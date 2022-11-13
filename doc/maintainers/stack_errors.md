@@ -26,431 +26,429 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Control.Concurrent.ExecuteException`
 
         ~~~haskell
-        = InconsistentDependencies
+        [S-2816] = InconsistentDependencies
         ~~~
 
     -   `Main.MainException`
 
         ~~~haskell
-        = InvalidReExecVersion String String
-        | InvalidPathForExec FilePath
+        [S-2186] = InvalidReExecVersion String String
+        [S-1541] | InvalidPathForExec FilePath
         ~~~
 
     -   `Main.MainPrettyException`
 
         ~~~haskell
-        = GHCProfOptionInvalid
-        | ResolverOptionInvalid
-        | PackageIdNotFound String
-        | ExecutableToRunNotFound
+        [S-8100] = GHCProfOptionInvalid
+        [S-8761] | ResolverOptionInvalid
+        [S-8251] | PackageIdNotFound String
+        [S-2483] | ExecutableToRunNotFound
         ~~~
 
     -   `Options.Applicative.Builder.Extra.OptionsApplicativeExtraException`
 
         ~~~haskell
-        = FlagNotFoundBug
+        [S-2797] = FlagNotFoundBug
         ~~~
 
     -   `Stack.Build.QueryException`
 
         ~~~haskell
-        = SelectorNotFound [Text]
-        | IndexOutOfRange [Text]
-        | NoNumericSelector [Text]
-        | CannotApplySelector Value [Text]
+        [S-4419] = SelectorNotFound [Text]
+        [S-8422] | IndexOutOfRange [Text]
+        [S-4360] | NoNumericSelector [Text]
+        [S-1711] | CannotApplySelector Value [Text]
         ~~~
 
     -   `Stack.Build.CabalVersionException`
 
         ~~~haskell
-        = AllowNewerNotSupported Version
-        | CabalVersionNotSupported Version
+        [S-8503] = AllowNewerNotSupported Version
+        [S-5973] | CabalVersionNotSupported Version
         ~~~
-
-        The `String` is a message.
 
     -   `Stack.Build.ConstructPlan.NotOnlyLocal`
 
         ~~~haskell
-        = NotOnlyLocal [PackageName] [Text]
+        [S-1727] = NotOnlyLocal [PackageName] [Text]
         ~~~
 
     -   `Stack.BuildPlan.BuildPlanException`
 
         ~~~haskell
-        = UnknownPackages (Path Abs File) (Map PackageName (Maybe Version, Set PackageName)) (Map PackageName (Set PackageIdentifier))
-        | SnapshotNotFound SnapName
-        | NeitherCompilerOrResolverSpecified Text
-        | DuplicatePackagesBug
+        [S-7571] = UnknownPackages (Path Abs File) (Map PackageName (Maybe Version, Set PackageName)) (Map PackageName (Set PackageIdentifier))
+        [S-2045] | SnapshotNotFound SnapName
+        [S-8559] | NeitherCompilerOrResolverSpecified Text
+        [S-5743] | DuplicatePackagesBug
         ~~~
 
     -   `Stack.Clean.CleanException`
 
         ~~~haskell
-        = NonLocalPackages [PackageName]
-        | DeletionFailures [(Path Abs Dir, SomeException)]
+        [S-9463] = NonLocalPackages [PackageName]
+        [S-6321] | DeletionFailures [(Path Abs Dir, SomeException)]
         ~~~
 
     -   `Stack.Config.Docker.ConfigDockerException`
 
         ~~~haskell
-        = ResolverNotSupportedException (Maybe Project) (Maybe AbstractResolver)
+        [S-8575] = ResolverNotSupportedException (Maybe Project) (Maybe AbstractResolver)
         ~~~
 
     -   `Stack.Config.Nix.ConfigNixException`
 
         ~~~haskell
-        = NixCannotUseShellFileAndPackagesException
-        | GHCMajorVersionUnspecified
-        | OnlyGHCSupported
+        [S-2726] = NixCannotUseShellFileAndPackagesException
+        [S-9317] | GHCMajorVersionUnspecified
+        [S-8605] | OnlyGHCSupported
         ~~~
 
     -   `Stack.ConfigCmd.ConfigCmdException`
 
         ~~~haskell
-        = NoProjectConfigAvailable
+        [S-3136] = NoProjectConfigAvailable
         ~~~
 
     -   `Stack.Constants.ConstantsException`
 
         ~~~haskell
-        = WiredInPackagesNotParsedBug
+        [S-6057] = WiredInPackagesNotParsedBug
         ~~~
 
     -   `Stack.Coverage.CoverageException`
 
         ~~~haskell
-        = NonTestSuiteTarget PackageName
-        | NoTargetsOrTixSpecified
-        | NotLocalPackage PackageName
+        [S-6361] = NonTestSuiteTarget PackageName
+        [S-2321] | NoTargetsOrTixSpecified
+        [S-9975] | NotLocalPackage PackageName
         ~~~
 
     -   `Stack.Dot.DotException`
 
         ~~~haskell
-        = DependencyNotFoundBug GhcPkgId
-        | PackageNotFoundBug PackageName
+        [S-7071] = DependencyNotFoundBug GhcPkgId
+        [S-7151] | PackageNotFoundBug PackageName
         ~~~
 
     -   `Stack.Ghci.Ghci.Exception`
 
         ~~~haskell
-        = InvalidPackageOption String
-        | LoadingDuplicateModules
-        | MissingFileTarget String
-        | Can'tSpecifyFilesAndTargets
-        | Can'tSpecifyFilesAndMainIs
-        | GhciTargetParseException [Text]
+        [S-6716] = InvalidPackageOption String
+        [S-9632] | LoadingDuplicateModules
+        [S-3600] | MissingFileTarget String
+        [S-9906] | Can'tSpecifyFilesAndTargets
+        [S-5188] | Can'tSpecifyFilesAndMainIs
+        [S-6948] | GhciTargetParseException [Text]
         ~~~
 
 
     -   `Stack.Hoogle.HoogleException`
 
         ~~~haskell
-        = HoogleDatabaseNotFound
-        | HoogleNotFound String
-        | HoogleOnPathNotFound
+        [S-3025] = HoogleDatabaseNotFound
+        [S-1329] | HoogleNotFound String
+        [S-9669] | HoogleOnPathNotFound
         ~~~
 
     -   `Stack.Init.InitException`
 
         ~~~haskell
-        = ConfigFileAlreadyExists FilePath
-        | SnapshotDownloadFailure SomeException
-        | NoPackagesToIgnore
-        | PackagesToIgnoreBug
-        | PackageNameInvalid [FilePath]
+        [S-8009] = ConfigFileAlreadyExists FilePath
+        [S-8332] | SnapshotDownloadFailure SomeException
+        [S-4934] | NoPackagesToIgnore
+        [S-2747] | PackagesToIgnoreBug
+        [S-5267] | PackageNameInvalid [FilePath]
         ~~~
 
     -   `Stack.List.ListException`
 
         ~~~haskell
-        = CouldNotParsePackageSelectors [String]
+        [S-4926] = CouldNotParsePackageSelectors [String]
         ~~~
 
     -   `Stack.Ls.LsException` *
 
         ~~~haskell
-        = ParseFailure [Value]
+        [S-3421] = ParseFailure [Value]
         ~~~
 
     -   `Stack.Lock.LockException`
 
         ~~~haskell
-        = WritingLockFileError (Path Abs File) Locked
+        [S-1353] = WritingLockFileError (Path Abs File) Locked
         ~~~
 
     -   `Stack.New.NewException`
 
         ~~~haskell
-        = FailedToLoadTemplate TemplateName FilePath
-        | FailedToDownloadTemplate TemplateName VerifiedDownloadException
-        | AlreadyExists (Path Abs Dir)
-        | MissingParameters PackageName TemplateName (Set String) (Path Abs File)
-        | InvalidTemplate TemplateName String
-        | AttemptedOverwrites [Path Abs File]
-        | FailedToDownloadTemplatesHelp HttpException
-        | BadTemplatesHelpEncoding String UnicodeException
-        | Can'tUseWiredInName PackageName
+        [S-3650] = FailedToLoadTemplate TemplateName FilePath
+        [S-1688] | FailedToDownloadTemplate TemplateName VerifiedDownloadException
+        [S-2135] | AlreadyExists (Path Abs Dir)
+        [S-5515] | MissingParameters PackageName TemplateName (Set String) (Path Abs File)
+        [S-9490] | InvalidTemplate TemplateName String
+        [S-3113] | AttemptedOverwrites [Path Abs File]
+        [S-8143] | FailedToDownloadTemplatesHelp HttpException
+        [S-6670] | BadTemplatesHelpEncoding String UnicodeException
+        [S-5682] | Can'tUseWiredInName PackageName
         ~~~
 
     -   `Stack.Nix.NixException`
 
         ~~~haskell
-        = CannotDetermineProjectRoot
+        [S-7384] = CannotDetermineProjectRoot
         ~~~
 
     -   `Stack.PackageDump.PackageDumpException`
 
         ~~~haskell
-        = MissingSingleField Text (Map Text [Line])
-        | Couldn'tParseField Text [Line]
+        [S-4257] = MissingSingleField Text (Map Text [Line])
+        [S-2016] | Couldn'tParseField Text [Line]
         ~~~
 
     -   `Stack.Runners.RunnersException`
 
         ~~~haskell
-        = CommandInvalid
-        | DockerAndNixInvalid
-        | NixWithinDockerInvalid
-        | DockerWithinNixInvalid
+        [S-7144] = CommandInvalid
+        [S-8314] | DockerAndNixInvalid
+        [S-8641] | NixWithinDockerInvalid
+        [S-5107] | DockerWithinNixInvalid
         ~~~
 
     -   `Stack.SDist.SDistException`
 
         ~~~haskell
-        = CheckException (NonEmpty PackageCheck)
-        | CabalFilePathsInconsistentBug (Path Abs File) (Path Abs File)
-        | ToTarPathException
+        [S-6439] = CheckException (NonEmpty PackageCheck)
+        [S-9595] | CabalFilePathsInconsistentBug (Path Abs File) (Path Abs File)
+        [S-7875] | ToTarPathException
         ~~~
 
     -   `Stack.Script.ScriptException`
 
         ~~~haskell
-        = MutableDependenciesForScript [PackageName]
-        | AmbiguousModuleName ModuleName [PackageName]
-        | ArgumentsWithNoRunInvalid
-        | NoRunWithoutCompilationInvalid
+        [S-4994] = MutableDependenciesForScript [PackageName]
+        [S-1691] | AmbiguousModuleName ModuleName [PackageName]
+        [S-5067] | ArgumentsWithNoRunInvalid
+        [S-9469] | NoRunWithoutCompilationInvalid
         ~~~
 
     -   `Stack.Setup.PerformPathCheckingException`
 
         ~~~haskell
-        = ProcessExited ExitCode String [String]
+        [S-1991] = ProcessExited ExitCode String [String]
         ~~~
 
     -   `Stack.Setup.SetupException`
 
         ~~~haskell
-        = UnsupportedSetupCombo OS Arch
-        | MissingDependencies [String]
-        | UnknownCompilerVersion (Set Text) WantedCompiler (Set ActualCompiler)
-        | UnknownOSKey Text
-        | GHCSanityCheckCompileFailed SomeException (Path Abs File)
-        | WantedMustBeGHC
-        | RequireCustomGHCVariant
-        | ProblemWhileDecompressing (Path Abs File)
-        | SetupInfoMissingSevenz
-        | DockerStackExeNotFound Version Text
-        | UnsupportedSetupConfiguration
-        | InvalidGhcAt (Path Abs File) SomeException
-        | MSYS2NotFound Text
-        | UnwantedCompilerVersion
-        | UnwantedArchitecture
-        | SandboxedCompilerNotFound
-        | CompilerNotFound [String]
-        | GHCInfoNotValidUTF8 UnicodeException
-        | GHCInfoNotListOfPairs
-        | GHCInfoMissingGlobalPackageDB
-        | GHCInfoMissingTargetPlatform
-        | GHCInfoTargetPlatformInvalid String
-        | CabalNotFound (Path Abs File)
-        | HadrianScriptNotFound
-        | URLInvalid String
-        | UnknownArchiveExtension String
-        | Unsupported7z
-        | TarballInvalid String
-        | TarballFileInvalid String (Path Abs File)
-        | UnknownArchiveStructure (Path Abs File)
-        | StackReleaseInfoNotFound String
-        | StackBinaryArchiveNotFound [String]
-        | WorkingDirectoryInvalid
-        | HadrianBindistNotFound
-        | DownloadAndInstallCompilerError
-        | StackBinaryArchiveZipUnsupported
-        | StackBinaryArchiveUnsupported Text
-        | StackBinaryNotInArchive String Text
-        | FileTypeInArchiveInvalid Entry Text
-        | BinaryUpgradeOnOSUnsupported OS
-        | BinaryUpgradeOnArchUnsupported Arch
-        | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
+        [S-1852] = UnsupportedSetupCombo OS Arch
+        [S-2126] | MissingDependencies [String]
+        [S-9443] | UnknownCompilerVersion (Set Text) WantedCompiler (Set ActualCompiler)
+        [S-6810] | UnknownOSKey Text
+        [S-5159] | GHCSanityCheckCompileFailed SomeException (Path Abs File)
+        [S-9030] | WantedMustBeGHC
+        [S-8948] | RequireCustomGHCVariant
+        [S-2905] | ProblemWhileDecompressing (Path Abs File)
+        [S-9561] | SetupInfoMissingSevenz
+        [S-1457] | DockerStackExeNotFound Version Text
+        [S-7748] | UnsupportedSetupConfiguration
+        [S-2476] | InvalidGhcAt (Path Abs File) SomeException
+        [S-5308] | MSYS2NotFound Text
+        [S-5127] | UnwantedCompilerVersion
+        [S-1540] | UnwantedArchitecture
+        [S-9953] | SandboxedCompilerNotFound
+        [S-4764] | CompilerNotFound [String]
+        [S-8668] | GHCInfoNotValidUTF8 UnicodeException
+        [S-4878] | GHCInfoNotListOfPairs
+        [S-2965] | GHCInfoMissingGlobalPackageDB
+        [S-5219] | GHCInfoMissingTargetPlatform
+        [S-8299] | GHCInfoTargetPlatformInvalid String
+        [S-2574] | CabalNotFound (Path Abs File)
+        [S-1128] | HadrianScriptNotFound
+        [S-1906] | URLInvalid String
+        [S-1648] | UnknownArchiveExtension String
+        [S-4509] | Unsupported7z
+        [S-3158] | TarballInvalid String
+        [S-5252] | TarballFileInvalid String (Path Abs File)
+        [S-1827] | UnknownArchiveStructure (Path Abs File)
+        [S-9476] | StackReleaseInfoNotFound String
+        [S-4461] | StackBinaryArchiveNotFound [String]
+        [S-2076] | WorkingDirectoryInvalid
+        [S-6617] | HadrianBindistNotFound
+        [S-7227] | DownloadAndInstallCompilerError
+        [S-3967] | StackBinaryArchiveZipUnsupported
+        [S-6636] | StackBinaryArchiveUnsupported Text
+        [S-7871] | StackBinaryNotInArchive String Text
+        [S-5046] | FileTypeInArchiveInvalid Entry Text
+        [S-4132] | BinaryUpgradeOnOSUnsupported OS
+        [S-3249] | BinaryUpgradeOnArchUnsupported Arch
+        [S-4230] | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
         ~~~
 
     -   `Stack.Setup.SetupPrettyException`
 
         ~~~haskell
-        = GHCInstallFailed SomeException StyleDoc String [String] (Path Abs Dir) (Path Abs Dir) (Path Abs Dir)
+        [S-7441]= GHCInstallFailed SomeException StyleDoc String [String] (Path Abs Dir) (Path Abs Dir) (Path Abs Dir)
         ~~~
 
     -   `Stack.Storage.User.StorageUserException`
 
         ~~~haskell
-        = CompilerFileMetadataMismatch
-        | GlobalPackageCacheFileMetadataMismatch
-        | GlobalDumpParseFailure
-        | CompilerCacheArchitectureInvalid Text
+        [S-8196] = CompilerFileMetadataMismatch
+        [S-5378] | GlobalPackageCacheFileMetadataMismatch
+        [S-2673] | GlobalDumpParseFailure
+        [S-8441] | CompilerCacheArchitectureInvalid Text
         ~~~
 
     -   `Stack.Types.Build.StackBuildException`
 
         ~~~haskell
-        = Couldn'tFindPkgId PackageName
-        | CompilerVersionMismatch (Maybe (ActualCompiler, Arch)) (WantedCompiler, Arch) GHCVariant CompilerBuild VersionCheck (Maybe (Path Abs File)) Text
-        | Couldn'tParseTargets [Text]
-        | UnknownTargets (Set PackageName) (Map PackageName Version) (Path Abs File)
-        | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File)) ByteString
-        | TestSuiteTypeUnsupported TestSuiteInterface
-        | ConstructPlanFailed String
-        | CabalExitedUnsuccessfully ExitCode PackageIdentifier (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
-        | SetupHsBuildFailure ExitCode (Maybe PackageIdentifier) (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
-        | ExecutionFailure [SomeException]
-        | LocalPackageDoesn'tMatchTarget PackageName Version Version
-        | NoSetupHsFound (Path Abs Dir)
-        | InvalidFlagSpecification (Set UnusedFlags)
-        | InvalidGhcOptionsSpecification [PackageName]
-        | TargetParseException [Text]
-        | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
-        | TestSuiteExeMissing Bool String String String
-        | CabalCopyFailed Bool String
-        | LocalPackagesPresent [PackageIdentifier]
-        | CouldNotLockDistDir (Path Abs File)
-        | TaskCycleBug PackageIdentifier
-        | PackageIdMissingBug PackageIdentifier
-        | AllInOneBuildBug
-        | MulipleResultsBug PackageName [DumpPackage]
-        | TemplateHaskellNotFoundBug
-        | HaddockIndexNotFound
+        [S-7178] = Couldn'tFindPkgId PackageName
+        [S-6362] | CompilerVersionMismatch (Maybe (ActualCompiler, Arch)) (WantedCompiler, Arch) GHCVariant CompilerBuild VersionCheck (Maybe (Path Abs File)) Text
+        [S-3127] | Couldn'tParseTargets [Text]
+        [S-2154] | UnknownTargets (Set PackageName) (Map PackageName Version) (Path Abs File)
+        [S-1995] | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File)) ByteString
+        [S-3819] | TestSuiteTypeUnsupported TestSuiteInterface
+        [S-4804] | ConstructPlanFailed String
+        [S-7011] | CabalExitedUnsuccessfully ExitCode PackageIdentifier (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
+        [S-6374] | SetupHsBuildFailure ExitCode (Maybe PackageIdentifier) (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
+        [S-7282] | ExecutionFailure [SomeException]
+        [S-5797] | LocalPackageDoesn'tMatchTarget PackageName Version Version
+        [S-3118] | NoSetupHsFound (Path Abs Dir)
+        [S-8664] | InvalidFlagSpecification (Set UnusedFlags)
+        [S-4925] | InvalidGhcOptionsSpecification [PackageName]
+        [S-8506] | TargetParseException [Text]
+        [S-7086] | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
+        [S-7987] | TestSuiteExeMissing Bool String String String
+        [S-8027] | CabalCopyFailed Bool String
+        [S-5510] | LocalPackagesPresent [PackageIdentifier]
+        [S-7168] | CouldNotLockDistDir (Path Abs File)
+        [S-7868] | TaskCycleBug PackageIdentifier
+        [S-8923] | PackageIdMissingBug PackageIdentifier
+        [S-7371] | AllInOneBuildBug
+        [S-6739] | MulipleResultsBug PackageName [DumpPackage]
+        [S-3121] | TemplateHaskellNotFoundBug
+        [S-6901] | HaddockIndexNotFound
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`
 
         ~~~haskell
-        = GhcjsNotSupported
-        | PantryException PantryException
+        [S-7903] = GhcjsNotSupported
+        [S-7972] | PantryException PantryException
         ~~~
 
     -   `Stack.Types.Config.ConfigException`
 
         ~~~haskell
-        = ParseConfigFileException (Path Abs File) ParseException
-        | ParseCustomSnapshotException Text ParseException
-        | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
-        | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
-        | UnableToExtractArchive Text (Path Abs File)
-        | BadStackVersionException VersionRange
-        | NoMatchingSnapshot (NonEmpty SnapName)
-        | ResolverMismatch RawSnapshotLocation String
-        | ResolverPartial RawSnapshotLocation String
-        | NoSuchDirectory FilePath
-        | ParseGHCVariantException String
-        | BadStackRoot (Path Abs Dir)
-        | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir)
-        | UserDoesn'tOwnDirectory (Path Abs Dir)
-        | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
-        | NixRequiresSystemGhc
-        | NoResolverWhenUsingNoProject
-        | DuplicateLocalPackageNames [(PackageName, [PackageLocation])]
-        | NoLTSWithMajorVersion Int
-        | NoLTSFound
-        | MultiplePackageIndices [PackageIndexConfig]
+        [S-6602] = ParseConfigFileException (Path Abs File) ParseException
+        [S-8981] | ParseCustomSnapshotException Text ParseException
+        [S-2206] | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
+        [S-4964] | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
+        [S-2040] | UnableToExtractArchive Text (Path Abs File)
+        [S-1641] | BadStackVersionException VersionRange
+        [S-1833] | NoMatchingSnapshot (NonEmpty SnapName)
+        [S-6395] | ResolverMismatch RawSnapshotLocation String
+        [S-2422] | ResolverPartial RawSnapshotLocation String
+        [S-8773] | NoSuchDirectory FilePath
+        [S-3938] | ParseGHCVariantException String
+        [S-8530] | BadStackRoot (Path Abs Dir)
+        [S-7613] | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir)
+        [S-8707] | UserDoesn'tOwnDirectory (Path Abs Dir)
+        [S-3605] | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
+        [S-6816] | NixRequiresSystemGhc
+        [S-5027] | NoResolverWhenUsingNoProject
+        [S-5470] | DuplicateLocalPackageNames [(PackageName, [PackageLocation])]
+        [S-3803] | NoLTSWithMajorVersion Int
+        [S-5472] | NoLTSFound
+        [S-3251] | MultiplePackageIndices [PackageIndexConfig]
         ~~~
 
     -   `Stack.Types.Config.ParseAbsolutePathException`
 
         ~~~haskell
-        = ParseAbsolutePathException String String
+        [S-9437] = ParseAbsolutePathException String String
         ~~~
 
     -   `Stack.Types.Docker.DockerException`
 
         ~~~haskell
-        = DockerMustBeEnabledException
-        | OnlyOnHostException
-        | InspectFailedException String
-        | NotPulledException String
-        | InvalidImagesOutputException String
-        | InvalidPSOutputException String
-        | InvalidInspectOutputException String
-        | PullFailedException String
-        | DockerTooOldException Version Version
-        | DockerVersionProhibitedException [Version] Version
-        | BadDockerVersionException VersionRange Version
-        | InvalidVersionOutputException
-        | HostStackTooOldException Version (Maybe Version)
-        | ContainerStackTooOldException Version Version
-        | CannotDetermineProjectRootException
-        | DockerNotInstalledException
-        | UnsupportedStackExeHostPlatformException
-        | DockerStackExeParseException String
+        [S-3223] = DockerMustBeEnabledException
+        [S-9779] | OnlyOnHostException
+        [S-9105] | InspectFailedException String
+        [S-6626] | NotPulledException String
+        [S-5841] | InvalidImagesOutputException String
+        [S-9608] | InvalidPSOutputException String
+        [S-2240] | InvalidInspectOutputException String
+        [S-6092] | PullFailedException String
+        [S-6218] | DockerTooOldException Version Version
+        [S-8252] | DockerVersionProhibitedException [Version] Version
+        [S-6170] | BadDockerVersionException VersionRange Version
+        [S-5827] | InvalidVersionOutputException
+        [S-7112] | HostStackTooOldException Version (Maybe Version)
+        [S-5832] | ContainerStackTooOldException Version Version
+        [S-4078] | CannotDetermineProjectRootException
+        [S-7058] | DockerNotInstalledException
+        [S-6894] | UnsupportedStackExeHostPlatformException
+        [S-1512] | DockerStackExeParseException String
         ~~~
 
     -   `Stack.Types.GhcPkgId.GhcPkgIdParseFail`
 
         ~~~haskell
-        = GhcPkgIdParseFail Text
+        [S-5359] = GhcPkgIdParseFail Text
         ~~~
 
     -   `Stack.Types.Package.PackageException`
 
         ~~~haskell
-        = PackageInvalidCabalFile (Either PackageIdentifierRevision (Path Abs File)) (Maybe Version) [PError] [PWarning]
-        | MismatchedCabalIdentifier PackageIdentifierRevision PackageIdentifier
-        | CabalFileNameParseFail FilePath
-        | CabalFileNameInvalidPackageName FilePath
-        | ComponentNotParsedBug
+        [S-8072] = PackageInvalidCabalFile (Either PackageIdentifierRevision (Path Abs File)) (Maybe Version) [PError] [PWarning]
+        [S-5394] | MismatchedCabalIdentifier PackageIdentifierRevision PackageIdentifier
+        [S-2203] | CabalFileNameParseFail FilePath
+        [S-8854] | CabalFileNameInvalidPackageName FilePath
+        [S-4623] | ComponentNotParsedBug
         ~~~
 
     -   `Stack.Types.Resolver.TypesResolverException`
 
         ~~~haskell
-        = ParseResolverException Text
-        | FilepathInDownloadedSnapshot Text
+        [S-8787] = ParseResolverException Text
+        [S-4865] | FilepathInDownloadedSnapshot Text
         ~~~
 
     -   `Stack.Types.TemplateName.TypesTemplateNameException`
 
         ~~~haskell
-        = DefaultTemplateNameNotParsedBug String
+        [S-7410] = DefaultTemplateNameNotParsedBug String
         ~~~
 
     -   `Stack.Upgrade.UpgradeException`
 
         ~~~haskell
-        = NeitherBinaryOrSourceSpecified
-        | ExecutableFailure
-        | CommitsNotFound String String
-        | StackInPackageIndexNotFound
-        | VersionWithNoRevision
+        [S-3642] = NeitherBinaryOrSourceSpecified
+        [S-8716] | ExecutableFailure
+        [S-7114] | CommitsNotFound String String
+        [S-9668] | StackInPackageIndexNotFound
+        [S-6648] | VersionWithNoRevision
         ~~~
 
     -   `Stack.Upload.UploadPrettyException`
 
         ~~~haskell
-        = AuthenticationFailure
-        | ArchiveUploadFailure Int [String] String
+        [S-2256] = AuthenticationFailure
+        [S-6108] | ArchiveUploadFailure Int [String] String
         ~~~
 
     -   `Stack.Unpack.UnpackException`
 
         ~~~haskell
-        = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
-        | CouldNotParsePackageSelectors [String]
+        [S-3515] = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
+        [S-2628] | CouldNotParsePackageSelectors [String]
         ~~~
 
     -   `System.Process.Pager.PagerException`
 
         ~~~haskell
-        = PagerExitFailure CmdSpec Int
+        [S-9392] = PagerExitFailure CmdSpec Int
         ~~~
 
     \* The instance of `Show` is derived.
@@ -467,7 +465,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 *   `Stack.Config.configFromConfigMonoid`:
 
     ~~~text
-    Stack's 'programs' path contains a space character and has no alternative
+    [S-8432] Stack's 'programs' path contains a space character and has no alternative
     short ('8 dot 3') name. This will cause problems with packages that use the
     GNU project's 'configure' shell script. Use the 'local-programs-path'
     configuration option to specify an alternative path. The current path is:
@@ -484,20 +482,20 @@ to take stock of the errors that Stack itself can raise, by reference to the
 *   `Stack.Coverage.generateHpcReportInternal`:
 
     ~~~text
-    Didn't find .tix for <report> - expected to find it at <path>.
+    [S-4634] Didn't find .tix for <report> - expected to find it at <path>.
     ~~~
 
 *   `Stack.Coverage.generateHpcReportInternal`:
 
     ~~~text
-    <exception>
+    [S-8215] <exception>
     Error occurred while producing <report>"
     ~~~
 
 *   `Stack.Coverage.generateHpcReportInternal`:
 
     ~~~text
-    Error: The <report> did not consider any code. One possible cause of this is
+    [S-6829] Error: The <report> did not consider any code. One possible cause of this is
     if your test-suite builds the library code (see Stack issue #1008). It may
     also indicate a bug in Stack or the hpc program. Please report this issue if
     you think your coverage report should have meaningful results.
@@ -506,19 +504,19 @@ to take stock of the errors that Stack itself can raise, by reference to the
 *   `Stack.Coverage.readTixOrlog`:
 
     ~~~text
-    Error while reading tix: <exeception>
+    [S-3521] Error while reading tix: <exeception>
     ~~~
 
 *   `Stack.Coverage.readTixOrlog`:
 
     ~~~text
-    Failed to read tix file <path>
+    [S-7786] Failed to read tix file <path>
     ~~~
 
 *   `Stack.Coverage.updateTixFile`:
 
     ~~~text
-    Failed to read <file>
+    [S-2887] Failed to read <file>
     ~~~
 
 *   `Stack.Ghci.buildDepsAndInitialSteps`: catches exeception from
@@ -531,7 +529,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 *   `Stack.GhcPkg.createDatabase`:
 
     ~~~text
-    Unable to create package database at <path>
+    [S-9735] Unable to create package database at <path>
     ~~~
 
 *   `Stack.Lock.loadYamlThrow`:
@@ -549,7 +547,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 *   `Stack.Runners.withConfig`:
 
     ~~~text
-    Error when running shouldUpgradeCheck: <exception>
+    [S-7353] Error when running shouldUpgradeCheck: <exception>
     ~~~
 
 *   `Stack.Script.scriptCmd`:
@@ -571,7 +569,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 *   `Stack.SDist.getSDistTarball`:
 
     ~~~text
-    Error building custom-setup dependencies: <exception>
+    [S-8399] Error building custom-setup dependencies: <exception>
     ~~~
 
 *   `Stack.Setup.downloadStackExe`: catches exceptions from `performPathChecking`
@@ -583,7 +581,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 *   `Stack.Upload.uploadBytes`:
 
     ~~~text
-    forbidden upload
+    [S-2804] forbidden upload
     Usually means: you've already uploaded this package/version combination
     Ignoring error and continuing, full message from Hackage below:
     <Hackage_message>
@@ -592,7 +590,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 *   `Stack.Upload.uploadBytes`:
 
     ~~~text
-    service unavailable
+    [S-4444] service unavailable
     This error some times gets sent even though the upload succeeded
     Check on Hackage to see if your package is present
     <Hackage_message>
