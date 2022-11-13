@@ -33,6 +33,25 @@ import           Stack.Types.Config (HasCompiler (..), GhcPkgExe (..), DumpPacka
 import           Stack.Types.GhcPkgId
 import           RIO.Process hiding (readProcess)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.PackageDump" module.
+data PackageDumpException
+    = MissingSingleField Text (Map Text [Line])
+    | Couldn'tParseField Text [Line]
+    deriving Typeable
+
+instance Show PackageDumpException where
+    show (MissingSingleField name values) = unlines $
+      pure (concat
+        [ "Expected single value for field name "
+        , show name
+        , " when parsing ghc-pkg dump output:"
+        ]) ++ map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
+    show (Couldn'tParseField name ls) =
+        "Couldn't parse the field " ++ show name ++ " from lines: " ++ show ls
+
+instance Exception PackageDumpException
+
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump
     :: (HasProcessContext env, HasLogFunc env)
@@ -137,21 +156,6 @@ sinkMatching allowed =
         case Map.lookup name allowed of
             Just version' | version /= version' -> False
             _ -> True
-
-data PackageDumpException
-    = MissingSingleField Text (Map Text [Line])
-    | Couldn'tParseField Text [Line]
-    deriving Typeable
-instance Exception PackageDumpException
-instance Show PackageDumpException where
-    show (MissingSingleField name values) = unlines $
-      pure (concat
-        [ "Expected single value for field name "
-        , show name
-        , " when parsing ghc-pkg dump output:"
-        ]) ++ map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
-    show (Couldn'tParseField name ls) =
-        "Couldn't parse the field " ++ show name ++ " from lines: " ++ show ls
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
 conduitDumpPackage :: MonadThrow m

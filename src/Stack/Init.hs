@@ -54,7 +54,7 @@ data InitException
     | NoPackagesToIgnore
     | PackagesToIgnoreBug
     | PackageNameInvalid [FilePath]
-    deriving (Typeable)
+    deriving Typeable
 
 instance Show InitException where
     show (ConfigFileAlreadyExists reldest) = concat

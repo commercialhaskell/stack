@@ -15,6 +15,28 @@ import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Resolver
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Config.Docker" module.
+data ConfigDockerException
+    = ResolverNotSupportedException !(Maybe Project) !(Maybe AbstractResolver)
+    -- ^ Only LTS resolvers are supported for default image tag.
+    deriving Typeable
+
+-- | Show instance for StackDockerConfigException.
+instance Show ConfigDockerException where
+    show (ResolverNotSupportedException mproject maresolver) =
+        concat
+            [ "Resolver not supported for Docker images:\n    "
+            , case (mproject, maresolver) of
+                (Nothing, Nothing) -> "no resolver specified"
+                (_, Just aresolver) -> T.unpack $ utf8BuilderToText $ display aresolver
+                (Just project, Nothing) -> T.unpack $ utf8BuilderToText $ display $ projectResolver project
+            , "\nUse an LTS resolver, or set the '"
+            , T.unpack dockerImageArgName
+            , "' explicitly, in your configuration file."]
+
+instance Exception ConfigDockerException
+
 -- | Add a default Docker tag name to a given base image.
 addDefaultTag
   :: MonadThrow m
@@ -76,25 +98,3 @@ dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
   where emptyToNothing Nothing = Nothing
         emptyToNothing (Just s) | null s = Nothing
                                 | otherwise = Just s
-
--- | Exceptions thrown by Stack.Docker.Config.
-data StackDockerConfigException
-    = ResolverNotSupportedException !(Maybe Project) !(Maybe AbstractResolver)
-    -- ^ Only LTS resolvers are supported for default image tag.
-    deriving (Typeable)
-
--- | Exception instance for StackDockerConfigException.
-instance Exception StackDockerConfigException
-
--- | Show instance for StackDockerConfigException.
-instance Show StackDockerConfigException where
-    show (ResolverNotSupportedException mproject maresolver) =
-        concat
-            [ "Resolver not supported for Docker images:\n    "
-            , case (mproject, maresolver) of
-                (Nothing, Nothing) -> "no resolver specified"
-                (_, Just aresolver) -> T.unpack $ utf8BuilderToText $ display aresolver
-                (Just project, Nothing) -> T.unpack $ utf8BuilderToText $ display $ projectResolver project
-            , "\nUse an LTS resolver, or set the '"
-            , T.unpack dockerImageArgName
-            , "' explicitly, in your configuration file."]

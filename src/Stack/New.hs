@@ -47,6 +47,81 @@ import qualified Text.Mustache.Render as Mustache
 import           Text.ProjectTemplate
 
 --------------------------------------------------------------------------------
+-- Exceptions
+
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.New" module.
+data NewException
+    = FailedToLoadTemplate !TemplateName !FilePath
+    | FailedToDownloadTemplate !TemplateName !VerifiedDownloadException
+    | AlreadyExists !(Path Abs Dir)
+    | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
+    | InvalidTemplate !TemplateName !String
+    | AttemptedOverwrites [Path Abs File]
+    | FailedToDownloadTemplatesHelp !HttpException
+    | BadTemplatesHelpEncoding
+        !String -- URL it's downloaded from
+        !UnicodeException
+    | Can'tUseWiredInName !PackageName
+    deriving Typeable
+
+instance Show NewException where
+    show (FailedToLoadTemplate name path) =
+        "Failed to load download template " <> T.unpack (templateName name) <>
+        " from " <>
+        path
+    show (FailedToDownloadTemplate name (DownloadHttpError httpError)) =
+          "There was an unexpected HTTP error while downloading template " <>
+          T.unpack (templateName name) <> ": " <> show httpError
+    show (FailedToDownloadTemplate name _) =
+        "Failed to download template " <> T.unpack (templateName name) <>
+        ": unknown reason"
+
+    show (AlreadyExists path) =
+        "Directory " <> toFilePath path <> " already exists. Aborting."
+    show (MissingParameters name template missingKeys userConfigPath) =
+        L.intercalate
+            "\n"
+            [ "The following parameters were needed by the template but not provided: " <>
+              L.intercalate ", " (S.toList missingKeys)
+            , "You can provide them in " <>
+              toFilePath userConfigPath <>
+              ", like this:"
+            , "templates:"
+            , "  params:"
+            , L.intercalate
+                  "\n"
+                  (map
+                       (\key ->
+                             "    " <> key <> ": value")
+                       (S.toList missingKeys))
+            , "Or you can pass each one as parameters like this:"
+            , "stack new " <> packageNameString name <> " " <>
+              T.unpack (templateName template) <>
+              " " <>
+              unwords
+                  (map
+                       (\key ->
+                             "-p \"" <> key <> ":value\"")
+                       (S.toList missingKeys))]
+    show (InvalidTemplate name why) =
+        "The template \"" <> T.unpack (templateName name) <>
+        "\" is invalid and could not be used. " <>
+        "The error was: " <> why
+    show (AttemptedOverwrites fps) =
+        "The template would create the following files, but they already exist:\n" <>
+        unlines (map (("  " ++) . toFilePath) fps) <>
+        "Use --force to ignore this, and overwrite these files."
+    show (FailedToDownloadTemplatesHelp ex) =
+        "Failed to download 'stack templates' help. The HTTP error was: " <> show ex
+    show (BadTemplatesHelpEncoding url err) =
+        "UTF-8 decoding error on template info from\n    " <> url <> "\n\n" <> show err
+    show (Can'tUseWiredInName name) =
+        "The name \"" <> packageNameString name <> "\" is used by GHC wired-in packages, and so shouldn't be used as a package name"
+
+instance Exception NewException
+
+--------------------------------------------------------------------------------
 -- Main project creation
 
 -- | Options for creating a new project.
@@ -362,79 +437,3 @@ defaultRepoService = GitHub
 defaultTemplatesHelpUrl :: String
 defaultTemplatesHelpUrl =
     "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master/STACK_HELP.md"
-
---------------------------------------------------------------------------------
--- Exceptions
-
--- | Exception that might occur when making a new project.
-data NewException
-    = FailedToLoadTemplate !TemplateName
-                           !FilePath
-    | FailedToDownloadTemplate !TemplateName
-                               !VerifiedDownloadException
-    | AlreadyExists !(Path Abs Dir)
-    | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
-    | InvalidTemplate !TemplateName !String
-    | AttemptedOverwrites [Path Abs File]
-    | FailedToDownloadTemplatesHelp !HttpException
-    | BadTemplatesHelpEncoding
-        !String -- URL it's downloaded from
-        !UnicodeException
-    | Can'tUseWiredInName !PackageName
-    deriving (Typeable)
-
-instance Exception NewException
-
-instance Show NewException where
-    show (FailedToLoadTemplate name path) =
-        "Failed to load download template " <> T.unpack (templateName name) <>
-        " from " <>
-        path
-    show (FailedToDownloadTemplate name (DownloadHttpError httpError)) =
-          "There was an unexpected HTTP error while downloading template " <>
-          T.unpack (templateName name) <> ": " <> show httpError
-    show (FailedToDownloadTemplate name _) =
-        "Failed to download template " <> T.unpack (templateName name) <>
-        ": unknown reason"
-
-    show (AlreadyExists path) =
-        "Directory " <> toFilePath path <> " already exists. Aborting."
-    show (MissingParameters name template missingKeys userConfigPath) =
-        L.intercalate
-            "\n"
-            [ "The following parameters were needed by the template but not provided: " <>
-              L.intercalate ", " (S.toList missingKeys)
-            , "You can provide them in " <>
-              toFilePath userConfigPath <>
-              ", like this:"
-            , "templates:"
-            , "  params:"
-            , L.intercalate
-                  "\n"
-                  (map
-                       (\key ->
-                             "    " <> key <> ": value")
-                       (S.toList missingKeys))
-            , "Or you can pass each one as parameters like this:"
-            , "stack new " <> packageNameString name <> " " <>
-              T.unpack (templateName template) <>
-              " " <>
-              unwords
-                  (map
-                       (\key ->
-                             "-p \"" <> key <> ":value\"")
-                       (S.toList missingKeys))]
-    show (InvalidTemplate name why) =
-        "The template \"" <> T.unpack (templateName name) <>
-        "\" is invalid and could not be used. " <>
-        "The error was: " <> why
-    show (AttemptedOverwrites fps) =
-        "The template would create the following files, but they already exist:\n" <>
-        unlines (map (("  " ++) . toFilePath) fps) <>
-        "Use --force to ignore this, and overwrite these files."
-    show (FailedToDownloadTemplatesHelp ex) =
-        "Failed to download 'stack templates' help. The HTTP error was: " <> show ex
-    show (BadTemplatesHelpEncoding url err) =
-        "UTF-8 decoding error on template info from\n    " <> url <> "\n\n" <> show err
-    show (Can'tUseWiredInName name) =
-        "The name \"" <> packageNameString name <> "\" is used by GHC wired-in packages, and so shouldn't be used as a package name"

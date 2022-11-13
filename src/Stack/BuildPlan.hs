@@ -56,7 +56,7 @@ data BuildPlanException
     | SnapshotNotFound SnapName
     | NeitherCompilerOrResolverSpecified T.Text
     | DuplicatePackagesBug
-    deriving (Typeable)
+    deriving Typeable
 
 instance Show BuildPlanException where
     show (SnapshotNotFound snapName) = unlines

@@ -11,12 +11,16 @@ import qualified RIO.Map as Map
 import RIO.List (intercalate)
 import RIO.Process (HasProcessContext)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.List" module.
 newtype ListException
   = CouldNotParsePackageSelectors [String]
     deriving Typeable
-instance Exception ListException
+
 instance Show ListException where
     show (CouldNotParsePackageSelectors strs) = unlines $ map ("- " ++) strs
+
+instance Exception ListException
 
 -- | Intended to work for the command line command.
 listPackages

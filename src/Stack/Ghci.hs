@@ -52,6 +52,36 @@ import           System.IO (putStrLn)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
 import           System.Permissions (setScriptPerms)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Ghci" module.
+data GhciException
+    = InvalidPackageOption String
+    | LoadingDuplicateModules
+    | MissingFileTarget String
+    | Can'tSpecifyFilesAndTargets
+    | Can'tSpecifyFilesAndMainIs
+    | GhciTargetParseException [Text]
+    deriving Typeable
+
+instance Show GhciException where
+    show (InvalidPackageOption name) =
+        "Failed to parse --package option " ++ name
+    show LoadingDuplicateModules = unlines
+        [ "Not attempting to start ghci due to these duplicate modules."
+        , "Use --no-load to try to start it anyway, without loading any modules (but these are still likely to cause errors)"
+        ]
+    show (MissingFileTarget name) =
+        "Cannot find file target " ++ name
+    show Can'tSpecifyFilesAndTargets =
+        "Cannot use 'stack ghci' with both file targets and package targets"
+    show Can'tSpecifyFilesAndMainIs =
+        "Cannot use 'stack ghci' with both file targets and --main-is flag"
+    show (GhciTargetParseException xs) =
+        show (TargetParseException xs) ++
+        "\nNote that to specify options to be passed to GHCi, use the --ghci-options flag"
+
+instance Exception GhciException
+
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
     { ghciTargets            :: ![Text]
@@ -99,34 +129,6 @@ type ModuleMap = Map ModuleName (Map (Path Abs File) (Set (PackageName, NamedCom
 
 unionModuleMaps :: [ModuleMap] -> ModuleMap
 unionModuleMaps = M.unionsWith (M.unionWith S.union)
-
-data GhciException
-    = InvalidPackageOption String
-    | LoadingDuplicateModules
-    | MissingFileTarget String
-    | Can'tSpecifyFilesAndTargets
-    | Can'tSpecifyFilesAndMainIs
-    | GhciTargetParseException [Text]
-    deriving (Typeable)
-
-instance Exception GhciException
-
-instance Show GhciException where
-    show (InvalidPackageOption name) =
-        "Failed to parse --package option " ++ name
-    show LoadingDuplicateModules = unlines
-        [ "Not attempting to start ghci due to these duplicate modules."
-        , "Use --no-load to try to start it anyway, without loading any modules (but these are still likely to cause errors)"
-        ]
-    show (MissingFileTarget name) =
-        "Cannot find file target " ++ name
-    show Can'tSpecifyFilesAndTargets =
-        "Cannot use 'stack ghci' with both file targets and package targets"
-    show Can'tSpecifyFilesAndMainIs =
-        "Cannot use 'stack ghci' with both file targets and --main-is flag"
-    show (GhciTargetParseException xs) =
-        show (TargetParseException xs) ++
-        "\nNote that to specify options to be passed to GHCi, use the --ghci-options flag"
 
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions

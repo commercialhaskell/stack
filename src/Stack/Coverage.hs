@@ -46,6 +46,8 @@ import           RIO.Process
 import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Coverage" module.
 data CoverageException
     = NonTestSuiteTarget PackageName
     | NoTargetsOrTixSpecified

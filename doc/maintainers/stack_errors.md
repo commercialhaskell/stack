@@ -91,7 +91,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | DeletionFailures [(Path Abs Dir, SomeException)]
         ~~~
 
-    -   `Stack.Config.Docker.StackDockerConfigExeceiption`
+    -   `Stack.Config.Docker.ConfigDockerException`
 
         ~~~haskell
         = ResolverNotSupportedException (Maybe Project) (Maybe AbstractResolver)
@@ -194,7 +194,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | Can'tUseWiredInName PackageName
         ~~~
 
-    -   `Stack.Nix.StackNixException`
+    -   `Stack.Nix.NixException`
 
         ~~~haskell
         = CannotDetermineProjectRoot
@@ -410,7 +410,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         | ComponentNotParsedBug
         ~~~
 
-    -   `Stack.Types.Resolver.BuildPlanTypesException`
+    -   `Stack.Types.Resolver.TypesResolverException`
 
         ~~~haskell
         = ParseResolverException Text

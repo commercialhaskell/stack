@@ -25,7 +25,7 @@ import           Stack.Types.SourceMap
 data CleanException
     = NonLocalPackages [PackageName]
     | DeletionFailures [(Path Abs Dir, SomeException)]
-    deriving (Typeable)
+    deriving Typeable
 
 instance Show CleanException where
     show (NonLocalPackages pkgs) =

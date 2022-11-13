@@ -29,6 +29,28 @@ import           Options.Applicative (ReadM)
 import qualified Options.Applicative.Types as OA
 import           Stack.Prelude
 
+-- | Type representing exceptions thrown by functions exported by the
+-- "Stack.Types.Resolver" module.
+data TypesResolverException
+    = ParseResolverException !Text
+    | FilepathInDownloadedSnapshot !Text
+    deriving Typeable
+
+instance Show TypesResolverException where
+    show (ParseResolverException t) = concat
+        [ "Invalid resolver value: "
+        , T.unpack t
+        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, ghc-7.10.2, and ghcjs-0.1.0_ghc-7.10.2. "
+        , "See https://www.stackage.org/snapshots for a complete list."
+        ]
+    show (FilepathInDownloadedSnapshot url) = unlines
+        [ "Downloaded snapshot specified a 'resolver: { location: filepath }' "
+        , "field, but filepaths are not allowed in downloaded snapshots.\n"
+        , "Filepath specified: " ++ T.unpack url
+        ]
+
+instance Exception TypesResolverException
+
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
 -- latest nightly).
 data AbstractResolver
@@ -58,24 +80,6 @@ readAbstractResolver = do
         'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
             pure $ pure $ ARLatestLTSMajor x'
         _ -> pure $ ARResolver <$> parseRawSnapshotLocation (T.pack s)
-
-data BuildPlanTypesException
-    = ParseResolverException !Text
-    | FilepathInDownloadedSnapshot !Text
-    deriving Typeable
-instance Exception BuildPlanTypesException
-instance Show BuildPlanTypesException where
-    show (ParseResolverException t) = concat
-        [ "Invalid resolver value: "
-        , T.unpack t
-        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, ghc-7.10.2, and ghcjs-0.1.0_ghc-7.10.2. "
-        , "See https://www.stackage.org/snapshots for a complete list."
-        ]
-    show (FilepathInDownloadedSnapshot url) = unlines
-        [ "Downloaded snapshot specified a 'resolver: { location: filepath }' "
-        , "field, but filepaths are not allowed in downloaded snapshots.\n"
-        , "Filepath specified: " ++ T.unpack url
-        ]
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots
