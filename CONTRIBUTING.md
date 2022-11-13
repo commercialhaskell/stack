@@ -154,18 +154,18 @@ description of a file in the menu can differ from the file's name. The
 navigation menu allows files to be organised in a hierarchy. Currently, up to
 three levels are used. The top level is:
 
-* **Home:** The introduction to Stack. This page aims to be no longer than
+* **Welcome!:** The introduction to Stack. This page aims to be no longer than
   necessary but also to not assume much existing knowledge on the part of the
   reader. It provides a 'quick start' guide to getting and using Stack.
-* **Tool documentation:** How to get and use Stack. This includes Stack's user's
-  guide, the answers to frequently asked questions, and more thorough
-  explanations of aspects of Stack. The user's guide is divided into two parts.
-  The first part is 'introductory', and has the style of a tutorial. The second
-  part is 'advanced', and has more of a reference style.
-* **Advanced documentation:** Stack's internal workings. Many users will not
-  need to consult this documentation.
-* **Project documentation:** Information useful to people contributing to, or
-  maintaining, Stack's code and documentation.
+* **How to get & use Stack:** This includes Stack's user's guide, answers to
+  frequently asked questions, and more thorough explanations of aspects of
+  Stack. The user's guide is divided into two parts. The first part is
+  'introductory', and has the style of a tutorial. The second part is
+  'advanced', and has more of a reference style.
+* **How Stack works (advanced):** Many users will not need to consult this
+  advanced documentation.
+* **Stack's code (advanced):** Other information useful to people contributing
+  to, or maintaining, Stack's code, documentation, and other files.
 * **Signing key:** How Stack's released executables are signed.
 * **Glossary:** A glossary of terms used throughout Stack's in-tool and online
   documentation. We aim to describe the same things in the same way in different

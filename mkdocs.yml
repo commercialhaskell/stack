@@ -22,32 +22,34 @@ extra_javascript:
 - 'https://code.jquery.com/jquery-3.6.1.min.js'
 
 nav:
-- Home: README.md
-- Tool documentation:
-  - Install/upgrade: install_and_upgrade.md
-  - User's guide (introductory): GUIDE.md
-  - User's guide (advanced): GUIDE_advanced.md
-  - FAQ: faq.md
-  - Configuration (project and global): yaml_configuration.md
-  - Snapshot and package location: pantry.md
-  - Snapshot specification: custom_snapshot.md
-  - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
-  - Build command: build_command.md
-  - Code coverage: coverage.md
-  - REPL environment: ghci.md
-  - Dependency visualization: dependency_visualization.md
-  - Docker integration: docker_integration.md
-  - Nix integration: nix_integration.md
-  - Non-standard project initialization: nonstandard_project_init.md
-  - Stack and Visual Studio Code: Stack_and_VS_Code.md
-  - Developing on Windows: developing_on_windows.md
-  - Shell auto-completion: shell_autocompletion.md
-  - Travis CI: travis_ci.md
-  - Azure CI: azure_ci.md
-  - Lock files: lock_files.md
-- Advanced documentation:
+- Welcome!: README.md
+- How to get & use Stack:
+  - General guidance:
+    - Install/upgrade: install_and_upgrade.md
+    - User's guide (introductory): GUIDE.md
+    - User's guide (advanced): GUIDE_advanced.md
+    - FAQ: faq.md
+  - Specific topics:
+    - Configuration (project and global): yaml_configuration.md
+    - Snapshot and package location: pantry.md
+    - Snapshot specification: custom_snapshot.md
+    - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
+    - Build command: build_command.md
+    - Code coverage: coverage.md
+    - REPL environment: ghci.md
+    - Dependency visualization: dependency_visualization.md
+    - Docker integration: docker_integration.md
+    - Nix integration: nix_integration.md
+    - Non-standard project initialization: nonstandard_project_init.md
+    - Stack and Visual Studio Code: Stack_and_VS_Code.md
+    - Developing on Windows: developing_on_windows.md
+    - Shell auto-completion: shell_autocompletion.md
+    - Travis CI: travis_ci.md
+    - Azure CI: azure_ci.md
+    - Lock files: lock_files.md
+- How Stack works (advanced):
   - Build overview: build_overview.md
-- Project documentation:
+- Stack's code (advanced):
   - Contributors:
     - Contributor's guide: CONTRIBUTING.md
   - Maintainers:
