@@ -122,7 +122,8 @@ data StackBuildInfo =
     StackBuildInfo {sbiBuildable :: !Bool
                    -- ^ From BuildInfo in cabal
                    ,sbiDependency :: !(Map PackageName DepValue)
-                   -- ^ From targetBuildDepends in BuildInfo in cabal.
+                   -- ^ From targetBuildDepends in BuildInfo in cabal, and known
+                   -- legacy specified build tools (buildTool).
                    ,sbiUnknownTools :: Set Text
                    -- ^ From buildTool in Cabal, we only keep the legacy
                    -- build tool depends that we know (from a hardcoded list).

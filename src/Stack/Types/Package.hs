@@ -65,6 +65,8 @@ import           Stack.Types.PackageFile
                    )
 import           Stack.Types.SourceMap ( CommonPackage, FromSnapshot )
 import           Stack.Types.Version ( VersionRange )
+import           Stack.Types.CompCollection ( CompCollection )
+import           Stack.Types.Component ( StackLibrary, StackForeignLibrary, StackTest, StackBenchmark, StackExecutable )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -175,6 +177,12 @@ data Package = Package
     -- ^ Flags used on package.
   , packageDefaultFlags :: !(Map FlagName Bool)
     -- ^ Defaults for unspecified flags.
+  , packageLibrary :: Maybe StackLibrary
+  , packageSubLibraries :: CompCollection StackLibrary
+  , packageForeignLibraries :: CompCollection StackForeignLibrary
+  , packageTestSuites :: CompCollection StackTest
+  , packageBenchmarkSuites :: CompCollection StackBenchmark
+  , packageExecutables :: CompCollection StackExecutable
   , packageLibraries :: !PackageLibraries
     -- ^ does the package have a buildable library stanza?
   , packageSubLibraries :: !(Set Text)
