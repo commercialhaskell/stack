@@ -85,6 +85,10 @@ import           Stack.Types.Dependency ( DepValue (..), DepType (..) )
 import           Stack.Types.PackageFile ( DotCabalPath , GetPackageFiles (..) )
 import           Stack.PackageFile ( getPackageFile )
 
+import           Stack.Types.CompCollection (foldAndMakeCollection)
+import           Stack.Component
+import qualified Stack.Types.Component
+
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
 -- derived from the package's Cabal file.
@@ -121,6 +125,12 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageFlags = packageConfigFlags packageConfig
   , packageDefaultFlags = M.fromList
       [(flagName flag, flagDefault flag) | flag <- pkgFlags]
+  , packageLibrary = stackLibraryFromCabal <$> library pkg
+  , packageSubLibraries = foldAndMakeCollection stackLibraryFromCabal $ subLibraries pkg
+  , packageForeignLibraries = foldAndMakeCollection stackForeignLibraryFromCabal $ foreignLibs pkg
+  , packageTestSuites = foldAndMakeCollection stackTestFromCabal $ testSuites pkg
+  , packageBenchmarkSuites = foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkg
+  , packageExecutables = foldAndMakeCollection stackExecutableFromCabal $ executables pkg
   , packageAllDeps = M.keysSet deps
   , packageSubLibDeps = subLibDeps
   , packageLibraries =
