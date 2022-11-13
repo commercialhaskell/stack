@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.36.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -326,7 +326,10 @@ library
       Paths_stack
   other-modules:
       GHC.Utils.GhcPkg.Main.Compat
+      Stack.Component
       Stack.Config.ConfigureScript
+      Stack.Types.CompCollection
+      Stack.Types.Component
       Stack.Types.FileDigestCache
   autogen-modules:
       Build_stack
