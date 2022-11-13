@@ -115,7 +115,20 @@ confirmation and we will close it.
 
 ## Documentation
 
-The files which make up Stack's documentation are located in the `doc`
+Consistent with its goal of being easy to use, Stack aims to maintain a high
+quality of in-tool and online documentation.
+
+The in-tool documentation includes the output when the `--help` flag is
+specified and the content of Stack's warning and error messages.
+
+When drafting documentation it is helpful to have in mind the intended reader
+and what they are assumed to know, and not know, already. In that regard,
+documentation should aim to meet, at least, the needs of a person who is about
+to begin to study computing as an undergraduate but who has not previously
+coded using Haskell. That person may be familiar with one popular operating
+system but may not be familiar with others.
+
+The files which make up Stack's online documentation are located in the `doc`
 directory of the repository. They are formatted in the
 [Markdown syntax](https://daringfireball.net/projects/markdown/), with some
 extensions.
@@ -135,10 +148,40 @@ documentation, please submit a
 changes/additions based off the
 [stable branch](https://github.com/commercialhaskell/stack/tree/stable).
 
+The Markdown files are organised into the navigation menu (the table of
+contents) in the file `mkdocs.yml`, the configuration file for MkDocs. The
+description of a file in the menu can differ from the file's name. The
+navigation menu allows files to be organised in a hierarchy. Currently, up to
+three levels are used. The top level is:
+
+* **Home:** The introduction to Stack. This page aims to be no longer than
+  necessary but also to not assume much existing knowledge on the part of the
+  reader. It provides a 'quick start' guide to getting and using Stack.
+* **Tool documentation:** How to get and use Stack. This includes Stack's user's
+  guide, the answers to frequently asked questions, and more thorough
+  explanations of aspects of Stack. The user's guide is divided into two parts.
+  The first part is 'introductory', and has the style of a tutorial. The second
+  part is 'advanced', and has more of a reference style.
+* **Advanced documentation:** Stack's internal workings. Many users will not
+  need to consult this documentation.
+* **Project documentation:** Information useful to people contributing to, or
+  maintaining, Stack's code and documentation.
+* **Signing key:** How Stack's released executables are signed.
+* **Glossary:** A glossary of terms used throughout Stack's in-tool and online
+  documentation. We aim to describe the same things in the same way in different
+  places.
+* **Version history:** The log of changes to Stack between versions.
+
 The specific versions of the online documentation (eg `v: v2.9.1`) are generated
 from the content of files at the point in the repository's history specified by
 the corresponding release tag. Consequently, that content is fixed once
 released.
+
+If the names of Markdown files do not change between versions, then people can
+use the flyout on the online documentation to move between different versions of
+the same page. For that reason, the names of new Markdown files should be chosen
+with care and existing Markdown files should not be deleted or renamed without
+due consideration of the consequences.
 
 The Markdown syntax supported by MkDocs and the Material for MkDocs theme can
 differ from the GitHub Flavored Markdown ([GFM](https://github.github.com/gfm/))
@@ -148,8 +191,8 @@ and the
 [Material for MkDocs reference](https://squidfunk.github.io/mkdocs-material/reference/)
 to ensure your pull request will achieve the desired rendering.
 
-The configuration file for MkDocs is `mkdocs.yml`. The extensions to the basic
-Markdown syntax used include:
+The extensions to the basic Markdown syntax used are set out in `mkdocs.yml` and
+include:
 
 * admonitions
 * code blocks, with syntax highlighting provided by
