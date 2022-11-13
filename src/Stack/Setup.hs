@@ -135,10 +135,10 @@ data SetupException
     | UnknownArchiveStructure (Path Abs File)
     | StackReleaseInfoNotFound String
     | StackBinaryArchiveNotFound [String]
-    | WorkingDirectoryInvalid
+    | WorkingDirectoryInvalidBug
     | HadrianBindistNotFound
     | DownloadAndInstallCompilerError
-    | StackBinaryArchiveZipUnsupported
+    | StackBinaryArchiveZipUnsupportedBug
     | StackBinaryArchiveUnsupported Text
     | StackBinaryNotInArchive String Text
     | FileTypeInArchiveInvalid Tar.Entry Text
@@ -149,26 +149,33 @@ data SetupException
 
 instance Show SetupException where
     show (UnsupportedSetupCombo os arch) = concat
-        [ "I don't know how to install GHC for "
+        [ "Error: [S-1852]\n"
+        , "I don't know how to install GHC for "
         , show (os, arch)
         , ", please install manually"
         ]
-    show (MissingDependencies tools) =
-        "The following executables are missing and must be installed: " ++
-        intercalate ", " tools
+    show (MissingDependencies tools) = concat
+        [ "Error: [S-2126]\n"
+        , "The following executables are missing and must be installed: "
+        , intercalate ", " tools
+        ]
     show (UnknownCompilerVersion oskeys wanted known) = concat
-        [ "No setup information found for "
+        [ "Error: [S-9443]\n"
+        , "No setup information found for "
         , T.unpack $ utf8BuilderToText $ RIO.display wanted
         , " on your platform.\nThis probably means a GHC bindist has not yet been added for OS key '"
         , T.unpack (T.intercalate "', '" (sort $ Set.toList oskeys))
         , "'.\nSupported versions: "
         , T.unpack (T.intercalate ", " (map compilerVersionText (sort $ Set.toList known)))
         ]
-    show (UnknownOSKey oskey) =
-        "Unable to find installation URLs for OS key: " ++
-        T.unpack oskey
+    show (UnknownOSKey oskey) = concat
+        [ "Error: [S-6810]\n"
+        , "Unable to find installation URLs for OS key: "
+        , T.unpack oskey
+        ]
     show (GHCSanityCheckCompileFailed e ghc) = concat
-        [ "The GHC located at "
+        [ "Error: [S-5159]\n"
+        , "The GHC located at "
         , toFilePath ghc
         , " failed to compile a sanity check. Please see:\n\n"
         , "    http://docs.haskellstack.org/en/stable/install_and_upgrade/\n\n"
@@ -176,112 +183,168 @@ instance Show SetupException where
         , show e
         ]
     show WantedMustBeGHC =
-        "The wanted compiler must be GHC"
+        "Error: [S-9030]\n"
+        ++ "The wanted compiler must be GHC."
     show RequireCustomGHCVariant =
-        "A custom --ghc-variant must be specified to use --ghc-bindist"
-    show (ProblemWhileDecompressing archive) =
-        "Problem while decompressing " ++ toFilePath archive
+        "Error: [S-8948]\n"
+        ++ "A custom '--ghc-variant' must be specified to use '--ghc-bindist'."
+    show (ProblemWhileDecompressing archive) = concat
+        [ "Error: [S-2905]\n"
+        , "Problem while decompressing "
+        , toFilePath archive
+        ]
     show SetupInfoMissingSevenz =
-        "SetupInfo missing Sevenz EXE/DLL"
+        "Error: [S-9561]\n"
+        ++ "SetupInfo missing Sevenz EXE/DLL."
     show (DockerStackExeNotFound stackVersion' osKey) = concat
-        [ stackProgName
+        [ "Error: [S-1457]\n"
+        , stackProgName
         , "-"
         , versionString stackVersion'
         , " executable not found for "
         , T.unpack osKey
         , "\nUse the '"
         , T.unpack dockerStackExeArgName
-        , "' option to specify a location"]
+        , "' option to specify a location."]
     show UnsupportedSetupConfiguration =
-        "I don't know how to install GHC on your system configuration, please install manually"
-    show (InvalidGhcAt compiler e) =
-        "Found an invalid compiler at " ++ show (toFilePath compiler) ++ ": " ++ displayException e
+        "Error: [S-7748]\n"
+        ++ "Stack does not know how to install GHC on your system \
+           \configuration, please install manually."
+    show (InvalidGhcAt compiler e) = concat
+        [ "Error: [S-2476]\n"
+        , "Found an invalid compiler at "
+        , show (toFilePath compiler)
+        , ": "
+        , displayException e
+        ]
     show (MSYS2NotFound osKey) = concat
-        [ "Error: MSYS2 not found for "
+        [ "Error: [S-5308]\n"
+        , "MSYS2 not found for "
         , T.unpack osKey
         ]
-    show UnwantedCompilerVersion = "Error: Not the compiler version we want"
-    show UnwantedArchitecture = "Error: Not the architecture we want"
-    show SandboxedCompilerNotFound = "Error: Could not find sandboxed compiler"
+    show UnwantedCompilerVersion =
+        "Error: [S-5127]\n"
+        ++ "Not the compiler version we want."
+    show UnwantedArchitecture =
+        "Error: [S-1540]\n"
+        ++ "Not the architecture we want."
+    show SandboxedCompilerNotFound =
+        "Error: [S-9953]\n"
+        ++ "Could not find sandboxed compiler."
     show (CompilerNotFound toTry) = concat
-        [ "Error: Could not find any of: "
+        [ "Error: [S-4764]\n"
+        , "Could not find any of: "
         , show toTry
         ]
     show (GHCInfoNotValidUTF8 e) = concat
-        [ "Error: GHC info is not valid UTF-8: "
+        [ "Error: [S-8668]\n"
+        , "GHC info is not valid UTF-8: "
         , show e
         ]
     show GHCInfoNotListOfPairs =
-        "Error: GHC info does not parse as a list of pairs"
+        "Error: [S-4878]\n"
+        ++ "GHC info does not parse as a list of pairs."
     show GHCInfoMissingGlobalPackageDB =
-        "Error: Key 'Global Package DB' not found in GHC info"
+        "Error: [S-2965]\n"
+        ++ "Key 'Global Package DB' not found in GHC info."
     show GHCInfoMissingTargetPlatform =
-        "Error: Key 'Target platform' not found in GHC info"
-    show (GHCInfoTargetPlatformInvalid targetPlatform) =
-        "Error: Invalid target platform in GHC info: " ++ targetPlatform
+        "Error: [S-5219]\n"
+        ++ "Key 'Target platform' not found in GHC info."
+    show (GHCInfoTargetPlatformInvalid targetPlatform) = concat
+        [ "Error: [S-8299]\n"
+        , "Invalid target platform in GHC info: "
+        , targetPlatform
+        ]
     show (CabalNotFound compiler) = concat
-        [ "Error: Cabal library not found in global package database for "
+        [ "Error: [S-2574]\n"
+        , "Cabal library not found in global package database for "
         , toFilePath compiler
         ]
-    show HadrianScriptNotFound = "Error: No Hadrian build script found"
-    show (URLInvalid url) =
-        "Error: `url` must be either an HTTP URL or a file path: " ++ url
-    show (UnknownArchiveExtension url) =
-        "Error: Unknown extension for url: " ++ url
+    show HadrianScriptNotFound =
+        "Error: [S-1128]\n"
+        ++ "No Hadrian build script found."
+    show (URLInvalid url) = concat
+         [ "Error: [S-1906]\n"
+         , "`url` must be either an HTTP URL or a file path: "
+         , url
+         ]
+    show (UnknownArchiveExtension url) = concat
+         [ "Error: [S-1648]\n"
+         , "Unknown extension for url: "
+         , url
+         ]
     show Unsupported7z =
-        "Error: Don't know how to deal with .7z files on non-Windows"
-    show (TarballInvalid name) =
-        "Error: " ++ name ++ " must be a tarball file"
+        "Error: [S-4509]\n"
+        ++ "Don't know how to deal with .7z files on non-Windows."
+    show (TarballInvalid name) = concat
+        [ "Error: [S-3158]\n"
+        , name
+        , " must be a tarball file."
+        ]
     show (TarballFileInvalid name archiveFile) = concat
-        [ "Error: Invalid "
+        [ "Error: [S-5252]\n"
+        , "Invalid "
         , name
         , " filename: "
         , show archiveFile
         ]
     show (UnknownArchiveStructure archiveFile) = concat
-        [ "Error: Expected a single directory within unpacked "
+        [ "Error: [S-1827]\n"
+        , "Expected a single directory within unpacked "
         , toFilePath archiveFile
         ]
-    show (StackReleaseInfoNotFound url) =
-        "Error: Could not get release information for Stack from: " ++ url
+    show (StackReleaseInfoNotFound url) = concat
+        [ "Error: [S-9476]\n"
+        , "Could not get release information for Stack from: "
+        , url
+        ]
     show (StackBinaryArchiveNotFound platforms) = concat
-        [ "Error: Unable to find binary Stack archive for platforms: "
+        [ "Error: [S-4461]\n"
+        , "Unable to find binary Stack archive for platforms: "
         , unwords platforms
         ]
-    show WorkingDirectoryInvalid =
-        "Error: The impossible happened. Invalid working directory."
+    show WorkingDirectoryInvalidBug = bugReport "[S-2076]"
+        "Invalid working directory."
     show HadrianBindistNotFound =
-        "Error: Can't find hadrian generated bindist"
+        "Error: [S-6617]\n"
+        ++ "Can't find Hadrian-generated binary distribution."
     show DownloadAndInstallCompilerError =
-        "Error: 'downloadAndInstallCompiler' should not be reached with ghc-git"
-    show StackBinaryArchiveZipUnsupported =
-        "Error: FIXME: Handle zip files"
+        "Error: [S-7227]\n"
+        ++ "'downloadAndInstallCompiler' should not be reached with ghc-git."
+    show StackBinaryArchiveZipUnsupportedBug = bugReport "[S-3967]"
+        "FIXME: Handle zip files."
     show (StackBinaryArchiveUnsupported archiveURL) = concat
-        [ "Error: Unknown archive format for Stack archive: "
+        [ "Error: [S-6636]\n"
+        , "Unknown archive format for Stack archive: "
         , T.unpack archiveURL
         ]
     show (StackBinaryNotInArchive exeName url) = concat
-        [ "Error: Stack executable "
+        [ "Error: [S-7871]\n"
+        , "Stack executable "
         , exeName
         , " not found in archive from "
         , T.unpack url
         ]
     show (FileTypeInArchiveInvalid e url) = concat
-        [ "Error: Invalid file type for tar entry named "
+        [ "Error: [S-5046]\n"
+        , "Invalid file type for tar entry named "
         , Tar.entryPath e
         , " downloaded from "
         , T.unpack url
         ]
     show (BinaryUpgradeOnOSUnsupported os) = concat
-        [ "Error: Binary upgrade not yet supported on OS: "
+        [ "Error: [S-4132]\n"
+        , "Binary upgrade not yet supported on OS: "
         , show os
         ]
     show (BinaryUpgradeOnArchUnsupported arch) = concat
-        [ "Error: Binary upgrade not yet supported on arch: "
+        [ "Error: [S-3249]\n"
+        , "Binary upgrade not yet supported on arch: "
         , show arch
         ]
     show (ExistingMSYS2NotDeleted destDir e) = concat
-        [ "Error: Could not delete existing MSYS2 directory: "
+        [ "Error: [S-4230]\n"
+        , "Could not delete existing MSYS2 directory: "
         , toFilePath destDir
         , "\n"
         , show e
@@ -298,7 +361,9 @@ data SetupPrettyException
 
 instance Pretty SetupPrettyException where
     pretty (GHCInstallFailed ex step cmd args wd tempDir destDir) =
-         string (show ex)
+         flow "Error: [S-7441]"
+      <> line
+      <> string (show ex)
       <> line
       <> hang 2 (  flow "Error encountered while" <+> fromString step <+> flow "GHC with"
                 <> line
@@ -336,7 +401,8 @@ data PerformPathCheckingException
 
 instance Show PerformPathCheckingException where
     show (ProcessExited ec cmd args) = concat
-        [ "Process exited with "
+        [ "Error: [S-1991]\n"
+        , "Process exited with "
         , show ec
         , ": "
         , unwords (cmd:args)
@@ -1086,7 +1152,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
        Pantry.withRepo (Pantry.SimpleRepo url commitId RepoGit) $ do
          -- withRepo is guaranteed to set workingDirL, so let's get it
          mcwd <- traverse parseAbsDir =<< view workingDirL
-         cwd <- maybe (throwIO WorkingDirectoryInvalid) pure mcwd
+         cwd <- maybe (throwIO WorkingDirectoryInvalidBug) pure mcwd
          threads <- view $ configL.to configJobs
          let
            hadrianArgs = fmap T.unpack
@@ -2176,8 +2242,10 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     liftIO $ do
       case () of
         ()
-          | ".tar.gz" `T.isSuffixOf` archiveURL -> handleTarball tmpFile isWindows archiveURL
-          | ".zip" `T.isSuffixOf` archiveURL -> throwIO StackBinaryArchiveZipUnsupported
+          | ".tar.gz" `T.isSuffixOf` archiveURL ->
+              handleTarball tmpFile isWindows archiveURL
+          | ".zip" `T.isSuffixOf` archiveURL ->
+              throwIO StackBinaryArchiveZipUnsupportedBug
           | otherwise -> throwIO $ StackBinaryArchiveUnsupported archiveURL
 
     logInfo "Download complete, testing executable"

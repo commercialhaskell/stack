@@ -54,8 +54,10 @@ data OptionsApplicativeExtraException
 
 instance Show OptionsApplicativeExtraException where
   show FlagNotFoundBug =
-    "Error: The impossible happened! No valid flags found in \
-    \enableDisableFlagsNoDefault."
+    "Error: [S-2797]\n"
+    ++ "The impossible happened! No valid flags found in \
+       \enableDisableFlagsNoDefault. Please report this bug at Stack's \
+       \repository."
 
 instance Exception OptionsApplicativeExtraException
 

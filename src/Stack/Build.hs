@@ -51,6 +51,51 @@ import           Stack.Types.SourceMap
 import           Stack.Types.Compiler (compilerVersionText, getGhcVersion)
 import           System.Terminal (fixCodePage)
 
+data CabalVersionException
+    = AllowNewerNotSupported Version
+    | CabalVersionNotSupported Version
+    deriving (Typeable)
+
+instance Show CabalVersionException where
+    show (AllowNewerNotSupported cabalVer) = concat
+        [ "Error: [S-8503]\n"
+        , "'--allow-newer' requires Cabal version 1.22 or greater, but "
+        , "version "
+        , versionString cabalVer
+        , " was found."
+        ]
+    show (CabalVersionNotSupported cabalVer) = concat
+        [ "Error: [S-5973]\n"
+        , "Stack no longer supports Cabal versions before 1.19.2, "
+        , "but version "
+        , versionString cabalVer
+        , " was found. To fix this, consider updating the resolver to lts-3.0 "
+        , "or later or to nightly-2015-05-05 or later."
+        ]
+
+instance Exception CabalVersionException
+
+data QueryException
+    = SelectorNotFound [Text]
+    | IndexOutOfRange [Text]
+    | NoNumericSelector [Text]
+    | CannotApplySelector Value [Text]
+    deriving (Typeable)
+
+instance Show QueryException where
+    show (SelectorNotFound sels) = err "[S-4419]" "Selector not found" sels
+    show (IndexOutOfRange sels) = err "[S-8422]" "Index out of range" sels
+    show (NoNumericSelector sels) =
+        err "[S-4360]" "Encountered array and needed numeric selector" sels
+    show (CannotApplySelector value sels) =
+        err "[S-1711]" ("Cannot apply selector to " ++ show value) sels
+
+instance Exception QueryException
+
+-- | Helper function for 'QueryException' instance of 'Show'
+err :: String -> String -> [Text] -> String
+err msg code sels = "Error: " ++ code ++ "\n" ++ msg ++ ": " ++ show sels
+
 -- | Build.
 --
 --   If a buildLock is passed there is an important contract here.  That lock must
@@ -144,49 +189,6 @@ checkCabalVersion = do
     -- https://github.com/haskell/cabal/blob/580fe6b6bf4e1648b2f66c1cb9da9f1f1378492c/cabal-install/Distribution/Client/Setup.hs#L592
     when (cabalVer < mkVersion [1, 19, 2]) $ throwM $
         CabalVersionNotSupported cabalVer
-
-data CabalVersionException
-    = AllowNewerNotSupported Version
-    | CabalVersionNotSupported Version
-    deriving (Typeable)
-
-instance Show CabalVersionException where
-    show (AllowNewerNotSupported cabalVer) = concat
-        [ "Error: --allow-newer requires at least Cabal version 1.22, but "
-        , "version "
-        , versionString cabalVer
-        , " was found."
-        ]
-    show (CabalVersionNotSupported cabalVer) = concat
-        [ "Error: Stack no longer supports Cabal versions older than 1.19.2, "
-        , "but version "
-        , versionString cabalVer
-        , " was found. To fix this, consider updating the resolver to lts-3.0 "
-        , "or later or to nightly-2015-05-05 or later."
-        ]
-
-instance Exception CabalVersionException
-
-data QueryException
-    = SelectorNotFound [Text]
-    | IndexOutOfRange [Text]
-    | NoNumericSelector [Text]
-    | CannotApplySelector Value [Text]
-    deriving (Typeable)
-
-instance Show QueryException where
-    show (SelectorNotFound sels) = err "Selector not found" sels
-    show (IndexOutOfRange sels) = err "Index out of range" sels
-    show (NoNumericSelector sels) =
-        err "Encountered array and needed numeric selector" sels
-    show (CannotApplySelector value sels) =
-        err ("Cannot apply selector to " ++ show value) sels
-
-instance Exception QueryException
-
--- Helper function for 'QueryException' instance of 'Show'
-err :: String -> [Text] -> String
-err msg sels = "Error: " ++ msg ++ ": " ++ show sels
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten

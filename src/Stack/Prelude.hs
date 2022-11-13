@@ -24,6 +24,8 @@ module Stack.Prelude
   , fromFirstFalse
   , defaultFirstFalse
   , writeBinaryFileAtomic
+  , bugReport
+  , bugPrettyReport
   , module X
   ) where
 
@@ -42,6 +44,7 @@ import           Path as X
 import qualified Path.IO
 import           RIO as X
 import           RIO.File as X hiding ( writeBinaryFileAtomic )
+import           RIO.PrettyPrint ( StyleDoc, (<+>), flow, line )
 import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
 import           RIO.Process
                    ( HasProcessContext (..), ProcessContext, setStdin, closed
@@ -231,3 +234,24 @@ writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
 writeBinaryFileAtomic fp builder =
     liftIO $
     withBinaryFileAtomic (toFilePath fp) WriteMode (`hPutBuilder` builder)
+
+-- | Report a bug in Stack.
+bugReport :: String -> String -> String
+bugReport code msg =
+    "Error: " ++ code ++ "\n" ++
+    bugDeclaration ++ " " ++ msg ++ " " ++ bugRequest
+
+-- | Report a pretty bug in Stack.
+bugPrettyReport :: String -> StyleDoc -> StyleDoc
+bugPrettyReport code msg =
+       "Error:" <+> fromString code
+    <> line
+    <> flow bugDeclaration <+> msg <+> flow bugRequest
+
+-- | Bug declaration message.
+bugDeclaration :: String
+bugDeclaration = "The impossible happened!"
+
+-- | Bug report message.
+bugRequest :: String
+bugRequest =  "Please report this bug at Stack's repository."

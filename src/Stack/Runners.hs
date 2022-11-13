@@ -48,14 +48,18 @@ data RunnersException
 
 instance Show RunnersException where
   show CommandInvalid =
-    "Error: Cannot use this command with options which override the stack.yaml \
-    \location"
+    "Error: [S-7144]\n"
+    ++ "Cannot use this command with options which override the stack.yaml \
+       \location."
   show DockerAndNixInvalid =
-    "Error: Cannot use both Docker and Nix at the same time"
+    "Error: [S-8314]\n"
+    ++ "Cannot use both Docker and Nix at the same time."
   show NixWithinDockerInvalid =
-    "Error: Cannot use Nix from within a Docker container"
+    "Error: [S-8641]\n"
+    ++ "Cannot use Nix from within a Docker container."
   show DockerWithinNixInvalid =
-    "Error: Cannot use Docker from within a Nix shell"
+    "Error: [S-5107]\n"
+    ++ "Cannot use Docker from within a Nix shell."
 
 instance Exception RunnersException
 
@@ -115,7 +119,10 @@ withConfig shouldReexec inner =
         -- Catching all exceptions here, since we don't want this
         -- check to ever cause Stack to stop working
         shouldUpgradeCheck `catchAny` \e ->
-          logError ("Error when running shouldUpgradeCheck: " <> displayShow e)
+          logError $
+            "Error: [S-7353]\n" <>
+            "Error when running shouldUpgradeCheck: " <>
+            displayShow e
         case shouldReexec of
           YesReexec -> reexec inner
           NoReexec -> inner

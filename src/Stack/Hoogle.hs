@@ -30,20 +30,20 @@ import           RIO.Process
 data HoogleException
   = HoogleDatabaseNotFound
   | HoogleNotFound !Text
-  | HoogleOnPathNotFound
+  | HoogleOnPathNotFoundBug
   deriving Typeable
 
 instance Show HoogleException where
   show HoogleDatabaseNotFound =
-    "Error: No Hoogle database. Not building one due to '--no-setup'."
+    "Error: [S-3025]\n"
+    ++ "No Hoogle database. Not building one due to '--no-setup'."
   show (HoogleNotFound e) =
-    "Error: "
+    "Error: [S-1329]\n"
     ++ T.unpack e
     ++ "\n"
     ++ "Not installing Hoogle due to '--no-setup'."
-  show HoogleOnPathNotFound =
-    "Error: Cannot find Hoogle executable on PATH, after installing. This \
-    \shouldn't happen. It may be a bug."
+  show HoogleOnPathNotFoundBug = bugReport "[S-9669]"
+    "Cannot find Hoogle executable on PATH, after installing."
 
 instance Exception HoogleException
 
@@ -105,7 +105,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
         mhooglePath' <- findExecutable "hoogle"
         case mhooglePath' of
             Right hooglePath -> parseAbsFile hooglePath
-            Left _ -> throwIO HoogleOnPathNotFound
+            Left _ -> throwIO HoogleOnPathNotFoundBug
     requiringHoogle :: Muted -> RIO EnvConfig x -> RIO EnvConfig x
     requiringHoogle muted f = do
         hoogleTarget <- do

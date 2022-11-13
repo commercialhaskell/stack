@@ -28,11 +28,14 @@ data CleanException
     deriving Typeable
 
 instance Show CleanException where
-    show (NonLocalPackages pkgs) =
-        "The following packages are not part of this project: " ++
-        intercalate ", " (map show pkgs)
+    show (NonLocalPackages pkgs) = concat
+        [ "Error: [S-9463]\n"
+        , "The following packages are not part of this project: "
+        , intercalate ", " (map show pkgs)
+        ]
     show (DeletionFailures failures) = concat
-        [ "Error: Exception while recursively deleting:\n"
+        [ "Error: [S-6321]\n"
+        , "Exception while recursively deleting:\n"
         , concatMap (\(dir, e) -> toFilePath dir <> "\n" <> show e <> "\n") failures
         , "Perhaps you do not have permission to delete these files or they \
           \are in use?"

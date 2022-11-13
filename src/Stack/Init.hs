@@ -58,12 +58,14 @@ data InitException
 
 instance Show InitException where
     show (ConfigFileAlreadyExists reldest) = concat
-        [ "Error: Stack configuration file "
+        [ "Error: [S-8009]\n"
+        , "Stack configuration file "
         , reldest
         , " exists, use '--force' to overwrite it."
         ]
     show (SnapshotDownloadFailure e) = concat
-        [ "Error: Unable to download snapshot list, and therefore could not \
+        [ "Error: [S-8332]\n"
+        , "Unable to download snapshot list, and therefore could not \
           \generate a stack.yaml file automatically\n"
         , "This sometimes happens due to missing Certificate Authorities on \
           \your system. For more information, see:\n"
@@ -77,13 +79,16 @@ instance Show InitException where
         , "Exception was: "
         , show e
         ]
-    show NoPackagesToIgnore = "Error: No packages to ignore"
-    show PackagesToIgnoreBug =
-        "Error: The impossible happened! No packages to ignore"
-    show (PackageNameInvalid rels) = concat
-        [ "Error: Package name as defined in the Cabal file must match the \
-          \Cabal file name.\n"
-        , "Please fix the following packages and try again:\n"
+    show NoPackagesToIgnore =
+        "Error: [S-4934]\n"
+        ++ "No packages to ignore"
+    show PackagesToIgnoreBug = bugReport "[S-2747]"
+        "No packages to ignore."
+    show (PackageNameInvalid rels) = unlines
+        [ "Error: [S-5267]"
+        , "Package name as defined in the Cabal file must match the Cabal file \
+          \name."
+        , "Please fix the following packages and try again:"
         , T.unpack (utf8BuilderToText (formatGroup rels))
         ]
 

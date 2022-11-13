@@ -66,58 +66,87 @@ data NewException
     deriving Typeable
 
 instance Show NewException where
-    show (FailedToLoadTemplate name path) =
-        "Failed to load download template " <> T.unpack (templateName name) <>
-        " from " <>
-        path
-    show (FailedToDownloadTemplate name (DownloadHttpError httpError)) =
-          "There was an unexpected HTTP error while downloading template " <>
-          T.unpack (templateName name) <> ": " <> show httpError
-    show (FailedToDownloadTemplate name _) =
-        "Failed to download template " <> T.unpack (templateName name) <>
-        ": unknown reason"
-
-    show (AlreadyExists path) =
-        "Directory " <> toFilePath path <> " already exists. Aborting."
-    show (MissingParameters name template missingKeys userConfigPath) =
-        L.intercalate
-            "\n"
-            [ "The following parameters were needed by the template but not provided: " <>
-              L.intercalate ", " (S.toList missingKeys)
-            , "You can provide them in " <>
-              toFilePath userConfigPath <>
-              ", like this:"
-            , "templates:"
-            , "  params:"
-            , L.intercalate
-                  "\n"
-                  (map
-                       (\key ->
-                             "    " <> key <> ": value")
-                       (S.toList missingKeys))
-            , "Or you can pass each one as parameters like this:"
-            , "stack new " <> packageNameString name <> " " <>
-              T.unpack (templateName template) <>
-              " " <>
-              unwords
-                  (map
-                       (\key ->
-                             "-p \"" <> key <> ":value\"")
-                       (S.toList missingKeys))]
-    show (InvalidTemplate name why) =
-        "The template \"" <> T.unpack (templateName name) <>
-        "\" is invalid and could not be used. " <>
-        "The error was: " <> why
-    show (AttemptedOverwrites fps) =
-        "The template would create the following files, but they already exist:\n" <>
-        unlines (map (("  " ++) . toFilePath) fps) <>
-        "Use --force to ignore this, and overwrite these files."
-    show (FailedToDownloadTemplatesHelp ex) =
-        "Failed to download 'stack templates' help. The HTTP error was: " <> show ex
-    show (BadTemplatesHelpEncoding url err) =
-        "UTF-8 decoding error on template info from\n    " <> url <> "\n\n" <> show err
-    show (Can'tUseWiredInName name) =
-        "The name \"" <> packageNameString name <> "\" is used by GHC wired-in packages, and so shouldn't be used as a package name"
+    show (FailedToLoadTemplate name path) = concat
+        [ "Error: [S-3650]\n"
+        , "Failed to load download template "
+        , T.unpack (templateName name)
+        , " from "
+        , path
+        ]
+    show (FailedToDownloadTemplate name (DownloadHttpError httpError)) = concat
+        [ "Error: [S-1688]\n"
+        , "There was an unexpected HTTP error while downloading template "
+        , T.unpack (templateName name)
+        , ": "
+        , show httpError
+        ]
+    show (FailedToDownloadTemplate name _) = concat
+        [ "Error: [S-1688]\n"
+        , "Failed to download template "
+        , T.unpack (templateName name)
+        , ": unknown reason"
+        ]
+    show (AlreadyExists path) = concat
+        [ "Error: [S-2135]\n"
+        , "Directory "
+        , toFilePath path
+        , " already exists. Aborting."
+        ]
+    show (MissingParameters name template missingKeys userConfigPath) = unlines
+        [ "Error: [S-5515]"
+        , "The following parameters were needed by the template but not \
+          \provided: " <> L.intercalate ", " (S.toList missingKeys)
+        ,    "You can provide them in "
+          <> toFilePath userConfigPath
+          <> ", like this:"
+        , "templates:"
+        , "  params:"
+        , unlines $
+              map (\key -> "    " <> key <> ": value") (S.toList missingKeys)
+        , "Or you can pass each one as parameters like this:"
+        , concat
+            [ "stack new "
+            , packageNameString name
+            , " "
+            , T.unpack (templateName template)
+            , " "
+            , unwords $
+                map (\key -> "-p \"" <> key <> ":value\"") (S.toList missingKeys)
+            ]
+        ]
+    show (InvalidTemplate name why) = concat
+        [ "Error: [S-9490]\n"
+        , "The template \""
+        , T.unpack (templateName name)
+        , "\" is invalid and could not be used. The error was: "
+        , why
+        ]
+    show (AttemptedOverwrites fps) = concat
+        [ "Error: [S-3113]\n"
+        , "The template would create the following files, but they already \
+          \exist:\n"
+        , unlines (map (("  " ++) . toFilePath) fps)
+        , "Use '--force' to ignore this, and overwrite these files."
+        ]
+    show (FailedToDownloadTemplatesHelp ex) = concat
+        [ "Error: [S-8143]\n"
+        , "Failed to download 'stack templates' help. The HTTP error was: "
+        , show ex
+        ]
+    show (BadTemplatesHelpEncoding url err) = concat
+        [ "Error: [S-6670]\n"
+        , "UTF-8 decoding error on template info from\n    "
+        , url
+        , "\n\n"
+        , show err
+        ]
+    show (Can'tUseWiredInName name) = concat
+        [ "Error: [S-5682]\n"
+        , "The name \""
+        , packageNameString name
+        , "\" is used by GHC wired-in packages, and so shouldn't be used as a \
+          \package name."
+        ]
 
 instance Exception NewException
 

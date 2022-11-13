@@ -56,16 +56,18 @@ data CoverageException
 
 instance Show CoverageException where
     show (NonTestSuiteTarget name) = concat
-        [ "Error: Can't specify anything except test-suites as hpc report "
-        , "targets ("
+        [ "Error: [S-6361]\n"
+        , "Can't specify anything except test-suites as hpc report targets ("
         , packageNameString name
-        , " is used with a non test-suite target)"
+        , ") is used with a non test-suite target."
         ]
     show NoTargetsOrTixSpecified =
-        "Error: Not generating combined report, because no targets or tix " ++
-        "files are specified."
+        "Error: [S-2321]\n"
+        ++ "Not generating combined report, because no targets or tix files \
+           \are specified."
     show (NotLocalPackage name) = concat
-        [ "Error: Expected a local package, but "
+        [ "Error: [S-9975]"
+        , "Expected a local package, but "
         , packageNameString name
         , " is either an extra-dep or in the snapshot."
         ]
@@ -91,7 +93,10 @@ updateTixFile pkgName' tixSrc testName = do
         -- version that fixes https://ghc.haskell.org/trac/ghc/ticket/1853
         mtix <- readTixOrLog tixSrc
         case mtix of
-            Nothing -> logError $ "Failed to read " <> fromString (toFilePath tixSrc)
+            Nothing -> logError $
+                "Error: [S-2887]\n" <>
+                "Failed to read " <>
+                fromString (toFilePath tixSrc)
             Just tix -> do
                 liftIO $ writeTix (toFilePath tixDest) (removeExeModules tix)
                 -- TODO: ideally we'd do a file move, but IIRC this can
@@ -173,6 +178,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
     if not tixFileExists
         then do
             logError $
+                 "Error: [S-4634]\n" <>
                  "Didn't find .tix for " <>
                  RIO.display report <>
                  " - expected to find it at " <>
@@ -183,7 +189,11 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                  logError $ displayShow err
                  generateHpcErrorReport reportDir $ RIO.display $ sanitize $ show err
                  pure Nothing) $
-             (`onException` logError ("Error occurred while producing " <> RIO.display report)) $ do
+             (`onException`
+                 logError
+                   ("Error: [S-8215]\n" <>
+                    "Error occurred while producing " <>
+                    RIO.display report)) $ do
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
@@ -204,7 +214,8 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             if all ("(0/0)" `S8.isSuffixOf`) outputLines
                 then do
                     let msg html =
-                            "Error: The " <>
+                            "Error: [S-6829]\n"<>
+                            "The " <>
                             RIO.display report <>
                             " did not consider any code. One possible cause of this is" <>
                             " if your test-suite builds the library code (see Stack " <>
@@ -347,10 +358,16 @@ generateUnionReport report reportDir tixFiles = do
 readTixOrLog :: HasLogFunc env => Path b File -> RIO env (Maybe Tix)
 readTixOrLog path = do
     mtix <- liftIO (readTix (toFilePath path)) `catchAny` \errorCall -> do
-        logError $ "Error while reading tix: " <> fromString (show errorCall)
+        logError $
+            "Error: [S-3521]\n" <>
+            "Error while reading tix: " <>
+            fromString (show errorCall)
         pure Nothing
     when (isNothing mtix) $
-        logError $ "Failed to read tix file " <> fromString (toFilePath path)
+        logError $
+            "Error: [S-7786]\n" <>
+            "Failed to read tix file " <>
+            fromString (toFilePath path)
     pure mtix
 
 -- | Module names which contain '/' have a package name, and so they weren't built into the

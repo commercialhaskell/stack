@@ -38,13 +38,16 @@ data TypesResolverException
 
 instance Show TypesResolverException where
     show (ParseResolverException t) = concat
-        [ "Invalid resolver value: "
+        [ "Error: [S-8787]\n"
+        , "Invalid resolver value: "
         , T.unpack t
-        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, ghc-7.10.2, and ghcjs-0.1.0_ghc-7.10.2. "
-        , "See https://www.stackage.org/snapshots for a complete list."
+        , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, \
+          \ghc-7.10.2, and ghcjs-0.1.0_ghc-7.10.2. See \
+          \https://www.stackage.org/snapshots for a complete list."
         ]
     show (FilepathInDownloadedSnapshot url) = unlines
-        [ "Downloaded snapshot specified a 'resolver: { location: filepath }' "
+        [ "Error: [S-4865]"
+        , "Downloaded snapshot specified a 'resolver: { location: filepath }' "
         , "field, but filepaths are not allowed in downloaded snapshots.\n"
         , "Filepath specified: " ++ T.unpack url
         ]

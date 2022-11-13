@@ -60,13 +60,15 @@ data BuildPlanException
 
 instance Show BuildPlanException where
     show (SnapshotNotFound snapName) = unlines
-        [ "SnapshotNotFound " ++ snapName'
+        [ "Error: [S-2045]"
+        , "SnapshotNotFound " ++ snapName'
         , "Non existing resolver: " ++ snapName' ++ "."
         , "For a complete list of available snapshots see https://www.stackage.org/snapshots"
         ]
         where snapName' = show snapName
     show (UnknownPackages stackYaml unknown shadowed) =
-        unlines $ unknown' ++ shadowed'
+        "Error: [S-7571]\n"
+        ++ unlines (unknown' ++ shadowed')
       where
         unknown' :: [String]
         unknown'
@@ -133,13 +135,13 @@ instance Show BuildPlanException where
                       $ Set.unions
                       $ Map.elems shadowed
     show (NeitherCompilerOrResolverSpecified url) = concat
-        [ "Failed to load custom snapshot at "
+        [ "Error: [S-8559]\n"
+        , "Failed to load custom snapshot at "
         , T.unpack url
         , ", because no 'compiler' or 'resolver' is specified."
         ]
-    show DuplicatePackagesBug =
-        "Error: The impossible happened. Duplicate packages are not expected \
-        \here"
+    show DuplicatePackagesBug = bugReport "[S-5743]"
+        "Duplicate packages are not expected here."
 
 instance Exception BuildPlanException
 

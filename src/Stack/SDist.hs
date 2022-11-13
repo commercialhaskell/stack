@@ -75,13 +75,18 @@ data SDistException
   deriving (Typeable)
 
 instance Show SDistException where
-  show (CheckException xs) =
-    "Error: Package check reported the following errors:\n" ++
-    (List.intercalate "\n" . fmap show . NE.toList $ xs)
-  show (CabalFilePathsInconsistentBug cabalfp cabalfp') =
-    "Error: The impossible happened! Two Cabal file paths are inconsistent: "
-    ++ show (cabalfp, cabalfp')
-  show (ToTarPathException e) = e
+  show (CheckException xs) = unlines $
+    [ "Error: [S-6439]"
+    , "Package check reported the following errors:"
+    ] <> fmap show (NE.toList xs)
+  show (CabalFilePathsInconsistentBug cabalfp cabalfp') = concat
+    [ "Error: [S-9595]\n"
+    , "The impossible happened! Two Cabal file paths are inconsistent: "
+    , show (cabalfp, cabalfp')
+    ]
+  show (ToTarPathException e) =
+    "Error: [S-7875\n"
+    ++ e
 
 instance Exception SDistException
 
@@ -122,7 +127,10 @@ getSDistTarball mpvpBounds pkgDir = do
             eres <- buildLocalTargets nonEmptyDepTargets
             case eres of
               Left err ->
-                logError $ "Error building custom-setup dependencies: " <> displayShow err
+                logError $
+                  "Error: [S-8399]\n" <>
+                  "Error building custom-setup dependencies: " <>
+                  displayShow err
               Right _ ->
                 pure ()
           Nothing ->

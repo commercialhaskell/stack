@@ -36,7 +36,8 @@ data NixException
 
 instance Show NixException where
   show CannotDetermineProjectRoot =
-    "Cannot determine project root directory."
+    "Error: [S-7384]\n"
+    ++ "Cannot determine project root directory."
 
 instance Exception NixException
 

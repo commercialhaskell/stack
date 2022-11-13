@@ -96,8 +96,11 @@ createDatabase (GhcPkgExe pkgPath) db = do
                 ensureDir (parent db)
                 pure ["init", toFilePath db]
         void $ proc (toFilePath pkgPath) args $ \pc ->
-          readProcess_ pc `onException`
-          logError ("Unable to create package database at " <> fromString (toFilePath db))
+          onException (readProcess_ pc) $
+            logError $
+              "Error: [S-9735]\n" <>
+               "Unable to create package database at " <>
+               fromString (toFilePath db)
 
 -- | Get the environment variable to use for the package DB paths.
 ghcPkgPathEnvVar :: WhichCompiler -> Text

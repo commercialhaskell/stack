@@ -132,43 +132,49 @@ data StackBuildException
   deriving Typeable
 
 instance Show StackBuildException where
-    show (Couldn'tFindPkgId name) =
-              "After installing " <> packageNameString name <>
-               ", the package id couldn't be found " <> "(via ghc-pkg describe " <>
-               packageNameString name <> "). This shouldn't happen, " <>
-               "please report as a bug"
+    show (Couldn'tFindPkgId name) = bugReport "[S-7178]" $ concat
+        [ "After installing "
+        , packageNameString name
+        ,", the package id couldn't be found (via ghc-pkg describe "
+        , packageNameString name
+        , ")."
+        ]
     show (CompilerVersionMismatch mactual (expected, eArch) ghcVariant ghcBuild check mstack resolution) = concat
-                [ case mactual of
-                    Nothing -> "No compiler found, expected "
-                    Just (actual, arch) -> concat
-                        [ "Compiler version mismatched, found "
-                        , compilerVersionString actual
-                        , " ("
-                        , C.display arch
-                        , ")"
-                        , ", but expected "
-                        ]
-                , case check of
-                    MatchMinor -> "minor version match with "
-                    MatchExact -> "exact version "
-                    NewerMinor -> "minor version match or newer with "
-                , T.unpack $ utf8BuilderToText $ display expected
+        [ "Error: [S-6362]\n"
+        , case mactual of
+            Nothing -> "No compiler found, expected "
+            Just (actual, arch) -> concat
+                [ "Compiler version mismatched, found "
+                , compilerVersionString actual
                 , " ("
-                , C.display eArch
-                , ghcVariantSuffix ghcVariant
-                , compilerBuildSuffix ghcBuild
-                , ") (based on "
-                , case mstack of
-                    Nothing -> "command line arguments"
-                    Just stack -> "resolver setting in " ++ toFilePath stack
-                , ").\n"
-                , T.unpack resolution
+                , C.display arch
+                , ")"
+                , ", but expected "
                 ]
+        , case check of
+            MatchMinor -> "minor version match with "
+            MatchExact -> "exact version "
+            NewerMinor -> "minor version match or newer with "
+        , T.unpack $ utf8BuilderToText $ display expected
+        , " ("
+        , C.display eArch
+        , ghcVariantSuffix ghcVariant
+        , compilerBuildSuffix ghcBuild
+        , ") (based on "
+        , case mstack of
+            Nothing -> "command line arguments"
+            Just stack -> "resolver setting in " ++ toFilePath stack
+        , ").\n"
+        , T.unpack resolution
+        ]
     show (Couldn'tParseTargets targets) = unlines
-                $ "The following targets could not be parsed as package names or directories:"
-                : map T.unpack targets
-    show (UnknownTargets noKnown notInSnapshot stackYaml) =
-        unlines $ noKnown' ++ notInSnapshot'
+        $ "Error: [S-3127]"
+        : "The following targets could not be parsed as package names or \
+          \directories:"
+        : map T.unpack targets
+    show (UnknownTargets noKnown notInSnapshot stackYaml) = unlines
+        $ "Error: [S-2154]"
+        : (noKnown' ++ notInSnapshot')
       where
         noKnown'
             | Set.null noKnown = []
@@ -189,37 +195,47 @@ instance Show StackBuildException where
                     (\(name, version') -> "- " ++ packageIdentifierString
                         (PackageIdentifier name version'))
                     (Map.toList notInSnapshot)
-    show (TestSuiteFailure ident codes mlogFile bs) = unlines $ concat
-        [ ["Test suite failure for package " ++ packageIdentifierString ident]
-        , flip map (Map.toList codes) $ \(name, mcode) -> concat
-            [ "    "
-            , T.unpack name
-            , ": "
-            , case mcode of
-                Nothing -> " executable not found"
-                Just ec -> " exited with: " ++ show ec
+    show (TestSuiteFailure ident codes mlogFile bs) = unlines
+        $ "Error: [S-1995]"
+        : concat
+            [ ["Test suite failure for package " ++ packageIdentifierString ident]
+            , flip map (Map.toList codes) $ \(name, mcode) -> concat
+                [ "    "
+                , T.unpack name
+                , ": "
+                , case mcode of
+                    Nothing -> " executable not found"
+                    Just ec -> " exited with: " ++ show ec
+                ]
+            , pure $ case mlogFile of
+                Nothing -> "Logs printed to console"
+                -- TODO Should we load up the full error output and print it here?
+                Just logFile -> "Full log available at " ++ toFilePath logFile
+            , if S.null bs
+                then []
+                else ["", "", doubleIndent $ T.unpack $ decodeUtf8With lenientDecode bs]
             ]
-        , pure $ case mlogFile of
-            Nothing -> "Logs printed to console"
-            -- TODO Should we load up the full error output and print it here?
-            Just logFile -> "Full log available at " ++ toFilePath logFile
-        , if S.null bs
-            then []
-            else ["", "", doubleIndent $ T.unpack $ decodeUtf8With lenientDecode bs]
+      where
+        indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
+        doubleIndent = indent . indent
+    show (TestSuiteTypeUnsupported interface) = concat
+        [ "Error: [S-3819]\n"
+        , "Unsupported test suite type: "
+        , show interface
         ]
-         where
-          indent = dropWhileEnd isSpace . unlines . fmap (\line -> "  " ++ line) . lines
-          doubleIndent = indent . indent
-    show (TestSuiteTypeUnsupported interface) =
-              "Unsupported test suite type: " <> show interface
      -- Suppressing duplicate output
     show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
-      showBuildError False exitCode (Just taskProvides') execName fullArgs logFiles bss
+        showBuildError "[S-7011]"
+            False exitCode (Just taskProvides') execName fullArgs logFiles bss
     show (SetupHsBuildFailure exitCode mtaskProvides execName fullArgs logFiles bss) =
-      showBuildError True exitCode mtaskProvides execName fullArgs logFiles bss
-    show (ExecutionFailure es) = intercalate "\n\n" $ map show es
+        showBuildError "[S-6374]"
+            True exitCode mtaskProvides execName fullArgs logFiles bss
+    show (ExecutionFailure es) =
+        "Error: [S-7282]\n"
+        ++ intercalate "\n\n" (map show es)
     show (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
-        [ "Version for local package "
+        [ "Error: [S-5797]\n"
+        , "Version for local package "
         , packageNameString name
         , " is "
         , versionString localV
@@ -227,10 +243,14 @@ instance Show StackBuildException where
         , versionString requestedV
         , " on the command line"
         ]
-    show (NoSetupHsFound dir) =
-        "No Setup.hs or Setup.lhs file found in " ++ toFilePath dir
+    show (NoSetupHsFound dir) = concat
+        [ "Error: [S-3118]\n"
+        , "No Setup.hs or Setup.lhs file found in "
+        , toFilePath dir
+        ]
     show (InvalidFlagSpecification unused) = unlines
-        $ "Invalid flag specification:"
+        $ "Error: [S-8664]"
+        : "Invalid flag specification:"
         : map go (Set.toList unused)
       where
         showFlagSrc :: FlagSource -> String
@@ -265,7 +285,8 @@ instance Show StackBuildException where
             , ", please add to extra-deps"
             ]
     show (InvalidGhcOptionsSpecification unused) = unlines
-        $ "Invalid GHC options specification:"
+        $ "Error: [S-4925]"
+        : "Invalid GHC options specification:"
         : map showGhcOptionSrc unused
       where
         showGhcOptionSrc name = concat
@@ -273,17 +294,26 @@ instance Show StackBuildException where
             , packageNameString name
             , "' not found"
             ]
-    show (TargetParseException [err]) = "Error parsing targets: " ++ T.unpack err
+    show (TargetParseException [err]) = concat
+        [ "Error: [S-8506]\n"
+        , "Error parsing targets: "
+        , T.unpack err
+        ]
     show (TargetParseException errs) = unlines
-        $ "The following errors occurred while parsing the build targets:"
+        $ "Error [S-8506]"
+        : "The following errors occurred while parsing the build targets:"
         : map (("- " ++) . T.unpack) errs
-
-    show (SomeTargetsNotBuildable xs) =
-        "The following components have 'buildable: False' set in the cabal configuration, and so cannot be targets:\n    " ++
-        T.unpack (renderPkgComponents xs) ++
-        "\nTo resolve this, either provide flags such that these components are buildable, or only specify buildable targets."
+    show (SomeTargetsNotBuildable xs) = unlines
+        [ "Error: [S-7086]"
+        , "The following components have 'buildable: False' set in the Cabal \
+          \configuration, and so cannot be targets:"
+        , "    " <> T.unpack (renderPkgComponents xs)
+        , "To resolve this, either provide flags such that these components \
+          \are buildable, or only specify buildable targets."
+        ]
     show (TestSuiteExeMissing isSimpleBuildType exeName pkgName' testName) =
-        missingExeError isSimpleBuildType $ concat
+        missingExeError "[S-7987]"
+          isSimpleBuildType $ concat
             [ "Test suite executable \""
             , exeName
             , " not found for "
@@ -292,41 +322,44 @@ instance Show StackBuildException where
             , testName
             ]
     show (CabalCopyFailed isSimpleBuildType innerMsg) =
-        missingExeError isSimpleBuildType $ concat
+        missingExeError "[S-8027]"
+          isSimpleBuildType $ concat
             [ "'cabal copy' failed.  Error message:\n"
             , innerMsg
             , "\n"
             ]
-    show (ConstructPlanFailed msg) = msg
+    show (ConstructPlanFailed msg) =
+        "Error: [S-4804]\n"
+        ++ msg
     show (LocalPackagesPresent locals) = unlines
-        $ "Local packages are not allowed when using the script command. Packages found:"
+        $ "Error: [S-5510]"
+        : "Local packages are not allowed when using the 'script' command. \
+          \Packages found:"
         : map (\ident -> "- " ++ packageIdentifierString ident) locals
     show (CouldNotLockDistDir lockFile) = unlines
-        [ "Locking the dist directory failed, try to lock file:"
+        [ "Error: [S-7168]"
+        , "Locking the dist directory failed, try to lock file:"
         , "  " ++ toFilePath lockFile
         , "Maybe you're running another copy of Stack?"
         ]
-    show (TaskCycleBug pid) =
+    show (TaskCycleBug pid) = bugReport "[S-7868]" $
         "Error: The impossible happened! Unexpected task cycle for "
         ++ packageNameString (pkgName pid)
-    show (PackageIdMissingBug ident) =
-        "Error: The impossible happened! singleBuild: missing package ID \
-        \missing: "
+    show (PackageIdMissingBug ident) = bugReport "[S-8923]" $
+        "The impossible happened! singleBuild: missing package ID missing: "
         ++ show ident
-    show AllInOneBuildBug =
-        "Error: The impossible happened! Cannot have an all-in-one build that \
-        \also has a final build step."
-    show (MulipleResultsBug name dps) =
-        "Error: The impossible happened! singleBuild: multiple results when \
-        \describing installed package "
+    show AllInOneBuildBug = bugReport "[S-7371]"
+        "Cannot have an all-in-one build that also has a final build step."
+    show (MulipleResultsBug name dps) = bugReport "[S-6739]"
+        "singleBuild: multiple results when describing installed package "
         ++ show (name, dps)
-    show TemplateHaskellNotFoundBug =
-        "Error: The impossible happened! template-haskell is a wired-in GHC \
-        \boot library but it wasn't found"
+    show TemplateHaskellNotFoundBug = bugReport "[S-3121]"
+        "template-haskell is a wired-in GHC boot library but it wasn't found."
     show HaddockIndexNotFound =
-        "Error: No local or snapshot doc index found to open."
-    show ShowBuildErrorBug =
-        "Error: The impossible happened! Unexpected case in showBuildError"
+        "Error: [S-6901]\n"
+        ++ "No local or snapshot doc index found to open."
+    show ShowBuildErrorBug = bugReport "[S-5452]"
+        "Unexpected case in showBuildError."
 
 instance Exception StackBuildException
 
@@ -342,25 +375,26 @@ data UnusedFlags = UFNoPackage FlagSource PackageName
                  | UFSnapshot PackageName
     deriving (Show, Eq, Ord)
 
-missingExeError :: Bool -> String -> String
-missingExeError isSimpleBuildType msg =
-    unlines $ msg : "Possible causes of this issue:" :
-              map ("* " <>) possibleCauses
+missingExeError :: String -> Bool -> String -> String
+missingExeError errorCode isSimpleBuildType msg = unlines
+    $ "Error: " <> errorCode
+    : msg
+    : "Possible causes of this issue:"
+    : map ("* " <>) possibleCauses
   where
-    possibleCauses =
-        "No module named \"Main\". The 'main-is' source file should usually \
-        \have a header indicating that it's a 'Main' module." :
-
-        "A Cabal file that refers to nonexistent other files (e.g. a \
-        \license-file that doesn't exist). Running 'cabal check' may point \
-        \out these issues." :
-
-        if isSimpleBuildType
+    possibleCauses
+        = "No module named \"Main\". The 'main-is' source file should usually \
+          \have a header indicating that it's a 'Main' module."
+        : "A Cabal file that refers to nonexistent other files (e.g. a \
+          \license-file that doesn't exist). Running 'cabal check' may point \
+          \out these issues."
+        : if isSimpleBuildType
             then []
             else ["The Setup.hs file is changing the installation target dir."]
 
 showBuildError
-  :: Bool
+  :: String
+  -> Bool
   -> ExitCode
   -> Maybe PackageIdentifier
   -> Path Abs File
@@ -368,12 +402,12 @@ showBuildError
   -> Maybe (Path Abs File)
   -> [Text]
   -> String
-showBuildError isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles bss =
+showBuildError errorCode isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles bss =
   let fullCmd = unwords
               $ dropQuotes (toFilePath execName)
               : map (T.unpack . showProcessArgDebug) fullArgs
       logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
-  in "\n--  While building " ++
+  in "Error: " ++ errorCode ++ "\n--  While building " ++
      (case (isBuildingSetup, mtaskProvides) of
        (False, Nothing) -> impureThrow ShowBuildErrorBug
        (False, Just taskProvides') -> "package " ++ dropQuotes (packageIdentifierString taskProvides')

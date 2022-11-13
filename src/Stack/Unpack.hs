@@ -24,11 +24,14 @@ data UnpackException
 
 instance Show UnpackException where
     show (UnpackDirectoryAlreadyExists dirs) = unlines
-        $ "Unable to unpack due to already present directories:"
+        $ "Error: [S-3515]"
+        : "Unable to unpack due to already present directories:"
         : map (("    " ++) . toFilePath) (Set.toList dirs)
     show (CouldNotParsePackageSelectors strs) = unlines
-      $ "The following package selectors are not valid package names or identifiers:"
-      : map ("- " ++) strs
+        $ "Error: [S-2628]"
+        : "The following package selectors are not valid package names or \
+          \identifiers:"
+        : map ("- " ++) strs
 
 instance Exception UnpackException
 

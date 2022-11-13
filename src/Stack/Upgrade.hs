@@ -39,19 +39,24 @@ data UpgradeException
 
 instance Show UpgradeException where
     show NeitherBinaryOrSourceSpecified =
-        "Error: You must allow either binary or source upgrade paths"
+        "Error: [S-3642]\n"
+        ++ "You must allow either binary or source upgrade paths."
     show ExecutableFailure =
-        "Error: Non-success exit code from running newly downloaded executable"
+        "Error: [S-8716]\n"
+        ++ "Non-success exit code from running newly downloaded executable."
     show (CommitsNotFound branch repo) = concat
-        [ "Error: No commits found for branch "
+        [ "Error: [S-7114]\n"
+        , "No commits found for branch "
         , branch
         , " on repo "
         , repo
         ]
     show StackInPackageIndexNotFound =
-        "Error: No Stack version found in package indices"
+        "Error: [S-9668]\n"
+        ++ "No Stack version found in package indices."
     show VersionWithNoRevision =
-        "Error: Latest version with no revision"
+        "Error: [S-6648]\n"
+        ++ "Latest version with no revision."
 
 instance Exception UpgradeException
 

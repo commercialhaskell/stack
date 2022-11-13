@@ -60,11 +60,15 @@ data UploadPrettyException
 
 instance Pretty UploadPrettyException where
     pretty AuthenticationFailure =
-           flow "authentification failure"
+           "Error:" <+> "[S-2256]"
+        <> line
+        <> flow "authentification failure"
         <> line
         <> flow "Authentication failure uploading to server"
     pretty (ArchiveUploadFailure code res tarName) =
-           flow "unhandled status code:" <+> fromString (show code)
+           "Error:" <+> "[S-6108]"
+        <> line
+        <> flow "unhandled status code:" <+> fromString (show code)
         <> line
         <> flow "Upload failed on" <+> style File (fromString tarName)
         <> line
@@ -255,11 +259,13 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
                   _ -> pure ()
                 throwIO $ PrettyException AuthenticationFailure
             403 -> do
+                logError "Error: [S-2804]"
                 logError "forbidden upload"
                 logError "Usually means: you've already uploaded this package/version combination"
                 logError "Ignoring error and continuing, full message from Hackage below:\n"
                 liftIO $ printBody res
             503 -> do
+                logError "Error: [S-4444]"
                 logError "service unavailable"
                 logError "This error some times gets sent even though the upload succeeded"
                 logError "Check on Hackage to see if your package is present"

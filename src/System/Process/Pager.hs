@@ -29,11 +29,15 @@ data PagerException
 
 instance Show PagerException where
   show (PagerExitFailure cmd n) =
-    let
-      getStr (ShellCommand c) = c
-      getStr (RawCommand exePath _) = exePath
-    in
-      "Pager (`" ++ getStr cmd ++ "') exited with non-zero status: " ++ show n
+    let getStr (ShellCommand c) = c
+        getStr (RawCommand exePath _) = exePath
+    in  concat
+          [ "Error: [S-9392]\n"
+          , "Pager (`"
+          , getStr cmd
+          , "') exited with non-zero status: "
+          , show n
+          ]
 
 instance Exception PagerException
 

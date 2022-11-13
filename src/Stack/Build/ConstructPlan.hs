@@ -283,7 +283,8 @@ data NotOnlyLocal = NotOnlyLocal [PackageName] [Text]
 
 instance Show NotOnlyLocal where
   show (NotOnlyLocal packages exes) = concat
-    [ "Specified only-locals, but I need to build snapshot contents:\n"
+    [ "Error: [S-1727]\n"
+    , "Specified only-locals, but I need to build snapshot contents:\n"
     , if null packages then "" else concat
         [ "Packages: "
         , L.intercalate ", " (map packageNameString packages)

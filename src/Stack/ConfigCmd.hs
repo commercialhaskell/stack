@@ -48,7 +48,8 @@ data ConfigCmdException
 
 instance Show ConfigCmdException where
     show NoProjectConfigAvailable =
-        "Error: config command used when no project configuration available"
+        "Error: [S-3136]\n"
+        ++ "'config' command used when no project configuration available."
 
 instance Exception ConfigCmdException
 

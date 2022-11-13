@@ -57,15 +57,15 @@ data DotException
   deriving Typeable
 
 instance Show DotException where
-  show (DependencyNotFoundBug depId) = concat
-    [ "Error: The impossible happened! Expected to find "
+  show (DependencyNotFoundBug depId) = bugReport "[S-7071]" $ concat
+    [ "Expected to find "
     , ghcPkgIdString depId
-    , " in global DB"
+    , " in global DB."
     ]
-  show (PackageNotFoundBug pkgName) = concat
-    [ "Error: The impossible happened! The '"
+  show (PackageNotFoundBug pkgName) = bugReport "[S-7151]" $ concat
+    [ "The '"
     , packageNameString pkgName
-    , "' package was not found in any of the dependency sources"
+    , "' package was not found in any of the dependency sources."
     ]
 
 instance Exception DotException

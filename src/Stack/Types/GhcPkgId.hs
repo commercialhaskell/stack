@@ -26,7 +26,11 @@ newtype GhcPkgIdParseFail
   deriving Typeable
 
 instance Show GhcPkgIdParseFail where
-    show (GhcPkgIdParseFail bs) = "Invalid package ID: " ++ show bs
+    show (GhcPkgIdParseFail bs) = concat
+        [ "Error: [S-5359]\n"
+        , "Invalid package ID: "
+        , show bs
+        ]
 
 instance Exception GhcPkgIdParseFail
 
