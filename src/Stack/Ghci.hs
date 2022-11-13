@@ -47,6 +47,7 @@ import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
+import           Stack.Types.PackageFile
 import           Stack.Types.SourceMap
 import           System.IO (putStrLn)
 import           System.IO.Temp (getCanonicalTemporaryDirectory)
