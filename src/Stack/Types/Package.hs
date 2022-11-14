@@ -29,7 +29,8 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
-import Stack.Types.Dependency (DepValue)
+import           Stack.Types.Dependency (DepValue)
+import           Stack.Types.PackageFile (GetPackageFiles(..), DotCabalDescriptor(..), DotCabalPath(..))
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -182,32 +183,6 @@ data BuildInfoOpts = BuildInfoOpts
     , bioCabalMacros :: Path Abs File
     } deriving Show
 
--- | Files that the package depends on, relative to package directory.
--- Argument is the location of the Cabal file
-newtype GetPackageFiles = GetPackageFiles
-    { getPackageFiles :: forall env. HasEnvConfig env
-                      => Path Abs File
-                      -> RIO env
-                           (Map NamedComponent (Map ModuleName (Path Abs File))
-                           ,Map NamedComponent [DotCabalPath]
-                           ,Set (Path Abs File)
-                           ,[PackageWarning])
-    }
-instance Show GetPackageFiles where
-    show _ = "<GetPackageFiles>"
-
--- | Warning generated when reading a package
-data PackageWarning
-    = UnlistedModulesWarning NamedComponent [ModuleName]
-      -- ^ Modules found that are not listed in Cabal file
-
-    -- TODO: bring this back - see
-    -- https://github.com/commercialhaskell/stack/issues/2649
-    {-
-    | MissingModulesWarning (Path Abs File) (Maybe String) [ModuleName]
-      -- ^ Modules not found in file system, which are listed in Cabal file
-    -}
-
 -- | Package build configuration
 data PackageConfig =
   PackageConfig {packageConfigEnableTests :: !Bool                -- ^ Are tests enabled?
@@ -350,20 +325,6 @@ instance FromJSON FileCacheInfo where
   parseJSON = withObject "FileCacheInfo" $ \o -> FileCacheInfo
     <$> o .: "hash"
 
--- | A descriptor from a Cabal file indicating one of the following:
---
--- exposed-modules: Foo
--- other-modules: Foo
--- or
--- main-is: Foo.hs
---
-data DotCabalDescriptor
-    = DotCabalModule !ModuleName
-    | DotCabalMain !FilePath
-    | DotCabalFile !FilePath
-    | DotCabalCFile !FilePath
-    deriving (Eq,Ord,Show)
-
 -- | Maybe get the module name from the .cabal descriptor.
 dotCabalModule :: DotCabalDescriptor -> Maybe ModuleName
 dotCabalModule (DotCabalModule m) = Just m
@@ -373,15 +334,6 @@ dotCabalModule _ = Nothing
 dotCabalMain :: DotCabalDescriptor -> Maybe FilePath
 dotCabalMain (DotCabalMain m) = Just m
 dotCabalMain _ = Nothing
-
--- | A path resolved from the Cabal file, which is either main-is or
--- an exposed/internal/referenced module.
-data DotCabalPath
-    = DotCabalModulePath !(Path Abs File)
-    | DotCabalMainPath !(Path Abs File)
-    | DotCabalFilePath !(Path Abs File)
-    | DotCabalCFilePath !(Path Abs File)
-    deriving (Eq,Ord,Show)
 
 -- | Get the module path.
 dotCabalModulePath :: DotCabalPath -> Maybe (Path Abs File)

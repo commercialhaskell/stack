@@ -36,6 +36,7 @@ import              Stack.Types.Build
 import              Stack.Types.Config
 import              Stack.Types.NamedComponent
 import              Stack.Types.Package
+import              Stack.Types.PackageFile
 import              Stack.Types.SourceMap
 import              System.FilePath (takeFileName)
 import              System.IO.Error (isDoesNotExistError)
