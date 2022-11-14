@@ -22,7 +22,7 @@ module Stack.Types.Version
   ,stackMinorVersion)
   where
 
-import           Stack.Prelude hiding (Vector)
+import           Stack.Prelude hiding (Vector, pretty)
 import           Pantry.Internal.AesonExtended
 import           Data.List (find)
 import qualified Data.Set as Set

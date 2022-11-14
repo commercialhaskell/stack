@@ -299,7 +299,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-8441] | CompilerCacheArchitectureInvalid Text
         ~~~
 
-    -   `Stack.Types.Build.StackBuildException`
+    -   `Stack.Types.Build.BuildException`
 
         ~~~haskell
         [S-7178] = Couldn'tFindPkgId PackageName
@@ -308,7 +308,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2154] | UnknownTargets (Set PackageName) (Map PackageName Version) (Path Abs File)
         [S-1995] | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File)) ByteString
         [S-3819] | TestSuiteTypeUnsupported TestSuiteInterface
-        [S-4804] | ConstructPlanFailed String
         [S-7011] | CabalExitedUnsuccessfully ExitCode PackageIdentifier (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
         [S-6374] | SetupHsBuildFailure ExitCode (Maybe PackageIdentifier) (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
         [S-7282] | ExecutionFailure [SomeException]
@@ -329,6 +328,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3121] | TemplateHaskellNotFoundBug
         [S-6901] | HaddockIndexNotFound
         [S-5452] | ShowBuildErrorBug
+        ~~~
+
+    -   `Stack.Types.Build.BuildPrettyException`
+
+        ~~~haskell
+        [S-4804] | ConstructPlanFailed [ConstructPlanException] (Path Abs File) (Path Abs Dir) ParentMap (Set PackageName) (Map PackageName [PackageName])
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`

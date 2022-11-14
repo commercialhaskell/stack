@@ -5,6 +5,7 @@
 
 module Stack.Prelude
   ( PrettyException (..)
+  , Pretty (..)
   , withSystemTempDir
   , withKeepSystemTempDir
   , sinkProcessStderrStdout
@@ -44,7 +45,7 @@ import           Path as X
 import qualified Path.IO
 import           RIO as X
 import           RIO.File as X hiding ( writeBinaryFileAtomic )
-import           RIO.PrettyPrint ( StyleDoc, (<+>), flow, line )
+import           RIO.PrettyPrint ( Pretty (..), StyleDoc, (<+>), flow, line )
 import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
 import           RIO.Process
                    ( HasProcessContext (..), ProcessContext, setStdin, closed
