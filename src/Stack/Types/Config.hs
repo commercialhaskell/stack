@@ -222,9 +222,12 @@ import           Pantry.Internal (Storage)
 import           Path
 import qualified Paths_stack as Meta
 import qualified RIO.List as List
-import           RIO.PrettyPrint (HasTerm (..), StyleDoc, prettyWarnL, prettyDebugL)
-import           RIO.PrettyPrint.StylesUpdate (StylesUpdate,
-                     parseStylesUpdateFromString, HasStylesUpdate (..))
+import           RIO.PrettyPrint
+                   ( HasTerm (..), StyleDoc, prettyDebugL, prettyWarnL )
+import           RIO.PrettyPrint.StylesUpdate
+                   ( HasStylesUpdate (..), StylesUpdate
+                   , parseStylesUpdateFromString
+                   )
 import           Stack.Constants
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild

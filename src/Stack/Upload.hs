@@ -40,9 +40,7 @@ import           Network.HTTP.StackClient
                    , partLBS, applyDigestAuth, displayDigestAuthException
                    )
 import           RIO.PrettyPrint
-                   ( Pretty (..), Style (..), StyleDoc, (<+>), flow, line
-                   , style, vsep
-                   )
+                   ( Style (..), StyleDoc, (<+>), flow, line, style, vsep )
 import           Stack.Options.UploadParser
 import           Stack.Types.Config
 import           System.Directory
