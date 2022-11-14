@@ -42,13 +42,21 @@ data PackageDumpException
 
 instance Show PackageDumpException where
     show (MissingSingleField name values) = unlines $
-      pure (concat
-        [ "Expected single value for field name "
+        concat
+            [ "Error: [S-4257]\n"
+            , "Expected single value for field name "
+            , show name
+            , " when parsing ghc-pkg dump output:"
+            ]
+        : map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
+    show (Couldn'tParseField name ls) = concat
+        [ "Error: [S-2016]\n"
+        , "Couldn't parse the field "
         , show name
-        , " when parsing ghc-pkg dump output:"
-        ]) ++ map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
-    show (Couldn'tParseField name ls) =
-        "Couldn't parse the field " ++ show name ++ " from lines: " ++ show ls
+        , " from lines: "
+        , show ls
+        , "."
+        ]
 
 instance Exception PackageDumpException
 

@@ -31,8 +31,8 @@ newtype TypeTemplateNameException
     deriving Typeable
 
 instance Show TypeTemplateNameException where
-    show (DefaultTemplateNameNotParsedBug s) =
-        "Error: The impossible happened! Cannot parse default template name: "
+    show (DefaultTemplateNameNotParsedBug s) = bugReport "[S-7410]" $
+        "The impossible happened! Cannot parse default template name: "
         ++ s
 
 instance Exception TypeTemplateNameException

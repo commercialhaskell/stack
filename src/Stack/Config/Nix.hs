@@ -31,10 +31,15 @@ data ConfigNixException
 
 instance Show ConfigNixException where
   show NixCannotUseShellFileAndPackagesException =
-    "Error: You cannot have packages and a shell-file filled at the same time \
-    \in your nix-shell configuration."
-  show GHCMajorVersionUnspecified = "Error: GHC major version not specified"
-  show OnlyGHCSupported = "Error: Only GHC is supported by stack --nix"
+    "Error: [S-2726]\n"
+    ++ "You cannot have packages and a shell-file filled at the same time \
+       \in your nix-shell configuration."
+  show GHCMajorVersionUnspecified =
+    "Error: [S-9317]\n"
+    ++ "GHC major version not specified."
+  show OnlyGHCSupported =
+    "Error: [S-8605]\n"
+    ++ "Only GHC is supported by 'stack --nix'."
 
 instance Exception ConfigNixException
 

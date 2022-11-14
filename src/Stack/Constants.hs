@@ -149,8 +149,8 @@ data ConstantsException
   deriving Typeable
 
 instance Show ConstantsException where
-  show WiredInPackagesNotParsedBug =
-    "Error: The impossible happened! Parse error in wiredInPackages."
+  show WiredInPackagesNotParsedBug = bugReport "[S-6057]"
+    "Parse error in wiredInPackages."
 
 instance Exception ConstantsException
 

@@ -64,88 +64,130 @@ data DockerException
 
 instance Show DockerException where
     show DockerMustBeEnabledException =
-        "Docker must be enabled in your configuration file to use this command."
+        "Error: [S-3223]\n"
+        ++ "Docker must be enabled in your configuration file to use this \
+           \command."
     show OnlyOnHostException =
-        "This command must be run on host OS (not in a Docker container)."
-    show (InspectFailedException image) =
-        concat ["'docker inspect' failed for image after pull: ",image,"."]
-    show (NotPulledException image) =
-        concat ["The Docker image referenced by your configuration file"
-               ," has not\nbeen downloaded:\n    "
-               ,image
-               ,"\n\nRun '"
-               ,unwords [stackProgName, dockerCmdName, dockerPullCmdName]
-               ,"' to download it, then try again."]
-    show (InvalidImagesOutputException line) =
-        concat ["Invalid 'docker images' output line: '",line,"'."]
-    show (InvalidPSOutputException line) =
-        concat ["Invalid 'docker ps' output line: '",line,"'."]
-    show (InvalidInspectOutputException msg) =
-        concat ["Invalid 'docker inspect' output: ",msg,"."]
-    show (PullFailedException image) =
-        concat ["Could not pull Docker image:\n    "
-               ,image
-               ,"\nThere may not be an image on the registry for your resolver's LTS version in\n"
-               ,"your configuration file."]
-    show (DockerTooOldException minVersion haveVersion) =
-        concat ["Minimum docker version '"
-               ,versionString minVersion
-               ,"' is required by "
-               ,stackProgName
-               ," (you have '"
-               ,versionString haveVersion
-               ,"')."]
-    show (DockerVersionProhibitedException prohibitedVersions haveVersion) =
-        concat ["These Docker versions are incompatible with "
-               ,stackProgName
-               ," (you have '"
-               ,versionString haveVersion
-               ,"'): "
-               ,intercalate ", " (map versionString prohibitedVersions)
-               ,"."]
-    show (BadDockerVersionException requiredRange haveVersion) =
-        concat ["The version of 'docker' you are using ("
-               ,show haveVersion
-               ,") is outside the required\n"
-               ,"version range specified in stack.yaml ("
-               ,T.unpack (versionRangeText requiredRange)
-               ,")."]
+        "Error: [S-9779]\n"
+        ++ "This command must be run on host OS (not in a Docker container)."
+    show (InspectFailedException image) = concat
+        [ "Error: [S-9105]\n"
+        , "'docker inspect' failed for image after pull: "
+        , image
+        , "."
+        ]
+    show (NotPulledException image) = concat
+        [ "Error: [S-6626]\n"
+        , "The Docker image referenced by your configuration file"
+        , " has not\nbeen downloaded:\n    "
+        , image
+        , "\n\nRun '"
+        , unwords [stackProgName, dockerCmdName, dockerPullCmdName]
+        , "' to download it, then try again."
+        ]
+    show (InvalidImagesOutputException line) = concat
+        [ "Error: [S-5841]\n"
+        , "Invalid 'docker images' output line: '"
+        , line
+        , "'."
+        ]
+    show (InvalidPSOutputException line) = concat
+        [ "Error: [S-9608]\n"
+        , "Invalid 'docker ps' output line: '"
+        , line
+        ,"'."
+        ]
+    show (InvalidInspectOutputException msg) = concat
+        [ "Error: [S-2240]\n"
+        , "Invalid 'docker inspect' output: "
+        , msg
+        , "."
+        ]
+    show (PullFailedException image) = concat
+        [ "Error: [S-6092]\n"
+        , "Could not pull Docker image:\n    "
+        , image
+        , "\nThere may not be an image on the registry for your resolver's LTS \
+          \version in\n"
+        , "your configuration file."
+        ]
+    show (DockerTooOldException minVersion haveVersion) = concat
+        [ "Error: [S-6281]\n"
+        , "Minimum docker version '"
+        , versionString minVersion
+        , "' is required by "
+        , stackProgName
+        , " (you have '"
+        , versionString haveVersion
+        , "')."
+        ]
+    show (DockerVersionProhibitedException prohibitedVersions haveVersion) = concat
+        [ "Error: [S-8252]\n"
+        , "These Docker versions are incompatible with "
+        , stackProgName
+        , " (you have '"
+        , versionString haveVersion
+        , "'): "
+        , intercalate ", " (map versionString prohibitedVersions)
+        , "."
+        ]
+    show (BadDockerVersionException requiredRange haveVersion) = concat
+        [ "Error: [S-6170]\n"
+        , "The version of 'docker' you are using ("
+        , show haveVersion
+        , ") is outside the required\n"
+        , "version range specified in stack.yaml ("
+        , T.unpack (versionRangeText requiredRange)
+        , ")."
+        ]
     show InvalidVersionOutputException =
-        "Cannot get Docker version (invalid 'docker --version' output)."
-    show (HostStackTooOldException minVersion (Just hostVersion)) =
-        concat ["The host's version of '"
-               ,stackProgName
-               ,"' is too old for this Docker image.\nVersion "
-               ,versionString minVersion
-               ," is required; you have "
-               ,versionString hostVersion
-               ,"."]
-    show (HostStackTooOldException minVersion Nothing) =
-        concat ["The host's version of '"
-               ,stackProgName
-               ,"' is too old.\nVersion "
-               ,versionString minVersion
-               ," is required."]
-    show (ContainerStackTooOldException requiredVersion containerVersion) =
-        concat ["The Docker container's version of '"
-               ,stackProgName
-               ,"' is too old.\nVersion "
-               ,versionString requiredVersion
-               ," is required; the container has "
-               ,versionString containerVersion
-               ,"."]
+        "Error: [S-5827]\n"
+        ++ "Cannot get Docker version (invalid 'docker --version' output)."
+    show (HostStackTooOldException minVersion (Just hostVersion)) = concat
+        [ "Error: [S-7112]\n"
+        , "The host's version of '"
+        , stackProgName
+        , "' is too old for this Docker image.\nVersion "
+        , versionString minVersion
+        , " is required; you have "
+        , versionString hostVersion
+        , "."
+        ]
+    show (HostStackTooOldException minVersion Nothing) = concat
+        [ "Error: [S-7112]\n"
+        , "The host's version of '"
+        , stackProgName
+        , "' is too old.\nVersion "
+        , versionString minVersion
+        , " is required."
+        ]
+    show (ContainerStackTooOldException requiredVersion containerVersion) = concat
+        [ "Error: [S-5832]\n"
+        , "The Docker container's version of '"
+        , stackProgName
+        , "' is too old.\nVersion "
+        , versionString requiredVersion
+        , " is required; the container has "
+        , versionString containerVersion
+        , "."
+        ]
     show CannotDetermineProjectRootException =
-        "Cannot determine project root directory for Docker sandbox."
+        "Error: [S-4078]\n"
+        ++ "Cannot determine project root directory for Docker sandbox."
     show DockerNotInstalledException =
-        "Cannot find 'docker' in PATH.  Is Docker installed?"
+        "Error: [S-7058]\n"
+        ++ "Cannot find 'docker' in PATH.  Is Docker installed?"
     show UnsupportedStackExeHostPlatformException = concat
-        [ "Using host's "
+        [ "Error: [S-6894]\n"
+        , "Using host's "
         , stackProgName
         , " executable in Docker container is only supported on "
         , display dockerContainerPlatform
-        , " platform" ]
+        , " platform."
+        ]
     show (DockerStackExeParseException s) = concat
-        [ "Failed to parse "
+        [ "Error: [S-1512]\n"
+        , "Failed to parse "
         , show s
         , ". Expected "
         , show dockerStackExeDownloadVal

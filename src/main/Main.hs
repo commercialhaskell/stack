@@ -101,7 +101,8 @@ data MainException
 
 instance Show MainException where
   show (InvalidReExecVersion expected actual) = concat
-    [ "When re-executing '"
+    [ "Error: [S-2186]\n"
+    , "When re-executing '"
     , stackProgName
     , "' in a container, the incorrect version was found\nExpected: "
     , expected
@@ -109,9 +110,10 @@ instance Show MainException where
     , actual
     ]
   show (InvalidPathForExec path) = concat
-    [ "Got an invalid --cwd argument for stack exec ("
+    [ "Error: [S-1541]\n"
+    , "Got an invalid '--cwd' argument for 'stack exec' ("
     , path
-    , ")"
+    , ")."
     ]
 
 instance Exception MainException
@@ -121,26 +123,32 @@ instance Exception MainException
 data MainPrettyException
   = GHCProfOptionInvalid
   | ResolverOptionInvalid
-  | PackageIdNotFound !String
+  | PackageIdNotFoundBug !String
   | ExecutableToRunNotFound
   deriving (Show, Typeable)
 
 instance Pretty MainPrettyException where
   pretty GHCProfOptionInvalid =
-       flow "When building with Stack, you should not use GHC's '-prof' \
+       "[S-8100]"
+    <> line
+    <> flow "When building with Stack, you should not use GHC's '-prof' \
             \option. Instead, please use Stack's '--library-profiling' and \
             \'--executable-profiling' flags. See:" <+>
             style Url "https://github.com/commercialhaskell/stack/issues/1015"
     <> "."
   pretty ResolverOptionInvalid =
-    flow "The '--resolver' option cannot be used with Stack's 'upgrade' \
-         \command."
-  pretty (PackageIdNotFound name) =
-       flow "The impossible happened! Could not find the package id of the \
-            \package" <+> style Target (fromString name)
+       "[S-8761]"
+    <> line
+    <> flow "The '--resolver' option cannot be used with Stack's 'upgrade' \
+            \command."
+  pretty (PackageIdNotFoundBug name) = bugPrettyReport "[S-8251]" $
+    "Could not find the package id of the package" <+>
+      style Target (fromString name)
     <> "."
   pretty ExecutableToRunNotFound =
-    flow "No executables found."
+       "[S-2483]"
+    <> line
+    <> flow "No executables found."
 
 instance Exception MainPrettyException
 
@@ -847,7 +855,7 @@ execCmd ExecOpts {..} =
           case mId of
               Just i -> pure (L.head $ words (T.unpack i))
               -- should never happen as we have already installed the packages
-              _      -> throwIO $ PrettyException (PackageIdNotFound name)
+              _      -> throwIO $ PrettyException (PackageIdNotFoundBug name)
 
       getPkgOpts pkgs =
           map ("-package-id=" ++) <$> mapM getPkgId pkgs

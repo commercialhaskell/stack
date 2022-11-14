@@ -65,20 +65,29 @@ data GhciException
 
 instance Show GhciException where
     show (InvalidPackageOption name) =
-        "Failed to parse --package option " ++ name
+        "Error: [S-6716]\n"
+        ++ "Failed to parse '--package' option " ++ name ++ "."
     show LoadingDuplicateModules = unlines
-        [ "Not attempting to start ghci due to these duplicate modules."
-        , "Use --no-load to try to start it anyway, without loading any modules (but these are still likely to cause errors)"
+        [ "Error: [S-9632]"
+        , "Not attempting to start ghci due to these duplicate modules."
+        , "Use '--no-load' to try to start it anyway, without loading any \
+          \modules (but these are still likely to cause errors)."
         ]
     show (MissingFileTarget name) =
-        "Cannot find file target " ++ name
+        "Error: [S-3600]\n"
+        ++ "Cannot find file target " ++ name ++ "."
     show Can'tSpecifyFilesAndTargets =
-        "Cannot use 'stack ghci' with both file targets and package targets"
+        "Error: [S-9906]\n"
+        ++ "Cannot use 'stack ghci' with both file targets and package targets."
     show Can'tSpecifyFilesAndMainIs =
-        "Cannot use 'stack ghci' with both file targets and --main-is flag"
+        "Error: [S-5188]\n"
+        ++ "Cannot use 'stack ghci' with both file targets and '--main-is' \
+           \flag."
     show (GhciTargetParseException xs) =
-        show (TargetParseException xs) ++
-        "\nNote that to specify options to be passed to GHCi, use the --ghci-options flag"
+        "Error: [S-6948]\n"
+        ++ show (TargetParseException xs)
+        ++ "\nNote that to specify options to be passed to GHCi, use the \
+           \'--ghci-options' flag."
 
 instance Exception GhciException
 

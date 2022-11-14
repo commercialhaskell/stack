@@ -31,13 +31,11 @@ data LockException
     deriving Typeable
 
 instance Show LockException where
-    show (WritingLockFileError lockFile newLocked) = concat
-        [ "Error: You indicated that Stack should error out on writing a lock \
-          \file\n"
-        , "You indicated that Stack should error out on writing a lock file\n"
+    show (WritingLockFileError lockFile newLocked) = unlines
+        [ "Error: [S-1353]"
+        , "You indicated that Stack should error out on writing a lock file"
         , "Stack just tried to write the following lock file contents to "
-        , toFilePath lockFile
-        , "\n"
+          ++ toFilePath lockFile
         , T.unpack $ decodeUtf8With lenientDecode $ Yaml.encode newLocked
         ]
 

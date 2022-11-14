@@ -51,19 +51,23 @@ data ScriptException
 
 instance Show ScriptException where
     show (MutableDependenciesForScript names) = unlines
-        $ "No mutable packages are allowed in the `script` command. Mutable \
+        $ "Error: [S-4994]"
+        : "No mutable packages are allowed in the 'script' command. Mutable \
           \packages found:"
         : map (\name -> "- " ++ packageNameString name) names
     show (AmbiguousModuleName mname pkgs) = unlines
-        $ (  "Module "
+        $ "Error: [S-1691]"
+        : (  "Module "
           ++ moduleNameString mname
           ++ " appears in multiple packages: "
           )
         : [ unwords $ map packageNameString pkgs ]
     show ArgumentsWithNoRunInvalid =
-        "Error: --no-run incompatible with arguments"
+        "Error: [S-5067]\n"
+        ++ "'--no-run' incompatible with arguments."
     show NoRunWithoutCompilationInvalid =
-        "Error: --no-run requires either --compile or --optimize"
+        "Error: [S-9469]\n"
+        ++ "'--no-run' requires either '--compile' or '--optimize'."
 
 instance Exception ScriptException
 

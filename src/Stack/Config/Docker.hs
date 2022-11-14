@@ -26,7 +26,8 @@ data ConfigDockerException
 instance Show ConfigDockerException where
     show (ResolverNotSupportedException mproject maresolver) =
         concat
-            [ "Resolver not supported for Docker images:\n    "
+            [ "Error: [S-8575]\n"
+            , "Resolver not supported for Docker images:\n    "
             , case (mproject, maresolver) of
                 (Nothing, Nothing) -> "no resolver specified"
                 (_, Just aresolver) -> T.unpack $ utf8BuilderToText $ display aresolver

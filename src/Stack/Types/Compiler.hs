@@ -38,8 +38,12 @@ data CompilerException
   deriving Typeable
 
 instance Show CompilerException where
-    show GhcjsNotSupported = "GHCJS is no longer supported by Stack"
-    show (PantryException p) = displayException p
+    show GhcjsNotSupported =
+        "Error: [S-7903]\n"
+        ++ "GHCJS is no longer supported by Stack."
+    show (PantryException p) =
+        "Error: [S-7972]\n"
+        ++ displayException p
 
 instance Exception CompilerException
 

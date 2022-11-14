@@ -272,21 +272,24 @@ data ConfigException
 
 instance Show ConfigException where
     show (ParseConfigFileException configFile exception) = concat
-        [ "Could not parse '"
+        [ "Error: [S-6602]\n"
+        , "Could not parse '"
         , toFilePath configFile
         , "':\n"
         , Yaml.prettyPrintParseException exception
         , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/"
         ]
     show (ParseCustomSnapshotException url exception) = concat
-        [ "Could not parse '"
+        [ "Error: [S-8981]\n"
+        , "Could not parse '"
         , T.unpack url
         , "':\n"
         , Yaml.prettyPrintParseException exception
         , "\nSee https://docs.haskellstack.org/en/stable/custom_snapshot/"
         ]
     show (NoProjectConfigFound dir mcmd) = concat
-        [ "Unable to find a stack.yaml file in the current directory ("
+        [ "Error: [S-2206]\n"
+        , "Unable to find a stack.yaml file in the current directory ("
         , toFilePath dir
         , ") or its ancestors"
         , case mcmd of
@@ -294,18 +297,24 @@ instance Show ConfigException where
             Just cmd -> "\nRecommended action: stack " ++ T.unpack cmd
         ]
     show (UnexpectedArchiveContents dirs files) = concat
-        [ "When unpacking an archive specified in your stack.yaml file, "
+        [ "Error: [S-4964]\n"
+        , "When unpacking an archive specified in your stack.yaml file, "
         , "did not find expected contents. Expected: a single directory. Found: "
         , show ( map (toFilePath . dirname) dirs
                , map (toFilePath . filename) files
                )
         ]
     show (UnableToExtractArchive url file) = concat
-        [ "Archive extraction failed. Tarballs and zip archives are supported, couldn't handle the following URL, "
-        , T.unpack url, " downloaded to the file ", toFilePath $ filename file
+        [ "Error: [S-2040]\n"
+        , "Archive extraction failed. Tarballs and zip archives are supported, \
+          \couldn't handle the following URL, "
+        , T.unpack url
+        , " downloaded to the file "
+        , toFilePath $ filename file
         ]
     show (BadStackVersionException requiredRange) = concat
-        [ "The version of Stack you are using ("
+        [ "Error: [S-1641]\n"
+        , "The version of Stack you are using ("
         , show (mkVersion' Meta.version)
         , ") is outside the required\n"
         ,"version range specified in stack.yaml ("
@@ -315,14 +324,16 @@ instance Show ConfigException where
         , "stack upgrade"
         ]
     show (NoMatchingSnapshot names) = concat
-        [ "None of the following snapshots provides a compiler matching "
+        [ "Error: [S-1833]\n"
+        , "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
         , unlines $ map (\name -> "    - " <> show name)
                         (NonEmpty.toList names)
         , resolveOptions
         ]
     show (ResolverMismatch resolver errDesc) = concat
-        [ "Resolver '"
+        [ "Error: [S-6395]\n"
+        , "Resolver '"
         , T.unpack $ utf8BuilderToText $ display resolver
         , "' does not have a matching compiler to build some or all of your "
         , "package(s).\n"
@@ -330,30 +341,40 @@ instance Show ConfigException where
         , resolveOptions
         ]
     show (ResolverPartial resolver errDesc) = concat
-        [ "Resolver '"
+        [ "Error: [S-2422]\n"
+        , "Resolver '"
         , T.unpack $ utf8BuilderToText $ display resolver
         , "' does not have all the packages to match your requirements.\n"
         , unlines $ fmap ("    " <>) (lines errDesc)
         , resolveOptions
         ]
-    show (NoSuchDirectory dir) =
-        "No directory could be located matching the supplied path: " ++ dir
-    show (ParseGHCVariantException v) =
-        "Invalid ghc-variant value: " ++ v
+    show (NoSuchDirectory dir) = concat
+        [ "Error: [S-8773]\n"
+        , "No directory could be located matching the supplied path: "
+        , dir
+        ]
+    show (ParseGHCVariantException v) = concat
+        [ "Error: [S-3938]\n"
+        , "Invalid ghc-variant value: "
+        , v
+        ]
     show (BadStackRoot stackRoot) = concat
-        [ "Invalid Stack root: '"
+        [ "Error: [S-8530]\n"
+        , "Invalid Stack root: '"
         , toFilePath stackRoot
         , "'. Please provide a valid absolute path."
         ]
     show (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
-        [ "Preventing creation of Stack root '"
+        [ "Error: [S-7613]\n"
+        , "Preventing creation of Stack root '"
         , toFilePath envStackRoot
         , "'. Parent directory '"
         , toFilePath parentDir
         , "' is owned by someone else."
         ]
     show (UserDoesn'tOwnDirectory dir) = concat
-        [ "You are not the owner of '"
+        [ "Error: [S-8707]\n"
+        , "You are not the owner of '"
         , toFilePath dir
         , "'. Aborting to protect file permissions."
         , "\nRetry with '--"
@@ -361,21 +382,26 @@ instance Show ConfigException where
         , "' to disable this precaution."
         ]
     show ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
-        [ "Stack can only control the "
+        [ "Error: [S-3605]\n"
+        , "Stack can only control the "
         , configMonoidGHCVariantName
         , " of its own GHC installations. Please use '--no-"
         , configMonoidSystemGHCName
         , "'."
         ]
     show NixRequiresSystemGhc = T.unpack $ T.concat
-        [ "Stack's Nix integration is incompatible with '--no-system-ghc'. "
+        [ "Error: [S-6816]\n"
+        , "Stack's Nix integration is incompatible with '--no-system-ghc'. "
         , "Please use '--"
         , configMonoidSystemGHCName
         , "' or disable the Nix integration."
         ]
-    show NoResolverWhenUsingNoProject = "When using the script command, you must provide a resolver argument"
+    show NoResolverWhenUsingNoProject =
+        "Error: [S-5027]\n"
+        ++ "When using the script command, you must provide a resolver argument"
     show (DuplicateLocalPackageNames pairs) = concat
-        $ "The same package name is used in multiple local packages\n"
+        $ "Error: [S-5470]\n"
+        : "The same package name is used in multiple local packages\n"
         : map go pairs
       where
         go (name, dirs) = unlines
@@ -383,11 +409,18 @@ instance Show ConfigException where
             : (packageNameString name ++ " used in:")
             : map goLoc dirs
         goLoc loc = "- " ++ show loc
-    show (NoLTSWithMajorVersion n) =
-        "Error: No LTS release found with major version " ++ show n
-    show NoLTSFound = "Error: No LTS releases found"
+    show (NoLTSWithMajorVersion n) = concat
+        [ "Error: [S-3803]\n"
+        , "No LTS release found with major version "
+        , show n
+        , "."
+        ]
+    show NoLTSFound =
+        "Error: [S-5472]\n"
+        ++ "No LTS releases found."
     show (MultiplePackageIndices pics) = concat
-        [ "Error: When using the 'package-indices' key to override the default "
+        [ "Error: [S-3251]\n"
+        , "When using the 'package-indices' key to override the default "
         , "package index, you must provide exactly one value, received: "
         , show pics
         , "\n"
@@ -402,7 +435,8 @@ data ParseAbsolutePathException
 
 instance Show ParseAbsolutePathException where
     show (ParseAbsolutePathException envVar dir) = concat
-        [ "Error: Failed to parse "
+        [ "Error: [S-9437]\n"
+        , "Failed to parse "
         , envVar
         , " environment variable (expected absolute directory): "
         , dir

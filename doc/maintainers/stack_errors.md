@@ -26,7 +26,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Control.Concurrent.ExecuteException`
 
         ~~~haskell
-        [S-2816] = InconsistentDependencies
+        [S-2816] = InconsistentDependenciesBug
         ~~~
 
     -   `Main.MainException`
@@ -41,7 +41,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-8100] = GHCProfOptionInvalid
         [S-8761] | ResolverOptionInvalid
-        [S-8251] | PackageIdNotFound String
+        [S-8251] | PackageIdNotFoundBug String
         [S-2483] | ExecutableToRunNotFound
         ~~~
 
@@ -147,7 +147,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-3025] = HoogleDatabaseNotFound
         [S-1329] | HoogleNotFound String
-        [S-9669] | HoogleOnPathNotFound
+        [S-9669] | HoogleOnPathNotFoundBug
         ~~~
 
     -   `Stack.Init.InitException`
@@ -166,16 +166,16 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-4926] = CouldNotParsePackageSelectors [String]
         ~~~
 
-    -   `Stack.Ls.LsException` *
-
-        ~~~haskell
-        [S-3421] = ParseFailure [Value]
-        ~~~
-
     -   `Stack.Lock.LockException`
 
         ~~~haskell
         [S-1353] = WritingLockFileError (Path Abs File) Locked
+        ~~~
+
+    -   `Stack.Ls.LsException` *
+
+        ~~~haskell
+        [S-3421] = ParseFailure [Value]
         ~~~
 
     -   `Stack.New.NewException`
@@ -272,10 +272,10 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-1827] | UnknownArchiveStructure (Path Abs File)
         [S-9476] | StackReleaseInfoNotFound String
         [S-4461] | StackBinaryArchiveNotFound [String]
-        [S-2076] | WorkingDirectoryInvalid
+        [S-2076] | WorkingDirectoryInvalidBug
         [S-6617] | HadrianBindistNotFound
         [S-7227] | DownloadAndInstallCompilerError
-        [S-3967] | StackBinaryArchiveZipUnsupported
+        [S-3967] | StackBinaryArchiveZipUnsupportedBug
         [S-6636] | StackBinaryArchiveUnsupported Text
         [S-7871] | StackBinaryNotInArchive String Text
         [S-5046] | FileTypeInArchiveInvalid Entry Text
@@ -328,6 +328,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-6739] | MulipleResultsBug PackageName [DumpPackage]
         [S-3121] | TemplateHaskellNotFoundBug
         [S-6901] | HaddockIndexNotFound
+        [S-5452] | ShowBuildErrorBug
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`
@@ -421,6 +422,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-7410] = DefaultTemplateNameNotParsedBug String
         ~~~
 
+    -   `Stack.Unpack.UnpackException`
+
+        ~~~haskell
+        [S-3515] = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
+        [S-2628] | CouldNotParsePackageSelectors [String]
+        ~~~
+
     -   `Stack.Upgrade.UpgradeException`
 
         ~~~haskell
@@ -436,13 +444,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-2256] = AuthenticationFailure
         [S-6108] | ArchiveUploadFailure Int [String] String
-        ~~~
-
-    -   `Stack.Unpack.UnpackException`
-
-        ~~~haskell
-        [S-3515] = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
-        [S-2628] | CouldNotParsePackageSelectors [String]
         ~~~
 
     -   `System.Process.Pager.PagerException`

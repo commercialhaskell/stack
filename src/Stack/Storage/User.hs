@@ -63,14 +63,19 @@ data StorageUserException
 
 instance Show StorageUserException where
     show CompilerFileMetadataMismatch =
-        "Error: Compiler file metadata mismatch, ignoring cache"
+        "Error: [S-8196]\n"
+        ++ "Compiler file metadata mismatch, ignoring cache."
     show GlobalPackageCacheFileMetadataMismatch =
-        "Error: Global package cache file metadata mismatch, ignoring cache"
+        "Error: [S-5378]\n"
+        ++ "Global package cache file metadata mismatch, ignoring cache."
     show GlobalDumpParseFailure =
-        "Error: Global dump did not parse correctly"
-    show (CompilerCacheArchitectureInvalid compilerCacheArch) =
-        "Error: Invalid arch: "
-        ++ show compilerCacheArch
+        "Error: [S-2673]\n"
+        ++ "Global dump did not parse correctly."
+    show (CompilerCacheArchitectureInvalid compilerCacheArch) = concat
+        [ "Error: [S-8441]\n"
+        , "Invalid arch: "
+        , show compilerCacheArch
+        ]
 
 instance Exception StorageUserException
 

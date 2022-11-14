@@ -47,7 +47,8 @@ newtype LsException
 
 instance Show LsException where
     show (ParseFailure val) =
-        "Error: Failure to parse values as a snapshot: "
+        "Error: [S-3421]\n"
+        ++ "Failure to parse values as a snapshot: "
         ++ show val
 
 instance Exception LsException

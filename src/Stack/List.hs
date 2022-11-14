@@ -18,7 +18,9 @@ newtype ListException
     deriving Typeable
 
 instance Show ListException where
-    show (CouldNotParsePackageSelectors strs) = unlines $ map ("- " ++) strs
+    show (CouldNotParsePackageSelectors strs) = unlines $
+        "Error: [S-4926]"
+        : map ("- " ++) strs
 
 instance Exception ListException
 

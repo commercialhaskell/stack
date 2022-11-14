@@ -21,14 +21,13 @@ import qualified Data.Set                 as Set
 -- | Type representing exceptions thrown by functions exported by the
 -- "Control.Concurrent.Execute" module.
 data ExecuteException
-    = InconsistentDependencies
+    = InconsistentDependenciesBug
     deriving Typeable
 
 instance Show ExecuteException where
-    show InconsistentDependencies =
+    show InconsistentDependenciesBug = bugReport "[S-2816]"
         "Inconsistent dependencies were discovered while executing your build \
-        \plan. This should never happen, please report it as a bug to the \
-        \Stack team."
+        \plan."
 
 instance Exception ExecuteException
 
@@ -126,7 +125,8 @@ runActions' ExecuteState {..} =
                 if Set.null inAction
                     then do
                         unless esKeepGoing $
-                            modifyTVar esExceptions (toException InconsistentDependencies:)
+                            modifyTVar esExceptions
+                                (toException InconsistentDependenciesBug:)
                         pure $ pure ()
                     else retry
             (xs, action:ys) -> do
