@@ -32,7 +32,6 @@ extra-source-files:
     ChangeLog.md
     README.md
     stack.yaml
-    stack-macos.yaml
     doc/azure_ci.md
     doc/build_command.md
     doc/build_overview.md

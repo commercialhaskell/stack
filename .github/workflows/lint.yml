@@ -22,7 +22,7 @@ jobs:
     - name: Set up HLint
       uses: haskell/actions/hlint-setup@v2
       with:
-        version: "3.4"
+        version: "3.5"
     - name: Apply HLint
       run: |
         set -ex

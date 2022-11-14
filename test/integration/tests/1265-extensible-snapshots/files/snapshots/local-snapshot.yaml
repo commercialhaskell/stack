@@ -1,5 +1,5 @@
 ---
-resolver: nightly-2022-09-05
+resolver: lts-20.0
 name: local-snapshot
 packages:
 - archive: package-0.1.2.3.tar.gz

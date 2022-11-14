@@ -281,7 +281,7 @@ would seek. Instead, Stack aims to define a well-known combination of
 dependencies on which its executable relies. That applies in particular to the
 `Cabal` package, where Stack aims to support one, and only one, version of
 `Cabal` with each release of its executable. At the time of writing (September
-2022) that combination is defined by resolver `nightly-2022-09-05` (for
+2022) that combination is defined by resolver `nightly-2022-11-14` (for
 GHC 9.2.4, and including `Cabal-3.6.3.0`) - see `stack.yaml`.
 
 ## Code Quality

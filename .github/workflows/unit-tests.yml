@@ -9,8 +9,8 @@ on:
     - rc/**
   workflow_dispatch:
 
-# As of 11 August 2022, ubuntu-latest, windows-latest and macos-latest come with
-# Stack 2.7.5. ubuntu-latest comes with GHC 9.2.4.
+# As of 14 November 2022, ubuntu-latest, windows-latest and macos-latest come
+# with Stack 2.9.1 and GHC 9.4.2.
 
 jobs:
   pedantic:
@@ -36,19 +36,15 @@ jobs:
       matrix:
         include:
         - os: ubuntu-latest
-          stack-yaml: stack.yaml
           extra-suffix: ""
           stack-args: ""
         - os: ubuntu-latest
-          stack-yaml: stack.yaml
           extra-suffix: "alpine"
           stack-args: "--docker --system-ghc --no-install-ghc --flag stack:static"
         - os: windows-latest
-          stack-yaml: stack.yaml
           extra-suffix: ""
           stack-args: ""
         - os: macos-latest
-          stack-yaml: stack-macos.yaml
           extra-suffix: ""
           stack-args: ""
     steps:
@@ -59,7 +55,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ~/.stack
-        key: ${{ runner.os }}-${{ hashFiles(matrix.stack-yaml) }}-${{ matrix.extra-suffix }}
+        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.extra-suffix }}
     - name: Cache dependencies on Windows
       if: startsWith(runner.os, 'Windows')
       uses: actions/cache@v3
@@ -67,7 +63,7 @@ jobs:
         path: |
           ~\AppData\Roaming\stack
           ~\AppData\Local\Programs\stack
-        key: ${{ runner.os }}-${{ hashFiles(matrix.stack-yaml) }}-${{ matrix.extra-suffix }}
+        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.extra-suffix }}
     - name: Run tests
       shell: bash
       run: |
@@ -86,7 +82,7 @@ jobs:
         EOF
         fi
 
-        stack test ${{ matrix.stack-args }} --stack-yaml ${{ matrix.stack-yaml }} --haddock --no-haddock-deps --ghc-options="-Werror -O0" --copy-bins --local-bin-path bin
+        stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror -O0" --copy-bins --local-bin-path bin
 
         # Get output about whether the exe is dynamically linked
         if [[ "${{ matrix.os }}" == "macos-latest" ]]

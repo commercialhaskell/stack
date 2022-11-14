@@ -31,7 +31,6 @@ extra-source-files:
 - ChangeLog.md
 - README.md
 - stack.yaml
-- stack-macos.yaml
 - doc/*.md
 - src/setup-shim/StackSetupShim.hs
 - test/package-dump/ghc-7.10.txt

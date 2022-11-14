@@ -1,4 +1,4 @@
-resolver: nightly-2022-09-05
+resolver: lts-20.0
 name: snapshot-modify-lts
 drop-packages:
 - zlib
