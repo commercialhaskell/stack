@@ -729,11 +729,8 @@ addPackageDeps package = do
                                     , "."
                                     ]
                         allowNewer <- view $ configL.to configAllowNewer
-                        if allowNewer
-                            then do
-                                warn_ "allow-newer enabled"
-                                pure True
-                            else do
+                        allowNewerDeps <- view $ configL.to configAllowNewerDeps
+                        let inSnapshotCheck = do
                                 -- We ignore dependency information for packages in a snapshot
                                 x <- inSnapshot (packageName package) (packageVersion package)
                                 y <- inSnapshot depname (adrVersion adr)
@@ -742,6 +739,19 @@ addPackageDeps package = do
                                         warn_ "trusting snapshot over Cabal file dependency information"
                                         pure True
                                     else pure False
+                        if allowNewer
+                            then do
+                                warn_ "allow-newer enabled"
+                                case allowNewerDeps of
+                                    Nothing -> pure True
+                                    Just boundsIgnoredDeps ->
+                                        pure $ packageName package `elem` boundsIgnoredDeps
+                            else do
+                                when (isJust allowNewerDeps) $
+                                    warn_ "allow-newer-deps are specified but allow-newer isn't enabled"
+                                inSnapshotCheck
+
+
                 if inRange
                     then case adr of
                         ADRToInstall task -> pure $ Right

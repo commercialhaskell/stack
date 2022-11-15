@@ -1,0 +1,8 @@
+name: foo
+version: 0
+
+dependencies:
+- base >= 4.13 && < 4.14
+
+library:
+  source-dirs: src

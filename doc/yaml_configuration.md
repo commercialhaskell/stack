@@ -367,6 +367,19 @@ The name `allow-newer` is chosen to match the commonly-used Cabal option.
 allow-newer: true
 ~~~
 
+### allow-newer-deps (experimental)
+
+Default: `none`
+
+Determines a subset of packages to which `allow-newer` should apply. This option
+has no effect (but warns) if `allow-newer` is `false`.
+
+~~~yaml
+allow-newer-deps:
+  - foo
+  - bar
+~~~
+
 ### apply-ghc-options
 
 [:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)

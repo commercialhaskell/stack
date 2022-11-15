@@ -1,0 +1,5 @@
+resolver: nightly-2022-09-05
+
+allow-newer: true
+allow-newer-deps:
+- foo

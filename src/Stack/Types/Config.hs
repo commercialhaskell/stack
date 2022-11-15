@@ -64,6 +64,8 @@ module Stack.Types.Config
   -- * Details
   -- ** ApplyGhcOptions
   ,ApplyGhcOptions(..)
+  -- ** AllowNewerDeps
+  ,AllowNewerDeps(..)
   -- ** CabalConfigKey
   ,CabalConfigKey(..)
   -- ** ConfigException
@@ -560,6 +562,9 @@ data Config =
          ,configAllowNewer          :: !Bool
          -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
          -- match cabal.
+         ,configAllowNewerDeps      :: !(Maybe [PackageName])
+         -- ^ Ignore dependency upper and lower bounds only for specified
+         -- packages. No effect unless allow-newer is enabled.
          ,configDefaultTemplate     :: !(Maybe TemplateName)
          -- ^ The default template to use when none is specified.
          -- (If Nothing, the 'default' default template is used.)
@@ -646,6 +651,19 @@ instance FromJSON ApplyGhcOptions where
             "locals" -> pure AGOLocals
             "everything" -> pure AGOEverything
             _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
+
+newtype AllowNewerDeps = AllowNewerDeps [PackageName]
+  deriving (Show, Read, Eq, Ord, Generic)
+
+instance Semigroup AllowNewerDeps where
+  (<>) = mappenddefault
+
+instance Monoid AllowNewerDeps where
+  mappend = (<>)
+  mempty = memptydefault
+
+instance FromJSON AllowNewerDeps where
+  parseJSON = fmap (AllowNewerDeps . fmap C.mkPackageName) . parseJSON
 
 -- | Which build log files to dump
 data DumpLogs
@@ -1066,6 +1084,8 @@ data ConfigMonoid =
     -- ^ See 'configApplyGhcOptions'
     ,configMonoidAllowNewer          :: !(First Bool)
     -- ^ See 'configMonoidAllowNewer'
+    ,configMonoidAllowNewerDeps      :: !(Maybe AllowNewerDeps)
+    -- ^ See 'configMonoidAllowNewerDeps'
     ,configMonoidDefaultTemplate     :: !(First TemplateName)
     -- ^ The default template to use when none is specified.
     -- (If Nothing, the 'default' default template is used.)
@@ -1194,6 +1214,7 @@ parseConfigMonoidObject rootDir obj = do
     configMonoidRebuildGhcOptions <- FirstFalse <$> obj ..:? configMonoidRebuildGhcOptionsName
     configMonoidApplyGhcOptions <- First <$> obj ..:? configMonoidApplyGhcOptionsName
     configMonoidAllowNewer <- First <$> obj ..:? configMonoidAllowNewerName
+    configMonoidAllowNewerDeps <- obj ..:? configMonoidAllowNewerDepsName
     configMonoidDefaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
     configMonoidAllowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
     configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
@@ -1341,6 +1362,9 @@ configMonoidApplyGhcOptionsName = "apply-ghc-options"
 
 configMonoidAllowNewerName :: Text
 configMonoidAllowNewerName = "allow-newer"
+
+configMonoidAllowNewerDepsName :: Text
+configMonoidAllowNewerDepsName = "allow-newer-deps"
 
 configMonoidDefaultTemplateName :: Text
 configMonoidDefaultTemplateName = "default-template"

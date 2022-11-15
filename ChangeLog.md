@@ -40,7 +40,10 @@ Other enhancements:
   `STACK_ROOT` environment variable.
 * Add `stack path --global-config`, to yield the full path of Stack's
   user-specific global YAML configuration file (`config.yaml`).
-
+* Add an experimental option, `allow-newer-deps`, which allows users to
+  specify a subset of dependencies for which version bounds should be ignored
+  (`allow-newer-deps: ['foo', 'bar']`). This field has no effect unless
+  `allow-newer` is enabled.
 
 Bug fixes:
 
