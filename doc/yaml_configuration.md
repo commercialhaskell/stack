@@ -367,7 +367,7 @@ The name `allow-newer` is chosen to match the commonly-used Cabal option.
 allow-newer: true
 ~~~
 
-### allow-newer-deps
+### allow-newer-deps (experimental)
 
 Default: `none`
 
