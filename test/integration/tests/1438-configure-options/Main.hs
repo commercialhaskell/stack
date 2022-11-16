@@ -9,7 +9,7 @@ main = do
   let stackYamlFiles = words "stack-locals.yaml stack-everything.yaml stack-targets.yaml stack-name.yaml"
   for_ stackYamlFiles $ \stackYaml ->
     stackErrStderr ["build", "--stack-yaml", stackYaml] $ \str ->
-      unless ("this is an invalid option" `isInfixOf` str) $
+      unless ("invalid option" `isInfixOf` str) $
       error "Configure option is not present"
 
   stack ["build", "--stack-yaml", "stack-locals.yaml", "acme-dont"]

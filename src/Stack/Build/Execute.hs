@@ -299,7 +299,14 @@ getSetupExe setupHs setupShimHs tmpdir = do
               let pc = setStdout (useHandleOpen stderr) pc0
               runProcess_ pc)
                 `catch` \ece ->
-                    throwM $ SetupHsBuildFailure (eceExitCode ece) Nothing compilerPath args Nothing []
+                    throwM $ PrettyException $
+                        SetupHsBuildFailure
+                            (eceExitCode ece)
+                            Nothing
+                            compilerPath
+                            args
+                            Nothing
+                            []
             renameFile tmpExePath exePath
             pure $ Just exePath
 
@@ -641,7 +648,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
     when (toCoverage $ boptsTestOpts eeBuildOpts) $ do
         generateHpcUnifiedReport
         generateHpcMarkupIndex
-    unless (null errs) $ throwM $ ExecutionFailure errs
+    unless (null errs) $ throwM $ PrettyException (ExecutionFailure errs)
     when (boptsHaddock eeBuildOpts) $ do
         snapshotDumpPkgs <- liftIO (readTVarIO eeSnapshotDumpPkgs)
         localDumpPkgs <- liftIO (readTVarIO eeLocalDumpPkgs)
@@ -1274,7 +1281,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                                             .| CT.decodeUtf8Lenient
                                             .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir compilerVer
                                             .| CL.consume
-                        throwM $ CabalExitedUnsuccessfully
+                        throwM $ PrettyException $ CabalExitedUnsuccessfully
                             (eceExitCode ece)
                             taskProvides
                             exeName
@@ -1609,14 +1616,27 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       "- In" <+>
                       fromString (T.unpack (renderComponent comp)) <>
                       ":" <> line <>
-                      indent 4 (mconcat $ L.intersperse line $ map (style Good . fromString . C.display) modules)
+                      indent 4 ( mconcat
+                               $ L.intersperse line
+                               $ map
+                                   (style Good . fromString . C.display)
+                                   modules
+                               )
                 forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
                     unless (null warnings) $ prettyWarn $
-                        "The following modules should be added to exposed-modules or other-modules in" <+>
-                        pretty cabalfp <> ":" <> line <>
-                        indent 4 (mconcat $ L.intersperse line $ map showModuleWarning warnings) <>
-                        line <> line <>
-                        "Missing modules in the Cabal file are likely to cause undefined reference errors from the linker, along with other problems."
+                           flow "The following modules should be added to \
+                                \exposed-modules or other-modules in" <+>
+                                pretty cabalfp
+                        <> ":"
+                        <> line
+                        <> indent 4 ( mconcat
+                                    $ L.intersperse line
+                                    $ map showModuleWarning warnings
+                                    )
+                        <> blankLine
+                        <> flow "Missing modules in the Cabal file are likely \
+                                \to cause undefined reference errors from the \
+                                \linker, along with other problems."
 
         () <- announce ("build" <> RIO.display (annSuffix executableBuildStatuses))
         config <- view configL
@@ -1632,7 +1652,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 (TTLocalMutable lp, True, False) -> primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
                 (TTRemotePackage{}, _, _) -> [])
           `catch` \ex -> case ex of
-              CabalExitedUnsuccessfully{} -> postBuildCheck False >> throwM ex
+              CabalExitedUnsuccessfully{} ->
+                  postBuildCheck False >> throwM (PrettyException ex)
               _ -> throwM ex
         postBuildCheck True
 

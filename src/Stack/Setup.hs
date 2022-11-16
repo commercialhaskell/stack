@@ -373,14 +373,14 @@ instance Pretty SetupPrettyException where
                 -- hang 2 (shellColor (fillSep (fromString cmd : map fromString args))) <> line <>
                 <> flow "run in" <+> pretty wd
                 )
-      <> line <> line
+      <> blankLine
       <> flow "The following directories may now contain files, but won't be \
               \used by Stack:"
       <> line
       <> "  -" <+> pretty tempDir
       <> line
       <> "  -" <+> pretty destDir
-      <> line <> line
+      <> blankLine
       <> flow "For more information consider rerunning with --verbose flag"
       <> line
 

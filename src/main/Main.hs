@@ -215,7 +215,14 @@ handleExitCode = exitWith
 -- | Handle PrettyException exceptions.
 handlePrettyException :: PrettyException -> RIO Runner a
 handlePrettyException e = do
-  prettyError $ pretty e
+  -- The code below loads the entire Stack configuration, when all that is
+  -- needed are the Stack colours. A tailored approach may be better.
+  result <- tryAny $ withConfig NoReexec $ prettyError $ pretty e
+  case result of
+    -- Falls back to the command line's Stack colours if there is any error in
+    -- loading the entire Stack configuration.
+    Left _ -> prettyError $ pretty e
+    Right _ -> pure ()
   exitFailure
 
 -- | Handle SomeException exceptions. This special handler stops "stack: " from
