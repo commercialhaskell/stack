@@ -27,6 +27,7 @@ module Stack.Prelude
   , writeBinaryFileAtomic
   , bugReport
   , bugPrettyReport
+  , blankLine
   , module X
   ) where
 
@@ -256,3 +257,7 @@ bugDeclaration = "The impossible happened!"
 -- | Bug report message.
 bugRequest :: String
 bugRequest =  "Please report this bug at Stack's repository."
+
+-- | A 'pretty' blank line.
+blankLine :: StyleDoc
+blankLine = line <> line

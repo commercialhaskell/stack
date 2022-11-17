@@ -70,7 +70,7 @@ import qualified Distribution.Version            as C
 import           Path                            (parseRelDir, (</>), parent)
 import           Path.Extra                      (toFilePathNoTrailingSep)
 import           RIO.PrettyPrint
-                   ( Style (..), StyleDoc, (<+>), align, encloseSep, flow
+                   ( Style (..), StyleDoc, (<+>), align, encloseSep, flow, hcat
                    , indent, line, parens, sep, softline, style, vsep
                    )
 import           Stack.Constants
@@ -104,21 +104,6 @@ data BuildException
     (Path Abs File) -- stack.yaml
   | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File)) S.ByteString
   | TestSuiteTypeUnsupported TestSuiteInterface
-  | CabalExitedUnsuccessfully
-        ExitCode
-        PackageIdentifier
-        (Path Abs File)  -- cabal Executable
-        [String]         -- cabal arguments
-        (Maybe (Path Abs File)) -- logfiles location
-        [Text]     -- log contents
-  | SetupHsBuildFailure
-        ExitCode
-        (Maybe PackageIdentifier) -- which package's custom setup, is simple setup if Nothing
-        (Path Abs File)  -- ghc Executable
-        [String]         -- ghc arguments
-        (Maybe (Path Abs File)) -- logfiles location
-        [Text]     -- log contents
-  | ExecutionFailure [SomeException]
   | LocalPackageDoesn'tMatchTarget
         PackageName
         Version -- local version
@@ -234,15 +219,6 @@ instance Show BuildException where
         , show interface
         ]
      -- Suppressing duplicate output
-    show (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
-        showBuildError "[S-7011]"
-            False exitCode (Just taskProvides') execName fullArgs logFiles bss
-    show (SetupHsBuildFailure exitCode mtaskProvides execName fullArgs logFiles bss) =
-        showBuildError "[S-6374]"
-            True exitCode mtaskProvides execName fullArgs logFiles bss
-    show (ExecutionFailure es) =
-        "Error: [S-7282]\n"
-        ++ intercalate "\n\n" (map show es)
     show (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
         [ "Error: [S-5797]\n"
         , "Version for local package "
@@ -371,27 +347,74 @@ instance Show BuildException where
 instance Exception BuildException
 
 data BuildPrettyException
-    =  ConstructPlanFailed
-           [ConstructPlanException]
-           (Path Abs File)
-           (Path Abs Dir)
-           ParentMap
-           (Set PackageName)
-           (Map PackageName [PackageName])
+    = ConstructPlanFailed
+        [ConstructPlanException]
+        (Path Abs File)
+        (Path Abs Dir)
+        ParentMap
+        (Set PackageName)
+        (Map PackageName [PackageName])
+    | ExecutionFailure [SomeException]
+    | CabalExitedUnsuccessfully
+        ExitCode
+        PackageIdentifier
+        (Path Abs File)  -- cabal Executable
+        [String]         -- cabal arguments
+        (Maybe (Path Abs File)) -- logfiles location
+        [Text]     -- log contents
+    | SetupHsBuildFailure
+        ExitCode
+        (Maybe PackageIdentifier) -- which package's custom setup, is simple setup if Nothing
+        (Path Abs File)  -- ghc Executable
+        [String]         -- ghc arguments
+        (Maybe (Path Abs File)) -- logfiles location
+        [Text]     -- log contents
     deriving Typeable
 
+-- | These exceptions are intended to be thrown only as 'pretty exceptions, so
+-- their 'show' functions can be simple.
 instance Show BuildPrettyException where
     show (ConstructPlanFailed {}) = "ConstructPlanFailed"
+    show (ExecutionFailure {}) = "ExecutionFailure"
+    show (CabalExitedUnsuccessfully {}) = "CabalExitedUnsuccessfully"
+    show (SetupHsBuildFailure {}) = "SetupBuildFailure"
 
 instance Pretty BuildPrettyException where
     pretty ( ConstructPlanFailed errs stackYaml stackRoot parents wanted prunedGlobalDeps ) =
-           "Error:" <+> "[S-4804]"
+           "[S-4804]"
         <> line
         <> flow "Stack failed to construct a build plan."
-        <> line
-        <> line
+        <> blankLine
         <> pprintExceptions
                errs stackYaml stackRoot parents wanted prunedGlobalDeps
+    pretty (ExecutionFailure es) =
+           "[S-7282]"
+        <> line
+        <> flow "Stack failed to execute the build plan."
+        <> blankLine
+        <> flow "While executing the build plan, Stack encountered the \
+                \following exceptions:"
+        <> blankLine
+        <> hcat (L.intersperse blankLine (map ppExceptions es))
+      where
+        ppExceptions :: SomeException -> StyleDoc
+        ppExceptions e = case fromException e of
+            Just (PrettyException e') -> pretty e'
+            Nothing -> (string . show) e
+    pretty (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
+        showBuildError "[S-7011]"
+            False exitCode (Just taskProvides') execName fullArgs logFiles bss
+    pretty (SetupHsBuildFailure exitCode mtaskProvides execName fullArgs logFiles bss) =
+        showBuildError "[S-6374]"
+            True exitCode mtaskProvides execName fullArgs logFiles bss
+
+-- | @string@ is not exported by module "Text.PrettyPrint.Leijen.Extended" of
+-- the @rio-prettyprint@ package.
+string :: String -> StyleDoc
+string "" = mempty
+string ('\n':s) = line <> string s
+string s        = let (xs, ys) = span (/='\n') s
+                  in  fromString xs <> string ys
 
 instance Exception BuildPrettyException
 
@@ -405,8 +428,8 @@ pprintExceptions
     -> StyleDoc
 pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDeps =
     mconcat $
-      [ flow "While constructing the build plan, the following exceptions were \
-             \encountered:"
+      [ flow "While constructing the build plan, Stack encountered the \
+             \following exceptions:"
       , blankLine
       , mconcat (L.intersperse blankLine (mapMaybe pprintException exceptions'))
       ] ++ if L.null recommendations
@@ -419,8 +442,6 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
 
   where
     exceptions' = {- should we dedupe these somehow? nubOrd -} exceptions
-
-    blankLine = line <> line
 
     recommendations =
         if not onlyHasDependencyMismatches
@@ -697,28 +718,49 @@ showBuildError
   -> [String]
   -> Maybe (Path Abs File)
   -> [Text]
-  -> String
+  -> StyleDoc
 showBuildError errorCode isBuildingSetup exitCode mtaskProvides execName fullArgs logFiles bss =
   let fullCmd = unwords
               $ dropQuotes (toFilePath execName)
               : map (T.unpack . showProcessArgDebug) fullArgs
-      logLocations = maybe "" (\fp -> "\n    Logs have been written to: " ++ toFilePath fp) logFiles
-  in "Error: " ++ errorCode ++ "\n--  While building " ++
-     (case (isBuildingSetup, mtaskProvides) of
-       (False, Nothing) -> impureThrow ShowBuildErrorBug
-       (False, Just taskProvides') -> "package " ++ dropQuotes (packageIdentifierString taskProvides')
-       (True, Nothing) -> "simple Setup.hs"
-       (True, Just taskProvides') -> "custom Setup.hs for package " ++ dropQuotes (packageIdentifierString taskProvides')
-     ) ++
-     " (scroll up to its section to see the error) using:\n      " ++ fullCmd ++ "\n" ++
-     "    Process exited with code: " ++ show exitCode ++
-     (if exitCode == ExitFailure (-9)
-          then " (THIS MAY INDICATE OUT OF MEMORY)"
-          else "") ++
-     logLocations ++
-     (if null bss
-          then ""
-          else "\n\n" ++ removeTrailingSpaces (map T.unpack bss))
+      logLocations =
+          maybe
+              mempty
+              (\fp -> line <> flow "Logs have been written to:" <+>
+                        style File (pretty fp))
+              logFiles
+  in     fromString errorCode
+      <> line
+      <> flow "While building" <+>
+         ( case (isBuildingSetup, mtaskProvides) of
+             (False, Nothing) -> impureThrow ShowBuildErrorBug
+             (False, Just taskProvides') ->
+                "package" <+>
+                  style
+                    Target
+                    (fromString $ dropQuotes (packageIdentifierString taskProvides'))
+             (True, Nothing) -> "simple" <+> style File "Setup.hs"
+             (True, Just taskProvides') ->
+                "custom" <+>
+                  style File "Setup.hs" <+>
+                  flow "for package" <+>
+                  style
+                    Target
+                    (fromString $ dropQuotes (packageIdentifierString taskProvides'))
+         ) <+>
+         flow "(scroll up to its section to see the error) using:"
+      <> line
+      <> style Shell (fromString fullCmd)
+      <> line
+      <> flow "Process exited with code:" <+> (fromString . show) exitCode <+>
+         ( if exitCode == ExitFailure (-9)
+             then flow "(THIS MAY INDICATE OUT OF MEMORY)"
+             else mempty
+         )
+      <> logLocations
+      <> if null bss
+           then mempty
+           else blankLine <> string (removeTrailingSpaces (map T.unpack bss))
    where
     removeTrailingSpaces = dropWhileEnd isSpace . unlines
     dropQuotes = filter ('\"' /=)

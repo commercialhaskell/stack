@@ -396,7 +396,9 @@ certificateNameOptName = "certificate-name"
 
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
-stackArgs Global{..} = ["--arch=" ++ display gArch, "--interleaved-output"]
+stackArgs Global{..} = [ "--arch=" ++ display gArch
+                       , "--interleaved-output"
+                       ]
 
 -- | Name of the 'stack' program.
 stackProgName :: FilePath

@@ -2,9 +2,10 @@ import Control.Monad (unless)
 import Data.List (isInfixOf)
 import StackTest
 
+-- | Stack's error code for failing to construct a build plan.
 planFailure :: String
 planFailure =
-  "While constructing the build plan, the following exceptions were encountered:"
+  "[S-4804]"
 
 main :: IO ()
 main = do
