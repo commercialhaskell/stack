@@ -11,7 +11,6 @@
 module Main (main) where
 
 import           BuildInfo
-import           Stack.Prelude hiding (Display (..))
 import           Conduit (runConduitRes, sourceLazy, sinkFileCautious)
 import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
 import           Data.Attoparsec.Interpreter (getInterpreterArgs)
@@ -36,8 +35,6 @@ import           Pantry (loadSnapshot)
 import           Path
 import           Path.IO
 import qualified Paths_stack as Meta
-import           RIO.PrettyPrint
-import qualified RIO.PrettyPrint as PP (style)
 import           Stack.Build
 import           Stack.Build.Target (NeedTargets(..))
 import           Stack.Clean (CleanCommand(..), CleanOpts(..), clean)
@@ -74,6 +71,7 @@ import           Stack.Options.SDistParser
 import           Stack.Options.UploadParser
 import           Stack.Options.Utils
 import qualified Stack.Path
+import           Stack.Prelude hiding (Display (..))
 import           Stack.Runners
 import           Stack.Script
 import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
@@ -687,7 +685,7 @@ uninstallCmd () = withConfig NoReexec $ do
   globalConfig <- view stackGlobalConfigL
   programsDir <- view $ configL.to configLocalProgramsBase
   localBinDir <- view $ configL.to configLocalBin
-  let toStyleDoc = PP.style Dir . fromString . toFilePath
+  let toStyleDoc = style Dir . fromString . toFilePath
       stackRoot' = toStyleDoc stackRoot
       globalConfig' = toStyleDoc globalConfig
       programsDir' = toStyleDoc programsDir
@@ -704,11 +702,11 @@ uninstallCmd () = withConfig NoReexec $ do
     , hang 4 $ fillSep [flow "(4) the 'stack' executable file (see the output",
       flow "of command", howToFindStack <> ",", flow "if Stack is on the PATH;",
       flow "Stack is often installed in", localBinDir' <> softbreak <> ")."]
-    , fillSep [flow "You may also want to delete", PP.style File ".stack-work",
+    , fillSep [flow "You may also want to delete", style File ".stack-work",
       flow "directories in any Haskell projects that you have built."]
     ]
  where
-  styleShell = PP.style Shell
+  styleShell = style Shell
   howToFindStack
     | osIsWindows = styleShell "where.exe stack"
     | otherwise   = styleShell "which stack"
@@ -745,7 +743,7 @@ uploadCmd :: UploadOpts -> RIO Runner ()
 uploadCmd (UploadOpts (SDistOpts [] _ _ _ _) _) = do
     prettyErrorL
         [ flow "To upload the current package, please run"
-        , PP.style Shell "stack upload ."
+        , style Shell "stack upload ."
         , flow "(with the period at the end)"
         ]
     liftIO exitFailure
@@ -760,9 +758,9 @@ uploadCmd uploadOpts = do
     (dirs, invalid) <- liftIO $ partitionM D.doesDirectoryExist nonFiles
     withConfig YesReexec $ withDefaultEnvConfig $ do
         unless (null invalid) $ do
-            let invalidList = bulletedList $ map (PP.style File . fromString) invalid
+            let invalidList = bulletedList $ map (style File . fromString) invalid
             prettyErrorL
-                [ PP.style Shell "stack upload"
+                [ style Shell "stack upload"
                 , flow "expects a list of sdist tarballs or package directories."
                 , flow "Can't find:"
                 , line <> invalidList
@@ -770,7 +768,7 @@ uploadCmd uploadOpts = do
             exitFailure
         when (null files && null dirs) $ do
             prettyErrorL
-                [ PP.style Shell "stack upload"
+                [ style Shell "stack upload"
                 , flow "expects a list of sdist tarballs or package directories, but none were specified."
                 ]
             exitFailure
@@ -801,7 +799,7 @@ sdistCmd sdistOpts =
                 when (null dirs) $ do
                     stackYaml <- view stackYamlL
                     prettyErrorL
-                        [ PP.style Shell "stack sdist"
+                        [ style Shell "stack sdist"
                         , flow "expects a list of targets, and otherwise defaults to all of the project's packages."
                         , flow "However, the configuration at"
                         , pretty stackYaml

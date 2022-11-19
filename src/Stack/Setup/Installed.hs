@@ -21,20 +21,21 @@ module Stack.Setup.Installed
     , tempInstallDir
     ) where
 
-import           Stack.Prelude
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
+import           Data.Char ( isDigit )
 import qualified Data.List as L
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Distribution.System (Platform (..))
+import           Distribution.System ( Platform (..) )
 import qualified Distribution.System as Cabal
 import           Path
 import           Path.IO
+import           RIO.Process
 import           Stack.Constants
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.Config
-import           RIO.Process
 
 data Tool
     = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
@@ -125,7 +126,7 @@ getCompilerVersion wc exe = do
             pure x
   where
     versionFromEnd = S8.spanEnd isValid . fst . S8.breakEnd isValid
-    isValid c = c == '.' || ('0' <= c && c <= '9')
+    isValid c = c == '.' || isDigit c
 
 -- | Binary directories for the given installed package
 extraDirs :: HasConfig env => Tool -> RIO env ExtraDirs

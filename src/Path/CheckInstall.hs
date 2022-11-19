@@ -4,10 +4,9 @@
 
 module Path.CheckInstall where
 
-import           Control.Monad.Extra (anyM, (&&^))
+import           Control.Monad.Extra ( anyM, (&&^) )
 import qualified Data.Text as T
 import           Stack.Prelude
-import           RIO.PrettyPrint
 import           Stack.Types.Config
 import qualified System.Directory as D
 import qualified System.FilePath as FP

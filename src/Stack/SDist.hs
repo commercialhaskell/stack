@@ -50,7 +50,6 @@ import           Path
 import           Path.IO
                    hiding
                      ( getModificationTime, getPermissions, withSystemTempDir )
-import           RIO.PrettyPrint
 import           Stack.Build ( mkBaseConfigOpts, build, buildLocalTargets )
 import           Stack.Build.Execute
 import           Stack.Build.Installed

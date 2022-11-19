@@ -85,16 +85,16 @@ instance Show DockerException where
         , unwords [stackProgName, dockerCmdName, dockerPullCmdName]
         , "' to download it, then try again."
         ]
-    show (InvalidImagesOutputException line) = concat
+    show (InvalidImagesOutputException l) = concat
         [ "Error: [S-5841]\n"
         , "Invalid 'docker images' output line: '"
-        , line
+        , l
         , "'."
         ]
-    show (InvalidPSOutputException line) = concat
+    show (InvalidPSOutputException l) = concat
         [ "Error: [S-9608]\n"
         , "Invalid 'docker ps' output line: '"
-        , line
+        , l
         ,"'."
         ]
     show (InvalidInspectOutputException msg) = concat

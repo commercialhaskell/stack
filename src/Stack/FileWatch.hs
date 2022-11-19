@@ -8,15 +8,14 @@ module Stack.FileWatch
     , fileWatchPoll
     ) where
 
-import Control.Concurrent.STM (check)
-import Stack.Prelude
+import           Control.Concurrent.STM (check)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import GHC.IO.Exception
-import Path
-import System.FSNotify
-import System.IO (getLine)
-import RIO.PrettyPrint hiding (line)
+import           GHC.IO.Exception
+import           Path
+import           Stack.Prelude
+import           System.FSNotify
+import           System.IO (getLine)
 
 fileWatch
   :: (HasLogFunc env, HasTerm env)
@@ -86,9 +85,9 @@ fileWatchConf cfg inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -
                 pure $ Just listen
 
     let watchInput = do
-            line <- getLine
-            unless (line == "quit") $ do
-                run $ case line of
+            l <- getLine
+            unless (l == "quit") $ do
+                run $ case l of
                     "help" -> do
                         logInfo ""
                         logInfo "help: display this help"
@@ -102,7 +101,7 @@ fileWatchConf cfg inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -
                     "" -> atomically $ writeTVar dirtyVar True
                     _ -> logInfo $
                         "Unknown command: " <>
-                        displayShow line <>
+                        displayShow l <>
                         ". Try 'help'"
 
                 watchInput

@@ -17,7 +17,6 @@ module Stack.Types.PackageFile
   ) where
 
 import           Distribution.ModuleName ( ModuleName )
-import           RIO.PrettyPrint ( HasStylesUpdate (..), HasTerm (..) )
 import           RIO.Process ( HasProcessContext (processContextL) )
 import           Stack.Prelude
 import           Stack.Types.Config

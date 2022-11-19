@@ -21,7 +21,6 @@ module Stack.Upload
     , maybeGetHackageKey
     ) where
 
-import           Stack.Prelude
 import           Conduit ( mapOutput, sinkList )
 import           Data.Aeson
                    ( FromJSON (..), ToJSON (..), decode', toEncoding
@@ -39,9 +38,8 @@ import           Network.HTTP.StackClient
                    , parseRequest, formDataBody, partFileRequestBody, partBS
                    , partLBS, applyDigestAuth, displayDigestAuthException
                    )
-import           RIO.PrettyPrint
-                   ( Style (..), StyleDoc, (<+>), flow, line, style, vsep )
 import           Stack.Options.UploadParser
+import           Stack.Prelude
 import           Stack.Types.Config
 import           System.Directory
                    ( createDirectoryIfMissing, removeFile, renameFile )
@@ -71,14 +69,6 @@ instance Pretty UploadPrettyException where
         <> flow "Upload failed on" <+> style File (fromString tarName)
         <> line
         <> vsep (map string res)
-
--- | @string@ is not exported by module "Text.PrettyPrint.Leijen.Extended" of
--- the @rio-prettyprint@ package.
-string :: String -> StyleDoc
-string "" = mempty
-string ('\n':s) = line <> string s
-string s        = let (xs, ys) = span (/='\n') s
-                  in  fromString xs <> string ys
 
 instance Exception UploadPrettyException
 

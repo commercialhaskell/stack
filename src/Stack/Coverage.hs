@@ -41,7 +41,6 @@ import           Stack.Types.Package
 import           Stack.Types.SourceMap
 import           System.FilePath (isPathSeparator)
 import qualified RIO
-import           RIO.PrettyPrint
 import           RIO.Process
 import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)

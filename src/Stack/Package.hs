@@ -63,9 +63,11 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Version
 import           System.FilePath (replaceExtension)
-import           RIO.PrettyPrint
 import           Stack.Types.Dependency (DepValue(..), DepType (..))
-import           Stack.Types.PackageFile (GetPackageFileContext(..), DotCabalPath, GetPackageFiles(..))
+import           Stack.Types.PackageFile
+                   ( GetPackageFileContext (..), DotCabalPath
+                   , GetPackageFiles (..)
+                   )
 import           Stack.PackageFile (packageDescModulesAndFiles)
 import           Stack.ComponentFile
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.

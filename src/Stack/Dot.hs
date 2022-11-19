@@ -31,7 +31,6 @@ import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License (License(BSD3), licenseFromSPDX)
 import           Distribution.Types.PackageName (mkPackageName)
 import qualified Path
-import           RIO.PrettyPrint (HasTerm (..), HasStylesUpdate (..))
 import           RIO.Process (HasProcessContext (..))
 import           Stack.Build (loadPackage)
 import           Stack.Build.Installed (getInstalled, toInstallMap)

@@ -59,15 +59,18 @@ import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.Find (findInParents)
 import           Path.IO
 import qualified Paths_stack as Meta
+import           RIO.List (unzip)
+import           RIO.Process
+import           RIO.Time (toGregorian)
+import           Stack.Build.Haddock (shouldHaddockDeps)
 import           Stack.Config.Build
 import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Constants
-import           Stack.Build.Haddock (shouldHaddockDeps)
 import           Stack.Lock (lockCachedWanted)
+import           Stack.SourceMap
 import           Stack.Storage.Project (initProjectStorage)
 import           Stack.Storage.User (initUserStorage)
-import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -81,13 +84,6 @@ import           System.Environment
 import           System.Info.ShortPathName (getShortPathName)
 import           System.PosixCompat.Files (fileOwner, getFileStatus)
 import           System.PosixCompat.User (getEffectiveUserID)
-import           RIO.List (unzip)
-import           RIO.PrettyPrint (Style (Highlight, Secondary),
-                   logLevelToStyle, stylesUpdateL, useColorL)
-import           RIO.PrettyPrint.StylesUpdate (StylesUpdate (..))
-import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
-import           RIO.Process
-import           RIO.Time (toGregorian)
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
@@ -869,7 +865,8 @@ loadConfigYaml
 loadConfigYaml parser path = do
     eres <- loadYaml parser path
     case eres of
-        Left err -> liftIO $ throwM (ParseConfigFileException path err)
+        Left err -> liftIO $
+            throwM $ PrettyException (ParseConfigFileException path err)
         Right res -> pure res
 
 -- | Load and parse YAML from the given file.

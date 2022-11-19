@@ -9,21 +9,20 @@ module Stack.Path
     , pathParser
     ) where
 
-import           Stack.Prelude
-import           Data.List (intercalate)
+import           Data.List ( intercalate )
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Options.Applicative as OA
 import           Path
 import           Path.Extra
+import           RIO.Process ( HasProcessContext (..), exeSearchPathL )
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.GhcPkg as GhcPkg
+import           Stack.Prelude
 import           Stack.Runners
 import           Stack.Types.Config
 import qualified System.FilePath as FP
-import           RIO.PrettyPrint
-import           RIO.Process (HasProcessContext (..), exeSearchPathL)
 
 -- | Print out useful path information in a human-readable format (and
 -- support others later).

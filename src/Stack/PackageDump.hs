@@ -296,11 +296,11 @@ eachPair inner =
       where
         (key, bs2) = T.break (== ':') bs1
         (spaces, bs3) = T.span (== ' ') $ T.drop 1 bs2
-        indent = T.length key + 1 + T.length spaces
+        ind = T.length key + 1 + T.length spaces
 
         valSrc
             | T.null bs3 = noIndent
-            | otherwise = yield bs3 >> loopIndent indent
+            | otherwise = yield bs3 >> loopIndent ind
 
     noIndent = do
         mx <- await

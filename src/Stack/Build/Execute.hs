@@ -24,48 +24,51 @@ module Stack.Build.Execute
     ) where
 
 import           Control.Concurrent.Execute
-import           Control.Concurrent.STM (check)
-import           Stack.Prelude hiding (Display (..))
+import           Control.Concurrent.STM ( check )
 import           Crypto.Hash
-import           Data.Attoparsec.Text hiding (try)
-import qualified Data.ByteArray as Mem (convert)
+import           Data.Attoparsec.Text as P hiding ( try )
+import qualified Data.ByteArray as Mem ( convert )
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Builder
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Base64.URL as B64URL
-import           Data.Char (isSpace)
+import           Data.Char ( isSpace )
 import           Conduit
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.Filesystem as CF
 import qualified Data.Conduit.List as CL
-import           Data.Conduit.Process.Typed (createSource)
+import           Data.Conduit.Process.Typed ( createSource )
 import qualified Data.Conduit.Text as CT
 import qualified Data.List as L
-import           Data.List.NonEmpty (nonEmpty)
-import qualified Data.List.NonEmpty as NonEmpty (toList)
-import           Data.List.Split (chunksOf)
+import           Data.List.NonEmpty ( nonEmpty )
+import qualified Data.List.NonEmpty as NonEmpty ( toList )
+import           Data.List.Split ( chunksOf )
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
+import           Data.Text.Encoding ( decodeUtf8 )
 import           Data.Tuple
-import           Data.Time (ZonedTime, getZonedTime, formatTime, defaultTimeLocale)
+import           Data.Time
+                   ( ZonedTime, getZonedTime, formatTime, defaultTimeLocale )
 import qualified Data.ByteString.Char8 as S8
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Simple.Build.Macros as C
-import           Distribution.System            (OS (Windows),
-                                                 Platform (Platform))
+import           Distribution.System ( OS (Windows), Platform (Platform) )
 import qualified Distribution.Text as C
-import           Distribution.Types.PackageName (mkPackageName)
-import           Distribution.Types.UnqualComponentName (mkUnqualComponentName)
-import           Distribution.Verbosity (showForCabal)
-import           Distribution.Version (mkVersion)
+import           Distribution.Types.PackageName ( mkPackageName )
+import           Distribution.Types.UnqualComponentName
+                   ( mkUnqualComponentName )
+import           Distribution.Verbosity ( showForCabal )
+import           Distribution.Version ( mkVersion )
+import           Pantry.Internal.Companion
 import           Path
 import           Path.CheckInstall
-import           Path.Extra (toFilePathNoTrailingSep, rejectMissingFile)
-import           Path.IO hiding (findExecutable, makeAbsolute, withSystemTempDir)
+import           Path.Extra ( toFilePathNoTrailingSep, rejectMissingFile )
+import           Path.IO
+                   hiding ( findExecutable, makeAbsolute, withSystemTempDir )
 import qualified RIO
+import           RIO.Process
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
@@ -75,10 +78,11 @@ import           Stack.Config
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Coverage
-import           Stack.DefaultColorWhen (defaultColorWhen)
+import           Stack.DefaultColorWhen ( defaultColorWhen )
 import           Stack.GhcPkg
 import           Stack.Package
 import           Stack.PackageDump
+import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -88,15 +92,16 @@ import           Stack.Types.Package
 import           Stack.Types.PackageFile
 import           Stack.Types.Version
 import qualified System.Directory as D
-import           System.Environment (getExecutablePath, lookupEnv)
-import           System.FileLock (withTryFileLock, SharedExclusive (Exclusive), withFileLock)
+import           System.Environment ( getExecutablePath, lookupEnv )
+import           System.FileLock
+                   ( withTryFileLock, SharedExclusive (Exclusive)
+                   , withFileLock
+                   )
 import qualified System.FilePath as FP
-import           System.IO.Error (isDoesNotExistError)
-import           System.PosixCompat.Files (createLink, modificationTime, getFileStatus)
-import           RIO.PrettyPrint
-import           RIO.Process
-import           Pantry.Internal.Companion
-import           System.Random (randomIO)
+import           System.IO.Error ( isDoesNotExistError )
+import           System.PosixCompat.Files
+                   ( createLink, modificationTime, getFileStatus )
+import           System.Random ( randomIO )
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus
@@ -2193,7 +2198,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
     lineCol = char ':'
            >> choice
                 [ num >> char ':' >> num >> optional (char '-' >> num) >> pure ()
-                , char '(' >> num >> char ',' >> num >> string ")-(" >> num >> char ',' >> num >> char ')' >> pure ()
+                , char '(' >> num >> char ',' >> num >> P.string ")-(" >> num >> char ',' >> num >> char ')' >> pure ()
                 ]
            >> char ':'
            >> pure ()

@@ -145,9 +145,9 @@ getInterpreterArgs file = do
 
     decodeError e =
       case e of
-        ParseError ctxs _ (Position line col _) ->
+        ParseError ctxs _ (Position l col _) ->
           if null ctxs
           then "Parse error"
           else ("Expecting " ++ intercalate " or " ctxs)
-          ++ " at line " ++ show line ++ ", column " ++ show col
+          ++ " at line " ++ show l ++ ", column " ++ show col
         DivergentParser -> "Divergent parser"

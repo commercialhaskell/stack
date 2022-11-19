@@ -16,26 +16,25 @@ module Stack.Build.Haddock
     , shouldHaddockDeps
     ) where
 
-import           Stack.Prelude
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import           Data.Time (UTCTime)
+import           Data.Time ( UTCTime )
 import           Path
 import           Path.Extra
 import           Path.IO
-import           RIO.List (intercalate)
-import           RIO.PrettyPrint
+import           RIO.List ( intercalate )
+import           RIO.Process
 import           Stack.Constants
 import           Stack.PackageDump
+import           Stack.Prelude
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import qualified System.FilePath as FP
-import           RIO.Process
-import           Web.Browser (openBrowser)
+import           Web.Browser ( openBrowser )
 
 openHaddocksInBrowser
     :: HasTerm env

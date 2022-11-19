@@ -33,8 +33,10 @@ import           Path
 import           Path.Extra (toFilePathNoTrailingSep)
 import           Path.IO hiding (withSystemTempDir)
 import qualified RIO
-import           RIO.PrettyPrint
-import           RIO.Process (HasProcessContext, exec, proc, readProcess_, withWorkingDir)
+import           RIO.Process
+                   ( HasProcessContext, exec, proc, readProcess_
+                   , withWorkingDir
+                   )
 import           Stack.Build
 import           Stack.Build.Installed
 import           Stack.Build.Source
