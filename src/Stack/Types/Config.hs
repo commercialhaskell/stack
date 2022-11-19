@@ -422,7 +422,7 @@ instance Show ConfigException where
 
 instance Exception ConfigException
 
--- | Type representing 'pretty' exceptions thrown by functions exported by the
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Config" module.
 data ConfigPrettyException
     = ParseConfigFileException (Path Abs File) ParseException

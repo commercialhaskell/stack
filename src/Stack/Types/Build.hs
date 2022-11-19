@@ -367,8 +367,8 @@ data BuildPrettyException
         [Text]     -- log contents
     deriving Typeable
 
--- | These exceptions are intended to be thrown only as 'pretty exceptions, so
--- their 'show' functions can be simple.
+-- | These exceptions are intended to be thrown only as \'pretty\' exceptions,
+-- so their \'show\' functions can be simple.
 instance Show BuildPrettyException where
     show (ConstructPlanFailed {}) = "ConstructPlanFailed"
     show (ExecutionFailure {}) = "ExecutionFailure"

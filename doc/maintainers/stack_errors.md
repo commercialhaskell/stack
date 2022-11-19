@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2022-11-11.
+`master` branch of the Stack repository. Last updated: 2022-11-19.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -308,9 +308,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2154] | UnknownTargets (Set PackageName) (Map PackageName Version) (Path Abs File)
         [S-1995] | TestSuiteFailure PackageIdentifier (Map Text (Maybe ExitCode)) (Maybe (Path Abs File)) ByteString
         [S-3819] | TestSuiteTypeUnsupported TestSuiteInterface
-        [S-7011] | CabalExitedUnsuccessfully ExitCode PackageIdentifier (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
-        [S-6374] | SetupHsBuildFailure ExitCode (Maybe PackageIdentifier) (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
-        [S-7282] | ExecutionFailure [SomeException]
         [S-5797] | LocalPackageDoesn'tMatchTarget PackageName Version Version
         [S-3118] | NoSetupHsFound (Path Abs Dir)
         [S-8664] | InvalidFlagSpecification (Set UnusedFlags)
@@ -334,6 +331,9 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-4804] | ConstructPlanFailed [ConstructPlanException] (Path Abs File) (Path Abs Dir) ParentMap (Set PackageName) (Map PackageName [PackageName])
+        [S-7282] | ExecutionFailure [SomeException]
+        [S-7011] | CabalExitedUnsuccessfully ExitCode PackageIdentifier (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
+        [S-6374] | SetupHsBuildFailure ExitCode (Maybe PackageIdentifier) (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`
@@ -419,6 +419,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-8787] = ParseResolverException Text
         [S-4865] | FilepathInDownloadedSnapshot Text
+        ~~~
+
+    -   `Stack.Types.Storage.StoragePrettyException`
+
+        ~~~haskell
+        [S-8835] = StorageMigrationFailure Text (Path Abs File) SomeException
         ~~~
 
     -   `Stack.Types.TemplateName.TypesTemplateNameException`

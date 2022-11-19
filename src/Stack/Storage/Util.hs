@@ -7,13 +7,15 @@
 
 -- | Utils for the other Stack.Storage modules
 module Stack.Storage.Util
-    ( updateList
+    ( handleMigrationException
+    , updateList
     , updateSet
     ) where
 
 import qualified Data.Set as Set
-import Database.Persist
-import Stack.Prelude hiding (MigrationFailure)
+import           Database.Persist
+import           Stack.Prelude
+import           Stack.Types.Storage ( StoragePrettyException (..) )
 
 -- | Efficiently update a set of values stored in a database table
 updateSet ::
@@ -69,3 +71,16 @@ updateList recordCons parentFieldCons parentId indexFieldCons old new =
         insertMany_ $
             map (uncurry $ recordCons parentId) $
             Set.toList (Set.difference newSet oldSet)
+
+handleMigrationException :: HasLogFunc env => RIO env a -> RIO env a
+handleMigrationException inner = do
+    eres <- try inner
+    either
+        ( \e -> case e :: PantryException of
+                    MigrationFailure desc fp ex ->
+                        throwIO $
+                            PrettyException $ StorageMigrationFailure desc fp ex
+                    _ -> throwIO e
+        )
+        pure
+        eres
