@@ -1,5 +1,5 @@
 {- stack script
-    --resolver nightly-2022-09-05
+    --resolver nightly-2022-11-14
     --extra-dep Cabal-3.6.3.0
     --extra-dep directory-1.3.6.2
     --ghc-options -Wall
@@ -62,16 +62,12 @@ main =
             gHomeDir <- getHomeDirectory
 
             let gAllowDirty = False
-                platformArgs :: [String]
-                platformArgs = if Info.os == "darwin"
-                               then ["--stack-yaml", "stack-macos.yaml"]
-                               else []
                 Platform arch _ = buildPlatform
                 gArch = arch
                 gBinarySuffix = ""
                 gTestHaddocks = True
                 gProjectRoot = "" -- Set to real value below.
-                gBuildArgs = platformArgs <> ["--flag", "stack:-developer-mode"]
+                gBuildArgs = ["--flag", "stack:-developer-mode"]
                 gStaticLinux = False
                 gCertificateName = Nothing
                 global0 = foldl (flip id) Global{..} flags

@@ -4,4 +4,4 @@ packages:
 - sub-package
 - cyclic
 extra-deps: []
-resolver: nightly-2022-09-05
+resolver: lts-20.0

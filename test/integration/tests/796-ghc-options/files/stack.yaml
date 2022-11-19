@@ -1,4 +1,4 @@
-resolver: ghc-9.2.4
+resolver: ghc-9.2.5
 ghc-options:
   "*": -DFOO
   ghc-options: -DBAR

@@ -1,4 +1,4 @@
-# Stack is built with GHC 9.2.4. GHC 9.2.4 for Linux/AArch64 says it was made on
+# Stack is built with GHC 9.2.5. GHC 9.2.5 for Linux/AArch64 says it was made on
 # a Debian 10 system and requires GMP 6.1. Debian 10 is codename 'buster' and
 # includes libc6 (2.28-10+deb10u1).
 FROM debian:buster
@@ -14,7 +14,7 @@ RUN cd /tmp && \
     tar xfv /tmp/llvm.tar --strip-components 1 -C /usr && \
     rm /tmp/llvm.tar
 
-RUN curl -L https://downloads.haskell.org/ghcup/unofficial-bindists/stack/2.7.5/stack-2.7.5-linux-aarch64.tar.gz --output /tmp/stack.tar.gz && \
+RUN curl -L https://downloads.haskell.org/ghcup/unofficial-bindists/stack/2.9.1/stack-2.9.1-linux-aarch64.tar.gz --output /tmp/stack.tar.gz && \
     tar xfv /tmp/stack.tar.gz -C /usr/local/bin && \
     rm /tmp/stack.tar.gz
 
@@ -46,5 +46,5 @@ RUN stack build shake
 
 COPY etc/scripts/release.hs /src
 
-RUN stack script --resolver nightly-2022-09-05 --extra-dep Cabal-3.6.3.0 --compile /src/release.hs -- --version
+RUN stack script --resolver lts-20.0 --extra-dep Cabal-3.6.3.0 --compile /src/release.hs -- --version
 RUN cp /src/release /home/stack
