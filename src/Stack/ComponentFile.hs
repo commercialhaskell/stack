@@ -31,7 +31,9 @@ import           Distribution.ModuleName ( ModuleName )
 import qualified Distribution.ModuleName as Cabal
 import           Distribution.Package
                    hiding
-                     ( Package, PackageIdentifier, packageName, packageVersion )
+                     ( Module, Package, PackageIdentifier, packageName
+                     , packageVersion
+                     )
 import           Distribution.PackageDescription hiding ( FlagName )
 import           Distribution.Text ( display )
 import           Distribution.Utils.Path ( getSymbolicPath )
@@ -40,8 +42,6 @@ import qualified HiFileParser as Iface
 import           Path as FL hiding ( replaceExtension )
 import           Path.Extra
 import           Path.IO hiding ( findFiles )
-import           RIO.PrettyPrint
-import qualified RIO.PrettyPrint as PP ( Style (Module) )
 import           Stack.Constants
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Config
@@ -395,7 +395,7 @@ logPossibilities dirs mn = do
   possibilities <- liftM concat (makePossibilities mn)
   unless (null possibilities) $ prettyWarnL
     [ flow "Unable to find a known candidate for the Cabal entry"
-    , (style PP.Module . fromString $ display mn) <> ","
+    , (style Module . fromString $ display mn) <> ","
     , flow "but did find:"
     , line <> bulletedList (map pretty possibilities)
     , flow "If you are using a custom preprocessor for this module"

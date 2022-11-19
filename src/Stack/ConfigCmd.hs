@@ -166,7 +166,7 @@ cfgCmdSet cmd = do
 
     parsePlainKey :: Text -> Parser KeyType
     parsePlainKey key = do
-      _ <- string key
+      _ <- P.string key
       pure PlainKey
 
     parseSingleQuotedKey :: Text -> Parser KeyType
@@ -178,7 +178,7 @@ cfgCmdSet cmd = do
     parseQuotedKey :: KeyType -> Char -> Text -> Parser KeyType
     parseQuotedKey kt c key = do
         skip (==c)
-        _ <- string key
+        _ <- P.string key
         skip (==c)
         pure kt
 

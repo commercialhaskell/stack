@@ -69,7 +69,6 @@ import              Path.IO hiding (findExecutable, withSystemTempDir)
 import qualified    Pantry
 import qualified    RIO
 import              RIO.List
-import              RIO.PrettyPrint
 import              RIO.Process
 import              Stack.Build.Haddock (shouldHaddockDeps)
 import              Stack.Build.Source (loadSourceMap, hashSourceMapData)
@@ -383,14 +382,6 @@ instance Pretty SetupPrettyException where
       <> blankLine
       <> flow "For more information consider rerunning with --verbose flag"
       <> line
-
--- | @string@ is not exported by module "Text.PrettyPrint.Leijen.Extended" of
--- the @rio-prettyprint@ package.
-string :: String -> StyleDoc
-string "" = mempty
-string ('\n':s) = line <> string s
-string s        = let (xs, ys) = span (/='\n') s
-                  in  fromString xs <> string ys
 
 instance Exception SetupPrettyException
 

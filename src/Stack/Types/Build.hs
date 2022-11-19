@@ -60,7 +60,7 @@ import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
 import           Database.Persist.Sql
                    ( PersistField (..), PersistFieldSql(..)
-                   , PersistValue(PersistText), SqlType(SqlString)
+                   , PersistValue (PersistText), SqlType (SqlString)
                    )
 import           Distribution.PackageDescription
                    ( TestSuiteInterface, mkPackageName )
@@ -69,10 +69,7 @@ import qualified Distribution.Text               as C
 import qualified Distribution.Version            as C
 import           Path                            (parseRelDir, (</>), parent)
 import           Path.Extra                      (toFilePathNoTrailingSep)
-import           RIO.PrettyPrint
-                   ( Style (..), StyleDoc, (<+>), align, encloseSep, flow, hcat
-                   , indent, line, parens, sep, softline, style, vsep
-                   )
+import           RIO.Process                     (showProcessArgDebug)
 import           Stack.Constants
 import           Stack.Prelude
 import           Stack.Types.Compiler
@@ -83,7 +80,6 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Version
 import           System.FilePath                 (pathSeparator)
-import           RIO.Process                     (showProcessArgDebug)
 
 -- | Type representing exceptions thrown by functions exported by modules with
 -- names beginning @Stack.Build@.
@@ -407,14 +403,6 @@ instance Pretty BuildPrettyException where
     pretty (SetupHsBuildFailure exitCode mtaskProvides execName fullArgs logFiles bss) =
         showBuildError "[S-6374]"
             True exitCode mtaskProvides execName fullArgs logFiles bss
-
--- | @string@ is not exported by module "Text.PrettyPrint.Leijen.Extended" of
--- the @rio-prettyprint@ package.
-string :: String -> StyleDoc
-string "" = mempty
-string ('\n':s) = line <> string s
-string s        = let (xs, ys) = span (/='\n') s
-                  in  fromString xs <> string ys
 
 instance Exception BuildPrettyException
 

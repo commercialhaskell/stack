@@ -10,22 +10,21 @@ module Stack.Upgrade
     , upgradeOpts
     ) where
 
-import           Stack.Prelude               hiding (force, Display (..))
 import qualified Data.Text as T
-import           Distribution.Version        (mkVersion')
+import           Distribution.Version ( mkVersion' )
 import           Options.Applicative
 import           Path
 import qualified Paths_stack as Paths
+import           RIO.Process
 import           Stack.Build
-import           Stack.Build.Target (NeedTargets(..))
+import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Constants
+import           Stack.Prelude hiding ( force, Display (..) )
 import           Stack.Runners
 import           Stack.Setup
 import           Stack.Types.Config
-import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
-import           System.Process              (rawSystem, readProcess)
-import           RIO.PrettyPrint
-import           RIO.Process
+import           System.Console.ANSI ( hSupportsANSIWithoutEmulation )
+import           System.Process ( rawSystem, readProcess )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Upgrade" module.

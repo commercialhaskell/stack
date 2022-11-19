@@ -180,7 +180,7 @@ initProject currDir initOpts mresolver = do
 
         makeRel = fmap toFilePath . makeRelativeToCurrentDir
 
-        indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+        ind t = T.unlines $ fmap ("    " <>) (T.lines t)
 
     logInfo $ "Initialising configuration using resolver: " <> display snapshotLoc
     logInfo $ "Total number of user packages considered: "
@@ -191,14 +191,14 @@ initProject currDir initOpts mresolver = do
                    <> displayShow (length dupPkgs)
                    <> " duplicate packages:"
         rels <- mapM makeRel dupPkgs
-        logWarn $ display $ indent $ showItems rels
+        logWarn $ display $ ind $ showItems rels
 
     when (Map.size ignored > 0) $ do
         logWarn $ "Warning! Ignoring "
                    <> displayShow (Map.size ignored)
                    <> " packages due to dependency conflicts:"
         rels <- mapM makeRel (Map.elems (fmap fst ignored))
-        logWarn $ display $ indent $ showItems rels
+        logWarn $ display $ ind $ showItems rels
 
     when (Map.size extraDeps > 0) $ do
         logWarn $ "Warning! " <> displayShow (Map.size extraDeps)
@@ -437,7 +437,7 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
 
                         if length ignored > 1 then do
                           logWarn "*** Ignoring packages:"
-                          logWarn $ display $ indent $ showItems $ map packageNameString ignored
+                          logWarn $ display $ ind $ showItems $ map packageNameString ignored
                         else
                           logWarn $ "*** Ignoring package: "
                                  <> fromString
@@ -447,7 +447,7 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
 
                         go available
                     where
-                      indent t   = T.unlines $ fmap ("    " <>) (T.lines t)
+                      ind t   = T.unlines $ fmap ("    " <>) (T.lines t)
                       isAvailable k _ = k `notElem` ignored
                       available       = Map.filterWithKey isAvailable pkgDirs
 
@@ -476,15 +476,15 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
                            <> display snapshotLoc
-                logWarn $ display $ indent $ T.pack $ show result
+                logWarn $ display $ ind $ T.pack $ show result
                 pure $ Left $ failedUserPkgs e
             | otherwise -> throwM $ ResolverMismatch snapshotLoc (show result)
     where
-      indent t  = T.unlines $ fmap ("    " <>) (T.lines t)
+      ind t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
           logWarn $ "*** Resolver " <> display snapshotLoc
                       <> " will need external packages: "
-          logWarn $ display $ indent $ T.pack $ show res
+          logWarn $ display $ ind $ T.pack $ show res
 
       failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
 

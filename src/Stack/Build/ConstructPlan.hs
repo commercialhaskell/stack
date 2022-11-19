@@ -13,20 +13,20 @@ module Stack.Build.ConstructPlan
     ( constructPlan
     ) where
 
-import           Stack.Prelude hiding (Display (..), loadPackage)
-import           Control.Monad.RWS.Strict hiding ((<>))
-import           Control.Monad.State.Strict (execState)
+import           Control.Monad.RWS.Strict hiding ( (<>) )
+import           Control.Monad.State.Strict ( execState )
 import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
-import           Data.Monoid.Map (MonoidMap(..))
+import           Data.Monoid.Map ( MonoidMap(..) )
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.Types.BuildType (BuildType (Configure))
-import           Distribution.Types.PackageName (mkPackageName)
-import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Path (parent)
+import           Distribution.Types.BuildType ( BuildType (Configure) )
+import           Distribution.Types.PackageName ( mkPackageName )
+import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
+import           Path ( parent )
 import qualified RIO
+import           RIO.Process ( findExecutable, HasProcessContext (..) )
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
 import           Stack.Build.Installed
@@ -34,20 +34,20 @@ import           Stack.Build.Source
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
+import           Stack.Prelude hiding ( Display (..), loadPackage )
 import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
+import           Stack.Types.Dependency
+                   ( DepValue (DepValue), DepType (AsLibrary) )
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
-import           System.Environment (lookupEnv)
-import           System.IO (putStrLn)
-import           RIO.PrettyPrint
-import           RIO.Process (findExecutable, HasProcessContext (..))
-import           Stack.Types.Dependency (DepValue(DepValue), DepType (AsLibrary))
+import           System.Environment ( lookupEnv )
+import           System.IO ( putStrLn )
 
 data PackageInfo
     =

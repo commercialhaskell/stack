@@ -4,9 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables       #-}
 
 module Stack.Prelude
-  ( PrettyException (..)
-  , Pretty (..)
-  , withSystemTempDir
+  ( withSystemTempDir
   , withKeepSystemTempDir
   , sinkProcessStderrStdout
   , sinkProcessStdout
@@ -29,16 +27,56 @@ module Stack.Prelude
   , bugPrettyReport
   , blankLine
   , module X
+  -- * Re-exports from the rio-pretty print package, and 'string'
+  , HasStylesUpdate (..)
+  , HasTerm (..)
+  , Pretty (..)
+  , PrettyException (..)
+  , StyleDoc
+  , Style (..)
+  , StyleSpec
+  , StylesUpdate (..)
+  , (<+>)
+  , align
+  , bulletedList
+  , debugBracket
+  , defaultStyles
+  , encloseSep
+  , fillSep
+  , flow
+  , hang
+  , hcat
+  , indent
+  , line
+  , logLevelToStyle
+  , parens
+  , parseStylesUpdateFromString
+  , prettyDebugL
+  , prettyError
+  , prettyErrorL
+  , prettyInfo
+  , prettyInfoL
+  , prettyInfoS
+  , prettyNote
+  , prettyWarn
+  , prettyWarnL
+  , prettyWarnS
+  , punctuate
+  , sep
+  , softbreak
+  , softline
+  , string
+  , style
+  , vsep
   ) where
 
 import           Data.Monoid as X
-                   ( First (..), Any (..), Sum (..), Endo (..) )
-
+                   ( Any (..), Endo (..), First (..), Sum (..) )
 import           Data.Conduit as X ( ConduitM, runConduit, (.|) )
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed
-                   ( withLoggedProcess_, createSource, byteStringInput)
+                   ( byteStringInput, createSource, withLoggedProcess_ )
 import qualified Data.Text.IO as T
 import           Pantry as X hiding ( Package (..), loadSnapshot )
 import           Path as X
@@ -46,13 +84,26 @@ import           Path as X
 import qualified Path.IO
 import           RIO as X
 import           RIO.File as X hiding ( writeBinaryFileAtomic )
-import           RIO.PrettyPrint ( Pretty (..), StyleDoc, (<+>), flow, line )
+import           RIO.PrettyPrint
+                   ( HasStylesUpdate (..), HasTerm (..), Pretty (..)
+                   , Style (..), StyleDoc, (<+>), align, bulletedList
+                   , debugBracket, encloseSep, fillSep, flow, hang, hcat
+                   , indent, line, logLevelToStyle, parens, prettyDebugL
+                   , prettyError, prettyErrorL, prettyInfo, prettyInfoL
+                   , prettyInfoS, prettyNote, prettyWarn, prettyWarnL
+                   , prettyWarnS, punctuate, sep, softbreak, softline, style
+                   , stylesUpdateL, useColorL, vsep
+                   )
+import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
+import           RIO.PrettyPrint.StylesUpdate
+                   ( StylesUpdate (..), parseStylesUpdateFromString )
+import           RIO.PrettyPrint.Types ( StyleSpec )
 import           RIO.Process
-                   ( HasProcessContext (..), ProcessContext, setStdin, closed
-                   , getStderr, getStdout, proc, withProcessWait_, setStdout
-                   , setStderr, ProcessConfig, readProcess_, workingDirL
-                   , waitExitCode
+                   ( HasProcessContext (..), ProcessConfig, ProcessContext
+                   , closed, getStderr, getStdout, proc, readProcess_, setStderr
+                   , setStdin, setStdout, waitExitCode, withProcessWait_
+                   , workingDirL
                    )
 import qualified RIO.Text as T
 import           System.IO.Echo ( withoutInputEcho )
@@ -236,6 +287,14 @@ writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
 writeBinaryFileAtomic fp builder =
     liftIO $
     withBinaryFileAtomic (toFilePath fp) WriteMode (`hPutBuilder` builder)
+
+-- | @string@ is not exported by module "Text.PrettyPrint.Leijen.Extended" of
+-- the @rio-prettyprint@ package.
+string :: String -> StyleDoc
+string "" = mempty
+string ('\n':s) = line <> string s
+string s        = let (xs, ys) = span (/='\n') s
+                  in  fromString xs <> string ys
 
 -- | Report a bug in Stack.
 bugReport :: String -> String -> String

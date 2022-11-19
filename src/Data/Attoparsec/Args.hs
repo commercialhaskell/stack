@@ -36,10 +36,11 @@ argsParser mode = many (P.skipSpace *> (quoted <|> unquoted)) <*
                   P.skipSpace <* (P.endOfInput <?> "unterminated string")
   where
     unquoted = P.many1 naked
-    quoted = P.char '"' *> string <* P.char '"'
-    string = many (case mode of
+    quoted = P.char '"' *> str <* P.char '"'
+    str = many ( case mode of
                      Escaping -> escaped <|> nonquote
-                     NoEscaping -> nonquote)
+                     NoEscaping -> nonquote
+               )
     escaped = P.char '\\' *> P.anyChar
     nonquote = P.satisfy (/= '"')
     naked = P.satisfy (not . flip elem ("\" " :: String))

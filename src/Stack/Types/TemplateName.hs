@@ -75,16 +75,16 @@ templateNameArgument :: O.Mod O.ArgumentFields TemplateName
                      -> O.Parser TemplateName
 templateNameArgument =
     O.argument
-        (do string <- O.str
-            either O.readerError pure (parseTemplateNameFromString string))
+        (do s <- O.str
+            either O.readerError pure (parseTemplateNameFromString s))
 
 -- | An argument which accepts a @key:value@ pair for specifying parameters.
 templateParamArgument :: O.Mod O.OptionFields (Text,Text)
                       -> O.Parser (Text,Text)
 templateParamArgument =
     O.option
-        (do string <- O.str
-            either O.readerError pure (parsePair string))
+        (do s <- O.str
+            either O.readerError pure (parsePair s))
   where
     parsePair :: String -> Either String (Text, Text)
     parsePair s =

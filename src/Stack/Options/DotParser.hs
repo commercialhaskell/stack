@@ -3,11 +3,11 @@
 
 module Stack.Options.DotParser where
 
-import           Data.Char (isSpace)
-import           Data.List.Split (splitOn)
+import           Data.Char ( isSpace )
+import           Data.List.Split ( splitOn )
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.Types.PackageName(mkPackageName)
+import           Distribution.Types.PackageName ( mkPackageName )
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Dot
@@ -66,7 +66,7 @@ separatorParser =
                       "and package version.") <>
                 value " " <>
                 showDefault))
-  where escapeSep sep = T.replace "\\t" "\t" (T.replace "\\n" "\n" sep)
+  where escapeSep s = T.replace "\\t" "\t" (T.replace "\\n" "\n" s)
 
 licenseParser :: Parser Bool
 licenseParser = boolFlags False

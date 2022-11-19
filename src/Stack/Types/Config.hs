@@ -22,214 +22,211 @@ module Stack.Types.Config
   (
   -- * Main configuration types and classes
   -- ** HasPlatform & HasStackRoot
-   HasPlatform(..)
-  ,PlatformVariant(..)
+    HasPlatform(..)
+  , PlatformVariant(..)
   -- ** Runner
-  ,HasRunner(..)
-  ,Runner(..)
-  ,ColorWhen(..)
-  ,terminalL
-  ,reExecL
+  , HasRunner(..)
+  , Runner(..)
+  , ColorWhen(..)
+  , terminalL
+  , reExecL
   -- ** Config & HasConfig
-  ,Config(..)
-  ,HasConfig(..)
-  ,askLatestSnapshotUrl
-  ,configProjectRoot
+  , Config(..)
+  , HasConfig(..)
+  , askLatestSnapshotUrl
+  , configProjectRoot
   -- ** BuildConfig & HasBuildConfig
-  ,BuildConfig(..)
-  ,ProjectPackage(..)
-  ,DepPackage(..)
-  ,ppRoot
-  ,ppVersion
-  ,ppComponents
-  ,ppGPD
-  ,stackYamlL
-  ,projectRootL
-  ,HasBuildConfig(..)
+  , BuildConfig(..)
+  , ProjectPackage(..)
+  , DepPackage(..)
+  , ppRoot
+  , ppVersion
+  , ppComponents
+  , ppGPD
+  , stackYamlL
+  , projectRootL
+  , HasBuildConfig(..)
   -- ** Storage databases
-  ,UserStorage(..)
-  ,ProjectStorage(..)
+  , UserStorage(..)
+  , ProjectStorage(..)
   -- ** GHCVariant & HasGHCVariant
-  ,GHCVariant(..)
-  ,ghcVariantName
-  ,ghcVariantSuffix
-  ,parseGHCVariant
-  ,HasGHCVariant(..)
-  ,snapshotsDir
+  , GHCVariant(..)
+  , ghcVariantName
+  , ghcVariantSuffix
+  , parseGHCVariant
+  , HasGHCVariant(..)
+  , snapshotsDir
   -- ** EnvConfig & HasEnvConfig
-  ,EnvConfig(..)
-  ,HasSourceMap(..)
-  ,HasEnvConfig(..)
-  ,getCompilerPath
+  , EnvConfig(..)
+  , HasSourceMap(..)
+  , HasEnvConfig(..)
+  , getCompilerPath
   -- * Details
   -- ** ApplyGhcOptions
-  ,ApplyGhcOptions(..)
+  , ApplyGhcOptions(..)
   -- ** AllowNewerDeps
-  ,AllowNewerDeps(..)
+  , AllowNewerDeps(..)
   -- ** CabalConfigKey
-  ,CabalConfigKey(..)
+  , CabalConfigKey(..)
   -- ** ConfigException
-  ,HpackExecutable(..)
-  ,ConfigException(..)
-  ,ParseAbsolutePathException(..)
-  ,packageIndicesWarning
+  , HpackExecutable(..)
+  , ConfigException(..)
+  , ConfigPrettyException(..)
+  , ParseAbsolutePathException(..)
+  , packageIndicesWarning
   -- ** ConfigMonoid
-  ,ConfigMonoid(..)
-  ,configMonoidInstallGHCName
-  ,configMonoidSystemGHCName
-  ,parseConfigMonoid
+  , ConfigMonoid(..)
+  , configMonoidInstallGHCName
+  , configMonoidSystemGHCName
+  , parseConfigMonoid
   -- ** DumpLogs
-  ,DumpLogs(..)
+  , DumpLogs(..)
   -- ** EnvSettings
-  ,EnvSettings(..)
-  ,minimalEnvSettings
-  ,defaultEnvSettings
-  ,plainEnvSettings
+  , EnvSettings(..)
+  , minimalEnvSettings
+  , defaultEnvSettings
+  , plainEnvSettings
   -- ** GlobalOpts & GlobalOptsMonoid
-  ,GlobalOpts(..)
-  ,GlobalOptsMonoid(..)
-  ,rslInLogL
-  ,StackYamlLoc(..)
-  ,stackYamlLocL
-  ,LockFileBehavior(..)
-  ,readLockFileBehavior
-  ,lockFileBehaviorL
-  ,defaultLogLevel
+  , GlobalOpts(..)
+  , GlobalOptsMonoid(..)
+  , rslInLogL
+  , StackYamlLoc(..)
+  , stackYamlLocL
+  , LockFileBehavior(..)
+  , readLockFileBehavior
+  , lockFileBehaviorL
+  , defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
-  ,Project(..)
-  ,ProjectConfig(..)
-  ,Curator(..)
-  ,ProjectAndConfigMonoid(..)
-  ,parseProjectAndConfigMonoid
+  , Project(..)
+  , ProjectConfig(..)
+  , Curator(..)
+  , ProjectAndConfigMonoid(..)
+  , parseProjectAndConfigMonoid
   -- ** PvpBounds
-  ,PvpBounds(..)
-  ,PvpBoundsType(..)
-  ,parsePvpBounds
+  , PvpBounds(..)
+  , PvpBoundsType(..)
+  , parsePvpBounds
   -- ** ColorWhen
-  ,readColorWhen
+  , readColorWhen
   -- ** Styles
-  ,readStyles
+  , readStyles
   -- ** SCM
-  ,SCM(..)
+  , SCM(..)
   -- * Paths
-  ,bindirSuffix
-  ,GlobalInfoSource(..)
-  ,getProjectWorkDir
-  ,docDirSuffix
-  ,extraBinDirs
-  ,hpcReportDir
-  ,installationRootDeps
-  ,installationRootLocal
-  ,bindirCompilerTools
-  ,hoogleRoot
-  ,hoogleDatabasePath
-  ,packageDatabaseDeps
-  ,packageDatabaseExtra
-  ,packageDatabaseLocal
-  ,platformOnlyRelDir
-  ,platformGhcRelDir
-  ,platformGhcVerOnlyRelDir
-  ,useShaPathOnWindows
-  ,shaPath
-  ,shaPathForBytes
-  ,workDirL
-  ,ghcInstallHook
+  , bindirSuffix
+  , GlobalInfoSource(..)
+  , getProjectWorkDir
+  , docDirSuffix
+  , extraBinDirs
+  , hpcReportDir
+  , installationRootDeps
+  , installationRootLocal
+  , bindirCompilerTools
+  , hoogleRoot
+  , hoogleDatabasePath
+  , packageDatabaseDeps
+  , packageDatabaseExtra
+  , packageDatabaseLocal
+  , platformOnlyRelDir
+  , platformGhcRelDir
+  , platformGhcVerOnlyRelDir
+  , useShaPathOnWindows
+  , shaPath
+  , shaPathForBytes
+  , workDirL
+  , ghcInstallHook
   -- * Command-related types
-  ,AddCommand
+  , AddCommand
   -- ** Eval
-  ,EvalOpts(..)
+  , EvalOpts(..)
   -- ** Exec
-  ,ExecOpts(..)
-  ,SpecialExecCmd(..)
-  ,ExecOptsExtra(..)
+  , ExecOpts(..)
+  , SpecialExecCmd(..)
+  , ExecOptsExtra(..)
   -- ** Setup
-  ,DownloadInfo(..)
-  ,VersionedDownloadInfo(..)
-  ,GHCDownloadInfo(..)
-  ,SetupInfo(..)
+  , DownloadInfo(..)
+  , VersionedDownloadInfo(..)
+  , GHCDownloadInfo(..)
+  , SetupInfo(..)
   -- ** Docker entrypoint
-  ,DockerEntrypoint(..)
-  ,DockerUser(..)
-  ,module X
+  , DockerEntrypoint(..)
+  , DockerUser(..)
+  , module X
   -- * Lens helpers
-  ,wantedCompilerVersionL
-  ,actualCompilerVersionL
-  ,HasCompiler(..)
-  ,DumpPackage(..)
-  ,CompilerPaths(..)
-  ,GhcPkgExe(..)
-  ,getGhcPkgExe
-  ,cpWhich
-  ,ExtraDirs(..)
-  ,buildOptsL
-  ,globalOptsL
-  ,buildOptsInstallExesL
-  ,buildOptsMonoidHaddockL
-  ,buildOptsMonoidTestsL
-  ,buildOptsMonoidBenchmarksL
-  ,buildOptsMonoidInstallExesL
-  ,buildOptsHaddockL
-  ,globalOptsBuildOptsMonoidL
-  ,stackRootL
-  ,stackGlobalConfigL
-  ,cabalVersionL
-  ,whichCompilerL
-  ,envOverrideSettingsL
-  ,shouldForceGhcColorFlag
-  ,appropriateGhcColorFlag
+  , wantedCompilerVersionL
+  , actualCompilerVersionL
+  , HasCompiler(..)
+  , DumpPackage(..)
+  , CompilerPaths(..)
+  , GhcPkgExe(..)
+  , getGhcPkgExe
+  , cpWhich
+  , ExtraDirs(..)
+  , buildOptsL
+  , globalOptsL
+  , buildOptsInstallExesL
+  , buildOptsMonoidHaddockL
+  , buildOptsMonoidTestsL
+  , buildOptsMonoidBenchmarksL
+  , buildOptsMonoidInstallExesL
+  , buildOptsHaddockL
+  , globalOptsBuildOptsMonoidL
+  , stackRootL
+  , stackGlobalConfigL
+  , cabalVersionL
+  , whichCompilerL
+  , envOverrideSettingsL
+  , shouldForceGhcColorFlag
+  , appropriateGhcColorFlag
   -- * Helper logging functions
-  ,prettyStackDevL
+  , prettyStackDevL
   -- * Lens reexport
-  ,view
-  ,to
+  , view
+  , to
   ) where
 
-import           Control.Monad.Writer (Writer, tell)
-import           Control.Monad.Trans.Except (ExceptT)
-import           Crypto.Hash (hashWith, SHA1(..))
+import           Control.Monad.Writer ( Writer, tell )
+import           Control.Monad.Trans.Except ( ExceptT )
+import           Crypto.Hash ( hashWith, SHA1 (..) )
 import           Stack.Prelude
 import           Pantry.Internal.AesonExtended
-                 (ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON, withText, object,
-                  (.=), (..:), (...:), (..:?), (..!=), Value(Bool),
-                  withObjectWarnings, WarningParser, Object, jsonSubWarnings,
-                  jsonSubWarningsT, jsonSubWarningsTT, WithJSONWarnings(..),
-                  FromJSONKeyFunction (FromJSONKeyTextParser))
-import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
-import qualified Data.ByteArray.Encoding as Mem (convertToBase, Base(Base16))
+                   ( ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON
+                   , withText, object, (.=), (..:), (...:), (..:?), (..!=)
+                   , Value(Bool), withObjectWarnings, WarningParser, Object
+                   , jsonSubWarnings, jsonSubWarningsT, jsonSubWarningsTT
+                   , WithJSONWarnings(..)
+                   , FromJSONKeyFunction (FromJSONKeyTextParser)
+                   )
+import           Data.Attoparsec.Args ( parseArgs, EscapingMode (Escaping) )
+import qualified Data.ByteArray.Encoding as Mem ( convertToBase, Base(Base16) )
 import qualified Data.ByteString.Char8 as S8
-import           Data.Coerce (coerce)
-import           Data.List (stripPrefix)
+import           Data.Coerce ( coerce )
+import           Data.List ( stripPrefix )
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import qualified Data.Monoid as Monoid
-import           Data.Monoid.Map (MonoidMap(..))
+import           Data.Monoid.Map ( MonoidMap (..) )
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Yaml (ParseException)
+import           Data.Yaml ( ParseException )
 import qualified Data.Yaml as Yaml
 import qualified Distribution.License as C
-import           Distribution.ModuleName (ModuleName)
-import           Distribution.PackageDescription (GenericPackageDescription)
+import           Distribution.ModuleName ( ModuleName )
+import           Distribution.PackageDescription ( GenericPackageDescription )
 import qualified Distribution.PackageDescription as C
-import           Distribution.System (Platform, Arch)
+import           Distribution.System ( Platform, Arch )
 import qualified Distribution.Text
-import           Distribution.Version (anyVersion, mkVersion', mkVersion)
-import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
+import           Distribution.Version ( anyVersion, mkVersion', mkVersion )
+import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Lens.Micro
-import           Options.Applicative (ReadM)
+import           Options.Applicative ( ReadM )
 import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
-import           Pantry.Internal (Storage)
+import           Pantry.Internal ( Storage )
 import           Path
 import qualified Paths_stack as Meta
 import qualified RIO.List as List
-import           RIO.PrettyPrint
-                   ( HasTerm (..), StyleDoc, prettyDebugL, prettyWarnL )
-import           RIO.PrettyPrint.StylesUpdate
-                   ( HasStylesUpdate (..), StylesUpdate
-                   , parseStylesUpdateFromString
-                   )
 import           Stack.Constants
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
@@ -242,9 +239,9 @@ import           Stack.Types.SourceMap
 import           Stack.Types.TemplateName
 import           Stack.Types.Version
 import qualified System.FilePath as FilePath
-import           System.PosixCompat.Types (UserID, GroupID, FileMode)
-import           RIO.Process (ProcessContext, HasProcessContext (..))
-import           Casa.Client (CasaRepoPrefix)
+import           System.PosixCompat.Types ( UserID, GroupID, FileMode )
+import           RIO.Process ( ProcessContext, HasProcessContext (..) )
+import           Casa.Client ( CasaRepoPrefix )
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -252,8 +249,7 @@ import           Stack.Types.Config.Build as X
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Config" module.
 data ConfigException
-  = ParseConfigFileException (Path Abs File) ParseException
-  | ParseCustomSnapshotException Text ParseException
+  = ParseCustomSnapshotException Text ParseException
   | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
   | UnableToExtractArchive Text (Path Abs File)
@@ -276,14 +272,6 @@ data ConfigException
   deriving Typeable
 
 instance Show ConfigException where
-    show (ParseConfigFileException configFile exception) = concat
-        [ "Error: [S-6602]\n"
-        , "Could not parse '"
-        , toFilePath configFile
-        , "':\n"
-        , Yaml.prettyPrintParseException exception
-        , "\nSee http://docs.haskellstack.org/en/stable/yaml_configuration/"
-        ]
     show (ParseCustomSnapshotException url exception) = concat
         [ "Error: [S-8981]\n"
         , "Could not parse '"
@@ -433,6 +421,37 @@ instance Show ConfigException where
         ]
 
 instance Exception ConfigException
+
+-- | Type representing 'pretty' exceptions thrown by functions exported by the
+-- "Stack.Config" module.
+data ConfigPrettyException
+    = ParseConfigFileException (Path Abs File) ParseException
+    deriving (Typeable)
+
+instance Show ConfigPrettyException where
+    show (ParseConfigFileException {}) = "ParseConfigFileException"
+
+instance Pretty ConfigPrettyException where
+    pretty (ParseConfigFileException configFile exception) =
+        "[S-6602]"
+        <> line
+        <>     flow "Stack could not load and parse"
+           <+> style File (pretty configFile)
+           <+> flow "as a YAML configuraton file."
+        <> blankLine
+        <> flow "While loading and parsing, Stack encountered the following \
+                \exception:"
+        <> blankLine
+        <> string (Yaml.prettyPrintParseException exception)
+        <> blankLine
+        <>     flow "For help about the content of Stack's YAML configuration \
+                    \files, see (for the most recent release of Stack)"
+           <+> style
+                 Url
+                 "http://docs.haskellstack.org/en/stable/yaml_configuration/"
+        <> "."
+
+instance Exception ConfigPrettyException
 
 data ParseAbsolutePathException
     = ParseAbsolutePathException String String

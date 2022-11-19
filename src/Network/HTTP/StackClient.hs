@@ -58,30 +58,44 @@ module Network.HTTP.StackClient
   , setForceDownload
   ) where
 
-import           Control.Monad.State (get, put, modify)
-import           Data.Aeson (FromJSON)
+import           Control.Monad.State ( get, put, modify )
+import           Data.Aeson ( FromJSON )
 import qualified Data.ByteString as Strict
-import           Data.Conduit (ConduitM, ConduitT, awaitForever, (.|), yield, await)
-import           Data.Conduit.Lift (evalStateC)
+import           Data.Conduit
+                   ( ConduitM, ConduitT, awaitForever, (.|), yield, await )
+import           Data.Conduit.Lift ( evalStateC )
 import qualified Data.Conduit.List as CL
-import           Data.Monoid (Sum (..))
+import           Data.Monoid ( Sum (..) )
 import qualified Data.Text as T
-import           Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
-import           Network.HTTP.Client (Request, RequestBody(..), Response, parseRequest, getUri, path, checkResponse, parseUrlThrow)
-import           Network.HTTP.Simple (setRequestCheckStatus, setRequestMethod, setRequestBody, setRequestHeader, addRequestHeader, HttpException(..), getResponseBody, getResponseStatusCode, getResponseHeaders)
-import           Network.HTTP.Types (hAccept, hContentLength, hContentMD5, methodPut)
-import           Network.HTTP.Conduit (requestHeaders)
-import           Network.HTTP.Client.TLS (getGlobalManager, applyDigestAuth, displayDigestAuthException)
-import           Network.HTTP.Download hiding (download, redownload, verifiedDownload)
+import           Data.Time.Clock
+                   ( NominalDiffTime, diffUTCTime, getCurrentTime )
+import           Network.HTTP.Client
+                   ( Request, RequestBody (..), Response, parseRequest, getUri
+                   , path, checkResponse, parseUrlThrow
+                   )
+import           Network.HTTP.Simple
+                   ( setRequestCheckStatus, setRequestMethod, setRequestBody
+                   , setRequestHeader, addRequestHeader, HttpException (..)
+                   , getResponseBody, getResponseStatusCode, getResponseHeaders
+                   )
+import           Network.HTTP.Types
+                   ( hAccept, hContentLength, hContentMD5, methodPut )
+import           Network.HTTP.Conduit ( requestHeaders )
+import           Network.HTTP.Client.TLS
+                   ( getGlobalManager, applyDigestAuth
+                   , displayDigestAuthException
+                   )
+import           Network.HTTP.Download
+                   hiding ( download, redownload, verifiedDownload )
 import qualified Network.HTTP.Download as Download
 import qualified Network.HTTP.Simple
-import           Network.HTTP.Client.MultipartFormData (formDataBody, partFileRequestBody, partBS, partLBS)
+import           Network.HTTP.Client.MultipartFormData
+                   ( formDataBody, partFileRequestBody, partBS, partLBS )
 import           Path
-import           Prelude (until, (!!))
+import           Prelude ( until, (!!) )
 import           RIO
-import           RIO.PrettyPrint
-import           Text.Printf (printf)
-
+import           RIO.PrettyPrint ( HasTerm )
+import           Text.Printf ( printf )
 
 setUserAgent :: Request -> Request
 setUserAgent = setRequestHeader "User-Agent" ["The Haskell Stack"]

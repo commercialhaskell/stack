@@ -18,7 +18,7 @@ import           Data.ByteString.Builder (toLazyByteString)
 import qualified Data.List as L
 import qualified Data.Set as S
 import           Path
-import           Stack.Prelude
+import           Stack.Prelude hiding (Module)
 import           System.IO (hSetBinaryMode)
 
 import           Distribution.ModuleName hiding (toFilePath)

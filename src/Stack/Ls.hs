@@ -8,36 +8,37 @@ module Stack.Ls
   , lsParser
   ) where
 
-import Data.Aeson
-import Data.Array.IArray ((//), elems)
-import Distribution.Package (mkPackageName)
-import Stack.Prelude hiding (Snapshot (..), SnapName (..))
+import           Data.Aeson
+import           Data.Array.IArray ( (//), elems )
+import           Distribution.Package ( mkPackageName )
 import qualified Data.Aeson.Types as A
 import qualified Data.List as L
-import Data.Text hiding (filter, intercalate, pack, reverse)
+import           Data.Text hiding ( filter, intercalate, pack, reverse )
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V
-import Network.HTTP.StackClient (httpJSON, addRequestHeader, getResponseBody, parseRequest, hAccept)
+import           Network.HTTP.StackClient
+                   ( httpJSON, addRequestHeader, getResponseBody, parseRequest
+                   , hAccept
+                   )
 import qualified Options.Applicative as OA
-import Options.Applicative (idm)
-import Options.Applicative.Builder.Extra (boolFlags)
-import Path
-import RIO.List (sort)
-import RIO.PrettyPrint (useColorL)
-import RIO.PrettyPrint.DefaultStyles (defaultStyles)
-import RIO.PrettyPrint.Types (StyleSpec)
-import RIO.PrettyPrint.StylesUpdate (StylesUpdate (..), stylesUpdateL)
-import Stack.Constants (osIsWindows, globalFooter)
-import Stack.Dot
-import Stack.Runners
-import Stack.Options.DotParser (listDepsOptsParser)
-import Stack.Setup.Installed (Tool (..), filterTools, listInstalled, toolString)
-import Stack.Types.Config
-import System.Console.ANSI.Codes (SGR (Reset), setSGRCode, sgrToCode)
-import System.Process.Pager (pageText)
-import System.Directory (listDirectory)
-import System.IO (putStrLn)
+import           Options.Applicative ( idm )
+import           Options.Applicative.Builder.Extra ( boolFlags )
+import           Path
+import           RIO.List ( sort )
+import           Stack.Constants ( osIsWindows, globalFooter )
+import           Stack.Dot
+import           Stack.Prelude hiding ( Snapshot (..), SnapName (..) )
+import           Stack.Runners
+import           Stack.Options.DotParser ( listDepsOptsParser )
+import           Stack.Setup.Installed
+                   ( Tool (..), filterTools, listInstalled, toolString )
+import           Stack.Types.Config
+import           System.Console.ANSI.Codes
+                   ( SGR (Reset), setSGRCode, sgrToCode )
+import           System.Process.Pager ( pageText )
+import           System.Directory ( listDirectory )
+import           System.IO ( putStrLn )
 
 -- | Type representing exceptions thrown by functions exported by the "Stack.Ls"
 -- module.

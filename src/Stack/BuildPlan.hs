@@ -421,13 +421,13 @@ selectBestSnapshot pkgDirs snaps = do
 
         reportResult r@BuildPlanCheckPartial {} loc = do
             logWarn $ "* Partially matches " <> RIO.display loc
-            logWarn $ RIO.display $ indent $ T.pack $ show r
+            logWarn $ RIO.display $ ind $ T.pack $ show r
 
         reportResult r@BuildPlanCheckFail {} loc = do
             logWarn $ "* Rejected " <> RIO.display loc
-            logWarn $ RIO.display $ indent $ T.pack $ show r
+            logWarn $ RIO.display $ ind $ T.pack $ show r
 
-        indent t = T.unlines $ fmap ("    " <>) (T.lines t)
+        ind t = T.unlines $ fmap ("    " <>) (T.lines t)
 
 showItems :: [String] -> Text
 showItems items = T.concat (map formatItem items)

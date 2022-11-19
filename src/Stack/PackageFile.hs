@@ -18,7 +18,6 @@ import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Path as FL hiding ( replaceExtension )
 import           Path.Extra
 import           Path.IO hiding ( findFiles )
-import           RIO.PrettyPrint
 import           Stack.ComponentFile
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.NamedComponent
