@@ -224,6 +224,7 @@ library
       Stack.Types.Cache
       Stack.Types.Dependency
       Stack.Types.PackageFile
+      Stack.Types.Storage
   autogen-modules:
       Paths_stack
   hs-source-dirs:

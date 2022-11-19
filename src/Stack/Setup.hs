@@ -351,7 +351,7 @@ instance Show SetupException where
 
 instance Exception SetupException
 
--- | Type representing pretty exceptions thrown by functions exported by the
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Setup" module
 data SetupPrettyException
     = GHCInstallFailed SomeException String String [String] (Path Abs Dir)

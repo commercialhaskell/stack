@@ -116,7 +116,7 @@ instance Show MainException where
 
 instance Exception MainException
 
--- | Type representing pretty exceptions thrown by functions in the "Main"
+-- | Type representing \'pretty\' exceptions thrown by functions in the "Main"
 -- module.
 data MainPrettyException
   = GHCProfOptionInvalid

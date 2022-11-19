@@ -33,24 +33,28 @@ module Stack.Storage.User
 
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import Data.Time.Clock (UTCTime)
-import Database.Persist.Sqlite
-import Database.Persist.TH
-import Distribution.Text (simpleParse, display)
-import Foreign.C.Types (CTime (..))
+import           Data.Time.Clock ( UTCTime )
+import           Database.Persist.Sqlite
+import           Database.Persist.TH
+import           Distribution.Text ( simpleParse, display )
+import           Foreign.C.Types ( CTime (..) )
 import qualified Pantry.Internal as SQLite
-import Path
-import Path.IO (resolveFile', resolveDir')
+import           Path
+import           Path.IO ( resolveFile', resolveDir' )
 import qualified RIO.FilePath as FP
-import Stack.Prelude hiding (MigrationFailure)
-import Stack.Storage.Util
-import Stack.Types.Build
-import Stack.Types.Cache
-import Stack.Types.Compiler
-import Stack.Types.CompilerBuild (CompilerBuild)
-import Stack.Types.Config (HasConfig, configL, configUserStorage, CompilerPaths (..), GhcPkgExe (..), UserStorage (..))
-import System.Posix.Types (COff (..))
-import System.PosixCompat.Files (getFileStatus, fileSize, modificationTime)
+import           Stack.Prelude hiding ( MigrationFailure )
+import           Stack.Storage.Util ( handleMigrationException, updateSet )
+import           Stack.Types.Build
+import           Stack.Types.Cache
+import           Stack.Types.Compiler
+import           Stack.Types.CompilerBuild ( CompilerBuild )
+import           Stack.Types.Config
+                   ( CompilerPaths (..), GhcPkgExe (..), HasConfig
+                   , UserStorage (..), configL, configUserStorage
+                   )
+import           System.Posix.Types ( COff (..) )
+import           System.PosixCompat.Files
+                   ( fileSize, getFileStatus, modificationTime )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Storage.User" module.
@@ -154,7 +158,8 @@ initUserStorage ::
     => Path Abs File -- ^ storage file
     -> (UserStorage -> RIO env a)
     -> RIO env a
-initUserStorage fp f = SQLite.initStorage "Stack" migrateAll fp $ f . UserStorage
+initUserStorage fp f = handleMigrationException $
+    SQLite.initStorage "Stack" migrateAll fp $ f . UserStorage
 
 -- | Run an action in a database transaction
 withUserStorage ::

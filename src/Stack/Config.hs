@@ -19,58 +19,61 @@
 -- probably default to behaving like cabal, possibly with spitting out
 -- a warning that "you should run `stk init` to make things better".
 module Stack.Config
-  (loadConfig
-  ,loadConfigYaml
-  ,packagesParser
-  ,getImplicitGlobalProjectDir
-  ,getSnapshots
-  ,makeConcreteResolver
-  ,checkOwnership
-  ,getInContainer
-  ,getInNixShell
-  ,defaultConfigYaml
-  ,getProjectConfig
-  ,withBuildConfig
-  ,withNewLogFunc
+  ( loadConfig
+  , loadConfigYaml
+  , packagesParser
+  , getImplicitGlobalProjectDir
+  , getSnapshots
+  , makeConcreteResolver
+  , checkOwnership
+  , getInContainer
+  , getInNixShell
+  , defaultConfigYaml
+  , getProjectConfig
+  , withBuildConfig
+  , withNewLogFunc
   ) where
 
-import           Control.Monad.Extra (firstJustM)
-import           Stack.Prelude
-import           Pantry.Internal.AesonExtended
-import           Data.Array.IArray ((!), (//))
+import           Control.Monad.Extra ( firstJustM )
+import           Data.Array.IArray ( (!), (//) )
 import qualified Data.ByteString as S
-import           Data.ByteString.Builder (byteString)
-import           Data.Coerce (coerce)
+import           Data.ByteString.Builder ( byteString )
+import           Data.Coerce ( coerce )
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import qualified Data.Map.Merge.Strict as MS
 import qualified Data.Monoid
-import           Data.Monoid.Map (MonoidMap(..))
+import           Data.Monoid.Map ( MonoidMap (..) )
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import           Distribution.System (OS (..), Platform (..), buildPlatform, Arch(OtherArch))
+import           Distribution.System
+                   ( Arch (OtherArch), OS (..), Platform (..), buildPlatform )
 import qualified Distribution.Text
-import           Distribution.Version (simplifyVersionRange, mkVersion')
-import           GHC.Conc (getNumProcessors)
-import           Network.HTTP.StackClient (httpJSON, parseUrlThrow, getResponseBody)
-import           Options.Applicative (Parser, help, long, metavar, strOption)
+import           Distribution.Version ( simplifyVersionRange, mkVersion' )
+import           GHC.Conc ( getNumProcessors )
+import           Network.HTTP.StackClient
+                   ( httpJSON, parseUrlThrow, getResponseBody )
+import           Options.Applicative ( Parser, help, long, metavar, strOption )
+import           Pantry.Internal.AesonExtended
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.Find (findInParents)
+import           Path.Extra ( toFilePathNoTrailingSep )
+import           Path.Find ( findInParents )
 import           Path.IO
 import qualified Paths_stack as Meta
-import           RIO.List (unzip)
+import           RIO.List ( unzip )
 import           RIO.Process
-import           RIO.Time (toGregorian)
-import           Stack.Build.Haddock (shouldHaddockDeps)
+import           RIO.Time ( toGregorian )
+import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Config.Build
 import           Stack.Config.Docker
 import           Stack.Config.Nix
 import           Stack.Constants
-import           Stack.Lock (lockCachedWanted)
+import           Stack.Lock ( lockCachedWanted )
+import           Stack.Prelude
 import           Stack.SourceMap
-import           Stack.Storage.Project (initProjectStorage)
-import           Stack.Storage.User (initUserStorage)
+import           Stack.Storage.Project ( initProjectStorage )
+import           Stack.Storage.User ( initUserStorage )
+import           Stack.Storage.Util ( handleMigrationException )
 import           Stack.Types.Build
 import           Stack.Types.Compiler
 import           Stack.Types.Config
@@ -79,11 +82,12 @@ import           Stack.Types.Nix
 import           Stack.Types.Resolver
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
-import           System.Console.ANSI (hSupportsANSIWithoutEmulation, setSGRCode)
+import           System.Console.ANSI
+                   ( hSupportsANSIWithoutEmulation, setSGRCode )
 import           System.Environment
-import           System.Info.ShortPathName (getShortPathName)
-import           System.PosixCompat.Files (fileOwner, getFileStatus)
-import           System.PosixCompat.User (getEffectiveUserID)
+import           System.Info.ShortPathName ( getShortPathName )
+import           System.PosixCompat.Files ( fileOwner, getFileStatus )
+import           System.PosixCompat.User ( getEffectiveUserID )
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
@@ -406,17 +410,18 @@ configFromConfigMonoid
 
      withNewLogFunc go useColor'' stylesUpdate' $ \logFunc -> do
        let configRunner = configRunner'' & logFuncL .~ logFunc
-       withLocalLogFunc logFunc $ withPantryConfig
-         pantryRoot
-         pic
-         (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
-         clConnectionCount
-         (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)
-         defaultCasaMaxPerRequest
-         snapLoc
-         (\configPantryConfig -> initUserStorage
-           (configStackRoot </> relFileStorage)
-           (\configUserStorage -> inner Config {..}))
+       withLocalLogFunc logFunc $ handleMigrationException $
+         withPantryConfig
+           pantryRoot
+           pic
+           (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
+           clConnectionCount
+           (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)
+           defaultCasaMaxPerRequest
+           snapLoc
+           (\configPantryConfig -> initUserStorage
+             (configStackRoot </> relFileStorage)
+             (\configUserStorage -> inner Config {..}))
 
 -- | Runs the provided action with the given 'LogFunc' in the environment
 withLocalLogFunc :: HasLogFunc env => LogFunc -> RIO env a -> RIO env a

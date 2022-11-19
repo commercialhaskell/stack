@@ -47,7 +47,7 @@ import           System.Environment ( lookupEnv )
 import           System.FilePath ( (</>), takeFileName, takeDirectory )
 import           System.PosixCompat.Files ( setFileMode )
 
--- | Type representing pretty exceptions thrown by functions exported by the
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Upload" module.
 data UploadPrettyException
     = AuthenticationFailure

@@ -85,14 +85,14 @@ import qualified Path.IO
 import           RIO as X
 import           RIO.File as X hiding ( writeBinaryFileAtomic )
 import           RIO.PrettyPrint
-                   ( HasStylesUpdate (..), HasTerm (..), Pretty (..)
-                   , Style (..), StyleDoc, (<+>), align, bulletedList
-                   , debugBracket, encloseSep, fillSep, flow, hang, hcat
-                   , indent, line, logLevelToStyle, parens, prettyDebugL
-                   , prettyError, prettyErrorL, prettyInfo, prettyInfoL
-                   , prettyInfoS, prettyNote, prettyWarn, prettyWarnL
-                   , prettyWarnS, punctuate, sep, softbreak, softline, style
-                   , stylesUpdateL, useColorL, vsep
+                   ( HasStylesUpdate (..), HasTerm (..), Pretty (..), Style (..)
+                   , StyleDoc, (<+>), align, bulletedList, debugBracket
+                   , encloseSep, fillSep, flow, hang, hcat, indent, line
+                   , logLevelToStyle, parens, prettyDebugL, prettyError
+                   , prettyErrorL, prettyInfo, prettyInfoL, prettyInfoS
+                   , prettyNote, prettyWarn, prettyWarnL, prettyWarnS, punctuate
+                   , sep, softbreak, softline, style, stylesUpdateL, useColorL
+                   , vsep
                    )
 import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
@@ -317,6 +317,6 @@ bugDeclaration = "The impossible happened!"
 bugRequest :: String
 bugRequest =  "Please report this bug at Stack's repository."
 
--- | A 'pretty' blank line.
+-- | A \'pretty\' blank line.
 blankLine :: StyleDoc
 blankLine = line <> line
