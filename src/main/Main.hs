@@ -247,7 +247,8 @@ commandLineHandler currentDir progName isInterpreter = complicatedOptions
   "stack - The Haskell Tool Stack"
   ""
   "Stack's documentation is available at https://docs.haskellstack.org/. \
-  \Command 'stack COMMAND --help' for help about a Stack command."
+  \Command 'stack COMMAND --help' for help about a Stack command. Stack also \
+  \supports the Haskell Error Index at https://errors.haskell.org/."
   (globalOpts OuterGlobalOpts)
   (Just failureCallback)
   addCommands
