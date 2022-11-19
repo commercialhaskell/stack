@@ -179,7 +179,7 @@ spec = beforeAll setup $ do
                                         , toCoverage = True
                                         , toDisableRun = True
                                         , toMaximumTimeSeconds = Nothing
-                                        , toAllowStdin = False
+                                        , toAllowStdin = True
                                         }
       boptsBenchmarks `shouldBe` True
       boptsBenchmarkOpts `shouldBe` BenchmarkOpts { beoAdditionalArgs = Just "-O2"
