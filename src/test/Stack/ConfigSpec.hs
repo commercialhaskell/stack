@@ -174,14 +174,17 @@ spec = beforeAll setup $ do
       boptsKeepTmpFiles `shouldBe` True
       boptsForceDirty `shouldBe` True
       boptsTests `shouldBe` True
-      boptsTestOpts `shouldBe` TestOpts {toRerunTests = True
-                                         ,toAdditionalArgs = ["-fprof"]
-                                         ,toCoverage = True
-                                         ,toDisableRun = True
-                                         ,toMaximumTimeSeconds = Nothing}
+      boptsTestOpts `shouldBe` TestOpts { toRerunTests = True
+                                        , toAdditionalArgs = ["-fprof"]
+                                        , toCoverage = True
+                                        , toDisableRun = True
+                                        , toMaximumTimeSeconds = Nothing
+                                        , toAllowStdin = True
+                                        }
       boptsBenchmarks `shouldBe` True
-      boptsBenchmarkOpts `shouldBe` BenchmarkOpts {beoAdditionalArgs = Just "-O2"
-                                                   ,beoDisableRun = True}
+      boptsBenchmarkOpts `shouldBe` BenchmarkOpts { beoAdditionalArgs = Just "-O2"
+                                                  , beoDisableRun = True
+                                                  }
       boptsReconfigure `shouldBe` True
       boptsCabalVerbose `shouldBe` CabalVerbosity verbose
 

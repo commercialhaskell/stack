@@ -81,6 +81,7 @@ testOptsFromMonoid TestOptsMonoid{..} madditional =
     , toCoverage = fromFirstFalse toMonoidCoverage
     , toDisableRun = fromFirstFalse toMonoidDisableRun
     , toMaximumTimeSeconds = fromFirst (toMaximumTimeSeconds defaultTestOpts) toMonoidMaximumTimeSeconds
+    , toAllowStdin = fromFirstTrue toMonoidAllowStdin
     }
 
 benchmarkOptsFromMonoid :: BenchmarkOptsMonoid -> Maybe [String] -> BenchmarkOpts
