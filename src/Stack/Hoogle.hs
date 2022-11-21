@@ -118,7 +118,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
                       restrictMinHoogleVersion muted (packageLocationIdent pli)
                 plm@(PLMutable _) -> do
                   T.pack . packageIdentifierString . package . packageDescription
-                      <$> loadCabalFile plm
+                      <$> loadCabalFile (Just stackProgName') plm
             Nothing -> do
               -- not muted because this should happen only once
               logWarn "No hoogle version was found, trying to install the latest version"

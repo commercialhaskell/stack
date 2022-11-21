@@ -16,6 +16,7 @@ module Stack.Prelude
   , promptPassword
   , promptBool
   , stackProgName
+  , stackProgName'
   , FirstTrue (..)
   , fromFirstTrue
   , defaultFirstTrue
@@ -245,6 +246,9 @@ promptBool txt = liftIO $ do
 -- GHC stage restrictions.
 stackProgName :: String
 stackProgName = "stack"
+
+stackProgName' :: Text
+stackProgName' = T.pack stackProgName
 
 -- | Like @First Bool@, but the default is @True@.
 newtype FirstTrue = FirstTrue { getFirstTrue :: Maybe Bool }

@@ -557,7 +557,7 @@ cabalPackagesCheck cabaldirs = do
     logInfo $ formatGroup relpaths
 
     packages <- for cabaldirs $ \dir -> do
-      (gpdio, _name, cabalfp) <- loadCabalFilePath dir
+      (gpdio, _name, cabalfp) <- loadCabalFilePath (Just stackProgName') dir
       gpd <- liftIO $ gpdio YesPrintWarnings
       pure (cabalfp, gpd)
 

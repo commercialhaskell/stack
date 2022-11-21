@@ -199,7 +199,8 @@ getCabalLbs :: HasEnvConfig env
             -> SourceMap
             -> RIO env (PackageIdentifier, L.ByteString)
 getCabalLbs pvpBounds mrev cabalfp sourceMap = do
-    (gpdio, _name, cabalfp') <- loadCabalFilePath (parent cabalfp)
+    (gpdio, _name, cabalfp') <-
+      loadCabalFilePath (Just stackProgName') (parent cabalfp)
     gpd <- liftIO $ gpdio NoPrintWarnings
     unless (cabalfp == cabalfp') $
       throwIO $ CabalFilePathsInconsistentBug cabalfp cabalfp'
@@ -334,7 +335,7 @@ gtraverseT f =
 readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
     config  <- getDefaultPackageConfig
-    (gpdio, _, cabalfp) <- loadCabalFilePath pkgDir
+    (gpdio, _, cabalfp) <- loadCabalFilePath (Just stackProgName') pkgDir
     gpd <- liftIO $ gpdio YesPrintWarnings
     let package = resolvePackage config gpd
     pure LocalPackage
@@ -441,7 +442,7 @@ checkPackageInExtractedTarball
   => Path Abs Dir -- ^ Absolute path to tarball
   -> RIO env ()
 checkPackageInExtractedTarball pkgDir = do
-    (gpdio, name, _cabalfp) <- loadCabalFilePath pkgDir
+    (gpdio, name, _cabalfp) <- loadCabalFilePath (Just stackProgName') pkgDir
     gpd <- liftIO $ gpdio YesPrintWarnings
     config  <- getDefaultPackageConfig
     let PackageDescriptionPair pkgDesc _ = resolvePackageDescription config gpd
