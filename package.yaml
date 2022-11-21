@@ -1,5 +1,5 @@
 name: stack
-version: '2.9.2.0'
+version: '2.10.0'
 synopsis: The Haskell Tool Stack
 description: |
   Please see the documentation at <https://docs.haskellstack.org>
