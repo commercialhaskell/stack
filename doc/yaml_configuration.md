@@ -369,6 +369,8 @@ allow-newer: true
 
 ### allow-newer-deps (experimental)
 
+:octicons-tag-24: 2.9.3
+
 Default: `none`
 
 Determines a subset of packages to which `allow-newer` should apply. This option
@@ -977,7 +979,7 @@ For further information, see the
 
 ### package-index
 
-:octicons-tag-24: Unreleased
+:octicons-tag-24: 2.9.3
 
 Default:
 

@@ -331,7 +331,7 @@ project packages or from local dependencies). See also the `--file-watch` flag.
 
 ### The `stack build --tests-allow-stdin` flag
 
-:octicons-tag-24: Unreleased
+:octicons-tag-24: 2.9.3
 
 Default: Enabled
 
