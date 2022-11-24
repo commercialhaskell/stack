@@ -51,27 +51,25 @@ data CoverageException
     = NonTestSuiteTarget PackageName
     | NoTargetsOrTixSpecified
     | NotLocalPackage PackageName
-    deriving (Typeable)
+    deriving (Show, Typeable)
 
-instance Show CoverageException where
-    show (NonTestSuiteTarget name) = concat
+instance Exception CoverageException where
+    displayException (NonTestSuiteTarget name) = concat
         [ "Error: [S-6361]\n"
         , "Can't specify anything except test-suites as hpc report targets ("
         , packageNameString name
         , ") is used with a non test-suite target."
         ]
-    show NoTargetsOrTixSpecified =
+    displayException NoTargetsOrTixSpecified =
         "Error: [S-2321]\n"
         ++ "Not generating combined report, because no targets or tix files \
            \are specified."
-    show (NotLocalPackage name) = concat
+    displayException (NotLocalPackage name) = concat
         [ "Error: [S-9975]"
         , "Expected a local package, but "
         , packageNameString name
         , " is either an extra-dep or in the snapshot."
         ]
-
-instance Exception CoverageException
 
 -- | Invoked at the beginning of running with "--coverage"
 deleteHpcReports :: HasEnvConfig env => RIO env ()
@@ -186,7 +184,8 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             pure Nothing
         else (`catch` \(err :: ProcessException) -> do
                  logError $ displayShow err
-                 generateHpcErrorReport reportDir $ RIO.display $ sanitize $ show err
+                 generateHpcErrorReport reportDir $ RIO.display $ sanitize $
+                     displayException err
                  pure Nothing) $
              (`onException`
                  logError
@@ -360,7 +359,7 @@ readTixOrLog path = do
         logError $
             "Error: [S-3521]\n" <>
             "Error while reading tix: " <>
-            fromString (show errorCall)
+            fromString (displayException errorCall)
         pure Nothing
     when (isNothing mtix) $
         logError $

@@ -1717,7 +1717,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             eres <- try $ cabal KeepTHLoading ["copy"]
             case eres of
                 Left err@CabalExitedUnsuccessfully{} ->
-                    throwM $ CabalCopyFailed (packageBuildType package == C.Simple) (show err)
+                    throwM $ CabalCopyFailed
+                               (packageBuildType package == C.Simple)
+                               (displayException err)
                 _ -> pure ()
             when hasLibrary $ cabal KeepTHLoading ["register"]
 

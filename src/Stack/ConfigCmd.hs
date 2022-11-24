@@ -44,14 +44,12 @@ import           System.Environment (getEnvironment)
 -- "Stack.ConfigCmd" module.
 data ConfigCmdException
     = NoProjectConfigAvailable
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show ConfigCmdException where
-    show NoProjectConfigAvailable =
+instance Exception ConfigCmdException where
+    displayException NoProjectConfigAvailable =
         "Error: [S-3136]\n"
         ++ "'config' command used when no project configuration available."
-
-instance Exception ConfigCmdException
 
 data ConfigCmdSet
     = ConfigCmdSetResolver !(Unresolved AbstractResolver)

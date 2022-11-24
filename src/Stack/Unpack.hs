@@ -20,20 +20,18 @@ import Path.IO (doesDirExist)
 data UnpackException
   = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
   | CouldNotParsePackageSelectors [String]
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show UnpackException where
-    show (UnpackDirectoryAlreadyExists dirs) = unlines
+instance Exception UnpackException where
+    displayException (UnpackDirectoryAlreadyExists dirs) = unlines
         $ "Error: [S-3515]"
         : "Unable to unpack due to already present directories:"
         : map (("    " ++) . toFilePath) (Set.toList dirs)
-    show (CouldNotParsePackageSelectors strs) = unlines
+    displayException (CouldNotParsePackageSelectors strs) = unlines
         $ "Error: [S-2628]"
         : "The following package selectors are not valid package names or \
           \identifiers:"
         : map ("- " ++) strs
-
-instance Exception UnpackException
 
 -- | Intended to work for the command line command.
 unpackPackages

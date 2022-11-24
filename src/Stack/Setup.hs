@@ -144,21 +144,21 @@ data SetupException
     | BinaryUpgradeOnOSUnsupported Cabal.OS
     | BinaryUpgradeOnArchUnsupported Cabal.Arch
     | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show SetupException where
-    show (UnsupportedSetupCombo os arch) = concat
+instance Exception SetupException where
+    displayException (UnsupportedSetupCombo os arch) = concat
         [ "Error: [S-1852]\n"
         , "I don't know how to install GHC for "
         , show (os, arch)
         , ", please install manually"
         ]
-    show (MissingDependencies tools) = concat
+    displayException (MissingDependencies tools) = concat
         [ "Error: [S-2126]\n"
         , "The following executables are missing and must be installed: "
         , intercalate ", " tools
         ]
-    show (UnknownCompilerVersion oskeys wanted known) = concat
+    displayException (UnknownCompilerVersion oskeys wanted known) = concat
         [ "Error: [S-9443]\n"
         , "No setup information found for "
         , T.unpack $ utf8BuilderToText $ RIO.display wanted
@@ -167,35 +167,35 @@ instance Show SetupException where
         , "'.\nSupported versions: "
         , T.unpack (T.intercalate ", " (map compilerVersionText (sort $ Set.toList known)))
         ]
-    show (UnknownOSKey oskey) = concat
+    displayException (UnknownOSKey oskey) = concat
         [ "Error: [S-6810]\n"
         , "Unable to find installation URLs for OS key: "
         , T.unpack oskey
         ]
-    show (GHCSanityCheckCompileFailed e ghc) = concat
+    displayException (GHCSanityCheckCompileFailed e ghc) = concat
         [ "Error: [S-5159]\n"
         , "The GHC located at "
         , toFilePath ghc
         , " failed to compile a sanity check. Please see:\n\n"
         , "    http://docs.haskellstack.org/en/stable/install_and_upgrade/\n\n"
         , "for more information. Exception was:\n"
-        , show e
+        , displayException e
         ]
-    show WantedMustBeGHC =
+    displayException WantedMustBeGHC =
         "Error: [S-9030]\n"
         ++ "The wanted compiler must be GHC."
-    show RequireCustomGHCVariant =
+    displayException RequireCustomGHCVariant =
         "Error: [S-8948]\n"
         ++ "A custom '--ghc-variant' must be specified to use '--ghc-bindist'."
-    show (ProblemWhileDecompressing archive) = concat
+    displayException (ProblemWhileDecompressing archive) = concat
         [ "Error: [S-2905]\n"
         , "Problem while decompressing "
         , toFilePath archive
         ]
-    show SetupInfoMissingSevenz =
+    displayException SetupInfoMissingSevenz =
         "Error: [S-9561]\n"
         ++ "SetupInfo missing Sevenz EXE/DLL."
-    show (DockerStackExeNotFound stackVersion' osKey) = concat
+    displayException (DockerStackExeNotFound stackVersion' osKey) = concat
         [ "Error: [S-1457]\n"
         , stackProgName
         , "-"
@@ -205,151 +205,149 @@ instance Show SetupException where
         , "\nUse the '"
         , T.unpack dockerStackExeArgName
         , "' option to specify a location."]
-    show UnsupportedSetupConfiguration =
+    displayException UnsupportedSetupConfiguration =
         "Error: [S-7748]\n"
         ++ "Stack does not know how to install GHC on your system \
            \configuration, please install manually."
-    show (InvalidGhcAt compiler e) = concat
+    displayException (InvalidGhcAt compiler e) = concat
         [ "Error: [S-2476]\n"
         , "Found an invalid compiler at "
         , show (toFilePath compiler)
         , ": "
         , displayException e
         ]
-    show (MSYS2NotFound osKey) = concat
+    displayException (MSYS2NotFound osKey) = concat
         [ "Error: [S-5308]\n"
         , "MSYS2 not found for "
         , T.unpack osKey
         ]
-    show UnwantedCompilerVersion =
+    displayException UnwantedCompilerVersion =
         "Error: [S-5127]\n"
         ++ "Not the compiler version we want."
-    show UnwantedArchitecture =
+    displayException UnwantedArchitecture =
         "Error: [S-1540]\n"
         ++ "Not the architecture we want."
-    show SandboxedCompilerNotFound =
+    displayException SandboxedCompilerNotFound =
         "Error: [S-9953]\n"
         ++ "Could not find sandboxed compiler."
-    show (CompilerNotFound toTry) = concat
+    displayException (CompilerNotFound toTry) = concat
         [ "Error: [S-4764]\n"
         , "Could not find any of: "
         , show toTry
         ]
-    show (GHCInfoNotValidUTF8 e) = concat
+    displayException (GHCInfoNotValidUTF8 e) = concat
         [ "Error: [S-8668]\n"
         , "GHC info is not valid UTF-8: "
-        , show e
+        , displayException e
         ]
-    show GHCInfoNotListOfPairs =
+    displayException GHCInfoNotListOfPairs =
         "Error: [S-4878]\n"
         ++ "GHC info does not parse as a list of pairs."
-    show GHCInfoMissingGlobalPackageDB =
+    displayException GHCInfoMissingGlobalPackageDB =
         "Error: [S-2965]\n"
         ++ "Key 'Global Package DB' not found in GHC info."
-    show GHCInfoMissingTargetPlatform =
+    displayException GHCInfoMissingTargetPlatform =
         "Error: [S-5219]\n"
         ++ "Key 'Target platform' not found in GHC info."
-    show (GHCInfoTargetPlatformInvalid targetPlatform) = concat
+    displayException (GHCInfoTargetPlatformInvalid targetPlatform) = concat
         [ "Error: [S-8299]\n"
         , "Invalid target platform in GHC info: "
         , targetPlatform
         ]
-    show (CabalNotFound compiler) = concat
+    displayException (CabalNotFound compiler) = concat
         [ "Error: [S-2574]\n"
         , "Cabal library not found in global package database for "
         , toFilePath compiler
         ]
-    show HadrianScriptNotFound =
+    displayException HadrianScriptNotFound =
         "Error: [S-1128]\n"
         ++ "No Hadrian build script found."
-    show (URLInvalid url) = concat
+    displayException (URLInvalid url) = concat
          [ "Error: [S-1906]\n"
          , "`url` must be either an HTTP URL or a file path: "
          , url
          ]
-    show (UnknownArchiveExtension url) = concat
+    displayException (UnknownArchiveExtension url) = concat
          [ "Error: [S-1648]\n"
          , "Unknown extension for url: "
          , url
          ]
-    show Unsupported7z =
+    displayException Unsupported7z =
         "Error: [S-4509]\n"
         ++ "Don't know how to deal with .7z files on non-Windows."
-    show (TarballInvalid name) = concat
+    displayException (TarballInvalid name) = concat
         [ "Error: [S-3158]\n"
         , name
         , " must be a tarball file."
         ]
-    show (TarballFileInvalid name archiveFile) = concat
+    displayException (TarballFileInvalid name archiveFile) = concat
         [ "Error: [S-5252]\n"
         , "Invalid "
         , name
         , " filename: "
         , show archiveFile
         ]
-    show (UnknownArchiveStructure archiveFile) = concat
+    displayException (UnknownArchiveStructure archiveFile) = concat
         [ "Error: [S-1827]\n"
         , "Expected a single directory within unpacked "
         , toFilePath archiveFile
         ]
-    show (StackReleaseInfoNotFound url) = concat
+    displayException (StackReleaseInfoNotFound url) = concat
         [ "Error: [S-9476]\n"
         , "Could not get release information for Stack from: "
         , url
         ]
-    show (StackBinaryArchiveNotFound platforms) = concat
+    displayException (StackBinaryArchiveNotFound platforms) = concat
         [ "Error: [S-4461]\n"
         , "Unable to find binary Stack archive for platforms: "
         , unwords platforms
         ]
-    show WorkingDirectoryInvalidBug = bugReport "[S-2076]"
+    displayException WorkingDirectoryInvalidBug = bugReport "[S-2076]"
         "Invalid working directory."
-    show HadrianBindistNotFound =
+    displayException HadrianBindistNotFound =
         "Error: [S-6617]\n"
         ++ "Can't find Hadrian-generated binary distribution."
-    show DownloadAndInstallCompilerError =
+    displayException DownloadAndInstallCompilerError =
         "Error: [S-7227]\n"
         ++ "'downloadAndInstallCompiler' should not be reached with ghc-git."
-    show StackBinaryArchiveZipUnsupportedBug = bugReport "[S-3967]"
+    displayException StackBinaryArchiveZipUnsupportedBug = bugReport "[S-3967]"
         "FIXME: Handle zip files."
-    show (StackBinaryArchiveUnsupported archiveURL) = concat
+    displayException (StackBinaryArchiveUnsupported archiveURL) = concat
         [ "Error: [S-6636]\n"
         , "Unknown archive format for Stack archive: "
         , T.unpack archiveURL
         ]
-    show (StackBinaryNotInArchive exeName url) = concat
+    displayException (StackBinaryNotInArchive exeName url) = concat
         [ "Error: [S-7871]\n"
         , "Stack executable "
         , exeName
         , " not found in archive from "
         , T.unpack url
         ]
-    show (FileTypeInArchiveInvalid e url) = concat
+    displayException (FileTypeInArchiveInvalid e url) = concat
         [ "Error: [S-5046]\n"
         , "Invalid file type for tar entry named "
         , Tar.entryPath e
         , " downloaded from "
         , T.unpack url
         ]
-    show (BinaryUpgradeOnOSUnsupported os) = concat
+    displayException (BinaryUpgradeOnOSUnsupported os) = concat
         [ "Error: [S-4132]\n"
         , "Binary upgrade not yet supported on OS: "
         , show os
         ]
-    show (BinaryUpgradeOnArchUnsupported arch) = concat
+    displayException (BinaryUpgradeOnArchUnsupported arch) = concat
         [ "Error: [S-3249]\n"
         , "Binary upgrade not yet supported on arch: "
         , show arch
         ]
-    show (ExistingMSYS2NotDeleted destDir e) = concat
+    displayException (ExistingMSYS2NotDeleted destDir e) = concat
         [ "Error: [S-4230]\n"
         , "Could not delete existing MSYS2 directory: "
         , toFilePath destDir
         , "\n"
-        , show e
+        , displayException e
         ]
-
-instance Exception SetupException
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Setup" module
@@ -362,7 +360,7 @@ instance Pretty SetupPrettyException where
     pretty (GHCInstallFailed ex step cmd args wd tempDir destDir) =
          flow "Error: [S-7441]"
       <> line
-      <> string (show ex)
+      <> string (displayException ex)
       <> line
       <> hang 2 (  flow "Error encountered while" <+> fromString step <+> flow "GHC with"
                 <> line
@@ -388,18 +386,16 @@ instance Exception SetupPrettyException
 -- | Type representing exceptions thrown by 'performPathChecking'
 data PerformPathCheckingException
     = ProcessExited ExitCode String [String]
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show PerformPathCheckingException where
-    show (ProcessExited ec cmd args) = concat
+instance Exception PerformPathCheckingException where
+    displayException (ProcessExited ec cmd args) = concat
         [ "Error: [S-1991]\n"
         , "Process exited with "
-        , show ec
+        , displayException ec
         , ": "
         , unwords (cmd:args)
         ]
-
-instance Exception PerformPathCheckingException
 
 -- | Default location of the stack-setup.yaml file
 defaultSetupInfoYaml :: String

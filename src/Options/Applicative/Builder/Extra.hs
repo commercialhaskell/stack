@@ -50,16 +50,14 @@ import System.FilePath (takeBaseName, (</>), splitFileName, isRelative, takeExte
 -- "Options.Applicative.Builder.Extra" module.
 data OptionsApplicativeExtraException
   = FlagNotFoundBug
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show OptionsApplicativeExtraException where
-  show FlagNotFoundBug =
+instance Exception OptionsApplicativeExtraException where
+  displayException FlagNotFoundBug =
     "Error: [S-2797]\n"
     ++ "The impossible happened! No valid flags found in \
        \enableDisableFlagsNoDefault. Please report this bug at Stack's \
        \repository."
-
-instance Exception OptionsApplicativeExtraException
 
 -- | Enable/disable flags for a 'Bool'.
 boolFlags :: Bool                 -- ^ Default value

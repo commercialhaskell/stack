@@ -53,21 +53,19 @@ import           Stack.Build.Target(NeedTargets(..), parseTargets)
 data DotException
   = DependencyNotFoundBug GhcPkgId
   | PackageNotFoundBug PackageName
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show DotException where
-  show (DependencyNotFoundBug depId) = bugReport "[S-7071]" $ concat
+instance Exception DotException where
+  displayException (DependencyNotFoundBug depId) = bugReport "[S-7071]" $ concat
     [ "Expected to find "
     , ghcPkgIdString depId
     , " in global DB."
     ]
-  show (PackageNotFoundBug pkgName) = bugReport "[S-7151]" $ concat
+  displayException (PackageNotFoundBug pkgName) = bugReport "[S-7151]" $ concat
     [ "The '"
     , packageNameString pkgName
     , "' package was not found in any of the dependency sources."
     ]
-
-instance Exception DotException
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts

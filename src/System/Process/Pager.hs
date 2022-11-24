@@ -25,10 +25,10 @@ import qualified Data.Text.IO as T
 -- "System.Process.Pager" module.
 data PagerException
   = PagerExitFailure CmdSpec Int
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show PagerException where
-  show (PagerExitFailure cmd n) =
+instance Exception PagerException where
+  displayException (PagerExitFailure cmd n) =
     let getStr (ShellCommand c) = c
         getStr (RawCommand exePath _) = exePath
     in  concat
@@ -38,8 +38,6 @@ instance Show PagerException where
           , "') exited with non-zero status: "
           , show n
           ]
-
-instance Exception PagerException
 
 -- | Run pager, providing a function that writes to the pager's input.
 pageWriter :: (Handle -> IO ()) -> IO ()

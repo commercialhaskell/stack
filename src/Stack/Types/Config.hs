@@ -269,10 +269,10 @@ data ConfigException
   | NoLTSWithMajorVersion Int
   | NoLTSFound
   | MultiplePackageIndices [PackageIndexConfig]
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show ConfigException where
-    show (ParseCustomSnapshotException url exception) = concat
+instance Exception ConfigException where
+    displayException (ParseCustomSnapshotException url exception) = concat
         [ "Error: [S-8981]\n"
         , "Could not parse '"
         , T.unpack url
@@ -280,7 +280,7 @@ instance Show ConfigException where
         , Yaml.prettyPrintParseException exception
         , "\nSee https://docs.haskellstack.org/en/stable/custom_snapshot/"
         ]
-    show (NoProjectConfigFound dir mcmd) = concat
+    displayException (NoProjectConfigFound dir mcmd) = concat
         [ "Error: [S-2206]\n"
         , "Unable to find a stack.yaml file in the current directory ("
         , toFilePath dir
@@ -289,7 +289,7 @@ instance Show ConfigException where
             Nothing -> ""
             Just cmd -> "\nRecommended action: stack " ++ T.unpack cmd
         ]
-    show (UnexpectedArchiveContents dirs files) = concat
+    displayException (UnexpectedArchiveContents dirs files) = concat
         [ "Error: [S-4964]\n"
         , "When unpacking an archive specified in your stack.yaml file, "
         , "did not find expected contents. Expected: a single directory. Found: "
@@ -297,7 +297,7 @@ instance Show ConfigException where
                , map (toFilePath . filename) files
                )
         ]
-    show (UnableToExtractArchive url file) = concat
+    displayException (UnableToExtractArchive url file) = concat
         [ "Error: [S-2040]\n"
         , "Archive extraction failed. Tarballs and zip archives are supported, \
           \couldn't handle the following URL, "
@@ -305,7 +305,7 @@ instance Show ConfigException where
         , " downloaded to the file "
         , toFilePath $ filename file
         ]
-    show (BadStackVersionException requiredRange) = concat
+    displayException (BadStackVersionException requiredRange) = concat
         [ "Error: [S-1641]\n"
         , "The version of Stack you are using ("
         , show (mkVersion' Meta.version)
@@ -316,7 +316,7 @@ instance Show ConfigException where
         , "You can upgrade Stack by running:\n\n"
         , "stack upgrade"
         ]
-    show (NoMatchingSnapshot names) = concat
+    displayException (NoMatchingSnapshot names) = concat
         [ "Error: [S-1833]\n"
         , "None of the following snapshots provides a compiler matching "
         , "your package(s):\n"
@@ -324,7 +324,7 @@ instance Show ConfigException where
                         (NonEmpty.toList names)
         , resolveOptions
         ]
-    show (ResolverMismatch resolver errDesc) = concat
+    displayException (ResolverMismatch resolver errDesc) = concat
         [ "Error: [S-6395]\n"
         , "Resolver '"
         , T.unpack $ utf8BuilderToText $ display resolver
@@ -333,7 +333,7 @@ instance Show ConfigException where
         , errDesc
         , resolveOptions
         ]
-    show (ResolverPartial resolver errDesc) = concat
+    displayException (ResolverPartial resolver errDesc) = concat
         [ "Error: [S-2422]\n"
         , "Resolver '"
         , T.unpack $ utf8BuilderToText $ display resolver
@@ -341,23 +341,23 @@ instance Show ConfigException where
         , unlines $ fmap ("    " <>) (lines errDesc)
         , resolveOptions
         ]
-    show (NoSuchDirectory dir) = concat
+    displayException (NoSuchDirectory dir) = concat
         [ "Error: [S-8773]\n"
         , "No directory could be located matching the supplied path: "
         , dir
         ]
-    show (ParseGHCVariantException v) = concat
+    displayException (ParseGHCVariantException v) = concat
         [ "Error: [S-3938]\n"
         , "Invalid ghc-variant value: "
         , v
         ]
-    show (BadStackRoot stackRoot) = concat
+    displayException (BadStackRoot stackRoot) = concat
         [ "Error: [S-8530]\n"
         , "Invalid Stack root: '"
         , toFilePath stackRoot
         , "'. Please provide a valid absolute path."
         ]
-    show (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
+    displayException (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
         [ "Error: [S-7613]\n"
         , "Preventing creation of Stack root '"
         , toFilePath envStackRoot
@@ -365,7 +365,7 @@ instance Show ConfigException where
         , toFilePath parentDir
         , "' is owned by someone else."
         ]
-    show (UserDoesn'tOwnDirectory dir) = concat
+    displayException (UserDoesn'tOwnDirectory dir) = concat
         [ "Error: [S-8707]\n"
         , "You are not the owner of '"
         , toFilePath dir
@@ -374,7 +374,7 @@ instance Show ConfigException where
         , T.unpack configMonoidAllowDifferentUserName
         , "' to disable this precaution."
         ]
-    show ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
+    displayException ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
         [ "Error: [S-3605]\n"
         , "Stack can only control the "
         , configMonoidGHCVariantName
@@ -382,17 +382,17 @@ instance Show ConfigException where
         , configMonoidSystemGHCName
         , "'."
         ]
-    show NixRequiresSystemGhc = T.unpack $ T.concat
+    displayException NixRequiresSystemGhc = T.unpack $ T.concat
         [ "Error: [S-6816]\n"
         , "Stack's Nix integration is incompatible with '--no-system-ghc'. "
         , "Please use '--"
         , configMonoidSystemGHCName
         , "' or disable the Nix integration."
         ]
-    show NoResolverWhenUsingNoProject =
+    displayException NoResolverWhenUsingNoProject =
         "Error: [S-5027]\n"
         ++ "When using the script command, you must provide a resolver argument"
-    show (DuplicateLocalPackageNames pairs) = concat
+    displayException (DuplicateLocalPackageNames pairs) = concat
         $ "Error: [S-5470]\n"
         : "The same package name is used in multiple local packages\n"
         : map go pairs
@@ -402,16 +402,16 @@ instance Show ConfigException where
             : (packageNameString name ++ " used in:")
             : map goLoc dirs
         goLoc loc = "- " ++ show loc
-    show (NoLTSWithMajorVersion n) = concat
+    displayException (NoLTSWithMajorVersion n) = concat
         [ "Error: [S-3803]\n"
         , "No LTS release found with major version "
         , show n
         , "."
         ]
-    show NoLTSFound =
+    displayException NoLTSFound =
         "Error: [S-5472]\n"
         ++ "No LTS releases found."
-    show (MultiplePackageIndices pics) = concat
+    displayException (MultiplePackageIndices pics) = concat
         [ "Error: [S-3251]\n"
         , "When using the 'package-indices' key to override the default "
         , "package index, you must provide exactly one value, received: "
@@ -420,16 +420,11 @@ instance Show ConfigException where
         , packageIndicesWarning
         ]
 
-instance Exception ConfigException
-
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Config" module.
 data ConfigPrettyException
     = ParseConfigFileException (Path Abs File) ParseException
-    deriving (Typeable)
-
-instance Show ConfigPrettyException where
-    show (ParseConfigFileException {}) = "ParseConfigFileException"
+    deriving (Show, Typeable)
 
 instance Pretty ConfigPrettyException where
     pretty (ParseConfigFileException configFile exception) =
@@ -455,18 +450,16 @@ instance Exception ConfigPrettyException
 
 data ParseAbsolutePathException
     = ParseAbsolutePathException String String
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show ParseAbsolutePathException where
-    show (ParseAbsolutePathException envVar dir) = concat
+instance Exception ParseAbsolutePathException where
+    displayException (ParseAbsolutePathException envVar dir) = concat
         [ "Error: [S-9437]\n"
         , "Failed to parse "
         , envVar
         , " environment variable (expected absolute directory): "
         , dir
         ]
-
-instance Exception ParseAbsolutePathException
 
 -- | The base environment that almost everything in Stack runs in,
 -- based off of parsing command line options in 'GlobalOpts'. Provides

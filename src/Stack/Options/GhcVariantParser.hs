@@ -21,5 +21,5 @@ ghcVariantParser hide = option readGHCVariant
   readGHCVariant = do
     s <- readerAsk
     case parseGHCVariant s of
-      Left e -> readerError (show e)
+      Left e -> readerError (displayException e)
       Right v -> pure v

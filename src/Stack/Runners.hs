@@ -44,24 +44,22 @@ data RunnersException
   | DockerAndNixInvalid
   | NixWithinDockerInvalid
   | DockerWithinNixInvalid
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show RunnersException where
-  show CommandInvalid =
+instance Exception RunnersException where
+  displayException CommandInvalid =
     "Error: [S-7144]\n"
     ++ "Cannot use this command with options which override the stack.yaml \
        \location."
-  show DockerAndNixInvalid =
+  displayException DockerAndNixInvalid =
     "Error: [S-8314]\n"
     ++ "Cannot use both Docker and Nix at the same time."
-  show NixWithinDockerInvalid =
+  displayException NixWithinDockerInvalid =
     "Error: [S-8641]\n"
     ++ "Cannot use Nix from within a Docker container."
-  show DockerWithinNixInvalid =
+  displayException DockerWithinNixInvalid =
     "Error: [S-5107]\n"
     ++ "Cannot use Docker from within a Nix shell."
-
-instance Exception RunnersException
 
 -- | Ensure that no project settings are used when running 'withConfig'.
 withGlobalProject :: RIO Runner a -> RIO Runner a

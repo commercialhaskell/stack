@@ -28,14 +28,12 @@ import           Stack.Prelude
 -- "Stack.Types.TemplateName" module.
 newtype TypeTemplateNameException
     = DefaultTemplateNameNotParsedBug String
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show TypeTemplateNameException where
-    show (DefaultTemplateNameNotParsedBug s) = bugReport "[S-7410]" $
+instance Exception TypeTemplateNameException where
+    displayException (DefaultTemplateNameNotParsedBug s) = bugReport "[S-7410]" $
         "The impossible happened! Cannot parse default template name: "
         ++ s
-
-instance Exception TypeTemplateNameException
 
 -- | A template name.
 data TemplateName = TemplateName !Text !TemplatePath

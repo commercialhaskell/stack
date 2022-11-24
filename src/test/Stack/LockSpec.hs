@@ -22,7 +22,7 @@ decodeSHA :: ByteString -> SHA256
 decodeSHA string =
     case SHA256.fromHexBytes string of
         Right csha -> csha
-        Left err -> error $ "Failed decoding. Error:  " <> show err
+        Left err -> error $ "Failed decoding. Error:  " <> displayException err
 
 decodeLocked :: ByteString -> IO Locked
 decodeLocked bs = do

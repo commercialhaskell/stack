@@ -266,7 +266,9 @@ parseHI
 parseHI hiPath = do
   dir <- asks (parent . ctxFile)
   result <-
-    liftIO $ Iface.fromFile hiPath `catchAnyDeep` \e -> pure (Left (show e))
+    liftIO $ catchAnyDeep
+      (Iface.fromFile hiPath)
+      (\e -> pure (Left (displayException e)))
   case result of
     Left msg -> do
       prettyStackDevL

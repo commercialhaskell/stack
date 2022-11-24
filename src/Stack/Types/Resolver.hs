@@ -34,10 +34,10 @@ import           Stack.Prelude
 data TypesResolverException
     = ParseResolverException !Text
     | FilepathInDownloadedSnapshot !Text
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show TypesResolverException where
-    show (ParseResolverException t) = concat
+instance Exception TypesResolverException where
+    displayException (ParseResolverException t) = concat
         [ "Error: [S-8787]\n"
         , "Invalid resolver value: "
         , T.unpack t
@@ -45,14 +45,12 @@ instance Show TypesResolverException where
           \ghc-7.10.2, and ghcjs-0.1.0_ghc-7.10.2. See \
           \https://www.stackage.org/snapshots for a complete list."
         ]
-    show (FilepathInDownloadedSnapshot url) = unlines
+    displayException (FilepathInDownloadedSnapshot url) = unlines
         [ "Error: [S-4865]"
         , "Downloaded snapshot specified a 'resolver: { location: filepath }' "
         , "field, but filepaths are not allowed in downloaded snapshots.\n"
         , "Filepath specified: " ++ T.unpack url
         ]
-
-instance Exception TypesResolverException
 
 -- | Either an actual resolver value, or an abstract description of one (e.g.,
 -- latest nightly).
@@ -99,7 +97,7 @@ instance FromJSON Snapshots where
       where
         parseNightly t =
             case parseSnapName t of
-                Left e -> fail $ show e
+                Left e -> fail $ displayException e
                 Right (LTS _ _) -> fail "Unexpected LTS value"
                 Right (Nightly d) -> pure d
 
@@ -107,6 +105,6 @@ instance FromJSON Snapshots where
 
         parseLTS = withText "LTS" $ \t ->
             case parseSnapName t of
-                Left e -> fail $ show e
+                Left e -> fail $ displayException e
                 Right (LTS x y) -> pure $ IntMap.singleton x y
                 Right (Nightly _) -> fail "Unexpected nightly value"

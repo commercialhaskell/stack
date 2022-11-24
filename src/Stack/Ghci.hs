@@ -64,35 +64,33 @@ data GhciException
     | Can'tSpecifyFilesAndTargets
     | Can'tSpecifyFilesAndMainIs
     | GhciTargetParseException [Text]
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show GhciException where
-    show (InvalidPackageOption name) =
+instance Exception GhciException where
+    displayException (InvalidPackageOption name) =
         "Error: [S-6716]\n"
         ++ "Failed to parse '--package' option " ++ name ++ "."
-    show LoadingDuplicateModules = unlines
+    displayException LoadingDuplicateModules = unlines
         [ "Error: [S-9632]"
         , "Not attempting to start ghci due to these duplicate modules."
         , "Use '--no-load' to try to start it anyway, without loading any \
           \modules (but these are still likely to cause errors)."
         ]
-    show (MissingFileTarget name) =
+    displayException (MissingFileTarget name) =
         "Error: [S-3600]\n"
         ++ "Cannot find file target " ++ name ++ "."
-    show Can'tSpecifyFilesAndTargets =
+    displayException Can'tSpecifyFilesAndTargets =
         "Error: [S-9906]\n"
         ++ "Cannot use 'stack ghci' with both file targets and package targets."
-    show Can'tSpecifyFilesAndMainIs =
+    displayException Can'tSpecifyFilesAndMainIs =
         "Error: [S-5188]\n"
         ++ "Cannot use 'stack ghci' with both file targets and '--main-is' \
            \flag."
-    show (GhciTargetParseException xs) =
+    displayException (GhciTargetParseException xs) =
         "Error: [S-6948]\n"
         ++ show (TargetParseException xs)
         ++ "\nNote that to specify options to be passed to GHCi, use the \
            \'--ghci-options' flag."
-
-instance Exception GhciException
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
@@ -368,7 +366,7 @@ buildDepsAndInitialSteps GhciOpts{..} localTargets = do
         case eres of
             Right () -> pure ()
             Left err -> do
-                prettyError $ fromString (show err)
+                prettyError $ fromString (displayException err)
                 prettyWarn "Build failed, but trying to launch GHCi anyway"
       _ ->
         pure ()

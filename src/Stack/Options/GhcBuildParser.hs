@@ -30,5 +30,5 @@ ghcBuildParser hide =
     readGHCBuild = do
         s <- readerAsk
         case parseCompilerBuild s of
-            Left e -> readerError (show e)
+            Left e -> readerError (displayException e)
             Right v -> pure v

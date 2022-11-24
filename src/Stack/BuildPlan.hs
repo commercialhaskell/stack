@@ -56,17 +56,17 @@ data BuildPlanException
     | SnapshotNotFound SnapName
     | NeitherCompilerOrResolverSpecified T.Text
     | DuplicatePackagesBug
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show BuildPlanException where
-    show (SnapshotNotFound snapName) = unlines
+instance Exception BuildPlanException where
+    displayException (SnapshotNotFound snapName) = unlines
         [ "Error: [S-2045]"
         , "SnapshotNotFound " ++ snapName'
         , "Non existing resolver: " ++ snapName' ++ "."
         , "For a complete list of available snapshots see https://www.stackage.org/snapshots"
         ]
-        where snapName' = show snapName
-    show (UnknownPackages stackYaml unknown shadowed) =
+      where snapName' = show snapName
+    displayException (UnknownPackages stackYaml unknown shadowed) =
         "Error: [S-7571]\n"
         ++ unlines (unknown' ++ shadowed')
       where
@@ -134,16 +134,14 @@ instance Show BuildPlanException where
                       $ Set.toList
                       $ Set.unions
                       $ Map.elems shadowed
-    show (NeitherCompilerOrResolverSpecified url) = concat
+    displayException (NeitherCompilerOrResolverSpecified url) = concat
         [ "Error: [S-8559]\n"
         , "Failed to load custom snapshot at "
         , T.unpack url
         , ", because no 'compiler' or 'resolver' is specified."
         ]
-    show DuplicatePackagesBug = bugReport "[S-5743]"
+    displayException DuplicatePackagesBug = bugReport "[S-5743]"
         "Duplicate packages are not expected here."
-
-instance Exception BuildPlanException
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
 gpdPackages = Map.fromList . map (toPair . C.package . C.packageDescription)

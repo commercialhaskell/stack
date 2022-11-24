@@ -13,12 +13,7 @@ import           Stack.Prelude
 -- modules beginning @Stack.Storage@.
 data StoragePrettyException
   = StorageMigrationFailure !Text !(Path Abs File) !SomeException
-  deriving Typeable
-
--- | These exceptions are intended to be thrown only as \'pretty\' exceptions,
--- so their \'show\' functions can be simple.
-instance Show StoragePrettyException where
-  show (StorageMigrationFailure {}) = "StorageMigrationFailure"
+  deriving (Show, Typeable)
 
 instance Pretty StoragePrettyException where
   pretty (StorageMigrationFailure desc fp ex) =
@@ -50,7 +45,7 @@ instance Pretty StoragePrettyException where
            flow "As a workaround you may delete the database. This \
                 \will cause the database to be recreated."
    where
-    exMsg = show ex
+    exMsg = displayException ex
     winIOGHCRTSMsg =
       "\\\\.\\NUL: hDuplicateTo: illegal operation (handles are incompatible)"
 

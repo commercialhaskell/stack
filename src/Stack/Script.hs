@@ -47,29 +47,27 @@ data ScriptException
     | AmbiguousModuleName ModuleName [PackageName]
     | ArgumentsWithNoRunInvalid
     | NoRunWithoutCompilationInvalid
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show ScriptException where
-    show (MutableDependenciesForScript names) = unlines
+instance Exception ScriptException where
+    displayException (MutableDependenciesForScript names) = unlines
         $ "Error: [S-4994]"
         : "No mutable packages are allowed in the 'script' command. Mutable \
           \packages found:"
         : map (\name -> "- " ++ packageNameString name) names
-    show (AmbiguousModuleName mname pkgs) = unlines
+    displayException (AmbiguousModuleName mname pkgs) = unlines
         $ "Error: [S-1691]"
         : (  "Module "
           ++ moduleNameString mname
           ++ " appears in multiple packages: "
           )
         : [ unwords $ map packageNameString pkgs ]
-    show ArgumentsWithNoRunInvalid =
+    displayException ArgumentsWithNoRunInvalid =
         "Error: [S-5067]\n"
         ++ "'--no-run' incompatible with arguments."
-    show NoRunWithoutCompilationInvalid =
+    displayException NoRunWithoutCompilationInvalid =
         "Error: [S-9469]\n"
         ++ "'--no-run' requires either '--compile' or '--optimize'."
-
-instance Exception ScriptException
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()

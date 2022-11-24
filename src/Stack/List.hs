@@ -15,14 +15,12 @@ import RIO.Process (HasProcessContext)
 -- "Stack.List" module.
 newtype ListException
   = CouldNotParsePackageSelectors [String]
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show ListException where
-    show (CouldNotParsePackageSelectors strs) = unlines $
+instance Exception ListException where
+    displayException (CouldNotParsePackageSelectors strs) = unlines $
         "Error: [S-4926]"
         : map ("- " ++) strs
-
-instance Exception ListException
 
 -- | Intended to work for the command line command.
 listPackages

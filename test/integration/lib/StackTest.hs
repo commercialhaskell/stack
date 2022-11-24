@@ -26,21 +26,24 @@ run' cmd args = do
 run :: HasCallStack => FilePath -> [String] -> IO ()
 run cmd args = do
     ec <- run' cmd args
-    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+    unless (ec == ExitSuccess) $
+        error $ "Exited with exit code: " ++ displayException ec
 
 runShell :: HasCallStack => String -> IO ()
 runShell cmd = do
     logInfo $ "Running: " ++ cmd
     (Nothing, Nothing, Nothing, ph) <- createProcess (shell cmd)
     ec <- waitForProcess ph
-    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+    unless (ec == ExitSuccess) $
+        error $ "Exited with exit code: " ++ displayException ec
 
 runWithCwd :: HasCallStack => FilePath -> String -> [String] -> IO String
 runWithCwd cwdPath cmd args = do
     logInfo $ "Running: " ++ cmd
     let cp = proc cmd args
     (ec, stdoutStr, _) <- readCreateProcessWithExitCode (cp { cwd = Just cwdPath }) ""
-    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+    unless (ec == ExitSuccess) $
+        error $ "Exited with exit code: " ++ displayException ec
     pure stdoutStr
 
 stackExe :: IO String
@@ -60,7 +63,8 @@ stack' args = do
 stack :: HasCallStack => [String] -> IO ()
 stack args = do
     ec <- stack' args
-    unless (ec == ExitSuccess) $ error $ "Exited with exit code: " ++ show ec
+    unless (ec == ExitSuccess) $
+        error $ "Exited with exit code: " ++ displayException ec
 
 -- Temporary workaround for Windows to ignore exceptions arising out
 -- of Windows when we do stack clean. More info here: https://github.com/commercialhaskell/stack/issues/4936
@@ -157,7 +161,7 @@ stackCheckStderr :: HasCallStack => [String] -> (String -> IO ()) -> IO ()
 stackCheckStderr args check = do
     (ec, err) <- stackStderr args
     if ec /= ExitSuccess
-        then error $ "Exited with exit code: " ++ show ec
+        then error $ "Exited with exit code: " ++ displayException ec
         else check err
 
 -- | Same as 'stackCheckStderr', but ensures that the Stack process
@@ -190,7 +194,7 @@ stackCheckStdout args check = do
     stackExe' <- stackExe
     (ec, out, _) <- runEx' stackExe' args
     if ec /= ExitSuccess
-        then error $ "Exited with exit code: " ++ show ec
+        then error $ "Exited with exit code: " ++ displayException ec
         else check out
 
 doesNotExist :: HasCallStack => FilePath -> IO ()

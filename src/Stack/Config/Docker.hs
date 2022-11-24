@@ -20,11 +20,10 @@ import           Stack.Types.Resolver
 data ConfigDockerException
     = ResolverNotSupportedException !(Maybe Project) !(Maybe AbstractResolver)
     -- ^ Only LTS resolvers are supported for default image tag.
-    deriving Typeable
+    deriving (Show, Typeable)
 
--- | Show instance for StackDockerConfigException.
-instance Show ConfigDockerException where
-    show (ResolverNotSupportedException mproject maresolver) =
+instance Exception ConfigDockerException where
+    displayException (ResolverNotSupportedException mproject maresolver) =
         concat
             [ "Error: [S-8575]\n"
             , "Resolver not supported for Docker images:\n    "
@@ -35,8 +34,6 @@ instance Show ConfigDockerException where
             , "\nUse an LTS resolver, or set the '"
             , T.unpack dockerImageArgName
             , "' explicitly, in your configuration file."]
-
-instance Exception ConfigDockerException
 
 -- | Add a default Docker tag name to a given base image.
 addDefaultTag

@@ -44,10 +44,10 @@ data PackageException
   | CabalFileNameParseFail FilePath
   | CabalFileNameInvalidPackageName FilePath
   | ComponentNotParsedBug
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show PackageException where
-    show (PackageInvalidCabalFile loc _mversion errs warnings) = concat
+instance Exception PackageException where
+    displayException (PackageInvalidCabalFile loc _mversion errs warnings) = concat
         [ "Error: [S-8072]\n"
         , "Unable to parse Cabal file "
         , case loc of
@@ -81,7 +81,7 @@ instance Show PackageException where
                 ])
             warnings
         ]
-    show (MismatchedCabalIdentifier pir ident) = concat
+    displayException (MismatchedCabalIdentifier pir ident) = concat
         [ "Error: [S-5394]\n"
         , "Mismatched package identifier."
         , "\nFound:    "
@@ -89,21 +89,19 @@ instance Show PackageException where
         , "\nExpected: "
         , T.unpack $ utf8BuilderToText $ display pir
         ]
-    show (CabalFileNameParseFail fp) = concat
+    displayException (CabalFileNameParseFail fp) = concat
         [ "Error: [S-2203]\n"
         , "Invalid file path for Cabal file, must have a .cabal extension: "
         , fp
         ]
-    show (CabalFileNameInvalidPackageName fp) = concat
+    displayException (CabalFileNameInvalidPackageName fp) = concat
         [ "Error: [S-8854]\n"
         , "Cabal file names must use valid package names followed by a .cabal \
           \extension, the following is invalid: "
         , fp
         ]
-    show ComponentNotParsedBug = bugReport "[S-4623]"
+    displayException ComponentNotParsedBug = bugReport "[S-4623]"
         "Component names should always parse as directory names."
-
-instance Exception PackageException
 
 -- | Libraries in a package. Since Cabal 2.0, internal libraries are a
 -- thing.

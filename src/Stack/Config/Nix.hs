@@ -27,21 +27,19 @@ data ConfigNixException
     -- ^ Nix can't be given packages and a shell file at the same time
   | GHCMajorVersionUnspecified
   | OnlyGHCSupported
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show ConfigNixException where
-  show NixCannotUseShellFileAndPackagesException =
+instance Exception ConfigNixException where
+  displayException NixCannotUseShellFileAndPackagesException =
     "Error: [S-2726]\n"
     ++ "You cannot have packages and a shell-file filled at the same time \
        \in your nix-shell configuration."
-  show GHCMajorVersionUnspecified =
+  displayException GHCMajorVersionUnspecified =
     "Error: [S-9317]\n"
     ++ "GHC major version not specified."
-  show OnlyGHCSupported =
+  displayException OnlyGHCSupported =
     "Error: [S-8605]\n"
     ++ "Only GHC is supported by 'stack --nix'."
-
-instance Exception ConfigNixException
 
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid
