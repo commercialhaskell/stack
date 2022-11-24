@@ -213,7 +213,18 @@ inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 inNixShellEnvVar :: String
 inNixShellEnvVar = map toUpper stackProgName ++ "_IN_NIX_SHELL"
 
--- See https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey
+-- | The comment to 'see
+-- https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey'
+-- appears to be out of date.
+--
+-- See 'Note [About units]' and 'Wired-in units' at
+-- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Unit.hs.
+--
+-- The 'wired-in packages' appear to have been replaced by those that have (e.g)
+--
+-- > ghc-options: -this-unit-id ghc-prim
+--
+-- in their Cabal file because they are 'magic'.
 wiredInPackages :: Set PackageName
 wiredInPackages = case mparsed of
   Just parsed -> Set.fromList parsed
@@ -221,15 +232,33 @@ wiredInPackages = case mparsed of
  where
   mparsed = mapM parsePackageName
     [ "ghc-prim"
+      -- A magic package
     , "integer-gmp"
+      -- No longer magic > 1.0.3.0. With GHC 9.2.5 at least, there seems to be
+      -- no problem in using it.
     , "integer-simple"
+      -- A magic package
     , "base"
+      -- A magic package
     , "rts"
+      -- Said to be not a 'real' package
     , "template-haskell"
+      -- A magic package
     , "dph-seq"
+      -- Deprecated in favour of dph-prim-seq, which does not appear to be
+      -- magic. With GHC 9.2.5 at least, there seems to be no problem in using
+      -- it.
     , "dph-par"
+      --  Deprecated in favour of dph-prim-par, which does not appear to be
+      -- magic. With GHC 9.2.5 at least, there seems to be no problem in using
+      -- it.
     , "ghc"
+      -- A magic package
     , "interactive"
+      -- Could not identify information about this package name. With GHC 9.2.5
+      -- at least, there seems to be no problem in using it.
+    , "ghc-bignum"
+      -- A magic package
     ]
 
 -- | Just to avoid repetition and magic strings.
