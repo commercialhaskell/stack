@@ -71,23 +71,21 @@ data SDistException
   = CheckException (NonEmpty Check.PackageCheck)
   | CabalFilePathsInconsistentBug (Path Abs File) (Path Abs File)
   | ToTarPathException String
-  deriving (Typeable)
+  deriving (Show, Typeable)
 
-instance Show SDistException where
-  show (CheckException xs) = unlines $
+instance Exception SDistException where
+  displayException (CheckException xs) = unlines $
     [ "Error: [S-6439]"
     , "Package check reported the following errors:"
     ] <> fmap show (NE.toList xs)
-  show (CabalFilePathsInconsistentBug cabalfp cabalfp') = concat
+  displayException (CabalFilePathsInconsistentBug cabalfp cabalfp') = concat
     [ "Error: [S-9595]\n"
     , "The impossible happened! Two Cabal file paths are inconsistent: "
     , show (cabalfp, cabalfp')
     ]
-  show (ToTarPathException e) =
+  displayException (ToTarPathException e) =
     "Error: [S-7875\n"
     ++ e
-
-instance Exception SDistException
 
 data SDistOpts = SDistOpts
   { sdoptsDirsToWorkWith :: [String]

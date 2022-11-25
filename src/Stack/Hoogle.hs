@@ -31,21 +31,19 @@ data HoogleException
   = HoogleDatabaseNotFound
   | HoogleNotFound !Text
   | HoogleOnPathNotFoundBug
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show HoogleException where
-  show HoogleDatabaseNotFound =
+instance Exception HoogleException where
+  displayException HoogleDatabaseNotFound =
     "Error: [S-3025]\n"
     ++ "No Hoogle database. Not building one due to '--no-setup'."
-  show (HoogleNotFound e) =
+  displayException (HoogleNotFound e) =
     "Error: [S-1329]\n"
     ++ T.unpack e
     ++ "\n"
     ++ "Not installing Hoogle due to '--no-setup'."
-  show HoogleOnPathNotFoundBug = bugReport "[S-9669]"
+  displayException HoogleOnPathNotFoundBug = bugReport "[S-9669]"
     "Cannot find Hoogle executable on PATH, after installing."
-
-instance Exception HoogleException
 
 -- | Helper type to duplicate log messages
 data Muted = Muted | NotMuted
@@ -190,7 +188,7 @@ hoogleCmd (args,setup,rebuild,startServer) =
                         , got
                         ]
                 pure $ case result of
-                    Left err -> unexpectedResult $ T.pack (show err)
+                    Left err -> unexpectedResult $ T.pack (displayException err)
                     Right bs -> case parseVersion (takeWhile (not . isSpace) (BL8.unpack bs)) of
                         Nothing -> unexpectedResult $ T.pack (BL8.unpack bs)
                         Just ver

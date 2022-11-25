@@ -32,14 +32,12 @@ import           RIO.Process (processContextL, exec)
 data NixException
   = CannotDetermineProjectRoot
     -- ^ Can't determine the project root (location of the shell file if any).
-  deriving (Typeable)
+  deriving (Show, Typeable)
 
-instance Show NixException where
-  show CannotDetermineProjectRoot =
+instance Exception NixException where
+  displayException CannotDetermineProjectRoot =
     "Error: [S-7384]\n"
     ++ "Cannot determine project root directory."
-
-instance Exception NixException
 
 runShellAndExit :: RIO Config void
 runShellAndExit = do

@@ -272,10 +272,12 @@ errorOnSnapshot plan@(Plan tasks _finals _unregister installExes) = do
     NotOnlyLocal snapTasks snapExes
   pure plan
 
-data NotOnlyLocal = NotOnlyLocal [PackageName] [Text]
+data NotOnlyLocal
+    = NotOnlyLocal [PackageName] [Text]
+    deriving (Show, Typeable)
 
-instance Show NotOnlyLocal where
-  show (NotOnlyLocal packages exes) = concat
+instance Exception NotOnlyLocal where
+  displayException (NotOnlyLocal packages exes) = concat
     [ "Error: [S-1727]\n"
     , "Specified only-locals, but I need to build snapshot contents:\n"
     , if null packages then "" else concat
@@ -289,7 +291,6 @@ instance Show NotOnlyLocal where
         , "\n"
         ]
     ]
-instance Exception NotOnlyLocal
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.

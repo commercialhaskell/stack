@@ -63,36 +63,38 @@ data NewException
         !String -- URL it's downloaded from
         !UnicodeException
     | Can'tUseWiredInName !PackageName
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show NewException where
-    show (FailedToLoadTemplate name path) = concat
+instance Exception NewException where
+    displayException (FailedToLoadTemplate name path) = concat
         [ "Error: [S-3650]\n"
         , "Failed to load download template "
         , T.unpack (templateName name)
         , " from "
         , path
         ]
-    show (FailedToDownloadTemplate name (DownloadHttpError httpError)) = concat
+    displayException
+      (FailedToDownloadTemplate name (DownloadHttpError httpError)) = concat
         [ "Error: [S-1688]\n"
         , "There was an unexpected HTTP error while downloading template "
         , T.unpack (templateName name)
         , ": "
         , show httpError
         ]
-    show (FailedToDownloadTemplate name _) = concat
+    displayException (FailedToDownloadTemplate name _) = concat
         [ "Error: [S-1688]\n"
         , "Failed to download template "
         , T.unpack (templateName name)
         , ": unknown reason"
         ]
-    show (AlreadyExists path) = concat
+    displayException (AlreadyExists path) = concat
         [ "Error: [S-2135]\n"
         , "Directory "
         , toFilePath path
         , " already exists. Aborting."
         ]
-    show (MissingParameters name template missingKeys userConfigPath) = unlines
+    displayException
+      (MissingParameters name template missingKeys userConfigPath) = unlines
         [ "Error: [S-5515]"
         , "The following parameters were needed by the template but not \
           \provided: " <> L.intercalate ", " (S.toList missingKeys)
@@ -114,41 +116,39 @@ instance Show NewException where
                 map (\key -> "-p \"" <> key <> ":value\"") (S.toList missingKeys)
             ]
         ]
-    show (InvalidTemplate name why) = concat
+    displayException (InvalidTemplate name why) = concat
         [ "Error: [S-9490]\n"
         , "The template \""
         , T.unpack (templateName name)
         , "\" is invalid and could not be used. The error was: "
         , why
         ]
-    show (AttemptedOverwrites fps) = concat
+    displayException (AttemptedOverwrites fps) = concat
         [ "Error: [S-3113]\n"
         , "The template would create the following files, but they already \
           \exist:\n"
         , unlines (map (("  " ++) . toFilePath) fps)
         , "Use '--force' to ignore this, and overwrite these files."
         ]
-    show (FailedToDownloadTemplatesHelp ex) = concat
+    displayException (FailedToDownloadTemplatesHelp ex) = concat
         [ "Error: [S-8143]\n"
         , "Failed to download 'stack templates' help. The HTTP error was: "
-        , show ex
+        , displayException ex
         ]
-    show (BadTemplatesHelpEncoding url err) = concat
+    displayException (BadTemplatesHelpEncoding url err) = concat
         [ "Error: [S-6670]\n"
         , "UTF-8 decoding error on template info from\n    "
         , url
         , "\n\n"
-        , show err
+        , displayException err
         ]
-    show (Can'tUseWiredInName name) = concat
+    displayException (Can'tUseWiredInName name) = concat
         [ "Error: [S-5682]\n"
         , "The name \""
         , packageNameString name
         , "\" is used by GHC wired-in packages, and so shouldn't be used as a \
           \package name."
         ]
-
-instance Exception NewException
 
 --------------------------------------------------------------------------------
 -- Main project creation
@@ -356,7 +356,7 @@ applyTemplate project template nonceParams dir templateText = do
                unpackTemplate receiveMem id
               )
               (\(e :: ProjectTemplateException) ->
-                   throwM (InvalidTemplate template (show e)))
+                   throwM (InvalidTemplate template (displayException e)))
     when (M.null files) $
          throwM (InvalidTemplate template "Template does not contain any files")
 

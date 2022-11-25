@@ -34,30 +34,28 @@ data UpgradeException
     | CommitsNotFound String String
     | StackInPackageIndexNotFound
     | VersionWithNoRevision
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show UpgradeException where
-    show NeitherBinaryOrSourceSpecified =
+instance Exception UpgradeException where
+    displayException NeitherBinaryOrSourceSpecified =
         "Error: [S-3642]\n"
         ++ "You must allow either binary or source upgrade paths."
-    show ExecutableFailure =
+    displayException ExecutableFailure =
         "Error: [S-8716]\n"
         ++ "Non-success exit code from running newly downloaded executable."
-    show (CommitsNotFound branch repo) = concat
+    displayException (CommitsNotFound branch repo) = concat
         [ "Error: [S-7114]\n"
         , "No commits found for branch "
         , branch
         , " on repo "
         , repo
         ]
-    show StackInPackageIndexNotFound =
+    displayException StackInPackageIndexNotFound =
         "Error: [S-9668]\n"
         ++ "No Stack version found in package indices."
-    show VersionWithNoRevision =
+    displayException VersionWithNoRevision =
         "Error: [S-6648]\n"
         ++ "Latest version with no revision."
-
-instance Exception UpgradeException
 
 upgradeOpts :: Parser UpgradeOpts
 upgradeOpts = UpgradeOpts

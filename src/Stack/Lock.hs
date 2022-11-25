@@ -28,18 +28,16 @@ import Stack.Types.SourceMap
 -- "Stack.Lock" module.
 data LockException
     = WritingLockFileError (Path Abs File) Locked
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show LockException where
-    show (WritingLockFileError lockFile newLocked) = unlines
+instance Exception LockException where
+    displayException (WritingLockFileError lockFile newLocked) = unlines
         [ "Error: [S-1353]"
         , "You indicated that Stack should error out on writing a lock file"
         , "Stack just tried to write the following lock file contents to "
           ++ toFilePath lockFile
         , T.unpack $ decodeUtf8With lenientDecode $ Yaml.encode newLocked
         ]
-
-instance Exception LockException
 
 data LockedLocation a b = LockedLocation
     { llOriginal :: a

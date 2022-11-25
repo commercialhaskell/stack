@@ -95,10 +95,10 @@ import           System.Terminal (hIsTerminalDeviceOrMinTTY)
 data MainException
   = InvalidReExecVersion String String
   | InvalidPathForExec FilePath
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show MainException where
-  show (InvalidReExecVersion expected actual) = concat
+instance Exception MainException where
+  displayException (InvalidReExecVersion expected actual) = concat
     [ "Error: [S-2186]\n"
     , "When re-executing '"
     , stackProgName
@@ -107,14 +107,12 @@ instance Show MainException where
     , "; found: "
     , actual
     ]
-  show (InvalidPathForExec path) = concat
+  displayException (InvalidPathForExec path) = concat
     [ "Error: [S-1541]\n"
     , "Got an invalid '--cwd' argument for 'stack exec' ("
     , path
     , ")."
     ]
-
-instance Exception MainException
 
 -- | Type representing \'pretty\' exceptions thrown by functions in the "Main"
 -- module.

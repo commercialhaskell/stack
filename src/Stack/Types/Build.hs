@@ -120,17 +120,17 @@ data BuildException
   | TemplateHaskellNotFoundBug
   | HaddockIndexNotFound
   | ShowBuildErrorBug
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show BuildException where
-    show (Couldn'tFindPkgId name) = bugReport "[S-7178]" $ concat
+instance Exception BuildException where
+    displayException (Couldn'tFindPkgId name) = bugReport "[S-7178]" $ concat
         [ "After installing "
         , packageNameString name
         ,", the package id couldn't be found (via ghc-pkg describe "
         , packageNameString name
         , ")."
         ]
-    show (CompilerVersionMismatch mactual (expected, eArch) ghcVariant ghcBuild check mstack resolution) = concat
+    displayException (CompilerVersionMismatch mactual (expected, eArch) ghcVariant ghcBuild check mstack resolution) = concat
         [ "Error: [S-6362]\n"
         , case mactual of
             Nothing -> "No compiler found, expected "
@@ -158,12 +158,12 @@ instance Show BuildException where
         , ").\n"
         , T.unpack resolution
         ]
-    show (Couldn'tParseTargets targets) = unlines
+    displayException (Couldn'tParseTargets targets) = unlines
         $ "Error: [S-3127]"
         : "The following targets could not be parsed as package names or \
           \directories:"
         : map T.unpack targets
-    show (UnknownTargets noKnown notInSnapshot stackYaml) = unlines
+    displayException (UnknownTargets noKnown notInSnapshot stackYaml) = unlines
         $ "Error: [S-2154]"
         : (noKnown' ++ notInSnapshot')
       where
@@ -186,7 +186,7 @@ instance Show BuildException where
                     (\(name, version') -> "- " ++ packageIdentifierString
                         (PackageIdentifier name version'))
                     (Map.toList notInSnapshot)
-    show (TestSuiteFailure ident codes mlogFile bs) = unlines
+    displayException (TestSuiteFailure ident codes mlogFile bs) = unlines
         $ "Error: [S-1995]"
         : concat
             [ ["Test suite failure for package " ++ packageIdentifierString ident]
@@ -196,7 +196,7 @@ instance Show BuildException where
                 , ": "
                 , case mcode of
                     Nothing -> " executable not found"
-                    Just ec -> " exited with: " ++ show ec
+                    Just ec -> " exited with: " ++ displayException ec
                 ]
             , pure $ case mlogFile of
                 Nothing -> "Logs printed to console"
@@ -209,13 +209,13 @@ instance Show BuildException where
       where
         indent' = dropWhileEnd isSpace . unlines . fmap (\l -> "  " ++ l) . lines
         doubleIndent = indent' . indent'
-    show (TestSuiteTypeUnsupported interface) = concat
+    displayException (TestSuiteTypeUnsupported interface) = concat
         [ "Error: [S-3819]\n"
         , "Unsupported test suite type: "
         , show interface
         ]
      -- Suppressing duplicate output
-    show (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
+    displayException (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
         [ "Error: [S-5797]\n"
         , "Version for local package "
         , packageNameString name
@@ -225,12 +225,12 @@ instance Show BuildException where
         , versionString requestedV
         , " on the command line"
         ]
-    show (NoSetupHsFound dir) = concat
+    displayException (NoSetupHsFound dir) = concat
         [ "Error: [S-3118]\n"
         , "No Setup.hs or Setup.lhs file found in "
         , toFilePath dir
         ]
-    show (InvalidFlagSpecification unused) = unlines
+    displayException (InvalidFlagSpecification unused) = unlines
         $ "Error: [S-8664]"
         : "Invalid flag specification:"
         : map go (Set.toList unused)
@@ -266,7 +266,7 @@ instance Show BuildException where
             , packageNameString name
             , ", please add to extra-deps"
             ]
-    show (InvalidGhcOptionsSpecification unused) = unlines
+    displayException (InvalidGhcOptionsSpecification unused) = unlines
         $ "Error: [S-4925]"
         : "Invalid GHC options specification:"
         : map showGhcOptionSrc unused
@@ -276,16 +276,16 @@ instance Show BuildException where
             , packageNameString name
             , "' not found"
             ]
-    show (TargetParseException [err]) = concat
+    displayException (TargetParseException [err]) = concat
         [ "Error: [S-8506]\n"
         , "Error parsing targets: "
         , T.unpack err
         ]
-    show (TargetParseException errs) = unlines
+    displayException (TargetParseException errs) = unlines
         $ "Error [S-8506]"
         : "The following errors occurred while parsing the build targets:"
         : map (("- " ++) . T.unpack) errs
-    show (SomeTargetsNotBuildable xs) = unlines
+    displayException (SomeTargetsNotBuildable xs) = unlines
         [ "Error: [S-7086]"
         , "The following components have 'buildable: False' set in the Cabal \
           \configuration, and so cannot be targets:"
@@ -293,7 +293,7 @@ instance Show BuildException where
         , "To resolve this, either provide flags such that these components \
           \are buildable, or only specify buildable targets."
         ]
-    show (TestSuiteExeMissing isSimpleBuildType exeName pkgName' testName) =
+    displayException (TestSuiteExeMissing isSimpleBuildType exeName pkgName' testName) =
         missingExeError "[S-7987]"
           isSimpleBuildType $ concat
             [ "Test suite executable \""
@@ -303,44 +303,42 @@ instance Show BuildException where
             , ":test:"
             , testName
             ]
-    show (CabalCopyFailed isSimpleBuildType innerMsg) =
+    displayException (CabalCopyFailed isSimpleBuildType innerMsg) =
         missingExeError "[S-8027]"
           isSimpleBuildType $ concat
             [ "'cabal copy' failed.  Error message:\n"
             , innerMsg
             , "\n"
             ]
-    show (LocalPackagesPresent locals) = unlines
+    displayException (LocalPackagesPresent locals) = unlines
         $ "Error: [S-5510]"
         : "Local packages are not allowed when using the 'script' command. \
           \Packages found:"
         : map (\ident -> "- " ++ packageIdentifierString ident) locals
-    show (CouldNotLockDistDir lockFile) = unlines
+    displayException (CouldNotLockDistDir lockFile) = unlines
         [ "Error: [S-7168]"
         , "Locking the dist directory failed, try to lock file:"
         , "  " ++ toFilePath lockFile
         , "Maybe you're running another copy of Stack?"
         ]
-    show (TaskCycleBug pid) = bugReport "[S-7868]" $
+    displayException (TaskCycleBug pid) = bugReport "[S-7868]" $
         "Error: The impossible happened! Unexpected task cycle for "
         ++ packageNameString (pkgName pid)
-    show (PackageIdMissingBug ident) = bugReport "[S-8923]" $
+    displayException (PackageIdMissingBug ident) = bugReport "[S-8923]" $
         "The impossible happened! singleBuild: missing package ID missing: "
         ++ show ident
-    show AllInOneBuildBug = bugReport "[S-7371]"
+    displayException AllInOneBuildBug = bugReport "[S-7371]"
         "Cannot have an all-in-one build that also has a final build step."
-    show (MulipleResultsBug name dps) = bugReport "[S-6739]"
+    displayException (MulipleResultsBug name dps) = bugReport "[S-6739]"
         "singleBuild: multiple results when describing installed package "
         ++ show (name, dps)
-    show TemplateHaskellNotFoundBug = bugReport "[S-3121]"
+    displayException TemplateHaskellNotFoundBug = bugReport "[S-3121]"
         "template-haskell is a wired-in GHC boot library but it wasn't found."
-    show HaddockIndexNotFound =
+    displayException HaddockIndexNotFound =
         "Error: [S-6901]\n"
         ++ "No local or snapshot doc index found to open."
-    show ShowBuildErrorBug = bugReport "[S-5452]"
+    displayException ShowBuildErrorBug = bugReport "[S-5452]"
         "Unexpected case in showBuildError."
-
-instance Exception BuildException
 
 data BuildPrettyException
     = ConstructPlanFailed
@@ -365,15 +363,7 @@ data BuildPrettyException
         [String]         -- ghc arguments
         (Maybe (Path Abs File)) -- logfiles location
         [Text]     -- log contents
-    deriving Typeable
-
--- | These exceptions are intended to be thrown only as \'pretty\' exceptions,
--- so their \'show\' functions can be simple.
-instance Show BuildPrettyException where
-    show (ConstructPlanFailed {}) = "ConstructPlanFailed"
-    show (ExecutionFailure {}) = "ExecutionFailure"
-    show (CabalExitedUnsuccessfully {}) = "CabalExitedUnsuccessfully"
-    show (SetupHsBuildFailure {}) = "SetupBuildFailure"
+    deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
     pretty ( ConstructPlanFailed errs stackYaml stackRoot parents wanted prunedGlobalDeps ) =

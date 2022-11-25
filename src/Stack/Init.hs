@@ -54,16 +54,16 @@ data InitException
     | NoPackagesToIgnore
     | PackagesToIgnoreBug
     | PackageNameInvalid [FilePath]
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show InitException where
-    show (ConfigFileAlreadyExists reldest) = concat
+instance Exception InitException where
+    displayException (ConfigFileAlreadyExists reldest) = concat
         [ "Error: [S-8009]\n"
         , "Stack configuration file "
         , reldest
         , " exists, use '--force' to overwrite it."
         ]
-    show (SnapshotDownloadFailure e) = concat
+    displayException (SnapshotDownloadFailure e) = concat
         [ "Error: [S-8332]\n"
         , "Unable to download snapshot list, and therefore could not \
           \generate a stack.yaml file automatically\n"
@@ -77,22 +77,20 @@ instance Show InitException where
         , "    http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
         , "\n"
         , "Exception was: "
-        , show e
+        , displayException e
         ]
-    show NoPackagesToIgnore =
+    displayException NoPackagesToIgnore =
         "Error: [S-4934]\n"
         ++ "No packages to ignore"
-    show PackagesToIgnoreBug = bugReport "[S-2747]"
+    displayException PackagesToIgnoreBug = bugReport "[S-2747]"
         "No packages to ignore."
-    show (PackageNameInvalid rels) = unlines
+    displayException (PackageNameInvalid rels) = unlines
         [ "Error: [S-5267]"
         , "Package name as defined in the Cabal file must match the Cabal file \
           \name."
         , "Please fix the following packages and try again:"
         , T.unpack (utf8BuilderToText (formatGroup rels))
         ]
-
-instance Exception InitException
 
 -- | Generate stack.yaml
 initProject

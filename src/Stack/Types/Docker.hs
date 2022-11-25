@@ -60,23 +60,23 @@ data DockerException
       -- ^ Using host stack-exe on unsupported platform.
     | DockerStackExeParseException String
       -- ^ @stack-exe@ option fails to parse.
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show DockerException where
-    show DockerMustBeEnabledException =
+instance Exception DockerException where
+    displayException DockerMustBeEnabledException =
         "Error: [S-3223]\n"
         ++ "Docker must be enabled in your configuration file to use this \
            \command."
-    show OnlyOnHostException =
+    displayException OnlyOnHostException =
         "Error: [S-9779]\n"
         ++ "This command must be run on host OS (not in a Docker container)."
-    show (InspectFailedException image) = concat
+    displayException (InspectFailedException image) = concat
         [ "Error: [S-9105]\n"
         , "'docker inspect' failed for image after pull: "
         , image
         , "."
         ]
-    show (NotPulledException image) = concat
+    displayException (NotPulledException image) = concat
         [ "Error: [S-6626]\n"
         , "The Docker image referenced by your configuration file"
         , " has not\nbeen downloaded:\n    "
@@ -85,25 +85,25 @@ instance Show DockerException where
         , unwords [stackProgName, dockerCmdName, dockerPullCmdName]
         , "' to download it, then try again."
         ]
-    show (InvalidImagesOutputException l) = concat
+    displayException (InvalidImagesOutputException l) = concat
         [ "Error: [S-5841]\n"
         , "Invalid 'docker images' output line: '"
         , l
         , "'."
         ]
-    show (InvalidPSOutputException l) = concat
+    displayException (InvalidPSOutputException l) = concat
         [ "Error: [S-9608]\n"
         , "Invalid 'docker ps' output line: '"
         , l
         ,"'."
         ]
-    show (InvalidInspectOutputException msg) = concat
+    displayException (InvalidInspectOutputException msg) = concat
         [ "Error: [S-2240]\n"
         , "Invalid 'docker inspect' output: "
         , msg
         , "."
         ]
-    show (PullFailedException image) = concat
+    displayException (PullFailedException image) = concat
         [ "Error: [S-6092]\n"
         , "Could not pull Docker image:\n    "
         , image
@@ -111,7 +111,7 @@ instance Show DockerException where
           \version in\n"
         , "your configuration file."
         ]
-    show (DockerTooOldException minVersion haveVersion) = concat
+    displayException (DockerTooOldException minVersion haveVersion) = concat
         [ "Error: [S-6281]\n"
         , "Minimum docker version '"
         , versionString minVersion
@@ -121,7 +121,7 @@ instance Show DockerException where
         , versionString haveVersion
         , "')."
         ]
-    show (DockerVersionProhibitedException prohibitedVersions haveVersion) = concat
+    displayException (DockerVersionProhibitedException prohibitedVersions haveVersion) = concat
         [ "Error: [S-8252]\n"
         , "These Docker versions are incompatible with "
         , stackProgName
@@ -131,7 +131,7 @@ instance Show DockerException where
         , intercalate ", " (map versionString prohibitedVersions)
         , "."
         ]
-    show (BadDockerVersionException requiredRange haveVersion) = concat
+    displayException (BadDockerVersionException requiredRange haveVersion) = concat
         [ "Error: [S-6170]\n"
         , "The version of 'docker' you are using ("
         , show haveVersion
@@ -140,10 +140,10 @@ instance Show DockerException where
         , T.unpack (versionRangeText requiredRange)
         , ")."
         ]
-    show InvalidVersionOutputException =
+    displayException InvalidVersionOutputException =
         "Error: [S-5827]\n"
         ++ "Cannot get Docker version (invalid 'docker --version' output)."
-    show (HostStackTooOldException minVersion (Just hostVersion)) = concat
+    displayException (HostStackTooOldException minVersion (Just hostVersion)) = concat
         [ "Error: [S-7112]\n"
         , "The host's version of '"
         , stackProgName
@@ -153,7 +153,7 @@ instance Show DockerException where
         , versionString hostVersion
         , "."
         ]
-    show (HostStackTooOldException minVersion Nothing) = concat
+    displayException (HostStackTooOldException minVersion Nothing) = concat
         [ "Error: [S-7112]\n"
         , "The host's version of '"
         , stackProgName
@@ -161,7 +161,7 @@ instance Show DockerException where
         , versionString minVersion
         , " is required."
         ]
-    show (ContainerStackTooOldException requiredVersion containerVersion) = concat
+    displayException (ContainerStackTooOldException requiredVersion containerVersion) = concat
         [ "Error: [S-5832]\n"
         , "The Docker container's version of '"
         , stackProgName
@@ -171,13 +171,13 @@ instance Show DockerException where
         , versionString containerVersion
         , "."
         ]
-    show CannotDetermineProjectRootException =
+    displayException CannotDetermineProjectRootException =
         "Error: [S-4078]\n"
         ++ "Cannot determine project root directory for Docker sandbox."
-    show DockerNotInstalledException =
+    displayException DockerNotInstalledException =
         "Error: [S-7058]\n"
         ++ "Cannot find 'docker' in PATH.  Is Docker installed?"
-    show UnsupportedStackExeHostPlatformException = concat
+    displayException UnsupportedStackExeHostPlatformException = concat
         [ "Error: [S-6894]\n"
         , "Using host's "
         , stackProgName
@@ -185,7 +185,7 @@ instance Show DockerException where
         , display dockerContainerPlatform
         , " platform."
         ]
-    show (DockerStackExeParseException s) = concat
+    displayException (DockerStackExeParseException s) = concat
         [ "Error: [S-1512]\n"
         , "Failed to parse "
         , show s
@@ -197,8 +197,6 @@ instance Show DockerException where
         , show dockerStackExeImageVal
         , " or absolute path to executable."
         ]
-
-instance Exception DockerException
 
 -- | Docker configuration.
 data DockerOpts = DockerOpts
@@ -336,7 +334,7 @@ instance FromJSON DockerStackExe where
         s <- parseJSON a
         case parseDockerStackExe s of
             Right dse -> pure dse
-            Left e -> fail (show e)
+            Left e -> fail (displayException e)
 
 -- | Parse 'DockerStackExe'.
 parseDockerStackExe :: (MonadThrow m) => String -> m DockerStackExe

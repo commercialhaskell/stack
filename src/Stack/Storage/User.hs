@@ -63,25 +63,24 @@ data StorageUserException
     | GlobalPackageCacheFileMetadataMismatch
     | GlobalDumpParseFailure
     | CompilerCacheArchitectureInvalid Text
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show StorageUserException where
-    show CompilerFileMetadataMismatch =
+instance Exception StorageUserException where
+    displayException CompilerFileMetadataMismatch =
         "Error: [S-8196]\n"
         ++ "Compiler file metadata mismatch, ignoring cache."
-    show GlobalPackageCacheFileMetadataMismatch =
+    displayException GlobalPackageCacheFileMetadataMismatch =
         "Error: [S-5378]\n"
         ++ "Global package cache file metadata mismatch, ignoring cache."
-    show GlobalDumpParseFailure =
+    displayException GlobalDumpParseFailure =
         "Error: [S-2673]\n"
         ++ "Global dump did not parse correctly."
-    show (CompilerCacheArchitectureInvalid compilerCacheArch) = concat
+    displayException
+      (CompilerCacheArchitectureInvalid compilerCacheArch) = concat
         [ "Error: [S-8441]\n"
         , "Invalid arch: "
         , show compilerCacheArch
         ]
-
-instance Exception StorageUserException
 
 share [ mkPersist sqlSettings
       , mkMigrate "migrateAll"

@@ -25,23 +25,22 @@ import           Stack.Types.SourceMap
 data CleanException
     = NonLocalPackages [PackageName]
     | DeletionFailures [(Path Abs Dir, SomeException)]
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show CleanException where
-    show (NonLocalPackages pkgs) = concat
+instance Exception CleanException where
+    displayException (NonLocalPackages pkgs) = concat
         [ "Error: [S-9463]\n"
         , "The following packages are not part of this project: "
         , intercalate ", " (map show pkgs)
         ]
-    show (DeletionFailures failures) = concat
+    displayException (DeletionFailures failures) = concat
         [ "Error: [S-6321]\n"
         , "Exception while recursively deleting:\n"
-        , concatMap (\(dir, e) -> toFilePath dir <> "\n" <> show e <> "\n") failures
+        , concatMap (\(dir, e) ->
+            toFilePath dir <> "\n" <> displayException e <> "\n") failures
         , "Perhaps you do not have permission to delete these files or they \
           \are in use?"
         ]
-
-instance Exception CleanException
 
 -- | Deletes build artifacts in the current project.
 clean :: CleanOpts -> RIO Config ()

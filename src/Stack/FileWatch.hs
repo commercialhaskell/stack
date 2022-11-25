@@ -127,7 +127,7 @@ fileWatchConf cfg inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -
                 let theStyle = case fromException e of
                         Just ExitSuccess -> Good
                         _ -> Error
-                 in style theStyle $ fromString $ show e
+                 in style theStyle $ fromString $ displayException e
             _ -> style Good "Success! Waiting for next file change."
 
         logInfo "Type help for available commands. Press enter to force a rebuild."

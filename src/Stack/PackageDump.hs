@@ -38,10 +38,10 @@ import           RIO.Process hiding (readProcess)
 data PackageDumpException
     = MissingSingleField Text (Map Text [Line])
     | Couldn'tParseField Text [Line]
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show PackageDumpException where
-    show (MissingSingleField name values) = unlines $
+instance Exception PackageDumpException where
+    displayException (MissingSingleField name values) = unlines $
         concat
             [ "Error: [S-4257]\n"
             , "Expected single value for field name "
@@ -49,7 +49,7 @@ instance Show PackageDumpException where
             , " when parsing ghc-pkg dump output:"
             ]
         : map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
-    show (Couldn'tParseField name ls) = concat
+    displayException (Couldn'tParseField name ls) = concat
         [ "Error: [S-2016]\n"
         , "Couldn't parse the field "
         , show name
@@ -57,8 +57,6 @@ instance Show PackageDumpException where
         , show ls
         , "."
         ]
-
-instance Exception PackageDumpException
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump

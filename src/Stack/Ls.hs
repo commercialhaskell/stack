@@ -44,15 +44,13 @@ import           System.IO ( putStrLn )
 -- module.
 newtype LsException
     = ParseFailure [Value]
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show LsException where
-    show (ParseFailure val) =
+instance Exception LsException where
+    displayException (ParseFailure val) =
         "Error: [S-3421]\n"
         ++ "Failure to parse values as a snapshot: "
         ++ show val
-
-instance Exception LsException
 
 data LsView
     = Local

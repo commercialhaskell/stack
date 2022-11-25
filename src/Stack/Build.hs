@@ -54,17 +54,17 @@ import           System.Terminal (fixCodePage)
 data CabalVersionException
     = AllowNewerNotSupported Version
     | CabalVersionNotSupported Version
-    deriving (Typeable)
+    deriving (Show, Typeable)
 
-instance Show CabalVersionException where
-    show (AllowNewerNotSupported cabalVer) = concat
+instance Exception CabalVersionException where
+    displayException (AllowNewerNotSupported cabalVer) = concat
         [ "Error: [S-8503]\n"
         , "'--allow-newer' requires Cabal version 1.22 or greater, but "
         , "version "
         , versionString cabalVer
         , " was found."
         ]
-    show (CabalVersionNotSupported cabalVer) = concat
+    displayException (CabalVersionNotSupported cabalVer) = concat
         [ "Error: [S-5973]\n"
         , "Stack no longer supports Cabal versions before 1.19.2, "
         , "but version "
@@ -73,24 +73,22 @@ instance Show CabalVersionException where
         , "or later or to nightly-2015-05-05 or later."
         ]
 
-instance Exception CabalVersionException
-
 data QueryException
     = SelectorNotFound [Text]
     | IndexOutOfRange [Text]
     | NoNumericSelector [Text]
     | CannotApplySelector Value [Text]
-    deriving (Typeable)
+    deriving (Show, Typeable)
 
-instance Show QueryException where
-    show (SelectorNotFound sels) = err "[S-4419]" "Selector not found" sels
-    show (IndexOutOfRange sels) = err "[S-8422]" "Index out of range" sels
-    show (NoNumericSelector sels) =
+instance Exception QueryException where
+    displayException (SelectorNotFound sels) =
+        err "[S-4419]" "Selector not found" sels
+    displayException (IndexOutOfRange sels) =
+        err "[S-8422]" "Index out of range" sels
+    displayException (NoNumericSelector sels) =
         err "[S-4360]" "Encountered array and needed numeric selector" sels
-    show (CannotApplySelector value sels) =
+    displayException (CannotApplySelector value sels) =
         err "[S-1711]" ("Cannot apply selector to " ++ show value) sels
-
-instance Exception QueryException
 
 -- | Helper function for 'QueryException' instance of 'Show'
 err :: String -> String -> [Text] -> String

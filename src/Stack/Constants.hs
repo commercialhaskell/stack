@@ -146,13 +146,11 @@ import           System.Process (readProcess)
 -- "Stack.Constants" module.
 data ConstantsException
   = WiredInPackagesNotParsedBug
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show ConstantsException where
-  show WiredInPackagesNotParsedBug = bugReport "[S-6057]"
+instance Exception ConstantsException where
+  displayException WiredInPackagesNotParsedBug = bugReport "[S-6057]"
     "Parse error in wiredInPackages."
-
-instance Exception ConstantsException
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
