@@ -57,8 +57,6 @@ data NewException
     | AlreadyExists !(Path Abs Dir)
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
-    | AttemptedOverwrites [Path Abs File]
-    | FailedToDownloadTemplatesHelp !HttpException
     | BadTemplatesHelpEncoding
         !String -- URL it's downloaded from
         !UnicodeException
@@ -123,18 +121,6 @@ instance Exception NewException where
         , "\" is invalid and could not be used. The error was: "
         , why
         ]
-    displayException (AttemptedOverwrites fps) = concat
-        [ "Error: [S-3113]\n"
-        , "The template would create the following files, but they already \
-          \exist:\n"
-        , unlines (map (("  " ++) . toFilePath) fps)
-        , "Use '--force' to ignore this, and overwrite these files."
-        ]
-    displayException (FailedToDownloadTemplatesHelp ex) = concat
-        [ "Error: [S-8143]\n"
-        , "Failed to download 'stack templates' help. The HTTP error was: "
-        , displayException ex
-        ]
     displayException (BadTemplatesHelpEncoding url err) = concat
         [ "Error: [S-6670]\n"
         , "UTF-8 decoding error on template info from\n    "
@@ -149,6 +135,44 @@ instance Exception NewException where
         , "\" is used by GHC wired-in packages, and so shouldn't be used as a \
           \package name."
         ]
+
+data NewPrettyException
+    = AttemptedOverwrites !Text ![Path Abs File]
+    | FailedToDownloadTemplatesHelp !HttpException
+    deriving (Show, Typeable)
+
+instance Pretty NewPrettyException where
+    pretty (AttemptedOverwrites name fps) =
+        "[S-3113]"
+        <> line
+        <> fillSep
+             [ flow "Stack declined to apply the template"
+             , style Current (fromString . T.unpack $ name) <> ","
+             , flow "as it would create files that already exist."
+             ]
+        <> blankLine
+        <> flow "The template would create the following existing files:"
+        <> line
+        <> bulletedList (map (style File . pretty) fps)
+        <> blankLine
+        <> fillSep
+             [ "Use the"
+             , style Shell "--force"
+             , "flag to ignore this and overwrite those files."
+             ]
+    pretty (FailedToDownloadTemplatesHelp ex) =
+        "[S-8143]"
+        <> line
+        <> fillSep
+             [ flow "Stack failed to download the help for"
+             , style Shell "stack templates" <> "."
+             ]
+        <> blankLine
+        <> flow "While downloading, Stack encountered the following exception:"
+        <> blankLine
+        <> string (displayException ex)
+
+instance Exception NewPrettyException
 
 --------------------------------------------------------------------------------
 -- Main project creation
@@ -190,7 +214,8 @@ new opts forceOverwrite = do
                     (newOptsNonceParams opts)
                     absDir
                     templateText
-            when (not forceOverwrite && bare) $ checkForOverwrite (M.keys files)
+            when (not forceOverwrite && bare) $
+                checkForOverwrite (templateName template) (M.keys files)
             writeTemplateFiles files
             runTemplateInits absDir
             pure absDir
@@ -414,10 +439,11 @@ applyTemplate project template nonceParams dir templateText = do
       pure (a'', c:cs)
 
 -- | Check if we're going to overwrite any existing files.
-checkForOverwrite :: (MonadIO m, MonadThrow m) => [Path Abs File] -> m ()
-checkForOverwrite files = do
+checkForOverwrite :: (MonadIO m, MonadThrow m) => Text -> [Path Abs File] -> m ()
+checkForOverwrite name files = do
     overwrites <- filterM doesFileExist files
-    unless (null overwrites) $ throwM (AttemptedOverwrites overwrites)
+    unless (null overwrites) $
+        throwM $ PrettyException $ AttemptedOverwrites name overwrites
 
 -- | Write files to the new project directory.
 writeTemplateFiles
@@ -450,7 +476,9 @@ templatesHelp :: HasLogFunc env => RIO env ()
 templatesHelp = do
   let url = defaultTemplatesHelpUrl
   req <- liftM setGitHubHeaders (parseUrlThrow url)
-  resp <- httpLbs req `catch` (throwM . FailedToDownloadTemplatesHelp)
+  resp <- catch
+    (httpLbs req)
+    (throwM . PrettyException. FailedToDownloadTemplatesHelp)
   case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
     Left err -> throwM $ BadTemplatesHelpEncoding url err
     Right txt -> logInfo $ display txt
