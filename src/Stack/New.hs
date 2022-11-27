@@ -60,7 +60,6 @@ data NewException
     | BadTemplatesHelpEncoding
         !String -- URL it's downloaded from
         !UnicodeException
-    | Can'tUseWiredInName !PackageName
     deriving (Show, Typeable)
 
 instance Exception NewException where
@@ -128,20 +127,35 @@ instance Exception NewException where
         , "\n\n"
         , displayException err
         ]
-    displayException (Can'tUseWiredInName name) = concat
-        [ "Error: [S-5682]\n"
-        , "The name \""
-        , packageNameString name
-        , "\" is used by GHC wired-in packages, and so shouldn't be used as a \
-          \package name."
-        ]
 
 data NewPrettyException
-    = AttemptedOverwrites !Text ![Path Abs File]
+    = MagicPackageNameInvalid !String
+    | AttemptedOverwrites !Text ![Path Abs File]
     | FailedToDownloadTemplatesHelp !HttpException
     deriving (Show, Typeable)
 
 instance Pretty NewPrettyException where
+    pretty (MagicPackageNameInvalid name) =
+        "[S-5682]"
+        <> line
+        <> fillSep
+             [ flow "Stack declined to create a new directory for project"
+             , style Current (fromString name) <> ","
+             , flow "as package"
+             , fromString name
+             , flow "is 'wired-in' to a version of GHC. That can cause build \
+                    \errors."
+             ]
+        <> blankLine
+        <> fillSep
+             ( flow "The names blocked by Stack are:"
+             : mkNarrativeList Nothing False
+                 ( map toStyleDoc (L.sort $ S.toList wiredInPackages)
+                 )
+             )
+      where
+        toStyleDoc :: PackageName -> StyleDoc
+        toStyleDoc = fromString . packageNameString
     pretty (AttemptedOverwrites name fps) =
         "[S-3113]"
         <> line
@@ -192,8 +206,8 @@ data NewOpts = NewOpts
 -- | Create a new project with the given options.
 new :: HasConfig env => NewOpts -> Bool -> RIO env (Path Abs Dir)
 new opts forceOverwrite = do
-    when (newOptsProjectName opts `elem` wiredInPackages) $
-      throwM $ Can'tUseWiredInName (newOptsProjectName opts)
+    when (project `elem` wiredInPackages) $
+        throwM $ PrettyException $ MagicPackageNameInvalid projectName
     pwd <- getCurrentDir
     absDir <- if bare then pure pwd
                       else do relDir <- parseRelDir (packageNameString project)
@@ -222,6 +236,7 @@ new opts forceOverwrite = do
   where
     cliOptionTemplate = newOptsTemplate opts
     project = newOptsProjectName opts
+    projectName = packageNameString project
     bare = newOptsCreateBare opts
     logUsing absDir template templateFrom =
         let loading = case templateFrom of

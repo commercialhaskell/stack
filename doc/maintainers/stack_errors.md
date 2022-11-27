@@ -191,13 +191,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-5515] | MissingParameters PackageName TemplateName (Set String) (Path Abs File)
         [S-9490] | InvalidTemplate TemplateName String
         [S-6670] | BadTemplatesHelpEncoding String UnicodeException
-        [S-5682] | Can'tUseWiredInName PackageName
         ~~~
 
     -   `Stack.New.NewPrettyException`
 
         ~~~haskell
-        [S-3113] = AttemptedOverwrites [Path Abs File]
+        [S-5682] = MagicPackageNameInvalid String
+        [S-3113] | AttemptedOverwrites [Path Abs File]
         [S-8143] | FailedToDownloadTemplatesHelp HttpException
         ~~~
 
