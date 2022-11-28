@@ -47,6 +47,7 @@ module Stack.Prelude
   , flow
   , hang
   , hcat
+  , hsep
   , indent
   , line
   , logLevelToStyle
@@ -89,7 +90,7 @@ import           RIO.File as X hiding ( writeBinaryFileAtomic )
 import           RIO.PrettyPrint
                    ( HasStylesUpdate (..), HasTerm (..), Pretty (..), Style (..)
                    , StyleDoc, (<+>), align, bulletedList, debugBracket
-                   , encloseSep, fillSep, flow, hang, hcat, indent, line
+                   , encloseSep, fillSep, flow, hang, hcat, hsep, indent, line
                    , logLevelToStyle, mkNarrativeList, parens, prettyDebugL
                    , prettyError, prettyErrorL, prettyInfo, prettyInfoL
                    , prettyInfoS, prettyNote, prettyWarn, prettyWarnL

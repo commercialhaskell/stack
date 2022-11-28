@@ -186,7 +186,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-3650] = FailedToLoadTemplate TemplateName FilePath
-        [S-5515] | MissingParameters PackageName TemplateName (Set String) (Path Abs File)
         [S-9490] | InvalidTemplate TemplateName String
         [S-6670] | BadTemplatesHelpEncoding String UnicodeException
         ~~~

@@ -53,7 +53,6 @@ import           Text.ProjectTemplate
 -- "Stack.New" module.
 data NewException
     = FailedToLoadTemplate !TemplateName !FilePath
-    | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
     | BadTemplatesHelpEncoding
         !String -- URL it's downloaded from
@@ -67,29 +66,6 @@ instance Exception NewException where
         , T.unpack (templateName name)
         , " from "
         , path
-        ]
-    displayException
-      (MissingParameters name template missingKeys userConfigPath) = unlines
-        [ "Error: [S-5515]"
-        , "The following parameters were needed by the template but not \
-          \provided: " <> L.intercalate ", " (S.toList missingKeys)
-        ,    "You can provide them in "
-          <> toFilePath userConfigPath
-          <> ", like this:"
-        , "templates:"
-        , "  params:"
-        , unlines $
-              map (\key -> "    " <> key <> ": value") (S.toList missingKeys)
-        , "Or you can pass each one as parameters like this:"
-        , concat
-            [ "stack new "
-            , packageNameString name
-            , " "
-            , T.unpack (templateName template)
-            , " "
-            , unwords $
-                map (\key -> "-p \"" <> key <> ":value\"") (S.toList missingKeys)
-            ]
         ]
     displayException (InvalidTemplate name why) = concat
         [ "Error: [S-9490]\n"
@@ -474,12 +450,10 @@ applyTemplate project template nonceParams dir templateText = do
 
     (missingKeys, results) <- mapAccumLM processFile S.empty (M.toList files)
     unless (S.null missingKeys) $ do
-      let missingParameters = MissingParameters
-                               project
-                               template
-                               missingKeys
-                               (configUserConfigPath config)
-      logInfo ("\n" <> displayShow missingParameters <> "\n")
+      prettyNote $
+        missingParameters
+          missingKeys
+          (configUserConfigPath config)
     pure $ M.fromList results
   where
     onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks
@@ -491,6 +465,60 @@ applyTemplate project template nonceParams dir templateText = do
       (a', c) <- f a x
       (a'', cs) <- mapAccumLM f a' xs
       pure (a'', c:cs)
+
+    missingParameters
+      :: Set String
+      -> Path Abs File
+      -> StyleDoc
+    missingParameters missingKeys userConfigPath =
+           fillSep
+             ( flow "The following parameters were needed by the template but \
+                    \not provided:"
+             : mkNarrativeList
+                 Nothing
+                 False
+                 (map toStyleDoc (S.toList missingKeys))
+             )
+        <> blankLine
+        <> fillSep
+             [ flow "You can provide them in Stack's global YAML configuration \
+                    \file"
+             , "(" <> style File (pretty userConfigPath) <> ")"
+             , "like this:"
+             ]
+        <> blankLine
+        <> "templates:"
+        <> line
+        <> "  params:"
+        <> line
+        <> vsep
+             ( map
+                 (\key -> "    " <> fromString key <> ": value")
+                 (S.toList missingKeys)
+             )
+        <> blankLine
+        <> flow "Or you can pass each one on the command line as parameters \
+                \like this:"
+        <> blankLine
+        <> style Shell
+             ( fillSep
+                 [ flow "stack new"
+                 , fromString (packageNameString project)
+                 , fromString $ T.unpack (templateName template)
+                 , hsep $
+                     map
+                       ( \key ->
+                           fillSep [ "-p"
+                                   , "\"" <> fromString key <> ":value\""
+                                   ]
+                       )
+                       (S.toList missingKeys)
+                 ]
+             )
+        <> line
+      where
+        toStyleDoc :: String -> StyleDoc
+        toStyleDoc = fromString
 
 -- | Check if we're going to overwrite any existing files.
 checkForOverwrite :: (MonadIO m, MonadThrow m) => Text -> [Path Abs File] -> m ()
