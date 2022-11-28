@@ -254,17 +254,28 @@ new opts forceOverwrite = do
     bare = newOptsCreateBare opts
     logUsing absDir template templateFrom =
         let loading = case templateFrom of
-                          LocalTemp -> "Loading local"
+                          LocalTemp -> flow "Loading local"
                           RemoteTemp -> "Downloading"
-         in
-        logInfo
-            (loading <> " template \"" <> display (templateName template) <>
-             "\" to create project \"" <>
-             fromString (packageNameString project) <>
-             "\" in " <>
-             if bare then "the current directory"
-                     else fromString (toFilePath (dirname absDir)) <>
-             " ...")
+        in  prettyInfo
+              ( fillSep
+                  [ loading
+                  , "template"
+                  , style
+                      Current
+                      (fromString $ T.unpack $ templateName template)
+                  , flow "to create project"
+                  , style Current (fromString projectName)
+                  , "in"
+                  ,    ( if bare
+                           then flow "the current directory"
+                           else fillSep
+                                  [ "directory"
+                                  , style Dir (pretty $ dirname absDir)
+                                  ]
+                       )
+                    <> "..."
+                  ]
+                )
 
 data TemplateFrom = LocalTemp | RemoteTemp
 
