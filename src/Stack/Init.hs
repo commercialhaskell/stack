@@ -23,7 +23,6 @@ import qualified Data.List.NonEmpty              as NonEmpty
 import qualified Data.Map.Strict                 as Map
 import qualified Data.Set                        as Set
 import qualified Data.Text                       as T
-import qualified Data.Text.Normalize             as T (normalize , NormalizationMode(NFC))
 import qualified Data.Yaml                       as Yaml
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Text               as C
@@ -49,48 +48,77 @@ import           Stack.Types.Version
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Init" module.
 data InitException
-    = ConfigFileAlreadyExists FilePath
-    | SnapshotDownloadFailure SomeException
-    | NoPackagesToIgnore
-    | PackagesToIgnoreBug
-    | PackageNameInvalid [FilePath]
+    = NoPackagesToIgnoreBug
     deriving (Show, Typeable)
 
 instance Exception InitException where
-    displayException (ConfigFileAlreadyExists reldest) = concat
-        [ "Error: [S-8009]\n"
-        , "Stack configuration file "
-        , reldest
-        , " exists, use '--force' to overwrite it."
-        ]
-    displayException (SnapshotDownloadFailure e) = concat
-        [ "Error: [S-8332]\n"
-        , "Unable to download snapshot list, and therefore could not \
-          \generate a stack.yaml file automatically\n"
-        , "This sometimes happens due to missing Certificate Authorities on \
-          \your system. For more information, see:\n"
-        , "\n"
-        , "    https://github.com/commercialhaskell/stack/issues/234\n"
-        , "\n"
-        , "You can try again, or create your stack.yaml file by hand. See:\n"
-        , "\n"
-        , "    http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
-        , "\n"
-        , "Exception was: "
-        , displayException e
-        ]
-    displayException NoPackagesToIgnore =
-        "Error: [S-4934]\n"
-        ++ "No packages to ignore"
-    displayException PackagesToIgnoreBug = bugReport "[S-2747]"
+    displayException NoPackagesToIgnoreBug = bugReport "[S-2747]"
         "No packages to ignore."
-    displayException (PackageNameInvalid rels) = unlines
-        [ "Error: [S-5267]"
-        , "Package name as defined in the Cabal file must match the Cabal file \
-          \name."
-        , "Please fix the following packages and try again:"
-        , T.unpack (utf8BuilderToText (formatGroup rels))
-        ]
+
+data InitPrettyException
+    = SnapshotDownloadFailure SomeException
+    | ConfigFileAlreadyExists FilePath
+    | PackageNameInvalid [(Path Abs File, PackageName)]
+    deriving (Show, Typeable)
+
+instance Pretty InitPrettyException where
+    pretty (ConfigFileAlreadyExists reldest) =
+        "[S-8009]"
+        <> line
+        <> flow "Stack declined to create a project-level YAML configuration \
+                \file."
+        <> blankLine
+        <> fillSep
+             [ flow "The file"
+             , style File (fromString reldest)
+             , "already exists. To overwrite it, pass the flag"
+             , style Shell "--force" <> "."
+             ]
+    pretty (PackageNameInvalid rels) =
+        "[S-5267]"
+        <> line
+        <> flow "Stack did not create project-level YAML configuration, as \
+                \(like Hackage) it requires a Cabal file name to match the \
+                \package it defines."
+        <> blankLine
+        <> flow "Please rename the following Cabal files:"
+        <> line
+        <> bulletedList
+             ( map
+                 ( \(fp, name) -> fillSep
+                     [ style File (pretty fp)
+                     , "as"
+                     , style
+                         File
+                         (fromString (packageNameString name) <> ".cabal")
+                     ]
+                 )
+                 rels
+             )
+    pretty (SnapshotDownloadFailure e) =
+        "[S-8332]"
+        <> line
+        <> flow "Stack failed to create project-level YAML configuration, as \
+                \it was unable to download the index of available snapshots."
+        <> blankLine
+        <> fillSep
+             [ flow "This sometimes happens because Certificate Authorities \
+                    \are missing on your system. You can try the Stack command \
+                    \again or manually create the configuration file. For help \
+                    \about the content of Stack's YAML configuration files, \
+                    \see (for the most recent release of Stack)"
+             , style
+                 Url
+                 "http://docs.haskellstack.org/en/stable/yaml_configuration/"
+               <> "."
+             ]
+        <> blankLine
+        <> flow "While downloading the snapshot index, Stack encountered the \
+                \following exception:"
+        <> blankLine
+        <> string (displayException e)
+
+instance Exception InitPrettyException
 
 -- | Generate stack.yaml
 initProject
@@ -106,7 +134,7 @@ initProject currDir initOpts mresolver = do
 
     exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $
-        throwIO $ ConfigFileAlreadyExists reldest
+        throwIO $ PrettyException $ ConfigFileAlreadyExists reldest
 
     dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     let find  = findCabalDirs (includeSubDirs initOpts)
@@ -361,8 +389,9 @@ renderStackYaml p ignoredPackages dupPackages =
         ]
 
 getSnapshots' :: HasConfig env => RIO env Snapshots
-getSnapshots' = do
-    getSnapshots `catchAny` \e -> throwIO $ SnapshotDownloadFailure e
+getSnapshots' = catchAny
+    getSnapshots
+    (\e -> throwIO $ PrettyException $ SnapshotDownloadFailure e)
 
 -- | Get the default resolver value
 getDefaultResolver
@@ -431,7 +460,7 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
                         pure (snapLoc, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
                         when (Map.size available == Map.size pkgDirs) $
-                            throwM NoPackagesToIgnore
+                            throwM NoPackagesToIgnoreBug
 
                         if length ignored > 1 then do
                           logWarn "*** Ignoring packages:"
@@ -440,7 +469,7 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
                           logWarn $ "*** Ignoring package: "
                                  <> fromString
                                       (case ignored of
-                                        [] -> throwM PackagesToIgnoreBug
+                                        [] -> throwM NoPackagesToIgnoreBug
                                         x:_ -> packageNameString x)
 
                         go available
@@ -551,29 +580,29 @@ cabalPackagesCheck cabaldirs = do
       logWarn "If this isn't what you want, please delete the generated \"stack.yaml\""
 
     relpaths <- mapM prettyPath cabaldirs
-    logInfo "Using cabal packages:"
-    logInfo $ formatGroup relpaths
+    unless (null relpaths) $
+        prettyInfo $
+               flow "Using the Cabal packages:"
+            <> line
+            <> bulletedList (map (style File . fromString) relpaths)
+            <> line
 
-    packages <- for cabaldirs $ \dir -> do
-      (gpdio, _name, cabalfp) <- loadCabalFilePath (Just stackProgName') dir
-      gpd <- liftIO $ gpdio YesPrintWarnings
-      pure (cabalfp, gpd)
-
-    -- package name cannot be empty or missing otherwise
-    -- it will result in Cabal solver failure.
-    -- Stack requires packages name to match the Cabal file name
-    -- Just the latter check is enough to cover both the cases
-
-    let normalizeString = T.unpack . T.normalize T.NFC . T.pack
-        getNameMismatchPkg (fp, gpd)
-            | (normalizeString . packageNameString . gpdPackageName) gpd /= (normalizeString . FP.takeBaseName . toFilePath) fp
-                = Just fp
-            | otherwise = Nothing
-        nameMismatchPkgs = mapMaybe getNameMismatchPkg packages
-
-    when (nameMismatchPkgs /= []) $ do
-        rels <- mapM prettyPath nameMismatchPkgs
-        throwIO $ PackageNameInvalid rels
+    -- A package name cannot be empty or missing otherwise it will result in
+    -- Cabal solver failure. Stack requires packages name to match the Cabal
+    -- file name. Just the latter check is enough to cover both the cases.
+    ePackages <- for cabaldirs $ \dir -> do
+        -- Pantry's 'loadCabalFilePath' throws 'MismatchedCabalName' (error
+        -- [S-910]) if the Cabal file name does not match the package it
+        -- defines.
+        (gpdio, _name, cabalfp) <- loadCabalFilePath (Just stackProgName') dir
+        eres <- liftIO $ try (gpdio YesPrintWarnings)
+        case eres :: Either PantryException C.GenericPackageDescription of
+            Right gpd -> pure $ Right (cabalfp, gpd)
+            Left (MismatchedCabalName fp name) -> pure $ Left (fp, name)
+            Left e -> throwIO e
+    let (nameMismatchPkgs, packages) = partitionEithers ePackages
+    when (nameMismatchPkgs /= []) $
+        throwIO $ PrettyException $ PackageNameInvalid nameMismatchPkgs
 
     let dupGroups = filter ((> 1) . length)
                             . groupSortOn (gpdPackageName . snd)

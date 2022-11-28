@@ -153,10 +153,14 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Stack.Init.InitException`
 
         ~~~haskell
-        [S-8009] = ConfigFileAlreadyExists FilePath
-        [S-8332] | SnapshotDownloadFailure SomeException
-        [S-4934] | NoPackagesToIgnore
-        [S-2747] | PackagesToIgnoreBug
+        [S-2747] | NoPackagesToIgnoreBug
+        ~~~
+
+    -   `Stack.Init.InitPrettyException`
+
+        ~~~haskell
+        [S-8332] = SnapshotDownloadFailure SomeException
+        [S-8009] | ConfigFileAlreadyExists FilePath
         [S-5267] | PackageNameInvalid [FilePath]
         ~~~
 
