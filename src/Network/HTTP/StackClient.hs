@@ -31,8 +31,10 @@ module Network.HTTP.StackClient
   , displayDigestAuthException
   , Request
   , RequestBody(RequestBodyBS, RequestBodyLBS)
-  , Response
-  , HttpException
+  , Response (..)
+  , HttpException (..)
+  , HttpExceptionContent (..)
+  , notFound404
   , hAccept
   , hContentLength
   , hContentMD5
@@ -70,7 +72,7 @@ import qualified Data.Text as T
 import           Data.Time.Clock
                    ( NominalDiffTime, diffUTCTime, getCurrentTime )
 import           Network.HTTP.Client
-                   ( Request, RequestBody (..), Response, parseRequest, getUri
+                   ( HttpExceptionContent (..), Request, RequestBody (..), Response (..), parseRequest, getUri
                    , path, checkResponse, parseUrlThrow
                    )
 import           Network.HTTP.Simple
@@ -79,7 +81,7 @@ import           Network.HTTP.Simple
                    , getResponseBody, getResponseStatusCode, getResponseHeaders
                    )
 import           Network.HTTP.Types
-                   ( hAccept, hContentLength, hContentMD5, methodPut )
+                   ( hAccept, hContentLength, hContentMD5, methodPut, notFound404 )
 import           Network.HTTP.Conduit ( requestHeaders )
 import           Network.HTTP.Client.TLS
                    ( getGlobalManager, applyDigestAuth

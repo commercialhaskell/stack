@@ -32,8 +32,8 @@ import qualified Data.Text.Encoding as T
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Network.HTTP.StackClient (VerifiedDownloadException (..), Request, HttpException,
-                                           getResponseBody, httpLbs, mkDownloadRequest, parseRequest, parseUrlThrow,
+import           Network.HTTP.StackClient (VerifiedDownloadException (..), Response (..), HttpException (..), HttpExceptionContent (..),
+                                           getResponseBody, httpLbs, mkDownloadRequest, notFound404, parseRequest, parseUrlThrow,
                                            setForceDownload, setGitHubHeaders, setRequestCheckStatus, verifiedDownloadWithProgress)
 import           Path
 import           Path.IO
@@ -53,8 +53,6 @@ import           Text.ProjectTemplate
 -- "Stack.New" module.
 data NewException
     = FailedToLoadTemplate !TemplateName !FilePath
-    | FailedToDownloadTemplate !TemplateName !VerifiedDownloadException
-    | AlreadyExists !(Path Abs Dir)
     | MissingParameters !PackageName !TemplateName !(Set String) !(Path Abs File)
     | InvalidTemplate !TemplateName !String
     | BadTemplatesHelpEncoding
@@ -69,26 +67,6 @@ instance Exception NewException where
         , T.unpack (templateName name)
         , " from "
         , path
-        ]
-    displayException
-      (FailedToDownloadTemplate name (DownloadHttpError httpError)) = concat
-        [ "Error: [S-1688]\n"
-        , "There was an unexpected HTTP error while downloading template "
-        , T.unpack (templateName name)
-        , ": "
-        , show httpError
-        ]
-    displayException (FailedToDownloadTemplate name _) = concat
-        [ "Error: [S-1688]\n"
-        , "Failed to download template "
-        , T.unpack (templateName name)
-        , ": unknown reason"
-        ]
-    displayException (AlreadyExists path) = concat
-        [ "Error: [S-2135]\n"
-        , "Directory "
-        , toFilePath path
-        , " already exists. Aborting."
         ]
     displayException
       (MissingParameters name template missingKeys userConfigPath) = unlines
@@ -129,12 +107,71 @@ instance Exception NewException where
         ]
 
 data NewPrettyException
-    = MagicPackageNameInvalid !String
+    = ProjectDirAlreadyExists !String !(Path Abs Dir)
+    | FailedToDownloadTemplate !Text !String !VerifiedDownloadException
+    | MagicPackageNameInvalid !String
     | AttemptedOverwrites !Text ![Path Abs File]
     | FailedToDownloadTemplatesHelp !HttpException
     deriving (Show, Typeable)
 
 instance Pretty NewPrettyException where
+    pretty (ProjectDirAlreadyExists name path) =
+        "[S-2135]"
+        <> line
+        <> fillSep
+             [ flow "Stack failed to create a new directory for project"
+             , style Current (fromString name) <> ","
+             , flow "as the directory"
+             , style Dir (pretty path)
+             , flow "already exists."
+             ]
+    pretty (FailedToDownloadTemplate name url ex) =
+        "[S-1688]"
+        <> line
+        <> fillSep
+             [ flow "Stack failed to download the template"
+             , style Current (fromString . T.unpack $ name)
+             , "from"
+             , style Url (fromString url) <> "."
+             ]
+        <> blankLine
+        <> ( if isNotFound
+                then    flow "Please check that the template exists at that \
+                             \location."
+                     <> blankLine
+                else mempty
+           )
+        <> fillSep
+             [ flow "While downloading, Stack encountered"
+             , msg
+             ]
+      where
+        (msg, isNotFound) = case ex of
+            DownloadHttpError (HttpExceptionRequest req content) ->
+              let msg' =    flow "an HTTP exception. Stack made the request:"
+                         <> blankLine
+                         <> fromString (show req)
+                         <> blankLine
+                         <> flow "and the content of the exception was:"
+                         <> blankLine
+                         <> fromString (show content)
+                  isNotFound404 = case content of
+                                    StatusCodeException res _ ->
+                                      responseStatus res == notFound404
+                                    _ -> False
+              in  (msg', isNotFound404)
+            DownloadHttpError (InvalidUrlException url' reason) ->
+              let msg' = fillSep
+                           [ flow "an HTTP exception. The URL"
+                           , style Url (fromString url')
+                           , flow "was considered invalid because"
+                           , fromString reason <> "."
+                           ]
+              in (msg', False)
+            _ -> let msg' =    flow "the exception:"
+                            <> blankLine
+                            <> fromString (show ex)
+                 in (msg', False)
     pretty (MagicPackageNameInvalid name) =
         "[S-5682]"
         <> line
@@ -218,7 +255,8 @@ new opts forceOverwrite = do
                                                         , configTemplate
                                                         ]
     if exists && not bare
-        then throwM (AlreadyExists absDir)
+        then throwM $ PrettyException $
+                 ProjectDirAlreadyExists projectName absDir
         else do
             templateText <- loadTemplate template (logUsing absDir template)
             files <-
@@ -275,9 +313,9 @@ loadTemplate name logIt = do
                 (\(e :: NewException) -> do
                       case relSettings rawParam of
                         Just settings -> do
-                          req <- parseRequest (tplDownloadUrl settings)
-                          let extract = tplExtract settings
-                          downloadTemplate req extract (templateDir </> relFile)
+                          let url = tplDownloadUrl settings
+                              extract = tplExtract settings
+                          downloadTemplate url extract (templateDir </> relFile)
                         Nothing -> throwM e
                 )
         RepoPath rtp -> do
@@ -307,28 +345,29 @@ loadTemplate name logIt = do
     downloadFromUrl :: TemplateDownloadSettings -> Path Abs Dir -> RIO env Text
     downloadFromUrl settings templateDir = do
         let url = tplDownloadUrl settings
+            rel = fromMaybe backupUrlRelPath (parseRelFile url)
+        downloadTemplate url (tplExtract settings) (templateDir </> rel)
+    downloadTemplate :: String -> (ByteString -> Either String Text) -> Path Abs File -> RIO env Text
+    downloadTemplate url extract path = do
         req <- parseRequest url
-        let rel = fromMaybe backupUrlRelPath (parseRelFile url)
-        downloadTemplate req (tplExtract settings) (templateDir </> rel)
-    downloadTemplate :: Request -> (ByteString -> Either String Text) -> Path Abs File -> RIO env Text
-    downloadTemplate req extract path = do
         let dReq = setForceDownload True $ mkDownloadRequest (setRequestCheckStatus req)
         logIt RemoteTemp
         catch
           (void $ do
             verifiedDownloadWithProgress dReq path (T.pack $ toFilePath path) Nothing
           )
-          (useCachedVersionOrThrow path)
+          (useCachedVersionOrThrow url path)
 
         loadLocalFile path extract
-    useCachedVersionOrThrow :: Path Abs File -> VerifiedDownloadException -> RIO env ()
-    useCachedVersionOrThrow path exception = do
+    useCachedVersionOrThrow :: String -> Path Abs File -> VerifiedDownloadException -> RIO env ()
+    useCachedVersionOrThrow url path exception = do
       exists <- doesFileExist path
 
       if exists
         then do logWarn "Tried to download the template but an error was found."
                 logWarn "Using cached local version. It may not be the most recent version though."
-        else throwM (FailedToDownloadTemplate name exception)
+        else throwM $ PrettyException $
+                 FailedToDownloadTemplate (templateName name) url exception
 
 data TemplateDownloadSettings = TemplateDownloadSettings
   { tplDownloadUrl :: String
