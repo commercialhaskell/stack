@@ -54,9 +54,6 @@ import           Text.ProjectTemplate
 data NewException
     = FailedToLoadTemplate !TemplateName !FilePath
     | InvalidTemplate !TemplateName !String
-    | BadTemplatesHelpEncoding
-        !String -- URL it's downloaded from
-        !UnicodeException
     deriving (Show, Typeable)
 
 instance Exception NewException where
@@ -74,20 +71,13 @@ instance Exception NewException where
         , "\" is invalid and could not be used. The error was: "
         , why
         ]
-    displayException (BadTemplatesHelpEncoding url err) = concat
-        [ "Error: [S-6670]\n"
-        , "UTF-8 decoding error on template info from\n    "
-        , url
-        , "\n\n"
-        , displayException err
-        ]
-
 data NewPrettyException
     = ProjectDirAlreadyExists !String !(Path Abs Dir)
     | FailedToDownloadTemplate !Text !String !VerifiedDownloadException
     | MagicPackageNameInvalid !String
     | AttemptedOverwrites !Text ![Path Abs File]
     | FailedToDownloadTemplatesHelp !HttpException
+    | TemplatesHelpEncodingInvalid !String !UnicodeException
     deriving (Show, Typeable)
 
 instance Pretty NewPrettyException where
@@ -101,7 +91,7 @@ instance Pretty NewPrettyException where
              , style Dir (pretty path)
              , flow "already exists."
              ]
-    pretty (FailedToDownloadTemplate name url ex) =
+    pretty (FailedToDownloadTemplate name url err) =
         "[S-1688]"
         <> line
         <> fillSep
@@ -122,7 +112,7 @@ instance Pretty NewPrettyException where
              , msg
              ]
       where
-        (msg, isNotFound) = case ex of
+        (msg, isNotFound) = case err of
             DownloadHttpError (HttpExceptionRequest req content) ->
               let msg' =    flow "an HTTP exception. Stack made the request:"
                          <> blankLine
@@ -144,9 +134,9 @@ instance Pretty NewPrettyException where
                            , fromString reason <> "."
                            ]
               in (msg', False)
-            _ -> let msg' =    flow "the exception:"
+            _ -> let msg' =    flow "the following exception:"
                             <> blankLine
-                            <> fromString (show ex)
+                            <> fromString (displayException err)
                  in (msg', False)
     pretty (MagicPackageNameInvalid name) =
         "[S-5682]"
@@ -187,7 +177,7 @@ instance Pretty NewPrettyException where
              , style Shell "--force"
              , "flag to ignore this and overwrite those files."
              ]
-    pretty (FailedToDownloadTemplatesHelp ex) =
+    pretty (FailedToDownloadTemplatesHelp err) =
         "[S-8143]"
         <> line
         <> fillSep
@@ -197,7 +187,21 @@ instance Pretty NewPrettyException where
         <> blankLine
         <> flow "While downloading, Stack encountered the following exception:"
         <> blankLine
-        <> string (displayException ex)
+        <> string (displayException err)
+    pretty (TemplatesHelpEncodingInvalid url err) =
+        "[S-6670]"
+        <> line
+        <> fillSep
+             [ flow "Stack failed to decode the help for"
+             , style Shell "stack templates"
+             , flow "downloaded from"
+             , style Url (fromString url) <> "."
+             ]
+        <> blankLine
+        <> flow "While decoding, Stack encountered the following exception:"
+        <> blankLine
+        <> string (displayException err)
+
 
 instance Exception NewPrettyException
 
@@ -576,7 +580,7 @@ templatesHelp = do
     (httpLbs req)
     (throwM . PrettyException. FailedToDownloadTemplatesHelp)
   case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
-    Left err -> throwM $ BadTemplatesHelpEncoding url err
+    Left err -> throwM $ PrettyException $ TemplatesHelpEncodingInvalid url err
     Right txt -> logInfo $ display txt
 
 --------------------------------------------------------------------------------

@@ -187,7 +187,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-3650] = FailedToLoadTemplate TemplateName FilePath
         [S-9490] | InvalidTemplate TemplateName String
-        [S-6670] | BadTemplatesHelpEncoding String UnicodeException
         ~~~
 
     -   `Stack.New.NewPrettyException`
@@ -198,6 +197,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-5682] | MagicPackageNameInvalid String
         [S-3113] | AttemptedOverwrites [Path Abs File]
         [S-8143] | FailedToDownloadTemplatesHelp HttpException
+        [S-6670] | TemplatesHelpEncodingInvalid String UnicodeException
         ~~~
 
     -   `Stack.Nix.NixException`
