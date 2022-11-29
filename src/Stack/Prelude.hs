@@ -33,6 +33,7 @@ module Stack.Prelude
   , HasTerm (..)
   , Pretty (..)
   , PrettyException (..)
+  , PrettyRawSnapshotLocation (..)
   , StyleDoc
   , Style (..)
   , StyleSpec
@@ -293,6 +294,23 @@ writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
 writeBinaryFileAtomic fp builder =
     liftIO $
     withBinaryFileAtomic (toFilePath fp) WriteMode (`hPutBuilder` builder)
+
+newtype PrettyRawSnapshotLocation
+    = PrettyRawSnapshotLocation RawSnapshotLocation
+
+instance Pretty PrettyRawSnapshotLocation where
+    pretty (PrettyRawSnapshotLocation (RSLCompiler compiler)) =
+        fromString $ T.unpack $ utf8BuilderToText $ display compiler
+    pretty (PrettyRawSnapshotLocation (RSLUrl url Nothing)) =
+        style Url (fromString $ T.unpack url)
+    pretty (PrettyRawSnapshotLocation (RSLUrl url (Just blob))) =
+        fillSep
+        [ style Url (fromString $ T.unpack url)
+        , parens $ fromString $ T.unpack $ utf8BuilderToText $ display blob
+        ]
+    pretty (PrettyRawSnapshotLocation (RSLFilePath resolved)) =
+        style File (fromString $ show $ resolvedRelative resolved)
+    pretty (PrettyRawSnapshotLocation (RSLSynonym syn)) = fromString $ show syn
 
 -- | Report a bug in Stack.
 bugReport :: String -> String -> String

@@ -37,7 +37,6 @@ import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import           Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as C
-import qualified RIO
 import           Stack.Constants
 import           Stack.Package
 import           Stack.SourceMap
@@ -392,9 +391,13 @@ selectBestSnapshot
     -> NonEmpty SnapName
     -> RIO env (SnapshotCandidate env, RawSnapshotLocation, BuildPlanCheck)
 selectBestSnapshot pkgDirs snaps = do
-    logInfo $ "Selecting the best among "
-               <> displayShow (NonEmpty.length snaps)
-               <> " snapshots...\n"
+    prettyInfo $
+           fillSep
+             [ flow "Selecting the best among"
+             , fromString $ show (NonEmpty.length snaps)
+             , "snapshots..."
+             ]
+        <> line
     F.foldr1 go (NonEmpty.map (getResult <=< snapshotLocation) snaps)
     where
         go mold mnew = do
@@ -413,19 +416,31 @@ selectBestSnapshot pkgDirs snaps = do
           | compareBuildPlanCheck r1 r2 /= LT = (s1, l1, r1)
           | otherwise = (s2, l2, r2)
 
-        reportResult BuildPlanCheckOk {} loc = do
-            logInfo $ "* Matches " <> RIO.display loc
-            logInfo ""
+        reportResult BuildPlanCheckOk {} loc =
+            prettyInfo $
+                   fillSep
+                      [ flow "* Matches"
+                      , pretty $ PrettyRawSnapshotLocation loc
+                      ]
+                <> line
 
-        reportResult r@BuildPlanCheckPartial {} loc = do
-            logWarn $ "* Partially matches " <> RIO.display loc
-            logWarn $ RIO.display $ ind $ T.pack $ show r
+        reportResult r@BuildPlanCheckPartial {} loc =
+            prettyWarn $
+                   fillSep
+                     [ flow "* Partially matches"
+                     , pretty $ PrettyRawSnapshotLocation loc
+                     ]
+                 <> blankLine
+                 <> string (show r)
 
-        reportResult r@BuildPlanCheckFail {} loc = do
-            logWarn $ "* Rejected " <> RIO.display loc
-            logWarn $ RIO.display $ ind $ T.pack $ show r
-
-        ind t = T.unlines $ fmap ("    " <>) (T.lines t)
+        reportResult r@BuildPlanCheckFail {} loc =
+            prettyWarn $
+                   fillSep
+                     [ flow "* Rejected"
+                     , pretty $ PrettyRawSnapshotLocation loc
+                     ]
+                <> blankLine
+                <> string (show r)
 
 showItems :: [String] -> Text
 showItems items = T.concat (map formatItem items)

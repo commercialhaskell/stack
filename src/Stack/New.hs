@@ -351,8 +351,11 @@ loadTemplate name logIt = do
       exists <- doesFileExist path
 
       if exists
-        then do logWarn "Tried to download the template but an error was found."
-                logWarn "Using cached local version. It may not be the most recent version though."
+        then prettyWarn
+                 ( flow "Tried to download the template but an error was \
+                        \found. Using cached local version. It may not be the \
+                        \most recent version though."
+                 )
         else throwM $ PrettyException $
                  FailedToDownloadTemplate (templateName name) url exception
 
