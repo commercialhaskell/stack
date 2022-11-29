@@ -291,7 +291,7 @@ library
     , random
     , retry
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.3.0
+    , rio-prettyprint >=0.1.4.0
     , semigroups
     , split
     , stm
@@ -415,7 +415,7 @@ executable stack
     , random
     , retry
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.3.0
+    , rio-prettyprint >=0.1.4.0
     , semigroups
     , split
     , stack
@@ -540,7 +540,7 @@ executable stack-integration-test
     , random
     , retry
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.3.0
+    , rio-prettyprint >=0.1.4.0
     , semigroups
     , split
     , stm
@@ -671,7 +671,7 @@ test-suite stack-test
     , raw-strings-qq
     , retry
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.3.0
+    , rio-prettyprint >=0.1.4.0
     , semigroups
     , smallcheck
     , split

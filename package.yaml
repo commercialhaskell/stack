@@ -112,7 +112,7 @@ dependencies:
 - random
 - retry
 - rio >= 0.1.22.0
-- rio-prettyprint >= 0.1.3.0
+- rio-prettyprint >= 0.1.4.0
 - semigroups
 - split
 - stm

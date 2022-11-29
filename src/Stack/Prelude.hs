@@ -28,7 +28,7 @@ module Stack.Prelude
   , bugPrettyReport
   , blankLine
   , module X
-  -- * Re-exports from the rio-pretty print package, and 'string'
+  -- * Re-exports from the rio-pretty print package
   , HasStylesUpdate (..)
   , HasTerm (..)
   , Pretty (..)
@@ -50,6 +50,7 @@ module Stack.Prelude
   , indent
   , line
   , logLevelToStyle
+  , mkNarrativeList
   , parens
   , parseStylesUpdateFromString
   , prettyDebugL
@@ -89,11 +90,11 @@ import           RIO.PrettyPrint
                    ( HasStylesUpdate (..), HasTerm (..), Pretty (..), Style (..)
                    , StyleDoc, (<+>), align, bulletedList, debugBracket
                    , encloseSep, fillSep, flow, hang, hcat, indent, line
-                   , logLevelToStyle, parens, prettyDebugL, prettyError
-                   , prettyErrorL, prettyInfo, prettyInfoL, prettyInfoS
-                   , prettyNote, prettyWarn, prettyWarnL, prettyWarnS, punctuate
-                   , sep, softbreak, softline, style, stylesUpdateL, useColorL
-                   , vsep
+                   , logLevelToStyle, mkNarrativeList, parens, prettyDebugL
+                   , prettyError, prettyErrorL, prettyInfo, prettyInfoL
+                   , prettyInfoS, prettyNote, prettyWarn, prettyWarnL
+                   , prettyWarnS, punctuate, sep, softbreak, softline, string
+                   , style, stylesUpdateL, useColorL, vsep
                    )
 import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
@@ -291,14 +292,6 @@ writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
 writeBinaryFileAtomic fp builder =
     liftIO $
     withBinaryFileAtomic (toFilePath fp) WriteMode (`hPutBuilder` builder)
-
--- | @string@ is not exported by module "Text.PrettyPrint.Leijen.Extended" of
--- the @rio-prettyprint@ package.
-string :: String -> StyleDoc
-string "" = mempty
-string ('\n':s) = line <> string s
-string s        = let (xs, ys) = span (/='\n') s
-                  in  fromString xs <> string ys
 
 -- | Report a bug in Stack.
 bugReport :: String -> String -> String
