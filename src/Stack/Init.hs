@@ -141,9 +141,7 @@ initProject currDir initOpts mresolver = do
         dirs' = if null dirs then [currDir] else dirs
     prettyInfo $
            fillSep
-             [ flow "Looking for"
-             , style File "*.cabal"
-             , "or"
+             [ flow "Looking for Cabal or"
              , style File "package.yaml"
              , flow "files to use to initialise Stack's project-level YAML \
                     \configuration file."
@@ -217,7 +215,7 @@ initProject currDir initOpts mresolver = do
 
     prettyInfo $
         fillSep
-          [ flow "Initialising Stack's project-level configuration file \
+          [ flow "Initialising Stack's project-level YAML configuration file \
                  \using snapshot"
           , pretty (PrettyRawSnapshotLocation snapshotLoc) <> "."
           ]
@@ -480,8 +478,8 @@ getWorkingResolverPlan
 getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
     prettyInfo $
         fillSep
-          [ flow "Selected snapshot:"
-          , pretty $ PrettyRawSnapshotLocation snapLoc
+          [ flow "Selected the snapshot"
+          , pretty (PrettyRawSnapshotLocation snapLoc) <> "."
           ]
     go pkgDirs0
     where

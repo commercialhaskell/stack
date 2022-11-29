@@ -53,7 +53,6 @@ import           Text.ProjectTemplate
 -- "Stack.New" module.
 data NewException
     = FailedToLoadTemplate !TemplateName !FilePath
-    | InvalidTemplate !TemplateName !String
     deriving (Show, Typeable)
 
 instance Exception NewException where
@@ -64,16 +63,13 @@ instance Exception NewException where
         , " from "
         , path
         ]
-    displayException (InvalidTemplate name why) = concat
-        [ "Error: [S-9490]\n"
-        , "The template \""
-        , T.unpack (templateName name)
-        , "\" is invalid and could not be used. The error was: "
-        , why
-        ]
+
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
+-- "Stack.New" module.
 data NewPrettyException
     = ProjectDirAlreadyExists !String !(Path Abs Dir)
     | FailedToDownloadTemplate !Text !String !VerifiedDownloadException
+    | TemplateInvalid !TemplateName !StyleDoc
     | MagicPackageNameInvalid !String
     | AttemptedOverwrites !Text ![Path Abs File]
     | FailedToDownloadTemplatesHelp !HttpException
@@ -138,6 +134,15 @@ instance Pretty NewPrettyException where
                             <> blankLine
                             <> fromString (displayException err)
                  in (msg', False)
+    pretty (TemplateInvalid name why) =
+        "[S-9490]"
+        <> line
+        <> fillSep
+             [ flow "Stack failed to use the template"
+             , style Current (fromString $ T.unpack $ templateName name) <> ","
+             , "as"
+             , why
+             ]
     pretty (MagicPackageNameInvalid name) =
         "[S-5682]"
         <> line
@@ -424,19 +429,29 @@ applyTemplate project template nonceParams dir templateText = do
             configParams = configTemplateParams config
             yearParam = M.singleton "year" currentYear
     files :: Map FilePath LB.ByteString <-
-        catch (execWriterT $ runConduit $
-               yield (T.encodeUtf8 templateText) .|
-               unpackTemplate receiveMem id
-              )
-              (\(e :: ProjectTemplateException) ->
-                   throwM (InvalidTemplate template (displayException e)))
+        catch
+            ( execWriterT $ runConduit $
+                  yield (T.encodeUtf8 templateText) .|
+                  unpackTemplate receiveMem id
+            )
+            ( \(e :: ProjectTemplateException) ->
+                  throwM $ PrettyException $
+                      TemplateInvalid template (string $ displayException e)
+            )
     when (M.null files) $
-         throwM (InvalidTemplate template "Template does not contain any files")
+        throwM $ PrettyException $
+            TemplateInvalid
+                template
+                (flow "the template does not contain any files.")
 
     let isPkgSpec f = ".cabal" `L.isSuffixOf` f || f == "package.yaml"
     unless (any isPkgSpec . M.keys $ files) $
-         throwM (InvalidTemplate template
-           "Template does not contain a .cabal or package.yaml file")
+         throwM $ PrettyException $
+             TemplateInvalid
+                 template
+                 ( flow "the template does not contain a Cabal or package.yaml \
+                       \file."
+                 )
 
     -- Apply Mustache templating to a single file within the project template.
     let applyMustache bytes
@@ -448,7 +463,15 @@ applyTemplate project template nonceParams dir templateText = do
           , Right text <- TLE.decodeUtf8' bytes = do
               let etemplateCompiled = Mustache.compileTemplate (T.unpack (templateName template)) $ TL.toStrict text
               templateCompiled <- case etemplateCompiled of
-                Left e -> throwM $ InvalidTemplate template (show e)
+                Left e -> throwM $ PrettyException $
+                    TemplateInvalid
+                        template
+                        (    flow "Stack encountered the following exception:"
+                          <> blankLine
+                             -- Text.Parsec.Error.ParseError is not an instance
+                             -- of Control.Exception.
+                          <> string (show e)
+                        )
                 Right t -> pure t
               let (substitutionErrors, applied) = Mustache.checkedSubstitute templateCompiled context
                   missingKeys = S.fromList $ concatMap onlyMissingKeys substitutionErrors

@@ -186,7 +186,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-3650] = FailedToLoadTemplate TemplateName FilePath
-        [S-9490] | InvalidTemplate TemplateName String
         ~~~
 
     -   `Stack.New.NewPrettyException`
@@ -194,6 +193,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-2135] = ProjectDirAlreadyExists String (Path Abs Dir)
         [S-1688] | FailedToDownloadTemplate Text String VerifiedDownloadException
+        [S-9490] | TemplateInvalid TemplateName StyleDoc
         [S-5682] | MagicPackageNameInvalid String
         [S-3113] | AttemptedOverwrites [Path Abs File]
         [S-8143] | FailedToDownloadTemplatesHelp HttpException
