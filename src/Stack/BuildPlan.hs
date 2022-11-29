@@ -417,9 +417,9 @@ selectBestSnapshot pkgDirs snaps = do
           | otherwise = (s2, l2, r2)
 
         reportResult BuildPlanCheckOk {} loc =
-            prettyInfo $
+            prettyNote $
                    fillSep
-                      [ flow "* Matches"
+                      [ flow "Matches"
                       , pretty $ PrettyRawSnapshotLocation loc
                       ]
                 <> line
@@ -427,7 +427,7 @@ selectBestSnapshot pkgDirs snaps = do
         reportResult r@BuildPlanCheckPartial {} loc =
             prettyWarn $
                    fillSep
-                     [ flow "* Partially matches"
+                     [ flow "Partially matches"
                      , pretty $ PrettyRawSnapshotLocation loc
                      ]
                  <> blankLine
@@ -436,7 +436,7 @@ selectBestSnapshot pkgDirs snaps = do
         reportResult r@BuildPlanCheckFail {} loc =
             prettyWarn $
                    fillSep
-                     [ flow "* Rejected"
+                     [ flow "Rejected"
                      , pretty $ PrettyRawSnapshotLocation loc
                      ]
                 <> blankLine
