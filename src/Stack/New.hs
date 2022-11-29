@@ -49,30 +49,17 @@ import           Text.ProjectTemplate
 --------------------------------------------------------------------------------
 -- Exceptions
 
--- | Type representing exceptions thrown by functions exported by the
--- "Stack.New" module.
-data NewException
-    = FailedToLoadTemplate !TemplateName !FilePath
-    deriving (Show, Typeable)
-
-instance Exception NewException where
-    displayException (FailedToLoadTemplate name path) = concat
-        [ "Error: [S-3650]\n"
-        , "Failed to load download template "
-        , T.unpack (templateName name)
-        , " from "
-        , path
-        ]
-
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.New" module.
 data NewPrettyException
     = ProjectDirAlreadyExists !String !(Path Abs Dir)
-    | FailedToDownloadTemplate !Text !String !VerifiedDownloadException
+    | DownloadTemplateFailed !Text !String !VerifiedDownloadException
+    | LoadTemplateFailed !TemplateName !FilePath
+    | ExtractTemplateFailed !TemplateName !FilePath !String
     | TemplateInvalid !TemplateName !StyleDoc
     | MagicPackageNameInvalid !String
     | AttemptedOverwrites !Text ![Path Abs File]
-    | FailedToDownloadTemplatesHelp !HttpException
+    | DownloadTemplatesHelpFailed !HttpException
     | TemplatesHelpEncodingInvalid !String !UnicodeException
     deriving (Show, Typeable)
 
@@ -87,7 +74,7 @@ instance Pretty NewPrettyException where
              , style Dir (pretty path)
              , flow "already exists."
              ]
-    pretty (FailedToDownloadTemplate name url err) =
+    pretty (DownloadTemplateFailed name url err) =
         "[S-1688]"
         <> line
         <> fillSep
@@ -134,6 +121,28 @@ instance Pretty NewPrettyException where
                             <> blankLine
                             <> fromString (displayException err)
                  in (msg', False)
+    pretty (LoadTemplateFailed name path) =
+        "[S-3650]"
+        <> line
+        <> fillSep
+             [ flow "Stack failed to load the downloaded template"
+             , style Current (fromString $ T.unpack $ templateName name)
+             , "from"
+             , style File (fromString path) <> "."
+             ]
+    pretty (ExtractTemplateFailed name path err) =
+        "[S-9582]"
+        <> line
+        <> fillSep
+             [ flow "Stack failed to extract the loaded template"
+             , style Current (fromString $ T.unpack $ templateName name)
+             , "at"
+             , style File (fromString path) <> "."
+             ]
+        <> blankLine
+        <> flow "While extracting, Stack encountered the following exception:"
+        <> blankLine
+        <> string err
     pretty (TemplateInvalid name why) =
         "[S-9490]"
         <> line
@@ -182,7 +191,7 @@ instance Pretty NewPrettyException where
              , style Shell "--force"
              , "flag to ignore this and overwrite those files."
              ]
-    pretty (FailedToDownloadTemplatesHelp err) =
+    pretty (DownloadTemplatesHelpFailed err) =
         "[S-8143]"
         <> line
         <> fillSep
@@ -306,7 +315,7 @@ loadTemplate name logIt = do
                 (do f <- loadLocalFile relFile eitherByteStringToText
                     logIt LocalTemp
                     pure f)
-                (\(e :: NewException) -> do
+                (\(e :: PrettyException) -> do
                       case relSettings rawParam of
                         Just settings -> do
                           let url = tplDownloadUrl settings
@@ -328,12 +337,12 @@ loadTemplate name logIt = do
             then do
                 bs <- readFileBinary (toFilePath path) --readFileUtf8 (toFilePath path)
                 case extract bs of
-                    Left err -> do
-                        logWarn $ "Template extraction error: " <> display (T.pack err)
-                        throwM (FailedToLoadTemplate name (toFilePath path))
+                    Left err -> throwM $ PrettyException $
+                        ExtractTemplateFailed name (toFilePath path) err
                     Right template ->
                         pure template
-            else throwM (FailedToLoadTemplate name (toFilePath path))
+            else throwM $ PrettyException $
+                LoadTemplateFailed name (toFilePath path)
     relSettings :: String -> Maybe TemplateDownloadSettings
     relSettings req = do
         rtp <- parseRepoPathWithService defaultRepoService (T.pack req)
@@ -366,7 +375,7 @@ loadTemplate name logIt = do
                         \most recent version though."
                  )
         else throwM $ PrettyException $
-                 FailedToDownloadTemplate (templateName name) url exception
+                 DownloadTemplateFailed (templateName name) url exception
 
 data TemplateDownloadSettings = TemplateDownloadSettings
   { tplDownloadUrl :: String
@@ -601,7 +610,7 @@ templatesHelp = do
   req <- liftM setGitHubHeaders (parseUrlThrow url)
   resp <- catch
     (httpLbs req)
-    (throwM . PrettyException. FailedToDownloadTemplatesHelp)
+    (throwM . PrettyException. DownloadTemplatesHelpFailed)
   case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
     Left err -> throwM $ PrettyException $ TemplatesHelpEncodingInvalid url err
     Right txt -> logInfo $ display txt
