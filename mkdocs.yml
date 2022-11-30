@@ -27,23 +27,63 @@ nav:
   - General guidance:
     - Install/upgrade: install_and_upgrade.md
     - User's guide (introductory): GUIDE.md
-    - User's guide (advanced): GUIDE_advanced.md
     - FAQ: faq.md
-  - Specific topics:
+    - Other resources: other_resources.md
+  - Reference (advanced):
+    - Introduction: GUIDE_advanced.md
+    - Environment variables: environment_variables.md
     - Configuration (project and global): yaml_configuration.md
+    - Global flags and options: global_flags.md
+    - bench command: build_command.md
+    - build command: build_command.md
+    - clean command: clean_command.md
+    - config commands: config_command.md
+    - dot command: dot_command.md
+    - docker commands: docker_command.md
+    - eval command: eval_command.md
+    - exec command: exec_command.md
+    - ghc command: ghc_command.md
+    - ghci command: ghci.md
+    - haddock command: build_command.md
+    - hoogle command: hoogle_command.md
+    - hpc command: hpc_command.md
+    - ide command: ide_command.md
+    - init command: init_command.md
+    - install command: build_command.md
+    - list command: list_command.md
+    - ls command: ls_command.md
+    - new command: new_command.md
+    - path command: path_command.md
+    - purge command: purge_command.md
+    - query command: query_command.md
+    - repl command: ghci.md
+    - run command: run_command.md
+    - runghc command: runghc_command.md
+    - runhaskell command: runghc_command.md
+    - script command: script_command.md
+    - sdist command: sdist_command.md
+    - setup command: setup_command.md
+    - templates command: templates_command.md
+    - test command: build_command.md
+    - uninstall command: uninstall_command.md
+    - unpack command: unpack_command.md
+    - update command: update_command.md
+    - upgrade command: upgrade_command.md
+    - upload command: upload_command.md
+  - Specific topics:
     - Snapshot and package location: pantry.md
     - Snapshot specification: custom_snapshot.md
     - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
-    - Build command: build_command.md
-    - Code coverage: coverage.md
-    - REPL environment: ghci.md
-    - Dependency visualization: dependency_visualization.md
+    - Script interpreter: scripts.md
     - Docker integration: docker_integration.md
     - Nix integration: nix_integration.md
     - Non-standard project initialization: nonstandard_project_init.md
+    - Debugging: debugging.md
+    - Editor integration: editor_integration.md
     - Stack and Visual Studio Code: Stack_and_VS_Code.md
     - Developing on Windows: developing_on_windows.md
     - Shell auto-completion: shell_autocompletion.md
+    - CI: CI.md
     - Travis CI: travis_ci.md
     - Azure CI: azure_ci.md
     - Lock files: lock_files.md
