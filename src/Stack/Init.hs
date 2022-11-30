@@ -33,7 +33,7 @@ import           Path.Find                       (findFiles)
 import           Path.IO                         hiding (findFiles)
 import qualified Paths_stack                     as Meta
 import qualified RIO.FilePath                    as FP
-import           RIO.List                        ((\\), intercalate, intersperse,
+import           RIO.List                        ((\\), intercalate,
                                                   isSuffixOf, isPrefixOf)
 import           RIO.List.Partial                (minimumBy)
 import           Stack.BuildPlan
@@ -139,7 +139,14 @@ initProject currDir initOpts mresolver = do
     dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     let find  = findCabalDirs (includeSubDirs initOpts)
         dirs' = if null dirs then [currDir] else dirs
-    logInfo "Looking for .cabal or package.yaml files to use to init the project."
+    prettyInfo $
+           fillSep
+             [ flow "Looking for Cabal or"
+             , style File "package.yaml"
+             , flow "files to use to initialise Stack's project-level YAML \
+                    \configuration file."
+             ]
+        <> line
     cabaldirs <- Set.toList . Set.unions <$> mapM find dirs'
     (bundle, dupPkgs)  <- cabalPackagesCheck cabaldirs
     let makeRelDir dir =
@@ -206,38 +213,63 @@ initProject currDir initOpts mresolver = do
 
         makeRel = fmap toFilePath . makeRelativeToCurrentDir
 
-        ind t = T.unlines $ fmap ("    " <>) (T.lines t)
-
-    logInfo $ "Initialising configuration using resolver: " <> display snapshotLoc
-    logInfo $ "Total number of user packages considered: "
-               <> display (Map.size bundle + length dupPkgs)
+    prettyInfo $
+        fillSep
+          [ flow "Initialising Stack's project-level YAML configuration file \
+                 \using snapshot"
+          , pretty (PrettyRawSnapshotLocation snapshotLoc) <> "."
+          ]
+    prettyInfo $
+        let n = Map.size bundle + length dupPkgs
+        in  fillSep
+              [ "Considered"
+              , fromString $ show n
+              , "user"
+              , if n == 1 then "package." else "packages."
+              ]
 
     when (dupPkgs /= []) $ do
-        logWarn $ "Warning! Ignoring "
-                   <> displayShow (length dupPkgs)
-                   <> " duplicate packages:"
         rels <- mapM makeRel dupPkgs
-        logWarn $ display $ ind $ showItems rels
+        prettyWarn $
+               fillSep
+                 [ flow "Ignoring these"
+                 , fromString $ show (length dupPkgs)
+                 , flow "duplicate packages:"
+                 ]
+            <> line
+            <> bulletedList (map (style File . fromString) rels)
 
     when (Map.size ignored > 0) $ do
-        logWarn $ "Warning! Ignoring "
-                   <> displayShow (Map.size ignored)
-                   <> " packages due to dependency conflicts:"
         rels <- mapM makeRel (Map.elems (fmap fst ignored))
-        logWarn $ display $ ind $ showItems rels
+        prettyWarn $
+               fillSep
+                 [ flow "Ignoring these"
+                 , fromString $ show (Map.size ignored)
+                 , flow "packages due to dependency conflicts:"
+                 ]
+            <> line
+            <> bulletedList (map (style File . fromString) rels)
 
     when (Map.size extraDeps > 0) $ do
-        logWarn $ "Warning! " <> displayShow (Map.size extraDeps)
-                   <> " external dependencies were added."
-    logInfo $
-        (if exists then "Overwriting existing configuration file: "
-         else "Writing configuration to file: ")
-        <> fromString reldest
+        prettyWarn $
+            fillSep
+              [ fromString $ show (Map.size extraDeps)
+              , flow "external dependencies were added."
+              ]
+    prettyInfo $
+        fillSep
+          [ flow $ if exists
+                then "Overwriting existing configuration file"
+                else "Writing configuration to"
+          , style File (fromString reldest) <> "."
+          ]
     writeBinaryFileAtomic dest
            $ renderStackYaml p
                (Map.elems $ fmap (makeRelDir . parent . fst) ignored)
                (map (makeRelDir . parent) dupPkgs)
-    logInfo "All done."
+    prettyInfo $
+        flow "Stack's project-level YAML configuration file has been \
+             \initialised."
 
 -- | Render a stack.yaml file with comments, see:
 -- https://github.com/commercialhaskell/stack/issues/226
@@ -444,7 +476,11 @@ getWorkingResolverPlan
        --   , Extra dependencies
        --   , Src packages actually considered)
 getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
-    logInfo $ "Selected resolver: " <> display snapLoc
+    prettyInfo $
+        fillSep
+          [ flow "Selected the snapshot"
+          , pretty (PrettyRawSnapshotLocation snapLoc) <> "."
+          ]
     go pkgDirs0
     where
         go pkgDirs = do
@@ -454,27 +490,39 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
                 Right (f, edeps)-> pure (snapLoc, f, edeps, pkgDirs)
                 Left ignored
                     | Map.null available -> do
-                        logWarn $ "*** Could not find a working plan for any of " <>
-                                "the user packages.\nProceeding to create a " <>
-                                "config anyway."
+                        prettyWarn $
+                            flow "Could not find a working plan for any of the \
+                                 \user packages. Proceeding to create a YAML \
+                                 \configuration file anyway."
                         pure (snapLoc, Map.empty, Map.empty, Map.empty)
                     | otherwise -> do
                         when (Map.size available == Map.size pkgDirs) $
                             throwM NoPackagesToIgnoreBug
 
-                        if length ignored > 1 then do
-                          logWarn "*** Ignoring packages:"
-                          logWarn $ display $ ind $ showItems $ map packageNameString ignored
-                        else
-                          logWarn $ "*** Ignoring package: "
-                                 <> fromString
-                                      (case ignored of
-                                        [] -> throwM NoPackagesToIgnoreBug
-                                        x:_ -> packageNameString x)
-
+                        if length ignored > 1
+                          then
+                            prettyWarn
+                              (    flow "Ignoring the following packages:"
+                                <> line
+                                <> bulletedList
+                                     ( map
+                                           (fromString . packageNameString)
+                                           ignored
+                                     )
+                              )
+                          else
+                            prettyWarn
+                              ( fillSep
+                                  [ flow "Ignoring package:"
+                                  , fromString
+                                        ( case ignored of
+                                              [] -> throwM NoPackagesToIgnoreBug
+                                              x:_ -> packageNameString x
+                                        )
+                                  ]
+                              )
                         go available
                     where
-                      ind t   = T.unlines $ fmap ("    " <>) (T.lines t)
                       isAvailable k _ = k `notElem` ignored
                       available       = Map.filterWithKey isAvailable pkgDirs
 
@@ -573,12 +621,21 @@ cabalPackagesCheck
           ( Map PackageName (Path Abs File, C.GenericPackageDescription)
           , [Path Abs File])
 cabalPackagesCheck cabaldirs = do
-    when (null cabaldirs) $ do
-      logWarn "We didn't find any local package directories"
-      logWarn "You may want to create a package with \"stack new\" instead"
-      logWarn "Create an empty project for now"
-      logWarn "If this isn't what you want, please delete the generated \"stack.yaml\""
-
+    when (null cabaldirs) $
+      prettyWarn $
+             fillSep
+               [ flow "Stack did not find any local package directories. You may \
+                      \want to create a package with"
+               , style Shell (flow "stack new")
+               , flow "instead."
+               ]
+          <> blankLine
+          <> fillSep
+               [ flow "Stack will create an empty project. If this is not what \
+                      \you want, please delete the generated"
+               , style File "stack.yaml"
+               , "file."
+               ]
     relpaths <- mapM prettyPath cabaldirs
     unless (null relpaths) $
         prettyInfo $
@@ -617,19 +674,22 @@ cabalPackagesCheck cabaldirs = do
 
     when (dupIgnored /= []) $ do
         dups <- mapM (mapM (prettyPath. fst)) (dupGroups packages)
-        logWarn $
-            "Following packages have duplicate package names:\n" <>
-            mconcat (intersperse "\n" (map formatGroup dups))
-        logWarn $
-            "Packages with duplicate names will be ignored.\n" <>
-            "Packages in upper level directories will be preferred.\n"
+        prettyWarn $
+               flow "The following packages have duplicate package names:"
+            <> line
+            <> foldMap
+                   ( \dup ->    bulletedList (map fromString dup)
+                             <> line
+                   )
+                   dups
+            <> line
+            <> flow "Packages with duplicate names will be ignored. Packages \
+                    \in upper level directories will be preferred."
+            <> line
 
     pure (Map.fromList
             $ map (\(file, gpd) -> (gpdPackageName gpd,(file, gpd))) unique
            , map fst dupIgnored)
-
-formatGroup :: [String] -> Utf8Builder
-formatGroup = foldMap (\path -> "- " <> fromString path <> "\n")
 
 prettyPath ::
        (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))

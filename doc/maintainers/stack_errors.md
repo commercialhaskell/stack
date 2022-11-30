@@ -182,18 +182,18 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3421] = ParseFailure [Value]
         ~~~
 
-    -   `Stack.New.NewException`
+    -   `Stack.New.NewPrettyException`
 
         ~~~haskell
-        [S-3650] = FailedToLoadTemplate TemplateName FilePath
-        [S-1688] | FailedToDownloadTemplate TemplateName VerifiedDownloadException
-        [S-2135] | AlreadyExists (Path Abs Dir)
-        [S-5515] | MissingParameters PackageName TemplateName (Set String) (Path Abs File)
-        [S-9490] | InvalidTemplate TemplateName String
+        [S-2135] = ProjectDirAlreadyExists String (Path Abs Dir)
+        [S-1688] | DownloadTemplateFailed Text String VerifiedDownloadException
+        [S-3650] | LoadTemplateFailed TemplateName FilePath
+        [S-9582] | ExtractTemplateFailed TemplateName FilePath String
+        [S-9490] | TemplateInvalid TemplateName StyleDoc
+        [S-5682] | MagicPackageNameInvalid String
         [S-3113] | AttemptedOverwrites [Path Abs File]
-        [S-8143] | FailedToDownloadTemplatesHelp HttpException
-        [S-6670] | BadTemplatesHelpEncoding String UnicodeException
-        [S-5682] | Can'tUseWiredInName PackageName
+        [S-8143] | DownloadTemplatesHelpFailed HttpException
+        [S-6670] | TemplatesHelpEncodingInvalid String UnicodeException
         ~~~
 
     -   `Stack.Nix.NixException`
