@@ -568,10 +568,13 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
                              \omission from the stack.yaml packages list?)"
                     | otherwise -> ""
                 Just (laVer, _)
-                    | Just laVer == mversion -> softline <>
+                    | Just laVer == mversion ->
                         flow "(latest matching version is specified)"
-                    | otherwise -> softline <>
-                        flow "(latest matching version is" <+> style Good (fromString $ versionString laVer) <> ")"
+                    | otherwise ->
+                        fillSep
+                          [ flow "(latest matching version is"
+                          , style Good (fromString $ versionString laVer) <> ")"
+                          ]
 
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'

@@ -431,7 +431,7 @@ selectBestSnapshot pkgDirs snaps = do
                      , pretty $ PrettyRawSnapshotLocation loc
                      ]
                  <> blankLine
-                 <> string (show r)
+                 <> indent 4 (string (show r))
 
         reportResult r@BuildPlanCheckFail {} loc =
             prettyWarn $
@@ -440,7 +440,7 @@ selectBestSnapshot pkgDirs snaps = do
                      , pretty $ PrettyRawSnapshotLocation loc
                      ]
                 <> blankLine
-                <> string (show r)
+                <> indent 4 (string (show r))
 
 showItems :: [String] -> Text
 showItems items = T.concat (map formatItem items)

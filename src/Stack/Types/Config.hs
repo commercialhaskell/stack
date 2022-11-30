@@ -254,9 +254,6 @@ data ConfigException
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
-  | NoMatchingSnapshot (NonEmpty SnapName)
-  | ResolverMismatch !RawSnapshotLocation String
-  | ResolverPartial !RawSnapshotLocation String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   | BadStackRoot (Path Abs Dir)
@@ -315,31 +312,6 @@ instance Exception ConfigException where
         , ").\n"
         , "You can upgrade Stack by running:\n\n"
         , "stack upgrade"
-        ]
-    displayException (NoMatchingSnapshot names) = concat
-        [ "Error: [S-1833]\n"
-        , "None of the following snapshots provides a compiler matching "
-        , "your package(s):\n"
-        , unlines $ map (\name -> "    - " <> show name)
-                        (NonEmpty.toList names)
-        , resolveOptions
-        ]
-    displayException (ResolverMismatch resolver errDesc) = concat
-        [ "Error: [S-6395]\n"
-        , "Resolver '"
-        , T.unpack $ utf8BuilderToText $ display resolver
-        , "' does not have a matching compiler to build some or all of your "
-        , "package(s).\n"
-        , errDesc
-        , resolveOptions
-        ]
-    displayException (ResolverPartial resolver errDesc) = concat
-        [ "Error: [S-2422]\n"
-        , "Resolver '"
-        , T.unpack $ utf8BuilderToText $ display resolver
-        , "' does not have all the packages to match your requirements.\n"
-        , unlines $ fmap ("    " <>) (lines errDesc)
-        , resolveOptions
         ]
     displayException (NoSuchDirectory dir) = concat
         [ "Error: [S-8773]\n"
@@ -423,28 +395,69 @@ instance Exception ConfigException where
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Config" module.
 data ConfigPrettyException
-    = ParseConfigFileException (Path Abs File) ParseException
+    = ParseConfigFileException !(Path Abs File) !ParseException
+    | NoMatchingSnapshot !(NonEmpty SnapName)
+    | ResolverMismatch !RawSnapshotLocation String
+    | ResolverPartial !RawSnapshotLocation !String
     deriving (Show, Typeable)
 
 instance Pretty ConfigPrettyException where
     pretty (ParseConfigFileException configFile exception) =
         "[S-6602]"
         <> line
-        <>     flow "Stack could not load and parse"
-           <+> style File (pretty configFile)
-           <+> flow "as a YAML configuraton file."
+        <> fillSep
+             [ flow "Stack could not load and parse"
+             , style File (pretty configFile)
+             , flow "as a YAML configuraton file."
+             ]
         <> blankLine
         <> flow "While loading and parsing, Stack encountered the following \
                 \exception:"
         <> blankLine
         <> string (Yaml.prettyPrintParseException exception)
         <> blankLine
-        <>     flow "For help about the content of Stack's YAML configuration \
+        <> fillSep
+             [ flow "For help about the content of Stack's YAML configuration \
                     \files, see (for the most recent release of Stack)"
-           <+> style
-                 Url
-                 "http://docs.haskellstack.org/en/stable/yaml_configuration/"
-        <> "."
+             ,    style
+                    Url
+                    "http://docs.haskellstack.org/en/stable/yaml_configuration/"
+               <> "."
+             ]
+    pretty (NoMatchingSnapshot names) =
+        "[S-1833]"
+        <> line
+        <> flow "None of the following snapshots provides a compiler matching \
+                \your package(s):"
+        <> line
+        <> bulletedList (map (fromString . show) (NonEmpty.toList names))
+        <> blankLine
+        <> resolveOptions
+    pretty (ResolverMismatch resolver errDesc) =
+        "[S-6395]"
+        <> line
+        <> fillSep
+             [ "Snapshot"
+             , style Url (pretty $ PrettyRawSnapshotLocation resolver)
+             , flow "does not have a matching compiler to build some or all of \
+                    \your package(s)."
+             ]
+        <> blankLine
+        <> indent 4 (string errDesc)
+        <> line
+        <> resolveOptions
+    pretty (ResolverPartial resolver errDesc) =
+        "[S-2422]"
+        <> line
+        <> fillSep
+             [ "Snapshot"
+             , style Url (pretty $ PrettyRawSnapshotLocation resolver)
+             , flow "does not have all the packages to match your requirements."
+             ]
+        <> blankLine
+        <> indent 4 (string errDesc)
+        <> line
+        <> resolveOptions
 
 instance Exception ConfigPrettyException
 
@@ -1427,12 +1440,22 @@ packageIndicesWarning :: String
 packageIndicesWarning =
     "The 'package-indices' key is deprecated in favour of 'package-index'."
 
-resolveOptions :: String
+resolveOptions :: StyleDoc
 resolveOptions =
-  unlines [ "\nThis may be resolved by:"
-          , "    - Using '--omit-packages' to exclude mismatching package(s)."
-          , "    - Using '--resolver' to specify a matching snapshot/resolver"
-          ]
+     flow "This may be resolved by:"
+  <> line
+  <> bulletedList
+       [ fillSep
+           [ "Using"
+           , style Shell "--omit-packages"
+           , "to exclude mismatching package(s)."
+           ]
+       , fillSep
+           [ "Using"
+           , style Shell "--resolver"
+           , "to specify a matching snapshot/resolver."
+           ]
+       ]
 
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
