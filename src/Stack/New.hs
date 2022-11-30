@@ -1,9 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE ConstraintKinds     #-}
-{-# LANGUAGE DeriveDataTypeable  #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE ConstraintKinds           #-}
+{-# LANGUAGE DeriveDataTypeable        #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts          #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE StandaloneDeriving        #-}
 
 -- | Create new a new project directory populated with a basic working
 -- project.
@@ -59,14 +61,16 @@ import           Text.ProjectTemplate
 data NewPrettyException
     = ProjectDirAlreadyExists !String !(Path Abs Dir)
     | DownloadTemplateFailed !Text !String !VerifiedDownloadException
-    | LoadTemplateFailed !TemplateName !FilePath
-    | ExtractTemplateFailed !TemplateName !FilePath !String
+    | forall b. LoadTemplateFailed !TemplateName !(Path b File)
+    | forall b. ExtractTemplateFailed !TemplateName !(Path b File) !String
     | TemplateInvalid !TemplateName !StyleDoc
     | MagicPackageNameInvalid !String
     | AttemptedOverwrites !Text ![Path Abs File]
     | DownloadTemplatesHelpFailed !HttpException
     | TemplatesHelpEncodingInvalid !String !UnicodeException
-    deriving (Show, Typeable)
+    deriving Typeable
+
+deriving instance Show NewPrettyException
 
 instance Pretty NewPrettyException where
     pretty (ProjectDirAlreadyExists name path) =
@@ -133,7 +137,7 @@ instance Pretty NewPrettyException where
              [ flow "Stack failed to load the downloaded template"
              , style Current (fromString $ T.unpack $ templateName name)
              , "from"
-             , style File (fromString path) <> "."
+             , style File (pretty path) <> "."
              ]
     pretty (ExtractTemplateFailed name path err) =
         "[S-9582]"
@@ -142,7 +146,7 @@ instance Pretty NewPrettyException where
              [ flow "Stack failed to extract the loaded template"
              , style Current (fromString $ T.unpack $ templateName name)
              , "at"
-             , style File (fromString path) <> "."
+             , style File (pretty path) <> "."
              ]
         <> blankLine
         <> flow "While extracting, Stack encountered the following exception:"
@@ -346,11 +350,11 @@ loadTemplate name logIt = do
                 bs <- readFileBinary (toFilePath path) --readFileUtf8 (toFilePath path)
                 case extract bs of
                     Left err -> throwM $ PrettyException $
-                        ExtractTemplateFailed name (toFilePath path) err
+                        ExtractTemplateFailed name path err
                     Right template ->
                         pure template
             else throwM $ PrettyException $
-                LoadTemplateFailed name (toFilePath path)
+                LoadTemplateFailed name path
     relSettings :: String -> Maybe TemplateDownloadSettings
     relSettings req = do
         rtp <- parseRepoPathWithService defaultRepoService (T.pack req)
