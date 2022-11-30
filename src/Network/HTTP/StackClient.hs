@@ -30,7 +30,7 @@ module Network.HTTP.StackClient
   , applyDigestAuth
   , displayDigestAuthException
   , Request
-  , RequestBody(RequestBodyBS, RequestBodyLBS)
+  , RequestBody (RequestBodyBS, RequestBodyLBS)
   , Response (..)
   , HttpException (..)
   , HttpExceptionContent (..)
@@ -72,27 +72,30 @@ import qualified Data.Text as T
 import           Data.Time.Clock
                    ( NominalDiffTime, diffUTCTime, getCurrentTime )
 import           Network.HTTP.Client
-                   ( HttpExceptionContent (..), Request, RequestBody (..), Response (..), parseRequest, getUri
-                   , path, checkResponse, parseUrlThrow
+                   ( HttpException (..), HttpExceptionContent (..), Request
+                   , RequestBody (..), Response (..), checkResponse, getUri
+                   , parseRequest, parseUrlThrow, path
                    )
-import           Network.HTTP.Simple
-                   ( setRequestCheckStatus, setRequestMethod, setRequestBody
-                   , setRequestHeader, addRequestHeader, HttpException (..)
-                   , getResponseBody, getResponseStatusCode, getResponseHeaders
-                   )
-import           Network.HTTP.Types
-                   ( hAccept, hContentLength, hContentMD5, methodPut, notFound404 )
-import           Network.HTTP.Conduit ( requestHeaders )
+import           Network.HTTP.Client.MultipartFormData
+                   ( formDataBody, partBS, partFileRequestBody, partLBS )
 import           Network.HTTP.Client.TLS
-                   ( getGlobalManager, applyDigestAuth
-                   , displayDigestAuthException
+                   ( applyDigestAuth, displayDigestAuthException
+                   , getGlobalManager
                    )
+import           Network.HTTP.Conduit ( requestHeaders )
 import           Network.HTTP.Download
                    hiding ( download, redownload, verifiedDownload )
 import qualified Network.HTTP.Download as Download
+import           Network.HTTP.Simple
+                   ( addRequestHeader, getResponseBody, getResponseHeaders
+                   , getResponseStatusCode, setRequestBody
+                   , setRequestCheckStatus, setRequestHeader, setRequestMethod
+                   )
 import qualified Network.HTTP.Simple
-import           Network.HTTP.Client.MultipartFormData
-                   ( formDataBody, partFileRequestBody, partBS, partLBS )
+import           Network.HTTP.Types
+                   ( hAccept, hContentLength, hContentMD5, methodPut
+                   , notFound404
+                   )
 import           Path
 import           Prelude ( until, (!!) )
 import           RIO

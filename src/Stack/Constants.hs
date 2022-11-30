@@ -211,18 +211,18 @@ inContainerEnvVar = stackProgNameUpper ++ "_IN_CONTAINER"
 inNixShellEnvVar :: String
 inNixShellEnvVar = map toUpper stackProgName ++ "_IN_NIX_SHELL"
 
--- | The comment to 'see
--- https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey'
+-- | The comment to \'see
+-- https://downloads.haskell.org/~ghc/7.10.1/docs/html/libraries/ghc/src/Module.html#integerPackageKey\'
 -- appears to be out of date.
 --
--- See 'Note [About units]' and 'Wired-in units' at
+-- See \'Note [About units]\' and \'Wired-in units\' at
 -- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Unit.hs.
 --
--- The 'wired-in packages' appear to have been replaced by those that have (e.g)
+-- The \'wired-in packages\' appear to have been replaced by those that have (e.g)
 --
 -- > ghc-options: -this-unit-id ghc-prim
 --
--- in their Cabal file because they are 'magic'.
+-- in their Cabal file because they are \'magic\'.
 wiredInPackages :: Set PackageName
 wiredInPackages = case mparsed of
   Just parsed -> Set.fromList parsed
@@ -239,7 +239,7 @@ wiredInPackages = case mparsed of
     , "base"
       -- A magic package
     , "rts"
-      -- Said to be not a 'real' package
+      -- Said to be not a \'real\' package
     , "template-haskell"
       -- A magic package
     , "dph-seq"

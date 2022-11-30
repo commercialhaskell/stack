@@ -15,33 +15,38 @@ module Stack.New
     , templatesHelp
     ) where
 
-import           Stack.Prelude
 import           Control.Monad.Trans.Writer.Strict
 import           Data.Aeson as A
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString.Base64 as B64
-import           Data.ByteString.Builder (lazyByteString)
+import           Data.ByteString.Builder ( lazyByteString )
 import qualified Data.ByteString.Lazy as LB
 import           Data.Conduit
 import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Encoding as T
+import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar
 import           Data.Time.Clock
-import           Network.HTTP.StackClient (VerifiedDownloadException (..), Response (..), HttpException (..), HttpExceptionContent (..),
-                                           getResponseBody, httpLbs, mkDownloadRequest, notFound404, parseRequest, parseUrlThrow,
-                                           setForceDownload, setGitHubHeaders, setRequestCheckStatus, verifiedDownloadWithProgress)
+import           Network.HTTP.StackClient
+                   ( HttpException (..), HttpExceptionContent (..)
+                   , Response (..), VerifiedDownloadException (..)
+                   , getResponseBody, httpLbs, mkDownloadRequest, notFound404
+                   , parseRequest, parseUrlThrow, setForceDownload
+                   , setGitHubHeaders, setRequestCheckStatus
+                   , verifiedDownloadWithProgress
+                   )
 import           Path
 import           Path.IO
+import           RIO.Process
 import           Stack.Constants
 import           Stack.Constants.Config
+import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.TemplateName
-import           RIO.Process
 import qualified Text.Mustache as Mustache
 import qualified Text.Mustache.Render as Mustache
 import           Text.ProjectTemplate
@@ -306,7 +311,8 @@ loadTemplate
 loadTemplate name logIt = do
     templateDir <- view $ configL.to templatesDir
     case templatePath name of
-        AbsPath absFile -> logIt LocalTemp >> loadLocalFile absFile eitherByteStringToText
+        AbsPath absFile ->
+            logIt LocalTemp >> loadLocalFile absFile eitherByteStringToText
         UrlPath s -> do
             let settings = asIsFromUrl s
             downloadFromUrl settings templateDir
@@ -328,7 +334,9 @@ loadTemplate name logIt = do
             downloadFromUrl settings templateDir
 
   where
-    loadLocalFile :: Path b File -> (ByteString -> Either String Text) -> RIO env Text
+    loadLocalFile :: Path b File
+                  -> (ByteString -> Either String Text)
+                  -> RIO env Text
     loadLocalFile path extract = do
         logDebug ("Opening local template: \"" <> fromString (toFilePath path)
                                                 <> "\"")
@@ -352,10 +360,15 @@ loadTemplate name logIt = do
         let url = tplDownloadUrl settings
             rel = fromMaybe backupUrlRelPath (parseRelFile url)
         downloadTemplate url (tplExtract settings) (templateDir </> rel)
-    downloadTemplate :: String -> (ByteString -> Either String Text) -> Path Abs File -> RIO env Text
+    downloadTemplate :: String
+                     -> (ByteString
+                     -> Either String Text)
+                     -> Path Abs File
+                     -> RIO env Text
     downloadTemplate url extract path = do
         req <- parseRequest url
-        let dReq = setForceDownload True $ mkDownloadRequest (setRequestCheckStatus req)
+        let dReq = setForceDownload True $
+                       mkDownloadRequest (setRequestCheckStatus req)
         logIt RemoteTemp
         catch
           (void $ do
@@ -364,7 +377,10 @@ loadTemplate name logIt = do
           (useCachedVersionOrThrow url path)
 
         loadLocalFile path extract
-    useCachedVersionOrThrow :: String -> Path Abs File -> VerifiedDownloadException -> RIO env ()
+    useCachedVersionOrThrow :: String
+                            -> Path Abs File
+                            -> VerifiedDownloadException
+                            -> RIO env ()
     useCachedVersionOrThrow url path exception = do
       exists <- doesFileExist path
 
@@ -396,7 +412,12 @@ settingsFromRepoTemplatePath :: RepoTemplatePath -> TemplateDownloadSettings
 settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) =
     -- T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
     TemplateDownloadSettings
-    { tplDownloadUrl = concat ["https://api.github.com/repos/", T.unpack user, "/stack-templates/contents/", T.unpack name]
+    { tplDownloadUrl = concat
+          [ "https://api.github.com/repos/"
+          , T.unpack user
+          , "/stack-templates/contents/"
+          , T.unpack name
+          ]
     , tplExtract = \bs -> do
         decodedJson <- eitherDecode (LB.fromStrict bs)
         case decodedJson of
@@ -409,9 +430,21 @@ settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) =
     }
 
 settingsFromRepoTemplatePath (RepoTemplatePath GitLab user name) =
-    asIsFromUrl $ concat ["https://gitlab.com",                "/", T.unpack user, "/stack-templates/raw/master/", T.unpack name]
+    asIsFromUrl $ concat
+        [ "https://gitlab.com"
+        , "/"
+        , T.unpack user
+        , "/stack-templates/raw/master/"
+        , T.unpack name
+        ]
 settingsFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
-    asIsFromUrl $ concat ["https://bitbucket.org",             "/", T.unpack user, "/stack-templates/raw/master/", T.unpack name]
+    asIsFromUrl $ concat
+        [ "https://bitbucket.org"
+        , "/"
+        , T.unpack user
+        , "/stack-templates/raw/master/"
+        , T.unpack name
+        ]
 
 -- | Apply and unpack a template into a directory.
 applyTemplate
@@ -431,7 +464,8 @@ applyTemplate project template nonceParams dir templateText = do
     let context = M.unions [nonceParams, nameParams, configParams, yearParam]
           where
             nameAsVarId = T.replace "-" "_" $ T.pack $ packageNameString project
-            nameAsModule = T.filter (/= ' ') $ T.toTitle $ T.replace "-" " " $ T.pack $ packageNameString project
+            nameAsModule = T.filter (/= ' ') $ T.toTitle $ T.replace "-" " " $
+                               T.pack $ packageNameString project
             nameParams = M.fromList [ ("name", T.pack $ packageNameString project)
                                     , ("name-as-varid", nameAsVarId)
                                     , ("name-as-module", nameAsModule) ]
