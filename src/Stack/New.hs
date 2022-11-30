@@ -355,15 +355,18 @@ loadTemplate name logIt = do
                         pure template
             else throwM $ PrettyException $
                 LoadTemplateFailed name path
+
     relSettings :: String -> Maybe TemplateDownloadSettings
     relSettings req = do
         rtp <- parseRepoPathWithService defaultRepoService (T.pack req)
         pure (settingsFromRepoTemplatePath rtp)
+
     downloadFromUrl :: TemplateDownloadSettings -> Path Abs Dir -> RIO env Text
     downloadFromUrl settings templateDir = do
         let url = tplDownloadUrl settings
             rel = fromMaybe backupUrlRelPath (parseRelFile url)
         downloadTemplate url (tplExtract settings) (templateDir </> rel)
+
     downloadTemplate :: String
                      -> (ByteString
                      -> Either String Text)
@@ -375,12 +378,15 @@ loadTemplate name logIt = do
                        mkDownloadRequest (setRequestCheckStatus req)
         logIt RemoteTemp
         catch
-          (void $ do
-            verifiedDownloadWithProgress dReq path (T.pack $ toFilePath path) Nothing
+          ( do let label = T.pack $ toFilePath path
+               res <- verifiedDownloadWithProgress dReq path label Nothing
+               if res
+                 then logStickyDone ("Downloaded " <> display label <> ".")
+                 else logStickyDone "Already downloaded."
           )
           (useCachedVersionOrThrow url path)
-
         loadLocalFile path extract
+
     useCachedVersionOrThrow :: String
                             -> Path Abs File
                             -> VerifiedDownloadException
@@ -636,10 +642,16 @@ runTemplateInits dir = do
     config <- view configL
     case configScmInit config of
         Nothing -> pure ()
-        Just Git ->
-            withWorkingDir (toFilePath dir) $
-            catchAny (proc "git" ["init"] runProcess_)
-                  (\_ -> logInfo "git init failed to run, ignoring ...")
+        Just Git -> withWorkingDir (toFilePath dir) $
+            catchAny
+                (proc "git" ["init"] runProcess_)
+                ( \_ -> prettyWarn $
+                            fillSep
+                              [ flow "Stack failed to run a"
+                              , style Shell (flow "git init")
+                              , flow "command. Ignoring..."
+                              ]
+                )
 
 -- | Display help for the templates command.
 templatesHelp :: HasLogFunc env => RIO env ()

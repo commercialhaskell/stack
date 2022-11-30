@@ -188,7 +188,8 @@ verifiedDownloadWithProgress
   -> Maybe Int
   -> RIO env Bool
 verifiedDownloadWithProgress req destpath lbl msize =
-  verifiedDownload req destpath (chattyDownloadProgress lbl msize)
+    verifiedDownload req destpath (chattyDownloadProgress lbl msize)
+
 
 chattyDownloadProgress
   :: ( HasLogFunc env
