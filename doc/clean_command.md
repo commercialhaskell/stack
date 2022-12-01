@@ -2,8 +2,20 @@
 
 # The `stack clean` command
 
+Either
+
 ~~~text
-stack clean [[PACKAGE] | --full]
+stack clean [PACKAGE]
 ~~~
 
-This command is described in Stack's introductory [User's Guide](GUIDE.md).
+or
+
+~~~text
+stack clean --full
+~~~
+
+`stack clean` deletes build artefacts for one or more project packages specified
+as arguments. If no project packages are specified, all project packages are
+cleaned.
+
+`stack clean --full` deletes the project's Stack working directory.
