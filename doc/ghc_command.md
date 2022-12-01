@@ -3,8 +3,9 @@
 # The `stack ghc` command
 
 ~~~text
-stack hoogle [-- ARGUMENT(S) (e.g. 'stack hoogle -- server --local')]
-             [--[no-]setup] [--rebuild] [--server]
+stack ghc [-- ARGUMENT(S) (e.g. stack runghc -- X.hs -o x)]
+          [--[no-]ghc-package-path] [--[no-]stack-exe]
+          [--package PACKAGE] [--rts-options RTSFLAG] [--cwd DIR]
 ~~~
 
-This command is described in Stack's introductory [User's Guide](GUIDE.md).
+`stack ghc` has the same effect as [`stack exec ghc`](exec_command.md).
