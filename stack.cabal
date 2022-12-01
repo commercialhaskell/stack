@@ -47,6 +47,7 @@ extra-source-files:
     doc/developing_on_windows.md
     doc/docker_command.md
     doc/docker_integration.md
+    doc/dot_command.md
     doc/editor_integration.md
     doc/environment_variables.md
     doc/eval_command.md
@@ -59,6 +60,7 @@ extra-source-files:
     doc/GUIDE.md
     doc/GUIDE_advanced.md
     doc/hoogle_command.md
+    doc/hpc_command.md
     doc/ide_command.md
     doc/init_command.md
     doc/install_and_upgrade.md
