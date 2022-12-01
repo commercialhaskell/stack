@@ -18,21 +18,33 @@ the available commands.
 
 ## The `stack ls dependencies` command
 
+Either
+
+~~~text
+stack ls dependencies COMMAND
+
+Available commands:
+  cabal                    Print dependencies as exact Cabal constraints
+  json                     Print dependencies as JSON
+  text                     Print dependencies as text (default)
+  tree                     Print dependencies as tree
+~~~
+
+or
+
+~~~text
+stack ls dependencies [--separator SEP] [--[no-]license] [--[no-]external]
+                      [--[no-]include-base] [--depth DEPTH] [--prune PACKAGES]
+                      [TARGET] [--flag PACKAGE:[-]FLAG] [--test] [--bench]
+                      [--global-hints]
+~~~
+
 `stack ls dependencies` lists all of the packages and versions used for a
 project. All local packages are considered by default, but a target can be
 specified as an argument. For further information, see the
 [target syntax](build_command.md#target-syntax) documentation.
 
 Subcommands specify the format of the output, as follows:
-
-* `text` (the default) lists the packages, each on a separate line. For example
-  (extract):
-
-    ~~~text
-    Cabal 3.6.3.0
-    Cabal-syntax 3.6.0.0
-    Glob 0.10.2
-    ~~~
 
 * `cabal` lists the packages in the format of exact Cabal constraints.
   For example (extract):
@@ -42,20 +54,6 @@ Subcommands specify the format of the output, as follows:
     , Cabal ==3.6.3.0
     , Cabal-syntax ==3.6.0.0
     , Glob ==0.10.2
-    ~~~
-
-* `tree` lists dependencies in the format of a tree. For example (extract):
-
-    ~~~text
-    Packages
-    └─┬ stack 2.10.0
-      ├─┬ Cabal 3.6.3.0
-      │ ├─┬ Win32 2.12.0.1
-      │ │ ├─┬ base 4.16.3.0
-      │ │ │ ├─┬ ghc-bignum 1.2
-      │ │ │ │ └─┬ ghc-prim 0.8.0
-      │ │ │ │   └── rts 1.0.2
-      │ │ │ ├─┬ ghc-prim 0.8.0
     ~~~
 
 * `json` lists dependencies in JSON format (an array of objects). For example
@@ -77,6 +75,29 @@ Subcommands specify the format of the output, as follows:
     dependencies:
     - base
     - bytestring
+    ~~~
+
+* `text` (the default) lists the packages, each on a separate line. For example
+  (extract):
+
+    ~~~text
+    Cabal 3.6.3.0
+    Cabal-syntax 3.6.0.0
+    Glob 0.10.2
+    ~~~
+
+* `tree` lists dependencies in the format of a tree. For example (extract):
+
+    ~~~text
+    Packages
+    └─┬ stack 2.10.0
+      ├─┬ Cabal 3.6.3.0
+      │ ├─┬ Win32 2.12.0.1
+      │ │ ├─┬ base 4.16.3.0
+      │ │ │ ├─┬ ghc-bignum 1.2
+      │ │ │ │ └─┬ ghc-prim 0.8.0
+      │ │ │ │   └── rts 1.0.2
+      │ │ │ ├─┬ ghc-prim 0.8.0
     ~~~
 
 The `--separator` option specifies the separator between the package name and
@@ -105,11 +126,23 @@ command then does not require an installed GHC.
 
 ## The `stack ls snapshots` command
 
+~~~text
+stack ls snapshots [COMMAND] [-l|--lts] [-n|--nightly]
+
+Available commands:
+  local                    View local snapshots
+  remote                   View remote snapshots
+~~~
+
 `stack ls snapshots` will list all the local snapshots by default. You can also
 view the remote snapshots using `stack ls snapshots remote`. It also supports
 options for viewing only lts (`-l`) and nightly (`-n`) snapshots.
 
 ## The `stack ls stack-colors` command
+
+~~~text
+stack ls stack-colors [--[no-]basic] [--[no-]sgr] [--[no-]example]
+~~~
 
 The British English spelling is also accepted (`stack ls stack-colours`).
 
@@ -126,6 +159,10 @@ by Stack's command line option `--stack-colors` and the YAML configuration key
 `stack-colors`.
 
 ## The `stack ls tools` command
+
+~~~text
+stack ls tools [--filter TOOL_NAME]
+~~~
 
 `stack ls tools` will list Stack's installed tools. On Unix-like operating
 systems, they will be one or more versions of GHC. On Windows, they will include
