@@ -6,4 +6,4 @@
 stack purge
 ~~~
 
-This command is described in Stack's introductory [User's Guide](GUIDE.md).
+`stack purge` has the same effect as [`stack clean --full`](clean_command.md).
