@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2022-11-19.
+`master` branch of the Stack repository. Last updated: 2022-11-30.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -350,15 +350,11 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Stack.Types.Config.ConfigException`
 
         ~~~haskell
-        [S-6602] = ParseConfigFileException (Path Abs File) ParseException
         [S-8981] | ParseCustomSnapshotException Text ParseException
         [S-2206] | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
         [S-4964] | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
         [S-2040] | UnableToExtractArchive Text (Path Abs File)
         [S-1641] | BadStackVersionException VersionRange
-        [S-1833] | NoMatchingSnapshot (NonEmpty SnapName)
-        [S-6395] | ResolverMismatch RawSnapshotLocation String
-        [S-2422] | ResolverPartial RawSnapshotLocation String
         [S-8773] | NoSuchDirectory FilePath
         [S-3938] | ParseGHCVariantException String
         [S-8530] | BadStackRoot (Path Abs Dir)
@@ -371,6 +367,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3803] | NoLTSWithMajorVersion Int
         [S-5472] | NoLTSFound
         [S-3251] | MultiplePackageIndices [PackageIndexConfig]
+        ~~~
+
+    -   `Stack.Types.Config.ConfigPrettyException`
+
+        ~~~haskell
+        [S-6602] = ParseConfigFileException (Path Abs File) ParseException
+        [S-1833] | NoMatchingSnapshot (NonEmpty SnapName)
+        [S-6395] | ResolverMismatch RawSnapshotLocation String
+        [S-2422] | ResolverPartial RawSnapshotLocation String
         ~~~
 
     -   `Stack.Types.Config.ParseAbsolutePathException`

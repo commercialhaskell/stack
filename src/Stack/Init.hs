@@ -456,7 +456,8 @@ getDefaultResolver initOpts mresolver pkgDirs = do
             (c, l, r) <- selectBestSnapshot (Map.elems pkgDirs) snaps
             case r of
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
-                        -> throwM (NoMatchingSnapshot snaps)
+                        -> throwM $ PrettyException $
+                               NoMatchingSnapshot snaps
                 _ -> pure (c, l)
 
 getWorkingResolverPlan
@@ -546,14 +547,16 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
                     warnPartial result
                     logWarn "*** Omitting packages with unsatisfied dependencies"
                     pure $ Left $ failedUserPkgs e
-                else throwM $ ResolverPartial snapshotLoc (show result)
+                else throwM $ PrettyException $
+                         ResolverPartial snapshotLoc (show result)
         BuildPlanCheckFail _ e _
             | omitPackages initOpts -> do
                 logWarn $ "*** Resolver compiler mismatch: "
                            <> display snapshotLoc
                 logWarn $ display $ ind $ T.pack $ show result
                 pure $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ ResolverMismatch snapshotLoc (show result)
+            | otherwise -> throwM $ PrettyException $
+                               ResolverMismatch snapshotLoc (show result)
     where
       ind t  = T.unlines $ fmap ("    " <>) (T.lines t)
       warnPartial res = do
