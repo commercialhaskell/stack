@@ -9,4 +9,10 @@ stack ghc [-- ARGUMENT(S) (e.g. stack ghc -- X.hs -o x)]
 ~~~
 
 `stack ghc` has the same effect as, and is provided as a shorthand for,
-[`stack exec ghc`](exec_command.md).
+[`stack exec ghc`](exec_command.md), with the exception of the `--package`
+option.
+
+Pass the option `--package <package>` to add the initial GHC argument
+`-package-id=<unit_id>`, where `<unit_id>` is the unit ID of the specified
+package in the installed package database. The option can be specified multiple
+times.
