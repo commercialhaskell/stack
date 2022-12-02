@@ -4,8 +4,7 @@
 
 ~~~text
 stack setup [GHC_VERSION] [--[no-]reinstall] [--ghc-bindist URL]
-            [--ghcjs-boot-options GHCJS_BOOT]
-            [--[no-]ghcjs-boot-clean]
+            [--ghcjs-boot-options GHCJS_BOOT] [--[no-]ghcjs-boot-clean]
 ~~~
 
 `stack setup` attempts to install a version of GHC - by default, the version

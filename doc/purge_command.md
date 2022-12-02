@@ -6,4 +6,5 @@
 stack purge
 ~~~
 
-`stack purge` has the same effect as [`stack clean --full`](clean_command.md).
+`stack purge` has the same effect as, and is provided as a shorthand for,
+[`stack clean --full`](clean_command.md).

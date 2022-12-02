@@ -6,5 +6,6 @@
 stack unpack PACKAGE [--to ARG]
 ~~~
 
-`stack unpack` does what you'd expect: downloads a tarball and unpacks it. It
-accepts an optional `--to` argument to specify the destination directory.
+`stack unpack` downloads a tarball for the specified package and unpacks it.
+
+Pass the option `--to <directory>` to specify the destination directory.

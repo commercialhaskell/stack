@@ -6,14 +6,19 @@
 stack config COMMAND
 
 Available commands:
-  set                      Sets a key in YAML configuration file to value
   env                      Print environment variables for use in a shell
+  set                      Sets a key in YAML configuration file to value
 ~~~
 
 The `stack config` commands provide assistance with accessing or modifying
 Stack's configuration. See `stack config` for the available commands.
 
 ## The `stack config env` command
+
+~~~text
+stack config env [--[no-]locals] [--[no-]ghc-package-path] [--[no-]stack-exe]
+                 [--[no-]locale-utf8] [--[no-]keep-ghc-rts]
+~~~
 
 `stack config env` outputs a script that sets or unsets environment variables
 for a Stack environment. Flags modify the script that is output:
@@ -47,6 +52,10 @@ files to be set. See `stack config set` for the available keys.
 
 ## The `stack config set install-ghc` command
 
+~~~text
+stack config set install-ghc [--global] true|false
+~~~
+
 `stack config set install-ghc true` or `false` sets the `install-ghc` key in a
 YAML configuration file, accordingly. By default, the project-level
 configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
@@ -56,6 +65,10 @@ user-specific global configuration file (`config.yaml`).
 
 :octicons-tag-24: Unreleased
 
+~~~text
+stack config set package-index download-prefix [--global] [URL]
+~~~
+
 `stack config set package-index download-prefix <url>` sets the
 `download-prefix` key of the `package-index` key in a YAML configuration file,
 accordingly. By default, the project-level configuration file (`stack.yaml`) is
@@ -63,6 +76,10 @@ altered. The `--global` flag specifies the user-specific global configuration
 file (`config.yaml`).
 
 ## The `stack config set resolver` command
+
+~~~text
+stack config set resolver SNAPSHOT
+~~~
 
 `stack config set resolver <snapshot>` sets the `resolver` key in the
 project-level configuration file (`stack.yaml`).
@@ -76,6 +93,10 @@ Known bug:
 * The command does not respect the presence of a `snapshot` key.
 
 ## The `stack config set system-ghc` command
+
+~~~text
+stack config set system-ghc [--global] true|false
+~~~
 
 `stack config set system-ghc true` or `false` sets the `system-ghc` key in a
 YAML configuration file, accordingly. By default, the project-level

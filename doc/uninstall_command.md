@@ -6,4 +6,5 @@
 stack uninstall
 ~~~
 
-The `stack uninstall` command provides information about how to uninstall Stack. It does not itself uninstall Stack.
+`stack uninstall` provides information about how to uninstall Stack. It does not
+itself uninstall Stack.

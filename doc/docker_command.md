@@ -16,3 +16,22 @@ have the same system libraries.
 
 For further information, see the [Docker integration](docker_integration.md)
 documentation.
+
+## The `stack docker pull` command
+
+~~~text
+stack docker pull
+~~~
+
+`stack docker pull` pulls the latest version of the Docker image from the
+registry.
+
+## The `stack docker reset` command
+
+~~~text
+stack docker reset [--keep-home]
+~~~
+
+`stack docker reset` resets the Docker sandbox.
+
+Pass the flag `--keep-home` to preserve the sandbox's home directory.

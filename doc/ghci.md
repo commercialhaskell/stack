@@ -4,10 +4,9 @@
 
 ~~~text
 stack ghci [TARGET/FILE] [--pedantic] [--ghci-options OPTIONS]
-           [--ghc-options OPTIONS] [--flag PACKAGE:[-]FLAG]
-           [--with-ghc GHC] [--[no-]load] [--package PACKAGE]
-           [--main-is TARGET] [--load-local-deps]
-           [--[no-]package-hiding] [--only-main] [--trace]
+           [--ghc-options OPTIONS] [--flag PACKAGE:[-]FLAG] [--with-ghc GHC]
+           [--[no-]load] [--package PACKAGE] [--main-is TARGET]
+           [--load-local-deps] [--[no-]package-hiding] [--only-main] [--trace]
            [--profile] [--no-strip] [--[no-]test] [--[no-]bench]
 ~~~
 

@@ -16,19 +16,29 @@ commands.
 
 ## The `stack ide packages` command
 
-`stack ide packages` lists all available local packages that are loadable. By
-default, its output is sent to the standard error channel. This can be changed
-to the standard output channel with the `--stdout` flag.
+~~~text
+stack ide packages [--stdout] [--cabal-files]
+~~~
 
-By default, the output is the package name (without its version). This can be
-changed to the full path to the package's Cabal file with the `--cabal-files`
-flag.
+`stack ide packages` lists all available local packages that are loadable.
+
+By default:
+
+* its output is sent to the standard error channel. Pass the flag `--stdout` to
+  change to the standard output channel; and
+* the output is the package name (without its version). Pass the flag
+  `--cabal-files` to change to the full path to the package's Cabal file.
 
 ## The `stack ide targets` command
 
-`stack ide targets` lists all available Stack targets. By default, its output is
-sent to the standard error channel. This can be changed to the standard output
-channel with the `--stdout` flag.
+~~~text
+stack ide targets [--stdout]
+~~~
+
+`stack ide targets` lists all available Stack targets.
+
+By default, its output is sent to the standard error channel. Pass the flag
+`--stdout` to change to the standard output channel.
 
 For example, for the Stack project itself, command:
 

@@ -3,9 +3,8 @@
 # The `stack new` command
 
 ~~~text
-stack new PACKAGE_NAME [--bare] [TEMPLATE_NAME]
-          [-p|--param KEY:VALUE] [DIR(S)] [--omit-packages] [--force]
-          [--ignore-subdirs]
+stack new PACKAGE_NAME [--bare] [TEMPLATE_NAME] [-p|--param KEY:VALUE] [DIR(S)]
+          [--omit-packages] [--force] [--ignore-subdirs]
 ~~~
 
 `stack new` creates a new Stack project for a package using a template.
