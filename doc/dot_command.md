@@ -51,53 +51,53 @@ The following examples are based on a version of the
 output from `stack dot` is piped as an input into Graphviz's `dot` executable,
 and `dot` produces output in the form of a PNG file named `wreq.png`.
 
-* A simple example:
+*   A simple example:
 
-    ~~~text
-    stack dot | dot -Tpng -o wreq.png
-    ~~~
+        ~~~text
+        stack dot | dot -Tpng -o wreq.png
+        ~~~
 
-  [![wreq](https://cloud.githubusercontent.com/assets/591567/8478591/ae10a418-20d2-11e5-8945-55246dcfac62.png)](https://cloud.githubusercontent.com/assets/591567/8478591/ae10a418-20d2-11e5-8945-55246dcfac62.png)
+    [![wreq](https://cloud.githubusercontent.com/assets/591567/8478591/ae10a418-20d2-11e5-8945-55246dcfac62.png)](https://cloud.githubusercontent.com/assets/591567/8478591/ae10a418-20d2-11e5-8945-55246dcfac62.png)
 
-* Include external dependencies:
+*   Include external dependencies:
 
-    ~~~text
-    stack dot --external | dot -Tpng -o wreq.png
-    ~~~
+        ~~~text
+        stack dot --external | dot -Tpng -o wreq.png
+        ~~~
 
-  [![wreq_ext](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)
+    [![wreq_ext](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)
 
-* Include external dependencies, limit the depth and save the output from
-  `stack dot` as an intermediate file (`wreq.dot`).
+*   Include external dependencies, limit the depth and save the output from
+    `stack dot` as an intermediate file (`wreq.dot`).
 
-    ~~~text
-    stack dot --external --depth 1 > wreq.dot
-    dot -Tpng -o wreq.png wreq.dot
-    ~~~
+        ~~~text
+        stack dot --external --depth 1 > wreq.dot
+        dot -Tpng -o wreq.png wreq.dot
+        ~~~
 
-* Include external dependencies, exclude `base` and limit the depth:
+*   Include external dependencies, exclude `base` and limit the depth:
 
-    ~~~text
-    stack dot --no-include-base --external --depth 1 | dot -Tpng -o wreq.png
-    ~~~
+        ~~~text
+        stack dot --no-include-base --external --depth 1 | dot -Tpng -o wreq.png
+        ~~~
 
-  [![wreq_depth](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)
+    [![wreq_depth](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)
 
-* Include external dependencies and prune `base` and other packages:
+*   Include external dependencies and prune `base` and other packages:
 
-    ~~~text
-    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | dot -Tpng -o wreq.png
-    ~~~
+        ~~~text
+        stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | dot -Tpng -o wreq.png
+        ~~~
 
-  [![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8478768/adbad280-20d3-11e5-9992-914dc24fe569.png)](https://cloud.githubusercontent.com/assets/591567/8478768/adbad280-20d3-11e5-9992-914dc24fe569.png)
+    [![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8478768/adbad280-20d3-11e5-9992-914dc24fe569.png)](https://cloud.githubusercontent.com/assets/591567/8478768/adbad280-20d3-11e5-9992-914dc24fe569.png)
 
-* Include external dependencies, prune `base` and other packages, and use a
-  different Graphviz executable to draw the graph:
+*   Include external dependencies, prune `base` and other packages, and use a
+    different Graphviz executable to draw the graph:
 
-  Graphviz's `twopi` executable draws graphs in a radial layout.
+    Graphviz's `twopi` executable draws graphs in a radial layout.
 
-    ~~~text
-    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tpng -o wreq.png
-    ~~~
+        ~~~text
+        stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tpng -o wreq.png
+        ~~~
 
-  [![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)
+    [![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)
