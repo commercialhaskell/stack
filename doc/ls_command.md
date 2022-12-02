@@ -13,8 +13,8 @@ Available commands:
   tools                    View Stack's installed tools
 ~~~
 
-The `stack ls` commands list different types of information. See `stack ls` for
-the available commands.
+The `stack ls` commands list different types of information. Command `stack ls`
+for the available commands.
 
 ## The `stack ls dependencies` command
 
