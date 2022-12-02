@@ -8,68 +8,95 @@ stack dot [--[no-]external] [--[no-]include-base] [--depth DEPTH]
           [--test] [--bench] [--global-hints]
 ~~~
 
-`stack dot` produces output that can be used to visualize the dependencies
-between your packages and optionally also external dependencies. The
-visualization is performed by a separate application, the `dot` command of
-Graphviz.
+A package and its dependencies and the direct dependency relationships between
+them form a directed graph. [Graphviz](https://www.graphviz.org/) is open source
+software that visualises graphs. It provides the DOT language for defining
+graphs and the `dot` executable for drawing directed graphs. Graphviz is
+available to [download](https://www.graphviz.org/download/) for Linux, Windows,
+macOS and FreeBSD.
 
-First, you need [Graphviz](https://www.graphviz.org/). You can [get it here](https://www.graphviz.org/download/).
+`stack dot` produces output, to the standard output channel, in the DOT language
+to represent the relationships between your packages and their dependencies.
 
-As an example, let's look at `wreq`. Command:
+By default:
+* external dependencies are excluded from the output. Pass the flag
+`--external` to include external dependencies;
+* the `base` package and its dependencies are included in the output.
+Pass the flag `--no-include-base` to exclude `base` and its dependencies;
+* there is no limit to the depth of the resolution of dependencies.
+Pass the `--depth <depth>` option to limit the depth;
+* all relevant packages are included in the output. Pass the
+`--prude <packages>` option to exclude the specified packages, where
+`<packages>` is a list of package names separated by commas;
+* all packages in the project are included in the output. However, the
+target for the command can be specified as an argument. It uses the same format
+as the [`stack build` command](build_command.md);
+* test components of the packages in the project are excluded from the
+output. Pass the flag `--test` to include test components; and
+* benchmark components of the packages in the project are excluded
+from the output. Pass the flag `--bench` to include benchmark components.
 
-~~~text
-stack dot | dot -Tpng -o wreq.png
-~~~
+Pass the option `--flag <package_name>:<flag_name>` or
+`--flag <package_name>:-<flag_name>` to set or unset a Cabal flag. This
+option can be specified multiple times.
 
-[![wreq](https://cloud.githubusercontent.com/assets/591567/8478591/ae10a418-20d2-11e5-8945-55246dcfac62.png)](https://cloud.githubusercontent.com/assets/591567/8478591/ae10a418-20d2-11e5-8945-55246dcfac62.png)
+Pass the flag `--global-hints` to use a hint file for global packages. If a hint
+file is used, GHC does not need to be installed.
 
-Okay that is a little boring, let's also look at external dependencies. Command:
+## Examples
 
-~~~text
-stack dot --external | dot -Tpng -o wreq.png
-~~~
+The following examples are based on a version of the
+[`wreq` package](https://hackage.haskell.org/package/wreq). In each case, the
+output from `stack dot` is piped as an input into Graphviz's `dot` executable,
+and `dot` produces output in the form of a PNG file named `wreq.png`.
 
-[![wreq_ext](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)
+* A simple example:
 
-Well that is certainly a lot. As a start we can exclude `base` and then
-depending on our needs we can either limit the depth. Command:
+    ~~~text
+    stack dot | dot -Tpng -o wreq.png
+    ~~~
 
-~~~text
-stack dot --no-include-base --external --depth 1 | dot -Tpng -o wreq.png
-~~~
+  [![wreq](https://cloud.githubusercontent.com/assets/591567/8478591/ae10a418-20d2-11e5-8945-55246dcfac62.png)](https://cloud.githubusercontent.com/assets/591567/8478591/ae10a418-20d2-11e5-8945-55246dcfac62.png)
 
-[![wreq_depth](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)
+* Include external dependencies:
 
-or prune packages explicitly. Command:
+    ~~~text
+    stack dot --external | dot -Tpng -o wreq.png
+    ~~~
 
-~~~text
-stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | dot -Tpng -o wreq_pruned.png
-~~~
+  [![wreq_ext](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)](https://cloud.githubusercontent.com/assets/591567/8478621/d247247e-20d2-11e5-993d-79096e382abd.png)
 
-[![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8478768/adbad280-20d3-11e5-9992-914dc24fe569.png)](https://cloud.githubusercontent.com/assets/591567/8478768/adbad280-20d3-11e5-9992-914dc24fe569.png)
+* Include external dependencies, limit the depth and save the output from
+  `stack dot` as an intermediate file (`wreq.dot`).
 
-Keep in mind that you can also save the dot file. Command:
+    ~~~text
+    stack dot --external --depth 1 > wreq.dot
+    dot -Tpng -o wreq.png wreq.dot
+    ~~~
 
-~~~text
-stack dot --external --depth 1 > wreq.dot
-dot -Tpng -o wreq.png wreq.dot
-~~~
+* Include external dependencies, exclude `base` and limit the depth:
 
-and pass in options to `dot` or use another graph layout engine like `twopi`.
-Command:
+    ~~~text
+    stack dot --no-include-base --external --depth 1 | dot -Tpng -o wreq.png
+    ~~~
 
-~~~text
-stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tpng -o wreq_pruned.png
-~~~
+  [![wreq_depth](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)](https://cloud.githubusercontent.com/assets/591567/8484310/45b399a0-20f7-11e5-8068-031c2b352961.png)
 
-[![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)
+* Include external dependencies and prune `base` and other packages:
 
-## Specifying local targets and flags
+    ~~~text
+    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | dot -Tpng -o wreq.png
+    ~~~
 
-The `dot` and `list-dependencies` commands both also accept the following
-options which affect how local packages are considered:
+  [![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8478768/adbad280-20d3-11e5-9992-914dc24fe569.png)](https://cloud.githubusercontent.com/assets/591567/8478768/adbad280-20d3-11e5-9992-914dc24fe569.png)
 
-* `TARGET`, same as the targets passed to `build`
-* `--test`, specifying that test components should be considered
-* `--bench`, specifying that benchmark components should be considered
-* `--flag`, specifying flags which may affect cabal file `build-depends`
+* Include external dependencies, prune `base` and other packages, and use a
+  different Graphviz executable to draw the graph:
+
+  Graphviz's `twopi` executable draws graphs in a radial layout.
+
+    ~~~text
+    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tpng -o wreq.png
+    ~~~
+
+  [![wreq_pruned](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)](https://cloud.githubusercontent.com/assets/591567/8495538/9fae1184-216e-11e5-9931-99e6147f8aed.png)
