@@ -19,22 +19,23 @@ macOS and FreeBSD.
 to represent the relationships between your packages and their dependencies.
 
 By default:
+
 * external dependencies are excluded from the output. Pass the flag
-`--external` to include external dependencies;
-* the `base` package and its dependencies are included in the output.
-Pass the flag `--no-include-base` to exclude `base` and its dependencies;
-* there is no limit to the depth of the resolution of dependencies.
-Pass the `--depth <depth>` option to limit the depth;
+  `--external` to include external dependencies;
+* the `base` package and its dependencies are included in the output. Pass the
+  flag `--no-include-base` to exclude `base` and its dependencies;
+* there is no limit to the depth of the resolution of dependencies. Pass the
+  `--depth <depth>` option to limit the depth;
 * all relevant packages are included in the output. Pass the
-`--prude <packages>` option to exclude the specified packages, where
-`<packages>` is a list of package names separated by commas;
-* all packages in the project are included in the output. However, the
-target for the command can be specified as an argument. It uses the same format
-as the [`stack build` command](build_command.md);
-* test components of the packages in the project are excluded from the
-output. Pass the flag `--test` to include test components; and
-* benchmark components of the packages in the project are excluded
-from the output. Pass the flag `--bench` to include benchmark components.
+  `--prude <packages>` option to exclude the specified packages, where
+  `<packages>` is a list of package names separated by commas;
+* all packages in the project are included in the output. However, the target
+  for the command can be specified as an argument. It uses the same format
+  as the [`stack build` command](build_command.md);
+* test components of the packages in the project are excluded from the output.
+  Pass the flag `--test` to include test components; and
+* benchmark components of the packages in the project are excluded from the
+  output. Pass the flag `--bench` to include benchmark components.git p
 
 Pass the option `--flag <package_name>:<flag_name>` or
 `--flag <package_name>:-<flag_name>` to set or unset a Cabal flag. This
