@@ -24,7 +24,7 @@ execOptsParser mcmd =
             Nothing -> normalTxt
             Just ExecCmd{} -> normalTxt
             Just ExecRun -> "-- ARGUMENT(S) (e.g. stack run -- file.txt)"
-            Just ExecGhc -> "-- ARGUMENT(S) (e.g. stack runghc -- X.hs -o x)"
+            Just ExecGhc -> "-- ARGUMENT(S) (e.g. stack ghc -- X.hs -o x)"
             Just ExecRunGhc -> "-- ARGUMENT(S) (e.g. stack runghc -- X.hs)"
         normalTxt = "-- ARGUMENT(S) (e.g. stack exec ghc-pkg -- describe base)"
 
