@@ -17,16 +17,16 @@ module Options.Applicative.Complicated
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Writer
 import           Options.Applicative
-import           Options.Applicative.Types
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Builder.Internal
+import           Options.Applicative.Types
 import           Stack.Prelude
 import           Stack.Types.Config
 import           System.Environment
 
 -- | Generate and execute a complicated options parser.
-complicatedOptions
-  :: Version
+complicatedOptions ::
+     Version
   -- ^ numeric version
   -> Maybe String
   -- ^ version string
@@ -54,43 +54,58 @@ complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerS
        Failure f | Just onFailure <- mOnFailure -> onFailure f args
        parseResult -> handleParseResult parseResult
      pure (mappend c a,b)
-  where parser = info (helpOption <*> versionOptions <*> complicatedParser "COMMAND|FILE" commonParser commandParser) desc
-        desc = fullDesc <> header h <> progDesc pd <> footer footerStr
-        versionOptions =
-          case stringVersion of
-            Nothing -> versionOption (versionString numericVersion)
-            Just s -> versionOption s <*> numericVersionOption <*> numericHpackVersionOption
-        versionOption s =
-          infoOption
-            s
-            (long "version" <>
-             help "Show version")
-        numericVersionOption =
-          infoOption
-            (versionString numericVersion)
-            (long "numeric-version" <>
-             help "Show only version number")
-        numericHpackVersionOption =
-          infoOption
-            numericHpackVersion
-            (long "hpack-numeric-version" <>
-             help "Show only Hpack's version number")
+ where
+  parser = info
+    (   helpOption
+    <*> versionOptions
+    <*> complicatedParser "COMMAND|FILE" commonParser commandParser
+    )
+    desc
+  desc = fullDesc <> header h <> progDesc pd <> footer footerStr
+  versionOptions =
+    case stringVersion of
+      Nothing -> versionOption (versionString numericVersion)
+      Just s ->
+            versionOption s
+        <*> numericVersionOption
+        <*> numericHpackVersionOption
+  versionOption s =
+    infoOption
+      s
+      (  long "version"
+      <> help "Show version"
+      )
+  numericVersionOption =
+    infoOption
+      (versionString numericVersion)
+      (  long "numeric-version"
+      <> help "Show only version number"
+      )
+  numericHpackVersionOption =
+    infoOption
+      numericHpackVersion
+      (  long "hpack-numeric-version"
+      <> help "Show only Hpack's version number"
+       )
 
 -- | Add a command to the options dispatcher.
-addCommand :: String   -- ^ command string
-           -> String   -- ^ title of command
-           -> String   -- ^ footer of command help
-           -> (opts -> RIO Runner ()) -- ^ constructor to wrap up command in common data type
-           -> (opts -> GlobalOptsMonoid -> GlobalOptsMonoid) -- ^ extend common settings from local settings
-           -> Parser GlobalOptsMonoid -- ^ common parser
-           -> Parser opts -- ^ command parser
-           -> AddCommand
+addCommand ::
+     String   -- ^ command string
+  -> String   -- ^ title of command
+  -> String   -- ^ footer of command help
+  -> (opts -> RIO Runner ())
+     -- ^ constructor to wrap up command in common data type
+  -> (opts -> GlobalOptsMonoid -> GlobalOptsMonoid)
+     -- ^ extend common settings from local settings
+  -> Parser GlobalOptsMonoid -- ^ common parser
+  -> Parser opts -- ^ command parser
+  -> AddCommand
 addCommand cmd title footerStr constr extendCommon =
   addCommand' cmd title footerStr (\a c -> (constr a,extendCommon a c))
 
 -- | Add a command that takes sub-commands to the options dispatcher.
-addSubCommands
-  :: String
+addSubCommands ::
+     String
   -- ^ command string
   -> String
   -- ^ title of command
@@ -110,21 +125,23 @@ addSubCommands cmd title footerStr commonParser commandParser =
               (complicatedParser "COMMAND" commonParser commandParser)
 
 -- | Add a command to the options dispatcher.
-addCommand' :: String   -- ^ command string
-            -> String   -- ^ title of command
-            -> String   -- ^ footer of command help
-            -> (opts -> GlobalOptsMonoid -> (RIO Runner (),GlobalOptsMonoid)) -- ^ constructor to wrap up command in common data type
-            -> Parser GlobalOptsMonoid -- ^ common parser
-            -> Parser opts -- ^ command parser
-            -> AddCommand
+addCommand' ::
+     String   -- ^ command string
+  -> String   -- ^ title of command
+  -> String   -- ^ footer of command help
+  -> (opts -> GlobalOptsMonoid -> (RIO Runner (),GlobalOptsMonoid))
+     -- ^ constructor to wrap up command in common data type
+  -> Parser GlobalOptsMonoid -- ^ common parser
+  -> Parser opts -- ^ command parser
+  -> AddCommand
 addCommand' cmd title footerStr constr commonParser inner =
   lift (tell (command cmd
                       (info (constr <$> inner <*> commonParser)
                             (progDesc title <> footer footerStr))))
 
 -- | Generate a complicated options parser.
-complicatedParser
-  :: String
+complicatedParser ::
+     String
   -- ^ metavar for the sub-command
   -> Parser GlobalOptsMonoid
   -- ^ common settings
@@ -132,26 +149,26 @@ complicatedParser
   -- ^ commands (use 'addCommand')
   -> Parser (GlobalOptsMonoid,(RIO Runner (),GlobalOptsMonoid))
 complicatedParser commandMetavar commonParser commandParser =
-   (,) <$>
-   commonParser <*>
-   case runWriter (runExceptT commandParser) of
-     (Right (),d) -> hsubparser' commandMetavar d
-     (Left b,_) -> pure (b,mempty)
+   (,)
+     <$> commonParser
+     <*> case runWriter (runExceptT commandParser) of
+           (Right (), d) -> hsubparser' commandMetavar d
+           (Left b, _) -> pure (b, mempty)
 
 -- | Subparser with @--help@ argument. Borrowed with slight modification
 -- from Options.Applicative.Extra.
 hsubparser' :: String -> Mod CommandFields a -> Parser a
 hsubparser' commandMetavar m = mkParser d g rdr
-  where
-    Mod _ d g = metavar commandMetavar `mappend` m
-    (groupName, cmds, subs) = mkCommand m
-    rdr = CmdReader groupName cmds (fmap add_helper . subs)
-    add_helper pinfo = pinfo
-      { infoParser = infoParser pinfo <**> helpOption }
+ where
+  Mod _ d g = metavar commandMetavar `mappend` m
+  (groupName, cmds, subs) = mkCommand m
+  rdr = CmdReader groupName cmds (fmap add_helper . subs)
+  add_helper pinfo = pinfo
+    { infoParser = infoParser pinfo <**> helpOption }
 
 -- | Non-hidden help option.
 helpOption :: Parser (a -> a)
 helpOption =
-    abortOption showHelpText $
-    long "help" <>
-    help "Show this help text"
+  abortOption showHelpText $
+       long "help"
+    <> help "Show this help text"
