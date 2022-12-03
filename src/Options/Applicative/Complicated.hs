@@ -2,10 +2,11 @@
 
 -- | Simple interface to complicated program arguments.
 --
--- This is a "fork" of the @optparse-simple@ package that has some workarounds for
--- optparse-applicative issues that become problematic with programs that have many options and
--- subcommands. Because it makes the interface more complex, these workarounds are not suitable for
--- pushing upstream to optparse-applicative.
+-- This is a "fork" of the @optparse-simple@ package that has some workarounds
+-- for optparse-applicative issues that become problematic with programs that
+-- have many options and subcommands. Because it makes the interface more
+-- complex, these workarounds are not suitable for pushing upstream to
+-- optparse-applicative.
 
 module Options.Applicative.Complicated
   ( addCommand
@@ -14,15 +15,22 @@ module Options.Applicative.Complicated
   , complicatedParser
   ) where
 
-import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.Writer
+import           Control.Monad.Trans.Except ( runExceptT )
+import           Control.Monad.Trans.Writer ( runWriter, tell )
 import           Options.Applicative
-import           Options.Applicative.Builder.Extra
+                   ( CommandFields, Parser, ParserFailure, ParserHelp
+                   , ParserInfo (..), ParserResult (..), (<**>), abortOption
+                   , command, execParserPure, footer, fullDesc
+                   , handleParseResult, header, help, info, infoOption, long
+                   , metavar, noBacktrack, prefs, progDesc, showHelpOnEmpty
+                   )
+import           Options.Applicative.Builder.Extra ( showHelpText )
 import           Options.Applicative.Builder.Internal
-import           Options.Applicative.Types
+                   ( Mod (..), mkCommand, mkParser )
+import           Options.Applicative.Types ( OptReader (..) )
 import           Stack.Prelude
-import           Stack.Types.Config
-import           System.Environment
+import           Stack.Types.Config ( AddCommand, GlobalOptsMonoid, Runner )
+import           System.Environment ( getArgs )
 
 -- | Generate and execute a complicated options parser.
 complicatedOptions ::
@@ -35,25 +43,30 @@ complicatedOptions ::
   -> String
   -- ^ header
   -> String
-  -- ^ program description (displayed between usage and options listing in the help output)
+  -- ^ program description (displayed between usage and options listing in the
+  -- help output)
   -> String
   -- ^ footer
   -> Parser GlobalOptsMonoid
   -- ^ common settings
-  -> Maybe (ParserFailure ParserHelp -> [String] -> IO (GlobalOptsMonoid,(RIO Runner (),GlobalOptsMonoid)))
+  -> Maybe (  ParserFailure ParserHelp
+           -> [String]
+           -> IO (GlobalOptsMonoid, (RIO Runner (), GlobalOptsMonoid))
+           )
   -- ^ optional handler for parser failure; 'handleParseResult' is called by
   -- default
   -> AddCommand
   -- ^ commands (use 'addCommand')
   -> IO (GlobalOptsMonoid, RIO Runner ())
-complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerStr commonParser mOnFailure commandParser =
-  do args <- getArgs
-     (a,(b,c)) <- let parserPrefs = prefs $ noBacktrack <> showHelpOnEmpty
-                  in  case execParserPure parserPrefs parser args of
+complicatedOptions numericVersion stringVersion numericHpackVersion h pd
+  footerStr commonParser mOnFailure commandParser = do
+    args <- getArgs
+    (a, (b, c)) <- let parserPrefs = prefs $ noBacktrack <> showHelpOnEmpty
+                   in  case execParserPure parserPrefs parser args of
        -- call onFailure handler if it's present and parsing options failed
-       Failure f | Just onFailure <- mOnFailure -> onFailure f args
-       parseResult -> handleParseResult parseResult
-     pure (mappend c a,b)
+      Failure f | Just onFailure <- mOnFailure -> onFailure f args
+      parseResult -> handleParseResult parseResult
+    pure (mappend c a, b)
  where
   parser = info
     (   helpOption
@@ -86,7 +99,7 @@ complicatedOptions numericVersion stringVersion numericHpackVersion h pd footerS
       numericHpackVersion
       (  long "hpack-numeric-version"
       <> help "Show only Hpack's version number"
-       )
+      )
 
 -- | Add a command to the options dispatcher.
 addCommand ::
@@ -101,7 +114,7 @@ addCommand ::
   -> Parser opts -- ^ command parser
   -> AddCommand
 addCommand cmd title footerStr constr extendCommon =
-  addCommand' cmd title footerStr (\a c -> (constr a,extendCommon a c))
+  addCommand' cmd title footerStr (\a c -> (constr a, extendCommon a c))
 
 -- | Add a command that takes sub-commands to the options dispatcher.
 addSubCommands ::
@@ -117,12 +130,13 @@ addSubCommands ::
   -- ^ sub-commands (use 'addCommand')
   -> AddCommand
 addSubCommands cmd title footerStr commonParser commandParser =
-  addCommand' cmd
-              title
-              footerStr
-              (\(c1,(a,c2)) c3 -> (a,mconcat [c3, c2, c1]))
-              commonParser
-              (complicatedParser "COMMAND" commonParser commandParser)
+  addCommand'
+    cmd
+    title
+    footerStr
+    (\(c1, (a, c2)) c3 -> (a, mconcat [c3, c2, c1]))
+    commonParser
+    (complicatedParser "COMMAND" commonParser commandParser)
 
 -- | Add a command to the options dispatcher.
 addCommand' ::
@@ -135,9 +149,13 @@ addCommand' ::
   -> Parser opts -- ^ command parser
   -> AddCommand
 addCommand' cmd title footerStr constr commonParser inner =
-  lift (tell (command cmd
-                      (info (constr <$> inner <*> commonParser)
-                            (progDesc title <> footer footerStr))))
+  lift $ tell $
+    command
+      cmd
+      ( info
+          (constr <$> inner <*> commonParser)
+          (progDesc title <> footer footerStr)
+      )
 
 -- | Generate a complicated options parser.
 complicatedParser ::
@@ -147,13 +165,13 @@ complicatedParser ::
   -- ^ common settings
   -> AddCommand
   -- ^ commands (use 'addCommand')
-  -> Parser (GlobalOptsMonoid,(RIO Runner (),GlobalOptsMonoid))
+  -> Parser (GlobalOptsMonoid, (RIO Runner (), GlobalOptsMonoid))
 complicatedParser commandMetavar commonParser commandParser =
-   (,)
-     <$> commonParser
-     <*> case runWriter (runExceptT commandParser) of
-           (Right (), d) -> hsubparser' commandMetavar d
-           (Left b, _) -> pure (b, mempty)
+  (,)
+    <$> commonParser
+    <*> case runWriter (runExceptT commandParser) of
+          (Right (), d) -> hsubparser' commandMetavar d
+          (Left b, _) -> pure (b, mempty)
 
 -- | Subparser with @--help@ argument. Borrowed with slight modification
 -- from Options.Applicative.Extra.
