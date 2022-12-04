@@ -8,42 +8,39 @@
 {-# LANGUAGE TypeOperators         #-}
 
 module Stack.Init
-    ( initProject
-    , InitOpts (..)
-    ) where
+  ( initProject
+  , InitOpts (..)
+  ) where
 
-import           Stack.Prelude
-import qualified Data.Aeson.KeyMap               as KeyMap
-import qualified Data.ByteString.Builder         as B
-import qualified Data.ByteString.Char8           as BC
-import qualified Data.Foldable                   as F
-import qualified Data.IntMap                     as IntMap
-import           Data.List.Extra                 (groupSortOn)
-import qualified Data.List.NonEmpty              as NonEmpty
-import qualified Data.Map.Strict                 as Map
-import qualified Data.Set                        as Set
-import qualified Data.Text                       as T
-import qualified Data.Yaml                       as Yaml
+import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.ByteString.Builder as B
+import qualified Data.ByteString.Char8 as BC
+import qualified Data.Foldable as F
+import qualified Data.IntMap as IntMap
+import           Data.List.Extra ( groupSortOn )
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Data.Text as T
+import qualified Data.Yaml as Yaml
 import qualified Distribution.PackageDescription as C
-import qualified Distribution.Text               as C
-import qualified Distribution.Version            as C
+import qualified Distribution.Text as C
+import qualified Distribution.Version as C
 import           Path
-import           Path.Extra                      (toFilePathNoTrailingSep)
-import           Path.Find                       (findFiles)
-import           Path.IO                         hiding (findFiles)
-import qualified Paths_stack                     as Meta
-import qualified RIO.FilePath                    as FP
-import           RIO.List                        ((\\), intercalate,
-                                                  isSuffixOf, isPrefixOf)
-import           RIO.List.Partial                (minimumBy)
+import           Path.Extra ( toFilePathNoTrailingSep )
+import           Path.Find ( findFiles )
+import           Path.IO hiding ( findFiles )
+import qualified RIO.FilePath as FP
+import           RIO.List ( (\\), intercalate, isSuffixOf, isPrefixOf )
+import           RIO.List.Partial ( minimumBy )
 import           Stack.BuildPlan
-import           Stack.Config                    (getSnapshots,
-                                                  makeConcreteResolver)
+import           Stack.Config ( getSnapshots, makeConcreteResolver )
 import           Stack.Constants
+import           Stack.Prelude
 import           Stack.SourceMap
 import           Stack.Types.Config
 import           Stack.Types.Resolver
-import           Stack.Types.Version
+import           Stack.Types.Version ( stackMajorVersion )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Init" module.
@@ -397,16 +394,14 @@ renderStackYaml p ignoredPackages dupPackages =
         , ""
         ]
 
-    footerHelp =
-        let major = toMajorVersion $ C.mkVersion' Meta.version
-        in commentHelp
+    footerHelp = commentHelp
         [ "Control whether we use the GHC we find on the path"
         , "system-ghc: true"
         , ""
         , "Require a specific version of Stack, using version ranges"
         , "require-stack-version: -any # Default"
         , "require-stack-version: \""
-          ++ C.display (C.orLaterVersion major) ++ "\""
+          ++ C.display (C.orLaterVersion stackMajorVersion) ++ "\""
         , ""
         , "Override the architecture used by Stack, especially useful on Windows"
         , "arch: i386"

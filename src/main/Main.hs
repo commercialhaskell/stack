@@ -18,9 +18,7 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Version ( showVersion )
 import           RIO.Process
-import           Distribution.Version ( mkVersion' )
 import           GHC.IO.Encoding ( mkTextEncoding, textEncodingName )
 import           Options.Applicative
                    ( Parser, ParserFailure, ParserHelp, ParserResult (..), flag
@@ -34,7 +32,6 @@ import           Options.Applicative.Complicated
 import           Pantry ( loadSnapshot )
 import           Path
 import           Path.IO
-import qualified Paths_stack as Meta
 import           Stack.Build
 import           Stack.Build.Target ( NeedTargets(..) )
 import           Stack.Clean ( CleanCommand(..), CleanOpts(..), clean )
@@ -62,7 +59,6 @@ import           Stack.Options.DotParser
 import           Stack.Options.ExecParser
 import           Stack.Options.GhciParser
 import           Stack.Options.GlobalParser
-
 import           Stack.Options.HpcReportParser
 import           Stack.Options.NewParser
 import           Stack.Options.NixParser
@@ -81,6 +77,9 @@ import           Stack.SDist
 import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.SetupCmd
 import           Stack.Types.Version
+                   ( VersionCheck (..), checkVersion, showStackVersion
+                   , stackVersion
+                   )
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
@@ -182,12 +181,14 @@ main = do
       throwIO exitCode
     Right (globalMonoid, run) -> do
       global <- globalOptsFromMonoid isTerminal globalMonoid
-      when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
+      when (globalLogLevel global == LevelDebug) $
+        hPutStrLn stderr versionString'
       case globalReExecVersion global of
         Just expectVersion -> do
-            expectVersion' <- parseVersionThrowing expectVersion
-            unless (checkVersion MatchMinor expectVersion' (mkVersion' Meta.version))
-                $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
+          expectVersion' <- parseVersionThrowing expectVersion
+          unless (checkVersion MatchMinor expectVersion' stackVersion) $
+            throwIO $
+              InvalidReExecVersion expectVersion showStackVersion
         _ -> pure ()
       withRunnerGlobal global $ run `catches`
         [ Handler handleExitCode
@@ -243,7 +244,7 @@ commandLineHandler ::
   -> IO (GlobalOptsMonoid, RIO Runner ())
 commandLineHandler currentDir progName isInterpreter =
   complicatedOptions
-    (mkVersion' Meta.version)
+    stackVersion
     (Just versionString')
     hpackVersion
     "stack - The Haskell Tool Stack"

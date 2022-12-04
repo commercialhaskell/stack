@@ -49,7 +49,7 @@ import qualified Data.Yaml as Yaml
 import           Distribution.System
                    ( Arch (OtherArch), OS (..), Platform (..), buildPlatform )
 import qualified Distribution.Text
-import           Distribution.Version ( simplifyVersionRange, mkVersion' )
+import           Distribution.Version ( simplifyVersionRange )
 import           GHC.Conc ( getNumProcessors )
 import           Network.HTTP.StackClient
                    ( httpJSON, parseUrlThrow, getResponseBody )
@@ -59,7 +59,6 @@ import           Path
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.Find ( findInParents )
 import           Path.IO
-import qualified Paths_stack as Meta
 import           RIO.List ( unzip )
 import           RIO.Process
 import           RIO.Time ( toGregorian )
@@ -82,6 +81,9 @@ import           Stack.Types.Nix
 import           Stack.Types.Resolver
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
+                   ( IntersectingVersionRange (..), VersionCheck (..)
+                   , stackVersion, withinRange
+                   )
 import           System.Console.ANSI
                    ( hSupportsANSIWithoutEmulation, setSGRCode )
 import           System.Environment
@@ -91,8 +93,8 @@ import           System.PosixCompat.User ( getEffectiveUserID )
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
-tryDeprecatedPath
-    :: HasLogFunc env
+tryDeprecatedPath ::
+       HasLogFunc env
     => Maybe T.Text -- ^ Description of file for warning (if Nothing, no deprecation warning is displayed)
     -> (Path Abs a -> RIO env Bool) -- ^ Test for existence
     -> Path Abs a -- ^ New path
@@ -121,8 +123,8 @@ tryDeprecatedPath mWarningDesc exists new old = do
 -- | Get the location of the implicit global project directory.
 -- If the directory already exists at the deprecated location, its location is returned.
 -- Otherwise, the new location is returned.
-getImplicitGlobalProjectDir
-    :: HasLogFunc env
+getImplicitGlobalProjectDir ::
+       HasLogFunc env
     => Config -> RIO env (Path Abs Dir)
 getImplicitGlobalProjectDir config =
     --TEST no warning printed
@@ -145,8 +147,8 @@ getSnapshots = do
     pure $ getResponseBody result
 
 -- | Turn an 'AbstractResolver' into a 'Resolver'.
-makeConcreteResolver
-    :: HasConfig env
+makeConcreteResolver ::
+       HasConfig env
     => AbstractResolver
     -> RIO env RawSnapshotLocation
 makeConcreteResolver (ARResolver r) = pure r
@@ -184,8 +186,8 @@ getLatestResolver = do
     pure $ RSLSynonym $ fromMaybe (Nightly (snapshotsNightly snapshots)) mlts
 
 -- Interprets ConfigMonoid options.
-configFromConfigMonoid
-    :: HasRunner env
+configFromConfigMonoid ::
+       HasRunner env
     => Path Abs Dir -- ^ Stack root, e.g. ~/.stack
     -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
     -> Maybe AbstractResolver
@@ -516,7 +518,7 @@ loadConfig inner = do
             (mconcat $ configArgs : addConfigMonoid extraConfigs)
 
     withConfig $ \config -> do
-      unless (mkVersion' Meta.version `withinRange` configRequireStackVersion config)
+      unless (stackVersion `withinRange` configRequireStackVersion config)
           (throwM (BadStackVersionException (configRequireStackVersion config)))
       unless (configAllowDifferentUser config) $ do
           unless userOwnsStackRoot $
@@ -527,8 +529,8 @@ loadConfig inner = do
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
 -- values.
-withBuildConfig
-  :: RIO BuildConfig a
+withBuildConfig ::
+     RIO BuildConfig a
   -> RIO Config a
 withBuildConfig inner = do
     config <- ask
@@ -813,8 +815,8 @@ checkOwnership dir = do
 
 -- | @'getDirAndOwnership' dir@ returns @'Just' (dir, 'True')@ when @dir@
 -- exists and the current user owns it in the sense of 'isOwnedByUser'.
-getDirAndOwnership
-    :: (MonadIO m)
+getDirAndOwnership ::
+       (MonadIO m)
     => Path Abs Dir
     -> m (Maybe (Path Abs Dir, Bool))
 getDirAndOwnership dir = liftIO $ forgivingAbsence $ do
@@ -864,8 +866,8 @@ getExtraConfigs userConfigPath = do
 
 -- | Load and parse YAML from the given config file. Throws
 -- 'ParseConfigFileException' when there's a decoding error.
-loadConfigYaml
-    :: HasLogFunc env
+loadConfigYaml ::
+       HasLogFunc env
     => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
 loadConfigYaml parser path = do
     eres <- loadYaml parser path
@@ -875,8 +877,8 @@ loadConfigYaml parser path = do
         Right res -> pure res
 
 -- | Load and parse YAML from the given file.
-loadYaml
-    :: HasLogFunc env
+loadYaml ::
+       HasLogFunc env
     => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env (Either Yaml.ParseException a)
 loadYaml parser path = do
     eres <- liftIO $ Yaml.decodeFileEither (toFilePath path)
@@ -946,8 +948,8 @@ loadProjectConfig mstackYaml = do
 -- | Get the location of the default Stack configuration file.
 -- If a file already exists at the deprecated location, its location is returned.
 -- Otherwise, the new location is returned.
-getDefaultGlobalConfigPath
-    :: HasLogFunc env
+getDefaultGlobalConfigPath ::
+       HasLogFunc env
     => RIO env (Maybe (Path Abs File))
 getDefaultGlobalConfigPath =
     case (defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated) of
@@ -964,8 +966,8 @@ getDefaultGlobalConfigPath =
 -- | Get the location of the default user configuration file.
 -- If a file already exists at the deprecated location, its location is returned.
 -- Otherwise, the new location is returned.
-getDefaultUserConfigPath
-    :: HasLogFunc env
+getDefaultUserConfigPath ::
+       HasLogFunc env
     => Path Abs Dir -> RIO env (Path Abs File)
 getDefaultUserConfigPath stackRoot = do
     (path, exists) <- tryDeprecatedPath
