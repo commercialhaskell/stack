@@ -56,13 +56,13 @@ data UploadPrettyException
 
 instance Pretty UploadPrettyException where
     pretty AuthenticationFailure =
-           "Error:" <+> "[S-2256]"
+           "[S-2256]"
         <> line
         <> flow "authentification failure"
         <> line
         <> flow "Authentication failure uploading to server"
     pretty (ArchiveUploadFailure code res tarName) =
-           "Error:" <+> "[S-6108]"
+           "[S-6108]"
         <> line
         <> flow "unhandled status code:" <+> fromString (show code)
         <> line

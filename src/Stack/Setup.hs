@@ -358,7 +358,7 @@ data SetupPrettyException
 
 instance Pretty SetupPrettyException where
     pretty (GHCInstallFailed ex step cmd args wd tempDir destDir) =
-         flow "Error: [S-7441]"
+         "[S-7441]"
       <> line
       <> string (displayException ex)
       <> line
