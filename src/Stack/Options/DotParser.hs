@@ -64,10 +64,11 @@ dotOptsParser externalDefault = DotOpts
 
   splitNames :: String -> [PackageName]
   splitNames = map
-    ( mkPackageName
-    . takeWhile (not . isSpace)
-    . dropWhile isSpace
-    ) . splitOn ","
+      ( mkPackageName
+      . takeWhile (not . isSpace)
+      . dropWhile isSpace
+      )
+    . splitOn ","
 
   globalHints = switch
     (  long "global-hints"
