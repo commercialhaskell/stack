@@ -14,15 +14,14 @@ module Stack.Nix
 
 import           Stack.Prelude
 import qualified Data.Text as T
-import           Data.Version (showVersion)
 import           Path.IO
-import qualified Paths_stack as Meta
 import           Stack.Config (getInContainer, withBuildConfig)
 import           Stack.Config.Nix (nixCompiler, nixCompilerVersion)
 import           Stack.Constants (platformVariantEnvVar,inNixShellEnvVar,inContainerEnvVar)
 import           Stack.Types.Config
 import           Stack.Types.Docker
 import           Stack.Types.Nix
+import           Stack.Types.Version ( showStackVersion )
 import           System.Environment (getArgs,getExecutablePath,lookupEnv)
 import qualified System.FilePath  as F
 import           RIO.Process (processContextL, exec)
@@ -46,7 +45,7 @@ runShellAndExit = do
    let args | inContainer = origArgs  -- internal-re-exec version already passed
               -- first stack when restarting in the container
             | otherwise =
-                ("--" ++ reExecArgName ++ "=" ++ showVersion Meta.version) : origArgs
+                ("--" ++ reExecArgName ++ "=" ++ showStackVersion) : origArgs
    exePath <- liftIO getExecutablePath
    config <- view configL
    envOverride <- view processContextL
