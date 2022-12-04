@@ -6,39 +6,39 @@ module Stack.Script
     ( scriptCmd
     ) where
 
-import           Stack.Prelude
-import           Data.ByteString.Builder    (toLazyByteString)
-import qualified Data.ByteString.Char8      as S8
-import qualified Data.Conduit.List          as CL
-import           Data.List.Split            (splitWhen)
-import qualified Data.Map.Strict            as Map
-import qualified Data.Set                   as Set
-import           Distribution.Compiler      (CompilerFlavor (..))
-import           Distribution.ModuleName    (ModuleName)
+import           Data.ByteString.Builder ( toLazyByteString )
+import qualified Data.ByteString.Char8 as S8
+import qualified Data.Conduit.List as CL
+import           Data.List.Split ( splitWhen )
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import           Distribution.Compiler ( CompilerFlavor (..) )
+import           Distribution.ModuleName ( ModuleName )
 import qualified Distribution.PackageDescription as PD
 import qualified Distribution.Types.CondTree as C
-import           Distribution.Types.ModuleReexport
-import           Distribution.Types.PackageName (mkPackageName)
-import           Distribution.Types.VersionRange (withinRange)
-import           Distribution.System        (Platform (..))
+import           Distribution.Types.ModuleReexport ( moduleReexportName )
+import           Distribution.Types.PackageName ( mkPackageName )
+import           Distribution.Types.VersionRange ( withinRange )
+import           Distribution.System ( Platform (..) )
 import qualified Pantry.SHA256 as SHA256
-import           Path hiding (replaceExtension)
-import           Path.IO
+import           Path ( parent )
+import           Path.IO ( getModificationTime, resolveFile' )
+import qualified RIO.Directory as Dir
+import           RIO.Process ( exec, proc, readProcessStdout_, withWorkingDir )
+import qualified RIO.Text as T
 import qualified Stack.Build
 import           Stack.Build.Installed
-import           Stack.Constants            (osIsWindows)
+import           Stack.Constants ( osIsWindows )
 import           Stack.PackageDump
+import           Stack.Prelude
 import           Stack.Options.ScriptParser
 import           Stack.Runners
-import           Stack.Setup                (withNewLocalBuildTargets)
-import           Stack.SourceMap            (getCompilerInfo, immutableLocSha)
+import           Stack.Setup ( withNewLocalBuildTargets )
+import           Stack.SourceMap ( getCompilerInfo, immutableLocSha )
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.SourceMap
-import           System.FilePath            (dropExtension, replaceExtension)
-import qualified RIO.Directory as Dir
-import           RIO.Process
-import qualified RIO.Text as T
+import           System.FilePath ( dropExtension, replaceExtension )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Script" module.
