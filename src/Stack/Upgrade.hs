@@ -11,10 +11,8 @@ module Stack.Upgrade
     ) where
 
 import qualified Data.Text as T
-import           Distribution.Version ( mkVersion' )
 import           Options.Applicative
 import           Path
-import qualified Paths_stack as Paths
 import           RIO.Process
 import           Stack.Build
 import           Stack.Build.Target ( NeedTargets (..) )
@@ -243,7 +241,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
             Nothing -> throwIO StackInPackageIndexNotFound
             Just version -> pure version
 
-        if version <= mkVersion' Paths.version
+        if version <= stackVersion
             then do
                 prettyInfoS "Already at latest version, no upgrade required"
                 pure Nothing

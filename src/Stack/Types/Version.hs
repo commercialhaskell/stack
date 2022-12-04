@@ -6,43 +6,46 @@
 -- | Versions for packages.
 
 module Stack.Types.Version
-  (Version
-  ,Cabal.VersionRange -- TODO in the future should have a newtype wrapper
-  ,IntersectingVersionRange(..)
-  ,VersionCheck(..)
-  ,versionRangeText
-  ,Cabal.withinRange
-  ,Stack.Types.Version.intersectVersionRanges
-  ,toMajorVersion
-  ,latestApplicableVersion
-  ,checkVersion
-  ,nextMajorVersion
-  ,minorVersion
-  ,stackVersion
-  ,stackMinorVersion)
-  where
+  ( Cabal.VersionRange -- TODO in the future should have a newtype wrapper
+  , IntersectingVersionRange (..)
+  , VersionCheck (..)
+  , versionRangeText
+  , Cabal.withinRange
+  , Stack.Types.Version.intersectVersionRanges
+  , toMajorVersion
+  , latestApplicableVersion
+  , checkVersion
+  , nextMajorVersion
+  , minorVersion
+  , stackVersion
+  , showStackVersion
+  , stackMajorVersion
+  , stackMinorVersion
+  ) where
 
-import           Stack.Prelude hiding (Vector, pretty)
-import           Pantry.Internal.AesonExtended
-import           Data.List (find)
+import           Data.List ( find )
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.Pretty (pretty)
+import           Data.Version ( showVersion )
+import           Distribution.Pretty ( pretty )
 import qualified Distribution.Version as Cabal
+import           Pantry.Internal.AesonExtended
+                   ( FromJSON (..), ToJSON (..), Value (..), withText )
 import qualified Paths_stack as Meta
-import           Text.PrettyPrint (render)
+import           Stack.Prelude hiding ( Vector, pretty )
+import           Text.PrettyPrint ( render )
 
-newtype IntersectingVersionRange =
-    IntersectingVersionRange { getIntersectingVersionRange :: Cabal.VersionRange }
-    deriving Show
+newtype IntersectingVersionRange = IntersectingVersionRange
+  { getIntersectingVersionRange :: Cabal.VersionRange }
+  deriving Show
 
 instance Semigroup IntersectingVersionRange where
-    IntersectingVersionRange l <> IntersectingVersionRange r =
-        IntersectingVersionRange (l `Cabal.intersectVersionRanges` r)
+  IntersectingVersionRange l <> IntersectingVersionRange r =
+    IntersectingVersionRange (l `Cabal.intersectVersionRanges` r)
 
 instance Monoid IntersectingVersionRange where
-    mempty = IntersectingVersionRange Cabal.anyVersion
-    mappend = (<>)
+  mempty = IntersectingVersionRange Cabal.anyVersion
+  mappend = (<>)
 
 -- | Display a version range
 versionRangeText :: Cabal.VersionRange -> Text
@@ -74,41 +77,43 @@ nextMajorVersion v =
     a:b:_ -> Cabal.mkVersion [a, b + 1]
 
 data VersionCheck
-    = MatchMinor
-    | MatchExact
-    | NewerMinor
-    deriving (Show, Eq, Ord)
+  = MatchMinor
+  | MatchExact
+  | NewerMinor
+  deriving (Eq, Ord, Show)
+
 instance ToJSON VersionCheck where
-    toJSON MatchMinor = String "match-minor"
-    toJSON MatchExact = String "match-exact"
-    toJSON NewerMinor = String "newer-minor"
+  toJSON MatchMinor = String "match-minor"
+  toJSON MatchExact = String "match-exact"
+  toJSON NewerMinor = String "newer-minor"
+
 instance FromJSON VersionCheck where
-    parseJSON = withText expected $ \t ->
-        case t of
-            "match-minor" -> pure MatchMinor
-            "match-exact" -> pure MatchExact
-            "newer-minor" -> pure NewerMinor
-            _ -> fail ("Expected " ++ expected ++ ", but got " ++ show t)
-      where
-        expected = "VersionCheck value (match-minor, match-exact, or newer-minor)"
+  parseJSON = withText expected $ \t ->
+    case t of
+      "match-minor" -> pure MatchMinor
+      "match-exact" -> pure MatchExact
+      "newer-minor" -> pure NewerMinor
+      _ -> fail ("Expected " ++ expected ++ ", but got " ++ show t)
+   where
+    expected = "VersionCheck value (match-minor, match-exact, or newer-minor)"
 
 checkVersion :: VersionCheck -> Version -> Version -> Bool
 checkVersion check (Cabal.versionNumbers -> wanted) (Cabal.versionNumbers -> actual) =
-    case check of
-        MatchMinor -> and (take 3 matching)
-        MatchExact -> length wanted == length actual && and matching
-        NewerMinor -> and (take 2 matching) && newerMinor
-  where
-    matching = zipWith (==) wanted actual
+  case check of
+    MatchMinor -> and (take 3 matching)
+    MatchExact -> length wanted == length actual && and matching
+    NewerMinor -> and (take 2 matching) && newerMinor
+ where
+  matching = zipWith (==) wanted actual
 
-    getMinor (_a:_b:c:_) = Just c
-    getMinor _ = Nothing
+  getMinor (_a:_b:c:_) = Just c
+  getMinor _ = Nothing
 
-    newerMinor =
-        case (getMinor wanted, getMinor actual) of
-            (Nothing, _) -> True
-            (Just _, Nothing) -> False
-            (Just w, Just a) -> a >= w
+  newerMinor =
+    case (getMinor wanted, getMinor actual) of
+      (Nothing, _) -> True
+      (Just _, Nothing) -> False
+      (Just w, Just a) -> a >= w
 
 -- | Get minor version (excludes any patchlevel)
 minorVersion :: Version -> Version
@@ -118,6 +123,16 @@ minorVersion = Cabal.mkVersion . take 3 . Cabal.versionNumbers
 stackVersion :: Version
 stackVersion = Cabal.mkVersion' Meta.version
 
+-- | Current Stack version in the same format as yielded by
+-- 'Data.Version.showVersion'.
+showStackVersion :: String
+showStackVersion = showVersion Meta.version
+
 -- | Current Stack minor version (excludes patchlevel)
 stackMinorVersion :: Version
 stackMinorVersion = minorVersion stackVersion
+
+-- | Current Stack major version. Returns the first two components, defaulting
+-- to 0 if not present
+stackMajorVersion :: Version
+stackMajorVersion = toMajorVersion stackVersion

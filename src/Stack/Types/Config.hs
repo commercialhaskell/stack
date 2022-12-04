@@ -188,7 +188,6 @@ module Stack.Types.Config
 import           Control.Monad.Writer ( Writer, tell )
 import           Control.Monad.Trans.Except ( ExceptT )
 import           Crypto.Hash ( hashWith, SHA1 (..) )
-import           Stack.Prelude
 import           Pantry.Internal.AesonExtended
                    ( ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON
                    , withText, object, (.=), (..:), (...:), (..:?), (..!=)
@@ -217,7 +216,7 @@ import           Distribution.PackageDescription ( GenericPackageDescription )
 import qualified Distribution.PackageDescription as C
 import           Distribution.System ( Platform, Arch )
 import qualified Distribution.Text
-import           Distribution.Version ( anyVersion, mkVersion', mkVersion )
+import           Distribution.Version ( anyVersion, mkVersion )
 import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Lens.Micro
 import           Options.Applicative ( ReadM )
@@ -225,9 +224,9 @@ import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Pantry.Internal ( Storage )
 import           Path
-import qualified Paths_stack as Meta
 import qualified RIO.List as List
 import           Stack.Constants
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
@@ -238,6 +237,9 @@ import           Stack.Types.Resolver
 import           Stack.Types.SourceMap
 import           Stack.Types.TemplateName
 import           Stack.Types.Version
+                   ( IntersectingVersionRange (..), VersionCheck (..)
+                   , VersionRange, stackVersion, versionRangeText
+                   )
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types ( UserID, GroupID, FileMode )
 import           RIO.Process ( ProcessContext, HasProcessContext (..) )
@@ -305,7 +307,7 @@ instance Exception ConfigException where
     displayException (BadStackVersionException requiredRange) = concat
         [ "Error: [S-1641]\n"
         , "The version of Stack you are using ("
-        , show (mkVersion' Meta.version)
+        , show stackVersion
         , ") is outside the required\n"
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)

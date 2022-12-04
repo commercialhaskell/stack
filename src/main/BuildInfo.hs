@@ -50,7 +50,7 @@ versionString' = concat $ concat
     , [afterVersion]
     ]
 #else
-versionString' = showVersion Meta.version ++ afterVersion
+versionString' = showStackVersion ++ afterVersion
 #endif
   where
     afterVersion = concat
