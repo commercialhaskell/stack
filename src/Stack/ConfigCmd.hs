@@ -8,37 +8,42 @@
 
 -- | Make changes to project or global configuration.
 module Stack.ConfigCmd
-       (ConfigCmdSet(..)
-       ,configCmdSetParser
-       ,cfgCmdSet
-       ,cfgCmdSetName
-       ,configCmdEnvParser
-       ,cfgCmdEnv
-       ,cfgCmdEnvName
-       ,cfgCmdName) where
+  ( ConfigCmdSet (..)
+  , configCmdSetParser
+  , cfgCmdSet
+  , cfgCmdSetName
+  , configCmdEnvParser
+  , cfgCmdEnv
+  , cfgCmdEnvName
+  , cfgCmdName
+  ) where
 
-import           Stack.Prelude
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
-import           Data.Attoparsec.Text as P (Parser, parseOnly, skip, skipWhile,
-                                           string, takeText, takeWhile)
+import           Data.Attoparsec.Text as P
+                   ( Parser, parseOnly, skip, skipWhile, string, takeText
+                   , takeWhile
+                   )
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
-import qualified Options.Applicative.Types as OA
 import           Options.Applicative.Builder.Extra
-import           Pantry (loadSnapshot)
+import qualified Options.Applicative.Types as OA
+import           Pantry ( loadSnapshot )
 import           Path
 import qualified RIO.Map as Map
-import           RIO.Process (envVarsL)
-import           Stack.Config (makeConcreteResolver, getProjectConfig,
-                              getImplicitGlobalProjectDir)
+import           RIO.Process ( envVarsL )
+import           Stack.Config
+                   ( makeConcreteResolver, getProjectConfig
+                   , getImplicitGlobalProjectDir
+                   )
 import           Stack.Constants
+import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.Resolver
-import           System.Environment (getEnvironment)
+import           System.Environment ( getEnvironment )
 
 -- | Type repesenting exceptions thrown by functions exported by the
 -- "Stack.ConfigCmd" module.

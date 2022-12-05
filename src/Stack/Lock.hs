@@ -5,24 +5,24 @@
 {-# LANGUAGE RecordWildCards   #-}
 
 module Stack.Lock
-    ( lockCachedWanted
-    , LockedLocation(..)
-    , Locked(..)
-    ) where
+  ( lockCachedWanted
+  , LockedLocation (..)
+  , Locked (..)
+  ) where
 
-import Pantry.Internal.AesonExtended
-import Data.ByteString.Builder (byteString)
+import           Data.ByteString.Builder ( byteString )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import Path (parent)
-import Path.Extended (addExtension)
-import Path.IO (doesFileExist)
-import Stack.Prelude
-import Stack.SourceMap
-import Stack.Types.Config
-import Stack.Types.SourceMap
+import           Pantry.Internal.AesonExtended
+import           Path ( parent )
+import           Path.Extended ( addExtension )
+import           Path.IO ( doesFileExist )
+import           Stack.Prelude
+import           Stack.SourceMap
+import           Stack.Types.Config
+import           Stack.Types.SourceMap
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Lock" module.

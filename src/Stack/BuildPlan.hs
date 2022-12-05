@@ -14,7 +14,7 @@ module Stack.BuildPlan
     ( BuildPlanException (..)
     , BuildPlanCheck (..)
     , checkSnapBuildPlan
-    , DepError(..)
+    , DepError (..)
     , DepErrors
     , removeSrcPkgDefaultFlags
     , selectBestSnapshot

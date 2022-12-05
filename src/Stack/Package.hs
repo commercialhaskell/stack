@@ -10,65 +10,67 @@
 -- | Dealing with Cabal.
 
 module Stack.Package
-  (readDotBuildinfo
-  ,resolvePackage
-  ,packageFromPackageDescription
-  ,Package(..)
-  ,PackageDescriptionPair(..)
-  ,GetPackageOpts(..)
-  ,PackageConfig(..)
-  ,buildLogPath
-  ,PackageException (..)
-  ,resolvePackageDescription
-  ,packageDependencies
-  ,applyForceCustomBuild
+  ( readDotBuildinfo
+  , resolvePackage
+  , packageFromPackageDescription
+  , Package (..)
+  , PackageDescriptionPair (..)
+  , GetPackageOpts (..)
+  , PackageConfig (..)
+  , buildLogPath
+  , PackageException (..)
+  , resolvePackageDescription
+  , packageDependencies
+  , applyForceCustomBuild
   ) where
 
-import           Data.List (unzip)
+import           Data.List ( unzip )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import           Distribution.CabalSpecVersion
 import           Distribution.Compiler
-import           Distribution.Package hiding (Package, packageName, packageVersion, PackageIdentifier)
-import           Distribution.PackageDescription hiding (FlagName)
+import           Distribution.Package
+                   hiding
+                     ( Package, packageName, packageVersion, PackageIdentifier )
+import           Distribution.PackageDescription hiding ( FlagName )
 #if !MIN_VERSION_Cabal(3,8,1)
 import           Distribution.PackageDescription.Parsec
 #endif
-import           Distribution.Pretty (prettyShow)
+import           Distribution.Pretty ( prettyShow )
 #if MIN_VERSION_Cabal(3,8,1)
-import           Distribution.Simple.PackageDescription (readHookedBuildInfo)
+import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
 #endif
-import           Distribution.System (OS (..), Arch, Platform (..))
-import           Distribution.Text (display)
+import           Distribution.System ( OS (..), Arch, Platform (..) )
+import           Distribution.Text ( display )
 import qualified Distribution.Types.CondTree as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
 import qualified Distribution.Types.LegacyExeDependency as Cabal
 import           Distribution.Types.MungedPackageName
 import qualified Distribution.Types.UnqualComponentName as Cabal
-import           Distribution.Utils.Path (getSymbolicPath)
-import           Distribution.Verbosity (silent)
-import           Distribution.Version (mkVersion, orLaterVersion, anyVersion)
-import           Path as FL hiding (replaceExtension)
+import           Distribution.Utils.Path ( getSymbolicPath )
+import           Distribution.Verbosity ( silent )
+import           Distribution.Version ( mkVersion, orLaterVersion, anyVersion )
+import           Path as FL hiding ( replaceExtension )
 import           Path.Extra
-import           Path.IO hiding (findFiles)
+import           Path.IO hiding ( findFiles )
 import           Stack.Build.Installed
 import           Stack.Constants
 import           Stack.Constants.Config
-import           Stack.Prelude hiding (Display (..))
+import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Version
-import           System.FilePath (replaceExtension)
-import           Stack.Types.Dependency (DepValue(..), DepType (..))
+import           System.FilePath ( replaceExtension )
+import           Stack.Types.Dependency ( DepValue (..), DepType (..) )
 import           Stack.Types.PackageFile
                    ( GetPackageFileContext (..), DotCabalPath
                    , GetPackageFiles (..)
                    )
-import           Stack.PackageFile (packageDescModulesAndFiles)
+import           Stack.PackageFile ( packageDescModulesAndFiles )
 import           Stack.ComponentFile
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description

@@ -33,8 +33,8 @@ import           Pantry ( loadSnapshot )
 import           Path
 import           Path.IO
 import           Stack.Build
-import           Stack.Build.Target ( NeedTargets(..) )
-import           Stack.Clean ( CleanCommand(..), CleanOpts(..), clean )
+import           Stack.Build.Target ( NeedTargets (..) )
+import           Stack.Clean ( CleanCommand (..), CleanOpts (..), clean )
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants

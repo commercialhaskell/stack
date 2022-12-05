@@ -8,23 +8,23 @@
 
 module Stack.Types.Config.Build
     (
-      BuildOpts(..)
-    , BuildCommand(..)
+      BuildOpts (..)
+    , BuildCommand (..)
     , defaultBuildOpts
     , defaultBuildOptsCLI
-    , BuildOptsCLI(..)
-    , BuildOptsMonoid(..)
-    , TestOpts(..)
+    , BuildOptsCLI (..)
+    , BuildOptsMonoid (..)
+    , TestOpts (..)
     , defaultTestOpts
-    , TestOptsMonoid(..)
-    , HaddockOpts(..)
+    , TestOptsMonoid (..)
+    , HaddockOpts (..)
     , defaultHaddockOpts
-    , HaddockOptsMonoid(..)
-    , BenchmarkOpts(..)
+    , HaddockOptsMonoid (..)
+    , BenchmarkOpts (..)
     , defaultBenchmarkOpts
-    , BenchmarkOptsMonoid(..)
-    , FileWatchOpts(..)
-    , BuildSubset(..)
+    , BenchmarkOptsMonoid (..)
+    , FileWatchOpts (..)
+    , BuildSubset (..)
     , ApplyCLIFlag (..)
     , boptsCLIFlagsByName
     , CabalVerbosity (..)
@@ -34,9 +34,9 @@ module Stack.Types.Config.Build
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
-import           Distribution.Parsec (Parsec (..), simpleParsec)
-import           Distribution.Verbosity (Verbosity, normal, verbose)
-import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
+import           Distribution.Parsec ( Parsec (..), simpleParsec )
+import           Distribution.Verbosity ( Verbosity, normal, verbose )
+import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Pantry.Internal.AesonExtended
 import           Stack.Prelude
 

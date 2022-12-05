@@ -4,21 +4,21 @@
 
 -- | A wrapper around hoogle.
 module Stack.Hoogle
-    ( hoogleCmd
-    ) where
+  ( hoogleCmd
+  ) where
 
-import           Stack.Prelude
 import qualified Data.ByteString.Lazy.Char8 as BL8
-import           Data.Char (isSpace)
+import           Data.Char ( isSpace )
 import qualified Data.Text as T
-import           Distribution.PackageDescription (packageDescription, package)
-import           Distribution.Types.PackageName (mkPackageName)
-import           Distribution.Version (mkVersion)
-import           Lens.Micro ((?~))
-import           Path (parseAbsFile)
-import           Path.IO hiding (findExecutable)
+import           Distribution.PackageDescription ( packageDescription, package )
+import           Distribution.Types.PackageName ( mkPackageName )
+import           Distribution.Version ( mkVersion )
+import           Lens.Micro ( (?~) )
+import           Path ( parseAbsFile )
+import           Path.IO hiding ( findExecutable )
 import qualified Stack.Build
-import           Stack.Build.Target (NeedTargets(NeedTargets))
+import           Stack.Build.Target ( NeedTargets (NeedTargets) )
+import           Stack.Prelude
 import           Stack.Runners
 import           Stack.Types.Config
 import           Stack.Types.SourceMap

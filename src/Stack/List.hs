@@ -6,10 +6,10 @@ module Stack.List
   ( listPackages
   ) where
 
-import Stack.Prelude
+import           RIO.List ( intercalate )
 import qualified RIO.Map as Map
-import RIO.List (intercalate)
-import RIO.Process (HasProcessContext)
+import           RIO.Process ( HasProcessContext )
+import           Stack.Prelude
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.List" module.

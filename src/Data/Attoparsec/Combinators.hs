@@ -2,9 +2,14 @@
 
 -- | More readable combinators for writing parsers.
 
-module Data.Attoparsec.Combinators where
+module Data.Attoparsec.Combinators
+  ( alternating
+  , appending
+  , concating
+  , pured
+  ) where
 
-import Stack.Prelude
+import           Stack.Prelude
 
 -- | Concatenate two parsers.
 appending :: (Applicative f,Semigroup a)

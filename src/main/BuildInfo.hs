@@ -14,28 +14,24 @@ module BuildInfo
   , hpackVersion
   ) where
 
-import Stack.Prelude
-import qualified Paths_stack as Meta
-import qualified Distribution.Text as Cabal (display)
-import           Distribution.System (buildArch)
-
 #ifndef HIDE_DEP_VERSIONS
 import qualified Build_stack
 #endif
-
 #ifdef USE_GIT_INFO
-import           GitHash (giCommitCount, giHash, tGitInfoCwdTry)
-#endif
-
-#ifdef USE_GIT_INFO
-import           Options.Applicative.Simple (simpleVersion)
-#endif
-
-#ifdef USE_GIT_INFO
-import           Data.Version (versionBranch)
+import           Data.Version ( versionBranch )
 #else
-import           Data.Version (showVersion, versionBranch)
+import           Data.Version ( showVersion, versionBranch )
 #endif
+import           Distribution.System ( buildArch )
+import qualified Distribution.Text as Cabal ( display )
+#ifdef USE_GIT_INFO
+import           GitHash ( giCommitCount, giHash, tGitInfoCwdTry )
+#endif
+#ifdef USE_GIT_INFO
+import           Options.Applicative.Simple ( simpleVersion )
+#endif
+import           Stack.Prelude
+import qualified Paths_stack as Meta
 
 versionString' :: String
 #ifdef USE_GIT_INFO

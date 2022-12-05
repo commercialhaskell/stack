@@ -2,9 +2,9 @@
 
 module Stack.Options.DockerParser where
 
-import           Data.List                         (intercalate)
-import qualified Data.Text                         as T
-import           Distribution.Version              (anyVersion)
+import           Data.List ( intercalate )
+import qualified Data.Text as T
+import           Distribution.Version ( anyVersion )
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra

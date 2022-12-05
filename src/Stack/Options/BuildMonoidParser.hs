@@ -3,10 +3,10 @@
 module Stack.Options.BuildMonoidParser where
 
 import qualified Data.Text as T
-import           Distribution.Parsec (eitherParsec)
+import           Distribution.Parsec ( eitherParsec )
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Stack.Build (splitObjsWarning)
+import           Stack.Build ( splitObjsWarning )
 import           Stack.Prelude
 import           Stack.Options.BenchParser
 import           Stack.Options.TestParser

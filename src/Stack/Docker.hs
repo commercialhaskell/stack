@@ -18,7 +18,7 @@ module Stack.Docker
   , pull
   , reset
   , reExecArgName
-  , DockerException(..)
+  , DockerException (..)
   , getProjectRoot
   , runContainerAndExit
   ) where

@@ -58,28 +58,28 @@
 -- Finally, we upgrade the snapshot by using
 -- calculatePackagePromotion.
 module Stack.Build.Target
-    ( -- * Types
-      Target (..)
-    , NeedTargets (..)
-    , PackageType (..)
-    , parseTargets
-      -- * Convenience helpers
-    , gpdVersion
-      -- * Test suite exports
-    , parseRawTarget
-    , RawTarget (..)
-    , UnresolvedComponent (..)
-    ) where
+  ( -- * Types
+    Target (..)
+  , NeedTargets (..)
+  , PackageType (..)
+  , parseTargets
+    -- * Convenience helpers
+  , gpdVersion
+    -- * Test suite exports
+  , parseRawTarget
+  , RawTarget (..)
+  , UnresolvedComponent (..)
+  ) where
 
-import           Stack.Prelude
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Path
-import           Path.Extra (rejectMissingDir)
+import           Path.Extra ( rejectMissingDir )
 import           Path.IO
-import           RIO.Process (HasProcessContext)
+import           RIO.Process ( HasProcessContext )
 import           Stack.SourceMap
+import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Build

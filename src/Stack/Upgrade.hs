@@ -5,10 +5,10 @@
 {-# LANGUAGE OverloadedStrings     #-}
 
 module Stack.Upgrade
-    ( upgrade
-    , UpgradeOpts
-    , upgradeOpts
-    ) where
+  ( upgrade
+  , UpgradeOpts
+  , upgradeOpts
+  ) where
 
 import qualified Data.Text as T
 import           Options.Applicative

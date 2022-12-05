@@ -28,7 +28,7 @@ import           Database.Persist.Sql
 import qualified Data.Text as T
 import           Stack.Prelude
 import           Stack.Types.Version
-import           Distribution.Version (mkVersion)
+import           Distribution.Version ( mkVersion )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Types.Compiler" module.

@@ -6,7 +6,7 @@ import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Stack.Prelude
 import           Stack.SDist
-import           Stack.Options.HpcReportParser (pvpBoundsOption)
+import           Stack.Options.HpcReportParser ( pvpBoundsOption )
 
 -- | Parser for arguments to `stack sdist`
 sdistOptsParser :: Parser SDistOpts

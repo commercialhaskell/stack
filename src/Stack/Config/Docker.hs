@@ -6,10 +6,10 @@
 -- | Docker configuration
 module Stack.Config.Docker where
 
-import           Stack.Prelude
-import           Data.List (find)
+import           Data.List ( find )
 import qualified Data.Text as T
-import           Distribution.Version (simplifyVersionRange)
+import           Distribution.Version ( simplifyVersionRange )
+import           Stack.Prelude
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker

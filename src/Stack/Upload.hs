@@ -7,19 +7,19 @@
 
 -- | Provide ability to upload tarballs to Hackage.
 module Stack.Upload
-    ( -- * Upload
-      upload
-    , uploadBytes
-    , uploadRevision
-      -- * Credentials
-    , HackageCreds
-    , HackageAuth(..)
-    , HackageKey(..)
-    , loadAuth
-    , writeFilePrivate
-      -- * Internal
-    , maybeGetHackageKey
-    ) where
+  ( -- * Upload
+    upload
+  , uploadBytes
+  , uploadRevision
+    -- * Credentials
+  , HackageCreds
+  , HackageAuth (..)
+  , HackageKey (..)
+  , loadAuth
+  , writeFilePrivate
+    -- * Internal
+  , maybeGetHackageKey
+  ) where
 
 import           Conduit ( mapOutput, sinkList )
 import           Data.Aeson

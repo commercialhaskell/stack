@@ -12,13 +12,12 @@ module Stack.Coverage
     ( deleteHpcReports
     , updateTixFile
     , generateHpcReport
-    , HpcReportOpts(..)
+    , HpcReportOpts (..)
     , generateHpcReportForTargets
     , generateHpcUnifiedReport
     , generateHpcMarkupIndex
     ) where
 
-import           Stack.Prelude hiding (Display (..))
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.List as L
@@ -26,22 +25,23 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as LT
-import           Distribution.Version (mkVersion)
+import           Distribution.Version ( mkVersion )
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
+import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
+import qualified RIO
+import           RIO.Process
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Package
+import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
-import           System.FilePath (isPathSeparator)
-import qualified RIO
-import           RIO.Process
+import           System.FilePath ( isPathSeparator )
 import           Trace.Hpc.Tix
 import           Web.Browser (openBrowser)
 

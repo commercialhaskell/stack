@@ -1,14 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Stack.Types.Dependency
-  (DepValue(..)
-  ,DepType(..)
-  )
-  where
+  ( DepValue (..)
+  , DepType (..)
+  ) where
 
-import Stack.Prelude
-import Distribution.Types.VersionRange (VersionRange)
-import Stack.Types.Version (intersectVersionRanges)
+import           Distribution.Types.VersionRange ( VersionRange )
+import           Stack.Prelude
+import           Stack.Types.Version ( intersectVersionRanges )
 
 
 -- | The value for a map from dependency name. This contains both the

@@ -8,9 +8,9 @@
 
 module Stack.Types.Nix where
 
-import Pantry.Internal.AesonExtended
-import Stack.Prelude
-import Generics.Deriving.Monoid (mappenddefault, memptydefault)
+import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
+import           Pantry.Internal.AesonExtended
+import           Stack.Prelude
 
 -- | Nix configuration. Parameterize by resolver type to avoid cyclic
 -- dependency.

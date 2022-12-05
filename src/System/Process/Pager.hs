@@ -10,16 +10,17 @@ module System.Process.Pager
   , PagerException (..)
   ) where
 
-import Stack.Prelude
-import System.Directory (findExecutable)
-import System.Environment (lookupEnv)
-import System.Process ( createProcess, cmdspec, shell, proc, waitForProcess
-                      , CmdSpec (ShellCommand, RawCommand)
-                      , StdStream (CreatePipe)
-                      , CreateProcess (std_in, close_fds, delegate_ctlc)
-                      )
-import Control.Monad.Trans.Maybe (MaybeT (runMaybeT, MaybeT))
+import           Control.Monad.Trans.Maybe ( MaybeT (runMaybeT, MaybeT) )
 import qualified Data.Text.IO as T
+import           Stack.Prelude
+import           System.Directory ( findExecutable )
+import           System.Environment ( lookupEnv )
+import           System.Process
+                   ( createProcess, cmdspec, shell, proc, waitForProcess
+                   , CmdSpec (ShellCommand, RawCommand)
+                   , StdStream (CreatePipe)
+                   , CreateProcess (std_in, close_fds, delegate_ctlc)
+                   )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "System.Process.Pager" module.

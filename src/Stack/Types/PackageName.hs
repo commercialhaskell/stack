@@ -4,8 +4,8 @@
 -- | Names for packages.
 
 module Stack.Types.PackageName
-    ( packageNameArgument
-    ) where
+  ( packageNameArgument
+  ) where
 
 import           Stack.Prelude
 import qualified Options.Applicative as O

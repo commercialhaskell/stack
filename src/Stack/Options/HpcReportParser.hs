@@ -2,12 +2,12 @@
 
 module Stack.Options.HpcReportParser where
 
-import qualified Data.Text                         as T
+import qualified Data.Text as T
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Options.Applicative.Types         (readerAsk)
-import           Stack.Coverage                    (HpcReportOpts (..))
-import           Stack.Options.Completion          (targetCompleter)
+import           Options.Applicative.Types ( readerAsk )
+import           Stack.Coverage ( HpcReportOpts (..) )
+import           Stack.Options.Completion ( targetCompleter )
 import           Stack.Prelude
 import           Stack.Types.Config
 

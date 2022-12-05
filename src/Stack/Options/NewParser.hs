@@ -2,7 +2,7 @@
 
 module Stack.Options.NewParser where
 
-import qualified Data.Map.Strict                   as M
+import qualified Data.Map.Strict as M
 import           Options.Applicative
 import           Stack.Init
 import           Stack.New

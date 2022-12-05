@@ -10,32 +10,32 @@
 -- configuration parsing. For example, we want @withConfig $
 -- withConfig $ ...@ to fail.
 module Stack.Runners
-    ( withBuildConfig
-    , withEnvConfig
-    , withDefaultEnvConfig
-    , withConfig
-    , withGlobalProject
-    , withRunnerGlobal
-    , ShouldReexec (..)
-    ) where
+  ( withBuildConfig
+  , withEnvConfig
+  , withDefaultEnvConfig
+  , withConfig
+  , withGlobalProject
+  , withRunnerGlobal
+  , ShouldReexec (..)
+  ) where
 
-import           Stack.Prelude
-import           RIO.Process (mkDefaultProcessContext)
-import           RIO.Time (addUTCTime, getCurrentTime)
-import           Stack.Build.Target(NeedTargets(..))
+import           RIO.Process ( mkDefaultProcessContext )
+import           RIO.Time ( addUTCTime, getCurrentTime )
+import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Config
 import           Stack.Constants
-import           Stack.DefaultColorWhen (defaultColorWhen)
+import           Stack.DefaultColorWhen ( defaultColorWhen )
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
+import           Stack.Prelude
 import           Stack.Setup
-import           Stack.Storage.User (upgradeChecksSince, logUpgradeCheck)
+import           Stack.Storage.User ( upgradeChecksSince, logUpgradeCheck )
 import           Stack.Types.Config
-import           Stack.Types.Docker (dockerEnable)
-import           Stack.Types.Nix (nixEnable)
-import           Stack.Types.Version (stackMinorVersion, minorVersion)
-import           System.Console.ANSI (hSupportsANSIWithoutEmulation)
-import           System.Terminal (getTerminalWidth)
+import           Stack.Types.Docker ( dockerEnable )
+import           Stack.Types.Nix ( nixEnable )
+import           Stack.Types.Version ( stackMinorVersion, minorVersion )
+import           System.Console.ANSI ( hSupportsANSIWithoutEmulation )
+import           System.Terminal ( getTerminalWidth )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Runners" module.

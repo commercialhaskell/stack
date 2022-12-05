@@ -19,8 +19,8 @@ module Stack.Build.Execute
     , ExecuteEnv
     , withExecuteEnv
     , withSingleContext
-    , ExcludeTHLoading(..)
-    , KeepOutputOpen(..)
+    , ExcludeTHLoading (..)
+    , KeepOutputOpen (..)
     ) where
 
 import           Control.Concurrent.Execute

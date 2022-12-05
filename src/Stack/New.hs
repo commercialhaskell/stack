@@ -12,7 +12,7 @@
 
 module Stack.New
     ( new
-    , NewOpts(..)
+    , NewOpts (..)
     , TemplateName
     , templatesHelp
     ) where

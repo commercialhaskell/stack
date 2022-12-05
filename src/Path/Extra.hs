@@ -4,25 +4,25 @@
 -- | Extra Path utilities.
 
 module Path.Extra
-  (toFilePathNoTrailingSep
-  ,dropRoot
-  ,parseCollapsedAbsDir
-  ,parseCollapsedAbsFile
-  ,concatAndCollapseAbsDir
-  ,rejectMissingFile
-  ,rejectMissingDir
-  ,pathToByteString
-  ,pathToLazyByteString
-  ,pathToText
-  ,tryGetModificationTime
+  ( toFilePathNoTrailingSep
+  , dropRoot
+  , parseCollapsedAbsDir
+  , parseCollapsedAbsFile
+  , concatAndCollapseAbsDir
+  , rejectMissingFile
+  , rejectMissingDir
+  , pathToByteString
+  , pathToLazyByteString
+  , pathToText
+  , tryGetModificationTime
   ) where
 
-import           Data.Time (UTCTime)
+import           Data.Time ( UTCTime )
 import           Path
 import           Path.IO
-import           Path.Internal (Path(..))
+import           Path.Internal ( Path (..) )
 import           RIO
-import           System.IO.Error (isDoesNotExistError)
+import           System.IO.Error ( isDoesNotExistError )
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL
 import qualified Data.Text as T

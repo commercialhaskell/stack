@@ -2,11 +2,11 @@
 
 module Stack.Options.PackageParser where
 
-import qualified Data.Map                          as Map
+import qualified Data.Map as Map
 import           Options.Applicative
-import           Options.Applicative.Types         (readerAsk)
+import           Options.Applicative.Types ( readerAsk )
 import           Stack.Prelude
-import           Stack.Types.Config.Build (ApplyCLIFlag (..))
+import           Stack.Types.Config.Build ( ApplyCLIFlag (..) )
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map ApplyCLIFlag (Map FlagName Bool))
