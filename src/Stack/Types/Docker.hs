@@ -9,17 +9,17 @@
 
 module Stack.Types.Docker where
 
-import Stack.Prelude hiding (Display (..))
-import Pantry.Internal.AesonExtended
-import Data.List (intercalate)
+import           Data.List ( intercalate )
 import qualified Data.Text as T
-import Distribution.System (Platform(..), OS(..), Arch(..))
-import Distribution.Text (simpleParse, display)
-import Distribution.Version (anyVersion)
-import Generics.Deriving.Monoid (mappenddefault, memptydefault)
-import Path
-import Stack.Types.Version
-import Text.Read (Read (..))
+import           Distribution.System ( Platform (..), OS (..), Arch (..) )
+import           Distribution.Text ( simpleParse, display )
+import           Distribution.Version ( anyVersion )
+import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
+import           Pantry.Internal.AesonExtended
+import           Path
+import           Stack.Prelude hiding ( Display (..) )
+import           Stack.Types.Version
+import           Text.Read ( Read (..) )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Docker" module.

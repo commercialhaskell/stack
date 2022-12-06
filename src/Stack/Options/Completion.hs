@@ -9,8 +9,8 @@ module Stack.Options.Completion
     , projectExeCompleter
     ) where
 
-import           Data.Char (isSpace)
-import           Data.List (isPrefixOf)
+import           Data.Char ( isSpace )
+import           Data.List ( isPrefixOf )
 import qualified Data.Map as Map
 import           Data.Maybe
 import qualified Data.Set as Set
@@ -18,8 +18,8 @@ import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
-import           Stack.Constants (ghcShowOptionsOutput)
-import           Stack.Options.GlobalParser (globalOptsFromMonoid)
+import           Stack.Constants ( ghcShowOptionsOutput )
+import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           Stack.Runners
 import           Stack.Prelude
 import           Stack.Types.Config

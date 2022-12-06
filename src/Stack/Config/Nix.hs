@@ -10,15 +10,15 @@ module Stack.Config.Nix
        ,nixCompilerVersion
        ) where
 
-import Stack.Prelude
-import Control.Monad.Extra (ifM)
+import           Control.Monad.Extra ( ifM )
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import Distribution.System (OS (..))
-import Stack.Constants
-import Stack.Types.Config
-import Stack.Types.Nix
-import System.Directory (doesFileExist)
+import           Distribution.System ( OS (..) )
+import           Stack.Constants
+import           Stack.Prelude
+import           Stack.Types.Config
+import           Stack.Types.Nix
+import           System.Directory ( doesFileExist )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Config.Nix" module.

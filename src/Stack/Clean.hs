@@ -6,17 +6,17 @@
 
 -- | Clean a project.
 module Stack.Clean
-    (clean
-    ,CleanOpts(..)
-    ,CleanCommand(..)
-    ) where
+  ( clean
+  , CleanOpts (..)
+  , CleanCommand (..)
+  ) where
 
-import           Stack.Prelude
-import           Data.List ((\\),intercalate)
+import           Data.List ( (\\), intercalate )
 import qualified Data.Map.Strict as Map
-import           Path.IO (ignoringAbsence, removeDirRecur)
-import           Stack.Config (withBuildConfig)
-import           Stack.Constants.Config (rootDistDirFromDir, workDirFromDir)
+import           Path.IO ( ignoringAbsence, removeDirRecur )
+import           Stack.Config ( withBuildConfig )
+import           Stack.Constants.Config ( rootDistDirFromDir, workDirFromDir )
+import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.SourceMap
 

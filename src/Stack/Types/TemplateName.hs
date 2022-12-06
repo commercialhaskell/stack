@@ -17,9 +17,9 @@ module Stack.Types.TemplateName
   , defaultTemplateName
   ) where
 
-import           Data.Aeson (FromJSON (..), withText)
+import           Data.Aeson ( FromJSON (..), withText )
 import qualified Data.Text as T
-import           Network.HTTP.StackClient (parseRequest)
+import           Network.HTTP.StackClient ( parseRequest )
 import qualified Options.Applicative as O
 import           Path
 import           Stack.Prelude

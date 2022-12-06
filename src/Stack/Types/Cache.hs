@@ -2,14 +2,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Types.Cache
-    ( ConfigCacheType(..)
-    , Action(..)
-    ) where
+  ( ConfigCacheType (..)
+  , Action (..)
+  ) where
 
 import qualified Data.Text as T
-import Database.Persist.Sql
-import Stack.Prelude
-import Stack.Types.GhcPkgId
+import           Database.Persist.Sql
+import           Stack.Prelude
+import           Stack.Types.GhcPkgId
 
 -- | Type of config cache
 data ConfigCacheType

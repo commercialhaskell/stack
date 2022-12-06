@@ -8,19 +8,18 @@
 
 -- Create a source distribution tarball
 module Stack.SDist
-    ( getSDistTarball
-    , checkSDistTarball
-    , checkSDistTarball'
-    , SDistOpts (..)
-    ) where
+  ( getSDistTarball
+  , checkSDistTarball
+  , checkSDistTarball'
+  , SDistOpts (..)
+  ) where
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute
-                   ( ActionContext(..), Concurrency(..) )
-import           Stack.Prelude hiding ( Display (..) )
+                   ( ActionContext (..), Concurrency (..) )
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
@@ -54,11 +53,12 @@ import           Stack.Build ( mkBaseConfigOpts, build, buildLocalTargets )
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source ( projectLocalPackages )
-import           Stack.Types.GhcPkgId
 import           Stack.Package
+import           Stack.Prelude hiding ( Display (..) )
 import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
+import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
 import           Stack.Types.Version

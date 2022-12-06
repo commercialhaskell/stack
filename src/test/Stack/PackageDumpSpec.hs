@@ -5,14 +5,14 @@
 module Stack.PackageDumpSpec where
 
 import           Conduit
-import qualified Data.Conduit.List             as CL
-import           Data.Conduit.Text             (decodeUtf8)
-import qualified Data.Map                      as Map
-import qualified Data.Set                      as Set
-import           Distribution.License          (License(..))
-import           Distribution.Types.PackageName (mkPackageName)
-import           Distribution.Version          (mkVersion)
-import           Path                          (parseAbsFile)
+import qualified Data.Conduit.List as CL
+import           Data.Conduit.Text ( decodeUtf8 )
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import           Distribution.License ( License (..) )
+import           Distribution.Types.PackageName ( mkPackageName )
+import           Distribution.Version ( mkVersion )
+import           Path ( parseAbsFile )
 import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.Types.Config

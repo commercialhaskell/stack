@@ -4,14 +4,14 @@
 
 module Stack.ArgsSpec where
 
-import Control.Monad
-import Data.Attoparsec.Args (EscapingMode(..), parseArgsFromString)
-import Data.Attoparsec.Interpreter (interpreterArgsParser)
+import           Control.Monad
+import           Data.Attoparsec.Args ( EscapingMode (..), parseArgsFromString )
+import           Data.Attoparsec.Interpreter ( interpreterArgsParser )
 import qualified Data.Attoparsec.Text as P
-import Data.Text (pack)
-import Stack.Prelude
-import Test.Hspec
-import Prelude (head)
+import           Data.Text ( pack )
+import           Stack.Prelude
+import           Test.Hspec
+import           Prelude ( head )
 
 -- | Test spec.
 spec :: Spec

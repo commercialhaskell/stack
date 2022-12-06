@@ -4,9 +4,9 @@
 -- | Build configuration
 module Stack.Config.Build where
 
+import           Distribution.Verbosity ( normal )
 import           Stack.Prelude
 import           Stack.Types.Config
-import           Distribution.Verbosity   (normal)
 
 -- | Interprets BuildOptsMonoid options.
 buildOptsFromMonoid :: BuildOptsMonoid -> BuildOpts

@@ -3,7 +3,7 @@
 module Stack.Options.GhcVariantParser where
 
 import           Options.Applicative
-import           Options.Applicative.Types         (readerAsk)
+import           Options.Applicative.Types ( readerAsk )
 import           Stack.Prelude
 import           Stack.Options.Utils
 import           Stack.Types.Config

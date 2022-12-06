@@ -11,22 +11,21 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Stack.Types.Resolver
-  (AbstractResolver(..)
-  ,readAbstractResolver
-  ,Snapshots (..)
+  ( AbstractResolver (..)
+  , readAbstractResolver
+  , Snapshots (..)
   ) where
 
-import           Pantry.Internal.AesonExtended
-                 (FromJSON, parseJSON,
-                  withObject, (.:), withText)
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
-import           Data.Text.Read (decimal)
-import           Data.Time (Day)
-import           Options.Applicative (ReadM)
+import           Data.Text.Read ( decimal )
+import           Data.Time ( Day )
+import           Options.Applicative ( ReadM )
 import qualified Options.Applicative.Types as OA
+import           Pantry.Internal.AesonExtended
+                   ( FromJSON, parseJSON, withObject, (.:), withText )
 import           Stack.Prelude
 
 -- | Type representing exceptions thrown by functions exported by the

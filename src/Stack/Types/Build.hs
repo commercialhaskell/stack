@@ -9,67 +9,66 @@
 -- | Build-specific types.
 
 module Stack.Types.Build
-    (BuildException(..)
-    ,BuildPrettyException(..)
-    ,ConstructPlanException(..)
-    ,BadDependency(..)
-    ,ParentMap
-    ,FlagSource(..)
-    ,UnusedFlags(..)
-    ,InstallLocation(..)
-    ,Installed(..)
-    ,psVersion
-    ,Task(..)
-    ,taskIsTarget
-    ,taskLocation
-    ,taskTargetIsMutable
-    ,LocalPackage(..)
-    ,BaseConfigOpts(..)
-    ,Plan(..)
-    ,TestOpts(..)
-    ,BenchmarkOpts(..)
-    ,FileWatchOpts(..)
-    ,BuildOpts(..)
-    ,BuildSubset(..)
-    ,defaultBuildOpts
-    ,TaskType(..)
-    ,IsMutable(..)
-    ,installLocationIsMutable
-    ,TaskConfigOpts(..)
-    ,BuildCache(..)
-    ,ConfigCache(..)
-    ,configureOpts
-    ,CachePkgSrc (..)
-    ,toCachePkgSrc
-    ,isStackOpt
-    ,wantedLocalPackages
-    ,FileCacheInfo (..)
-    ,ConfigureOpts (..)
-    ,PrecompiledCache (..)
-    )
-    where
+  ( BuildException (..)
+  , BuildPrettyException (..)
+  , ConstructPlanException (..)
+  , BadDependency (..)
+  , ParentMap
+  , FlagSource (..)
+  , UnusedFlags (..)
+  , InstallLocation (..)
+  , Installed (..)
+  , psVersion
+  , Task (..)
+  , taskIsTarget
+  , taskLocation
+  , taskTargetIsMutable
+  , LocalPackage (..)
+  , BaseConfigOpts (..)
+  , Plan (..)
+  , TestOpts (..)
+  , BenchmarkOpts (..)
+  , FileWatchOpts (..)
+  , BuildOpts (..)
+  , BuildSubset (..)
+  , defaultBuildOpts
+  , TaskType (..)
+  , IsMutable (..)
+  , installLocationIsMutable
+  , TaskConfigOpts (..)
+  , BuildCache (..)
+  , ConfigCache (..)
+  , configureOpts
+  , CachePkgSrc (..)
+  , toCachePkgSrc
+  , isStackOpt
+  , wantedLocalPackages
+  , FileCacheInfo (..)
+  , ConfigureOpts (..)
+  , PrecompiledCache (..)
+  ) where
 
-import           Data.Aeson                      (ToJSON, FromJSON)
-import qualified Data.ByteString                 as S
-import           Data.Char                       (isSpace)
-import           Data.List                       as L
-import qualified Data.Map                        as Map
-import qualified Data.Map.Strict                 as M
-import           Data.Monoid.Map                 (MonoidMap(..))
-import qualified Data.Set                        as Set
-import qualified Data.Text                       as T
+import           Data.Aeson ( ToJSON, FromJSON )
+import qualified Data.ByteString as S
+import           Data.Char ( isSpace )
+import           Data.List as L
+import qualified Data.Map as Map
+import qualified Data.Map.Strict as M
+import           Data.Monoid.Map ( MonoidMap (..) )
+import qualified Data.Set as Set
+import qualified Data.Text as T
 import           Database.Persist.Sql
-                   ( PersistField (..), PersistFieldSql(..)
+                   ( PersistField (..), PersistFieldSql (..)
                    , PersistValue (PersistText), SqlType (SqlString)
                    )
 import           Distribution.PackageDescription
                    ( TestSuiteInterface, mkPackageName )
-import           Distribution.System             (Arch)
-import qualified Distribution.Text               as C
-import qualified Distribution.Version            as C
-import           Path                            (parseRelDir, (</>), parent)
-import           Path.Extra                      (toFilePathNoTrailingSep)
-import           RIO.Process                     (showProcessArgDebug)
+import           Distribution.System ( Arch )
+import qualified Distribution.Text as C
+import qualified Distribution.Version as C
+import           Path ( parseRelDir, (</>), parent )
+import           Path.Extra ( toFilePathNoTrailingSep )
+import           RIO.Process ( showProcessArgDebug )
 import           Stack.Constants
 import           Stack.Prelude
 import           Stack.Types.Compiler
@@ -79,7 +78,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.Version
-import           System.FilePath                 (pathSeparator)
+import           System.FilePath ( pathSeparator )
 
 -- | Type representing exceptions thrown by functions exported by modules with
 -- names beginning @Stack.Build@.

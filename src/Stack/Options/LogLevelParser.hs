@@ -3,7 +3,7 @@
 
 module Stack.Options.LogLevelParser where
 
-import qualified Data.Text                         as T
+import qualified Data.Text as T
 import           Options.Applicative
 import           Stack.Options.Utils
 import           Stack.Prelude

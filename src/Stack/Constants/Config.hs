@@ -23,10 +23,10 @@ module Stack.Constants.Config
   , templatesDir
   ) where
 
-import Stack.Prelude
-import Stack.Constants
-import Stack.Types.Config
-import Path
+import           Path
+import           Stack.Constants
+import           Stack.Prelude
+import           Stack.Types.Config
 
 -- | Output .o/.hi directory.
 objectInterfaceDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)

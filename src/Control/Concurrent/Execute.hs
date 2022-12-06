@@ -9,7 +9,7 @@ module Control.Concurrent.Execute
     , ActionId (..)
     , ActionContext (..)
     , Action (..)
-    , Concurrency(..)
+    , Concurrency (..)
     , runActions
     ) where
 

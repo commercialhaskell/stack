@@ -13,24 +13,30 @@ module Stack.Types.Package where
 
 import           Stack.Prelude
 import qualified RIO.Text as T
-import           Data.Aeson (ToJSON (..), FromJSON (..), (.=), (.:), object, withObject)
+import           Data.Aeson
+                   ( ToJSON (..), FromJSON (..), (.=), (.:), object, withObject
+                   )
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import           Distribution.CabalSpecVersion
-import           Distribution.Parsec (PError (..), PWarning (..), showPos)
+import           Distribution.Parsec ( PError (..), PWarning (..), showPos )
 import qualified Distribution.SPDX.License as SPDX
-import           Distribution.License (License)
-import           Distribution.ModuleName (ModuleName)
-import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
-import           Distribution.System (Platform (..))
+import           Distribution.License ( License )
+import           Distribution.ModuleName ( ModuleName )
+import           Distribution.PackageDescription
+                   ( TestSuiteInterface, BuildType )
+import           Distribution.System ( Platform (..) )
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
-import           Stack.Types.Dependency (DepValue)
-import           Stack.Types.PackageFile (GetPackageFiles(..), DotCabalDescriptor(..), DotCabalPath(..))
+import           Stack.Types.Dependency ( DepValue )
+import           Stack.Types.PackageFile
+                   ( GetPackageFiles (..), DotCabalDescriptor (..)
+                   , DotCabalPath (..)
+                   )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.

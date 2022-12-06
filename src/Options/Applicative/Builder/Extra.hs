@@ -27,7 +27,7 @@ module Options.Applicative.Builder.Extra
   , fileCompleter
   , fileExtCompleter
   , dirCompleter
-  , PathCompleterOpts(..)
+  , PathCompleterOpts (..)
   , defaultPathCompleterOpts
   , pathCompleterWith
   , unescapeBashArg

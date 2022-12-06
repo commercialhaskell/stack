@@ -1,23 +1,36 @@
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
-module Main (main) where
+module Main
+  ( main
+  ) where
 
-import Data.List ( nub, sortBy )
-import Data.Ord ( comparing )
-import Distribution.Package ( PackageId, UnitId, packageVersion, packageName )
-import Distribution.PackageDescription ( PackageDescription(), Executable(..) )
-import Distribution.InstalledPackageInfo (sourcePackageId, installedUnitId)
-import Distribution.Simple ( defaultMainWithHooks, UserHooks(..), simpleUserHooks )
-import Distribution.Simple.Utils ( rewriteFileEx, createDirectoryIfMissingVerbose )
-import Distribution.Simple.BuildPaths ( autogenPackageModulesDir )
-import Distribution.Simple.PackageIndex (allPackages, dependencyClosure)
-import Distribution.Simple.Setup ( BuildFlags(buildVerbosity), fromFlag )
-import Distribution.Simple.LocalBuildInfo ( installedPkgs, withLibLBI, withExeLBI, LocalBuildInfo(), ComponentLocalBuildInfo(componentPackageDeps) )
-import Distribution.Types.PackageName (PackageName, unPackageName)
-import Distribution.Types.UnqualComponentName (unUnqualComponentName)
-import Distribution.Verbosity ( Verbosity, normal )
-import Distribution.Pretty ( prettyShow )
-import System.FilePath ( (</>) )
+import           Data.List ( nub, sortBy )
+import           Data.Ord ( comparing )
+import           Distribution.InstalledPackageInfo
+                   ( sourcePackageId, installedUnitId )
+import           Distribution.Package
+                   ( PackageId, UnitId, packageVersion, packageName )
+import           Distribution.PackageDescription
+                   ( PackageDescription (), Executable (..) )
+import           Distribution.Pretty ( prettyShow )
+import           Distribution.Simple
+                   ( defaultMainWithHooks, UserHooks(..), simpleUserHooks )
+import           Distribution.Simple.BuildPaths ( autogenPackageModulesDir )
+import           Distribution.Simple.LocalBuildInfo
+                   ( installedPkgs, withLibLBI, withExeLBI, LocalBuildInfo ()
+                   , ComponentLocalBuildInfo (componentPackageDeps)
+                   )
+import           Distribution.Simple.PackageIndex
+                   ( allPackages, dependencyClosure )
+import           Distribution.Simple.Setup
+                   ( BuildFlags (buildVerbosity), fromFlag )
+import           Distribution.Simple.Utils
+                   ( rewriteFileEx, createDirectoryIfMissingVerbose )
+import           Distribution.Types.PackageName ( PackageName, unPackageName )
+import           Distribution.Types.UnqualComponentName
+                   ( unUnqualComponentName )
+import           Distribution.Verbosity ( Verbosity, normal )
+import           System.FilePath ( (</>) )
 
 main :: IO ()
 main = defaultMainWithHooks simpleUserHooks

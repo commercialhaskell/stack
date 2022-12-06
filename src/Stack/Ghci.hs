@@ -9,18 +9,17 @@
 -- | Run a GHCi configured with the user's package(s).
 
 module Stack.Ghci
-    ( GhciOpts(..)
-    , GhciPkgInfo(..)
-    , GhciException(..)
-    , ghci
-    ) where
+  ( GhciOpts (..)
+  , GhciPkgInfo (..)
+  , GhciException (..)
+  , ghci
+  ) where
 
-import           Stack.Prelude hiding (Display (..))
-import           Control.Monad.State.Strict (State, execState, get, modify)
-import           Data.ByteString.Builder (byteString)
+import           Control.Monad.State.Strict ( State, execState, get, modify )
+import           Data.ByteString.Builder ( byteString )
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
-import           Data.Foldable (foldl)
+import           Data.Foldable ( foldl )
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
@@ -30,8 +29,8 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Distribution.PackageDescription as C
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO hiding (withSystemTempDir)
+import           Path.Extra ( toFilePathNoTrailingSep )
+import           Path.IO hiding ( withSystemTempDir )
 import qualified RIO
 import           RIO.Process
                    ( HasProcessContext, exec, proc, readProcess_
@@ -45,15 +44,16 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Ghci.Script
 import           Stack.Package
+import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageFile
 import           Stack.Types.SourceMap
-import           System.IO (putStrLn)
-import           System.IO.Temp (getCanonicalTemporaryDirectory)
-import           System.Permissions (setScriptPerms)
+import           System.IO ( putStrLn )
+import           System.IO.Temp ( getCanonicalTemporaryDirectory )
+import           System.Permissions ( setScriptPerms )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Ghci" module.

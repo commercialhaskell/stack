@@ -22,89 +22,89 @@ module Stack.Types.Config
   (
   -- * Main configuration types and classes
   -- ** HasPlatform & HasStackRoot
-    HasPlatform(..)
-  , PlatformVariant(..)
+    HasPlatform (..)
+  , PlatformVariant (..)
   -- ** Runner
-  , HasRunner(..)
-  , Runner(..)
-  , ColorWhen(..)
+  , HasRunner (..)
+  , Runner (..)
+  , ColorWhen (..)
   , terminalL
   , reExecL
   -- ** Config & HasConfig
-  , Config(..)
-  , HasConfig(..)
+  , Config (..)
+  , HasConfig (..)
   , askLatestSnapshotUrl
   , configProjectRoot
   -- ** BuildConfig & HasBuildConfig
-  , BuildConfig(..)
-  , ProjectPackage(..)
-  , DepPackage(..)
+  , BuildConfig (..)
+  , ProjectPackage (..)
+  , DepPackage (..)
   , ppRoot
   , ppVersion
   , ppComponents
   , ppGPD
   , stackYamlL
   , projectRootL
-  , HasBuildConfig(..)
+  , HasBuildConfig (..)
   -- ** Storage databases
-  , UserStorage(..)
-  , ProjectStorage(..)
+  , UserStorage (..)
+  , ProjectStorage (..)
   -- ** GHCVariant & HasGHCVariant
-  , GHCVariant(..)
+  , GHCVariant (..)
   , ghcVariantName
   , ghcVariantSuffix
   , parseGHCVariant
-  , HasGHCVariant(..)
+  , HasGHCVariant (..)
   , snapshotsDir
   -- ** EnvConfig & HasEnvConfig
-  , EnvConfig(..)
-  , HasSourceMap(..)
-  , HasEnvConfig(..)
+  , EnvConfig (..)
+  , HasSourceMap (..)
+  , HasEnvConfig (..)
   , getCompilerPath
   -- * Details
   -- ** ApplyGhcOptions
-  , ApplyGhcOptions(..)
+  , ApplyGhcOptions (..)
   -- ** AllowNewerDeps
-  , AllowNewerDeps(..)
+  , AllowNewerDeps (..)
   -- ** CabalConfigKey
-  , CabalConfigKey(..)
+  , CabalConfigKey (..)
   -- ** ConfigException
-  , HpackExecutable(..)
-  , ConfigException(..)
-  , ConfigPrettyException(..)
-  , ParseAbsolutePathException(..)
+  , HpackExecutable (..)
+  , ConfigException (..)
+  , ConfigPrettyException (..)
+  , ParseAbsolutePathException (..)
   , packageIndicesWarning
   -- ** ConfigMonoid
-  , ConfigMonoid(..)
+  , ConfigMonoid (..)
   , configMonoidInstallGHCName
   , configMonoidSystemGHCName
   , parseConfigMonoid
   -- ** DumpLogs
-  , DumpLogs(..)
+  , DumpLogs (..)
   -- ** EnvSettings
-  , EnvSettings(..)
+  , EnvSettings (..)
   , minimalEnvSettings
   , defaultEnvSettings
   , plainEnvSettings
   -- ** GlobalOpts & GlobalOptsMonoid
-  , GlobalOpts(..)
-  , GlobalOptsMonoid(..)
+  , GlobalOpts (..)
+  , GlobalOptsMonoid (..)
   , rslInLogL
-  , StackYamlLoc(..)
+  , StackYamlLoc (..)
   , stackYamlLocL
-  , LockFileBehavior(..)
+  , LockFileBehavior (..)
   , readLockFileBehavior
   , lockFileBehaviorL
   , defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
-  , Project(..)
-  , ProjectConfig(..)
-  , Curator(..)
-  , ProjectAndConfigMonoid(..)
+  , Project (..)
+  , ProjectConfig (..)
+  , Curator (..)
+  , ProjectAndConfigMonoid (..)
   , parseProjectAndConfigMonoid
   -- ** PvpBounds
-  , PvpBounds(..)
-  , PvpBoundsType(..)
+  , PvpBounds (..)
+  , PvpBoundsType (..)
   , parsePvpBounds
   -- ** ColorWhen
   , readColorWhen
@@ -114,7 +114,7 @@ module Stack.Types.Config
   , SCM(..)
   -- * Paths
   , bindirSuffix
-  , GlobalInfoSource(..)
+  , GlobalInfoSource (..)
   , getProjectWorkDir
   , docDirSuffix
   , extraBinDirs
@@ -138,30 +138,30 @@ module Stack.Types.Config
   -- * Command-related types
   , AddCommand
   -- ** Eval
-  , EvalOpts(..)
+  , EvalOpts (..)
   -- ** Exec
-  , ExecOpts(..)
-  , SpecialExecCmd(..)
-  , ExecOptsExtra(..)
+  , ExecOpts (..)
+  , SpecialExecCmd (..)
+  , ExecOptsExtra (..)
   -- ** Setup
-  , DownloadInfo(..)
-  , VersionedDownloadInfo(..)
-  , GHCDownloadInfo(..)
-  , SetupInfo(..)
+  , DownloadInfo (..)
+  , VersionedDownloadInfo (..)
+  , GHCDownloadInfo (..)
+  , SetupInfo (..)
   -- ** Docker entrypoint
-  , DockerEntrypoint(..)
-  , DockerUser(..)
+  , DockerEntrypoint (..)
+  , DockerUser (..)
   , module X
   -- * Lens helpers
   , wantedCompilerVersionL
   , actualCompilerVersionL
-  , HasCompiler(..)
-  , DumpPackage(..)
-  , CompilerPaths(..)
-  , GhcPkgExe(..)
+  , HasCompiler (..)
+  , DumpPackage (..)
+  , CompilerPaths (..)
+  , GhcPkgExe (..)
   , getGhcPkgExe
   , cpWhich
-  , ExtraDirs(..)
+  , ExtraDirs (..)
   , buildOptsL
   , globalOptsL
   , buildOptsInstallExesL
@@ -193,7 +193,7 @@ import           Pantry.Internal.AesonExtended
                    , withText, object, (.=), (..:), (...:), (..:?), (..!=)
                    , Value(Bool), withObjectWarnings, WarningParser, Object
                    , jsonSubWarnings, jsonSubWarningsT, jsonSubWarningsTT
-                   , WithJSONWarnings(..)
+                   , WithJSONWarnings (..)
                    , FromJSONKeyFunction (FromJSONKeyTextParser)
                    )
 import           Data.Attoparsec.Args ( parseArgs, EscapingMode (Escaping) )

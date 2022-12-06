@@ -3,9 +3,9 @@
 
 module Stack.Options.ResolverParser where
 
-import qualified Data.Text                         as T
+import qualified Data.Text as T
 import           Options.Applicative
-import           Options.Applicative.Types         (readerAsk)
+import           Options.Applicative.Types ( readerAsk )
 import           Stack.Options.Utils
 import           Stack.Prelude
 import           Stack.Types.Resolver

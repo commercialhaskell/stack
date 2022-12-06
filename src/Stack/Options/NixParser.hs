@@ -2,7 +2,7 @@
 
 module Stack.Options.NixParser where
 
-import qualified Data.Text                         as T
+import qualified Data.Text as T
 import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra

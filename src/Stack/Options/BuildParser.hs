@@ -8,7 +8,7 @@ import           Options.Applicative
 import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Stack.Options.Completion
-import           Stack.Options.PackageParser (readFlag)
+import           Stack.Options.PackageParser ( readFlag )
 import           Stack.Prelude
 import           Stack.Types.Config
 
