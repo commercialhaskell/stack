@@ -96,7 +96,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative >= 0.17.0.0
-- pantry >= 0.8.0
+- pantry >= 0.8.1
 - path
 - path-io
 # In order for Cabal (the tool) to build Stack, it needs to be told of the

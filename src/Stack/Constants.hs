@@ -132,7 +132,7 @@ import           Data.Char ( toUpper )
 import           Data.FileEmbed ( embedFile, makeRelativeToProject )
 import qualified Data.Set as Set
 import           Distribution.Package ( mkPackageName )
-import qualified Hpack.Config as Hpack
+import           Hpack.Config ( packageConfig )
 import qualified Language.Haskell.TH.Syntax as TH ( runIO, lift )
 import           Path as FL
 import           Stack.Prelude
@@ -342,7 +342,7 @@ relFileSetupLhs :: Path Rel File
 relFileSetupLhs = $(mkRelFile "Setup.lhs")
 
 relFileHpackPackageConfig :: Path Rel File
-relFileHpackPackageConfig = $(mkRelFile Hpack.packageConfig)
+relFileHpackPackageConfig = $(mkRelFile packageConfig)
 
 relDirGlobalAutogen :: Path Rel Dir
 relDirGlobalAutogen = $(mkRelDir "global-autogen")

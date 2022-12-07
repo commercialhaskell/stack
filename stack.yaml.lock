@@ -5,12 +5,19 @@
 
 packages:
 - completed:
-    hackage: pantry-0.8.0@sha256:351a9103c0b1dd78f6b8f243ca4fc6a6952d5ba00f72032b831e5ee0e61dce0f,4099
+    hackage: hpack-0.35.1@sha256:ef816234cbc7b52b0a6c55f7e904b6bc5292b8dd8f2d81ffcbcbc69ab80d75e5,4762
     pantry-tree:
-      sha256: a5f0a90f33a78e3c92f3c13335f870fe83f20c45296cda9c279042b7c451a310
+      sha256: 514f0311eff442ab83ef3c2db456857f360ea173c17df133e575f50915e02da0
+      size: 3675
+  original:
+    hackage: hpack-0.35.1@sha256:ef816234cbc7b52b0a6c55f7e904b6bc5292b8dd8f2d81ffcbcbc69ab80d75e5,4762
+- completed:
+    hackage: pantry-0.8.1@sha256:196111414d2489499fda6213deebcb865bc12285023d5af9bd273bf27cdb185d,4099
+    pantry-tree:
+      sha256: f7032e124bda7deb3b70b0fc308e9bbe9ba6c81f79b88a1cd0b5b7932f4ab14a
       size: 2524
   original:
-    hackage: pantry-0.8.0@sha256:351a9103c0b1dd78f6b8f243ca4fc6a6952d5ba00f72032b831e5ee0e61dce0f,4099
+    hackage: pantry-0.8.1@sha256:196111414d2489499fda6213deebcb865bc12285023d5af9bd273bf27cdb185d,4099
 - completed:
     hackage: rio-prettyprint-0.1.4.0@sha256:1f8eb3ead0ef33d3736d53e1de5e9b2c91a0c207cdca23321bd74c401e85f23a,1301
     pantry-tree:
