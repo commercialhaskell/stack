@@ -9,7 +9,40 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RankNTypes                 #-}
 
-module Stack.Types.Package where
+module Stack.Types.Package
+ ( BuildInfoOpts (..)
+ , ExeName (..)
+ , FileCacheInfo (..)
+ , GetPackageOpts (..)
+ , InstallLocation (..)
+ , InstallMap
+ , Installed (..)
+ , InstalledPackageLocation (..)
+ , InstalledMap
+ , LocalPackage (..)
+ , MemoizedWith (..)
+ , Package (..)
+ , PackageConfig (..)
+ , PackageException (..)
+ , PackageLibraries (..)
+ , PackageSource (..)
+ , dotCabalCFilePath
+ , dotCabalGetPath
+ , dotCabalMain
+ , dotCabalMainPath
+ , dotCabalModule
+ , dotCabalModulePath
+ , installedPackageIdentifier
+ , installedVersion
+ , lpFiles
+ , lpFilesForComponents
+ , memoizeRefWith
+ , packageDefinedFlags
+ , packageIdent
+ , packageIdentifier
+ , psVersion
+ , runMemoizedWith
+ ) where
 
 import           Stack.Prelude
 import qualified RIO.Text as T
@@ -277,8 +310,8 @@ memoizeRefWith action = do
           pure res
     either throwIO pure res
 
-runMemoizedWith
-  :: (HasEnvConfig env, MonadReader env m, MonadIO m)
+runMemoizedWith ::
+     (HasEnvConfig env, MonadReader env m, MonadIO m)
   => MemoizedWith EnvConfig a
   -> m a
 runMemoizedWith (MemoizedWith action) = do

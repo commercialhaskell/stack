@@ -1,7 +1,19 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.Options.DotParser where
+module Stack.Options.DotParser
+  ( dotOptsParser
+  , formatSubCommand
+  , licenseParser
+  , listDepsConstraintsParser
+  , listDepsFormatOptsParser
+  , listDepsJsonParser
+  , listDepsOptsParser
+  , listDepsTextParser
+  , listDepsTreeParser
+  , separatorParser
+  , toListDepsOptsParser
+  ) where
 
 import           Data.Char ( isSpace )
 import           Data.List.Split ( splitOn )

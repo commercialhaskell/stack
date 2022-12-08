@@ -1,7 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.Options.GhciParser where
+module Stack.Options.GhciParser
+  ( ghciOptsParser
+  ) where
 
 import           Options.Applicative
                    ( Parser, completer, flag, help, idm, internal, long, metavar
