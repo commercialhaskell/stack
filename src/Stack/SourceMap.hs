@@ -3,32 +3,31 @@
 {-# LANGUAGE RecordWildCards   #-}
 
 module Stack.SourceMap
-    ( mkProjectPackage
-    , snapToDepPackage
-    , additionalDepPackage
-    , loadVersion
-    , getPLIVersion
-    , loadGlobalHints
-    , DumpedGlobalPackage
-    , actualFromGhc
-    , actualFromHints
-    , checkFlagsUsedThrowing
-    , globalCondCheck
-    , pruneGlobals
-    , globalsFromHints
-    , getCompilerInfo
-    , immutableLocSha
-    , loadProjectSnapshotCandidate
-    , SnapshotCandidate
-    , globalsFromDump
-    ) where
+  ( mkProjectPackage
+  , snapToDepPackage
+  , additionalDepPackage
+  , loadVersion
+  , getPLIVersion
+  , loadGlobalHints
+  , DumpedGlobalPackage
+  , actualFromGhc
+  , actualFromHints
+  , checkFlagsUsedThrowing
+  , globalCondCheck
+  , pruneGlobals
+  , globalsFromHints
+  , getCompilerInfo
+  , immutableLocSha
+  , loadProjectSnapshotCandidate
+  , SnapshotCandidate
+  , globalsFromDump
+  ) where
 
 import           Data.ByteString.Builder ( byteString )
 import qualified Data.Conduit.List as CL
 import qualified Distribution.PackageDescription as PD
 import           Distribution.System ( Platform (..) )
 import qualified Pantry.SHA256 as SHA256
-import qualified RIO
 import qualified RIO.Map as Map
 import           RIO.Process
 import qualified RIO.Set as Set
@@ -40,8 +39,8 @@ import           Stack.Types.Config
 import           Stack.Types.SourceMap
 
 -- | Create a 'ProjectPackage' from a directory containing a package.
-mkProjectPackage
-  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+mkProjectPackage ::
+     forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PrintWarnings
   -> ResolvedPath Dir
   -> Bool
@@ -65,8 +64,8 @@ mkProjectPackage printWarnings dir buildHaddocks = do
 
 -- | Create a 'DepPackage' from a 'PackageLocation', from some additional
 -- to a snapshot setting (extra-deps or command line)
-additionalDepPackage
-  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+additionalDepPackage ::
+     forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Bool
   -> PackageLocation
   -> RIO env DepPackage
@@ -96,8 +95,8 @@ additionalDepPackage buildHaddocks pl = do
           }
     }
 
-snapToDepPackage
-  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+snapToDepPackage ::
+     forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Bool
   -> PackageName
   -> SnapshotPackage
@@ -129,8 +128,8 @@ getPLIVersion (PLIHackage (PackageIdentifier _ v) _ _) = v
 getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
 getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
-globalsFromDump
-  :: (HasLogFunc env, HasProcessContext env)
+globalsFromDump ::
+     (HasLogFunc env, HasProcessContext env)
   => GhcPkgExe
   -> RIO env (Map PackageName DumpedGlobalPackage)
 globalsFromDump pkgexe = do
@@ -140,8 +139,8 @@ globalsFromDump pkgexe = do
         Map.fromList $ map (pkgName . dpPackageIdent &&& id) $ Map.elems ds
   toGlobals <$> ghcPkgDump pkgexe [] pkgConduit
 
-globalsFromHints
-  :: HasConfig env
+globalsFromHints ::
+     HasConfig env
   => WantedCompiler
   -> RIO env (Map PackageName Version)
 globalsFromHints compiler = do
@@ -149,13 +148,13 @@ globalsFromHints compiler = do
   case mglobalHints of
     Just hints -> pure hints
     Nothing -> do
-      logWarn $ "Unable to load global hints for " <> RIO.display compiler
+      logWarn $ "Unable to load global hints for " <> display compiler
       pure mempty
 
 type DumpedGlobalPackage = DumpPackage
 
-actualFromGhc
-  :: (HasConfig env, HasCompiler env)
+actualFromGhc ::
+     (HasConfig env, HasCompiler env)
   => SMWanted
   -> ActualCompiler
   -> RIO env (SMActual DumpedGlobalPackage)
@@ -169,8 +168,8 @@ actualFromGhc smw ac = do
       , smaGlobal = globals
       }
 
-actualFromHints
-  :: (HasConfig env)
+actualFromHints ::
+     (HasConfig env)
   => SMWanted
   -> ActualCompiler
   -> RIO env (SMActual GlobalPackageVersion)
@@ -185,8 +184,8 @@ actualFromHints smw ac = do
       }
 
 -- | Simple cond check for boot packages - checks only OS and Arch
-globalCondCheck
-  :: (HasConfig env)
+globalCondCheck ::
+     (HasConfig env)
   => RIO env (PD.ConfVar
   -> Either PD.ConfVar Bool)
 globalCondCheck = do
@@ -196,8 +195,8 @@ globalCondCheck = do
       condCheck c = Left c
   pure condCheck
 
-checkFlagsUsedThrowing
-  :: (MonadIO m, MonadThrow m)
+checkFlagsUsedThrowing ::
+     (MonadIO m, MonadThrow m)
   => Map PackageName (Map FlagName Bool)
   -> FlagSource
   -> Map PackageName ProjectPackage
@@ -210,8 +209,8 @@ checkFlagsUsedThrowing packageFlags source prjPackages deps = do
   unless (null unusedFlags) $
     throwM $ InvalidFlagSpecification $ Set.fromList unusedFlags
 
-getUnusedPackageFlags
-  :: MonadIO m
+getUnusedPackageFlags ::
+     MonadIO m
   => (PackageName, Map FlagName Bool)
   -> FlagSource
   -> Map PackageName ProjectPackage
@@ -236,8 +235,8 @@ getUnusedPackageFlags (name, userFlags) source prj deps =
             -- Error about the undefined flags
             else pure $ Just $ UFFlagsNotDefined source pname pkgFlags unused
 
-pruneGlobals
-  :: Map PackageName DumpedGlobalPackage
+pruneGlobals ::
+     Map PackageName DumpedGlobalPackage
   -> Set PackageName
   -> Map PackageName GlobalPackage
 pruneGlobals globals deps =
@@ -261,8 +260,8 @@ immutableLocSha = byteString . treeKeyToBs . locationTreeKey
 type SnapshotCandidate env
   = [ResolvedPath Dir] -> RIO env (SMActual GlobalPackageVersion)
 
-loadProjectSnapshotCandidate
-  :: (HasConfig env)
+loadProjectSnapshotCandidate ::
+     (HasConfig env)
   => RawSnapshotLocation
   -> PrintWarnings
   -> Bool

@@ -9,14 +9,14 @@
 
 -- | Generate HPC (Haskell Program Coverage) reports
 module Stack.Coverage
-    ( deleteHpcReports
-    , updateTixFile
-    , generateHpcReport
-    , HpcReportOpts (..)
-    , generateHpcReportForTargets
-    , generateHpcUnifiedReport
-    , generateHpcMarkupIndex
-    ) where
+  ( deleteHpcReports
+  , updateTixFile
+  , generateHpcReport
+  , HpcReportOpts (..)
+  , generateHpcReportForTargets
+  , generateHpcUnifiedReport
+  , generateHpcMarkupIndex
+  ) where
 
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
@@ -29,13 +29,12 @@ import           Distribution.Version ( mkVersion )
 import           Path
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
-import qualified RIO
 import           RIO.Process
 import           Stack.Build.Target
 import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Package
-import           Stack.Prelude hiding ( Display (..) )
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -77,17 +76,23 @@ deleteHpcReports = do
     hpcDir <- hpcReportDir
     liftIO $ ignoringAbsence (removeDirRecur hpcDir)
 
--- | Move a tix file into a sub-directory of the hpc report directory. Deletes the old one if one is
--- present.
-updateTixFile :: HasEnvConfig env => PackageName -> Path Abs File -> String -> RIO env ()
+-- | Move a tix file into a sub-directory of the hpc report directory. Deletes
+-- the old one if one is present.
+updateTixFile ::
+     HasEnvConfig env
+  => PackageName
+  -> Path Abs File
+  -> String
+  -> RIO env ()
 updateTixFile pkgName' tixSrc testName = do
     exists <- doesFileExist tixSrc
     when exists $ do
         tixDest <- tixFilePath pkgName' testName
         liftIO $ ignoringAbsence (removeFile tixDest)
         ensureDir (parent tixDest)
-        -- Remove exe modules because they are problematic. This could be revisited if there's a GHC
-        -- version that fixes https://ghc.haskell.org/trac/ghc/ticket/1853
+        -- Remove exe modules because they are problematic. This could be
+        -- revisited if there's a GHC version that fixes
+        -- https://ghc.haskell.org/trac/ghc/ticket/1853
         mtix <- readTixOrLog tixSrc
         case mtix of
             Nothing -> logError $
@@ -109,8 +114,8 @@ hpcPkgPath pkgName' = do
     pkgNameRel <- parseRelDir (packageNameString pkgName')
     pure (outputDir </> pkgNameRel)
 
--- | Get the tix file location, given the name of the file (without extension), and the package
--- identifier string.
+-- | Get the tix file location, given the name of the file (without extension),
+-- and the package identifier string.
 tixFilePath :: HasEnvConfig env
             => PackageName -> String -> RIO env (Path Abs File)
 tixFilePath pkgName' testName = do
@@ -147,7 +152,7 @@ generateHpcReport pkgDir package tests = do
             eincludeName <- findPackageFieldForBuiltPackage pkgDir (packageIdentifier package) internalLibs hpcNameField
             case eincludeName of
                 Left err -> do
-                    logError $ RIO.display err
+                    logError $ display err
                     pure $ Left err
                 Right includeNames -> pure $ Right $ Just $ map T.unpack includeNames
     forM_ tests $ \testName -> do
@@ -155,7 +160,7 @@ generateHpcReport pkgDir package tests = do
         let report = "coverage report for " <> pkgName' <> "'s test-suite \"" <> testName <> "\""
             reportDir = parent tixSrc
         case eincludeName of
-            Left err -> generateHpcErrorReport reportDir (RIO.display (sanitize (T.unpack err)))
+            Left err -> generateHpcErrorReport reportDir (display (sanitize (T.unpack err)))
             -- Restrict to just the current library code, if there is a library in the package (see
             -- #634 - this will likely be customizable in the future)
             Right mincludeName -> do
@@ -170,28 +175,29 @@ generateHpcReportInternal :: HasEnvConfig env
                           => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String]
                           -> RIO env (Maybe (Path Abs File))
 generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
-    -- If a .tix file exists, move it to the HPC output directory and generate a report for it.
+    -- If a .tix file exists, move it to the HPC output directory and generate a
+    -- report for it.
     tixFileExists <- doesFileExist tixSrc
     if not tixFileExists
         then do
             logError $
                  "Error: [S-4634]\n" <>
                  "Didn't find .tix for " <>
-                 RIO.display report <>
+                 display report <>
                  " - expected to find it at " <>
                  fromString (toFilePath tixSrc) <>
                  "."
             pure Nothing
         else (`catch` \(err :: ProcessException) -> do
                  logError $ displayShow err
-                 generateHpcErrorReport reportDir $ RIO.display $ sanitize $
+                 generateHpcErrorReport reportDir $ display $ sanitize $
                      displayException err
                  pure Nothing) $
              (`onException`
                  logError
                    ("Error: [S-8215]\n" <>
                     "Error occurred while producing " <>
-                    RIO.display report)) $ do
+                    display report)) $ do
             -- Directories for .mix files.
             hpcRelDir <- hpcRelativeDir
             -- Compute arguments used for both "hpc markup" and "hpc report".
@@ -201,7 +207,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++
                     -- Look for index files in the correct dir (relative to each pkgdir).
                     ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
-            logInfo $ "Generating " <> RIO.display report
+            logInfo $ "Generating " <> display report
             outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines . BL.toStrict . fst) $
                 proc "hpc"
                 ( "report"
@@ -214,7 +220,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     let msg html =
                             "Error: [S-6829]\n"<>
                             "The " <>
-                            RIO.display report <>
+                            display report <>
                             " did not consider any code. One possible cause of this is" <>
                             " if your test-suite builds the library code (see Stack " <>
                             (if html then "<a href='https://github.com/commercialhaskell/stack/issues/1008'>" else "") <>
@@ -345,7 +351,7 @@ generateUnionReport report reportDir tixFiles = do
     logDebug $ "Using the following tix files: " <> fromString (show tixFiles)
     unless (null errs) $ logWarn $
         "The following modules are left out of the " <>
-        RIO.display report <>
+        display report <>
         " due to version mismatches: " <>
         mconcat (L.intersperse ", " (map fromString errs))
     tixDest <- liftM (reportDir </>) $ parseRelFile (dirnameString reportDir ++ ".tix")

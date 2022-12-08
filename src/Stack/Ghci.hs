@@ -31,7 +31,6 @@ import qualified Distribution.PackageDescription as C
 import           Path
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO hiding ( withSystemTempDir )
-import qualified RIO
 import           RIO.Process
                    ( HasProcessContext, exec, proc, readProcess_
                    , withWorkingDir
@@ -44,7 +43,7 @@ import           Stack.Constants
 import           Stack.Constants.Config
 import           Stack.Ghci.Script
 import           Stack.Package
-import           Stack.Prelude hiding ( Display (..) )
+import           Stack.Prelude
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -211,8 +210,8 @@ ghci opts@GhciOpts{..} = do
     -- Finally, do the invocation of ghci
     runGhci opts localTargets mainFile pkgs (maybe [] snd mfileTargets) (nonLocalTargets ++ addPkgs)
 
-preprocessTargets
-    :: HasEnvConfig env
+preprocessTargets ::
+       HasEnvConfig env
     => BuildOptsCLI
     -> SMActual GlobalPackage
     -> [Text]
@@ -242,8 +241,8 @@ preprocessTargets buildOptsCLI sma rawTargets = do
             unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
             pure (Right $ smtTargets normalTargets)
 
-parseMainIsTargets
-     :: HasEnvConfig env
+parseMainIsTargets ::
+        HasEnvConfig env
      => BuildOptsCLI
      -> SMActual GlobalPackage
      -> Maybe Text
@@ -257,8 +256,8 @@ parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do
 displayPkgComponent :: (PackageName, NamedComponent) -> StyleDoc
 displayPkgComponent = style PkgComponent . fromString . T.unpack . renderPkgComponent
 
-findFileTargets
-    :: HasEnvConfig env
+findFileTargets ::
+       HasEnvConfig env
     => [LocalPackage]
     -> [Path Abs File]
     -> RIO env (Map PackageName Target, Map PackageName [Path Abs File], [Path Abs File])
@@ -306,8 +305,8 @@ findFileTargets locals fileTargets = do
                 associatedFiles
     pure (targetMap, infoMap, extraFiles)
 
-getAllLocalTargets
-    :: HasEnvConfig env
+getAllLocalTargets ::
+       HasEnvConfig env
     => GhciOpts
     -> Map PackageName Target
     -> Maybe (Map PackageName Target)
@@ -346,9 +345,9 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets localMap = do
                   "\n(Use --skip-intermediate-deps to omit these)"
             pure (directlyWanted ++ extraLoadDeps)
 
-getAllNonLocalTargets
-    :: Map PackageName Target
-    -> RIO env [PackageName]
+getAllNonLocalTargets ::
+     Map PackageName Target
+  -> RIO env [PackageName]
 getAllNonLocalTargets targets = do
   let isNonLocal (TargetAll PTDependency) = True
       isNonLocal _ = False
@@ -377,8 +376,8 @@ checkAdditionalPackages pkgs = forM pkgs $ \name -> do
             <|> parsePackageNameThrowing name
     maybe (throwM $ InvalidPackageOption name) pure mres
 
-runGhci
-    :: HasEnvConfig env
+runGhci ::
+       HasEnvConfig env
     => GhciOpts
     -> [(PackageName, (Path Abs File, Target))]
     -> Maybe (Path Abs File)
@@ -474,7 +473,11 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
             scriptOptions <- writeGhciScript tmpDirectory (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
             execGhci (macrosOptions ++ scriptOptions)
 
-writeMacrosFile :: HasTerm env => Path Abs Dir -> [GhciPkgInfo] -> RIO env [String]
+writeMacrosFile ::
+     HasTerm env
+  => Path Abs Dir
+  -> [GhciPkgInfo]
+  -> RIO env [String]
 writeMacrosFile outputDirectory pkgs = do
     fps <- fmap (nubOrd . catMaybes . concat) $
         forM pkgs $ \pkg -> forM (ghciPkgOpts pkg) $ \(_, bio) -> do
@@ -499,7 +502,11 @@ writeGhciScript outputDirectory script = do
     setScriptPerms scriptFilePath
     pure ["-ghci-script=" <> scriptFilePath]
 
-writeHashedFile :: Path Abs Dir -> Path Rel File -> ByteString -> IO (Path Abs File)
+writeHashedFile ::
+     Path Abs Dir
+  -> Path Rel File
+  -> ByteString
+  -> IO (Path Abs File)
 writeHashedFile outputDirectory relFile contents = do
     relSha <- shaPathForBytes contents
     let outDir = outputDirectory </> relSha
@@ -510,7 +517,13 @@ writeHashedFile outputDirectory relFile contents = do
         writeBinaryFileAtomic outFile $ byteString contents
     pure outFile
 
-renderScript :: Bool -> [GhciPkgInfo] -> Maybe (Path Abs File) -> Bool -> [Path Abs File] -> GhciScript
+renderScript ::
+     Bool
+  -> [GhciPkgInfo]
+  -> Maybe (Path Abs File)
+  -> Bool
+  -> [Path Abs File]
+  -> GhciScript
 renderScript isIntero pkgs mainFile onlyMain extraFiles = do
     let cdPhase = case (isIntero, pkgs) of
           -- If only loading one package, set the cwd properly.
@@ -538,8 +551,8 @@ getFileTargets = concatMap (concat . maybeToList . ghciPkgTargetFiles)
 
 -- | Figure out the main-is file to load based on the targets. Asks the
 -- user for input if there is more than one candidate main-is file.
-figureOutMainFile
-    :: HasRunner env
+figureOutMainFile ::
+       HasRunner env
     => BuildOpts
     -> Maybe (Map PackageName Target)
     -> [(PackageName, (Path Abs File, Target))]
@@ -548,23 +561,23 @@ figureOutMainFile
 figureOutMainFile bopts mainIsTargets targets0 packages = do
     case candidates of
         [] -> pure Nothing
-        [c@(_,_,fp)] -> do logInfo ("Using main module: " <> RIO.display (renderCandidate c))
+        [c@(_,_,fp)] -> do logInfo ("Using main module: " <> display (renderCandidate c))
                            pure (Just fp)
         candidate:_ -> do
           borderedWarning $ do
             logWarn "The main module to load is ambiguous. Candidates are: "
-            forM_ (map renderCandidate candidates) (logWarn . RIO.display)
+            forM_ (map renderCandidate candidates) (logWarn . display)
             logWarn
                 "You can specify which one to pick by: "
             logWarn
                 (" * Specifying targets to stack ghci e.g. stack ghci " <>
-                RIO.display ( sampleTargetArg candidate))
+                display ( sampleTargetArg candidate))
             logWarn
                 (" * Specifying what the main is e.g. stack ghci " <>
-                 RIO.display (sampleMainIsArg candidate))
+                 display (sampleMainIsArg candidate))
             logWarn
                 (" * Choosing from the candidate above [1.." <>
-                RIO.display (length candidates) <> "]")
+                display (length candidates) <> "]")
           liftIO userOption
   where
     targets = fromMaybe (M.fromList $ map (\(k, (_, x)) -> (k, x)) targets0)
@@ -626,8 +639,8 @@ figureOutMainFile bopts mainIsTargets targets0 packages = do
     sampleMainIsArg (pkg,comp,_) =
         "--main-is " <> T.pack (packageNameString pkg) <> ":" <> renderComp comp
 
-loadGhciPkgDescs
-    :: HasEnvConfig env
+loadGhciPkgDescs ::
+       HasEnvConfig env
     => BuildOptsCLI
     -> [(PackageName, (Path Abs File, Target))]
     -> RIO env [GhciPkgDesc]
@@ -636,8 +649,8 @@ loadGhciPkgDescs buildOptsCLI localTargets =
         loadGhciPkgDesc buildOptsCLI name cabalfp target
 
 -- | Load package description information for a ghci target.
-loadGhciPkgDesc
-    :: HasEnvConfig env
+loadGhciPkgDesc ::
+       HasEnvConfig env
     => BuildOptsCLI
     -> PackageName
     -> Path Abs File
@@ -701,8 +714,8 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
       , ghciDescTarget = target
       }
 
-getGhciPkgInfos
-    :: HasEnvConfig env
+getGhciPkgInfos ::
+       HasEnvConfig env
     => InstallMap
     -> [PackageName]
     -> Maybe (Map PackageName [Path Abs File])
@@ -719,8 +732,8 @@ getGhciPkgInfos installMap addPkgs mfileTargets localTargets = do
       makeGhciPkgInfo installMap installedMap localLibs addPkgs mfileTargets pkgDesc
 
 -- | Make information necessary to load the given package in GHCi.
-makeGhciPkgInfo
-    :: HasEnvConfig env
+makeGhciPkgInfo ::
+       HasEnvConfig env
     => InstallMap
     -> InstalledMap
     -> [PackageName]
@@ -775,7 +788,7 @@ checkForIssues pkgs = do
             logWarn "Warning: There are cabal flags for this project which may prevent GHCi from loading your code properly."
             logWarn "In some cases it can also load some projects which would otherwise fail to build."
             logWarn ""
-            mapM_ (logWarn . RIO.display) $ L.intercalate [""] cabalFlagIssues
+            mapM_ (logWarn . display) $ L.intercalate [""] cabalFlagIssues
             logWarn ""
             logWarn "To resolve, remove the flag(s) from the Cabal file(s) and instead put them at the top of the haskell files."
             logWarn ""
@@ -879,8 +892,8 @@ checkForDuplicateModules pkgs = do
     fileDuplicate (fp, comps) =
       pretty fp <+> parens (fillSep (punctuate "," (map displayPkgComponent (S.toList comps))))
 
-targetWarnings
-  :: HasBuildConfig env
+targetWarnings ::
+     HasBuildConfig env
   => [(PackageName, (Path Abs File, Target))]
   -> [PackageName]
   -> Maybe (Map PackageName [Path Abs File], [Path Abs File])
@@ -904,7 +917,7 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
           , ""
           , flow $ T.unpack $ utf8BuilderToText $
                    "You are using snapshot: " <>
-                   RIO.display (smwSnapshotLocation smWanted)
+                   display (smwSnapshotLocation smWanted)
           , ""
           , flow "If you want to use package hiding and options, then you can try one of the following:"
           , ""
@@ -927,8 +940,8 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
 --
 -- If 'True' is passed for loadAllDeps, this loads all local deps, even
 -- if they aren't intermediate.
-getExtraLoadDeps
-    :: Bool
+getExtraLoadDeps ::
+       Bool
     -> Map PackageName LocalPackage
     -> [(PackageName, (Path Abs File, Target))]
     -> [(PackageName, (Path Abs File, Target))]
@@ -980,7 +993,11 @@ hasLocalComp p t =
 
 -- | Run a command and grab the first line of stdout, dropping
 -- stderr's contexts completely.
-runGrabFirstLine :: (HasProcessContext env, HasLogFunc env) => String -> [String] -> RIO env String
+runGrabFirstLine ::
+     (HasProcessContext env, HasLogFunc env)
+  => String
+  -> [String]
+  -> RIO env String
 runGrabFirstLine cmd0 args =
   proc cmd0 args $ \pc -> do
     (out, _err) <- readProcess_ pc
