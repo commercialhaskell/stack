@@ -4,7 +4,11 @@
 {-# LANGUAGE RecordWildCards    #-}
 
 -- | Docker configuration
-module Stack.Config.Docker where
+module Stack.Config.Docker
+  ( ConfigDockerException (..)
+  , addDefaultTag
+  , dockerOptsFromMonoid
+  ) where
 
 import           Data.List ( find )
 import qualified Data.Text as T
@@ -36,8 +40,8 @@ instance Exception ConfigDockerException where
             , "' explicitly, in your configuration file."]
 
 -- | Add a default Docker tag name to a given base image.
-addDefaultTag
-  :: MonadThrow m
+addDefaultTag ::
+     MonadThrow m
   => String -- ^ base
   -> Maybe Project
   -> Maybe AbstractResolver
@@ -54,45 +58,46 @@ addDefaultTag base mproject maresolver = do
   pure $ base ++ ":" ++ show lts
 
 -- | Interprets DockerOptsMonoid options.
-dockerOptsFromMonoid
-    :: MonadThrow m
-    => Maybe Project
-    -> Maybe AbstractResolver
-    -> DockerOptsMonoid
-    -> m DockerOpts
+dockerOptsFromMonoid ::
+     MonadThrow m
+  => Maybe Project
+  -> Maybe AbstractResolver
+  -> DockerOptsMonoid
+  -> m DockerOpts
 dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
-    let dockerImage =
-          case getFirst dockerMonoidRepoOrImage of
-            Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
-            Just (DockerMonoidImage image) -> pure image
-            Just (DockerMonoidRepo repo) ->
-              case find (`elem` (":@" :: String)) repo of
-                Nothing -> addDefaultTag repo mproject maresolver
-                -- Repo already specified a tag or digest, so don't append default
-                Just _ -> pure repo
-    let dockerEnable =
-            fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
-        dockerRegistryLogin =
-            fromFirst
-                (isJust (emptyToNothing (getFirst dockerMonoidRegistryUsername)))
-                dockerMonoidRegistryLogin
-        dockerRegistryUsername = emptyToNothing (getFirst dockerMonoidRegistryUsername)
-        dockerRegistryPassword = emptyToNothing (getFirst dockerMonoidRegistryPassword)
-        dockerAutoPull = fromFirstTrue dockerMonoidAutoPull
-        dockerDetach = fromFirstFalse dockerMonoidDetach
-        dockerPersist = fromFirstFalse dockerMonoidPersist
-        dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
-        dockerNetwork = emptyToNothing (getFirst dockerMonoidNetwork)
-        dockerRunArgs = dockerMonoidRunArgs
-        dockerMount = dockerMonoidMount
-        dockerMountMode = emptyToNothing (getFirst dockerMonoidMountMode)
-        dockerEnv = dockerMonoidEnv
-        dockerSetUser = getFirst dockerMonoidSetUser
-        dockerRequireDockerVersion =
-            simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
-        dockerStackExe = getFirst dockerMonoidStackExe
-
-    pure DockerOpts{..}
-  where emptyToNothing Nothing = Nothing
-        emptyToNothing (Just s) | null s = Nothing
-                                | otherwise = Just s
+  let dockerImage =
+        case getFirst dockerMonoidRepoOrImage of
+          Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
+          Just (DockerMonoidImage image) -> pure image
+          Just (DockerMonoidRepo repo) ->
+            case find (`elem` (":@" :: String)) repo of
+              Nothing -> addDefaultTag repo mproject maresolver
+              -- Repo already specified a tag or digest, so don't append default
+              Just _ -> pure repo
+  let dockerEnable =
+        fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
+      dockerRegistryLogin =
+        fromFirst
+          (isJust (emptyToNothing (getFirst dockerMonoidRegistryUsername)))
+          dockerMonoidRegistryLogin
+      dockerRegistryUsername = emptyToNothing (getFirst dockerMonoidRegistryUsername)
+      dockerRegistryPassword = emptyToNothing (getFirst dockerMonoidRegistryPassword)
+      dockerAutoPull = fromFirstTrue dockerMonoidAutoPull
+      dockerDetach = fromFirstFalse dockerMonoidDetach
+      dockerPersist = fromFirstFalse dockerMonoidPersist
+      dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
+      dockerNetwork = emptyToNothing (getFirst dockerMonoidNetwork)
+      dockerRunArgs = dockerMonoidRunArgs
+      dockerMount = dockerMonoidMount
+      dockerMountMode = emptyToNothing (getFirst dockerMonoidMountMode)
+      dockerEnv = dockerMonoidEnv
+      dockerSetUser = getFirst dockerMonoidSetUser
+      dockerRequireDockerVersion =
+        simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
+      dockerStackExe = getFirst dockerMonoidStackExe
+  pure DockerOpts{..}
+ where
+  emptyToNothing Nothing = Nothing
+  emptyToNothing (Just s)
+    | null s = Nothing
+    | otherwise = Just s
