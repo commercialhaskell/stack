@@ -6,141 +6,139 @@
 -- | Constants used throughout the project.
 
 module Stack.Constants
-    (buildPlanDir
-    ,buildPlanCacheDir
-    ,haskellFileExts
-    ,haskellDefaultPreprocessorExts
-    ,stackDotYaml
-    ,stackWorkEnvVar
-    ,stackRootEnvVar
-    ,stackXdgEnvVar
-    ,stackRootOptionName
-    ,stackGlobalConfigOptionName
-    ,pantryRootEnvVar
-    ,deprecatedStackRootOptionName
-    ,inContainerEnvVar
-    ,inNixShellEnvVar
-    ,stackProgNameUpper
-    ,wiredInPackages
-    ,cabalPackageName
-    ,implicitGlobalProjectDirDeprecated
-    ,implicitGlobalProjectDir
-    ,defaultUserConfigPathDeprecated
-    ,defaultUserConfigPath
-    ,defaultGlobalConfigPathDeprecated
-    ,defaultGlobalConfigPath
-    ,platformVariantEnvVar
-    ,compilerOptionsCabalFlag
-    ,ghcColorForceFlag
-    ,minTerminalWidth
-    ,maxTerminalWidth
-    ,defaultTerminalWidth
-    ,osIsWindows
-    ,relFileSetupHs
-    ,relFileSetupLhs
-    ,relFileHpackPackageConfig
-    ,relDirGlobalAutogen
-    ,relDirAutogen
-    ,relDirLogs
-    ,relFileCabalMacrosH
-    ,relDirBuild
-    ,relDirBin
-    ,relDirPantry
-    ,relDirPrograms
-    ,relDirUpperPrograms
-    ,relDirStackProgName
-    ,relDirStackWork
-    ,relFileReadmeTxt
-    ,relDirScript
-    ,relFileConfigYaml
-    ,relDirSnapshots
-    ,relDirGlobalHints
-    ,relFileGlobalHintsYaml
-    ,relDirInstall
-    ,relDirCompilerTools
-    ,relDirHoogle
-    ,relFileDatabaseHoo
-    ,relDirPkgdb
-    ,relFileStorage
-    ,relDirLoadedSnapshotCache
-    ,bindirSuffix
-    ,docDirSuffix
-    ,relDirHpc
-    ,relDirLib
-    ,relDirShare
-    ,relDirLibexec
-    ,relDirEtc
-    ,setupGhciShimCode
-    ,relDirSetupExeCache
-    ,relDirSetupExeSrc
-    ,relFileConfigure
-    ,relDirDist
-    ,relFileSetupMacrosH
-    ,relDirSetup
-    ,relFileSetupLower
-    ,relDirMingw
-    ,relDirMingw32
-    ,relDirMingw64
-    ,relDirLocal
-    ,relDirUsr
-    ,relDirInclude
-    ,relFileIndexHtml
-    ,relDirAll
-    ,relFilePackageCache
-    ,relFileDockerfile
-    ,relDirHaskellStackGhci
-    ,relFileGhciScript
-    ,relDirCombined
-    ,relFileHpcIndexHtml
-    ,relDirCustom
-    ,relDirPackageConfInplace
-    ,relDirExtraTixFiles
-    ,relDirInstalledPackages
-    ,backupUrlRelPath
-    ,relDirDotLocal
-    ,relDirDotSsh
-    ,relDirDotStackProgName
-    ,relDirUnderHome
-    ,relDirSrc
-    ,relFileLibtinfoSo5
-    ,relFileLibtinfoSo6
-    ,relFileLibncurseswSo6
-    ,relFileLibgmpSo10
-    ,relFileLibgmpSo3
-    ,relDirNewCabal
-    ,relFileSetupExe
-    ,relFileSetupUpper
-    ,relFile7zexe
-    ,relFile7zdll
-    ,relFileMainHs
-    ,relFileStack
-    ,relFileStackDotExe
-    ,relFileStackDotTmpDotExe
-    ,relFileStackDotTmp
-    ,ghcShowOptionsOutput
-    ,hadrianScriptsWindows
-    ,hadrianScriptsPosix
-    ,usrLibDirs
-    ,testGhcEnvRelFile
-    ,relFileBuildLock
-    ,stackDeveloperModeDefault
-    ,globalFooter
-    )
-    where
+  ( buildPlanDir
+  , buildPlanCacheDir
+  , haskellFileExts
+  , haskellDefaultPreprocessorExts
+  , stackDotYaml
+  , stackWorkEnvVar
+  , stackRootEnvVar
+  , stackXdgEnvVar
+  , stackRootOptionName
+  , stackGlobalConfigOptionName
+  , pantryRootEnvVar
+  , deprecatedStackRootOptionName
+  , inContainerEnvVar
+  , inNixShellEnvVar
+  , stackProgNameUpper
+  , wiredInPackages
+  , cabalPackageName
+  , implicitGlobalProjectDirDeprecated
+  , implicitGlobalProjectDir
+  , defaultUserConfigPathDeprecated
+  , defaultUserConfigPath
+  , defaultGlobalConfigPathDeprecated
+  , defaultGlobalConfigPath
+  , platformVariantEnvVar
+  , compilerOptionsCabalFlag
+  , ghcColorForceFlag
+  , minTerminalWidth
+  , maxTerminalWidth
+  , defaultTerminalWidth
+  , osIsWindows
+  , relFileSetupHs
+  , relFileSetupLhs
+  , relFileHpackPackageConfig
+  , relDirGlobalAutogen
+  , relDirAutogen
+  , relDirLogs
+  , relFileCabalMacrosH
+  , relDirBuild
+  , relDirBin
+  , relDirPantry
+  , relDirPrograms
+  , relDirUpperPrograms
+  , relDirStackProgName
+  , relDirStackWork
+  , relFileReadmeTxt
+  , relDirScript
+  , relFileConfigYaml
+  , relDirSnapshots
+  , relDirGlobalHints
+  , relFileGlobalHintsYaml
+  , relDirInstall
+  , relDirCompilerTools
+  , relDirHoogle
+  , relFileDatabaseHoo
+  , relDirPkgdb
+  , relFileStorage
+  , relDirLoadedSnapshotCache
+  , bindirSuffix
+  , docDirSuffix
+  , relDirHpc
+  , relDirLib
+  , relDirShare
+  , relDirLibexec
+  , relDirEtc
+  , setupGhciShimCode
+  , relDirSetupExeCache
+  , relDirSetupExeSrc
+  , relFileConfigure
+  , relDirDist
+  , relFileSetupMacrosH
+  , relDirSetup
+  , relFileSetupLower
+  , relDirMingw
+  , relDirMingw32
+  , relDirMingw64
+  , relDirLocal
+  , relDirUsr
+  , relDirInclude
+  , relFileIndexHtml
+  , relDirAll
+  , relFilePackageCache
+  , relFileDockerfile
+  , relDirHaskellStackGhci
+  , relFileGhciScript
+  , relDirCombined
+  , relFileHpcIndexHtml
+  , relDirCustom
+  , relDirPackageConfInplace
+  , relDirExtraTixFiles
+  , relDirInstalledPackages
+  , backupUrlRelPath
+  , relDirDotLocal
+  , relDirDotSsh
+  , relDirDotStackProgName
+  , relDirUnderHome
+  , relDirSrc
+  , relFileLibtinfoSo5
+  , relFileLibtinfoSo6
+  , relFileLibncurseswSo6
+  , relFileLibgmpSo10
+  , relFileLibgmpSo3
+  , relDirNewCabal
+  , relFileSetupExe
+  , relFileSetupUpper
+  , relFile7zexe
+  , relFile7zdll
+  , relFileMainHs
+  , relFileStack
+  , relFileStackDotExe
+  , relFileStackDotTmpDotExe
+  , relFileStackDotTmp
+  , ghcShowOptionsOutput
+  , hadrianScriptsWindows
+  , hadrianScriptsPosix
+  , usrLibDirs
+  , testGhcEnvRelFile
+  , relFileBuildLock
+  , stackDeveloperModeDefault
+  , globalFooter
+  ) where
 
-import           Data.ByteString.Builder (byteString)
-import           Data.Char (toUpper)
-import           Data.FileEmbed (embedFile, makeRelativeToProject)
+import           Data.ByteString.Builder ( byteString )
+import           Data.Char ( toUpper )
+import           Data.FileEmbed ( embedFile, makeRelativeToProject )
 import qualified Data.Set as Set
-import           Distribution.Package (mkPackageName)
+import           Distribution.Package ( mkPackageName )
 import qualified Hpack.Config as Hpack
-import qualified Language.Haskell.TH.Syntax as TH (runIO, lift)
+import qualified Language.Haskell.TH.Syntax as TH ( runIO, lift )
 import           Path as FL
-import           RIO
 import           Stack.Prelude
-import           Stack.Types.Compiler
-import           System.Permissions (osIsWindows)
-import           System.Process (readProcess)
+import           Stack.Types.Compiler ( WhichCompiler (..) )
+import           System.Permissions ( osIsWindows )
+import           System.Process ( readProcess )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Constants" module.
