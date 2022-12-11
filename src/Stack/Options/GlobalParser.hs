@@ -1,20 +1,36 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Stack.Options.GlobalParser where
+module Stack.Options.GlobalParser
+  ( globalOptsFromMonoid
+  , globalOptsParser
+  , initOptsParser
+  ) where
 
 import           Options.Applicative
+                   ( Parser, auto, completer, help, hidden, internal, long
+                   , metavar, option, strOption, switch, value
+                   )
 import           Options.Applicative.Builder.Extra
+                   ( dirCompleter, fileExtCompleter, firstBoolFlagsFalse
+                   , firstBoolFlagsNoDefault, firstBoolFlagsTrue, optionalFirst
+                   , textArgument
+                   )
 import           Path.IO ( getCurrentDir, resolveDir', resolveFile' )
 import qualified Stack.Docker as Docker
-import           Stack.Init
+import           Stack.Init ( InitOpts (..) )
 import           Stack.Prelude
-import           Stack.Options.ConfigParser
-import           Stack.Options.LogLevelParser
+import           Stack.Options.ConfigParser ( configOptsParser )
+import           Stack.Options.LogLevelParser ( logLevelOptsParser )
 import           Stack.Options.ResolverParser
-import           Stack.Options.Utils
+                   ( abstractResolverOptsParser, compilerOptsParser )
+import           Stack.Options.Utils ( GlobalOptsContext (..), hideMods )
 import           Stack.Types.Config
-import           Stack.Types.Docker
+                   ( GlobalOpts (..), GlobalOptsMonoid (..)
+                   , LockFileBehavior (..), StackYamlLoc (..), defaultLogLevel
+                   , readLockFileBehavior, readStyles
+                   )
+import           Stack.Types.Docker ( dockerEntrypointArgName )
 
 -- | Parser for global command-line options.
 globalOptsParser ::
