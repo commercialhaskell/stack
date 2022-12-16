@@ -358,7 +358,7 @@ project packages or from local dependencies). See also the `--file-watch` flag.
 
 ### The `stack build --tests-allow-stdin` flag
 
-:octicons-tag-24: 2.9.3
+[:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
 Default: Enabled
 

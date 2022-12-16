@@ -63,7 +63,7 @@ user-specific global configuration file (`config.yaml`).
 
 ## The `stack config set package-index download-prefix` command
 
-:octicons-tag-24: 2.9.3
+[:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
 ~~~text
 stack config set package-index download-prefix [--global] [URL]

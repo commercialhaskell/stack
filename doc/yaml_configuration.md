@@ -369,7 +369,7 @@ allow-newer: true
 
 ### allow-newer-deps (experimental)
 
-:octicons-tag-24: 2.9.3
+[:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
 Default: `none`
 
@@ -979,7 +979,7 @@ For further information, see the
 
 ### package-index
 
-:octicons-tag-24: 2.9.3
+[:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
 Default:
 
