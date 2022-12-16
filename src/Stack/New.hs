@@ -106,11 +106,11 @@ instance Pretty NewPrettyException where
       where
         (msg, isNotFound) = case err of
             DownloadHttpError (HttpExceptionRequest req content) ->
-              let msg' =    flow "an HTTP exception. Stack made the request:"
+              let msg' =    flow "an HTTP error. Stack made the request:"
                          <> blankLine
                          <> fromString (show req)
                          <> blankLine
-                         <> flow "and the content of the exception was:"
+                         <> flow "and the content of the error was:"
                          <> blankLine
                          <> fromString (show content)
                   isNotFound404 = case content of
@@ -120,13 +120,13 @@ instance Pretty NewPrettyException where
               in  (msg', isNotFound404)
             DownloadHttpError (InvalidUrlException url' reason) ->
               let msg' = fillSep
-                           [ flow "an HTTP exception. The URL"
+                           [ flow "an HTTP error. The URL"
                            , style Url (fromString url')
                            , flow "was considered invalid because"
                            , fromString reason <> "."
                            ]
               in (msg', False)
-            _ -> let msg' =    flow "the following exception:"
+            _ -> let msg' =    flow "the following error:"
                             <> blankLine
                             <> fromString (displayException err)
                  in (msg', False)
@@ -149,7 +149,7 @@ instance Pretty NewPrettyException where
              , style File (pretty path) <> "."
              ]
         <> blankLine
-        <> flow "While extracting, Stack encountered the following exception:"
+        <> flow "While extracting, Stack encountered the following error:"
         <> blankLine
         <> string err
     pretty (TemplateInvalid name why) =
@@ -208,7 +208,7 @@ instance Pretty NewPrettyException where
              , style Shell "stack templates" <> "."
              ]
         <> blankLine
-        <> flow "While downloading, Stack encountered the following exception:"
+        <> flow "While downloading, Stack encountered the following error:"
         <> blankLine
         <> string (displayException err)
     pretty (TemplatesHelpEncodingInvalid url err) =
@@ -221,7 +221,7 @@ instance Pretty NewPrettyException where
              , style Url (fromString url) <> "."
              ]
         <> blankLine
-        <> flow "While decoding, Stack encountered the following exception:"
+        <> flow "While decoding, Stack encountered the following error:"
         <> blankLine
         <> string (displayException err)
 
@@ -519,7 +519,7 @@ applyTemplate project template nonceParams dir templateText = do
                 Left e -> throwM $ PrettyException $
                     TemplateInvalid
                         template
-                        (    flow "Stack encountered the following exception:"
+                        (    flow "Stack encountered the following error:"
                           <> blankLine
                              -- Text.Parsec.Error.ParseError is not an instance
                              -- of Control.Exception.

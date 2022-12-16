@@ -25,7 +25,7 @@ instance Pretty StoragePrettyException where
        <+> style Dir (pretty fp)
     <> "."
     <> blankLine
-    <> flow "While migrating the database, Stack encountered the exception:"
+    <> flow "While migrating the database, Stack encountered the error:"
     <> blankLine
     <> string exMsg
     <> blankLine

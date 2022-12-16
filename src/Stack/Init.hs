@@ -111,7 +111,7 @@ instance Pretty InitPrettyException where
              ]
         <> blankLine
         <> flow "While downloading the snapshot index, Stack encountered the \
-                \following exception:"
+                \following error:"
         <> blankLine
         <> string (displayException e)
 

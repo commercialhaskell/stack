@@ -378,7 +378,7 @@ instance Pretty BuildPrettyException where
         <> flow "Stack failed to execute the build plan."
         <> blankLine
         <> flow "While executing the build plan, Stack encountered the \
-                \following exceptions:"
+                \following errors:"
         <> blankLine
         <> hcat (L.intersperse blankLine (map ppExceptions es))
       where
@@ -406,7 +406,7 @@ pprintExceptions
 pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDeps =
     mconcat $
       [ flow "While constructing the build plan, Stack encountered the \
-             \following exceptions:"
+             \following errors:"
       , blankLine
       , mconcat (L.intersperse blankLine (mapMaybe pprintException exceptions'))
       ] ++ if L.null recommendations

@@ -414,7 +414,7 @@ instance Pretty ConfigPrettyException where
              ]
         <> blankLine
         <> flow "While loading and parsing, Stack encountered the following \
-                \exception:"
+                \error:"
         <> blankLine
         <> string (Yaml.prettyPrintParseException exception)
         <> blankLine
