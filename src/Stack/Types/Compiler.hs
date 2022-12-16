@@ -28,24 +28,22 @@ import           Database.Persist.Sql
 import qualified Data.Text as T
 import           Stack.Prelude
 import           Stack.Types.Version
-import           Distribution.Version (mkVersion)
+import           Distribution.Version ( mkVersion )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Types.Compiler" module.
 data CompilerException
   = GhcjsNotSupported
   | PantryException PantryException
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show CompilerException where
-    show GhcjsNotSupported =
+instance Exception CompilerException where
+    displayException GhcjsNotSupported =
         "Error: [S-7903]\n"
         ++ "GHCJS is no longer supported by Stack."
-    show (PantryException p) =
+    displayException (PantryException p) =
         "Error: [S-7972]\n"
         ++ displayException p
-
-instance Exception CompilerException
 
 -- | Variety of compiler to use.
 data WhichCompiler

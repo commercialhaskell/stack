@@ -4,7 +4,7 @@
 -- | Parsing of Stack command line arguments
 
 module Data.Attoparsec.Args
-    ( EscapingMode(..)
+    ( EscapingMode (..)
     , argsParser
     , parseArgs
     , parseArgsFromString

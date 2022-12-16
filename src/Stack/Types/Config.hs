@@ -22,89 +22,89 @@ module Stack.Types.Config
   (
   -- * Main configuration types and classes
   -- ** HasPlatform & HasStackRoot
-    HasPlatform(..)
-  , PlatformVariant(..)
+    HasPlatform (..)
+  , PlatformVariant (..)
   -- ** Runner
-  , HasRunner(..)
-  , Runner(..)
-  , ColorWhen(..)
+  , HasRunner (..)
+  , Runner (..)
+  , ColorWhen (..)
   , terminalL
   , reExecL
   -- ** Config & HasConfig
-  , Config(..)
-  , HasConfig(..)
+  , Config (..)
+  , HasConfig (..)
   , askLatestSnapshotUrl
   , configProjectRoot
   -- ** BuildConfig & HasBuildConfig
-  , BuildConfig(..)
-  , ProjectPackage(..)
-  , DepPackage(..)
+  , BuildConfig (..)
+  , ProjectPackage (..)
+  , DepPackage (..)
   , ppRoot
   , ppVersion
   , ppComponents
   , ppGPD
   , stackYamlL
   , projectRootL
-  , HasBuildConfig(..)
+  , HasBuildConfig (..)
   -- ** Storage databases
-  , UserStorage(..)
-  , ProjectStorage(..)
+  , UserStorage (..)
+  , ProjectStorage (..)
   -- ** GHCVariant & HasGHCVariant
-  , GHCVariant(..)
+  , GHCVariant (..)
   , ghcVariantName
   , ghcVariantSuffix
   , parseGHCVariant
-  , HasGHCVariant(..)
+  , HasGHCVariant (..)
   , snapshotsDir
   -- ** EnvConfig & HasEnvConfig
-  , EnvConfig(..)
-  , HasSourceMap(..)
-  , HasEnvConfig(..)
+  , EnvConfig (..)
+  , HasSourceMap (..)
+  , HasEnvConfig (..)
   , getCompilerPath
   -- * Details
   -- ** ApplyGhcOptions
-  , ApplyGhcOptions(..)
+  , ApplyGhcOptions (..)
   -- ** AllowNewerDeps
-  , AllowNewerDeps(..)
+  , AllowNewerDeps (..)
   -- ** CabalConfigKey
-  , CabalConfigKey(..)
+  , CabalConfigKey (..)
   -- ** ConfigException
-  , HpackExecutable(..)
-  , ConfigException(..)
-  , ConfigPrettyException(..)
-  , ParseAbsolutePathException(..)
+  , HpackExecutable (..)
+  , ConfigException (..)
+  , ConfigPrettyException (..)
+  , ParseAbsolutePathException (..)
   , packageIndicesWarning
   -- ** ConfigMonoid
-  , ConfigMonoid(..)
+  , ConfigMonoid (..)
   , configMonoidInstallGHCName
   , configMonoidSystemGHCName
   , parseConfigMonoid
   -- ** DumpLogs
-  , DumpLogs(..)
+  , DumpLogs (..)
   -- ** EnvSettings
-  , EnvSettings(..)
+  , EnvSettings (..)
   , minimalEnvSettings
   , defaultEnvSettings
   , plainEnvSettings
   -- ** GlobalOpts & GlobalOptsMonoid
-  , GlobalOpts(..)
-  , GlobalOptsMonoid(..)
+  , GlobalOpts (..)
+  , GlobalOptsMonoid (..)
   , rslInLogL
-  , StackYamlLoc(..)
+  , StackYamlLoc (..)
   , stackYamlLocL
-  , LockFileBehavior(..)
+  , LockFileBehavior (..)
   , readLockFileBehavior
   , lockFileBehaviorL
   , defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
-  , Project(..)
-  , ProjectConfig(..)
-  , Curator(..)
-  , ProjectAndConfigMonoid(..)
+  , Project (..)
+  , ProjectConfig (..)
+  , Curator (..)
+  , ProjectAndConfigMonoid (..)
   , parseProjectAndConfigMonoid
   -- ** PvpBounds
-  , PvpBounds(..)
-  , PvpBoundsType(..)
+  , PvpBounds (..)
+  , PvpBoundsType (..)
   , parsePvpBounds
   -- ** ColorWhen
   , readColorWhen
@@ -114,7 +114,7 @@ module Stack.Types.Config
   , SCM(..)
   -- * Paths
   , bindirSuffix
-  , GlobalInfoSource(..)
+  , GlobalInfoSource (..)
   , getProjectWorkDir
   , docDirSuffix
   , extraBinDirs
@@ -138,30 +138,30 @@ module Stack.Types.Config
   -- * Command-related types
   , AddCommand
   -- ** Eval
-  , EvalOpts(..)
+  , EvalOpts (..)
   -- ** Exec
-  , ExecOpts(..)
-  , SpecialExecCmd(..)
-  , ExecOptsExtra(..)
+  , ExecOpts (..)
+  , SpecialExecCmd (..)
+  , ExecOptsExtra (..)
   -- ** Setup
-  , DownloadInfo(..)
-  , VersionedDownloadInfo(..)
-  , GHCDownloadInfo(..)
-  , SetupInfo(..)
+  , DownloadInfo (..)
+  , VersionedDownloadInfo (..)
+  , GHCDownloadInfo (..)
+  , SetupInfo (..)
   -- ** Docker entrypoint
-  , DockerEntrypoint(..)
-  , DockerUser(..)
+  , DockerEntrypoint (..)
+  , DockerUser (..)
   , module X
   -- * Lens helpers
   , wantedCompilerVersionL
   , actualCompilerVersionL
-  , HasCompiler(..)
-  , DumpPackage(..)
-  , CompilerPaths(..)
-  , GhcPkgExe(..)
+  , HasCompiler (..)
+  , DumpPackage (..)
+  , CompilerPaths (..)
+  , GhcPkgExe (..)
   , getGhcPkgExe
   , cpWhich
-  , ExtraDirs(..)
+  , ExtraDirs (..)
   , buildOptsL
   , globalOptsL
   , buildOptsInstallExesL
@@ -188,13 +188,12 @@ module Stack.Types.Config
 import           Control.Monad.Writer ( Writer, tell )
 import           Control.Monad.Trans.Except ( ExceptT )
 import           Crypto.Hash ( hashWith, SHA1 (..) )
-import           Stack.Prelude
 import           Pantry.Internal.AesonExtended
                    ( ToJSON, toJSON, FromJSON, FromJSONKey (..), parseJSON
                    , withText, object, (.=), (..:), (...:), (..:?), (..!=)
                    , Value(Bool), withObjectWarnings, WarningParser, Object
                    , jsonSubWarnings, jsonSubWarningsT, jsonSubWarningsTT
-                   , WithJSONWarnings(..)
+                   , WithJSONWarnings (..)
                    , FromJSONKeyFunction (FromJSONKeyTextParser)
                    )
 import           Data.Attoparsec.Args ( parseArgs, EscapingMode (Escaping) )
@@ -217,7 +216,7 @@ import           Distribution.PackageDescription ( GenericPackageDescription )
 import qualified Distribution.PackageDescription as C
 import           Distribution.System ( Platform, Arch )
 import qualified Distribution.Text
-import           Distribution.Version ( anyVersion, mkVersion', mkVersion )
+import           Distribution.Version ( anyVersion, mkVersion )
 import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Lens.Micro
 import           Options.Applicative ( ReadM )
@@ -225,9 +224,9 @@ import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Pantry.Internal ( Storage )
 import           Path
-import qualified Paths_stack as Meta
 import qualified RIO.List as List
 import           Stack.Constants
+import           Stack.Prelude
 import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
 import           Stack.Types.Docker
@@ -238,6 +237,9 @@ import           Stack.Types.Resolver
 import           Stack.Types.SourceMap
 import           Stack.Types.TemplateName
 import           Stack.Types.Version
+                   ( IntersectingVersionRange (..), VersionCheck (..)
+                   , VersionRange, stackVersion, versionRangeText
+                   )
 import qualified System.FilePath as FilePath
 import           System.PosixCompat.Types ( UserID, GroupID, FileMode )
 import           RIO.Process ( ProcessContext, HasProcessContext (..) )
@@ -254,9 +256,6 @@ data ConfigException
   | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
-  | NoMatchingSnapshot (NonEmpty SnapName)
-  | ResolverMismatch !RawSnapshotLocation String
-  | ResolverPartial !RawSnapshotLocation String
   | NoSuchDirectory FilePath
   | ParseGHCVariantException String
   | BadStackRoot (Path Abs Dir)
@@ -269,10 +268,10 @@ data ConfigException
   | NoLTSWithMajorVersion Int
   | NoLTSFound
   | MultiplePackageIndices [PackageIndexConfig]
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show ConfigException where
-    show (ParseCustomSnapshotException url exception) = concat
+instance Exception ConfigException where
+    displayException (ParseCustomSnapshotException url exception) = concat
         [ "Error: [S-8981]\n"
         , "Could not parse '"
         , T.unpack url
@@ -280,7 +279,7 @@ instance Show ConfigException where
         , Yaml.prettyPrintParseException exception
         , "\nSee https://docs.haskellstack.org/en/stable/custom_snapshot/"
         ]
-    show (NoProjectConfigFound dir mcmd) = concat
+    displayException (NoProjectConfigFound dir mcmd) = concat
         [ "Error: [S-2206]\n"
         , "Unable to find a stack.yaml file in the current directory ("
         , toFilePath dir
@@ -289,7 +288,7 @@ instance Show ConfigException where
             Nothing -> ""
             Just cmd -> "\nRecommended action: stack " ++ T.unpack cmd
         ]
-    show (UnexpectedArchiveContents dirs files) = concat
+    displayException (UnexpectedArchiveContents dirs files) = concat
         [ "Error: [S-4964]\n"
         , "When unpacking an archive specified in your stack.yaml file, "
         , "did not find expected contents. Expected: a single directory. Found: "
@@ -297,7 +296,7 @@ instance Show ConfigException where
                , map (toFilePath . filename) files
                )
         ]
-    show (UnableToExtractArchive url file) = concat
+    displayException (UnableToExtractArchive url file) = concat
         [ "Error: [S-2040]\n"
         , "Archive extraction failed. Tarballs and zip archives are supported, \
           \couldn't handle the following URL, "
@@ -305,10 +304,10 @@ instance Show ConfigException where
         , " downloaded to the file "
         , toFilePath $ filename file
         ]
-    show (BadStackVersionException requiredRange) = concat
+    displayException (BadStackVersionException requiredRange) = concat
         [ "Error: [S-1641]\n"
         , "The version of Stack you are using ("
-        , show (mkVersion' Meta.version)
+        , show stackVersion
         , ") is outside the required\n"
         ,"version range specified in stack.yaml ("
         , T.unpack (versionRangeText requiredRange)
@@ -316,48 +315,23 @@ instance Show ConfigException where
         , "You can upgrade Stack by running:\n\n"
         , "stack upgrade"
         ]
-    show (NoMatchingSnapshot names) = concat
-        [ "Error: [S-1833]\n"
-        , "None of the following snapshots provides a compiler matching "
-        , "your package(s):\n"
-        , unlines $ map (\name -> "    - " <> show name)
-                        (NonEmpty.toList names)
-        , resolveOptions
-        ]
-    show (ResolverMismatch resolver errDesc) = concat
-        [ "Error: [S-6395]\n"
-        , "Resolver '"
-        , T.unpack $ utf8BuilderToText $ display resolver
-        , "' does not have a matching compiler to build some or all of your "
-        , "package(s).\n"
-        , errDesc
-        , resolveOptions
-        ]
-    show (ResolverPartial resolver errDesc) = concat
-        [ "Error: [S-2422]\n"
-        , "Resolver '"
-        , T.unpack $ utf8BuilderToText $ display resolver
-        , "' does not have all the packages to match your requirements.\n"
-        , unlines $ fmap ("    " <>) (lines errDesc)
-        , resolveOptions
-        ]
-    show (NoSuchDirectory dir) = concat
+    displayException (NoSuchDirectory dir) = concat
         [ "Error: [S-8773]\n"
         , "No directory could be located matching the supplied path: "
         , dir
         ]
-    show (ParseGHCVariantException v) = concat
+    displayException (ParseGHCVariantException v) = concat
         [ "Error: [S-3938]\n"
         , "Invalid ghc-variant value: "
         , v
         ]
-    show (BadStackRoot stackRoot) = concat
+    displayException (BadStackRoot stackRoot) = concat
         [ "Error: [S-8530]\n"
         , "Invalid Stack root: '"
         , toFilePath stackRoot
         , "'. Please provide a valid absolute path."
         ]
-    show (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
+    displayException (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
         [ "Error: [S-7613]\n"
         , "Preventing creation of Stack root '"
         , toFilePath envStackRoot
@@ -365,7 +339,7 @@ instance Show ConfigException where
         , toFilePath parentDir
         , "' is owned by someone else."
         ]
-    show (UserDoesn'tOwnDirectory dir) = concat
+    displayException (UserDoesn'tOwnDirectory dir) = concat
         [ "Error: [S-8707]\n"
         , "You are not the owner of '"
         , toFilePath dir
@@ -374,7 +348,7 @@ instance Show ConfigException where
         , T.unpack configMonoidAllowDifferentUserName
         , "' to disable this precaution."
         ]
-    show ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
+    displayException ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
         [ "Error: [S-3605]\n"
         , "Stack can only control the "
         , configMonoidGHCVariantName
@@ -382,17 +356,17 @@ instance Show ConfigException where
         , configMonoidSystemGHCName
         , "'."
         ]
-    show NixRequiresSystemGhc = T.unpack $ T.concat
+    displayException NixRequiresSystemGhc = T.unpack $ T.concat
         [ "Error: [S-6816]\n"
         , "Stack's Nix integration is incompatible with '--no-system-ghc'. "
         , "Please use '--"
         , configMonoidSystemGHCName
         , "' or disable the Nix integration."
         ]
-    show NoResolverWhenUsingNoProject =
+    displayException NoResolverWhenUsingNoProject =
         "Error: [S-5027]\n"
         ++ "When using the script command, you must provide a resolver argument"
-    show (DuplicateLocalPackageNames pairs) = concat
+    displayException (DuplicateLocalPackageNames pairs) = concat
         $ "Error: [S-5470]\n"
         : "The same package name is used in multiple local packages\n"
         : map go pairs
@@ -402,16 +376,16 @@ instance Show ConfigException where
             : (packageNameString name ++ " used in:")
             : map goLoc dirs
         goLoc loc = "- " ++ show loc
-    show (NoLTSWithMajorVersion n) = concat
+    displayException (NoLTSWithMajorVersion n) = concat
         [ "Error: [S-3803]\n"
         , "No LTS release found with major version "
         , show n
         , "."
         ]
-    show NoLTSFound =
+    displayException NoLTSFound =
         "Error: [S-5472]\n"
         ++ "No LTS releases found."
-    show (MultiplePackageIndices pics) = concat
+    displayException (MultiplePackageIndices pics) = concat
         [ "Error: [S-3251]\n"
         , "When using the 'package-indices' key to override the default "
         , "package index, you must provide exactly one value, received: "
@@ -420,53 +394,87 @@ instance Show ConfigException where
         , packageIndicesWarning
         ]
 
-instance Exception ConfigException
-
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Config" module.
 data ConfigPrettyException
-    = ParseConfigFileException (Path Abs File) ParseException
-    deriving (Typeable)
-
-instance Show ConfigPrettyException where
-    show (ParseConfigFileException {}) = "ParseConfigFileException"
+    = ParseConfigFileException !(Path Abs File) !ParseException
+    | NoMatchingSnapshot !(NonEmpty SnapName)
+    | ResolverMismatch !RawSnapshotLocation String
+    | ResolverPartial !RawSnapshotLocation !String
+    deriving (Show, Typeable)
 
 instance Pretty ConfigPrettyException where
     pretty (ParseConfigFileException configFile exception) =
         "[S-6602]"
         <> line
-        <>     flow "Stack could not load and parse"
-           <+> style File (pretty configFile)
-           <+> flow "as a YAML configuraton file."
+        <> fillSep
+             [ flow "Stack could not load and parse"
+             , style File (pretty configFile)
+             , flow "as a YAML configuraton file."
+             ]
         <> blankLine
         <> flow "While loading and parsing, Stack encountered the following \
-                \exception:"
+                \error:"
         <> blankLine
         <> string (Yaml.prettyPrintParseException exception)
         <> blankLine
-        <>     flow "For help about the content of Stack's YAML configuration \
+        <> fillSep
+             [ flow "For help about the content of Stack's YAML configuration \
                     \files, see (for the most recent release of Stack)"
-           <+> style
-                 Url
-                 "http://docs.haskellstack.org/en/stable/yaml_configuration/"
-        <> "."
+             ,    style
+                    Url
+                    "http://docs.haskellstack.org/en/stable/yaml_configuration/"
+               <> "."
+             ]
+    pretty (NoMatchingSnapshot names) =
+        "[S-1833]"
+        <> line
+        <> flow "None of the following snapshots provides a compiler matching \
+                \your package(s):"
+        <> line
+        <> bulletedList (map (fromString . show) (NonEmpty.toList names))
+        <> blankLine
+        <> resolveOptions
+    pretty (ResolverMismatch resolver errDesc) =
+        "[S-6395]"
+        <> line
+        <> fillSep
+             [ "Snapshot"
+             , style Url (pretty $ PrettyRawSnapshotLocation resolver)
+             , flow "does not have a matching compiler to build some or all of \
+                    \your package(s)."
+             ]
+        <> blankLine
+        <> indent 4 (string errDesc)
+        <> line
+        <> resolveOptions
+    pretty (ResolverPartial resolver errDesc) =
+        "[S-2422]"
+        <> line
+        <> fillSep
+             [ "Snapshot"
+             , style Url (pretty $ PrettyRawSnapshotLocation resolver)
+             , flow "does not have all the packages to match your requirements."
+             ]
+        <> blankLine
+        <> indent 4 (string errDesc)
+        <> line
+        <> resolveOptions
 
 instance Exception ConfigPrettyException
 
 data ParseAbsolutePathException
     = ParseAbsolutePathException String String
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show ParseAbsolutePathException where
-    show (ParseAbsolutePathException envVar dir) = concat
+instance Exception ParseAbsolutePathException where
+    displayException (ParseAbsolutePathException envVar dir) = concat
         [ "Error: [S-9437]\n"
         , "Failed to parse "
         , envVar
         , " environment variable (expected absolute directory): "
         , dir
         ]
-
-instance Exception ParseAbsolutePathException
 
 -- | The base environment that almost everything in Stack runs in,
 -- based off of parsing command line options in 'GlobalOpts'. Provides
@@ -1434,12 +1442,22 @@ packageIndicesWarning :: String
 packageIndicesWarning =
     "The 'package-indices' key is deprecated in favour of 'package-index'."
 
-resolveOptions :: String
+resolveOptions :: StyleDoc
 resolveOptions =
-  unlines [ "\nThis may be resolved by:"
-          , "    - Using '--omit-packages' to exclude mismatching package(s)."
-          , "    - Using '--resolver' to specify a matching snapshot/resolver"
-          ]
+     flow "This may be resolved by:"
+  <> line
+  <> bulletedList
+       [ fillSep
+           [ "Using"
+           , style Shell "--omit-packages"
+           , "to exclude mismatching package(s)."
+           ]
+       , fillSep
+           [ "Using"
+           , style Shell "--resolver"
+           , "to specify a matching snapshot/resolver."
+           ]
+       ]
 
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text

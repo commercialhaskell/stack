@@ -1,14 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Stack.Types.CompilerBuild
-  (CompilerBuild(..)
-  ,compilerBuildName
-  ,compilerBuildSuffix
-  ,parseCompilerBuild
+  ( CompilerBuild (..)
+  , compilerBuildName
+  , compilerBuildSuffix
+  , parseCompilerBuild
   ) where
 
 import           Stack.Prelude
-import           Pantry.Internal.AesonExtended (FromJSON, parseJSON, withText)
+import           Pantry.Internal.AesonExtended ( FromJSON, parseJSON, withText )
 import           Data.Text as T
 
 data CompilerBuild

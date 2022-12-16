@@ -1,8 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module Stack.Options.Utils where
+module Stack.Options.Utils
+  ( GlobalOptsContext (..)
+  , hideMods
+  ) where
 
-import           Options.Applicative
+import           Options.Applicative ( Mod, hidden, idm, internal )
 import           Stack.Prelude
 
 -- | If argument is True, hides the option from usage and help
@@ -15,8 +18,8 @@ hideMods hide = if hide then internal <> hidden else idm
 -- local --resolver this is not being used anymore but the code is kept for any
 -- similar future use cases.
 data GlobalOptsContext
-    = OuterGlobalOpts -- ^ Global options before subcommand name
-    | OtherCmdGlobalOpts -- ^ Global options following any other subcommand
-    | BuildCmdGlobalOpts
-    | GhciCmdGlobalOpts
-    deriving (Show, Eq)
+  = OuterGlobalOpts -- ^ Global options before subcommand name
+  | OtherCmdGlobalOpts -- ^ Global options following any other subcommand
+  | BuildCmdGlobalOpts
+  | GhciCmdGlobalOpts
+  deriving (Eq, Show)

@@ -5,41 +5,39 @@
 {-# LANGUAGE RecordWildCards   #-}
 
 module Stack.Lock
-    ( lockCachedWanted
-    , LockedLocation(..)
-    , Locked(..)
-    ) where
+  ( lockCachedWanted
+  , LockedLocation (..)
+  , Locked (..)
+  ) where
 
-import Pantry.Internal.AesonExtended
-import Data.ByteString.Builder (byteString)
+import           Data.ByteString.Builder ( byteString )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import Path (parent)
-import Path.Extended (addExtension)
-import Path.IO (doesFileExist)
-import Stack.Prelude
-import Stack.SourceMap
-import Stack.Types.Config
-import Stack.Types.SourceMap
+import           Pantry.Internal.AesonExtended
+import           Path ( parent )
+import           Path.Extended ( addExtension )
+import           Path.IO ( doesFileExist )
+import           Stack.Prelude
+import           Stack.SourceMap
+import           Stack.Types.Config
+import           Stack.Types.SourceMap
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Lock" module.
 data LockException
     = WritingLockFileError (Path Abs File) Locked
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show LockException where
-    show (WritingLockFileError lockFile newLocked) = unlines
+instance Exception LockException where
+    displayException (WritingLockFileError lockFile newLocked) = unlines
         [ "Error: [S-1353]"
         , "You indicated that Stack should error out on writing a lock file"
         , "Stack just tried to write the following lock file contents to "
           ++ toFilePath lockFile
         , T.unpack $ decodeUtf8With lenientDecode $ Yaml.encode newLocked
         ]
-
-instance Exception LockException
 
 data LockedLocation a b = LockedLocation
     { llOriginal :: a

@@ -4,17 +4,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
-module Stack.Dot (dot
-                 ,listDependencies
-                 ,DotOpts(..)
-                 ,DotPayload(..)
-                 ,ListDepsOpts(..)
-                 ,ListDepsFormat(..)
-                 ,ListDepsFormatOpts(..)
-                 ,resolveDependencies
-                 ,printGraph
-                 ,pruneGraph
-                 ) where
+module Stack.Dot
+  ( dot
+  , listDependencies
+  , DotOpts (..)
+  , DotPayload (..)
+  , ListDepsOpts (..)
+  , ListDepsFormat (..)
+  , ListDepsFormatOpts (..)
+  , resolveDependencies
+  , printGraph
+  , pruneGraph
+  ) where
 
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8 as LBC8
@@ -25,49 +26,47 @@ import qualified Data.Map as Map
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
 import qualified Data.Traversable as T
-import           Distribution.Text (display)
+import           Distribution.License ( License (BSD3), licenseFromSPDX )
 import qualified Distribution.PackageDescription as PD
 import qualified Distribution.SPDX.License as SPDX
-import           Distribution.License (License(BSD3), licenseFromSPDX)
-import           Distribution.Types.PackageName (mkPackageName)
+import           Distribution.Text ( display )
+import           Distribution.Types.PackageName ( mkPackageName )
 import qualified Path
-import           RIO.Process (HasProcessContext (..))
-import           Stack.Build (loadPackage)
-import           Stack.Build.Installed (getInstalled, toInstallMap)
+import           RIO.Process ( HasProcessContext (..) )
+import           Stack.Build ( loadPackage )
+import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source
+import           Stack.Build.Target( NeedTargets (..), parseTargets )
 import           Stack.Constants
 import           Stack.Package
-import           Stack.Prelude hiding (Display (..), pkgName, loadPackage)
-import qualified Stack.Prelude (pkgName)
+import           Stack.Prelude hiding ( Display (..), pkgName, loadPackage )
+import qualified Stack.Prelude ( pkgName )
 import           Stack.Runners
 import           Stack.SourceMap
 import           Stack.Types.Build
-import           Stack.Types.Compiler (wantedToActual)
+import           Stack.Types.Compiler ( wantedToActual )
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.SourceMap
-import           Stack.Build.Target(NeedTargets(..), parseTargets)
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Dot" module.
 data DotException
   = DependencyNotFoundBug GhcPkgId
   | PackageNotFoundBug PackageName
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show DotException where
-  show (DependencyNotFoundBug depId) = bugReport "[S-7071]" $ concat
+instance Exception DotException where
+  displayException (DependencyNotFoundBug depId) = bugReport "[S-7071]" $ concat
     [ "Expected to find "
     , ghcPkgIdString depId
     , " in global DB."
     ]
-  show (PackageNotFoundBug pkgName) = bugReport "[S-7151]" $ concat
+  displayException (PackageNotFoundBug pkgName) = bugReport "[S-7151]" $ concat
     [ "The '"
     , packageNameString pkgName
     , "' package was not found in any of the dependency sources."
     ]
-
-instance Exception DotException
 
 -- | Options record for @stack dot@
 data DotOpts = DotOpts

@@ -7,8 +7,8 @@
 
 -- | Functions for IDEs.
 module Stack.IDE
-    ( OutputStream(..)
-    , ListPackagesCmd(..)
+    ( OutputStream (..)
+    , ListPackagesCmd (..)
     , listPackages
     , listTargets
     ) where

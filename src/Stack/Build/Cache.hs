@@ -30,22 +30,22 @@ module Stack.Build.Cache
     , writePrecompiledCache
     , readPrecompiledCache
     -- Exported for testing
-    , BuildCache(..)
+    , BuildCache (..)
     ) where
 
-import           Stack.Prelude
-import           Crypto.Hash (hashWith, SHA256(..))
-import qualified Data.ByteArray as Mem (convert)
-import           Data.ByteString.Builder (byteString)
+import           Crypto.Hash ( hashWith, SHA256 (..) )
+import qualified Data.ByteArray as Mem ( convert )
+import           Data.ByteString.Builder ( byteString )
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import           Foreign.C.Types (CTime)
+import           Foreign.C.Types ( CTime )
 import           Path
 import           Path.IO
 import           Stack.Constants
 import           Stack.Constants.Config
+import           Stack.Prelude
 import           Stack.Storage.Project
 import           Stack.Storage.User
 import           Stack.Types.Build
@@ -53,8 +53,9 @@ import           Stack.Types.Cache
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
-import           Stack.Types.SourceMap (smRelDir)
-import           System.PosixCompat.Files (modificationTime, getFileStatus, setFileTimes)
+import           Stack.Types.SourceMap ( smRelDir )
+import           System.PosixCompat.Files
+                   ( modificationTime, getFileStatus, setFileTimes )
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (HasEnvConfig env)

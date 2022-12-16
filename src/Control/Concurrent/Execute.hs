@@ -9,7 +9,7 @@ module Control.Concurrent.Execute
     , ActionId (..)
     , ActionContext (..)
     , Action (..)
-    , Concurrency(..)
+    , Concurrency (..)
     , runActions
     ) where
 
@@ -22,14 +22,12 @@ import qualified Data.Set                 as Set
 -- "Control.Concurrent.Execute" module.
 data ExecuteException
     = InconsistentDependenciesBug
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show ExecuteException where
-    show InconsistentDependenciesBug = bugReport "[S-2816]"
+instance Exception ExecuteException where
+    displayException InconsistentDependenciesBug = bugReport "[S-2816]"
         "Inconsistent dependencies were discovered while executing your build \
         \plan."
-
-instance Exception ExecuteException
 
 data ActionType
     = ATBuild

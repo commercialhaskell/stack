@@ -7,19 +7,19 @@
 
 -- | Provide ability to upload tarballs to Hackage.
 module Stack.Upload
-    ( -- * Upload
-      upload
-    , uploadBytes
-    , uploadRevision
-      -- * Credentials
-    , HackageCreds
-    , HackageAuth(..)
-    , HackageKey(..)
-    , loadAuth
-    , writeFilePrivate
-      -- * Internal
-    , maybeGetHackageKey
-    ) where
+  ( -- * Upload
+    upload
+  , uploadBytes
+  , uploadRevision
+    -- * Credentials
+  , HackageCreds
+  , HackageAuth (..)
+  , HackageKey (..)
+  , loadAuth
+  , writeFilePrivate
+    -- * Internal
+  , maybeGetHackageKey
+  ) where
 
 import           Conduit ( mapOutput, sinkList )
 import           Data.Aeson
@@ -56,13 +56,13 @@ data UploadPrettyException
 
 instance Pretty UploadPrettyException where
     pretty AuthenticationFailure =
-           "Error:" <+> "[S-2256]"
+           "[S-2256]"
         <> line
         <> flow "authentification failure"
         <> line
         <> flow "Authentication failure uploading to server"
     pretty (ArchiveUploadFailure code res tarName) =
-           "Error:" <+> "[S-6108]"
+           "[S-6108]"
         <> line
         <> flow "unhandled status code:" <+> fromString (show code)
         <> line

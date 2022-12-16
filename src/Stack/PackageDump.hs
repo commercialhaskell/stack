@@ -6,18 +6,17 @@
 {-# LANGUAGE TupleSections      #-}
 
 module Stack.PackageDump
-    ( Line
-    , eachSection
-    , eachPair
-    , DumpPackage (..)
-    , conduitDumpPackage
-    , ghcPkgDump
-    , ghcPkgDescribe
-    , sinkMatching
-    , pruneDeps
-    ) where
+  ( Line
+  , eachSection
+  , eachPair
+  , DumpPackage (..)
+  , conduitDumpPackage
+  , ghcPkgDump
+  , ghcPkgDescribe
+  , sinkMatching
+  , pruneDeps
+  ) where
 
-import           Stack.Prelude
 import           Data.Attoparsec.Args
 import           Data.Attoparsec.Text as P
 import           Data.Conduit
@@ -25,23 +24,25 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified RIO.Text as T
 import qualified Distribution.Text as C
-import           Path.Extra (toFilePathNoTrailingSep)
+import           Path.Extra ( toFilePathNoTrailingSep )
+import           RIO.Process hiding ( readProcess )
+import qualified RIO.Text as T
 import           Stack.GhcPkg
-import           Stack.Types.Config (HasCompiler (..), GhcPkgExe (..), DumpPackage (..))
+import           Stack.Prelude
+import           Stack.Types.Config
+                   ( HasCompiler (..), GhcPkgExe (..), DumpPackage (..) )
 import           Stack.Types.GhcPkgId
-import           RIO.Process hiding (readProcess)
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.PackageDump" module.
 data PackageDumpException
     = MissingSingleField Text (Map Text [Line])
     | Couldn'tParseField Text [Line]
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show PackageDumpException where
-    show (MissingSingleField name values) = unlines $
+instance Exception PackageDumpException where
+    displayException (MissingSingleField name values) = unlines $
         concat
             [ "Error: [S-4257]\n"
             , "Expected single value for field name "
@@ -49,7 +50,7 @@ instance Show PackageDumpException where
             , " when parsing ghc-pkg dump output:"
             ]
         : map (\(k, v) -> "    " ++ show (k, v)) (Map.toList values)
-    show (Couldn'tParseField name ls) = concat
+    displayException (Couldn'tParseField name ls) = concat
         [ "Error: [S-2016]\n"
         , "Couldn't parse the field "
         , show name
@@ -57,8 +58,6 @@ instance Show PackageDumpException where
         , show ls
         , "."
         ]
-
-instance Exception PackageDumpException
 
 -- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
 ghcPkgDump

@@ -94,7 +94,7 @@ There are three types of package locations:
 
 All three types support optional tree metadata to be added, which can be used
 for reproducibility and faster downloads. This information can automatically be
-generated in a [lock file](lock_file.md).
+generated in a [lock file](lock_files.md).
 
 ### Hackage packages
 

@@ -4,18 +4,19 @@
 -- | Finding files.
 
 module Path.Find
-  (findFileUp
-  ,findDirUp
-  ,findFiles
-  ,findInParents)
-  where
+  ( findFileUp
+  , findDirUp
+  , findFiles
+  , findInParents
+  ) where
 
-import RIO
-import System.IO.Error (isPermissionError)
 import qualified Data.List as L
-import Path
-import Path.IO hiding (findFiles)
-import System.PosixCompat.Files (getSymbolicLinkStatus, isSymbolicLink)
+import           Path
+import           Path.IO hiding (findFiles)
+import           RIO
+import           System.IO.Error ( isPermissionError )
+import           System.PosixCompat.Files
+                   ( getSymbolicLinkStatus, isSymbolicLink )
 
 -- | Find the location of a file matching the given predicate.
 findFileUp :: (MonadIO m,MonadThrow m)

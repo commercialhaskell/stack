@@ -8,63 +8,62 @@
 -- | Build the project.
 
 module Stack.Build
-  (build
-  ,buildLocalTargets
-  ,loadPackage
-  ,mkBaseConfigOpts
-  ,queryBuildInfo
-  ,splitObjsWarning
-  ,CabalVersionException(..))
-  where
+  ( build
+  , buildLocalTargets
+  , loadPackage
+  , mkBaseConfigOpts
+  , queryBuildInfo
+  , splitObjsWarning
+  , CabalVersionException (..)
+  ) where
 
-import           Stack.Prelude hiding (loadPackage)
-import           Data.Aeson (Value (Object, Array), (.=), object)
+import           Data.Aeson ( Value (Object, Array), (.=), object )
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
-import           Data.List ((\\), isPrefixOf)
-import           Data.List.Extra (groupSort)
+import           Data.List ( (\\), isPrefixOf )
+import           Data.List.Extra ( groupSort )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Text.Encoding (decodeUtf8)
+import           Data.Text.Encoding ( decodeUtf8 )
 import qualified Data.Text.IO as TIO
-import           Data.Text.Read (decimal)
+import           Data.Text.Read ( decimal )
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import qualified Distribution.PackageDescription as C
-import           Distribution.Types.Dependency (depLibraries)
-import           Distribution.Version (mkVersion)
-import           Path (parent)
+import           Distribution.Types.Dependency ( depLibraries )
+import           Distribution.Version ( mkVersion )
+import           Path ( parent )
 import           Stack.Build.ConstructPlan
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source
 import           Stack.Package
-import           Stack.Setup (withNewLocalBuildTargets)
+import           Stack.Prelude hiding ( loadPackage )
+import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.Types.Build
+import           Stack.Types.Compiler ( compilerVersionText, getGhcVersion )
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
-
-import           Stack.Types.Compiler (compilerVersionText, getGhcVersion)
-import           System.Terminal (fixCodePage)
+import           System.Terminal ( fixCodePage )
 
 data CabalVersionException
     = AllowNewerNotSupported Version
     | CabalVersionNotSupported Version
-    deriving (Typeable)
+    deriving (Show, Typeable)
 
-instance Show CabalVersionException where
-    show (AllowNewerNotSupported cabalVer) = concat
+instance Exception CabalVersionException where
+    displayException (AllowNewerNotSupported cabalVer) = concat
         [ "Error: [S-8503]\n"
         , "'--allow-newer' requires Cabal version 1.22 or greater, but "
         , "version "
         , versionString cabalVer
         , " was found."
         ]
-    show (CabalVersionNotSupported cabalVer) = concat
+    displayException (CabalVersionNotSupported cabalVer) = concat
         [ "Error: [S-5973]\n"
         , "Stack no longer supports Cabal versions before 1.19.2, "
         , "but version "
@@ -73,24 +72,22 @@ instance Show CabalVersionException where
         , "or later or to nightly-2015-05-05 or later."
         ]
 
-instance Exception CabalVersionException
-
 data QueryException
     = SelectorNotFound [Text]
     | IndexOutOfRange [Text]
     | NoNumericSelector [Text]
     | CannotApplySelector Value [Text]
-    deriving (Typeable)
+    deriving (Show, Typeable)
 
-instance Show QueryException where
-    show (SelectorNotFound sels) = err "[S-4419]" "Selector not found" sels
-    show (IndexOutOfRange sels) = err "[S-8422]" "Index out of range" sels
-    show (NoNumericSelector sels) =
+instance Exception QueryException where
+    displayException (SelectorNotFound sels) =
+        err "[S-4419]" "Selector not found" sels
+    displayException (IndexOutOfRange sels) =
+        err "[S-8422]" "Index out of range" sels
+    displayException (NoNumericSelector sels) =
         err "[S-4360]" "Encountered array and needed numeric selector" sels
-    show (CannotApplySelector value sels) =
+    displayException (CannotApplySelector value sels) =
         err "[S-1711]" ("Cannot apply selector to " ++ show value) sels
-
-instance Exception QueryException
 
 -- | Helper function for 'QueryException' instance of 'Show'
 err :: String -> String -> [Text] -> String

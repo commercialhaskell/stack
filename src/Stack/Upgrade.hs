@@ -5,16 +5,14 @@
 {-# LANGUAGE OverloadedStrings     #-}
 
 module Stack.Upgrade
-    ( upgrade
-    , UpgradeOpts
-    , upgradeOpts
-    ) where
+  ( upgrade
+  , UpgradeOpts
+  , upgradeOpts
+  ) where
 
 import qualified Data.Text as T
-import           Distribution.Version ( mkVersion' )
 import           Options.Applicative
 import           Path
-import qualified Paths_stack as Paths
 import           RIO.Process
 import           Stack.Build
 import           Stack.Build.Target ( NeedTargets (..) )
@@ -34,30 +32,28 @@ data UpgradeException
     | CommitsNotFound String String
     | StackInPackageIndexNotFound
     | VersionWithNoRevision
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show UpgradeException where
-    show NeitherBinaryOrSourceSpecified =
+instance Exception UpgradeException where
+    displayException NeitherBinaryOrSourceSpecified =
         "Error: [S-3642]\n"
         ++ "You must allow either binary or source upgrade paths."
-    show ExecutableFailure =
+    displayException ExecutableFailure =
         "Error: [S-8716]\n"
         ++ "Non-success exit code from running newly downloaded executable."
-    show (CommitsNotFound branch repo) = concat
+    displayException (CommitsNotFound branch repo) = concat
         [ "Error: [S-7114]\n"
         , "No commits found for branch "
         , branch
         , " on repo "
         , repo
         ]
-    show StackInPackageIndexNotFound =
+    displayException StackInPackageIndexNotFound =
         "Error: [S-9668]\n"
         ++ "No Stack version found in package indices."
-    show VersionWithNoRevision =
+    displayException VersionWithNoRevision =
         "Error: [S-6648]\n"
         ++ "Latest version with no revision."
-
-instance Exception UpgradeException
 
 upgradeOpts :: Parser UpgradeOpts
 upgradeOpts = UpgradeOpts
@@ -245,7 +241,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
             Nothing -> throwIO StackInPackageIndexNotFound
             Just version -> pure version
 
-        if version <= mkVersion' Paths.version
+        if version <= stackVersion
             then do
                 prettyInfoS "Already at latest version, no upgrade required"
                 pure Nothing

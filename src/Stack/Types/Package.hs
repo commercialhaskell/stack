@@ -9,28 +9,67 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RankNTypes                 #-}
 
-module Stack.Types.Package where
+module Stack.Types.Package
+ ( BuildInfoOpts (..)
+ , ExeName (..)
+ , FileCacheInfo (..)
+ , GetPackageOpts (..)
+ , InstallLocation (..)
+ , InstallMap
+ , Installed (..)
+ , InstalledPackageLocation (..)
+ , InstalledMap
+ , LocalPackage (..)
+ , MemoizedWith (..)
+ , Package (..)
+ , PackageConfig (..)
+ , PackageException (..)
+ , PackageLibraries (..)
+ , PackageSource (..)
+ , dotCabalCFilePath
+ , dotCabalGetPath
+ , dotCabalMain
+ , dotCabalMainPath
+ , dotCabalModule
+ , dotCabalModulePath
+ , installedPackageIdentifier
+ , installedVersion
+ , lpFiles
+ , lpFilesForComponents
+ , memoizeRefWith
+ , packageDefinedFlags
+ , packageIdent
+ , packageIdentifier
+ , psVersion
+ , runMemoizedWith
+ ) where
 
 import           Stack.Prelude
 import qualified RIO.Text as T
-import           Data.Aeson (ToJSON (..), FromJSON (..), (.=), (.:), object, withObject)
+import           Data.Aeson
+                   ( ToJSON (..), FromJSON (..), (.=), (.:), object, withObject
+                   )
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import           Distribution.CabalSpecVersion
-import           Distribution.Parsec (PError (..), PWarning (..), showPos)
+import           Distribution.Parsec ( PError (..), PWarning (..), showPos )
 import qualified Distribution.SPDX.License as SPDX
-import           Distribution.License (License)
-import           Distribution.ModuleName (ModuleName)
-import           Distribution.PackageDescription (TestSuiteInterface, BuildType)
-import           Distribution.System (Platform (..))
+import           Distribution.License ( License )
+import           Distribution.ModuleName ( ModuleName )
+import           Distribution.PackageDescription
+                   ( TestSuiteInterface, BuildType )
+import           Distribution.System ( Platform (..) )
 import           Stack.Types.Compiler
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
-import           Stack.Types.Dependency (DepValue)
-import           Stack.Types.PackageFile (GetPackageFiles(..), DotCabalDescriptor(..), DotCabalPath(..))
+import           Stack.Types.Dependency ( DepValue )
+import           Stack.Types.PackageFile
+                   ( GetPackageFiles (..), DotCabalDescriptor (..)
+                   , DotCabalPath (..)
+                   )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -44,10 +83,10 @@ data PackageException
   | CabalFileNameParseFail FilePath
   | CabalFileNameInvalidPackageName FilePath
   | ComponentNotParsedBug
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show PackageException where
-    show (PackageInvalidCabalFile loc _mversion errs warnings) = concat
+instance Exception PackageException where
+    displayException (PackageInvalidCabalFile loc _mversion errs warnings) = concat
         [ "Error: [S-8072]\n"
         , "Unable to parse Cabal file "
         , case loc of
@@ -81,7 +120,7 @@ instance Show PackageException where
                 ])
             warnings
         ]
-    show (MismatchedCabalIdentifier pir ident) = concat
+    displayException (MismatchedCabalIdentifier pir ident) = concat
         [ "Error: [S-5394]\n"
         , "Mismatched package identifier."
         , "\nFound:    "
@@ -89,21 +128,19 @@ instance Show PackageException where
         , "\nExpected: "
         , T.unpack $ utf8BuilderToText $ display pir
         ]
-    show (CabalFileNameParseFail fp) = concat
+    displayException (CabalFileNameParseFail fp) = concat
         [ "Error: [S-2203]\n"
         , "Invalid file path for Cabal file, must have a .cabal extension: "
         , fp
         ]
-    show (CabalFileNameInvalidPackageName fp) = concat
+    displayException (CabalFileNameInvalidPackageName fp) = concat
         [ "Error: [S-8854]\n"
         , "Cabal file names must use valid package names followed by a .cabal \
           \extension, the following is invalid: "
         , fp
         ]
-    show ComponentNotParsedBug = bugReport "[S-4623]"
+    displayException ComponentNotParsedBug = bugReport "[S-4623]"
         "Component names should always parse as directory names."
-
-instance Exception PackageException
 
 -- | Libraries in a package. Since Cabal 2.0, internal libraries are a
 -- thing.
@@ -273,8 +310,8 @@ memoizeRefWith action = do
           pure res
     either throwIO pure res
 
-runMemoizedWith
-  :: (HasEnvConfig env, MonadReader env m, MonadIO m)
+runMemoizedWith ::
+     (HasEnvConfig env, MonadReader env m, MonadIO m)
   => MemoizedWith EnvConfig a
   -> m a
 runMemoizedWith (MemoizedWith action) = do

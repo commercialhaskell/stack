@@ -3,19 +3,19 @@
 {-# LANGUAGE TupleSections     #-}
 
 module Stack.FileWatch
-    ( WatchMode (WatchModePoll)
-    , fileWatch
-    , fileWatchPoll
-    ) where
+  ( WatchMode (WatchModePoll)
+  , fileWatch
+  , fileWatchPoll
+  ) where
 
-import           Control.Concurrent.STM (check)
+import           Control.Concurrent.STM ( check )
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import           GHC.IO.Exception
 import           Path
 import           Stack.Prelude
 import           System.FSNotify
-import           System.IO (getLine)
+import           System.IO ( getLine )
 
 fileWatch
   :: (HasLogFunc env, HasTerm env)
@@ -127,7 +127,7 @@ fileWatchConf cfg inner = withRunInIO $ \run -> withManagerConf cfg $ \manager -
                 let theStyle = case fromException e of
                         Just ExitSuccess -> Good
                         _ -> Error
-                 in style theStyle $ fromString $ show e
+                 in style theStyle $ fromString $ displayException e
             _ -> style Good "Success! Waiting for next file change."
 
         logInfo "Type help for available commands. Press enter to force a rebuild."

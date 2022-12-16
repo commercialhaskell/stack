@@ -1,15 +1,18 @@
 
-module TestUtil(
-    (==>), QFilePath(..), QFilePathValidW(..), QFilePathValidP(..),
-    module Test.QuickCheck,
-    module Data.List,
-    module Data.Maybe
-    ) where
+module TestUtil
+  ( (==>)
+  , QFilePath (..)
+  , QFilePathValidW (..)
+  , QFilePathValidP (..)
+  , module Test.QuickCheck
+  , module Data.List
+  , module Data.Maybe
+  ) where
 
-import Test.QuickCheck hiding ((==>))
-import Data.List
-import Data.Maybe
-import Control.Monad
+import           Test.QuickCheck hiding ( (==>) )
+import           Data.List
+import           Data.Maybe
+import           Control.Monad
 import qualified System.FilePath.Windows as W
 import qualified System.FilePath.Posix as P
 

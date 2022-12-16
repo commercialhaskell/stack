@@ -7,10 +7,10 @@
 
 -- | Install GHC/GHCJS and Cabal.
 module Stack.SetupCmd
-    ( setup
-    , setupParser
-    , SetupCmdOpts(..)
-    ) where
+  ( setup
+  , setupParser
+  , SetupCmdOpts (..)
+  ) where
 
 import           Control.Applicative
 import qualified Data.Text as T

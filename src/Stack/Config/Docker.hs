@@ -4,12 +4,16 @@
 {-# LANGUAGE RecordWildCards    #-}
 
 -- | Docker configuration
-module Stack.Config.Docker where
+module Stack.Config.Docker
+  ( ConfigDockerException (..)
+  , addDefaultTag
+  , dockerOptsFromMonoid
+  ) where
 
-import           Stack.Prelude
-import           Data.List (find)
+import           Data.List ( find )
 import qualified Data.Text as T
-import           Distribution.Version (simplifyVersionRange)
+import           Distribution.Version ( simplifyVersionRange )
+import           Stack.Prelude
 import           Stack.Types.Version
 import           Stack.Types.Config
 import           Stack.Types.Docker
@@ -20,11 +24,10 @@ import           Stack.Types.Resolver
 data ConfigDockerException
     = ResolverNotSupportedException !(Maybe Project) !(Maybe AbstractResolver)
     -- ^ Only LTS resolvers are supported for default image tag.
-    deriving Typeable
+    deriving (Show, Typeable)
 
--- | Show instance for StackDockerConfigException.
-instance Show ConfigDockerException where
-    show (ResolverNotSupportedException mproject maresolver) =
+instance Exception ConfigDockerException where
+    displayException (ResolverNotSupportedException mproject maresolver) =
         concat
             [ "Error: [S-8575]\n"
             , "Resolver not supported for Docker images:\n    "
@@ -36,11 +39,9 @@ instance Show ConfigDockerException where
             , T.unpack dockerImageArgName
             , "' explicitly, in your configuration file."]
 
-instance Exception ConfigDockerException
-
 -- | Add a default Docker tag name to a given base image.
-addDefaultTag
-  :: MonadThrow m
+addDefaultTag ::
+     MonadThrow m
   => String -- ^ base
   -> Maybe Project
   -> Maybe AbstractResolver
@@ -57,45 +58,46 @@ addDefaultTag base mproject maresolver = do
   pure $ base ++ ":" ++ show lts
 
 -- | Interprets DockerOptsMonoid options.
-dockerOptsFromMonoid
-    :: MonadThrow m
-    => Maybe Project
-    -> Maybe AbstractResolver
-    -> DockerOptsMonoid
-    -> m DockerOpts
+dockerOptsFromMonoid ::
+     MonadThrow m
+  => Maybe Project
+  -> Maybe AbstractResolver
+  -> DockerOptsMonoid
+  -> m DockerOpts
 dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
-    let dockerImage =
-          case getFirst dockerMonoidRepoOrImage of
-            Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
-            Just (DockerMonoidImage image) -> pure image
-            Just (DockerMonoidRepo repo) ->
-              case find (`elem` (":@" :: String)) repo of
-                Nothing -> addDefaultTag repo mproject maresolver
-                -- Repo already specified a tag or digest, so don't append default
-                Just _ -> pure repo
-    let dockerEnable =
-            fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
-        dockerRegistryLogin =
-            fromFirst
-                (isJust (emptyToNothing (getFirst dockerMonoidRegistryUsername)))
-                dockerMonoidRegistryLogin
-        dockerRegistryUsername = emptyToNothing (getFirst dockerMonoidRegistryUsername)
-        dockerRegistryPassword = emptyToNothing (getFirst dockerMonoidRegistryPassword)
-        dockerAutoPull = fromFirstTrue dockerMonoidAutoPull
-        dockerDetach = fromFirstFalse dockerMonoidDetach
-        dockerPersist = fromFirstFalse dockerMonoidPersist
-        dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
-        dockerNetwork = emptyToNothing (getFirst dockerMonoidNetwork)
-        dockerRunArgs = dockerMonoidRunArgs
-        dockerMount = dockerMonoidMount
-        dockerMountMode = emptyToNothing (getFirst dockerMonoidMountMode)
-        dockerEnv = dockerMonoidEnv
-        dockerSetUser = getFirst dockerMonoidSetUser
-        dockerRequireDockerVersion =
-            simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
-        dockerStackExe = getFirst dockerMonoidStackExe
-
-    pure DockerOpts{..}
-  where emptyToNothing Nothing = Nothing
-        emptyToNothing (Just s) | null s = Nothing
-                                | otherwise = Just s
+  let dockerImage =
+        case getFirst dockerMonoidRepoOrImage of
+          Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
+          Just (DockerMonoidImage image) -> pure image
+          Just (DockerMonoidRepo repo) ->
+            case find (`elem` (":@" :: String)) repo of
+              Nothing -> addDefaultTag repo mproject maresolver
+              -- Repo already specified a tag or digest, so don't append default
+              Just _ -> pure repo
+  let dockerEnable =
+        fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
+      dockerRegistryLogin =
+        fromFirst
+          (isJust (emptyToNothing (getFirst dockerMonoidRegistryUsername)))
+          dockerMonoidRegistryLogin
+      dockerRegistryUsername = emptyToNothing (getFirst dockerMonoidRegistryUsername)
+      dockerRegistryPassword = emptyToNothing (getFirst dockerMonoidRegistryPassword)
+      dockerAutoPull = fromFirstTrue dockerMonoidAutoPull
+      dockerDetach = fromFirstFalse dockerMonoidDetach
+      dockerPersist = fromFirstFalse dockerMonoidPersist
+      dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
+      dockerNetwork = emptyToNothing (getFirst dockerMonoidNetwork)
+      dockerRunArgs = dockerMonoidRunArgs
+      dockerMount = dockerMonoidMount
+      dockerMountMode = emptyToNothing (getFirst dockerMonoidMountMode)
+      dockerEnv = dockerMonoidEnv
+      dockerSetUser = getFirst dockerMonoidSetUser
+      dockerRequireDockerVersion =
+        simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
+      dockerStackExe = getFirst dockerMonoidStackExe
+  pure DockerOpts{..}
+ where
+  emptyToNothing Nothing = Nothing
+  emptyToNothing (Just s)
+    | null s = Nothing
+    | otherwise = Just s

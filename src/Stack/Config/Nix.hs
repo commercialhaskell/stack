@@ -5,20 +5,20 @@
 
 -- | Nix configuration
 module Stack.Config.Nix
-       (nixOptsFromMonoid
-       ,nixCompiler
-       ,nixCompilerVersion
-       ) where
+  ( nixCompiler
+  , nixCompilerVersion
+  , nixOptsFromMonoid
+  ) where
 
-import Stack.Prelude
-import Control.Monad.Extra (ifM)
+import           Control.Monad.Extra ( ifM )
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import Distribution.System (OS (..))
-import Stack.Constants
-import Stack.Types.Config
-import Stack.Types.Nix
-import System.Directory (doesFileExist)
+import           Distribution.System ( OS (..) )
+import           Stack.Constants ( osIsWindows )
+import           Stack.Prelude
+import           Stack.Types.Config ( HasRunner )
+import           Stack.Types.Nix ( NixOpts (..), NixOptsMonoid (..) )
+import           System.Directory ( doesFileExist )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Config.Nix" module.
@@ -27,54 +27,55 @@ data ConfigNixException
     -- ^ Nix can't be given packages and a shell file at the same time
   | GHCMajorVersionUnspecified
   | OnlyGHCSupported
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show ConfigNixException where
-  show NixCannotUseShellFileAndPackagesException =
+instance Exception ConfigNixException where
+  displayException NixCannotUseShellFileAndPackagesException =
     "Error: [S-2726]\n"
     ++ "You cannot have packages and a shell-file filled at the same time \
        \in your nix-shell configuration."
-  show GHCMajorVersionUnspecified =
+  displayException GHCMajorVersionUnspecified =
     "Error: [S-9317]\n"
     ++ "GHC major version not specified."
-  show OnlyGHCSupported =
+  displayException OnlyGHCSupported =
     "Error: [S-8605]\n"
     ++ "Only GHC is supported by 'stack --nix'."
 
-instance Exception ConfigNixException
-
 -- | Interprets NixOptsMonoid options.
-nixOptsFromMonoid
-    :: HasRunner env
-    => NixOptsMonoid
-    -> OS
-    -> RIO env NixOpts
+nixOptsFromMonoid ::
+     HasRunner env
+  => NixOptsMonoid
+  -> OS
+  -> RIO env NixOpts
 nixOptsFromMonoid NixOptsMonoid{..} os = do
-    let defaultPure = case os of
-          OSX -> False
-          _ -> True
-        nixPureShell = fromFirst defaultPure nixMonoidPureShell
-        nixPackages = fromFirst [] nixMonoidPackages
-        nixInitFile = getFirst nixMonoidInitFile
-        nixShellOptions = fromFirst [] nixMonoidShellOptions
-                          ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
-        nixAddGCRoots   = fromFirstFalse nixMonoidAddGCRoots
+  let defaultPure = case os of
+        OSX -> False
+        _ -> True
+      nixPureShell = fromFirst defaultPure nixMonoidPureShell
+      nixPackages = fromFirst [] nixMonoidPackages
+      nixInitFile = getFirst nixMonoidInitFile
+      nixShellOptions = fromFirst [] nixMonoidShellOptions
+                        ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
+      nixAddGCRoots   = fromFirstFalse nixMonoidAddGCRoots
 
-    -- Enable Nix-mode by default on NixOS, unless Docker-mode was specified
-    osIsNixOS <- isNixOS
-    let nixEnable0 = fromFirst osIsNixOS nixMonoidEnable
+  -- Enable Nix-mode by default on NixOS, unless Docker-mode was specified
+  osIsNixOS <- isNixOS
+  let nixEnable0 = fromFirst osIsNixOS nixMonoidEnable
 
-    nixEnable <- case () of _
-                                | nixEnable0 && osIsWindows -> do
-                                      logInfo "Note: Disabling nix integration, since this is being run in Windows"
-                                      pure False
-                                | otherwise                 -> pure nixEnable0
+  nixEnable <- case () of
+    _
+      | nixEnable0 && osIsWindows -> do
+          logInfo
+            "Note: Disabling nix integration, since this is being run in Windows"
+          pure False
+      | otherwise -> pure nixEnable0
 
-    when (not (null nixPackages) && isJust nixInitFile) $
-       throwIO NixCannotUseShellFileAndPackagesException
-    pure NixOpts{..}
-  where prefixAll p (x:xs) = p : x : prefixAll p xs
-        prefixAll _ _      = []
+  when (not (null nixPackages) && isJust nixInitFile) $
+    throwIO NixCannotUseShellFileAndPackagesException
+  pure NixOpts{..}
+ where
+  prefixAll p (x:xs) = p : x : prefixAll p xs
+  prefixAll _ _      = []
 
 nixCompiler :: WantedCompiler -> Either ConfigNixException T.Text
 nixCompiler compilerVersion =
@@ -114,7 +115,7 @@ nixCompilerVersion compilerVersion =
 
 isNixOS :: MonadIO m => m Bool
 isNixOS = liftIO $ do
-    let fp = "/etc/os-release"
-    ifM (doesFileExist fp)
-        (T.isInfixOf "ID=nixos" <$> TIO.readFile fp)
-        (pure False)
+  let fp = "/etc/os-release"
+  ifM (doesFileExist fp)
+      (T.isInfixOf "ID=nixos" <$> TIO.readFile fp)
+      (pure False)

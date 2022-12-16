@@ -14,7 +14,7 @@ module Stack.BuildPlan
     ( BuildPlanException (..)
     , BuildPlanCheck (..)
     , checkSnapBuildPlan
-    , DepError(..)
+    , DepError (..)
     , DepErrors
     , removeSrcPkgDefaultFlags
     , selectBestSnapshot
@@ -37,7 +37,6 @@ import           Distribution.System (Platform)
 import           Distribution.Text (display)
 import           Distribution.Types.UnqualComponentName (unUnqualComponentName)
 import qualified Distribution.Version as C
-import qualified RIO
 import           Stack.Constants
 import           Stack.Package
 import           Stack.SourceMap
@@ -56,17 +55,17 @@ data BuildPlanException
     | SnapshotNotFound SnapName
     | NeitherCompilerOrResolverSpecified T.Text
     | DuplicatePackagesBug
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show BuildPlanException where
-    show (SnapshotNotFound snapName) = unlines
+instance Exception BuildPlanException where
+    displayException (SnapshotNotFound snapName) = unlines
         [ "Error: [S-2045]"
         , "SnapshotNotFound " ++ snapName'
         , "Non existing resolver: " ++ snapName' ++ "."
         , "For a complete list of available snapshots see https://www.stackage.org/snapshots"
         ]
-        where snapName' = show snapName
-    show (UnknownPackages stackYaml unknown shadowed) =
+      where snapName' = show snapName
+    displayException (UnknownPackages stackYaml unknown shadowed) =
         "Error: [S-7571]\n"
         ++ unlines (unknown' ++ shadowed')
       where
@@ -134,16 +133,14 @@ instance Show BuildPlanException where
                       $ Set.toList
                       $ Set.unions
                       $ Map.elems shadowed
-    show (NeitherCompilerOrResolverSpecified url) = concat
+    displayException (NeitherCompilerOrResolverSpecified url) = concat
         [ "Error: [S-8559]\n"
         , "Failed to load custom snapshot at "
         , T.unpack url
         , ", because no 'compiler' or 'resolver' is specified."
         ]
-    show DuplicatePackagesBug = bugReport "[S-5743]"
+    displayException DuplicatePackagesBug = bugReport "[S-5743]"
         "Duplicate packages are not expected here."
-
-instance Exception BuildPlanException
 
 gpdPackages :: [GenericPackageDescription] -> Map PackageName Version
 gpdPackages = Map.fromList . map (toPair . C.package . C.packageDescription)
@@ -394,9 +391,13 @@ selectBestSnapshot
     -> NonEmpty SnapName
     -> RIO env (SnapshotCandidate env, RawSnapshotLocation, BuildPlanCheck)
 selectBestSnapshot pkgDirs snaps = do
-    logInfo $ "Selecting the best among "
-               <> displayShow (NonEmpty.length snaps)
-               <> " snapshots...\n"
+    prettyInfo $
+           fillSep
+             [ flow "Selecting the best among"
+             , fromString $ show (NonEmpty.length snaps)
+             , "snapshots..."
+             ]
+        <> line
     F.foldr1 go (NonEmpty.map (getResult <=< snapshotLocation) snaps)
     where
         go mold mnew = do
@@ -415,19 +416,31 @@ selectBestSnapshot pkgDirs snaps = do
           | compareBuildPlanCheck r1 r2 /= LT = (s1, l1, r1)
           | otherwise = (s2, l2, r2)
 
-        reportResult BuildPlanCheckOk {} loc = do
-            logInfo $ "* Matches " <> RIO.display loc
-            logInfo ""
+        reportResult BuildPlanCheckOk {} loc =
+            prettyNote $
+                   fillSep
+                      [ flow "Matches"
+                      , pretty $ PrettyRawSnapshotLocation loc
+                      ]
+                <> line
 
-        reportResult r@BuildPlanCheckPartial {} loc = do
-            logWarn $ "* Partially matches " <> RIO.display loc
-            logWarn $ RIO.display $ ind $ T.pack $ show r
+        reportResult r@BuildPlanCheckPartial {} loc =
+            prettyWarn $
+                   fillSep
+                     [ flow "Partially matches"
+                     , pretty $ PrettyRawSnapshotLocation loc
+                     ]
+                 <> blankLine
+                 <> indent 4 (string (show r))
 
-        reportResult r@BuildPlanCheckFail {} loc = do
-            logWarn $ "* Rejected " <> RIO.display loc
-            logWarn $ RIO.display $ ind $ T.pack $ show r
-
-        ind t = T.unlines $ fmap ("    " <>) (T.lines t)
+        reportResult r@BuildPlanCheckFail {} loc =
+            prettyWarn $
+                   fillSep
+                     [ flow "Rejected"
+                     , pretty $ PrettyRawSnapshotLocation loc
+                     ]
+                <> blankLine
+                <> indent 4 (string (show r))
 
 showItems :: [String] -> Text
 showItems items = T.concat (map formatItem items)

@@ -6,7 +6,6 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE PackageImports      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ViewPatterns        #-}
@@ -28,76 +27,94 @@ module Stack.Setup
   , downloadStackExe
   ) where
 
-import qualified    Codec.Archive.Tar as Tar
-import              Conduit
-import              Control.Applicative (empty)
-import "cryptonite" Crypto.Hash (SHA1(..), SHA256(..))
-import              Pantry.Internal.AesonExtended
-import qualified    Data.Aeson.KeyMap as KeyMap
-import qualified    Data.ByteString as S
-import qualified    Data.ByteString.Lazy as LBS
-import qualified    Data.Conduit.Binary as CB
-import              Data.Conduit.Lazy (lazyConsume)
-import qualified    Data.Conduit.List as CL
-import              Data.Conduit.Process.Typed (createSource)
-import              Data.Conduit.Zlib          (ungzip)
-import qualified    Data.Map as Map
-import qualified    Data.Set as Set
-import qualified    Data.Text as T
-import qualified    Data.Text.Lazy as TL
-import qualified    Data.Text.Encoding as T
-import qualified    Data.Text.Lazy.Encoding as TL
-import qualified    Data.Text.Encoding.Error as T
-import qualified    Data.Yaml as Yaml
-import              Distribution.System (OS, Arch (..), Platform (..))
-import qualified    Distribution.System as Cabal
-import              Distribution.Text (simpleParse)
-import              Distribution.Types.PackageName (mkPackageName)
-import              Distribution.Version (mkVersion)
-import              Network.HTTP.Client (redirectCount)
-import              Network.HTTP.StackClient (CheckHexDigest (..), HashCheck (..),
-                                              getResponseBody, getResponseStatusCode, httpLbs, httpJSON,
-                                              mkDownloadRequest, parseRequest, parseUrlThrow, setGitHubHeaders,
-                                              setHashChecks, setLengthCheck, verifiedDownloadWithProgress, withResponse,
-                                              setRequestMethod)
-import              Network.HTTP.Simple (getResponseHeader)
-import              Path hiding (fileExtension)
-import              Path.CheckInstall (warnInstallSearchPathIssues)
-import              Path.Extended (fileExtension)
-import              Path.Extra (toFilePathNoTrailingSep)
-import              Path.IO hiding (findExecutable, withSystemTempDir)
-import qualified    Pantry
-import qualified    RIO
-import              RIO.List
-import              RIO.Process
-import              Stack.Build.Haddock (shouldHaddockDeps)
-import              Stack.Build.Source (loadSourceMap, hashSourceMapData)
-import              Stack.Build.Target (NeedTargets(..), parseTargets)
-import              Stack.Constants
-import              Stack.Constants.Config (distRelativeDir)
-import              Stack.GhcPkg (createDatabase, getGlobalDB, mkGhcPackagePath, ghcPkgPathEnvVar)
-import              Stack.Prelude hiding (Display (..))
-import              Stack.SourceMap
-import              Stack.Setup.Installed (Tool (..), extraDirs, filterTools,
-                                          installDir, getCompilerVersion,
-                                          listInstalled, markInstalled, tempInstallDir,
-                                          toolString, unmarkInstalled)
-import              Stack.Storage.User (loadCompilerPaths, saveCompilerPaths)
-import              Stack.Types.Build
-import              Stack.Types.Compiler
-import              Stack.Types.CompilerBuild
-import              Stack.Types.Config
-import              Stack.Types.Docker
-import              Stack.Types.SourceMap
-import              Stack.Types.Version
-import qualified    System.Directory as D
-import              System.Environment (getExecutablePath, lookupEnv)
-import              System.IO.Error (isPermissionError)
-import              System.FilePath (searchPathSeparator)
-import qualified    System.FilePath as FP
-import              System.Permissions (setFileExecutable)
-import              System.Uname (getRelease)
-import              Data.List.Split (splitOn)
+import qualified Codec.Archive.Tar as Tar
+import           Conduit
+                   ( ConduitT, await, concatMapMC, filterCE, foldMC, yield )
+import           Control.Applicative ( empty )
+import           Crypto.Hash ( SHA1 (..), SHA256 (..) )
+import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.ByteString as S
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Conduit.Binary as CB
+import           Data.Conduit.Lazy ( lazyConsume )
+import qualified Data.Conduit.List as CL
+import           Data.Conduit.Process.Typed ( createSource )
+import           Data.Conduit.Zlib ( ungzip )
+import           Data.List.Split ( splitOn )
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.Lazy.Encoding as TL
+import qualified Data.Text.Encoding.Error as T
+import qualified Data.Yaml as Yaml
+import           Distribution.System ( Arch (..), OS, Platform (..) )
+import qualified Distribution.System as Cabal
+import           Distribution.Text ( simpleParse )
+import           Distribution.Types.PackageName ( mkPackageName )
+import           Distribution.Version ( mkVersion )
+import           Network.HTTP.Client ( redirectCount )
+import           Network.HTTP.StackClient
+                   ( CheckHexDigest (..), HashCheck (..), getResponseBody
+                   , getResponseStatusCode, httpLbs, httpJSON
+                   , mkDownloadRequest, parseRequest, parseUrlThrow
+                   , setGitHubHeaders, setHashChecks, setLengthCheck
+                   , verifiedDownloadWithProgress, withResponse
+                   , setRequestMethod
+                   )
+import           Network.HTTP.Simple ( getResponseHeader )
+import           Pantry.Internal.AesonExtended
+                   ( Value (..), WithJSONWarnings (..), logJSONWarnings )
+import           Path
+                   ( (</>), dirname, filename, parent, parseAbsDir, parseAbsFile
+                   , parseRelDir, parseRelFile, toFilePath
+                   )
+import           Path.CheckInstall ( warnInstallSearchPathIssues )
+import           Path.Extended ( fileExtension )
+import           Path.Extra ( toFilePathNoTrailingSep )
+import           Path.IO hiding ( findExecutable, withSystemTempDir )
+import           RIO.List
+                   ( headMaybe, intercalate, intersperse, isPrefixOf
+                   , maximumByMaybe, sort, sortBy, stripPrefix )
+import           RIO.Process
+                   ( EnvVars, HasProcessContext (..), ProcessContext
+                   , augmentPath, augmentPathMap, doesExecutableExist, envVarsL
+                   , exeSearchPathL, getStdout, mkProcessContext, modifyEnvVars
+                   , proc, readProcess_, readProcessStdout, runProcess
+                   , runProcess_, setStdout, waitExitCode, withModifyEnvVars
+                   , withProcessWait, withWorkingDir, workingDirL
+                   )
+import           Stack.Build.Haddock ( shouldHaddockDeps )
+import           Stack.Build.Source ( hashSourceMapData, loadSourceMap )
+import           Stack.Build.Target ( NeedTargets (..), parseTargets )
+import           Stack.Constants
+import           Stack.Constants.Config ( distRelativeDir )
+import           Stack.GhcPkg
+                   ( createDatabase, getGlobalDB, ghcPkgPathEnvVar
+                   , mkGhcPackagePath )
+import           Stack.Prelude
+import           Stack.SourceMap
+import           Stack.Setup.Installed
+                   ( Tool (..), extraDirs, filterTools, getCompilerVersion
+                   , installDir, listInstalled, markInstalled, tempInstallDir
+                   , toolString, unmarkInstalled
+                   )
+import           Stack.Storage.User ( loadCompilerPaths, saveCompilerPaths )
+import           Stack.Types.Build
+import           Stack.Types.Compiler
+import           Stack.Types.CompilerBuild
+import           Stack.Types.Config
+import           Stack.Types.Docker
+import           Stack.Types.SourceMap
+import           Stack.Types.Version
+import qualified System.Directory as D
+import           System.Environment ( getExecutablePath, lookupEnv )
+import           System.IO.Error ( isPermissionError )
+import           System.FilePath ( searchPathSeparator )
+import qualified System.FilePath as FP
+import           System.Permissions ( setFileExecutable )
+import           System.Uname ( getRelease )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Setup" module
@@ -144,58 +161,58 @@ data SetupException
     | BinaryUpgradeOnOSUnsupported Cabal.OS
     | BinaryUpgradeOnArchUnsupported Cabal.Arch
     | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show SetupException where
-    show (UnsupportedSetupCombo os arch) = concat
+instance Exception SetupException where
+    displayException (UnsupportedSetupCombo os arch) = concat
         [ "Error: [S-1852]\n"
         , "I don't know how to install GHC for "
         , show (os, arch)
         , ", please install manually"
         ]
-    show (MissingDependencies tools) = concat
+    displayException (MissingDependencies tools) = concat
         [ "Error: [S-2126]\n"
         , "The following executables are missing and must be installed: "
         , intercalate ", " tools
         ]
-    show (UnknownCompilerVersion oskeys wanted known) = concat
+    displayException (UnknownCompilerVersion oskeys wanted known) = concat
         [ "Error: [S-9443]\n"
         , "No setup information found for "
-        , T.unpack $ utf8BuilderToText $ RIO.display wanted
+        , T.unpack $ utf8BuilderToText $ display wanted
         , " on your platform.\nThis probably means a GHC bindist has not yet been added for OS key '"
         , T.unpack (T.intercalate "', '" (sort $ Set.toList oskeys))
         , "'.\nSupported versions: "
         , T.unpack (T.intercalate ", " (map compilerVersionText (sort $ Set.toList known)))
         ]
-    show (UnknownOSKey oskey) = concat
+    displayException (UnknownOSKey oskey) = concat
         [ "Error: [S-6810]\n"
         , "Unable to find installation URLs for OS key: "
         , T.unpack oskey
         ]
-    show (GHCSanityCheckCompileFailed e ghc) = concat
+    displayException (GHCSanityCheckCompileFailed e ghc) = concat
         [ "Error: [S-5159]\n"
         , "The GHC located at "
         , toFilePath ghc
         , " failed to compile a sanity check. Please see:\n\n"
         , "    http://docs.haskellstack.org/en/stable/install_and_upgrade/\n\n"
         , "for more information. Exception was:\n"
-        , show e
+        , displayException e
         ]
-    show WantedMustBeGHC =
+    displayException WantedMustBeGHC =
         "Error: [S-9030]\n"
         ++ "The wanted compiler must be GHC."
-    show RequireCustomGHCVariant =
+    displayException RequireCustomGHCVariant =
         "Error: [S-8948]\n"
         ++ "A custom '--ghc-variant' must be specified to use '--ghc-bindist'."
-    show (ProblemWhileDecompressing archive) = concat
+    displayException (ProblemWhileDecompressing archive) = concat
         [ "Error: [S-2905]\n"
         , "Problem while decompressing "
         , toFilePath archive
         ]
-    show SetupInfoMissingSevenz =
+    displayException SetupInfoMissingSevenz =
         "Error: [S-9561]\n"
         ++ "SetupInfo missing Sevenz EXE/DLL."
-    show (DockerStackExeNotFound stackVersion' osKey) = concat
+    displayException (DockerStackExeNotFound stackVersion' osKey) = concat
         [ "Error: [S-1457]\n"
         , stackProgName
         , "-"
@@ -205,151 +222,149 @@ instance Show SetupException where
         , "\nUse the '"
         , T.unpack dockerStackExeArgName
         , "' option to specify a location."]
-    show UnsupportedSetupConfiguration =
+    displayException UnsupportedSetupConfiguration =
         "Error: [S-7748]\n"
         ++ "Stack does not know how to install GHC on your system \
            \configuration, please install manually."
-    show (InvalidGhcAt compiler e) = concat
+    displayException (InvalidGhcAt compiler e) = concat
         [ "Error: [S-2476]\n"
         , "Found an invalid compiler at "
         , show (toFilePath compiler)
         , ": "
         , displayException e
         ]
-    show (MSYS2NotFound osKey) = concat
+    displayException (MSYS2NotFound osKey) = concat
         [ "Error: [S-5308]\n"
         , "MSYS2 not found for "
         , T.unpack osKey
         ]
-    show UnwantedCompilerVersion =
+    displayException UnwantedCompilerVersion =
         "Error: [S-5127]\n"
         ++ "Not the compiler version we want."
-    show UnwantedArchitecture =
+    displayException UnwantedArchitecture =
         "Error: [S-1540]\n"
         ++ "Not the architecture we want."
-    show SandboxedCompilerNotFound =
+    displayException SandboxedCompilerNotFound =
         "Error: [S-9953]\n"
         ++ "Could not find sandboxed compiler."
-    show (CompilerNotFound toTry) = concat
+    displayException (CompilerNotFound toTry) = concat
         [ "Error: [S-4764]\n"
         , "Could not find any of: "
         , show toTry
         ]
-    show (GHCInfoNotValidUTF8 e) = concat
+    displayException (GHCInfoNotValidUTF8 e) = concat
         [ "Error: [S-8668]\n"
         , "GHC info is not valid UTF-8: "
-        , show e
+        , displayException e
         ]
-    show GHCInfoNotListOfPairs =
+    displayException GHCInfoNotListOfPairs =
         "Error: [S-4878]\n"
         ++ "GHC info does not parse as a list of pairs."
-    show GHCInfoMissingGlobalPackageDB =
+    displayException GHCInfoMissingGlobalPackageDB =
         "Error: [S-2965]\n"
         ++ "Key 'Global Package DB' not found in GHC info."
-    show GHCInfoMissingTargetPlatform =
+    displayException GHCInfoMissingTargetPlatform =
         "Error: [S-5219]\n"
         ++ "Key 'Target platform' not found in GHC info."
-    show (GHCInfoTargetPlatformInvalid targetPlatform) = concat
+    displayException (GHCInfoTargetPlatformInvalid targetPlatform) = concat
         [ "Error: [S-8299]\n"
         , "Invalid target platform in GHC info: "
         , targetPlatform
         ]
-    show (CabalNotFound compiler) = concat
+    displayException (CabalNotFound compiler) = concat
         [ "Error: [S-2574]\n"
         , "Cabal library not found in global package database for "
         , toFilePath compiler
         ]
-    show HadrianScriptNotFound =
+    displayException HadrianScriptNotFound =
         "Error: [S-1128]\n"
         ++ "No Hadrian build script found."
-    show (URLInvalid url) = concat
+    displayException (URLInvalid url) = concat
          [ "Error: [S-1906]\n"
          , "`url` must be either an HTTP URL or a file path: "
          , url
          ]
-    show (UnknownArchiveExtension url) = concat
+    displayException (UnknownArchiveExtension url) = concat
          [ "Error: [S-1648]\n"
          , "Unknown extension for url: "
          , url
          ]
-    show Unsupported7z =
+    displayException Unsupported7z =
         "Error: [S-4509]\n"
         ++ "Don't know how to deal with .7z files on non-Windows."
-    show (TarballInvalid name) = concat
+    displayException (TarballInvalid name) = concat
         [ "Error: [S-3158]\n"
         , name
         , " must be a tarball file."
         ]
-    show (TarballFileInvalid name archiveFile) = concat
+    displayException (TarballFileInvalid name archiveFile) = concat
         [ "Error: [S-5252]\n"
         , "Invalid "
         , name
         , " filename: "
         , show archiveFile
         ]
-    show (UnknownArchiveStructure archiveFile) = concat
+    displayException (UnknownArchiveStructure archiveFile) = concat
         [ "Error: [S-1827]\n"
         , "Expected a single directory within unpacked "
         , toFilePath archiveFile
         ]
-    show (StackReleaseInfoNotFound url) = concat
+    displayException (StackReleaseInfoNotFound url) = concat
         [ "Error: [S-9476]\n"
         , "Could not get release information for Stack from: "
         , url
         ]
-    show (StackBinaryArchiveNotFound platforms) = concat
+    displayException (StackBinaryArchiveNotFound platforms) = concat
         [ "Error: [S-4461]\n"
         , "Unable to find binary Stack archive for platforms: "
         , unwords platforms
         ]
-    show WorkingDirectoryInvalidBug = bugReport "[S-2076]"
+    displayException WorkingDirectoryInvalidBug = bugReport "[S-2076]"
         "Invalid working directory."
-    show HadrianBindistNotFound =
+    displayException HadrianBindistNotFound =
         "Error: [S-6617]\n"
         ++ "Can't find Hadrian-generated binary distribution."
-    show DownloadAndInstallCompilerError =
+    displayException DownloadAndInstallCompilerError =
         "Error: [S-7227]\n"
         ++ "'downloadAndInstallCompiler' should not be reached with ghc-git."
-    show StackBinaryArchiveZipUnsupportedBug = bugReport "[S-3967]"
+    displayException StackBinaryArchiveZipUnsupportedBug = bugReport "[S-3967]"
         "FIXME: Handle zip files."
-    show (StackBinaryArchiveUnsupported archiveURL) = concat
+    displayException (StackBinaryArchiveUnsupported archiveURL) = concat
         [ "Error: [S-6636]\n"
         , "Unknown archive format for Stack archive: "
         , T.unpack archiveURL
         ]
-    show (StackBinaryNotInArchive exeName url) = concat
+    displayException (StackBinaryNotInArchive exeName url) = concat
         [ "Error: [S-7871]\n"
         , "Stack executable "
         , exeName
         , " not found in archive from "
         , T.unpack url
         ]
-    show (FileTypeInArchiveInvalid e url) = concat
+    displayException (FileTypeInArchiveInvalid e url) = concat
         [ "Error: [S-5046]\n"
         , "Invalid file type for tar entry named "
         , Tar.entryPath e
         , " downloaded from "
         , T.unpack url
         ]
-    show (BinaryUpgradeOnOSUnsupported os) = concat
+    displayException (BinaryUpgradeOnOSUnsupported os) = concat
         [ "Error: [S-4132]\n"
         , "Binary upgrade not yet supported on OS: "
         , show os
         ]
-    show (BinaryUpgradeOnArchUnsupported arch) = concat
+    displayException (BinaryUpgradeOnArchUnsupported arch) = concat
         [ "Error: [S-3249]\n"
         , "Binary upgrade not yet supported on arch: "
         , show arch
         ]
-    show (ExistingMSYS2NotDeleted destDir e) = concat
+    displayException (ExistingMSYS2NotDeleted destDir e) = concat
         [ "Error: [S-4230]\n"
         , "Could not delete existing MSYS2 directory: "
         , toFilePath destDir
         , "\n"
-        , show e
+        , displayException e
         ]
-
-instance Exception SetupException
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Setup" module
@@ -360,9 +375,9 @@ data SetupPrettyException
 
 instance Pretty SetupPrettyException where
     pretty (GHCInstallFailed ex step cmd args wd tempDir destDir) =
-         flow "Error: [S-7441]"
+         "[S-7441]"
       <> line
-      <> string (show ex)
+      <> string (displayException ex)
       <> line
       <> hang 2 (  flow "Error encountered while" <+> fromString step <+> flow "GHC with"
                 <> line
@@ -388,18 +403,16 @@ instance Exception SetupPrettyException
 -- | Type representing exceptions thrown by 'performPathChecking'
 data PerformPathCheckingException
     = ProcessExited ExitCode String [String]
-    deriving Typeable
+    deriving (Show, Typeable)
 
-instance Show PerformPathCheckingException where
-    show (ProcessExited ec cmd args) = concat
+instance Exception PerformPathCheckingException where
+    displayException (ProcessExited ec cmd args) = concat
         [ "Error: [S-1991]\n"
         , "Process exited with "
-        , show ec
+        , displayException ec
         , ": "
         , unwords (cmd:args)
         ]
-
-instance Exception PerformPathCheckingException
 
 -- | Default location of the stack-setup.yaml file
 defaultSetupInfoYaml :: String
@@ -1140,7 +1153,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
      then pure (compilerTool,CompilerBuildStandard)
      else do
        -- clone the repository and execute the given commands
-       Pantry.withRepo (Pantry.SimpleRepo url commitId RepoGit) $ do
+       withRepo (SimpleRepo url commitId RepoGit) $ do
          -- withRepo is guaranteed to set workingDirL, so let's get it
          mcwd <- traverse parseAbsDir =<< view workingDirL
          cwd <- maybe (throwIO WorkingDirectoryInvalidBug) pure mcwd
@@ -1161,7 +1174,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
            maybe (throwIO HadrianScriptNotFound) pure $ listToMaybe foundHadrianPaths
 
          logSticky $ "Building GHC from source with `"
-            <> RIO.display flavour
+            <> display flavour
             <> "` flavour. It can take a long time (more than one hour)..."
 
          -- We need to provide an absolute path to the script since
@@ -1848,13 +1861,13 @@ setup7z si = do
                            .| foldMC
                                 (\count bs -> do
                                     let count' = count + S.length bs
-                                    logSticky $ "Extracted " <> RIO.display count' <> " files"
+                                    logSticky $ "Extracted " <> display count' <> " files"
                                     pure count'
                                 )
                                 0
                         logStickyDone $
                           "Extracted total of " <>
-                          RIO.display total <>
+                          display total <>
                           " files from " <>
                           archiveDisplay
                         waitExitCode p
@@ -1873,11 +1886,11 @@ chattyDownload label downloadInfo path = do
     req <- parseUrlThrow $ T.unpack url
     logSticky $
       "Preparing to download " <>
-      RIO.display label <>
+      display label <>
       " ..."
     logDebug $
       "Downloading from " <>
-      RIO.display url <>
+      display url <>
       " to " <>
       fromString (toFilePath path) <>
       " ..."
@@ -1903,7 +1916,7 @@ chattyDownload label downloadInfo path = do
                mkDownloadRequest req
     x <- verifiedDownloadWithProgress dReq path label mtotalSize
     if x
-        then logStickyDone ("Downloaded " <> RIO.display label <> ".")
+        then logStickyDone ("Downloaded " <> display label <> ".")
         else logStickyDone "Already downloaded."
   where
     mtotalSize = downloadInfoContentLength downloadInfo
@@ -2228,7 +2241,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
                 , destDir </> relFileStackDotTmp
                 )
 
-    logInfo $ "Downloading from: " <> RIO.display archiveURL
+    logInfo $ "Downloading from: " <> display archiveURL
 
     liftIO $ do
       case () of

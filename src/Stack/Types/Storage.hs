@@ -13,12 +13,7 @@ import           Stack.Prelude
 -- modules beginning @Stack.Storage@.
 data StoragePrettyException
   = StorageMigrationFailure !Text !(Path Abs File) !SomeException
-  deriving Typeable
-
--- | These exceptions are intended to be thrown only as \'pretty\' exceptions,
--- so their \'show\' functions can be simple.
-instance Show StoragePrettyException where
-  show (StorageMigrationFailure {}) = "StorageMigrationFailure"
+  deriving (Show, Typeable)
 
 instance Pretty StoragePrettyException where
   pretty (StorageMigrationFailure desc fp ex) =
@@ -30,7 +25,7 @@ instance Pretty StoragePrettyException where
        <+> style Dir (pretty fp)
     <> "."
     <> blankLine
-    <> flow "While migrating the database, Stack encountered the exception:"
+    <> flow "While migrating the database, Stack encountered the error:"
     <> blankLine
     <> string exMsg
     <> blankLine
@@ -41,7 +36,7 @@ instance Pretty StoragePrettyException where
     -- See https://github.com/commercialhaskell/stack/issues/5851
     <> if exMsg == winIOGHCRTSMsg
          then
-           flow "This exception can be caused by a bug that arises if GHC's \
+           flow "This error can be caused by a bug that arises if GHC's \
                 \'--io-manager=native' RTS option is set using the GHCRTS \
                 \environment variable. As a workaround try setting the option \
                 \in the project's Cabal file, Stack's YAML configuration file \
@@ -50,7 +45,7 @@ instance Pretty StoragePrettyException where
            flow "As a workaround you may delete the database. This \
                 \will cause the database to be recreated."
    where
-    exMsg = show ex
+    exMsg = displayException ex
     winIOGHCRTSMsg =
       "\\\\.\\NUL: hDuplicateTo: illegal operation (handles are incompatible)"
 

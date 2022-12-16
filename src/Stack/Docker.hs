@@ -18,59 +18,62 @@ module Stack.Docker
   , pull
   , reset
   , reExecArgName
-  , DockerException(..)
+  , DockerException (..)
   , getProjectRoot
   , runContainerAndExit
   ) where
 
-import           Stack.Prelude
-import qualified Crypto.Hash as Hash (Digest, MD5, hash)
-import           Pantry.Internal.AesonExtended (FromJSON(..),(.:),(.:?),(.!=),eitherDecode)
+import qualified Crypto.Hash as Hash ( Digest, MD5, hash )
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import           Data.Char (isAscii,isDigit)
-import           Data.Conduit.List (sinkNull)
-import           Data.Conduit.Process.Typed hiding (proc)
-import           Data.List (dropWhileEnd,isPrefixOf,isInfixOf)
-import           Data.List.Extra (trim)
+import           Data.Char ( isAscii, isDigit )
+import           Data.Conduit.List ( sinkNull )
+import           Data.Conduit.Process.Typed hiding ( proc )
+import           Data.List ( dropWhileEnd, isInfixOf, isPrefixOf )
+import           Data.List.Extra ( trim )
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Data.Time (UTCTime)
-import qualified Data.Version (showVersion, parseVersion)
-import           Distribution.Version (mkVersion, mkVersion')
+import           Data.Time ( UTCTime )
+import qualified Data.Version ( parseVersion )
+import           Distribution.Version ( mkVersion, mkVersion' )
+import           Pantry.Internal.AesonExtended
+                   ( FromJSON (..), (.:), (.:?), (.!=), eitherDecode )
 import           Path
-import           Path.Extra (toFilePathNoTrailingSep)
-import           Path.IO hiding (canonicalizePath)
-import qualified Paths_stack as Meta
-import           Stack.Config (getInContainer)
+import           Path.Extra ( toFilePathNoTrailingSep )
+import           Path.IO hiding ( canonicalizePath )
+import qualified RIO.Directory
+import           RIO.Process
+import           Stack.Config ( getInContainer )
 import           Stack.Constants
 import           Stack.Constants.Config
-import           Stack.Setup (ensureDockerStackExe)
-import           Stack.Storage.User (loadDockerImageExeCache,saveDockerImageExeCache)
-import           Stack.Types.Version
+import           Stack.Prelude
+import           Stack.Setup ( ensureDockerStackExe )
+import           Stack.Storage.User
+                   ( loadDockerImageExeCache, saveDockerImageExeCache )
 import           Stack.Types.Config
 import           Stack.Types.Docker
-import           System.Environment (getEnv,getEnvironment,getProgName,getArgs,getExecutablePath)
+import           Stack.Types.Version ( showStackVersion, withinRange )
+import           System.Environment
+                   ( getArgs, getEnv, getEnvironment, getExecutablePath
+                   , getProgName
+                   )
 import qualified System.FilePath as FP
-import           System.IO.Error (isDoesNotExistError)
-import           System.IO.Unsafe (unsafePerformIO)
-import qualified System.PosixCompat.User as User
-import qualified System.PosixCompat.Files as Files
-import           System.Terminal (hIsTerminalDeviceOrMinTTY)
-import           Text.ParserCombinators.ReadP (readP_to_S)
-import           RIO.Process
-import qualified RIO.Directory
-
+import           System.IO.Error ( isDoesNotExistError )
+import           System.IO.Unsafe ( unsafePerformIO )
 #ifndef WINDOWS
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
+import qualified System.PosixCompat.User as User
+import qualified System.PosixCompat.Files as Files
+import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
+import           Text.ParserCombinators.ReadP ( readP_to_S )
 
 -- | Function to get command and arguments to run in Docker container
-getCmdArgs
-  :: HasConfig env
+getCmdArgs ::
+     HasConfig env
   => DockerOpts
   -> Inspect
   -> Bool
@@ -90,7 +93,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
             else pure Nothing
     args <-
         fmap
-            (["--" ++ reExecArgName ++ "=" ++ Data.Version.showVersion Meta.version
+            (["--" ++ reExecArgName ++ "=" ++ showStackVersion
              ,"--" ++ dockerEntrypointArgName
              ,show DockerEntrypoint{..}] ++)
             (liftIO getArgs)
@@ -404,8 +407,8 @@ pullImage docker image =
        ExitFailure _ -> throwIO (PullFailedException image)
 
 -- | Check docker version (throws exception if incorrect)
-checkDockerVersion
-    :: (HasProcessContext env, HasLogFunc env)
+checkDockerVersion ::
+       (HasProcessContext env, HasLogFunc env)
     => DockerOpts -> RIO env ()
 checkDockerVersion docker =
   do dockerExists <- doesExecutableExist "docker"
@@ -550,8 +553,8 @@ removeDirectoryContents path excludeDirs excludeFiles =
 -- e.g. docker pull, in which docker uses stderr for progress output.
 --
 -- Use 'readProcess_' directly to customize this.
-readDockerProcess
-    :: (HasProcessContext env, HasLogFunc env)
+readDockerProcess ::
+       (HasProcessContext env, HasLogFunc env)
     => [String] -> RIO env BS.ByteString
 readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_
 

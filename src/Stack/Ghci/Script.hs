@@ -14,14 +14,14 @@ module Stack.Ghci.Script
   , scriptToFile
   ) where
 
-import           Data.ByteString.Builder (toLazyByteString)
+import           Data.ByteString.Builder ( toLazyByteString )
 import qualified Data.List as L
 import qualified Data.Set as S
+import           Distribution.ModuleName hiding ( toFilePath )
 import           Path
-import           Stack.Prelude hiding (Module)
-import           System.IO (hSetBinaryMode)
+import           Stack.Prelude hiding ( Module )
+import           System.IO ( hSetBinaryMode )
 
-import           Distribution.ModuleName hiding (toFilePath)
 
 newtype GhciScript = GhciScript { unGhciScript :: [GhciCommand] }
 

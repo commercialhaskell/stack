@@ -1,15 +1,15 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Stack.Options.UploadParser
-  ( UploadOpts(..)
-  , UploadVariant(..)
+  ( UploadOpts (..)
+  , UploadVariant (..)
   , uploadOptsParser
   ) where
 
 import           Options.Applicative
-import           Stack.Options.SDistParser (sdistOptsParser)
+import           Stack.Options.SDistParser ( sdistOptsParser )
 import           Stack.Prelude
-import           Stack.SDist (SDistOpts(..))
+import           Stack.SDist ( SDistOpts (..) )
 
 data UploadOpts = UploadOpts
   { uoptsSDistOpts :: SDistOpts

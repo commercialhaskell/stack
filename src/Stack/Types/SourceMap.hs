@@ -25,12 +25,12 @@ module Stack.Types.SourceMap
   ) where
 
 import qualified Data.Text as T
+import           Distribution.PackageDescription ( GenericPackageDescription )
 import qualified Pantry.SHA256 as SHA256
-import Path
-import Stack.Prelude
-import Stack.Types.Compiler
-import Stack.Types.NamedComponent
-import Distribution.PackageDescription (GenericPackageDescription)
+import           Path
+import           Stack.Prelude
+import           Stack.Types.Compiler
+import           Stack.Types.NamedComponent
 
 -- | Common settings for both dependency and project package.
 data CommonPackage = CommonPackage

@@ -10,8 +10,8 @@
 
 -- | Construct a @Plan@ for how to build
 module Stack.Build.ConstructPlan
-    ( constructPlan
-    ) where
+  ( constructPlan
+  ) where
 
 import           Control.Monad.RWS.Strict hiding ( (<>) )
 import           Control.Monad.State.Strict ( execState )
@@ -25,7 +25,6 @@ import           Distribution.Types.BuildType ( BuildType (Configure) )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Path ( parent )
-import qualified RIO
 import           RIO.Process ( findExecutable, HasProcessContext (..) )
 import           Stack.Build.Cache
 import           Stack.Build.Haddock
@@ -34,7 +33,7 @@ import           Stack.Build.Source
 import           Stack.Constants
 import           Stack.Package
 import           Stack.PackageDump
-import           Stack.Prelude hiding ( Display (..), loadPackage )
+import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Compiler
@@ -186,7 +185,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
     ((), m, W efinals installExes dirtyReason warnings parents) <-
         liftIO $ runRWST inner ctx M.empty
-    mapM_ (logWarn . RIO.display) (warnings [])
+    mapM_ (logWarn . display) (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
         (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -272,10 +271,12 @@ errorOnSnapshot plan@(Plan tasks _finals _unregister installExes) = do
     NotOnlyLocal snapTasks snapExes
   pure plan
 
-data NotOnlyLocal = NotOnlyLocal [PackageName] [Text]
+data NotOnlyLocal
+    = NotOnlyLocal [PackageName] [Text]
+    deriving (Show, Typeable)
 
-instance Show NotOnlyLocal where
-  show (NotOnlyLocal packages exes) = concat
+instance Exception NotOnlyLocal where
+  displayException (NotOnlyLocal packages exes) = concat
     [ "Error: [S-1727]\n"
     , "Specified only-locals, but I need to build snapshot contents:\n"
     , if null packages then "" else concat
@@ -289,7 +290,6 @@ instance Show NotOnlyLocal where
         , "\n"
         ]
     ]
-instance Exception NotOnlyLocal
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.
@@ -675,7 +675,15 @@ addEllipsis t
 -- then the parent package must be installed locally. Otherwise, if it
 -- is 'Snap', then it can either be installed locally or in the
 -- snapshot.
-addPackageDeps :: Package -> M (Either ConstructPlanException (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable))
+addPackageDeps ::
+     Package
+  -> M ( Either
+           ConstructPlanException
+           ( Set PackageIdentifier
+           , Map PackageIdentifier GhcPkgId
+           , IsMutable
+           )
+       )
 addPackageDeps package = do
     ctx <- ask
     checkAndWarnForUnknownTools package

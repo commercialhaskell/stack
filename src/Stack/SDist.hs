@@ -8,19 +8,18 @@
 
 -- Create a source distribution tarball
 module Stack.SDist
-    ( getSDistTarball
-    , checkSDistTarball
-    , checkSDistTarball'
-    , SDistOpts (..)
-    ) where
+  ( getSDistTarball
+  , checkSDistTarball
+  , checkSDistTarball'
+  , SDistOpts (..)
+  ) where
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Control.Applicative
 import           Control.Concurrent.Execute
-                   ( ActionContext(..), Concurrency(..) )
-import           Stack.Prelude hiding ( Display (..) )
+                   ( ActionContext (..), Concurrency (..) )
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
@@ -54,11 +53,12 @@ import           Stack.Build ( mkBaseConfigOpts, build, buildLocalTargets )
 import           Stack.Build.Execute
 import           Stack.Build.Installed
 import           Stack.Build.Source ( projectLocalPackages )
-import           Stack.Types.GhcPkgId
 import           Stack.Package
+import           Stack.Prelude hiding ( Display (..) )
 import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Config
+import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
@@ -71,23 +71,21 @@ data SDistException
   = CheckException (NonEmpty Check.PackageCheck)
   | CabalFilePathsInconsistentBug (Path Abs File) (Path Abs File)
   | ToTarPathException String
-  deriving (Typeable)
+  deriving (Show, Typeable)
 
-instance Show SDistException where
-  show (CheckException xs) = unlines $
+instance Exception SDistException where
+  displayException (CheckException xs) = unlines $
     [ "Error: [S-6439]"
     , "Package check reported the following errors:"
     ] <> fmap show (NE.toList xs)
-  show (CabalFilePathsInconsistentBug cabalfp cabalfp') = concat
+  displayException (CabalFilePathsInconsistentBug cabalfp cabalfp') = concat
     [ "Error: [S-9595]\n"
     , "The impossible happened! Two Cabal file paths are inconsistent: "
     , show (cabalfp, cabalfp')
     ]
-  show (ToTarPathException e) =
+  displayException (ToTarPathException e) =
     "Error: [S-7875\n"
     ++ e
-
-instance Exception SDistException
 
 data SDistOpts = SDistOpts
   { sdoptsDirsToWorkWith :: [String]

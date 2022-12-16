@@ -11,33 +11,30 @@
 module Main (main) where
 
 import           BuildInfo
-import           Conduit (runConduitRes, sourceLazy, sinkFileCautious)
-import           Data.Attoparsec.Args (parseArgs, EscapingMode (Escaping))
-import           Data.Attoparsec.Interpreter (getInterpreterArgs)
+import           Conduit ( runConduitRes, sourceLazy, sinkFileCautious )
+import           Data.Attoparsec.Args ( EscapingMode (Escaping), parseArgs )
+import           Data.Attoparsec.Interpreter ( getInterpreterArgs )
 import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Version (showVersion)
 import           RIO.Process
-import           Distribution.Version (mkVersion')
-import           GHC.IO.Encoding (mkTextEncoding, textEncodingName)
+import           GHC.IO.Encoding ( mkTextEncoding, textEncodingName )
 import           Options.Applicative
                    ( Parser, ParserFailure, ParserHelp, ParserResult (..), flag
                    , handleParseResult, help, helpError, idm, long, metavar
                    , overFailure, renderFailure, strArgument, switch )
-import           Options.Applicative.Help (errorHelp, stringChunk, vcatChunks)
+import           Options.Applicative.Help ( errorHelp, stringChunk, vcatChunks )
 import           Options.Applicative.Builder.Extra
                    ( boolFlags, execExtraHelp, extraHelpOption, textOption )
 import           Options.Applicative.Complicated
                    ( addCommand, addSubCommands, complicatedOptions )
-import           Pantry (loadSnapshot)
+import           Pantry ( loadSnapshot )
 import           Path
 import           Path.IO
-import qualified Paths_stack as Meta
 import           Stack.Build
-import           Stack.Build.Target (NeedTargets(..))
-import           Stack.Clean (CleanCommand(..), CleanOpts(..), clean)
+import           Stack.Build.Target ( NeedTargets (..) )
+import           Stack.Clean ( CleanCommand (..), CleanOpts (..), clean )
 import           Stack.Config
 import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants
@@ -45,7 +42,7 @@ import           Stack.Constants.Config
 import           Stack.Coverage
 import qualified Stack.Docker as Docker
 import           Stack.Dot
-import           Stack.GhcPkg (findGhcPkgField)
+import           Stack.GhcPkg ( findGhcPkgField )
 import qualified Stack.Nix as Nix
 import           Stack.FileWatch
 import           Stack.Ghci
@@ -62,7 +59,6 @@ import           Stack.Options.DotParser
 import           Stack.Options.ExecParser
 import           Stack.Options.GhciParser
 import           Stack.Options.GlobalParser
-
 import           Stack.Options.HpcReportParser
 import           Stack.Options.NewParser
 import           Stack.Options.NixParser
@@ -74,10 +70,16 @@ import qualified Stack.Path
 import           Stack.Prelude hiding (Display (..))
 import           Stack.Runners
 import           Stack.Script
-import           Stack.SDist (getSDistTarball, checkSDistTarball, checkSDistTarball', SDistOpts(..))
-import           Stack.Setup (withNewLocalBuildTargets)
+import           Stack.SDist
+                   ( SDistOpts (..), checkSDistTarball, checkSDistTarball'
+                   , getSDistTarball
+                   )
+import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.SetupCmd
 import           Stack.Types.Version
+                   ( VersionCheck (..), checkVersion, showStackVersion
+                   , stackVersion
+                   )
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
@@ -85,20 +87,20 @@ import           Stack.Unpack
 import           Stack.Upgrade
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
-import           System.Environment (getProgName, getArgs, withArgs)
-import           System.FilePath (isValid, pathSeparator, takeDirectory)
+import           System.Environment ( getArgs, getProgName, withArgs )
+import           System.FilePath ( isValid, pathSeparator, takeDirectory )
 import qualified System.FilePath as FP
-import           System.IO (hPutStrLn, hGetEncoding, hSetEncoding)
-import           System.Terminal (hIsTerminalDeviceOrMinTTY)
+import           System.IO ( hGetEncoding, hPutStrLn, hSetEncoding )
+import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
 
 -- | Type representing exceptions thrown by functions in the "Main" module.
 data MainException
   = InvalidReExecVersion String String
   | InvalidPathForExec FilePath
-  deriving Typeable
+  deriving (Show, Typeable)
 
-instance Show MainException where
-  show (InvalidReExecVersion expected actual) = concat
+instance Exception MainException where
+  displayException (InvalidReExecVersion expected actual) = concat
     [ "Error: [S-2186]\n"
     , "When re-executing '"
     , stackProgName
@@ -107,14 +109,12 @@ instance Show MainException where
     , "; found: "
     , actual
     ]
-  show (InvalidPathForExec path) = concat
+  displayException (InvalidPathForExec path) = concat
     [ "Error: [S-1541]\n"
     , "Got an invalid '--cwd' argument for 'stack exec' ("
     , path
     , ")."
     ]
-
-instance Exception MainException
 
 -- | Type representing \'pretty\' exceptions thrown by functions in the "Main"
 -- module.
@@ -181,12 +181,14 @@ main = do
       throwIO exitCode
     Right (globalMonoid, run) -> do
       global <- globalOptsFromMonoid isTerminal globalMonoid
-      when (globalLogLevel global == LevelDebug) $ hPutStrLn stderr versionString'
+      when (globalLogLevel global == LevelDebug) $
+        hPutStrLn stderr versionString'
       case globalReExecVersion global of
         Just expectVersion -> do
-            expectVersion' <- parseVersionThrowing expectVersion
-            unless (checkVersion MatchMinor expectVersion' (mkVersion' Meta.version))
-                $ throwIO $ InvalidReExecVersion expectVersion (showVersion Meta.version)
+          expectVersion' <- parseVersionThrowing expectVersion
+          unless (checkVersion MatchMinor expectVersion' stackVersion) $
+            throwIO $
+              InvalidReExecVersion expectVersion showStackVersion
         _ -> pure ()
       withRunnerGlobal global $ run `catches`
         [ Handler handleExitCode
@@ -235,348 +237,460 @@ handleSomeException (SomeException e) = do
 vcatErrorHelp :: ParserHelp -> ParserHelp -> ParserHelp
 vcatErrorHelp h1 h2 = h2 { helpError = vcatChunks [helpError h2, helpError h1] }
 
-commandLineHandler
-  :: FilePath
+commandLineHandler ::
+     FilePath
   -> String
   -> Bool
   -> IO (GlobalOptsMonoid, RIO Runner ())
-commandLineHandler currentDir progName isInterpreter = complicatedOptions
-  (mkVersion' Meta.version)
-  (Just versionString')
-  hpackVersion
-  "stack - The Haskell Tool Stack"
-  ""
-  "Stack's documentation is available at https://docs.haskellstack.org/. \
-  \Command 'stack COMMAND --help' for help about a Stack command. Stack also \
-  \supports the Haskell Error Index at https://errors.haskell.org/."
-  (globalOpts OuterGlobalOpts)
-  (Just failureCallback)
-  addCommands
-  where
-    failureCallback f args =
-      case L.stripPrefix "Invalid argument" (fst (renderFailure f "")) of
-          Just _ -> if isInterpreter
-                    then parseResultHandler args f
-                    else secondaryCommandHandler args f
-                        >>= interpreterHandler currentDir args
-          Nothing -> parseResultHandler args f
+commandLineHandler currentDir progName isInterpreter =
+  complicatedOptions
+    stackVersion
+    (Just versionString')
+    hpackVersion
+    "stack - The Haskell Tool Stack"
+    ""
+    "Stack's documentation is available at https://docs.haskellstack.org/. \
+    \Command 'stack COMMAND --help' for help about a Stack command. Stack also \
+    \supports the Haskell Error Index at https://errors.haskell.org/."
+    (globalOpts OuterGlobalOpts)
+    (Just failureCallback)
+    addCommands
+ where
+  failureCallback f args =
+    case L.stripPrefix "Invalid argument" (fst (renderFailure f "")) of
+      Just _ -> if isInterpreter
+                  then parseResultHandler args f
+                  else secondaryCommandHandler args f
+                      >>= interpreterHandler currentDir args
+      Nothing -> parseResultHandler args f
 
-    parseResultHandler args f =
-      if isInterpreter
-      then do
-        let hlp = errorHelp $ stringChunk
-              (unwords ["Error executing interpreter command:"
-                        , progName
-                        , unwords args])
-        handleParseResult (overFailure (vcatErrorHelp hlp) (Failure f))
-      else handleParseResult (Failure f)
+  parseResultHandler args f =
+    if isInterpreter
+    then do
+      let hlp = errorHelp $ stringChunk
+            (unwords ["Error executing interpreter command:"
+                      , progName
+                      , unwords args])
+      handleParseResult (overFailure (vcatErrorHelp hlp) (Failure f))
+    else handleParseResult (Failure f)
 
-    addCommands = do
-      unless isInterpreter (do
-        addBuildCommand' "build"
-                         "Build the package(s) in this directory/configuration"
-                         buildCmd
-                         (buildOptsParser Build)
-        addBuildCommand' "install"
-                         "Shortcut for 'build --copy-bins'"
-                         buildCmd
-                         (buildOptsParser Install)
-        addCommand' "uninstall"
-         (unwords [ "Show how to uninstall Stack. This command does not"
-                  , "itself uninstall Stack."
-                  ] )
-                    uninstallCmd
-                    (pure())
-        addBuildCommand' "test"
-                         "Shortcut for 'build --test'"
-                         buildCmd
-                         (buildOptsParser Test)
-        addBuildCommand' "bench"
-                         "Shortcut for 'build --bench'"
-                         buildCmd
-                         (buildOptsParser Bench)
-        addBuildCommand' "haddock"
-                         "Shortcut for 'build --haddock'"
-                         buildCmd
-                         (buildOptsParser Haddock)
-        addCommand' "new"
-         (unwords [ "Create a new project from a template."
-                  , "Run 'stack templates' to see available templates. Will"
-                  , "also initialise if there is no stack.yaml file."
-                  , "Note: you can also specify a local file or a"
-                  , "remote URL as a template; or force an initialisation."
-                  ] )
-                    newCmd
-                    newOptsParser
-        addCommand' "templates"
-         (unwords [ "Show how to find templates available for 'stack new'."
-                  , "'stack new' can accept a template from a remote repository"
-                  , "(default: github), local file or remote URL."
-                  , "Note: this downloads the help file."
-                  ] )
-                    templatesCmd
-                    (pure ())
-        addCommand' "init"
-                    "Create Stack project configuration from Cabal or Hpack package specifications"
-                    initCmd
-                    initOptsParser
-        addCommand' "setup"
-                    "Get the appropriate GHC for your project"
-                    setupCmd
-                    setupParser
-        addCommand' "path"
-                    "Print out handy path information"
-                    Stack.Path.path
-                    Stack.Path.pathParser
-        addCommand' "ls"
-                    "List command. (Supports snapshots, dependencies, Stack's styles and installed tools)"
-                    lsCmd
-                    lsParser
-        addCommand' "unpack"
-                    "Unpack one or more packages locally"
-                    unpackCmd
-                    ((,) <$> some (strArgument $ metavar "PACKAGE")
-                         <*> optional (textOption $ long "to" <>
-                                         help "Optional path to unpack the package into (will unpack into subdirectory)"))
-        addCommand' "update"
-                    "Update the package index"
-                    updateCmd
-                    (pure ())
-        addCommand'' "upgrade"
-                     "Upgrade Stack, installing to Stack's local-bin directory \
-                     \and, if different and permitted, the directory of the \
-                     \current Stack executable"
-                     upgradeCmd
-                     "Warning: if you use GHCup to install Stack, use only \
-                     \GHCup to upgrade Stack."
-                     upgradeOpts
-        addCommand'
-            "upload"
-            "Upload a package to Hackage"
-            uploadCmd
-            uploadOptsParser
-        addCommand'
-            "sdist"
-            "Create source distribution tarballs"
-            sdistCmd
-            sdistOptsParser
-        addCommand' "dot"
-                    "Visualize your project's dependency graph using Graphviz dot"
-                    dot
-                    (dotOptsParser False) -- Default for --external is False.
-        addCommand' "ghc"
-                    "Run ghc"
-                    execCmd
-                    (execOptsParser $ Just ExecGhc)
-        addCommand' "hoogle"
-                    ("Run hoogle, the Haskell API search engine. Use the '-- ARGUMENT(S)' syntax " ++
-                     "to pass Hoogle arguments, e.g. 'stack hoogle -- --count=20', or " ++
-                     "'stack hoogle -- server --local'.")
-                    hoogleCmd
-                    ((,,,) <$> many (strArgument
-                                 (metavar "-- ARGUMENT(S) (e.g. 'stack hoogle -- server --local')"))
-                          <*> boolFlags
-                                  True
-                                  "setup"
-                                  "If needed: install hoogle, build haddocks and generate a hoogle database"
-                                  idm
-                          <*> switch
-                                  (long "rebuild" <>
-                                   help "Rebuild the hoogle database")
-                          <*> switch
-                                  (long "server" <>
-                                   help "Start local Hoogle server"))
+  addCommands = do
+    unless isInterpreter $ do
+      addBuildCommand'
+        "build"
+        "Build the package(s) in this directory/configuration"
+        buildCmd
+        (buildOptsParser Build)
+      addBuildCommand'
+        "install"
+        "Shortcut for 'build --copy-bins'"
+        buildCmd
+        (buildOptsParser Install)
+      addCommand'
+        "uninstall"
+        "Show how to uninstall Stack. This command does not itself uninstall \
+        \Stack."
+        uninstallCmd
+        (pure ())
+      addBuildCommand'
+        "test"
+        "Shortcut for 'build --test'"
+        buildCmd
+        (buildOptsParser Test)
+      addBuildCommand'
+        "bench"
+        "Shortcut for 'build --bench'"
+        buildCmd
+        (buildOptsParser Bench)
+      addBuildCommand'
+        "haddock"
+        "Shortcut for 'build --haddock'"
+        buildCmd
+        (buildOptsParser Haddock)
+      addCommand'
+        "new"
+        "Create a new project from a template. Run 'stack templates' to see \
+        \available templates. Will also initialise if there is no stack.yaml \
+        \file. Note: you can also specify a local file or a remote URL as a \
+        \template; or force an initialisation."
+        newCmd
+        newOptsParser
+      addCommand'
+        "templates"
+        "Show how to find templates available for 'stack new'. 'stack new' \
+        \can accept a template from a remote repository (default: github), \
+        \local file or remote URL. Note: this downloads the help file."
+        templatesCmd
+        (pure ())
+      addCommand'
+        "init"
+        "Create Stack project configuration from Cabal or Hpack package \
+        \specifications"
+        initCmd
+        initOptsParser
+      addCommand'
+        "setup"
+        "Get the appropriate GHC for your project"
+        setupCmd
+        setupParser
+      addCommand'
+        "path"
+        "Print out handy path information"
+        Stack.Path.path
+        Stack.Path.pathParser
+      addCommand'
+        "ls"
+        "List command. (Supports snapshots, dependencies, Stack's styles and \
+        \installed tools)"
+        lsCmd
+        lsParser
+      addCommand'
+        "unpack"
+        "Unpack one or more packages locally"
+        unpackCmd
+        ( (,)
+            <$> some (strArgument $ metavar "PACKAGE")
+            <*> optional (textOption
+                  (  long "to"
+                  <> help "Optional path to unpack the package into (will \
+                          \unpack into subdirectory)"
+                  ))
         )
-
-      -- These are the only commands allowed in interpreter mode as well
-      addCommand' "exec"
-                  "Execute a command. If the command is absent, the first of any arguments is taken as the command."
-                  execCmd
-                  (execOptsParser Nothing)
-      addCommand' "run"
-                  "Build and run an executable. Defaults to the first available executable if none is provided as the first argument."
-                  execCmd
-                  (execOptsParser $ Just ExecRun)
-      addGhciCommand' "ghci"
-                      "Run ghci in the context of package(s) (experimental)"
-                      ghciCmd
-                      ghciOptsParser
-      addGhciCommand' "repl"
-                      "Run ghci in the context of package(s) (experimental) (alias for 'ghci')"
-                      ghciCmd
-                      ghciOptsParser
-      addCommand' "runghc"
-                  "Run runghc"
-                  execCmd
-                  (execOptsParser $ Just ExecRunGhc)
-      addCommand' "runhaskell"
-                  "Run runghc (alias for 'runghc')"
-                  execCmd
-                  (execOptsParser $ Just ExecRunGhc)
-      addCommand "script"
-                 "Run a Stack Script"
-                 globalFooter
-                 scriptCmd
-                 (\so gom ->
-                    gom
-                      { globalMonoidResolverRoot = First $ Just $ takeDirectory $ soFile so
-                      })
-                 (globalOpts OtherCmdGlobalOpts)
-                 scriptOptsParser
-
-      unless isInterpreter (do
-        addCommand' "eval"
-                    "Evaluate some haskell code inline. Shortcut for 'stack exec ghc -- -e CODE'"
-                    evalCmd
-                    (evalOptsParser "CODE")
-        addCommand' "clean"
-                    "Delete build artefacts for the project packages."
-                    cleanCmd
-                    (cleanOptsParser Clean)
-        addCommand' "purge"
-                    "Delete the project Stack working directories (.stack-work by default). Shortcut for 'stack clean --full'"
-                    cleanCmd
-                    (cleanOptsParser Purge)
-        addCommand' "query"
-                    "Query general build information (experimental)"
-                    queryCmd
-                    (many $ strArgument $ metavar "SELECTOR...")
-        addCommand' "list"
-                    "List package id's in snapshot (experimental)"
-                    listCmd
-                    (many $ strArgument $ metavar "PACKAGE")
-        addSubCommands'
-            "ide"
-            "IDE-specific commands"
-            (let outputFlag = flag
-                   IDE.OutputLogInfo
-                   IDE.OutputStdout
-                   (long "stdout" <>
-                    help "Send output to stdout instead of the default, stderr")
-                 cabalFileFlag = flag
-                   IDE.ListPackageNames
-                   IDE.ListPackageCabalFiles
-                   (long "cabal-files" <>
-                    help "Print paths to package cabal-files instead of package names")
-             in
-             do addCommand'
-                    "packages"
-                    "List all available local loadable packages"
-                    idePackagesCmd
-                    ((,) <$> outputFlag <*> cabalFileFlag)
-                addCommand'
-                    "targets"
-                    "List all available Stack targets"
-                    ideTargetsCmd
-                    outputFlag)
-        addSubCommands'
-          Docker.dockerCmdName
-          "Subcommands specific to Docker use"
-          (do addCommand' Docker.dockerPullCmdName
-                          "Pull latest version of Docker image from registry"
-                          dockerPullCmd
-                          (pure ())
-              addCommand' "reset"
-                          "Reset the Docker sandbox"
-                          dockerResetCmd
-                          (switch (long "keep-home" <>
-                                   help "Do not delete sandbox's home directory")))
-        addSubCommands'
-            ConfigCmd.cfgCmdName
-            "Subcommands for accessing and modifying configuration values"
-            (do
-               addCommand' ConfigCmd.cfgCmdSetName
-                          "Sets a key in YAML configuration file to value"
-                          (withConfig NoReexec . cfgCmdSet)
-                          configCmdSetParser
-               addCommand' ConfigCmd.cfgCmdEnvName
-                          "Print environment variables for use in a shell"
-                          (withConfig YesReexec . withDefaultEnvConfig . cfgCmdEnv)
-                          configCmdEnvParser)
-        addSubCommands'
-          "hpc"
-          "Subcommands specific to Haskell Program Coverage"
-          (addCommand' "report"
-                        "Generate unified HPC coverage report from tix files and project targets"
-                        hpcReportCmd
-                        hpcReportOptsParser)
+      addCommand'
+        "update"
+        "Update the package index"
+        updateCmd
+        (pure ())
+      addCommand''
+        "upgrade"
+        "Upgrade Stack, installing to Stack's local-bin directory and, if \
+        \different and permitted, the directory of the current Stack \
+        \executable"
+        upgradeCmd
+        "Warning: if you use GHCup to install Stack, use only GHCup to \
+        \upgrade Stack."
+        upgradeOpts
+      addCommand'
+        "upload"
+        "Upload a package to Hackage"
+        uploadCmd
+        uploadOptsParser
+      addCommand'
+        "sdist"
+        "Create source distribution tarballs"
+        sdistCmd
+        sdistOptsParser
+      addCommand'
+        "dot"
+        "Visualize your project's dependency graph using Graphviz dot"
+        dot
+        (dotOptsParser False) -- Default for --external is False.
+      addCommand'
+        "ghc"
+        "Run ghc"
+        execCmd
+        (execOptsParser $ Just ExecGhc)
+      addCommand'
+        "hoogle"
+        "Run hoogle, the Haskell API search engine. Use the '-- ARGUMENT(S)' \
+        \syntax to pass Hoogle arguments, e.g. 'stack hoogle -- --count=20', \
+        \or 'stack hoogle -- server --local'."
+        hoogleCmd
+        ( (,,,)
+            <$> many (strArgument
+                  ( metavar "-- ARGUMENT(S) (e.g. 'stack hoogle -- server --local')"
+                  ))
+            <*> boolFlags
+                  True
+                  "setup"
+                  "If needed: install hoogle, build haddocks and \
+                  \generate a hoogle database"
+                  idm
+            <*> switch
+                  (  long "rebuild"
+                  <> help "Rebuild the hoogle database"
+                  )
+            <*> switch
+                  (  long "server"
+                  <> help "Start local Hoogle server"
+                  )
+          )
+    -- These are the only commands allowed in interpreter mode as well
+    addCommand'
+      "exec"
+      "Execute a command. If the command is absent, the first of any \
+      \arguments is taken as the command."
+      execCmd
+      (execOptsParser Nothing)
+    addCommand'
+      "run"
+      "Build and run an executable. Defaults to the first available \
+      \executable if none is provided as the first argument."
+      execCmd
+      (execOptsParser $ Just ExecRun)
+    addGhciCommand'
+      "ghci"
+      "Run ghci in the context of package(s) (experimental)"
+      ghciCmd
+      ghciOptsParser
+    addGhciCommand'
+      "repl"
+      "Run ghci in the context of package(s) (experimental) (alias for \
+      \'ghci')"
+      ghciCmd
+      ghciOptsParser
+    addCommand'
+      "runghc"
+      "Run runghc"
+      execCmd
+      (execOptsParser $ Just ExecRunGhc)
+    addCommand'
+      "runhaskell"
+      "Run runghc (alias for 'runghc')"
+      execCmd
+      (execOptsParser $ Just ExecRunGhc)
+    addCommand
+      "script"
+      "Run a Stack Script"
+      globalFooter
+      scriptCmd
+      ( \so gom ->
+          gom
+            { globalMonoidResolverRoot =
+                First $ Just $ takeDirectory $ soFile so
+            }
+      )
+      (globalOpts OtherCmdGlobalOpts)
+      scriptOptsParser
+    unless isInterpreter $ do
+      addCommand'
+        "eval"
+        "Evaluate some haskell code inline. Shortcut for 'stack exec ghc -- \
+        \-e CODE'"
+        evalCmd
+        (evalOptsParser "CODE")
+      addCommand'
+        "clean"
+        "Delete build artefacts for the project packages."
+        cleanCmd
+        (cleanOptsParser Clean)
+      addCommand'
+        "purge"
+        "Delete the project Stack working directories (.stack-work by \
+        \default). Shortcut for 'stack clean --full'"
+        cleanCmd
+        (cleanOptsParser Purge)
+      addCommand'
+        "query"
+        "Query general build information (experimental)"
+        queryCmd
+        (many $ strArgument $ metavar "SELECTOR...")
+      addCommand'
+        "list"
+        "List package id's in snapshot (experimental)"
+        listCmd
+        (many $ strArgument $ metavar "PACKAGE")
+      addSubCommands'
+        "ide"
+        "IDE-specific commands"
+        ( let outputFlag = flag
+                IDE.OutputLogInfo
+                IDE.OutputStdout
+                (  long "stdout"
+                <> help "Send output to stdout instead of the default, stderr"
+                )
+              cabalFileFlag = flag
+                IDE.ListPackageNames
+                IDE.ListPackageCabalFiles
+                (  long "cabal-files"
+                <> help "Print paths to package cabal-files instead of \
+                        \package names"
+                )
+           in  do
+                 addCommand'
+                   "packages"
+                   "List all available local loadable packages"
+                   idePackagesCmd
+                   ((,) <$> outputFlag <*> cabalFileFlag)
+                 addCommand'
+                   "targets"
+                   "List all available Stack targets"
+                   ideTargetsCmd
+                   outputFlag
         )
-      where
-        -- addCommand hiding global options
-        addCommand' :: String -> String -> (a -> RIO Runner ()) -> Parser a
-                    -> AddCommand
-        addCommand' cmd title constr =
-            addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts OtherCmdGlobalOpts)
+      addSubCommands'
+        Docker.dockerCmdName
+        "Subcommands specific to Docker use"
+        ( do
+            addCommand'
+              Docker.dockerPullCmdName
+              "Pull latest version of Docker image from registry"
+              dockerPullCmd
+              (pure ())
+            addCommand'
+              "reset"
+              "Reset the Docker sandbox"
+              dockerResetCmd
+              ( switch
+                  (  long "keep-home"
+                  <> help "Do not delete sandbox's home directory"
+                  )
+              )
+        )
+      addSubCommands'
+        ConfigCmd.cfgCmdName
+          "Subcommands for accessing and modifying configuration values"
+          ( do
+              addCommand'
+                ConfigCmd.cfgCmdSetName
+                "Sets a key in YAML configuration file to value"
+                (withConfig NoReexec . cfgCmdSet)
+                configCmdSetParser
+              addCommand'
+                ConfigCmd.cfgCmdEnvName
+                "Print environment variables for use in a shell"
+                (withConfig YesReexec . withDefaultEnvConfig . cfgCmdEnv)
+                configCmdEnvParser
+          )
+      addSubCommands'
+        "hpc"
+        "Subcommands specific to Haskell Program Coverage"
+        ( addCommand'
+            "report"
+            "Generate unified HPC coverage report from tix files and project \
+            \targets"
+            hpcReportCmd
+            hpcReportOptsParser
+        )
+     where
+      -- addCommand hiding global options
+      addCommand' ::
+           String
+        -> String
+        -> (a -> RIO Runner ())
+        -> Parser a
+        -> AddCommand
+      addCommand' cmd title constr =
+        addCommand
+          cmd
+          title
+          globalFooter
+          constr
+          (\_ gom -> gom)
+          (globalOpts OtherCmdGlobalOpts)
+      -- addCommand with custom footer hiding global options
+      addCommand'' ::
+           String
+        -> String
+        -> (a -> RIO Runner ())
+        -> String
+        -> Parser a
+        -> AddCommand
+      addCommand'' cmd title constr cmdFooter =
+        addCommand
+          cmd
+          title
+          (globalFooter <> " " <> cmdFooter)
+          constr
+          (\_ gom -> gom)
+          (globalOpts OtherCmdGlobalOpts)
 
-        -- addCommand with custom footer hiding global options
-        addCommand'' :: String
-                     -> String
-                     -> (a -> RIO Runner ())
-                     -> String
-                     -> Parser a
-                     -> AddCommand
-        addCommand'' cmd title constr cmdFooter =
-            addCommand cmd title (globalFooter <> " " <> cmdFooter) constr
-                       (\_ gom -> gom) (globalOpts OtherCmdGlobalOpts)
+      addSubCommands' ::
+           String
+        -> String
+        -> AddCommand
+        -> AddCommand
+      addSubCommands' cmd title =
+        addSubCommands
+          cmd
+          title
+          globalFooter
+          (globalOpts OtherCmdGlobalOpts)
 
-        addSubCommands' :: String -> String -> AddCommand
-                        -> AddCommand
-        addSubCommands' cmd title =
-            addSubCommands cmd title globalFooter (globalOpts OtherCmdGlobalOpts)
+      -- Additional helper that hides global options and shows build options
+      addBuildCommand' ::
+           String
+        -> String
+        -> (a -> RIO Runner ())
+        -> Parser a
+        -> AddCommand
+      addBuildCommand' cmd title constr =
+          addCommand
+            cmd
+            title
+            globalFooter
+            constr
+            (\_ gom -> gom)
+            (globalOpts BuildCmdGlobalOpts)
 
-        -- Additional helper that hides global options and shows build options
-        addBuildCommand' :: String -> String -> (a -> RIO Runner ()) -> Parser a
-                         -> AddCommand
-        addBuildCommand' cmd title constr =
-            addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts BuildCmdGlobalOpts)
+      -- Additional helper that hides global options and shows some ghci options
+      addGhciCommand' ::
+           String
+        -> String
+        -> (a -> RIO Runner ())
+        -> Parser a
+        -> AddCommand
+      addGhciCommand' cmd title constr =
+          addCommand
+            cmd
+            title
+            globalFooter
+            constr
+            (\_ gom -> gom)
+            (globalOpts GhciCmdGlobalOpts)
 
-        -- Additional helper that hides global options and shows some ghci options
-        addGhciCommand' :: String -> String -> (a -> RIO Runner ()) -> Parser a
-                         -> AddCommand
-        addGhciCommand' cmd title constr =
-            addCommand cmd title globalFooter constr (\_ gom -> gom) (globalOpts GhciCmdGlobalOpts)
-
-    globalOpts :: GlobalOptsContext -> Parser GlobalOptsMonoid
-    globalOpts kind =
-        extraHelpOption hide progName (Docker.dockerCmdName ++ "*") Docker.dockerHelpOptName <*>
-        extraHelpOption hide progName (Nix.nixCmdName ++ "*") Nix.nixHelpOptName <*>
-        globalOptsParser currentDir kind
-            (if isInterpreter
-                -- Silent except when errors occur - see #2879
-                then Just LevelError
-                else Nothing)
-        where hide = kind /= OuterGlobalOpts
+  globalOpts :: GlobalOptsContext -> Parser GlobalOptsMonoid
+  globalOpts kind =
+        extraHelpOption
+          hide
+          progName
+          (Docker.dockerCmdName ++ "*")
+          Docker.dockerHelpOptName
+    <*> extraHelpOption
+          hide
+          progName
+          (Nix.nixCmdName ++ "*")
+          Nix.nixHelpOptName
+    <*> globalOptsParser
+          currentDir kind
+          ( if isInterpreter
+              -- Silent except when errors occur - see #2879
+              then Just LevelError
+              else Nothing
+          )
+   where
+    hide = kind /= OuterGlobalOpts
 
 -- | fall-through to external executables in `git` style if they exist
 -- (i.e. `stack something` looks for `stack-something` before
 -- failing with "Invalid argument `something'")
-secondaryCommandHandler
-  :: [String]
+secondaryCommandHandler ::
+     [String]
   -> ParserFailure ParserHelp
   -> IO (ParserFailure ParserHelp)
 secondaryCommandHandler args f =
-    -- don't even try when the argument looks like a path or flag
-    if elem pathSeparator cmd || "-" `L.isPrefixOf` L.head args
-       then pure f
-    else do
-      mExternalExec <- D.findExecutable cmd
-      case mExternalExec of
-        Just ex -> withProcessContextNoLogging $ do
-          -- TODO show the command in verbose mode
-          -- hPutStrLn stderr $ unwords $
-          --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
-          _ <- exec ex (L.tail args)
-          pure f
-        Nothing -> pure $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
-  where
-    -- FIXME this is broken when any options are specified before the command
-    -- e.g. stack --verbosity silent cmd
-    cmd = stackProgName ++ "-" ++ L.head args
-    noSuchCmd name = errorHelp $ stringChunk
-      ("Auxiliary command not found in path `" ++ name ++ "'")
+  -- don't even try when the argument looks like a path or flag
+  if elem pathSeparator cmd || "-" `L.isPrefixOf` L.head args
+     then pure f
+  else do
+    mExternalExec <- D.findExecutable cmd
+    case mExternalExec of
+      Just ex -> withProcessContextNoLogging $ do
+        -- TODO show the command in verbose mode
+        -- hPutStrLn stderr $ unwords $
+        --   ["Running", "[" ++ ex, unwords (tail args) ++ "]"]
+        _ <- exec ex (L.tail args)
+        pure f
+      Nothing -> pure $ fmap (vcatErrorHelp (noSuchCmd cmd)) f
+ where
+  -- FIXME this is broken when any options are specified before the command
+  -- e.g. stack --verbosity silent cmd
+  cmd = stackProgName ++ "-" ++ L.head args
+  noSuchCmd name = errorHelp $ stringChunk
+    ("Auxiliary command not found in path `" ++ name ++ "'")
 
-interpreterHandler
-  :: Monoid t
+interpreterHandler ::
+     Monoid t
   => FilePath
   -> [String]
   -> ParserFailure ParserHelp
@@ -590,48 +704,48 @@ interpreterHandler currentDir args f = do
   case fileArgs of
     (file:fileArgs') -> runInterpreterCommand file stackArgs fileArgs'
     [] -> parseResultHandler (errorCombine (noSuchFile firstArg))
-  where
-    firstArg = L.head args
+ where
+  firstArg = L.head args
 
-    spanM _ [] = pure ([], [])
-    spanM p xs@(x:xs') = do
-      r <- p x
-      if r
-      then do
-        (ys, zs) <- spanM p xs'
-        pure (x:ys, zs)
-      else
-        pure ([], xs)
+  spanM _ [] = pure ([], [])
+  spanM p xs@(x:xs') = do
+    r <- p x
+    if r
+    then do
+      (ys, zs) <- spanM p xs'
+      pure (x:ys, zs)
+    else
+      pure ([], xs)
 
-    -- if the first argument contains a path separator then it might be a file,
-    -- or a Stack option referencing a file. In that case we only show the
-    -- interpreter error message and exclude the command related error messages.
-    errorCombine =
-      if pathSeparator `elem` firstArg
-      then overrideErrorHelp
-      else vcatErrorHelp
+  -- if the first argument contains a path separator then it might be a file,
+  -- or a Stack option referencing a file. In that case we only show the
+  -- interpreter error message and exclude the command related error messages.
+  errorCombine =
+    if pathSeparator `elem` firstArg
+    then overrideErrorHelp
+    else vcatErrorHelp
 
-    overrideErrorHelp h1 h2 = h2 { helpError = helpError h1 }
+  overrideErrorHelp h1 h2 = h2 { helpError = helpError h1 }
 
-    parseResultHandler fn = handleParseResult (overFailure fn (Failure f))
-    noSuchFile name = errorHelp $ stringChunk
-      ("File does not exist or is not a regular file `" ++ name ++ "'")
+  parseResultHandler fn = handleParseResult (overFailure fn (Failure f))
+  noSuchFile name = errorHelp $ stringChunk
+    ("File does not exist or is not a regular file `" ++ name ++ "'")
 
-    runInterpreterCommand path stackArgs fileArgs = do
-      progName <- getProgName
-      iargs <- getInterpreterArgs path
-      let parseCmdLine = commandLineHandler currentDir progName True
-          -- Implicit file arguments are put before other arguments that
-          -- occur after "--". See #3658
-          cmdArgs = stackArgs ++ case break (== "--") iargs of
-            (beforeSep, []) -> beforeSep ++ ["--"] ++ [path] ++ fileArgs
-            (beforeSep, optSep : afterSep) ->
-              beforeSep ++ [optSep] ++ [path] ++ fileArgs ++ afterSep
-       -- TODO show the command in verbose mode
-       -- hPutStrLn stderr $ unwords $
-       --   ["Running", "[" ++ progName, unwords cmdArgs ++ "]"]
-      (a,b) <- withArgs cmdArgs parseCmdLine
-      pure (a,(b,mempty))
+  runInterpreterCommand path stackArgs fileArgs = do
+    progName <- getProgName
+    iargs <- getInterpreterArgs path
+    let parseCmdLine = commandLineHandler currentDir progName True
+        -- Implicit file arguments are put before other arguments that
+        -- occur after "--". See #3658
+        cmdArgs = stackArgs ++ case break (== "--") iargs of
+          (beforeSep, []) -> beforeSep ++ ["--"] ++ [path] ++ fileArgs
+          (beforeSep, optSep : afterSep) ->
+            beforeSep ++ [optSep] ++ [path] ++ fileArgs ++ afterSep
+     -- TODO show the command in verbose mode
+     -- hPutStrLn stderr $ unwords $
+     --   ["Running", "[" ++ progName, unwords cmdArgs ++ "]"]
+    (a,b) <- withArgs cmdArgs parseCmdLine
+    pure (a,(b,mempty))
 
 setupCmd :: SetupCmdOpts -> RIO Runner ()
 setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ do
@@ -664,20 +778,20 @@ buildCmd opts = do
       FileWatchPoll -> fileWatchPoll (inner . Just)
       FileWatch -> fileWatch (inner . Just)
       NoFileWatch -> inner Nothing
-  where
-    inner
-      :: Maybe (Set (Path Abs File) -> IO ())
-      -> RIO Runner ()
-    inner setLocalFiles = withConfig YesReexec $ withEnvConfig NeedTargets opts $
-        Stack.Build.build setLocalFiles
-    -- Read the build command from the CLI and enable it to run
-    modifyGO =
-      case boptsCLICommand opts of
-        Test -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True)
-        Haddock -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just True)
-        Bench -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True)
-        Install -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidInstallExesL) (Just True)
-        Build -> id -- Default case is just Build
+ where
+  inner
+    :: Maybe (Set (Path Abs File) -> IO ())
+    -> RIO Runner ()
+  inner setLocalFiles = withConfig YesReexec $ withEnvConfig NeedTargets opts $
+      Stack.Build.build setLocalFiles
+  -- Read the build command from the CLI and enable it to run
+  modifyGO =
+    case boptsCLICommand opts of
+      Test -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True)
+      Haddock -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just True)
+      Bench -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True)
+      Install -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidInstallExesL) (Just True)
+      Build -> id -- Default case is just Build
 
 -- | Display help for the uninstall command.
 uninstallCmd :: () -> RIO Runner ()
@@ -716,13 +830,13 @@ uninstallCmd () = withConfig NoReexec $ do
 unpackCmd :: ([String], Maybe Text) -> RIO Runner ()
 unpackCmd (names, Nothing) = unpackCmd (names, Just ".")
 unpackCmd (names, Just dstPath) = withConfig NoReexec $ do
-    mresolver <- view $ globalOptsL.to globalResolver
-    mSnapshot <- forM mresolver $ \resolver -> do
-      concrete <- makeConcreteResolver resolver
-      loc <- completeSnapshotLocation concrete
-      loadSnapshot loc
-    dstPath' <- resolveDir' $ T.unpack dstPath
-    unpackPackages mSnapshot dstPath' names
+  mresolver <- view $ globalOptsL.to globalResolver
+  mSnapshot <- forM mresolver $ \resolver -> do
+    concrete <- makeConcreteResolver resolver
+    loc <- completeSnapshotLocation concrete
+    loadSnapshot loc
+  dstPath' <- resolveDir' $ T.unpack dstPath
+  unpackPackages mSnapshot dstPath' names
 
 -- | Update the package index
 updateCmd :: () -> RIO Runner ()
@@ -742,53 +856,53 @@ upgradeCmd upgradeOpts' = do
 -- | Upload to Hackage
 uploadCmd :: UploadOpts -> RIO Runner ()
 uploadCmd (UploadOpts (SDistOpts [] _ _ _ _) _) = do
-    prettyErrorL
-        [ flow "To upload the current package, please run"
-        , style Shell "stack upload ."
-        , flow "(with the period at the end)"
-        ]
-    liftIO exitFailure
+  prettyErrorL
+      [ flow "To upload the current package, please run"
+      , style Shell "stack upload ."
+      , flow "(with the period at the end)"
+      ]
+  liftIO exitFailure
 uploadCmd uploadOpts = do
-    let partitionM _ [] = pure ([], [])
-        partitionM f (x:xs) = do
-            r <- f x
-            (as, bs) <- partitionM f xs
-            pure $ if r then (x:as, bs) else (as, x:bs)
-        sdistOpts = uoptsSDistOpts uploadOpts
-    (files, nonFiles) <- liftIO $ partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
-    (dirs, invalid) <- liftIO $ partitionM D.doesDirectoryExist nonFiles
-    withConfig YesReexec $ withDefaultEnvConfig $ do
-        unless (null invalid) $ do
-            let invalidList = bulletedList $ map (style File . fromString) invalid
-            prettyErrorL
-                [ style Shell "stack upload"
-                , flow "expects a list of sdist tarballs or package directories."
-                , flow "Can't find:"
-                , line <> invalidList
-                ]
-            exitFailure
-        when (null files && null dirs) $ do
-            prettyErrorL
-                [ style Shell "stack upload"
-                , flow "expects a list of sdist tarballs or package directories, but none were specified."
-                ]
-            exitFailure
-        config <- view configL
-        let hackageUrl = T.unpack $ configHackageBaseUrl config
-            uploadVariant = uoptsUploadVariant uploadOpts
-        getCreds <- memoizeRef $ Upload.loadAuth config
-        mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
-        forM_ files $ \file -> do
-            tarFile <- resolveFile' file
-            creds <- runMemoized getCreds
-            Upload.upload hackageUrl creds (toFilePath tarFile) uploadVariant
-        forM_ dirs $ \dir -> do
-            pkgDir <- resolveDir' dir
-            (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
-            checkSDistTarball' sdistOpts tarName tarBytes
-            creds <- runMemoized getCreds
-            Upload.uploadBytes hackageUrl creds tarName uploadVariant tarBytes
-            forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
+  let partitionM _ [] = pure ([], [])
+      partitionM f (x:xs) = do
+          r <- f x
+          (as, bs) <- partitionM f xs
+          pure $ if r then (x:as, bs) else (as, x:bs)
+      sdistOpts = uoptsSDistOpts uploadOpts
+  (files, nonFiles) <- liftIO $ partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
+  (dirs, invalid) <- liftIO $ partitionM D.doesDirectoryExist nonFiles
+  withConfig YesReexec $ withDefaultEnvConfig $ do
+      unless (null invalid) $ do
+          let invalidList = bulletedList $ map (style File . fromString) invalid
+          prettyErrorL
+              [ style Shell "stack upload"
+              , flow "expects a list of sdist tarballs or package directories."
+              , flow "Can't find:"
+              , line <> invalidList
+              ]
+          exitFailure
+      when (null files && null dirs) $ do
+          prettyErrorL
+              [ style Shell "stack upload"
+              , flow "expects a list of sdist tarballs or package directories, but none were specified."
+              ]
+          exitFailure
+      config <- view configL
+      let hackageUrl = T.unpack $ configHackageBaseUrl config
+          uploadVariant = uoptsUploadVariant uploadOpts
+      getCreds <- memoizeRef $ Upload.loadAuth config
+      mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
+      forM_ files $ \file -> do
+          tarFile <- resolveFile' file
+          creds <- runMemoized getCreds
+          Upload.upload hackageUrl creds (toFilePath tarFile) uploadVariant
+      forM_ dirs $ \dir -> do
+          pkgDir <- resolveDir' dir
+          (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
+          checkSDistTarball' sdistOpts tarName tarBytes
+          creds <- runMemoized getCreds
+          Upload.uploadBytes hackageUrl creds tarName uploadVariant tarBytes
+          forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
 
 sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =
@@ -846,68 +960,68 @@ execCmd ExecOpts {..} =
           (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
 
       runWithPath eoCwd $ exec cmd args
-  where
-      ExecOptsExtra {..} = eoExtra
+ where
+  ExecOptsExtra {..} = eoExtra
 
-      targets = concatMap words eoPackages
-      boptsCLI = defaultBuildOptsCLI
-                 { boptsCLITargets = map T.pack targets
-                 }
+  targets = concatMap words eoPackages
+  boptsCLI = defaultBuildOptsCLI
+             { boptsCLITargets = map T.pack targets
+             }
 
-      -- return the package-id of the first package in GHC_PACKAGE_PATH
-      getPkgId name = do
-          pkg <- getGhcPkgExe
-          mId <- findGhcPkgField pkg [] name "id"
-          case mId of
-              Just i -> pure (L.head $ words (T.unpack i))
-              -- should never happen as we have already installed the packages
-              _      -> throwIO $ PrettyException (PackageIdNotFoundBug name)
+  -- return the package-id of the first package in GHC_PACKAGE_PATH
+  getPkgId name = do
+    pkg <- getGhcPkgExe
+    mId <- findGhcPkgField pkg [] name "id"
+    case mId of
+      Just i -> pure (L.head $ words (T.unpack i))
+      -- should never happen as we have already installed the packages
+      _      -> throwIO $ PrettyException (PackageIdNotFoundBug name)
 
-      getPkgOpts pkgs =
-          map ("-package-id=" ++) <$> mapM getPkgId pkgs
+  getPkgOpts pkgs =
+    map ("-package-id=" ++) <$> mapM getPkgId pkgs
 
-      getRunCmd args = do
-          packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
-          pkgComponents <- for (Map.elems packages) ppComponents
-          let executables = filter isCExe $ concatMap Set.toList pkgComponents
-          let (exe, args') = case args of
-                             []   -> (firstExe, args)
-                             x:xs -> case L.find (\y -> y == CExe (T.pack x)) executables of
-                                     Nothing -> (firstExe, args)
-                                     argExe -> (argExe, xs)
-                             where
-                                firstExe = listToMaybe executables
-          case exe of
-              Just (CExe exe') -> do
-                withNewLocalBuildTargets [T.cons ':' exe'] $ Stack.Build.build Nothing
-                pure (T.unpack exe', args')
-              _ -> throwIO $ PrettyException ExecutableToRunNotFound
+  getRunCmd args = do
+    packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+    pkgComponents <- for (Map.elems packages) ppComponents
+    let executables = filter isCExe $ concatMap Set.toList pkgComponents
+    let (exe, args') = case args of
+                       []   -> (firstExe, args)
+                       x:xs -> case L.find (\y -> y == CExe (T.pack x)) executables of
+                               Nothing -> (firstExe, args)
+                               argExe -> (argExe, xs)
+                       where
+                          firstExe = listToMaybe executables
+    case exe of
+      Just (CExe exe') -> do
+        withNewLocalBuildTargets [T.cons ':' exe'] $ Stack.Build.build Nothing
+        pure (T.unpack exe', args')
+      _ -> throwIO $ PrettyException ExecutableToRunNotFound
 
-      getGhcCmd pkgs args = do
-          pkgopts <- getPkgOpts pkgs
-          compiler <- view $ compilerPathsL.to cpCompiler
-          pure (toFilePath compiler, pkgopts ++ args)
+  getGhcCmd pkgs args = do
+    pkgopts <- getPkgOpts pkgs
+    compiler <- view $ compilerPathsL.to cpCompiler
+    pure (toFilePath compiler, pkgopts ++ args)
 
-      getRunGhcCmd pkgs args = do
-          pkgopts <- getPkgOpts pkgs
-          interpret <- view $ compilerPathsL.to cpInterpreter
-          pure (toFilePath interpret, pkgopts ++ args)
+  getRunGhcCmd pkgs args = do
+    pkgopts <- getPkgOpts pkgs
+    interpret <- view $ compilerPathsL.to cpInterpreter
+    pure (toFilePath interpret, pkgopts ++ args)
 
-      runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
-      runWithPath path callback = case path of
-        Nothing                  -> callback
-        Just p | not (isValid p) -> throwIO $ InvalidPathForExec p
-        Just p                   -> withUnliftIO $ \ul -> D.withCurrentDirectory p $ unliftIO ul callback
+  runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
+  runWithPath path callback = case path of
+    Nothing                  -> callback
+    Just p | not (isValid p) -> throwIO $ InvalidPathForExec p
+    Just p                   -> withUnliftIO $ \ul -> D.withCurrentDirectory p $ unliftIO ul callback
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> RIO Runner ()
 evalCmd EvalOpts {..} = execCmd execOpts
-    where
-      execOpts =
-          ExecOpts { eoCmd = ExecGhc
-                   , eoArgs = ["-e", evalArg]
-                   , eoExtra = evalExtra
-                   }
+ where
+  execOpts =
+    ExecOpts { eoCmd = ExecGhc
+             , eoArgs = ["-e", evalArg]
+             , eoExtra = evalExtra
+             }
 
 -- | Run GHCi in the context of a project.
 ghciCmd :: GhciOpts -> RIO Runner ()
@@ -919,15 +1033,15 @@ ghciCmd ghciOpts =
           , boptsCLIFlags = ghciFlags ghciOpts
           , boptsCLIGhcOptions = map T.pack (ghciGhcOptions ghciOpts)
           }
-  in withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
-    bopts <- view buildOptsL
-    -- override env so running of tests and benchmarks is disabled
-    let boptsLocal = bopts
-               { boptsTestOpts = (boptsTestOpts bopts) { toDisableRun = True }
-               , boptsBenchmarkOpts = (boptsBenchmarkOpts bopts) { beoDisableRun = True }
-               }
-    local (set buildOptsL boptsLocal)
-          (ghci ghciOpts)
+  in  withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
+        bopts <- view buildOptsL
+        -- override env so running of tests and benchmarks is disabled
+        let boptsLocal = bopts
+              { boptsTestOpts = (boptsTestOpts bopts) { toDisableRun = True }
+              , boptsBenchmarkOpts = (boptsBenchmarkOpts bopts) { beoDisableRun = True }
+              }
+        local (set buildOptsL boptsLocal)
+              (ghci ghciOpts)
 
 -- | List packages in the project.
 idePackagesCmd :: (IDE.OutputStream, IDE.ListPackagesCmd) -> RIO Runner ()
@@ -948,19 +1062,20 @@ dockerResetCmd = withConfig NoReexec . Docker.preventInContainer . Docker.reset
 -- | Project initialization
 initCmd :: InitOpts -> RIO Runner ()
 initCmd initOpts = do
-    pwd <- getCurrentDir
-    go <- view globalOptsL
-    withGlobalProject $ withConfig YesReexec (initProject pwd initOpts (globalResolver go))
+  pwd <- getCurrentDir
+  go <- view globalOptsL
+  withGlobalProject $
+    withConfig YesReexec (initProject pwd initOpts (globalResolver go))
 
 -- | Create a project directory structure and initialize the Stack config.
 newCmd :: (NewOpts, InitOpts) -> RIO Runner ()
 newCmd (newOpts, initOpts) =
-    withGlobalProject $ withConfig YesReexec $ do
-        dir <- new newOpts (forceOverwrite initOpts)
-        exists <- doesFileExist $ dir </> stackDotYaml
-        when (forceOverwrite initOpts || not exists) $ do
-            go <- view globalOptsL
-            initProject dir initOpts (globalResolver go)
+  withGlobalProject $ withConfig YesReexec $ do
+    dir <- new newOpts (forceOverwrite initOpts)
+    exists <- doesFileExist $ dir </> stackDotYaml
+    when (forceOverwrite initOpts || not exists) $ do
+      go <- view globalOptsL
+      initProject dir initOpts (globalResolver go)
 
 -- | Display instructions for how to use templates
 templatesCmd :: () -> RIO Runner ()
@@ -968,23 +1083,24 @@ templatesCmd () = withConfig NoReexec templatesHelp
 
 -- | Query build information
 queryCmd :: [String] -> RIO Runner ()
-queryCmd selectors = withConfig YesReexec $ withDefaultEnvConfig $ queryBuildInfo $ map T.pack selectors
+queryCmd selectors = withConfig YesReexec $
+  withDefaultEnvConfig $ queryBuildInfo $ map T.pack selectors
 
 -- | List packages
 listCmd :: [String] -> RIO Runner ()
 listCmd names = withConfig NoReexec $ do
-    mresolver <- view $ globalOptsL.to globalResolver
-    mSnapshot <- forM mresolver $ \resolver -> do
-      concrete <- makeConcreteResolver resolver
-      loc <- completeSnapshotLocation concrete
-      loadSnapshot loc
-    listPackages mSnapshot names
+  mresolver <- view $ globalOptsL.to globalResolver
+  mSnapshot <- forM mresolver $ \resolver -> do
+    concrete <- makeConcreteResolver resolver
+    loc <- completeSnapshotLocation concrete
+    loadSnapshot loc
+  listPackages mSnapshot names
 
 -- | generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> RIO Runner ()
 hpcReportCmd hropts = do
-    let (tixFiles, targetNames) = L.partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
-        boptsCLI = defaultBuildOptsCLI
-          { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
-    withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
-        generateHpcReportForTargets hropts tixFiles targetNames
+  let (tixFiles, targetNames) = L.partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
+      boptsCLI = defaultBuildOptsCLI
+        { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
+  withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
+      generateHpcReportForTargets hropts tixFiles targetNames
