@@ -502,7 +502,7 @@ also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite
 a bit of information about it at
 [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-20.1`, as is currently the
+* The appropriate resolver value (`resolver: lts-20.4`, as is currently the
   latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
@@ -523,14 +523,14 @@ towards by default as well).
 
 Let's explore package sets a bit further. Instead of lts-19.17, let's change our
 `stack.yaml` file to use the [latest nightly](https://www.stackage.org/nightly).
-Right now, this is currently 2022-11-21 - please see the resolver from the link
+Right now, this is currently 2022-12-16 - please see the resolver from the link
 above to get the latest.
 
 Then, commanding `stack build` again will produce:
 
 ~~~text
 stack build
-# Downloaded nightly-2020-07-31 build plan.
+# Downloaded nightly-2022-12-16 build plan.
 # build output ...
 ~~~
 
