@@ -36,7 +36,7 @@ instance Pretty StoragePrettyException where
     -- See https://github.com/commercialhaskell/stack/issues/5851
     <> if exMsg == winIOGHCRTSMsg
          then
-           flow "This exception can be caused by a bug that arises if GHC's \
+           flow "This error can be caused by a bug that arises if GHC's \
                 \'--io-manager=native' RTS option is set using the GHCRTS \
                 \environment variable. As a workaround try setting the option \
                 \in the project's Cabal file, Stack's YAML configuration file \
