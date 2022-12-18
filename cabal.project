@@ -12,6 +12,19 @@
 -- The constraints in file `cabal.config` can be obtained by commanding:
 --
 -- > stack ls dependencies cabal > cabal.config
+--
+-- However, be aware that, in respect of the `unix` package or the `Win32`
+-- package (that may come with GHC, depending on the operating system):
+--
+-- * on Windows, the Stack project does not depend on `unix` but depends on
+--   `Win32`; and
+--
+-- * on non-Windows operating systems, the Stack project does not depend on
+--   `Win32` but depends on `unix`.
+--
+-- The command above will add one of the two packages to `cabal.config` but omit
+-- the other. A comprehensive `cabal.config` will need to be created by editing
+-- the command's output.
 
 import: cabal.config
 packages: .
