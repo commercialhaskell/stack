@@ -14,8 +14,10 @@ RUN cd /tmp && \
     tar xfv /tmp/llvm.tar --strip-components 1 -C /usr && \
     rm /tmp/llvm.tar
 
-RUN curl -L https://downloads.haskell.org/ghcup/unofficial-bindists/stack/2.9.1/stack-2.9.1-linux-aarch64.tar.gz --output /tmp/stack.tar.gz && \
-    tar xfv /tmp/stack.tar.gz -C /usr/local/bin && \
+# Stack's *.tar archive contains a directory that contains the 'stack'
+# executable, hence the use of tar's '--strip-components 1' option.
+RUN curl -L https://github.com/commercialhaskell/stack/releases/download/v2.9.3/stack-2.9.3-linux-aarch64.tar.gz --output /tmp/stack.tar.gz && \
+    tar xfv /tmp/stack.tar.gz -C /usr/local/bin --strip-components 1 && \
     rm /tmp/stack.tar.gz
 
 # RUN curl -sSL https://github.com/commercialhaskell/stack/releases/download/v2.7.1/stack-2.7.1-linux-aarch64.bin > /usr/local/bin/stack && \
