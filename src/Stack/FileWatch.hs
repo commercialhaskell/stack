@@ -125,13 +125,14 @@ fileWatchConf cfg inner =
       -- https://github.com/commercialhaskell/stack/issues/822
       atomically $ writeTVar dirtyVar False
 
-      prettyInfo $
-        case eres of
-          Left e ->
-            let theStyle = case fromException e of
-                  Just ExitSuccess -> Good
-                  _ -> Error
-            in  style theStyle $ fromString $ displayException e
-          _ -> style Good "Success! Waiting for next file change."
+      case eres of
+        Left e ->
+          case fromException e of
+            Just ExitSuccess ->
+              prettyInfo $ style Good $ fromString $ displayException e
+            _ -> case fromException e :: Maybe PrettyException of
+              Just pe -> prettyError $ pretty pe
+              _ -> prettyInfo $ style Error $ fromString $ displayException e
+        _ -> prettyInfo $ style Good "Success! Waiting for next file change."
 
       logInfo "Type help for available commands. Press enter to force a rebuild."

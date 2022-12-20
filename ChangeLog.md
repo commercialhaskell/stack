@@ -14,6 +14,10 @@ Other enhancements:
 
 Bug fixes:
 
+* `stack build` with `--file-watch` or `--file-watch-poll` outputs 'pretty'
+  error messages, as intended. See
+  [#5978](https://github.com/commercialhaskell/stack/issues/5978).
+
 ## v2.9.3
 
 Release notes:
