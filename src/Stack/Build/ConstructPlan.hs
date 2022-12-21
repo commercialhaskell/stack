@@ -31,7 +31,6 @@ import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
 import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package ( applyForceCustomBuild )
--- import           Stack.PackageDump (  )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
 import           Stack.Types.Build
@@ -46,13 +45,13 @@ import           Stack.Types.Build
                    )
 import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           Stack.Types.Config
-                   ( BuildConfig (..), BuildOpts (..), BuildOptsCLI (..), BuildSubset (..)
-                   , CompilerPaths (..)
-                   , Config (..), Curator (..), DumpPackage (..), EnvConfig
-                   , EnvSettings (..), HasBuildConfig (..), HasCompiler (..)
-                   , HasConfig (..), HasEnvConfig (..), HasGHCVariant
-                   , HasPlatform, HasRunner (..), HasSourceMap (..)
-                   , minimalEnvSettings, stackRootL, stackYamlL
+                   ( BuildConfig (..), BuildOpts (..), BuildOptsCLI (..)
+                   , BuildSubset (..), CompilerPaths (..), Config (..)
+                   , Curator (..), DumpPackage (..), EnvConfig, EnvSettings (..)
+                   , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
+                   , HasEnvConfig (..), HasGHCVariant, HasPlatform
+                   , HasRunner (..), HasSourceMap (..), minimalEnvSettings
+                   , stackRootL, stackYamlL
                    )
 import           Stack.Types.Dependency
                    ( DepValue (DepValue), DepType (AsLibrary) )
