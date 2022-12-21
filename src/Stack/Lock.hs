@@ -89,9 +89,11 @@ instance FromJSON (WithJSONWarnings (Unresolved Locked)) where
       let unwrap ll = ll { llOriginal = unSingleRPLI (llOriginal ll) }
       pure $ Locked <$> sequenceA snapshots <*> (map unwrap <$> sequenceA packages)
 
-loadYamlThrow
-    :: HasLogFunc env
-    => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
+loadYamlThrow ::
+       HasLogFunc env
+    => (Value -> Yaml.Parser (WithJSONWarnings a))
+    -> Path Abs File
+    -> RIO env a
 loadYamlThrow parser path = do
     eVal <- liftIO $ Yaml.decodeFileEither (toFilePath path)
     case eVal of
@@ -107,10 +109,11 @@ lockCachedWanted ::
        (HasPantryConfig env, HasRunner env)
     => Path Abs File
     -> RawSnapshotLocation
-    -> (Map RawPackageLocationImmutable PackageLocationImmutable
-        -> WantedCompiler
-        -> Map PackageName (Bool -> RIO env DepPackage)
-        -> RIO env ( SMWanted, [CompletedPLI]))
+    -> (  Map RawPackageLocationImmutable PackageLocationImmutable
+       -> WantedCompiler
+       -> Map PackageName (Bool -> RIO env DepPackage)
+       -> RIO env ( SMWanted, [CompletedPLI])
+       )
     -> RIO env SMWanted
 lockCachedWanted stackFile resolver fillWanted = do
     lockFile <- liftIO $ addExtension ".lock" stackFile

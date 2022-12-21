@@ -147,8 +147,8 @@ gpdPackages = Map.fromList . map (toPair . C.package . C.packageDescription)
     where
         toPair (C.PackageIdentifier name version) = (name, version)
 
-gpdPackageDeps
-    :: GenericPackageDescription
+gpdPackageDeps ::
+       GenericPackageDescription
     -> ActualCompiler
     -> Platform
     -> Map FlagName Bool
@@ -202,8 +202,8 @@ removeSrcPkgDefaultFlags gpds flags =
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
 -- only modify non-manual flags, and will prefer default values for flags.
 -- Returns the plan which produces least number of dep errors
-selectPackageBuildPlan
-    :: Platform
+selectPackageBuildPlan ::
+       Platform
     -> ActualCompiler
     -> Map PackageName Version
     -> GenericPackageDescription
@@ -241,8 +241,8 @@ selectPackageBuildPlan platform compiler pool gpd =
 
 -- | Check whether with the given set of flags a package's dependency
 -- constraints can be satisfied against a given build plan or pool of packages.
-checkPackageBuildPlan
-    :: Platform
+checkPackageBuildPlan ::
+       Platform
     -> ActualCompiler
     -> Map PackageName Version
     -> Map FlagName Bool
@@ -258,8 +258,8 @@ checkPackageBuildPlan platform compiler pool flags gpd =
 -- | Checks if the given package dependencies can be satisfied by the given set
 -- of packages. Will fail if a package is either missing or has a version
 -- outside of the version range.
-checkPackageDeps
-    :: PackageName -- ^ package using dependencies, for constructing DepErrors
+checkPackageDeps ::
+       PackageName -- ^ package using dependencies, for constructing DepErrors
     -> Map PackageName VersionRange -- ^ dependency constraints
     -> Map PackageName Version -- ^ Available package pool or index
     -> DepErrors
@@ -295,8 +295,8 @@ combineDepError (DepError a x) (DepError b y) =
 -- build and an available package pool (snapshot) check whether the bundle's
 -- dependencies can be satisfied. If flags is passed as Nothing flag settings
 -- will be chosen automatically.
-checkBundleBuildPlan
-    :: Platform
+checkBundleBuildPlan ::
+       Platform
     -> ActualCompiler
     -> Map PackageName Version
     -> Maybe (Map PackageName (Map FlagName Bool))
@@ -345,8 +345,8 @@ instance Show BuildPlanCheck where
 -- | Check a set of 'GenericPackageDescription's and a set of flags against a
 -- given snapshot. Returns how well the snapshot satisfies the dependencies of
 -- the packages.
-checkSnapBuildPlan
-    :: (HasConfig env, HasGHCVariant env)
+checkSnapBuildPlan ::
+       (HasConfig env, HasGHCVariant env)
     => [ResolvedPath Dir]
     -> Maybe (Map PackageName (Map FlagName Bool))
     -> SnapshotCandidate env
@@ -385,8 +385,8 @@ checkSnapBuildPlan pkgDirs flags snapCandidate = do
 
 -- | Find a snapshot and set of flags that is compatible with and matches as
 -- best as possible with the given 'GenericPackageDescription's.
-selectBestSnapshot
-    :: (HasConfig env, HasGHCVariant env)
+selectBestSnapshot ::
+       (HasConfig env, HasGHCVariant env)
     => [ResolvedPath Dir]
     -> NonEmpty SnapName
     -> RIO env (SnapshotCandidate env, RawSnapshotLocation, BuildPlanCheck)
@@ -469,8 +469,8 @@ showPackageFlags pkg fl =
 showMapPackages :: Map PackageName a -> Text
 showMapPackages mp = showItems $ map packageNameString $ Map.keys mp
 
-showCompilerErrors
-    :: Map PackageName (Map FlagName Bool)
+showCompilerErrors ::
+       Map PackageName (Map FlagName Bool)
     -> DepErrors
     -> ActualCompiler
     -> Text

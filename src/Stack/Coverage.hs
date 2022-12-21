@@ -472,8 +472,8 @@ sanitize = LT.toStrict . htmlEscape . LT.pack
 dirnameString :: Path r Dir -> String
 dirnameString = L.dropWhileEnd isPathSeparator . toFilePath . dirname
 
-findPackageFieldForBuiltPackage
-    :: HasEnvConfig env
+findPackageFieldForBuiltPackage ::
+       HasEnvConfig env
     => Path Abs Dir -> PackageIdentifier -> Set.Set Text -> Text
     -> RIO env (Either Text [Text])
 findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do

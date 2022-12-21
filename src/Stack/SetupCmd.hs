@@ -63,8 +63,8 @@ setupParser = SetupCmdOpts
                     Right x -> pure x
             Right x -> pure x
 
-setup
-    :: (HasBuildConfig env, HasGHCVariant env)
+setup ::
+       (HasBuildConfig env, HasGHCVariant env)
     => SetupCmdOpts
     -> WantedCompiler
     -> VersionCheck

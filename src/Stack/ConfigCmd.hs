@@ -75,8 +75,8 @@ configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetDownloadPrefix scope _) = scope
 
-cfgCmdSet
-    :: (HasConfig env, HasGHCVariant env)
+cfgCmdSet ::
+       (HasConfig env, HasGHCVariant env)
     => ConfigCmdSet -> RIO env ()
 cfgCmdSet cmd = do
     conf <- view configL
@@ -198,8 +198,8 @@ data KeyType
     | DoubleQuotedKey  -- ^ For example: "install-ghc"
     deriving (Eq, Show)
 
-cfgCmdSetValue
-    :: (HasConfig env, HasGHCVariant env)
+cfgCmdSetValue ::
+       (HasConfig env, HasGHCVariant env)
     => Path Abs Dir -- ^ root directory of project
     -> ConfigCmdSet -> RIO env Yaml.Value
 cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do

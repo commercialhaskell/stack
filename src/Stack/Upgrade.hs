@@ -190,8 +190,8 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) = withConfig NoReexe
             ec <- rawSystem (toFilePath tmpFile) ["--version"]
             unless (ec == ExitSuccess) (throwIO ExecutableFailure)
 
-sourceUpgrade
-  :: Maybe String
+sourceUpgrade ::
+     Maybe String
   -> SourceOpts
   -> RIO Runner ()
 sourceUpgrade builtHash (SourceOpts gitRepo) =

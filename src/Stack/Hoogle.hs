@@ -132,9 +132,11 @@ hoogleCmd (args,setup,rebuild,startServer) =
                 { boptsCLITargets =  [hoogleTarget]
                 }
         runRIO config $ withEnvConfig NeedTargets boptsCLI f
-    restrictMinHoogleVersion
-      :: HasLogFunc env
-      => Muted -> PackageIdentifier -> RIO env PackageIdentifier
+    restrictMinHoogleVersion ::
+         HasLogFunc env
+      => Muted
+      -> PackageIdentifier
+      -> RIO env PackageIdentifier
     restrictMinHoogleVersion muted ident = do
       if ident < hoogleMinIdent
       then do

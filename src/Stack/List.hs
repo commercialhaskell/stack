@@ -23,8 +23,8 @@ instance Exception ListException where
         : map ("- " ++) strs
 
 -- | Intended to work for the command line command.
-listPackages
-  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+listPackages ::
+     forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Maybe RawSnapshot -- ^ when looking up by name, take from this build plan
   -> [String] -- ^ names or identifiers
   -> RIO env ()

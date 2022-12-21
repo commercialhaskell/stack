@@ -57,7 +57,7 @@ data BuildOpts =
             -- ^ Build haddocks for dependencies?
             ,boptsHaddockInternal :: !Bool
             -- ^ Build haddocks for all symbols and packages, like @cabal haddock --internal@
-            ,boptsHaddockHyperlinkSource  :: !Bool
+            ,boptsHaddockHyperlinkSource :: !Bool
             -- ^ Build hyperlinked source if possible. Fallback to
             -- @hscolour@. Disable for no sources.
             ,boptsInstallExes :: !Bool

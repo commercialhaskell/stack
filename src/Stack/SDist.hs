@@ -106,8 +106,8 @@ data SDistOpts = SDistOpts
 -- While this yields a 'FilePath', the name of the tarball, this
 -- tarball is not written to the disk and instead yielded as a lazy
 -- bytestring.
-getSDistTarball
-  :: HasEnvConfig env
+getSDistTarball ::
+     HasEnvConfig env
   => Maybe PvpBounds            -- ^ Override Config value
   -> Path Abs Dir               -- ^ Path to local package
   -> RIO env (FilePath, L.ByteString, Maybe (PackageIdentifier, L.ByteString))
@@ -420,8 +420,8 @@ dirsFromFiles dirs = Set.toAscList (Set.delete "." results)
 -- and will throw an exception in case of critical errors.
 --
 -- Note that we temporarily decompress the archive to analyze it.
-checkSDistTarball
-  :: HasEnvConfig env
+checkSDistTarball ::
+     HasEnvConfig env
   => SDistOpts -- ^ The configuration of what to check
   -> Path Abs File -- ^ Absolute path to tarball
   -> RIO env ()
@@ -435,8 +435,8 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
                                       })
     unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)
 
-checkPackageInExtractedTarball
-  :: HasEnvConfig env
+checkPackageInExtractedTarball ::
+     HasEnvConfig env
   => Path Abs Dir -- ^ Absolute path to tarball
   -> RIO env ()
 checkPackageInExtractedTarball pkgDir = do
@@ -503,8 +503,8 @@ buildExtractedTarball pkgDir = do
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to
 -- temporary directory and then calls 'checkSDistTarball' on it.
-checkSDistTarball'
-  :: HasEnvConfig env
+checkSDistTarball' ::
+     HasEnvConfig env
   => SDistOpts
   -> String       -- ^ Tarball name
   -> L.ByteString -- ^ Tarball contents as a byte string
@@ -514,9 +514,11 @@ checkSDistTarball' opts name bytes = withSystemTempDir "stack" $ \tpath -> do
     liftIO $ L.writeFile (toFilePath npath) bytes
     checkSDistTarball opts npath
 
-withTempTarGzContents
-  :: Path Abs File                     -- ^ Location of tarball
-  -> (Path Abs Dir -> RIO env a) -- ^ Perform actions given dir with tarball contents
+withTempTarGzContents ::
+     Path Abs File
+     -- ^ Location of tarball
+  -> (Path Abs Dir -> RIO env a)
+     -- ^ Perform actions given dir with tarball contents
   -> RIO env a
 withTempTarGzContents apath f = withSystemTempDir "stack" $ \tpath -> do
     archive <- liftIO $ L.readFile (toFilePath apath)

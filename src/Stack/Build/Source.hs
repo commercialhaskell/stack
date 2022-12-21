@@ -137,8 +137,8 @@ loadSourceMap smt boptsCli sma = do
 --
 -- * Make sure things like profiling and haddocks are included in the hash
 --
-hashSourceMapData
-    :: (HasBuildConfig env, HasCompiler env)
+hashSourceMapData ::
+       (HasBuildConfig env, HasCompiler env)
     => BuildOptsCLI
     -> SourceMap
     -> RIO env SourceMapHash
@@ -175,8 +175,8 @@ depPackageHashableContent DepPackage {..} = do
                 getUtf8Builder (mconcat cabalConfigOpts)
 
 -- | All flags for a local package.
-getLocalFlags
-    :: BuildOptsCLI
+getLocalFlags ::
+       BuildOptsCLI
     -> PackageName
     -> Map FlagName Bool
 getLocalFlags boptsCli name = Map.unions
@@ -412,8 +412,8 @@ checkBuildCache oldCache files = do
         pure (Set.singleton fp, Map.singleton fp $ FileCacheInfo digest')
 
 -- | Returns entries to add to the build cache for any newly found unlisted modules
-addUnlistedToBuildCache
-    :: HasEnvConfig env
+addUnlistedToBuildCache ::
+       HasEnvConfig env
     => Package
     -> Path Abs File
     -> Set NamedComponent
@@ -439,8 +439,8 @@ addUnlistedToBuildCache pkg cabalFP nonLibComponents buildCaches = do
 -- | Gets list of Paths for files relevant to a set of components in a package.
 --   Note that the library component, if any, is always automatically added to the
 --   set of components.
-getPackageFilesForTargets
-    :: HasEnvConfig env
+getPackageFilesForTargets ::
+       HasEnvConfig env
     => Package
     -> Path Abs File
     -> Set NamedComponent
@@ -469,8 +469,8 @@ getFileDigestMaybe fp = do
     getDigest src = runConduit $ src .| getZipSink (ZipSink SHA256.sinkHash)
 
 -- | Get 'PackageConfig' for package given its name.
-getPackageConfig
-  :: (HasBuildConfig env, HasSourceMap env)
+getPackageConfig ::
+     (HasBuildConfig env, HasSourceMap env)
   => Map FlagName Bool
   -> [Text] -- ^ GHC options
   -> [Text] -- ^ cabal config opts

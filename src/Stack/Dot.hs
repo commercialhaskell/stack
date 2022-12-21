@@ -129,9 +129,11 @@ data DotPayload = DotPayload
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and a map from package names to
 -- dependencies.
-createPrunedDependencyGraph
-  :: DotOpts
-  -> RIO Runner (Set PackageName, Map PackageName (Set PackageName, DotPayload))
+createPrunedDependencyGraph ::
+     DotOpts
+  -> RIO
+       Runner
+       (Set PackageName, Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
   localNames <- view $ buildConfigL.to (Map.keysSet . smwProject . bcSMWanted)
   logDebug "Creating dependency graph"
@@ -147,8 +149,8 @@ createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
 -- name to a tuple of dependencies and payload if available. This
 -- function mainly gathers the required arguments for
 -- @resolveDependencies@.
-createDependencyGraph
-  :: DotOpts
+createDependencyGraph ::
+     DotOpts
   -> RIO DotConfig (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
@@ -175,9 +177,7 @@ createDependencyGraph dotOpts = do
                                    (Just $ packageLicense pkg)
                                    (Just $ PLImmutable loc)
 
-listDependencies
-  :: ListDepsOpts
-  -> RIO Runner ()
+listDependencies :: ListDepsOpts -> RIO Runner ()
 listDependencies opts = do
   let dotOpts = listDepsDotOpts opts
   (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
@@ -363,8 +363,8 @@ pruneUnreachable dontPrune = fixpoint prune
 
 
 -- | Resolve the dependency graph up to (Just depth) or until fixpoint is reached
-resolveDependencies
-  :: (Applicative m, Monad m)
+resolveDependencies ::
+     (Applicative m, Monad m)
   => Maybe Int
   -> Map PackageName (Set PackageName, DotPayload)
   -> (PackageName -> m (Set PackageName, DotPayload))
@@ -386,8 +386,8 @@ resolveDependencies limit graph loadPackageDeps = do
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for
 -- a package
-createDepLoader
-  :: SourceMap
+createDepLoader ::
+     SourceMap
   -> Map PackageName DumpPackage
   -> Map GhcPkgId PackageIdentifier
   -> (PackageName -> Version -> PackageLocationImmutable ->
@@ -447,8 +447,8 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
 
 -- | Resolve the direct (depth 0) external dependencies of the given local
 -- packages (assumed to come from project packages)
-projectPackageDependencies
-  :: DotOpts
+projectPackageDependencies ::
+     DotOpts
   -> [LocalPackage]
   -> [(PackageName, (Set PackageName, DotPayload))]
 projectPackageDependencies dotOpts locals =
@@ -537,8 +537,8 @@ localPackageToPackage lp =
   fromMaybe (lpPackage lp) (lpTestBench lp)
 
 -- Plumbing for --test and --bench flags
-withDotConfig
-    :: DotOpts
+withDotConfig ::
+       DotOpts
     -> RIO DotConfig a
     -> RIO Runner a
 withDotConfig opts inner =

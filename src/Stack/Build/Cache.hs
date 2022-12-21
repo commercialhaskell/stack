@@ -200,8 +200,8 @@ writeCabalMod dir x = do
     liftIO $ setFileTimes (toFilePath fp) x x
 
 -- | See 'tryGetSetupConfigMod'
-writeSetupConfigMod
-  :: HasEnvConfig env
+writeSetupConfigMod ::
+     HasEnvConfig env
   => Path Abs Dir
   -> Maybe CTime
   -> RIO env ()
@@ -214,8 +214,8 @@ writeSetupConfigMod dir (Just x) = do
     liftIO $ setFileTimes (toFilePath fp) x x
 
 -- | See 'tryGetPackageProjectRoot'
-writePackageProjectRoot
-  :: HasEnvConfig env
+writePackageProjectRoot ::
+     HasEnvConfig env
   => Path Abs Dir
   -> ByteString
   -> RIO env ()

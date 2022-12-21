@@ -397,8 +397,8 @@ resolveRawTarget sma allLocs (ri, rt) =
 -- Combine the ResolveResults
 ---------------------------------------------------------------------------------
 
-combineResolveResults
-  :: forall env. HasLogFunc env
+combineResolveResults ::
+     forall env. HasLogFunc env
   => [ResolveResult]
   -> RIO env ([Text], Map PackageName Target, Map PackageName PackageLocationImmutable)
 combineResolveResults results = do

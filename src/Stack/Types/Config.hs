@@ -1487,8 +1487,8 @@ getProjectWorkDir = do
     pure (root </> workDir)
 
 -- | Relative directory for the platform identifier
-platformOnlyRelDir
-    :: (MonadReader env m, HasPlatform env, MonadThrow m)
+platformOnlyRelDir ::
+       (MonadReader env m, HasPlatform env, MonadThrow m)
     => m (Path Rel Dir)
 platformOnlyRelDir = do
     platform <- view platformL
@@ -1546,8 +1546,8 @@ hoogleDatabasePath = do
 
 -- | Path for platform followed by snapshot name followed by compiler
 -- name.
-platformSnapAndCompilerRel
-    :: (HasEnvConfig env)
+platformSnapAndCompilerRel ::
+       (HasEnvConfig env)
     => RIO env (Path Rel Dir)
 platformSnapAndCompilerRel = do
     platform <- platformGhcRelDir
@@ -1557,8 +1557,8 @@ platformSnapAndCompilerRel = do
     useShaPathOnWindows (platform </> name </> ghc)
 
 -- | Relative directory for the platform and GHC identifier
-platformGhcRelDir
-    :: (MonadReader env m, HasEnvConfig env, MonadThrow m)
+platformGhcRelDir ::
+       (MonadReader env m, HasEnvConfig env, MonadThrow m)
     => m (Path Rel Dir)
 platformGhcRelDir = do
     cp <- view compilerPathsL
@@ -1567,16 +1567,16 @@ platformGhcRelDir = do
     parseRelDir (mconcat [ verOnly, cbSuffix ])
 
 -- | Relative directory for the platform and GHC identifier without GHC bindist build
-platformGhcVerOnlyRelDir
-    :: (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
+platformGhcVerOnlyRelDir ::
+       (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
     => m (Path Rel Dir)
 platformGhcVerOnlyRelDir =
     parseRelDir =<< platformGhcVerOnlyRelDirStr
 
 -- | Relative directory for the platform and GHC identifier without GHC bindist build
 -- (before parsing into a Path)
-platformGhcVerOnlyRelDirStr
-    :: (MonadReader env m, HasPlatform env, HasGHCVariant env)
+platformGhcVerOnlyRelDirStr ::
+       (MonadReader env m, HasPlatform env, HasGHCVariant env)
     => m FilePath
 platformGhcVerOnlyRelDirStr = do
     platform <- view platformL

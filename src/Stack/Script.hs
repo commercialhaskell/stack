@@ -214,8 +214,8 @@ scriptCmd opts = do
       then replaceExtension fp "exe"
       else dropExtension fp
 
-getPackagesFromImports
-  :: FilePath -- ^ script filename
+getPackagesFromImports ::
+     FilePath -- ^ script filename
   -> RIO EnvConfig (Set PackageName)
 getPackagesFromImports scriptFP = do
     (pns, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
@@ -223,8 +223,8 @@ getPackagesFromImports scriptFP = do
         then pure pns
         else Set.union pns <$> getPackagesFromModuleNames mns
 
-getPackagesFromModuleNames
-  :: Set ModuleName
+getPackagesFromModuleNames ::
+     Set ModuleName
   -> RIO EnvConfig (Set PackageName)
 getPackagesFromModuleNames mns = do
     hash <- hashSnapshot

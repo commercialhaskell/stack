@@ -1035,8 +1035,8 @@ psForceDirty :: PackageSource -> Bool
 psForceDirty (PSFilePath lp) = lpForceDirty lp
 psForceDirty PSRemote{} = False
 
-psDirty
-  :: (MonadIO m, HasEnvConfig env, MonadReader env m)
+psDirty ::
+     (MonadIO m, HasEnvConfig env, MonadReader env m)
   => PackageSource
   -> m (Maybe (Set FilePath))
 psDirty (PSFilePath lp) = runMemoizedWith $ lpDirtyFiles lp

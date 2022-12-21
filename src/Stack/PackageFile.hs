@@ -37,8 +37,8 @@ resolveFileOrWarn = resolveOrWarn "File" f
   f p x = liftIO (forgivingAbsence (resolveFile p x)) >>= rejectMissingFile
 
 -- | Get all files referenced by the package.
-packageDescModulesAndFiles
-    :: PackageDescription
+packageDescModulesAndFiles ::
+       PackageDescription
     -> RIO
          GetPackageFileContext
          ( Map NamedComponent (Map ModuleName (Path Abs File))
@@ -104,8 +104,8 @@ packageDescModulesAndFiles pkg = do
 
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
-resolveGlobFiles
-  :: CabalSpecVersion -- ^ Cabal file version
+resolveGlobFiles ::
+     CabalSpecVersion -- ^ Cabal file version
   -> [String]
   -> RIO GetPackageFileContext (Set (Path Abs File))
 resolveGlobFiles cabalFileVersion =

@@ -292,8 +292,8 @@ timeToInt64 (CTime i) = fromIntegral i -- fromIntegral added for 32-bit systems
 
 -- | Load compiler information, if available, and confirm that the
 -- referenced files are unchanged. May throw exceptions!
-loadCompilerPaths
-  :: HasConfig env
+loadCompilerPaths ::
+     HasConfig env
   => Path Abs File -- ^ compiler executable
   -> CompilerBuild
   -> Bool -- ^ sandboxed?
@@ -346,8 +346,8 @@ loadCompilerPaths compiler build sandboxed = do
       }
 
 -- | Save compiler information. May throw exceptions!
-saveCompilerPaths
-  :: HasConfig env
+saveCompilerPaths ::
+     HasConfig env
   => CompilerPaths
   -> RIO env ()
 saveCompilerPaths CompilerPaths {..} = withUserStorage $ do

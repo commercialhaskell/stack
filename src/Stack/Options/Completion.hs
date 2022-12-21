@@ -39,8 +39,8 @@ ghcOptsCompleter = mkCompleter $ \inputRaw -> pure $
 -- TODO: Ideally this would pay attention to --stack-yaml, may require
 -- changes to optparse-applicative.
 
-buildConfigCompleter
-    :: (String -> RIO EnvConfig [String])
+buildConfigCompleter ::
+       (String -> RIO EnvConfig [String])
     -> Completer
 buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
     let input = unescapeBashArg inputRaw

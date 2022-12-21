@@ -303,8 +303,8 @@ buildPlanDir :: Path Abs Dir -- ^ Stack root
 buildPlanDir = (</> $(mkRelDir "build-plan"))
 
 -- | Path where binary caches of the build plans are stored.
-buildPlanCacheDir
-  :: Path Abs Dir -- ^ Stack root
+buildPlanCacheDir ::
+     Path Abs Dir -- ^ Stack root
   -> Path Abs Dir
 buildPlanCacheDir = (</> $(mkRelDir "build-plan-cache"))
 

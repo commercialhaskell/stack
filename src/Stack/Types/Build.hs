@@ -395,8 +395,8 @@ instance Pretty BuildPrettyException where
 
 instance Exception BuildPrettyException
 
-pprintExceptions
-    :: [ConstructPlanException]
+pprintExceptions ::
+       [ConstructPlanException]
     -> Path Abs File
     -> Path Abs Dir
     -> ParentMap
@@ -578,8 +578,8 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
 -- | Get the shortest reason for the package to be in the build plan. In
 -- other words, trace the parent dependencies back to a 'wanted'
 -- package.
-getShortestDepsPath
-    :: ParentMap
+getShortestDepsPath ::
+       ParentMap
     -> Set PackageName
     -> PackageName
     -> Maybe [PackageIdentifier]
@@ -689,8 +689,8 @@ missingExeError errorCode isSimpleBuildType msg = unlines
             then []
             else ["The Setup.hs file is changing the installation target dir."]
 
-showBuildError
-  :: String
+showBuildError ::
+     String
   -> Bool
   -> ExitCode
   -> Maybe PackageIdentifier

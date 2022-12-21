@@ -132,8 +132,8 @@ withKeepSystemTempDir str inner = withRunInIO $ \run -> do
 --
 -- Throws a 'ReadProcessException' if unsuccessful in launching, or
 -- 'ExitCodeException' if the process itself fails.
-sinkProcessStderrStdout
-  :: forall e o env. (HasProcessContext env, HasLogFunc env, HasCallStack)
+sinkProcessStderrStdout ::
+     forall e o env. (HasProcessContext env, HasLogFunc env, HasCallStack)
   => String -- ^ Command
   -> [String] -- ^ Command line arguments
   -> ConduitM ByteString Void (RIO env) e -- ^ Sink for stderr
@@ -157,8 +157,8 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
 -- lots of output; for that use 'sinkProcessStderrStdout'.
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
-sinkProcessStdout
-    :: (HasProcessContext env, HasLogFunc env, HasCallStack)
+sinkProcessStdout ::
+       (HasProcessContext env, HasLogFunc env, HasCallStack)
     => String -- ^ Command
     -> [String] -- ^ Command line arguments
     -> ConduitM ByteString Void (RIO env) a -- ^ Sink for stdout
@@ -169,8 +169,8 @@ sinkProcessStdout name args sinkStdout =
     $ Concurrently (runConduit $ getStderr p .| CL.sinkNull)
    *> Concurrently (runConduit $ getStdout p .| sinkStdout)
 
-logProcessStderrStdout
-    :: (HasCallStack, HasProcessContext env, HasLogFunc env)
+logProcessStderrStdout ::
+       (HasCallStack, HasProcessContext env, HasLogFunc env)
     => ProcessConfig stdin stdoutIgnored stderrIgnored
     -> RIO env ()
 logProcessStderrStdout pc = withLoggedProcess_ pc $ \p ->

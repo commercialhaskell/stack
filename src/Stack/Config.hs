@@ -752,8 +752,8 @@ checkDuplicateNames locals =
 -- | Get the Stack root, e.g. @~/.stack@, and determine whether the user owns it.
 --
 -- On Windows, the second value is always 'True'.
-determineStackRootAndOwnership
-    :: (MonadIO m)
+determineStackRootAndOwnership ::
+       (MonadIO m)
     => ConfigMonoid
     -- ^ Parsed command-line arguments
     -> m (Path Abs Dir, Path Abs Dir, Bool)

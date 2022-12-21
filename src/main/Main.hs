@@ -779,8 +779,8 @@ buildCmd opts = do
       FileWatch -> fileWatch (inner . Just)
       NoFileWatch -> inner Nothing
  where
-  inner
-    :: Maybe (Set (Path Abs File) -> IO ())
+  inner ::
+       Maybe (Set (Path Abs File) -> IO ())
     -> RIO Runner ()
   inner setLocalFiles = withConfig YesReexec $ withEnvConfig NeedTargets opts $
       Stack.Build.build setLocalFiles

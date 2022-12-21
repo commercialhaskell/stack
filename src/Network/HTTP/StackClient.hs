@@ -118,17 +118,19 @@ httpNoBody :: MonadIO m => Request -> m (Response ())
 httpNoBody = Network.HTTP.Simple.httpNoBody . setUserAgent
 
 
-httpSink
-  :: MonadUnliftIO m
+httpSink ::
+     MonadUnliftIO m
   => Request
   -> (Response () -> ConduitM Strict.ByteString Void m a)
   -> m a
 httpSink = Network.HTTP.Simple.httpSink . setUserAgent
 
 
-withResponse
-  :: (MonadUnliftIO m, MonadIO n)
-  => Request -> (Response (ConduitM i Strict.ByteString n ()) -> m a) -> m a
+withResponse ::
+     (MonadUnliftIO m, MonadIO n)
+  => Request
+  -> (Response (ConduitM i Strict.ByteString n ()) -> m a)
+  -> m a
 withResponse = Network.HTTP.Simple.withResponse . setUserAgent
 
 -- | Set the user-agent request header
@@ -169,19 +171,20 @@ redownload req dest = Download.redownload (setUserAgent req) dest
 -- Throws VerifiedDownloadException.
 -- Throws IOExceptions related to file system operations.
 -- Throws HttpException.
-verifiedDownload
-         :: HasTerm env
-         => DownloadRequest
-         -> Path Abs File -- ^ destination
-         -> (Maybe Integer -> ConduitM ByteString Void (RIO env) ()) -- ^ custom hook to observe progress
-         -> RIO env Bool -- ^ Whether a download was performed
+verifiedDownload ::
+     HasTerm env
+  => DownloadRequest
+  -> Path Abs File -- ^ destination
+  -> (Maybe Integer -> ConduitM ByteString Void (RIO env) ())
+     -- ^ custom hook to observe progress
+  -> RIO env Bool -- ^ Whether a download was performed
 verifiedDownload dr destpath progressSink =
     Download.verifiedDownload dr' destpath progressSink
   where
     dr' = modifyRequest setUserAgent dr
 
-verifiedDownloadWithProgress
-  :: HasTerm env
+verifiedDownloadWithProgress ::
+     HasTerm env
   => DownloadRequest
   -> Path Abs File
   -> Text
@@ -190,9 +193,8 @@ verifiedDownloadWithProgress
 verifiedDownloadWithProgress req destpath lbl msize =
     verifiedDownload req destpath (chattyDownloadProgress lbl msize)
 
-
-chattyDownloadProgress
-  :: ( HasLogFunc env
+chattyDownloadProgress ::
+     ( HasLogFunc env
      , MonadIO m
      , MonadReader env m
      )

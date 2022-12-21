@@ -110,8 +110,8 @@ filterTools name goodVersion installed =
             , pkgName pkgId == name
             , goodVersion (pkgVersion pkgId) ]
 
-getCompilerVersion
-  :: (HasProcessContext env, HasLogFunc env)
+getCompilerVersion ::
+     (HasProcessContext env, HasLogFunc env)
   => WhichCompiler
   -> Path Abs File -- ^ executable
   -> RIO env ActualCompiler

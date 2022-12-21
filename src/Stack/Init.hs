@@ -118,8 +118,8 @@ instance Pretty InitPrettyException where
 instance Exception InitPrettyException
 
 -- | Generate stack.yaml
-initProject
-    :: (HasConfig env, HasGHCVariant env)
+initProject ::
+       (HasConfig env, HasGHCVariant env)
     => Path Abs Dir
     -> InitOpts
     -> Maybe AbstractResolver
@@ -421,8 +421,8 @@ getSnapshots' = catchAny
     (\e -> throwIO $ PrettyException $ SnapshotDownloadFailure e)
 
 -- | Get the default resolver value
-getDefaultResolver
-    :: (HasConfig env, HasGHCVariant env)
+getDefaultResolver ::
+       (HasConfig env, HasGHCVariant env)
     => InitOpts
     -> Maybe AbstractResolver
     -> Map PackageName (ResolvedPath Dir)
@@ -455,8 +455,8 @@ getDefaultResolver initOpts mresolver pkgDirs = do
                                NoMatchingSnapshot snaps
                 _ -> pure (c, l)
 
-getWorkingResolverPlan
-    :: (HasConfig env, HasGHCVariant env)
+getWorkingResolverPlan ::
+       (HasConfig env, HasGHCVariant env)
     => InitOpts
     -> Map PackageName (ResolvedPath Dir)
     -- ^ Src packages: cabal dir
@@ -522,8 +522,8 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
                       isAvailable k _ = k `notElem` ignored
                       available       = Map.filterWithKey isAvailable pkgDirs
 
-checkBundleResolver
-    :: (HasConfig env, HasGHCVariant env)
+checkBundleResolver ::
+       (HasConfig env, HasGHCVariant env)
     => InitOpts
     -> RawSnapshotLocation
     -> SnapshotCandidate env
@@ -590,8 +590,8 @@ data InitOpts = InitOpts
     -- ^ If True, include all .cabal files found in any sub directories
     }
 
-findCabalDirs
-  :: HasConfig env
+findCabalDirs ::
+     HasConfig env
   => Bool -> Path Abs Dir -> RIO env (Set (Path Abs Dir))
 findCabalDirs recurse dir =
     Set.fromList . map parent
@@ -612,12 +612,13 @@ ignoredDirs = Set.fromList
     [ "dist"
     ]
 
-cabalPackagesCheck
-    :: (HasConfig env, HasGHCVariant env)
-     => [Path Abs Dir]
-     -> RIO env
-          ( Map PackageName (Path Abs File, C.GenericPackageDescription)
-          , [Path Abs File])
+cabalPackagesCheck ::
+       (HasConfig env, HasGHCVariant env)
+    => [Path Abs Dir]
+    -> RIO env
+         ( Map PackageName (Path Abs File, C.GenericPackageDescription)
+         , [Path Abs File]
+         )
 cabalPackagesCheck cabaldirs = do
     when (null cabaldirs) $
       prettyWarn $

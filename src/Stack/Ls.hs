@@ -280,9 +280,7 @@ handleLocal lsOpts = do
         LsStyles _ -> pure ()
         LsTools _ -> pure ()
 
-handleRemote
-    :: HasRunner env
-    => LsCmdOpts -> RIO env ()
+handleRemote :: HasRunner env => LsCmdOpts -> RIO env ()
 handleRemote lsOpts = do
     req <- liftIO $ parseRequest urlInfo
     isStdoutTerminal <- view terminalL

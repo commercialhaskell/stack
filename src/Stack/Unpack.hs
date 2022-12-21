@@ -34,8 +34,8 @@ instance Exception UnpackException where
         : map ("- " ++) strs
 
 -- | Intended to work for the command line command.
-unpackPackages
-  :: forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+unpackPackages ::
+     forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Maybe RawSnapshot -- ^ when looking up by name, take from this build plan
   -> Path Abs Dir -- ^ destination
   -> [String] -- ^ names or identifiers

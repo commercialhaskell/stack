@@ -239,8 +239,8 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
 -- | Generate GHC options for the package's components, and a list of
 -- options which apply generally to the package, not one specific
 -- component.
-generatePkgDescOpts
-    :: (HasEnvConfig env, MonadThrow m, MonadReader env m, MonadIO m)
+generatePkgDescOpts ::
+       (HasEnvConfig env, MonadThrow m, MonadReader env m, MonadIO m)
     => InstallMap
     -> InstalledMap
     -> [PackageName] -- ^ Packages to omit from the "-package" / "-package-id" flags
@@ -426,8 +426,8 @@ generateBuildInfoOpts BioInput {..} =
 --     $(mkAbsFile "/Users/chris/Repos/hoogle/cbits/text_search.c")
 -- Just "/Users/chris/Repos/hoogle/.stack-work/Cabal-x.x.x/dist/build/hoogle/hoogle-tmp/cbits/text_search.o"
 -- λ>
-makeObjectFilePathFromC
-    :: MonadThrow m
+makeObjectFilePathFromC ::
+       MonadThrow m
     => Path Abs Dir          -- ^ The cabal directory.
     -> NamedComponent        -- ^ The name of the component.
     -> Path Abs Dir          -- ^ Dist directory.
@@ -447,8 +447,8 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
 -- library version in this case for simplicity, so we'll check for GHC
 -- being 7.10 or earlier. This obviously makes our function a lot more
 -- fun to write...
-packageDependencies
-  :: PackageConfig
+packageDependencies ::
+     PackageConfig
   -> PackageDescription
   -> Map PackageName VersionRange
 packageDependencies pkgConfig pkg' =
@@ -481,8 +481,8 @@ packageDependencies pkgConfig pkg' =
 --
 -- This uses both the new 'buildToolDepends' and old 'buildTools'
 -- information.
-packageDescTools
-  :: PackageDescription
+packageDescTools ::
+     PackageDescription
   -> (Set ExeName, Map PackageName DepValue)
 packageDescTools pd =
     (S.fromList $ concat unknowns, M.fromListWith (<>) $ concat knowns)
@@ -775,8 +775,8 @@ mkDepPackage pl = do
 
 -- | Force a package to be treated as a custom build type, see
 -- <https://github.com/commercialhaskell/stack/issues/4488>
-applyForceCustomBuild
-  :: Version -- ^ global Cabal version
+applyForceCustomBuild ::
+     Version -- ^ global Cabal version
   -> Package
   -> Package
 applyForceCustomBuild cabalVersion package

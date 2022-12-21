@@ -162,7 +162,10 @@ build msetLocalFiles = do
                          (smtTargets $ smTargets sourceMap)
                          plan
 
-buildLocalTargets :: HasEnvConfig env => NonEmpty Text -> RIO env (Either SomeException ())
+buildLocalTargets ::
+       HasEnvConfig env
+    => NonEmpty Text
+    -> RIO env (Either SomeException ())
 buildLocalTargets targets =
   tryAny $ withNewLocalBuildTargets (NE.toList targets) $ build Nothing
 
@@ -188,8 +191,11 @@ checkCabalVersion = do
         CabalVersionNotSupported cabalVer
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
-warnIfExecutablesWithSameNameCouldBeOverwritten
-    :: HasLogFunc env => [LocalPackage] -> Plan -> RIO env ()
+warnIfExecutablesWithSameNameCouldBeOverwritten ::
+       HasLogFunc env
+    => [LocalPackage]
+    -> Plan
+    -> RIO env ()
 warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     logDebug "Checking if we are going to build multiple executables with the same name"
     forM_ (Map.toList warnings) $ \(exe,(toBuild,otherLocals)) -> do
@@ -290,8 +296,8 @@ mkBaseConfigOpts boptsCli = do
         }
 
 -- | Provide a function for loading package information from the package index
-loadPackage
-  :: (HasBuildConfig env, HasSourceMap env)
+loadPackage ::
+     (HasBuildConfig env, HasSourceMap env)
   => PackageLocationImmutable
   -> Map FlagName Bool
   -> [Text] -- ^ GHC options

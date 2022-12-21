@@ -307,8 +307,8 @@ new opts forceOverwrite = do
 data TemplateFrom = LocalTemp | RemoteTemp
 
 -- | Download and read in a template's text content.
-loadTemplate
-    :: forall env. HasConfig env
+loadTemplate ::
+       forall env. HasConfig env
     => TemplateName
     -> (TemplateFrom -> RIO env ())
     -> RIO env Text
@@ -457,14 +457,14 @@ settingsFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
         ]
 
 -- | Apply and unpack a template into a directory.
-applyTemplate
-    :: HasConfig env
+applyTemplate ::
+       HasConfig env
     => PackageName
     -> TemplateName
     -> Map Text Text
     -> Path Abs Dir
     -> Text
-    -> RIO env  (Map (Path Abs File) LB.ByteString)
+    -> RIO env (Map (Path Abs File) LB.ByteString)
 applyTemplate project template nonceParams dir templateText = do
     config <- view configL
     currentYear <- do
@@ -560,10 +560,7 @@ applyTemplate project template nonceParams dir templateText = do
       (a'', cs) <- mapAccumLM f a' xs
       pure (a'', c:cs)
 
-    missingParameters
-      :: Set String
-      -> Path Abs File
-      -> StyleDoc
+    missingParameters :: Set String -> Path Abs File -> StyleDoc
     missingParameters missingKeys userConfigPath =
            fillSep
              ( flow "The following parameters were needed by the template but \
@@ -622,8 +619,8 @@ checkForOverwrite name files = do
         throwM $ PrettyException $ AttemptedOverwrites name overwrites
 
 -- | Write files to the new project directory.
-writeTemplateFiles
-    :: MonadIO m
+writeTemplateFiles ::
+       MonadIO m
     => Map (Path Abs File) LB.ByteString -> m ()
 writeTemplateFiles files =
     liftIO $
@@ -634,10 +631,7 @@ writeTemplateFiles files =
                  writeBinaryFileAtomic fp $ lazyByteString bytes)
 
 -- | Run any initialization functions, such as Git.
-runTemplateInits
-    :: HasConfig env
-    => Path Abs Dir
-    -> RIO env ()
+runTemplateInits :: HasConfig env => Path Abs Dir -> RIO env ()
 runTemplateInits dir = do
     config <- view configL
     case configScmInit config of

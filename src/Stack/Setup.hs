@@ -688,8 +688,8 @@ addIncludeLib (ExtraDirs _bins includes libs) config = config
 
 -- | Ensure both the compiler and the msys toolchain are installed and
 -- provide the PATHs to add if necessary
-ensureCompilerAndMsys
-  :: (HasBuildConfig env, HasGHCVariant env)
+ensureCompilerAndMsys ::
+     (HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
   -> RIO env (CompilerPaths, ExtraDirs)
 ensureCompilerAndMsys sopts = do
@@ -730,8 +730,8 @@ warnUnsupportedCompiler ghcVersion = do
         pure False
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
-warnUnsupportedCompilerCabal
-  :: HasLogFunc env
+warnUnsupportedCompilerCabal ::
+     HasLogFunc env
   => CompilerPaths
   -> Bool -- ^ already warned about GHC?
   -> RIO env ()
@@ -755,8 +755,8 @@ warnUnsupportedCompilerCabal cp didWarn = do
 
 -- | Ensure that the msys toolchain is installed if necessary and
 -- provide the PATHs to add if necessary
-ensureMsys
-  :: HasBuildConfig env
+ensureMsys ::
+     HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (Maybe Tool)
@@ -785,8 +785,8 @@ ensureMsys sopts getSetupInfo' = do
                       pure Nothing
       _ -> pure Nothing
 
-installGhcBindist
-  :: HasBuildConfig env
+installGhcBindist ::
+     HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
   -> [Tool]
@@ -848,8 +848,8 @@ installGhcBindist sopts getSetupInfo' installed = do
                     suggestion
 
 -- | Ensure compiler is installed, without worrying about msys
-ensureCompiler
-  :: forall env. (HasConfig env, HasBuildConfig env, HasGHCVariant env)
+ensureCompiler ::
+     forall env. (HasConfig env, HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (CompilerPaths, ExtraDirs)
@@ -903,8 +903,8 @@ ensureCompiler sopts getSetupInfo' = do
 --
 -- Reads and possibly validates the output of the process as the GHC
 -- binary and returns it.
-runGHCInstallHook
-  :: HasBuildConfig env
+runGHCInstallHook ::
+     HasBuildConfig env
   => SetupOpts
   -> Path Abs File
   -> RIO env (Maybe (Path Abs File))
@@ -953,8 +953,8 @@ runGHCInstallHook sopts hook = do
     stripNewline str = filter (flip notElem newlines) str
 
 
-ensureSandboxedCompiler
-  :: HasBuildConfig env
+ensureSandboxedCompiler ::
+     HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
   -> RIO env (CompilerPaths, ExtraDirs)
@@ -1016,8 +1016,8 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
     cp <- pathsFromCompiler wc compilerBuild True compiler
     pure (cp, paths)
 
-pathsFromCompiler
-  :: forall env. HasConfig env
+pathsFromCompiler ::
+     forall env. HasConfig env
   => WhichCompiler
   -> CompilerBuild
   -> Bool
@@ -1360,8 +1360,8 @@ ensureDockerStackExe containerPlatform = do
     pure stackExePath
 
 -- | Get all executables on the path that might match the wanted compiler
-sourceSystemCompilers
-  :: (HasProcessContext env, HasLogFunc env)
+sourceSystemCompilers ::
+     (HasProcessContext env, HasLogFunc env)
   => WantedCompiler
   -> ConduitT i (Path Abs File) (RIO env) ()
 sourceSystemCompilers wanted = do
@@ -1497,8 +1497,8 @@ getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
         filter (isWantedCompiler versionCheck wanted . toCV . fst) (Map.toList pairs_)
 
 -- | Download and install the first available compiler build.
-downloadAndInstallPossibleCompilers
-    :: (HasGHCVariant env, HasBuildConfig env)
+downloadAndInstallPossibleCompilers ::
+       (HasGHCVariant env, HasBuildConfig env)
     => [CompilerBuild]
     -> SetupInfo
     -> WantedCompiler
@@ -1568,9 +1568,12 @@ getOSKey platform =
         Platform AArch64               Cabal.FreeBSD -> pure "freebsd-aarch64"
         Platform arch os -> throwM $ UnsupportedSetupCombo os arch
 
-downloadOrUseLocal
-    :: (HasTerm env, HasBuildConfig env)
-    => Text -> DownloadInfo -> Path Abs File -> RIO env (Path Abs File)
+downloadOrUseLocal ::
+       (HasTerm env, HasBuildConfig env)
+    => Text
+    -> DownloadInfo
+    -> Path Abs File
+    -> RIO env (Path Abs File)
 downloadOrUseLocal downloadLabel downloadInfo destination =
   case url of
     (parseUrlThrow -> Just _) -> do
@@ -1597,9 +1600,12 @@ downloadOrUseLocal downloadLabel downloadInfo destination =
       when (isJust sha256) $
         logWarn "`sha256` is not checked and should not be specified when `url` is a file path"
 
-downloadFromInfo
-    :: (HasTerm env, HasBuildConfig env)
-    => Path Abs Dir -> DownloadInfo -> Tool -> RIO env (Path Abs File, ArchiveType)
+downloadFromInfo ::
+       (HasTerm env, HasBuildConfig env)
+    => Path Abs Dir
+    -> DownloadInfo
+    -> Tool
+    -> RIO env (Path Abs File, ArchiveType)
 downloadFromInfo programsDir downloadInfo tool = do
     archiveType <-
         case extension of
@@ -1953,8 +1959,8 @@ removeHaskellEnvVars =
     Map.delete "GHCRTS"
 
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
-getUtf8EnvVars
-    :: (HasProcessContext env, HasPlatform env, HasLogFunc env)
+getUtf8EnvVars ::
+       (HasProcessContext env, HasPlatform env, HasLogFunc env)
     => ActualCompiler
     -> RIO env (Map Text Text)
 getUtf8EnvVars compilerVer =
@@ -2031,8 +2037,7 @@ getUtf8EnvVars compilerVer =
                         pure (Map.union changes adds)
     -- Determines whether an environment variable is locale-related and, if so, whether it needs to
     -- be adjusted.
-    checkVar
-        :: (Text, Text) -> ([Text], Set Text)
+    checkVar :: (Text, Text) -> ([Text], Set Text)
     checkVar (k,v) =
         if k `elem` ["LANG", "LANGUAGE"] || "LC_" `T.isPrefixOf` k
             then if isUtf8Locale v
@@ -2042,8 +2047,12 @@ getUtf8EnvVars compilerVer =
     -- Adjusted value of an existing locale variable.  Looks for valid UTF-8 encodings with
     -- same language /and/ territory, then with same language, and finally the first UTF-8 locale
     -- returned by @locale -a@.
-    adjustedVarValue
-        :: ProcessContext -> [Text] -> Maybe Text -> Text -> Map Text Text
+    adjustedVarValue ::
+           ProcessContext
+        -> [Text]
+        -> Maybe Text
+        -> Text
+        -> Map Text Text
     adjustedVarValue menv utf8Locales mfallback k =
         case Map.lookup k (view envVarsL menv) of
             Nothing -> Map.empty
@@ -2060,8 +2069,7 @@ getUtf8EnvVars compilerVer =
     -- Determine the fallback locale, by looking for any UTF-8 locale prefixed with the list in
     -- @fallbackPrefixes@, and if not found, picking the first UTF-8 encoding returned by @locale
     -- -a@.
-    getFallbackLocale
-        :: [Text] -> Maybe Text
+    getFallbackLocale :: [Text] -> Maybe Text
     getFallbackLocale utf8Locales =
         case concatMap (matchingLocales utf8Locales) fallbackPrefixes of
             (v:_) -> Just v
@@ -2070,8 +2078,7 @@ getUtf8EnvVars compilerVer =
                     [] -> Nothing
                     (v:_) -> Just v
     -- Filter the list of locales for any with the given prefixes (case-insensitive).
-    matchingLocales
-        :: [Text] -> Text -> [Text]
+    matchingLocales :: [Text] -> Text -> [Text]
     matchingLocales utf8Locales prefix =
         filter (\v -> T.toLower prefix `T.isPrefixOf` T.toLower v) utf8Locales
     -- Does the locale have one of the encodings in @utf8Suffixes@ (case-insensitive)?
@@ -2097,8 +2104,8 @@ data HaskellStackOrg = HaskellStackOrg
   }
   deriving Show
 
-downloadStackReleaseInfo
-  :: (HasPlatform env, HasLogFunc env)
+downloadStackReleaseInfo ::
+     (HasPlatform env, HasLogFunc env)
   => Maybe String -- GitHub org
   -> Maybe String -- GitHub repo
   -> Maybe String -- ^ optional version
@@ -2163,8 +2170,8 @@ downloadStackReleaseInfo Nothing Nothing Nothing = do
 downloadStackReleaseInfo morg mrepo mver = downloadStackReleaseInfoGitHub morg mrepo mver
 
 -- | Same as above, but always uses GitHub
-downloadStackReleaseInfoGitHub
-  :: (MonadIO m, MonadThrow m)
+downloadStackReleaseInfoGitHub ::
+     (MonadIO m, MonadThrow m)
   => Maybe String -- GitHub org
   -> Maybe String -- GitHub repo
   -> Maybe String -- ^ optional version
@@ -2212,8 +2219,8 @@ preferredPlatforms = do
           | otherwise = ["-static", ""]
     pure $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
 
-downloadStackExe
-    :: HasConfig env
+downloadStackExe ::
+       HasConfig env
     => [(Bool, String)] -- ^ acceptable platforms
     -> StackReleaseInfo
     -> Path Abs Dir -- ^ destination directory
@@ -2326,8 +2333,8 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 -- | Ensure that the Stack executable download is in the same location
 -- as the currently running executable. See:
 -- https://github.com/commercialhaskell/stack/issues/3232
-performPathChecking
-    :: HasConfig env
+performPathChecking ::
+       HasConfig env
     => Path Abs File -- ^ location of the newly downloaded file
     -> String -- ^ currently running executable
     -> RIO env ()

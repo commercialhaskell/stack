@@ -97,8 +97,8 @@ configPackageProjectRoot dir =
         (distDirFromDir dir)
 
 -- | Directory for HPC work.
-hpcDirFromDir
-    :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
+hpcDirFromDir ::
+       (MonadThrow m, MonadReader env m, HasEnvConfig env)
     => Path Abs Dir  -- ^ Package directory.
     -> m (Path Abs Dir)
 hpcDirFromDir fp =
@@ -127,8 +127,8 @@ distDirFromDir fp =
 
 -- | The directory containing all dist directories, including all
 -- different GHC/Cabal combos.
-rootDistDirFromDir
-  :: (MonadReader env m, HasConfig env)
+rootDistDirFromDir ::
+     (MonadReader env m, HasConfig env)
   => Path Abs Dir
   -> m (Path Abs Dir)
 rootDistDirFromDir fp =
@@ -136,8 +136,8 @@ rootDistDirFromDir fp =
 
 -- | Relative directory to the top dist directory, containing
 -- individual GHC/Cabal combo as subdirs.
-rootDistRelativeDir
-  :: (MonadReader env m, HasConfig env)
+rootDistRelativeDir ::
+     (MonadReader env m, HasConfig env)
   => m (Path Rel Dir)
 rootDistRelativeDir = do
     workDir <- view workDirL

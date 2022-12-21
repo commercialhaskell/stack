@@ -51,8 +51,8 @@ listTargets stream = do
   outputFunc stream $ T.unpack $ T.intercalate "\n" $
     map renderPkgComponent pairs
   where
-    toNameAndComponent
-      :: PackageName
+    toNameAndComponent ::
+         PackageName
       -> ProjectPackage
       -> RIO env [(PackageName, NamedComponent)]
     toNameAndComponent pkgName' =

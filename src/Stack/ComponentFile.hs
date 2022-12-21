@@ -55,8 +55,8 @@ import qualified System.Directory as D ( doesFileExist )
 import qualified System.FilePath as FilePath
 
 -- | Get all files referenced by the benchmark.
-benchmarkFiles
-  :: NamedComponent
+benchmarkFiles ::
+     NamedComponent
   -> Benchmark
   -> RIO
        GetPackageFileContext
@@ -73,8 +73,8 @@ benchmarkFiles component bench = do
   build = benchmarkBuildInfo bench
 
 -- | Get all files referenced by the test.
-testFiles
-  :: NamedComponent
+testFiles ::
+     NamedComponent
   -> TestSuite
   -> RIO
        GetPackageFileContext
@@ -92,8 +92,8 @@ testFiles component test = do
   build = testBuildInfo test
 
 -- | Get all files referenced by the executable.
-executableFiles
-  :: NamedComponent
+executableFiles ::
+     NamedComponent
   -> Executable
   -> RIO
        GetPackageFileContext
@@ -107,8 +107,8 @@ executableFiles component exe = do
     [DotCabalMain (modulePath exe)]
 
 -- | Get all files referenced by the library.
-libraryFiles
-  :: NamedComponent
+libraryFiles ::
+     NamedComponent
   -> Library
   -> RIO
        GetPackageFileContext
@@ -122,8 +122,8 @@ libraryFiles component lib = do
   bnames = map DotCabalModule (otherModules build)
 
 -- | Get all files referenced by the component.
-resolveComponentFiles
-  :: NamedComponent
+resolveComponentFiles ::
+     NamedComponent
   -> BuildInfo
   -> [DotCabalDescriptor]
   -> RIO
@@ -152,8 +152,8 @@ resolveComponentFiles component build names = do
 -- looking for unique instances of base names applied with the given
 -- extensions, plus find any of their module and TemplateHaskell
 -- dependencies.
-resolveFilesAndDeps
-  :: NamedComponent       -- ^ Package component name
+resolveFilesAndDeps ::
+     NamedComponent       -- ^ Package component name
   -> [Path Abs Dir]       -- ^ Directories to look in.
   -> [DotCabalDescriptor] -- ^ Base names.
   -> RIO
@@ -216,15 +216,15 @@ resolveFilesAndDeps component dirs names0 = do
       -}
   -- TODO: In usages of toResolvedModule / toMissingModule, some sort
   -- of map + partition would probably be better.
-  toResolvedModule
-    :: (DotCabalDescriptor, Maybe DotCabalPath)
+  toResolvedModule ::
+       (DotCabalDescriptor, Maybe DotCabalPath)
     -> Maybe (ModuleName, Path Abs File)
   toResolvedModule (DotCabalModule mn, Just (DotCabalModulePath fp)) =
     Just (mn, fp)
   toResolvedModule _ =
     Nothing
-  toMissingModule
-    :: (DotCabalDescriptor, Maybe DotCabalPath)
+  toMissingModule ::
+       (DotCabalDescriptor, Maybe DotCabalPath)
     -> Maybe ModuleName
   toMissingModule (DotCabalModule mn, Nothing) =
     Just mn
@@ -232,8 +232,8 @@ resolveFilesAndDeps component dirs names0 = do
     Nothing
 
 -- | Get the dependencies of a Haskell module file.
-getDependencies
-  :: NamedComponent
+getDependencies ::
+     NamedComponent
   -> [Path Abs Dir]
   -> DotCabalPath
   -> RIO GetPackageFileContext (Set ModuleName, [Path Abs File])
@@ -261,8 +261,9 @@ getDependencies component dirs dotCabalPath =
           else pure (S.empty, [])
 
 -- | Parse a .hi file into a set of modules and files.
-parseHI
-  :: FilePath -> RIO GetPackageFileContext (Set ModuleName, [Path Abs File])
+parseHI ::
+     FilePath
+  -> RIO GetPackageFileContext (Set ModuleName, [Path Abs File])
 parseHI hiPath = do
   dir <- asks (parent . ctxFile)
   result <-
@@ -314,8 +315,8 @@ componentOutputDir namedComponent distDir =
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
 -- extensions.
-resolveFiles
-  :: [Path Abs Dir] -- ^ Directories to look in.
+resolveFiles ::
+     [Path Abs Dir] -- ^ Directories to look in.
   -> [DotCabalDescriptor] -- ^ Base names.
   -> RIO GetPackageFileContext [(DotCabalDescriptor, Maybe DotCabalPath)]
 resolveFiles dirs names =
@@ -323,8 +324,8 @@ resolveFiles dirs names =
 
 -- | Find a candidate for the given module-or-filename from the list
 -- of directories and given extensions.
-findCandidate
-  :: [Path Abs Dir]
+findCandidate ::
+     [Path Abs Dir]
   -> DotCabalDescriptor
   -> RIO GetPackageFileContext (Maybe DotCabalPath)
 findCandidate dirs name = do
@@ -388,8 +389,8 @@ findCandidate dirs name = do
 --
 -- For example: .erb for a Ruby file might exist in one of the
 -- directories.
-logPossibilities
-  :: HasTerm env
+logPossibilities ::
+     HasTerm env
   => [Path Abs Dir]
   -> ModuleName
   -> RIO env ()
@@ -444,8 +445,8 @@ targetJsSources = jsSources
 
 -- | Resolve file as a child of a specified directory, symlinks
 -- don't get followed.
-resolveDirFile
-  :: (MonadIO m, MonadThrow m)
+resolveDirFile ::
+     (MonadIO m, MonadThrow m)
   => Path Abs Dir -> FilePath.FilePath -> m (Maybe (Path Abs File))
 resolveDirFile x y = do
   -- The standard canonicalizePath does not work for this case
@@ -455,8 +456,8 @@ resolveDirFile x y = do
 
 -- | Warn the user that multiple candidates are available for an
 -- entry, but that we picked one anyway and continued.
-warnMultiple
-  :: DotCabalDescriptor
+warnMultiple ::
+     DotCabalDescriptor
   -> Path b t
   -> [Path b t]
   -> RIO GetPackageFileContext ()
@@ -545,8 +546,8 @@ resolveOrWarn subject resolver path = do
   when (isNothing result) $ warnMissingFile subject cwd path file
   pure result
 
-warnMissingFile
-  :: Text
+warnMissingFile ::
+     Text
   -> Path Abs Dir
   -> FilePath
   -> Path Abs File

@@ -72,8 +72,8 @@ getTerminalWidth = do
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
-fixCodePage
-  :: HasLogFunc env
+fixCodePage ::
+     HasLogFunc env
   => Bool -- ^ modify code page?
   -> Version -- ^ GHC version
   -> RIO env a
