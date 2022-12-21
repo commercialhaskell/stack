@@ -362,7 +362,9 @@ generateBuildInfoOpts BioInput {..} =
         | Dependency name _ _ <- targetBuildDepends biBuildInfo -- TODO: cabal 3 introduced multiple public libraries in a single dependency
         , name `notElem` biOmitPackages]
     PerCompilerFlavor ghcOpts _ = options biBuildInfo
-    extOpts = map (("-X" ++) . display) (usedExtensions biBuildInfo)
+    extOpts =
+         map (("-X" ++) . display) (allLanguages biBuildInfo)
+      <> map (("-X" ++) . display) (usedExtensions biBuildInfo)
     srcOpts =
         map (("-i" <>) . toFilePathNoTrailingSep)
             (concat
