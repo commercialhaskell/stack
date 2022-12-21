@@ -113,6 +113,7 @@ import           System.Environment ( getExecutablePath, lookupEnv )
 import           System.IO.Error ( isPermissionError )
 import           System.FilePath ( searchPathSeparator )
 import qualified System.FilePath as FP
+import qualified System.OsRelease as OsRelease
 import           System.Permissions ( setFileExecutable )
 import           System.Uname ( getRelease )
 
@@ -1226,7 +1227,23 @@ getGhcBuilds = do
     config <- view configL
     case configGHCBuild config of
         Just ghcBuild -> pure [ghcBuild]
-        Nothing -> determineGhcBuild
+        Nothing -> do
+          mOsReleaseResult <- liftIO OsRelease.parseOsRelease
+          case mOsReleaseResult of
+            Nothing -> determineGhcBuild
+            Just OsRelease.OsReleaseResult{OsRelease.osRelease=osRelease} -> do
+              let OsRelease.OsRelease{OsRelease.id=osId, OsRelease.id_like=osIdLike} = osRelease
+              -- The heuristic in determineGhcBuild chooses a Fedora build for
+              -- GHC 9.4 on Debian 11 and Ubuntu 20.04, which doesn't work.
+              -- Make sure we use the standard build on Debian-like distributions.
+              -- Up until now, it has always been a Debian build.
+              -- Note that we don't verify the operating system version, so it
+              -- could still be wrong.
+              if elem (fromMaybe osId osIdLike) ["debian", "ubuntu"] then
+                pure [CompilerBuildStandard]
+              else
+                determineGhcBuild
+
   where
     determineGhcBuild = do
         -- TODO: a more reliable, flexible, and data driven approach would be to actually download small

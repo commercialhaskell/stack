@@ -96,6 +96,7 @@ dependencies:
 - network-uri
 - open-browser
 - optparse-applicative >= 0.17.0.0
+- os-release >= 1.0
 - pantry >= 0.8.1
 - path
 - path-io
