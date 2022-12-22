@@ -317,7 +317,7 @@ library
     , pantry >=0.8.1
     , path
     , path-io
-    , persistent >=2.13.3.5 && <2.14
+    , persistent >=2.14.0.0 && <2.15
     , persistent-sqlite
     , persistent-template
     , pretty
@@ -442,7 +442,7 @@ executable stack
     , pantry >=0.8.1
     , path
     , path-io
-    , persistent >=2.13.3.5 && <2.14
+    , persistent >=2.14.0.0 && <2.15
     , persistent-sqlite
     , persistent-template
     , pretty
@@ -568,7 +568,7 @@ executable stack-integration-test
     , pantry >=0.8.1
     , path
     , path-io
-    , persistent >=2.13.3.5 && <2.14
+    , persistent >=2.14.0.0 && <2.15
     , persistent-sqlite
     , persistent-template
     , pretty
@@ -699,7 +699,7 @@ test-suite stack-test
     , pantry >=0.8.1
     , path
     , path-io
-    , persistent >=2.13.3.5 && <2.14
+    , persistent >=2.14.0.0 && <2.15
     , persistent-sqlite
     , persistent-template
     , pretty

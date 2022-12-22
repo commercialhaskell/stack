@@ -10,6 +10,10 @@ Major changes:
 
 Behavior changes:
 
+* `stack ghci` and `stack repl` now take into account the values of
+  `default-language` keys in Cabal files, like they take into account the values
+  of `default-extensions` keys.
+
 Other enhancements:
 
 Bug fixes:
