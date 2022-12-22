@@ -9,6 +9,7 @@ extra-deps:
 - pantry-0.8.1@sha256:196111414d2489499fda6213deebcb865bc12285023d5af9bd273bf27cdb185d,4099
 - rio-prettyprint-0.1.4.0@sha256:1f8eb3ead0ef33d3736d53e1de5e9b2c91a0c207cdca23321bd74c401e85f23a,1301
 - fsnotify-0.4.1.0@sha256:44540beabea36aeeef930aa4d5f28091d431904bc9923b6ac4d358831c651235,2854
+- os-release-1.0.2.1@sha256:2c3e8f7a9a0e17d5042d14d2036d52b42c8d5606e8d004697af462a95c87a9e2,2718
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

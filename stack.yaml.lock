@@ -32,6 +32,13 @@ packages:
       size: 1280
   original:
     hackage: fsnotify-0.4.1.0@sha256:44540beabea36aeeef930aa4d5f28091d431904bc9923b6ac4d358831c651235,2854
+- completed:
+    hackage: os-release-1.0.2.1@sha256:2c3e8f7a9a0e17d5042d14d2036d52b42c8d5606e8d004697af462a95c87a9e2,2718
+    pantry-tree:
+      sha256: 9e1dd3b613f16648430ab5b2b0ba420edba3de9025cbbd8e678477520242c434
+      size: 2261
+  original:
+    hackage: os-release-1.0.2.1@sha256:2c3e8f7a9a0e17d5042d14d2036d52b42c8d5606e8d004697af462a95c87a9e2,2718
 snapshots:
 - completed:
     sha256: a2cbcd2f37010a64c4ef74c21fd7e55982a07b49840d2bed306f9bac9981a9c3
