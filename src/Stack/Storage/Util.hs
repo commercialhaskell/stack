@@ -14,6 +14,10 @@ module Stack.Storage.Util
 
 import qualified Data.Set as Set
 import           Database.Persist
+                   ( BaseBackend, EntityField, PersistEntity
+                   , PersistEntityBackend, PersistField, PersistQueryWrite
+                   , SafeToInsert, (<-.), (==.), deleteWhere, insertMany_
+                   )
 import           Stack.Prelude
 import           Stack.Types.Storage ( StoragePrettyException (..) )
 
@@ -26,6 +30,7 @@ updateSet ::
        , PersistEntity record
        , MonadIO m
        , PersistQueryWrite backend
+       , SafeToInsert record
        )
     => (parentid -> value -> record)
     -> EntityField record parentid
@@ -51,6 +56,7 @@ updateList ::
        , PersistEntity record
        , MonadIO m
        , PersistQueryWrite backend
+       , SafeToInsert record
        )
     => (parentid -> Int -> value -> record)
     -> EntityField record parentid

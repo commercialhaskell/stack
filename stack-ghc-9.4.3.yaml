@@ -7,12 +7,6 @@ resolver: nightly-2022-12-22
 packages:
 - .
 
-extra-deps:
-# Stack will not build (at least, on Windows) with persistent > 2.13
-- persistent-2.13.3.5@sha256:adbcf7ac015722c1ada5e0899a5f012f459467302d148d903350fdab15bfd14f,7271
-
-allow-newer: true
-
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
 - cabal-install
