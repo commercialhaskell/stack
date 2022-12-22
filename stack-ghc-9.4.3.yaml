@@ -2,15 +2,14 @@
 # built with GHC 9.4.3.
 
 # GHC 9.4.3
-resolver: nightly-2022-11-21
+resolver: nightly-2022-12-22
 
 packages:
 - .
 
 extra-deps:
-- pantry-0.8.0@sha256:351a9103c0b1dd78f6b8f243ca4fc6a6952d5ba00f72032b831e5ee0e61dce0f,4099
-- persistent-2.13.3.5@sha256:7c0b876cee0cb1a37e2ee70db7a59280b20201130dc1568f95f2ed468d1200f5,7056
-- hackage-security-0.6.2.1@sha256:1d4b292bd90970f7ef52c72f2ae365f88bd2c6a75627dc34a31d24bc8f53f2e4,12645
+# Stack will not build (at least, on Windows) with persistent > 2.13
+- persistent-2.13.3.5@sha256:adbcf7ac015722c1ada5e0899a5f012f459467302d148d903350fdab15bfd14f,7271
 
 allow-newer: true
 
