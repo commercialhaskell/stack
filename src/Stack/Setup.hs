@@ -35,6 +35,7 @@ import           Crypto.Hash ( SHA1 (..), SHA256 (..) )
 import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as LBS
+import           Data.Char ( toLower )
 import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Lazy ( lazyConsume )
 import qualified Data.Conduit.List as CL
@@ -1239,7 +1240,13 @@ getGhcBuilds = do
               -- Up until now, it has always been a Debian build.
               -- Note that we don't verify the operating system version, so it
               -- could still be wrong.
-              if elem (fromMaybe osId osIdLike) ["debian", "ubuntu"] then
+              let
+                idWords :: [String]
+                idWords =
+                  case osIdLike of
+                    Just idLike -> words $ fmap toLower idLike
+                    Nothing -> [fmap toLower osId]
+              if "debian" `elem` idWords || "ubuntu" `elem` idWords then
                 pure [CompilerBuildStandard]
               else
                 determineGhcBuild
