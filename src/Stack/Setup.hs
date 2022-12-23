@@ -33,8 +33,10 @@ import           Conduit
 import           Control.Applicative ( empty )
 import           Crypto.Hash ( SHA1 (..), SHA256 (..) )
 import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.Attoparsec.Text as P
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as LBS
+import           Data.Char ( isDigit )
 import qualified Data.Conduit.Binary as CB
 import           Data.Conduit.Lazy ( lazyConsume )
 import qualified Data.Conduit.List as CL
@@ -81,9 +83,10 @@ import           RIO.Process
                    ( EnvVars, HasProcessContext (..), ProcessContext
                    , augmentPath, augmentPathMap, doesExecutableExist, envVarsL
                    , exeSearchPathL, getStdout, mkProcessContext, modifyEnvVars
-                   , proc, readProcess_, readProcessStdout, runProcess
-                   , runProcess_, setStdout, waitExitCode, withModifyEnvVars
-                   , withProcessWait, withWorkingDir, workingDirL
+                   , proc, readProcess_, readProcessStdout, readProcessStdout_
+                   , runProcess, runProcess_, setStdout, waitExitCode
+                   , withModifyEnvVars, withProcessWait, withWorkingDir
+                   , workingDirL
                    )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( hashSourceMapData, loadSourceMap )
@@ -1286,13 +1289,52 @@ getGhcBuilds = do
                       where
                         libT = T.pack (toFilePath lib)
                         libD = fromString (toFilePath lib)
+                    getLibc6Version = do
+                        elddOut <-
+                            proc "ldd" ["--version"] $ tryAny . readProcessStdout_
+                        pure $ case elddOut of
+                            Right lddOut ->
+                                let lddOut' =
+                                        decodeUtf8Lenient (LBS.toStrict lddOut)
+                                in  case P.parse lddVersion lddOut' of
+                                        P.Done _ result -> Just result
+                                        _ -> Nothing
+                            Left _ -> Nothing
+                    -- Assumes the first line of ldd has the format:
+                    --
+                    -- ldd (...) nn.nn
+                    --
+                    -- where nn.nn corresponds to the version of libc6.
+                    lddVersion :: P.Parser Version
+                    lddVersion = do
+                        P.skipWhile (/= ')')
+                        P.skip (== ')')
+                        P.skipSpace
+                        lddMajorVersion <- P.decimal
+                        P.skip (== '.')
+                        lddMinorVersion <- P.decimal
+                        P.skip (not . isDigit)
+                        pure $ mkVersion [ lddMajorVersion, lddMinorVersion ]
+                mLibc6Version <- getLibc6Version
+                case mLibc6Version of
+                    Just libc6Version -> logDebug $
+                           "Found shared library libc6 in version: "
+                        <> fromString (versionString libc6Version)
+                    Nothing -> logDebug
+                        "Did not find a version of shared library libc6."
+                let hasLibc6_2_32 =
+                      maybe False (>= mkVersion [2 , 32]) mLibc6Version
                 hastinfo5 <- checkLib relFileLibtinfoSo5
                 hastinfo6 <- checkLib relFileLibtinfoSo6
                 hasncurses6 <- checkLib relFileLibncurseswSo6
                 hasgmp5 <- checkLib relFileLibgmpSo10
                 hasgmp4 <- checkLib relFileLibgmpSo3
                 let libComponents = concat
-                        [ [["tinfo6"] | hastinfo6 && hasgmp5]
+                        [ if hastinfo6 && hasgmp5
+                              then if hasLibc6_2_32
+                                       then [["tinfo6"]]
+                                       else [["tinfo6-libc6-pre2.32"]]
+                              else [[]]
                         , [[] | hastinfo5 && hasgmp5]
                         , [["ncurses6"] | hasncurses6 && hasgmp5 ]
                         , [["gmp4"] | hasgmp4 ]
