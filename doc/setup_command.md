@@ -62,8 +62,9 @@ command are inconsistent and take no action.
     * `ncurses6` to indicate `libgmp.so.10` and `libncursesw.so.6` are present
     * `gmp4` to indicate `libgmp.so.3` is present
 
-    GHC also depends on `libc6`, the GNU C Library (glibc). The GNU C Library is
-    designed to be backwards compatible.
+    GHC also depends on `libc6`, the
+    [GNU C Library](https://www.gnu.org/software/libc/) (glibc). The GNU C
+    Library is designed to be backwards compatible.
 
     By default, versions of Stack up to 2.9.3 associate the `tinfo6` build with
     the 'Fedora 33' binary distribution of GHC 9.4.1 to 9.4.3. Those binary
