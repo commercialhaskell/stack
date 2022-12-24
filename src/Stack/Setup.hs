@@ -1333,7 +1333,7 @@ getGhcBuilds = do
                         [ if hastinfo6 && hasgmp5
                               then if hasLibc6_2_32
                                        then [["tinfo6"]]
-                                       else [["tinfo6-libc6-pre2.32"]]
+                                       else [["tinfo6-libc6-pre232"]]
                               else [[]]
                         , [[] | hastinfo5 && hasgmp5]
                         , [["ncurses6"] | hasncurses6 && hasgmp5 ]

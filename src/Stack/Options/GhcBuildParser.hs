@@ -21,7 +21,7 @@ ghcBuildParser hide = option readGHCBuild
        , "gmp4"
        , "nopie"
        , "tinfo6"
-       , "tinfo6-libc6-pre2.32"
+       , "tinfo6-libc6-pre232"
        , "tinfo6-nopie"
        , "ncurses6"
        , "int-native"
