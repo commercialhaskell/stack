@@ -43,7 +43,11 @@ command are inconsistent and take no action.
     required on Linux, Stack will refer to the presence or absence of certain
     libraries or the versions of those libraries.
 
-    For example, Stack 2.9.3 considers:
+    For example, Stack UNRELEASED considers:
+
+    *   the version of `libc6`, the
+        [GNU C Library](https://www.gnu.org/software/libc/) (glibc), that is
+        present. The GNU C Library is designed to be backwards compatible.
 
     *   if `libgmp.so.3` or `libgmp.so.10` is present. These files are provided
         by different versions of the
@@ -56,47 +60,21 @@ command are inconsistent and take no action.
         provided by different versions of a shared low-level terminfo library
         for terminal handling.
 
-    Stack 2.9.3 uses `ghc-build`:
+    Stack UNRELEASED uses `ghc-build`:
 
-    * `tinfo6` to indicate `libgmp.so.10` and `libtinfo.so.6` are present
+    * `tinfo6` to indicate `libgmp.so.10` and `libtinfo.so.6` are present and
+      `libc6` is compatible with `libc6` 2.32.
+    * `tinfo6-libc6-pre232` to indicate `libgmp.so.10` and `libtinfo.so.6` are
+       present and `libc6` is not compatible with `libc6` 2.32.
     * `ncurses6` to indicate `libgmp.so.10` and `libncursesw.so.6` are present
     * `gmp4` to indicate `libgmp.so.3` is present
 
-    GHC also depends on `libc6`, the
-    [GNU C Library](https://www.gnu.org/software/libc/) (glibc). The GNU C
-    Library is designed to be backwards compatible.
+    By default, Stack associates:
 
-    By default, versions of Stack up to 2.9.3 associate the `tinfo6` build with
-    the 'Fedora 33' binary distribution of GHC 9.4.1 to 9.4.3. Those binary
-    distributions require versions of `libc6` that are compatible with
-    `libc6` 2.32.
+    * the `tinfo6` build with the 'Fedora 33' binary distribution of GHC 9.4.1
+      to 9.4.3. Those binary distributions require versions of `libc6` that are
+      compatible with `libc6` 2.32; and
 
-    For Linux distributions/versions that provide versions of `libc6` that are
-    not compatible with `libc6` 2.32 but are compatible with `libc6` 2.28, the
-    'Debian 10' binary distributions of GHC 9.4.1 to 9.4.3 may be a viable
-    alternative. They can be specified using a `setup-info` key in a Stack
-    YAML configuration file (global or project-level), as follows:
-
-    ~~~yaml
-    setup-info:
-      ghc:
-        linux64-tinfo6:
-          9.4.1:
-            url: "https://downloads.haskell.org/~ghc/9.4.1/ghc-9.4.1-x86_64-deb10-linux.tar.xz"
-            content-length: 186574068
-            sha1: 7e885cae97fbf893d8d3e41e19131a6c73264941
-            sha256: dcbff828b14a59d01d3fda68bb01b9cbc3a321a0c013905f436df5627128aa58
-          9.4.2:
-            url: "https://downloads.haskell.org/~ghc/9.4.2/ghc-9.4.2-x86_64-deb10-linux.tar.xz"
-            content-length: 184995132
-            sha1: 004f5aec6ab60ca95ddd78fa2b99d6d7657e6a06
-            sha256: 5bf34ef70a2b824d45e525f09690c76707b7f01698962e425e8fd78b94ea9174
-          9.4.3:
-            url: "https://downloads.haskell.org/~ghc/9.4.3/ghc-9.4.3-x86_64-deb10-linux.tar.xz"
-            content-length: 184837364
-            sha1: 28a94f2da6077d725a7d72f48bc909cf9f2444e3
-            sha256: 940ac2b1770dc63b5f3f38f829bfe69f4a572d6b26cd93094cdd99d5300b5067
-    ~~~
-
-    Examples of such Linux distributions/versions are Debian 10 itself,
-    Debian 11 (`libc6` 2.31), and Ubuntu 20.04 (`libc6` 2.31).
+    * the `tinfo6-libc6-pre232` build with the 'Debian 10' binary distribution
+      of GHC 9.4.1 to 9.4.3. Those binary distributions require versions of
+      `libc6` that are compatible with `libc6` 2.28.

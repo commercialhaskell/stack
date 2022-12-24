@@ -749,8 +749,8 @@ See [`setup-info`](#setup-info).
 
 `ghc-build` specifies a specialized architecture for the GHC executable.
 Normally this is determined automatically, but it can be overridden. Possible
-arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-nopie`,
-`ncurses6`, `int-native` and `integersimple`.
+arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-libc6-pre232`,
+`tinfo6-nopie`, `ncurses6`, `int-native` and `integersimple`.
 
 ### ghc-options
 
@@ -1211,7 +1211,7 @@ setup-info:
 
 'Platforms' are pairs of an operating system and a machine architecture (for
 example, 32-bit i386 or 64-bit x86-64) (represented by the
-`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.9.1)
+`Cabal.Distribution.Systems.Platform` type). Stack currently (version UNRELEASED)
 supports the following pairs in the format of the `setup-info` key:
 
 |Operating system|I386 arch|X86_64 arch|Other machine architectures                                 |
