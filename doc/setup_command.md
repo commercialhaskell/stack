@@ -13,7 +13,7 @@ By default:
 
 * the version of GHC is the one required by the project. Specify the version of
   GHC as an argument to attempt to install a different version of GHC. For
-  example `stack setup 9.4.3` will attempt to install GHC 9.4.3; and
+  example `stack setup 9.4.4` will attempt to install GHC 9.4.4; and
 
 * an attempt to install is made only if the version of GHC is not already
   available to Stack. Pass the flag `--reinstall` (disabled by default) to
@@ -67,13 +67,13 @@ command are inconsistent and take no action.
     Library is designed to be backwards compatible.
 
     By default, versions of Stack up to 2.9.3 associate the `tinfo6` build with
-    the 'Fedora 33' binary distribution of GHC 9.4.1 to 9.4.3. Those binary
+    the 'Fedora 33' binary distribution of GHC 9.4.1 to 9.4.4. Those binary
     distributions require versions of `libc6` that are compatible with
     `libc6` 2.32.
 
     For Linux distributions/versions that provide versions of `libc6` that are
     not compatible with `libc6` 2.32 but are compatible with `libc6` 2.28, the
-    'Debian 10' binary distributions of GHC 9.4.1 to 9.4.3 may be a viable
+    'Debian 10' binary distributions of GHC 9.4.1 to 9.4.4 may be a viable
     alternative. They can be specified using a `setup-info` key in a Stack
     YAML configuration file (global or project-level), as follows:
 
@@ -96,6 +96,11 @@ command are inconsistent and take no action.
             content-length: 184837364
             sha1: 28a94f2da6077d725a7d72f48bc909cf9f2444e3
             sha256: 940ac2b1770dc63b5f3f38f829bfe69f4a572d6b26cd93094cdd99d5300b5067
+          9.4.4:
+            url: "https://downloads.haskell.org/~ghc/9.4.4/ghc-9.4.4-x86_64-deb10-linux.tar.xz"
+            content-length: 187207372
+            sha1: e8b22f0c2b523e368a7df557e8ee915c42790cb9
+            sha256: a3ecd2426bb519d6fdad05904c386f1c74b433f07722b0d1ef606c23159ade2d
     ~~~
 
     Examples of such Linux distributions/versions are Debian 10 itself,
