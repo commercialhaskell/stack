@@ -13,7 +13,7 @@ By default:
 
 * the version of GHC is the one required by the project. Specify the version of
   GHC as an argument to attempt to install a different version of GHC. For
-  example `stack setup 9.4.3` will attempt to install GHC 9.4.3; and
+  example `stack setup 9.4.4` will attempt to install GHC 9.4.4; and
 
 * an attempt to install is made only if the version of GHC is not already
   available to Stack. Pass the flag `--reinstall` (disabled by default) to
@@ -72,9 +72,9 @@ command are inconsistent and take no action.
     By default, Stack associates:
 
     * the `tinfo6` build with the 'Fedora 33' binary distribution of GHC 9.4.1
-      to 9.4.3. Those binary distributions require versions of `libc6` that are
+      to 9.4.4. Those binary distributions require versions of `libc6` that are
       compatible with `libc6` 2.32; and
 
     * the `tinfo6-libc6-pre232` build with the 'Debian 10' binary distribution
-      of GHC 9.4.1 to 9.4.3. Those binary distributions require versions of
+      of GHC 9.4.1 to 9.4.4. Those binary distributions require versions of
       `libc6` that are compatible with `libc6` 2.28.
