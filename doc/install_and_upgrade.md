@@ -240,43 +240,120 @@ GitHub repository.
 
 === "macOS"
 
-    The easiest way to install Stack is to command:
+    From late 2020, Apple began a transition from Mac computers with Intel
+    processors (Intel-based Mac) to
+    [Mac computers with Apple silicon](https://support.apple.com/en-gb/HT211814).
 
-    ~~~text
-    curl -sSL https://get.haskellstack.org/ | sh
-    ~~~
+    === "Intel-based"
 
-    or:
+        Intel-based Mac computers have processors with x86_64 architectures. For
+        most Intel-based Mac computers, the easiest way to install Stack is
+        to command:
 
-    ~~~text
-    wget -qO- https://get.haskellstack.org/ | sh
-    ~~~
+        ~~~text
+        curl -sSL https://get.haskellstack.org/ | sh
+        ~~~
 
-    !!! note
+        or:
 
-        The script at [get.haskellstack.org](https://get.haskellstack.org/) will
-        ask for root access using `sudo`. It needs such access in order to use
-        your platform's package manager to install dependencies and to install
-        to `/usr/local/bin`. If you prefer more control, follow the manual
-        installation instructions below.
+        ~~~text
+        wget -qO- https://get.haskellstack.org/ | sh
+        ~~~
 
-    !!! info
+        !!! note
 
-        We generally test on the current version of macOS and do our best to
-        keep it compatible with the three most recent major versions. Stack may
-        also work on older versions.
+            The script at [get.haskellstack.org](https://get.haskellstack.org/)
+            will ask for root access using `sudo`. It needs such access in order
+            to use your platform's package manager to install dependencies and
+            to install to `/usr/local/bin`. If you prefer more control, follow
+            the manual installation instructions below.
 
-    ### Manual download
+        !!! info
 
-    * Click
-      [:material-cloud-download-outline:](https://get.haskellstack.org/stable/osx-x86_64.tar.gz)
-      to download an archive file with the latest release for x86_64
-      architectures.
+            We generally test on the current version of macOS and do our best to
+            keep it compatible with the three most recent major versions. Stack
+            may also work on older versions.
 
-    * Extract the archive and place `stack` somewhere on your PATH (see the
-      [Path](#path) section below).
+        ### Manual download
 
-    * Now you can run Stack from the command line in a terminal.
+        * Click
+          [:material-cloud-download-outline:](https://get.haskellstack.org/stable/osx-x86_64.tar.gz)
+          to download an archive file with the latest release for x86_64
+          architectures.
+
+        * Extract the archive and place `stack` somewhere on your PATH (see the
+          [Path](#path) section below).
+
+        * Now you can run Stack from the command line in a terminal.
+
+    === "Apple silicon"
+
+        Mac computers with Apple silicon have an M1, M1 Pro, M1 Max, M1 Ultra or
+        M2 chip. These chips use an architecture known as ARM64 or AArch64.
+
+        The Stack repository uses GitHub-hosted runners to create binary
+        distributions for macOS. GitHub-hosted runners are not expected to be
+        available for macOS on Apple silicon until July to September 2023.
+
+        Consequently, for Mac computers with Apple silicon, the easiest way to
+        install Stack directly is to obtain the 'unofficial' `osx-aarch64`
+        binary distribution released by the GHCup developers and copy it to a
+        location on the PATH. `*.tar.gz` archive files containing those binary
+        distributions are available at the directories here:
+        [:material-cloud-download-outline:](https://downloads.haskell.org/ghcup/unofficial-bindists/stack/).
+
+        It is still possible to use the commands:
+
+        ~~~text
+        curl -sSL https://get.haskellstack.org/ | sh
+        ~~~
+
+        or:
+
+        ~~~text
+        wget -qO- https://get.haskellstack.org/ | sh
+        ~~~
+
+        However, those commands will download and install the version of Stack
+        for Intel-based Mac computers. Mac computers with Apple silicon will
+        use Apple's
+        [Rosetta 2 application](https://support.apple.com/en-gb/HT211861) to
+        use that version of Stack.
+
+        Apple's Terminal application will not detect automatically that Rosetta
+        has not yet been installed. Rosetta can be manually installed by
+        commanding:
+
+        ~~~text
+        softwareupdate --install-rosetta
+        ~~~
+
+        The installation of Stack or some packages (e.g. `network`) requiring C
+        source compilation might fail with `configure: error: C compiler cannot
+        build executables`. In that case you should pass `-arch arm64` as part
+        of the `CFLAGS` environment variable. This setting will be picked up by
+        the C compiler of your choice.
+
+        ~~~bash
+        # Assuming BASH below
+
+        # passing CFLAGS in-line with the command giving rise to the error
+        CFLAGS="-arch arm64 ${CFLAGS:-}" some_command_to_install_stack
+        CFLAGS="-arch arm64 ${CFLAGS:-}" stack [build|install]
+
+        # -- OR --
+
+        # ~/.bash_profile
+        # NOTE: only do this if you do not have to cross-compile, or remember to unset
+        # CFLAGS when needed
+        export CFLAGS="-arch arm64 ${CFLAGS:-}"
+        ~~~
+
+        The setting instructs the C compiler to compile objects for ARM64. These
+        can then be linked with libraries built for ARM64. Without the
+        instruction, the C compiler, invoked by Cabal running in x86-64, would
+        compile x86-64 objects and attempt to link them with existing ARM64
+        libraries, resulting in the error above.
 
     ### Using Homebrew
 
@@ -320,35 +397,8 @@ GitHub repository.
     * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.md#usr-bin-ar-permission-denied)
     * [DYLD_LIBRARY_PATH is ignored](faq.md#dyld-library-path-ignored)
 
-    If you are on macOS 10.12 (Sierra) and encounter GHC panic while building, see
-    this [issue](https://github.com/commercialhaskell/stack/issues/2577)
-
-    On Apple silicon chip (AArch64/ARM64) architectures, the installation of
-    Stack or some packages (e.g. `network`) requiring C source compilation might
-    fail with `configure: error: C compiler cannot build executables`. In that
-    case you should pass `-arch arm64` as part of the `CFLAGS` environment
-    variable. This setting will be picked up by the C compiler of your choice.
-
-    ~~~bash
-    # Assuming BASH below
-
-    # passing CFLAGS in-line with the command giving rise to the error
-    CFLAGS="-arch arm64 ${CFLAGS:-}" some_command_to_install_stack
-    CFLAGS="-arch arm64 ${CFLAGS:-}" stack [build|install]
-
-    # -- OR --
-
-    # ~/.bash_profile
-    # NOTE: only do this if you do not have to cross-compile, or remember to unset
-    # CFLAGS when needed
-    export CFLAGS="-arch arm64 ${CFLAGS:-}"
-    ~~~
-
-    The setting instructs the C compiler to compile objects for ARM64. These can
-    then be linked with libraries built for ARM64. Without the instruction, the C
-    compiler, invoked by Cabal running in x86-64, would compile x86-64 objects and
-    attempt to link them with existing ARM64 libraries, resulting in the error
-    above.
+    If you are on macOS 10.12 (Sierra) and encounter GHC panic while building,
+    see this [issue](https://github.com/commercialhaskell/stack/issues/2577).
 
     It is possible to set up auto-completion of Stack commands. For further
     information, see the [shell auto-completion](shell_autocompletion.md)
