@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2022-11-30.
+`master` branch of the Stack repository. Last updated: 2022-12-25.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -130,7 +130,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-7151] | PackageNotFoundBug PackageName
         ~~~
 
-    -   `Stack.Ghci.Ghci.Exception`
+    -   `Stack.Ghci.GhciException`
 
         ~~~haskell
         [S-6716] = InvalidPackageOption String
@@ -138,9 +138,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3600] | MissingFileTarget String
         [S-9906] | Can'tSpecifyFilesAndTargets
         [S-5188] | Can'tSpecifyFilesAndMainIs
-        [S-6948] | GhciTargetParseException [Text]
         ~~~
 
+    -   `Stack.Ghci.GhciPrettyException`
+
+        ~~~haskell
+        [S-6948] = GhciTargetParseException [StyleDoc]
+        ~~~
 
     -   `Stack.Hoogle.HoogleException`
 
@@ -316,7 +320,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3118] | NoSetupHsFound (Path Abs Dir)
         [S-8664] | InvalidFlagSpecification (Set UnusedFlags)
         [S-4925] | InvalidGhcOptionsSpecification [PackageName]
-        [S-8506] | TargetParseException [Text]
         [S-7086] | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
         [S-7987] | TestSuiteExeMissing Bool String String String
         [S-8027] | CabalCopyFailed Bool String
@@ -338,6 +341,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-7282] | ExecutionFailure [SomeException]
         [S-7011] | CabalExitedUnsuccessfully ExitCode PackageIdentifier (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
         [S-6374] | SetupHsBuildFailure ExitCode (Maybe PackageIdentifier) (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
+        [S-8506] | TargetParseException [StyleDoc]
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`

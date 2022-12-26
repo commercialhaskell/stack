@@ -11,6 +11,7 @@
 module Stack.Types.Build
   ( BuildException (..)
   , BuildPrettyException (..)
+  , pprintTargetParseErrors
   , ConstructPlanException (..)
   , BadDependency (..)
   , ParentMap
@@ -106,7 +107,6 @@ data BuildException
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
   | InvalidGhcOptionsSpecification [PackageName]
-  | TargetParseException [Text]
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   | TestSuiteExeMissing Bool String String String
   | CabalCopyFailed Bool String
@@ -275,15 +275,6 @@ instance Exception BuildException where
             , packageNameString name
             , "' not found"
             ]
-    displayException (TargetParseException [err]) = concat
-        [ "Error: [S-8506]\n"
-        , "Error parsing targets: "
-        , T.unpack err
-        ]
-    displayException (TargetParseException errs) = unlines
-        $ "Error [S-8506]"
-        : "The following errors occurred while parsing the build targets:"
-        : map (("- " ++) . T.unpack) errs
     displayException (SomeTargetsNotBuildable xs) = unlines
         [ "Error: [S-7086]"
         , "The following components have 'buildable: False' set in the Cabal \
@@ -362,6 +353,7 @@ data BuildPrettyException
         [String]         -- ghc arguments
         (Maybe (Path Abs File)) -- logfiles location
         [Text]     -- log contents
+    | TargetParseException [StyleDoc]
     deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
@@ -392,8 +384,30 @@ instance Pretty BuildPrettyException where
     pretty (SetupHsBuildFailure exitCode mtaskProvides execName fullArgs logFiles bss) =
         showBuildError "[S-6374]"
             True exitCode mtaskProvides execName fullArgs logFiles bss
+    pretty (TargetParseException errs) =
+           "[S-8506]"
+        <> pprintTargetParseErrors errs
 
 instance Exception BuildPrettyException
+
+-- | Helper function to pretty print an error message for target parse errors.
+pprintTargetParseErrors :: [StyleDoc] -> StyleDoc
+pprintTargetParseErrors errs =
+       line
+    <> flow "Stack failed to parse the target(s)."
+    <> blankLine
+    <> fillSep
+         [ flow "While parsing, Stack encountered the"
+         , case errs of
+             [err] ->
+                    "error:"
+                 <> blankLine
+                 <> err
+             _ ->
+                    flow "following errors:"
+                 <> blankLine
+                 <> bulletedList errs
+         ]
 
 pprintExceptions ::
        [ConstructPlanException]
