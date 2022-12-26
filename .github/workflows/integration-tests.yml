@@ -11,9 +11,10 @@ on:
     - '**'
   workflow_dispatch:
 
-# As of 11 August 2022, ubuntu-latest, windows-latest and macos-latest come with
-# Stack 2.7.5. windows-latest comes with NSIS 3.08, for which the default value
-# of the 'Unicode' installer attribute is 'true'.
+# As of 26 December 2022, ubuntu-latest, windows-latest and macos-latest come
+# with Stack 2.9.1. ubuntu-latest and macos-latest come with GHC 9.4.3.
+# windows-latest comes with GHC 9.4.2. windows-latest comes with NSIS 3.08, for
+# which the default value of the 'Unicode' installer attribute is 'true'.
 
 jobs:
   integration-tests:

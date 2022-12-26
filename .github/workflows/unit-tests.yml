@@ -9,8 +9,9 @@ on:
     - rc/**
   workflow_dispatch:
 
-# As of 14 November 2022, ubuntu-latest, windows-latest and macos-latest come
-# with Stack 2.9.1 and GHC 9.4.2.
+# As of 26 December 2022, ubuntu-latest, windows-latest and macos-latest come
+# with Stack 2.9.1. ubuntu-latest and macos-latest come with GHC 9.4.3.
+# windows-latest comes with GHC 9.4.2.
 
 jobs:
   pedantic:
