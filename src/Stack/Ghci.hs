@@ -12,6 +12,7 @@ module Stack.Ghci
   ( GhciOpts (..)
   , GhciPkgInfo (..)
   , GhciException (..)
+  , GhciPrettyException (..)
   , ghci
   ) where
 
@@ -62,7 +63,6 @@ data GhciException
     | MissingFileTarget String
     | Can'tSpecifyFilesAndTargets
     | Can'tSpecifyFilesAndMainIs
-    | GhciTargetParseException [Text]
     deriving (Show, Typeable)
 
 instance Exception GhciException where
@@ -85,11 +85,23 @@ instance Exception GhciException where
         "Error: [S-5188]\n"
         ++ "Cannot use 'stack ghci' with both file targets and '--main-is' \
            \flag."
-    displayException (GhciTargetParseException xs) =
-        "Error: [S-6948]\n"
-        ++ show (TargetParseException xs)
-        ++ "\nNote that to specify options to be passed to GHCi, use the \
-           \'--ghci-options' flag."
+
+newtype GhciPrettyException
+    = GhciTargetParseException [StyleDoc]
+    deriving (Show, Typeable)
+
+instance Pretty GhciPrettyException where
+    pretty (GhciTargetParseException errs) =
+           "[S-6948]"
+        <> pprintTargetParseErrors errs
+        <> blankLine
+        <> fillSep
+             [ flow "Note that to specify options to be passed to GHCi, use the"
+             , style Shell "--ghci-options"
+             , "option."
+             ]
+
+instance Exception GhciPrettyException
 
 -- | Command-line options for GHC.
 data GhciOpts = GhciOpts
@@ -235,9 +247,12 @@ preprocessTargets buildOptsCLI sma rawTargets = do
             -- module targets are specified (see issue#3342).
             let boptsCLI = buildOptsCLI { boptsCLITargets = normalTargetsRaw }
             normalTargets <- parseTargets AllowNoTargets False boptsCLI sma
-                `catch` \ex -> case ex of
-                    TargetParseException xs -> throwM (GhciTargetParseException xs)
-                    _ -> throwM ex
+                `catch` \pex@(PrettyException ex) ->
+                    case fromException $ toException ex of
+                        Just (TargetParseException xs) ->
+                            throwM $ PrettyException $
+                                GhciTargetParseException xs
+                        _ -> throwM pex
             unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
             pure (Right $ smtTargets normalTargets)
 
