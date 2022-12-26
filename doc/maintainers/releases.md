@@ -430,7 +430,7 @@ final release.
 
     ~~~text
     git branch -d rc/vX.Y
-    git push origin :rc/vX.Y`
+    git push origin :rc/vX.Y
     ~~~
 
     ### E: Activate the version on Read The Docs
