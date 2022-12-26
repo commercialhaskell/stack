@@ -26,7 +26,7 @@ the steps required to upgrade the MSYS2 version used by Stack.
 
     ~~~text
     ./7z a msys2-YYYYMMDD-x86_64.tar C:\msys64
-    ./7z a msys2-YYYYMMDD-x86_65.tar.xz msys2-YYYYMMDD-x86_64.tar
+    ./7z a msys2-YYYYMMDD-x86_64.tar.xz msys2-YYYYMMDD-x86_64.tar
     rm msys2-YYYYMMDD-x86_64.tar # Tidy up
     ~~~
 
