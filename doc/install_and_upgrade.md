@@ -246,7 +246,7 @@ GitHub repository.
 
     === "Intel-based"
 
-        Intel-based Mac computers have processors with x*6_64 architectures. For
+        Intel-based Mac computers have processors with x86_64 architectures. For
         most Intel-based Mac computers, the easiest way to install Stack is
         to command:
 
@@ -284,7 +284,7 @@ GitHub repository.
         * Extract the archive and place `stack` somewhere on your PATH (see the
           [Path](#path) section below).
 
-    * Now you can run Stack from the command line in a terminal.
+        * Now you can run Stack from the command line in a terminal.
 
     === "Apple silicon"
 
