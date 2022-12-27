@@ -50,10 +50,20 @@ jobs:
           ~\AppData\Roaming\stack
           ~\AppData\Local\Programs\stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
+    - name: Update PATH on Windows
+      if: startsWith(runner.os, 'Windows')
+      run: |
+        # On Windows, `stack upgrade` fails to overwrite the Stack executable at
+        # C:\hostedtoolcache\windows\stack\2.9.1\x64\, so add location of
+        # upgraded Stack executable to the PATH for subsequent steps:
+        Add-Content $env:GITHUB_PATH "C:\Users\runneradmin\AppData\Roaming\local\bin"
     - name: Install deps and run checks
       shell: bash
       run: |
         set -ex
+
+        # Stack 2.9.3 is required to build Stack
+        stack upgrade
 
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
         then
@@ -94,7 +104,8 @@ jobs:
 
     - name: Build bindist
       shell: bash
-      run: stack etc/scripts/release.hs build ${{ matrix.release-args }}
+      run: |
+        stack etc/scripts/release.hs build ${{ matrix.release-args }}
 
     - name: Upload bindist
       uses: actions/upload-artifact@v3

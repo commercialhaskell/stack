@@ -10,6 +10,10 @@ extra-deps:
 - pantry-0.8.1@sha256:196111414d2489499fda6213deebcb865bc12285023d5af9bd273bf27cdb185d,4099
 - persistent-2.14.4.3@sha256:22237669897fed2b71de521bfeba7f8e0677e54992920288ae1fa8206a4711fc,7199
 - rio-prettyprint-0.1.4.0@sha256:1f8eb3ead0ef33d3736d53e1de5e9b2c91a0c207cdca23321bd74c401e85f23a,1301
+# lts-20.0 specifies Cabal-3.6.3.0
+- Cabal-3.8.1.0@sha256:155d64beeecbae2b19e5d67844532494af88bc8795d4db4146a0c29296f59967,12220
+# lts-20.0 specifies Cabal-syntax-3.6.0.0
+- Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
@@ -28,6 +32,10 @@ nix:
 flags:
   stack:
     developer-mode: true
+  hackage-security:
+    Cabal-syntax: true
+  mintty:
+    win32-2-13-1: false
 
 ghc-options:
   "$locals": -fhide-source-paths

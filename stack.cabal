@@ -265,7 +265,7 @@ library
       src/
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -fwarn-identities
   build-depends:
-      Cabal >=3.6.3.0
+      Cabal >=3.8.1.0
     , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
@@ -389,7 +389,7 @@ executable stack
       src/main
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts
   build-depends:
-      Cabal >=3.6.3.0
+      Cabal >=3.8.1.0
     , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
@@ -512,7 +512,7 @@ executable stack-integration-test
       test/integration/lib
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      Cabal >=3.6.3.0
+      Cabal >=3.8.1.0
     , aeson >=2.0.3.0
     , annotated-wl-pprint
     , ansi-terminal
@@ -642,7 +642,7 @@ test-suite stack-test
       src/test
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates -optP-Wno-nonportable-include-path -threaded
   build-depends:
-      Cabal >=3.6.3.0
+      Cabal >=3.8.1.0
     , QuickCheck
     , aeson >=2.0.3.0
     , annotated-wl-pprint
