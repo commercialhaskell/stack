@@ -36,7 +36,7 @@ Windows.
 === "Linux"
 
     For most Linux distributions, the easiest way to install Stack
-    directly is to command:
+    directly (rather than use GHCup) is to command:
 
     ~~~text
     curl -sSL https://get.haskellstack.org/ | sh
@@ -66,7 +66,7 @@ Windows.
     === "Intel-based"
 
         For most Intel-based Mac computers, the easiest way to install Stack
-        directly is to command:
+        directly (rather than use GHCup) is to command:
 
         ~~~text
         curl -sSL https://get.haskellstack.org/ | sh
@@ -93,10 +93,10 @@ Windows.
         M2 chip. These chips use an architecture known as ARM64 or AArch64.
 
         For Mac computers with Apple silicon, the easiest way to install Stack
-        directly is to obtain the 'unofficial' `osx-aarch64` binary distribution
-        released by the GHCup developers and copy it to a location on the PATH.
-        `*.tar.gz` archive files containing those binary distributions are
-        available at the directories here:
+        directly (rather than use GHCup) is to obtain the 'unofficial'
+        `osx-aarch64` binary distribution released by the GHCup developers and
+        copy it to a location on the PATH. `*.tar.gz` archive files containing
+        those binary distributions are available at the directories here:
         [:material-cloud-download-outline:](https://downloads.haskell.org/ghcup/unofficial-bindists/stack/).
 
         It is still possible to use the commands:
@@ -127,8 +127,8 @@ Windows.
 
 === "Windows"
 
-    On 64-bit Windows, the easiest way to install Stack directly is to download
-    and install the
+    On 64-bit Windows, the easiest way to install Stack directly (rather than
+    use GHCup) is to download and install the
     [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
 
     !!! note
@@ -138,8 +138,8 @@ Windows.
 
 === "Other/direct downloads"
 
-    For other operating systems and direct downloads, see the
-    [install and upgrade guide](install_and_upgrade.md).
+    For other operating systems and direct downloads (rather than use GHCup),
+    see the [install and upgrade guide](install_and_upgrade.md).
 
 ## How to upgrade Stack
 

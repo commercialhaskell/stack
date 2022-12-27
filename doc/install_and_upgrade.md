@@ -37,8 +37,8 @@ GitHub repository.
 
 === "Linux"
 
-    For most Linux distributions, the easiest way to install Stack is to
-    command:
+    For most Linux distributions, the easiest way to install Stack directly
+    (rather than use GHCup) is to command:
 
     ~~~text
     curl -sSL https://get.haskellstack.org/ | sh
@@ -247,8 +247,8 @@ GitHub repository.
     === "Intel-based"
 
         Intel-based Mac computers have processors with x86_64 architectures. For
-        most Intel-based Mac computers, the easiest way to install Stack is
-        to command:
+        most Intel-based Mac computers, the easiest way to install Stack
+        directly (rather than use GHCup) is to command:
 
         ~~~text
         curl -sSL https://get.haskellstack.org/ | sh
@@ -296,10 +296,11 @@ GitHub repository.
         available for macOS on Apple silicon until July to September 2023.
 
         Consequently, for Mac computers with Apple silicon, the easiest way to
-        install Stack directly is to obtain the 'unofficial' `osx-aarch64`
-        binary distribution released by the GHCup developers and copy it to a
-        location on the PATH. `*.tar.gz` archive files containing those binary
-        distributions are available at the directories here:
+        install Stack directly (rather than use GHCup) is to obtain the
+        'unofficial' `osx-aarch64` binary distribution released by the GHCup
+        developers and copy it to a location on the PATH. `*.tar.gz` archive
+        files containing those binary distributions are available at the
+        directories here:
         [:material-cloud-download-outline:](https://downloads.haskell.org/ghcup/unofficial-bindists/stack/).
 
         It is still possible to use the commands:
@@ -406,7 +407,8 @@ GitHub repository.
 
 === "Windows"
 
-    On 64-bit Windows, you can download and install the
+    On 64-bit Windows, the easiest way to install Stack directly (rather than
+    use GHCup) is to download and use the
     [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
 
     !!! note "Anti-virus software"
