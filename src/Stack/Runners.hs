@@ -23,17 +23,27 @@ import           RIO.Process ( mkDefaultProcessContext )
 import           RIO.Time ( addUTCTime, getCurrentTime )
 import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Config
+                   ( getInContainer, getInNixShell, loadConfig, withBuildConfig
+                   , withNewLogFunc
+                   )
 import           Stack.Constants
+                   ( defaultTerminalWidth, maxTerminalWidth, minTerminalWidth )
 import           Stack.DefaultColorWhen ( defaultColorWhen )
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
 import           Stack.Prelude
-import           Stack.Setup
-import           Stack.Storage.User ( upgradeChecksSince, logUpgradeCheck )
+import           Stack.Setup ( setupEnv )
+import           Stack.Storage.User ( logUpgradeCheck, upgradeChecksSince )
 import           Stack.Types.Config
+                   ( BuildOptsCLI, ColorWhen (..), Config (..)
+                   , ConfigMonoid (..), EnvConfig, GlobalOpts (..), Runner (..)
+                   , StackYamlLoc (..), defaultBuildOptsCLI, globalOptsL
+                   , reExecL, stackYamlLocL
+                   )
 import           Stack.Types.Docker ( dockerEnable )
 import           Stack.Types.Nix ( nixEnable )
-import           Stack.Types.Version ( stackMinorVersion, minorVersion )
+import           Stack.Types.Version
+                   ( minorVersion, stackMinorVersion, stackVersion )
 import           System.Console.ANSI ( hSupportsANSIWithoutEmulation )
 import           System.Terminal ( getTerminalWidth )
 
@@ -83,12 +93,12 @@ withDefaultEnvConfig = withEnvConfig AllowNoTargets defaultBuildOptsCLI
 -- toolchain. This is intended to be run inside a call to
 -- 'withConfig'.
 withEnvConfig ::
-       NeedTargets
-    -> BuildOptsCLI
-    -> RIO EnvConfig a
-    -- ^ Action that uses the build config.  If Docker is enabled for builds,
-    -- this will be run in a Docker container.
-    -> RIO Config a
+     NeedTargets
+  -> BuildOptsCLI
+  -> RIO EnvConfig a
+  -- ^ Action that uses the build config.  If Docker is enabled for builds,
+  -- this will be run in a Docker container.
+  -> RIO Config a
 withEnvConfig needTargets boptsCLI inner =
   withBuildConfig $ do
     envConfig <- setupEnv needTargets boptsCLI Nothing
@@ -96,32 +106,34 @@ withEnvConfig needTargets boptsCLI inner =
     runRIO envConfig inner
 
 -- | If the settings justify it, should we reexec inside Docker or Nix?
-data ShouldReexec = YesReexec | NoReexec
+data ShouldReexec
+  = YesReexec
+  | NoReexec
 
 -- | Load the configuration. Convenience function used
 -- throughout this module.
 withConfig :: ShouldReexec -> RIO Config a -> RIO Runner a
 withConfig shouldReexec inner =
-    loadConfig $ \config -> do
-      -- If we have been relaunched in a Docker container, perform in-container initialization
-      -- (switch UID, etc.).  We do this after first loading the configuration since it must
-      -- happen ASAP but needs a configuration.
-      view (globalOptsL.to globalDockerEntrypoint) >>=
-        traverse_ (Docker.entrypoint config)
-      runRIO config $ do
-        -- Catching all exceptions here, since we don't want this
-        -- check to ever cause Stack to stop working
-        shouldUpgradeCheck `catchAny` \e ->
-          logError $
-            "Error: [S-7353]\n" <>
-            "Error when running shouldUpgradeCheck: " <>
-            displayShow e
-        case shouldReexec of
-          YesReexec -> reexec inner
-          NoReexec -> inner
+  loadConfig $ \config -> do
+    -- If we have been relaunched in a Docker container, perform in-container
+    -- initialization (switch UID, etc.).  We do this after first loading the
+    -- configuration since it must happen ASAP but needs a configuration.
+    view (globalOptsL.to globalDockerEntrypoint) >>=
+      traverse_ (Docker.entrypoint config)
+    runRIO config $ do
+      -- Catching all exceptions here, since we don't want this
+      -- check to ever cause Stack to stop working
+      shouldUpgradeCheck `catchAny` \e ->
+        logError $
+          "Error: [S-7353]\n" <>
+          "Error when running shouldUpgradeCheck: " <>
+          displayShow e
+      case shouldReexec of
+        YesReexec -> reexec inner
+        NoReexec -> inner
 
--- | Perform a Docker or Nix reexec, if warranted. Otherwise run the
--- inner action.
+-- | Perform a Docker or Nix reexec, if warranted. Otherwise run the inner
+-- action.
 reexec :: RIO Config a -> RIO Config a
 reexec inner = do
   nixEnable' <- asks $ nixEnable . configNix
@@ -174,10 +186,11 @@ withRunnerGlobal go inner = do
     , runnerTermWidth = termWidth
     , runnerProcessContext = menv
     } inner
-  where clipWidth w
-          | w < minTerminalWidth = minTerminalWidth
-          | w > maxTerminalWidth = maxTerminalWidth
-          | otherwise = w
+ where
+  clipWidth w
+    | w < minTerminalWidth = minTerminalWidth
+    | w > maxTerminalWidth = maxTerminalWidth
+    | otherwise = w
 
 -- | Check if we should recommend upgrading Stack and, if so, recommend it.
 shouldUpgradeCheck :: RIO Config ()
