@@ -43,10 +43,10 @@ ghc-options:
 - -fwrite-ide-info
 - -hiedir=.hie
 - -Wall
-- -fwarn-tabs
-- -fwarn-incomplete-uni-patterns
-- -fwarn-incomplete-record-updates
-- -optP-Wno-nonportable-include-path # workaround [Filename case on macOS · Issue #4739 · haskell/cabal](https://github.com/haskell/cabal/issues/4739)
+# Workaround for https://github.com/haskell/cabal/issues/4739.
+# -Wnon-noportable-include-path is a Clang diagnostic flag. See
+# https://clang.llvm.org/docs/DiagnosticsReference.html#wnonportable-include-path
+- -optP-Wno-nonportable-include-path
 dependencies:
 - base >= 4.14.3.0 && < 5
 - Cabal >= 3.8.1.0
@@ -155,7 +155,7 @@ when:
 library:
   source-dirs: src/
   ghc-options:
-  - -fwarn-identities
+  - -Widentities
   generated-exposed-modules:
   - Paths_stack
   exposed-modules:
