@@ -63,11 +63,18 @@ jobs:
       run: |
         set -ex
 
-        # Check the PATH environment variable
-        echo "$PATH"
-
-        # Stack 2.9.3 is required to build Stack
+        # Stack 2.9.3 is required to build Stack. In the bash shell on the
+        # Windows runner, this may report that the Stack executable is not on
+        # the PATH. That appears to be due to some latency somewhere.
         stack upgrade
+
+        # Introduce a short pause, otherwise, in the bash shell on the Windows
+        # runner, the following `which` command does not recognise that
+        # `stack.exe` has been copied to a directory on the PATH.
+        sleep 1
+
+        # Check location(s) of Stack executable(s)
+        which -a stack
 
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
         then
