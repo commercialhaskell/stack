@@ -2,9 +2,9 @@
 
 # Stack's script interpreter
 
-Stack also offers a very useful feature for running files: a script interpreter.
-For too long have Haskellers felt shackled to bash or Python because it's just
-too hard to create reusable source-only Haskell scripts. Stack attempts to solve
+Stack offers a very useful feature for running files: a script interpreter. For
+too long have Haskellers felt shackled to bash or Python because it's just too
+hard to create reusable source-only Haskell scripts. Stack attempts to solve
 that.
 
 You can use `stack <file_name>` to execute a Haskell source file. Usually, the
@@ -19,7 +19,7 @@ An example will be easiest to understand. Consider the Haskell source file
 
 ~~~haskell
 #!/usr/bin/env stack
--- stack script --resolver lts-19.28 --package turtle
+-- stack script --resolver lts-20.4 --package turtle
 {-# LANGUAGE OverloadedStrings #-}
 import Turtle (echo)
 main = echo "Hello World!"
@@ -78,10 +78,10 @@ able to reuse everything already built).
 
 The second line of the source code is the Stack interpreter options comment. In
 this example, it specifies the `stack script` command with the options of a
-LTS Haskell 19.28 snapshot (`--resolver lts-19.28`) and ensuring the
+LTS Haskell 20.4 snapshot (`--resolver lts-20.4`) and ensuring the
 [`turtle` package](https://hackage.haskell.org/package/turtle) is available
 (`--package turtle`). The version of the package will be that in the specified
-snapshot (`lts-19.28` provides `turtle-1.5.25`).
+snapshot (`lts-20.4` provides `turtle-1.5.25`).
 
 ## Arguments and interpreter options and arguments
 
@@ -116,7 +116,7 @@ For example, the command `stack MyScript.hs arg1 arg2` with `MyScript.hs`:
 ~~~haskell
 #!/usr/bin/env stack
 {- stack script
-   --resolver lts-19.28
+   --resolver lts-20.4
    --
    +RTS -s -RTS
 -}
@@ -132,7 +132,7 @@ main = do
 is equivalent to the following command at the command line:
 
 ~~~text
-stack script --resolver lts-19.28 -- MyScript.hs arg1 arg2 +RTS -s -RTS
+stack script --resolver lts-20.4 -- MyScript.hs arg1 arg2 +RTS -s -RTS
 ~~~
 
 where `+RTS -s -RTS` are some of GHC's
@@ -161,7 +161,7 @@ space separated list. For example:
 ~~~haskell
 #!/usr/bin/env stack
 {- stack script
-   --resolver lts-19.28
+   --resolver lts-20.4
    --package turtle
    --package "stm async"
    --package http-client,http-conduit
@@ -170,7 +170,8 @@ space separated list. For example:
 
 ## Stack configuration for scripts
 
-With the `stack script` command, all Stack YAML configuration files are ignored.
+With the `stack script` command, all Stack YAML configuration files (global and
+project-level) are ignored.
 
 With the `stack runghc` command, if the current working directory is inside a
 project then that project's Stack project-level YAML configuration is effective
@@ -190,7 +191,7 @@ which makes use of the joke package
 
 ~~~haskell
 {- stack script
-   --resolver lts-19.28
+   --resolver lts-20.4
    --package acme-missiles
 -}
 import Acme.Missiles (launchMissiles)
@@ -201,7 +202,7 @@ main = launchMissiles
 
 The command `stack --script-no-run-compile Script.hs` then behaves as if the
 command
-`stack script --resolver lts-19.28 --package acme-missiles --no-run --compile -- Script.hs`
+`stack script --resolver lts-20.4 --package acme-missiles --no-run --compile -- Script.hs`
 had been given. `Script.hs` is compiled (without optimisation) and the resulting
 executable is not run: no missiles are launched in the process!
 
@@ -209,8 +210,9 @@ executable is not run: no missiles are launched in the process!
 
 The `stack script` command will automatically:
 
-* Install GHC and libraries if missing
-* Require that all packages used be explicitly stated on the command line
+* Install GHC and libraries, if missing. `stack script` behaves as if the
+  `--install-ghc` flag had been passed at the command line.
+* Require that all packages used be explicitly stated on the command line.
 
 This ensures that your scripts are _independent_ of any prior deployment
 specific configuration, and are _reliable_ by using exactly the same version of
@@ -237,7 +239,7 @@ example with `runghc`:
 {- stack
   runghc
   --install-ghc
-  --resolver lts-19.17
+  --resolver lts-20.4
   --package base
   --package turtle
   --
@@ -260,7 +262,7 @@ it. Here is an example:
 {- stack
    exec ghci
    --install-ghc
-   --resolver lts-19.28
+   --resolver lts-20.4
    --package turtle
 -}
 ~~~
