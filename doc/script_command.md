@@ -9,23 +9,26 @@ stack script [--package PACKAGE] FILE
              [--extra-dep PACKAGE-VERSION] [--no-run]
 ~~~
 
-The `stack script` command also either runs a specified Haskell source file
-(using GHC's `runghc`) or, optionally, compiles a specified Haskell source file
-(using GHC) and, by default, runs it.
+The `stack script` command either runs a specified Haskell source file (using
+GHC's `runghc`) or, optionally, compiles a specified Haskell source file (using
+GHC) and, by default, runs it.
 
-However, unlike `stack ghc` and `stack runghc`, the command ignores all Stack
-YAML configuration files. A snapshot must be specified on the command line (with
-the `--resolver` option). For example:
+Unlike `stack ghc` and `stack runghc`, the command ignores all Stack YAML
+configuration files (global and project-level). A snapshot must be specified on
+the command line (with the `--resolver` option). For example:
 
 ~~~text
-stack --resolver lts-19.28 MyScript.hs
+stack --resolver lts-20.4 MyScript.hs
 ~~~
 
 or, equivalently:
 
 ~~~text
-stack script --resolver lts-19.28 MyScript.hs
+stack script --resolver lts-20.4 MyScript.hs
 ~~~
+
+The `stack script` command behaves as if the `--install-ghc` flag had been
+passed at the command line.
 
 Everything after `--` on the command line is interpreted as a command line
 argument to be passed to what is run.
@@ -69,5 +72,5 @@ main = do
 can be compiled and run, with arguments, with:
 
 ~~~text
-stack --resolver lts-19.28 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
+stack --resolver lts-20.4 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
 ~~~
