@@ -365,11 +365,15 @@ library
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
   if os(windows)
     other-modules:
+        Stack.Constants.UsrLibDirs
+        Stack.Docker.Handlers
         System.Uname
     hs-source-dirs:
         src/windows/
   else
     other-modules:
+        Stack.Constants.UsrLibDirs
+        Stack.Docker.Handlers
         System.Uname
     hs-source-dirs:
         src/unix/
@@ -627,7 +631,6 @@ test-suite stack-test
       Stack.Config.DockerSpec
       Stack.ConfigSpec
       Stack.DotSpec
-      Stack.Ghci.PortableFakePaths
       Stack.Ghci.ScriptSpec
       Stack.GhciSpec
       Stack.LockSpec
@@ -745,5 +748,15 @@ test-suite stack-test
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+  if os(windows)
+    other-modules:
+        Stack.Ghci.FakePaths
+    hs-source-dirs:
+        src/test/windows/
+  else
+    other-modules:
+        Stack.Ghci.FakePaths
+    hs-source-dirs:
+        src/test/unix/
   build-tool-depends:
       hspec-discover:hspec-discover

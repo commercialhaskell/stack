@@ -1,6 +1,8 @@
 {-# LANGUAGE CApiFFI                  #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 
+-- | The module of this name differs as between Windows and non-Windows builds.
+-- This is the non-Windows version.
 module System.Terminal
 ( fixCodePage
 , getTerminalWidth

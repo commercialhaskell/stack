@@ -322,6 +322,12 @@ tests:
   stack-test:
     main: Spec.hs
     source-dirs: src/test
+    when:
+    - condition: 'os(windows)'
+      then:
+        source-dirs: src/test/windows/
+      else:
+        source-dirs: src/test/unix/
     ghc-options:
     - -threaded
     dependencies:

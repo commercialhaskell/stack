@@ -2,6 +2,8 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE OverloadedStrings        #-}
 
+-- | The module of this name differs as between Windows and non-Windows builds.
+-- This is the Windows version.
 module System.Terminal
 ( fixCodePage
 , getTerminalWidth

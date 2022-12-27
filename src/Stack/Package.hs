@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
@@ -34,13 +33,8 @@ import           Distribution.Package
                    hiding
                      ( Package, packageName, packageVersion, PackageIdentifier )
 import           Distribution.PackageDescription hiding ( FlagName )
-#if !MIN_VERSION_Cabal(3,8,1)
-import           Distribution.PackageDescription.Parsec
-#endif
 import           Distribution.Pretty ( prettyShow )
-#if MIN_VERSION_Cabal(3,8,1)
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
-#endif
 import           Distribution.System ( OS (..), Arch, Platform (..) )
 import           Distribution.Text ( display )
 import qualified Distribution.Types.CondTree as Cabal
