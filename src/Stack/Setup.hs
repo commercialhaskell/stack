@@ -2322,10 +2322,10 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
               renameFile tmpFile destFile
           _ -> renameFile tmpFile destFile
 
+    logInfo $ "New Stack executable available at " <> fromString (toFilePath destFile)
+
     destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
     warnInstallSearchPathIssues destDir' ["stack"]
-
-    logInfo $ "New Stack executable available at " <> fromString (toFilePath destFile)
 
     when checkPath $ performPathChecking destFile currExe
       `catchAny` (logError . displayShow)
