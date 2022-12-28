@@ -64,8 +64,7 @@ import           Stack.Storage.User
                    ( loadDockerImageExeCache, saveDockerImageExeCache )
 import           Stack.Types.Config
                    ( Config (..), DockerEntrypoint (..), DockerUser (..)
-                   , HasConfig, configL, configProjectRoot, stackRootL
-                   , terminalL
+                   , HasConfig (..), configProjectRoot, stackRootL, terminalL
                    )
 import           Stack.Types.Docker
                   ( DockerException (..), DockerOpts (..), DockerStackExe (..)
