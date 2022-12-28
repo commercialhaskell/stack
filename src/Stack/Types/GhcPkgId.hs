@@ -57,9 +57,10 @@ instance ToJSON GhcPkgId where
 -- | Convenient way to parse a package name from a 'Text'.
 parseGhcPkgId :: MonadThrow m => Text -> m GhcPkgId
 parseGhcPkgId x = go x
-  where go =
-          either (const (throwM (GhcPkgIdParseFail x))) pure .
-          parseOnly (ghcPkgIdParser <* endOfInput)
+ where
+  go = either
+         (const (throwM (GhcPkgIdParseFail x)))
+         pure . parseOnly (ghcPkgIdParser <* endOfInput)
 
 -- | A parser for a package-version-hash pair.
 ghcPkgIdParser :: Parser GhcPkgId

@@ -221,7 +221,7 @@ displaySingleSnap snapshots =
             let snaps =
                     displayTime x <> ["\n\n"] <> displaySnap x <>
                     L.concatMap displaySnap xs
-            in T.concat snaps
+            in  T.concat snaps
 
 renderData :: Bool -> Text -> IO ()
 renderData True content = pageText content
@@ -233,7 +233,7 @@ displaySnapshotData term sdata =
         [] -> pure ()
         xs ->
             let snaps = T.concat $ L.map displaySingleSnap xs
-            in renderData term snaps
+            in  renderData term snaps
 
 filterSnapshotData :: SnapshotData -> SnapshotType -> SnapshotData
 filterSnapshotData sdata stype =

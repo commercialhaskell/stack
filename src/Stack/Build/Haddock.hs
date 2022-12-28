@@ -162,7 +162,7 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
   getGhcPkgId LocalPackage{lpPackage = Package{packageName, packageVersion}} =
     let pkgId = PackageIdentifier packageName packageVersion
         mdpPkg = F.find (\dp -> dpPackageIdent dp == pkgId) localDumpPkgs
-    in fmap dpGhcPkgId mdpPkg
+    in  fmap dpGhcPkgId mdpPkg
   findTransitiveDepends :: [GhcPkgId] -> [GhcPkgId]
   findTransitiveDepends = (`go` HS.empty) . HS.fromList
    where

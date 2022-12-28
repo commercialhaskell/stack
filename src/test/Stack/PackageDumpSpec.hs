@@ -240,7 +240,7 @@ spec = do
         prop "invariant holds" $ \prunes' ->
             -- Force uniqueness
             let prunes = Map.toList $ Map.fromList prunes'
-             in checkDepsPresent prunes $ fst <$> pruneDeps fst fst snd bestPrune prunes
+            in  checkDepsPresent prunes $ fst <$> pruneDeps fst fst snd bestPrune prunes
 
 type PruneCheck = ((Int, Char), [(Int, Char)])
 

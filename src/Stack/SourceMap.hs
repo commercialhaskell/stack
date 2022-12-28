@@ -243,8 +243,8 @@ pruneGlobals globals deps =
   let (prunedGlobals, keptGlobals) =
         partitionReplacedDependencies globals (pkgName . dpPackageIdent)
           dpGhcPkgId dpDepends deps
-  in Map.map (GlobalPackage . pkgVersion . dpPackageIdent) keptGlobals <>
-     Map.map ReplacedGlobalPackage prunedGlobals
+  in  Map.map (GlobalPackage . pkgVersion . dpPackageIdent) keptGlobals <>
+      Map.map ReplacedGlobalPackage prunedGlobals
 
 getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder
 getCompilerInfo = view $ compilerPathsL.to (byteString . cpGhcInfo)

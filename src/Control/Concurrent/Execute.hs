@@ -151,7 +151,7 @@ runActions' ExecuteState {..} =
                             Left err -> modifyTVar esExceptions (err:)
                             Right () ->
                                 let dropDep a = a { actionDeps = Set.delete (actionId action) $ actionDeps a }
-                                 in modifyTVar esActions $ map dropDep
+                                in  modifyTVar esActions $ map dropDep
                     restore loop
 
 downstreamActions :: ActionId -> [Action] -> [Action]

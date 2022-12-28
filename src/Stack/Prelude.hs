@@ -175,7 +175,7 @@ logProcessStderrStdout ::
     -> RIO env ()
 logProcessStderrStdout pc = withLoggedProcess_ pc $ \p ->
     let logLines = CB.lines .| CL.mapM_ (logInfo . displayBytesUtf8)
-     in runConcurrently
+    in  runConcurrently
             $ Concurrently (runConduit $ getStdout p .| logLines)
            *> Concurrently (runConduit $ getStderr p .| logLines)
 

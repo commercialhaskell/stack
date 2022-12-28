@@ -1608,10 +1608,17 @@ shaPathForBytes
 class IsPath b t where
   parsePath :: MonadThrow m => FilePath -> m (Path b t)
 
-instance IsPath Abs Dir where parsePath = parseAbsDir
-instance IsPath Rel Dir where parsePath = parseRelDir
-instance IsPath Abs File where parsePath = parseAbsFile
-instance IsPath Rel File where parsePath = parseRelFile
+instance IsPath Abs Dir where
+  parsePath = parseAbsDir
+
+instance IsPath Rel Dir where
+  parsePath = parseRelDir
+
+instance IsPath Abs File where
+  parsePath = parseAbsFile
+
+instance IsPath Rel File where
+  parsePath = parseRelFile
 
 compilerVersionDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env) => m (Path Rel Dir)
 compilerVersionDir = do
@@ -2300,8 +2307,9 @@ shouldForceGhcColorFlag = do
 appropriateGhcColorFlag :: (HasRunner env, HasEnvConfig env)
                         => RIO env (Maybe String)
 appropriateGhcColorFlag = f <$> shouldForceGhcColorFlag
-  where f True = Just ghcColorForceFlag
-        f False = Nothing
+  where
+    f True = Just ghcColorForceFlag
+    f False = Nothing
 
 -- | See 'globalTerminal'
 terminalL :: HasRunner env => Lens' env Bool

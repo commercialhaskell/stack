@@ -250,9 +250,10 @@ showProcessArgDebug :: String -> String
 showProcessArgDebug x
     | any special x = show x
     | otherwise = x
-  where special '"' = True
-        special ' ' = True
-        special _ = False
+  where
+    special '"' = True
+    special ' ' = True
+    special _ = False
 
 -- | Extension of executables
 exeExt :: String

@@ -217,7 +217,7 @@ dependencyToJSON pkg (deps, payload) =
                             ]
       loc = catMaybes
               [("location" .=) . pkgLocToJSON <$> payloadLocation payload]
-  in object $ fieldsAlwaysPresent ++ loc
+  in  object $ fieldsAlwaysPresent ++ loc
 
 pkgLocToJSON :: PackageLocation -> Value
 pkgLocToJSON (PLMutable (ResolvedPath _ dir)) = object
@@ -233,12 +233,12 @@ pkgLocToJSON (PLImmutable (PLIArchive archive _)) =
               ALUrl u -> u
               ALFilePath (ResolvedPath _ path) ->
                 Text.pack $ "file://" ++ Path.toFilePath path
-  in object
-       [ "type" .= ("archive" :: Text)
-       , "url" .= url
-       , "sha256" .= archiveHash archive
-       , "size" .= archiveSize archive
-       ]
+  in  object
+        [ "type" .= ("archive" :: Text)
+        , "url" .= url
+        , "sha256" .= archiveHash archive
+        , "size" .= archiveSize archive
+        ]
 pkgLocToJSON (PLImmutable (PLIRepo repo _)) = object
   [ "type" .= case repoType repo of
                 RepoGit -> "git" :: Text
@@ -257,7 +257,7 @@ printJSON pkgs dependencyMap =
 treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
 treeRoots opts projectPackages' =
   let targets = dotTargets $ listDepsDotOpts opts
-   in if null targets
+  in  if null targets
         then projectPackages'
         else Set.fromList $ map (mkPackageName . Text.unpack) targets
 
@@ -295,9 +295,9 @@ printTreeNode :: ListDepsFormatOpts
 printTreeNode opts dotOpts depth remainingDepsCounts deps payload name =
   let remainingDepth = fromMaybe 999 (dotDependencyDepth dotOpts) - depth
       hasDeps = not $ null deps
-  in Text.putStrLn $
-       treeNodePrefix "" remainingDepsCounts hasDeps remainingDepth <> " " <>
-       listDepsLine opts name payload
+  in  Text.putStrLn $
+        treeNodePrefix "" remainingDepsCounts hasDeps remainingDepth <> " " <>
+        listDepsLine opts name payload
 
 treeNodePrefix :: Text -> [Int] -> Bool -> Int -> Text
 treeNodePrefix t [] _ _      = t
@@ -343,9 +343,9 @@ pruneGraph dontPrune names =
     if pkg `F.elem` names
       then Nothing
       else let filtered = Set.filter (\n -> n `F.notElem` names) pkgDeps
-           in if Set.null filtered && not (Set.null pkgDeps)
-                then Nothing
-                else Just (filtered,x))
+           in  if Set.null filtered && not (Set.null pkgDeps)
+                 then Nothing
+                 else Just (filtered,x))
 
 -- | Make sure that all unreachable nodes (orphans) are pruned
 pruneUnreachable :: (Eq a, F.Foldable f)

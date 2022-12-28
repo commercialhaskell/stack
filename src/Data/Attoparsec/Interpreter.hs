@@ -81,7 +81,7 @@ interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpret
 
     -- Treat newlines as spaces inside the block comment
     anyCharNormalizeSpace = let normalizeSpace c = if isSpace c then ' ' else c
-                            in P.satisfyWith normalizeSpace $ const True
+                            in  P.satisfyWith normalizeSpace $ const True
 
     comment start end = commentStart start
       *> ((end >> pure "")

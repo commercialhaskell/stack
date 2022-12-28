@@ -85,20 +85,20 @@ loadSourceMap smt boptsCli sma = do
                   generalGhcOptions bconfig boptsCli isTarget isProjectPackage
                 cabalConfigOpts =
                   loadCabalConfigOpts bconfig (cpName common) isTarget isProjectPackage
-            in common
-               { cpFlags =
-                     if M.null flags
-                         then cpFlags common
-                         else flags
-               , cpGhcOptions =
-                     ghcOptions ++ cpGhcOptions common
-               , cpCabalConfigOpts =
-                     cabalConfigOpts ++ cpCabalConfigOpts common
-               , cpHaddocks =
-                     if isTarget
-                         then boptsHaddock bopts
-                         else shouldHaddockDeps bopts
-               }
+            in  common
+                { cpFlags =
+                      if M.null flags
+                          then cpFlags common
+                          else flags
+                , cpGhcOptions =
+                      ghcOptions ++ cpGhcOptions common
+                , cpCabalConfigOpts =
+                      cabalConfigOpts ++ cpCabalConfigOpts common
+                , cpHaddocks =
+                      if isTarget
+                          then boptsHaddock bopts
+                          else shouldHaddockDeps bopts
+                }
         packageCliFlags = Map.fromList $
           mapMaybe maybeProjectFlags $
           Map.toList (boptsCLIFlags boptsCli)
@@ -294,9 +294,9 @@ loadLocalPackage pp = do
                     case packageLibraries pkg of
                       NoLibraries -> False
                       HasLibraries _ -> True
-               in hasLibrary
-               || not (Set.null nonLibComponents)
-               || not (Set.null $ packageInternalLibraries pkg)
+              in  hasLibrary
+                  || not (Set.null nonLibComponents)
+                  || not (Set.null $ packageInternalLibraries pkg)
 
         filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
 
@@ -351,7 +351,7 @@ loadLocalPackage pp = do
             if not (Set.null allDirtyFiles)
                 then let tryStripPrefix y =
                           fromMaybe y (L.stripPrefix (toFilePath $ ppRoot pp) y)
-                      in Just $ Set.map tryStripPrefix allDirtyFiles
+                     in  Just $ Set.map tryStripPrefix allDirtyFiles
                 else Nothing
         newBuildCaches =
             M.fromList . map (\(c, (_, cache)) -> (c, cache))

@@ -344,7 +344,8 @@ isExtensionOf ext         = isSuffixOf ('.':ext) . takeExtensions
 stripExtension :: String -> FilePath -> Maybe FilePath
 stripExtension []        path = Just path
 stripExtension ext@(x:_) path = stripSuffix dotExt path
-    where dotExt = if isExtSeparator x then ext else '.':ext
+  where
+    dotExt = if isExtSeparator x then ext else '.':ext
 
 
 -- | Split on all extensions.
@@ -356,9 +357,9 @@ stripExtension ext@(x:_) path = stripSuffix dotExt path
 -- > splitExtensions "file.tar.gz" == ("file",".tar.gz")
 splitExtensions :: FilePath -> (FilePath, String)
 splitExtensions x = (a ++ c, d)
-    where
-        (a,b) = splitFileName_ x
-        (c,d) = break isExtSeparator b
+  where
+    (a,b) = splitFileName_ x
+    (c,d) = break isExtSeparator b
 
 -- | Drop all extensions.
 --
@@ -424,7 +425,8 @@ splitDrive x = ("",x)
 
 addSlash :: FilePath -> FilePath -> (FilePath, FilePath)
 addSlash a xs = (a++c,d)
-    where (c,d) = span isPathSeparator xs
+  where
+    (c,d) = span isPathSeparator xs
 
 -- See [1].
 -- "\\?\D:\<path>" or "\\?\UNC\<server>\<share>"
@@ -433,7 +435,7 @@ readDriveUNC (s1:s2:'?':s3:xs) | all isPathSeparator [s1,s2,s3] =
     case map toUpper xs of
         ('U':'N':'C':s4:_) | isPathSeparator s4 ->
             let (a,b) = readDriveShareName (drop 4 xs)
-            in Just (s1:s2:'?':s3:take 4 xs ++ a, b)
+            in  Just (s1:s2:'?':s3:take 4 xs ++ a, b)
         _ -> case readDriveLetter xs of
                  -- Extended-length path.
                  Just (a,b) -> Just (s1:s2:'?':s3:a,b)
@@ -450,14 +452,16 @@ readDriveLetter _ = Nothing
 readDriveShare :: String -> Maybe (FilePath, FilePath)
 readDriveShare (s1:s2:xs) | isPathSeparator s1 && isPathSeparator s2 =
         Just (s1:s2:a,b)
-    where (a,b) = readDriveShareName xs
+  where
+    (a,b) = readDriveShareName xs
 readDriveShare _ = Nothing
 
 {- assume you have already seen \\ -}
 {- share\bob -> "share\", "bob" -}
 readDriveShareName :: String -> (FilePath, FilePath)
 readDriveShareName name = addSlash a b
-    where (a,b) = break isPathSeparator name
+  where
+    (a,b) = break isPathSeparator name
 
 
 
@@ -533,16 +537,18 @@ splitFileName x = (if null dir then "./" else dir, name)
 -- e.g. replaceFileName.
 splitFileName_ :: FilePath -> (String, String)
 splitFileName_ x = (drv ++ dir, file)
-    where
-        (drv,pth) = splitDrive x
-        (dir,file) = breakEnd isPathSeparator pth
+  where
+    (drv,pth) = splitDrive x
+    (dir,file) = breakEnd isPathSeparator pth
 
 -- | Set the filename.
 --
 -- > replaceFileName "/directory/other.txt" "file.ext" == "/directory/file.ext"
 -- > Valid x => replaceFileName x (takeFileName x) == x
 replaceFileName :: FilePath -> String -> FilePath
-replaceFileName x y = a </> y where (a,_) = splitFileName_ x
+replaceFileName x y = a </> y
+  where
+    (a,_) = splitFileName_ x
 
 -- | Drop the filename. Unlike 'takeDirectory', this function will leave
 --   a trailing path separator on the directory.
@@ -623,7 +629,7 @@ dropTrailingPathSeparator :: FilePath -> FilePath
 dropTrailingPathSeparator x =
     if hasTrailingPathSeparator x && not (isDrive x)
     then let x' = dropWhileEnd isPathSeparator x
-         in if null x' then [last x] else x'
+         in  if null x' then [last x] else x'
     else x
 
 
@@ -812,24 +818,25 @@ equalFilePath a b = f a == f b
 -- > Posix:   makeRelative "some/path" "some/path/a/b/c" == "a/b/c"
 makeRelative :: FilePath -> FilePath -> FilePath
 makeRelative root path
- | equalFilePath root path = "."
- | takeAbs root /= takeAbs path = path
- | otherwise = f (dropAbs root) (dropAbs path)
-    where
-        f "" y = dropWhile isPathSeparator y
-        f x y = let (x1,x2) = g x
-                    (y1,y2) = g y
-                in if equalFilePath x1 y1 then f x2 y2 else path
+  | equalFilePath root path = "."
+  | takeAbs root /= takeAbs path = path
+  | otherwise = f (dropAbs root) (dropAbs path)
+ where
+  f "" y = dropWhile isPathSeparator y
+  f x y = let (x1,x2) = g x
+              (y1,y2) = g y
+          in  if equalFilePath x1 y1 then f x2 y2 else path
 
-        g x = (dropWhile isPathSeparator a, dropWhile isPathSeparator b)
-            where (a,b) = break isPathSeparator $ dropWhile isPathSeparator x
+  g x = (dropWhile isPathSeparator a, dropWhile isPathSeparator b)
+   where
+    (a,b) = break isPathSeparator $ dropWhile isPathSeparator x
 
-        -- on windows, need to drop '/' which is kind of absolute, but not a drive
-        dropAbs x | hasLeadingPathSeparator x && not (hasDrive x) = tail x
-        dropAbs x = dropDrive x
+  -- on windows, need to drop '/' which is kind of absolute, but not a drive
+  dropAbs x | hasLeadingPathSeparator x && not (hasDrive x) = tail x
+  dropAbs x = dropDrive x
 
-        takeAbs x | hasLeadingPathSeparator x && not (hasDrive x) = [pathSeparator]
-        takeAbs x = map (\y -> if isPathSeparator y then pathSeparator else toLower y) $ takeDrive x
+  takeAbs x | hasLeadingPathSeparator x && not (hasDrive x) = [pathSeparator]
+  takeAbs x = map (\y -> if isPathSeparator y then pathSeparator else toLower y) $ takeDrive x
 
 -- | Normalise a file
 --
@@ -967,17 +974,19 @@ makeValid path
         | isJust (readDriveUNC drv) && not (hasTrailingPathSeparator drv) =
             makeValid (drv ++ [pathSeparator] ++ pth)
         | otherwise = joinDrive drv $ validElements $ validChars pth
-    where
-        (drv,pth) = splitDrive path
+  where
+    (drv,pth) = splitDrive path
 
-        validChars = map f
-        f x = if isBadCharacter x then '_' else x
+    validChars = map f
+    f x = if isBadCharacter x then '_' else x
 
-        validElements x = joinPath $ map g $ splitPath x
-        g x = h a ++ b
-            where (a,b) = break isPathSeparator x
-        h x = if map toUpper (dropWhileEnd (== ' ') a) `elem` badElements then a ++ "_" <.> b else x
-            where (a,b) = splitExtensions x
+    validElements x = joinPath $ map g $ splitPath x
+    g x = h a ++ b
+      where
+        (a,b) = break isPathSeparator x
+    h x = if map toUpper (dropWhileEnd (== ' ') a) `elem` badElements then a ++ "_" <.> b else x
+      where
+        (a,b) = splitExtensions x
 
 
 -- | Is a path relative, or is it fixed to the root?
@@ -1004,7 +1013,8 @@ makeValid path
 -- * "You cannot use the "\\?\" prefix with a relative path."
 isRelative :: FilePath -> Bool
 isRelative x = null drive || isRelativeDrive drive
-    where drive = takeDrive x
+  where
+    drive = takeDrive x
 
 
 {- c:foo -}

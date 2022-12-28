@@ -411,4 +411,4 @@ installedPackageIdentifier (Executable pid) = pid
 installedVersion :: Installed -> Version
 installedVersion i =
   let PackageIdentifier _ version = installedPackageIdentifier i
-   in version
+  in  version

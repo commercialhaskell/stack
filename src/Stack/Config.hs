@@ -173,7 +173,7 @@ makeConcreteResolver ar = do
                 if IntMap.null $ snapshotsLts snapshots
                    then throwIO NoLTSFound
                    else let (x, y) = IntMap.findMax $ snapshotsLts snapshots
-                        in pure $ RSLSynonym $ LTS x y
+                        in  pure $ RSLSynonym $ LTS x y
     logInfo $ "Selected resolver: " <> display r
     pure r
 
@@ -400,11 +400,11 @@ configFromConfigMonoid
                             <> "/" <> display y <> ".yaml"
                     customSnapshotLocation (Nightly date) =
                         let (year, month, day) = toGregorian date
-                        in mkRSLUrl $ addr'
-                            <> "/nightly/"
-                            <> display year
-                            <> "/" <> display month
-                            <> "/" <> display day <> ".yaml"
+                        in  mkRSLUrl $ addr'
+                              <> "/nightly/"
+                              <> display year
+                              <> "/" <> display month
+                              <> "/" <> display day <> ".yaml"
                     mkRSLUrl builder = RSLUrl (utf8BuilderToText builder) Nothing
                     addr' = display $ T.dropWhileEnd (=='/') addr
 

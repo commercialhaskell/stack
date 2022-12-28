@@ -33,14 +33,14 @@ objectInterfaceDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)
 objectInterfaceDirL = to $ \env -> -- FIXME is this idiomatic lens code?
   let workDir = view workDirL env
       root = view projectRootL env
-   in root </> workDir </> $(mkRelDir "odir/")
+  in  root </> workDir </> $(mkRelDir "odir/")
 
 -- | GHCi files directory.
 ghciDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)
 ghciDirL = to $ \env -> -- FIXME is this idiomatic lens code?
   let workDir = view workDirL env
       root = view projectRootL env
-   in root </> workDir </> $(mkRelDir "ghci/")
+  in  root </> workDir </> $(mkRelDir "ghci/")
 
 -- | The directory containing the files used for dirtiness check of source files.
 buildCachesDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)

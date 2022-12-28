@@ -230,8 +230,9 @@ chattyDownloadProgress label mtotalSize _ = do
               " (%6.2f%%) downloaded...")
               (T.unpack label)
               percentage
-      where percentage :: Double
-            percentage = fromIntegral totalSoFar / fromIntegral total * 100
+     where
+      percentage :: Double
+      percentage = fromIntegral totalSoFar / fromIntegral total * 100
 
 -- | Given a printf format string for the decimal part and a number of
 -- bytes, formats the bytes using an appropriate unit and returns the
@@ -243,12 +244,13 @@ bytesfmt :: Integral a => String -> a -> String
 bytesfmt formatter bs = printf (formatter <> " %s")
                                (fromIntegral (signum bs) * dec :: Double)
                                (bytesSuffixes !! i)
-  where
-    (dec,i) = getSuffix (abs bs)
-    getSuffix n = until p (\(x,y) -> (x / 1024, y+1)) (fromIntegral n,0)
-      where p (n',numDivs) = n' < 1024 || numDivs == (length bytesSuffixes - 1)
-    bytesSuffixes :: [String]
-    bytesSuffixes = ["B","KiB","MiB","GiB","TiB","PiB","EiB","ZiB","YiB"]
+ where
+  (dec,i) = getSuffix (abs bs)
+  getSuffix n = until p (\(x,y) -> (x / 1024, y+1)) (fromIntegral n,0)
+   where
+    p (n',numDivs) = n' < 1024 || numDivs == (length bytesSuffixes - 1)
+  bytesSuffixes :: [String]
+  bytesSuffixes = ["B","KiB","MiB","GiB","TiB","PiB","EiB","ZiB","YiB"]
 
 -- Await eagerly (collect with monoidal append),
 -- but space out yields by at least the given amount of time.

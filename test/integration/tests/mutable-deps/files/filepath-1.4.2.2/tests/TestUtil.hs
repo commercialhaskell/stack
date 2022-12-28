@@ -52,4 +52,5 @@ shrinkValid wrap valid o =
     [ wrap y
     | y <- map valid $ shrinkList (\x -> ['a' | x /= 'a']) o
     , length y < length o || (length y == length o && countA y > countA o)]
-    where countA = length . filter (== 'a')
+  where
+    countA = length . filter (== 'a')
