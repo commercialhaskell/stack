@@ -26,99 +26,108 @@ import           Path.IO ( getModificationTime, resolveFile' )
 import qualified RIO.Directory as Dir
 import           RIO.Process ( exec, proc, readProcessStdout_, withWorkingDir )
 import qualified RIO.Text as T
-import qualified Stack.Build
-import           Stack.Build.Installed
+import           Stack.Build ( build )
+import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Constants ( osIsWindows )
-import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.Options.ScriptParser
+                   ( ScriptExecute (..), ScriptOpts (..), ShouldRun (..) )
 import           Stack.Runners
+                   ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.SourceMap ( getCompilerInfo, immutableLocSha )
-import           Stack.Types.Compiler
+import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.Config
+                   ( CompilerPaths (..), Config (..), ConfigMonoid (..)
+                   , DumpPackage (..), EnvConfig (..), GhcPkgExe (..)
+                   , GlobalOpts (..), HasCompiler (..), HasConfig (..)
+                   , HasEnvConfig (..), HasPlatform (..), Runner
+                   , StackYamlLoc (..), actualCompilerVersionL
+                   , appropriateGhcColorFlag, defaultEnvSettings, globalOptsL
+                   )
 import           Stack.Types.SourceMap
+                   ( CommonPackage (..), DepPackage (..), SourceMap (..) )
 import           System.FilePath ( dropExtension, replaceExtension )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Script" module.
 data ScriptException
-    = MutableDependenciesForScript [PackageName]
-    | AmbiguousModuleName ModuleName [PackageName]
-    | ArgumentsWithNoRunInvalid
-    | NoRunWithoutCompilationInvalid
+  = MutableDependenciesForScript [PackageName]
+  | AmbiguousModuleName ModuleName [PackageName]
+  | ArgumentsWithNoRunInvalid
+  | NoRunWithoutCompilationInvalid
   deriving (Show, Typeable)
 
 instance Exception ScriptException where
-    displayException (MutableDependenciesForScript names) = unlines
-        $ "Error: [S-4994]"
-        : "No mutable packages are allowed in the 'script' command. Mutable \
-          \packages found:"
-        : map (\name -> "- " ++ packageNameString name) names
-    displayException (AmbiguousModuleName mname pkgs) = unlines
-        $ "Error: [S-1691]"
-        : (  "Module "
-          ++ moduleNameString mname
-          ++ " appears in multiple packages: "
-          )
-        : [ unwords $ map packageNameString pkgs ]
-    displayException ArgumentsWithNoRunInvalid =
-        "Error: [S-5067]\n"
-        ++ "'--no-run' incompatible with arguments."
-    displayException NoRunWithoutCompilationInvalid =
-        "Error: [S-9469]\n"
-        ++ "'--no-run' requires either '--compile' or '--optimize'."
+  displayException (MutableDependenciesForScript names) = unlines
+    $ "Error: [S-4994]"
+    : "No mutable packages are allowed in the 'script' command. Mutable \
+      \packages found:"
+    : map (\name -> "- " ++ packageNameString name) names
+  displayException (AmbiguousModuleName mname pkgs) = unlines
+    $ "Error: [S-1691]"
+    : (  "Module "
+      ++ moduleNameString mname
+      ++ " appears in multiple packages: "
+      )
+    : [ unwords $ map packageNameString pkgs ]
+  displayException ArgumentsWithNoRunInvalid =
+    "Error: [S-5067]\n"
+    ++ "'--no-run' incompatible with arguments."
+  displayException NoRunWithoutCompilationInvalid =
+    "Error: [S-9469]\n"
+    ++ "'--no-run' requires either '--compile' or '--optimize'."
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()
 scriptCmd opts = do
-    -- Some warnings in case the user somehow tries to set a
-    -- stack.yaml location. Note that in this functions we use
-    -- logError instead of logWarn because, when using the
-    -- interpreter mode, only error messages are shown. See:
-    -- https://github.com/commercialhaskell/stack/issues/3007
-    view (globalOptsL.to globalStackYaml) >>= \case
-      SYLOverride fp -> logError $
-        "Ignoring override stack.yaml file for script command: " <>
-        fromString (toFilePath fp)
-      SYLGlobalProject -> logError "Ignoring SYLGlobalProject for script command"
-      SYLDefault -> pure ()
-      SYLNoProject _ -> assert False (pure ())
+  -- Some warnings in case the user somehow tries to set a
+  -- stack.yaml location. Note that in this functions we use
+  -- logError instead of logWarn because, when using the
+  -- interpreter mode, only error messages are shown. See:
+  -- https://github.com/commercialhaskell/stack/issues/3007
+  view (globalOptsL.to globalStackYaml) >>= \case
+    SYLOverride fp -> logError $
+      "Ignoring override stack.yaml file for script command: " <>
+      fromString (toFilePath fp)
+    SYLGlobalProject -> logError "Ignoring SYLGlobalProject for script command"
+    SYLDefault -> pure ()
+    SYLNoProject _ -> assert False (pure ())
 
-    file <- resolveFile' $ soFile opts
+  file <- resolveFile' $ soFile opts
 
-    isNoRunCompile <- fromFirstFalse . configMonoidNoRunCompile <$>
-                             view (globalOptsL.to globalConfigMonoid)
+  isNoRunCompile <- fromFirstFalse . configMonoidNoRunCompile <$>
+                           view (globalOptsL.to globalConfigMonoid)
 
-    let scriptDir = parent file
-        modifyGO go = go
-            { globalConfigMonoid = (globalConfigMonoid go)
-                { configMonoidInstallGHC = FirstTrue $ Just True
-                }
-            , globalStackYaml = SYLNoProject $ soScriptExtraDeps opts
-            }
-        (shouldRun, shouldCompile) = if isNoRunCompile
-          then (NoRun, SECompile)
-          else (soShouldRun opts, soCompile opts)
+  let scriptDir = parent file
+      modifyGO go = go
+          { globalConfigMonoid = (globalConfigMonoid go)
+              { configMonoidInstallGHC = FirstTrue $ Just True
+              }
+          , globalStackYaml = SYLNoProject $ soScriptExtraDeps opts
+          }
+      (shouldRun, shouldCompile) = if isNoRunCompile
+        then (NoRun, SECompile)
+        else (soShouldRun opts, soCompile opts)
 
-    case shouldRun of
-      YesRun -> pure ()
-      NoRun -> do
-        unless (null $ soArgs opts) $ throwIO ArgumentsWithNoRunInvalid
-        case shouldCompile of
-          SEInterpret -> throwIO NoRunWithoutCompilationInvalid
-          SECompile -> pure ()
-          SEOptimize -> pure ()
-
-    -- Optimization: if we're compiling, and the executable is newer
-    -- than the source file, run it immediately.
-    local (over globalOptsL modifyGO) $
+  case shouldRun of
+    YesRun -> pure ()
+    NoRun -> do
+      unless (null $ soArgs opts) $ throwIO ArgumentsWithNoRunInvalid
       case shouldCompile of
-        SEInterpret -> longWay shouldRun shouldCompile file scriptDir
-        SECompile -> shortCut shouldRun shouldCompile file scriptDir
-        SEOptimize -> shortCut shouldRun shouldCompile file scriptDir
+        SEInterpret -> throwIO NoRunWithoutCompilationInvalid
+        SECompile -> pure ()
+        SEOptimize -> pure ()
 
-  where
+  -- Optimization: if we're compiling, and the executable is newer
+  -- than the source file, run it immediately.
+  local (over globalOptsL modifyGO) $
+    case shouldCompile of
+      SEInterpret -> longWay shouldRun shouldCompile file scriptDir
+      SECompile -> shortCut shouldRun shouldCompile file scriptDir
+      SEOptimize -> shortCut shouldRun shouldCompile file scriptDir
+
+ where
   runCompiled shouldRun file = do
     let exeName = toExeName $ toFilePath file
     case shouldRun of
@@ -142,50 +151,51 @@ scriptCmd opts = do
         colorFlag <- appropriateGhcColorFlag
 
         targetsSet <-
-            case soPackages opts of
-                [] -> do
-                    -- Using the import parser
-                    getPackagesFromImports (soFile opts)
-                packages -> do
-                    let targets = concatMap wordsComma packages
-                    targets' <- mapM parsePackageNameThrowing targets
-                    pure $ Set.fromList targets'
+          case soPackages opts of
+            [] -> do
+              -- Using the import parser
+              getPackagesFromImports (soFile opts)
+            packages -> do
+              let targets = concatMap wordsComma packages
+              targets' <- mapM parsePackageNameThrowing targets
+              pure $ Set.fromList targets'
 
         unless (Set.null targetsSet) $ do
-            -- Optimization: use the relatively cheap ghc-pkg list
-            -- --simple-output to check which packages are installed
-            -- already. If all needed packages are available, we can
-            -- skip the (rather expensive) build call below.
-            GhcPkgExe pkg <- view $ compilerPathsL.to cpPkg
-            -- https://github.com/haskell/process/issues/251
-            bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
-                ["list", "--simple-output"] CL.sinkNull CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
-            let installed = Set.fromList
-                          $ map toPackageName
-                          $ words
-                          $ S8.unpack
-                          $ S8.concat bss
-            if Set.null $ Set.difference (Set.map packageNameString targetsSet) installed
-                then logDebug "All packages already installed"
-                else do
-                    logDebug "Missing packages, performing installation"
-                    let targets = map (T.pack . packageNameString) $ Set.toList targetsSet
-                    withNewLocalBuildTargets targets $ Stack.Build.build Nothing
+          -- Optimization: use the relatively cheap ghc-pkg list
+          -- --simple-output to check which packages are installed
+          -- already. If all needed packages are available, we can
+          -- skip the (rather expensive) build call below.
+          GhcPkgExe pkg <- view $ compilerPathsL.to cpPkg
+          -- https://github.com/haskell/process/issues/251
+          bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
+              ["list", "--simple-output"] CL.sinkNull CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
+          let installed = Set.fromList
+                        $ map toPackageName
+                        $ words
+                        $ S8.unpack
+                        $ S8.concat bss
+          if Set.null $ Set.difference (Set.map packageNameString targetsSet) installed
+            then logDebug "All packages already installed"
+            else do
+              logDebug "Missing packages, performing installation"
+              let targets =
+                    map (T.pack . packageNameString) $ Set.toList targetsSet
+              withNewLocalBuildTargets targets $ build Nothing
 
         let ghcArgs = concat
-                [ ["-i", "-i" ++ toFilePath scriptDir]
-                , ["-hide-all-packages"]
-                , maybeToList colorFlag
-                , map (\x -> "-package" ++ x)
-                    $ Set.toList
-                    $ Set.insert "base"
-                    $ Set.map packageNameString targetsSet
-                , case shouldCompile of
-                    SEInterpret -> []
-                    SECompile -> []
-                    SEOptimize -> ["-O2"]
-                , soGhcOptions opts
-                ]
+              [ ["-i", "-i" ++ toFilePath scriptDir]
+              , ["-hide-all-packages"]
+              , maybeToList colorFlag
+              , map (\x -> "-package" ++ x)
+                  $ Set.toList
+                  $ Set.insert "base"
+                  $ Set.map packageNameString targetsSet
+              , case shouldCompile of
+                  SEInterpret -> []
+                  SECompile -> []
+                  SEOptimize -> ["-O2"]
+              , soGhcOptions opts
+              ]
         case shouldCompile of
           SEInterpret -> do
             interpret <- view $ compilerPathsL.to cpInterpreter
@@ -218,71 +228,73 @@ getPackagesFromImports ::
      FilePath -- ^ script filename
   -> RIO EnvConfig (Set PackageName)
 getPackagesFromImports scriptFP = do
-    (pns, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
-    if Set.null mns
-        then pure pns
-        else Set.union pns <$> getPackagesFromModuleNames mns
+  (pns, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
+  if Set.null mns
+    then pure pns
+    else Set.union pns <$> getPackagesFromModuleNames mns
 
 getPackagesFromModuleNames ::
      Set ModuleName
   -> RIO EnvConfig (Set PackageName)
 getPackagesFromModuleNames mns = do
-    hash <- hashSnapshot
-    withSnapshotCache hash mapSnapshotPackageModules $ \getModulePackages -> do
-        pns <- forM (Set.toList mns) $ \mn -> do
-            pkgs <- getModulePackages mn
-            case pkgs of
-                [] -> pure Set.empty
-                [pn] -> pure $ Set.singleton pn
-                _ -> throwM $ AmbiguousModuleName mn pkgs
-        pure $ Set.unions pns `Set.difference` blacklist
+  hash <- hashSnapshot
+  withSnapshotCache hash mapSnapshotPackageModules $ \getModulePackages -> do
+    pns <- forM (Set.toList mns) $ \mn -> do
+      pkgs <- getModulePackages mn
+      case pkgs of
+        [] -> pure Set.empty
+        [pn] -> pure $ Set.singleton pn
+        _ -> throwM $ AmbiguousModuleName mn pkgs
+    pure $ Set.unions pns `Set.difference` blacklist
 
 hashSnapshot :: RIO EnvConfig SnapshotCacheHash
 hashSnapshot = do
-    sourceMap <- view $ envConfigL . to envConfigSourceMap
-    compilerInfo <- getCompilerInfo
-    let eitherPliHash (pn, dep) | PLImmutable pli <- dpLocation dep =
-                                    Right $ immutableLocSha pli
-                                | otherwise =
-                                    Left pn
-        deps = Map.toList (smDeps sourceMap)
-    case partitionEithers (map eitherPliHash deps) of
-        ([], pliHashes) -> do
-            let hashedContent = mconcat $ compilerInfo : pliHashes
-            pure $ SnapshotCacheHash (SHA256.hashLazyBytes $ toLazyByteString hashedContent)
-        (mutables, _) ->
-            throwM $ MutableDependenciesForScript mutables
+  sourceMap <- view $ envConfigL . to envConfigSourceMap
+  compilerInfo <- getCompilerInfo
+  let eitherPliHash (pn, dep) | PLImmutable pli <- dpLocation dep =
+                                  Right $ immutableLocSha pli
+                              | otherwise =
+                                  Left pn
+      deps = Map.toList (smDeps sourceMap)
+  case partitionEithers (map eitherPliHash deps) of
+    ([], pliHashes) -> do
+      let hashedContent = mconcat $ compilerInfo : pliHashes
+      pure
+        $ SnapshotCacheHash (SHA256.hashLazyBytes
+        $ toLazyByteString hashedContent)
+    (mutables, _) ->
+      throwM $ MutableDependenciesForScript mutables
 
 mapSnapshotPackageModules :: RIO EnvConfig (Map PackageName (Set ModuleName))
 mapSnapshotPackageModules = do
-    sourceMap <- view $ envConfigL . to envConfigSourceMap
-    installMap <- toInstallMap sourceMap
-    (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
-        getInstalled installMap
-    let globals = dumpedPackageModules (smGlobal sourceMap) globalDumpPkgs
-        notHidden = Map.filter (not . dpHidden)
-        notHiddenDeps = notHidden $ smDeps sourceMap
-        installedDeps = dumpedPackageModules notHiddenDeps snapshotDumpPkgs
-        dumpPkgs = Set.fromList $ map (pkgName . dpPackageIdent) snapshotDumpPkgs
-        notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
-    otherDeps <- for notInstalledDeps $ \dep -> do
-        gpd <- liftIO $ cpGPD (dpCommon dep)
-        Set.fromList <$> allExposedModules gpd
-    -- source map construction process should guarantee unique package names
-    -- in these maps
-    pure $ globals <> installedDeps <> otherDeps
+  sourceMap <- view $ envConfigL . to envConfigSourceMap
+  installMap <- toInstallMap sourceMap
+  (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
+      getInstalled installMap
+  let globals = dumpedPackageModules (smGlobal sourceMap) globalDumpPkgs
+      notHidden = Map.filter (not . dpHidden)
+      notHiddenDeps = notHidden $ smDeps sourceMap
+      installedDeps = dumpedPackageModules notHiddenDeps snapshotDumpPkgs
+      dumpPkgs = Set.fromList $ map (pkgName . dpPackageIdent) snapshotDumpPkgs
+      notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
+  otherDeps <- for notInstalledDeps $ \dep -> do
+    gpd <- liftIO $ cpGPD (dpCommon dep)
+    Set.fromList <$> allExposedModules gpd
+  -- source map construction process should guarantee unique package names
+  -- in these maps
+  pure $ globals <> installedDeps <> otherDeps
 
 dumpedPackageModules :: Map PackageName a
                      -> [DumpPackage]
                      -> Map PackageName (Set ModuleName)
 dumpedPackageModules pkgs dumpPkgs =
-    let pnames = Map.keysSet pkgs `Set.difference` blacklist
-    in  Map.fromList
-            [ (pn, dpExposedModules)
-            | DumpPackage {..} <- dumpPkgs
-            , let PackageIdentifier pn _ = dpPackageIdent
-            , pn `Set.member` pnames
-            ]
+  let pnames = Map.keysSet pkgs `Set.difference` blacklist
+  in  Map.fromList
+        [ (pn, dpExposedModules)
+        | DumpPackage {..} <- dumpPkgs
+        , let PackageIdentifier pn _ = dpPackageIdent
+        , pn `Set.member` pnames
+        ]
 
 allExposedModules :: PD.GenericPackageDescription -> RIO EnvConfig [ModuleName]
 allExposedModules gpd = do
@@ -311,78 +323,78 @@ allExposedModules gpd = do
 -- packages that should never be auto-parsed in.
 blacklist :: Set PackageName
 blacklist = Set.fromList
-    [ mkPackageName "async-dejafu"
-    , mkPackageName "monads-tf"
-    , mkPackageName "crypto-api"
-    , mkPackageName "fay-base"
-    , mkPackageName "hashmap"
-    , mkPackageName "hxt-unicode"
-    , mkPackageName "hledger-web"
-    , mkPackageName "plot-gtk3"
-    , mkPackageName "gtk3"
-    , mkPackageName "regex-pcre-builtin"
-    , mkPackageName "regex-compat-tdfa"
-    , mkPackageName "log"
-    , mkPackageName "zip"
-    , mkPackageName "monad-extras"
-    , mkPackageName "control-monad-free"
-    , mkPackageName "prompt"
-    , mkPackageName "kawhi"
-    , mkPackageName "language-c"
-    , mkPackageName "gl"
-    , mkPackageName "svg-tree"
-    , mkPackageName "Glob"
-    , mkPackageName "nanospec"
-    , mkPackageName "HTF"
-    , mkPackageName "courier"
-    , mkPackageName "newtype-generics"
-    , mkPackageName "objective"
-    , mkPackageName "binary-ieee754"
-    , mkPackageName "rerebase"
-    , mkPackageName "cipher-aes"
-    , mkPackageName "cipher-blowfish"
-    , mkPackageName "cipher-camellia"
-    , mkPackageName "cipher-des"
-    , mkPackageName "cipher-rc4"
-    , mkPackageName "crypto-cipher-types"
-    , mkPackageName "crypto-numbers"
-    , mkPackageName "crypto-pubkey"
-    , mkPackageName "crypto-random"
-    , mkPackageName "cryptohash"
-    , mkPackageName "cryptohash-conduit"
-    , mkPackageName "cryptohash-md5"
-    , mkPackageName "cryptohash-sha1"
-    , mkPackageName "cryptohash-sha256"
-    ]
+  [ mkPackageName "async-dejafu"
+  , mkPackageName "monads-tf"
+  , mkPackageName "crypto-api"
+  , mkPackageName "fay-base"
+  , mkPackageName "hashmap"
+  , mkPackageName "hxt-unicode"
+  , mkPackageName "hledger-web"
+  , mkPackageName "plot-gtk3"
+  , mkPackageName "gtk3"
+  , mkPackageName "regex-pcre-builtin"
+  , mkPackageName "regex-compat-tdfa"
+  , mkPackageName "log"
+  , mkPackageName "zip"
+  , mkPackageName "monad-extras"
+  , mkPackageName "control-monad-free"
+  , mkPackageName "prompt"
+  , mkPackageName "kawhi"
+  , mkPackageName "language-c"
+  , mkPackageName "gl"
+  , mkPackageName "svg-tree"
+  , mkPackageName "Glob"
+  , mkPackageName "nanospec"
+  , mkPackageName "HTF"
+  , mkPackageName "courier"
+  , mkPackageName "newtype-generics"
+  , mkPackageName "objective"
+  , mkPackageName "binary-ieee754"
+  , mkPackageName "rerebase"
+  , mkPackageName "cipher-aes"
+  , mkPackageName "cipher-blowfish"
+  , mkPackageName "cipher-camellia"
+  , mkPackageName "cipher-des"
+  , mkPackageName "cipher-rc4"
+  , mkPackageName "crypto-cipher-types"
+  , mkPackageName "crypto-numbers"
+  , mkPackageName "crypto-pubkey"
+  , mkPackageName "crypto-random"
+  , mkPackageName "cryptohash"
+  , mkPackageName "cryptohash-conduit"
+  , mkPackageName "cryptohash-md5"
+  , mkPackageName "cryptohash-sha1"
+  , mkPackageName "cryptohash-sha256"
+  ]
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
-    fold . mapMaybe (parseLine . stripCR') . S8.lines
-  where
-    -- Remove any carriage pure character present at the end, to
-    -- support Windows-style line endings (CRLF)
-    stripCR' bs
-      | S8.null bs = bs
-      | S8.last bs == '\r' = S8.init bs
-      | otherwise = bs
+  fold . mapMaybe (parseLine . stripCR') . S8.lines
+ where
+  -- Remove any carriage pure character present at the end, to
+  -- support Windows-style line endings (CRLF)
+  stripCR' bs
+    | S8.null bs = bs
+    | S8.last bs == '\r' = S8.init bs
+    | otherwise = bs
 
-    stripPrefix x y
-      | x `S8.isPrefixOf` y = Just $ S8.drop (S8.length x) y
-      | otherwise = Nothing
+  stripPrefix x y
+    | x `S8.isPrefixOf` y = Just $ S8.drop (S8.length x) y
+    | otherwise = Nothing
 
-    parseLine bs0 = do
-        bs1 <- stripPrefix "import " bs0
-        let bs2 = S8.dropWhile (== ' ') bs1
-            bs3 = fromMaybe bs2 $ stripPrefix "qualified " bs2
-        case stripPrefix "\"" bs3 of
-            Just bs4 -> do
-                pn <- parsePackageNameThrowing $ S8.unpack $ S8.takeWhile (/= '"') bs4
-                Just (Set.singleton pn, Set.empty)
-            Nothing -> Just
-                ( Set.empty
-                , Set.singleton
-                    $ fromString
-                    $ T.unpack
-                    $ decodeUtf8With lenientDecode
-                    $ S8.takeWhile (\c -> c /= ' ' && c /= '(') bs3
-                )
+  parseLine bs0 = do
+    bs1 <- stripPrefix "import " bs0
+    let bs2 = S8.dropWhile (== ' ') bs1
+        bs3 = fromMaybe bs2 $ stripPrefix "qualified " bs2
+    case stripPrefix "\"" bs3 of
+      Just bs4 -> do
+        pn <- parsePackageNameThrowing $ S8.unpack $ S8.takeWhile (/= '"') bs4
+        Just (Set.singleton pn, Set.empty)
+      Nothing -> Just
+        ( Set.empty
+        , Set.singleton
+            $ fromString
+            $ T.unpack
+            $ decodeUtf8With lenientDecode
+            $ S8.takeWhile (\c -> c /= ' ' && c /= '(') bs3
+        )

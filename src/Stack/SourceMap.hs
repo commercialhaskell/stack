@@ -29,14 +29,23 @@ import qualified Distribution.PackageDescription as PD
 import           Distribution.System ( Platform (..) )
 import qualified Pantry.SHA256 as SHA256
 import qualified RIO.Map as Map
-import           RIO.Process
+import           RIO.Process ( HasProcessContext )
 import qualified RIO.Set as Set
-import           Stack.PackageDump
+import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDump )
 import           Stack.Prelude
 import           Stack.Types.Build
+                   ( BuildException (..), FlagSource, UnusedFlags (..) )
 import           Stack.Types.Compiler
+                   ( ActualCompiler, actualToWanted, wantedToActual )
 import           Stack.Types.Config
+                   ( CompilerPaths (..), DumpPackage (..), GhcPkgExe
+                   , HasCompiler (..), HasConfig, HasPlatform (..), rslInLogL
+                   )
 import           Stack.Types.SourceMap
+                   ( CommonPackage (..), DepPackage (..), FromSnapshot (..)
+                   , GlobalPackage (..), GlobalPackageVersion (..)
+                   , ProjectPackage (..), SMActual (..), SMWanted (..)
+                   )
 
 -- | Create a 'ProjectPackage' from a directory containing a package.
 mkProjectPackage ::

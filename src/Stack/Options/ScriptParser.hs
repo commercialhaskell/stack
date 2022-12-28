@@ -32,7 +32,9 @@ data ScriptExecute
   | SEOptimize
   deriving Show
 
-data ShouldRun = YesRun | NoRun
+data ShouldRun
+  = YesRun
+  | NoRun
   deriving Show
 
 scriptOptsParser :: Parser ScriptOpts

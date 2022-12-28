@@ -519,7 +519,9 @@ buildExtractedTarball pkgDir = do
   -- We remove the path based on the name of the package
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
-        pure $ packageName (lpPackage localPackage) == packageName (lpPackage localPackageToBuild)
+        pure
+          $  packageName (lpPackage localPackage)
+          == packageName (lpPackage localPackageToBuild)
   pathsToKeep
     <- fmap Map.fromList
      $ flip filterM (Map.toList (smwProject (bcSMWanted (envConfigBuildConfig envConfig))))
@@ -527,8 +529,10 @@ buildExtractedTarball pkgDir = do
   pp <- mkProjectPackage YesPrintWarnings pkgDir False
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
-              { envConfigSourceMap = updatePackagesInSourceMap (envConfigSourceMap envConfig)
-              , envConfigBuildConfig = updateBuildConfig (envConfigBuildConfig envConfig)
+              { envConfigSourceMap =
+                  updatePackagesInSourceMap (envConfigSourceMap envConfig)
+              , envConfigBuildConfig =
+                  updateBuildConfig (envConfigBuildConfig envConfig)
               }
             updateBuildConfig bc = bc
               { bcConfig = (bcConfig bc)
@@ -577,8 +581,9 @@ packFileEntry filepath tarpath = do
   content <- S.readFile filepath
   let size = fromIntegral (S.length content)
   pure (Tar.simpleEntry tarpath (Tar.NormalFile (L.fromStrict content) size)) {
-    Tar.entryPermissions = if executable perms then Tar.executableFilePermissions
-                                               else Tar.ordinaryFilePermissions,
+    Tar.entryPermissions = if executable perms
+                             then Tar.executableFilePermissions
+                             else Tar.ordinaryFilePermissions,
     Tar.entryTime = mtime
   }
 

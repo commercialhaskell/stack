@@ -2165,7 +2165,8 @@ wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
 wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
 -- | Location of the ghc-pkg executable
-newtype GhcPkgExe = GhcPkgExe (Path Abs File)
+newtype GhcPkgExe
+  = GhcPkgExe (Path Abs File)
   deriving Show
 
 -- | Get the 'GhcPkgExe' from a 'HasCompiler' environment
