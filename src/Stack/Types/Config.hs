@@ -859,7 +859,8 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
     , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
     , globalMonoidLockFileBehavior :: !(First LockFileBehavior) -- ^ See 'globalLockFileBehavior'
-    } deriving Generic
+    }
+    deriving Generic
 
 instance Semigroup GlobalOptsMonoid where
     (<>) = mappenddefault
@@ -1825,7 +1826,8 @@ data DownloadInfo = DownloadInfo
     , downloadInfoContentLength :: Maybe Int
     , downloadInfoSha1 :: Maybe ByteString
     , downloadInfoSha256 :: Maybe ByteString
-    } deriving Show
+    }
+    deriving Show
 
 instance FromJSON (WithJSONWarnings DownloadInfo) where
     parseJSON = withObjectWarnings "DownloadInfo" parseDownloadInfoFromObject
@@ -1964,7 +1966,8 @@ instance FromJSON PvpBounds where
 newtype DockerEntrypoint = DockerEntrypoint
     { deUser :: Maybe DockerUser
       -- ^ UID/GID/etc of host user, if we wish to perform UID/GID switch in container
-    } deriving (Read, Show)
+    }
+    deriving (Read, Show)
 
 -- | Docker host user info
 data DockerUser = DockerUser
@@ -1972,7 +1975,8 @@ data DockerUser = DockerUser
     , duGid :: GroupID -- ^ gid
     , duGroups :: [GroupID] -- ^ Supplemental groups
     , duUmask :: FileMode -- ^ File creation mask }
-    } deriving (Read, Show)
+    }
+    deriving (Read, Show)
 
 data GhcOptionKey
   = GOKOldEverything
@@ -2221,9 +2225,12 @@ data ExtraDirs = ExtraDirs
     { edBins :: ![Path Abs Dir]
     , edInclude :: ![Path Abs Dir]
     , edLib :: ![Path Abs Dir]
-    } deriving (Show, Generic)
+    }
+    deriving (Show, Generic)
+
 instance Semigroup ExtraDirs where
     (<>) = mappenddefault
+
 instance Monoid ExtraDirs where
     mempty = memptydefault
     mappend = (<>)

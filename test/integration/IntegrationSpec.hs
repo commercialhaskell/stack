@@ -67,7 +67,8 @@ main = runSimpleApp $ do
 data Options = Options
   { optSpeed :: Maybe Speed
   , optMatch :: Maybe String
-  } deriving Generic
+  }
+  deriving Generic
 
 instance ParseRecord Options where
   parseRecord = parseRecordWithModifiers modifiers

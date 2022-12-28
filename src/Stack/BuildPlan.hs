@@ -288,7 +288,8 @@ type DepErrors = Map PackageName DepError
 data DepError = DepError
     { deVersion :: !(Maybe Version)
     , deNeededBy :: !(Map PackageName VersionRange)
-    } deriving Show
+    }
+    deriving Show
 
 -- | Combine two 'DepError's for the same 'Version'.
 combineDepError :: DepError -> DepError -> DepError

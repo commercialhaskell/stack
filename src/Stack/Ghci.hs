@@ -118,7 +118,8 @@ data GhciOpts = GhciOpts
     , ghciHidePackages       :: !(Maybe Bool)
     , ghciNoBuild            :: !Bool
     , ghciOnlyMain           :: !Bool
-    } deriving Show
+    }
+    deriving Show
 
 -- | Necessary information to load a package or its components.
 --
@@ -133,7 +134,8 @@ data GhciPkgInfo = GhciPkgInfo
     , ghciPkgMainIs :: !(Map NamedComponent [Path Abs File])
     , ghciPkgTargetFiles :: !(Maybe [Path Abs File])
     , ghciPkgPackage :: !Package
-    } deriving Show
+    }
+    deriving Show
 
 -- | Loaded package description and related info.
 data GhciPkgDesc = GhciPkgDesc

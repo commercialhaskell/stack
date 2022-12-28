@@ -218,17 +218,18 @@ data BuildInfoOpts = BuildInfoOpts
     -- there are no multi-word options (see
     -- https://github.com/commercialhaskell/stack/issues/1255)
     , bioCabalMacros :: Path Abs File
-    } deriving Show
+    }
+    deriving Show
 
 -- | Package build configuration
 data PackageConfig =
-  PackageConfig {packageConfigEnableTests :: !Bool                -- ^ Are tests enabled?
-                ,packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
-                ,packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
-                ,packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
-                ,packageConfigCabalConfigOpts :: ![Text]          -- ^ ./Setup.hs configure options
-                ,packageConfigCompilerVersion :: ActualCompiler   -- ^ GHC version
-                ,packageConfigPlatform :: !Platform               -- ^ host platform
+  PackageConfig { packageConfigEnableTests :: !Bool                -- ^ Are tests enabled?
+                , packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
+                , packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
+                , packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
+                , packageConfigCabalConfigOpts :: ![Text]          -- ^ ./Setup.hs configure options
+                , packageConfigCompilerVersion :: ActualCompiler   -- ^ GHC version
+                , packageConfigPlatform :: !Platform               -- ^ host platform
                 }
  deriving (Show, Typeable)
 

@@ -20,19 +20,22 @@ infixr 0 ==>
 a ==> b = not a || b
 
 
-newtype QFilePathValidW = QFilePathValidW FilePath deriving Show
+newtype QFilePathValidW = QFilePathValidW FilePath
+    deriving Show
 
 instance Arbitrary QFilePathValidW where
     arbitrary = fmap (QFilePathValidW . W.makeValid) arbitraryFilePath
     shrink (QFilePathValidW x) = shrinkValid QFilePathValidW W.makeValid x
 
-newtype QFilePathValidP = QFilePathValidP FilePath deriving Show
+newtype QFilePathValidP = QFilePathValidP FilePath
+    deriving Show
 
 instance Arbitrary QFilePathValidP where
     arbitrary = fmap (QFilePathValidP . P.makeValid) arbitraryFilePath
     shrink (QFilePathValidP x) = shrinkValid QFilePathValidP P.makeValid x
 
-newtype QFilePath = QFilePath FilePath deriving Show
+newtype QFilePath = QFilePath FilePath
+    deriving Show
 
 instance Arbitrary QFilePath where
     arbitrary = fmap QFilePath arbitraryFilePath

@@ -124,7 +124,8 @@ data DotPayload = DotPayload
   -- ^ The license the package was released under.
   , payloadLocation :: Maybe PackageLocation
   -- ^ The location of the package.
-  } deriving (Eq, Show)
+  }
+  deriving (Eq, Show)
 
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and a map from package names to

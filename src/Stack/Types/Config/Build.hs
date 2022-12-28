@@ -177,7 +177,8 @@ data BuildOptsCLI = BuildOptsCLI
     , boptsCLIOnlyConfigure :: !Bool
     , boptsCLICommand :: !BuildCommand
     , boptsCLIInitialBuildSteps :: !Bool
-    } deriving Show
+    }
+    deriving Show
 
 -- | Command sum type for conditional arguments.
 data BuildCommand
@@ -219,7 +220,8 @@ data BuildOptsMonoid = BuildOptsMonoid
     , buildMonoidSkipComponents :: ![Text]
     , buildMonoidInterleavedOutput :: !FirstTrue
     , buildMonoidDdumpDir :: !(First Text)
-    } deriving (Show, Generic)
+    }
+    deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
   parseJSON = withObjectWarnings "BuildOptsMonoid"
@@ -358,13 +360,14 @@ data BuildSubset
 
 -- | Options for the 'FinalAction' 'DoTests'
 data TestOpts =
-  TestOpts {toRerunTests :: !Bool -- ^ Whether successful tests will be run gain
-           ,toAdditionalArgs :: ![String] -- ^ Arguments passed to the test program
-           ,toCoverage :: !Bool -- ^ Generate a code coverage report
-           ,toDisableRun :: !Bool -- ^ Disable running of tests
-           ,toMaximumTimeSeconds :: !(Maybe Int) -- ^ test suite timeout in seconds
-           ,toAllowStdin :: !Bool -- ^ Whether to allow standard input
-           } deriving (Eq, Show)
+  TestOpts { toRerunTests :: !Bool -- ^ Whether successful tests will be run gain
+           , toAdditionalArgs :: ![String] -- ^ Arguments passed to the test program
+           , toCoverage :: !Bool -- ^ Generate a code coverage report
+           , toDisableRun :: !Bool -- ^ Disable running of tests
+           , toMaximumTimeSeconds :: !(Maybe Int) -- ^ test suite timeout in seconds
+           , toAllowStdin :: !Bool -- ^ Whether to allow standard input
+           }
+           deriving (Eq, Show)
 
 defaultTestOpts :: TestOpts
 defaultTestOpts = TestOpts
@@ -384,7 +387,8 @@ data TestOptsMonoid =
     , toMonoidDisableRun :: !FirstFalse
     , toMonoidMaximumTimeSeconds :: !(First (Maybe Int))
     , toMonoidAllowStdin :: !FirstTrue
-    } deriving (Show, Generic)
+    }
+    deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings TestOptsMonoid) where
   parseJSON = withObjectWarnings "TestOptsMonoid"
@@ -426,11 +430,13 @@ instance Monoid TestOptsMonoid where
 -- | Haddock Options
 newtype HaddockOpts =
   HaddockOpts { hoAdditionalArgs :: [String] -- ^ Arguments passed to haddock program
-              } deriving (Eq, Show)
+              }
+              deriving (Eq, Show)
 
 newtype HaddockOptsMonoid =
-  HaddockOptsMonoid {hoMonoidAdditionalArgs :: [String]
-                    } deriving (Show, Generic)
+  HaddockOptsMonoid { hoMonoidAdditionalArgs :: [String]
+                    }
+                    deriving (Show, Generic)
 
 defaultHaddockOpts :: HaddockOpts
 defaultHaddockOpts = HaddockOpts {hoAdditionalArgs = []}
@@ -456,7 +462,8 @@ data BenchmarkOpts =
   BenchmarkOpts
     { beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
     , beoDisableRun :: !Bool -- ^ Disable running of benchmarks
-    } deriving (Eq, Show)
+    }
+    deriving (Eq, Show)
 
 defaultBenchmarkOpts :: BenchmarkOpts
 defaultBenchmarkOpts = BenchmarkOpts
@@ -466,9 +473,10 @@ defaultBenchmarkOpts = BenchmarkOpts
 
 data BenchmarkOptsMonoid =
   BenchmarkOptsMonoid
-     { beoMonoidAdditionalArgs :: !(First String)
-     , beoMonoidDisableRun :: !(First Bool)
-     } deriving (Show, Generic)
+    { beoMonoidAdditionalArgs :: !(First String)
+    , beoMonoidDisableRun :: !(First Bool)
+    }
+    deriving (Show, Generic)
 
 instance FromJSON (WithJSONWarnings BenchmarkOptsMonoid) where
   parseJSON = withObjectWarnings "BenchmarkOptsMonoid"

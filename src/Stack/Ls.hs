@@ -72,13 +72,15 @@ data SnapshotOpts = SnapshotOpts
     { soptViewType :: LsView
     , soptLtsSnapView :: Bool
     , soptNightlySnapView :: Bool
-    } deriving (Eq, Show, Ord)
+    }
+    deriving (Eq, Show, Ord)
 
 data ListStylesOpts = ListStylesOpts
     { coptBasic   :: Bool
     , coptSGR     :: Bool
     , coptExample :: Bool
-    } deriving (Eq, Ord, Show)
+    }
+    deriving (Eq, Ord, Show)
 
 newtype ListToolsOpts = ListToolsOpts
     { toptFilter  :: String
@@ -178,12 +180,14 @@ data Snapshot = Snapshot
     { snapId :: Text
     , snapTitle :: Text
     , snapTime :: Text
-    } deriving (Show, Eq, Ord)
+    }
+    deriving (Show, Eq, Ord)
 
 data SnapshotData = SnapshotData
     { _snapTotalCounts :: Integer
     , snaps :: [[Snapshot]]
-    } deriving (Show, Eq, Ord)
+    }
+    deriving (Show, Eq, Ord)
 
 instance FromJSON Snapshot where
     parseJSON o@(Array _) = parseSnapshot o

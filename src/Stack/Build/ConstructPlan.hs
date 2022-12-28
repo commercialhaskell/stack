@@ -118,7 +118,8 @@ data W = W
   -- ^ Warnings
   , wParents :: !ParentMap
   -- ^ Which packages a given package depends on, along with the package's version
-  } deriving Generic
+  }
+  deriving Generic
 
 instance Semigroup W where
   (<>) = mappenddefault

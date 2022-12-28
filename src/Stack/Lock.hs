@@ -42,7 +42,8 @@ instance Exception LockException where
 data LockedLocation a b = LockedLocation
     { llOriginal :: a
     , llCompleted :: b
-    } deriving (Eq, Show)
+    }
+    deriving (Eq, Show)
 
 instance (ToJSON a, ToJSON b) => ToJSON (LockedLocation a b) where
     toJSON ll =
@@ -73,7 +74,8 @@ instance FromJSON (WithJSONWarnings (Unresolved SingleRPLI)) where
 data Locked = Locked
     { lckSnapshotLocations :: [LockedLocation RawSnapshotLocation SnapshotLocation]
     , lckPkgImmutableLocations :: [LockedLocation RawPackageLocationImmutable PackageLocationImmutable]
-    } deriving (Eq, Show)
+    }
+    deriving (Eq, Show)
 
 instance ToJSON Locked where
     toJSON Locked {..} =
