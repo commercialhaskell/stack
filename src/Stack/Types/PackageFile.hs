@@ -33,21 +33,30 @@ data GetPackageFileContext = GetPackageFileContext
   }
 
 instance HasPlatform GetPackageFileContext
+
 instance HasGHCVariant GetPackageFileContext
+
 instance HasLogFunc GetPackageFileContext where
   logFuncL = configL.logFuncL
+
 instance HasRunner GetPackageFileContext where
   runnerL = configL.runnerL
+
 instance HasStylesUpdate GetPackageFileContext where
   stylesUpdateL = runnerL.stylesUpdateL
+
 instance HasTerm GetPackageFileContext where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
+
 instance HasConfig GetPackageFileContext
+
 instance HasPantryConfig GetPackageFileContext where
   pantryConfigL = configL.pantryConfigL
+
 instance HasProcessContext GetPackageFileContext where
   processContextL = configL.processContextL
+
 instance HasBuildConfig GetPackageFileContext where
   buildConfigL = lens ctxBuildConfig (\x y -> x { ctxBuildConfig = y })
 

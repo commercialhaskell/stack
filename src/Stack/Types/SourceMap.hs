@@ -27,18 +27,19 @@ module Stack.Types.SourceMap
 import qualified Data.Text as T
 import           Distribution.PackageDescription ( GenericPackageDescription )
 import qualified Pantry.SHA256 as SHA256
-import           Path
+import           Path ( parseRelDir )
 import           Stack.Prelude
-import           Stack.Types.Compiler
-import           Stack.Types.NamedComponent
+import           Stack.Types.Compiler ( ActualCompiler )
+import           Stack.Types.NamedComponent ( NamedComponent )
 
 -- | Common settings for both dependency and project package.
 data CommonPackage = CommonPackage
   { cpGPD :: !(IO GenericPackageDescription)
   , cpName :: !PackageName
   , cpFlags :: !(Map FlagName Bool)
-  -- ^ overrides default flags
-  , cpGhcOptions :: ![Text] -- also lets us know if we're doing profiling
+    -- ^ overrides default flags
+  , cpGhcOptions :: ![Text]
+    -- also lets us know if we're doing profiling
   , cpCabalConfigOpts :: ![Text]
   , cpHaddocks :: !Bool
   }
@@ -46,9 +47,9 @@ data CommonPackage = CommonPackage
 -- | Flag showing if package comes from a snapshot
 -- needed to ignore dependency bounds between such packages
 data FromSnapshot
-    = FromSnapshot
-    | NotFromSnapshot
-    deriving Show
+  = FromSnapshot
+  | NotFromSnapshot
+  deriving Show
 
 -- | A view of a dependency package, specified in stack.yaml
 data DepPackage = DepPackage
@@ -108,7 +109,8 @@ data SMActual global = SMActual
   , smaGlobal :: !(Map PackageName global)
   }
 
-newtype GlobalPackageVersion = GlobalPackageVersion Version
+newtype GlobalPackageVersion
+  = GlobalPackageVersion Version
 
 -- | How a package is intended to be built
 data Target
@@ -153,7 +155,8 @@ data SourceMap = SourceMap
   }
 
 -- | A unique hash for the immutable portions of a 'SourceMap'.
-newtype SourceMapHash = SourceMapHash SHA256
+newtype SourceMapHash
+  = SourceMapHash SHA256
 
 -- | Returns relative directory name with source map's hash
 smRelDir :: (MonadThrow m) => SourceMapHash -> m (Path Rel Dir)

@@ -4,7 +4,6 @@
 {-# LANGUAGE ViewPatterns      #-}
 
 -- | Versions for packages.
-
 module Stack.Types.Version
   ( Cabal.VersionRange -- TODO in the future should have a newtype wrapper
   , IntersectingVersionRange (..)
