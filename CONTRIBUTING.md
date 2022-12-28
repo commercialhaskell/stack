@@ -329,6 +329,48 @@ Once installed, you can check your changes with command:
 stack exec -- sh ./etc/scripts/hlint.sh
 ~~~
 
+## Code Style
+
+A single code style is not applied consistently to Stack's code and Stack is not
+Procrustean about matters of style. Rules of thumb, however, are:
+
+* keep pull requests that simply reformat code separate from those that make
+  other changes to code; and
+* when making changes to code other than reformatting, follow the existing style
+  of the function(s) or module(s) in question.
+
+That said, the following may help:
+
+* Stack's code generally avoids the use of C preprocessor (CPP) directives.
+  Windows and non-Windows code is separated in separate source code directories
+  and distinguished in Stack's Cabal file. `Stack.Constants.osIsWindows :: Bool`
+  is provided. Multi-line strings are generally formatted on the assumption that
+  GHC's `CPP` language pragma is not being used.
+* Language pragmas usually start with `NoImplictPrelude`, where applicable, and
+  then all others are listed alphabetically. The closing `#-}` are aligned, for
+  purely aesthetic reasons.
+* Stack is compiled with GHC's `-Wall` enabled, which includes `-Wtabs` (no tabs
+  in source code). Most modules are based on two spaces (with one space for a
+  `where`) for indentation but older and larger modules are still based on four
+  spaces.
+* Stack's code and documentation tends to be based on lines of no more than 80
+  characters or, if longer, no longer than necessary.
+* Stack uses export lists.
+* Stack's imports are listed alphabetically, including `Stack.Prelude`, where
+  applicable. The module names are left aligned, with space left for `qualified`
+  where it is absent.
+* Stack's code is sufficiently stable that explict import lists can sensibly be
+  used. The exception is the import of `Stack.Prelude`. Not all modules have
+  comprehensive explicit import lists.
+* Short explicit import lists follow the module name. Longer lists start on the
+  line below the module name. Spaces are used to separate listed items from
+  their enclosing parentheses.
+* As noted above, the types used to implement Stack's exceptions and the related
+ `instance` definitions are usually located at the top of the relevant module.
+* In function type signatures, the `::` is kept on the same line as the
+  function's name. This format is Haskell syntax highlighter-friendly.
+* If `where` is used, the declarations follow on a separate line.
+
 ## Testing
 
 The Stack code has both unit tests and integration tests. Integration tests can
