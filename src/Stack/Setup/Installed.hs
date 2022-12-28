@@ -40,7 +40,7 @@ import           Stack.Types.Config
 data Tool
     = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
     | ToolGhcGit !Text !Text   -- ^ e.g. ghc-git-COMMIT_ID-FLAVOUR
-    deriving (Eq)
+    deriving Eq
 
 -- | 'Tool' values are ordered by name (being @ghc-git@, for @ToolGhcGit _ _@)
 -- alphabetically and then by version (later versions are ordered before

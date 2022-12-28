@@ -415,4 +415,4 @@ data Global = Global
     , gStaticLinux :: !Bool
     , gCertificateName :: !(Maybe String)
     }
-    deriving (Show)
+    deriving Show

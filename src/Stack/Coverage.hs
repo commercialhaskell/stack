@@ -251,7 +251,8 @@ data HpcReportOpts = HpcReportOpts
     , hroptsAll :: Bool
     , hroptsDestDir :: Maybe String
     , hroptsOpenBrowser :: Bool
-    } deriving (Show)
+    }
+    deriving Show
 
 generateHpcReportForTargets :: HasEnvConfig env
                             => HpcReportOpts -> [Text] -> [Text] -> RIO env ()

@@ -121,7 +121,7 @@ getGhcVersion (ACGhcGit _ _) =
 -- | Repository containing the compiler sources
 newtype CompilerRepository
   = CompilerRepository Text
-  deriving (Show)
+  deriving Show
 
 instance FromJSON CompilerRepository where
   parseJSON = withText "CompilerRepository" (pure . CompilerRepository)

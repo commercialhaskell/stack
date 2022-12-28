@@ -53,7 +53,7 @@ data Action = Action
     }
 
 data Concurrency = ConcurrencyAllowed | ConcurrencyDisallowed
-    deriving (Eq)
+    deriving Eq
 
 data ActionContext = ActionContext
     { acRemaining :: !(Set ActionId)

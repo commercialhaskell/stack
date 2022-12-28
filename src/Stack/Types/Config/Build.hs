@@ -98,7 +98,7 @@ data BuildOpts =
             -- multiple packages?
             ,boptsDdumpDir :: !(Maybe Text)
             }
-  deriving (Show)
+  deriving Show
 
 defaultBuildOpts :: BuildOpts
 defaultBuildOpts = BuildOpts

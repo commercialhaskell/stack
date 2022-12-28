@@ -736,7 +736,8 @@ data ExecOpts = ExecOpts
     { eoCmd :: !SpecialExecCmd
     , eoArgs :: ![String]
     , eoExtra :: !ExecOptsExtra
-    } deriving (Show)
+    }
+    deriving Show
 
 data SpecialExecCmd
     = ExecCmd String
@@ -751,12 +752,13 @@ data ExecOptsExtra = ExecOptsExtra
   , eoRtsOptions :: ![String]
   , eoCwd :: !(Maybe FilePath)
   }
-  deriving (Show)
+  deriving Show
 
 data EvalOpts = EvalOpts
     { evalArg :: !String
     , evalExtra :: !ExecOptsExtra
-    } deriving (Show)
+    }
+    deriving Show
 
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts
@@ -774,7 +776,8 @@ data GlobalOpts = GlobalOpts
     , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
     , globalStackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
     , globalLockFileBehavior :: !LockFileBehavior
-    } deriving (Show)
+    }
+    deriving Show
 
 rslInLogL :: HasRunner env => SimpleGetter env Bool
 rslInLogL = globalOptsL.to globalRSLInLog
@@ -1750,7 +1753,7 @@ parseProjectAndConfigMonoid rootDir =
 
 -- | A software control system.
 data SCM = Git
-  deriving (Show)
+  deriving Show
 
 instance FromJSON SCM where
     parseJSON v = do
@@ -1781,7 +1784,7 @@ data GHCVariant
     -- ^ Bindist that uses the Haskell-native big-integer backend
     | GHCCustom String
     -- ^ Other bindists
-    deriving (Show)
+    deriving Show
 
 instance FromJSON GHCVariant where
     -- Strange structuring is to give consistent error messages
@@ -1822,7 +1825,7 @@ data DownloadInfo = DownloadInfo
     , downloadInfoContentLength :: Maybe Int
     , downloadInfoSha1 :: Maybe ByteString
     , downloadInfoSha256 :: Maybe ByteString
-    } deriving (Show)
+    } deriving Show
 
 instance FromJSON (WithJSONWarnings DownloadInfo) where
     parseJSON = withObjectWarnings "DownloadInfo" parseDownloadInfoFromObject

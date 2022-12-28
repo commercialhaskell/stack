@@ -36,7 +36,7 @@ data NixOpts = NixOpts
   , nixAddGCRoots :: !Bool
      -- ^ Should we register gc roots so running nix-collect-garbage doesn't remove nix dependencies
   }
-  deriving (Show)
+  deriving Show
 
 -- | An uninterpreted representation of nix options.
 -- Configurations may be "cascaded" using mappend (left-biased).

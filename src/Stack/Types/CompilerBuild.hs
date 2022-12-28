@@ -14,7 +14,7 @@ import           Data.Text as T
 data CompilerBuild
     = CompilerBuildStandard
     | CompilerBuildSpecialized String
-    deriving (Show)
+    deriving Show
 
 instance FromJSON CompilerBuild where
     -- Strange structuring is to give consistent error messages
