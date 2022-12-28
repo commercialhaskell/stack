@@ -158,11 +158,11 @@ sinkProcessStderrStdout name args sinkStderr sinkStdout =
 --
 -- Throws a 'ReadProcessException' if unsuccessful.
 sinkProcessStdout ::
-       (HasProcessContext env, HasLogFunc env, HasCallStack)
-    => String -- ^ Command
-    -> [String] -- ^ Command line arguments
-    -> ConduitM ByteString Void (RIO env) a -- ^ Sink for stdout
-    -> RIO env a
+     (HasProcessContext env, HasLogFunc env, HasCallStack)
+  => String -- ^ Command
+  -> [String] -- ^ Command line arguments
+  -> ConduitM ByteString Void (RIO env) a -- ^ Sink for stdout
+  -> RIO env a
 sinkProcessStdout name args sinkStdout =
   proc name args $ \pc ->
   withLoggedProcess_ (setStdin closed pc) $ \p -> runConcurrently
@@ -170,14 +170,14 @@ sinkProcessStdout name args sinkStdout =
    *> Concurrently (runConduit $ getStdout p .| sinkStdout)
 
 logProcessStderrStdout ::
-       (HasCallStack, HasProcessContext env, HasLogFunc env)
-    => ProcessConfig stdin stdoutIgnored stderrIgnored
-    -> RIO env ()
+     (HasCallStack, HasProcessContext env, HasLogFunc env)
+  => ProcessConfig stdin stdoutIgnored stderrIgnored
+  -> RIO env ()
 logProcessStderrStdout pc = withLoggedProcess_ pc $ \p ->
-    let logLines = CB.lines .| CL.mapM_ (logInfo . displayBytesUtf8)
-    in  runConcurrently
-            $ Concurrently (runConduit $ getStdout p .| logLines)
-           *> Concurrently (runConduit $ getStderr p .| logLines)
+  let logLines = CB.lines .| CL.mapM_ (logInfo . displayBytesUtf8)
+  in  runConcurrently
+        $  Concurrently (runConduit $ getStdout p .| logLines)
+        *> Concurrently (runConduit $ getStderr p .| logLines)
 
 -- | Read from the process, ignoring any output.
 --
@@ -254,11 +254,14 @@ stackProgName' :: Text
 stackProgName' = T.pack stackProgName
 
 -- | Like @First Bool@, but the default is @True@.
-newtype FirstTrue = FirstTrue { getFirstTrue :: Maybe Bool }
-  deriving (Show, Eq, Ord)
+newtype FirstTrue
+  = FirstTrue { getFirstTrue :: Maybe Bool }
+  deriving (Eq, Ord, Show)
+
 instance Semigroup FirstTrue where
   FirstTrue (Just x) <> _ = FirstTrue (Just x)
   FirstTrue Nothing <> x = x
+
 instance Monoid FirstTrue where
   mempty = FirstTrue Nothing
   mappend = (<>)
@@ -272,11 +275,14 @@ defaultFirstTrue :: (a -> FirstTrue) -> Bool
 defaultFirstTrue _ = True
 
 -- | Like @First Bool@, but the default is @False@.
-newtype FirstFalse = FirstFalse { getFirstFalse :: Maybe Bool }
-  deriving (Show, Eq, Ord)
+newtype FirstFalse
+  = FirstFalse { getFirstFalse :: Maybe Bool }
+  deriving (Eq, Ord, Show)
+
 instance Semigroup FirstFalse where
   FirstFalse (Just x) <> _ = FirstFalse (Just x)
   FirstFalse Nothing <> x = x
+
 instance Monoid FirstFalse where
   mempty = FirstFalse Nothing
   mappend = (<>)
@@ -292,38 +298,38 @@ defaultFirstFalse _ = False
 -- | Write a @Builder@ to a file and atomically rename.
 writeBinaryFileAtomic :: MonadIO m => Path absrel File -> Builder -> m ()
 writeBinaryFileAtomic fp builder =
-    liftIO $
-    withBinaryFileAtomic (toFilePath fp) WriteMode (`hPutBuilder` builder)
+  liftIO $
+  withBinaryFileAtomic (toFilePath fp) WriteMode (`hPutBuilder` builder)
 
 newtype PrettyRawSnapshotLocation
-    = PrettyRawSnapshotLocation RawSnapshotLocation
+  = PrettyRawSnapshotLocation RawSnapshotLocation
 
 instance Pretty PrettyRawSnapshotLocation where
-    pretty (PrettyRawSnapshotLocation (RSLCompiler compiler)) =
-        fromString $ T.unpack $ utf8BuilderToText $ display compiler
-    pretty (PrettyRawSnapshotLocation (RSLUrl url Nothing)) =
-        style Url (fromString $ T.unpack url)
-    pretty (PrettyRawSnapshotLocation (RSLUrl url (Just blob))) =
-        fillSep
-        [ style Url (fromString $ T.unpack url)
-        , parens $ fromString $ T.unpack $ utf8BuilderToText $ display blob
-        ]
-    pretty (PrettyRawSnapshotLocation (RSLFilePath resolved)) =
-        style File (fromString $ show $ resolvedRelative resolved)
-    pretty (PrettyRawSnapshotLocation (RSLSynonym syn)) = fromString $ show syn
+  pretty (PrettyRawSnapshotLocation (RSLCompiler compiler)) =
+    fromString $ T.unpack $ utf8BuilderToText $ display compiler
+  pretty (PrettyRawSnapshotLocation (RSLUrl url Nothing)) =
+    style Url (fromString $ T.unpack url)
+  pretty (PrettyRawSnapshotLocation (RSLUrl url (Just blob))) =
+    fillSep
+    [ style Url (fromString $ T.unpack url)
+    , parens $ fromString $ T.unpack $ utf8BuilderToText $ display blob
+    ]
+  pretty (PrettyRawSnapshotLocation (RSLFilePath resolved)) =
+    style File (fromString $ show $ resolvedRelative resolved)
+  pretty (PrettyRawSnapshotLocation (RSLSynonym syn)) = fromString $ show syn
 
 -- | Report a bug in Stack.
 bugReport :: String -> String -> String
 bugReport code msg =
-    "Error: " ++ code ++ "\n" ++
-    bugDeclaration ++ " " ++ msg ++ " " ++ bugRequest
+  "Error: " ++ code ++ "\n" ++
+  bugDeclaration ++ " " ++ msg ++ " " ++ bugRequest
 
 -- | Report a pretty bug in Stack.
 bugPrettyReport :: String -> StyleDoc -> StyleDoc
 bugPrettyReport code msg =
-       "Error:" <+> fromString code
-    <> line
-    <> flow bugDeclaration <+> msg <+> flow bugRequest
+     "Error:" <+> fromString code
+  <> line
+  <> flow bugDeclaration <+> msg <+> flow bugRequest
 
 -- | Bug declaration message.
 bugDeclaration :: String

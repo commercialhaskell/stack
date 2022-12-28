@@ -17,11 +17,26 @@ import           Path ( (</>), parent )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           RIO.Process ( HasProcessContext (..), exeSearchPathL )
 import           Stack.Constants
-import           Stack.Constants.Config
+                   ( deprecatedStackRootOptionName, docDirSuffix
+                   , stackGlobalConfigOptionName, stackRootOptionName
+                   )
+import           Stack.Constants.Config ( distRelativeDir )
 import           Stack.GhcPkg as GhcPkg
 import           Stack.Prelude
 import           Stack.Runners
+                   ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Types.Config
+                   ( BuildConfig, CompilerPaths (..), Config (..), EnvConfig
+                   , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
+                   , HasEnvConfig (..), HasGHCVariant, HasPlatform
+                   , HasRunner (..), Runner, bindirCompilerTools
+                   , buildOptsMonoidHaddockL, getCompilerPath
+                   , globalOptsBuildOptsMonoidL, globalOptsL, hoogleRoot
+                   , hpcReportDir, installationRootDeps, installationRootLocal
+                   , packageDatabaseDeps, packageDatabaseExtra
+                   , packageDatabaseLocal, projectRootL, stackGlobalConfigL
+                   , stackRootL, stackYamlL
+                   )
 import qualified System.FilePath as FP
 
 -- | Print out useful path information in a human-readable format (and
@@ -125,26 +140,37 @@ data PathInfo = PathInfo
   }
 
 instance HasPlatform PathInfo
+
 instance HasLogFunc PathInfo where
   logFuncL = configL.logFuncL
+
 instance HasRunner PathInfo where
   runnerL = configL.runnerL
+
 instance HasStylesUpdate PathInfo where
   stylesUpdateL = runnerL.stylesUpdateL
+
 instance HasTerm PathInfo where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
+
 instance HasGHCVariant PathInfo
+
 instance HasConfig PathInfo
+
 instance HasPantryConfig PathInfo where
   pantryConfigL = configL.pantryConfigL
+
 instance HasProcessContext PathInfo where
   processContextL = configL.processContextL
+
 instance HasBuildConfig PathInfo where
   buildConfigL = lens piBuildConfig (\x y -> x { piBuildConfig = y })
                  . buildConfigL
 
-data UseHaddocks a = UseHaddocks a | WithoutHaddocks a
+data UseHaddocks a
+  = UseHaddocks a
+  | WithoutHaddocks a
 
 -- | The paths of interest to a user. The first tuple string is used
 -- for a description that the optparse flag uses, and the second
