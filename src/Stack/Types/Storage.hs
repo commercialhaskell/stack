@@ -6,7 +6,6 @@ module Stack.Types.Storage
   ( StoragePrettyException (..)
   ) where
 
-import           Data.Text
 import           Stack.Prelude
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by

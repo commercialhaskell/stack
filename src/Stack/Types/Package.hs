@@ -44,8 +44,6 @@ module Stack.Types.Package
  , runMemoizedWith
  ) where
 
-import           Stack.Prelude
-import qualified RIO.Text as T
 import           Data.Aeson
                    ( ToJSON (..), FromJSON (..), (.=), (.:), object, withObject
                    )
@@ -59,17 +57,19 @@ import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription
                    ( TestSuiteInterface, BuildType )
 import           Distribution.System ( Platform (..) )
-import           Stack.Types.Compiler
-import           Stack.Types.Config
-import           Stack.Types.GhcPkgId
-import           Stack.Types.NamedComponent
-import           Stack.Types.SourceMap
-import           Stack.Types.Version
+import qualified RIO.Text as T
+import           Stack.Prelude
+import           Stack.Types.Compiler ( ActualCompiler )
+import           Stack.Types.Config ( EnvConfig, HasEnvConfig (..) )
 import           Stack.Types.Dependency ( DepValue )
+import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.PackageFile
                    ( GetPackageFiles (..), DotCabalDescriptor (..)
                    , DotCabalPath (..)
                    )
+import           Stack.Types.SourceMap ( CommonPackage, FromSnapshot )
+import           Stack.Types.Version ( VersionRange )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -86,61 +86,59 @@ data PackageException
   deriving (Show, Typeable)
 
 instance Exception PackageException where
-    displayException (PackageInvalidCabalFile loc _mversion errs warnings) = concat
-        [ "Error: [S-8072]\n"
-        , "Unable to parse Cabal file "
-        , case loc of
-            Left pir -> "for " ++ T.unpack (utf8BuilderToText (display pir))
-            Right fp -> toFilePath fp
-        {-
-
-         Not actually needed, the errors will indicate if a newer version exists.
-         Also, it seems that this is set to Just the version even if we support it.
-
-        , case mversion of
-            Nothing -> ""
-            Just version -> "\nRequires newer Cabal file parser version: " ++
-                            versionString version
-        -}
-        , "\n\n"
-        , unlines $ map
-            (\(PError pos msg) -> concat
-                [ "- "
-                , showPos pos
-                , ": "
-                , msg
-                ])
-            errs
-        , unlines $ map
-            (\(PWarning _ pos msg) -> concat
-                [ "- "
-                , showPos pos
-                , ": "
-                , msg
-                ])
-            warnings
-        ]
-    displayException (MismatchedCabalIdentifier pir ident) = concat
-        [ "Error: [S-5394]\n"
-        , "Mismatched package identifier."
-        , "\nFound:    "
-        , packageIdentifierString ident
-        , "\nExpected: "
-        , T.unpack $ utf8BuilderToText $ display pir
-        ]
-    displayException (CabalFileNameParseFail fp) = concat
-        [ "Error: [S-2203]\n"
-        , "Invalid file path for Cabal file, must have a .cabal extension: "
-        , fp
-        ]
-    displayException (CabalFileNameInvalidPackageName fp) = concat
-        [ "Error: [S-8854]\n"
-        , "Cabal file names must use valid package names followed by a .cabal \
-          \extension, the following is invalid: "
-        , fp
-        ]
-    displayException ComponentNotParsedBug = bugReport "[S-4623]"
-        "Component names should always parse as directory names."
+  displayException (PackageInvalidCabalFile loc _mversion errs warnings) = concat
+    [ "Error: [S-8072]\n"
+    , "Unable to parse Cabal file "
+    , case loc of
+        Left pir -> "for " ++ T.unpack (utf8BuilderToText (display pir))
+        Right fp -> toFilePath fp
+    {-
+     Not actually needed, the errors will indicate if a newer version exists.
+     Also, it seems that this is set to Just the version even if we support it.
+    , case mversion of
+        Nothing -> ""
+        Just version -> "\nRequires newer Cabal file parser version: " ++
+                        versionString version
+    -}
+    , "\n\n"
+    , unlines $ map
+        (\(PError pos msg) -> concat
+            [ "- "
+            , showPos pos
+            , ": "
+            , msg
+            ])
+        errs
+    , unlines $ map
+        (\(PWarning _ pos msg) -> concat
+            [ "- "
+            , showPos pos
+            , ": "
+            , msg
+            ])
+        warnings
+    ]
+  displayException (MismatchedCabalIdentifier pir ident) = concat
+    [ "Error: [S-5394]\n"
+    , "Mismatched package identifier."
+    , "\nFound:    "
+    , packageIdentifierString ident
+    , "\nExpected: "
+    , T.unpack $ utf8BuilderToText $ display pir
+    ]
+  displayException (CabalFileNameParseFail fp) = concat
+    [ "Error: [S-2203]\n"
+    , "Invalid file path for Cabal file, must have a .cabal extension: "
+    , fp
+    ]
+  displayException (CabalFileNameInvalidPackageName fp) = concat
+    [ "Error: [S-8854]\n"
+    , "Cabal file names must use valid package names followed by a .cabal \
+      \extension, the following is invalid: "
+    , fp
+    ]
+  displayException ComponentNotParsedBug = bugReport "[S-4623]"
+    "Component names should always parse as directory names."
 
 -- | Libraries in a package. Since Cabal 2.0, internal libraries are a
 -- thing.
@@ -150,42 +148,63 @@ data PackageLibraries
  deriving (Show, Typeable)
 
 -- | Name of an executable.
-newtype ExeName = ExeName { unExeName :: Text }
-    deriving (Show, Eq, Ord, Hashable, IsString, Generic, NFData, Data, Typeable)
+newtype ExeName
+  = ExeName { unExeName :: Text }
+  deriving (Data, Eq, Generic, Hashable, IsString, NFData, Ord, Show, Typeable)
 
 -- | Some package info.
-data Package =
-  Package {packageName :: !PackageName                    -- ^ Name of the package.
-          ,packageVersion :: !Version                     -- ^ Version of the package
-          ,packageLicense :: !(Either SPDX.License License) -- ^ The license the package was released under.
-          ,packageFiles :: !GetPackageFiles               -- ^ Get all files of the package.
-          ,packageDeps :: !(Map PackageName DepValue)     -- ^ Packages that the package depends on, both as libraries and build tools.
-          ,packageUnknownTools :: !(Set ExeName)          -- ^ Build tools specified in the legacy manner (build-tools:) that failed the hard-coded lookup.
-          ,packageAllDeps :: !(Set PackageName)           -- ^ Original dependencies (not sieved).
-          ,packageGhcOptions :: ![Text]                   -- ^ Ghc options used on package.
-          ,packageCabalConfigOpts :: ![Text]              -- ^ Additional options passed to ./Setup.hs configure
-          ,packageFlags :: !(Map FlagName Bool)           -- ^ Flags used on package.
-          ,packageDefaultFlags :: !(Map FlagName Bool)    -- ^ Defaults for unspecified flags.
-          ,packageLibraries :: !PackageLibraries          -- ^ does the package have a buildable library stanza?
-          ,packageInternalLibraries :: !(Set Text)        -- ^ names of internal libraries
-          ,packageTests :: !(Map Text TestSuiteInterface) -- ^ names and interfaces of test suites
-          ,packageBenchmarks :: !(Set Text)               -- ^ names of benchmarks
-          ,packageExes :: !(Set Text)                     -- ^ names of executables
-          ,packageOpts :: !GetPackageOpts                 -- ^ Args to pass to GHC.
-          ,packageHasExposedModules :: !Bool              -- ^ Does the package have exposed modules?
-          ,packageBuildType :: !BuildType                 -- ^ Package build-type.
-          ,packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
-                                                          -- ^ If present: custom-setup dependencies
-          ,packageCabalSpec :: !CabalSpecVersion          -- ^ Cabal spec range
-          }
- deriving (Show, Typeable)
+data Package = Package
+  { packageName :: !PackageName
+    -- ^ Name of the package.
+  , packageVersion :: !Version
+    -- ^ Version of the package
+  , packageLicense :: !(Either SPDX.License License)
+    -- ^ The license the package was released under.
+  , packageFiles :: !GetPackageFiles
+    -- ^ Get all files of the package.
+  , packageDeps :: !(Map PackageName DepValue)
+    -- ^ Packages that the package depends on, both as libraries and build tools.
+  , packageUnknownTools :: !(Set ExeName)
+    -- ^ Build tools specified in the legacy manner (build-tools:) that failed the hard-coded lookup.
+  , packageAllDeps :: !(Set PackageName)
+    -- ^ Original dependencies (not sieved).
+  , packageGhcOptions :: ![Text]
+    -- ^ Ghc options used on package.
+  , packageCabalConfigOpts :: ![Text]
+    -- ^ Additional options passed to ./Setup.hs configure
+  , packageFlags :: !(Map FlagName Bool)
+    -- ^ Flags used on package.
+  , packageDefaultFlags :: !(Map FlagName Bool)
+    -- ^ Defaults for unspecified flags.
+  , packageLibraries :: !PackageLibraries
+    -- ^ does the package have a buildable library stanza?
+  , packageInternalLibraries :: !(Set Text)
+    -- ^ names of internal libraries
+  , packageTests :: !(Map Text TestSuiteInterface)
+    -- ^ names and interfaces of test suites
+  , packageBenchmarks :: !(Set Text)
+    -- ^ names of benchmarks
+  , packageExes :: !(Set Text)
+    -- ^ names of executables
+  , packageOpts :: !GetPackageOpts
+    -- ^ Args to pass to GHC.
+  , packageHasExposedModules :: !Bool
+    -- ^ Does the package have exposed modules?
+  , packageBuildType :: !BuildType
+    -- ^ Package build-type.
+  , packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
+    -- ^ If present: custom-setup dependencies
+  , packageCabalSpec :: !CabalSpecVersion
+    -- ^ Cabal spec range
+  }
+  deriving (Show, Typeable)
 
 packageIdent :: Package -> PackageIdentifier
 packageIdent p = PackageIdentifier (packageName p) (packageVersion p)
 
 packageIdentifier :: Package -> PackageIdentifier
 packageIdentifier pkg =
-    PackageIdentifier (packageName pkg) (packageVersion pkg)
+  PackageIdentifier (packageName pkg) (packageVersion pkg)
 
 packageDefinedFlags :: Package -> Set FlagName
 packageDefinedFlags = M.keysSet . packageDefaultFlags
@@ -195,42 +214,50 @@ type InstallMap = Map PackageName (InstallLocation, Version)
 -- | Files that the package depends on, relative to package directory.
 -- Argument is the location of the Cabal file
 newtype GetPackageOpts = GetPackageOpts
-    { getPackageOpts :: forall env. HasEnvConfig env
-                     => InstallMap
-                     -> InstalledMap
-                     -> [PackageName]
-                     -> [PackageName]
-                     -> Path Abs File
-                     -> RIO env
-                          (Map NamedComponent (Map ModuleName (Path Abs File))
-                          ,Map NamedComponent [DotCabalPath]
-                          ,Map NamedComponent BuildInfoOpts)
-    }
+  { getPackageOpts :: forall env. HasEnvConfig env
+                   => InstallMap
+                   -> InstalledMap
+                   -> [PackageName]
+                   -> [PackageName]
+                   -> Path Abs File
+                   -> RIO env
+                        (Map NamedComponent (Map ModuleName (Path Abs File))
+                        ,Map NamedComponent [DotCabalPath]
+                        ,Map NamedComponent BuildInfoOpts)
+  }
+
 instance Show GetPackageOpts where
-    show _ = "<GetPackageOpts>"
+  show _ = "<GetPackageOpts>"
 
 -- | GHC options based on cabal information and ghc-options.
 data BuildInfoOpts = BuildInfoOpts
-    { bioOpts :: [String]
-    , bioOneWordOpts :: [String]
-    , bioPackageFlags :: [String]
-    -- ^ These options can safely have 'nubOrd' applied to them, as
-    -- there are no multi-word options (see
-    -- https://github.com/commercialhaskell/stack/issues/1255)
-    , bioCabalMacros :: Path Abs File
-    }
-    deriving Show
+  { bioOpts :: [String]
+  , bioOneWordOpts :: [String]
+  , bioPackageFlags :: [String]
+  -- ^ These options can safely have 'nubOrd' applied to them, as
+  -- there are no multi-word options (see
+  -- https://github.com/commercialhaskell/stack/issues/1255)
+  , bioCabalMacros :: Path Abs File
+  }
+  deriving Show
 
 -- | Package build configuration
-data PackageConfig =
-  PackageConfig { packageConfigEnableTests :: !Bool                -- ^ Are tests enabled?
-                , packageConfigEnableBenchmarks :: !Bool           -- ^ Are benchmarks enabled?
-                , packageConfigFlags :: !(Map FlagName Bool)       -- ^ Configured flags.
-                , packageConfigGhcOptions :: ![Text]               -- ^ Configured ghc options.
-                , packageConfigCabalConfigOpts :: ![Text]          -- ^ ./Setup.hs configure options
-                , packageConfigCompilerVersion :: ActualCompiler   -- ^ GHC version
-                , packageConfigPlatform :: !Platform               -- ^ host platform
-                }
+data PackageConfig = PackageConfig
+  { packageConfigEnableTests :: !Bool
+    -- ^ Are tests enabled?
+  , packageConfigEnableBenchmarks :: !Bool
+    -- ^ Are benchmarks enabled?
+  , packageConfigFlags :: !(Map FlagName Bool)
+    -- ^ Configured flags.
+  , packageConfigGhcOptions :: ![Text]
+    -- ^ Configured ghc options.
+  , packageConfigCabalConfigOpts :: ![Text]
+    -- ^ ./Setup.hs configure options
+  , packageConfigCompilerVersion :: ActualCompiler
+    -- ^ GHC version
+  , packageConfigPlatform :: !Platform
+    -- ^ host platform
+  }
  deriving (Show, Typeable)
 
 -- | Compares the package name.
@@ -249,15 +276,15 @@ data PackageSource
   -- ^ Package which is downloaded remotely.
 
 instance Show PackageSource where
-    show (PSFilePath lp) = concat ["PSFilePath (", show lp, ")"]
-    show (PSRemote pli v fromSnapshot _) =
-        concat
-            [ "PSRemote"
-            , "(", show pli, ")"
-            , "(", show v, ")"
-            , show fromSnapshot
-            , "<CommonPackage>"
-            ]
+  show (PSFilePath lp) = concat ["PSFilePath (", show lp, ")"]
+  show (PSRemote pli v fromSnapshot _) =
+    concat
+      [ "PSRemote"
+      , "(", show pli, ")"
+      , "(", show v, ")"
+      , show fromSnapshot
+      , "<CommonPackage>"
+      ]
 
 
 psVersion :: PackageSource -> Version
@@ -266,35 +293,43 @@ psVersion (PSRemote _ v _ _) = v
 
 -- | Information on a locally available package of source code
 data LocalPackage = LocalPackage
-    { lpPackage       :: !Package
-    -- ^ The @Package@ info itself, after resolution with package flags,
-    -- with tests and benchmarks disabled
-    , lpComponents    :: !(Set NamedComponent)
+  { lpPackage       :: !Package
+     -- ^ The @Package@ info itself, after resolution with package flags,
+     -- with tests and benchmarks disabled
+  , lpComponents    :: !(Set NamedComponent)
     -- ^ Components to build, not including the library component.
-    , lpUnbuildable   :: !(Set NamedComponent)
+  , lpUnbuildable   :: !(Set NamedComponent)
     -- ^ Components explicitly requested for build, that are marked
     -- "buildable: false".
-    , lpWanted        :: !Bool -- FIXME Should completely drop this "wanted" terminology, it's unclear
+  , lpWanted        :: !Bool -- FIXME Should completely drop this "wanted"
+                             -- terminology, it's unclear
     -- ^ Whether this package is wanted as a target.
-    , lpTestBench     :: !(Maybe Package)
+  , lpTestBench     :: !(Maybe Package)
     -- ^ This stores the 'Package' with tests and benchmarks enabled, if
     -- either is asked for by the user.
-    , lpCabalFile     :: !(Path Abs File)
+  , lpCabalFile     :: !(Path Abs File)
     -- ^ The Cabal file
-    , lpBuildHaddocks :: !Bool
-    , lpForceDirty    :: !Bool
-    , lpDirtyFiles    :: !(MemoizedWith EnvConfig (Maybe (Set FilePath)))
+  , lpBuildHaddocks :: !Bool
+  , lpForceDirty    :: !Bool
+  , lpDirtyFiles    :: !(MemoizedWith EnvConfig (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-    , lpNewBuildCaches :: !(MemoizedWith EnvConfig (Map NamedComponent (Map FilePath FileCacheInfo)))
+  , lpNewBuildCaches :: !( MemoizedWith
+                             EnvConfig
+                             (Map NamedComponent (Map FilePath FileCacheInfo))
+                         )
     -- ^ current state of the files
-    , lpComponentFiles :: !(MemoizedWith EnvConfig (Map NamedComponent (Set (Path Abs File))))
+  , lpComponentFiles :: !( MemoizedWith
+                             EnvConfig
+                             (Map NamedComponent (Set (Path Abs File)))
+                         )
     -- ^ all files used by this package
-    }
-    deriving Show
+  }
+  deriving Show
 
-newtype MemoizedWith env a = MemoizedWith { unMemoizedWith :: RIO env a }
+newtype MemoizedWith env a
+  = MemoizedWith { unMemoizedWith :: RIO env a }
   deriving (Functor, Applicative, Monad)
 
 memoizeRefWith :: MonadIO m => RIO env a -> m (MemoizedWith env a)
@@ -334,23 +369,29 @@ lpFilesForComponents components lp = runMemoizedWith $ do
   pure $ mconcat (M.elems (M.restrictKeys componentFiles components))
 
 -- | A location to install a package into, either snapshot or local
-data InstallLocation = Snap | Local
-    deriving (Show, Eq)
-instance Semigroup InstallLocation where
-    Local <> _ = Local
-    _ <> Local = Local
-    Snap <> Snap = Snap
-instance Monoid InstallLocation where
-    mempty = Snap
-    mappend = (<>)
+data InstallLocation
+  = Snap
+  | Local
+  deriving (Eq, Show)
 
-data InstalledPackageLocation = InstalledTo InstallLocation | ExtraGlobal
-    deriving (Show, Eq)
+instance Semigroup InstallLocation where
+  Local <> _ = Local
+  _ <> Local = Local
+  Snap <> Snap = Snap
+
+instance Monoid InstallLocation where
+  mempty = Snap
+  mappend = (<>)
+
+data InstalledPackageLocation
+  = InstalledTo InstallLocation | ExtraGlobal
+  deriving (Eq, Show)
 
 newtype FileCacheInfo = FileCacheInfo
-    { fciHash :: SHA256
-    }
-    deriving (Generic, Show, Eq, Typeable)
+  { fciHash :: SHA256
+  }
+  deriving (Eq, Generic, Show, Typeable)
+
 instance NFData FileCacheInfo
 
 -- Provided for storing the BuildCache values in a file. But maybe
@@ -391,18 +432,18 @@ dotCabalCFilePath _ = Nothing
 -- | Get the path.
 dotCabalGetPath :: DotCabalPath -> Path Abs File
 dotCabalGetPath dcp =
-    case dcp of
-        DotCabalModulePath fp -> fp
-        DotCabalMainPath fp -> fp
-        DotCabalFilePath fp -> fp
-        DotCabalCFilePath fp -> fp
+  case dcp of
+    DotCabalModulePath fp -> fp
+    DotCabalMainPath fp -> fp
+    DotCabalFilePath fp -> fp
+    DotCabalCFilePath fp -> fp
 
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
 data Installed
-    = Library PackageIdentifier GhcPkgId (Maybe (Either SPDX.License License))
-    | Executable PackageIdentifier
-    deriving (Show, Eq)
+  = Library PackageIdentifier GhcPkgId (Maybe (Either SPDX.License License))
+  | Executable PackageIdentifier
+  deriving (Eq, Show)
 
 installedPackageIdentifier :: Installed -> PackageIdentifier
 installedPackageIdentifier (Library pid _ _) = pid

@@ -13,12 +13,16 @@ module Stack.Types.GhcPkgId
   , ghcPkgIdString
   ) where
 
-import           Stack.Prelude
-import           Pantry.Internal.AesonExtended
 import           Data.Attoparsec.Text
+                   ( Parser, choice, digit, endOfInput, letter, many1, parseOnly
+                   , satisfy
+                   )
 import qualified Data.Text as T
 import           Database.Persist.Sql ( PersistField, PersistFieldSql )
+import           Pantry.Internal.AesonExtended
+                   ( FromJSON (..), ToJSON (..), withText )
 import           Prelude ( Read (..) )
+import           Stack.Prelude
 
 -- | A parse fail.
 newtype GhcPkgIdParseFail
@@ -26,21 +30,24 @@ newtype GhcPkgIdParseFail
   deriving (Show, Typeable)
 
 instance Exception GhcPkgIdParseFail where
-    displayException (GhcPkgIdParseFail bs) = concat
-        [ "Error: [S-5359]\n"
-        , "Invalid package ID: "
-        , show bs
-        ]
+  displayException (GhcPkgIdParseFail bs) = concat
+    [ "Error: [S-5359]\n"
+    , "Invalid package ID: "
+    , show bs
+    ]
 
 -- | A ghc-pkg package identifier.
-newtype GhcPkgId = GhcPkgId Text
+newtype GhcPkgId
+  = GhcPkgId Text
   deriving (Eq, Ord, Data, Typeable, Generic, PersistField, PersistFieldSql)
 
 instance Hashable GhcPkgId
+
 instance NFData GhcPkgId
 
 instance Show GhcPkgId where
   show = show . ghcPkgIdString
+
 instance Read GhcPkgId where
   readsPrec i = map (first (GhcPkgId . T.pack)) . readsPrec i
 
@@ -65,8 +72,9 @@ parseGhcPkgId x = go x
 -- | A parser for a package-version-hash pair.
 ghcPkgIdParser :: Parser GhcPkgId
 ghcPkgIdParser =
-    let elements =  "_.-" :: String in
-    GhcPkgId . T.pack <$> many1 (choice [digit, letter, satisfy (`elem` elements)])
+  let elements = "_.-" :: String
+  in  GhcPkgId . T.pack <$>
+        many1 (choice [digit, letter, satisfy (`elem` elements)])
 
 -- | Get a string representation of GHC package id.
 ghcPkgIdString :: GhcPkgId -> String
