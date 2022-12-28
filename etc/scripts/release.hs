@@ -182,7 +182,7 @@ rules global@Global{..} args = do
         stageFiles <- getBinaryPkgStageFiles
         let fixPath path =
                 let (x, y) = break (== '/') path
-                 in concat [x, "-static", y]
+                in  concat [x, "-static", y]
         writeTarGz fixPath out releaseStageDir stageFiles
 
     releaseStageDir </> binaryName </> stackExeFileName %> \out -> do
@@ -356,7 +356,7 @@ stackVersionStr =
 platformOS :: OS
 platformOS =
     let Platform _ os = buildPlatform
-    in os
+    in  os
 
 -- | Directory in which to store build and intermediate files.
 releaseDir :: FilePath

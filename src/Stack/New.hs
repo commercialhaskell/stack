@@ -125,11 +125,11 @@ instance Pretty NewPrettyException where
                            , flow "was considered invalid because"
                            , fromString reason <> "."
                            ]
-              in (msg', False)
+              in  (msg', False)
             _ -> let msg' =    flow "the following error:"
                             <> blankLine
                             <> fromString (displayException err)
-                 in (msg', False)
+                 in  (msg', False)
     pretty (LoadTemplateFailed name path) =
         "[S-3650]"
         <> line

@@ -64,7 +64,8 @@ instance Exception BuildPlanException where
         , "Non existing resolver: " ++ snapName' ++ "."
         , "For a complete list of available snapshots see https://www.stackage.org/snapshots"
         ]
-      where snapName' = show snapName
+      where
+        snapName' = show snapName
     displayException (UnknownPackages stackYaml unknown shadowed) =
         "Error: [S-7571]\n"
         ++ unlines (unknown' ++ shadowed')
@@ -188,11 +189,11 @@ removeSrcPkgDefaultFlags gpds flags =
     where
         removeSame f1 f2 =
             let diff v v' = if v == v' then Nothing else Just v
-            in Just $ Map.differenceWith diff f1 f2
+            in  Just $ Map.differenceWith diff f1 f2
 
         gpdDefaultFlags gpd =
             let tuples = map getDefault (C.genPackageFlags gpd)
-            in Map.singleton (gpdPackageName gpd) (Map.fromList tuples)
+            in  Map.singleton (gpdPackageName gpd) (Map.fromList tuples)
 
         getDefault f
             | C.flagDefault f = (C.flagName f, True)
@@ -218,13 +219,15 @@ selectPackageBuildPlan platform compiler pool gpd =
             | nErrors p1 == 0 = p1
             | nErrors p1 <= nErrors p2 = p1
             | otherwise = p2
-          where nErrors = Map.size . snd
+          where
+            nErrors = Map.size . snd
 
     -- Avoid exponential complexity in flag combinations making us sad pandas.
     -- See: https://github.com/commercialhaskell/stack/issues/543
     limitSearchSpace :: NonEmpty a -> NonEmpty a
     limitSearchSpace (x :| xs) = x :| take (maxFlagCombinations - 1) xs
-      where maxFlagCombinations = 128
+     where
+      maxFlagCombinations = 128
 
     makePlan :: [(FlagName, Bool)] -> (Map PackageName (Map FlagName Bool), DepErrors)
     makePlan flags = checkPackageBuildPlan platform compiler pool (Map.fromList flags) gpd
@@ -237,7 +240,8 @@ selectPackageBuildPlan platform compiler pool gpd =
             | flagManual f = (fname, flagDefault f) :| []
             | flagDefault f = (fname, True) :| [(fname, False)]
             | otherwise = (fname, False) :| [(fname, True)]
-          where fname = flagName f
+          where
+            fname = flagName f
 
 -- | Check whether with the given set of flags a package's dependency
 -- constraints can be satisfied against a given build plan or pool of packages.
@@ -330,7 +334,7 @@ compareBuildPlanCheck (BuildPlanCheckPartial _ e1) (BuildPlanCheckPartial _ e2) 
     compare (Map.size e2) (Map.size e1)
 compareBuildPlanCheck (BuildPlanCheckFail _ e1 _) (BuildPlanCheckFail _ e2 _) =
     let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
-    in compare (numUserPkgs e2) (numUserPkgs e1)
+    in  compare (numUserPkgs e2) (numUserPkgs e1)
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckOk{}      = EQ
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckPartial{} = GT
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckFail{}    = GT

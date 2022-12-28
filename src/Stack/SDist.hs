@@ -534,7 +534,7 @@ buildExtractedTarball pkgDir = do
               { bcConfig = (bcConfig bc)
                  { configBuild = defaultBuildOpts { boptsTests = True } }
               }
-        in set envConfigL updatedEnvConfig env
+        in  set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =
         sm {smProject = Map.insert (cpName $ ppCommon pp) pp pathsToKeep}
   local adjustEnvForBuild $ build Nothing

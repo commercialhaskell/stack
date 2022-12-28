@@ -143,7 +143,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
               case getFirst globalMonoidResolver of
                 Nothing -> LFBReadWrite
                 _ -> LFBReadOnly
-         in fromFirst defLFB globalMonoidLockFileBehavior
+        in  fromFirst defLFB globalMonoidLockFileBehavior
     }
 
 initOptsParser :: Parser InitOpts

@@ -277,12 +277,12 @@ dumpedPackageModules :: Map PackageName a
                      -> Map PackageName (Set ModuleName)
 dumpedPackageModules pkgs dumpPkgs =
     let pnames = Map.keysSet pkgs `Set.difference` blacklist
-    in Map.fromList
-           [ (pn, dpExposedModules)
-           | DumpPackage {..} <- dumpPkgs
-           , let PackageIdentifier pn _ = dpPackageIdent
-           , pn `Set.member` pnames
-           ]
+    in  Map.fromList
+            [ (pn, dpExposedModules)
+            | DumpPackage {..} <- dumpPkgs
+            , let PackageIdentifier pn _ = dpPackageIdent
+            , pn `Set.member` pnames
+            ]
 
 allExposedModules :: PD.GenericPackageDescription -> RIO EnvConfig [ModuleName]
 allExposedModules gpd = do

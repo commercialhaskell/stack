@@ -988,7 +988,7 @@ packageNamePrefix ee name' =
         case eeLargestPackageName ee of
           Nothing -> name
           Just len -> assert (len >= length name) $ take len $ name ++ L.repeat ' '
-   in fromString paddedName <> "> "
+  in  fromString paddedName <> "> "
 
 announceTask :: HasLogFunc env => ExecuteEnv -> Task -> Utf8Builder -> RIO env ()
 announceTask ee task action = logInfo $
@@ -1449,7 +1449,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       HasLibraries _ -> True
                   hasSubLibrary = not . Set.null $ packageInternalLibraries package
                   hasExecutables = not . Set.null $ exesToBuild executableBuildStatuses lp
-               in (hasLibrary, hasSubLibrary, hasExecutables)
+              in  (hasLibrary, hasSubLibrary, hasExecutables)
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
             _ -> (False, False, False)
@@ -2214,7 +2214,8 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
                 ]
            >> char ':'
            >> pure ()
-        where num = some digit
+      where
+        num = some digit
 
 -- | Whether to prefix log lines with timestamps.
 data PrefixWithTimestamps = PrefixWithTimestamps | WithoutTimestamps

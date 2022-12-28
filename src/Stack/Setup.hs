@@ -2278,7 +2278,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
             case findArchive archiveInfo p of
               Just x -> pure (isWindows, x)
               Nothing -> loop ps
-       in loop platforms0
+      in  loop platforms0
 
     let (destFile, tmpFile)
             | isWindows =

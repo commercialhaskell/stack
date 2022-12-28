@@ -32,9 +32,11 @@ ghcOptsCompleter = mkCompleter $ \inputRaw -> pure $
         (curArgReversed, otherArgsReversed) = break isSpace (reverse input)
         curArg = reverse curArgReversed
         otherArgs = reverse otherArgsReversed
-     in if null curArg then [] else
-         map (otherArgs ++) $
-         filter (curArg `isPrefixOf`) ghcShowOptionsOutput
+    in  if null curArg
+          then []
+          else
+            map (otherArgs ++) $
+            filter (curArg `isPrefixOf`) ghcShowOptionsOutput
 
 -- TODO: Ideally this would pay attention to --stack-yaml, may require
 -- changes to optparse-applicative.
@@ -80,7 +82,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
             $ Map.toList gpds
         flagString name fl =
             let flname = C.unFlagName $ C.flagName fl
-             in (if flagEnabled name fl then "-" else "") ++ flname
+            in  (if flagEnabled name fl then "-" else "") ++ flname
         prjFlags =
           case configProject (bcConfig bconfig) of
             PCProject (p, _) -> projectFlags p

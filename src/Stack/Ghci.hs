@@ -719,9 +719,9 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
               pdp
               (\bi ->
                let PackageDescriptionPair x y = pdp
-                in PackageDescriptionPair
-                    (C.updatePackageDescription bi x)
-                    (C.updatePackageDescription bi y))
+               in  PackageDescriptionPair
+                     (C.updatePackageDescription bi x)
+                     (C.updatePackageDescription bi y))
               mbuildinfo
     pure GhciPkgDesc
       { ghciDescPkg = pkg

@@ -56,7 +56,7 @@ spec = do
           allPackages g = Map.keysSet g `Set.union` foldMap fst g
       forAll (sublistOf (Set.toList (allPackages resolvedGraph))) $ \toPrune ->
         let pruned = pruneGraph [pkgName "one", pkgName "two"] toPrune resolvedGraph
-        in Set.null (allPackages pruned `Set.intersection` Set.fromList toPrune)
+        in  Set.null (allPackages pruned `Set.intersection` Set.fromList toPrune)
 
     prop "pruning removes orphans" $ do
       let resolvedGraph = runIdentity (resolveDependencies Nothing graph stubLoader)
@@ -64,7 +64,7 @@ spec = do
           orphans g = Map.filterWithKey (\k _ -> not (graphElem k g)) g
       forAll (sublistOf (Set.toList (allPackages resolvedGraph))) $ \toPrune ->
         let pruned = pruneGraph [pkgName "one", pkgName "two"] toPrune resolvedGraph
-        in null (Map.keys (orphans (fmap fst pruned)) \\ [pkgName "one", pkgName "two"])
+        in  null (Map.keys (orphans (fmap fst pruned)) \\ [pkgName "one", pkgName "two"])
 
 {- Helper functions below -}
 -- Backport from QuickCheck 2.8 to 2.7.6

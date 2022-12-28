@@ -259,7 +259,8 @@ instance Exception BuildException where
                           (map (\flag -> "  " ++ name ++ ":" ++ flagNameString flag)
                                (Set.toList pkgFlags))
             ]
-          where name = packageNameString pname
+          where
+            name = packageNameString pname
         go (UFSnapshot name) = concat
             [ "- Attempted to set flag on snapshot package "
             , packageNameString name
@@ -478,7 +479,7 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     pprintExtra (name, (version, BlobKey cabalHash cabalSize)) =
       let cfInfo = CFIHash cabalHash (Just cabalSize)
           packageIdRev = PackageIdentifierRevision name version cfInfo
-       in fromString ("- " ++ T.unpack (utf8BuilderToText (display packageIdRev)))
+      in  fromString ("- " ++ T.unpack (utf8BuilderToText (display packageIdRev)))
 
     allNotInBuildPlan = Set.fromList $ concatMap toNotInBuildPlan exceptions'
     toNotInBuildPlan (DependencyPlanFailures _ pDeps) =
@@ -525,11 +526,11 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
             Just $ flow "Can't build a package with same name as a wired-in-package:" <+> (style Current . fromString . packageNameString $ name)
         | Just pruned <- Map.lookup name prunedGlobalDeps =
             let prunedDeps = map (style Current . fromString . packageNameString) pruned
-            in Just $ flow "Can't use GHC boot package" <+>
-                      (style Current . fromString . packageNameString $ name) <+>
-                      flow "when it has an overridden dependency (issue #4510);" <+>
-                      flow "you need to add the following as explicit dependencies to the project:" <+>
-                      line <+> encloseSep "" "" ", " prunedDeps
+            in  Just $ flow "Can't use GHC boot package" <+>
+                       (style Current . fromString . packageNameString $ name) <+>
+                       flow "when it has an overridden dependency (issue #4510);" <+>
+                       flow "you need to add the following as explicit dependencies to the project:" <+>
+                       line <+> encloseSep "" "" ", " prunedDeps
         | otherwise = Just $ flow "Unknown package:" <+> (style Current . fromString . packageNameString $ name)
 
     pprintFlags flags
@@ -1013,7 +1014,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
     -- Cabal < 1.21.1 does not support --enable-profiling, use --enable-executable-profiling instead
     , let profFlag = "--enable-" <> concat ["executable-" | not newerCabal] <> "profiling"
-      in [ profFlag | boptsExeProfile bopts && isLocal]
+      in  [ profFlag | boptsExeProfile bopts && isLocal]
     , ["--enable-split-objs" | boptsSplitObjs bopts]
     , ["--disable-library-stripping" | not $ boptsLibStrip bopts || boptsExeStrip bopts]
     , ["--disable-executable-stripping" | not (boptsExeStrip bopts) && isLocal]

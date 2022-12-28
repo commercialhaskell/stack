@@ -646,22 +646,23 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc _ defaul
                 { targetBuildDepends = deps
                 , buildable = buildable bi && (if modBuildable then packageConfigEnableTests packageConfig else True)
                 }
-           in test { testBuildInfo = bi' }
+          in  test { testBuildInfo = bi' }
         updateBenchmarkDeps modBuildable benchmark deps =
           let bi = benchmarkBuildInfo benchmark
               bi' = bi
                 { targetBuildDepends = deps
                 , buildable = buildable bi && (if modBuildable then packageConfigEnableBenchmarks packageConfig else True)
                 }
-           in benchmark { benchmarkBuildInfo = bi' }
+          in  benchmark { benchmarkBuildInfo = bi' }
 
 -- | Make a map from a list of flag specifications.
 --
 -- What is @flagManual@ for?
 flagMap :: [PackageFlag] -> Map FlagName Bool
 flagMap = M.fromList . map pair
-  where pair :: PackageFlag -> (FlagName, Bool)
-        pair = flagName &&& flagDefault
+  where
+    pair :: PackageFlag -> (FlagName, Bool)
+    pair = flagName &&& flagDefault
 
 data ResolveConditions = ResolveConditions
     { rcFlags :: Map FlagName Bool
@@ -689,35 +690,37 @@ resolveConditions :: (Semigroup target,Monoid target,Show target)
                   -> CondTree ConfVar cs target
                   -> target
 resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
-  where basic = addDeps lib deps
-        children = mconcat (map apply cs)
-          where apply (Cabal.CondBranch cond node mcs) =
-                  if condSatisfied cond
-                     then resolveConditions rc addDeps node
-                     else maybe mempty (resolveConditions rc addDeps) mcs
-                condSatisfied c =
-                  case c of
-                    Var v -> varSatisfied v
-                    Lit b -> b
-                    CNot c' ->
-                      not (condSatisfied c')
-                    COr cx cy ->
-                      condSatisfied cx || condSatisfied cy
-                    CAnd cx cy ->
-                      condSatisfied cx && condSatisfied cy
-                varSatisfied v =
-                  case v of
-                    OS os -> os == rcOS rc
-                    Arch arch -> arch == rcArch rc
-                    PackageFlag flag ->
-                      fromMaybe False $ M.lookup flag (rcFlags rc)
-                      -- NOTE:  ^^^^^ This should never happen, as all flags
-                      -- which are used must be declared. Defaulting to
-                      -- False.
-                    Impl flavor range ->
-                      case (flavor, rcCompilerVersion rc) of
-                        (GHC, ACGhc vghc) -> vghc `withinRange` range
-                        _ -> False
+  where
+    basic = addDeps lib deps
+    children = mconcat (map apply cs)
+      where
+        apply (Cabal.CondBranch cond node mcs) =
+              if condSatisfied cond
+                 then resolveConditions rc addDeps node
+                 else maybe mempty (resolveConditions rc addDeps) mcs
+        condSatisfied c =
+          case c of
+            Var v -> varSatisfied v
+            Lit b -> b
+            CNot c' ->
+              not (condSatisfied c')
+            COr cx cy ->
+              condSatisfied cx || condSatisfied cy
+            CAnd cx cy ->
+              condSatisfied cx && condSatisfied cy
+        varSatisfied v =
+          case v of
+            OS os -> os == rcOS rc
+            Arch arch -> arch == rcArch rc
+            PackageFlag flag ->
+              fromMaybe False $ M.lookup flag (rcFlags rc)
+              -- NOTE:  ^^^^^ This should never happen, as all flags
+              -- which are used must be declared. Defaulting to
+              -- False.
+            Impl flavor range ->
+              case (flavor, rcCompilerVersion rc) of
+                (GHC, ACGhc vghc) -> vghc `withinRange` range
+                _ -> False
 
 -- | Path for the package's build log.
 buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)

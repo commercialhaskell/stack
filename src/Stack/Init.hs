@@ -154,7 +154,7 @@ initProject currDir initOpts mresolver = do
                 Just rel -> toFilePathNoTrailingSep rel
         fpToPkgDir fp =
             let absDir = parent fp
-            in ResolvedPath (RelFilePath $ T.pack $ makeRelDir absDir) absDir
+            in  ResolvedPath (RelFilePath $ T.pack $ makeRelDir absDir) absDir
         pkgDirs = Map.map (fpToPkgDir . fst) bundle
     (snapshotLoc, flags, extraDeps, rbundle) <- getDefaultResolver initOpts mresolver pkgDirs
 
@@ -181,10 +181,10 @@ initProject currDir initOpts mresolver = do
             | otherwise = ""
         makeUserMsg msgs =
             let msg = concat msgs
-            in if msg /= "" then
-                  msg <> "You can omit this message by removing it from " <>
-                         "stack.yaml\n"
-                 else ""
+            in  if msg /= "" then
+                   msg <> "You can omit this message by removing it from " <>
+                          "stack.yaml\n"
+                  else ""
 
         userMsg = makeUserMsg [dupPkgMsg, missingPkgMsg, extraDepMsg]
 
@@ -317,8 +317,8 @@ renderStackYaml p ignoredPackages dupPackages =
                 [ "The following packages have been ignored due to package name conflict "
                 , "with other packages."
                 ]
-        in commentPackages ignoredComment ignoredPackages
-           <> commentPackages dupComment dupPackages
+        in  commentPackages ignoredComment ignoredPackages
+            <> commentPackages dupComment dupPackages
 
     commentPackages comment pkgs
         | pkgs /= [] =

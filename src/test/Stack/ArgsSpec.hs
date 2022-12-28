@@ -129,15 +129,15 @@ interpreterArgsSpec =
         -- just chop the closing chars from a valid block comment
         <|> shebang
             <++> ["\n"]
-            <++> let
-                    c = head (blockComment args)
-                    l = length c - 2
-                 in [assert (drop l c == "-}") (take l c)]
+            <++> let c = head (blockComment args)
+                     l = length c - 2
+                 in  [assert (drop l c == "-}") (take l c)]
         -- nested block comment
         <|> shebang
             <++> ["\n"]
             <++> [head (blockComment "--x {- nested -} --y")]
-        where args = " --x --y"
+       where
+        args = " --x --y"
       (<++>) = liftA2 (++)
 
       -- Generative grammar for the interpreter comments
@@ -150,17 +150,19 @@ interpreterArgsSpec =
       -- A command starts with zero or more whitespace followed by "stack"
       makeComment maker space args =
         let makePrefix s = (s <|> [""]) <++> [stackProgName]
-        in (maker <$> (makePrefix space <++> [args])) <++> postComment
+        in  (maker <$> (makePrefix space <++> [args])) <++> postComment
 
       lineSpace = [" "] <|> ["\t"]
       lineComment = makeComment makeLine lineSpace
-        where makeLine s = "--" ++ s
+       where
+        makeLine s = "--" ++ s
 
       literateLineComment = makeComment ("> --" ++) lineSpace
 
       blockSpace = lineSpace <|> newLine
       blockComment = makeComment makeBlock blockSpace
-        where makeBlock s = "{-" ++ s ++ "-}"
+       where
+        makeBlock s = "{-" ++ s ++ "-}"
 
       literateBlockComment = makeComment
         (\s -> "> {-" ++ s ++ "-}")
