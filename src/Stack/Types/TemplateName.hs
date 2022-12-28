@@ -37,7 +37,7 @@ instance Exception TypeTemplateNameException where
 
 -- | A template name.
 data TemplateName = TemplateName !Text !TemplatePath
-  deriving (Ord,Eq,Show)
+  deriving (Ord, Eq, Show)
 
 data TemplatePath = AbsPath (Path Abs File)
                   -- ^ an absolute path on the filesystem

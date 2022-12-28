@@ -34,7 +34,7 @@ instance Exception GhcPkgIdParseFail where
 
 -- | A ghc-pkg package identifier.
 newtype GhcPkgId = GhcPkgId Text
-  deriving (Eq,Ord,Data,Typeable,Generic,PersistField,PersistFieldSql)
+  deriving (Eq, Ord, Data, Typeable, Generic, PersistField, PersistFieldSql)
 
 instance Hashable GhcPkgId
 instance NFData GhcPkgId

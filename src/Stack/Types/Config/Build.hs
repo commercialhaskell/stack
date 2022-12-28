@@ -364,7 +364,7 @@ data TestOpts =
            ,toDisableRun :: !Bool -- ^ Disable running of tests
            ,toMaximumTimeSeconds :: !(Maybe Int) -- ^ test suite timeout in seconds
            ,toAllowStdin :: !Bool -- ^ Whether to allow standard input
-           } deriving (Eq,Show)
+           } deriving (Eq, Show)
 
 defaultTestOpts :: TestOpts
 defaultTestOpts = TestOpts
@@ -426,7 +426,7 @@ instance Monoid TestOptsMonoid where
 -- | Haddock Options
 newtype HaddockOpts =
   HaddockOpts { hoAdditionalArgs :: [String] -- ^ Arguments passed to haddock program
-              } deriving (Eq,Show)
+              } deriving (Eq, Show)
 
 newtype HaddockOptsMonoid =
   HaddockOptsMonoid {hoMonoidAdditionalArgs :: [String]
@@ -456,7 +456,7 @@ data BenchmarkOpts =
   BenchmarkOpts
     { beoAdditionalArgs :: !(Maybe String) -- ^ Arguments passed to the benchmark program
     , beoDisableRun :: !Bool -- ^ Disable running of benchmarks
-    } deriving (Eq,Show)
+    } deriving (Eq, Show)
 
 defaultBenchmarkOpts :: BenchmarkOpts
 defaultBenchmarkOpts = BenchmarkOpts
@@ -493,7 +493,7 @@ data FileWatchOpts
   = NoFileWatch
   | FileWatch
   | FileWatchPoll
-  deriving (Show,Eq)
+  deriving (Show, Eq)
 
 newtype CabalVerbosity = CabalVerbosity Verbosity
   deriving (Eq, Show)

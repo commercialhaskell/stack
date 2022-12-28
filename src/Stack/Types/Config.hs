@@ -1964,7 +1964,7 @@ instance FromJSON PvpBounds where
 newtype DockerEntrypoint = DockerEntrypoint
     { deUser :: Maybe DockerUser
       -- ^ UID/GID/etc of host user, if we wish to perform UID/GID switch in container
-    } deriving (Read,Show)
+    } deriving (Read, Show)
 
 -- | Docker host user info
 data DockerUser = DockerUser
@@ -1972,7 +1972,7 @@ data DockerUser = DockerUser
     , duGid :: GroupID -- ^ gid
     , duGroups :: [GroupID] -- ^ Supplemental groups
     , duUmask :: FileMode -- ^ File creation mask }
-    } deriving (Read,Show)
+    } deriving (Read, Show)
 
 data GhcOptionKey
   = GOKOldEverything

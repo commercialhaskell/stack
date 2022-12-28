@@ -19,7 +19,7 @@ import           Stack.Prelude
 data EscapingMode
     = Escaping
     | NoEscaping
-    deriving (Show,Eq,Enum)
+    deriving (Show, Eq, Enum)
 
 -- | Parse arguments using 'argsParser'.
 parseArgs :: EscapingMode -> Text -> Either String [String]

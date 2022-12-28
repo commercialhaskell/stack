@@ -147,7 +147,7 @@ instance Exception PackageException where
 data PackageLibraries
   = NoLibraries
   | HasLibraries !(Set Text) -- ^ the foreign library names, sub libraries get built automatically without explicit component name passing
- deriving (Show,Typeable)
+ deriving (Show, Typeable)
 
 -- | Name of an executable.
 newtype ExeName = ExeName { unExeName :: Text }
@@ -178,7 +178,7 @@ data Package =
                                                           -- ^ If present: custom-setup dependencies
           ,packageCabalSpec :: !CabalSpecVersion          -- ^ Cabal spec range
           }
- deriving (Show,Typeable)
+ deriving (Show, Typeable)
 
 packageIdent :: Package -> PackageIdentifier
 packageIdent p = PackageIdentifier (packageName p) (packageVersion p)
@@ -230,7 +230,7 @@ data PackageConfig =
                 ,packageConfigCompilerVersion :: ActualCompiler   -- ^ GHC version
                 ,packageConfigPlatform :: !Platform               -- ^ host platform
                 }
- deriving (Show,Typeable)
+ deriving (Show, Typeable)
 
 -- | Compares the package name.
 instance Ord Package where
