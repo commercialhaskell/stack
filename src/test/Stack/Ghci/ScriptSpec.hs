@@ -10,7 +10,7 @@ import qualified Data.Set as S
 import           Distribution.ModuleName
 import           Test.Hspec
 import qualified System.FilePath as FP
-import           Stack.Ghci.PortableFakePaths
+import           Stack.Ghci.FakePaths
 import           Stack.Prelude hiding (fromString)
 import           Path
 import           Path.Extra (pathToLazyByteString)

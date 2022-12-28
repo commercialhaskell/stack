@@ -134,7 +134,8 @@ import qualified Data.Set as Set
 import           Distribution.Package ( mkPackageName )
 import           Hpack.Config ( packageConfig )
 import qualified Language.Haskell.TH.Syntax as TH ( runIO, lift )
-import           Path as FL
+import           Path ( (</>), mkRelDir, mkRelFile, parseAbsFile )
+import           Stack.Constants.UsrLibDirs ( usrLibDirs )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           System.Permissions ( osIsWindows )
@@ -597,14 +598,6 @@ hadrianScriptsWindows = [$(mkRelFile "hadrian/build-stack.bat"), $(mkRelFile "ha
 -- The second path is maintained for compatibility with older GHC versions.
 hadrianScriptsPosix :: [Path Rel File]
 hadrianScriptsPosix = [$(mkRelFile "hadrian/build-stack"), $(mkRelFile "hadrian/build.stack.sh")]
-
--- | Used in Stack.Setup for detecting libtinfo, see comments at use site
-usrLibDirs :: [Path Abs Dir]
-#if WINDOWS
-usrLibDirs = []
-#else
-usrLibDirs = [$(mkAbsDir "/usr/lib"),$(mkAbsDir "/usr/lib64")]
-#endif
 
 -- | Relative file path for a temporary GHC environment file for tests
 testGhcEnvRelFile :: Path Rel File
