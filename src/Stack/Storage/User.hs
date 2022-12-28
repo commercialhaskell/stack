@@ -56,8 +56,8 @@ import           Stack.Types.Cache ( Action (..) )
 import           Stack.Types.Compiler ( ActualCompiler, compilerVersionText )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
 import           Stack.Types.Config
-                   ( CompilerPaths (..), GhcPkgExe (..), HasConfig
-                   , UserStorage (..), configL, configUserStorage
+                   ( CompilerPaths (..), GhcPkgExe (..), HasConfig (..)
+                   , UserStorage (..), configUserStorage
                    )
 import           System.Posix.Types ( COff (..) )
 import           System.PosixCompat.Files

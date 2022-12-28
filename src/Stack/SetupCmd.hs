@@ -20,7 +20,7 @@ import           Stack.Prelude
 import           Stack.Setup ( SetupOpts (..), ensureCompilerAndMsys )
 import           Stack.Types.Config
                    ( CompilerPaths (..), Config (..), HasBuildConfig
-                   , HasGHCVariant, configL
+                   , HasConfig (..), HasGHCVariant
                    )
 import           Stack.Types.Version ( VersionCheck )
 
