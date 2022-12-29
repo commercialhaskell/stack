@@ -5,7 +5,16 @@
 [:octicons-tag-24: 0.1.10.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.10.0)
 
 [Nix](https://nixos.org/) is a purely functional package manager. Stack can be
-configured to integrate with Nix.
+configured to integrate with Nix. Integration provides these benefits:
+
+* more reproducible builds. This is because fixed versions of any system
+  libraries and commands required to build the project are automatically built
+  using Nix and managed locally for each project. These system packages never
+  conflict with any existing versions of these libraries on your system. That
+  they are managed locally to the project means that you don't need to alter
+  your system in any way to build any odd project pulled from the Internet; and
+* implicit sharing of system packages between projects. This means you don't
+  have more copies on-disk than you need.
 
 The Nix package manager is a pre-requisite for integration. On Linux (including
 Windows Subsystem for Linux) and macOS, it can be downloaded and installed from
