@@ -443,6 +443,7 @@ data SetupOpts = SetupOpts
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
     }
     deriving Show
+
 -- | Modify the environment variables (like PATH) appropriately, possibly doing installation too
 setupEnv :: NeedTargets
          -> BuildOptsCLI

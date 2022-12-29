@@ -12,7 +12,7 @@ import           RIO.Process
                    ( ExitCodeException, proc, runProcess_, setDelegateCtlc )
 import           Stack.Prelude
 import           Stack.Types.Config ( HasConfig )
-import           Stack.Types.Docker ( DockerOpts (..))
+import           Stack.Types.Docker ( DockerOpts (..) )
 import           System.Posix.Signals
                    ( Handler (..), installHandler, sigABRT, sigHUP, sigINT
                    , sigPIPE, sigTERM, sigUSR1, sigUSR2
