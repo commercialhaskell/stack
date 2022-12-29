@@ -982,7 +982,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
             (Just Nothing, _) | not loadAllDeps -> pure False
             (_, Just lp) -> do
                 let deps = M.keys (packageDeps (lpPackage lp))
-                shouldLoad <- liftM or $ mapM go deps
+                shouldLoad <- or <$> mapM go deps
                 if shouldLoad
                     then do
                         modify (M.insert name (Just (lpCabalFile lp, TargetComps (S.singleton CLib))))

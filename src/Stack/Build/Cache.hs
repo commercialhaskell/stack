@@ -60,8 +60,8 @@ import           System.PosixCompat.Files
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (HasEnvConfig env)
                 => InstallLocation -> RIO env (Path Abs Dir)
-exeInstalledDir Snap = (</> relDirInstalledPackages) `liftM` installationRootDeps
-exeInstalledDir Local = (</> relDirInstalledPackages) `liftM` installationRootLocal
+exeInstalledDir Snap = (</> relDirInstalledPackages) <$> installationRootDeps
+exeInstalledDir Local = (</> relDirInstalledPackages) <$> installationRootLocal
 
 -- | Get all of the installed executables
 getInstalledExes :: (HasEnvConfig env)

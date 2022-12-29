@@ -127,7 +127,7 @@ initProject ::
 initProject currDir initOpts mresolver = do
     let dest = currDir </> stackDotYaml
 
-    reldest <- toFilePath `liftM` makeRelativeToCurrentDir dest
+    reldest <- toFilePath <$> makeRelativeToCurrentDir dest
 
     exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $

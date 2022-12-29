@@ -525,8 +525,8 @@ copyExecutables ::
     -> RIO env ()
 copyExecutables exes | Map.null exes = pure ()
 copyExecutables exes = do
-    snapBin <- (</> bindirSuffix) `liftM` installationRootDeps
-    localBin <- (</> bindirSuffix) `liftM` installationRootLocal
+    snapBin <- (</> bindirSuffix) <$> installationRootDeps
+    localBin <- (</> bindirSuffix) <$> installationRootLocal
     compilerSpecific <- boptsInstallCompilerTool <$> view buildOptsL
     destDir <- if compilerSpecific
                    then bindirCompilerTools
@@ -1924,7 +1924,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                     , testName `elem` testsToRun
                     ]
 
-            errs <- liftM Map.unions $ forM suitesToRun $ \(testName, suiteInterface) -> do
+            errs <- fmap Map.unions $ forM suitesToRun $ \(testName, suiteInterface) -> do
                 let stestName = T.unpack testName
                 (testName', isTestTypeLib) <-
                     case suiteInterface of
@@ -1936,8 +1936,8 @@ singleTest topts testsToRun ac ee task installedMap = do
                         case configPlatform config of
                             Platform _ Windows -> ".exe"
                             _ -> ""
-                tixPath <- liftM (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
-                exePath <- liftM (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
+                tixPath <- fmap (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
+                exePath <- fmap (buildDir </>) $ parseRelFile $ "build/" ++ testName' ++ "/" ++ exeName
                 exists <- doesFileExist exePath
                 -- in Stack.Package.packageFromPackageDescription we filter out
                 -- package itself of any dependencies so any tests requiring loading
@@ -2197,7 +2197,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
         let (x, y) = T.break (== ':') bs
         mabs <-
             if isValidSuffix y
-                then liftIO $ liftM (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
+                then liftIO $ fmap (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
                          forgivingAbsence (resolveFile pkgDir (T.unpack $ T.dropWhile isSpace x)) `catch`
                              \(_ :: PathException) -> pure Nothing
                 else pure Nothing

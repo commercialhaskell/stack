@@ -387,10 +387,10 @@ checkBuildCache :: forall m. (MonadIO m)
                 -> [Path Abs File] -- ^ files in package
                 -> m (Set FilePath, Map FilePath FileCacheInfo)
 checkBuildCache oldCache files = do
-    fileTimes <- liftM Map.fromList $ forM files $ \fp -> do
+    fileTimes <- fmap Map.fromList $ forM files $ \fp -> do
         mdigest <- liftIO (getFileDigestMaybe (toFilePath fp))
         pure (toFilePath fp, mdigest)
-    liftM (mconcat . Map.elems) $ sequence $
+    fmap (mconcat . Map.elems) $ sequence $
         Map.mergeWithKey
             (\fp mdigest fci -> Just (go fp mdigest (Just fci)))
             (Map.mapWithKey (\fp mdigest -> go fp mdigest Nothing))
@@ -460,7 +460,7 @@ getFileDigestMaybe :: MonadIO m => FilePath -> m (Maybe SHA256)
 getFileDigestMaybe fp = do
     liftIO
         (catch
-             (liftM Just . withSourceFile fp $ getDigest)
+             (fmap Just . withSourceFile fp $ getDigest)
              (\e ->
                    if isDoesNotExistError e
                        then pure Nothing

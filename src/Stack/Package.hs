@@ -197,7 +197,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
                          setupLhsExists <- doesFileExist setupLhsPath
                          if setupLhsExists then pure (S.singleton setupLhsPath) else pure S.empty
                  else pure S.empty
-             buildFiles <- liftM (S.insert cabalfp . S.union setupFiles) $ do
+             buildFiles <- fmap (S.insert cabalfp . S.union setupFiles) $ do
                  let hpackPath = pkgDir </> relFileHpackPackageConfig
                  hpackExists <- doesFileExist hpackPath
                  pure $ if hpackExists then S.singleton hpackPath else S.empty
