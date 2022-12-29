@@ -208,7 +208,7 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                     -- Look for index files in the correct dir (relative to each pkgdir).
                     ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
             logInfo $ "Generating " <> display report
-            outputLines <- liftM (map (S8.filter (/= '\r')) . S8.lines . BL.toStrict . fst) $
+            outputLines <- map (S8.filter (/= '\r')) . S8.lines . BL.toStrict . fst <$>
                 proc "hpc"
                 ( "report"
                 : toFilePath tixSrc
@@ -266,16 +266,16 @@ generateHpcReportForTargets opts tixFiles targetNames = do
              when (hroptsAll opts && not (null targetNames)) $
                  logWarn $ "Since --all is used, it is redundant to specify these targets: " <> displayShow targetNames
              targets <- view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets
-             liftM concat $ forM (Map.toList targets) $ \(name, target) ->
+             fmap concat $ forM (Map.toList targets) $ \(name, target) ->
                  case target of
                      TargetAll PTDependency -> throwIO $ NotLocalPackage name
                      TargetComps comps -> do
                          pkgPath <- hpcPkgPath name
                          forM (toList comps) $ \nc ->
-                             case nc of
-                                 CTest testName ->
-                                     liftM (pkgPath </>) $ parseRelFile (T.unpack testName ++ "/" ++ T.unpack testName ++ ".tix")
-                                 _ -> throwIO $ NonTestSuiteTarget name
+                           case nc of
+                             CTest testName ->
+                               (pkgPath </>) <$> parseRelFile (T.unpack testName ++ "/" ++ T.unpack testName ++ ".tix")
+                             _ -> throwIO $ NonTestSuiteTarget name
 
                      TargetAll PTProject -> do
                          pkgPath <- hpcPkgPath name
@@ -283,11 +283,11 @@ generateHpcReportForTargets opts tixFiles targetNames = do
                          if exists
                              then do
                                  (dirs, _) <- listDir pkgPath
-                                 liftM concat $ forM dirs $ \dir -> do
+                                 fmap concat $ forM dirs $ \dir -> do
                                      (_, files) <- listDir dir
                                      pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
                              else pure []
-    tixPaths <- liftM (\xs -> xs ++ targetTixFiles) $ mapM (resolveFile' . T.unpack) tixFiles
+    tixPaths <- (\xs -> xs ++ targetTixFiles) <$> mapM (resolveFile' . T.unpack) tixFiles
     when (null tixPaths) $ throwIO NoTargetsOrTixSpecified
     outputDir <- hpcReportDir
     reportDir <- case hroptsDestDir opts of
@@ -310,7 +310,7 @@ generateHpcUnifiedReport = do
     outputDir <- hpcReportDir
     ensureDir outputDir
     (dirs, _) <- listDir outputDir
-    tixFiles0 <- liftM (concat . concat) $ forM (filter (("combined" /=) . dirnameString) dirs) $ \dir -> do
+    tixFiles0 <- fmap (concat . concat) $ forM (filter (("combined" /=) . dirnameString) dirs) $ \dir -> do
         (dirs', _) <- listDir dir
         forM dirs' $ \dir' -> do
             (_, files) <- listDir dir'
@@ -348,17 +348,17 @@ generateUnionReport :: HasEnvConfig env
                     => Text -> Path Abs Dir -> [Path Abs File]
                     -> RIO env (Maybe (Path Abs File))
 generateUnionReport report reportDir tixFiles = do
-    (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
-    logDebug $ "Using the following tix files: " <> fromString (show tixFiles)
-    unless (null errs) $ logWarn $
-        "The following modules are left out of the " <>
-        display report <>
-        " due to version mismatches: " <>
-        mconcat (L.intersperse ", " (map fromString errs))
-    tixDest <- liftM (reportDir </>) $ parseRelFile (dirnameString reportDir ++ ".tix")
-    ensureDir (parent tixDest)
-    liftIO $ writeTix (toFilePath tixDest) tix
-    generateHpcReportInternal tixDest reportDir report [] []
+  (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
+  logDebug $ "Using the following tix files: " <> fromString (show tixFiles)
+  unless (null errs) $ logWarn $
+    "The following modules are left out of the " <>
+    display report <>
+    " due to version mismatches: " <>
+    mconcat (L.intersperse ", " (map fromString errs))
+  tixDest <- (reportDir </>) <$> parseRelFile (dirnameString reportDir ++ ".tix")
+  ensureDir (parent tixDest)
+  liftIO $ writeTix (toFilePath tixDest) tix
+  generateHpcReportInternal tixDest reportDir report [] []
 
 readTixOrLog :: HasLogFunc env => Path b File -> RIO env (Maybe Tix)
 readTixOrLog path = do
@@ -396,7 +396,7 @@ generateHpcMarkupIndex = do
     let outputFile = outputDir </> relFileIndexHtml
     ensureDir outputDir
     (dirs, _) <- listDir outputDir
-    rows <- liftM (catMaybes . concat) $ forM dirs $ \dir -> do
+    rows <- fmap (catMaybes . concat) $ forM dirs $ \dir -> do
         (subdirs, _) <- listDir dir
         forM subdirs $ \subdir -> do
             let indexPath = subdir </> relFileHpcIndexHtml
@@ -491,7 +491,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
     if cabalVer < mkVersion [1, 24]
         then do
             -- here we don't need to handle internal libs
-            path <- liftM (inplaceDir </>) $ parseRelFile (pkgIdStr ++ "-inplace.conf")
+            path <- (inplaceDir </>) <$> parseRelFile (pkgIdStr ++ "-inplace.conf")
             logDebug $ "Parsing config in Cabal < 1.24 location: " <> fromString (toFilePath path)
             exists <- doesFileExist path
             if exists then fmap (:[]) <$> extractField path else notFoundErr

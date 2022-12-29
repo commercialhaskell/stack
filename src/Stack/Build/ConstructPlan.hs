@@ -680,7 +680,7 @@ resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
   case res of
     Left err -> pure $ Left err
     Right deps ->
-      liftM Right $
+      Right <$>
         installPackageGivenDeps
           isAllInOne buildHaddocks ps package minstalled deps
 

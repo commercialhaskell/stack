@@ -58,7 +58,6 @@
 - ignore: {name: "Redundant if"}
 - ignore: {name: "Avoid lambda"}
 - ignore: {name: "Eta reduce"}
-- ignore: {name: "Use fmap"}  # specific for GHC 7.8 compat
 - ignore: {name: "Parse error"}  # we trust the compiler over HLint
 - ignore: {name: "Use =="}  # Creates infinite loops in `EQ` using expressions
 - ignore: {name: "Evaluate"}

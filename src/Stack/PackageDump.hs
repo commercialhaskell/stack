@@ -181,7 +181,7 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
 
       parseDepend :: MonadThrow m => Text -> m (Maybe GhcPkgId)
       parseDepend "builtin_rts" = pure Nothing
-      parseDepend bs = liftM Just $ parseGhcPkgId bs'
+      parseDepend bs = Just <$> parseGhcPkgId bs'
        where
         (bs', _builtinRts) =
           case stripSuffixText " builtin_rts" bs of

@@ -127,14 +127,14 @@ getImplicitGlobalProjectDir ::
        HasLogFunc env
     => Config -> RIO env (Path Abs Dir)
 getImplicitGlobalProjectDir config =
-    --TEST no warning printed
-    liftM fst $ tryDeprecatedPath
-        Nothing
-        doesDirExist
-        (implicitGlobalProjectDir stackRoot)
-        (implicitGlobalProjectDirDeprecated stackRoot)
-  where
-    stackRoot = view stackRootL config
+  --TEST no warning printed
+  fst <$> tryDeprecatedPath
+    Nothing
+    doesDirExist
+    (implicitGlobalProjectDir stackRoot)
+    (implicitGlobalProjectDirDeprecated stackRoot)
+ where
+  stackRoot = view stackRootL config
 
 -- | Download the 'Snapshots' value from stackage.org.
 getSnapshots :: HasConfig env => RIO env Snapshots
@@ -903,7 +903,7 @@ getProjectConfig SYLDefault = do
     case lookup "STACK_YAML" env of
         Just fp -> do
             logInfo "Getting project config file from STACK_YAML environment"
-            liftM PCProject $ resolveFile' fp
+            PCProject <$> resolveFile' fp
         Nothing -> do
             currDir <- getCurrentDir
             maybe PCGlobalProject PCProject <$> findInParents getStackDotYaml currDir
@@ -949,19 +949,19 @@ loadProjectConfig mstackYaml = do
 -- If a file already exists at the deprecated location, its location is returned.
 -- Otherwise, the new location is returned.
 getDefaultGlobalConfigPath ::
-       HasLogFunc env
-    => RIO env (Maybe (Path Abs File))
+     HasLogFunc env
+  => RIO env (Maybe (Path Abs File))
 getDefaultGlobalConfigPath =
-    case (defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated) of
-        (Just new,Just old) ->
-            liftM (Just . fst ) $
-            tryDeprecatedPath
-                (Just "non-project global configuration file")
-                doesFileExist
-                new
-                old
-        (Just new,Nothing) -> pure (Just new)
-        _ -> pure Nothing
+  case (defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated) of
+    (Just new,Just old) ->
+      Just . fst <$>
+        tryDeprecatedPath
+          (Just "non-project global configuration file")
+          doesFileExist
+          new
+          old
+    (Just new,Nothing) -> pure (Just new)
+    _ -> pure Nothing
 
 -- | Get the location of the default user configuration file.
 -- If a file already exists at the deprecated location, its location is returned.

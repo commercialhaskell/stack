@@ -459,7 +459,7 @@ checkSDistTarball ::
   -> Path Abs File -- ^ Absolute path to tarball
   -> RIO env ()
 checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
-  pkgDir  <- (pkgDir' </>) `liftM`
+  pkgDir  <- (pkgDir' </>) <$>
     (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
   --               ^ drop ".tar"     ^ drop ".gz"
   when (sdoptsBuildTarball opts)
@@ -552,7 +552,7 @@ checkSDistTarball' ::
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> RIO env ()
 checkSDistTarball' opts name bytes = withSystemTempDir "stack" $ \tpath -> do
-  npath   <- (tpath </>) `liftM` parseRelFile name
+  npath   <- (tpath </>) <$> parseRelFile name
   liftIO $ L.writeFile (toFilePath npath) bytes
   checkSDistTarball opts npath
 

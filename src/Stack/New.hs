@@ -258,7 +258,7 @@ new opts forceOverwrite = do
   absDir <- if bare
               then pure pwd
               else do relDir <- parseRelDir (packageNameString project)
-                      liftM (pwd </>) (pure relDir)
+                      pure (pwd </> relDir)
   exists <- doesDirExist absDir
   configTemplate <- view $ configL.to configDefaultTemplate
   let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
@@ -666,7 +666,7 @@ runTemplateInits dir = do
 templatesHelp :: HasLogFunc env => RIO env ()
 templatesHelp = do
   let url = defaultTemplatesHelpUrl
-  req <- liftM setGitHubHeaders (parseUrlThrow url)
+  req <- fmap setGitHubHeaders (parseUrlThrow url)
   resp <- catch
     (httpLbs req)
     (throwM . PrettyException. DownloadTemplatesHelpFailed)

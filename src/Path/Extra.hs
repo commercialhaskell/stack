@@ -100,7 +100,7 @@ rejectMissingFile :: MonadIO m
   => Maybe (Path Abs File)
   -> m (Maybe (Path Abs File))
 rejectMissingFile Nothing = pure Nothing
-rejectMissingFile (Just p) = bool Nothing (Just p) `liftM` doesFileExist p
+rejectMissingFile (Just p) = bool Nothing (Just p) <$> doesFileExist p
 
 -- | See 'rejectMissingFile'.
 
@@ -108,7 +108,7 @@ rejectMissingDir :: MonadIO m
   => Maybe (Path Abs Dir)
   -> m (Maybe (Path Abs Dir))
 rejectMissingDir Nothing = pure Nothing
-rejectMissingDir (Just p) = bool Nothing (Just p) `liftM` doesDirExist p
+rejectMissingDir (Just p) = bool Nothing (Just p) <$> doesDirExist p
 
 -- | Convert to a lazy ByteString using toFilePath and UTF8.
 pathToLazyByteString :: Path b t -> BSL.ByteString

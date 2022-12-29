@@ -320,7 +320,7 @@ resolveFiles ::
   -> [DotCabalDescriptor] -- ^ Base names.
   -> RIO GetPackageFileContext [(DotCabalDescriptor, Maybe DotCabalPath)]
 resolveFiles dirs names =
-  forM names (\name -> liftM (name, ) (findCandidate dirs name))
+  forM names (\name -> fmap (name, ) (findCandidate dirs name))
 
 -- | Find a candidate for the given module-or-filename from the list
 -- of directories and given extensions.
@@ -354,7 +354,7 @@ findCandidate dirs name = do
       DotCabalCFile{} -> DotCabalCFilePath
   paths_pkg pkg = "Paths_" ++ packageNameString pkg
   makeNameCandidates haskellPreprocessorExts =
-    liftM
+    fmap
       (nubOrd . concat)
       (mapM (makeDirCandidates haskellPreprocessorExts) dirs)
   makeDirCandidates :: [Text]
@@ -395,7 +395,7 @@ logPossibilities ::
   -> ModuleName
   -> RIO env ()
 logPossibilities dirs mn = do
-  possibilities <- liftM concat (makePossibilities mn)
+  possibilities <- fmap concat (makePossibilities mn)
   unless (null possibilities) $ prettyWarnL
     [ flow "Unable to find a known candidate for the Cabal entry"
     , (style Module . fromString $ display mn) <> ","
@@ -487,7 +487,7 @@ parsePackageNameFromFilePath fp = do
     Nothing -> throwM $ CabalFileNameInvalidPackageName $ toFilePath fp
     Just x -> pure x
  where
-  clean = liftM reverse . strip . reverse
+  clean = fmap reverse . strip . reverse
   strip ('l':'a':'b':'a':'c':'.':xs) = pure xs
   strip _ = throwM (CabalFileNameParseFail (toFilePath fp))
 

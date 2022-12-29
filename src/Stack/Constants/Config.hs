@@ -47,54 +47,54 @@ buildCachesDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                => Path Abs Dir      -- ^ Package directory.
                -> m (Path Abs Dir)
 buildCachesDir dir =
-    liftM
-        (</> $(mkRelDir "stack-build-caches"))
-        (distDirFromDir dir)
+  fmap
+    (</> $(mkRelDir "stack-build-caches"))
+    (distDirFromDir dir)
 
 -- | The filename used to mark tests as having succeeded
 testSuccessFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                 => Path Abs Dir -- ^ Package directory
                 -> m (Path Abs File)
 testSuccessFile dir =
-    liftM
-        (</> $(mkRelFile "stack-test-success"))
-        (distDirFromDir dir)
+  fmap
+    (</> $(mkRelFile "stack-test-success"))
+    (distDirFromDir dir)
 
 -- | The filename used to mark tests as having built
 testBuiltFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
               => Path Abs Dir -- ^ Package directory
               -> m (Path Abs File)
 testBuiltFile dir =
-    liftM
-        (</> $(mkRelFile "stack-test-built"))
-        (distDirFromDir dir)
+  fmap
+    (</> $(mkRelFile "stack-test-built"))
+    (distDirFromDir dir)
 
 -- | The filename used for modification check of .cabal
 configCabalMod :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                => Path Abs Dir      -- ^ Package directory.
                -> m (Path Abs File)
 configCabalMod dir =
-    liftM
-        (</> $(mkRelFile "stack-cabal-mod"))
-        (distDirFromDir dir)
+  fmap
+    (</> $(mkRelFile "stack-cabal-mod"))
+    (distDirFromDir dir)
 
 -- | The filename used for modification check of setup-config
 configSetupConfigMod :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                      => Path Abs Dir      -- ^ Package directory.
                      -> m (Path Abs File)
 configSetupConfigMod dir =
-    liftM
-        (</> $(mkRelFile "stack-setup-config-mod"))
-        (distDirFromDir dir)
+  fmap
+    (</> $(mkRelFile "stack-setup-config-mod"))
+    (distDirFromDir dir)
 
 -- | The filename used for the project root from the last build of a package
 configPackageProjectRoot :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                      => Path Abs Dir      -- ^ Package directory.
                      -> m (Path Abs File)
 configPackageProjectRoot dir =
-    liftM
-        (</> $(mkRelFile "stack-project-root"))
-        (distDirFromDir dir)
+  fmap
+    (</> $(mkRelFile "stack-project-root"))
+    (distDirFromDir dir)
 
 -- | Directory for HPC work.
 hpcDirFromDir ::
@@ -102,13 +102,13 @@ hpcDirFromDir ::
     => Path Abs Dir  -- ^ Package directory.
     -> m (Path Abs Dir)
 hpcDirFromDir fp =
-    liftM (fp </>) hpcRelativeDir
+  fmap (fp </>) hpcRelativeDir
 
 -- | Relative location of directory for HPC work.
 hpcRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                => m (Path Rel Dir)
 hpcRelativeDir =
-    liftM (</> $(mkRelDir "hpc")) distRelativeDir
+  fmap (</> $(mkRelDir "hpc")) distRelativeDir
 
 -- | Package's setup-config storing Cabal configuration
 setupConfigFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -123,7 +123,7 @@ distDirFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                => Path Abs Dir
                -> m (Path Abs Dir)
 distDirFromDir fp =
-    liftM (fp </>) distRelativeDir
+  fmap (fp </>) distRelativeDir
 
 -- | The directory containing all dist directories, including all
 -- different GHC/Cabal combos.
@@ -132,7 +132,7 @@ rootDistDirFromDir ::
   => Path Abs Dir
   -> m (Path Abs Dir)
 rootDistDirFromDir fp =
-    liftM (fp </>) rootDistRelativeDir
+  fmap (fp </>) rootDistRelativeDir
 
 -- | Relative directory to the top dist directory, containing
 -- individual GHC/Cabal combo as subdirs.

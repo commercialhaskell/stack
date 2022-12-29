@@ -56,25 +56,25 @@ packageDescModulesAndFiles pkg = do
       (asModuleAndFileMap libComponent libraryFiles)
       (library pkg)
   (subLibrariesMods, subLibDotCabalFiles, subLibWarnings) <-
-    liftM
+    fmap
       foldTuples
       ( mapM
           (asModuleAndFileMap internalLibComponent libraryFiles)
           (subLibraries pkg)
       )
   (executableMods, exeDotCabalFiles, exeWarnings) <-
-    liftM
+    fmap
       foldTuples
       ( mapM
           (asModuleAndFileMap exeComponent executableFiles)
           (executables pkg)
       )
   (testMods, testDotCabalFiles, testWarnings) <-
-    liftM
+    fmap
       foldTuples
       (mapM (asModuleAndFileMap testComponent testFiles) (testSuites pkg))
   (benchModules, benchDotCabalPaths, benchWarnings) <-
-    liftM
+    fmap
       foldTuples
       ( mapM
           (asModuleAndFileMap benchComponent benchmarkFiles)
@@ -112,13 +112,13 @@ resolveGlobFiles ::
   -> [String]
   -> RIO GetPackageFileContext (Set (Path Abs File))
 resolveGlobFiles cabalFileVersion =
-  liftM (S.fromList . catMaybes . concat) .
+  fmap (S.fromList . catMaybes . concat) .
   mapM resolve
  where
   resolve name =
     if '*' `elem` name
       then explode name
-      else liftM pure (resolveFileOrWarn name)
+      else fmap pure (resolveFileOrWarn name)
   explode name = do
     dir <- asks (parent . ctxFile)
     names <- matchDirFileGlob' (toFilePath dir) name
