@@ -23,8 +23,11 @@ import           Stack.Constants
                    )
 import           Stack.Prelude
 import           Stack.Types.Config
-import           Stack.Types.Docker
-import           Stack.Types.Nix
+                   ( Config (..), HasConfig (..), configProjectRoot
+                   , wantedCompilerVersionL
+                   )
+import           Stack.Types.Docker ( reExecArgName )
+import           Stack.Types.Nix ( NixOpts (..) )
 import           Stack.Types.Version ( showStackVersion )
 import           System.Environment ( getArgs, getExecutablePath, lookupEnv )
 import qualified System.FilePath as F

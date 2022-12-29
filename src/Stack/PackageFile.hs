@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | A module which exports all package-level file-gathering logic.
 module Stack.PackageFile
@@ -15,12 +15,15 @@ import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription hiding ( FlagName )
 import           Distribution.Simple.Glob ( matchDirFileGlob )
 import qualified Distribution.Types.UnqualComponentName as Cabal
-import           Path as FL hiding ( replaceExtension )
-import           Path.Extra
-import           Path.IO hiding ( findFiles )
+import           Path ( parent )
+import           Path.Extra ( rejectMissingFile )
+import           Path.IO ( forgivingAbsence, resolveFile )
 import           Stack.ComponentFile
-import           Stack.Prelude hiding ( Display (..) )
-import           Stack.Types.NamedComponent
+                   ( benchmarkFiles, executableFiles, libraryFiles
+                   , resolveOrWarn, testFiles
+                   )
+import           Stack.Prelude
+import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.PackageFile
                    ( DotCabalPath (..), GetPackageFileContext (..)
                    , PackageWarning (..)
@@ -38,14 +41,14 @@ resolveFileOrWarn = resolveOrWarn "File" f
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles ::
-       PackageDescription
-    -> RIO
-         GetPackageFileContext
-         ( Map NamedComponent (Map ModuleName (Path Abs File))
-         , Map NamedComponent [DotCabalPath]
-         , Set (Path Abs File)
-         , [PackageWarning]
-         )
+     PackageDescription
+  -> RIO
+       GetPackageFileContext
+       ( Map NamedComponent (Map ModuleName (Path Abs File))
+       , Map NamedComponent [DotCabalPath]
+       , Set (Path Abs File)
+       , [PackageWarning]
+       )
 packageDescModulesAndFiles pkg = do
   (libraryMods, libDotCabalFiles, libWarnings) <-
     maybe
@@ -118,7 +121,7 @@ resolveGlobFiles cabalFileVersion =
       else liftM pure (resolveFileOrWarn name)
   explode name = do
     dir <- asks (parent . ctxFile)
-    names <- matchDirFileGlob' (FL.toFilePath dir) name
+    names <- matchDirFileGlob' (toFilePath dir) name
     mapM resolveFileOrWarn names
   matchDirFileGlob' dir glob =
     catch

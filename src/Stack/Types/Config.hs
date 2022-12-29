@@ -1753,7 +1753,8 @@ parseProjectAndConfigMonoid rootDir =
           pure $ ProjectAndConfigMonoid project config
 
 -- | A software control system.
-data SCM = Git
+data SCM
+  = Git
   deriving Show
 
 instance FromJSON SCM where
