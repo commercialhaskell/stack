@@ -143,23 +143,23 @@ about how these dependencies get specified.
 In addition to specifying targets, you can also control what gets built, or
 retained, with the following flags:
 
-### The `stack build --bench` flag
+### `--bench` flag
 
 Pass the flag to add benchmark components to the targets, if specific components
 are not identified. The `stack bench` synonym sets this flag.
 
-### The `stack build --dependencies-only` flag
+### `--dependencies-only` flag
 
 Pass the flag to skip building the targets. The flag `--only-dependencies` has
 the same effect.
 
-### The `stack build --[no-]dry-run` flag
+### `--[no-]dry-run` flag
 
 Default: Disabled
 
 Set the flag to build nothing and output information about the build plan.
 
-### The `stack build --flag` option
+### `--flag` option
 
 `stack build --flag <package_name>:[-]<flag_name>` sets (or unsets) the
 specified Cabal flag for the specified package.
@@ -181,14 +181,14 @@ stack build --flag *:[-]<flag)name>
     behavior currently and doesn't require that the modules be listed. This may
     change in a future release.
 
-### The `stack build --[no-]force-dirty` flag
+### `--[no-]force-dirty` flag
 
 Default: Disabled
 
 Set the flag to force rebuild of packages even when it doesn't seem necessary
 based on file dirtiness.
 
-### The `stack build --[no-]haddock` flag
+### `--[no-]haddock` flag
 
 Default: Disabled
 
@@ -196,30 +196,30 @@ Set the flag to build Haddock documentation. This may cause a lot of packages to
 get re-built, so that the documentation links work. The `stack haddock` synonym
 sets this flag.
 
-### The `stack build --haddock-arguments` option
+### `--haddock-arguments` option
 
 `stack haddock --haddock-arguments <haddock_arguments>` passes the specified
 arguments to the Haddock tool.
 
-### The `stack build --[no-]haddock-deps` flag
+### `--[no-]haddock-deps` flag
 
 Default: Enabled (if building Haddock documnentation)
 
 Unset the flag to disable building Haddock documentation for dependencies.
 
-### The `stack build --[no-]haddock-hyperlink-source` flag
+### `--[no-]haddock-hyperlink-source` flag
 
 Default: Enabled
 
 Unset the flag to disable building building hyperlinked source for Haddock.
 
-### The `stack build --[no-]haddock-internal` flag
+### `--[no-]haddock-internal` flag
 
 Default: Disabled
 
 Set the flag to enable building Haddock documentation for internal modules.
 
-### The `stack build --[no-]keep-going` flag
+### `--[no-]keep-going` flag
 
 Default (`stack build`): Disabled
 
@@ -228,7 +228,7 @@ Default (`stack test` or `stack bench`): Enabled
 Set the flag to continue building packages even after some build step fails.
 The packages which depend upon the failed build won't get built.
 
-### The `stack build --[no-]keep-tmp-files` flag
+### `--[no-]keep-tmp-files` flag
 
 Default: Disabled
 
@@ -236,7 +236,7 @@ Set the flag to keep intermediate files and build directories that would
 otherwise be considered temporary and deleted. It may be useful to inspect
 these, if a build fails. By default, they are not kept.
 
-### The `stack build --only-configure` flag
+### `--only-configure` flag
 
 [:octicons-tag-24: 0.1.4.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.4.0)
 
@@ -248,22 +248,22 @@ intended for tool usage. It may break when used on multiple packages at once.
     If there are downstream actions that require a package to be built then a
     full build will occur, even if the flag is passed.
 
-### The `stack build --only-dependencies` flag
+### `--only-dependencies` flag
 
 Pass the flag to skip building the targets. The flag `--dependencies-only` has
 the same effect.
 
-### The `stack build --only-locals` flag
+### `--only-locals` flag
 
 Pass the flag to build only packages in the local database. Fails if the build
 plan includes packages in the snapshot database.
 
-### The `stack build --only-snapshot` flag
+### `--only-snapshot` flag
 
 Pass the flag to build only snapshot dependencies, which are cached and shared
 with other projects.
 
-### The `stack build --[no-]reconfigure` flag
+### `--[no-]reconfigure` flag
 
 Default: Disabled
 
@@ -271,7 +271,7 @@ Set the flag to force reconfiguration even when it doesn't seem necessary based
 on file dirtiness. This is sometimes useful with custom `Setup.hs` files, in
 particular when they depend on external data files.
 
-### The `stack build --skip` option
+### `--skip` option
 
 `stack build --skip <component>` skips building the specified components of a
 local package. It allows you to skip test suites and benchmark without
@@ -282,61 +282,86 @@ executables won't work the first time the package is built due to an issue in
 
 This option can be specified multiple times to skip multiple components.
 
-### The `stack build --test` flag
+### `--test` flag
 
 Pass the flag to add test suite components to the targets, if specific
 components are not identified. The `stack test` synonym sets this flag.
 
+## Controlling when building occurs
+
+### `--file-watch` flag
+
+Pass the flag to rebuild your project every time a file changes. By default it
+will take into account all files belonging to the targets you specify. See also
+the `--watch-all` flag.
+
+### `--file-watch-poll` flag
+
+Like the `--file-watch` flag, but based on polling the file system instead of
+using events to determine if a file has changed.
+
+### `--watch-all` flag
+
+Pass the flag to rebuild your project every time any local file changes (from
+project packages or from local dependencies). See also the `--file-watch` flag.
+
+## Controlling what happens after building
+
+### `--exec` option
+
+`stack build --exec "<command> [<arguments>]"` will run the specified command
+after a successful build.
+
 ## Flags affecting GHC's behaviour
 
-### The `stack build --[no-]executable-profiling` flag
+### `--[no-]executable-profiling` flag
 
 Default: Disabled
 
 Set the flag to enable executable profiling for TARGETs and all its
 dependencies.
 
-### The `stack build --[no-]executable-stripping` flag
+### `--[no-]executable-stripping` flag
 
 Default: Enabled
 
 Unset the flag to disable executable stripping for TARGETs and all its
 dependencies.
 
-### The `stack build --fast` flag
+### `--fast` flag
 
 Pass the flag to build your project with the GHC option `-O0`. `-O0` disables
 GHC's optimisations (which is GHC's default).
 
-### The `stack build --ghc-options` option
+### `--ghc-options` option
 
 `stack build ghc-options <ghc_options>` passes the specified options to GHC.
 
-### The `stack build --[no-]library-profiling` flag
+### `--[no-]library-profiling` flag
 
 Default: Disabled
 
 Set the flag to enable library profiling for TARGETs and all its dependencies.
 
-### The `stack build --[no-]library-stripping` flag
+### `--[no-]library-stripping` flag
 
 Default: Enabled
 
 Unset the flag to disable library stripping for TARGETs and all its
 dependencies.
 
-### The `stack build --pedantic` flag
+### `--pedantic` flag
 
 Pass the flag to build your project with the GHC options `-Wall` and `-Werror`.
 `-Wall` turns on all warning options that indicate potentially suspicious code.
 `-Werror` makes any warning into a fatal error.
 
-### The `stack build --profile` flag
+### `--profile` flag
 
 Pass the flag to enable profiling in libraries, executables, etc. for all
 expressions, and generate a profiling report in tests or benchmarks.
 
-### The `stack build --[no-]split-objs` flag
+### `--[no-]split-objs` flag
 
 Default: Disabled
 
@@ -350,54 +375,54 @@ size (at the cost of build time).
     dependencies with split-objs, you will need to delete the snapshot (and all
     snapshots that could reference that snapshot).
 
-### The `stack build --no-strip` flag
+### `--no-strip` flag
 
 Pass the flag to disable DWARF debugging symbol stripping in libraries,
 executables, etc. for all expressions, producing larger executables but allowing
 the use of standard debuggers/profiling tools/other utilities that use debugging
 symbols.
 
-### The `stack build --trace` flag
+### `--trace` flag
 
 Pass the flag to enable profiling in libraries, executables, etc. for all
 expressions, and generate a backtrace on exception.
 
 ## Flags relating to build outputs
 
-### The `stack build --[no]-cabal-verbose` flag
+### `--[no]-cabal-verbose` flag
 
 Default: Disabled
 
 Set the flag to enable verbose output from Cabal (the library). This flag is an
 alternative to the `--cabal-verbosity` option.
 
-### The `stack build --[no]-cabal-verbosity` option
+### `--[no]-cabal-verbosity` option
 
 `stack build --cabal-verbosity <verbosity_level>` sets the specified verbosity
 level for output from Cabal (the library). It accepts Cabal's numerical and
 extended syntax. This option is an alternative to setting the `--cabal-verbose`
 flag.
 
-### The `stack build --[no-]copy-bins` flag
+### `--[no-]copy-bins` flag
 
 Default: Disabled
 
 Set the flag to enable copying binaries to Stack's local binary directory (see
 `stack path --local-bin`). The `stack install` synonym sets this flag.
 
-### The `stack build --[no-]copy-compiler-tool` flag
+### `--[no-]copy-compiler-tool` flag
 
 Default: Disabled
 
 Set the flag to enable copying binaries of targets to Stack's compiler tools
 binary directory (see `stack path --compiler-tools-bin`).
 
-### The `stack build --coverage` flag
+### `--coverage` flag
 
 Pass the flag to generate a code coverage report. For further information, see
 the [code coverage](hpc_command.md) documentation.
 
-### The `stack build --ddump-dir` option
+### `--ddump-dir` option
 
 GHC has a number of `ddump-*` flags and options to allow dumping out of
 intermediate structures produced by the compiler. They include the
@@ -414,7 +439,7 @@ For example:
 stack build --ghc-options "-ddump-to-file -ddump-timings" --ddump-dir my-ddump-dir
 ~~~
 
-### The `stack build --[no-]interleaved-output` flag
+### `--[no-]interleaved-output` flag
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
@@ -468,7 +493,7 @@ package is targetted in a multi-package project (for example, using
   default `dump-logs` mode is to output the contents of the log files that are
   warnings.
 
-### The `stack build --[no]-open` flag
+### `--[no]-open` flag
 
 Default: Disabled
 
@@ -476,35 +501,14 @@ Set the flag to enable opening the local Haddock documentation in the browser.
 
 ## Other flags and options
 
-There are a number of other flags accepted by `stack build`. Instead of listing
-all of them, please use `stack build --help`. Some particularly convenient ones
-worth mentioning here since they compose well with the rest of the build system
-as described:
-
-### The `stack build --exec` option
-
-`stack build --exec "<command> [<arguments>]"` will run a command after a
-successful build.
-
-### The `stack build --file-watch` flag
-
-Pass the flag to rebuild your project every time a file changes. By default it
-will take into account all files belonging to the targets you specify. See also
-the `--watch-all` flag.
-
-### The `stack build --file-watch-poll` flag
-
-Like the `--file-watch` flag, but based on polling the file system instead of
-using events to determine if a file has changed.
-
-### The `stack build --[no]-prefetch` flag
+### `--[no]-prefetch` flag
 
 Default: Disabled
 
 Set the flag to enable fetching packages necessary for the build immediately.
 This can be useful with `stack build --dry-run`.
 
-### The `stack build --tests-allow-stdin` flag
+### `--tests-allow-stdin` flag
 
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
@@ -517,11 +521,6 @@ nothing on the standard input channel (`stdin`). Pass this flag to override that
 specification and allow the executable to receive input on that channel. If you
 pass `--no-tests-allow-stdin` and the executable seeks input on the standard
 input channel, an exception will be thown.
-
-### The `stack build --watch-all` flag
-
-Pass the flag to rebuild your project every time any local file changes (from
-project packages or from local dependencies). See also the `--file-watch` flag.
 
 ## Examples
 
