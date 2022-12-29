@@ -137,6 +137,8 @@ Other extensions to the basic Markdown syntax used include:
         The `octicons-tag-24` icon (:octicons-tag-24:) is used to refer to
         versions of Stack. The `material-cloud-download-outline` icon
         (:material-cloud-download-outline:) is used to signify a download link.
+        The `octicons-beaker-24` icon (:octicons-beaker-24:) is used with
+        'Experimental' to signify that a feature is experimental.
 
 ## Testing online documentation
 

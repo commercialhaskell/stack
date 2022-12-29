@@ -13,12 +13,12 @@ archive ('tarball') in the format produced by Cabal's `sdist` action.
 `stack sdist` generates a file for your package, in the format accepted by
 Hackage for uploads. The command will report the location of the generated file.
 
-## The `stack sdist --ignore-check` flag
+## `--ignore-check` flag
 
 Pass the flag to disable checks of the package for common mistakes. By default,
 the command will check the package for common mistakes.
 
-## The `stack sdist --pvp-bounds` option
+## `--pvp-bounds` option
 
 The `--pvp-bounds <pvp_bounds_mode>` option determines whether and, if so, how
 PVP version bounds should be added to the Cabal file of the package. The
@@ -29,12 +29,12 @@ available modes for use with Cabal file revisions are `lower-revision`,
 For futher information, see the
 [YAML configuration](yaml_configuration.md#pvp-bounds) documentation.
 
-## The `stack sdist --tar-dir` option
+## `--tar-dir` option
 
 The `--tar-dir <path_to_directory>` option determines whether the package
 archive should be copied to the specified directory.
 
-## The `stack sdist --[no-]test-tarball` flag
+## `--[no-]test-tarball` flag
 
 Default: Disabled
 

@@ -2,6 +2,8 @@
 
 # The `stack query` command
 
+:octicons-beaker-24: Experimental
+
 [:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
 
 ~~~text
