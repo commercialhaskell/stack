@@ -10,7 +10,6 @@ stack path [--stack-root] [--global-config] [--project-root] [--config-location]
            [--global-pkg-db] [--ghc-package-path] [--snapshot-install-root]
            [--local-install-root] [--snapshot-doc-root] [--local-doc-root]
            [--local-hoogle-root] [--dist-dir] [--local-hpc-root]
-           [--local-bin-path] [--ghc-paths] [--global-stack-root]
 ~~~
 
 `stack path` provides information about files and locations used by Stack.
@@ -28,12 +27,9 @@ Pass the following flags for information about specific files or locations:
 |--extra-include-dirs   |Extra include directories.                            |
 |--extra-library-dirs   |Extra library directories.                            |
 |--ghc-package-path     |The `GHC_PACKAGE_PATH` environment variable.          |
-|--ghc-paths            |Deprecated.                                           |
 |--global-config        |Stack's user-specific global YAML configuration file (`config.yaml`).|
 |--global-pkg-db        |The global package database.                          |
-|--global-stack-root    |Deprecated.                                           |
 |--local-bin            |The directory in which Stack installs executables.    |
-|--local-bin-path       |Deprecated.                                           |
 |--local-doc-root       |The root directory for local project documentation.   |
 |--local-hoogle-root    |The root directory for local project documentation.   |
 |--local-hpc-root       |The root directory for .tix files and HPC reports.    |

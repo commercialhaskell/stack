@@ -17,8 +17,8 @@ import           Path ( (</>), parent )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           RIO.Process ( HasProcessContext (..), exeSearchPathL )
 import           Stack.Constants
-                   ( deprecatedStackRootOptionName, docDirSuffix
-                   , stackGlobalConfigOptionName, stackRootOptionName
+                   ( docDirSuffix, stackGlobalConfigOptionName
+                   , stackRootOptionName
                    )
 import           Stack.Constants.Config ( distRelativeDir )
 import           Stack.GhcPkg as GhcPkg
@@ -43,24 +43,10 @@ import qualified System.FilePath as FP
 -- support others later).
 path :: [Text] -> RIO Runner ()
 path keys = do
-  let deprecated = filter ((`elem` keys) . fst) deprecatedPathKeys
-  forM_ deprecated $ \(oldOption, newOption) ->
-    logWarn $
-         "\n"
-      <> "'--"
-      <> display oldOption
-      <> "' will be removed in a future release.\n"
-      <> "Please use '--"
-      <> display newOption
-      <> "' instead.\n"
-      <> "\n"
-  let -- filter the chosen paths in flags (keys),
-      -- or show all of them if no specific paths chosen.
+  let -- filter the chosen paths in flags (keys), or show all of them if no
+      -- specific paths chosen.
       goodPaths = filter
-        ( \(_, key, _) ->
-               (null keys && key /= T.pack deprecatedStackRootOptionName)
-            || elem key keys
-        )
+        ( \(_, key, _) -> null keys || elem key keys )
         paths
       singlePath = length goodPaths == 1
       toEither (_, k, UseHaddocks p) = Left (k, p)
@@ -269,22 +255,4 @@ paths =
   , ( "Where HPC reports and tix files are stored"
     , "local-hpc-root"
     , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . piHpcDir )
-  , ( "DEPRECATED: Use '--local-bin' instead"
-    , "local-bin-path"
-    , WithoutHaddocks $
-        T.pack . toFilePathNoTrailingSep . configLocalBin . view configL )
-  , ( "DEPRECATED: Use '--programs' instead"
-    , "ghc-paths"
-    , WithoutHaddocks $
-        T.pack . toFilePathNoTrailingSep . configLocalPrograms . view configL )
-  , ( "DEPRECATED: Use '--" <> stackRootOptionName <> "' instead"
-    , T.pack deprecatedStackRootOptionName
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . view stackRootL )
-  ]
-
-deprecatedPathKeys :: [(Text, Text)]
-deprecatedPathKeys =
-  [ (T.pack deprecatedStackRootOptionName, T.pack stackRootOptionName)
-  , ("ghc-paths", "programs")
-  , ("local-bin-path", "local-bin")
   ]

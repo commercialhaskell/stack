@@ -13,6 +13,9 @@ Behavior changes:
 * `stack ghci` and `stack repl` now take into account the values of
   `default-language` keys in Cabal files, like they take into account the values
   of `default-extensions` keys.
+* Removed `--ghc-paths`, `--global-stack-root` and `--local-bin-path` flags for
+  `stack path`, deprecated in Stack 1.1.0 in favour of `--programs`,
+  `--stack-root` and `local-bin` respectively.
 
 Other enhancements:
 
