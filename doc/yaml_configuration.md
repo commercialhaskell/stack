@@ -367,7 +367,9 @@ The name `allow-newer` is chosen to match the commonly-used Cabal option.
 allow-newer: true
 ~~~
 
-### allow-newer-deps (experimental)
+### allow-newer-deps
+
+:octicons-beaker-24: Experimental
 
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
@@ -504,7 +506,9 @@ compiler: ghc-8.6.4
 compiler-check: match-exact
 ~~~
 
-#### Building GHC from source (experimental)
+#### Building GHC from source
+
+:octicons-beaker-24: Experimental
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 

@@ -363,6 +363,8 @@ expressions, and generate a profiling report in tests or benchmarks.
 
 ### `--[no-]split-objs` flag
 
+:octicons-beaker-24: Experimental
+
 Default: Disabled
 
 Set the flag to enable the GHC option `--split-objs`. This will reduce output
@@ -370,10 +372,10 @@ size (at the cost of build time).
 
 !!! note
 
-    This feature is EXPERIMENTAL, and its behavior may be changed and improved.
-    You will need to clean your workdirs before use. If you want to compile all
-    dependencies with split-objs, you will need to delete the snapshot (and all
-    snapshots that could reference that snapshot).
+    The behaviour of this feature may be changed and improved. You will need to
+    clean your project's Stack working directory before use. If you want to
+    compile all dependencies with split-objs, you will need to delete the
+    snapshot (and all snapshots that could reference that snapshot).
 
 ### `--no-strip` flag
 
