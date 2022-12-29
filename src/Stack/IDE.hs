@@ -7,33 +7,41 @@
 
 -- | Functions for IDEs.
 module Stack.IDE
-    ( OutputStream (..)
-    , ListPackagesCmd (..)
-    , listPackages
-    , listTargets
-    ) where
+  ( OutputStream (..)
+  , ListPackagesCmd (..)
+  , listPackages
+  , listTargets
+  ) where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Stack.Prelude
 import           Stack.Types.Config
+                   ( BuildConfig (..), HasBuildConfig (..), ppComponents )
 import           Stack.Types.NamedComponent
-import           Stack.Types.SourceMap
-import           System.IO (putStrLn)
+                   ( NamedComponent, renderPkgComponent )
+import           Stack.Types.SourceMap ( ProjectPackage (..), SMWanted (..) )
+import           System.IO ( putStrLn )
 
-data OutputStream = OutputLogInfo
-                  | OutputStdout
+data OutputStream
+  = OutputLogInfo
+  | OutputStdout
 
-data ListPackagesCmd = ListPackageNames
-                     | ListPackageCabalFiles
+data ListPackagesCmd
+  = ListPackageNames
+  | ListPackageCabalFiles
 
 outputFunc :: HasLogFunc env => OutputStream -> String -> RIO env ()
 outputFunc OutputLogInfo = logInfo . fromString
 outputFunc OutputStdout  = liftIO . putStrLn
 
 -- | List the packages inside the current project.
-listPackages :: HasBuildConfig env => OutputStream -> ListPackagesCmd -> RIO env ()
+listPackages ::
+     HasBuildConfig env
+  => OutputStream
+  -> ListPackagesCmd
+  -> RIO env ()
 listPackages stream flag = do
   packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   let strs = case flag of
@@ -50,10 +58,10 @@ listTargets stream = do
   pairs <- concat <$> Map.traverseWithKey toNameAndComponent packages
   outputFunc stream $ T.unpack $ T.intercalate "\n" $
     map renderPkgComponent pairs
-  where
-    toNameAndComponent ::
-         PackageName
-      -> ProjectPackage
-      -> RIO env [(PackageName, NamedComponent)]
-    toNameAndComponent pkgName' =
-        fmap (map (pkgName', ) . Set.toList) . ppComponents
+ where
+  toNameAndComponent ::
+       PackageName
+    -> ProjectPackage
+    -> RIO env [(PackageName, NamedComponent)]
+  toNameAndComponent pkgName' =
+    fmap (map (pkgName', ) . Set.toList) . ppComponents
