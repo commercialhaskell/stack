@@ -17,19 +17,21 @@ Everything after `--` on the command line is interpreted as a command line
 argument to be passed to what is run, other than a first argument recognised as
 an executable target.
 
-By default, the `GHC_PACKAGE_PATH` environment variable is set for the
-subprocess. Pass the `--no-ghc-package-path` flag to not set the variable.
+By default:
 
-By default, the `STACK_EXE` environment variable is set with the path to Stack.
-Pass the `--no-stack-exe` flag to not set the variable.
+*   the `GHC_PACKAGE_PATH` environment variable is set for the subprocess. Pass
+    the `--no-ghc-package-path` flag to not set the variable; and
+
+*   the `STACK_EXE` environment variable is set with the path to Stack. Pass the
+    `--no-stack-exe` flag to not set the variable.
 
 The `--cwd` option can be used to set the working directory before the
 executable is run.
+
+The `--package` option (which can be specified multiple times) can be used to
+add a package name to build targets.
 
 The `--rts-options` option (which can be specified multiple times) can be used
 to pass a list of GHC's
 [runtime system (RTS) options](https://downloads.haskell.org/~ghc/latest/docs/users_guide/runtime_control.html#)
 to the executable when it is run. (The `+RTS` and `-RTS` must not be included.)
-
-The `--package` option (which can be specified multiple times) can be used to
-add a package name to build targets.

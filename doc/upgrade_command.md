@@ -20,5 +20,8 @@ binary distribution (pass the `--binary-only` flag, the default) or from
 compiling source code (pass the `--source-only` flag). The `--binary-only` and
 `--source-only` flags are alternatives.
 
-`--git` is a convenient way to get the most recent version from the `master`
-branch, for those testing and living on the bleeding edge.
+When compiling from source code, by default:
+
+*   Stack will obtain the source code for the most recent version in the package
+    index (eg Hackage). Pass the flag `--git` to specify the most recent version
+    from the `master` branch of Stack's repository.
