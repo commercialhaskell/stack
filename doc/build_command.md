@@ -253,6 +253,11 @@ intended for tool usage. It may break when used on multiple packages at once.
 Pass the flag to skip building the targets. The flag `--dependencies-only` has
 the same effect.
 
+### The `stack build --only-locals` flag
+
+Pass the flag to build only packages in the local database. Fails if the build
+plan includes packages in the snapshot database.
+
 ### The `stack build --only-snapshot` flag
 
 Pass the flag to build only snapshot dependencies, which are cached and shared
@@ -357,12 +362,21 @@ symbols.
 Pass the flag to enable profiling in libraries, executables, etc. for all
 expressions, and generate a backtrace on exception.
 
-## Other flags and options
+## Flags relating to build outputs
 
-There are a number of other flags accepted by `stack build`. Instead of listing
-all of them, please use `stack build --help`. Some particularly convenient ones
-worth mentioning here since they compose well with the rest of the build system
-as described:
+### The `stack build --[no]-cabal-verbose` flag
+
+Default: Disabled
+
+Set the flag to enable verbose output from Cabal (the library). This flag is an
+alternative to the `--cabal-verbosity` option.
+
+### The `stack build --[no]-cabal-verbosity` option
+
+`stack build --cabal-verbosity <verbosity_level>` sets the specified verbosity
+level for output from Cabal (the library). It accepts Cabal's numerical and
+extended syntax. This option is an alternative to setting the `--cabal-verbose`
+flag.
 
 ### The `stack build --[no-]copy-bins` flag
 
@@ -383,16 +397,22 @@ binary directory (see `stack path --compiler-tools-bin`).
 Pass the flag to generate a code coverage report. For further information, see
 the [code coverage](hpc_command.md) documentation.
 
-### The `stack build --exec` option
+### The `stack build --ddump-dir` option
 
-`stack build --exec "<command> [<arguments>]"` will run a command after a
-successful build.
+GHC has a number of `ddump-*` flags and options to allow dumping out of
+intermediate structures produced by the compiler. They include the
+`-ddump-to-file` flag that causes the output from other flags to be dumped to a
+file or files.
 
-### The `stack build --file-watch` flag
+`stack build --ddump_dir <relative_directory>` causes Stack to copy `*.dump-*`
+files to subdirectories of the specified directory, which is relative to Stack's
+working directory for the project.
 
-Pass the flag to rebuild your project every time a file changes. By default it
-will take into account all files belonging to the targets you specify. See also
-the `--watch-all` flag.
+For example:
+
+~~~text
+stack build --ghc-options "-ddump-to-file -ddump-timings" --ddump-dir my-ddump-dir
+~~~
 
 ### The `stack build --[no-]interleaved-output` flag
 
@@ -453,6 +473,29 @@ package is targetted in a multi-package project (for example, using
 Default: Disabled
 
 Set the flag to enable opening the local Haddock documentation in the browser.
+
+## Other flags and options
+
+There are a number of other flags accepted by `stack build`. Instead of listing
+all of them, please use `stack build --help`. Some particularly convenient ones
+worth mentioning here since they compose well with the rest of the build system
+as described:
+
+### The `stack build --exec` option
+
+`stack build --exec "<command> [<arguments>]"` will run a command after a
+successful build.
+
+### The `stack build --file-watch` flag
+
+Pass the flag to rebuild your project every time a file changes. By default it
+will take into account all files belonging to the targets you specify. See also
+the `--watch-all` flag.
+
+### The `stack build --file-watch-poll` flag
+
+Like the `--file-watch` flag, but based on polling the file system instead of
+using events to determine if a file has changed.
 
 ### The `stack build --[no]-prefetch` flag
 
