@@ -11,8 +11,8 @@ module Path.Find
   ) where
 
 import qualified Data.List as L
-import           Path
-import           Path.IO hiding (findFiles)
+import           Path ( Abs, Dir, File, Path, parent, toFilePath )
+import           Path.IO ( listDir )
 import           RIO
 import           System.IO.Error ( isPermissionError )
 import           System.PosixCompat.Files
@@ -38,17 +38,21 @@ findDirUp = findPathUp fst
 findPathUp :: (MonadIO m,MonadThrow m)
            => (([Path Abs Dir],[Path Abs File]) -> [Path Abs t])
               -- ^ Choose path type from pair.
-           -> Path Abs Dir                     -- ^ Start here.
-           -> (Path Abs t -> Bool)             -- ^ Predicate to match the path.
-           -> Maybe (Path Abs Dir)             -- ^ Do not ascend above this directory.
-           -> m (Maybe (Path Abs t))           -- ^ Absolute path.
-findPathUp pathType dir p upperBound =
-  do entries <- listDir dir
-     case L.find p (pathType entries) of
-       Just path -> pure (Just path)
-       Nothing | Just dir == upperBound -> pure Nothing
-               | parent dir == dir -> pure Nothing
-               | otherwise -> findPathUp pathType (parent dir) p upperBound
+           -> Path Abs Dir
+              -- ^ Start here.
+           -> (Path Abs t -> Bool)
+              -- ^ Predicate to match the path.
+           -> Maybe (Path Abs Dir)
+              -- ^ Do not ascend above this directory.
+           -> m (Maybe (Path Abs t))
+              -- ^ Absolute path.
+findPathUp pathType dir p upperBound = do
+  entries <- listDir dir
+  case L.find p (pathType entries) of
+    Just path -> pure (Just path)
+    Nothing | Just dir == upperBound -> pure Nothing
+            | parent dir == dir -> pure Nothing
+            | otherwise -> findPathUp pathType (parent dir) p upperBound
 
 -- | Find files matching predicate below a root directory.
 --
@@ -57,38 +61,45 @@ findPathUp pathType dir p upperBound =
 --
 -- TODO: write one of these that traverses symbolic links but
 -- efficiently ignores loops.
-findFiles :: Path Abs Dir            -- ^ Root directory to begin with.
-          -> (Path Abs File -> Bool) -- ^ Predicate to match files.
-          -> (Path Abs Dir -> Bool)  -- ^ Predicate for which directories to traverse.
-          -> IO [Path Abs File]      -- ^ List of matching files.
-findFiles dir p traversep =
-  do (dirs,files) <- catchJust (\ e -> if isPermissionError e
-                                         then Just ()
-                                         else Nothing)
-                               (listDir dir)
-                               (\ _ -> pure ([], []))
-     filteredFiles <- evaluate $ force (filter p files)
-     filteredDirs <- filterM (fmap not . isSymLink) dirs
-     subResults <-
-       forM filteredDirs
-            (\entry ->
-               if traversep entry
-                  then findFiles entry p traversep
-                  else pure [])
-     pure (concat (filteredFiles : subResults))
+findFiles :: Path Abs Dir
+             -- ^ Root directory to begin with.
+          -> (Path Abs File -> Bool)
+             -- ^ Predicate to match files.
+          -> (Path Abs Dir -> Bool)
+             -- ^ Predicate for which directories to traverse.
+          -> IO [Path Abs File]
+             -- ^ List of matching files.
+findFiles dir p traversep = do
+  (dirs,files) <- catchJust (\ e -> if isPermissionError e
+                                      then Just ()
+                                      else Nothing)
+                            (listDir dir)
+                            (\ _ -> pure ([], []))
+  filteredFiles <- evaluate $ force (filter p files)
+  filteredDirs <- filterM (fmap not . isSymLink) dirs
+  subResults <-
+    forM filteredDirs
+         (\entry ->
+            if traversep entry
+               then findFiles entry p traversep
+               else pure [])
+  pure (concat (filteredFiles : subResults))
 
 isSymLink :: Path Abs t -> IO Bool
 isSymLink = fmap isSymbolicLink . getSymbolicLinkStatus . toFilePath
 
 -- | @findInParents f path@ applies @f@ to @path@ and its 'parent's until
 -- it finds a 'Just' or reaches the root directory.
-findInParents :: MonadIO m => (Path Abs Dir -> m (Maybe a)) -> Path Abs Dir -> m (Maybe a)
+findInParents ::
+     MonadIO m
+  => (Path Abs Dir -> m (Maybe a))
+  -> Path Abs Dir -> m (Maybe a)
 findInParents f path = do
-    mres <- f path
-    case mres of
-        Just res -> pure (Just res)
-        Nothing -> do
-            let next = parent path
-            if next == path
-                then pure Nothing
-                else findInParents f next
+  mres <- f path
+  case mres of
+    Just res -> pure (Just res)
+    Nothing -> do
+      let next = parent path
+      if next == path
+        then pure Nothing
+        else findInParents f next

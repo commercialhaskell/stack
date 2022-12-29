@@ -5,7 +5,6 @@
 -- |
 -- Wrapper functions of 'Network.HTTP.Simple' and 'Network.HTTP.Client' to
 -- add the 'User-Agent' HTTP request header to each request.
-
 module Network.HTTP.StackClient
   ( httpJSON
   , httpLbs
@@ -92,11 +91,12 @@ import           Network.HTTP.Simple
                    , setRequestCheckStatus, setRequestHeader, setRequestMethod
                    )
 import qualified Network.HTTP.Simple
+                   ( httpJSON, httpLbs, httpNoBody, httpSink, withResponse )
 import           Network.HTTP.Types
                    ( hAccept, hContentLength, hContentMD5, methodPut
                    , notFound404
                    )
-import           Path
+import           Path ( Abs, File, Path )
 import           Prelude ( until, (!!) )
 import           RIO
 import           RIO.PrettyPrint ( HasTerm )
@@ -203,36 +203,36 @@ chattyDownloadProgress ::
   -> f
   -> ConduitT ByteString c m ()
 chattyDownloadProgress label mtotalSize _ = do
-    _ <- logSticky $ RIO.display label <> ": download has begun"
-    CL.map (Sum . Strict.length)
-      .| chunksOverTime 1
-      .| go
-  where
-    go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
-        modify (+ size)
-        totalSoFar <- get
-        logSticky $ fromString $
-            case mtotalSize of
-                Nothing -> chattyProgressNoTotal totalSoFar
-                Just 0 -> chattyProgressNoTotal totalSoFar
-                Just totalSize -> chattyProgressWithTotal totalSoFar totalSize
+  _ <- logSticky $ RIO.display label <> ": download has begun"
+  CL.map (Sum . Strict.length)
+    .| chunksOverTime 1
+    .| go
+ where
+  go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
+      modify (+ size)
+      totalSoFar <- get
+      logSticky $ fromString $
+        case mtotalSize of
+          Nothing -> chattyProgressNoTotal totalSoFar
+          Just 0 -> chattyProgressNoTotal totalSoFar
+          Just totalSize -> chattyProgressWithTotal totalSoFar totalSize
 
-    -- Example: ghc: 42.13 KiB downloaded...
-    chattyProgressNoTotal totalSoFar =
-        printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
-                (T.unpack label)
+  -- Example: ghc: 42.13 KiB downloaded...
+  chattyProgressNoTotal totalSoFar =
+    printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
+            (T.unpack label)
 
     -- Example: ghc: 50.00 MiB / 100.00 MiB (50.00%) downloaded...
-    chattyProgressWithTotal totalSoFar total =
-      printf ("%s: " <>
-              bytesfmt "%7.2f" totalSoFar <> " / " <>
-              bytesfmt "%.2f" total <>
-              " (%6.2f%%) downloaded...")
-              (T.unpack label)
-              percentage
-     where
-      percentage :: Double
-      percentage = fromIntegral totalSoFar / fromIntegral total * 100
+  chattyProgressWithTotal totalSoFar total =
+    printf ("%s: " <>
+            bytesfmt "%7.2f" totalSoFar <> " / " <>
+            bytesfmt "%.2f" total <>
+            " (%6.2f%%) downloaded...")
+            (T.unpack label)
+            percentage
+   where
+    percentage :: Double
+    percentage = fromIntegral totalSoFar / fromIntegral total * 100
 
 -- | Given a printf format string for the decimal part and a number of
 -- bytes, formats the bytes using an appropriate unit and returns the
@@ -259,21 +259,21 @@ bytesfmt formatter bs = printf (formatter <> " %s")
 -- (these literals are interpreted as "seconds")
 chunksOverTime :: (Monoid a, Semigroup a, MonadIO m) => NominalDiffTime -> ConduitM a a m ()
 chunksOverTime diff = do
-    currentTime <- liftIO getCurrentTime
-    evalStateC (currentTime, mempty) go
-  where
-    -- State is a tuple of:
-    -- * the last time a yield happened (or the beginning of the sink)
-    -- * the accumulated awaits since the last yield
-    go = await >>= \case
-      Nothing -> do
-        (_, acc) <- get
-        yield acc
-      Just a -> do
-        (lastTime, acc) <- get
-        let acc' = acc <> a
-        currentTime <- liftIO getCurrentTime
-        if diff < diffUTCTime currentTime lastTime
-          then put (currentTime, mempty) >> yield acc'
-          else put (lastTime,    acc')
-        go
+  currentTime <- liftIO getCurrentTime
+  evalStateC (currentTime, mempty) go
+ where
+  -- State is a tuple of:
+  -- * the last time a yield happened (or the beginning of the sink)
+  -- * the accumulated awaits since the last yield
+  go = await >>= \case
+    Nothing -> do
+      (_, acc) <- get
+      yield acc
+    Just a -> do
+      (lastTime, acc) <- get
+      let acc' = acc <> a
+      currentTime <- liftIO getCurrentTime
+      if diff < diffUTCTime currentTime lastTime
+        then put (currentTime, mempty) >> yield acc'
+        else put (lastTime,    acc')
+      go

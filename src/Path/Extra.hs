@@ -2,7 +2,6 @@
 {-# LANGUAGE ViewPatterns      #-}
 
 -- | Extra Path utilities.
-
 module Path.Extra
   ( toFilePathNoTrailingSep
   , dropRoot
@@ -19,8 +18,11 @@ module Path.Extra
 
 import           Data.Time ( UTCTime )
 import           Path
-import           Path.IO
-import           Path.Internal ( Path (..) )
+                   ( Abs, Dir, File, Rel, parseAbsDir, parseAbsFile
+                   , toFilePath
+                   )
+import           Path.Internal ( Path (Path) )
+import           Path.IO ( doesDirExist, doesFileExist, getModificationTime )
 import           RIO
 import           System.IO.Error ( isDoesNotExistError )
 import qualified Data.ByteString.Char8 as BS
@@ -64,16 +66,16 @@ concatAndCollapseAbsDir base rel = parseCollapsedAbsDir (toFilePath base FP.</> 
 -- (adapted from @Text.Pandoc.Shared@)
 collapseFilePath :: FilePath -> FilePath
 collapseFilePath = FP.joinPath . reverse . foldl' go [] . FP.splitDirectories
-  where
-    go rs "." = rs
-    go r@(p:rs) ".." = case p of
-                            ".." -> "..":r
-                            (checkPathSeparator -> True) -> "..":r
-                            _ -> rs
-    go _ (checkPathSeparator -> True) = [[FP.pathSeparator]]
-    go rs x = x:rs
-    checkPathSeparator [x] = FP.isPathSeparator x
-    checkPathSeparator _ = False
+ where
+  go rs "." = rs
+  go r@(p:rs) ".." = case p of
+                          ".." -> "..":r
+                          (checkPathSeparator -> True) -> "..":r
+                          _ -> rs
+  go _ (checkPathSeparator -> True) = [[FP.pathSeparator]]
+  go rs x = x:rs
+  checkPathSeparator [x] = FP.isPathSeparator x
+  checkPathSeparator _ = False
 
 -- | Drop the root (either @\/@ on POSIX or @C:\\@, @D:\\@, etc. on
 -- Windows).

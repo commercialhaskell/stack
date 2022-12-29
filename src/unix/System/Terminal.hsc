@@ -34,13 +34,13 @@ foreign import capi "sys/ioctl.h ioctl"
 
 getTerminalWidth :: IO (Maybe Int)
 getTerminalWidth =
-    alloca $ \p -> do
-        errno <- ioctl (#const STDOUT_FILENO) (#const TIOCGWINSZ) p
-        if errno < 0
-        then return Nothing
-        else do
-            WindowWidth w <- peek p
-            return . Just . fromIntegral $ w
+  alloca $ \p -> do
+    errno <- ioctl (#const STDOUT_FILENO) (#const TIOCGWINSZ) p
+    if errno < 0
+    then return Nothing
+    else do
+      WindowWidth w <- peek p
+      return . Just . fromIntegral $ w
 
 fixCodePage :: x -> y -> a -> a
 fixCodePage _ _ = id

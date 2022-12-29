@@ -48,63 +48,62 @@
 
   Nested block comments are not supported.
 -}
-
 module Data.Attoparsec.Interpreter
-    ( interpreterArgsParser -- for unit tests
-    , getInterpreterArgs
-    ) where
+  ( interpreterArgsParser -- for unit tests
+  , getInterpreterArgs
+  ) where
 
-import           Data.Attoparsec.Args
-import           Data.Attoparsec.Text ((<?>))
+import           Data.Attoparsec.Args ( EscapingMode (..), argsParser )
+import           Data.Attoparsec.Text ( (<?>) )
 import qualified Data.Attoparsec.Text as P
-import           Data.Char (isSpace)
-import           Conduit
-import           Data.Conduit.Attoparsec
-import           Data.List (intercalate)
-import           Data.Text (pack)
+import           Data.Char ( isSpace )
+import           Conduit ( decodeUtf8C, withSourceFile )
+import           Data.Conduit.Attoparsec ( ParseError (..), Position (..), sinkParserEither )
+import           Data.List ( intercalate )
+import           Data.Text ( pack )
 import           Stack.Prelude
-import           System.FilePath (takeExtension)
-import           System.IO (hPutStrLn)
+import           System.FilePath ( takeExtension )
+import           System.IO ( hPutStrLn )
 
 -- | Parser to extract the Stack command line embedded inside a comment
 -- after validating the placement and formatting rules for a valid
 -- interpreter specification.
 interpreterArgsParser :: Bool -> String -> P.Parser String
 interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpreterComment
-  where
-    sheBangLine =   P.string "#!"
-                 *> P.manyTill P.anyChar P.endOfLine
+ where
+  sheBangLine =   P.string "#!"
+               *> P.manyTill P.anyChar P.endOfLine
 
-    commentStart psr =   (psr <?> (progName ++ " options comment"))
-                      *> P.skipSpace
-                      *> (P.string (pack progName) <?> show progName)
+  commentStart psr =   (psr <?> (progName ++ " options comment"))
+                    *> P.skipSpace
+                    *> (P.string (pack progName) <?> show progName)
 
-    -- Treat newlines as spaces inside the block comment
-    anyCharNormalizeSpace = let normalizeSpace c = if isSpace c then ' ' else c
+  -- Treat newlines as spaces inside the block comment
+  anyCharNormalizeSpace = let normalizeSpace c = if isSpace c then ' ' else c
                             in  P.satisfyWith normalizeSpace $ const True
 
-    comment start end = commentStart start
-      *> ((end >> pure "")
-          <|> (P.space *> (P.manyTill anyCharNormalizeSpace end <?> "-}")))
+  comment start end = commentStart start
+    *> ((end >> pure "")
+        <|> (P.space *> (P.manyTill anyCharNormalizeSpace end <?> "-}")))
 
-    horizontalSpace = P.satisfy P.isHorizontalSpace
+  horizontalSpace = P.satisfy P.isHorizontalSpace
 
-    lineComment =  comment "--" (P.endOfLine <|> P.endOfInput)
-    literateLineComment = comment
-      (">" *> horizontalSpace *> "--")
-      (P.endOfLine <|> P.endOfInput)
-    blockComment = comment "{-" (P.string "-}")
+  lineComment =  comment "--" (P.endOfLine <|> P.endOfInput)
+  literateLineComment = comment
+    (">" *> horizontalSpace *> "--")
+    (P.endOfLine <|> P.endOfInput)
+  blockComment = comment "{-" (P.string "-}")
 
-    literateBlockComment =
-      (">" *> horizontalSpace *> "{-")
-      *> P.skipMany (("" <$ horizontalSpace) <|> (P.endOfLine *> ">"))
-      *> (P.string (pack progName) <?> progName)
-      *> P.manyTill' (P.satisfy (not . P.isEndOfLine)
-                       <|> (' ' <$ (P.endOfLine *> ">" <?> ">"))) "-}"
+  literateBlockComment =
+    (">" *> horizontalSpace *> "{-")
+    *> P.skipMany (("" <$ horizontalSpace) <|> (P.endOfLine *> ">"))
+    *> (P.string (pack progName) <?> progName)
+    *> P.manyTill' (P.satisfy (not . P.isEndOfLine)
+                     <|> (' ' <$ (P.endOfLine *> ">" <?> ">"))) "-}"
 
-    interpreterComment = if isLiterate
-                            then literateLineComment <|> literateBlockComment
-                            else lineComment <|> blockComment
+  interpreterComment = if isLiterate
+                         then literateLineComment <|> literateBlockComment
+                         else lineComment <|> blockComment
 
 -- | Extract Stack arguments from a correctly placed and correctly formatted
 -- comment when it is being used as an interpreter
@@ -114,40 +113,40 @@ getInterpreterArgs file = do
   case eArgStr of
     Left err -> handleFailure $ decodeError err
     Right str -> parseArgStr str
-  where
-    parseFile src =
-         runConduit
-       $ src
-      .| decodeUtf8C
-      .| sinkParserEither (interpreterArgsParser isLiterate stackProgName)
+ where
+  parseFile src =
+       runConduit
+     $ src
+    .| decodeUtf8C
+    .| sinkParserEither (interpreterArgsParser isLiterate stackProgName)
 
-    isLiterate = takeExtension file == ".lhs"
+  isLiterate = takeExtension file == ".lhs"
 
-    -- FIXME We should print anything only when explicit verbose mode is
-    -- specified by the user on command line. But currently the
-    -- implementation does not accept or parse any command line flags in
-    -- interpreter mode. We can only invoke the interpreter as
-    -- "stack <file name>" strictly without any options.
-    stackWarn s = hPutStrLn stderr $ stackProgName ++ ": WARNING! " ++ s
+  -- FIXME We should print anything only when explicit verbose mode is
+  -- specified by the user on command line. But currently the
+  -- implementation does not accept or parse any command line flags in
+  -- interpreter mode. We can only invoke the interpreter as
+  -- "stack <file name>" strictly without any options.
+  stackWarn s = hPutStrLn stderr $ stackProgName ++ ": WARNING! " ++ s
 
-    handleFailure err = do
-      mapM_ stackWarn (lines err)
-      stackWarn "Missing or unusable Stack options specification"
-      stackWarn "Using runghc without any additional Stack options"
-      pure ["runghc"]
+  handleFailure err = do
+    mapM_ stackWarn (lines err)
+    stackWarn "Missing or unusable Stack options specification"
+    stackWarn "Using runghc without any additional Stack options"
+    pure ["runghc"]
 
-    parseArgStr str =
-      case P.parseOnly (argsParser Escaping) (pack str) of
-        Left err -> handleFailure ("Error parsing command specified in the "
-                        ++ "Stack options comment: " ++ err)
-        Right [] -> handleFailure "Empty argument list in Stack options comment"
-        Right args -> pure args
+  parseArgStr str =
+    case P.parseOnly (argsParser Escaping) (pack str) of
+      Left err -> handleFailure ("Error parsing command specified in the "
+                      ++ "Stack options comment: " ++ err)
+      Right [] -> handleFailure "Empty argument list in Stack options comment"
+      Right args -> pure args
 
-    decodeError e =
-      case e of
-        ParseError ctxs _ (Position l col _) ->
-          if null ctxs
-          then "Parse error"
-          else ("Expecting " ++ intercalate " or " ctxs)
-          ++ " at line " ++ show l ++ ", column " ++ show col
-        DivergentParser -> "Divergent parser"
+  decodeError e =
+    case e of
+      ParseError ctxs _ (Position l col _) ->
+        if null ctxs
+        then "Parse error"
+        else ("Expecting " ++ intercalate " or " ctxs)
+        ++ " at line " ++ show l ++ ", column " ++ show col
+      DivergentParser -> "Divergent parser"

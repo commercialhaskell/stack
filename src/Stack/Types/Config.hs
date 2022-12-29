@@ -501,130 +501,130 @@ instance FromJSON ColorWhen where
                        "option are 'never', 'always', or 'auto'.")
 
 -- | The top-level Stackage configuration.
-data Config =
-  Config {configWorkDir             :: !(Path Rel Dir)
-         -- ^ this allows to override .stack-work directory
-         ,configUserConfigPath      :: !(Path Abs File)
-         -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
-         ,configBuild               :: !BuildOpts
-         -- ^ Build configuration
-         ,configDocker              :: !DockerOpts
-         -- ^ Docker configuration
-         ,configNix                 :: !NixOpts
-         -- ^ Execution environment (e.g nix-shell) configuration
-         ,configProcessContextSettings :: !(EnvSettings -> IO ProcessContext)
-         -- ^ Environment variables to be passed to external tools
-         ,configLocalProgramsBase   :: !(Path Abs Dir)
-         -- ^ Non-platform-specific path containing local installations
-         ,configLocalPrograms       :: !(Path Abs Dir)
-         -- ^ Path containing local installations (mainly GHC)
-         ,configHideTHLoading       :: !Bool
-         -- ^ Hide the Template Haskell "Loading package ..." messages from the
-         -- console
-         ,configPrefixTimestamps    :: !Bool
-         -- ^ Prefix build output with timestamps for each line.
-         ,configPlatform            :: !Platform
-         -- ^ The platform we're building for, used in many directory names
-         ,configPlatformVariant     :: !PlatformVariant
-         -- ^ Variant of the platform, also used in directory names
-         ,configGHCVariant          :: !(Maybe GHCVariant)
-         -- ^ The variant of GHC requested by the user.
-         ,configGHCBuild            :: !(Maybe CompilerBuild)
-         -- ^ Override build of the compiler distribution (e.g. standard, gmp4, tinfo6)
-         ,configLatestSnapshot      :: !Text
-         -- ^ URL of a JSON file providing the latest LTS and Nightly snapshots.
-         ,configSystemGHC           :: !Bool
-         -- ^ Should we use the system-installed GHC (on the PATH) if
-         -- available? Can be overridden by command line options.
-         ,configInstallGHC          :: !Bool
-         -- ^ Should we automatically install GHC if missing or the wrong
-         -- version is available? Can be overridden by command line options.
-         ,configSkipGHCCheck        :: !Bool
-         -- ^ Don't bother checking the GHC version or architecture.
-         ,configSkipMsys            :: !Bool
-         -- ^ On Windows: don't use a sandboxed MSYS
-         ,configCompilerCheck       :: !VersionCheck
-         -- ^ Specifies which versions of the compiler are acceptable.
-         ,configCompilerRepository  :: !CompilerRepository
-         -- ^ Specifies the repository containing the compiler sources
-         ,configLocalBin            :: !(Path Abs Dir)
-         -- ^ Directory we should install executables into
-         ,configRequireStackVersion :: !VersionRange
-         -- ^ Require a version of Stack within this range.
-         ,configJobs                :: !Int
-         -- ^ How many concurrent jobs to run, defaults to number of capabilities
-         ,configOverrideGccPath     :: !(Maybe (Path Abs File))
-         -- ^ Optional gcc override path
-         ,configExtraIncludeDirs    :: ![FilePath]
-         -- ^ --extra-include-dirs arguments
-         ,configExtraLibDirs        :: ![FilePath]
-         -- ^ --extra-lib-dirs arguments
-         ,configCustomPreprocessorExts :: ![Text]
-         -- ^ List of custom preprocessors to complete the hard coded ones
-         ,configConcurrentTests     :: !Bool
-         -- ^ Run test suites concurrently
-         ,configTemplateParams      :: !(Map Text Text)
-         -- ^ Parameters for templates.
-         ,configScmInit             :: !(Maybe SCM)
-         -- ^ Initialize SCM (e.g. git) when creating new projects.
-         ,configGhcOptionsByName    :: !(Map PackageName [Text])
-         -- ^ Additional GHC options to apply to specific packages.
-         ,configGhcOptionsByCat     :: !(Map ApplyGhcOptions [Text])
-         -- ^ Additional GHC options to apply to categories of packages
-         ,configCabalConfigOpts     :: !(Map CabalConfigKey [Text])
-         -- ^ Additional options to be passed to ./Setup.hs configure
-         ,configSetupInfoLocations  :: ![String]
-         -- ^ URLs or paths to stack-setup.yaml files, for finding tools.
-         -- If none present, the default setup-info is used.
-         ,configSetupInfoInline     :: !SetupInfo
-         -- ^ Additional SetupInfo to use to find tools.
-         ,configPvpBounds           :: !PvpBounds
-         -- ^ How PVP upper bounds should be added to packages
-         ,configModifyCodePage      :: !Bool
-         -- ^ Force the code page to UTF-8 on Windows
-         ,configRebuildGhcOptions   :: !Bool
-         -- ^ Rebuild on GHC options changes
-         ,configApplyGhcOptions     :: !ApplyGhcOptions
-         -- ^ Which packages to ghc-options on the command line apply to?
-         ,configAllowNewer          :: !Bool
-         -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
-         -- match cabal.
-         ,configAllowNewerDeps      :: !(Maybe [PackageName])
-         -- ^ Ignore dependency upper and lower bounds only for specified
-         -- packages. No effect unless allow-newer is enabled.
-         ,configDefaultTemplate     :: !(Maybe TemplateName)
-         -- ^ The default template to use when none is specified.
-         -- (If Nothing, the 'default' default template is used.)
-         ,configAllowDifferentUser  :: !Bool
-         -- ^ Allow users other than the Stack root owner to use the Stack
-         -- installation.
-         ,configDumpLogs            :: !DumpLogs
-         -- ^ Dump logs of local non-dependencies when doing a build.
-         ,configProject             :: !(ProjectConfig (Project, Path Abs File))
-         -- ^ Project information and stack.yaml file location
-         ,configAllowLocals         :: !Bool
-         -- ^ Are we allowed to build local packages? The script
-         -- command disallows this.
-         ,configSaveHackageCreds    :: !Bool
-         -- ^ Should we save Hackage credentials to a file?
-         ,configHackageBaseUrl      :: !Text
-         -- ^ Hackage base URL used when uploading packages
-         ,configRunner              :: !Runner
-         ,configPantryConfig        :: !PantryConfig
-         ,configStackRoot           :: !(Path Abs Dir)
-         ,configResolver            :: !(Maybe AbstractResolver)
-         -- ^ Any resolver override from the command line
-         ,configUserStorage         :: !UserStorage
-         -- ^ Database connection pool for user Stack database
-         ,configHideSourcePaths     :: !Bool
-         -- ^ Enable GHC hiding source paths?
-         ,configRecommendUpgrade    :: !Bool
-         -- ^ Recommend a Stack upgrade?
-         ,configNoRunCompile   :: !Bool
-         -- ^ Use --no-run and --compile options when using `stack script`
-         ,configStackDeveloperMode  :: !Bool
-         -- ^ Turn on Stack developer mode for additional messages?
-         }
+data Config = Config
+  { configWorkDir             :: !(Path Rel Dir)
+    -- ^ this allows to override .stack-work directory
+  , configUserConfigPath      :: !(Path Abs File)
+    -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
+  , configBuild               :: !BuildOpts
+    -- ^ Build configuration
+  , configDocker              :: !DockerOpts
+    -- ^ Docker configuration
+  , configNix                 :: !NixOpts
+    -- ^ Execution environment (e.g nix-shell) configuration
+  , configProcessContextSettings :: !(EnvSettings -> IO ProcessContext)
+    -- ^ Environment variables to be passed to external tools
+  , configLocalProgramsBase   :: !(Path Abs Dir)
+    -- ^ Non-platform-specific path containing local installations
+  , configLocalPrograms       :: !(Path Abs Dir)
+    -- ^ Path containing local installations (mainly GHC)
+  , configHideTHLoading       :: !Bool
+    -- ^ Hide the Template Haskell "Loading package ..." messages from the
+    -- console
+  , configPrefixTimestamps    :: !Bool
+    -- ^ Prefix build output with timestamps for each line.
+  , configPlatform            :: !Platform
+    -- ^ The platform we're building for, used in many directory names
+  , configPlatformVariant     :: !PlatformVariant
+    -- ^ Variant of the platform, also used in directory names
+  , configGHCVariant          :: !(Maybe GHCVariant)
+    -- ^ The variant of GHC requested by the user.
+  , configGHCBuild            :: !(Maybe CompilerBuild)
+    -- ^ Override build of the compiler distribution (e.g. standard, gmp4, tinfo6)
+  , configLatestSnapshot      :: !Text
+    -- ^ URL of a JSON file providing the latest LTS and Nightly snapshots.
+  , configSystemGHC           :: !Bool
+    -- ^ Should we use the system-installed GHC (on the PATH) if
+    -- available? Can be overridden by command line options.
+  , configInstallGHC          :: !Bool
+    -- ^ Should we automatically install GHC if missing or the wrong
+    -- version is available? Can be overridden by command line options.
+  , configSkipGHCCheck        :: !Bool
+    -- ^ Don't bother checking the GHC version or architecture.
+  , configSkipMsys            :: !Bool
+    -- ^ On Windows: don't use a sandboxed MSYS
+  , configCompilerCheck       :: !VersionCheck
+    -- ^ Specifies which versions of the compiler are acceptable.
+  , configCompilerRepository  :: !CompilerRepository
+    -- ^ Specifies the repository containing the compiler sources
+  , configLocalBin            :: !(Path Abs Dir)
+    -- ^ Directory we should install executables into
+  , configRequireStackVersion :: !VersionRange
+    -- ^ Require a version of Stack within this range.
+  , configJobs                :: !Int
+    -- ^ How many concurrent jobs to run, defaults to number of capabilities
+  , configOverrideGccPath     :: !(Maybe (Path Abs File))
+    -- ^ Optional gcc override path
+  , configExtraIncludeDirs    :: ![FilePath]
+    -- ^ --extra-include-dirs arguments
+  , configExtraLibDirs        :: ![FilePath]
+    -- ^ --extra-lib-dirs arguments
+  , configCustomPreprocessorExts :: ![Text]
+    -- ^ List of custom preprocessors to complete the hard coded ones
+  , configConcurrentTests     :: !Bool
+    -- ^ Run test suites concurrently
+  , configTemplateParams      :: !(Map Text Text)
+    -- ^ Parameters for templates.
+  , configScmInit             :: !(Maybe SCM)
+    -- ^ Initialize SCM (e.g. git) when creating new projects.
+  , configGhcOptionsByName    :: !(Map PackageName [Text])
+    -- ^ Additional GHC options to apply to specific packages.
+  , configGhcOptionsByCat     :: !(Map ApplyGhcOptions [Text])
+    -- ^ Additional GHC options to apply to categories of packages
+  , configCabalConfigOpts     :: !(Map CabalConfigKey [Text])
+    -- ^ Additional options to be passed to ./Setup.hs configure
+  , configSetupInfoLocations  :: ![String]
+    -- ^ URLs or paths to stack-setup.yaml files, for finding tools.
+    -- If none present, the default setup-info is used.
+  , configSetupInfoInline     :: !SetupInfo
+    -- ^ Additional SetupInfo to use to find tools.
+  , configPvpBounds           :: !PvpBounds
+    -- ^ How PVP upper bounds should be added to packages
+  , configModifyCodePage      :: !Bool
+    -- ^ Force the code page to UTF-8 on Windows
+  , configRebuildGhcOptions   :: !Bool
+    -- ^ Rebuild on GHC options changes
+  , configApplyGhcOptions     :: !ApplyGhcOptions
+    -- ^ Which packages to ghc-options on the command line apply to?
+  , configAllowNewer          :: !Bool
+    -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
+    -- match cabal.
+  , configAllowNewerDeps      :: !(Maybe [PackageName])
+    -- ^ Ignore dependency upper and lower bounds only for specified
+    -- packages. No effect unless allow-newer is enabled.
+  , configDefaultTemplate     :: !(Maybe TemplateName)
+    -- ^ The default template to use when none is specified.
+    -- (If Nothing, the 'default' default template is used.)
+  , configAllowDifferentUser  :: !Bool
+    -- ^ Allow users other than the Stack root owner to use the Stack
+    -- installation.
+  , configDumpLogs            :: !DumpLogs
+    -- ^ Dump logs of local non-dependencies when doing a build.
+  , configProject             :: !(ProjectConfig (Project, Path Abs File))
+    -- ^ Project information and stack.yaml file location
+  , configAllowLocals         :: !Bool
+    -- ^ Are we allowed to build local packages? The script
+    -- command disallows this.
+  , configSaveHackageCreds    :: !Bool
+    -- ^ Should we save Hackage credentials to a file?
+  , configHackageBaseUrl      :: !Text
+    -- ^ Hackage base URL used when uploading packages
+  , configRunner              :: !Runner
+  , configPantryConfig        :: !PantryConfig
+  , configStackRoot           :: !(Path Abs Dir)
+  , configResolver            :: !(Maybe AbstractResolver)
+    -- ^ Any resolver override from the command line
+  , configUserStorage         :: !UserStorage
+    -- ^ Database connection pool for user Stack database
+  , configHideSourcePaths     :: !Bool
+    -- ^ Enable GHC hiding source paths?
+  , configRecommendUpgrade    :: !Bool
+    -- ^ Recommend a Stack upgrade?
+  , configNoRunCompile   :: !Bool
+    -- ^ Use --no-run and --compile options when using `stack script`
+  , configStackDeveloperMode  :: !Bool
+    -- ^ Turn on Stack developer mode for additional messages?
+  }
 
 -- | A bit of type safety to ensure we're talking to the right database.
 newtype UserStorage = UserStorage
@@ -651,8 +651,10 @@ data CabalConfigKey
   | CCKEverything -- ^ See AGOEverything
   | CCKPackage !PackageName -- ^ A specific package
   deriving (Show, Read, Eq, Ord)
+
 instance FromJSON CabalConfigKey where
   parseJSON = withText "CabalConfigKey" parseCabalConfigKey
+
 instance FromJSONKey CabalConfigKey where
   fromJSONKey = FromJSONKeyTextParser parseCabalConfigKey
 
@@ -666,10 +668,11 @@ parseCabalConfigKey name =
     Just x -> pure $ CCKPackage x
 
 -- | Which packages do ghc-options on the command line apply to?
-data ApplyGhcOptions = AGOTargets -- ^ all local targets
-                     | AGOLocals -- ^ all local packages, even non-targets
-                     | AGOEverything -- ^ every package
-  deriving (Show, Read, Eq, Ord, Enum, Bounded)
+data ApplyGhcOptions
+  = AGOTargets -- ^ all local targets
+  | AGOLocals -- ^ all local packages, even non-targets
+  | AGOEverything -- ^ every package
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 instance FromJSON ApplyGhcOptions where
     parseJSON = withText "ApplyGhcOptions" $ \t ->
@@ -679,8 +682,9 @@ instance FromJSON ApplyGhcOptions where
             "everything" -> pure AGOEverything
             _ -> fail $ "Invalid ApplyGhcOptions: " ++ show t
 
-newtype AllowNewerDeps = AllowNewerDeps [PackageName]
-  deriving (Show, Read, Eq, Ord, Generic)
+newtype AllowNewerDeps
+  = AllowNewerDeps [PackageName]
+  deriving (Eq, Generic, Ord, Read, Show)
 
 instance Semigroup AllowNewerDeps where
   (<>) = mappenddefault
@@ -697,7 +701,7 @@ data DumpLogs
   = DumpNoLogs -- ^ don't dump any logfiles
   | DumpWarningLogs -- ^ dump logfiles containing warnings
   | DumpAllLogs -- ^ dump all logfiles
-  deriving (Show, Read, Eq, Ord, Enum, Bounded)
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 instance FromJSON DumpLogs where
   parseJSON (Bool True) = pure DumpAllLogs
@@ -714,18 +718,18 @@ instance FromJSON DumpLogs where
 
 -- | Controls which version of the environment is used
 data EnvSettings = EnvSettings
-    { esIncludeLocals :: !Bool
-    -- ^ include local project bin directory, GHC_PACKAGE_PATH, etc
-    , esIncludeGhcPackagePath :: !Bool
-    -- ^ include the GHC_PACKAGE_PATH variable
-    , esStackExe :: !Bool
-    -- ^ set the STACK_EXE variable to the current executable name
-    , esLocaleUtf8 :: !Bool
-    -- ^ set the locale to C.UTF-8
-    , esKeepGhcRts :: !Bool
-    -- ^ if True, keep GHCRTS variable in environment
-    }
-    deriving (Show, Eq, Ord)
+  { esIncludeLocals :: !Bool
+  -- ^ include local project bin directory, GHC_PACKAGE_PATH, etc
+  , esIncludeGhcPackagePath :: !Bool
+  -- ^ include the GHC_PACKAGE_PATH variable
+  , esStackExe :: !Bool
+  -- ^ set the STACK_EXE variable to the current executable name
+  , esLocaleUtf8 :: !Bool
+  -- ^ set the locale to C.UTF-8
+  , esKeepGhcRts :: !Bool
+  -- ^ if True, keep GHCRTS variable in environment
+  }
+  deriving (Eq, Ord, Show)
 
 type AddCommand =
   ExceptT (RIO Runner ())
@@ -733,18 +737,18 @@ type AddCommand =
           ()
 
 data ExecOpts = ExecOpts
-    { eoCmd :: !SpecialExecCmd
-    , eoArgs :: ![String]
-    , eoExtra :: !ExecOptsExtra
-    }
-    deriving Show
+  { eoCmd :: !SpecialExecCmd
+  , eoArgs :: ![String]
+  , eoExtra :: !ExecOptsExtra
+  }
+  deriving Show
 
 data SpecialExecCmd
-    = ExecCmd String
-    | ExecRun
-    | ExecGhc
-    | ExecRunGhc
-    deriving (Show, Eq)
+  = ExecCmd String
+  | ExecRun
+  | ExecGhc
+  | ExecRunGhc
+  deriving (Eq, Show)
 
 data ExecOptsExtra = ExecOptsExtra
   { eoEnvSettings :: !EnvSettings
@@ -755,45 +759,48 @@ data ExecOptsExtra = ExecOptsExtra
   deriving Show
 
 data EvalOpts = EvalOpts
-    { evalArg :: !String
-    , evalExtra :: !ExecOptsExtra
-    }
-    deriving Show
+  { evalArg :: !String
+  , evalExtra :: !ExecOptsExtra
+  }
+  deriving Show
 
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts
-    { globalReExecVersion :: !(Maybe String) -- ^ Expected re-exec in container version
-    , globalDockerEntrypoint :: !(Maybe DockerEntrypoint)
-      -- ^ Data used when Stack is acting as a Docker entrypoint (internal use only)
-    , globalLogLevel     :: !LogLevel -- ^ Log level
-    , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
-    , globalRSLInLog     :: !Bool -- ^ Whether to include raw snapshot layer (RSL) in logs.
-    , globalConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
-    , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
-    , globalCompiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
-    , globalTerminal     :: !Bool -- ^ We're in a terminal?
-    , globalStylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
-    , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
-    , globalStackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
-    , globalLockFileBehavior :: !LockFileBehavior
-    }
-    deriving Show
+  { globalReExecVersion :: !(Maybe String)
+    -- ^ Expected re-exec in container version
+  , globalDockerEntrypoint :: !(Maybe DockerEntrypoint)
+    -- ^ Data used when Stack is acting as a Docker entrypoint (internal use only)
+  , globalLogLevel     :: !LogLevel -- ^ Log level
+  , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
+  , globalRSLInLog     :: !Bool
+    -- ^ Whether to include raw snapshot layer (RSL) in logs.
+  , globalConfigMonoid :: !ConfigMonoid
+    -- ^ Config monoid, for passing into 'loadConfig'
+  , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
+  , globalCompiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
+  , globalTerminal     :: !Bool -- ^ We're in a terminal?
+  , globalStylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
+  , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
+  , globalStackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
+  , globalLockFileBehavior :: !LockFileBehavior
+  }
+  deriving Show
 
 rslInLogL :: HasRunner env => SimpleGetter env Bool
 rslInLogL = globalOptsL.to globalRSLInLog
 
 -- | Location for the project's stack.yaml file.
 data StackYamlLoc
-    = SYLDefault
+  = SYLDefault
     -- ^ Use the standard parent-directory-checking logic
-    | SYLOverride !(Path Abs File)
+  | SYLOverride !(Path Abs File)
     -- ^ Use a specific stack.yaml file provided
-    | SYLNoProject ![PackageIdentifierRevision]
+  | SYLNoProject ![PackageIdentifierRevision]
     -- ^ Do not load up a project, just user configuration. Include
     -- the given extra dependencies with the resolver.
-    | SYLGlobalProject
+  | SYLGlobalProject
     -- ^ Do not look for a project configuration, and use the implicit global.
-    deriving Show
+  deriving Show
 
 stackYamlLocL :: HasRunner env => Lens' env StackYamlLoc
 stackYamlLocL = globalOptsL.lens globalStackYaml (\x y -> x { globalStackYaml = y })
@@ -801,16 +808,16 @@ stackYamlLocL = globalOptsL.lens globalStackYaml (\x y -> x { globalStackYaml = 
 -- | How to interact with lock files
 data LockFileBehavior
   = LFBReadWrite
-  -- ^ Read and write lock files
+    -- ^ Read and write lock files
   | LFBReadOnly
-  -- ^ Read lock files, but do not write them
+    -- ^ Read lock files, but do not write them
   | LFBIgnore
-  -- ^ Entirely ignore lock files
+    -- ^ Entirely ignore lock files
   | LFBErrorOnWrite
-  -- ^ Error out on trying to write a lock file. This can be used to
-  -- ensure that lock files in a repository already ensure
-  -- reproducible builds.
-  deriving (Show, Enum, Bounded)
+    -- ^ Error out on trying to write a lock file. This can be used to
+    -- ensure that lock files in a repository already ensure
+    -- reproducible builds.
+  deriving (Bounded, Enum, Show)
 
 lockFileBehaviorL :: HasRunner env => SimpleGetter env LockFileBehavior
 lockFileBehaviorL = globalOptsL.to globalLockFileBehavior
@@ -833,34 +840,48 @@ readLockFileBehavior = do
 -- | Project configuration information. Not every run of Stack has a
 -- true local project; see constructors below.
 data ProjectConfig a
-    = PCProject a
+  = PCProject a
     -- ^ Normal run: we want a project, and have one. This comes from
     -- either 'SYLDefault' or 'SYLOverride'.
-    | PCGlobalProject
+  | PCGlobalProject
     -- ^ No project was found when using 'SYLDefault'. Instead, use
     -- the implicit global.
-    | PCNoProject ![PackageIdentifierRevision]
+  | PCNoProject ![PackageIdentifierRevision]
     -- ^ Use a no project run. This comes from 'SYLNoProject'.
 
 -- | Parsed global command-line options monoid.
 data GlobalOptsMonoid = GlobalOptsMonoid
-    { globalMonoidReExecVersion :: !(First String) -- ^ Expected re-exec in container version
-    , globalMonoidDockerEntrypoint :: !(First DockerEntrypoint)
-      -- ^ Data used when Stack is acting as a Docker entrypoint (internal use only)
-    , globalMonoidLogLevel     :: !(First LogLevel) -- ^ Log level
-    , globalMonoidTimeInLog    :: !FirstTrue -- ^ Whether to include timings in logs.
-    , globalMonoidRSLInLog     :: !FirstFalse -- ^ Whether to include raw snapshot layer (RSL) in logs.
-    , globalMonoidConfigMonoid :: !ConfigMonoid -- ^ Config monoid, for passing into 'loadConfig'
-    , globalMonoidResolver     :: !(First (Unresolved AbstractResolver)) -- ^ Resolver override
-    , globalMonoidResolverRoot :: !(First FilePath) -- ^ root directory for resolver relative path
-    , globalMonoidCompiler     :: !(First WantedCompiler) -- ^ Compiler override
-    , globalMonoidTerminal     :: !(First Bool) -- ^ We're in a terminal?
-    , globalMonoidStyles       :: !StylesUpdate -- ^ Stack's output styles
-    , globalMonoidTermWidth    :: !(First Int) -- ^ Terminal width override
-    , globalMonoidStackYaml    :: !(First FilePath) -- ^ Override project stack.yaml
-    , globalMonoidLockFileBehavior :: !(First LockFileBehavior) -- ^ See 'globalLockFileBehavior'
-    }
-    deriving Generic
+  { globalMonoidReExecVersion :: !(First String)
+    -- ^ Expected re-exec in container version
+  , globalMonoidDockerEntrypoint :: !(First DockerEntrypoint)
+    -- ^ Data used when Stack is acting as a Docker entrypoint (internal use
+    -- only)
+  , globalMonoidLogLevel     :: !(First LogLevel)
+    -- ^ Log level
+  , globalMonoidTimeInLog    :: !FirstTrue
+    -- ^ Whether to include timings in logs.
+  , globalMonoidRSLInLog     :: !FirstFalse
+    -- ^ Whether to include raw snapshot layer (RSL) in logs.
+  , globalMonoidConfigMonoid :: !ConfigMonoid
+    -- ^ Config monoid, for passing into 'loadConfig'
+  , globalMonoidResolver     :: !(First (Unresolved AbstractResolver))
+    -- ^ Resolver override
+  , globalMonoidResolverRoot :: !(First FilePath)
+    -- ^ root directory for resolver relative path
+  , globalMonoidCompiler     :: !(First WantedCompiler)
+    -- ^ Compiler override
+  , globalMonoidTerminal     :: !(First Bool)
+    -- ^ We're in a terminal?
+  , globalMonoidStyles       :: !StylesUpdate
+    -- ^ Stack's output styles
+  , globalMonoidTermWidth    :: !(First Int)
+    -- ^ Terminal width override
+  , globalMonoidStackYaml    :: !(First FilePath)
+    -- ^ Override project stack.yaml
+  , globalMonoidLockFileBehavior :: !(First LockFileBehavior)
+    -- ^ See 'globalLockFileBehavior'
+  }
+  deriving Generic
 
 instance Semigroup GlobalOptsMonoid where
     (<>) = mappenddefault
@@ -891,20 +912,20 @@ readStyles = parseStylesUpdateFromString <$> OA.readerAsk
 --
 -- These are the components which know nothing about local configuration.
 data BuildConfig = BuildConfig
-    { bcConfig     :: !Config
-    , bcSMWanted :: !SMWanted
-    , bcExtraPackageDBs :: ![Path Abs Dir]
-      -- ^ Extra package databases
-    , bcStackYaml  :: !(Path Abs File)
-      -- ^ Location of the stack.yaml file.
-      --
-      -- Note: if the STACK_YAML environment variable is used, this may be
-      -- different from projectRootL </> "stack.yaml" if a different file
-      -- name is used.
-    , bcProjectStorage :: !ProjectStorage
-    -- ^ Database connection pool for project Stack database
-    , bcCurator :: !(Maybe Curator)
-    }
+  { bcConfig     :: !Config
+  , bcSMWanted :: !SMWanted
+  , bcExtraPackageDBs :: ![Path Abs Dir]
+    -- ^ Extra package databases
+  , bcStackYaml  :: !(Path Abs File)
+    -- ^ Location of the stack.yaml file.
+    --
+    -- Note: if the STACK_YAML environment variable is used, this may be
+    -- different from projectRootL </> "stack.yaml" if a different file
+    -- name is used.
+  , bcProjectStorage :: !ProjectStorage
+  -- ^ Database connection pool for project Stack database
+  , bcCurator :: !(Maybe Curator)
+  }
 
 stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
 stackYamlL = buildConfigL.lens bcStackYaml (\x y -> x { bcStackYaml = y })
@@ -915,12 +936,12 @@ projectRootL = stackYamlL.to parent
 
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
-    {envConfigBuildConfig :: !BuildConfig
-    ,envConfigBuildOptsCLI :: !BuildOptsCLI
-    ,envConfigSourceMap :: !SourceMap
-    ,envConfigSourceMapHash :: !SourceMapHash
-    ,envConfigCompilerPaths :: !CompilerPaths
-    }
+  {envConfigBuildConfig :: !BuildConfig
+  ,envConfigBuildOptsCLI :: !BuildOptsCLI
+  ,envConfigSourceMap :: !SourceMap
+  ,envConfigSourceMapHash :: !SourceMapHash
+  ,envConfigCompilerPaths :: !CompilerPaths
+  }
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
 ppGPD = liftIO . cpGPD . ppCommon
@@ -952,29 +973,29 @@ ppVersion = fmap gpdVersion . ppGPD
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
 data Project = Project
-    { projectUserMsg :: !(Maybe String)
+  { projectUserMsg :: !(Maybe String)
     -- ^ A warning message to display to the user when the auto generated
     -- config may have issues.
-    , projectPackages :: ![RelFilePath]
+  , projectPackages :: ![RelFilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
-    , projectDependencies :: ![RawPackageLocation]
+  , projectDependencies :: ![RawPackageLocation]
     -- ^ Dependencies defined within the stack.yaml file, to be
     -- applied on top of the snapshot.
-    , projectFlags :: !(Map PackageName (Map FlagName Bool))
+  , projectFlags :: !(Map PackageName (Map FlagName Bool))
     -- ^ Flags to be applied on top of the snapshot flags.
-    , projectResolver :: !RawSnapshotLocation
+  , projectResolver :: !RawSnapshotLocation
     -- ^ How we resolve which @Snapshot@ to use
-    , projectCompiler :: !(Maybe WantedCompiler)
+  , projectCompiler :: !(Maybe WantedCompiler)
     -- ^ Override the compiler in 'projectResolver'
-    , projectExtraPackageDBs :: ![FilePath]
-    , projectCurator :: !(Maybe Curator)
+  , projectExtraPackageDBs :: ![FilePath]
+  , projectCurator :: !(Maybe Curator)
     -- ^ Extra configuration intended exclusively for usage by the
     -- curator tool. In other words, this is /not/ part of the
     -- documented and exposed Stack API. SUBJECT TO CHANGE.
-    , projectDropPackages :: !(Set PackageName)
+  , projectDropPackages :: !(Set PackageName)
     -- ^ Packages to drop from the 'projectResolver'.
-    }
+  }
   deriving Show
 
 instance ToJSON Project where
@@ -1003,6 +1024,7 @@ data Curator = Curator
   , curatorExpectHaddockFailure :: !(Set PackageName)
   }
   deriving Show
+
 instance ToJSON Curator where
   toJSON c = object
     [ "skip-test" .= Set.map CabalString (curatorSkipTest c)
@@ -1012,6 +1034,7 @@ instance ToJSON Curator where
     , "skip-haddock" .= Set.map CabalString (curatorSkipHaddock c)
     , "expect-test-failure" .= Set.map CabalString (curatorExpectHaddockFailure c)
     ]
+
 instance FromJSON (WithJSONWarnings Curator) where
   parseJSON = withObjectWarnings "Curator" $ \o -> Curator
     <$> fmap (Set.map unCabalString) (o ..:? "skip-test" ..!= mempty)
@@ -1023,127 +1046,126 @@ instance FromJSON (WithJSONWarnings Curator) where
 
 -- An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
-data ConfigMonoid =
-  ConfigMonoid
-    { configMonoidStackRoot          :: !(First (Path Abs Dir))
+data ConfigMonoid = ConfigMonoid
+  { configMonoidStackRoot          :: !(First (Path Abs Dir))
     -- ^ See: 'clStackRoot'
-    , configMonoidWorkDir            :: !(First (Path Rel Dir))
+  , configMonoidWorkDir            :: !(First (Path Rel Dir))
     -- ^ See: 'configWorkDir'.
-    , configMonoidBuildOpts          :: !BuildOptsMonoid
+  , configMonoidBuildOpts          :: !BuildOptsMonoid
     -- ^ build options.
-    , configMonoidDockerOpts         :: !DockerOptsMonoid
+  , configMonoidDockerOpts         :: !DockerOptsMonoid
     -- ^ Docker options.
-    , configMonoidNixOpts            :: !NixOptsMonoid
+  , configMonoidNixOpts            :: !NixOptsMonoid
     -- ^ Options for the execution environment (nix-shell or container)
-    , configMonoidConnectionCount    :: !(First Int)
+  , configMonoidConnectionCount    :: !(First Int)
     -- ^ See: 'configConnectionCount'
-    , configMonoidHideTHLoading      :: !FirstTrue
+  , configMonoidHideTHLoading      :: !FirstTrue
     -- ^ See: 'configHideTHLoading'
-    , configMonoidPrefixTimestamps   :: !(First Bool)
+  , configMonoidPrefixTimestamps   :: !(First Bool)
     -- ^ See: 'configPrefixTimestamps'
-    , configMonoidLatestSnapshot     :: !(First Text)
+  , configMonoidLatestSnapshot     :: !(First Text)
     -- ^ See: 'configLatestSnapshot'
-    , configMonoidPackageIndex     :: !(First PackageIndexConfig)
+  , configMonoidPackageIndex     :: !(First PackageIndexConfig)
     -- ^ See: 'withPantryConfig'
-    , configMonoidPackageIndices     :: !(First [PackageIndexConfig])
+  , configMonoidPackageIndices     :: !(First [PackageIndexConfig])
     -- ^ Deprecated in favour of package-index
-    , configMonoidSystemGHC          :: !(First Bool)
+  , configMonoidSystemGHC          :: !(First Bool)
     -- ^ See: 'configSystemGHC'
-    ,configMonoidInstallGHC          :: !FirstTrue
+  , configMonoidInstallGHC          :: !FirstTrue
     -- ^ See: 'configInstallGHC'
-    ,configMonoidSkipGHCCheck        :: !FirstFalse
+  , configMonoidSkipGHCCheck        :: !FirstFalse
     -- ^ See: 'configSkipGHCCheck'
-    ,configMonoidSkipMsys            :: !FirstFalse
+  , configMonoidSkipMsys            :: !FirstFalse
     -- ^ See: 'configSkipMsys'
-    ,configMonoidCompilerCheck       :: !(First VersionCheck)
+  , configMonoidCompilerCheck       :: !(First VersionCheck)
     -- ^ See: 'configCompilerCheck'
-    ,configMonoidCompilerRepository  :: !(First CompilerRepository)
+  , configMonoidCompilerRepository  :: !(First CompilerRepository)
     -- ^ See: 'configCompilerRepository'
-    ,configMonoidRequireStackVersion :: !IntersectingVersionRange
+  , configMonoidRequireStackVersion :: !IntersectingVersionRange
     -- ^ See: 'configRequireStackVersion'
-    ,configMonoidArch                :: !(First String)
+  , configMonoidArch                :: !(First String)
     -- ^ Used for overriding the platform
-    ,configMonoidGHCVariant          :: !(First GHCVariant)
+  , configMonoidGHCVariant          :: !(First GHCVariant)
     -- ^ Used for overriding the platform
-    ,configMonoidGHCBuild            :: !(First CompilerBuild)
+  , configMonoidGHCBuild            :: !(First CompilerBuild)
     -- ^ Used for overriding the GHC build
-    ,configMonoidJobs                :: !(First Int)
+  , configMonoidJobs                :: !(First Int)
     -- ^ See: 'configJobs'
-    ,configMonoidExtraIncludeDirs    :: ![FilePath]
+  , configMonoidExtraIncludeDirs    :: ![FilePath]
     -- ^ See: 'configExtraIncludeDirs'
-    ,configMonoidExtraLibDirs        :: ![FilePath]
+  , configMonoidExtraLibDirs        :: ![FilePath]
     -- ^ See: 'configExtraLibDirs'
-    ,configMonoidCustomPreprocessorExts :: ![Text]
+  , configMonoidCustomPreprocessorExts :: ![Text]
     -- ^ See: 'configCustomPreprocessorExts'
-    , configMonoidOverrideGccPath    :: !(First (Path Abs File))
+  , configMonoidOverrideGccPath    :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
-    ,configMonoidOverrideHpack       :: !(First FilePath)
+  , configMonoidOverrideHpack       :: !(First FilePath)
     -- ^ Use Hpack executable (overrides bundled Hpack)
-    ,configMonoidConcurrentTests     :: !(First Bool)
+  , configMonoidConcurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'
-    ,configMonoidLocalBinPath        :: !(First FilePath)
+  , configMonoidLocalBinPath        :: !(First FilePath)
     -- ^ Used to override the binary installation dir
-    ,configMonoidTemplateParameters  :: !(Map Text Text)
+  , configMonoidTemplateParameters  :: !(Map Text Text)
     -- ^ Template parameters.
-    ,configMonoidScmInit             :: !(First SCM)
+  , configMonoidScmInit             :: !(First SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
-    ,configMonoidGhcOptionsByName    :: !(MonoidMap PackageName (Monoid.Dual [Text]))
+  , configMonoidGhcOptionsByName    :: !(MonoidMap PackageName (Monoid.Dual [Text]))
     -- ^ See 'configGhcOptionsByName'. Uses 'Monoid.Dual' so that
     -- options from the configs on the right come first, so that they
     -- can be overridden.
-    ,configMonoidGhcOptionsByCat     :: !(MonoidMap ApplyGhcOptions (Monoid.Dual [Text]))
+  , configMonoidGhcOptionsByCat     :: !(MonoidMap ApplyGhcOptions (Monoid.Dual [Text]))
     -- ^ See 'configGhcOptionsAll'. Uses 'Monoid.Dual' so that options
     -- from the configs on the right come first, so that they can be
     -- overridden.
-    ,configMonoidCabalConfigOpts     :: !(MonoidMap CabalConfigKey (Monoid.Dual [Text]))
+  , configMonoidCabalConfigOpts     :: !(MonoidMap CabalConfigKey (Monoid.Dual [Text]))
     -- ^ See 'configCabalConfigOpts'.
-    ,configMonoidExtraPath           :: ![Path Abs Dir]
+  , configMonoidExtraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
-    ,configMonoidSetupInfoLocations  :: ![String]
+  , configMonoidSetupInfoLocations  :: ![String]
     -- ^ See 'configSetupInfoLocations'
-    ,configMonoidSetupInfoInline     :: !SetupInfo
+  , configMonoidSetupInfoInline     :: !SetupInfo
     -- ^ See 'configSetupInfoInline'
-    ,configMonoidLocalProgramsBase   :: !(First (Path Abs Dir))
+  , configMonoidLocalProgramsBase   :: !(First (Path Abs Dir))
     -- ^ Override the default local programs dir, where e.g. GHC is installed.
-    ,configMonoidPvpBounds           :: !(First PvpBounds)
+  , configMonoidPvpBounds           :: !(First PvpBounds)
     -- ^ See 'configPvpBounds'
-    ,configMonoidModifyCodePage      :: !FirstTrue
+  , configMonoidModifyCodePage      :: !FirstTrue
     -- ^ See 'configModifyCodePage'
-    ,configMonoidRebuildGhcOptions   :: !FirstFalse
+  , configMonoidRebuildGhcOptions   :: !FirstFalse
     -- ^ See 'configMonoidRebuildGhcOptions'
-    ,configMonoidApplyGhcOptions     :: !(First ApplyGhcOptions)
+  , configMonoidApplyGhcOptions     :: !(First ApplyGhcOptions)
     -- ^ See 'configApplyGhcOptions'
-    ,configMonoidAllowNewer          :: !(First Bool)
+  , configMonoidAllowNewer          :: !(First Bool)
     -- ^ See 'configMonoidAllowNewer'
-    ,configMonoidAllowNewerDeps      :: !(Maybe AllowNewerDeps)
+  , configMonoidAllowNewerDeps      :: !(Maybe AllowNewerDeps)
     -- ^ See 'configMonoidAllowNewerDeps'
-    ,configMonoidDefaultTemplate     :: !(First TemplateName)
-    -- ^ The default template to use when none is specified.
-    -- (If Nothing, the 'default' default template is used.)
-    , configMonoidAllowDifferentUser :: !(First Bool)
-    -- ^ Allow users other than the Stack root owner to use the Stack
-    -- installation.
-    , configMonoidDumpLogs           :: !(First DumpLogs)
+  , configMonoidDefaultTemplate     :: !(First TemplateName)
+   -- ^ The default template to use when none is specified.
+   -- (If Nothing, the 'default' default template is used.)
+  , configMonoidAllowDifferentUser :: !(First Bool)
+   -- ^ Allow users other than the Stack root owner to use the Stack
+   -- installation.
+  , configMonoidDumpLogs           :: !(First DumpLogs)
     -- ^ See 'configDumpLogs'
-    , configMonoidSaveHackageCreds   :: !(First Bool)
+  , configMonoidSaveHackageCreds   :: !(First Bool)
     -- ^ See 'configSaveHackageCreds'
-    , configMonoidHackageBaseUrl     :: !(First Text)
+  , configMonoidHackageBaseUrl     :: !(First Text)
     -- ^ See 'configHackageBaseUrl'
-    , configMonoidColorWhen          :: !(First ColorWhen)
+  , configMonoidColorWhen          :: !(First ColorWhen)
     -- ^ When to use 'ANSI' colors
-    , configMonoidStyles             :: !StylesUpdate
-    , configMonoidHideSourcePaths    :: !FirstTrue
+  , configMonoidStyles             :: !StylesUpdate
+  , configMonoidHideSourcePaths    :: !FirstTrue
     -- ^ See 'configHideSourcePaths'
-    , configMonoidRecommendUpgrade   :: !FirstTrue
+  , configMonoidRecommendUpgrade   :: !FirstTrue
     -- ^ See 'configRecommendUpgrade'
-    , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
-    , configMonoidSnapshotLocation :: !(First Text)
+  , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
+  , configMonoidSnapshotLocation :: !(First Text)
     -- ^ Custom location of LTS/Nightly snapshots
-    , configMonoidNoRunCompile  :: !FirstFalse
+  , configMonoidNoRunCompile  :: !FirstFalse
     -- ^ See: 'configNoRunCompile'
-    , configMonoidStackDeveloperMode :: !(First Bool)
+  , configMonoidStackDeveloperMode :: !(First Bool)
     -- ^ See 'configStackDeveloperMode'
-    }
+  }
   deriving (Show, Generic)
 
 instance Semigroup ConfigMonoid where
@@ -1651,9 +1673,9 @@ packageDatabaseExtra = view $ buildConfigL.to bcExtraPackageDBs
 -- 'LoadedSnapshot'?
 data GlobalInfoSource
   = GISSnapshotHints
-  -- ^ Accept the hints in the snapshot definition
+    -- ^ Accept the hints in the snapshot definition
   | GISCompiler ActualCompiler
-  -- ^ Look up the actual information in the installed compiler
+    -- ^ Look up the actual information in the installed compiler
 
 -- | Where HPC reports and tix files get stored.
 hpcReportDir :: (HasEnvConfig env)
@@ -1822,13 +1844,13 @@ parseGHCVariant s =
 -- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
-    { downloadInfoUrl :: Text
-      -- ^ URL or absolute file path
-    , downloadInfoContentLength :: Maybe Int
-    , downloadInfoSha1 :: Maybe ByteString
-    , downloadInfoSha256 :: Maybe ByteString
-    }
-    deriving Show
+  { downloadInfoUrl :: Text
+    -- ^ URL or absolute file path
+  , downloadInfoContentLength :: Maybe Int
+  , downloadInfoSha1 :: Maybe ByteString
+  , downloadInfoSha256 :: Maybe ByteString
+  }
+  deriving Show
 
 instance FromJSON (WithJSONWarnings DownloadInfo) where
     parseJSON = withObjectWarnings "DownloadInfo" parseDownloadInfoFromObject
@@ -1849,10 +1871,10 @@ parseDownloadInfoFromObject o = do
         }
 
 data VersionedDownloadInfo = VersionedDownloadInfo
-    { vdiVersion :: Version
-    , vdiDownloadInfo :: DownloadInfo
-    }
-    deriving Show
+  { vdiVersion :: Version
+  , vdiDownloadInfo :: DownloadInfo
+  }
+  deriving Show
 
 instance FromJSON (WithJSONWarnings VersionedDownloadInfo) where
     parseJSON = withObjectWarnings "VersionedDownloadInfo" $ \o -> do
@@ -1864,11 +1886,11 @@ instance FromJSON (WithJSONWarnings VersionedDownloadInfo) where
             }
 
 data GHCDownloadInfo = GHCDownloadInfo
-    { gdiConfigureOpts :: [Text]
-    , gdiConfigureEnv :: Map Text Text
-    , gdiDownloadInfo :: DownloadInfo
-    }
-    deriving Show
+  { gdiConfigureOpts :: [Text]
+  , gdiConfigureEnv :: Map Text Text
+  , gdiDownloadInfo :: DownloadInfo
+  }
+  deriving Show
 
 instance FromJSON (WithJSONWarnings GHCDownloadInfo) where
     parseJSON = withObjectWarnings "GHCDownloadInfo" $ \o -> do
@@ -1882,13 +1904,13 @@ instance FromJSON (WithJSONWarnings GHCDownloadInfo) where
             }
 
 data SetupInfo = SetupInfo
-    { siSevenzExe :: Maybe DownloadInfo
-    , siSevenzDll :: Maybe DownloadInfo
-    , siMsys2 :: Map Text VersionedDownloadInfo
-    , siGHCs :: Map Text (Map Version GHCDownloadInfo)
-    , siStack :: Map Text (Map Version DownloadInfo)
-    }
-    deriving Show
+  { siSevenzExe :: Maybe DownloadInfo
+  , siSevenzDll :: Maybe DownloadInfo
+  , siMsys2 :: Map Text VersionedDownloadInfo
+  , siGHCs :: Map Text (Map Version GHCDownloadInfo)
+  , siStack :: Map Text (Map Version DownloadInfo)
+  }
+  deriving Show
 
 instance FromJSON (WithJSONWarnings SetupInfo) where
     parseJSON = withObjectWarnings "SetupInfo" $ \o -> do
@@ -1960,24 +1982,25 @@ parsePvpBounds t = maybe err Right $ do
 instance ToJSON PvpBounds where
   toJSON (PvpBounds typ asRevision) =
     toJSON (pvpBoundsText typ <> (if asRevision then "-revision" else ""))
+
 instance FromJSON PvpBounds where
   parseJSON = withText "PvpBounds" (either fail pure . parsePvpBounds)
 
 -- | Data passed into Docker container for the Docker entrypoint's use
 newtype DockerEntrypoint = DockerEntrypoint
-    { deUser :: Maybe DockerUser
-      -- ^ UID/GID/etc of host user, if we wish to perform UID/GID switch in container
-    }
-    deriving (Read, Show)
+  { deUser :: Maybe DockerUser
+    -- ^ UID/GID/etc of host user, if we wish to perform UID/GID switch in container
+  }
+  deriving (Read, Show)
 
 -- | Docker host user info
 data DockerUser = DockerUser
-    { duUid :: UserID -- ^ uid
-    , duGid :: GroupID -- ^ gid
-    , duGroups :: [GroupID] -- ^ Supplemental groups
-    , duUmask :: FileMode -- ^ File creation mask }
-    }
-    deriving (Read, Show)
+  { duUid :: UserID -- ^ uid
+  , duGid :: GroupID -- ^ gid
+  , duGroups :: [GroupID] -- ^ Supplemental groups
+  , duUmask :: FileMode -- ^ File creation mask }
+  }
+  deriving (Read, Show)
 
 data GhcOptionKey
   = GOKOldEverything
@@ -2033,12 +2056,16 @@ class HasGHCVariant env where
 -- | Class for environment values which have a 'Runner'.
 class (HasProcessContext env, HasLogFunc env) => HasRunner env where
   runnerL :: Lens' env Runner
+
 instance HasLogFunc Runner where
   logFuncL = lens runnerLogFunc (\x y -> x { runnerLogFunc = y })
+
 instance HasProcessContext Runner where
   processContextL = lens runnerProcessContext (\x y -> x { runnerProcessContext = y })
+
 instance HasRunner Runner where
   runnerL = id
+
 instance HasStylesUpdate Runner where
   stylesUpdateL = globalOptsL.
                   lens globalStylesUpdate (\x y -> x { globalStylesUpdate = y })
@@ -2073,79 +2100,101 @@ class (HasBuildConfig env, HasSourceMap env, HasCompiler env) => HasEnvConfig en
 instance HasPlatform (Platform,PlatformVariant) where
     platformL = _1
     platformVariantL = _2
+
 instance HasPlatform Config where
     platformL = lens configPlatform (\x y -> x { configPlatform = y })
     platformVariantL = lens configPlatformVariant (\x y -> x { configPlatformVariant = y })
+
 instance HasPlatform BuildConfig
+
 instance HasPlatform EnvConfig
 
 instance HasGHCVariant GHCVariant where
     ghcVariantL = id
     {-# INLINE ghcVariantL #-}
+
 instance HasGHCVariant Config where
     ghcVariantL = to $ fromMaybe GHCStandard . configGHCVariant
+
 instance HasGHCVariant BuildConfig
+
 instance HasGHCVariant EnvConfig
 
 instance HasProcessContext Config where
     processContextL = runnerL.processContextL
+
 instance HasProcessContext BuildConfig where
     processContextL = configL.processContextL
+
 instance HasProcessContext EnvConfig where
     processContextL = configL.processContextL
 
 instance HasPantryConfig Config where
     pantryConfigL = lens configPantryConfig (\x y -> x { configPantryConfig = y })
+
 instance HasPantryConfig BuildConfig where
     pantryConfigL = configL.pantryConfigL
+
 instance HasPantryConfig EnvConfig where
     pantryConfigL = configL.pantryConfigL
 
 instance HasConfig Config where
     configL = id
     {-# INLINE configL #-}
+
 instance HasConfig BuildConfig where
     configL = lens bcConfig (\x y -> x { bcConfig = y })
+
 instance HasConfig EnvConfig
 
 instance HasBuildConfig BuildConfig where
     buildConfigL = id
     {-# INLINE buildConfigL #-}
+
 instance HasBuildConfig EnvConfig
 
 instance HasCompiler EnvConfig where
     compilerPathsL = to envConfigCompilerPaths
+
 instance HasEnvConfig EnvConfig where
     envConfigL = id
     {-# INLINE envConfigL #-}
 
 instance HasRunner Config where
   runnerL = lens configRunner (\x y -> x { configRunner = y })
+
 instance HasRunner BuildConfig where
   runnerL = configL.runnerL
+
 instance HasRunner EnvConfig where
   runnerL = configL.runnerL
 
 instance HasLogFunc Config where
   logFuncL = runnerL.logFuncL
+
 instance HasLogFunc BuildConfig where
   logFuncL = runnerL.logFuncL
+
 instance HasLogFunc EnvConfig where
   logFuncL = runnerL.logFuncL
 
 instance HasStylesUpdate Config where
   stylesUpdateL = runnerL.stylesUpdateL
+
 instance HasStylesUpdate BuildConfig where
   stylesUpdateL = runnerL.stylesUpdateL
+
 instance HasStylesUpdate EnvConfig where
   stylesUpdateL = runnerL.stylesUpdateL
 
 instance HasTerm Config where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
+
 instance HasTerm BuildConfig where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
+
 instance HasTerm EnvConfig where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
@@ -2176,20 +2225,20 @@ getGhcPkgExe = view $ compilerPathsL.to cpPkg
 
 -- | Dump information for a single package
 data DumpPackage = DumpPackage
-    { dpGhcPkgId :: !GhcPkgId
-    , dpPackageIdent :: !PackageIdentifier
-    , dpParentLibIdent :: !(Maybe PackageIdentifier)
-    , dpLicense :: !(Maybe C.License)
-    , dpLibDirs :: ![FilePath]
-    , dpLibraries :: ![Text]
-    , dpHasExposedModules :: !Bool
-    , dpExposedModules :: !(Set ModuleName)
-    , dpDepends :: ![GhcPkgId]
-    , dpHaddockInterfaces :: ![FilePath]
-    , dpHaddockHtml :: !(Maybe FilePath)
-    , dpIsExposed :: !Bool
-    }
-    deriving (Show, Read, Eq)
+  { dpGhcPkgId :: !GhcPkgId
+  , dpPackageIdent :: !PackageIdentifier
+  , dpParentLibIdent :: !(Maybe PackageIdentifier)
+  , dpLicense :: !(Maybe C.License)
+  , dpLibDirs :: ![FilePath]
+  , dpLibraries :: ![Text]
+  , dpHasExposedModules :: !Bool
+  , dpExposedModules :: !(Set ModuleName)
+  , dpDepends :: ![GhcPkgId]
+  , dpHaddockInterfaces :: ![FilePath]
+  , dpHaddockHtml :: !(Maybe FilePath)
+  , dpIsExposed :: !Bool
+  }
+  deriving (Eq, Read, Show)
 
 -- | Paths on the filesystem for the compiler we're using
 data CompilerPaths = CompilerPaths
@@ -2197,25 +2246,25 @@ data CompilerPaths = CompilerPaths
   , cpArch :: !Arch
   , cpBuild :: !CompilerBuild
   , cpCompiler :: !(Path Abs File)
-  -- | ghc-pkg or equivalent
   , cpPkg :: !GhcPkgExe
-  -- | runghc
+    -- ^ ghc-pkg or equivalent
   , cpInterpreter :: !(Path Abs File)
-  -- | haddock, in 'IO' to allow deferring the lookup
+    -- ^ runghc
   , cpHaddock :: !(Path Abs File)
-  -- | Is this a Stack-sandboxed installation?
+    -- ^ haddock, in 'IO' to allow deferring the lookup
   , cpSandboxed :: !Bool
+    -- ^ Is this a Stack-sandboxed installation?
   , cpCabalVersion :: !Version
-  -- ^ This is the version of Cabal that Stack will use to compile Setup.hs files
-  -- in the build process.
-  --
-  -- Note that this is not necessarily the same version as the one that Stack
-  -- depends on as a library and which is displayed when running
-  -- @stack ls dependencies | grep Cabal@ in the Stack project.
+    -- ^ This is the version of Cabal that Stack will use to compile Setup.hs files
+    -- in the build process.
+    --
+    -- Note that this is not necessarily the same version as the one that Stack
+    -- depends on as a library and which is displayed when running
+    -- @stack ls dependencies | grep Cabal@ in the Stack project.
   , cpGlobalDB :: !(Path Abs Dir)
-  -- ^ Global package database
+    -- ^ Global package database
   , cpGhcInfo :: !ByteString
-  -- ^ Output of @ghc --info@
+    -- ^ Output of @ghc --info@
   , cpGlobalDump :: !(Map PackageName DumpPackage)
   }
   deriving Show
@@ -2224,11 +2273,11 @@ cpWhich :: (MonadReader env m, HasCompiler env) => m WhichCompiler
 cpWhich = view $ compilerPathsL.to (whichCompiler.cpCompilerVersion)
 
 data ExtraDirs = ExtraDirs
-    { edBins :: ![Path Abs Dir]
-    , edInclude :: ![Path Abs Dir]
-    , edLib :: ![Path Abs Dir]
-    }
-    deriving (Show, Generic)
+  { edBins :: ![Path Abs Dir]
+  , edInclude :: ![Path Abs Dir]
+  , edLib :: ![Path Abs Dir]
+  }
+  deriving (Show, Generic)
 
 instance Semigroup ExtraDirs where
     (<>) = mappenddefault

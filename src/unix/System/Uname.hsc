@@ -7,8 +7,8 @@ module System.Uname
 
 #include <sys/utsname.h>
 
-import Foreign
-import Foreign.C
+import           Foreign
+import           Foreign.C
 
 getRelease :: IO String
 getRelease = do
@@ -33,10 +33,10 @@ foreign import ccall unsafe "haskell_uname"
 data Utsname
 
 instance Storable Utsname where
-    sizeOf    = const #size struct utsname
-    alignment = const #alignment struct utsname
-    poke      = error "Storable Utsname: peek: unsupported operation"
-    peek      = error "Storable Utsname: poke: unsupported operation"
+  sizeOf    = const #size struct utsname
+  alignment = const #alignment struct utsname
+  poke      = error "Storable Utsname: peek: unsupported operation"
+  peek      = error "Storable Utsname: poke: unsupported operation"
 
 release :: Ptr Utsname -> CString
 release = (#ptr struct utsname, release)
