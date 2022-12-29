@@ -3,37 +3,30 @@
 # The `stack build` command and its synonyms
 
 ~~~text
-stack build [TARGET] [--dry-run] [--pedantic] [--fast]
-            [--ghc-options OPTIONS] [--flag PACKAGE:[-]FLAG]
-            [--dependencies-only | --only-snapshot |
-              --only-dependencies | --only-locals]
-            [--file-watch | --file-watch-poll] [--watch-all]
-            [--exec COMMAND [ARGUMENT(S)]] [--only-configure]
-            [--trace] [--profile] [--no-strip]
+stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
+            [--flag PACKAGE:[-]FLAG] [--dependencies-only | --only-snapshot |
+              --only-dependencies | --only-locals] [--file-watch |
+              --file-watch-poll] [--watch-all] [--exec COMMAND [ARGUMENT(S)]]
+            [--only-configure] [--trace] [--profile] [--no-strip]
             [--[no-]library-profiling] [--[no-]executable-profiling]
             [--[no-]library-stripping] [--[no-]executable-stripping]
             [--[no-]haddock] [--haddock-arguments HADDOCK_ARGS]
-            [--[no-]open] [--[no-]haddock-deps]
-            [--[no-]haddock-internal]
+            [--[no-]open] [--[no-]haddock-deps] [--[no-]haddock-internal]
             [--[no-]haddock-hyperlink-source] [--[no-]copy-bins]
-            [--[no-]copy-compiler-tool] [--[no-]prefetch]
-            [--[no-]keep-going] [--[no-]keep-tmp-files]
-            [--[no-]force-dirty] [--[no-]test] [--[no-]rerun-tests]
-            [--ta|--test-arguments TEST_ARGS] [--coverage]
+            [--[no-]copy-compiler-tool] [--[no-]prefetch] [--[no-]keep-going]
+            [--[no-]keep-tmp-files] [--[no-]force-dirty] [--[no-]test]
+            [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS] [--coverage]
             [--no-run-tests] [--test-suite-timeout ARG]
             [--[no-]tests-allow-stdin] [--[no-]bench]
-            [--ba|--benchmark-arguments BENCH_ARGS]
-            [--no-run-benchmarks] [--[no-]reconfigure]
-            [--cabal-verbosity VERBOSITY | --[no-]cabal-verbose]
-            [--[no-]split-objs] [--skip ARG]
+            [--ba|--benchmark-arguments BENCH_ARGS] [--no-run-benchmarks]
+            [--[no-]reconfigure] [--cabal-verbosity VERBOSITY |
+              --[no-]cabal-verbose] [--[no-]split-objs] [--skip ARG]
             [--[no-]interleaved-output] [--ddump-dir ARG]
 ~~~
 
-## Overview
-
-Stack's primary command is `build`. This page describes its interface. The goal
-of the interface is to do the right thing for simple input, and allow
-flexibility for more complicated goals.
+`stack build` and its synonyms (`stack test`, `stack bench`, `stack haddock` and
+`stack install`) are Stack's primany command. The command provides a simple
+interface for simple tasks and flexibility for more complicated goals.
 
 See the introductory part of Stack's
 [user's guide](GUIDE.md#the-stack-build-command) for an introduction to the
@@ -41,20 +34,17 @@ command.
 
 ## Synonyms
 
-The synonym commands for `build` are:
+The synonym commands for `stack build` are:
 
-|Synonym command|Equivalent `build` command flag|
-|---------------|-------------------------------|
-|`stack test`   |`stack build --test`           |
-|`stack bench`  |`stack build --bench`          |
-|`stack haddock`|`stack build --haddock`        |
-|`stack install`|`stack build --copy-bins`      |
+|Synonym command|Equivalent `stack build` command flag|
+|---------------|-------------------------------------|
+|`stack test`   |`stack build --test`                 |
+|`stack bench`  |`stack build --bench`                |
+|`stack haddock`|`stack build --haddock`              |
+|`stack install`|`stack build --copy-bins`            |
 
 The advantage of the synonym commands is that they are convenient and short. The
-advantage of the flags is that they compose. For example,
-`stack build --test --copy-bins` will build libraries, executables, and test
-suites, run the test suites, and then copy the executables to your local bin
-path (more on this below).
+advantage of the flags is that they compose. See the examples below.
 
 ## Components
 
@@ -370,26 +360,33 @@ specification and allow the executable to receive input on that channel. If you
 pass `--no-tests-allow-stdin` and the executable seeks input on the standard
 input channel, an exception will be thown.
 
-## Composition
+## Examples
 
-To come back to the composable approach described above, consider this example
-(which uses the `wai` [repository](https://github.com/yesodweb/wai/)). The
-command:
+*   `stack build --test --copy-bins` or, equivalently, `stack test --copy-bins`
+    or `stack install --test`, will build libraries, executables, and test
+    suites, run the test suites, and then copy the executables to Stack's local
+    binary directory (see `stack path --local-bin`). This is an example of the
+    flags composing.
 
-~~~text
-stack build --file-watch --test --copy-bins --haddock wai-extra :warp warp:doctest --exec 'echo Yay, it worked!'
-~~~
+*   The following example uses the
+    `wai` [repository](https://github.com/yesodweb/wai/)). The `wai` project
+    comprises a number of packages, including `wai-extra` and `warp`. The
+    command:
 
-will start Stack up in file watch mode, waiting for files in your project to
-change. When first starting, and each time a file changes, it will do all of the
-following.
+    ~~~text
+    stack build --file-watch --test --copy-bins --haddock wai-extra :warp warp:doctest --exec 'echo Yay, it worked!'
+    ~~~
 
-* Build the wai-extra package and its test suites
-* Build the `warp` executable
-* Build the warp package's doctest component (which, as you may guess, is a
-  test site)
-* Run all of the wai-extra package's test suite components and the doctest test
-  suite component
-* If all of that succeeds:
-    * Copy generated executables to the local bin path
-    * Run the command `echo Yay, it worked!`
+    will start Stack up in file watch mode, waiting for files in your project to
+    change. When first starting, and each time a file changes, it will do all of
+    the following.
+
+    *   Build the `wai-extra` package and its test suites
+    *   Build the `warp` executable
+    *   Build the `warp` package's `doctest` component (which is a test site)
+    *   Run all of the `wai-extra` package's test suite components and the
+        `doctest` test suite component
+    *   If all of that succeeds:
+          * Copy generated executables to Stack's local binary directory (see
+            `stack path --local-bin`)
+          * Run the command `echo Yay, it worked!`
