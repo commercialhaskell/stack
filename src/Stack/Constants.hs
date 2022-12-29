@@ -17,7 +17,6 @@ module Stack.Constants
   , stackRootOptionName
   , stackGlobalConfigOptionName
   , pantryRootEnvVar
-  , deprecatedStackRootOptionName
   , inContainerEnvVar
   , inNixShellEnvVar
   , stackProgNameUpper
@@ -190,15 +189,6 @@ stackGlobalConfigOptionName = "global-config"
 -- | Environment variable used to override the location of the Pantry store
 pantryRootEnvVar :: String
 pantryRootEnvVar = "PANTRY_ROOT"
-
--- | Deprecated option name for the global Stack root.
---
--- Deprecated since stack-1.1.0.
---
--- TODO: Remove occurrences of this variable and use 'stackRootOptionName' only
--- after an appropriate deprecation period.
-deprecatedStackRootOptionName :: String
-deprecatedStackRootOptionName = "global-stack-root"
 
 -- | Environment variable used to indicate Stack is running in container.
 inContainerEnvVar :: String

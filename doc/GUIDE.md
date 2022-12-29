@@ -1265,9 +1265,6 @@ the output of the command:
 --local-hoogle-root      Local project documentation root
 --dist-dir               Dist work directory, relative to package directory
 --local-hpc-root         Where HPC reports and tix files are stored
---local-bin-path         DEPRECATED: Use '--local-bin' instead
---ghc-paths              DEPRECATED: Use '--programs' instead
---global-stack-root      DEPRECATED: Use '--stack-root' instead
 ~~~
 
 In addition, `stack path` accepts the flags above on the command line to state
