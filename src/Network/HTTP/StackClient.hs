@@ -179,9 +179,9 @@ verifiedDownload ::
      -- ^ custom hook to observe progress
   -> RIO env Bool -- ^ Whether a download was performed
 verifiedDownload dr destpath progressSink =
-    Download.verifiedDownload dr' destpath progressSink
-  where
-    dr' = modifyRequest setUserAgent dr
+  Download.verifiedDownload dr' destpath progressSink
+ where
+  dr' = modifyRequest setUserAgent dr
 
 verifiedDownloadWithProgress ::
      HasTerm env
@@ -191,7 +191,7 @@ verifiedDownloadWithProgress ::
   -> Maybe Int
   -> RIO env Bool
 verifiedDownloadWithProgress req destpath lbl msize =
-    verifiedDownload req destpath (chattyDownloadProgress lbl msize)
+  verifiedDownload req destpath (chattyDownloadProgress lbl msize)
 
 chattyDownloadProgress ::
      ( HasLogFunc env
@@ -209,27 +209,29 @@ chattyDownloadProgress label mtotalSize _ = do
     .| go
  where
   go = evalStateC 0 $ awaitForever $ \(Sum size) -> do
-      modify (+ size)
-      totalSoFar <- get
-      logSticky $ fromString $
-        case mtotalSize of
-          Nothing -> chattyProgressNoTotal totalSoFar
-          Just 0 -> chattyProgressNoTotal totalSoFar
-          Just totalSize -> chattyProgressWithTotal totalSoFar totalSize
+    modify (+ size)
+    totalSoFar <- get
+    logSticky $ fromString $
+      case mtotalSize of
+        Nothing -> chattyProgressNoTotal totalSoFar
+        Just 0 -> chattyProgressNoTotal totalSoFar
+        Just totalSize -> chattyProgressWithTotal totalSoFar totalSize
 
   -- Example: ghc: 42.13 KiB downloaded...
   chattyProgressNoTotal totalSoFar =
     printf ("%s: " <> bytesfmt "%7.2f" totalSoFar <> " downloaded...")
-            (T.unpack label)
+           (T.unpack label)
 
     -- Example: ghc: 50.00 MiB / 100.00 MiB (50.00%) downloaded...
   chattyProgressWithTotal totalSoFar total =
-    printf ("%s: " <>
-            bytesfmt "%7.2f" totalSoFar <> " / " <>
-            bytesfmt "%.2f" total <>
-            " (%6.2f%%) downloaded...")
-            (T.unpack label)
-            percentage
+    printf (  "%s: "
+           <> bytesfmt "%7.2f" totalSoFar
+           <> " / "
+           <> bytesfmt "%.2f" total
+           <> " (%6.2f%%) downloaded..."
+           )
+           (T.unpack label)
+           percentage
    where
     percentage :: Double
     percentage = fromIntegral totalSoFar / fromIntegral total * 100
@@ -250,14 +252,17 @@ bytesfmt formatter bs = printf (formatter <> " %s")
    where
     p (n',numDivs) = n' < 1024 || numDivs == (length bytesSuffixes - 1)
   bytesSuffixes :: [String]
-  bytesSuffixes = ["B","KiB","MiB","GiB","TiB","PiB","EiB","ZiB","YiB"]
+  bytesSuffixes = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"]
 
 -- Await eagerly (collect with monoidal append),
 -- but space out yields by at least the given amount of time.
 -- The final yield may come sooner, and may be a superfluous mempty.
 -- Note that Integer and Float literals can be turned into NominalDiffTime
 -- (these literals are interpreted as "seconds")
-chunksOverTime :: (Monoid a, Semigroup a, MonadIO m) => NominalDiffTime -> ConduitM a a m ()
+chunksOverTime ::
+     (Monoid a, Semigroup a, MonadIO m)
+  => NominalDiffTime
+  -> ConduitM a a m ()
 chunksOverTime diff = do
   currentTime <- liftIO getCurrentTime
   evalStateC (currentTime, mempty) go

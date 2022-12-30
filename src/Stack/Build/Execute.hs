@@ -1026,9 +1026,9 @@ withLockedDistDir announce root inner = do
                          "; maybe another Stack process is running?"
       withCompanion (\x -> complainer x) $
         \stopComplaining ->
-        withRunInIO $ \run ->
-        withFileLock (toFilePath lockFP) Exclusive $ \_ ->
-        run $ stopComplaining *> inner
+          withRunInIO $ \run ->
+            withFileLock (toFilePath lockFP) Exclusive $ \_ ->
+              run $ stopComplaining *> inner
 
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).
