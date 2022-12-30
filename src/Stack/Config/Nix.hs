@@ -62,13 +62,13 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
   osIsNixOS <- isNixOS
   let nixEnable0 = fromFirst osIsNixOS nixMonoidEnable
 
-  nixEnable <- case () of
-    _
-      | nixEnable0 && osIsWindows -> do
-          logInfo
-            "Note: Disabling nix integration, since this is being run in Windows"
-          pure False
-      | otherwise -> pure nixEnable0
+  nixEnable <-
+    if nixEnable0 && osIsWindows
+      then do
+        logInfo
+          "Note: Disabling nix integration, since this is being run in Windows"
+        pure False
+      else pure nixEnable0
 
   when (not (null nixPackages) && isJust nixInitFile) $
     throwIO NixCannotUseShellFileAndPackagesException
