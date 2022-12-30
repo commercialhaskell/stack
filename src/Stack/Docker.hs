@@ -120,8 +120,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
         Just DockerStackExeImage -> do
             progName <- liftIO getProgName
             pure (FP.takeBaseName progName, args, [], [])
-        Just (DockerStackExePath path) -> do
-            cmdArgs args path
+        Just (DockerStackExePath path) -> cmdArgs args path
         Just DockerStackExeDownload -> exeDownload args
         Nothing
           | configPlatform config == dockerContainerPlatform -> do
@@ -531,7 +530,7 @@ entrypoint config@Config{} DockerEntrypoint{..} =
           ["-o"
           ,"--gid",show duGid
           ,stackUserName]
-    forM_ duGroups $ \gid -> do
+    forM_ duGroups $ \gid ->
       readProcessNull "groupadd"
         ["-o"
         ,"--gid",show gid

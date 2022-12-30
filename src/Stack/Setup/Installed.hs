@@ -91,7 +91,7 @@ unmarkInstalled programsPath tool = liftIO $ do
 listInstalled :: (MonadIO m, MonadThrow m)
               => Path Abs Dir
               -> m [Tool]
-listInstalled programsPath = do
+listInstalled programsPath =
     doesDirExist programsPath >>= \case
         False -> pure []
         True -> do (_, files) <- listDir programsPath
@@ -115,7 +115,7 @@ getCompilerVersion ::
   => WhichCompiler
   -> Path Abs File -- ^ executable
   -> RIO env ActualCompiler
-getCompilerVersion wc exe = do
+getCompilerVersion wc exe =
     case wc of
         Ghc -> do
             logDebug "Asking GHC for its version"

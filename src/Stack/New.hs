@@ -553,7 +553,7 @@ applyTemplate project template nonceParams dir templateText = do
         pure (mks <> mks1 <> mks2, (dir </> path, bytes'))
 
   (missingKeys, results) <- mapAccumLM processFile S.empty (M.toList files)
-  unless (S.null missingKeys) $ do
+  unless (S.null missingKeys) $
     prettyNote $
       missingParameters
         missingKeys

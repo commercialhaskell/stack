@@ -157,7 +157,7 @@ hashSourceMapData boptsCli sm = do
     pure $ SourceMapHash (SHA256.hashLazyBytes hashedContent)
 
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env Builder
-depPackageHashableContent DepPackage {..} = do
+depPackageHashableContent DepPackage {..} =
     case dpLocation of
         PLMutable _ -> pure ""
         PLImmutable pli -> do
@@ -455,7 +455,7 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
 
 -- | Get file digest, if it exists
 getFileDigestMaybe :: MonadIO m => FilePath -> m (Maybe SHA256)
-getFileDigestMaybe fp = do
+getFileDigestMaybe fp =
     liftIO
         (catch
              (fmap Just . withSourceFile fp $ getDigest)

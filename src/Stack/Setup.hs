@@ -713,7 +713,7 @@ ensureCompilerAndMsys sopts = do
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
 warnUnsupportedCompiler :: HasLogFunc env => Version -> RIO env Bool
-warnUnsupportedCompiler ghcVersion = do
+warnUnsupportedCompiler ghcVersion =
   if
     | ghcVersion < mkVersion [7, 8] -> do
         logWarn $
@@ -1155,7 +1155,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
    -- detect when the correct GHC is already installed
    if compilerTool `elem` installed
      then pure (compilerTool,CompilerBuildStandard)
-     else do
+     else
        -- clone the repository and execute the given commands
        withRepo (SimpleRepo url commitId RepoGit) $ do
          -- withRepo is guaranteed to set workingDirL, so let's get it
@@ -1810,7 +1810,8 @@ installMsys2Windows :: HasBuildConfig env
                   -> RIO env ()
 installMsys2Windows si archiveFile archiveType _tempDir destDir = do
     exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
-    when exists $ liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e -> do
+    when exists $
+      liftIO (D.removeDirectoryRecursive $ toFilePath destDir) `catchIO` \e ->
         throwM $ ExistingMSYS2NotDeleted destDir e
 
     withUnpackedTarball7z "MSYS2" si archiveFile archiveType destDir
@@ -2293,7 +2294,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 
     logInfo $ "Downloading from: " <> display archiveURL
 
-    liftIO $ do
+    liftIO $
       case () of
         ()
           | ".tar.gz" `T.isSuffixOf` archiveURL ->

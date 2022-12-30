@@ -1104,7 +1104,7 @@ stripNonDeps deps plan = plan
   providesDep task = pkgName (taskProvides task) `Set.member` deps
   missing = Map.fromList $ map (taskProvides &&& tcoMissing . taskConfigOpts) $
             Map.elems (planTasks plan)
-  missingForDeps = flip execState mempty $ do
+  missingForDeps = flip execState mempty $
     for_ (Map.elems $ planTasks plan) $ \task ->
       when (providesDep task) $
         collectMissing mempty (taskProvides task)

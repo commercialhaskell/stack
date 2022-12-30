@@ -249,7 +249,7 @@ bytesfmt formatter bs = printf (formatter <> " %s")
   (dec,i) = getSuffix (abs bs)
   getSuffix n = until p (\(x,y) -> (x / 1024, y+1)) (fromIntegral n,0)
    where
-    p (n',numDivs) = n' < 1024 || numDivs == (length bytesSuffixes - 1)
+    p (n',numDivs) = n' < 1024 || numDivs == length bytesSuffixes - 1
   bytesSuffixes :: [String]
   bytesSuffixes = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"]
 

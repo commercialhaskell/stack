@@ -282,7 +282,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   collect = Map.map NE.fromList . Map.fromDistinctAscList . groupSort
 
 warnAboutSplitObjs :: HasLogFunc env => BuildOpts -> RIO env ()
-warnAboutSplitObjs bopts | boptsSplitObjs bopts = do
+warnAboutSplitObjs bopts | boptsSplitObjs bopts =
   logWarn $ "Building with --split-objs is enabled. " <> fromString splitObjsWarning
 warnAboutSplitObjs _ = pure ()
 
@@ -412,7 +412,7 @@ checkComponentsBuildable lps =
 
 -- | Find if sublibrary dependency exist in each project
 checkSubLibraryDependencies :: HasLogFunc env => [ProjectPackage] -> RIO env ()
-checkSubLibraryDependencies proj = do
+checkSubLibraryDependencies proj =
   forM_ proj $ \p -> do
     C.GenericPackageDescription _ _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
 

@@ -61,7 +61,7 @@ benchmarkFiles ::
   -> RIO
        GetPackageFileContext
        (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
-benchmarkFiles component bench = do
+benchmarkFiles component bench =
   resolveComponentFiles component build names
  where
   names = bnames <> exposed
@@ -79,7 +79,7 @@ testFiles ::
   -> RIO
        GetPackageFileContext
        (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
-testFiles component test = do
+testFiles component test =
   resolveComponentFiles component build names
  where
   names = bnames <> exposed
@@ -98,7 +98,7 @@ executableFiles ::
   -> RIO
        GetPackageFileContext
        (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
-executableFiles component exe = do
+executableFiles component exe =
   resolveComponentFiles component build names
  where
   build = buildInfo exe
@@ -113,7 +113,7 @@ libraryFiles ::
   -> RIO
        GetPackageFileContext
        (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
-libraryFiles component lib = do
+libraryFiles component lib =
   resolveComponentFiles component build names
  where
   build = libBuildInfo lib
@@ -199,7 +199,7 @@ resolveFilesAndDeps component dirs names0 = do
           (map fst (M.toList unlistedModules))
       | not (M.null unlistedModules)
       ]
-  warnMissing _missingModules = do
+  warnMissing _missingModules =
     pure []
       -- TODO: bring this back - see
       -- https://github.com/commercialhaskell/stack/issues/2649

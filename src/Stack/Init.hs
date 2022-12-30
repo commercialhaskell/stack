@@ -247,7 +247,7 @@ initProject currDir initOpts mresolver = do
             <> line
             <> bulletedList (map (style File . fromString) rels)
 
-    when (Map.size extraDeps > 0) $ do
+    when (Map.size extraDeps > 0) $
         prettyWarn $
             fillSep
               [ fromString $ show (Map.size extraDeps)

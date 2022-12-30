@@ -152,23 +152,22 @@ enableDisableFlagsNoDefault ::
   -> Parser a
 enableDisableFlagsNoDefault enabledValue disabledValue name helpSuffix mods =
   last <$> some
-    (   (   flag'
-              enabledValue
-              (  hidden
-              <> internal
-              <> long name
-              <> help helpSuffix
-              <> mods
-              )
-        <|> flag'
-              disabledValue
-              (  hidden
-              <> internal
-              <> long ("no-" ++ name)
-              <> help helpSuffix
-              <> mods
-              )
-        )
+    (   flag'
+          enabledValue
+          (  hidden
+          <> internal
+          <> long name
+          <> help helpSuffix
+          <> mods
+          )
+    <|> flag'
+          disabledValue
+          (  hidden
+          <> internal
+          <> long ("no-" ++ name)
+          <> help helpSuffix
+          <> mods
+          )
     <|> flag'
           disabledValue
           (  long ("[no-]" ++ name)
