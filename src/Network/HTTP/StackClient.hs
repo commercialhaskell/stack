@@ -147,7 +147,7 @@ download :: HasTerm env
          => Request
          -> Path Abs File -- ^ destination
          -> RIO env Bool -- ^ Was a downloaded performed (True) or did the file already exist (False)?
-download req dest = Download.download (setUserAgent req) dest
+download req = Download.download (setUserAgent req)
 
 -- | Same as 'download', but will download a file a second time if it is already present.
 --
@@ -156,7 +156,7 @@ redownload :: HasTerm env
            => Request
            -> Path Abs File -- ^ destination
            -> RIO env Bool
-redownload req dest = Download.redownload (setUserAgent req) dest
+redownload req = Download.redownload (setUserAgent req)
 
 -- | Copied and extended version of Network.HTTP.Download.download.
 --
@@ -178,8 +178,7 @@ verifiedDownload ::
   -> (Maybe Integer -> ConduitM ByteString Void (RIO env) ())
      -- ^ custom hook to observe progress
   -> RIO env Bool -- ^ Whether a download was performed
-verifiedDownload dr destpath progressSink =
-  Download.verifiedDownload dr' destpath progressSink
+verifiedDownload dr = Download.verifiedDownload dr'
  where
   dr' = modifyRequest setUserAgent dr
 

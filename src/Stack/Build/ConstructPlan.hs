@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -293,8 +294,8 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     , pathEnvVar = pathEnvVar'
     }
 
-  prunedGlobalDeps = flip Map.mapMaybe (smGlobal sourceMap) $ \gp ->
-    case gp of
+  prunedGlobalDeps = flip Map.mapMaybe (smGlobal sourceMap) $
+    \case
       ReplacedGlobalPackage deps ->
         let pruned = filter (not . inSourceMap) deps
         in  if null pruned then Nothing else Just pruned

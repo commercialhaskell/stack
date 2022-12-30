@@ -120,7 +120,7 @@ runShellAndExit = do
             ]
 
         fullArgs = concat
-          [ if pureShell then ["--pure"] else []
+          [ [ "--pure" | pureShell ]
           , if addGCRoots
               then [ "--indirect"
                    , "--add-root"

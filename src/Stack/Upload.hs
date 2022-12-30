@@ -191,10 +191,9 @@ credsFile config = do
   pure $ dir </> "credentials.json"
 
 addAPIKey :: HackageKey -> Request -> Request
-addAPIKey (HackageKey key) req = setRequestHeader
+addAPIKey (HackageKey key) = setRequestHeader
   "Authorization"
   [fromString $ "X-ApiKey" ++ " " ++ T.unpack key]
-  req
 
 applyAuth :: HasLogFunc m => HackageAuth -> Request -> RIO m Request
 applyAuth haAuth req0 = do

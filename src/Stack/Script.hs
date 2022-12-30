@@ -186,7 +186,7 @@ scriptCmd opts = do
               [ ["-i", "-i" ++ toFilePath scriptDir]
               , ["-hide-all-packages"]
               , maybeToList colorFlag
-              , map (\x -> "-package" ++ x)
+              , map ("-package" ++)
                   $ Set.toList
                   $ Set.insert "base"
                   $ Set.map packageNameString targetsSet

@@ -106,8 +106,5 @@ projectExeCompleter = buildConfigCompleter $ \input -> do
     $ filter (input `isPrefixOf`)
     $ nubOrd
     $ concatMap
-        (\gpd -> map
-          (C.unUnqualComponentName . fst)
-          (C.condExecutables gpd)
-        )
+        (map (C.unUnqualComponentName . fst) . C.condExecutables)
         gpds

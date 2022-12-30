@@ -194,12 +194,11 @@ resolveFilesAndDeps component dirs names0 = do
           foundModules `M.difference`
           M.fromList (mapMaybe (fmap (, ()) . dotCabalModule) names0)
     pure $
-      if M.null unlistedModules
-        then []
-        else [ UnlistedModulesWarning
-                   component
-                   (map fst (M.toList unlistedModules))
-             ]
+      [ UnlistedModulesWarning
+          component
+          (map fst (M.toList unlistedModules))
+      | not (M.null unlistedModules)
+      ]
   warnMissing _missingModules = do
     pure []
       -- TODO: bring this back - see
@@ -269,7 +268,7 @@ parseHI hiPath = do
   result <-
     liftIO $ catchAnyDeep
       (Iface.fromFile hiPath)
-      (\e -> pure (Left (displayException e)))
+      (pure . Left . displayException)
   case result of
     Left msg -> do
       prettyStackDevL

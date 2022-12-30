@@ -72,9 +72,8 @@ hoogleCmd (args, setup, rebuild, startServer) =
 
   args' :: [String]
   args' = if startServer
-            then ["server", "--local", "--port", "8080"]
-            else []
-          ++ args
+    then ["server", "--local", "--port", "8080"] ++ args
+    else args
 
   generateDbIfNeeded :: Path Abs File -> RIO EnvConfig ()
   generateDbIfNeeded hooglePath = do

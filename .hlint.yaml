@@ -51,49 +51,11 @@
     - Network.HTTP.StackClient
 
 # Not considered useful hints
-- ignore: {name: "Redundant do"}
-- ignore: {name: "Use section"}
-- ignore: {name: "Use camelCase"}
-- ignore: {name: "Use list comprehension"}
-- ignore: {name: "Redundant if"}
-- ignore: {name: "Avoid lambda"}
-- ignore: {name: "Eta reduce"}
-- ignore: {name: "Parse error"}  # we trust the compiler over HLint
-- ignore: {name: "Use =="}  # Creates infinite loops in `EQ` using expressions
-- ignore: {name: "Evaluate"}
-- ignore: {name: "Use &&&"}
-- ignore: {name: "Redundant compare"}
-- ignore: {name: "Use Just"}
-- ignore: {name: "Avoid lambda using `infix`"}
-
-# Added in hlint-2.0.10, ignoring for now
-- ignore: {name: "Unnecessary hiding"}
-- ignore: {name: "Use lambda-case"}
-
 - ignore:
-    name: "Use fewer imports"
+    name: "Use camelCase"
     within:
-    - System.Process.Read  # Related to 'Hide post-AMP warnings' comment
-    - Stack.Exec  # ifdef for System.Process.Read
-
-# Related to 'explicit pattern matching is clearer' comment
+    - System.Terminal
 - ignore:
-    name: "Use fromMaybe"
+    name: "Avoid lambda using `infix`"
     within:
-    - Stack.Types.Config.explicitSetupDeps
-
-# For clarity (related to do syntax)
-- ignore:
-    name: "Reduce duplication"
-    within:
-    - Network.HTTP.Download.VerifiedSpec
-    - Stack.PackageDumpSpec
-    - Stack.Types.StackT
-    - Stack.Docker
-
-# Gives an incorrect hint that breaks type checking due to mismatched types
-- ignore:
-    name: "Too strict maybe"
-    within:
-    - Stack.Config
-    - Stack.Package
+    - System.Process.Pager.pageWriter

@@ -343,7 +343,7 @@ pruneGraph dontPrune names =
   pruneUnreachable dontPrune . Map.mapMaybeWithKey (\pkg (pkgDeps,x) ->
     if pkg `F.elem` names
       then Nothing
-      else let filtered = Set.filter (\n -> n `F.notElem` names) pkgDeps
+      else let filtered = Set.filter (`F.notElem` names) pkgDeps
            in  if Set.null filtered && not (Set.null pkgDeps)
                  then Nothing
                  else Just (filtered,x))
@@ -437,10 +437,9 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
               Stack.Prelude.pkgName
               (Map.lookup depId globalIdMap)
 
-  payloadFromLocal pkg loc =
-    DotPayload (Just $ packageVersion pkg)
-               (Just $ packageLicense pkg)
-               loc
+  payloadFromLocal pkg =
+    DotPayload (Just $ packageVersion pkg) (Just $ packageLicense pkg)
+
   payloadFromDump dp =
     DotPayload (Just $ pkgVersion $ dpPackageIdent dp)
                (Right <$> dpLicense dp)

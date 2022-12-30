@@ -738,7 +738,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
                 [ Action
                     { actionId = ActionId taskProvides ATBuild
                     , actionDeps =
-                        Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts)
+                        Set.map (`ActionId` ATBuild) (tcoMissing taskConfigOpts)
                     , actionDo = \ac -> runInBase $ singleBuild ac ee task installedMap False
                     , actionConcurrency = ConcurrencyAllowed
                     }
@@ -751,7 +751,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
                     Action
                         { actionId = ActionId taskProvides ATBuildFinal
                         , actionDeps = addBuild
-                            (Set.map (\ident -> ActionId ident ATBuild) (tcoMissing taskConfigOpts))
+                            (Set.map (`ActionId` ATBuild) (tcoMissing taskConfigOpts))
                         , actionDo = \ac -> runInBase $ singleBuild ac ee task installedMap True
                         , actionConcurrency = ConcurrencyAllowed
                         }) $
@@ -1024,7 +1024,7 @@ withLockedDistDir announce root inner = do
               announce $ "still blocking for directory lock on " <>
                          fromString (toFilePath lockFP) <>
                          "; maybe another Stack process is running?"
-      withCompanion (\x -> complainer x) $
+      withCompanion complainer $
         \stopComplaining ->
           withRunInIO $ \run ->
             withFileLock (toFilePath lockFP) Exclusive $ \_ ->
@@ -1417,8 +1417,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         packageHasExposedModules package &&
                         -- Special help for the curator tool to avoid haddocks that are known to fail
                         maybe True (Set.notMember pname . curatorSkipHaddock) mcurator
-    expectHaddockFailure mcurator =
-        maybe False (Set.member pname . curatorExpectHaddockFailure) mcurator
+    expectHaddockFailure =
+        maybe False (Set.member pname . curatorExpectHaddockFailure)
     fulfillHaddockExpectations mcurator action | expectHaddockFailure mcurator = do
         eres <- tryAny $ action KeepOpen
         case eres of
@@ -2329,12 +2329,12 @@ taskComponents task =
         TTRemotePackage{} -> Set.empty
 
 expectTestFailure :: PackageName -> Maybe Curator -> Bool
-expectTestFailure pname mcurator =
-    maybe False (Set.member pname . curatorExpectTestFailure) mcurator
+expectTestFailure pname =
+    maybe False (Set.member pname . curatorExpectTestFailure)
 
 expectBenchmarkFailure :: PackageName -> Maybe Curator -> Bool
-expectBenchmarkFailure pname mcurator =
-    maybe False (Set.member pname . curatorExpectBenchmarkFailure) mcurator
+expectBenchmarkFailure pname =
+    maybe False (Set.member pname . curatorExpectBenchmarkFailure)
 
 fulfillCuratorBuildExpectations ::
        (HasLogFunc env, HasCallStack)

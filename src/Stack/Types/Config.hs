@@ -1003,13 +1003,15 @@ instance ToJSON Project where
     toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator drops) = object $ concat
       [ maybe [] (\cv -> ["compiler" .= cv]) mcompiler
       , maybe [] (\msg -> ["user-message" .= msg]) userMsg
-      , if null extraPackageDBs then [] else ["extra-package-dbs" .= extraPackageDBs]
-      , if null extraDeps then [] else ["extra-deps" .= extraDeps]
-      , if Map.null flags then [] else ["flags" .= fmap toCabalStringMap (toCabalStringMap flags)]
+      , [ "extra-package-dbs" .= extraPackageDBs | not (null extraPackageDBs) ]
+      , [ "extra-deps" .= extraDeps | not (null extraDeps) ]
+      , [ "flags" .= fmap toCabalStringMap (toCabalStringMap flags)
+        | not (Map.null flags)
+        ]
       , ["packages" .= packages]
       , ["resolver" .= resolver]
       , maybe [] (\c -> ["curator" .= c]) mcurator
-      , if Set.null drops then [] else ["drop-packages" .= Set.map CabalString drops]
+      , [ "drop-packages" .= Set.map CabalString drops | not (Set.null drops) ]
       ]
 
 -- | Extra configuration intended exclusively for usage by the

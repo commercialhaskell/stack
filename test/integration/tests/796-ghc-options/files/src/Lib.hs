@@ -6,6 +6,9 @@ module Lib
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
 
+-- Avoid problems with CPP and HLint
+#ifndef __HLINT__
+
 #ifndef FOO
 #error FOO isn't defined
 #endif
@@ -16,4 +19,6 @@ someFunc = putStrLn "someFunc"
 
 #ifdef BAZ
 #error BAZ is defined
+#endif
+
 #endif

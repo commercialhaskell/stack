@@ -172,8 +172,8 @@ upgrade builtHash (UpgradeOpts mbo mso) =
         ]
       source so
  where
-  binary bo = binaryUpgrade bo
-  source so = sourceUpgrade builtHash so
+  binary = binaryUpgrade
+  source = sourceUpgrade builtHash
 
 binaryUpgrade :: BinaryOpts -> RIO Runner ()
 binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) =
