@@ -58,14 +58,14 @@ instance Exception HoogleException where
 data Muted = Muted | NotMuted
 
 -- | Hoogle command.
-hoogleCmd :: ([String],Bool,Bool,Bool) -> RIO Runner ()
-hoogleCmd (args,setup,rebuild,startServer) =
+hoogleCmd :: ([String], Bool, Bool, Bool) -> RIO Runner ()
+hoogleCmd (args, setup, rebuild, startServer) =
   local (over globalOptsL modifyGO) $
-  withConfig YesReexec $
-  withDefaultEnvConfig $ do
-    hooglePath <- ensureHoogleInPath
-    generateDbIfNeeded hooglePath
-    runHoogle hooglePath args'
+    withConfig YesReexec $
+      withDefaultEnvConfig $ do
+        hooglePath <- ensureHoogleInPath
+        generateDbIfNeeded hooglePath
+        runHoogle hooglePath args'
  where
   modifyGO :: GlobalOpts -> GlobalOpts
   modifyGO = globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL ?~ True
