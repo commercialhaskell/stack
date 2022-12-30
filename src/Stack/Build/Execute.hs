@@ -760,7 +760,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
                     Action
                         { actionId = ActionId taskProvides ATRunTests
                         , actionDeps = finalDeps
-                        , actionDo = \ac -> withLock mtestLock $ runInBase $ do
+                        , actionDo = \ac -> withLock mtestLock $ runInBase $
                             singleTest topts (Set.toList tests) ac ee task installedMap
                         -- Always allow tests tasks to run concurrently with
                         -- other tasks, particularly build tasks. Note that
@@ -772,7 +772,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
                     Action
                         { actionId = ActionId taskProvides ATRunBenchmarks
                         , actionDeps = finalDeps
-                        , actionDo = \ac -> runInBase $ do
+                        , actionDo = \ac -> runInBase $
                             singleBench beopts (Set.toList benches) ac ee task installedMap
                         -- Never run benchmarks concurrently with any other task, see #3663
                         , actionConcurrency = ConcurrencyDisallowed
@@ -1087,10 +1087,13 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
     -- See the discussion on #426 for thoughts on sending output to the
     -- console from concurrent tasks.
     console =
-      (wanted &&
-       all (\(ActionId ident _) -> ident == taskProvides) (Set.toList acRemaining) &&
-       eeTotalWanted == 1
-      ) || (acConcurrency == ConcurrencyDisallowed)
+         (  wanted
+         && all
+              (\(ActionId ident _) -> ident == taskProvides)
+              (Set.toList acRemaining)
+         && eeTotalWanted == 1
+         )
+      || acConcurrency == ConcurrencyDisallowed
 
     withPackage inner =
         case taskType of
@@ -1195,7 +1198,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                 warnCustomNoDeps :: RIO env ()
                 warnCustomNoDeps =
                     case (taskType, packageBuildType package) of
-                        (TTLocalMutable lp, C.Custom) | lpWanted lp -> do
+                        (TTLocalMutable lp, C.Custom) | lpWanted lp ->
                             prettyWarnL
                                 [ flow "Package"
                                 , fromString $ packageNameString $ packageName package
@@ -1424,8 +1427,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         case eres of
           Right () -> logWarn $ fromString (packageNameString pname) <> ": unexpected Haddock success"
           Left _ -> pure ()
-    fulfillHaddockExpectations _ action = do
-        action CloseOnException
+    fulfillHaddockExpectations _ action = action CloseOnException
 
     buildingFinals = isFinalBuild || taskAllInOne
     enableTests = buildingFinals && any isCTest (taskComponents task)
@@ -1503,7 +1505,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
           allToUnregister = map (const pkgName) (maybeToList mlib) ++ map toCabalInternalLibName subLibNames
           allToRegister = maybeToList mlib ++ sublibs
 
-        unless (null allToRegister) $ do
+        unless (null allToRegister) $
             withMVar eeInstallLock $ \() -> do
                 -- We want to ignore the global and user databases.
                 -- Unfortunately, ghc-pkg doesn't take such arguments on the
@@ -1627,7 +1629,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                                    (style Good . fromString . C.display)
                                    modules
                                )
-                forM_ mlocalWarnings $ \(cabalfp, warnings) -> do
+                forM_ mlocalWarnings $ \(cabalfp, warnings) ->
                     unless (null warnings) $ prettyWarn $
                            flow "The following modules should be added to \
                                 \exposed-modules or other-modules in" <+>
@@ -2024,7 +2026,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                                       createSource
                                     OTLogFile _ h -> Nothing <$ useHandleOpen h
                             optionalTimeout action
-                                | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 = do
+                                | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 =
                                     timeout (maxSecs * 1000000) action
                                 | otherwise = Just <$> action
 
@@ -2135,8 +2137,7 @@ singleBench beopts benchesToRun ac ee task installedMap = do
               then do
                   announce "Benchmark running disabled by --no-run-benchmarks flag."
                   pure False
-              else do
-                  pure True
+              else pure True
 
         when toRun $ do
             announce "benchmarks"
@@ -2361,5 +2362,4 @@ fulfillCuratorBuildExpectations pname mcurator _ enableBench defValue action | e
           logWarn $ fromString (packageNameString pname) <> ": unexpected benchmark build success"
           pure res
       Left _ -> pure defValue
-fulfillCuratorBuildExpectations _ _ _ _ _ action = do
-    action
+fulfillCuratorBuildExpectations _ _ _ _ _ action = action

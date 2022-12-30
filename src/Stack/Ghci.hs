@@ -575,7 +575,7 @@ figureOutMainFile ::
     -> [(PackageName, (Path Abs File, Target))]
     -> [GhciPkgInfo]
     -> RIO env (Maybe (Path Abs File))
-figureOutMainFile bopts mainIsTargets targets0 packages = do
+figureOutMainFile bopts mainIsTargets targets0 packages =
     case candidates of
         [] -> pure Nothing
         [c@(_,_,fp)] -> do logInfo ("Using main module: " <> display (renderCandidate c))
@@ -798,7 +798,7 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
 wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: HasLogFunc env => [GhciPkgInfo] -> RIO env ()
-checkForIssues pkgs = do
+checkForIssues pkgs =
     when (length pkgs > 1) $ borderedWarning $ do
         -- Cabal flag issues could arise only when there are at least 2 packages
         unless (null cabalFlagIssues) $ borderedWarning $ do
@@ -887,9 +887,9 @@ borderedWarning f = do
 -- TODO: Should this also tell the user the filepaths, not just the
 -- module name?
 checkForDuplicateModules :: HasTerm env => [GhciPkgInfo] -> RIO env ()
-checkForDuplicateModules pkgs = do
-    unless (null duplicates) $ do
-        borderedWarning $ do
+checkForDuplicateModules pkgs =
+    unless (null duplicates) $
+        borderedWarning $
             prettyWarn $ "Multiple files use the same module name:" <>
               line <> bulletedList (map prettyDuplicate duplicates)
         -- MSS 2020-10-13 Disabling, may remove entirely in the future

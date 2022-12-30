@@ -152,9 +152,7 @@ scriptCmd opts = do
 
         targetsSet <-
           case soPackages opts of
-            [] -> do
-              -- Using the import parser
-              getPackagesFromImports (soFile opts)
+            [] -> getPackagesFromImports (soFile opts) -- Using the import parser
             packages -> do
               let targets = concatMap wordsComma packages
               targets' <- mapM parsePackageNameThrowing targets

@@ -161,7 +161,7 @@ createDependencyGraph dotOpts = do
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $ map (\dp -> (Stack.Prelude.pkgName (dpPackageIdent dp), dp)) globalDump
-      globalIdMap = Map.fromList $ map (\dp -> (dpGhcPkgId dp, dpPackageIdent dp)) globalDump
+      globalIdMap = Map.fromList $ map (dpGhcPkgId &&& dpPackageIdent) globalDump
   let depLoader = createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps
       loadPackageDeps name version loc flags ghcOptions cabalConfigOpts
         -- Skip packages that can't be loaded - see
@@ -396,7 +396,7 @@ createDepLoader ::
       RIO DotConfig (Set PackageName, DotPayload))
   -> PackageName
   -> RIO DotConfig (Set PackageName, DotPayload)
-createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName = do
+createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
   fromMaybe (throwIO $ PackageNotFoundBug pkgName)
     (projectPackageDeps <|> dependencyDeps <|> globalDeps)
  where

@@ -196,7 +196,7 @@ addAPIKey (HackageKey key) = setRequestHeader
   [fromString $ "X-ApiKey" ++ " " ++ T.unpack key]
 
 applyAuth :: HasLogFunc m => HackageAuth -> Request -> RIO m Request
-applyAuth haAuth req0 = do
+applyAuth haAuth req0 =
   case haAuth of
     HAKey key -> pure (addAPIKey key req0)
     HACreds creds -> applyCreds creds req0

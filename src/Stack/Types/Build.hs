@@ -804,7 +804,7 @@ instance NFData CachePkgSrc
 instance PersistField CachePkgSrc where
     toPersistValue CacheSrcUpstream = PersistText "upstream"
     toPersistValue (CacheSrcLocal fp) = PersistText ("local:" <> T.pack fp)
-    fromPersistValue (PersistText t) = do
+    fromPersistValue (PersistText t) =
         if t == "upstream"
             then Right CacheSrcUpstream
             else case T.stripPrefix "local:" t of

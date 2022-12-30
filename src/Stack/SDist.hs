@@ -266,7 +266,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
   case eres of
     Right roundtripped
       | roundtripped == gpd -> pure ()
-      | otherwise -> do
+      | otherwise ->
           prettyWarn $ vsep $ roundtripErrs ++
             [ "This seems to be fixed in development versions of Cabal, but \
               \at time of writing, the fix is not in any released versions."
@@ -295,7 +295,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
                    \on it indicating that you would like it to be fixed."
             , ""
             ]
-    Left (_version, errs) -> do
+    Left (_version, errs) ->
       prettyWarn $ vsep $ roundtripErrs ++
         [ flow "In particular, parsing the rendered Cabal file is yielding a \
                \parse error. Please check if there are already issues \

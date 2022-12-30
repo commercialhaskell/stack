@@ -289,7 +289,7 @@ configFromConfigMonoid
        -- exist.
        shortLocalProgramsFilePath <-
          liftIO $ getShortPathName localProgramsFilePath
-       when (' ' `elem` shortLocalProgramsFilePath) $ do
+       when (' ' `elem` shortLocalProgramsFilePath) $
          logError $ "Error: [S-8432]\n"<>
            "Stack's 'programs' path contains a space character and has no " <>
            "alternative short ('8 dot 3') name. This will cause problems " <>
@@ -811,7 +811,7 @@ checkOwnership dir = do
         Just (_, True) -> pure ()
         Just (dir', False) -> throwIO (UserDoesn'tOwnDirectory dir')
         Nothing ->
-            (throwIO . NoSuchDirectory) $ (toFilePathNoTrailingSep . parent) dir
+            throwIO . NoSuchDirectory $ (toFilePathNoTrailingSep . parent) dir
 
 -- | @'getDirAndOwnership' dir@ returns @'Just' (dir, 'True')@ when @dir@
 -- exists and the current user owns it in the sense of 'isOwnedByUser'.
@@ -828,7 +828,7 @@ getDirAndOwnership dir = liftIO $ forgivingAbsence $ do
 --
 -- Will always pure 'True' on Windows.
 isOwnedByUser :: MonadIO m => Path Abs t -> m Bool
-isOwnedByUser path = liftIO $ do
+isOwnedByUser path = liftIO $
     if osIsWindows
         then pure True
         else do

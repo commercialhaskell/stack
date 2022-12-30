@@ -74,9 +74,9 @@ getTerminalWidth = do
                   mbStdout
       else do
         [left,_top,right,_bottom] <- forM [0..3] $ \i -> do
-          v <- peekByteOff p ((i*2) + posCONSOLE_SCREEN_BUFFER_INFO_srWindow)
+          v <- peekByteOff p (i * 2 + posCONSOLE_SCREEN_BUFFER_INFO_srWindow)
           pure $ fromIntegral (v :: Word16)
-        pure $ Just (1+right-left)
+        pure $ Just (1 + right - left)
 
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
@@ -86,7 +86,7 @@ fixCodePage ::
   -> Version -- ^ GHC version
   -> RIO env a
   -> RIO env a
-fixCodePage mcp ghcVersion inner = do
+fixCodePage mcp ghcVersion inner =
   if mcp && ghcVersion < mkVersion [7, 10, 3]
     then fixCodePage'
     -- GHC >=7.10.3 doesn't need this code page hack.
@@ -100,14 +100,12 @@ fixCodePage mcp ghcVersion inner = do
         setOutput = origCPO /= expected
         fixInput
           | setInput = bracket_
-              (liftIO $ do
-                  setConsoleCP expected)
+              (liftIO $ setConsoleCP expected)
               (liftIO $ setConsoleCP origCPI)
           | otherwise = id
         fixOutput
           | setOutput = bracket_
-              (liftIO $ do
-                  setConsoleOutputCP expected)
+              (liftIO $ setConsoleOutputCP expected)
               (liftIO $ setConsoleOutputCP origCPO)
           | otherwise = id
 

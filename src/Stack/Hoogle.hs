@@ -130,7 +130,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
             PLImmutable pli ->
               T.pack . packageIdentifierString <$>
                   restrictMinHoogleVersion muted (packageLocationIdent pli)
-            plm@(PLMutable _) -> do
+            plm@(PLMutable _) ->
               T.pack . packageIdentifierString . package . packageDescription
                   <$> loadCabalFile (Just stackProgName') plm
         Nothing -> do
@@ -154,22 +154,22 @@ hoogleCmd (args, setup, rebuild, startServer) =
     => Muted
     -> PackageIdentifier
     -> RIO env PackageIdentifier
-  restrictMinHoogleVersion muted ident = do
+  restrictMinHoogleVersion muted ident =
     if ident < hoogleMinIdent
-    then do
-      muteableLog LevelWarn muted $
-        "Minimum " <>
-        fromString (packageIdentifierString hoogleMinIdent) <>
-        " is not in your index. Installing the minimum version."
-      pure hoogleMinIdent
-    else do
-      muteableLog LevelInfo muted $
-        "Minimum version is " <>
-        fromString (packageIdentifierString hoogleMinIdent) <>
-        ". Found acceptable " <>
-        fromString (packageIdentifierString ident) <>
-        " in your index, requiring its installation."
-      pure ident
+      then do
+        muteableLog LevelWarn muted $
+          "Minimum " <>
+          fromString (packageIdentifierString hoogleMinIdent) <>
+          " is not in your index. Installing the minimum version."
+        pure hoogleMinIdent
+      else do
+        muteableLog LevelInfo muted $
+          "Minimum version is " <>
+          fromString (packageIdentifierString hoogleMinIdent) <>
+          ". Found acceptable " <>
+          fromString (packageIdentifierString ident) <>
+          " in your index, requiring its installation."
+        pure ident
   muteableLog ::
        HasLogFunc env
     => LogLevel

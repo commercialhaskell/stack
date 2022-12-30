@@ -420,7 +420,7 @@ resolveRawTarget sma allLocs (ri, rt) =
       getLatestHackageLocation YesRequireHackageIndex name UsePreferredVersions
     pure $ case mloc of
       Nothing -> deferToConstructPlan name
-      Just loc -> do
+      Just loc ->
         Right ResolveResult
           { rrName = name
           , rrRaw = ri
@@ -470,8 +470,7 @@ combineResolveResults results = do
   addedDeps <- fmap Map.unions $ forM results $ \result ->
     case rrAddedDep result of
       Nothing -> pure Map.empty
-      Just pl -> do
-        pure $ Map.singleton (rrName result) pl
+      Just pl -> pure $ Map.singleton (rrName result) pl
 
   let m0 = Map.unionsWith (++) $
         map (\rr -> Map.singleton (rrName rr) [rr]) results

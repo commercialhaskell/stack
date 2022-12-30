@@ -27,7 +27,7 @@ warnInstallSearchPathIssues destDir installed = do
       case mexePath of
         Just exePath -> do
           exeDir <- (liftIO . fmap FP.takeDirectory . D.canonicalizePath) exePath
-          unless (exeDir `FP.equalFilePath` destDir) $ do
+          unless (exeDir `FP.equalFilePath` destDir) $
             prettyWarnL
               [ flow "The"
               , style File . fromString . T.unpack $ exe
@@ -38,7 +38,7 @@ warnInstallSearchPathIssues destDir installed = do
               , style File . fromString . T.unpack $ exe
               , "calls on the command line will not use this version."
               ]
-        Nothing -> do
+        Nothing ->
           prettyWarnL
             [ flow "Installation path"
             , style Dir . fromString $ destDir
@@ -46,7 +46,7 @@ warnInstallSearchPathIssues destDir installed = do
             , style File . fromString . T.unpack $ exe
             , flow "executable that was just installed could not be found on the PATH."
             ]
-    else do
+    else
       prettyWarnL
         [ flow "Installation path "
         , style Dir . fromString $ destDir

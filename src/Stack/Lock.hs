@@ -147,7 +147,7 @@ lockCachedWanted stackFile resolver fillWanted = do
       logDebug "Not reading lock file"
       pure $ Locked [] []
   let toMap :: Ord a => [LockedLocation a b] -> Map a b
-      toMap =  Map.fromList . map (\ll -> (llOriginal ll, llCompleted ll))
+      toMap =  Map.fromList . map (llOriginal &&& llCompleted)
       slocCache = toMap $ lckSnapshotLocations locked
       pkgLocCache = toMap $ lckPkgImmutableLocations locked
   debugRSL <- view rslInLogL
@@ -167,7 +167,7 @@ lockCachedWanted stackFile resolver fillWanted = do
         , lckPkgImmutableLocations =
           lockLocations $ pliCompleted <> prjCompleted
         }
-  when (newLocked /= locked) $ do
+  when (newLocked /= locked) $
     case lfb of
       LFBReadWrite ->
         writeBinaryFileAtomic lockFile $

@@ -16,7 +16,7 @@ osIsWindows :: Bool
 osIsWindows = False
 
 setScriptPerms :: MonadIO m => FilePath -> m ()
-setScriptPerms fp = do
+setScriptPerms fp =
   liftIO $ Posix.setFileMode fp $
     Posix.ownerReadMode `Posix.unionFileModes`
     Posix.ownerWriteMode `Posix.unionFileModes`

@@ -376,7 +376,7 @@ checkSnapBuildPlan pkgDirs flags snapCandidate = do
 
     if Map.null errs then
         pure $ BuildPlanCheckOk f
-    else if Map.null cerrs then do
+    else if Map.null cerrs then
             pure $ BuildPlanCheckPartial f errs
         else
             pure $ BuildPlanCheckFail f cerrs compiler

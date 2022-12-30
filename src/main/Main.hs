@@ -771,7 +771,7 @@ cleanCmd = withConfig NoReexec . clean
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> RIO Runner ()
 buildCmd opts = do
-  when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) (boptsCLIGhcOptions opts)) $ do
+  when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) (boptsCLIGhcOptions opts)) $
     throwIO $ PrettyException GHCProfOptionInvalid
   local (over globalOptsL modifyGO) $
     case boptsCLIFileWatch opts of
