@@ -2295,13 +2295,11 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     logInfo $ "Downloading from: " <> display archiveURL
 
     liftIO $
-      case () of
-        ()
-          | ".tar.gz" `T.isSuffixOf` archiveURL ->
-              handleTarball tmpFile isWindows archiveURL
-          | ".zip" `T.isSuffixOf` archiveURL ->
+      if | ".tar.gz" `T.isSuffixOf` archiveURL ->
+             handleTarball tmpFile isWindows archiveURL
+         | ".zip" `T.isSuffixOf` archiveURL ->
               throwIO StackBinaryArchiveZipUnsupportedBug
-          | otherwise -> throwIO $ StackBinaryArchiveUnsupported archiveURL
+         | otherwise -> throwIO $ StackBinaryArchiveUnsupported archiveURL
 
     logInfo "Download complete, testing executable"
 
