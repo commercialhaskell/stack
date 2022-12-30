@@ -27,5 +27,4 @@ jobs:
       run: |
         set -ex
         hlint src/
-        hlint src/ --cpp-define=WINDOWS=1
-        hlint test/ --cpp-simple
+        hlint test/

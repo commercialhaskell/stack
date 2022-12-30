@@ -78,7 +78,7 @@ import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO hiding ( findExecutable, withSystemTempDir )
 import           RIO.List
                    ( headMaybe, intercalate, intersperse, isPrefixOf
-                   , maximumByMaybe, sort, sortBy, stripPrefix )
+                   , maximumByMaybe, sort, sortOn, stripPrefix )
 import           RIO.Process
                    ( EnvVars, HasProcessContext (..), ProcessContext
                    , augmentPath, augmentPathMap, doesExecutableExist, envVarsL
@@ -672,7 +672,7 @@ rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
 -- see also the note about only local targets for rebuildEnv
 withNewLocalBuildTargets :: HasEnvConfig  env => [Text] -> RIO env a -> RIO env a
 withNewLocalBuildTargets targets f = do
-    envConfig <- view $ envConfigL
+    envConfig <- view envConfigL
     haddockDeps <- view $ configL.to configBuild.to shouldHaddockDeps
     let boptsCLI = envConfigBuildOptsCLI envConfig
     envConfig' <- rebuildEnv envConfig NeedTargets haddockDeps $
@@ -745,7 +745,7 @@ warnUnsupportedCompilerCabal cp didWarn = do
 
   if
     | cabalVersion < mkVersion [1, 19, 2] -> do
-        logWarn $ "Stack no longer supports Cabal versions below 1.19.2,"
+        logWarn "Stack no longer supports Cabal versions below 1.19.2,"
         logWarn $ "but version " <> fromString (versionString cabalVersion) <> " was found."
         logWarn "This invocation will most likely fail."
         logWarn "To fix this, either use an older version of Stack or a newer resolver"
@@ -954,7 +954,7 @@ runGHCInstallHook sopts hook = do
     newlines = ['\n', '\r']
 
     stripNewline :: String -> String
-    stripNewline str = filter (flip notElem newlines) str
+    stripNewline = filter (`notElem` newlines)
 
 
 ensureSandboxedCompiler ::
@@ -1193,7 +1193,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
            isBindist p = do
              extension <- fileExtension (filename p)
 
-             pure $ "ghc-" `isPrefixOf` (toFilePath (filename p))
+             pure $ "ghc-" `isPrefixOf` toFilePath (filename p)
                          && extension == ".xz"
 
          mbindist <- filterM isBindist files
@@ -1346,7 +1346,7 @@ getGhcBuilds = do
                         _ -> CompilerBuildSpecialized (intercalate "-" c))
                     libComponents
             Platform _ Cabal.FreeBSD -> do
-                let getMajorVer = readMaybe <=< headMaybe . (splitOn ".")
+                let getMajorVer = readMaybe <=< headMaybe . splitOn "."
                 majorVer <- getMajorVer <$> sysRelease
                 if majorVer >= Just (12 :: Int) then
                   useBuilds [CompilerBuildSpecialized "ino64"]
@@ -1440,7 +1440,7 @@ getSetupInfo = do
     loadSetupInfo urlOrFile = do
       bs <-
           case parseUrlThrow urlOrFile of
-              Just req -> liftM (LBS.toStrict . getResponseBody) $ httpLbs req
+              Just req -> LBS.toStrict . getResponseBody <$> httpLbs req
               Nothing -> liftIO $ S.readFile urlOrFile
       WithJSONWarnings si warnings <- either throwM pure (Yaml.decodeEither' bs)
       when (urlOrFile /= defaultSetupInfoYaml) $
@@ -1536,7 +1536,7 @@ getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
   where
     mpair =
         listToMaybe $
-        sortBy (flip (comparing fst)) $
+        sortOn (Down . fst) $
         filter (isWantedCompiler versionCheck wanted . toCV . fst) (Map.toList pairs_)
 
 -- | Download and install the first available compiler build.
@@ -1756,7 +1756,7 @@ installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
     logSticky "Installing GHC ..."
     runStep "installing" dir mempty makeTool ["install"]
 
-    logStickyDone $ "Installed GHC."
+    logStickyDone "Installed GHC."
     logDebug $ "GHC installed to " <> fromString (toFilePath destDir)
 
 -- | Check if given processes appear to be present, throwing an exception if
@@ -2039,7 +2039,7 @@ getUtf8EnvVars compilerVer =
                              Map.empty
                     else do
                         -- Get a list of known locales by running @locale -a@.
-                        elocales <- tryAny $ fmap fst $ proc "locale" ["-a"] readProcess_
+                        elocales <- tryAny (fst <$> proc "locale" ["-a"] readProcess_)
                         let
                             -- Filter the list to only include locales with UTF-8 encoding.
                             utf8Locales =
@@ -2256,8 +2256,8 @@ preferredPlatforms = do
         X86_64 -> pure "x86_64"
         Arm -> pure "arm"
         _ -> throwM $ BinaryUpgradeOnArchUnsupported arch'
-    hasgmp4 <- pure False -- FIXME import relevant code from Stack.Setup? checkLib $(mkRelFile "libgmp.so.3")
-    let suffixes
+    let hasgmp4 = False -- FIXME import relevant code from Stack.Setup? checkLib $(mkRelFile "libgmp.so.3")
+        suffixes
           | hasgmp4 = ["-static", "-gmp4", ""]
           | otherwise = ["-static", ""]
     pure $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
@@ -2332,12 +2332,12 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
       `catchAny` (logError . displayShow)
   where
 
-    findArchive (SRIGitHub val) pattern = do
+    findArchive (SRIGitHub val) platformPattern = do
         Object top <- pure val
         Array assets <- KeyMap.lookup "assets" top
-        getFirst $ fold $ fmap (First . findMatch pattern') assets
+        getFirst $ foldMap (First . findMatch pattern') assets
       where
-        pattern' = mconcat ["-", pattern, "."]
+        pattern' = mconcat ["-", platformPattern, "."]
 
         findMatch pattern'' (Object o) = do
             String name <- KeyMap.lookup "name" o

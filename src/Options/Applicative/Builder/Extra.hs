@@ -366,10 +366,10 @@ unescapeBashArg :: String -> String
 unescapeBashArg ('\'' : rest) = rest
 unescapeBashArg ('\"' : rest) = go rest
  where
-  pattern = "$`\"\\\n" :: String
+  special = "$`\"\\\n" :: String
   go [] = []
   go ('\\' : x : xs)
-    | x `elem` pattern = x : xs
+    | x `elem` special = x : xs
     | otherwise = '\\' : x : go xs
   go (x : xs) = x : go xs
 unescapeBashArg input = go input

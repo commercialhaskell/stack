@@ -64,7 +64,7 @@ pageWriter writer = do
  where
   cmdspecFromEnvVar = shell <$> MaybeT (lookupEnv "PAGER")
   cmdspecFromExeName =
-    fmap (\path -> proc path []) . MaybeT . findExecutable
+    fmap (\command -> proc command []) . MaybeT . findExecutable
 
 -- | Run pager to display a 'Text'
 pageText :: Text -> IO ()

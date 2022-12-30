@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -191,7 +192,8 @@ generateHpcReport pkgDir package tests = do
         let extraArgs = case mincludeName of
               Nothing -> []
               Just includeNames ->
-                "--include" : L.intersperse "--include" (map (\n -> n ++ ":") includeNames)
+                  "--include"
+                : L.intersperse "--include" (map (++ ":") includeNames)
         mreportPath <-
           generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
         forM_ mreportPath (displayReportPath "The" report . pretty)
@@ -295,17 +297,22 @@ generateHpcReportForTargets opts tixFiles targetNames = do
         logWarn $
              "Since --all is used, it is redundant to specify these targets: "
           <> displayShow targetNames
-      targets <- view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets
+      targets <-
+        view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets
       fmap concat $ forM (Map.toList targets) $ \(name, target) ->
         case target of
           TargetAll PTDependency -> throwIO $ NotLocalPackage name
           TargetComps comps -> do
             pkgPath <- hpcPkgPath name
-            forM (toList comps) $ \nc ->
-              case nc of
-                CTest testName ->
-                  (pkgPath </>) <$>
-                    parseRelFile (T.unpack testName ++ "/" ++ T.unpack testName ++ ".tix")
+            forM (toList comps) $
+              \case
+                CTest testName -> (pkgPath </>) <$>
+                  parseRelFile
+                    (  T.unpack testName
+                    ++ "/"
+                    ++ T.unpack testName
+                    ++ ".tix"
+                    )
                 _ -> throwIO $ NonTestSuiteTarget name
           TargetAll PTProject -> do
             pkgPath <- hpcPkgPath name
@@ -317,7 +324,8 @@ generateHpcReportForTargets opts tixFiles targetNames = do
                   (_, files) <- listDir dir
                   pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
               else pure []
-  tixPaths <- (\xs -> xs ++ targetTixFiles) <$> mapM (resolveFile' . T.unpack) tixFiles
+  tixPaths <- (++ targetTixFiles) <$>
+    mapM (resolveFile' . T.unpack) tixFiles
   when (null tixPaths) $ throwIO NoTargetsOrTixSpecified
   outputDir <- hpcReportDir
   reportDir <- case hroptsDestDir opts of

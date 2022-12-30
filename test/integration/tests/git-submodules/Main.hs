@@ -78,4 +78,4 @@ newline :: Char
 newline = '\n'
 
 stripNewline :: String -> String
-stripNewline str = filter (\x -> x /= newline) str
+stripNewline = filter (/= newline)

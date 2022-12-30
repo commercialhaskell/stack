@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds     #-}
 {-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -427,9 +428,8 @@ checkSubLibraryDependencies proj = do
       (logWarn "SubLibrary dependency is not supported, this will almost certainly fail")
  where
   getDeps (_, C.CondNode _ dep _) = dep
-  subLibDepExist lib =
-    any (\x ->
-      case x of
+  subLibDepExist = any
+    ( \case
         C.LSubLibName _ -> True
         C.LMainLibName  -> False
-    ) lib
+    )

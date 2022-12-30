@@ -394,7 +394,7 @@ generateBuildInfoOpts BioInput {..} =
        (Just ab, _       ) -> [ab]
        (_      , Just rel) -> [biCabalDir </> rel]
        (Nothing, Nothing ) -> []
-    fworks = map (\fwk -> "-framework=" <> fwk) (frameworks biBuildInfo)
+    fworks = map ("-framework=" <>) (frameworks biBuildInfo)
 
 -- | Make the .o path from the .c file path for a component. Example:
 --
@@ -644,14 +644,22 @@ resolvePackageDescription packageConfig (GenericPackageDescription desc _ defaul
           let bi = testBuildInfo test
               bi' = bi
                 { targetBuildDepends = deps
-                , buildable = buildable bi && (if modBuildable then packageConfigEnableTests packageConfig else True)
+                , buildable =
+                       buildable bi
+                    && (  not modBuildable
+                       || packageConfigEnableTests packageConfig
+                       )
                 }
           in  test { testBuildInfo = bi' }
         updateBenchmarkDeps modBuildable benchmark deps =
           let bi = benchmarkBuildInfo benchmark
               bi' = bi
                 { targetBuildDepends = deps
-                , buildable = buildable bi && (if modBuildable then packageConfigEnableBenchmarks packageConfig else True)
+                , buildable =
+                       buildable bi
+                    && (  not modBuildable
+                       || packageConfigEnableBenchmarks packageConfig
+                       )
                 }
           in  benchmark { benchmarkBuildInfo = bi' }
 

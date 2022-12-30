@@ -418,7 +418,7 @@ renderStackYaml p ignoredPackages dupPackages =
 getSnapshots' :: HasConfig env => RIO env Snapshots
 getSnapshots' = catchAny
     getSnapshots
-    (\e -> throwIO $ PrettyException $ SnapshotDownloadFailure e)
+    (throwIO . PrettyException . SnapshotDownloadFailure)
 
 -- | Get the default resolver value
 getDefaultResolver ::

@@ -206,7 +206,7 @@ instance Exception BuildException where
                 else ["", "", doubleIndent $ T.unpack $ decodeUtf8With lenientDecode bs]
             ]
       where
-        indent' = dropWhileEnd isSpace . unlines . fmap (\l -> "  " ++ l) . lines
+        indent' = dropWhileEnd isSpace . unlines . fmap ("  " ++) . lines
         doubleIndent = indent' . indent'
     displayException (TestSuiteTypeUnsupported interface) = concat
         [ "Error: [S-3819]\n"
@@ -621,7 +621,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted' name =
       where
         (targets, recurses) = L.partition (\(n, _) -> n `Set.member` wanted') (M.toList paths)
     chooseBest :: DepsPath -> DepsPath -> DepsPath
-    chooseBest x y = max x y
+    chooseBest = max
     -- Extend a path to all its parents.
     extendPath :: (PackageName, DepsPath) -> [(PackageName, DepsPath)]
     extendPath (n, dp) =
@@ -700,9 +700,9 @@ missingExeError errorCode isSimpleBuildType msg = unlines
         : "A Cabal file that refers to nonexistent other files (e.g. a \
           \license-file that doesn't exist). Running 'cabal check' may point \
           \out these issues."
-        : if isSimpleBuildType
-            then []
-            else ["The Setup.hs file is changing the installation target dir."]
+        : [ "The Setup.hs file is changing the installation target dir."
+          | not isSimpleBuildType
+          ]
 
 showBuildError ::
      String

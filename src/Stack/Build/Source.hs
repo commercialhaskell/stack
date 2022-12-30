@@ -214,11 +214,9 @@ generalGhcOptions bconfig boptsCli isTarget isLocal = concat
         else []
     , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
     , if boptsLibProfile bopts || boptsExeProfile bopts
-         then ["-fprof-auto","-fprof-cafs"]
+         then ["-fprof-auto", "-fprof-cafs"]
          else []
-    , if not $ boptsLibStrip bopts || boptsExeStrip bopts
-         then ["-g"]
-         else []
+    , [ "-g" | not $ boptsLibStrip bopts || boptsExeStrip bopts ]
     , if includeExtraOptions
          then boptsCLIGhcOptions boptsCli
          else []
