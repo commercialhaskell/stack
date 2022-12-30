@@ -3,7 +3,9 @@
 -- {-# LANGUAGE TemplateHaskell #-}
 
 -- | Test suite for GHCi like applications including both GHCi and Intero.
-module Stack.GhciSpec where
+module Stack.GhciSpec
+  ( spec
+  ) where
 
 import Test.Hspec
 

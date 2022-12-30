@@ -2,7 +2,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
-module Stack.PackageDumpSpec where
+module Stack.PackageDumpSpec
+  ( main
+  , spec
+  , bestPrune
+  , checkDepsPresent
+  , runEnvNoLogging
+  ) where
 
 import           Conduit
 import qualified Data.Conduit.List as CL

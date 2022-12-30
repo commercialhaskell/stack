@@ -2,7 +2,12 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Stack.LockSpec where
+module Stack.LockSpec
+  ( toBlobKey
+  , decodeSHA
+  , decodeLocked
+  , spec
+  ) where
 
 import           Pantry.Internal.AesonExtended ( WithJSONWarnings (..) )
 import qualified Data.Yaml as Yaml

@@ -2,7 +2,12 @@
 
 -- | Args parser test suite.
 
-module Stack.ArgsSpec where
+module Stack.ArgsSpec
+  ( spec
+  , argsSpec
+  , argsInputOutput
+  , interpreterArgsSpec
+  ) where
 
 import           Control.Monad
 import           Data.Attoparsec.Args ( EscapingMode (..), parseArgsFromString )

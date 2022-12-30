@@ -4,7 +4,9 @@
 {-# LANGUAGE TemplateHaskell   #-}
 
 -- | Test suite for the GhciScript DSL
-module Stack.Ghci.ScriptSpec where
+module Stack.Ghci.ScriptSpec
+  ( spec
+  ) where
 
 import qualified Data.Set as S
 import           Distribution.ModuleName

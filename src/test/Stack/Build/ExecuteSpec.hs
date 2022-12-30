@@ -1,6 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module Stack.Build.ExecuteSpec (main, spec) where
+module Stack.Build.ExecuteSpec
+  ( main
+  , spec
+  ) where
 
 import Stack.Prelude
 import Test.Hspec

@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.Types.TemplateNameSpec where
+module Stack.Types.TemplateNameSpec
+  ( spec
+  ) where
 
 import Stack.Types.TemplateName
 import Path.Internal
