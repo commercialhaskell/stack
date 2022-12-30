@@ -43,6 +43,7 @@ ghc-options:
 - -fwrite-ide-info
 - -hiedir=.hie
 - -Wall
+- -Wmissing-export-lists
 # Workaround for https://github.com/haskell/cabal/issues/4739.
 # -Wnon-noportable-include-path is a Clang diagnostic flag. See
 # https://clang.llvm.org/docs/DiagnosticsReference.html#wnonportable-include-path

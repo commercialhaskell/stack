@@ -1,7 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.UploadSpec (spec) where
+module Stack.UploadSpec
+  ( spec
+  ) where
 
 import RIO
 import RIO.Directory

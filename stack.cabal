@@ -263,7 +263,7 @@ library
       Paths_stack
   hs-source-dirs:
       src/
-  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -optP-Wno-nonportable-include-path -Widentities
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -Widentities
   build-depends:
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
@@ -391,7 +391,7 @@ executable stack
       Paths_stack
   hs-source-dirs:
       src/main
-  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -optP-Wno-nonportable-include-path -threaded -rtsopts
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded -rtsopts
   build-depends:
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
@@ -514,7 +514,7 @@ executable stack-integration-test
   hs-source-dirs:
       test/integration
       test/integration/lib
-  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
@@ -643,7 +643,7 @@ test-suite stack-test
       Paths_stack
   hs-source-dirs:
       src/test
-  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -optP-Wno-nonportable-include-path -threaded
+  ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded
   build-depends:
       Cabal >=3.8.1.0
     , QuickCheck

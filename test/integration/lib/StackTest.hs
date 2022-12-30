@@ -1,6 +1,52 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module StackTest where
+module StackTest
+  ( run'
+  , run
+  , runShell
+  , runWithCwd
+  , stackExe
+  , stackSrc
+  , testDir
+  , stack'
+  , stack
+  , stackCleanFull
+  , stackIgnoreException
+  , stackErr
+  , Repl
+  , ReplConnection (..)
+  , nextPrompt
+  , replCommand
+  , replGetChar
+  , replGetLine
+  , runRepl
+  , repl
+  , stackStderr
+  , stackCheckStderr
+  , stackErrStderr
+  , runEx
+  , runEx'
+  , stackCheckStdout
+  , doesNotExist
+  , doesExist
+  , doesFileOrDirExist
+  , copy
+  , fileContentsMatch
+  , logInfo
+  , showProcessArgDebug
+  , exeExt
+  , isWindows
+  , isLinux
+  , getIsAlpine
+  , isARM
+  , isMacOSX
+  , defaultResolverArg
+  , removeFileIgnore
+  , removeDirIgnore
+  , withCwd
+  , withSourceDirectory
+  , superslow
+  ) where
 
 import Control.Monad
 import Control.Monad.IO.Class

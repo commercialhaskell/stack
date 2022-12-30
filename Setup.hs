@@ -46,7 +46,9 @@ generateBuildModule verbosity pkg lbi = do
   withLibLBI pkg lbi $ \_ libcfg -> do
     withExeLBI pkg lbi $ \exe clbi ->
       rewriteFileEx normal (dir </> "Build_" ++ exeName' exe ++ ".hs") $ unlines
-        [ "module Build_" ++ exeName' exe ++ " where"
+        [ "module Build_" ++ exeName' exe
+        , "  ( deps"
+        , "  ) where"
         , ""
         , "deps :: [String]"
         , "deps = " ++ (show $ formatdeps (transDeps libcfg clbi))

@@ -3,7 +3,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Stack.ConfigSpec where
+module Stack.ConfigSpec
+  ( sampleConfig
+  , buildOptsConfig
+  , hpackConfig
+  , resolverConfig
+  , snapshotConfig
+  , resolverSnapshotConfig
+  , stackDotYaml
+  , setup
+  , noException
+  , spec
+  ) where
 
 import Control.Arrow
 import Distribution.Verbosity (verbose)

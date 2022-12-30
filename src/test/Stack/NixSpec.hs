@@ -2,7 +2,12 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.NixSpec where
+module Stack.NixSpec
+  ( sampleConfigNixEnabled
+  , sampleConfigNixDisabled
+  , setup
+  , spec
+  ) where
 
 import Data.Maybe (fromJust)
 import Options.Applicative

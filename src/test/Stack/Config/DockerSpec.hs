@@ -1,7 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Stack.Config.DockerSpec (spec) where
+module Stack.Config.DockerSpec
+  ( spec
+  ) where
 
 import Test.Hspec
 import Stack.Prelude

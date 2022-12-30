@@ -3,7 +3,13 @@
 {-# LANGUAGE TupleSections     #-}
 
 -- | Test suite for Stack.Dot
-module Stack.DotSpec where
+module Stack.DotSpec
+  ( dummyPayload
+  , spec
+  , sublistOf
+  , pkgName
+  , stubLoader
+  ) where
 
 import           Data.Functor.Identity
 import           Data.List ((\\))
