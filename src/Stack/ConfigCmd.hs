@@ -32,42 +32,47 @@ import qualified Options.Applicative as OA
 import           Options.Applicative.Builder.Extra
 import qualified Options.Applicative.Types as OA
 import           Pantry ( loadSnapshot )
-import           Path
+import           Path ( (</>), parent )
 import qualified RIO.Map as Map
 import           RIO.Process ( envVarsL )
 import           Stack.Config
                    ( makeConcreteResolver, getProjectConfig
                    , getImplicitGlobalProjectDir
                    )
-import           Stack.Constants
+import           Stack.Constants ( stackDotYaml )
 import           Stack.Prelude
 import           Stack.Types.Config
-import           Stack.Types.Resolver
+                   ( Config (..), EnvConfig, EnvSettings (..), GlobalOpts (..)
+                   , HasConfig (..), HasGHCVariant, ProjectConfig (..)
+                   , configMonoidInstallGHCName, configMonoidSystemGHCName
+                   , globalOptsL
+                   )
+import           Stack.Types.Resolver ( AbstractResolver, readAbstractResolver )
 import           System.Environment ( getEnvironment )
 
 -- | Type repesenting exceptions thrown by functions exported by the
 -- "Stack.ConfigCmd" module.
 data ConfigCmdException
-    = NoProjectConfigAvailable
-    deriving (Show, Typeable)
+  = NoProjectConfigAvailable
+  deriving (Show, Typeable)
 
 instance Exception ConfigCmdException where
-    displayException NoProjectConfigAvailable =
-        "Error: [S-3136]\n"
-        ++ "'config' command used when no project configuration available."
+  displayException NoProjectConfigAvailable =
+    "Error: [S-3136]\n"
+    ++ "'config' command used when no project configuration available."
 
 data ConfigCmdSet
-    = ConfigCmdSetResolver !(Unresolved AbstractResolver)
-    | ConfigCmdSetSystemGhc !CommandScope !Bool
-    | ConfigCmdSetInstallGhc !CommandScope !Bool
-    | ConfigCmdSetDownloadPrefix !CommandScope !Text
+  = ConfigCmdSetResolver !(Unresolved AbstractResolver)
+  | ConfigCmdSetSystemGhc !CommandScope !Bool
+  | ConfigCmdSetInstallGhc !CommandScope !Bool
+  | ConfigCmdSetDownloadPrefix !CommandScope !Text
 
 data CommandScope
-    = CommandScopeGlobal
-      -- ^ Apply changes to the global configuration,
-      --   typically at @~/.stack/config.yaml@.
-    | CommandScopeProject
-      -- ^ Apply changes to the project @stack.yaml@.
+  = CommandScopeGlobal
+    -- ^ Apply changes to the global configuration,
+    --   typically at @~/.stack/config.yaml@.
+  | CommandScopeProject
+    -- ^ Apply changes to the project @stack.yaml@.
 
 configCmdSetScope :: ConfigCmdSet -> CommandScope
 configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
@@ -76,138 +81,139 @@ configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetDownloadPrefix scope _) = scope
 
 cfgCmdSet ::
-       (HasConfig env, HasGHCVariant env)
-    => ConfigCmdSet -> RIO env ()
+     (HasConfig env, HasGHCVariant env)
+  => ConfigCmdSet -> RIO env ()
 cfgCmdSet cmd = do
-    conf <- view configL
-    configFilePath <-
-             case configCmdSetScope cmd of
-                 CommandScopeProject -> do
-                     mstackYamlOption <- view $ globalOptsL.to globalStackYaml
-                     mstackYaml <- getProjectConfig mstackYamlOption
-                     case mstackYaml of
-                         PCProject stackYaml -> pure stackYaml
-                         PCGlobalProject -> fmap (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
-                         PCNoProject _extraDeps -> throwIO NoProjectConfigAvailable
-                         -- maybe modify the ~/.stack/config.yaml file instead?
-                 CommandScopeGlobal -> pure (configUserConfigPath conf)
-    rawConfig <- liftIO (readFileUtf8 (toFilePath configFilePath))
-    config <- either throwM pure (Yaml.decodeEither' $ encodeUtf8 rawConfig)
-    newValue <- cfgCmdSetValue (parent configFilePath) cmd
-    let yamlLines = T.lines rawConfig
-        cmdKeys = cfgCmdSetKeys cmd  -- Text
-        newValue' = T.stripEnd $
-            decodeUtf8With lenientDecode $ Yaml.encode newValue  -- Text
-        file = toFilePath configFilePath  -- String
-        file' = display $ T.pack file     -- Utf8Builder
-    newYamlLines <- case inConfig config cmdKeys of
-        Nothing -> do
-            logInfo $ file' <> " has been extended."
-            pure $ writeLines yamlLines "" cmdKeys newValue'
-        Just oldValue -> if oldValue == newValue
-            then do
-                logInfo $ file' <> " already contained the intended \
-                    \configuration and remains unchanged."
-                pure yamlLines
-            else switchLine file' (NE.last cmdKeys) newValue' [] yamlLines
-    liftIO $ writeFileUtf8 file (T.unlines newYamlLines)
-  where
-    -- This assumes that if the key does not exist, the lines that can be
-    -- appended to include it are of a form like:
-    --
-    -- key1:
-    --   key2:
-    --     key3: value
-    --
-    writeLines yamlLines spaces cmdKeys value = case NE.tail cmdKeys of
-      [] -> yamlLines <> [spaces <> NE.head cmdKeys <> ": " <> value]
-      ks -> writeLines (yamlLines <> [spaces <> NE.head cmdKeys <> ":"])
-                       (spaces <> "  ")
-                       (NE.fromList ks)
-                       value
+  conf <- view configL
+  configFilePath <-
+    case configCmdSetScope cmd of
+      CommandScopeProject -> do
+        mstackYamlOption <- view $ globalOptsL.to globalStackYaml
+        mstackYaml <- getProjectConfig mstackYamlOption
+        case mstackYaml of
+          PCProject stackYaml -> pure stackYaml
+          PCGlobalProject ->
+            fmap (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
+          PCNoProject _extraDeps -> throwIO NoProjectConfigAvailable
+          -- maybe modify the ~/.stack/config.yaml file instead?
+      CommandScopeGlobal -> pure (configUserConfigPath conf)
+  rawConfig <- liftIO (readFileUtf8 (toFilePath configFilePath))
+  config <- either throwM pure (Yaml.decodeEither' $ encodeUtf8 rawConfig)
+  newValue <- cfgCmdSetValue (parent configFilePath) cmd
+  let yamlLines = T.lines rawConfig
+      cmdKeys = cfgCmdSetKeys cmd  -- Text
+      newValue' = T.stripEnd $
+          decodeUtf8With lenientDecode $ Yaml.encode newValue  -- Text
+      file = toFilePath configFilePath  -- String
+      file' = display $ T.pack file     -- Utf8Builder
+  newYamlLines <- case inConfig config cmdKeys of
+    Nothing -> do
+      logInfo $ file' <> " has been extended."
+      pure $ writeLines yamlLines "" cmdKeys newValue'
+    Just oldValue -> if oldValue == newValue
+      then do
+        logInfo $ file' <> " already contained the intended \
+          \configuration and remains unchanged."
+        pure yamlLines
+      else switchLine file' (NE.last cmdKeys) newValue' [] yamlLines
+  liftIO $ writeFileUtf8 file (T.unlines newYamlLines)
+ where
+  -- This assumes that if the key does not exist, the lines that can be
+  -- appended to include it are of a form like:
+  --
+  -- key1:
+  --   key2:
+  --     key3: value
+  --
+  writeLines yamlLines spaces cmdKeys value = case NE.tail cmdKeys of
+    [] -> yamlLines <> [spaces <> NE.head cmdKeys <> ": " <> value]
+    ks -> writeLines (yamlLines <> [spaces <> NE.head cmdKeys <> ":"])
+                     (spaces <> "  ")
+                     (NE.fromList ks)
+                     value
 
-    inConfig v cmdKeys = case v of
-        Yaml.Object obj ->
-            case KeyMap.lookup (Key.fromText (NE.head cmdKeys)) obj of
-                Nothing -> Nothing
-                Just v' -> case NE.tail cmdKeys of
-                    [] -> Just v'
-                    ks -> inConfig v' (NE.fromList ks)
-        _ -> Nothing
+  inConfig v cmdKeys = case v of
+    Yaml.Object obj ->
+      case KeyMap.lookup (Key.fromText (NE.head cmdKeys)) obj of
+        Nothing -> Nothing
+        Just v' -> case NE.tail cmdKeys of
+          [] -> Just v'
+          ks -> inConfig v' (NE.fromList ks)
+    _ -> Nothing
 
-    switchLine file cmdKey _ searched [] = do
-        logWarn $ display cmdKey <> " not found in YAML file " <> file <>
-            " as a single line. Multi-line key:value formats are not supported."
-        pure $ reverse searched
-    switchLine file cmdKey newValue searched (oldLine:rest) =
-        case parseOnly (parseLine cmdKey) oldLine of
-            Left _ ->
-                switchLine file cmdKey newValue (oldLine:searched) rest
-            Right (kt, spaces1, spaces2, spaces3, comment) -> do
-                let newLine = spaces1 <> renderKey cmdKey kt <> spaces2 <>
-                        ":" <> spaces3 <> newValue <> comment
-                logInfo $ file <> " has been updated."
-                pure $ reverse searched <> (newLine:rest)
+  switchLine file cmdKey _ searched [] = do
+    logWarn $ display cmdKey <> " not found in YAML file " <> file <>
+        " as a single line. Multi-line key:value formats are not supported."
+    pure $ reverse searched
+  switchLine file cmdKey newValue searched (oldLine:rest) =
+    case parseOnly (parseLine cmdKey) oldLine of
+      Left _ ->
+        switchLine file cmdKey newValue (oldLine:searched) rest
+      Right (kt, spaces1, spaces2, spaces3, comment) -> do
+        let newLine = spaces1 <> renderKey cmdKey kt <> spaces2 <>
+                ":" <> spaces3 <> newValue <> comment
+        logInfo $ file <> " has been updated."
+        pure $ reverse searched <> (newLine:rest)
 
-    parseLine :: Text -> Parser (KeyType, Text, Text, Text, Text)
-    parseLine key = do
-        spaces1 <- P.takeWhile (== ' ')
-        kt <- parseKey key
-        spaces2 <- P.takeWhile (== ' ')
-        skip (== ':')
-        spaces3 <- P.takeWhile (== ' ')
-        skipWhile (/= ' ')
-        comment <- takeText
-        pure (kt, spaces1, spaces2, spaces3, comment)
+  parseLine :: Text -> Parser (KeyType, Text, Text, Text, Text)
+  parseLine key = do
+    spaces1 <- P.takeWhile (== ' ')
+    kt <- parseKey key
+    spaces2 <- P.takeWhile (== ' ')
+    skip (== ':')
+    spaces3 <- P.takeWhile (== ' ')
+    skipWhile (/= ' ')
+    comment <- takeText
+    pure (kt, spaces1, spaces2, spaces3, comment)
 
-    -- If the key is, for example, install-ghc, this recognises install-ghc,
-    -- 'install-ghc' or "install-ghc".
-    parseKey :: Text -> Parser KeyType
-    parseKey k =   parsePlainKey k
-               <|> parseSingleQuotedKey k
-               <|> parseDoubleQuotedKey k
+  -- If the key is, for example, install-ghc, this recognises install-ghc,
+  -- 'install-ghc' or "install-ghc".
+  parseKey :: Text -> Parser KeyType
+  parseKey k =   parsePlainKey k
+    <|> parseSingleQuotedKey k
+    <|> parseDoubleQuotedKey k
 
-    parsePlainKey :: Text -> Parser KeyType
-    parsePlainKey key = do
-      _ <- P.string key
-      pure PlainKey
+  parsePlainKey :: Text -> Parser KeyType
+  parsePlainKey key = do
+    _ <- P.string key
+    pure PlainKey
 
-    parseSingleQuotedKey :: Text -> Parser KeyType
-    parseSingleQuotedKey = parseQuotedKey SingleQuotedKey '\''
+  parseSingleQuotedKey :: Text -> Parser KeyType
+  parseSingleQuotedKey = parseQuotedKey SingleQuotedKey '\''
 
-    parseDoubleQuotedKey :: Text -> Parser KeyType
-    parseDoubleQuotedKey = parseQuotedKey DoubleQuotedKey '"'
+  parseDoubleQuotedKey :: Text -> Parser KeyType
+  parseDoubleQuotedKey = parseQuotedKey DoubleQuotedKey '"'
 
-    parseQuotedKey :: KeyType -> Char -> Text -> Parser KeyType
-    parseQuotedKey kt c key = do
-        skip (==c)
-        _ <- P.string key
-        skip (==c)
-        pure kt
+  parseQuotedKey :: KeyType -> Char -> Text -> Parser KeyType
+  parseQuotedKey kt c key = do
+    skip (==c)
+    _ <- P.string key
+    skip (==c)
+    pure kt
 
-    renderKey :: Text -> KeyType -> Text
-    renderKey key kt = case kt of
-        PlainKey -> key
-        SingleQuotedKey -> '\'' `T.cons` key `T.snoc` '\''
-        DoubleQuotedKey -> '"' `T.cons` key `T.snoc` '"'
+  renderKey :: Text -> KeyType -> Text
+  renderKey key kt = case kt of
+    PlainKey -> key
+    SingleQuotedKey -> '\'' `T.cons` key `T.snoc` '\''
+    DoubleQuotedKey -> '"' `T.cons` key `T.snoc` '"'
 
 -- |Type representing types of representations of keys in YAML files.
 data KeyType
-    = PlainKey  -- ^ For example: install-ghc
-    | SingleQuotedKey  -- ^ For example: 'install-ghc'
-    | DoubleQuotedKey  -- ^ For example: "install-ghc"
-    deriving (Eq, Show)
+  = PlainKey  -- ^ For example: install-ghc
+  | SingleQuotedKey  -- ^ For example: 'install-ghc'
+  | DoubleQuotedKey  -- ^ For example: "install-ghc"
+  deriving (Eq, Show)
 
 cfgCmdSetValue ::
-       (HasConfig env, HasGHCVariant env)
-    => Path Abs Dir -- ^ root directory of project
-    -> ConfigCmdSet -> RIO env Yaml.Value
+     (HasConfig env, HasGHCVariant env)
+  => Path Abs Dir -- ^ root directory of project
+  -> ConfigCmdSet -> RIO env Yaml.Value
 cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
-    newResolver' <- resolvePaths (Just root) newResolver
-    concreteResolver <- makeConcreteResolver newResolver'
-    -- Check that the snapshot actually exists
-    void $ loadSnapshot =<< completeSnapshotLocation concreteResolver
-    pure (Yaml.toJSON concreteResolver)
+  newResolver' <- resolvePaths (Just root) newResolver
+  concreteResolver <- makeConcreteResolver newResolver'
+  -- Check that the snapshot actually exists
+  void $ loadSnapshot =<< completeSnapshotLocation concreteResolver
+  pure (Yaml.toJSON concreteResolver)
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') = pure $ Yaml.Bool bool'
 cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool') = pure $ Yaml.Bool bool'
 cfgCmdSetValue _ (ConfigCmdSetDownloadPrefix _ url) = pure $ Yaml.String url
@@ -218,7 +224,7 @@ cfgCmdSetKeys (ConfigCmdSetResolver _) = ["resolver"]
 cfgCmdSetKeys (ConfigCmdSetSystemGhc _ _) = [configMonoidSystemGHCName]
 cfgCmdSetKeys (ConfigCmdSetInstallGhc _ _) = [configMonoidInstallGHCName]
 cfgCmdSetKeys (ConfigCmdSetDownloadPrefix _ _) =
-    ["package-index", "download-prefix"]
+  ["package-index", "download-prefix"]
 
 cfgCmdName :: String
 cfgCmdName = "config"
@@ -231,47 +237,47 @@ cfgCmdEnvName = "env"
 
 configCmdSetParser :: OA.Parser ConfigCmdSet
 configCmdSetParser =
-      OA.hsubparser $
-        mconcat
-          [ OA.command "resolver"
-              ( OA.info
-                  (   ConfigCmdSetResolver
-                  <$> OA.argument
-                        readAbstractResolver
-                        (  OA.metavar "SNAPSHOT"
-                        <> OA.help "E.g. \"nightly\" or \"lts-7.2\"" ))
-                  ( OA.progDesc
-                      "Change the resolver of the current project." ))
-          , OA.command (T.unpack configMonoidSystemGHCName)
-              ( OA.info
-                  (   ConfigCmdSetSystemGhc
-                  <$> scopeFlag
-                  <*> boolArgument )
-                  ( OA.progDesc
-                      "Configure whether Stack should use a system GHC \
-                      \installation or not." ))
-          , OA.command (T.unpack configMonoidInstallGHCName)
-              ( OA.info
-                  (   ConfigCmdSetInstallGhc
-                  <$> scopeFlag
-                  <*> boolArgument )
-                  ( OA.progDesc
-                      "Configure whether Stack should automatically install \
-                      \GHC when necessary." ))
-          , OA.command "package-index"
-              ( OA.info
-                  ( OA.hsubparser $
-                      OA.command "download-prefix"
-                        ( OA.info
-                            (   ConfigCmdSetDownloadPrefix
-                            <$> scopeFlag
-                            <*> urlArgument )
-                            ( OA.progDesc
-                                "Configure download prefix for Stack's package \
-                                \index." )))
-                  ( OA.progDesc
-                      "Configure Stack's package index" ))
-          ]
+  OA.hsubparser $
+    mconcat
+      [ OA.command "resolver"
+          ( OA.info
+              (   ConfigCmdSetResolver
+              <$> OA.argument
+                    readAbstractResolver
+                    (  OA.metavar "SNAPSHOT"
+                    <> OA.help "E.g. \"nightly\" or \"lts-7.2\"" ))
+              ( OA.progDesc
+                  "Change the resolver of the current project." ))
+      , OA.command (T.unpack configMonoidSystemGHCName)
+          ( OA.info
+              (   ConfigCmdSetSystemGhc
+              <$> scopeFlag
+              <*> boolArgument )
+              ( OA.progDesc
+                  "Configure whether Stack should use a system GHC \
+                  \installation or not." ))
+      , OA.command (T.unpack configMonoidInstallGHCName)
+          ( OA.info
+              (   ConfigCmdSetInstallGhc
+              <$> scopeFlag
+              <*> boolArgument )
+              ( OA.progDesc
+                  "Configure whether Stack should automatically install \
+                  \GHC when necessary." ))
+      , OA.command "package-index"
+          ( OA.info
+              ( OA.hsubparser $
+                  OA.command "download-prefix"
+                    ( OA.info
+                        (   ConfigCmdSetDownloadPrefix
+                        <$> scopeFlag
+                        <*> urlArgument )
+                        ( OA.progDesc
+                            "Configure download prefix for Stack's package \
+                            \index." )))
+              ( OA.progDesc
+                  "Configure Stack's package index" ))
+      ]
 
 scopeFlag :: OA.Parser CommandScope
 scopeFlag = OA.flag
