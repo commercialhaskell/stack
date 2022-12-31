@@ -80,10 +80,11 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
         if exists
             then pure docFile
             else do
-              logWarn $
-                   "Expected to find documentation at "
-                <> fromString (toFilePath docFile)
-                <> ", but that file is missing.  Opening doc index instead."
+              prettyWarnL
+                [ flow "Expected to find documentation at"
+                , pretty docFile <> ","
+                , flow "but that file is missing. Opening doc index instead."
+                ]
               getDocIndex
       _ -> getDocIndex
   prettyInfo $ "Opening" <+> pretty docFile <+> "in the browser."

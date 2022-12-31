@@ -33,7 +33,7 @@ import           System.FilePath ( searchPathSeparator )
 
 -- | Get the global package database
 getGlobalDB ::
-     (HasProcessContext env, HasLogFunc env)
+     (HasLogFunc env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> RIO env (Path Abs Dir)
 getGlobalDB pkgexe = do
@@ -52,7 +52,7 @@ getGlobalDB pkgexe = do
 
 -- | Run the ghc-pkg executable
 ghcPkg ::
-     (HasProcessContext env, HasLogFunc env)
+     (HasLogFunc env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> [Path Abs Dir]
   -> [String]
@@ -71,7 +71,7 @@ ghcPkg pkgexe@(GhcPkgExe pkgPath) pkgDbs args = do
 
 -- | Create a package database in the given directory, if it doesn't exist.
 createDatabase ::
-     (HasProcessContext env, HasLogFunc env)
+     (HasLogFunc env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> Path Abs Dir
   -> RIO env ()
@@ -84,11 +84,13 @@ createDatabase (GhcPkgExe pkgPath) db = do
     dirExists <- doesDirExist db
     args <- if dirExists
       then do
-        logWarn $
-          "The package database located at " <>
-          fromString (toFilePath db) <>
-          " is corrupted (missing its package.cache file)."
-        logWarn "Proceeding with a recache"
+        prettyWarnL
+          [ flow "The package database located at"
+          , pretty db
+          , flow "is corrupted. It is missing its"
+          , style File "package.cache"
+          , flow "file. Stack is proceeding with a recache."
+          ]
         pure ["--package-db", toFilePath db, "recache"]
       else do
         -- Creating the parent doesn't seem necessary, as ghc-pkg
@@ -115,7 +117,7 @@ packageDbFlags pkgDbs =
 
 -- | Get the value of a field of the package.
 findGhcPkgField ::
-     (HasProcessContext env, HasLogFunc env)
+     (HasLogFunc env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> [Path Abs Dir] -- ^ package databases
   -> String -- ^ package identifier, or GhcPkgId
@@ -137,7 +139,7 @@ findGhcPkgField pkgexe pkgDbs name field = do
 -- see https://github.com/commercialhaskell/stack/issues/2662#issuecomment-460342402
 -- using GHC package id where available (from GHC 7.9)
 unregisterGhcPkgIds ::
-     (HasProcessContext env, HasLogFunc env)
+     ( HasLogFunc env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> Path Abs Dir -- ^ package database
   -> NonEmpty (Either PackageIdentifier GhcPkgId)
@@ -145,7 +147,7 @@ unregisterGhcPkgIds ::
 unregisterGhcPkgIds pkgexe pkgDb epgids = do
   eres <- ghcPkg pkgexe [pkgDb] args
   case eres of
-    Left e -> logWarn $ displayShow e
+    Left e -> prettyWarn $ string $ displayException e
     Right _ -> pure ()
  where
   (idents, gids) = partitionEithers $ toList epgids

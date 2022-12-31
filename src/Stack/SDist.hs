@@ -152,7 +152,7 @@ getSDistTarball mpvpBounds pkgDir = do
           Right _ ->
             pure ()
       Nothing ->
-        logWarn "unexpected empty custom-setup dependencies"
+        prettyWarnS "unexpected empty custom-setup dependencies."
   sourceMap <- view $ envConfigL.to envConfigSourceMap
   installMap <- toInstallMap sourceMap
   (installedMap, _globalDumpPkgs, _snapshotDumpPkgs, _localDumpPkgs) <-
@@ -419,15 +419,19 @@ getSDistFileList lp deps =
     , taskBuildTypeConfig = False
     }
 
-normalizeTarballPaths :: HasRunner env => [FilePath] -> RIO env [FilePath]
+normalizeTarballPaths ::
+     (HasRunner env, HasTerm env)
+  => [FilePath]
+  -> RIO env [FilePath]
 normalizeTarballPaths fps = do
   -- TODO: consider whether erroring out is better - otherwise the
   -- user might upload an incomplete tar?
   unless (null outsideDir) $
-    logWarn $
-         "Warning: These files are outside of the package directory, and will \
-         \be omitted from the tarball: "
-      <> displayShow outsideDir
+    prettyWarn $
+         flow "These files are outside of the package directory, and will be \
+              \omitted from the tarball:"
+      <> line
+      <> bulletedList (map (style File . fromString) outsideDir)
   pure (nubOrd files)
  where
   (outsideDir, files) = partitionEithers (map pathToEither fps)
@@ -505,9 +509,10 @@ checkPackageInExtractedTarball pkgDir = do
             criticalIssue _ = False
         in  List.partition criticalIssue checks
   unless (null warnings) $
-    logWarn $
-         "Package check reported the following warnings:\n"
-      <> mconcat (List.intersperse "\n" . fmap displayShow $ warnings)
+    prettyWarn $
+         flow "Package check reported the following warnings:"
+      <> line
+      <> bulletedList (map (fromString . show) warnings)
   case NE.nonEmpty errors of
     Nothing -> pure ()
     Just ne -> throwM $ CheckException ne

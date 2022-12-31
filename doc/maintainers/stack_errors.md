@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2022-12-25.
+`master` branch of the Stack repository. Last updated: 2022-12-31.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -150,8 +150,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-3025] = HoogleDatabaseNotFound
-        [S-1329] | HoogleNotFound String
         [S-9669] | HoogleOnPathNotFoundBug
+        ~~~
+
+    -   `Stack.Hoogle.HooglePrettyException`
+
+        ~~~haskell
+        [S-1329] = HoogleNotFound StyleDoc
         ~~~
 
     -   `Stack.Init.InitException`
@@ -370,7 +375,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-5470] | DuplicateLocalPackageNames [(PackageName, [PackageLocation])]
         [S-3803] | NoLTSWithMajorVersion Int
         [S-5472] | NoLTSFound
-        [S-3251] | MultiplePackageIndices [PackageIndexConfig]
         ~~~
 
     -   `Stack.Types.Config.ConfigPrettyException`
@@ -380,6 +384,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-1833] | NoMatchingSnapshot (NonEmpty SnapName)
         [S-6395] | ResolverMismatch RawSnapshotLocation String
         [S-2422] | ResolverPartial RawSnapshotLocation String
+        [S-3251] | MultiplePackageIndices [PackageIndexConfig]
         ~~~
 
     -   `Stack.Types.Config.ParseAbsolutePathException`

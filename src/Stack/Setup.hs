@@ -712,22 +712,30 @@ ensureCompilerAndMsys sopts = do
   pure (cp, paths)
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
-warnUnsupportedCompiler :: HasLogFunc env => Version -> RIO env Bool
+warnUnsupportedCompiler ::
+     (HasLogFunc env, HasTerm env)
+  => Version
+  -> RIO env Bool
 warnUnsupportedCompiler ghcVersion =
   if
     | ghcVersion < mkVersion [7, 8] -> do
-        logWarn $
-          "Stack will almost certainly fail with GHC below version 7.8, requested " <>
-          fromString (versionString ghcVersion)
-        logWarn "Valiantly attempting to run anyway, but I know this is doomed"
-        logWarn "For more information, see: https://github.com/commercialhaskell/stack/issues/648"
-        logWarn ""
+        prettyWarnL
+          [ flow "Stack will almost certainly fail with GHC below version 7.8, \
+                 \requested"
+          , fromString (versionString ghcVersion) <> "."
+          , flow "Valiantly attempting to run anyway, but I know this is \
+                 \doomed."
+          , flow "For more information, see:"
+          , style Url "https://github.com/commercialhaskell/stack/issues/648" <> "."
+          ]
         pure True
     | ghcVersion >= mkVersion [9, 5] -> do
-        logWarn $
-          "Stack has not been tested with GHC versions above 9.4, and using " <>
-          fromString (versionString ghcVersion) <>
-          ", this may fail"
+        prettyWarnL
+          [ flow "Stack has not been tested with GHC versions above 9.4, and \
+                 \using"
+          , fromString (versionString ghcVersion) <> ","
+          , flow "this may fail."
+          ]
         pure True
     | otherwise -> do
         logDebug "Asking for a supported GHC version"
@@ -735,7 +743,7 @@ warnUnsupportedCompiler ghcVersion =
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
 warnUnsupportedCompilerCabal ::
-     HasLogFunc env
+     (HasLogFunc env, HasTerm env)
   => CompilerPaths
   -> Bool -- ^ already warned about GHC?
   -> RIO env ()
@@ -745,16 +753,22 @@ warnUnsupportedCompilerCabal cp didWarn = do
 
   if
     | cabalVersion < mkVersion [1, 19, 2] -> do
-        logWarn "Stack no longer supports Cabal versions below 1.19.2,"
-        logWarn $ "but version " <> fromString (versionString cabalVersion) <> " was found."
-        logWarn "This invocation will most likely fail."
-        logWarn "To fix this, either use an older version of Stack or a newer resolver"
-        logWarn "Acceptable resolvers: lts-3.0/nightly-2015-05-05 or later"
+        prettyWarnL
+          [ flow "Stack no longer supports Cabal versions below 1.19.2, but \
+                 \version"
+          , fromString (versionString cabalVersion)
+          , flow "was found. This invocation will most likely fail. To fix \
+                 \this, either use an older version of Stack or a newer \
+                 \resolver. Acceptable resolvers: lts-3.0/nightly-2015-05-05 \
+                 \or later."
+          ]
     | cabalVersion >= mkVersion [3, 9] ->
-        logWarn $
-          "Stack has not been tested with Cabal versions above 3.8, but version " <>
-          fromString (versionString cabalVersion) <>
-          " was found, this may fail"
+        prettyWarnL
+          [ flow "Stack has not been tested with Cabal versions above 3.8, but \
+                 \version"
+          , fromString (versionString cabalVersion)
+          , flow "was found, this may fail."
+          ]
     | otherwise -> pure ()
 
 -- | Ensure that the msys toolchain is installed if necessary and
@@ -785,7 +799,7 @@ ensureMsys sopts getSetupInfo' = do
                       let tool = Tool (PackageIdentifier (mkPackageName "msys2") version)
                       Just <$> downloadAndInstallTool (configLocalPrograms config) info tool (installMsys2Windows si)
                   | otherwise -> do
-                      logWarn "Continuing despite missing tool: msys2"
+                      prettyWarnS "Continuing despite missing tool: msys2"
                       pure Nothing
       _ -> pure Nothing
 
@@ -928,10 +942,16 @@ runGHCInstallHook sopts hook = do
             logDebug ("Using GHC compiler at: " <> fromString (toFilePath compiler))
             pure (Just compiler)
           Nothing -> do
-            logWarn ("Path to GHC binary is not a valid path: " <> fromString ghcPath)
+            prettyWarnL
+              [ flow "Path to GHC binary is not a valid path:"
+              , style Dir (fromString ghcPath) <> "."
+              ]
             pure Nothing
       ExitFailure i -> do
-        logWarn ("GHC install hook exited with code: " <> fromString (show i))
+        prettyWarnL
+          [ flow "GHC install hook exited with code:"
+          , style Error (fromString $ show i) <> "."
+          ]
         pure Nothing
  where
     wantedCompilerToEnv :: WantedCompiler -> EnvVars
@@ -1003,9 +1023,16 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
             [] -> loop xs
             compiler:rest -> do
               unless (null rest) $ do
-                logWarn "Found multiple candidate compilers:"
-                for_ res $ \y -> logWarn $ "- " <> fromString y
-                logWarn $ "This usually indicates a failed installation. Trying anyway with " <> fromString compiler
+                prettyWarn $
+                     flow "Found multiple candidate compilers:"
+                  <> line
+                  <> bulletedList (map fromString res)
+                  <> blankLine
+                  <> fillSep
+                       [ flow "This usually indicates a failed installation. \
+                          \Trying anyway with"
+                       , fromString compiler
+                       ]
               parseAbsFile compiler
     compiler <- withProcessContext menv $ do
       compiler <- loop names
@@ -1091,15 +1118,20 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
         Ghc ->
           case Map.lookup "Project version" infoMap of
             Nothing -> do
-              logWarn "Key 'Project version' not found in GHC info"
+              prettyWarnS "Key 'Project version' not found in GHC info."
               getCompilerVersion wc compiler
             Just versionString' -> ACGhc <$> parseVersionThrowing versionString'
     globaldb <-
       case eglobaldb of
         Left e -> do
-          logWarn "Parsing global DB from GHC info failed"
-          logWarn $ displayShow e
-          logWarn "Asking ghc-pkg directly"
+          prettyWarn $
+               flow "Stack failed to parse the global DB from GHC info."
+            <> blankLine
+            <> flow "While parsing, Stack encountered the error:"
+            <> blankLine
+            <> string (show e)
+            <> blankLine
+            <> flow "Asking ghc-pkg directly."
           withProcessContext menv $ getGlobalDB pkg
         Right x -> pure x
 
@@ -1131,7 +1163,10 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
       mres <-
         case eres of
           Left e -> do
-            logWarn $ "Trouble loading CompilerPaths cache: " <> displayShow e
+            prettyWarn $
+                 flow "Trouble loading CompilerPaths cache:"
+              <> blankLine
+              <> string (displayException e)
             pure Nothing
           Right x -> pure x
       case mres of
@@ -1139,7 +1174,10 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler = withCache $ handleAny 
         Nothing -> do
           cp <- inner
           saveCompilerPaths cp `catchAny` \e ->
-            logWarn ("Unable to save CompilerPaths cache: " <> displayShow e)
+            prettyWarn $
+                 flow "Unable to save CompilerPaths cache:"
+              <> blankLine
+              <> string (displayException e)
           pure cp
 
 buildGhcFromSource :: forall env.
@@ -1375,12 +1413,17 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
     prefixMaj = prefixFst "maj" prefixMin
     prefixMin = prefixFst "min" (map ('r':))
 
-sysRelease :: HasLogFunc env => RIO env String
+sysRelease :: (HasLogFunc env, HasTerm env) => RIO env String
 sysRelease =
-  handleIO (\e -> do
-               logWarn $ "Could not query OS version: " <> displayShow e
-               pure "")
-  (liftIO getRelease)
+  handleIO
+    ( \e -> do
+        prettyWarn $
+             flow "Could not query OS version:"
+          <> blankLine
+          <> string (displayException e)
+        pure ""
+    )
+    (liftIO getRelease)
 
 -- | Ensure Docker container-compatible 'stack' executable is downloaded
 ensureDockerStackExe :: HasConfig env => Platform -> RIO env (Path Abs File)
@@ -1620,28 +1663,37 @@ downloadOrUseLocal ::
 downloadOrUseLocal downloadLabel downloadInfo destination =
   case url of
     (parseUrlThrow -> Just _) -> do
-        ensureDir (parent destination)
-        chattyDownload downloadLabel downloadInfo destination
-        pure destination
+      ensureDir (parent destination)
+      chattyDownload downloadLabel downloadInfo destination
+      pure destination
     (parseAbsFile -> Just path) -> do
-        warnOnIgnoredChecks
-        pure path
+      warnOnIgnoredChecks
+      pure path
     (parseRelFile -> Just path) -> do
-        warnOnIgnoredChecks
-        root <- view projectRootL
-        pure (root </> path)
+      warnOnIgnoredChecks
+      root <- view projectRootL
+      pure (root </> path)
     _ -> throwIO $ URLInvalid url
-  where
-    url = T.unpack $ downloadInfoUrl downloadInfo
-    warnOnIgnoredChecks = do
-      let DownloadInfo{downloadInfoContentLength=contentLength, downloadInfoSha1=sha1,
-                       downloadInfoSha256=sha256} = downloadInfo
-      when (isJust contentLength) $
-        logWarn "`content-length` is not checked and should not be specified when `url` is a file path"
-      when (isJust sha1) $
-        logWarn "`sha1` is not checked and should not be specified when `url` is a file path"
-      when (isJust sha256) $
-        logWarn "`sha256` is not checked and should not be specified when `url` is a file path"
+ where
+  url = T.unpack $ downloadInfoUrl downloadInfo
+  warnOnIgnoredChecks = do
+    let DownloadInfo
+          { downloadInfoContentLength = contentLength
+          , downloadInfoSha1 = sha1
+          , downloadInfoSha256 = sha256
+          } = downloadInfo
+    when (isJust contentLength) $
+      prettyWarnS
+         "`content-length` is not checked and should not be specified when \
+         \`url` is a file path."
+    when (isJust sha1) $
+      prettyWarnS
+        "`sha1` is not checked and should not be specified when `url` is a \
+        \file path."
+    when (isJust sha256) $
+      prettyWarn
+        "`sha256` is not checked and should not be specified when `url` is a \
+        \file path"
 
 downloadFromInfo ::
        (HasTerm env, HasBuildConfig env)
@@ -1958,9 +2010,9 @@ chattyDownload label downloadInfo path = do
                 displayBytesUtf8 bs
             pure $ Just $ constr $ CheckHexDigestByteString bs
           Nothing -> pure Nothing
-    when (null hashChecks) $ logWarn $
-        "No sha1 or sha256 found in metadata," <>
-        " download hash won't be checked."
+    when (null hashChecks) $
+      prettyWarnS
+        "No sha1 or sha256 found in metadata, download hash won't be checked."
     let dReq = setHashChecks hashChecks $
                setLengthCheck mtotalSize $
                mkDownloadRequest req
@@ -2004,7 +2056,7 @@ removeHaskellEnvVars =
 
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
 getUtf8EnvVars ::
-       (HasProcessContext env, HasPlatform env, HasLogFunc env)
+       (HasLogFunc env, HasPlatform env, HasProcessContext env, HasTerm env)
     => ActualCompiler
     -> RIO env (Map Text Text)
 getUtf8EnvVars compilerVer =
@@ -2055,9 +2107,11 @@ getUtf8EnvVars compilerVer =
                                                  LBS.toStrict locales)
                             mfallback = getFallbackLocale utf8Locales
                         when
-                            (isNothing mfallback)
-                            (logWarn
-                                 "Warning: unable to set locale to UTF-8 encoding; GHC may fail with 'invalid character'")
+                          (isNothing mfallback)
+                          ( prettyWarnS
+                              "Unable to set locale to UTF-8 encoding; GHC may \
+                              \fail with 'invalid character'"
+                          )
                         let
                             -- Get the new values of variables to adjust.
                             changes =
@@ -2394,8 +2448,13 @@ performPathChecking newFile executablePath = do
       Right () -> pure ()
       Left e
         | isPermissionError e -> do
-            logWarn $ "Permission error when trying to copy: " <> displayShow e
-            logWarn "Should I try to perform the file copy using sudo? This may fail"
+            prettyWarn $
+                 flow "Permission error when trying to copy:"
+              <> blankLine
+              <> string (displayException e)
+              <> blankLine
+              <> flow "Should I try to perform the file copy using sudo? This \
+                      \may fail."
             toSudo <- promptBool "Try using sudo? (y/n) "
             when toSudo $ do
               let run cmd args = do

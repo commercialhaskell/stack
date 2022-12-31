@@ -294,9 +294,14 @@ generateHpcReportForTargets opts tixFiles targetNames = do
     then pure []
     else do
       when (hroptsAll opts && not (null targetNames)) $
-        logWarn $
-             "Since --all is used, it is redundant to specify these targets: "
-          <> displayShow targetNames
+        prettyWarnL
+          $ "Since"
+          : style Shell "--all"
+          : flow "is used, it is redundant to specify these targets:"
+          : mkNarrativeList
+              (Just Target)
+              False
+              (map (fromString . T.unpack) targetNames :: [StyleDoc])
       targets <-
         view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets
       fmap concat $ forM (Map.toList targets) $ \(name, target) ->
@@ -389,11 +394,15 @@ generateUnionReport :: HasEnvConfig env
 generateUnionReport report reportDir tixFiles = do
   (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
   logDebug $ "Using the following tix files: " <> fromString (show tixFiles)
-  unless (null errs) $ logWarn $
-    "The following modules are left out of the " <>
-    display report <>
-    " due to version mismatches: " <>
-    mconcat (L.intersperse ", " (map fromString errs))
+  unless (null errs) $
+    prettyWarn $
+      fillSep
+         [ flow "The following modules are left out of the"
+         , flow (T.unpack report)
+         , flow "due to version mismatches:"
+         ]
+    <> line
+    <> bulletedList (map fromString errs :: [StyleDoc])
   tixDest <- (reportDir </>) <$> parseRelFile (dirnameString reportDir ++ ".tix")
   ensureDir (parent tixDest)
   liftIO $ writeTix (toFilePath tixDest) tix

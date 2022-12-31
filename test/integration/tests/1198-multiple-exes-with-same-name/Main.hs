@@ -18,15 +18,10 @@ expectMessage msg stderr =
     unless (msg `isInfixOf` stderr)
         (error $ "Expected a warning: \n" ++ show msg)
 
+-- Use short message fragment because prettyWarn formatting and colour
 buildMessage1 =
-    unlines
-        [ "Building several executables with the same name: 'also-has-exe-foo:foo', 'has-exe-foo:foo'."
-        , "Only one of them will be available via 'stack exec' or locally installed."
-        , "Other executables with the same name might be overwritten: 'has-exe-foo-too:foo'."
-        ]
+    "Building several executables with the same name:"
 
+-- Use short message fragment because prettyWarn formatting and colour
 buildMessage2 =
-    unlines
-        [ "Building executable 'has-exe-foo-too:foo'."
-        , "Other executables with the same name might be overwritten: 'also-has-exe-foo:foo', 'has-exe-foo:foo'."
-        ]
+    "Other executables with the same name"

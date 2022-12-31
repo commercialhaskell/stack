@@ -451,7 +451,15 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     addExtraDepsRecommendations
       | Map.null extras = []
       | (Just _) <- Map.lookup (mkPackageName "base") extras =
-          [ "  *" <+> align (flow "Build requires unattainable version of base. Since base is a part of GHC, you most likely need to use a different GHC version with the matching base.")
+          [ "  *" <+> align (fillSep
+              [ flow "Build requires unattainable version of the"
+              , style Current "base"
+              , flow "package. Since"
+              , style Current "base"
+              , flow "is a part of GHC, you most likely need to use a \
+                     \different GHC version with the matching"
+              , style Current "base"<> "."
+              ])
            , line
           ]
       | otherwise =
@@ -722,7 +730,7 @@ showBuildError errorCode isBuildingSetup exitCode mtaskProvides execName fullArg
           maybe
               mempty
               (\fp -> line <> flow "Logs have been written to:" <+>
-                        style File (pretty fp))
+                        pretty fp)
               logFiles
   in     fromString errorCode
       <> line

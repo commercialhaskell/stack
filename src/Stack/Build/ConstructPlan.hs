@@ -224,11 +224,20 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
 
   when hasBaseInDeps $
     prettyWarn $
-         flow "You are trying to upgrade/downgrade base, which is almost \
-              \certainly not what you really want. Please, consider using \
-              \another GHC version if you need a certain version of base, or \
-              \removing base from extra-deps. See more at \
-              \https://github.com/commercialhaskell/stack/issues/3940."
+         fillSep
+           [ flow "You are trying to upgrade or downgrade the"
+           , style Current "base"
+           , flow "package, which is almost certainly not what you really \
+                  \want. Please, consider using another GHC version if you \
+                  \need a certain version of"
+           , style Current "base" <> ","
+           , flow "or removing"
+           , style Current "base"
+           , flow "as an"
+           , style Shell "extra-deps" <> "."
+           , flow "For further information, see"
+           , style Url "https://github.com/commercialhaskell/stack/issues/3940" <> "."
+           ]
       <> line
 
   econfig <- view envConfigL
@@ -242,7 +251,8 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
   ((), m, W efinals installExes dirtyReason warnings parents) <-
     liftIO $ runRWST inner ctx M.empty
-  mapM_ (logWarn . display) (warnings [])
+  mapM_
+    (prettyWarn . fromString . T.unpack . textDisplay) (warnings [])
   let toEither (_, Left e)  = Left e
       toEither (k, Right v) = Right (k, v)
       (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
@@ -521,11 +531,18 @@ addDep name = do
                     case mrev of
                       Nothing -> do
                         -- this could happen for GHC boot libraries missing from Hackage
-                        logWarn $
-                             "No latest package revision found for: "
-                          <> fromString (packageNameString name)
-                          <> ", dependency callstack: "
-                          <> displayShow (map packageNameString $ callStack ctx)
+                        prettyWarnL
+                          $ flow "No latest package revision found for"
+                          : style Current (fromString $ packageNameString name) <> ","
+                          : flow "dependency callstack:"
+                          : mkNarrativeList
+                              Nothing
+                              False
+                              ( map
+                                  (fromString . packageNameString)
+                                  (callStack ctx)
+                                :: [StyleDoc]
+                              )
                         pure Nothing
                       Just (_rev, cfKey, treeKey) ->
                         pure . Just $

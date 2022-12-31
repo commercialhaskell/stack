@@ -25,6 +25,7 @@ module Stack.SourceMap
 
 import           Data.ByteString.Builder ( byteString )
 import qualified Data.Conduit.List as CL
+import qualified Data.Text as T
 import qualified Distribution.PackageDescription as PD
 import           Distribution.System ( Platform (..) )
 import qualified Pantry.SHA256 as SHA256
@@ -138,7 +139,7 @@ getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
 getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 globalsFromDump ::
-     (HasLogFunc env, HasProcessContext env)
+     (HasLogFunc env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> RIO env (Map PackageName DumpedGlobalPackage)
 globalsFromDump pkgexe = do
@@ -157,7 +158,10 @@ globalsFromHints compiler = do
   case mglobalHints of
     Just hints -> pure hints
     Nothing -> do
-      logWarn $ "Unable to load global hints for " <> display compiler
+      prettyWarnL
+        [ flow "Unable to load global hints for"
+        , fromString $ T.unpack $ textDisplay compiler
+        ]
       pure mempty
 
 type DumpedGlobalPackage = DumpPackage

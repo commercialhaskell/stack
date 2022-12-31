@@ -206,19 +206,26 @@ shouldUpgradeCheck = do
         -- Compare the minor version so we avoid patch-level, Hackage-only releases.
         -- See: https://github.com/commercialhaskell/stack/pull/4729#pullrequestreview-227176315
         Just (PackageIdentifierRevision _ version _) | minorVersion version > stackMinorVersion -> do
-          logWarn "<<<<<<<<<<<<<<<<<<"
-          logWarn $
-            "You are currently using Stack version " <>
-            fromString (versionString stackVersion) <>
-            ", but version " <>
-            fromString (versionString version) <>
-            " is available"
-          logWarn "You can try to upgrade by running 'stack upgrade'"
-          logWarn $
-            "Tired of seeing this? Add 'recommend-stack-upgrade: false' to " <>
-            fromString (toFilePath (configUserConfigPath config))
-          logWarn ">>>>>>>>>>>>>>>>>>"
-          logWarn ""
-          logWarn ""
+          prettyWarn $
+               fillSep
+                 [ flow "You are currently using Stack version"
+                 , fromString (versionString stackVersion)
+                 , flow "but version"
+                 , fromString (versionString version)
+                 , flow "is available."
+                 ]
+            <> blankLine
+            <> fillSep
+                 [ "You can try to upgrade by running"
+                 , style Shell (flow "stack upgrade")
+                 ]
+            <> blankLine
+            <> fillSep
+                 [ flow "Tired of seeing this? Add"
+                 , style Shell (flow "recommend-stack-upgrade: false")
+                 , "to"
+                 , pretty (configUserConfigPath config) <> "."
+                 ]
+            <> blankLine
         _ -> pure ()
       logUpgradeCheck now

@@ -44,6 +44,7 @@ module Stack.Prelude
   , debugBracket
   , defaultStyles
   , encloseSep
+  , fill
   , fillSep
   , flow
   , hang
@@ -64,6 +65,7 @@ module Stack.Prelude
   , prettyNote
   , prettyWarn
   , prettyWarnL
+  , prettyWarnNoIndent
   , prettyWarnS
   , punctuate
   , sep
@@ -91,12 +93,13 @@ import           RIO.File as X hiding ( writeBinaryFileAtomic )
 import           RIO.PrettyPrint
                    ( HasStylesUpdate (..), HasTerm (..), Pretty (..), Style (..)
                    , StyleDoc, (<+>), align, bulletedList, debugBracket
-                   , encloseSep, fillSep, flow, hang, hcat, hsep, indent, line
-                   , logLevelToStyle, mkNarrativeList, parens, prettyDebugL
-                   , prettyError, prettyErrorL, prettyInfo, prettyInfoL
-                   , prettyInfoS, prettyNote, prettyWarn, prettyWarnL
-                   , prettyWarnS, punctuate, sep, softbreak, softline, string
-                   , style, stylesUpdateL, useColorL, vsep
+                   , encloseSep, fill, fillSep, flow, hang, hcat, hsep, indent
+                   , line, logLevelToStyle, mkNarrativeList, parens
+                   , prettyDebugL, prettyError, prettyErrorL, prettyInfo
+                   , prettyInfoL, prettyInfoS, prettyNote, prettyWarn
+                   , prettyWarnL, prettyWarnNoIndent, prettyWarnS, punctuate
+                   , sep, softbreak, softline, string, style, stylesUpdateL
+                   , useColorL, vsep
                    )
 import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )

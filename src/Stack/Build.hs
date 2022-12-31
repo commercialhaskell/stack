@@ -211,30 +211,42 @@ checkCabalVersion = do
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten ::
-     HasLogFunc env
+     (HasLogFunc env, HasTerm env)
   => [LocalPackage]
   -> Plan
   -> RIO env ()
 warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   logDebug "Checking if we are going to build multiple executables with the same name"
-  forM_ (Map.toList warnings) $ \(exe,(toBuild,otherLocals)) -> do
+  forM_ (Map.toList warnings) $ \(exe, (toBuild, otherLocals)) -> do
     let exe_s
-          | length toBuild > 1 = "several executables with the same name:"
+          | length toBuild > 1 = flow "several executables with the same name:"
           | otherwise = "executable"
         exesText pkgs =
-          T.intercalate
-            ", "
-            ["'" <> T.pack (packageNameString p) <> ":" <> exe <> "'" | p <- pkgs]
-    (logWarn . display . T.unlines . concat)
-      [ [ "Building " <> exe_s <> " " <> exesText toBuild <> "." ]
-      , [ "Only one of them will be available via 'stack exec' or locally installed."
-        | length toBuild > 1
-        ]
-      , [ "Other executables with the same name might be overwritten: " <>
-          exesText otherLocals <> "."
-        | not (null otherLocals)
-        ]
-      ]
+          fillSep $ punctuate
+            ","
+            [ style
+                PkgComponent
+                (fromString $ packageNameString p <> ":" <> T.unpack exe)
+            | p <- pkgs
+            ]
+    prettyWarnL $
+         [ "Building"
+         , exe_s
+         , exesText toBuild <> "."
+         ]
+      <> [ fillSep
+             [ flow "Only one of them will be available via"
+             , style Shell "stack exec"
+             , flow "or locally installed."
+             ]
+         | length toBuild > 1
+         ]
+      <> [ fillSep
+             [ flow "Other executables with the same name might be overwritten:"
+             , exesText otherLocals <> "."
+             ]
+         | not (null otherLocals)
+         ]
  where
   -- Cases of several local packages having executables with the same name.
   -- The Map entries have the following form:
@@ -281,18 +293,25 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   collect :: Ord k => [(k,v)] -> Map k (NonEmpty v)
   collect = Map.map NE.fromList . Map.fromDistinctAscList . groupSort
 
-warnAboutSplitObjs :: HasLogFunc env => BuildOpts -> RIO env ()
+warnAboutSplitObjs ::
+     (HasLogFunc env, HasTerm env)
+  => BuildOpts
+  -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts =
-  logWarn $ "Building with --split-objs is enabled. " <> fromString splitObjsWarning
+  prettyWarnL
+    [ flow "Building with"
+    , style Shell "--split-objs"
+    , flow "is enabled."
+    , flow splitObjsWarning
+    ]
 warnAboutSplitObjs _ = pure ()
 
 splitObjsWarning :: String
-splitObjsWarning = unwords
-  [ "Note that this feature is EXPERIMENTAL, and its behavior may be changed and improved."
-  , "You will need to clean your workdirs before use. If you want to compile all dependencies"
-  , "with split-objs, you will need to delete the snapshot (and all snapshots that could"
-  , "reference that snapshot)."
-  ]
+splitObjsWarning =
+  "Note that this feature is EXPERIMENTAL, and its behavior may be changed and \
+  \improved. You will need to clean your workdirs before use. If you want to \
+  \compile all dependencies with split-objs, you will need to delete the \
+  \snapshot (and all snapshots that could reference that snapshot)."
 
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
 mkBaseConfigOpts :: (HasEnvConfig env)
@@ -411,7 +430,10 @@ checkComponentsBuildable lps =
     ]
 
 -- | Find if sublibrary dependency exist in each project
-checkSubLibraryDependencies :: HasLogFunc env => [ProjectPackage] -> RIO env ()
+checkSubLibraryDependencies ::
+     (HasLogFunc env, HasTerm env)
+  => [ProjectPackage]
+  -> RIO env ()
 checkSubLibraryDependencies proj =
   forM_ proj $ \p -> do
     C.GenericPackageDescription _ _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
@@ -424,8 +446,10 @@ checkSubLibraryDependencies proj =
                        maybe [] C.condTreeConstraints lib
         libraries = concatMap (toList . depLibraries) dependencies
 
-    when (subLibDepExist libraries)
-      (logWarn "SubLibrary dependency is not supported, this will almost certainly fail")
+    when (subLibDepExist libraries) $
+      prettyWarnS
+        "SubLibrary dependency is not supported, this will almost certainly \
+        \fail."
  where
   getDeps (_, C.CondNode _ dep _) = dep
   subLibDepExist = any

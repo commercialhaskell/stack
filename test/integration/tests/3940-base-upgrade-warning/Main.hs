@@ -2,17 +2,15 @@ import Control.Monad (unless)
 import Data.List (isInfixOf)
 import StackTest
 
+-- Use short message fragment because prettyWarn formatting and colour
 unattainableBaseWarning :: String
 unattainableBaseWarning =
-  "Build requires unattainable version of base. Since base is a part of GHC, \
-  \you most likely need to use a different GHC version with the matching base."
+  "Build requires unattainable version of"
 
+-- Use short message fragment because prettyWarn formatting and colour
 noBaseUpgradeWarning :: String
 noBaseUpgradeWarning =
-  "You are trying to upgrade/downgrade base, which is almost certainly \
-  \not what you really want. Please, consider using another GHC version \
-  \if you need a certain version of base, or removing base from extra-deps. \
-  \See more at https://github.com/commercialhaskell/stack/issues/3940."
+  "You are trying to upgrade or downgrade"
 
 main :: IO ()
 main = do

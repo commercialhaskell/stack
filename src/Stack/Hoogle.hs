@@ -38,7 +38,6 @@ import           Stack.Types.SourceMap ( DepPackage (..), SourceMap (..) )
 -- "Stack.Hoogle" module.
 data HoogleException
   = HoogleDatabaseNotFound
-  | HoogleNotFound !Text
   | HoogleOnPathNotFoundBug
   deriving (Show, Typeable)
 
@@ -46,13 +45,27 @@ instance Exception HoogleException where
   displayException HoogleDatabaseNotFound =
     "Error: [S-3025]\n"
     ++ "No Hoogle database. Not building one due to '--no-setup'."
-  displayException (HoogleNotFound e) =
-    "Error: [S-1329]\n"
-    ++ T.unpack e
-    ++ "\n"
-    ++ "Not installing Hoogle due to '--no-setup'."
   displayException HoogleOnPathNotFoundBug = bugReport "[S-9669]"
     "Cannot find Hoogle executable on PATH, after installing."
+
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
+-- "Stack.Hoogle" module.
+newtype HooglePrettyException
+  = HoogleNotFound StyleDoc
+  deriving (Show, Typeable)
+
+instance Pretty HooglePrettyException where
+  pretty (HoogleNotFound e) =
+    "[S-1329]"
+    <> line
+    <> e
+    <> line
+    <> fillSep
+         [ flow "Not installing Hoogle due to"
+         , style Shell "--no-setup" <> "."
+         ]
+
+instance Exception HooglePrettyException
 
 -- | Helper type to duplicate log messages
 data Muted = Muted | NotMuted
@@ -83,11 +96,16 @@ hoogleCmd (args, setup, rebuild, startServer) =
       else
         if setup || rebuild
           then do
-            logWarn
-              (if rebuild
-                 then "Rebuilding database ..."
-                 else "No Hoogle database yet. Automatically building haddocks \
-                      \and hoogle database (use --no-setup to disable) ...")
+            prettyWarn $
+              if rebuild
+                 then flow "Rebuilding database ..."
+                 else
+                   fillSep
+                     [ flow "No Hoogle database yet. Automatically building \
+                            \Haddock documentation and Hoogle database (use"
+                     , style Shell "--no-setup"
+                     , flow "to disable) ..."
+                     ]
             buildHaddocks
             logInfo "Built docs."
             generateDb hooglePath
@@ -135,7 +153,8 @@ hoogleCmd (args, setup, rebuild, startServer) =
                   <$> loadCabalFile (Just stackProgName') plm
         Nothing -> do
           -- not muted because this should happen only once
-          logWarn "No hoogle version was found, trying to install the latest version"
+          prettyWarnS
+            "No hoogle version was found, trying to install the latest version"
           mpir <- getLatestHackageVersion YesRequireHackageIndex hooglePackageName UsePreferredVersions
           let hoogleIdent = case mpir of
                   Nothing -> hoogleMinIdent
@@ -203,40 +222,46 @@ hoogleCmd (args, setup, rebuild, startServer) =
     mhooglePath <- runRIO menv (findExecutable "hoogle") <>
       requiringHoogle NotMuted (findExecutable "hoogle")
     eres <- case mhooglePath of
-      Left _ -> pure $ Left "Hoogle isn't installed."
+      Left _ -> pure $ Left (flow "Hoogle isn't installed.")
       Right hooglePath -> do
         result <- withProcessContext menv
           $ proc hooglePath ["--numeric-version"]
           $ tryAny . fmap fst . readProcess_
-        let unexpectedResult got = Left $ T.concat
-              [ "'"
-              , T.pack hooglePath
-              , " --numeric-version' did not respond with expected value. Got: "
-              , got
-              ]
+        let unexpectedResult got = Left $
+                 fillSep
+                   [ style Shell (fromString hooglePath)
+                   , style Shell "--numeric-version"
+                   , flow "did not respond with expected value. Got:"
+                   ]
+              <> blankLine
+              <> got
         pure $ case result of
-          Left err -> unexpectedResult $ T.pack (displayException err)
+          Left err -> unexpectedResult $ string (displayException err)
           Right bs ->
             case parseVersion (takeWhile (not . isSpace) (BL8.unpack bs)) of
-              Nothing -> unexpectedResult $ T.pack (BL8.unpack bs)
+              Nothing -> unexpectedResult $ fromString (BL8.unpack bs)
               Just ver
                 | ver >= hoogleMinVersion -> Right hooglePath
-                | otherwise -> Left $ T.concat
-                    [ "Installed Hoogle is too old, "
-                    , T.pack hooglePath
-                    , " is version "
-                    , T.pack $ versionString ver
-                    , " but >= 5.0 is required."
-                    ]
+                | otherwise -> Left $
+                    fillSep
+                      [ flow "Installed Hoogle is too old, "
+                      , style Shell (fromString hooglePath)
+                      , flow "is version"
+                      , fromString (versionString ver)
+                      , flow "but >= 5.0 is required."
+                      ]
     case eres of
       Right hooglePath -> parseAbsFile hooglePath
       Left err
         | setup -> do
-            logWarn $
-                 display err
-              <> " Automatically installing (use --no-setup to disable) ..."
+            prettyWarnL
+              [ err
+              , flow "Automatically installing (use"
+              , style Shell "--no-setup"
+              , flow "to disable) ..."
+              ]
             installHoogle
-        | otherwise -> throwIO $ HoogleNotFound err
+        | otherwise -> throwIO $ PrettyException $ HoogleNotFound err
 
   envSettings =
     EnvSettings

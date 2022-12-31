@@ -59,18 +59,20 @@ instance Exception PackageDumpException where
     , "."
     ]
 
--- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@, for a single database
+-- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@,
+-- for a single database
 ghcPkgDump ::
-     (HasProcessContext env, HasLogFunc env)
+     (HasLogFunc env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> [Path Abs Dir] -- ^ if empty, use global
   -> ConduitM Text Void (RIO env) a
   -> RIO env a
 ghcPkgDump pkgexe = ghcPkgCmdArgs pkgexe ["dump"]
 
--- | Call ghc-pkg describe with appropriate flags and stream to the given @Sink@, for a single database
+-- | Call ghc-pkg describe with appropriate flags and stream to the given
+-- @Sink@, for a single database
 ghcPkgDescribe ::
-     (HasProcessContext env, HasLogFunc env, HasCompiler env)
+     (HasCompiler env, HasLogFunc env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> PackageName
   -> [Path Abs Dir] -- ^ if empty, use global
@@ -81,7 +83,7 @@ ghcPkgDescribe pkgexe pkgName' = ghcPkgCmdArgs
 
 -- | Call ghc-pkg and stream to the given @Sink@, for a single database
 ghcPkgCmdArgs ::
-     (HasProcessContext env, HasLogFunc env)
+     (HasLogFunc env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> [String]
   -> [Path Abs Dir] -- ^ if empty, use global

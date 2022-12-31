@@ -103,19 +103,24 @@ cfgCmdSet cmd = do
   let yamlLines = T.lines rawConfig
       cmdKeys = cfgCmdSetKeys cmd  -- Text
       newValue' = T.stripEnd $
-          decodeUtf8With lenientDecode $ Yaml.encode newValue  -- Text
+        decodeUtf8With lenientDecode $ Yaml.encode newValue  -- Text
       file = toFilePath configFilePath  -- String
-      file' = display $ T.pack file     -- Utf8Builder
   newYamlLines <- case inConfig config cmdKeys of
     Nothing -> do
-      logInfo $ file' <> " has been extended."
+      prettyInfoL
+        [ pretty configFilePath
+        , flow "has been extended."
+        ]
       pure $ writeLines yamlLines "" cmdKeys newValue'
     Just oldValue -> if oldValue == newValue
       then do
-        logInfo $ file' <> " already contained the intended \
-          \configuration and remains unchanged."
+        prettyInfoL
+          [ pretty configFilePath
+          , flow "already contained the intended configuration and remains \
+                 \unchanged."
+          ]
         pure yamlLines
-      else switchLine file' (NE.last cmdKeys) newValue' [] yamlLines
+      else switchLine configFilePath (NE.last cmdKeys) newValue' [] yamlLines
   liftIO $ writeFileUtf8 file (T.unlines newYamlLines)
  where
   -- This assumes that if the key does not exist, the lines that can be
@@ -142,17 +147,24 @@ cfgCmdSet cmd = do
     _ -> Nothing
 
   switchLine file cmdKey _ searched [] = do
-    logWarn $ display cmdKey <> " not found in YAML file " <> file <>
-        " as a single line. Multi-line key:value formats are not supported."
+    prettyWarnL
+      [ style Current (fromString $ T.unpack cmdKey)
+      , flow "not found in YAML file"
+      , pretty file
+      , flow "as a single line. Multi-line key:value formats are not \
+             \supported."
+      ]
     pure $ reverse searched
   switchLine file cmdKey newValue searched (oldLine:rest) =
     case parseOnly (parseLine cmdKey) oldLine of
-      Left _ ->
-        switchLine file cmdKey newValue (oldLine:searched) rest
+      Left _ -> switchLine file cmdKey newValue (oldLine:searched) rest
       Right (kt, spaces1, spaces2, spaces3, comment) -> do
         let newLine = spaces1 <> renderKey cmdKey kt <> spaces2 <>
                 ":" <> spaces3 <> newValue <> comment
-        logInfo $ file <> " has been updated."
+        prettyInfoL
+          [ pretty file
+          , flow "has been updated."
+          ]
         pure $ reverse searched <> (newLine:rest)
 
   parseLine :: Text -> Parser (KeyType, Text, Text, Text, Text)
