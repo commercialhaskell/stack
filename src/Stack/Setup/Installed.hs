@@ -135,47 +135,50 @@ extraDirs tool = do
     dir <- installDir (configLocalPrograms config) tool
     case (configPlatform config, toolNameString tool) of
         (Platform _ Cabal.Windows, isGHC -> True) -> pure mempty
-            { edBins =
-                [ dir </> relDirBin
-                , dir </> relDirMingw </> relDirBin
-                ]
-            }
+          { edBins =
+              [ dir </> relDirBin
+              , dir </> relDirMingw </> relDirBin
+              ]
+          }
         (Platform Cabal.I386 Cabal.Windows, "msys2") -> pure mempty
-            { edBins =
-                [ dir </> relDirMingw32 </> relDirBin
-                , dir </> relDirUsr </> relDirBin
-                , dir </> relDirUsr </> relDirLocal </> relDirBin
-                ]
-            , edInclude =
-                [ dir </> relDirMingw32 </> relDirInclude
-                ]
-            , edLib =
-                [ dir </> relDirMingw32 </> relDirLib
-                , dir </> relDirMingw32 </> relDirBin
-                ]
-            }
+          { edBins =
+              [ dir </> relDirMingw32 </> relDirBin
+              , dir </> relDirUsr </> relDirBin
+              , dir </> relDirUsr </> relDirLocal </> relDirBin
+              ]
+          , edInclude =
+              [ dir </> relDirMingw32 </> relDirInclude
+              ]
+          , edLib =
+              [ dir </> relDirMingw32 </> relDirLib
+              , dir </> relDirMingw32 </> relDirBin
+              ]
+          }
         (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> pure mempty
-            { edBins =
-                [ dir </> relDirMingw64 </> relDirBin
-                , dir </> relDirUsr </> relDirBin
-                , dir </> relDirUsr </> relDirLocal </> relDirBin
-                ]
-            , edInclude =
-                [ dir </> relDirMingw64 </> relDirInclude
-                ]
-            , edLib =
-                [ dir </> relDirMingw64 </> relDirLib
-                , dir </> relDirMingw64 </> relDirBin
-                ]
-            }
+          { edBins =
+              [ dir </> relDirMingw64 </> relDirBin
+              , dir </> relDirUsr </> relDirBin
+              , dir </> relDirUsr </> relDirLocal </> relDirBin
+              ]
+          , edInclude =
+              [ dir </> relDirMingw64 </> relDirInclude
+              ]
+          , edLib =
+              [ dir </> relDirMingw64 </> relDirLib
+              , dir </> relDirMingw64 </> relDirBin
+              ]
+          }
         (_, isGHC -> True) -> pure mempty
-            { edBins =
-                [ dir </> relDirBin
-                ]
-            }
+          { edBins =
+              [ dir </> relDirBin
+              ]
+          }
         (Platform _ x, toolName) -> do
-            logWarn $ "binDirs: unexpected OS/tool combo: " <> displayShow (x, toolName)
-            pure mempty
+          prettyWarnL
+            [ flow "binDirs: unexpected OS/tool combo:"
+            , flow (show (x, toolName) <> ".")
+            ]
+          pure mempty
   where
     isGHC n = "ghc" == n || "ghc-" `L.isPrefixOf` n
 

@@ -271,7 +271,8 @@ parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do
 
 -- | Display PackageName + NamedComponent
 displayPkgComponent :: (PackageName, NamedComponent) -> StyleDoc
-displayPkgComponent = style PkgComponent . fromString . T.unpack . renderPkgComponent
+displayPkgComponent =
+  style PkgComponent . fromString . T.unpack . renderPkgComponent
 
 findFileTargets ::
        HasEnvConfig env
@@ -290,27 +291,36 @@ findFileTargets locals fileTargets = do
                                   ) filePackages
                 ) fileTargets
     results <- forM foundFileTargetComponents $ \(fp, xs) ->
-        case xs of
-            [] -> do
-                prettyWarn $ vsep
-                    [ "Couldn't find a component for file target" <+>
-                      pretty fp <>
-                      ". This means that the correct ghc options might not be used."
-                    , "Attempting to load the file anyway."
-                    ]
-                pure $ Left fp
-            [x] -> do
-                prettyInfo $
-                    "Using configuration for" <+> displayPkgComponent x <+>
-                    "to load" <+> pretty fp
-                pure $ Right (fp, x)
-            (x:_) -> do
-                prettyWarn $
-                    "Multiple components contain file target" <+>
-                    pretty fp <> ":" <+>
-                    mconcat (L.intersperse ", " (map displayPkgComponent xs)) <> line <>
-                    "Guessing the first one," <+> displayPkgComponent x <> "."
-                pure $ Right (fp, x)
+      case xs of
+        [] -> do
+          prettyWarnL
+            [ flow "Couldn't find a component for file target"
+            , pretty fp <> "."
+            , flow "This means that the correct GHC options might not be used. \
+                   \Attempting to load the file anyway."
+            ]
+          pure $ Left fp
+        [x] -> do
+          prettyInfoL
+            [ flow "Using configuration for"
+            , displayPkgComponent x
+            , flow "to load"
+            , pretty fp
+            ]
+          pure $ Right (fp, x)
+        (x:_) -> do
+          prettyWarn $
+               fillSep
+                 [ flow "Multiple components contain file target"
+                 , pretty fp <> ":"
+                 , fillSep $ punctuate "," (map displayPkgComponent xs)
+                 ]
+            <> line
+            <> fillSep
+                 [ flow "Guessing the first one,"
+                 , displayPkgComponent x <> "."
+                 ]
+          pure $ Right (fp, x)
     let (extraFiles, associatedFiles) = partitionEithers results
         targetMap =
             foldl unionTargets M.empty $
@@ -431,9 +441,16 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
         badForGhci x =
             L.isPrefixOf "-O" x || elem x (words "-debug -threaded -ticky -static -Werror")
     unless (null omittedOpts) $
-        logWarn
-            ("The following GHC options are incompatible with GHCi and have not been passed to it: " <>
-             mconcat (L.intersperse " " (fromString <$> nubOrd omittedOpts)))
+      prettyWarn $
+           fillSep
+             ( flow "The following GHC options are incompatible with GHCi and \
+                    \have not been passed to it:"
+             : mkNarrativeList
+                 (Just Current)
+                 False
+                 (map fromString (nubOrd omittedOpts) :: [StyleDoc])
+             )
+        <> line
     oiDir <- view objectInterfaceDirL
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
@@ -569,7 +586,7 @@ getFileTargets = concatMap (concat . maybeToList . ghciPkgTargetFiles)
 -- | Figure out the main-is file to load based on the targets. Asks the
 -- user for input if there is more than one candidate main-is file.
 figureOutMainFile ::
-       HasRunner env
+       (HasRunner env, HasTerm env)
     => BuildOpts
     -> Maybe (Map PackageName Target)
     -> [(PackageName, (Path Abs File, Target))]
@@ -578,23 +595,57 @@ figureOutMainFile ::
 figureOutMainFile bopts mainIsTargets targets0 packages =
     case candidates of
         [] -> pure Nothing
-        [c@(_,_,fp)] -> do logInfo ("Using main module: " <> display (renderCandidate c))
-                           pure (Just fp)
+        [c@(_,_,fp)] -> do
+          prettyInfo $
+               fillSep
+                 [ "Using"
+                 , style Current "main"
+                 , "module:"
+                 ]
+            <> line
+            <> renderCandidate c
+            <> line
+          pure (Just fp)
         candidate:_ -> do
-          borderedWarning $ do
-            logWarn "The main module to load is ambiguous. Candidates are: "
-            forM_ (map renderCandidate candidates) (logWarn . display)
-            logWarn
-                "You can specify which one to pick by: "
-            logWarn
-                (" * Specifying targets to stack ghci e.g. stack ghci " <>
-                display ( sampleTargetArg candidate))
-            logWarn
-                (" * Specifying what the main is e.g. stack ghci " <>
-                 display (sampleMainIsArg candidate))
-            logWarn
-                (" * Choosing from the candidate above [1.." <>
-                display (length candidates) <> "]")
+          prettyWarn $
+               fillSep
+                 [ "The"
+                 , style Current "main"
+                 , flow "module to load is ambiguous. Candidates are:"
+                 ]
+            <> line
+            <> mconcat (L.intersperse line (map renderCandidate candidates))
+            <> blankLine
+            <> flow "You can specify which one to pick by:"
+            <> line
+            <> bulletedList
+                 [ fillSep
+                     [ flow "Specifying targets to"
+                     , style Shell (flow "stack ghci")
+                     , "e.g."
+                     , style Shell ( fillSep
+                                       [ flow "stack ghci"
+                                       , sampleTargetArg candidate
+                                       ]
+                                   ) <> "."
+                     ]
+                 , fillSep
+                     [ flow "Specifying what the"
+                     , style Current "main"
+                     , flow "is e.g."
+                     , style Shell ( fillSep
+                                       [ flow "stack ghci"
+                                       , sampleMainIsArg candidate
+                                       ]
+                                   ) <> "."
+                     ]
+                  , flow
+                      $  "Choosing from the candidate above [1.."
+                      <> show (length candidates)
+                      <> "]."
+                 ]
+            <> line
+
           liftIO userOption
   where
     targets = fromMaybe (M.fromList $ map (\(k, (_, x)) -> (k, x)) targets0)
@@ -613,17 +664,30 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
               where
                 wantedComponents =
                     wantedPackageComponents bopts target (ghciPkgPackage pkg)
-    renderCandidate c@(pkgName,namedComponent,mainIs) =
-        let candidateIndex = T.pack . show . (+1) . fromMaybe 0 . L.elemIndex c
-            pkgNameText = T.pack (packageNameString pkgName)
-        in  candidateIndex candidates <> ". Package `" <>
-            pkgNameText <>
-            "' component " <>
-            -- This is the format that can be directly copy-pasted as
-            -- an argument to `stack ghci`.
-            pkgNameText <> ":" <> renderComp namedComponent <>
-            " with main-is file: " <>
-            T.pack (toFilePath mainIs)
+    renderCandidate c@(pkgName, namedComponent, mainIs) =
+      let candidateIndex =
+            fromString . show . (+1) . fromMaybe 0 . L.elemIndex c
+          pkgNameText = fromString $ packageNameString pkgName
+      in  hang 4
+            $  fill 4 ( candidateIndex candidates <> ".")
+            <> fillSep
+                 [ "Package"
+                 , style Current pkgNameText <> ","
+                 , "component"
+          --       This is the format that can be directly copy-pasted as
+          --       an argument to `stack ghci`.
+                 , style
+                     PkgComponent
+                     (  pkgNameText
+                     <> ":"
+                     <> renderComp namedComponent
+                     )
+                   <> ","
+                 , "with"
+                 , style Shell "main-is"
+                 , "file:"
+                 , pretty mainIs <> "."
+                 ]
     candidateIndices = take (length candidates) [1 :: Int ..]
     userOption = do
       option <- prompt "Specify main module to use (press enter to load none): "
@@ -645,16 +709,21 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
             putStrLn ""
             pure $ Just fp
     renderComp c =
-        case c of
-            CLib -> "lib"
-            CInternalLib name -> "internal-lib:" <> name
-            CExe name -> "exe:" <> name
-            CTest name -> "test:" <> name
-            CBench name -> "bench:" <> name
-    sampleTargetArg (pkg,comp,_) =
-        T.pack (packageNameString pkg) <> ":" <> renderComp comp
-    sampleMainIsArg (pkg,comp,_) =
-        "--main-is " <> T.pack (packageNameString pkg) <> ":" <> renderComp comp
+      case c of
+        CLib -> "lib"
+        CInternalLib name -> "internal-lib:" <> fromString (T.unpack name)
+        CExe name -> "exe:" <> fromString (T.unpack name)
+        CTest name -> "test:" <> fromString ( T.unpack name)
+        CBench name -> "bench:" <> fromString (T.unpack name)
+    sampleTargetArg (pkg, comp, _) =
+         fromString (packageNameString pkg)
+      <> ":"
+      <> renderComp comp
+    sampleMainIsArg (pkg, comp, _) =
+      fillSep
+        [ "--main-is"
+        , fromString (packageNameString pkg) <> ":" <> renderComp comp
+        ]
 
 loadGhciPkgDescs ::
        HasEnvConfig env
@@ -797,117 +866,163 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty
 
-checkForIssues :: HasLogFunc env => [GhciPkgInfo] -> RIO env ()
+checkForIssues ::
+     (HasLogFunc env, HasTerm env)
+  => [GhciPkgInfo]
+  -> RIO env ()
 checkForIssues pkgs =
-    when (length pkgs > 1) $ borderedWarning $ do
-        -- Cabal flag issues could arise only when there are at least 2 packages
-        unless (null cabalFlagIssues) $ borderedWarning $ do
-            logWarn "Warning: There are cabal flags for this project which may prevent GHCi from loading your code properly."
-            logWarn "In some cases it can also load some projects which would otherwise fail to build."
-            logWarn ""
-            mapM_ (logWarn . display) $ L.intercalate [""] cabalFlagIssues
-            logWarn ""
-            logWarn "To resolve, remove the flag(s) from the Cabal file(s) and instead put them at the top of the haskell files."
-            logWarn ""
-        logWarn "It isn't yet possible to load multiple packages into GHCi in all cases - see"
-        logWarn "https://ghc.haskell.org/trac/ghc/ticket/10827"
-  where
-    cabalFlagIssues = concatMap mixedFlag
-        [ ( "-XNoImplicitPrelude"
-          , [ "-XNoImplicitPrelude will be used, but GHCi will likely fail to build things which depend on the implicit prelude."]
-          )
-        , ( "-XCPP"
-          , [ "-XCPP will be used, but it can cause issues with multiline strings."
-            , "See https://downloads.haskell.org/~ghc/7.10.2/docs/html/users_guide/options-phases.html#cpp-string-gaps"
-            ]
-          )
-        , ( "-XNoTraditionalRecordSyntax"
-          , [ "-XNoTraditionalRecordSyntax will be used, but it break modules which use record syntax." ]
-          )
-        , ( "-XTemplateHaskell"
-          , [ "-XTemplateHaskell will be used, but it may cause compilation issues due to different parsing of '$' when there's no space after it." ]
-          )
-        , ( "-XQuasiQuotes"
-          , [ "-XQuasiQuotes will be used, but it may cause parse failures due to a different meaning for list comprehension syntax like [x| ... ]" ]
-          )
-        , ( "-XSafe"
-          , [ "-XSafe will be used, but it will fail to compile unsafe modules." ]
-          )
-        , ( "-XArrows"
-          , [ "-XArrows will be used, but it will cause non-arrow usages of proc, (-<), (-<<) to fail" ]
-          )
-        , ( "-XOverloadedStrings"
-          , [ "-XOverloadedStrings will be used, but it can cause type ambiguity in code not usually compiled with it." ]
-          )
-        , ( "-XOverloadedLists"
-          , [ "-XOverloadedLists will be used, but it can cause type ambiguity in code not usually compiled with it." ]
-          )
-        , ( "-XMonoLocalBinds"
-          , [ "-XMonoLocalBinds will be used, but it can cause type errors in code which expects generalized local bindings." ]
-          )
-        , ( "-XTypeFamilies"
-          , [ "-XTypeFamilies will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
-          )
-        , ( "-XGADTs"
-          , [ "-XGADTs will be used, but it implies -XMonoLocalBinds, and so can cause type errors in code which expects generalized local bindings." ]
-          )
-        , ( "-XNewQualifiedOperators"
-          , [ "-XNewQualifiedOperators will be used, but this will break usages of the old qualified operator syntax." ]
-          )
+  when (length pkgs > 1) $ do
+    -- Cabal flag issues could arise only when there are at least 2 packages
+    unless (null cabalFlagIssues) $ do
+      prettyWarn $
+           flow "There are Cabal flags for this project which may prevent \
+                \GHCi from loading your code properly. In some cases it \
+                \can also load some projects which would otherwise fail to \
+                \build."
+        <> blankLine
+        <> mconcat (L.intersperse blankLine cabalFlagIssues)
+        <> blankLine
+        <> flow "To resolve, remove the flag(s) from the Cabal file(s) and \
+                \instead put them at the top of the Haskell files."
+        <> blankLine
+    prettyWarnL
+      [ flow "It isn't yet possible to load multiple packages into GHCi in \
+             \all cases. For further information, see"
+      , style Url "https://ghc.haskell.org/trac/ghc/ticket/10827" <> "."
+      ]
+ where
+  cabalFlagIssues = concatMap mixedFlag
+    [ ( "-XNoImplicitPrelude"
+      , [ flow "-XNoImplicitPrelude will be used, but GHCi will likely fail to \
+               \build things which depend on the implicit prelude."
         ]
-    mixedFlag (flag, msgs) =
-        let x = partitionComps (== flag) in
-        [ msgs ++ showWhich x | mixedSettings x ]
-    mixedSettings (xs, ys) = xs /= [] && ys /= []
-    showWhich (haveIt, don'tHaveIt) =
-        [ "It is specified for:"
-        , "    " <> renderPkgComponents haveIt
-        , "But not for: "
-        , "    " <> renderPkgComponents don'tHaveIt
+      )
+    , ( "-XCPP"
+      , [ flow "-XCPP will be used, but it can cause issues with multiline \
+               \strings. For further information, see"
+        , style Url "https://downloads.haskell.org/~ghc/7.10.2/docs/html/users_guide/options-phases.html#cpp-string-gaps" <> "."
         ]
-    partitionComps f = (map fst xs, map fst ys)
-      where
-        (xs, ys) = L.partition (any f . snd) compsWithOpts
-    compsWithOpts = map (\(k, bio) -> (k, bioOneWordOpts bio ++ bioOpts bio)) compsWithBios
-    compsWithBios =
-        [ ((ghciPkgName pkg, c), bio)
-        | pkg <- pkgs
-        , (c, bio) <- ghciPkgOpts pkg
+      )
+    , ( "-XNoTraditionalRecordSyntax"
+      , [ flow "-XNoTraditionalRecordSyntax will be used, but it break modules \
+               \which use record syntax."
         ]
-
-borderedWarning :: HasLogFunc env => RIO env a -> RIO env a
-borderedWarning f = do
-    logWarn ""
-    logWarn "* * * * * * * *"
-    x <- f
-    logWarn "* * * * * * * *"
-    logWarn ""
-    pure x
+      )
+    , ( "-XTemplateHaskell"
+      , [ flow "-XTemplateHaskell will be used, but it may cause compilation \
+               \issues due to different parsing of '$' when there's no space \
+               \after it."
+        ]
+      )
+    , ( "-XQuasiQuotes"
+      , [ flow "-XQuasiQuotes will be used, but it may cause parse failures \
+               \due to a different meaning for list comprehension syntax like \
+               \[x| ... ]"
+          ]
+      )
+    , ( "-XSafe"
+      , [ flow "-XSafe will be used, but it will fail to compile unsafe \
+               \modules."
+        ]
+      )
+    , ( "-XArrows"
+      , [ flow "-XArrows will be used, but it will cause non-arrow usages of \
+               \proc, (-<), (-<<) to fail"
+        ]
+      )
+    , ( "-XOverloadedStrings"
+      , [ flow "-XOverloadedStrings will be used, but it can cause type \
+               \ambiguity in code not usually compiled with it."
+        ]
+      )
+    , ( "-XOverloadedLists"
+      , [ flow "-XOverloadedLists will be used, but it can cause type \
+               \ambiguity in code not usually compiled with it."
+        ]
+      )
+    , ( "-XMonoLocalBinds"
+      , [ flow "-XMonoLocalBinds will be used, but it can cause type errors in \
+               \code which expects generalized local bindings." ]
+      )
+    , ( "-XTypeFamilies"
+      , [ flow "-XTypeFamilies will be used, but it implies -XMonoLocalBinds, \
+               \and so can cause type errors in code which expects generalized \
+               \local bindings." ]
+      )
+    , ( "-XGADTs"
+      , [ flow "-XGADTs will be used, but it implies -XMonoLocalBinds, and so \
+               \can cause type errors in code which expects generalized local \
+               \bindings." ]
+      )
+    , ( "-XNewQualifiedOperators"
+      , [ flow "-XNewQualifiedOperators will be used, but this will break \
+               \usages of the old qualified operator syntax." ]
+      )
+    ]
+  mixedFlag (flag, msgs) =
+    let x = partitionComps (== flag) in
+    [ fillSep $ msgs ++ showWhich x | mixedSettings x ]
+  mixedSettings (xs, ys) = xs /= [] && ys /= []
+  showWhich (haveIt, don'tHaveIt) =
+       [ flow "It is specified for:" ]
+    <> mkNarrativeList
+         (Just PkgComponent)
+         False
+         ( map (fromString . T.unpack . renderPkgComponent) haveIt :: [StyleDoc])
+    <> [ flow "But not for:" ]
+    <> mkNarrativeList
+         (Just PkgComponent)
+         False
+         ( map (fromString . T.unpack . renderPkgComponent) don'tHaveIt :: [StyleDoc])
+  partitionComps f = (map fst xs, map fst ys)
+   where
+    (xs, ys) = L.partition (any f . snd) compsWithOpts
+  compsWithOpts = map (\(k, bio) ->
+    (k, bioOneWordOpts bio ++ bioOpts bio)) compsWithBios
+  compsWithBios =
+    [ ((ghciPkgName pkg, c), bio)
+    | pkg <- pkgs
+    , (c, bio) <- ghciPkgOpts pkg
+    ]
 
 -- TODO: Should this also tell the user the filepaths, not just the
 -- module name?
 checkForDuplicateModules :: HasTerm env => [GhciPkgInfo] -> RIO env ()
 checkForDuplicateModules pkgs =
-    unless (null duplicates) $
-        borderedWarning $
-            prettyWarn $ "Multiple files use the same module name:" <>
-              line <> bulletedList (map prettyDuplicate duplicates)
-        -- MSS 2020-10-13 Disabling, may remove entirely in the future
-        -- See: https://github.com/commercialhaskell/stack/issues/5407#issuecomment-707339928
-        -- throwM LoadingDuplicateModules
-  where
-    duplicates :: [(ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent)))]
-    duplicates =
-      filter (\(_, mp) -> M.size mp > 1) $
-      M.toList $
-      unionModuleMaps (map ghciPkgModules pkgs)
-    prettyDuplicate :: (ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent))) -> StyleDoc
-    prettyDuplicate (mn, mp) =
-      style Error (pretty mn) <+> "found at the following paths" <> line <>
-      bulletedList (map fileDuplicate (M.toList mp))
-    fileDuplicate :: (Path Abs File, Set (PackageName, NamedComponent)) -> StyleDoc
-    fileDuplicate (fp, comps) =
-      pretty fp <+> parens (fillSep (punctuate "," (map displayPkgComponent (S.toList comps))))
+  unless (null duplicates) $
+    prettyWarn $
+         flow "Multiple files use the same module name:"
+      <> line
+      <> bulletedList (map prettyDuplicate duplicates)
+      <> line
+    -- MSS 2020-10-13 Disabling, may remove entirely in the future
+    -- See: https://github.com/commercialhaskell/stack/issues/5407#issuecomment-707339928
+    -- throwM LoadingDuplicateModules
+ where
+  duplicates ::
+    [(ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent)))]
+  duplicates =
+    filter (\(_, mp) -> M.size mp > 1) $
+    M.toList $
+    unionModuleMaps (map ghciPkgModules pkgs)
+  prettyDuplicate ::
+       (ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent)))
+    -> StyleDoc
+  prettyDuplicate (mn, mp) =
+       fillSep
+         [ style Error (pretty mn)
+         , flow "found at the following paths"
+         ]
+    <> line
+    <> bulletedList (map fileDuplicate (M.toList mp))
+  fileDuplicate ::
+    (Path Abs File, Set (PackageName, NamedComponent)) -> StyleDoc
+  fileDuplicate (fp, comps) =
+    fillSep
+      [ pretty fp
+      , parens $
+          fillSep $ punctuate "," (map displayPkgComponent (S.toList comps))
+      ]
 
 targetWarnings ::
      HasBuildConfig env

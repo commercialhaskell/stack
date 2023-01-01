@@ -207,9 +207,11 @@ runContainerAndExit = do
       isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
   mstackYaml <- for (lookup "STACK_YAML" env) RIO.Directory.makeAbsolute
   image <- either throwIO pure (dockerImage docker)
-  when (isRemoteDocker &&
-        maybe False (isInfixOf "boot2docker") dockerCertPath)
-       (logWarn "Warning: Using boot2docker is NOT supported, and not likely to perform well.")
+  when
+    ( isRemoteDocker && maybe False (isInfixOf "boot2docker") dockerCertPath )
+    ( prettyWarnS
+        "Using boot2docker is NOT supported, and not likely to perform well."
+    )
   maybeImageInfo <- inspect image
   imageInfo@Inspect{..} <- case maybeImageInfo of
     Just ii -> pure ii
@@ -239,8 +241,11 @@ runContainerAndExit = do
                       (isTerm || (isNothing bamboo && isNothing jenkins))
   let mpath = T.pack <$> lookupImageEnv "PATH" imageEnvVars
   when (isNothing mpath) $ do
-    logWarn "The Docker image does not set the PATH env var"
-    logWarn "This will likely fail, see https://github.com/commercialhaskell/stack/issues/2742"
+    prettyWarnL
+      [ flow "The Docker image does not set the PATH environment variable. \
+             \This will likely fail. For further information, see"
+      , style Url "https://github.com/commercialhaskell/stack/issues/2742" <> "."
+      ]
   newPathEnv <- either throwM pure $ augmentPath
     [ hostBinDir
     , toFilePath (sandboxHomeDir </> relDirDotLocal </> relDirBin)

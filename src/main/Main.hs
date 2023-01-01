@@ -762,8 +762,13 @@ setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ do
              <*> (Just <$> view stackYamlL)
        setup sco wantedCompiler compilerCheck mstack
     else
-      logWarn "The --no-install-ghc flag is inconsistent with 'stack setup'. \
-              \No action taken."
+      prettyWarnL
+        [ "The"
+        , style Shell "--no-install-ghc"
+        , flow "flag is inconsistent with"
+        , style Shell (flow "stack setup") <> "."
+        , flow "No action taken."
+        ]
 
 cleanCmd :: CleanOpts -> RIO Runner ()
 cleanCmd = withConfig NoReexec . clean

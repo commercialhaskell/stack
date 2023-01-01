@@ -267,7 +267,6 @@ data ConfigException
   | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
   | NoLTSWithMajorVersion Int
   | NoLTSFound
-  | MultiplePackageIndices [PackageIndexConfig]
   deriving (Show, Typeable)
 
 instance Exception ConfigException where
@@ -385,14 +384,6 @@ instance Exception ConfigException where
     displayException NoLTSFound =
         "Error: [S-5472]\n"
         ++ "No LTS releases found."
-    displayException (MultiplePackageIndices pics) = concat
-        [ "Error: [S-3251]\n"
-        , "When using the 'package-indices' key to override the default "
-        , "package index, you must provide exactly one value, received: "
-        , show pics
-        , "\n"
-        , packageIndicesWarning
-        ]
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Config" module.
@@ -401,6 +392,7 @@ data ConfigPrettyException
     | NoMatchingSnapshot !(NonEmpty SnapName)
     | ResolverMismatch !RawSnapshotLocation String
     | ResolverPartial !RawSnapshotLocation !String
+    | MultiplePackageIndices [PackageIndexConfig]
     deriving (Show, Typeable)
 
 instance Pretty ConfigPrettyException where
@@ -409,7 +401,7 @@ instance Pretty ConfigPrettyException where
         <> line
         <> fillSep
              [ flow "Stack could not load and parse"
-             , style File (pretty configFile)
+             , pretty configFile
              , flow "as a YAML configuraton file."
              ]
         <> blankLine
@@ -460,6 +452,18 @@ instance Pretty ConfigPrettyException where
         <> indent 4 (string errDesc)
         <> line
         <> resolveOptions
+    pretty (MultiplePackageIndices pics) =
+        "[S-3251]"
+        <> line
+        <> fillSep
+             [ flow "When using the"
+             , style Shell "package-indices"
+             , flow "key to override the default package index, you must \
+                    \provide exactly one value, received:"
+             , bulletedList (map (string . show) pics)
+             ]
+        <> blankLine
+        <> packageIndicesWarning
 
 instance Exception ConfigPrettyException
 
@@ -1466,9 +1470,14 @@ configMonoidNoRunCompileName = "script-no-run-compile"
 configMonoidStackDeveloperModeName :: Text
 configMonoidStackDeveloperModeName = "stack-developer-mode"
 
-packageIndicesWarning :: String
+packageIndicesWarning :: StyleDoc
 packageIndicesWarning =
-    "The 'package-indices' key is deprecated in favour of 'package-index'."
+  fillSep
+    [ "The"
+    , style Shell "package-indices"
+    , flow "key is deprecated in favour of"
+    , style Shell "package-index" <> "."
+    ]
 
 resolveOptions :: StyleDoc
 resolveOptions =

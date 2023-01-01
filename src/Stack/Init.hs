@@ -83,7 +83,7 @@ instance Pretty InitPrettyException where
         <> bulletedList
              ( map
                  ( \(fp, name) -> fillSep
-                     [ style File (pretty fp)
+                     [ pretty fp
                      , "as"
                      , style
                          File
@@ -523,43 +523,52 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
                       available       = Map.filterWithKey isAvailable pkgDirs
 
 checkBundleResolver ::
-       (HasConfig env, HasGHCVariant env)
-    => InitOpts
-    -> RawSnapshotLocation
-    -> SnapshotCandidate env
-    -> [ResolvedPath Dir]
-    -- ^ Src package dirs
-    -> RIO env
-         (Either [PackageName] ( Map PackageName (Map FlagName Bool)
-                               , Map PackageName Version))
+     (HasConfig env, HasGHCVariant env)
+  => InitOpts
+  -> RawSnapshotLocation
+  -> SnapshotCandidate env
+  -> [ResolvedPath Dir]
+  -- ^ Src package dirs
+  -> RIO env
+       (Either [PackageName] ( Map PackageName (Map FlagName Bool)
+                             , Map PackageName Version))
 checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
-    result <- checkSnapBuildPlan pkgDirs Nothing snapCandidate
-    case result of
-        BuildPlanCheckOk f -> pure $ Right (f, Map.empty)
-        BuildPlanCheckPartial _f e -> do -- FIXME:qrilka unused f
-            if omitPackages initOpts
-                then do
-                    warnPartial result
-                    logWarn "*** Omitting packages with unsatisfied dependencies"
-                    pure $ Left $ failedUserPkgs e
-                else throwM $ PrettyException $
-                         ResolverPartial snapshotLoc (show result)
-        BuildPlanCheckFail _ e _
-            | omitPackages initOpts -> do
-                logWarn $ "*** Resolver compiler mismatch: "
-                           <> display snapshotLoc
-                logWarn $ display $ ind $ T.pack $ show result
-                pure $ Left $ failedUserPkgs e
-            | otherwise -> throwM $ PrettyException $
-                               ResolverMismatch snapshotLoc (show result)
-    where
-      ind t  = T.unlines $ fmap ("    " <>) (T.lines t)
-      warnPartial res = do
-          logWarn $ "*** Resolver " <> display snapshotLoc
-                      <> " will need external packages: "
-          logWarn $ display $ ind $ T.pack $ show res
+  result <- checkSnapBuildPlan pkgDirs Nothing snapCandidate
+  case result of
+    BuildPlanCheckOk f -> pure $ Right (f, Map.empty)
+    BuildPlanCheckPartial _f e -> do -- FIXME:qrilka unused f
+      if omitPackages initOpts
+        then do
+          warnPartial result
+          prettyWarnS "Omitting packages with unsatisfied dependencies"
+          pure $ Left $ failedUserPkgs e
+        else
+          throwM $ PrettyException $
+            ResolverPartial snapshotLoc (show result)
+    BuildPlanCheckFail _ e _
+      | omitPackages initOpts -> do
+          prettyWarn $
+               fillSep
+                 [ "Resolver compiler mismatch:"
+                 , style Current (fromString . T.unpack $ textDisplay snapshotLoc)
+                 ]
+            <> line
+            <> indent 4 (string $ show result)
+          pure $ Left $ failedUserPkgs e
+      | otherwise -> throwM $
+          PrettyException $ ResolverMismatch snapshotLoc (show result)
+ where
+  warnPartial res = do
+    prettyWarn $
+         fillSep
+           [ "Resolver"
+           , style Current (fromString . T.unpack $ textDisplay snapshotLoc)
+           , flow "will need external packages:"
+           ]
+      <> line
+      <> indent 4 (string $ show res)
 
-      failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
+  failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
 
 getRecommendedSnapshots :: Snapshots -> NonEmpty SnapName
 getRecommendedSnapshots snapshots =

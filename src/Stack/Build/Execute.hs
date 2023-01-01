@@ -552,11 +552,12 @@ copyExecutables exes = do
           >>= rejectMissingFile
         case mfp of
             Nothing -> do
-                logWarn $
-                    "Couldn't find executable " <>
-                    display name <>
-                    " in directory " <>
-                    fromString (toFilePath bindir)
+                prettyWarnL
+                  [ flow "Couldn't find executable"
+                  , style Current (fromString $ T.unpack name)
+                  , flow "in directory"
+                  , pretty bindir <> "."
+                  ]
                 pure Nothing
             Just file -> do
                 let destFile = destDir' FP.</> T.unpack name ++ ext
@@ -678,48 +679,53 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                   $ planUnregisterLocal plan
 
 unregisterPackages ::
-       (HasProcessContext env, HasLogFunc env, HasPlatform env, HasCompiler env)
-    => ActualCompiler
-    -> Path Abs Dir
-    -> NonEmpty (GhcPkgId, (PackageIdentifier, Text))
-    -> RIO env ()
+     ( HasCompiler env
+     , HasLogFunc env
+     , HasPlatform env
+     , HasProcessContext env
+     , HasTerm env
+     )
+  => ActualCompiler
+  -> Path Abs Dir
+  -> NonEmpty (GhcPkgId, (PackageIdentifier, Text))
+  -> RIO env ()
 unregisterPackages cv localDB ids = do
-    let logReason ident reason =
-            logInfo $
-            fromString (packageIdentifierString ident) <> ": unregistering" <>
-            if T.null reason
-                then ""
-                else " (" <> display reason <> ")"
-    let unregisterSinglePkg select (gid, (ident, reason)) = do
-            logReason ident reason
-            pkg <- getGhcPkgExe
-            unregisterGhcPkgIds pkg localDB $ select ident gid :| []
+  let logReason ident reason =
+        logInfo $
+        fromString (packageIdentifierString ident) <> ": unregistering" <>
+        if T.null reason
+          then ""
+          else " (" <> display reason <> ")"
+  let unregisterSinglePkg select (gid, (ident, reason)) = do
+        logReason ident reason
+        pkg <- getGhcPkgExe
+        unregisterGhcPkgIds pkg localDB $ select ident gid :| []
+  case cv of
+    -- GHC versions >= 8.2.1 support batch unregistering of packages. See
+    -- https://gitlab.haskell.org/ghc/ghc/issues/12637
+    ACGhc v | v >= mkVersion [8, 2, 1] -> do
+      platform <- view platformL
+      -- According to
+      -- https://support.microsoft.com/en-us/help/830473/command-prompt-cmd-exe-command-line-string-limitation
+      -- the maximum command line length on Windows since XP is 8191 characters.
+      -- We use conservative batch size of 100 ids on this OS thus argument name
+      -- '-ipid', package name, its version and a hash should fit well into this
+      -- limit. On Unix-like systems we're limited by ARG_MAX which is normally
+      -- hundreds of kilobytes so batch size of 500 should work fine.
+      let batchSize = case platform of
+            Platform _ Windows -> 100
+            _ -> 500
+      let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NonEmpty.toList
+      for_ (chunksOfNE batchSize ids) $ \batch -> do
+        for_ batch $ \(_, (ident, reason)) -> logReason ident reason
+        pkg <- getGhcPkgExe
+        unregisterGhcPkgIds pkg localDB $ fmap (Right . fst) batch
 
-    case cv of
-        -- GHC versions >= 8.2.1 support batch unregistering of packages. See
-        -- https://gitlab.haskell.org/ghc/ghc/issues/12637
-        ACGhc v | v >= mkVersion [8, 2, 1] -> do
-                platform <- view platformL
-                -- According to https://support.microsoft.com/en-us/help/830473/command-prompt-cmd-exe-command-line-string-limitation
-                -- the maximum command line length on Windows since XP is 8191 characters.
-                -- We use conservative batch size of 100 ids on this OS thus argument name '-ipid', package name,
-                -- its version and a hash should fit well into this limit.
-                -- On Unix-like systems we're limited by ARG_MAX which is normally hundreds
-                -- of kilobytes so batch size of 500 should work fine.
-                let batchSize = case platform of
-                      Platform _ Windows -> 100
-                      _ -> 500
-                let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NonEmpty.toList
-                for_ (chunksOfNE batchSize ids) $ \batch -> do
-                    for_ batch $ \(_, (ident, reason)) -> logReason ident reason
-                    pkg <- getGhcPkgExe
-                    unregisterGhcPkgIds pkg localDB $ fmap (Right . fst) batch
+    -- GHC versions >= 7.9 support unregistering of packages via their GhcPkgId.
+    ACGhc v | v >= mkVersion [7, 9] ->
+      for_ ids . unregisterSinglePkg $ \_ident gid -> Right gid
 
-        -- GHC versions >= 7.9 support unregistering of packages via their
-        -- GhcPkgId.
-        ACGhc v | v >= mkVersion [7, 9] -> for_ ids . unregisterSinglePkg $ \_ident gid -> Right gid
-
-        _ -> for_ ids . unregisterSinglePkg $ \ident _gid -> Left ident
+    _ -> for_ ids . unregisterSinglePkg $ \ident _gid -> Left ident
 
 toActions :: HasEnvConfig env
           => InstalledMap
@@ -954,7 +960,15 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             fixupOnWindows = when osIsWindows (void $ liftIO defaultColorWhen)
         withWorkingDir (toFilePath pkgDir) $ autoreconf `catchAny` \ex -> do
           fixupOnWindows
-          logWarn $ "Unable to run autoreconf: " <> displayShow ex
+          prettyWarn $
+               fillSep
+                 [ flow "Stack failed to run"
+                 , style Shell "autoreconf" <> "."
+                 ]
+            <> blankLine
+            <> flow "Stack encountered the following error:"
+            <> blankLine
+            <> string (displayException ex)
           when osIsWindows $ do
             logInfo $ "Check that executable perl is on the path in Stack's " <>
               "MSYS2 \\usr\\bin folder, and working, and that script file " <>
@@ -1226,12 +1240,18 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                                         version `withinRange` range
                                 case filter (matches . fst) (Map.toList allDeps) of
                                     x:xs -> do
-                                        unless (null xs)
-                                            (logWarn ("Found multiple installed packages for custom-setup dep: " <> fromString (packageNameString name)))
-                                        pure ("-package-id=" ++ ghcPkgIdString (snd x), Just (fst x))
+                                      unless (null xs) $
+                                        prettyWarnL
+                                          [ flow "Found multiple installed packages for custom-setup dep:"
+                                          , style Current (fromString $ packageNameString name) <> "."
+                                          ]
+                                      pure ("-package-id=" ++ ghcPkgIdString (snd x), Just (fst x))
                                     [] -> do
-                                        logWarn ("Could not find custom-setup dep: " <> fromString (packageNameString name))
-                                        pure ("-package=" ++ packageNameString name, Nothing)
+                                      prettyWarnL
+                                        [ flow "Could not find custom-setup dep:"
+                                        , style Current (fromString $ packageNameString name) <> "."
+                                        ]
+                                      pure ("-package=" ++ packageNameString name, Nothing)
                             let depsArgs = map fst matchedDeps
                             -- Generate setup_macros.h and provide it to ghc
                             let macroDeps = mapMaybe snd matchedDeps
@@ -1425,7 +1445,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     fulfillHaddockExpectations mcurator action | expectHaddockFailure mcurator = do
         eres <- tryAny $ action KeepOpen
         case eres of
-          Right () -> logWarn $ fromString (packageNameString pname) <> ": unexpected Haddock success"
+          Right () -> prettyWarnL
+            [ style Current (fromString $ packageNameString pname) <> ":"
+            , flow "unexpected Haddock success."
+            ]
           Left _ -> pure ()
     fulfillHaddockExpectations _ action = action CloseOnException
 
@@ -1684,9 +1707,14 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                     -- Older hscolour colouring
                     ExitFailure _ -> do
                         hscolourExists <- doesExecutableExist "HsColour"
-                        unless hscolourExists $ logWarn
-                            ("Warning: haddock not generating hyperlinked sources because 'HsColour' not\n" <>
-                             "found on PATH (use 'stack install hscolour' to install).")
+                        unless hscolourExists $
+                          prettyWarnL
+                            [ flow "Warning: Haddock is not generating \
+                                   \hyperlinked sources because 'HsColour' not \
+                                   \found on PATH (use"
+                            , style Shell (flow "stack install hscolour")
+                            , flow "to install)."
+                            ]
                         pure ["--hyperlink-source" | hscolourExists]
 
             -- For GHC 8.4 and later, provide the --quickjump option.
@@ -1996,7 +2024,10 @@ singleTest topts testsToRun ac ee task installedMap = do
                         when needHpc $ do
                             tixexists <- doesFileExist tixPath
                             when tixexists $
-                                logWarn ("Removing HPC file " <> fromString (toFilePath tixPath))
+                              prettyWarnL
+                                [ flow "Removing HPC file"
+                                , pretty tixPath <> "."
+                                ]
                             liftIO $ ignoringAbsence (removeFile tixPath)
 
                         let args = toAdditionalArgs topts
@@ -2338,28 +2369,34 @@ expectBenchmarkFailure pname =
     maybe False (Set.member pname . curatorExpectBenchmarkFailure)
 
 fulfillCuratorBuildExpectations ::
-       (HasLogFunc env, HasCallStack)
-    => PackageName
-    -> Maybe Curator
-    -> Bool
-    -> Bool
-    -> b
-    -> RIO env b
-    -> RIO env b
-fulfillCuratorBuildExpectations pname mcurator enableTests _ defValue action | enableTests &&
-                                                                          expectTestFailure pname mcurator = do
-    eres <- tryAny action
-    case eres of
-      Right res -> do
-          logWarn $ fromString (packageNameString pname) <> ": unexpected test build success"
+     (HasCallStack, HasLogFunc env, HasTerm env)
+  => PackageName
+  -> Maybe Curator
+  -> Bool
+  -> Bool
+  -> b
+  -> RIO env b
+  -> RIO env b
+fulfillCuratorBuildExpectations pname mcurator enableTests _ defValue action
+  | enableTests && expectTestFailure pname mcurator = do
+      eres <- tryAny action
+      case eres of
+        Right res -> do
+          prettyWarnL
+            [ style Current (fromString $ packageNameString pname) <> ":"
+            , flow "unexpected test build success."
+            ]
           pure res
-      Left _ -> pure defValue
-fulfillCuratorBuildExpectations pname mcurator _ enableBench defValue action | enableBench &&
-                                                                          expectBenchmarkFailure pname mcurator = do
-    eres <- tryAny action
-    case eres of
-      Right res -> do
-          logWarn $ fromString (packageNameString pname) <> ": unexpected benchmark build success"
+        Left _ -> pure defValue
+fulfillCuratorBuildExpectations pname mcurator _ enableBench defValue action
+  | enableBench && expectBenchmarkFailure pname mcurator = do
+      eres <- tryAny action
+      case eres of
+        Right res -> do
+          prettyWarnL
+            [ style Current (fromString $ packageNameString pname) <> ":"
+            , flow "unexpected benchmark build success."
+            ]
           pure res
-      Left _ -> pure defValue
+        Left _ -> pure defValue
 fulfillCuratorBuildExpectations _ _ _ _ _ action = action

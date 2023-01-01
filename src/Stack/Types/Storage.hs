@@ -18,18 +18,22 @@ instance Pretty StoragePrettyException where
   pretty (StorageMigrationFailure desc fp ex) =
     "[S-8835]"
     <> line
-    <>     flow "Stack could not migrate the the database"
-       <+> style File (fromString $ show desc)
-       <+> flow "located at"
-       <+> style Dir (pretty fp)
+    <> fillSep
+         [ flow "Stack could not migrate the the database"
+         , style File (fromString $ show desc)
+         , flow "located at"
+         , pretty fp
+         ]
     <> "."
     <> blankLine
     <> flow "While migrating the database, Stack encountered the error:"
     <> blankLine
     <> string exMsg
     <> blankLine
-    <>     flow "Please report this as an issue at"
-       <+> style Url "https://github.com/commercialhaskell/stack/issues"
+    <> fillSep
+         [ flow "Please report this as an issue at"
+         , style Url "https://github.com/commercialhaskell/stack/issues"
+         ]
     <> "."
     <> blankLine
     -- See https://github.com/commercialhaskell/stack/issues/5851

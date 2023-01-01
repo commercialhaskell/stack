@@ -86,7 +86,7 @@ instance Pretty NewPrettyException where
          [ flow "Stack failed to create a new directory for project"
          , style Current (fromString name) <> ","
          , flow "as the directory"
-         , style Dir (pretty path)
+         , pretty path
          , flow "already exists."
          ]
   pretty (DownloadTemplateFailed name url err) =
@@ -114,11 +114,11 @@ instance Pretty NewPrettyException where
       DownloadHttpError (HttpExceptionRequest req content) ->
         let msg' =    flow "an HTTP error. Stack made the request:"
                    <> blankLine
-                   <> fromString (show req)
+                   <> string (show req)
                    <> blankLine
                    <> flow "and the content of the error was:"
                    <> blankLine
-                   <> fromString (show content)
+                   <> string (show content)
             isNotFound404 = case content of
                               StatusCodeException res _ ->
                                 responseStatus res == notFound404
@@ -143,7 +143,7 @@ instance Pretty NewPrettyException where
          [ flow "Stack failed to load the downloaded template"
          , style Current (fromString $ T.unpack $ templateName name)
          , "from"
-         , style File (pretty path) <> "."
+         , pretty path <> "."
          ]
   pretty (ExtractTemplateFailed name path err) =
     "[S-9582]"
@@ -152,7 +152,7 @@ instance Pretty NewPrettyException where
          [ flow "Stack failed to extract the loaded template"
          , style Current (fromString $ T.unpack $ templateName name)
          , "at"
-         , style File (pretty path) <> "."
+         , pretty path <> "."
          ]
     <> blankLine
     <> flow "While extracting, Stack encountered the following error:"
@@ -304,7 +304,7 @@ new opts forceOverwrite = do
                        then flow "the current directory"
                        else fillSep
                               [ "directory"
-                              , style Dir (pretty $ dirname absDir)
+                              , pretty $ dirname absDir
                               ]
                    )
                 <> "..."
@@ -584,7 +584,7 @@ applyTemplate project template nonceParams dir templateText = do
     <> fillSep
          [ flow "You can provide them in Stack's global YAML configuration \
                 \file"
-         , "(" <> style File (pretty userConfigPath) <> ")"
+         , "(" <> pretty userConfigPath <> ")"
          , "like this:"
          ]
     <> blankLine

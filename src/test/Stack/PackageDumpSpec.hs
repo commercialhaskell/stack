@@ -23,6 +23,7 @@ import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
+import           RIO.PrettyPrint.Simple ( SimplePrettyApp, mkSimplePrettyApp )
 import           RIO.Process
 import           Test.Hspec
 import           Test.Hspec.QuickCheck
@@ -267,10 +268,11 @@ checkDepsPresent prunes selected =
             Nothing -> error "checkDepsPresent: missing in depMap"
             Just deps -> Set.null $ Set.difference (Set.fromList deps) allIds
 
-runEnvNoLogging :: (GhcPkgExe -> RIO LoggedProcessContext a) -> IO a
+runEnvNoLogging :: (GhcPkgExe -> RIO SimplePrettyApp a) -> IO a
 runEnvNoLogging inner = do
   envVars <- view envVarsL <$> mkDefaultProcessContext
   menv <- mkProcessContext $ Map.delete "GHC_PACKAGE_PATH" envVars
   let find name = runRIO menv (findExecutable name) >>= either throwIO parseAbsFile
   pkg <- GhcPkgExe <$> find "ghc-pkg"
-  runRIO (LoggedProcessContext menv mempty) (inner pkg)
+  app <- mkSimplePrettyApp mempty (Just menv) True 80 mempty
+  runRIO app (inner pkg)

@@ -109,7 +109,7 @@ maybeGetHackageKey :: RIO m (Maybe HackageKey)
 maybeGetHackageKey =
   liftIO $ fmap (HackageKey . T.pack) <$> lookupEnv "HACKAGE_KEY"
 
-loadAuth :: HasLogFunc m => Config -> RIO m HackageAuth
+loadAuth :: (HasLogFunc m, HasTerm m) => Config -> RIO m HackageAuth
 loadAuth config = do
   maybeHackageKey <- maybeGetHackageKey
   case maybeHackageKey of
@@ -122,7 +122,10 @@ loadAuth config = do
 -- line.
 --
 -- Since 0.1.0.0
-loadUserAndPassword :: HasLogFunc m => Config -> RIO m HackageCreds
+loadUserAndPassword ::
+     (HasLogFunc m, HasTerm m)
+  => Config
+  -> RIO m HackageCreds
 loadUserAndPassword config = do
   fp <- liftIO $ credsFile config
   elbs <- liftIO $ tryIO $ L.readFile fp
@@ -134,9 +137,11 @@ loadUserAndPassword config = do
       writeFilePrivate fp $ lazyByteString lbs
 
       unless (configSaveHackageCreds config) $ do
-        logWarn "WARNING: You've set save-hackage-creds to false"
-        logWarn "However, credentials were found at:"
-        logWarn $ "  " <> fromString fp
+        prettyWarnL
+          [ flow "You've set save-hackage-creds to false. However, credentials \
+                 \ were found at:"
+          , style File (fromString fp) <> "."
+          ]
       pure $ mkCreds fp
  where
   fromPrompt :: HasLogFunc m => FilePath -> RIO m HackageCreds
@@ -195,13 +200,21 @@ addAPIKey (HackageKey key) = setRequestHeader
   "Authorization"
   [fromString $ "X-ApiKey" ++ " " ++ T.unpack key]
 
-applyAuth :: HasLogFunc m => HackageAuth -> Request -> RIO m Request
+applyAuth ::
+     (HasLogFunc m, HasTerm m)
+  => HackageAuth
+  -> Request
+  -> RIO m Request
 applyAuth haAuth req0 =
   case haAuth of
     HAKey key -> pure (addAPIKey key req0)
     HACreds creds -> applyCreds creds req0
 
-applyCreds :: HasLogFunc m => HackageCreds -> Request -> RIO m Request
+applyCreds ::
+     (HasLogFunc m, HasTerm m)
+  => HackageCreds
+  -> Request
+  -> RIO m Request
 applyCreds creds req0 = do
   manager <- liftIO getGlobalManager
   ereq <- liftIO $ applyDigestAuth
@@ -211,10 +224,14 @@ applyCreds creds req0 = do
     manager
   case ereq of
     Left e -> do
-      logWarn "WARNING: No HTTP digest prompt found, this will probably fail"
-      case fromException e of
-        Just e' -> logWarn $ fromString $ displayDigestAuthException e'
-        Nothing -> logWarn $ fromString $ displayException e
+      prettyWarn $
+           flow "No HTTP digest prompt found, this will probably fail."
+        <> blankLine
+        <> string
+             ( case fromException e of
+                 Just e' -> displayDigestAuthException e'
+                 Nothing -> displayException e
+             )
       pure req0
     Right req -> pure req
 
@@ -222,7 +239,7 @@ applyCreds creds req0 = do
 -- sending a file like 'upload', this sends a lazy bytestring.
 --
 -- Since 0.1.2.1
-uploadBytes :: HasLogFunc m
+uploadBytes :: (HasLogFunc m, HasTerm m)
             => String -- ^ Hackage base URL
             -> HackageAuth
             -> String -- ^ tar file name
@@ -285,7 +302,7 @@ printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
 -- | Upload a single tarball with the given @Uploader@.
 --
 -- Since 0.1.0.0
-upload :: HasLogFunc m
+upload :: (HasLogFunc m, HasTerm m)
        => String -- ^ Hackage base URL
        -> HackageAuth
        -> FilePath
@@ -295,7 +312,7 @@ upload baseUrl auth fp uploadVariant =
   uploadBytes baseUrl auth (takeFileName fp) uploadVariant
     =<< liftIO (L.readFile fp)
 
-uploadRevision :: HasLogFunc m
+uploadRevision :: (HasLogFunc m, HasTerm m)
                => String -- ^ Hackage base URL
                -> HackageAuth
                -> PackageIdentifier
