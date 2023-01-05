@@ -73,20 +73,25 @@ sequences for color to its output.
 Related command: all commands that make use of Stack's global YAML configuration
 file (`config.yaml`).
 
-Overridden by: Stack's global `--stack-root` option.
+Overridden by: Stack's global
+[`--stack-root`](global_flags.md#-stack-root-option) option.
 
 The environment variable `STACK_ROOT` can be used to specify the Stack root
 directory.
 
 ## `STACK_WORK`
 
-Related command: all commands that make use of Stack's working directory.
+Related command: all commands that make use of Stack's work directories.
 
-Overridden by: Stack's global `--work-dir` option.
+Overridden by: Stack's [`work-dir`](yaml_configuration.md#work-dir) non-project
+specific configuration option, or global
+[`--work-dir`](global_flags.md#-work-dir-option) option.
 
-The environment variable `STACK_YAML` can be used to specify Stack's
-working directory in a project. The path must be a relative one, relative to the
-root directory of the project.
+The environment variable `STACK_WORK` can be used to specify the path of Stack's
+work directory, within a local project or package directory, and override
+Stack's default of `.stack-work`. The path must be a relative one, relative to
+the root directory of the project or package. The relative path cannot include a
+`..` (parent directory) component.
 
 ## `STACK_XDG`
 
@@ -94,7 +99,8 @@ Related command: all commands that make use of Stack's user-specific general
 YAML configuration file (`config.yaml`).
 
 Overridden by: the use of Stack's `STACK_ROOT` environment variable, or the use
-of Stack's global `--stack-root` option.
+of Stack's global
+[`--stack-root`](global_flags.md#-stack-root-option) option.
 
 On Unix-like operating systems and Windows, Stack can be configured to follow
 the XDG Base Directory Specification if the environment variable `STACK_XDG` is
@@ -105,7 +111,8 @@ set to any non-empty value.
 Related command: all commands that make use of Stack's project-level YAML
 configuration file.
 
-Overridden by: Stack's global `--stack-yaml` option.
+Overridden by: Stack's global
+[`--stack-yaml`](global_flags.md#-stack-yaml-option) option.
 
 The environment variable `STACK_YAML` can be used to specify Stack's
 project-level YAML configuration file.
