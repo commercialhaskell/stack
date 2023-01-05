@@ -15,7 +15,7 @@ import           Options.Applicative.Builder.Extra
                    , firstBoolFlagsNoDefault, firstBoolFlagsTrue, optionalFirst
                    , pathCompleterWith
                    )
-import           Path ( parseRelDir )
+import           Path ( PathException (..), parseRelDir )
 import           Stack.Constants ( stackRootOptionName )
 import           Stack.Options.BuildMonoidParser ( buildOptsMonoidParser )
 import           Stack.Options.DockerParser ( dockerOptsParser )
@@ -66,8 +66,8 @@ configOptsParser currentDir hide0 =
   <$> optionalFirst (absDirOption
         ( long stackRootOptionName
         <> metavar (map toUpper stackRootOptionName)
-        <> help "Absolute path to the global Stack root directory (Overrides \
-                \any STACK_ROOT environment variable)"
+        <> help "Absolute path to the global Stack root directory. (Overrides \
+                \any STACK_ROOT environment variable.)"
         <> hide
         ))
   <*> optionalFirst (option (eitherReader (mapLeft showWorkDirError . parseRelDir))
@@ -79,8 +79,8 @@ configOptsParser currentDir hide0 =
                    { pcoAbsolute = False, pcoFileFilter = const False }
                )
              )
-        <> help "Relative path of work directory (Overrides any STACK_WORK \
-                \environment variable, default is '.stack-work')"
+        <> help "Relative path to Stack's work directory. (Overrides any STACK_WORK \
+                \environment variable, default is '.stack-work'.)"
         <> hide
         ))
   <*> buildOptsMonoidParser hide0
@@ -205,7 +205,16 @@ configOptsParser currentDir hide0 =
   toDumpLogs (First (Just True)) = First (Just DumpAllLogs)
   toDumpLogs (First (Just False)) = First (Just DumpNoLogs)
   toDumpLogs (First Nothing) = First Nothing
-  showWorkDirError err = show err ++
-    "\nNote that --work-dir must be a relative child directory, because \
-    \work-dirs outside of the package are not supported by Cabal." ++
-    "\nSee https://github.com/commercialhaskell/stack/issues/2954"
+  showWorkDirError err = case fromException err of
+    Just (InvalidRelDir x) ->
+      "Stack failed to interpret the value of the option as a valid\n\
+      \relative path to a directory. Stack will not accept an absolute path. A \
+      \path\n\
+      \containing a .. (parent directory) component is not valid.\n\n\
+      \If set, Stack expects the value to identify the location of Stack's \
+      \work\n\
+      \directory, relative to the root directory of the project or package. \
+      \Stack\n\
+      \encountered the value:\n"
+      ++ x
+    _ -> displayException err

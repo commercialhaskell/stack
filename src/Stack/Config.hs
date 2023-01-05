@@ -219,7 +219,16 @@ configFromConfigMonoid
             PCProject _ -> True
             PCGlobalProject -> True
             PCNoProject _ -> False
-    configWorkDir0 <- maybe (pure relDirStackWork) (liftIO . parseRelDir) mstackWorkEnv
+    configWorkDir0 <-
+      let parseStackWorkEnv x =
+            catch
+              (parseRelDir x)
+              ( \e -> case e of
+                  InvalidRelDir _ ->
+                    throwIO $ PrettyException $ StackWorkEnvNotRelativeDir x
+                  _ -> throwIO e
+              )
+      in  maybe (pure relDirStackWork) (liftIO . parseStackWorkEnv) mstackWorkEnv
     let configWorkDir = fromFirst configWorkDir0 configMonoidWorkDir
         configLatestSnapshot = fromFirst
           "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"

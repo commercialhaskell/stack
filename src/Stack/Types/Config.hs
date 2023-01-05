@@ -389,6 +389,7 @@ instance Exception ConfigException where
 -- "Stack.Config" module.
 data ConfigPrettyException
     = ParseConfigFileException !(Path Abs File) !ParseException
+    | StackWorkEnvNotRelativeDir !String
     | NoMatchingSnapshot !(NonEmpty SnapName)
     | ResolverMismatch !RawSnapshotLocation String
     | ResolverPartial !RawSnapshotLocation !String
@@ -417,6 +418,20 @@ instance Pretty ConfigPrettyException where
                     Url
                     "http://docs.haskellstack.org/en/stable/yaml_configuration/"
                <> "."
+             ]
+    pretty (StackWorkEnvNotRelativeDir x) =
+        "[S-7462]"
+        <> line
+        <> flow "Stack failed to interpret the value of the STACK_WORK \
+                \environment variable as a valid relative path to a directory. \
+                \Stack will not accept an absolute path. A path containing a \
+                \.. (parent directory) component is not valid."
+        <> blankLine
+        <> fillSep
+             [ flow "If set, Stack expects the value to identify the location \
+                    \of Stack's work directory, relative to the root directory \
+                    \of the project or package. Stack encountered the value:"
+             , style Error (fromString x) <> "."
              ]
     pretty (NoMatchingSnapshot names) =
         "[S-1833]"

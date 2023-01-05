@@ -381,6 +381,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-6602] = ParseConfigFileException (Path Abs File) ParseException
+        [S-7462] | StackWorkEnvNotRelativeDir String
         [S-1833] | NoMatchingSnapshot (NonEmpty SnapName)
         [S-6395] | ResolverMismatch RawSnapshotLocation String
         [S-2422] | ResolverPartial RawSnapshotLocation String

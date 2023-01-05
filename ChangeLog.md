@@ -19,6 +19,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Better error message if the value of the `STACK_WORK` environment variable or
+  `--work-dir` option is not a valid relative path.
+
 Bug fixes:
 
 * `stack build` with `--file-watch` or `--file-watch-poll` outputs 'pretty'
