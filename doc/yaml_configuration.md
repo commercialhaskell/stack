@@ -1566,7 +1566,7 @@ with-hpack: /usr/local/bin/hpack
 Default: `.stack-work`
 
 Command line equivalent (takes precedence):
-[`--work-dir`](global_flags.md#the---work-dir-option) option
+[`--work-dir`](global_flags.md#work-dir-option) option
 
 Environment variable alternative (lowest precedence):
 [`STACK_WORK`](environment_variables.md#stack_work)
