@@ -268,13 +268,15 @@ non-project specific configuration [option](yaml_configuration.md#with-hpack).
 
 Default: `.stack-work`
 
-Overrides: `STACK_WORK` environment variable
+Overrides: [`STACK_WORK`](environment_variables.md#stack_work) environment
+variable, and [`work-dir`](yaml_configuration.md) non-project specific
+configuration option.
 
 Pass the option `--work-dir <relative_path_to_the_Stack_root>` to specify the
-path to Stack's work directory for the project. The path must be a relative one,
-relative to the project's root directory. For further information, see the
-documentation for the corresponding non-project specific configuration
-[option](yaml_configuration.md#work-dir).
+path to Stack's work directory, within a local project or package directory. The
+path must be a relative one, relative to the the root directory of the project
+or package. The relative path cannot include a `..` (parent directory)
+component.
 
 ## The `--setup-info-yaml` command option
 
