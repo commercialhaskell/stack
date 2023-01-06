@@ -69,8 +69,7 @@ buildOptsParser cmd = BuildOptsCLI
       )
   <*> (   flag' FileWatch
             (  long "file-watch"
-            <> help "Watch for changes in local files and automatically \
-                    \rebuild. Ignores files in VCS boring/ignore file"
+            <> help "Watch for changes in local files and automatically rebuild"
             )
       <|> flag' FileWatchPoll
             (  long "file-watch-poll"
