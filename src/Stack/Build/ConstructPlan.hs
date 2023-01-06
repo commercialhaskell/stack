@@ -439,17 +439,16 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
       name :: PackageName
       name = pkgName ident
 
--- | Given a 'LocalPackage' and its 'lpTestBench', adds a 'Task' for
--- running its tests and benchmarks.
+-- | Given a 'LocalPackage' and its 'lpTestBench', adds a 'Task' for running its
+-- tests and benchmarks.
 --
--- If @isAllInOne@ is 'True', then this means that the build step will
--- also build the tests. Otherwise, this indicates that there's a cyclic
--- dependency and an additional build step needs to be done.
+-- If @isAllInOne@ is 'True', then this means that the build step will also
+-- build the tests. Otherwise, this indicates that there's a cyclic dependency
+-- and an additional build step needs to be done.
 --
--- This will also add all the deps needed to build the tests /
--- benchmarks. If @isAllInOne@ is 'True' (the common case), then all of
--- these should have already been taken care of as part of the build
--- step.
+-- This will also add all the deps needed to build the tests / benchmarks. If
+-- @isAllInOne@ is 'True' (the common case), then all of these should have
+-- already been taken care of as part of the build step.
 addFinal :: LocalPackage -> Package -> Bool -> Bool -> M ()
 addFinal lp package isAllInOne buildHaddocks = do
   depsRes <- addPackageDeps package
@@ -480,16 +479,16 @@ addFinal lp package isAllInOne buildHaddocks = do
         }
   tell mempty { wFinals = Map.singleton (packageName package) res }
 
--- | Given a 'PackageName', adds all of the build tasks to build the
--- package, if needed.
+-- | Given a 'PackageName', adds all of the build tasks to build the package, if
+-- needed.
 --
 -- 'constructPlan' invokes this on all the target packages, setting
--- @treatAsDep'@ to False, because those packages are direct build
--- targets. 'addPackageDeps' invokes this while recursing into the
--- dependencies of a package. As such, it sets @treatAsDep'@ to True,
--- forcing this package to be marked as a dependency, even if it is
--- directly wanted. This makes sense - if we left out packages that are
--- deps, it would break the --only-dependencies build plan.
+-- @treatAsDep'@ to False, because those packages are direct build targets.
+-- 'addPackageDeps' invokes this while recursing into the dependencies of a
+-- package. As such, it sets @treatAsDep'@ to True, forcing this package to be
+-- marked as a dependency, even if it is directly wanted. This makes sense - if
+-- we left out packages that are deps, it would break the --only-dependencies
+-- build plan.
 addDep :: PackageName
        -> M (Either ConstructPlanException AddDepRes)
 addDep name = do
@@ -521,16 +520,16 @@ addDep name = do
             -- recommendation available
             Nothing -> pure $ Left $ UnknownPackage name
             Just (PIOnlyInstalled loc installed) -> do
-              -- FIXME Slightly hacky, no flags since
-              -- they likely won't affect executable
-              -- names. This code does not feel right.
+              -- FIXME Slightly hacky, no flags since they likely won't affect
+              -- executable names. This code does not feel right.
               let version = installedVersion installed
                   askPkgLoc = liftRIO $ do
                     mrev <- getLatestHackageRevision
                               YesRequireHackageIndex name version
                     case mrev of
                       Nothing -> do
-                        -- this could happen for GHC boot libraries missing from Hackage
+                        -- this could happen for GHC boot libraries missing from
+                        -- Hackage
                         prettyWarnL
                           $ flow "No latest package revision found for"
                           : style Current (fromString $ packageNameString name) <> ","
@@ -563,8 +562,7 @@ tellExecutables :: PackageName -> PackageSource -> M ()
 tellExecutables _name (PSFilePath lp)
   | lpWanted lp = tellExecutablesPackage Local $ lpPackage lp
   | otherwise = pure ()
--- Ignores ghcOptions because they don't matter for enumerating
--- executables.
+-- Ignores ghcOptions because they don't matter for enumerating executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnapshot cp) =
   tellExecutablesUpstream name (pure $ Just pkgloc) Snap (cpFlags cp)
 
@@ -607,8 +605,8 @@ tellExecutablesPackage loc p = do
     | Set.null myComps = x
     | otherwise = Set.intersection x myComps
 
--- | Given a 'PackageSource' and perhaps an 'Installed' value, adds
--- build 'Task's for the package and its dependencies.
+-- | Given a 'PackageSource' and perhaps an 'Installed' value, adds build
+-- 'Task's for the package and its dependencies.
 installPackage :: PackageName
                -> PackageSource
                -> Maybe Installed
@@ -671,13 +669,12 @@ installPackage name ps minstalled = do
                    \result map to "
                 <> show s
               put s
-              -- Otherwise, fall back on building the
-              -- tests / benchmarks in a separate step.
+              -- Otherwise, fall back on building the tests / benchmarks in a
+              -- separate step.
               res' <- resolveDepsAndInstall
                 False (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
               when (isRight res') $ do
-                -- Insert it into the map so that it's
-                -- available for addFinal.
+                -- Insert it into the map so that it's available for addFinal.
                 updateLibMap name res'
                 addFinal lp tb False False
               pure res'
@@ -703,8 +700,8 @@ resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
           isAllInOne buildHaddocks ps package minstalled deps
 
 -- | Checks if we need to install the given 'Package', given the results
--- of 'addPackageDeps'. If dependencies are missing, the package is
--- dirty, or it's not installed, then it needs to be installed.
+-- of 'addPackageDeps'. If dependencies are missing, the package is dirty, or
+-- it's not installed, then it needs to be installed.
 installPackageGivenDeps :: Bool
                         -> Bool
                         -> PackageSource
@@ -822,11 +819,9 @@ addPackageDeps package = do
         let bd = case e of
               UnknownPackage name -> assert (name == depname) NotInBuildPlan
               DependencyCycleDetected names -> BDDependencyCycleDetected names
-              -- ultimately we won't show any
-              -- information on this to the user, we'll
-              -- allow the dependency failures alone to
-              -- display to avoid spamming the user too
-              -- much
+              -- ultimately we won't show any information on this to the user,
+              -- we'll allow the dependency failures alone to display to avoid
+              -- spamming the user too much
               DependencyPlanFailures _ _  ->
                 Couldn'tResolveItsDependencies (packageVersion package)
         mlatestApplicable <- getLatestApplicableVersionAndRev
