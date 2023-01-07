@@ -164,8 +164,9 @@ parseRawTargetDirs root locals ri =
           case mapMaybe (childOf dir) $ Map.toList locals of
             [] -> pure $ Left $
               fillSep
-                [ flow "No local directories found as children of"
-                , style Dir (fromString $ T.unpack t) <> "."
+                [ style Dir (fromString $ T.unpack t)
+                , flow "is not a local package directory and it is not a \
+                       \parent directory of any local package directory."
                 ]
             names -> pure $ Right $ map ((ri, ) . RTPackage) names
  where
