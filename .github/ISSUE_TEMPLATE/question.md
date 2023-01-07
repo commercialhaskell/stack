@@ -1,12 +1,13 @@
 ---
 name: Question
-about: Ask a question about Stack usage
+about: Ask a question about how to use Stack
 ---
 
-Do you have a question regarding Stack's usage that isn't covered by the online
+Do you have a question about how to use Stack that is not covered by the online
 [documentation](http://haskellstack.org)? In that case please ask your question
-on [Stack Overflow](http://stackoverflow.com) and use
-[the haskell-stack tag](http://stackoverflow.com/questions/tagged/haskell-stack).
+at the [Haskell Community](https://discourse.haskell.org/) forum or on
+[Stack Overflow](http://stackoverflow.com) (use the
+[haskell-stack](http://stackoverflow.com/questions/tagged/haskell-stack) tag).
 This way your question will be more easily discoverable by other people with the
 same question.
 

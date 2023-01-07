@@ -3,7 +3,7 @@ name: Bug Report
 about: Report a bug in Stack
 ---
 
-Please follow the steps below for reporting a bug:
+Please follow the steps below for reporting a bug in Stack:
 
 Make sure that you are using the latest release (currently Stack 2.9.3). See the
 [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade)
@@ -55,3 +55,7 @@ Version 2.9.3, Git revision 6cf638947a863f49857f9cfbf72a38a48b183e7e x86_64 hpac
 * Via Cabal (the tool)
 * An unofficial package repository (please specify which)
 * Other (please specify)
+
+### Platform
+
+Your platform (machine architecture and operating system)
