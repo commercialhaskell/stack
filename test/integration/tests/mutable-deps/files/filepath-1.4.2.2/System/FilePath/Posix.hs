@@ -1,8 +1,3 @@
-
-
-
-{-# LANGUAGE PatternGuards #-}
-
 -- This template expects CPP definitions for:
 --     MODULE_NAME = Posix | Windows
 --     IS_WINDOWS  = False | True

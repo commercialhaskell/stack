@@ -1,5 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-
 import StackTest
 import System.Directory
 import Control.Exception (catch, IOException)

@@ -1,7 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | A ghc-pkg id.
 

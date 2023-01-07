@@ -1,9 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
 
 -- | Utils for the other Stack.Storage modules
 module Stack.Storage.Util

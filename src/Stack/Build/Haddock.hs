@@ -1,10 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE NamedFieldPuns        #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
 
 -- | Generate haddocks
 module Stack.Build.Haddock
