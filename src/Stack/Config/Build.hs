@@ -12,6 +12,12 @@ module Stack.Config.Build
 import           Distribution.Verbosity ( normal )
 import           Stack.Prelude
 import           Stack.Types.Config
+                   ( BenchmarkOpts (..), BenchmarkOptsMonoid (..)
+                   , BuildOpts (..), BuildOptsMonoid (..), CabalVerbosity (..)
+                   , HaddockOpts (..), HaddockOptsMonoid (..), TestOpts (..)
+                   , TestOptsMonoid (..), defaultBenchmarkOpts
+                   , defaultHaddockOpts, defaultTestOpts
+                   )
 
 -- | Interprets BuildOptsMonoid options.
 buildOptsFromMonoid :: BuildOptsMonoid -> BuildOpts
