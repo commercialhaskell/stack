@@ -432,11 +432,23 @@ pprintTargetParseErrors errs =
            [err] ->
                   "error:"
                <> blankLine
-               <> err
+               <> indent 4 err
            _ ->
                   flow "following errors:"
                <> blankLine
                <> bulletedList errs
+       ]
+  <> blankLine
+  <> fillSep
+       [ flow "Stack expects a target to be a package name (e.g."
+       , style Shell "my-package" <> "),"
+       , flow "a package identifier (e.g."
+       , style Shell "my-package-0.1.2.3" <> "),"
+       , flow "a package component (e.g."
+       , style Shell "my-package:test:my-test-suite" <> "),"
+       , flow "or, failing that, a relative path to a directory that is a \
+              \local package directory or a parent directory of one or more \
+              \local package directories."
        ]
 
 pprintExceptions ::
