@@ -207,24 +207,24 @@ GitHub repository.
         There is also an unofficial package for openSUSE or SUSE Linux
         Enterprise. Its Stack version may lag behind. To install it:
 
-        === openSUSE Tumbleweed
+        === "openSUSE Tumbleweed"
 
             ~~~text
             sudo zypper in stack
             ~~~
 
-        === openSUSE Leap
+        === "openSUSE Leap"
 
             ~~~text
             sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
             sudo zypper in stack
             ~~~
 
-        === SUSE Linux Enterprise 12
+        === "SUSE Linux Enterprise 12"
 
             ~~~text
             sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
-            sude zypper in stack
+            sudo zypper in stack
             ~~~
 
     === "Ubuntu"
