@@ -167,7 +167,7 @@ upgrade builtHash (UpgradeOpts mbo mso) =
       prettyWarnL
         [ flow "Exception occurred when trying to perform binary upgrade:"
         , fromString . show $ e
-        , line <> flow "Falling back to source upgrade"
+        , line <> flow "Falling back to source upgrade."
         ]
       source so
  where
@@ -205,7 +205,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) =
         Just downloadVersion -> do
           prettyInfoL
             [ flow "Current Stack version:"
-            , fromString (versionString stackVersion) <> ","
+            , fromString (versionString stackVersion) <> ";"
             , flow "available download version:"
             , fromString (versionString downloadVersion) <> "."
             ]

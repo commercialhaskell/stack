@@ -16,6 +16,12 @@ Behavior changes:
 * Removed `--ghc-paths`, `--global-stack-root` and `--local-bin-path` flags for
   `stack path`, deprecated in Stack 1.1.0 in favour of `--programs`,
   `--stack-root` and `local-bin` respectively.
+* On Windows, `stack upgrade` always renames the file of the running Stack
+  executable (adding extension `.old`) before attempting to write to the
+  original file name.
+* On Windows, `stack upgrade` does not offer `sudo` command alternatives if
+  attempting to write to the original file name of the running Stack exectuable
+  results in a 'Permission' error.
 
 Other enhancements:
 
