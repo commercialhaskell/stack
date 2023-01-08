@@ -50,31 +50,20 @@ jobs:
           ~\AppData\Roaming\stack
           ~\AppData\Local\Programs\stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
-    - name: Update PATH on Windows
-      if: startsWith(runner.os, 'Windows')
-      run: |
-        # On Windows, `stack upgrade` fails to overwrite the Stack executable at
-        # C:\hostedtoolcache\windows\stack\2.9.1\x64\, so add location of
-        # upgraded Stack executable to the PATH for subsequent steps:
-        "C:\Users\runneradmin\AppData\Roaming\local\bin" >> $env:GITHUB_PATH
 
-    - name: Install deps and run checks
+    # Separating out Unix-like OS from Windows because of the problem of
+    # upgrading GitHub-supplied Stack 2.9.1 to 2.9.3 on Windows
+    - name: Install deps and run checks on Unix-like OS
+      if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
       shell: bash
       run: |
         set -ex
 
-        # Stack 2.9.3 is required to build Stack. In the bash shell on the
-        # Windows runner, this may report that the Stack executable is not on
-        # the PATH. That appears to be due to some latency somewhere.
+        # Stack 2.9.3 is required to build Stack.
         stack upgrade
 
-        # Introduce a short pause, otherwise, in the bash shell on the Windows
-        # runner, the following `which` command does not recognise that
-        # `stack.exe` has been copied to a directory on the PATH.
-        sleep 1
-
-        # Check location(s) of Stack executable(s)
-        which -a stack
+        # Check the Stack version
+        stack --version
 
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
         then
@@ -101,6 +90,35 @@ jobs:
             - /usr/lib
         EOF
         fi
+
+        # In case GHCup hooks have been created, remove them
+        if [ -d $(stack path --stack-root)/hooks ]
+        then
+            rm -Rf $(stack path --stack-root)/hooks
+        fi
+
+        # Do this in the same step as installing deps to get relevant env var modifications
+        stack etc/scripts/release.hs check ${{ matrix.release-args }}
+
+        set +ex
+
+    # Separating out Windows because of the problem of upgrading GitHub-supplied
+    # Stack 2.9.1 to 2.9.3 on Windows
+    - name: Install deps and run checks on Windows
+      if: startsWith(runner.os, 'Windows')
+      shell: bash
+      run: |
+        set -ex
+
+        # Stack 2.9.3 is required to build Stack. The --local-bin-path is
+        # required to allow Stack (effectively) to overwrite the currently
+        # running Stack executable. The should be fixed in later versions of
+        # Stack that reflect
+        # https://github.com/commercialhaskell/stack/pull/6023
+        stack --local-bin-path /c/hostedtoolcache/windows/stack/2.9.1/x64 upgrade
+
+        # Check the Stack version
+        stack --version
 
         # In case GHCup hooks have been created, remove them
         if [ -d $(stack path --stack-root)/hooks ]

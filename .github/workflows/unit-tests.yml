@@ -68,30 +68,20 @@ jobs:
           ~\AppData\Roaming\stack
           ~\AppData\Local\Programs\stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.extra-suffix }}
-    - name: Update PATH on Windows
-      if: startsWith(runner.os, 'Windows')
-      run: |
-        # On Windows, `stack upgrade` fails to overwrite the stack executable at
-        # C:\hostedtoolcache\windows\stack\2.9.1\x64\, so add location of
-        # upgraded Stack executable to the PATH for subsequent steps:
-        "C:\Users\runneradmin\AppData\Roaming\local\bin" >> $env:GITHUB_PATH
-    - name: Run tests
+
+    # Separating out Unix-like OS from Windows because of the problem of
+    # upgrading GitHub-supplied Stack 2.9.1 to 2.9.3 on Windows
+    - name: Run tests on Unix-like OS
+      if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
       shell: bash
       run: |
         set -ex
 
-        # Stack 2.9.3 is required to build Stack. In the bash shell on the
-        # Windows runner, this may report that the Stack executable is not on
-        # the PATH. That appears to be due to some latency somewhere.
+        # Stack 2.9.3 is required to build Stack.
         stack upgrade
 
-        # Introduce a short pause, otherwise, in the bash shell on the Windows
-        # runner, the following `which` command does not recognise that
-        # `stack.exe` has been copied to a directory on the PATH.
-        sleep 1
-
-        # Check location(s) of Stack executable(s)
-        which -a stack
+        # Check the Stack version
+        stack --version
 
         if [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
         then
@@ -112,9 +102,6 @@ jobs:
         if [[ "${{ matrix.os }}" == "macos-latest" ]]
         then
             echo "Skipping ldd check on Mac"
-        elif [[ "${{ matrix.os }}" == "windows-latest" ]]
-        then
-            echo "Skipping ldd check on Windows"
         elif [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
         then
             # ldd returns exit code 1 if it's static, so failure is success
@@ -122,5 +109,29 @@ jobs:
         else
             ldd ./bin/stack
         fi
+
+        ./bin/stack --version
+
+    # Separating out Windows because of the problem of upgrading GitHub-supplied
+    # Stack 2.9.1 to 2.9.3 on Windows
+    - name: Run tests on Windows
+      if: startsWith(runner.os, 'Windows')
+      shell: bash
+      run: |
+        set -ex
+
+        # Stack 2.9.3 is required to build Stack. The --local-bin-path is
+        # required to allow Stack (effectively) to overwrite the currently
+        # running Stack executable. The should be fixed in later versions of
+        # Stack that reflect
+        # https://github.com/commercialhaskell/stack/pull/6023
+        stack --local-bin-path /c/hostedtoolcache/windows/stack/2.9.1/x64 upgrade
+
+        # Check the Stack version
+        stack --version
+
+        stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror -O0" --copy-bins --local-bin-path bin
+
+        echo "Skipping ldd check on Windows"
 
         ./bin/stack --version
