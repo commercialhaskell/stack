@@ -190,30 +190,36 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) =
     isNewer <-
       case mdownloadVersion of
         Nothing -> do
-          prettyErrorL $
-              flow "Unable to determine upstream version from GitHub metadata"
-            :
-            [ line <> flow "Rerun with --force-download to force an upgrade"
-              | not force]
+          prettyError $
+               flow "Unable to determine upstream version from GitHub metadata."
+            <> if force
+                 then mempty
+                 else
+                      line
+                   <> fillSep
+                        [ flow "Rerun with"
+                        , style Shell "--force-download"
+                        , flow "to force an upgrade."
+                        ]
           pure False
         Just downloadVersion -> do
           prettyInfoL
             [ flow "Current Stack version:"
             , fromString (versionString stackVersion) <> ","
             , flow "available download version:"
-            , fromString (versionString downloadVersion)
+            , fromString (versionString downloadVersion) <> "."
             ]
           pure $ downloadVersion > stackVersion
     toUpgrade <- case (force, isNewer) of
       (False, False) -> do
         prettyInfoS "Skipping binary upgrade, you are already running the most \
-                    \recent version"
+                    \recent version."
         pure False
       (True, False) -> do
-        prettyInfoS "Forcing binary upgrade"
+        prettyInfoS "Forcing binary upgrade."
         pure True
       (_, True) -> do
-        prettyInfoS "Newer version detected, downloading"
+        prettyInfoS "Newer version detected, downloading."
         pure True
     when toUpgrade $ do
       config <- view configL
