@@ -85,7 +85,6 @@ upgradeOpts = UpgradeOpts
     <$> optional (strOption
           (  long "binary-platform"
           <> help "Platform type for archive to download"
-          <> showDefault
           ))
     <*> switch
           (  long "force-download"
