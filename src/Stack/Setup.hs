@@ -68,8 +68,8 @@ import           Network.HTTP.Simple ( getResponseHeader )
 import           Pantry.Internal.AesonExtended
                    ( Value (..), WithJSONWarnings (..), logJSONWarnings )
 import           Path
-                   ( (</>), dirname, filename, parent, parseAbsDir, parseAbsFile
-                   , parseRelDir, parseRelFile, toFilePath
+                   ( (</>), addExtension, dirname, filename, parent, parseAbsDir
+                   , parseAbsFile, parseRelDir, parseRelFile, toFilePath
                    )
 import           Path.CheckInstall ( warnInstallSearchPathIssues )
 import           Path.Extended ( fileExtension )
@@ -2535,9 +2535,10 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
     let loop [] = throwIO $ StackBinaryArchiveNotFound (map snd platforms0)
         loop ((isWindows, p'):ps) = do
           let p = T.pack p'
-          logInfo $
-               "Querying for archive location for platform: "
-            <> fromString p'
+          prettyInfoL
+            [ flow "Querying for archive location for platform:"
+            , style Current (fromString p') <> "."
+            ]
           case findArchive archiveInfo p of
             Just x -> pure (isWindows, x)
             Nothing -> loop ps
@@ -2553,7 +2554,10 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
             , destDir </> relFileStackDotTmp
             )
 
-  logInfo $ "Downloading from: " <> display archiveURL
+  prettyInfoL
+    [ flow "Downloading from:"
+    , style Url (fromString $ T.unpack archiveURL) <> "."
+    ]
 
   liftIO $
     if | ".tar.gz" `T.isSuffixOf` archiveURL ->
@@ -2562,30 +2566,23 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
             throwIO StackBinaryArchiveZipUnsupportedBug
        | otherwise -> throwIO $ StackBinaryArchiveUnsupported archiveURL
 
-  logInfo "Download complete, testing executable"
-
-  platform <- view platformL
+  prettyInfoS "Download complete, testing executable."
 
   -- We need to call getExecutablePath before we overwrite the
   -- currently running binary: after that, Linux will append
   -- (deleted) to the filename.
-  currExe <- liftIO getExecutablePath
+  currExe <- liftIO getExecutablePath >>= parseAbsFile
 
   liftIO $ do
     setFileExecutable (toFilePath tmpFile)
-
     testExe tmpFile
 
-    case platform of
-      Platform _ Cabal.Windows | FP.equalFilePath (toFilePath destFile) currExe -> do
-        old <- parseAbsFile (toFilePath destFile ++ ".old")
-        renameFile destFile old
-        renameFile tmpFile destFile
-      _ -> renameFile tmpFile destFile
+  relocateStackExeFile currExe tmpFile destFile
 
-  logInfo $
-       "New Stack executable available at "
-    <> fromString (toFilePath destFile)
+  prettyInfoL
+    [ flow "New Stack executable available at:"
+    , pretty destFile <> "."
+    ]
 
   destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
   warnInstallSearchPathIssues destDir' ["stack"]
@@ -2636,60 +2633,102 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
       | isWindows = "stack.exe"
       | otherwise = "stack"
 
+relocateStackExeFile ::
+     HasTerm env
+  => Path Abs File
+     -- ^ Path to the currently running executable
+  -> Path Abs File
+     -- ^ Path to the executable file to be relocated
+  -> Path Abs File
+     -- ^ Path to the new location for the excutable file
+  -> RIO env ()
+relocateStackExeFile currExeFile newExeFile destExeFile = do
+  when (osIsWindows && destExeFile == currExeFile) $ do
+    -- Windows allows a running executable's file to be renamed, but not to be
+    -- overwritten.
+    old <- addExtension ".old" currExeFile
+    prettyInfoL
+      [ flow "Renaming existing:"
+      , pretty currExeFile
+      , "as:"
+      , pretty old <> "."
+      ]
+    renameFile currExeFile old
+  renameFile newExeFile destExeFile
+
 -- | Ensure that the Stack executable download is in the same location as the
 -- currently running executable. See:
 -- https://github.com/commercialhaskell/stack/issues/3232
 performPathChecking ::
      HasConfig env
-  => Path Abs File -- ^ location of the newly downloaded file
-  -> String -- ^ currently running executable
+  => Path Abs File
+     -- ^ Path to the newly downloaded file
+  -> Path Abs File
+     -- ^ Path to the currently running executable
   -> RIO env ()
-performPathChecking newFile executablePath = do
-  executablePath' <- parseAbsFile executablePath
-  unless (toFilePath newFile == executablePath) $ do
-    logInfo $ "Also copying Stack executable to " <> fromString executablePath
-    tmpFile <- parseAbsFile $ executablePath ++ ".tmp"
-    eres <- tryIO $ do
-      liftIO $ copyFile newFile tmpFile
-      setFileExecutable (toFilePath tmpFile)
-      liftIO $ renameFile tmpFile executablePath'
-      logInfo "Stack executable copied successfully!"
+performPathChecking newExeFile currExeFile = do
+  unless (newExeFile == currExeFile) $ do
+    prettyInfoL
+      [ flow "Also copying Stack executable to:"
+      , pretty currExeFile <> "."
+      ]
+    tmpFile <- toFilePath <$> addExtension ".tmp" currExeFile
+    eres <- tryIO $
+      relocateStackExeFile currExeFile newExeFile currExeFile
     case eres of
-      Right () -> pure ()
+      Right () -> prettyInfoS "Stack executable copied successfully!"
       Left e
-        | isPermissionError e -> do
-            prettyWarn $
-                 flow "Permission error when trying to copy:"
-              <> blankLine
-              <> string (displayException e)
-              <> blankLine
-              <> flow "Should I try to perform the file copy using sudo? This \
-                      \may fail."
-            toSudo <- promptBool "Try using sudo? (y/n) "
-            when toSudo $ do
-              let run cmd args = do
-                    ec <- proc cmd args runProcess
-                    when (ec /= ExitSuccess) $
+        | isPermissionError e -> if osIsWindows
+            then do
+              prettyWarn $
+                   flow "Permission error when trying to copy:"
+                <> blankLine
+                <> string (displayException e)
+            else do
+              prettyWarn $
+                   flow "Permission error when trying to copy:"
+                <> blankLine
+                <> string (displayException e)
+                <> blankLine
+                <> fillSep
+                     [ flow "Should I try to perform the file copy using"
+                     , style Shell "sudo" <> "?"
+                     , flow "This may fail."
+                     ]
+              toSudo <- promptBool "Try using sudo? (y/n) "
+              when toSudo $ do
+                let run cmd args = do
+                      ec <- proc cmd args runProcess
+                      when (ec /= ExitSuccess) $
                         throwIO $ ProcessExited ec cmd args
-                  commands =
-                    [ ("sudo",
-                        [ "cp"
-                        , toFilePath newFile
-                        , toFilePath tmpFile
-                        ])
-                    , ("sudo",
-                        [ "mv"
-                        , toFilePath tmpFile
-                        , executablePath
-                        ])
-                    ]
-              logInfo "Going to run the following commands:"
-              logInfo ""
-              forM_ commands $ \(cmd, args) ->
-                logInfo $ "-  " <> mconcat (intersperse " " (fromString <$> (cmd:args)))
-              mapM_ (uncurry run) commands
-              logInfo ""
-              logInfo "sudo file copy worked!"
+                    commands =
+                      [ ("sudo",
+                          [ "cp"
+                          , toFilePath newExeFile
+                          , tmpFile
+                          ])
+                      , ("sudo",
+                          [ "mv"
+                          , tmpFile
+                          , toFilePath currExeFile
+                          ])
+                      ]
+                prettyInfo $
+                     flow "Going to run the following commands:"
+                  <> blankLine
+                  <> bulletedList
+                       ( map
+                         ( \(cmd, args) ->
+                             style Shell $ fillSep
+                               $ fromString cmd
+                               : map fromString args
+                         )
+                         commands
+                       )
+                mapM_ (uncurry run) commands
+                prettyInfo $
+                     line
+                  <> flow "sudo file copy worked!"
         | otherwise -> throwM e
 
 getDownloadVersion :: StackReleaseInfo -> Maybe Version
