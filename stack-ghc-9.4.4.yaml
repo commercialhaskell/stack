@@ -1,8 +1,8 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.4.3.
+# built with GHC 9.4.4.
 
-# GHC 9.4.3
-resolver: nightly-2022-12-22
+# GHC 9.4.4
+resolver: nightly-2023-01-13
 
 packages:
 - .
@@ -22,12 +22,14 @@ nix:
   - unzip
 
 flags:
-  stack:
-    developer-mode: true
-  mintty:
+  ansi-terminal:
     win32-2-13-1: false
   hackage-security:
     cabal-syntax: true
+  mintty:
+    win32-2-13-1: false
+  stack:
+    developer-mode: true
 
 ghc-options:
   "$locals": -fhide-source-paths
