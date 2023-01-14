@@ -335,7 +335,7 @@ The following assumes that you already have installed a version of Stack and the
 1.  Clone the `stack` repository from GitHub with the command:
 
     ~~~text
-    git clone https://github.com/commercialhaskell/stack.git`
+    git clone https://github.com/commercialhaskell/stack.git
     ~~~
 
 2.  Change the current working directory to the cloned `stack` directory with the
