@@ -1483,6 +1483,21 @@ environment variable or using Stack's `--stack-root` option on the command line.
     `~/.config/stack` on Unix-like operating systems and `%APPDIR%\stack` on
     Windows.
 
+    This approach treats:
+
+    *   the project-level YAML configuration file that is common to all projects
+        without another such file in their project directory or its ancestor
+        directories as _data_ rather than as part of Stack's own
+        _configuration_;
+
+    *   the snapshots database as essential data rather than as non-essential
+        data that would be part of a _cache_, notwithstanding that Stack will
+        rebuild that database as its contents are needed; and
+
+    *   the Pantry store as essential data rather than as non-essential data
+        that would be part of a _cache_, notwithstanding that Stack will
+        download the package index and rebuild the store if it is absent.
+
 The location of the Stack root is reported by command:
 
 ~~~text
