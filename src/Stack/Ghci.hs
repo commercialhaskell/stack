@@ -351,21 +351,34 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets localMap = do
     -- Figure out
     let extraLoadDeps = getExtraLoadDeps ghciLoadLocalDeps localMap directlyWanted
     if (ghciSkipIntermediate && not ghciLoadLocalDeps) || null extraLoadDeps
-        then pure directlyWanted
-        else do
-            let extraList =
-                  mconcat $ L.intersperse ", " (map (fromString . packageNameString . fst) extraLoadDeps)
-            if ghciLoadLocalDeps
-                then logInfo $
-                  "The following libraries will also be loaded into GHCi because " <>
-                  "they are local dependencies of your targets, and you specified --load-local-deps:\n    " <>
-                  extraList
-                else logInfo $
-                  "The following libraries will also be loaded into GHCi because " <>
-                  "they are intermediate dependencies of your targets:\n    " <>
-                  extraList <>
-                  "\n(Use --skip-intermediate-deps to omit these)"
-            pure (directlyWanted ++ extraLoadDeps)
+      then pure directlyWanted
+      else do
+        let extraList' =
+              map (fromString . packageNameString . fst) extraLoadDeps :: [StyleDoc]
+            extraList = mkNarrativeList (Just Current) False extraList'
+        if ghciLoadLocalDeps
+          then prettyInfo $
+            fillSep $
+                  [ flow "The following libraries will also be loaded into \
+                         \GHCi because they are local dependencies of your \
+                         \targets, and you specified"
+                  , style Shell "--load-local-deps" <> ":"
+                  ]
+              <> extraList
+          else prettyInfo $
+               fillSep
+                 ( flow "The following libraries will also be loaded into \
+                        \GHCi because they are intermediate dependencies of \
+                        \your targets:"
+                 : extraList
+                 )
+            <> line
+            <> fillSep
+                 [ "(Use"
+                 , style Shell "--skip-intermediate-deps"
+                 , flow "to omit these.)"
+                 ]
+        pure (directlyWanted ++ extraLoadDeps)
 
 getAllNonLocalTargets ::
      Map PackageName Target
@@ -440,9 +453,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
            fillSep
              ( flow "The following GHC options are incompatible with GHCi and \
                     \have not been passed to it:"
-             : mkNarrativeList
-                 (Just Current)
-                 False
+             : mkNarrativeList (Just Current) False
                  (map fromString (nubOrd omittedOpts) :: [StyleDoc])
              )
         <> line
@@ -450,9 +461,11 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     let odir =
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir ]
-    logInfo $
-      "Configuring GHCi with the following packages: " <>
-      mconcat (L.intersperse ", " (map (fromString . packageNameString . ghciPkgName) pkgs))
+    prettyInfoL
+      ( flow "Configuring GHCi with the following packages:"
+      : mkNarrativeList (Just Current) False
+          (map (fromString . packageNameString . ghciPkgName) pkgs :: [StyleDoc])
+      )
     compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
     let execGhci extras = do
             menv <- liftIO $ configProcessContextSettings config defaultEnvSettings

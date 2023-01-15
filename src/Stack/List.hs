@@ -23,7 +23,7 @@ instance Exception ListException where
 
 -- | Intended to work for the command line command.
 listPackages ::
-     forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+     forall env. (HasPantryConfig env, HasProcessContext env, HasTerm env)
   => Maybe RawSnapshot -- ^ when looking up by name, take from this build plan
   -> [String] -- ^ names or identifiers
   -> RIO env ()
@@ -35,7 +35,7 @@ listPackages mSnapshot input = do
   case errs1 ++ errs2 of
     [] -> pure ()
     errs -> throwM $ CouldNotParsePackageSelectors errs
-  mapM_ (logInfo . fromString . packageIdentifierString) locs
+  mapM_ (prettyInfo . fromString . packageIdentifierString) locs
  where
   toLoc | Just snapshot <- mSnapshot = toLocSnapshot snapshot
         | otherwise = toLocNoSnapshot

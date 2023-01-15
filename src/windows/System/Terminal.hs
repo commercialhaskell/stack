@@ -80,7 +80,7 @@ getTerminalWidth = do
 -- | Set the code page for this process as necessary. Only applies to Windows.
 -- See: https://github.com/commercialhaskell/stack/issues/738
 fixCodePage ::
-     HasLogFunc env
+     HasTerm env
   => Bool -- ^ modify code page?
   -> Version -- ^ GHC version
   -> RIO env a
@@ -110,16 +110,16 @@ fixCodePage mcp ghcVersion inner =
 
     case (setInput, setOutput) of
       (False, False) -> pure ()
-      (True, True) -> warn ""
-      (True, False) -> warn " input"
-      (False, True) -> warn " output"
+      (True, True) -> warn []
+      (True, False) -> warn ["input"]
+      (False, True) -> warn ["output"]
 
     fixInput $ fixOutput inner
   expected = 65001 -- UTF-8
-  warn typ = logInfo $
-    "Setting" <>
-    typ <>
-    " codepage to UTF-8 (65001) to ensure correct output from GHC"
+  warn typ = prettyInfoL $
+       "Setting"
+    :  typ
+    <> [ flow "codepage to UTF-8 (65001) to ensure correct output from GHC." ]
 
 -- | hIsTerminaDevice does not recognise handles to mintty terminals as terminal
 -- devices, but isMinTTYHandle does.

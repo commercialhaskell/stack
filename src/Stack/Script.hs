@@ -132,7 +132,10 @@ scriptCmd opts = do
     let exeName = toExeName $ toFilePath file
     case shouldRun of
       YesRun -> exec exeName (soArgs opts)
-      NoRun -> logInfo $ "Compilation finished, executable available at " <> fromString exeName
+      NoRun -> prettyInfoL
+        [ flow "Compilation finished, executable available at"
+        , style File (fromString exeName) <> "."
+        ]
 
   shortCut shouldRun shouldCompile file scriptDir =
     handleIO (const $ longWay shouldRun shouldCompile file scriptDir) $ do

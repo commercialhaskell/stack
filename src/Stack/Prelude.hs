@@ -65,10 +65,13 @@ module Stack.Prelude
   , prettyDebugL
   , prettyError
   , prettyErrorL
+  , prettyGeneric
   , prettyInfo
   , prettyInfoL
   , prettyInfoS
   , prettyNote
+  , prettyNoteL
+  , prettyNoteS
   , prettyWarn
   , prettyWarnL
   , prettyWarnNoIndent
@@ -102,13 +105,14 @@ import           RIO.File as X hiding ( writeBinaryFileAtomic )
 import           RIO.PrettyPrint
                    ( HasStylesUpdate (..), HasTerm (..), Pretty (..), Style (..)
                    , StyleDoc, (<+>), align, bulletedList, debugBracket
-                   , encloseSep, fill, fillSep, flow, hang, hcat, hsep, indent
-                   , line, logLevelToStyle, mkNarrativeList, parens, prettyDebug
-                   , prettyDebugL, prettyError, prettyErrorL, prettyInfo
-                   , prettyInfoL, prettyInfoS, prettyNote, prettyWarn
+                   , displayWithColor, encloseSep, fill, fillSep, flow, hang
+                   , hcat, hsep, indent, line, logLevelToStyle, mkNarrativeList
+                   , parens, prettyDebug, prettyDebugL, prettyError
+                   , prettyErrorL, prettyInfo, prettyInfoL, prettyInfoS
+                   , prettyNote, prettyNoteL, prettyNoteS, prettyWarn
                    , prettyWarnL, prettyWarnNoIndent, prettyWarnS, punctuate
                    , sep, softbreak, softline, string, style, stylesUpdateL
-                   , useColorL, vsep, prettyDebug
+                   , useColorL, vsep
                    )
 import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
@@ -373,3 +377,10 @@ prettyThrowM = throwM . PrettyException
 -- | Maybe cons.
 mcons :: Maybe a -> [a] -> [a]
 mcons ma as = maybe as (:as) ma
+
+prettyGeneric ::
+     (HasTerm env, HasCallStack, Pretty b, MonadReader env m, MonadIO m)
+  => LogLevel
+  -> b
+  -> m ()
+prettyGeneric level = logGeneric "" level . display <=< displayWithColor

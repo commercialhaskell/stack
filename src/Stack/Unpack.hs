@@ -34,7 +34,7 @@ instance Exception UnpackException where
 
 -- | Intended to work for the command line command.
 unpackPackages ::
-     forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
+     forall env. (HasPantryConfig env, HasProcessContext env, HasTerm env)
   => Maybe RawSnapshot -- ^ when looking up by name, take from this build plan
   -> Path Abs Dir -- ^ destination
   -> [String] -- ^ names or identifiers
@@ -63,11 +63,12 @@ unpackPackages mSnapshot dest input = do
 
   forM_ (Map.toList locs) $ \(loc, dest') -> do
     unpackPackageLocation dest' loc
-    logInfo $
-      "Unpacked " <>
-      display loc <>
-      " to " <>
-      fromString (toFilePath dest')
+    prettyInfoL
+      [ "Unpacked"
+      , fromString $ T.unpack $ textDisplay loc
+      , "to"
+      , pretty dest' <> "."
+      ]
  where
   toLoc | Just snapshot <- mSnapshot = toLocSnapshot snapshot
         | otherwise = toLocNoSnapshot

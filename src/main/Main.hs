@@ -939,7 +939,10 @@ sdistCmd sdistOpts =
       runConduitRes $
         sourceLazy tarBytes .|
         sinkFileCautious (toFilePath tarPath)
-      prettyInfoL [flow "Wrote sdist tarball to", pretty tarPath]
+      prettyInfoL
+        [flow "Wrote sdist-format compressed archive to"
+        , pretty tarPath <> "."
+        ]
       checkSDistTarball sdistOpts tarPath
       forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
  where
