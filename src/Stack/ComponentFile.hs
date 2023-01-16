@@ -29,24 +29,35 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import           Distribution.ModuleName ( ModuleName )
 import qualified Distribution.ModuleName as Cabal
-import           Distribution.Package
-                   hiding
-                     ( Module, Package, PackageIdentifier, packageName
-                     , packageVersion
-                     )
-import           Distribution.PackageDescription hiding ( FlagName )
+import           Distribution.PackageDescription
+                   ( Benchmark (..), BenchmarkInterface (..), BuildInfo (..)
+                   , Executable (..), Library (..), TestSuite (..)
+                   , TestSuiteInterface (..)
+                   )
 import           Distribution.Text ( display )
 import           Distribution.Utils.Path ( getSymbolicPath )
 import           Distribution.Version ( mkVersion )
 import qualified HiFileParser as Iface
-import           Path as FL hiding ( replaceExtension )
+import           Path
+                   ( (</>), filename, isProperPrefixOf, parent, parseRelDir
+                   , stripProperPrefix
+                   )
 import           Path.Extra
-import           Path.IO hiding ( findFiles )
+                   ( parseCollapsedAbsFile, rejectMissingDir, rejectMissingFile
+                   )
+import           Path.IO
+                   ( doesDirExist, doesFileExist, forgivingAbsence
+                   , getCurrentDir, listDir, resolveDir, resolveFile
+                   )
 import           Stack.Constants
+                   ( haskellDefaultPreprocessorExts, haskellFileExts
+                   , relDirAutogen, relDirBuild, relDirGlobalAutogen
+                   )
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Config
-import           Stack.Types.NamedComponent
-import           Stack.Types.Package
+                   ( Config (..), HasConfig (..), prettyStackDevL )
+import           Stack.Types.NamedComponent ( NamedComponent (..) )
+import           Stack.Types.Package ( PackageException (..), dotCabalModule )
 import           Stack.Types.PackageFile
                    ( GetPackageFileContext (..), DotCabalDescriptor (..)
                    , DotCabalPath (..), PackageWarning (..)
