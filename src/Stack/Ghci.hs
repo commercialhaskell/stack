@@ -30,7 +30,7 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Distribution.PackageDescription as C
 import           Path
-import           Path.Extra ( toFilePathNoTrailingSep )
+import           Path.Extra ( forgivingResolveFile', toFilePathNoTrailingSep )
 import           Path.IO hiding ( withSystemTempDir )
 import           RIO.Process
                    ( HasProcessContext, exec, proc, readProcess_
@@ -239,7 +239,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
         then do
             fileTargets <- forM fileTargetsRaw $ \fp0 -> do
                 let fp = T.unpack fp0
-                mpath <- liftIO $ forgivingAbsence (resolveFile' fp)
+                mpath <- liftIO $ forgivingResolveFile' fp
                 case mpath of
                     Nothing -> throwM (MissingFileTarget fp)
                     Just path -> pure path

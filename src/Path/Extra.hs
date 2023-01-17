@@ -14,21 +14,27 @@ module Path.Extra
   , pathToLazyByteString
   , pathToText
   , tryGetModificationTime
+  , forgivingResolveFile
+  , forgivingResolveFile'
   ) where
 
 import           Data.Time ( UTCTime )
 import           Path
-                   ( Abs, Dir, File, Rel, parseAbsDir, parseAbsFile
-                   , toFilePath
+                   ( Abs, Dir, File, PathException (..), Rel, parseAbsDir
+                   , parseAbsFile, toFilePath
                    )
 import           Path.Internal ( Path (Path) )
-import           Path.IO ( doesDirExist, doesFileExist, getModificationTime )
+import           Path.IO
+                   ( doesDirExist, doesFileExist, getCurrentDir
+                   , getModificationTime
+                   )
 import           RIO
 import           System.IO.Error ( isDoesNotExistError )
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as BSL
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import qualified System.Directory as D
 import qualified System.FilePath as FP
 
 -- | Convert to FilePath but don't add a trailing slash.
@@ -123,3 +129,30 @@ pathToText = T.pack . toFilePath
 
 tryGetModificationTime :: MonadIO m => Path Abs File -> m (Either () UTCTime)
 tryGetModificationTime = liftIO . tryJust (guard . isDoesNotExistError) . getModificationTime
+
+-- | 'Path.IO.resolveFile' (@path-io@ package) throws 'InvalidAbsFile' (@path@
+-- package) if the file does not exist; this function yields 'Nothing'.
+forgivingResolveFile ::
+     MonadIO m
+  => Path Abs Dir
+     -- ^ Base directory
+  -> FilePath
+     -- ^ Path to resolve
+  -> m (Maybe (Path Abs File))
+forgivingResolveFile b p = liftIO $
+  D.canonicalizePath (toFilePath b FP.</> p) >>= \cp ->
+    catch
+      (Just <$> parseAbsFile cp)
+      ( \e -> case e of
+          InvalidAbsFile _ -> pure Nothing
+          _ -> throwIO e
+      )
+
+-- | 'Path.IO.resolveFile'' (@path-io@ package) throws 'InvalidAbsFile' (@path@
+-- package) if the file does not exist; this function yields 'Nothing'.
+forgivingResolveFile' ::
+     MonadIO m
+  => FilePath
+     -- ^ Path to resolve
+  -> m (Maybe (Path Abs File))
+forgivingResolveFile' p = getCurrentDir >>= flip forgivingResolveFile p
