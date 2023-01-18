@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ViewPatterns        #-}
 
@@ -153,11 +154,26 @@ parseRawTargetDirs root locals ri =
       mdir <- liftIO $ forgivingAbsence (resolveDir root (T.unpack t))
         >>= rejectMissingDir
       case mdir of
-        Nothing -> pure $ Left $
-          fillSep
-            [ flow "Directory not found:"
-            , style Dir (fromString $ T.unpack t) <> "."
-            ]
+        Nothing -> pure . Left $
+          if | T.isPrefixOf "stack-yaml" t ->
+                fillSep
+                  [ flow "Directory not found:"
+                  , style Dir (fromString $ T.unpack t) <> "."
+                  , flow "Is this a typo? Can I suggest:"
+                  , style Dir (fromString $ "--" ++ T.unpack t)
+                  ]
+             | T.isSuffixOf ".yaml" t ->
+                fillSep
+                  [ flow "Directory not found:"
+                  , style Dir (fromString $ T.unpack t) <> "."
+                  , flow "Is this a typo? Can I suggest:"
+                  , style Dir (fromString $ "--stack-yaml " ++ T.unpack t)
+                  ]
+             | otherwise ->
+                fillSep
+                  [ flow "Directory not found:"
+                  , style Dir (fromString $ T.unpack t) <> "."
+                  ]
         Just dir ->
           case mapMaybe (childOf dir) $ Map.toList locals of
             [] -> pure $ Left $
