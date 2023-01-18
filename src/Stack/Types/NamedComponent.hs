@@ -19,7 +19,6 @@ module Stack.Types.NamedComponent
 
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Pantry
 import           Stack.Prelude
 
 -- | A single, fully resolved component of a package
