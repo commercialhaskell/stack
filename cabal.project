@@ -13,6 +13,11 @@
 --
 -- > stack ls dependencies cabal > cabal.config
 --
+-- From the resolver in `stack.yaml` be sure to set `with-compiler: ghc-x.y.z`.
+-- This can be checked in the cabal.config from stackage that matches the
+-- resolver, such as:
+--   https://www.stackage.org/lts-20.0/cabal.config
+--
 -- However, be aware that, in respect of the `unix` package or the `Win32`
 -- package (that may come with GHC, depending on the operating system):
 --
@@ -26,5 +31,6 @@
 -- the other. A comprehensive `cabal.config` will need to be created by editing
 -- the command's output.
 
+with-compiler: ghc-9.2.5
 import: cabal.config
 packages: .
