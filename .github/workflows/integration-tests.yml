@@ -11,6 +11,11 @@ on:
     - '**'
   workflow_dispatch:
 
+# Stack will use the value of the GH_TOKEN environment variable to authenticate
+# its requests of the GitHub REST API, providing a higher request rate limit.
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 # As of 26 December 2022, ubuntu-latest, windows-latest and macos-latest come
 # with Stack 2.9.1. ubuntu-latest and macos-latest come with GHC 9.4.3.
 # windows-latest comes with GHC 9.4.2. windows-latest comes with NSIS 3.08, for

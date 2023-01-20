@@ -5,6 +5,22 @@
 The environment variables listed in alphabetal order below can affect how Stack
 behaves.
 
+## `GH_TOKEN` or `GITHUB_TOKEN`
+
+:octicons-tag-24: UNRELEASED
+
+Stack will use the value of the `GH_TOKEN` or, in the alternative,
+`GITHUB_TOKEN` environment variable (if not an empty string) as credentials to
+authenticate its requests of the GitHub REST API, using HTTP 'Basic'
+authentication.
+
+GitHub limits the rate of unauthenticated requests to its API, although most
+users of Stack will not experience that limit from the use of Stack alone. The
+limit for authenticated requests is significantly higher.
+
+For more information about authentication of requests of the GitHub REST API,
+see GitHub's REST API documentation.
+
 ## `HACKAGE_KEY`
 
 [:octicons-tag-24: 2.7.5](https://github.com/commercialhaskell/stack/releases/tag/v2.7.5)

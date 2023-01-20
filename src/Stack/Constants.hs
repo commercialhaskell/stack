@@ -124,6 +124,9 @@ module Stack.Constants
   , relFileBuildLock
   , stackDeveloperModeDefault
   , globalFooter
+  , gitHubBasicAuthType
+  , gitHubTokenEnvVar
+  , altGitHubTokenEnvVar
   ) where
 
 import           Data.ByteString.Builder ( byteString )
@@ -605,3 +608,17 @@ stackDeveloperModeDefault = STACK_DEVELOPER_MODE_DEFAULT
 globalFooter :: String
 globalFooter =
   "Command 'stack --help' for global options that apply to all subcommands."
+
+-- | The type for GitHub REST API HTTP \'Basic\' authentication.
+gitHubBasicAuthType :: ByteString
+gitHubBasicAuthType = "Bearer"
+
+-- | Environment variable to hold credentials for GitHub REST API HTTP \'Basic\'
+-- authentication.
+gitHubTokenEnvVar :: String
+gitHubTokenEnvVar = "GH_TOKEN"
+
+-- | Alternate environment variable to hold credentials for GitHub REST API HTTP
+-- \'Basic\' authentication.
+altGitHubTokenEnvVar :: String
+altGitHubTokenEnvVar = "GITHUB_TOKEN"
