@@ -118,7 +118,12 @@ Default: `read-write`, if snapshot specified in YAML configuration file;
 `read-only`, if a different snapshot is specified on the command line.
 
 Pass the option `--lock-file <mode>` to specify how Stack interacts with lock
-files. Valid modes are `error-on-write`, `ignore`, `read-only` and `read-write`.
+files. Valid modes are:
+
+* `error-on-write`: Stack reports an error, rather than write a lock file;
+* `ignore`: Stack ignores lock files;
+* `read-only`: Stack only reads lock files; and
+* `read-write`: Stack reads and writes lock files.
 
 ## `--[no-]modify-code-page` flag
 

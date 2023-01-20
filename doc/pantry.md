@@ -98,49 +98,45 @@ generated in a [lock file](lock_files.md).
 
 ### Hackage packages
 
-Packages can be stated by a name-version combination. The basic syntax for this
-is:
-
-~~~yaml
-extra-deps:
-- acme-missiles-0.3
-~~~
-
-Using this syntax, the most recent Cabal file revision available will
-be used.
-
-You can specify a specific revision number, with `0` being the original file,
-like this:
+A package can be identified by its name, version and its Cabal file revision
+number, with `0` being the original Cabal file. For example:
 
 ~~~yaml
 extra-deps:
 - acme-missiles-0.3@rev:0
 ~~~
 
-For safer, more reproducible builds, you can optionally specify the SHA256 hash
-of the Cabal file's contents, like this:
+A package name and version only can be stated. Using this syntax, the most
+recent Cabal file revision available in the package index will be used. For
+example:
+
+~~~yaml
+extra-deps:
+- acme-missiles-0.3
+~~~
+
+This may result in one build differing from another, if a further Cabal file
+revision is added to the package index between builds.
+
+Alternatively, you can specify the package name and version with the SHA256 hash
+of the contents of its Cabal file. Doing so is slighly more resilient than using
+the Cabal file revision number, as it does not rely on the correct ordering in
+the package index. For example:
 
 ~~~yaml
 extra-deps:
 - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
 ~~~
 
-You can optionally also specify the size of the Cabal file in bytes, like this:
+Optionally, you can specify also the size of the Cabal file in bytes. For
+example:
 
 ~~~yaml
 extra-deps:
 - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,631
 ~~~
 
-!!! note
-
-    Specifying package using SHA256 is slightly more resilient in that it does
-    not rely on correct ordering in the package index, while revision number is
-    likely simpler to use. In practice, both should guarantee equally
-    reproducible build plans.
-
-You can also include the Pantry tree information. The following would be
-generated and stored in the lock file:
+Optionally, you can specify also the Pantry tree information. For example:
 
 ~~~yaml
 - hackage: acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,613
@@ -148,6 +144,10 @@ generated and stored in the lock file:
     size: 226
     sha256: 614bc0cca76937507ea0a5ccc17a504c997ce458d7f2f9e43b15a10c8eaeb033
 ~~~
+
+The SHA256 hash of the contents of the Cabal file and its size in bytes is
+provided in Stack's lock file. For further information, see the
+[lock files](lock_files.md) documentation.
 
 ### Git and Mercurial repositories
 
