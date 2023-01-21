@@ -145,30 +145,40 @@ packages:
       sha256: 614bc0cca76937507ea0a5ccc17a504c997ce458d7f2f9e43b15a10c8eaeb033
 ~~~
 
-## Creation
+## Creation procedure
 
 Whenever a project-level configuration file (`stack.yaml`) is loaded, Stack
 checks for a lock file in the same file path, with a `.lock` extension added.
 For example, if you command:
 
 ~~~text
-stack build --stack-yaml my-stack.yaml
+stack --stack-yaml my-stack.yaml build
 ~~~
 
-Stack will use a lock file in the location `my-stack.yaml.lock`. For the rest of
-this document, we'll assume that the files are simply `stack.yaml` and
+or
+
+~~~text
+stack --stack-yaml my-stack.yaml build --dry-run
+~~~
+
+then Stack will use a lock file in the location `my-stack.yaml.lock`. For the
+rest of this document, we'll assume that the files are simply `stack.yaml` and
 `stack.yaml.lock`.
 
-If the lock file does not exist, it will be created by:
+If the lock file does not exist, subject to Stack's
+[`--lock-file`](global_flags.md#-lock-file-option) option, it will be
+created by:
 
 * Loading the `stack.yaml`
 * Loading all snapshot files
 * Completing all missing information
-* Writing out the new `stack.yaml.lock` file
+* Writing out the new `stack.yaml.lock` file to the disk
 
 ## Update procedure
 
-When loading a Stack project all completed package or snapshot locations (even
-when they were completed using information from a lock file) get collected to
-form a new lock file in memory and compare against the one on disk, writing if
-there are any differences.
+Whenever a project-level configuration file (`stack.yaml`) is loaded, all
+completed package or snapshot locations (even those completed using information
+from a lock file) get collected to form a new lock file in memory. Subject to
+Stack's [`--lock-file`](global_flags.md#-lock-file-option) option, that new lock
+file is compared against the one on disk and, if there are any differences,
+written out to the disk.

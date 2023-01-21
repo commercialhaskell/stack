@@ -1,7 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- | A ghc-pkg id.
 
@@ -39,7 +36,7 @@ instance Exception GhcPkgIdParseFail where
 -- | A ghc-pkg package identifier.
 newtype GhcPkgId
   = GhcPkgId Text
-  deriving (Eq, Ord, Data, Typeable, Generic, PersistField, PersistFieldSql)
+  deriving (Data, Eq, Generic, Ord, PersistField, PersistFieldSql, Typeable)
 
 instance Hashable GhcPkgId
 

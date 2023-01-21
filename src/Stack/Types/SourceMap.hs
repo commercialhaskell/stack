@@ -1,9 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | A sourcemap maps a package name to how it should be built,
--- including source code, flags, options, etc. This module contains
--- various stages of source map construction. See the
--- @build_overview.md@ doc for details on these stages.
+-- | A sourcemap maps a package name to how it should be built, including source
+-- code, flags, options, etc. This module contains various stages of source map
+-- construction. See the @build_overview.md@ doc for details on these stages.
 module Stack.Types.SourceMap
   ( -- * Different source map types
     SMWanted (..)
@@ -44,8 +43,8 @@ data CommonPackage = CommonPackage
   , cpHaddocks :: !Bool
   }
 
--- | Flag showing if package comes from a snapshot
--- needed to ignore dependency bounds between such packages
+-- | Flag showing if package comes from a snapshot needed to ignore dependency
+-- bounds between such packages
 data FromSnapshot
   = FromSnapshot
   | NotFromSnapshot
@@ -56,11 +55,11 @@ data DepPackage = DepPackage
   { dpCommon :: !CommonPackage
   , dpLocation :: !PackageLocation
   , dpHidden :: !Bool
-  -- ^ Should the package be hidden after registering?
-  -- Affects the script interpreter's module name import parser.
+    -- ^ Should the package be hidden after registering? Affects the script
+    -- interpreter's module name import parser.
   , dpFromSnapshot :: !FromSnapshot
-  -- ^ Needed to ignore bounds between snapshot packages
-  -- See https://github.com/commercialhaskell/stackage/issues/3185
+    -- ^ Needed to ignore bounds between snapshot packages
+    -- See https://github.com/commercialhaskell/stackage/issues/3185
   }
 
 -- | A view of a project package needed for resolving components
@@ -70,9 +69,9 @@ data ProjectPackage = ProjectPackage
   , ppResolvedDir :: !(ResolvedPath Dir)
   }
 
--- | A view of a package installed in the global package database also
--- could include marker for a replaced global package (could be replaced
--- because of a replaced dependency)
+-- | A view of a package installed in the global package database also could
+-- include marker for a replaced global package (could be replaced because of a
+-- replaced dependency)
 data GlobalPackage
   = GlobalPackage !Version
   | ReplacedGlobalPackage ![PackageName]
@@ -82,24 +81,24 @@ isReplacedGlobal :: GlobalPackage -> Bool
 isReplacedGlobal (ReplacedGlobalPackage _) = True
 isReplacedGlobal (GlobalPackage _) = False
 
--- | A source map with information on the wanted (but not actual)
--- compiler. This is derived by parsing the @stack.yaml@ file for
--- @packages@, @extra-deps@, their configuration (e.g., flags and
--- options), and parsing the snapshot it refers to. It does not
--- include global packages or any information from the command line.
+-- | A source map with information on the wanted (but not actual) compiler. This
+-- is derived by parsing the @stack.yaml@ file for @packages@, @extra-deps@,
+-- their configuration (e.g., flags and options), and parsing the snapshot it
+-- refers to. It does not include global packages or any information from the
+-- command line.
 --
--- Invariant: a @PackageName@ appears in either 'smwProject' or
--- 'smwDeps', but not both.
+-- Invariant: a @PackageName@ appears in either 'smwProject' or 'smwDeps', but
+-- not both.
 data SMWanted = SMWanted
   { smwCompiler :: !WantedCompiler
   , smwProject :: !(Map PackageName ProjectPackage)
   , smwDeps :: !(Map PackageName DepPackage)
   , smwSnapshotLocation :: !RawSnapshotLocation
-  -- ^ Where this snapshot is loaded from.
+    -- ^ Where this snapshot is loaded from.
   }
 
--- | Adds in actual compiler information to 'SMWanted', in particular
--- the contents of the global package database.
+-- | Adds in actual compiler information to 'SMWanted', in particular the
+-- contents of the global package database.
 --
 -- Invariant: a @PackageName@ appears in only one of the @Map@s.
 data SMActual global = SMActual
@@ -122,36 +121,34 @@ data Target
 data PackageType = PTProject | PTDependency
   deriving (Eq, Show)
 
--- | Builds on an 'SMActual' by resolving the targets specified on the
--- command line, potentially adding in new dependency packages in the
--- process.
+-- | Builds on an 'SMActual' by resolving the targets specified on the command
+-- line, potentially adding in new dependency packages in the process.
 data SMTargets = SMTargets
   { smtTargets :: !(Map PackageName Target)
   , smtDeps :: !(Map PackageName DepPackage)
   }
 
--- | The final source map, taking an 'SMTargets' and applying all
--- command line flags and GHC options.
+-- | The final source map, taking an 'SMTargets' and applying all command line
+-- flags and GHC options.
 data SourceMap = SourceMap
   { smTargets :: !SMTargets
-    -- ^ Doesn't need to be included in the hash, does not affect the
-    -- source map.
+    -- ^ Doesn't need to be included in the hash, does not affect the source
+    -- map.
   , smCompiler :: !ActualCompiler
-    -- ^ Need to hash the compiler version _and_ its installation
-    -- path.  Ideally there would be some kind of output from GHC
-    -- telling us some unique ID for the compiler itself.
+    -- ^ Need to hash the compiler version _and_ its installation path. Ideally
+    -- there would be some kind of output from GHC telling us some unique ID for
+    -- the compiler itself.
   , smProject :: !(Map PackageName ProjectPackage)
-    -- ^ Doesn't need to be included in hash, doesn't affect any of
-    -- the packages that get stored in the snapshot database.
+    -- ^ Doesn't need to be included in hash, doesn't affect any of the packages
+    -- that get stored in the snapshot database.
   , smDeps :: !(Map PackageName DepPackage)
-    -- ^ Need to hash all of the immutable dependencies, can ignore
-    -- the mutable dependencies.
+    -- ^ Need to hash all of the immutable dependencies, can ignore the mutable
+    -- dependencies.
   , smGlobal :: !(Map PackageName GlobalPackage)
-    -- ^ Doesn't actually need to be hashed, implicitly captured by
-    -- smCompiler. Can be broken if someone installs new global
-    -- packages. We can document that as not supported, _or_ we could
-    -- actually include all of this in the hash and make Stack more
-    -- resilient.
+    -- ^ Doesn't actually need to be hashed, implicitly captured by smCompiler.
+    -- Can be broken if someone installs new global packages. We can document
+    -- that as not supported, _or_ we could actually include all of this in the
+    -- hash and make Stack more resilient.
   }
 
 -- | A unique hash for the immutable portions of a 'SourceMap'.

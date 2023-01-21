@@ -1,13 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
 -- | Configuration options for building.
 module Stack.Types.Config.Build
-  (
-    BuildOpts (..)
+  ( BuildOpts (..)
   , BuildCommand (..)
   , defaultBuildOpts
   , defaultBuildOptsCLI
@@ -28,8 +25,7 @@ module Stack.Types.Config.Build
   , boptsCLIFlagsByName
   , CabalVerbosity (..)
   , toFirstCabalVerbosity
-  )
-  where
+  ) where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
@@ -150,9 +146,9 @@ defaultBuildOptsCLI = BuildOptsCLI
 -- | How to apply a CLI flag
 data ApplyCLIFlag
   = ACFAllProjectPackages
-  -- ^ Apply to all project packages which have such a flag name available.
+    -- ^ Apply to all project packages which have such a flag name available.
   | ACFByName !PackageName
-  -- ^ Apply to the specified package only.
+    -- ^ Apply to the specified package only.
   deriving (Eq, Ord, Show)
 
 -- | Only flags set via 'ACFByName'
@@ -440,8 +436,6 @@ instance Monoid TestOptsMonoid where
   mempty = memptydefault
   mappend = (<>)
 
-
-
 -- | Haddock Options
 newtype HaddockOpts = HaddockOpts
   { hoAdditionalArgs :: [String] -- ^ Arguments passed to haddock program
@@ -470,7 +464,6 @@ instance Monoid HaddockOptsMonoid where
 
 hoMonoidAdditionalArgsName :: Text
 hoMonoidAdditionalArgsName = "haddock-args"
-
 
 -- | Options for the 'FinalAction' 'DoBenchmarks'
 data BenchmarkOpts = BenchmarkOpts

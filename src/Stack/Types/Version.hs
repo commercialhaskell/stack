@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
 
@@ -51,8 +50,12 @@ versionRangeText :: Cabal.VersionRange -> Text
 versionRangeText = T.pack . render . pretty
 
 -- | A modified intersection which also simplifies, for better display.
-intersectVersionRanges :: Cabal.VersionRange -> Cabal.VersionRange -> Cabal.VersionRange
-intersectVersionRanges x y = Cabal.simplifyVersionRange $ Cabal.intersectVersionRanges x y
+intersectVersionRanges ::
+     Cabal.VersionRange
+  -> Cabal.VersionRange
+  -> Cabal.VersionRange
+intersectVersionRanges x y =
+  Cabal.simplifyVersionRange $ Cabal.intersectVersionRanges x y
 
 -- | Returns the first two components, defaulting to 0 if not present
 toMajorVersion :: Version -> Version

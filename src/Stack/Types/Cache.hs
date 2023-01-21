@@ -50,7 +50,7 @@ instance PersistFieldSql ConfigCacheType where
 
 data Action
   = UpgradeCheck
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 instance PersistField Action where
   toPersistValue UpgradeCheck = PersistInt64 1

@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Data.Monoid.Map
   ( MonoidMap (..)
   ) where

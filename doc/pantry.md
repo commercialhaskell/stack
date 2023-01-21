@@ -90,7 +90,7 @@ There are three types of package locations:
 
 1.  Hackage packages
 2.  Git and Mecurial repositories
-3.  Local or remote archives
+3.  Local or remote archives (such as GitHub archives)
 
 All three types support optional tree metadata to be added, which can be used
 for reproducibility and faster downloads. This information can automatically be
@@ -98,49 +98,47 @@ generated in a [lock file](lock_files.md).
 
 ### Hackage packages
 
-Packages can be stated by a name-version combination. The basic syntax for this
-is:
-
-~~~yaml
-extra-deps:
-- acme-missiles-0.3
-~~~
-
-Using this syntax, the most recent Cabal file revision available will
-be used.
-
-You can specify a specific revision number, with `0` being the original file,
-like this:
+A package can be identified by its name, version and Cabal file revision
+number, with revision `0` being the original Cabal file. For example:
 
 ~~~yaml
 extra-deps:
 - acme-missiles-0.3@rev:0
 ~~~
 
-For safer, more reproducible builds, you can optionally specify the SHA256 hash
-of the Cabal file's contents, like this:
+A package name and version only can be stated. Using this syntax, the most
+recent Cabal file revision available in the package index will be used. For
+example:
+
+~~~yaml
+extra-deps:
+- acme-missiles-0.3
+~~~
+
+This syntax is often used in practice, but may result in one build differing
+from another, if a new or further Cabal file revision is added to the package
+index between the builds.
+
+As an alternative to specifying the Cabal file revision number, you can specify
+the package name and version with the SHA256 hash of the contents of its Cabal
+file. Doing so is slightly more resilient than using the Cabal file revision
+number, as it does not rely on the correct ordering in the package index.
+For example:
 
 ~~~yaml
 extra-deps:
 - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1
 ~~~
 
-You can optionally also specify the size of the Cabal file in bytes, like this:
+Optionally, you can specify also the size of the Cabal file in bytes. For
+example (where the file size is `631` bytes):
 
 ~~~yaml
 extra-deps:
 - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,631
 ~~~
 
-!!! note
-
-    Specifying package using SHA256 is slightly more resilient in that it does
-    not rely on correct ordering in the package index, while revision number is
-    likely simpler to use. In practice, both should guarantee equally
-    reproducible build plans.
-
-You can also include the Pantry tree information. The following would be
-generated and stored in the lock file:
+Optionally, you can specify also the Pantry tree information. For example:
 
 ~~~yaml
 - hackage: acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,613
@@ -149,10 +147,17 @@ generated and stored in the lock file:
     sha256: 614bc0cca76937507ea0a5ccc17a504c997ce458d7f2f9e43b15a10c8eaeb033
 ~~~
 
+The SHA256 hash of the contents of the Cabal file and its size in bytes is
+provided in Stack's lock file. For further information, see the
+[lock files](lock_files.md) documentation. The SHA256 hash and file size
+alternative is also what Stack uses when it makes suggestions about missing
+packages.
+
 ### Git and Mercurial repositories
 
-You can give a Git or Mercurial repository at a specific commit, and Stack will
-clone that repository. For example:
+You can specify a Git or Mercurial repository at a specific commit, and Stack
+will clone that repository and, if it has submodules (Git), update the
+repository's submodules. For example:
 
 ~~~yaml
 extra-deps:
@@ -193,19 +198,6 @@ the root of the repository. If you specify a value of `subdirs`, then `'.'` is
 _not_ included by default and needs to be explicitly specified if a required
 package is found in the top-level directory of the repository.
 
-#### GitHub
-
-[:octicons-tag-24: 1.7.1](https://github.com/commercialhaskell/stack/releases/tag/v1.7.1)
-
-You can specify packages from GitHub repository name using `github`. For
-example:
-
-~~~yaml
-extra-deps:
-- github: snoyberg/http-client
-  commit: a5f4f30f01366738f913968163d856366d7e0342
-~~~
-
 #### git-annex
 
 [git-annex](https://git-annex.branchable.com) is not supported. This is because
@@ -225,7 +217,9 @@ following line:
 fonts export-ignore
 ~~~
 
-### Local or remote archives
+### Local or remote archives (such as GitHub archives)
+
+#### Filepaths or URLs to archive files
 
 You can use filepaths referring to local archive files or HTTP or HTTPS URLs
 referring to remote archive files, either tarballs or ZIP files.
@@ -250,3 +244,27 @@ extra-deps:
 - archive: ../acme-missiles-0.3.tar.gz
   sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
 ~~~
+
+#### GitHub archive files
+
+[:octicons-tag-24: 1.7.1](https://github.com/commercialhaskell/stack/releases/tag/v1.7.1)
+
+You can specify a GitHub respository at a specific commit and Stack will obtain
+from GitHub an archive file of the files in the repository at that point in its
+history. For example:
+
+~~~yaml
+extra-deps:
+- github: snoyberg/http-client
+  commit: a5f4f30f01366738f913968163d856366d7e0342
+~~~
+
+!!! note
+
+    An archive file of the files in a GitHub repository at a point in its
+    history is not the same as a clone of the repository (including its history)
+    and the updating of any submodules. If you need the latter, use the syntax
+    for a [Git repository](pantry.md#git-and-mercurial-repositories).
+
+    If the package fails to build due to missing files, it may be that updated
+    submodules are required.

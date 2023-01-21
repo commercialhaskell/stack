@@ -1,3 +1,6 @@
+# Hpack >= 0.35.0 is provided by Stack >= 2.9.1.
+spec-version: 0.35.0
+
 name: stack
 version: '2.10.0'
 synopsis: The Haskell Tool Stack
@@ -8,7 +11,7 @@ description: |
   If building a 'stack' executable for distribution, please download the
   source code from <https://github.com/commercialhaskell/stack/releases>
   and build it using Stack itself in order to ensure identical behaviour
-  to official binaries.  This package on Hackage is provided for convenience
+  to official binaries. This package on Hackage is provided for convenience
   and bootstrapping purposes.
   .
   Note that the API for the library is not currently stable, and may
@@ -39,6 +42,8 @@ extra-source-files:
 - test/package-dump/ghc-head.txt
 - src/test/Stack/Untar/test1.tar.gz
 - src/test/Stack/Untar/test2.tar.gz
+# GHC's GHC2021 language extension is supported by GHC >= 9.2.1
+language: GHC2021
 ghc-options:
 - -fwrite-ide-info
 - -hiedir=.hie

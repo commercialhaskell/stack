@@ -1,11 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude         #-}
-{-# LANGUAGE ConstraintKinds           #-}
-{-# LANGUAGE DeriveDataTypeable        #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE OverloadedStrings         #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
-{-# LANGUAGE StandaloneDeriving        #-}
 
 -- | Create new a new project directory populated with a basic working
 -- project.
@@ -33,6 +27,7 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import           Data.Time.Calendar ( toGregorian )
 import           Data.Time.Clock ( getCurrentTime, utctDay )
+import           Network.HTTP.Client ( applyBasicAuth )
 import           Network.HTTP.StackClient
                    ( HttpException (..), HttpExceptionContent (..)
                    , Response (..), VerifiedDownloadException (..)
@@ -45,7 +40,10 @@ import           Path ( (</>), dirname, parent, parseRelDir, parseRelFile )
 import           Path.IO
                    ( doesDirExist, doesFileExist, ensureDir, getCurrentDir )
 import           RIO.Process ( proc, runProcess_, withWorkingDir )
-import           Stack.Constants ( backupUrlRelPath, wiredInPackages )
+import           Stack.Constants
+                   ( altGitHubTokenEnvVar, backupUrlRelPath, gitHubBasicAuthType
+                   , gitHubTokenEnvVar, wiredInPackages
+                   )
 import           Stack.Constants.Config ( templatesDir )
 import           Stack.Prelude
 import           Stack.Types.Config ( Config (..), HasConfig (..), SCM (..) )
@@ -54,6 +52,7 @@ import           Stack.Types.TemplateName
                    , TemplatePath (..), defaultTemplateName
                    , parseRepoPathWithService, templateName, templatePath
                    )
+import           System.Environment ( lookupEnv )
 import qualified Text.Mustache as Mustache
 import qualified Text.Mustache.Render as Mustache
 import           Text.ProjectTemplate
@@ -332,16 +331,15 @@ loadTemplate name logIt = do
         (do f <- loadLocalFile relFile eitherByteStringToText
             logIt LocalTemp
             pure f)
-        (\(e :: PrettyException) -> do
-              case relSettings rawParam of
-                Just settings -> do
-                  let url = tplDownloadUrl settings
-                      extract = tplExtract settings
-                  downloadTemplate url extract (templateDir </> relFile)
-                Nothing -> throwM e
+        ( \(e :: PrettyException) -> do
+            settings <- fromMaybe (throwM e) (relSettings rawParam)
+            let url = tplDownloadUrl settings
+                mBasicAuth = tplBasicAuth settings
+                extract = tplExtract settings
+            downloadTemplate url mBasicAuth extract (templateDir </> relFile)
         )
     RepoPath rtp -> do
-      let settings = settingsFromRepoTemplatePath rtp
+      settings <- settingsFromRepoTemplatePath rtp
       downloadFromUrl settings templateDir
 
  where
@@ -365,7 +363,7 @@ loadTemplate name logIt = do
       else throwM $ PrettyException $
         LoadTemplateFailed name path
 
-  relSettings :: String -> Maybe TemplateDownloadSettings
+  relSettings :: String -> Maybe (RIO env TemplateDownloadSettings)
   relSettings req = do
     rtp <- parseRepoPathWithService defaultRepoService (T.pack req)
     pure (settingsFromRepoTemplatePath rtp)
@@ -373,18 +371,22 @@ loadTemplate name logIt = do
   downloadFromUrl :: TemplateDownloadSettings -> Path Abs Dir -> RIO env Text
   downloadFromUrl settings templateDir = do
     let url = tplDownloadUrl settings
+        mBasicAuth = tplBasicAuth settings
         rel = fromMaybe backupUrlRelPath (parseRelFile url)
-    downloadTemplate url (tplExtract settings) (templateDir </> rel)
+    downloadTemplate url mBasicAuth (tplExtract settings) (templateDir </> rel)
 
-  downloadTemplate :: String
-                   -> (ByteString
-                   -> Either String Text)
-                   -> Path Abs File
-                   -> RIO env Text
-  downloadTemplate url extract path = do
+  downloadTemplate ::
+       String
+    -> Maybe (ByteString, ByteString)
+       -- ^ Optional HTTP \'Basic\' authentication (type, credentials)
+    -> (ByteString -> Either String Text)
+    -> Path Abs File
+    -> RIO env Text
+  downloadTemplate url mBasicAuth extract path = do
     req <- parseRequest url
-    let dReq = setForceDownload True $
-                   mkDownloadRequest (setRequestCheckStatus req)
+    let authReq = maybe id (uncurry applyBasicAuth) mBasicAuth req
+        dReq = setForceDownload True $
+                   mkDownloadRequest (setRequestCheckStatus authReq)
     logIt RemoteTemp
     catch
       ( do let label = T.pack $ toFilePath path
@@ -414,8 +416,11 @@ loadTemplate name logIt = do
         throwM $ PrettyException $
           DownloadTemplateFailed (templateName name) url exception
 
+-- | Type representing settings for the download of Stack project templates.
 data TemplateDownloadSettings = TemplateDownloadSettings
   { tplDownloadUrl :: String
+  , tplBasicAuth :: Maybe (ByteString, ByteString)
+    -- ^ Optional HTTP 'Basic' authentication (type, credentials)
   , tplExtract :: ByteString -> Either String Text
   }
 
@@ -425,32 +430,56 @@ eitherByteStringToText = mapLeft show . decodeUtf8'
 asIsFromUrl :: String -> TemplateDownloadSettings
 asIsFromUrl url = TemplateDownloadSettings
   { tplDownloadUrl = url
+  , tplBasicAuth = Nothing
   , tplExtract = eitherByteStringToText
   }
 
--- | Construct a URL for downloading from a repo.
-settingsFromRepoTemplatePath :: RepoTemplatePath -> TemplateDownloadSettings
-settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) =
-  -- T.concat ["https://raw.githubusercontent.com", "/", user, "/stack-templates/master/", name]
-  TemplateDownloadSettings
-  { tplDownloadUrl = concat
-      [ "https://api.github.com/repos/"
-      , T.unpack user
-      , "/stack-templates/contents/"
-      , T.unpack name
-      ]
-  , tplExtract = \bs -> do
-      decodedJson <- eitherDecode (LB.fromStrict bs)
-      case decodedJson of
-        Object o | Just (String content) <- KeyMap.lookup "content" o -> do
-                     let noNewlines = T.filter (/= '\n')
-                     bsContent <- B64.decode $ T.encodeUtf8 (noNewlines content)
-                     mapLeft show $ decodeUtf8' bsContent
-        _ ->
-          Left "Couldn't parse GitHub response as a JSON object with a \"content\" field"
-  }
-
-settingsFromRepoTemplatePath (RepoTemplatePath GitLab user name) =
+-- | Construct settings for downloading a Stack project template from a
+-- repository.
+settingsFromRepoTemplatePath ::
+    HasTerm env
+ => RepoTemplatePath
+ -> RIO env TemplateDownloadSettings
+settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) = do
+  let basicAuthMsg token = prettyInfoL
+        [ flow "Using content of"
+        , fromString token
+        , flow " environment variable to authenticate GitHub REST API."
+        ]
+  mBasicAuth <- do
+    wantGitHubToken <- liftIO $ fromMaybe "" <$> lookupEnv gitHubTokenEnvVar
+    if not (L.null wantGitHubToken)
+      then do
+         basicAuthMsg gitHubTokenEnvVar
+         pure $ Just (gitHubBasicAuthType, fromString wantGitHubToken)
+      else do
+        wantAltGitHubToken <-
+          liftIO $ fromMaybe "" <$> lookupEnv altGitHubTokenEnvVar
+        if not (L.null wantAltGitHubToken)
+        then do
+          basicAuthMsg altGitHubTokenEnvVar
+          pure $ Just (gitHubBasicAuthType, fromString wantAltGitHubToken)
+        else pure Nothing
+  pure $ TemplateDownloadSettings
+    { tplDownloadUrl = concat
+        [ "https://api.github.com/repos/"
+        , T.unpack user
+        , "/stack-templates/contents/"
+        , T.unpack name
+        ]
+    , tplBasicAuth = mBasicAuth
+    , tplExtract = \bs -> do
+        decodedJson <- eitherDecode (LB.fromStrict bs)
+        case decodedJson of
+          Object o | Just (String content) <- KeyMap.lookup "content" o -> do
+            let noNewlines = T.filter (/= '\n')
+            bsContent <- B64.decode $ T.encodeUtf8 (noNewlines content)
+            mapLeft show $ decodeUtf8' bsContent
+          _ ->
+            Left "Couldn't parse GitHub response as a JSON object with a \
+                 \\"content\" field"
+    }
+settingsFromRepoTemplatePath (RepoTemplatePath GitLab user name) = pure $
   asIsFromUrl $ concat
     [ "https://gitlab.com"
     , "/"
@@ -458,7 +487,7 @@ settingsFromRepoTemplatePath (RepoTemplatePath GitLab user name) =
     , "/stack-templates/raw/master/"
     , T.unpack name
     ]
-settingsFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) =
+settingsFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) = pure $
   asIsFromUrl $ concat
     [ "https://bitbucket.org"
     , "/"

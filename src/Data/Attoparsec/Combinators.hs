@@ -11,8 +11,11 @@ module Data.Attoparsec.Combinators
 import           Stack.Prelude
 
 -- | Concatenate two parsers.
-appending :: (Applicative f, Semigroup a)
-                 => f a -> f a -> f a
+appending ::
+     (Applicative f, Semigroup a)
+  => f a
+  -> f a
+  -> f a
 appending a b = (<>) <$> a <*> b
 
 -- | Alternative parsers.

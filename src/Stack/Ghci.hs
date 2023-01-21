@@ -1,10 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE ConstraintKinds    #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
-{-# LANGUAGE TupleSections      #-}
 
 -- | Run a GHCi configured with the user's package(s).
 

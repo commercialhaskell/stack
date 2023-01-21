@@ -1,6 +1,5 @@
 {-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Stack.LockSpec
   ( toBlobKey

@@ -8,10 +8,8 @@ library
   exposed-modules:  Files
   build-depends:    base
                   , filemanip
-  default-language: Haskell2010
 
 executable test-exe
   hs-source-dirs: app
   main-is: Main.hs
   build-depends: base, files
-  default-language: Haskell2010

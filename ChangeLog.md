@@ -27,6 +27,9 @@ Other enhancements:
 
 * Better error message if the value of the `STACK_WORK` environment variable or
   `--work-dir` option is not a valid relative path.
+* Stack will use the value of the `GH_TOKEN`, or `GITHUB_TOKEN`, environment
+  variable as credentials to authenticate its GitHub REST API requests.
+
 
 Bug fixes:
 

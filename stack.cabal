@@ -13,7 +13,7 @@ description:    Please see the documentation at <https://docs.haskellstack.org>
                 If building a 'stack' executable for distribution, please download the
                 source code from <https://github.com/commercialhaskell/stack/releases>
                 and build it using Stack itself in order to ensure identical behaviour
-                to official binaries.  This package on Hackage is provided for convenience
+                to official binaries. This package on Hackage is provided for convenience
                 and bootstrapping purposes.
                 .
                 Note that the API for the library is not currently stable, and may
@@ -349,7 +349,7 @@ library
     , yaml
     , zip-archive
     , zlib
-  default-language: Haskell2010
+  default-language: GHC2021
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -478,7 +478,7 @@ executable stack
     , yaml
     , zip-archive
     , zlib
-  default-language: Haskell2010
+  default-language: GHC2021
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -602,7 +602,7 @@ executable stack-integration-test
     , yaml
     , zip-archive
     , zlib
-  default-language: Haskell2010
+  default-language: GHC2021
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -734,7 +734,7 @@ test-suite stack-test
     , yaml
     , zip-archive
     , zlib
-  default-language: Haskell2010
+  default-language: GHC2021
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:

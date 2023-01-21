@@ -35,19 +35,20 @@ instance Exception TypeTemplateNameException where
     ++ s
 
 -- | A template name.
-data TemplateName = TemplateName !Text !TemplatePath
+data TemplateName
+  = TemplateName !Text !TemplatePath
   deriving (Eq, Ord, Show)
 
 data TemplatePath
   = AbsPath (Path Abs File)
-  -- ^ an absolute path on the filesystem
+    -- ^ an absolute path on the filesystem
   | RelPath String (Path Rel File)
-  -- ^ a relative path on the filesystem, or relative to the template
-  -- repository. To avoid path separator conversion on Windows, the raw
-  -- command-line parameter passed is also given as the first field (possibly
-  -- with @.hsfiles@ appended).
+    -- ^ a relative path on the filesystem, or relative to the template
+    -- repository. To avoid path separator conversion on Windows, the raw
+    -- command-line parameter passed is also given as the first field (possibly
+    -- with @.hsfiles@ appended).
   | UrlPath String
-  -- ^ a full URL
+    -- ^ a full URL
   | RepoPath RepoTemplatePath
   deriving (Eq, Ord, Show)
 
@@ -70,8 +71,8 @@ instance FromJSON TemplateName where
   parseJSON = withText "TemplateName" $
     either fail pure . parseTemplateNameFromString . T.unpack
 
--- | An argument which accepts a template name of the format
--- @foo.hsfiles@ or @foo@, ultimately normalized to @foo@.
+-- | An argument which accepts a template name of the format @foo.hsfiles@ or
+-- @foo@, ultimately normalized to @foo@.
 templateNameArgument :: O.Mod O.ArgumentFields TemplateName
                      -> O.Parser TemplateName
 templateNameArgument =

@@ -56,8 +56,13 @@ parseCollapsedAbsFile = parseAbsFile . collapseFilePath
 -- | Add a relative FilePath to the end of a Path
 -- We can't parse the FilePath first because we need to account for ".."
 -- in the FilePath (#2895)
-concatAndCollapseAbsDir :: MonadThrow m => Path Abs Dir -> FilePath -> m (Path Abs Dir)
-concatAndCollapseAbsDir base rel = parseCollapsedAbsDir (toFilePath base FP.</> rel)
+concatAndCollapseAbsDir ::
+     MonadThrow m
+  => Path Abs Dir
+  -> FilePath
+  -> m (Path Abs Dir)
+concatAndCollapseAbsDir base rel =
+  parseCollapsedAbsDir (toFilePath base FP.</> rel)
 
 -- | Collapse intermediate "." and ".." directories from a path.
 --
@@ -102,7 +107,8 @@ dropRoot (Path l) = Path (FP.dropDrive l)
 --
 -- > forgivingAbsence (resolveFile …) >>= rejectMissingFile
 
-rejectMissingFile :: MonadIO m
+rejectMissingFile ::
+     MonadIO m
   => Maybe (Path Abs File)
   -> m (Maybe (Path Abs File))
 rejectMissingFile Nothing = pure Nothing
@@ -110,7 +116,8 @@ rejectMissingFile (Just p) = bool Nothing (Just p) <$> doesFileExist p
 
 -- | See 'rejectMissingFile'.
 
-rejectMissingDir :: MonadIO m
+rejectMissingDir ::
+     MonadIO m
   => Maybe (Path Abs Dir)
   -> m (Maybe (Path Abs Dir))
 rejectMissingDir Nothing = pure Nothing
@@ -128,7 +135,8 @@ pathToText :: Path b t -> T.Text
 pathToText = T.pack . toFilePath
 
 tryGetModificationTime :: MonadIO m => Path Abs File -> m (Either () UTCTime)
-tryGetModificationTime = liftIO . tryJust (guard . isDoesNotExistError) . getModificationTime
+tryGetModificationTime =
+  liftIO . tryJust (guard . isDoesNotExistError) . getModificationTime
 
 -- | 'Path.IO.resolveFile' (@path-io@ package) throws 'InvalidAbsFile' (@path@
 -- package) if the file does not exist; this function yields 'Nothing'.

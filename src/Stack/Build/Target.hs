@@ -2,8 +2,6 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE ViewPatterns        #-}
 
 -- | Parsing command line targets
@@ -135,10 +133,10 @@ data RawTarget
   = RTPackageComponent !PackageName !UnresolvedComponent
   | RTComponent !ComponentName
   | RTPackage !PackageName
-  -- Explicitly _not_ supporting revisions on the command line. If you want
-  -- that, you should be modifying your stack.yaml! (In fact, you should
-  -- probably do that anyway, we're just letting people be lazy, since we're
-  -- Haskeletors.)
+    -- Explicitly _not_ supporting revisions on the command line. If you want
+    -- that, you should be modifying your stack.yaml! (In fact, you should
+    -- probably do that anyway, we're just letting people be lazy, since we're
+    -- Haskeletors.)
   | RTPackageIdentifier !PackageIdentifier
   deriving (Eq, Show)
 
@@ -217,14 +215,14 @@ data ResolveResult = ResolveResult
   { rrName :: !PackageName
   , rrRaw :: !RawInput
   , rrComponent :: !(Maybe NamedComponent)
-  -- ^ Was a concrete component specified?
+    -- ^ Was a concrete component specified?
   , rrAddedDep :: !(Maybe PackageLocationImmutable)
-  -- ^ Only if we're adding this as a dependency
+    -- ^ Only if we're adding this as a dependency
   , rrPackageType :: !PackageType
   }
 
--- | Convert a 'RawTarget' into a 'ResolveResult' (see description on
--- the module).
+-- | Convert a 'RawTarget' into a 'ResolveResult' (see description on the
+-- module).
 resolveRawTarget ::
      (HasLogFunc env, HasPantryConfig env, HasProcessContext env)
   => SMActual GlobalPackage
@@ -247,9 +245,8 @@ resolveRawTarget sma allLocs (ri, rt) =
   isCompNamed t1 (CBench t2) = t1 == t2
 
   go (RTComponent cname) = do
-    -- Associated list from component name to package that defines
-    -- it. We use an assoc list and not a Map so we can detect
-    -- duplicates.
+    -- Associated list from component name to package that defines it. We use an
+    -- assoc list and not a Map so we can detect duplicates.
     allPairs <- fmap concat $ flip Map.traverseWithKey locals
       $ \name pp -> do
           comps <- ppComponents pp

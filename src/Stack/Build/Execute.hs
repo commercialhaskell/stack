@@ -1,13 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeFamilies          #-}
 
 -- | Perform a build
@@ -69,7 +63,7 @@ import           Distribution.Types.UnqualComponentName
                    ( mkUnqualComponentName )
 import           Distribution.Verbosity ( showForCabal )
 import           Distribution.Version ( mkVersion )
-import           Pantry.Internal.Companion ( withCompanion )
+import           Pantry.Internal.Companion ( Companion, withCompanion )
 import           Path
                    ( PathException, (</>), addExtension, filename
                    , isProperPrefixOf, parent, parseRelDir, parseRelFile
@@ -943,9 +937,14 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
   beopts = boptsBenchmarkOpts bopts
 
 -- | Generate the ConfigCache
-getConfigCache :: HasEnvConfig env
-               => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
-               -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
+getConfigCache ::
+     HasEnvConfig env
+  => ExecuteEnv
+  -> Task
+  -> InstalledMap
+  -> Bool
+  -> Bool
+  -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBench = do
   let extra =
         -- We enable tests if the test suite dependencies are already
@@ -1168,7 +1167,7 @@ announceTask ee task action = logInfo $
 -- | Ensure we're the only action using the directory.  See
 -- <https://github.com/commercialhaskell/stack/issues/2730>
 withLockedDistDir ::
-     HasEnvConfig env
+     forall env a. HasEnvConfig env
   => (Utf8Builder -> RIO env ()) -- ^ announce
   -> Path Abs Dir -- ^ root directory for package
   -> RIO env a
@@ -1176,32 +1175,35 @@ withLockedDistDir ::
 withLockedDistDir announce root inner = do
   distDir <- distRelativeDir
   let lockFP = root </> distDir </> relFileBuildLock
+      lockFP' = toFilePath lockFP
   ensureDir $ parent lockFP
 
   mres <-
     withRunInIO $ \run ->
-    withTryFileLock (toFilePath lockFP) Exclusive $ \_lock ->
+    withTryFileLock lockFP' Exclusive $ \_lock ->
     run inner
 
   case mres of
     Just res -> pure res
     Nothing -> do
-      let complainer delay = do
-            delay 5000000 -- 5 seconds
-            announce $
-                 "blocking for directory lock on "
-              <> fromString (toFilePath lockFP)
-            forever $ do
-              delay 30000000 -- 30 seconds
-              announce $
-                   "still blocking for directory lock on "
-                <> fromString (toFilePath lockFP)
-                <> "; maybe another Stack process is running?"
-      withCompanion complainer $
+      withCompanion (complainer lockFP') $
         \stopComplaining ->
           withRunInIO $ \run ->
-            withFileLock (toFilePath lockFP) Exclusive $ \_ ->
+            withFileLock lockFP' Exclusive $ \_ ->
               run $ stopComplaining *> inner
+ where
+  complainer :: FilePath -> Companion (RIO env)
+  complainer fp delay = do
+    delay 5000000 -- 5 seconds
+    announce $
+         "blocking for directory lock on "
+      <> fromString fp
+    forever $ do
+      delay 30000000 -- 30 seconds
+      announce $
+           "still blocking for directory lock on "
+        <> fromString fp
+        <> "; maybe another Stack process is running?"
 
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).

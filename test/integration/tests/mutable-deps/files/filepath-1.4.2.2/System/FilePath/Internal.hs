@@ -1,7 +1,6 @@
 #if __GLASGOW_HASKELL__ >= 704
 {-# LANGUAGE Safe #-}
 #endif
-{-# LANGUAGE PatternGuards #-}
 
 -- This template expects CPP definitions for:
 --     MODULE_NAME = Posix | Windows
