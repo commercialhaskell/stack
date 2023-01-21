@@ -206,6 +206,21 @@ extra-deps:
   commit: a5f4f30f01366738f913968163d856366d7e0342
 ~~~
 
+!!! note
+
+    `github` is not just syntactic sugar over `git`. It uses a completely
+    different approach to get the package's code − instead of cloning the
+    repo, it downloads an archive that is provided by GitHub. This can be more
+    efficient than cloning, as no revision history is downloaded.
+
+    On the other hand, if the dependency's repo contains git submodules, the
+    only option is to use `git` as it clones the repo and updates its
+    submodules.
+
+    Try to use `git` instead of `github` if the package build fails due to
+    some files are missing.
+
+
 #### git-annex
 
 [git-annex](https://git-annex.branchable.com) is not supported. This is because
