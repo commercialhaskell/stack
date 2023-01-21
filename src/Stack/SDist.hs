@@ -1,9 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE ConstraintKinds    #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TypeFamilies       #-}
 
 -- Create a source distribution tarball

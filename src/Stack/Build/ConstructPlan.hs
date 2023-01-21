@@ -1,12 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE ViewPatterns          #-}
 
 -- | Construct a @Plan@ for how to build

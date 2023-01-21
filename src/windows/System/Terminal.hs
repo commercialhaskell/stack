@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude        #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE OverloadedStrings        #-}
 
 -- | The module of this name differs as between Windows and non-Windows builds.

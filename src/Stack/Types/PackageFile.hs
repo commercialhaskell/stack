@@ -1,8 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE RankNTypes                 #-}
 
 -- | The facility for retrieving all files from the main Stack
 -- 'Stack.Types.Package' type. This was moved into its own module to allow

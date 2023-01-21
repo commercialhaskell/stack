@@ -1,9 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE BangPatterns        #-}
-{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 import           Conduit
 import           Data.List                (stripPrefix)

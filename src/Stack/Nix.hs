@@ -1,8 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE ConstraintKinds    #-}
 {-# LANGUAGE DataKinds          #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
 -- | Run commands in a nix-shell

@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards    #-}
 
 -- Concurrent execution with dependencies. Types currently hard-coded for needs
