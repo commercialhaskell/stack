@@ -112,13 +112,14 @@ data AddDepRes
 data W = W
   { wFinals :: !(Map PackageName (Either ConstructPlanException Task))
   , wInstall :: !(Map Text InstallLocation)
-  -- ^ executable to be installed, and location where the binary is placed
+    -- ^ executable to be installed, and location where the binary is placed
   , wDirty :: !(Map PackageName Text)
-  -- ^ why a local package is considered dirty
+    -- ^ why a local package is considered dirty
   , wWarnings :: !([Text] -> [Text])
-  -- ^ Warnings
+    -- ^ Warnings
   , wParents :: !ParentMap
-  -- ^ Which packages a given package depends on, along with the package's version
+    -- ^ Which packages a given package depends on, along with the package's
+    -- version
   }
   deriving Generic
 
@@ -188,22 +189,20 @@ instance HasCompiler Ctx where
 instance HasEnvConfig Ctx where
   envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
--- | Computes a build plan. This means figuring out which build 'Task's
--- to take, and the interdependencies among the build 'Task's. In
--- particular:
+-- | Computes a build plan. This means figuring out which build 'Task's to take,
+-- and the interdependencies among the build 'Task's. In particular:
 --
--- 1) It determines which packages need to be built, based on the
--- transitive deps of the current targets. For local packages, this is
--- indicated by the 'lpWanted' boolean. For extra packages to build,
--- this comes from the @extraToBuild0@ argument of type @Set
--- PackageName@. These are usually packages that have been specified on
--- the commandline.
+-- 1) It determines which packages need to be built, based on the transitive
+-- deps of the current targets. For local packages, this is indicated by the
+-- 'lpWanted' boolean. For extra packages to build, this comes from the
+-- @extraToBuild0@ argument of type @Set PackageName@. These are usually
+-- packages that have been specified on the command line.
 --
--- 2) It will only rebuild an upstream package if it isn't present in
--- the 'InstalledMap', or if some of its dependencies have changed.
+-- 2) It will only rebuild an upstream package if it isn't present in the
+-- 'InstalledMap', or if some of its dependencies have changed.
 --
--- 3) It will only rebuild a local package if its files are dirty or
--- some of its dependencies have changed.
+-- 3) It will only rebuild a local package if its files are dirty or some of its
+-- dependencies have changed.
 constructPlan ::
      forall env. HasEnvConfig env
   => BaseConfigOpts
@@ -374,14 +373,14 @@ data UnregisterState = UnregisterState
 -- already registered local packages
 mkUnregisterLocal ::
      Map PackageName Task
-  -- ^ Tasks
+     -- ^ Tasks
   -> Map PackageName Text
-  -- ^ Reasons why packages are dirty and must be rebuilt
+     -- ^ Reasons why packages are dirty and must be rebuilt
   -> [DumpPackage]
-  -- ^ Local package database dump
+     -- ^ Local package database dump
   -> Bool
-  -- ^ If true, we're doing a special initialBuildSteps build - don't unregister
-  -- target packages.
+     -- ^ If true, we're doing a special initialBuildSteps build - don't
+     -- unregister target packages.
   -> Map GhcPkgId (PackageIdentifier, Text)
 mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
   -- We'll take multiple passes through the local packages. This
@@ -764,8 +763,8 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
 packageBuildTypeConfig :: Package -> Bool
 packageBuildTypeConfig pkg = packageBuildType pkg == Configure
 
--- Update response in the lib map. If it is an error, and there's
--- already an error about cyclic dependencies, prefer the cyclic error.
+-- Update response in the lib map. If it is an error, and there's already an
+-- error about cyclic dependencies, prefer the cyclic error.
 updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> M ()
 updateLibMap name val = modify $ \mp ->
   case (M.lookup name mp, val) of
@@ -778,15 +777,14 @@ addEllipsis t
   | otherwise = T.take 97 t <> "..."
 
 -- | Given a package, recurses into all of its dependencies. The results
--- indicate which packages are missing, meaning that their 'GhcPkgId's
--- will be figured out during the build, after they've been built. The
--- 2nd part of the tuple result indicates the packages that are already
--- installed which will be used.
+-- indicate which packages are missing, meaning that their 'GhcPkgId's will be
+-- figured out during the build, after they've been built. The 2nd part of the
+-- tuple result indicates the packages that are already installed which will be
+-- used.
 --
--- The 3rd part of the tuple is an 'InstallLocation'. If it is 'Local',
--- then the parent package must be installed locally. Otherwise, if it
--- is 'Snap', then it can either be installed locally or in the
--- snapshot.
+-- The 3rd part of the tuple is an 'InstallLocation'. If it is 'Local', then the
+-- parent package must be installed locally. Otherwise, if it is 'Snap', then it
+-- can either be installed locally or in the snapshot.
 addPackageDeps ::
      Package
   -> M ( Either
@@ -977,10 +975,10 @@ checkDirtiness ps installed package present buildHaddocks = do
                   <> addEllipsis (T.pack $ unwords $ Set.toList files)
                 Nothing -> Nothing
   case mreason of
-      Nothing -> pure False
-      Just reason -> do
-          tell mempty { wDirty = Map.singleton (packageName package) reason }
-          pure True
+    Nothing -> pure False
+    Just reason -> do
+      tell mempty { wDirty = Map.singleton (packageName package) reason }
+      pure True
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
 describeConfigDiff config old new
@@ -1027,8 +1025,8 @@ describeConfigDiff config old new
 
   userOpts = filter (not . isStackOpt)
            . (if configRebuildGhcOptions config
-                 then id
-                 else stripGhcOptions)
+                then id
+                else stripGhcOptions)
            . map T.pack
            . (\(ConfigureOpts x y) -> x ++ y)
            . configCacheOpts

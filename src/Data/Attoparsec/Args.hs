@@ -37,8 +37,8 @@ argsParser mode = many (P.skipSpace *> (quoted <|> unquoted)) <*
   unquoted = P.many1 naked
   quoted = P.char '"' *> str <* P.char '"'
   str = many ( case mode of
-                   Escaping -> escaped <|> nonquote
-                   NoEscaping -> nonquote
+                 Escaping -> escaped <|> nonquote
+                 NoEscaping -> nonquote
              )
   escaped = P.char '\\' *> P.anyChar
   nonquote = P.satisfy (/= '"')

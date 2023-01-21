@@ -793,9 +793,12 @@ buildCmd opts = do
   modifyGO =
     case boptsCLICommand opts of
       Test -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True)
-      Haddock -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just True)
-      Bench -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True)
-      Install -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidInstallExesL) (Just True)
+      Haddock ->
+        set (globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just True)
+      Bench ->
+        set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True)
+      Install ->
+        set (globalOptsBuildOptsMonoidL.buildOptsMonoidInstallExesL) (Just True)
       Build -> id -- Default case is just Build
 
 -- | Display help for the uninstall command.
@@ -862,88 +865,91 @@ upgradeCmd upgradeOpts' = do
 uploadCmd :: UploadOpts -> RIO Runner ()
 uploadCmd (UploadOpts (SDistOpts [] _ _ _ _) _) = do
   prettyErrorL
-      [ flow "To upload the current package, please run"
-      , style Shell "stack upload ."
-      , flow "(with the period at the end)"
-      ]
+    [ flow "To upload the current package, please run"
+    , style Shell "stack upload ."
+    , flow "(with the period at the end)"
+    ]
   liftIO exitFailure
 uploadCmd uploadOpts = do
   let partitionM _ [] = pure ([], [])
       partitionM f (x:xs) = do
-          r <- f x
-          (as, bs) <- partitionM f xs
-          pure $ if r then (x:as, bs) else (as, x:bs)
+        r <- f x
+        (as, bs) <- partitionM f xs
+        pure $ if r then (x:as, bs) else (as, x:bs)
       sdistOpts = uoptsSDistOpts uploadOpts
-  (files, nonFiles) <- liftIO $ partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
+  (files, nonFiles) <-
+    liftIO $ partitionM D.doesFileExist (sdoptsDirsToWorkWith sdistOpts)
   (dirs, invalid) <- liftIO $ partitionM D.doesDirectoryExist nonFiles
   withConfig YesReexec $ withDefaultEnvConfig $ do
-      unless (null invalid) $ do
-          let invalidList = bulletedList $ map (style File . fromString) invalid
-          prettyErrorL
-              [ style Shell "stack upload"
-              , flow "expects a list of sdist tarballs or package directories."
-              , flow "Can't find:"
-              , line <> invalidList
-              ]
-          exitFailure
-      when (null files && null dirs) $ do
-          prettyErrorL
-              [ style Shell "stack upload"
-              , flow "expects a list of sdist tarballs or package directories, but none were specified."
-              ]
-          exitFailure
-      config <- view configL
-      let hackageUrl = T.unpack $ configHackageBaseUrl config
-          uploadVariant = uoptsUploadVariant uploadOpts
-      getCreds <- memoizeRef $ Upload.loadAuth config
-      mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
-      forM_ files $ \file -> do
-          tarFile <- resolveFile' file
-          creds <- runMemoized getCreds
-          Upload.upload hackageUrl creds (toFilePath tarFile) uploadVariant
-      forM_ dirs $ \dir -> do
-          pkgDir <- resolveDir' dir
-          (tarName, tarBytes, mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
-          checkSDistTarball' sdistOpts tarName tarBytes
-          creds <- runMemoized getCreds
-          Upload.uploadBytes hackageUrl creds tarName uploadVariant tarBytes
-          forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
+    unless (null invalid) $ do
+      let invalidList = bulletedList $ map (style File . fromString) invalid
+      prettyErrorL
+        [ style Shell "stack upload"
+        , flow "expects a list of sdist tarballs or package directories."
+        , flow "Can't find:"
+        , line <> invalidList
+        ]
+      exitFailure
+    when (null files && null dirs) $ do
+      prettyErrorL
+        [ style Shell "stack upload"
+        , flow "expects a list of sdist tarballs or package directories, but none were specified."
+        ]
+      exitFailure
+    config <- view configL
+    let hackageUrl = T.unpack $ configHackageBaseUrl config
+        uploadVariant = uoptsUploadVariant uploadOpts
+    getCreds <- memoizeRef $ Upload.loadAuth config
+    mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
+    forM_ files $ \file -> do
+      tarFile <- resolveFile' file
+      creds <- runMemoized getCreds
+      Upload.upload hackageUrl creds (toFilePath tarFile) uploadVariant
+    forM_ dirs $ \dir -> do
+      pkgDir <- resolveDir' dir
+      (tarName, tarBytes, mcabalRevision) <-
+        getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
+      checkSDistTarball' sdistOpts tarName tarBytes
+      creds <- runMemoized getCreds
+      Upload.uploadBytes hackageUrl creds tarName uploadVariant tarBytes
+      forM_ mcabalRevision $ uncurry $ Upload.uploadRevision hackageUrl creds
 
 sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =
-    withConfig YesReexec $ withDefaultEnvConfig $ do
-        -- If no directories are specified, build all sdist tarballs.
-        dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
-            then do
-                dirs <- view $ buildConfigL.to (map ppRoot . Map.elems . smwProject . bcSMWanted)
-                when (null dirs) $ do
-                    stackYaml <- view stackYamlL
-                    prettyErrorL
-                        [ style Shell "stack sdist"
-                        , flow "expects a list of targets, and otherwise defaults to all of the project's packages."
-                        , flow "However, the configuration at"
-                        , pretty stackYaml
-                        , flow "contains no packages, so no sdist tarballs will be generated."
-                        ]
-                    exitFailure
-                pure dirs
-            else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
-        forM_ dirs' $ \dir -> do
-            (tarName, tarBytes, _mcabalRevision) <- getSDistTarball (sdoptsPvpBounds sdistOpts) dir
-            distDir <- distDirFromDir dir
-            tarPath <- (distDir </>) <$> parseRelFile tarName
-            ensureDir (parent tarPath)
-            runConduitRes $
-              sourceLazy tarBytes .|
-              sinkFileCautious (toFilePath tarPath)
-            prettyInfoL [flow "Wrote sdist tarball to", pretty tarPath]
-            checkSDistTarball sdistOpts tarPath
-            forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
-        where
-          copyTarToTarPath tarPath tarName targetDir = liftIO $ do
-            let targetTarPath = targetDir FP.</> tarName
-            D.createDirectoryIfMissing True $ FP.takeDirectory targetTarPath
-            D.copyFile (toFilePath tarPath) targetTarPath
+  withConfig YesReexec $ withDefaultEnvConfig $ do
+    -- If no directories are specified, build all sdist tarballs.
+    dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
+      then do
+        dirs <- view $ buildConfigL.to (map ppRoot . Map.elems . smwProject . bcSMWanted)
+        when (null dirs) $ do
+          stackYaml <- view stackYamlL
+          prettyErrorL
+            [ style Shell "stack sdist"
+            , flow "expects a list of targets, and otherwise defaults to all of the project's packages."
+            , flow "However, the configuration at"
+            , pretty stackYaml
+            , flow "contains no packages, so no sdist tarballs will be generated."
+            ]
+          exitFailure
+        pure dirs
+      else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
+    forM_ dirs' $ \dir -> do
+      (tarName, tarBytes, _mcabalRevision) <-
+        getSDistTarball (sdoptsPvpBounds sdistOpts) dir
+      distDir <- distDirFromDir dir
+      tarPath <- (distDir </>) <$> parseRelFile tarName
+      ensureDir (parent tarPath)
+      runConduitRes $
+        sourceLazy tarBytes .|
+        sinkFileCautious (toFilePath tarPath)
+      prettyInfoL [flow "Wrote sdist tarball to", pretty tarPath]
+      checkSDistTarball sdistOpts tarPath
+      forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
+ where
+  copyTarToTarPath tarPath tarName targetDir = liftIO $ do
+    let targetTarPath = targetDir FP.</> tarName
+    D.createDirectoryIfMissing True $ FP.takeDirectory targetTarPath
+    D.copyFile (toFilePath tarPath) targetTarPath
 
 -- | Execute a command.
 execCmd :: ExecOpts -> RIO Runner ()
@@ -959,10 +965,10 @@ execCmd ExecOpts {..} =
                   then args :: [String]
                   else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
       (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
-          (ExecCmd cmd, args) -> pure (cmd, args)
-          (ExecRun, args) -> getRunCmd args
-          (ExecGhc, args) -> getGhcCmd eoPackages args
-          (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
+        (ExecCmd cmd, args) -> pure (cmd, args)
+        (ExecRun, args) -> getRunCmd args
+        (ExecGhc, args) -> getGhcCmd eoPackages args
+        (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
 
       runWithPath eoCwd $ exec cmd args
  where
@@ -1014,9 +1020,9 @@ execCmd ExecOpts {..} =
 
   runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
   runWithPath path callback = case path of
-    Nothing                  -> callback
+    Nothing -> callback
     Just p | not (isValid p) -> throwIO $ InvalidPathForExec p
-    Just p                   -> withUnliftIO $ \ul -> D.withCurrentDirectory p $ unliftIO ul callback
+    Just p -> withUnliftIO $ \ul -> D.withCurrentDirectory p $ unliftIO ul callback
 
 -- | Evaluate some haskell code inline.
 evalCmd :: EvalOpts -> RIO Runner ()
@@ -1032,25 +1038,27 @@ evalCmd EvalOpts {..} = execCmd execOpts
 ghciCmd :: GhciOpts -> RIO Runner ()
 ghciCmd ghciOpts =
   let boptsCLI = defaultBuildOptsCLI
-          -- using only additional packages, targets then get overridden in `ghci`
-          { boptsCLITargets = map T.pack (ghciAdditionalPackages  ghciOpts)
-          , boptsCLIInitialBuildSteps = True
-          , boptsCLIFlags = ghciFlags ghciOpts
-          , boptsCLIGhcOptions = map T.pack (ghciGhcOptions ghciOpts)
-          }
+        -- using only additional packages, targets then get overridden in `ghci`
+        { boptsCLITargets = map T.pack (ghciAdditionalPackages  ghciOpts)
+        , boptsCLIInitialBuildSteps = True
+        , boptsCLIFlags = ghciFlags ghciOpts
+        , boptsCLIGhcOptions = map T.pack (ghciGhcOptions ghciOpts)
+        }
   in  withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
         bopts <- view buildOptsL
         -- override env so running of tests and benchmarks is disabled
         let boptsLocal = bopts
               { boptsTestOpts = (boptsTestOpts bopts) { toDisableRun = True }
-              , boptsBenchmarkOpts = (boptsBenchmarkOpts bopts) { beoDisableRun = True }
+              , boptsBenchmarkOpts =
+                  (boptsBenchmarkOpts bopts) { beoDisableRun = True }
               }
         local (set buildOptsL boptsLocal)
               (ghci ghciOpts)
 
 -- | List packages in the project.
 idePackagesCmd :: (IDE.OutputStream, IDE.ListPackagesCmd) -> RIO Runner ()
-idePackagesCmd = withConfig NoReexec . withBuildConfig . uncurry IDE.listPackages
+idePackagesCmd =
+  withConfig NoReexec . withBuildConfig . uncurry IDE.listPackages
 
 -- | List targets in the project.
 ideTargetsCmd :: IDE.OutputStream -> RIO Runner ()
@@ -1104,8 +1112,9 @@ listCmd names = withConfig NoReexec $ do
 -- | generate a combined HPC report
 hpcReportCmd :: HpcReportOpts -> RIO Runner ()
 hpcReportCmd hropts = do
-  let (tixFiles, targetNames) = L.partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
+  let (tixFiles, targetNames) =
+        L.partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
       boptsCLI = defaultBuildOptsCLI
         { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
   withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
-      generateHpcReportForTargets hropts tixFiles targetNames
+    generateHpcReportForTargets hropts tixFiles targetNames

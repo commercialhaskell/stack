@@ -8,15 +8,15 @@
 
 -- Load information on package sources
 module Stack.Build.Source
-    ( projectLocalPackages
-    , localDependencies
-    , loadCommonPackage
-    , loadLocalPackage
-    , loadSourceMap
-    , getLocalFlags
-    , addUnlistedToBuildCache
-    , hashSourceMapData
-    ) where
+  ( projectLocalPackages
+  , localDependencies
+  , loadCommonPackage
+  , loadLocalPackage
+  , loadSourceMap
+  , getLocalFlags
+  , addUnlistedToBuildCache
+  , hashSourceMapData
+  ) where
 
 import              Conduit ( ZipSink (..), withSourceFile )
 import              Data.ByteString.Builder ( toLazyByteString )
@@ -171,8 +171,11 @@ hashSourceMapData boptsCli sm = do
       -- resolver 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds
       -- with profiling or without
       bootGhcOpts = map display (generalGhcOptions bc boptsCli False False)
-      hashedContent = toLazyByteString $ compilerPath <> compilerInfo <>
-          getUtf8Builder (mconcat bootGhcOpts) <> mconcat immDeps
+      hashedContent =
+           toLazyByteString $ compilerPath
+        <> compilerInfo
+        <> getUtf8Builder (mconcat bootGhcOpts)
+        <> mconcat immDeps
   pure $ SourceMapHash (SHA256.hashLazyBytes hashedContent)
 
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env Builder
@@ -181,9 +184,9 @@ depPackageHashableContent DepPackage {..} =
     PLMutable _ -> pure ""
     PLImmutable pli -> do
       let flagToBs (f, enabled) =
-              if enabled
-                  then ""
-                  else "-" <> fromString (C.unFlagName f)
+            if enabled
+              then ""
+              else "-" <> fromString (C.unFlagName f)
           flags = map flagToBs $ Map.toList (cpFlags dpCommon)
           ghcOptions = map display (cpGhcOptions dpCommon)
           cabalConfigOpts = map display (cpCabalConfigOpts dpCommon)
@@ -396,12 +399,12 @@ loadLocalPackage pp = do
     , lpCabalFile = ppCabalFP pp
     , lpWanted = isWanted
     , lpComponents = nonLibComponents
-    -- TODO: refactor this so that it's easier to be sure that these
-    -- components are indeed unbuildable.
-    --
-    -- The reasoning here is that if the STLocalComps specification made it
-    -- through component parsing, but the components aren't present, then they
-    -- must not be buildable.
+      -- TODO: refactor this so that it's easier to be sure that these
+      -- components are indeed unbuildable.
+      --
+      -- The reasoning here is that if the STLocalComps specification made it
+      -- through component parsing, but the components aren't present, then they
+      -- must not be buildable.
     , lpUnbuildable = toComponents
         (exes `Set.difference` packageExes pkg)
         (tests `Set.difference` Map.keysSet (packageTests pkg))

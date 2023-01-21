@@ -345,21 +345,24 @@ pathCompleterWith PathCompleterOpts {..} = mkCompleter $ \inputRaw -> do
       | input == "" && pcoAbsolute -> pure ["/"]
       | otherwise -> pure []
     Just searchDir -> do
-      entries <- getDirectoryContents searchDir `catch` \(_ :: IOException) -> pure []
+      entries <-
+        getDirectoryContents searchDir `catch` \(_ :: IOException) -> pure []
       fmap catMaybes $ forM entries $ \entry ->
         -- Skip . and .. unless user is typing . or ..
-        if entry `elem` ["..", "."] && searchPrefix `notElem` ["..", "."] then pure Nothing else
-          if searchPrefix `isPrefixOf` entry
-            then do
-              let path = searchDir </> entry
-              case (pcoFileFilter path, pcoDirFilter path) of
-                (True, True) -> pure $ Just (inputSearchDir </> entry)
-                (fileAllowed, dirAllowed) -> do
-                  isDir <- doesDirectoryExist path
-                  if (if isDir then dirAllowed else fileAllowed)
-                    then pure $ Just (inputSearchDir </> entry)
-                    else pure Nothing
-            else pure Nothing
+        if entry `elem` ["..", "."] && searchPrefix `notElem` ["..", "."]
+          then pure Nothing
+          else
+            if searchPrefix `isPrefixOf` entry
+              then do
+                let path = searchDir </> entry
+                case (pcoFileFilter path, pcoDirFilter path) of
+                  (True, True) -> pure $ Just (inputSearchDir </> entry)
+                  (fileAllowed, dirAllowed) -> do
+                    isDir <- doesDirectoryExist path
+                    if (if isDir then dirAllowed else fileAllowed)
+                      then pure $ Just (inputSearchDir </> entry)
+                      else pure Nothing
+              else pure Nothing
 
 unescapeBashArg :: String -> String
 unescapeBashArg ('\'' : rest) = rest

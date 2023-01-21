@@ -19,18 +19,18 @@ import           System.PosixCompat.Files
                    ( getSymbolicLinkStatus, isSymbolicLink )
 
 -- | Find the location of a file matching the given predicate.
-findFileUp :: (MonadIO m,MonadThrow m)
-           => Path Abs Dir                -- ^ Start here.
-           -> (Path Abs File -> Bool)     -- ^ Predicate to match the file.
-           -> Maybe (Path Abs Dir)        -- ^ Do not ascend above this directory.
-           -> m (Maybe (Path Abs File))  -- ^ Absolute file path.
+findFileUp :: (MonadIO m, MonadThrow m)
+           => Path Abs Dir              -- ^ Start here.
+           -> (Path Abs File -> Bool)   -- ^ Predicate to match the file.
+           -> Maybe (Path Abs Dir)      -- ^ Do not ascend above this directory.
+           -> m (Maybe (Path Abs File)) -- ^ Absolute file path.
 findFileUp = findPathUp snd
 
 -- | Find the location of a directory matching the given predicate.
 findDirUp :: (MonadIO m,MonadThrow m)
-          => Path Abs Dir                -- ^ Start here.
-          -> (Path Abs Dir -> Bool)      -- ^ Predicate to match the directory.
-          -> Maybe (Path Abs Dir)        -- ^ Do not ascend above this directory.
+          => Path Abs Dir               -- ^ Start here.
+          -> (Path Abs Dir -> Bool)     -- ^ Predicate to match the directory.
+          -> Maybe (Path Abs Dir)       -- ^ Do not ascend above this directory.
           -> m (Maybe (Path Abs Dir))   -- ^ Absolute directory path.
 findDirUp = findPathUp fst
 

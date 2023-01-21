@@ -10,39 +10,39 @@
 {-# LANGUAGE RankNTypes                 #-}
 
 module Stack.Types.Package
- ( BuildInfoOpts (..)
- , ExeName (..)
- , FileCacheInfo (..)
- , GetPackageOpts (..)
- , InstallLocation (..)
- , InstallMap
- , Installed (..)
- , InstalledPackageLocation (..)
- , InstalledMap
- , LocalPackage (..)
- , MemoizedWith (..)
- , Package (..)
- , PackageConfig (..)
- , PackageException (..)
- , PackageLibraries (..)
- , PackageSource (..)
- , dotCabalCFilePath
- , dotCabalGetPath
- , dotCabalMain
- , dotCabalMainPath
- , dotCabalModule
- , dotCabalModulePath
- , installedPackageIdentifier
- , installedVersion
- , lpFiles
- , lpFilesForComponents
- , memoizeRefWith
- , packageDefinedFlags
- , packageIdent
- , packageIdentifier
- , psVersion
- , runMemoizedWith
- ) where
+  ( BuildInfoOpts (..)
+  , ExeName (..)
+  , FileCacheInfo (..)
+  , GetPackageOpts (..)
+  , InstallLocation (..)
+  , InstallMap
+  , Installed (..)
+  , InstalledPackageLocation (..)
+  , InstalledMap
+  , LocalPackage (..)
+  , MemoizedWith (..)
+  , Package (..)
+  , PackageConfig (..)
+  , PackageException (..)
+  , PackageLibraries (..)
+  , PackageSource (..)
+  , dotCabalCFilePath
+  , dotCabalGetPath
+  , dotCabalMain
+  , dotCabalMainPath
+  , dotCabalModule
+  , dotCabalModulePath
+  , installedPackageIdentifier
+  , installedVersion
+  , lpFiles
+  , lpFilesForComponents
+  , memoizeRefWith
+  , packageDefinedFlags
+  , packageIdent
+  , packageIdentifier
+  , psVersion
+  , runMemoizedWith
+  ) where
 
 import           Data.Aeson
                    ( ToJSON (..), FromJSON (..), (.=), (.:), object, withObject
@@ -144,7 +144,9 @@ instance Exception PackageException where
 -- thing.
 data PackageLibraries
   = NoLibraries
-  | HasLibraries !(Set Text) -- ^ the foreign library names, sub libraries get built automatically without explicit component name passing
+  | HasLibraries !(Set Text)
+    -- ^ the foreign library names, sub libraries get built automatically
+    -- without explicit component name passing
  deriving (Show, Typeable)
 
 -- | Name of an executable.
@@ -165,7 +167,8 @@ data Package = Package
   , packageDeps :: !(Map PackageName DepValue)
     -- ^ Packages that the package depends on, both as libraries and build tools.
   , packageUnknownTools :: !(Set ExeName)
-    -- ^ Build tools specified in the legacy manner (build-tools:) that failed the hard-coded lookup.
+    -- ^ Build tools specified in the legacy manner (build-tools:) that failed
+    -- the hard-coded lookup.
   , packageAllDeps :: !(Set PackageName)
     -- ^ Original dependencies (not sieved).
   , packageGhcOptions :: ![Text]
@@ -221,9 +224,10 @@ newtype GetPackageOpts = GetPackageOpts
                    -> [PackageName]
                    -> Path Abs File
                    -> RIO env
-                        (Map NamedComponent (Map ModuleName (Path Abs File))
-                        ,Map NamedComponent [DotCabalPath]
-                        ,Map NamedComponent BuildInfoOpts)
+                        ( Map NamedComponent (Map ModuleName (Path Abs File))
+                        , Map NamedComponent [DotCabalPath]
+                        , Map NamedComponent BuildInfoOpts
+                        )
   }
 
 instance Show GetPackageOpts where
@@ -234,9 +238,9 @@ data BuildInfoOpts = BuildInfoOpts
   { bioOpts :: [String]
   , bioOneWordOpts :: [String]
   , bioPackageFlags :: [String]
-  -- ^ These options can safely have 'nubOrd' applied to them, as
-  -- there are no multi-word options (see
-  -- https://github.com/commercialhaskell/stack/issues/1255)
+    -- ^ These options can safely have 'nubOrd' applied to them, as there are no
+    -- multi-word options (see
+    -- https://github.com/commercialhaskell/stack/issues/1255)
   , bioCabalMacros :: Path Abs File
   }
   deriving Show
@@ -271,9 +275,9 @@ instance Eq Package where
 -- | Where the package's source is located: local directory or package index
 data PackageSource
   = PSFilePath LocalPackage
-  -- ^ Package which exist on the filesystem
+    -- ^ Package which exist on the filesystem
   | PSRemote PackageLocationImmutable Version FromSnapshot CommonPackage
-  -- ^ Package which is downloaded remotely.
+    -- ^ Package which is downloaded remotely.
 
 instance Show PackageSource where
   show (PSFilePath lp) = concat ["PSFilePath (", show lp, ")"]
@@ -330,7 +334,7 @@ data LocalPackage = LocalPackage
 
 newtype MemoizedWith env a
   = MemoizedWith { unMemoizedWith :: RIO env a }
-  deriving (Functor, Applicative, Monad)
+  deriving (Applicative, Functor, Monad)
 
 memoizeRefWith :: MonadIO m => RIO env a -> m (MemoizedWith env a)
 memoizeRefWith action = do
@@ -394,8 +398,8 @@ newtype FileCacheInfo = FileCacheInfo
 
 instance NFData FileCacheInfo
 
--- Provided for storing the BuildCache values in a file. But maybe
--- JSON/YAML isn't the right choice here, worth considering.
+-- Provided for storing the BuildCache values in a file. But maybe JSON/YAML
+-- isn't the right choice here, worth considering.
 instance ToJSON FileCacheInfo where
   toJSON (FileCacheInfo hash') = object
     [ "hash" .= hash'

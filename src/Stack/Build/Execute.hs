@@ -940,9 +940,14 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
   beopts = boptsBenchmarkOpts bopts
 
 -- | Generate the ConfigCache
-getConfigCache :: HasEnvConfig env
-               => ExecuteEnv -> Task -> InstalledMap -> Bool -> Bool
-               -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
+getConfigCache ::
+     HasEnvConfig env
+  => ExecuteEnv
+  -> Task
+  -> InstalledMap
+  -> Bool
+  -> Bool
+  -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
 getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBench = do
   let extra =
         -- We enable tests if the test suite dependencies are already
