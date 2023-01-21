@@ -155,8 +155,9 @@ packages.
 
 ### Git and Mercurial repositories
 
-You can give a Git or Mercurial repository at a specific commit, and Stack will
-clone that repository. For example:
+You can specify a Git or Mercurial repository at a specific commit, and Stack
+will clone that repository and, if it has submodules (Git), update the
+repository's submodules. For example:
 
 ~~~yaml
 extra-deps:
@@ -201,8 +202,9 @@ package is found in the top-level directory of the repository.
 
 [:octicons-tag-24: 1.7.1](https://github.com/commercialhaskell/stack/releases/tag/v1.7.1)
 
-You can specify packages from GitHub repository name using `github`. For
-example:
+You can specify a GitHub respository at a specific commit and Stack will obtain
+from GitHub an archive file of the files in the repository at that point in its
+history. For example:
 
 ~~~yaml
 extra-deps:
@@ -212,18 +214,13 @@ extra-deps:
 
 !!! note
 
-    `github` is not just syntactic sugar over `git`. It uses a completely
-    different approach to get the package's code − instead of cloning the
-    repo, it downloads an archive that is provided by GitHub. This can be more
-    efficient than cloning, as no revision history is downloaded.
+    An archive file of the files in a GitHub repository at a point in its
+    history is not the same as a clone of the repository (including its history)
+    and the updating of any submodules. If you need the latter, use the syntax
+    for a [Git repository](pantry.md#git-and-mercurial-repositories).
 
-    On the other hand, if the dependency's repo contains git submodules, the
-    only option is to use `git` as it clones the repo and updates its
-    submodules.
-
-    Try to use `git` instead of `github` if the package build fails due to
-    some files are missing.
-
+    If the package fails to build due to missing files, it may be that updated
+    submodules are required.
 
 #### git-annex
 
