@@ -1,4 +1,4 @@
-resolver: lts-20.0
+resolver: lts-20.8
 extra-deps: []
 flags: {}
 extra-package-dbs: []

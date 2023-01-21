@@ -1,4 +1,4 @@
-resolver: lts-20.0
+resolver: lts-20.8
 packages:
 - package-with-th
 - package-with-working-th
