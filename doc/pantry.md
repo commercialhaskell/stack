@@ -98,8 +98,8 @@ generated in a [lock file](lock_files.md).
 
 ### Hackage packages
 
-A package can be identified by its name, version and its Cabal file revision
-number, with `0` being the original Cabal file. For example:
+A package can be identified by its name, version and Cabal file revision
+number, with revision `0` being the original Cabal file. For example:
 
 ~~~yaml
 extra-deps:
@@ -115,13 +115,15 @@ extra-deps:
 - acme-missiles-0.3
 ~~~
 
-This may result in one build differing from another, if a further Cabal file
-revision is added to the package index between builds.
+This syntax is often used in practice, but may result in one build differing
+from another, if a new or further Cabal file revision is added to the package
+index between the builds.
 
-Alternatively, you can specify the package name and version with the SHA256 hash
-of the contents of its Cabal file. Doing so is slighly more resilient than using
-the Cabal file revision number, as it does not rely on the correct ordering in
-the package index. For example:
+As an alternative to specifying the Cabal file revision number, you can specify
+the package name and version with the SHA256 hash of the contents of its Cabal
+file. Doing so is slightly more resilient than using the Cabal file revision
+number, as it does not rely on the correct ordering in the package index.
+For example:
 
 ~~~yaml
 extra-deps:
@@ -129,7 +131,7 @@ extra-deps:
 ~~~
 
 Optionally, you can specify also the size of the Cabal file in bytes. For
-example:
+example (where the file size is `631` bytes):
 
 ~~~yaml
 extra-deps:
@@ -147,7 +149,9 @@ Optionally, you can specify also the Pantry tree information. For example:
 
 The SHA256 hash of the contents of the Cabal file and its size in bytes is
 provided in Stack's lock file. For further information, see the
-[lock files](lock_files.md) documentation.
+[lock files](lock_files.md) documentation. The SHA256 hash and file size
+alternative is also what Stack uses when it makes suggestions about missing
+packages.
 
 ### Git and Mercurial repositories
 
