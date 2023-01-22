@@ -49,8 +49,8 @@ advantage of the flags is that they compose. See the examples below.
 ## Components
 
 Every Cabal package is made up of one or more components. It can have an
-optional library component, one or more optional executable components, one or
-more optional test suite components, and one or more optional benchmark
+optional public library component, one or more optional executable components,
+one or more optional test suite components, and one or more optional benchmark
 components.
 
 Stack allows you to identify a specific component to be built. For example,
@@ -98,8 +98,10 @@ supported syntaxes for targets are:
     test suites to run, or to have a faster compilation cycle. There are
     multiple ways to refer to a specific component (provided for convenience):
 
-    *   `packagename:comptype:compname` is the most explicit. The available
-        comptypes are `exe`, `test`, and `bench`.
+    *   `<package-name>:lib` or `<package-name>:<comp-type>:<comp-name>` (where
+        the component type, `<comp-type>`, is one of `exe`, `test`, or `bench`)
+        is the most explicit. The library component type (`lib`) does not have
+        an associated component name, `<comp-name>`.
 
         !!! note
 
@@ -108,14 +110,14 @@ supported syntaxes for targets are:
             all currently released versions of Cabal. See
             [issue#1046](https://github.com/commercialhaskell/stack/issues/1406)
 
-    *   `packagename:compname` allows you to leave out the component type, as
-         that will (almost?) always be redundant with the component name. For
+    *   `<package-name>:<comp-name>` allows you to leave out the component type,
+         as that will often be unique for a given component name. For
          example, `stack build mypackage:mytestsuite`.
 
-    *   `:compname` is a useful shortcut, saying "find the component in all of
-        the local packages." This will result in an error if multiple packages
-        have a component with the same name. To continue the above example,
-        `stack build :mytestsuite`.
+    *   `:<comp-name>` is a useful shortcut, saying "find the component
+        `<comp-name>` in all of the local packages". This will result in an
+        error if more than one package has a component with the specified name.
+        To continue the above example, `stack build :mytestsuite`.
 
 *   *directory*, e.g. `stack build foo/bar`, will find all local packages that
     exist in the given directory hierarchy and then follow the same procedure as
