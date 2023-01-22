@@ -395,15 +395,14 @@ instance Pretty BuildPrettyException where
     <> line
     <> flow "Stack failed to execute the build plan."
     <> blankLine
-    <> flow "While executing the build plan, Stack encountered the \
-            \following errors:"
+    <> fillSep
+         [ flow "While executing the build plan, Stack encountered the"
+         , case es of
+             [_] -> "error:"
+             _ -> flow "following errors:"
+         ]
     <> blankLine
-    <> hcat (L.intersperse blankLine (map ppExceptions es))
-   where
-    ppExceptions :: SomeException -> StyleDoc
-    ppExceptions e = case fromException e of
-      Just (PrettyException e') -> pretty e'
-      Nothing -> (string . show) e
+    <> hcat (L.intersperse blankLine (map ppException es))
   pretty (CabalExitedUnsuccessfully exitCode taskProvides' execName fullArgs logFiles bss) =
     showBuildError "[S-7011]"
       False exitCode (Just taskProvides') execName fullArgs logFiles bss

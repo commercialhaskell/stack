@@ -159,12 +159,10 @@ data SetupException
   | SetupInfoMissingSevenz
   | DockerStackExeNotFound Version Text
   | UnsupportedSetupConfiguration
-  | InvalidGhcAt (Path Abs File) SomeException
   | MSYS2NotFound Text
   | UnwantedCompilerVersion
   | UnwantedArchitecture
   | SandboxedCompilerNotFound
-  | CompilerNotFound [String]
   | GHCInfoNotValidUTF8 UnicodeException
   | GHCInfoNotListOfPairs
   | GHCInfoMissingGlobalPackageDB
@@ -256,13 +254,6 @@ instance Exception SetupException where
     "Error: [S-7748]\n"
     ++ "Stack does not know how to install GHC on your system \
        \configuration, please install manually."
-  displayException (InvalidGhcAt compiler e) = concat
-    [ "Error: [S-2476]\n"
-    , "Found an invalid compiler at "
-    , show (toFilePath compiler)
-    , ": "
-    , displayException e
-    ]
   displayException (MSYS2NotFound osKey) = concat
     [ "Error: [S-5308]\n"
     , "MSYS2 not found for "
@@ -277,11 +268,6 @@ instance Exception SetupException where
   displayException SandboxedCompilerNotFound =
     "Error: [S-9953]\n"
     ++ "Could not find sandboxed compiler."
-  displayException (CompilerNotFound toTry) = concat
-    [ "Error: [S-4764]\n"
-    , "Could not find any of: "
-    , show toTry
-    ]
   displayException (GHCInfoNotValidUTF8 e) = concat
     [ "Error: [S-8668]\n"
     , "GHC info is not valid UTF-8: "
@@ -407,11 +393,13 @@ data SetupPrettyException
       (Path Abs Dir)
       (Path Abs Dir)
       (Path Abs Dir)
+  | InvalidGhcAt (Path Abs File) SomeException
+  | ExecutableNotFound [Path Abs File]
   deriving (Show, Typeable)
 
 instance Pretty SetupPrettyException where
   pretty (GHCInstallFailed ex step cmd args wd tempDir destDir) =
-       "[S-7441]"
+    "[S-7441]"
     <> line
     <> string (displayException ex)
     <> line
@@ -442,6 +430,24 @@ instance Pretty SetupPrettyException where
          , "flag."
          ]
     <> line
+  pretty (InvalidGhcAt compiler e) =
+    "[S-2476]"
+    <> line
+    <> fillSep
+         [ flow "Stack considers the compiler at"
+         , pretty compiler
+         , flow "to be invalid."
+         ]
+    <> blankLine
+    <> flow "While assessing that compiler, Stack encountered the error:"
+    <> blankLine
+    <> ppException e
+  pretty (ExecutableNotFound toTry) =
+    "[S-4764]"
+    <> line
+    <> flow "Stack could not find any of the following executables:"
+    <> line
+    <> bulletedList (map pretty toTry)
 
 instance Exception SetupPrettyException
 
@@ -1177,17 +1183,21 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler =
         suffixes = maybe id (:) msuffixWithVersion [suffixNoVersion]
         findHelper :: (WhichCompiler -> [String]) -> RIO env (Path Abs File)
         findHelper getNames = do
-          let toTry = [ dir ++ name ++ suffix
-                      | suffix <- suffixes, name <- getNames wc
-                      ]
-              loop [] = throwIO $ CompilerNotFound toTry
-              loop (guessedPath':rest) = do
-                guessedPath <- parseAbsFile guessedPath'
+          toTry <- mapM
+                     parseAbsFile
+                     [ dir ++ name ++ suffix
+                     | suffix <- suffixes, name <- getNames wc
+                     ]
+          let loop [] = throwIO $ PrettyException $ ExecutableNotFound toTry
+              loop (guessedPath:rest) = do
                 exists <- doesFileExist guessedPath
                 if exists
                   then pure guessedPath
                   else loop rest
-          logDebug $ "Looking for executable(s): " <> displayShow toTry
+          prettyDebug $
+               flow "Looking for executable(s):"
+            <> line
+            <> bulletedList (map pretty toTry)
           loop toTry
     pkg <- fmap GhcPkgExe $ findHelper $ \case
                                Ghc -> ["ghc-pkg"]
@@ -1268,7 +1278,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler =
       , cpGlobalDump = globalDump
       }
  where
-  onErr = throwIO . InvalidGhcAt compiler
+  onErr = throwIO . PrettyException . InvalidGhcAt compiler
 
   withCache inner = do
     eres <- tryAny $ loadCompilerPaths compiler compilerBuild isSandboxed

@@ -54,6 +54,8 @@ module Stack.Prelude
   , mkNarrativeList
   , parens
   , parseStylesUpdateFromString
+  , ppException
+  , prettyDebug
   , prettyDebugL
   , prettyError
   , prettyErrorL
@@ -92,12 +94,12 @@ import           RIO.PrettyPrint
                    ( HasStylesUpdate (..), HasTerm (..), Pretty (..), Style (..)
                    , StyleDoc, (<+>), align, bulletedList, debugBracket
                    , encloseSep, fill, fillSep, flow, hang, hcat, hsep, indent
-                   , line, logLevelToStyle, mkNarrativeList, parens
+                   , line, logLevelToStyle, mkNarrativeList, parens, prettyDebug
                    , prettyDebugL, prettyError, prettyErrorL, prettyInfo
                    , prettyInfoL, prettyInfoS, prettyNote, prettyWarn
                    , prettyWarnL, prettyWarnNoIndent, prettyWarnS, punctuate
                    , sep, softbreak, softline, string, style, stylesUpdateL
-                   , useColorL, vsep
+                   , useColorL, vsep, prettyDebug
                    )
 import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
@@ -343,3 +345,9 @@ bugRequest =  "Please report this bug at Stack's repository."
 -- | A \'pretty\' blank line.
 blankLine :: StyleDoc
 blankLine = line <> line
+
+-- | Provide the prettiest available information about an exception.
+ppException :: SomeException -> StyleDoc
+ppException e = case fromException e of
+  Just (PrettyException e') -> pretty e'
+  Nothing -> (string . displayException) e

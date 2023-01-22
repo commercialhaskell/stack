@@ -264,12 +264,10 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-9561] | SetupInfoMissingSevenz
         [S-1457] | DockerStackExeNotFound Version Text
         [S-7748] | UnsupportedSetupConfiguration
-        [S-2476] | InvalidGhcAt (Path Abs File) SomeException
         [S-5308] | MSYS2NotFound Text
         [S-5127] | UnwantedCompilerVersion
         [S-1540] | UnwantedArchitecture
         [S-9953] | SandboxedCompilerNotFound
-        [S-4764] | CompilerNotFound [String]
         [S-8668] | GHCInfoNotValidUTF8 UnicodeException
         [S-4878] | GHCInfoNotListOfPairs
         [S-2965] | GHCInfoMissingGlobalPackageDB
@@ -300,7 +298,9 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Stack.Setup.SetupPrettyException`
 
         ~~~haskell
-        [S-7441]= GHCInstallFailed SomeException StyleDoc String [String] (Path Abs Dir) (Path Abs Dir) (Path Abs Dir)
+        [S-7441] = GHCInstallFailed SomeException StyleDoc String [String] (Path Abs Dir) (Path Abs Dir) (Path Abs Dir)
+        [S-2476] | InvalidGhcAt (Path Abs File) SomeException
+        [S-4764] | ExecutableNotFound [Path Abs File]
         ~~~
 
     -   `Stack.Storage.User.StorageUserException`
