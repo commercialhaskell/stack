@@ -188,7 +188,7 @@ parseRawTargetDirs root locals ri =
   projectTypo :: Int -> Int -> String -> StyleDoc
   projectTypo padLength dropLength option =
     vsep
-      [ style Dir ((fromString $ replicate padLength ' ') <> (fromString $ T.unpack t))
+      [ style Dir (fromString (replicate padLength ' ') <> fromString (T.unpack t))
         <> " is not a directory."
       , style Highlight (fromString $ "--" <> option)
         <> style Dir (fromString . drop dropLength $ T.unpack t)
