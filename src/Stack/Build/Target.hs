@@ -155,20 +155,8 @@ parseRawTargetDirs root locals ri =
         >>= rejectMissingDir
       case mdir of
         Nothing -> pure . Left $
-          if | T.isPrefixOf "stack-yaml" t ->
-                fillSep
-                  [ flow "Directory not found:"
-                  , style Dir (fromString $ T.unpack t) <> "."
-                  , flow "Is this a typo? Can I suggest:"
-                  , style Dir (fromString $ "--" ++ T.unpack t)
-                  ]
-             | T.isSuffixOf ".yaml" t ->
-                fillSep
-                  [ flow "Directory not found:"
-                  , style Dir (fromString $ T.unpack t) <> "."
-                  , flow "Is this a typo? Can I suggest:"
-                  , style Dir (fromString $ "--stack-yaml " ++ T.unpack t)
-                  ]
+          if | T.isPrefixOf "stack-yaml=" t -> projectOptionTypo
+             | T.isSuffixOf ".yaml" t -> projectYamlExtTypo
              | otherwise ->
                 fillSep
                   [ flow "Directory not found:"
@@ -190,6 +178,22 @@ parseRawTargetDirs root locals ri =
       else Nothing
 
   RawInput t = ri
+
+  projectOptionTypo :: StyleDoc
+  projectOptionTypo = let o = "stack-yaml=" in projectTypo 2 (length o) o
+
+  projectYamlExtTypo :: StyleDoc
+  projectYamlExtTypo = let o = "stack-yaml " in projectTypo (2 + length o) 0 o
+
+  projectTypo :: Int -> Int -> String -> StyleDoc
+  projectTypo padLength dropLength option =
+    vsep
+      [ style Dir ((fromString $ replicate padLength ' ') <> (fromString $ T.unpack t))
+        <> " is not a directory."
+      , style Highlight (fromString $ "--" <> option)
+        <> style Dir (fromString . drop dropLength $ T.unpack t)
+        <> " might work as a project option."
+      ]
 
 -- | If this function returns @Nothing@, the input should be treated as a
 -- directory.
