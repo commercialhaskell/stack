@@ -13,11 +13,6 @@
 --
 -- > stack ls dependencies cabal > cabal.config
 --
--- From the resolver in `stack.yaml` be sure to set `with-compiler: ghc-x.y.z`.
--- This can be checked in the cabal.config from stackage that matches the
--- resolver, such as:
---   https://www.stackage.org/lts-20.0/cabal.config
---
 -- However, be aware that, in respect of the `unix` package or the `Win32`
 -- package (that may come with GHC, depending on the operating system):
 --
@@ -30,7 +25,16 @@
 -- The command above will add one of the two packages to `cabal.config` but omit
 -- the other. A comprehensive `cabal.config` will need to be created by editing
 -- the command's output.
-
+--
+-- Also be aware that there may be other packages required only on non-Windows
+-- systems. For example, the `hinotify` package.
+--
+-- Be sure to set `with-compiler: ghc-x.y.z` below to the version of GHC that is
+-- specified by the snapshot specifed in Stack's project-level YAML
+-- configuration file (`stack.yaml`). The relevant version of GHC can be
+-- confirmed by reviewing the snapshot on Stackage. For example, at:
+-- https://www.stackage.org/lts-20.8/cabal.config.
+--
 with-compiler: ghc-9.2.5
 import: cabal.config
 packages: .
