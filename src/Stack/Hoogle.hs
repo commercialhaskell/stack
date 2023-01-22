@@ -260,7 +260,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
               , flow "to disable) ..."
               ]
             installHoogle
-        | otherwise -> throwIO $ PrettyException $ HoogleNotFound err
+        | otherwise -> prettyThrowIO $ HoogleNotFound err
 
   envSettings =
     EnvSettings

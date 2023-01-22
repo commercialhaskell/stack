@@ -1949,8 +1949,7 @@ installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
           withProcessContext menv' $
           sinkProcessStderrStdout cmd args logStderr logStdout
           `catchAny` \ex ->
-            throwIO $ PrettyException
-              (GHCInstallFailed ex step cmd args wd tempDir destDir)
+            prettyThrowIO (GHCInstallFailed ex step cmd args wd tempDir destDir)
 
   logSticky $
        "Unpacking GHC into "

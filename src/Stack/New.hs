@@ -252,7 +252,7 @@ data NewOpts = NewOpts
 new :: HasConfig env => NewOpts -> Bool -> RIO env (Path Abs Dir)
 new opts forceOverwrite = do
   when (project `elem` wiredInPackages) $
-      throwM $ PrettyException $ MagicPackageNameInvalid projectName
+      prettyThrowM $ MagicPackageNameInvalid projectName
   pwd <- getCurrentDir
   absDir <- if bare
               then pure pwd
@@ -264,8 +264,7 @@ new opts forceOverwrite = do
                                                       , configTemplate
                                                       ]
   if exists && not bare
-    then throwM $ PrettyException $
-             ProjectDirAlreadyExists projectName absDir
+    then prettyThrowM $ ProjectDirAlreadyExists projectName absDir
     else do
       templateText <- loadTemplate template (logUsing absDir template)
       files <-
@@ -356,12 +355,10 @@ loadTemplate name logIt = do
       then do
         bs <- readFileBinary (toFilePath path) --readFileUtf8 (toFilePath path)
         case extract bs of
-          Left err -> throwM $ PrettyException $
-              ExtractTemplateFailed name path err
+          Left err -> prettyThrowM $ ExtractTemplateFailed name path err
           Right template ->
               pure template
-      else throwM $ PrettyException $
-        LoadTemplateFailed name path
+      else prettyThrowM $ LoadTemplateFailed name path
 
   relSettings :: String -> Maybe (RIO env TemplateDownloadSettings)
   relSettings req = do
@@ -413,8 +410,7 @@ loadTemplate name logIt = do
                  \most recent version though."
           )
       else
-        throwM $ PrettyException $
-          DownloadTemplateFailed (templateName name) url exception
+        prettyThrowM $ DownloadTemplateFailed (templateName name) url exception
 
 -- | Type representing settings for the download of Stack project templates.
 data TemplateDownloadSettings = TemplateDownloadSettings
@@ -528,22 +524,18 @@ applyTemplate project template nonceParams dir templateText = do
             unpackTemplate receiveMem id
       )
       ( \(e :: ProjectTemplateException) ->
-            throwM $ PrettyException $
-                TemplateInvalid template (string $ displayException e)
+          prettyThrowM $ TemplateInvalid template (string $ displayException e)
       )
   when (M.null files) $
-    throwM $ PrettyException $
-      TemplateInvalid
-        template
-        (flow "the template does not contain any files.")
+    prettyThrowM $ TemplateInvalid
+      template
+      (flow "the template does not contain any files.")
 
   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || f == "package.yaml"
   unless (any isPkgSpec . M.keys $ files) $
-    throwM $ PrettyException $
-      TemplateInvalid
-        template
-        ( flow "the template does not contain a Cabal or package.yaml file."
-        )
+    prettyThrowM $ TemplateInvalid
+      template
+      (flow "the template does not contain a Cabal or package.yaml file.")
 
     -- Apply Mustache templating to a single file within the project template.
   let applyMustache bytes
@@ -553,20 +545,22 @@ applyTemplate project template nonceParams dir templateText = do
         -- https://github.com/commercialhaskell/stack/issues/4133.
         | LB.length bytes < 50000
         , Right text <- TLE.decodeUtf8' bytes = do
-            let etemplateCompiled = Mustache.compileTemplate (T.unpack (templateName template)) $ TL.toStrict text
+            let etemplateCompiled =
+                  Mustache.compileTemplate (T.unpack (templateName template)) $ TL.toStrict text
             templateCompiled <- case etemplateCompiled of
-              Left e -> throwM $ PrettyException $
-                TemplateInvalid
-                  template
-                  (  flow "Stack encountered the following error:"
-                  <> blankLine
-                     -- Text.Parsec.Error.ParseError is not an instance
-                     -- of Control.Exception.
-                  <> string (show e)
-                  )
+              Left e -> prettyThrowM $ TemplateInvalid
+                template
+                (  flow "Stack encountered the following error:"
+                <> blankLine
+                   -- Text.Parsec.Error.ParseError is not an instance
+                   -- of Control.Exception.
+                <> string (show e)
+                )
               Right t -> pure t
-            let (substitutionErrors, applied) = Mustache.checkedSubstitute templateCompiled context
-                missingKeys = S.fromList $ concatMap onlyMissingKeys substitutionErrors
+            let (substitutionErrors, applied) =
+                  Mustache.checkedSubstitute templateCompiled context
+                missingKeys =
+                  S.fromList $ concatMap onlyMissingKeys substitutionErrors
             pure (LB.fromStrict $ encodeUtf8 applied, missingKeys)
 
         -- Too large or too binary
@@ -659,7 +653,7 @@ checkForOverwrite ::
 checkForOverwrite name files = do
   overwrites <- filterM doesFileExist files
   unless (null overwrites) $
-    throwM $ PrettyException $ AttemptedOverwrites name overwrites
+    prettyThrowM $ AttemptedOverwrites name overwrites
 
 -- | Write files to the new project directory.
 writeTemplateFiles ::
@@ -698,9 +692,9 @@ templatesHelp = do
   req <- fmap setGitHubHeaders (parseUrlThrow url)
   resp <- catch
     (httpLbs req)
-    (throwM . PrettyException. DownloadTemplatesHelpFailed)
+    (prettyThrowM . DownloadTemplatesHelpFailed)
   case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
-    Left err -> throwM $ PrettyException $ TemplatesHelpEncodingInvalid url err
+    Left err -> prettyThrowM $ TemplatesHelpEncodingInvalid url err
     Right txt -> logInfo $ display txt
 
 --------------------------------------------------------------------------------

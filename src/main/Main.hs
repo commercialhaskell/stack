@@ -774,7 +774,7 @@ cleanCmd = withConfig NoReexec . clean
 buildCmd :: BuildOptsCLI -> RIO Runner ()
 buildCmd opts = do
   when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) (boptsCLIGhcOptions opts)) $
-    throwIO $ PrettyException GHCProfOptionInvalid
+    prettyThrowIO GHCProfOptionInvalid
   local (over globalOptsL modifyGO) $
     case boptsCLIFileWatch opts of
       FileWatchPoll -> fileWatchPoll (inner . Just)
@@ -851,7 +851,7 @@ upgradeCmd :: UpgradeOpts -> RIO Runner ()
 upgradeCmd upgradeOpts' = do
   go <- view globalOptsL
   case globalResolver go of
-    Just _ -> throwIO $ PrettyException ResolverOptionInvalid
+    Just _ -> prettyThrowIO ResolverOptionInvalid
     Nothing ->
       withGlobalProject $
       upgrade
@@ -983,7 +983,7 @@ execCmd ExecOpts {..} =
     case mId of
       Just i -> pure (L.head $ words (T.unpack i))
       -- should never happen as we have already installed the packages
-      _      -> throwIO $ PrettyException (PackageIdNotFoundBug name)
+      _      -> prettyThrowIO (PackageIdNotFoundBug name)
 
   getPkgOpts pkgs =
     map ("-package-id=" ++) <$> mapM getPkgId pkgs
@@ -1003,7 +1003,7 @@ execCmd ExecOpts {..} =
       Just (CExe exe') -> do
         withNewLocalBuildTargets [T.cons ':' exe'] $ Stack.Build.build Nothing
         pure (T.unpack exe', args')
-      _ -> throwIO $ PrettyException ExecutableToRunNotFound
+      _ -> prettyThrowIO ExecutableToRunNotFound
 
   getGhcCmd pkgs args = do
     pkgopts <- getPkgOpts pkgs

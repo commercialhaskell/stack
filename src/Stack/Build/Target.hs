@@ -531,14 +531,14 @@ parseTargets needTargets haddockDeps boptscli smActual = do
 
   case concat [errs1, errs2, errs3] of
     [] -> pure ()
-    errs -> throwIO $ PrettyException $ TargetParseException errs
+    errs -> prettyThrowIO $ TargetParseException errs
 
   case (Map.null targets, needTargets) of
     (False, _) -> pure ()
     (True, AllowNoTargets) -> pure ()
     (True, NeedTargets)
       | null textTargets' && bcImplicitGlobal bconfig ->
-          throwIO $ PrettyException $ TargetParseException
+          prettyThrowIO $ TargetParseException
             [ fillSep
                 [ flow "The specified targets matched no packages. Perhaps you \
                        \need to run"
@@ -546,11 +546,11 @@ parseTargets needTargets haddockDeps boptscli smActual = do
                 ]
             ]
       | null textTargets' && Map.null locals ->
-          throwIO $ PrettyException $ TargetParseException
+          prettyThrowIO $ TargetParseException
             [ flow "The project contains no local packages (packages not \
                    \marked with 'extra-dep')."
             ]
-      | otherwise -> throwIO $ PrettyException $ TargetParseException
+      | otherwise -> prettyThrowIO $ TargetParseException
           [ flow "The specified targets matched no packages." ]
 
   addedDeps' <- mapM (additionalDepPackage haddockDeps . PLImmutable) addedDeps

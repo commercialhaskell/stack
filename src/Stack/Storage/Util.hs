@@ -81,8 +81,7 @@ handleMigrationException inner = do
   either
     ( \e -> case e :: PantryException of
               MigrationFailure desc fp ex ->
-                throwIO $
-                    PrettyException $ StorageMigrationFailure desc fp ex
+                prettyThrowIO $ StorageMigrationFailure desc fp ex
               _ -> throwIO e
     )
     pure
