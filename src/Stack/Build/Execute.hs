@@ -394,14 +394,8 @@ getSetupExe setupHs setupShimHs tmpdir = do
           let pc = setStdout (useHandleOpen stderr) pc0
           runProcess_ pc)
             `catch` \ece ->
-              throwM $ PrettyException $
-                SetupHsBuildFailure
-                  (eceExitCode ece)
-                  Nothing
-                  compilerPath
-                  args
-                  Nothing
-                  []
+              prettyThrowM $ SetupHsBuildFailure
+                (eceExitCode ece) Nothing compilerPath args Nothing []
       renameFile tmpExePath exePath
       pure $ Just exePath
 
@@ -770,7 +764,8 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
   when (toCoverage $ boptsTestOpts eeBuildOpts) $ do
     generateHpcUnifiedReport
     generateHpcMarkupIndex
-  unless (null errs) $ throwM $ PrettyException (ExecutionFailure errs)
+  unless (null errs) $
+    prettyThrowM $ ExecutionFailure errs
   when (boptsHaddock eeBuildOpts) $ do
     snapshotDumpPkgs <- liftIO (readTVarIO eeSnapshotDumpPkgs)
     localDumpPkgs <- liftIO (readTVarIO eeLocalDumpPkgs)
@@ -1498,13 +1493,8 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                           .| mungeBuildOutput
                                stripTHLoading makeAbsolute pkgDir compilerVer
                           .| CL.consume
-              throwM $ PrettyException $ CabalExitedUnsuccessfully
-                (eceExitCode ece)
-                taskProvides
-                exeName
-                fullArgs
-                mlogFile
-                bss
+              prettyThrowM $ CabalExitedUnsuccessfully
+                (eceExitCode ece) taskProvides exeName fullArgs mlogFile bss
            where
             runAndOutput :: ActualCompiler -> RIO env ()
             runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $
@@ -1923,7 +1913,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             (TTRemotePackage{}, _, _) -> [])
       `catch` \ex -> case ex of
         CabalExitedUnsuccessfully{} ->
-          postBuildCheck False >> throwM (PrettyException ex)
+          postBuildCheck False >> prettyThrowM ex
         _ -> throwM ex
     postBuildCheck True
 

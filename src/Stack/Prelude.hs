@@ -25,6 +25,9 @@ module Stack.Prelude
   , bugReport
   , bugPrettyReport
   , blankLine
+  , ppException
+  , prettyThrowIO
+  , prettyThrowM
   , module X
   -- * Re-exports from the rio-pretty print package
   , HasStylesUpdate (..)
@@ -54,7 +57,6 @@ module Stack.Prelude
   , mkNarrativeList
   , parens
   , parseStylesUpdateFromString
-  , ppException
   , prettyDebug
   , prettyDebugL
   , prettyError
@@ -351,3 +353,12 @@ ppException :: SomeException -> StyleDoc
 ppException e = case fromException e of
   Just (PrettyException e') -> pretty e'
   Nothing -> (string . displayException) e
+
+-- | Synchronously throw the given exception as a 'PrettyException'.
+prettyThrowIO :: (Exception e, MonadIO m, Pretty e) => e -> m a
+prettyThrowIO = throwIO . PrettyException
+
+-- | Throw the given exception as a 'PrettyException', when the action is run in
+-- the monad @m@.
+prettyThrowM :: (Exception e, MonadThrow m, Pretty e) => e -> m a
+prettyThrowM = throwM . PrettyException

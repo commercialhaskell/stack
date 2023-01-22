@@ -278,9 +278,8 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
       planDebug $ show errs
       stackYaml <- view stackYamlL
       stackRoot <- view stackRootL
-      throwM $ PrettyException $
-        ConstructPlanFailed
-          errs stackYaml stackRoot parents (wanted ctx) prunedGlobalDeps
+      prettyThrowM $ ConstructPlanFailed
+        errs stackYaml stackRoot parents (wanted ctx) prunedGlobalDeps
  where
   hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
 

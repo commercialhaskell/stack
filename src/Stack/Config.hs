@@ -270,7 +270,7 @@ configFromConfigMonoid
               (parseRelDir x)
               ( \e -> case e of
                   InvalidRelDir _ ->
-                    throwIO $ PrettyException $ StackWorkEnvNotRelativeDir x
+                    prettyThrowIO $ StackWorkEnvNotRelativeDir x
                   _ -> throwIO e
               )
       in  maybe (pure relDirStackWork) (liftIO . parseStackWorkEnv) mstackWorkEnv
@@ -429,7 +429,7 @@ configFromConfigMonoid
             Just [pic] -> do
               prettyWarn packageIndicesWarning
               pure pic
-            Just x -> throwIO $ PrettyException $ MultiplePackageIndices x
+            Just x -> prettyThrowIO $ MultiplePackageIndices x
         Just pic -> pure pic
     mpantryRoot <- liftIO $ lookupEnv pantryRootEnvVar
     pantryRoot <-
@@ -934,8 +934,7 @@ loadConfigYaml ::
 loadConfigYaml parser path = do
   eres <- loadYaml parser path
   case eres of
-    Left err -> liftIO $
-      throwM $ PrettyException (ParseConfigFileException path err)
+    Left err -> prettyThrowM (ParseConfigFileException path err)
     Right res -> pure res
 
 -- | Load and parse YAML from the given file.

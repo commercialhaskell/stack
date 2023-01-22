@@ -271,7 +271,7 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
               (const $ pure ())
               (liftIO $ removeFile (hcCredsFile creds))
           _ -> pure ()
-        throwIO $ PrettyException AuthenticationFailure
+        prettyThrowIO AuthenticationFailure
       403 -> do
         logError "Error: [S-2804]"
         logError "forbidden upload"
@@ -290,7 +290,7 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
       code -> do
         let resBody = mapOutput show (getResponseBody res)
         resBody' <- liftIO $ runConduit $ resBody .| sinkList
-        throwIO $ PrettyException (ArchiveUploadFailure code resBody' tarName)
+        prettyThrowIO (ArchiveUploadFailure code resBody' tarName)
 
 printBody :: Response (ConduitM () S.ByteString IO ()) -> IO ()
 printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout

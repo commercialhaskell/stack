@@ -180,7 +180,7 @@ lockCachedWanted stackFile resolver fillWanted = do
           header <>
           byteString (Yaml.encode newLocked)
       LFBErrorOnWrite ->
-        throwIO $ PrettyException $ WritingLockFileError lockFile newLocked
+        prettyThrowIO $ WritingLockFileError lockFile newLocked
       LFBIgnore -> pure ()
       LFBReadOnly -> pure ()
   pure wanted

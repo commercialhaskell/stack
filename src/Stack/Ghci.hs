@@ -248,8 +248,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
                 `catch` \pex@(PrettyException ex) ->
                     case fromException $ toException ex of
                         Just (TargetParseException xs) ->
-                            throwM $ PrettyException $
-                                GhciTargetParseException xs
+                            prettyThrowM $ GhciTargetParseException xs
                         _ -> throwM pex
             unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
             pure (Right $ smtTargets normalTargets)

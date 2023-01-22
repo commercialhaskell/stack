@@ -126,7 +126,7 @@ initProject currDir initOpts mresolver = do
 
     exists <- doesFileExist dest
     when (not (forceOverwrite initOpts) && exists) $
-        throwIO $ PrettyException $ ConfigFileAlreadyExists reldest
+        prettyThrowIO $ ConfigFileAlreadyExists reldest
 
     dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
     let find  = findCabalDirs (includeSubDirs initOpts)
@@ -413,7 +413,7 @@ renderStackYaml p ignoredPackages dupPackages =
 getSnapshots' :: HasConfig env => RIO env Snapshots
 getSnapshots' = catchAny
     getSnapshots
-    (throwIO . PrettyException . SnapshotDownloadFailure)
+    (prettyThrowIO . SnapshotDownloadFailure)
 
 -- | Get the default resolver value
 getDefaultResolver ::
@@ -446,8 +446,7 @@ getDefaultResolver initOpts mresolver pkgDirs = do
             (c, l, r) <- selectBestSnapshot (Map.elems pkgDirs) snaps
             case r of
                 BuildPlanCheckFail {} | not (omitPackages initOpts)
-                        -> throwM $ PrettyException $
-                               NoMatchingSnapshot snaps
+                        -> prettyThrowM $ NoMatchingSnapshot snaps
                 _ -> pure (c, l)
 
 getWorkingResolverPlan ::
@@ -538,8 +537,7 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
           prettyWarnS "Omitting packages with unsatisfied dependencies"
           pure $ Left $ failedUserPkgs e
         else
-          throwM $ PrettyException $
-            ResolverPartial snapshotLoc (show result)
+          prettyThrowM $ ResolverPartial snapshotLoc (show result)
     BuildPlanCheckFail _ e _
       | omitPackages initOpts -> do
           prettyWarn $
@@ -550,8 +548,7 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
             <> line
             <> indent 4 (string $ show result)
           pure $ Left $ failedUserPkgs e
-      | otherwise -> throwM $
-          PrettyException $ ResolverMismatch snapshotLoc (show result)
+      | otherwise -> prettyThrowM $ ResolverMismatch snapshotLoc (show result)
  where
   warnPartial res = do
     prettyWarn $
@@ -662,7 +659,7 @@ cabalPackagesCheck cabaldirs = do
             Left e -> throwIO e
     let (nameMismatchPkgs, packages) = partitionEithers ePackages
     when (nameMismatchPkgs /= []) $
-        throwIO $ PrettyException $ PackageNameInvalid nameMismatchPkgs
+        prettyThrowIO $ PackageNameInvalid nameMismatchPkgs
 
     let dupGroups = filter ((> 1) . length)
                             . groupSortOn (gpdPackageName . snd)
