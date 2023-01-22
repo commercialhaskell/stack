@@ -31,20 +31,28 @@ import           Stack.Types.Config
 import           Stack.Types.SourceMap
                    ( DepPackage, SMWanted )
 
--- | Type representing exceptions thrown by functions exported by the
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Lock" module.
-data LockException
+data LockPrettyException
   = WritingLockFileError (Path Abs File) Locked
   deriving (Show, Typeable)
 
-instance Exception LockException where
-  displayException (WritingLockFileError lockFile newLocked) = unlines
-    [ "Error: [S-1353]"
-    , "You indicated that Stack should error out on writing a lock file"
-    , "Stack just tried to write the following lock file contents to "
-      ++ toFilePath lockFile
-    , T.unpack $ decodeUtf8With lenientDecode $ Yaml.encode newLocked
-    ]
+instance Pretty LockPrettyException where
+  pretty (WritingLockFileError lockFile newLocked) =
+    "[S-1353]"
+    <> line
+    <> flow "Stack is configured to report an error on writing a lock file."
+    <> blankLine
+    <> fillSep
+         [ flow "Stack just tried to write the following lock file content to"
+         , pretty lockFile <> ":"
+         ]
+    <> blankLine
+    <> string newLocked'
+   where
+    newLocked' = T.unpack . decodeUtf8With lenientDecode $ Yaml.encode newLocked
+
+instance Exception LockPrettyException
 
 data LockedLocation a b = LockedLocation
   { llOriginal :: a
@@ -171,7 +179,8 @@ lockCachedWanted stackFile resolver fillWanted = do
         writeBinaryFileAtomic lockFile $
           header <>
           byteString (Yaml.encode newLocked)
-      LFBErrorOnWrite -> throwIO $ WritingLockFileError lockFile newLocked
+      LFBErrorOnWrite ->
+        throwIO $ PrettyException $ WritingLockFileError lockFile newLocked
       LFBIgnore -> pure ()
       LFBReadOnly -> pure ()
   pure wanted

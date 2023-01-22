@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2022-12-31.
+`master` branch of the Stack repository. Last updated: 2023-01-21.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -179,7 +179,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-4926] = CouldNotParsePackageSelectors [String]
         ~~~
 
-    -   `Stack.Lock.LockException`
+    -   `Stack.Lock.LockPrettyException`
 
         ~~~haskell
         [S-1353] = WritingLockFileError (Path Abs File) Locked
