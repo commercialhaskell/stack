@@ -798,12 +798,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                 $ planUnregisterLocal plan
 
 unregisterPackages ::
-     ( HasCompiler env
-     , HasLogFunc env
-     , HasPlatform env
-     , HasProcessContext env
-     , HasTerm env
-     )
+     (HasCompiler env, HasPlatform env, HasProcessContext env, HasTerm env)
   => ActualCompiler
   -> Path Abs Dir
   -> NonEmpty (GhcPkgId, (PackageIdentifier, Text))
@@ -2686,7 +2681,7 @@ expectBenchmarkFailure pname =
   maybe False (Set.member pname . curatorExpectBenchmarkFailure)
 
 fulfillCuratorBuildExpectations ::
-     (HasCallStack, HasLogFunc env, HasTerm env)
+     (HasCallStack, HasTerm env)
   => PackageName
   -> Maybe Curator
   -> Bool
