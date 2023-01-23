@@ -861,10 +861,7 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
     (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty
 
-checkForIssues ::
-     (HasLogFunc env, HasTerm env)
-  => [GhciPkgInfo]
-  -> RIO env ()
+checkForIssues :: HasTerm env => [GhciPkgInfo] -> RIO env ()
 checkForIssues pkgs =
   when (length pkgs > 1) $ do
     -- Cabal flag issues could arise only when there are at least 2 packages

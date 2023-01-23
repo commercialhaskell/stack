@@ -21,13 +21,13 @@ import           System.FSNotify
 import           System.IO ( getLine )
 
 fileWatch ::
-     (HasLogFunc env, HasTerm env)
+     HasTerm env
   => ((Set (Path Abs File) -> IO ()) -> RIO env ())
   -> RIO env ()
 fileWatch = fileWatchConf defaultConfig
 
 fileWatchPoll ::
-     (HasLogFunc env, HasTerm env)
+     HasTerm env
   => ((Set (Path Abs File) -> IO ()) -> RIO env ())
   -> RIO env ()
 fileWatchPoll =
@@ -38,7 +38,7 @@ fileWatchPoll =
 -- The action provided takes a callback that is used to set the files to be
 -- watched. When any of those files are changed, we rerun the action again.
 fileWatchConf ::
-     (HasLogFunc env, HasTerm env)
+     HasTerm env
   => WatchConfig
   -> ((Set (Path Abs File) -> IO ()) -> RIO env ())
   -> RIO env ()

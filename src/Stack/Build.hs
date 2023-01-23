@@ -207,7 +207,7 @@ checkCabalVersion = do
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten ::
-     (HasLogFunc env, HasTerm env)
+     HasTerm env
   => [LocalPackage]
   -> Plan
   -> RIO env ()
@@ -289,10 +289,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   collect :: Ord k => [(k,v)] -> Map k (NonEmpty v)
   collect = Map.map NE.fromList . Map.fromDistinctAscList . groupSort
 
-warnAboutSplitObjs ::
-     (HasLogFunc env, HasTerm env)
-  => BuildOpts
-  -> RIO env ()
+warnAboutSplitObjs :: HasTerm env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts =
   prettyWarnL
     [ flow "Building with"
@@ -426,13 +423,11 @@ checkComponentsBuildable lps =
     ]
 
 -- | Find if sublibrary dependency exist in each project
-checkSubLibraryDependencies ::
-     (HasLogFunc env, HasTerm env)
-  => [ProjectPackage]
-  -> RIO env ()
+checkSubLibraryDependencies :: HasTerm env => [ProjectPackage] -> RIO env ()
 checkSubLibraryDependencies proj =
   forM_ proj $ \p -> do
-    C.GenericPackageDescription _ _ _ lib subLibs foreignLibs exes tests benches <- liftIO $ cpGPD . ppCommon $ p
+    C.GenericPackageDescription _ _ _ lib subLibs foreignLibs exes tests benches <-
+      liftIO $ cpGPD . ppCommon $ p
 
     let dependencies = concatMap getDeps subLibs <>
                        concatMap getDeps foreignLibs <>

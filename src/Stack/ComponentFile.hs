@@ -395,11 +395,7 @@ findCandidate dirs name = do
 --
 -- For example: .erb for a Ruby file might exist in one of the
 -- directories.
-logPossibilities ::
-     HasTerm env
-  => [Path Abs Dir]
-  -> ModuleName
-  -> RIO env ()
+logPossibilities :: HasTerm env => [Path Abs Dir] -> ModuleName -> RIO env ()
 logPossibilities dirs mn = do
   possibilities <- fmap concat (makePossibilities mn)
   unless (null possibilities) $ prettyWarnL

@@ -32,7 +32,7 @@ import           System.FilePath ( searchPathSeparator )
 
 -- | Get the global package database
 getGlobalDB ::
-     (HasLogFunc env, HasProcessContext env, HasTerm env)
+     (HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> RIO env (Path Abs Dir)
 getGlobalDB pkgexe = do
@@ -51,7 +51,7 @@ getGlobalDB pkgexe = do
 
 -- | Run the ghc-pkg executable
 ghcPkg ::
-     (HasLogFunc env, HasProcessContext env, HasTerm env)
+     (HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> [Path Abs Dir]
   -> [String]
@@ -70,7 +70,7 @@ ghcPkg pkgexe@(GhcPkgExe pkgPath) pkgDbs args = do
 
 -- | Create a package database in the given directory, if it doesn't exist.
 createDatabase ::
-     (HasLogFunc env, HasProcessContext env, HasTerm env)
+     (HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> Path Abs Dir
   -> RIO env ()
@@ -116,7 +116,7 @@ packageDbFlags pkgDbs =
 
 -- | Get the value of a field of the package.
 findGhcPkgField ::
-     (HasLogFunc env, HasProcessContext env, HasTerm env)
+     (HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> [Path Abs Dir] -- ^ package databases
   -> String -- ^ package identifier, or GhcPkgId
@@ -138,7 +138,7 @@ findGhcPkgField pkgexe pkgDbs name field = do
 -- see https://github.com/commercialhaskell/stack/issues/2662#issuecomment-460342402
 -- using GHC package id where available (from GHC 7.9)
 unregisterGhcPkgIds ::
-     ( HasLogFunc env, HasProcessContext env, HasTerm env)
+     (HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> Path Abs Dir -- ^ package database
   -> NonEmpty (Either PackageIdentifier GhcPkgId)

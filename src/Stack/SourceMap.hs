@@ -138,7 +138,7 @@ getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
 getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
 globalsFromDump ::
-     (HasLogFunc env, HasProcessContext env, HasTerm env)
+     (HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> RIO env (Map PackageName DumpedGlobalPackage)
 globalsFromDump pkgexe = do

@@ -796,10 +796,7 @@ ensureCompilerAndMsys sopts = do
   pure (cp, paths)
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
-warnUnsupportedCompiler ::
-     (HasLogFunc env, HasTerm env)
-  => Version
-  -> RIO env Bool
+warnUnsupportedCompiler :: HasTerm env => Version -> RIO env Bool
 warnUnsupportedCompiler ghcVersion =
   if
     | ghcVersion < mkVersion [7, 8] -> do
@@ -827,7 +824,7 @@ warnUnsupportedCompiler ghcVersion =
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
 warnUnsupportedCompilerCabal ::
-     (HasLogFunc env, HasTerm env)
+     HasTerm env
   => CompilerPaths
   -> Bool -- ^ already warned about GHC?
   -> RIO env ()
@@ -1555,7 +1552,7 @@ mungeRelease = intercalate "-" . prefixMaj . splitOn "."
   prefixMaj = prefixFst "maj" prefixMin
   prefixMin = prefixFst "min" (map ('r':))
 
-sysRelease :: (HasLogFunc env, HasTerm env) => RIO env String
+sysRelease :: HasTerm env => RIO env String
 sysRelease =
   handleIO
     ( \e -> do
@@ -2245,7 +2242,7 @@ removeHaskellEnvVars =
 
 -- | Get map of environment variables to set to change the GHC's encoding to UTF-8
 getUtf8EnvVars ::
-     (HasLogFunc env, HasPlatform env, HasProcessContext env, HasTerm env)
+     (HasPlatform env, HasProcessContext env, HasTerm env)
   => ActualCompiler
   -> RIO env (Map Text Text)
 getUtf8EnvVars compilerVer =
