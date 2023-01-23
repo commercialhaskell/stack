@@ -70,11 +70,14 @@ import           Path
                    , stripProperPrefix
                    )
 import           Path.CheckInstall ( warnInstallSearchPathIssues )
-import           Path.Extra ( toFilePathNoTrailingSep, rejectMissingFile )
+import           Path.Extra
+                   ( forgivingResolveFile, rejectMissingFile
+                   , toFilePathNoTrailingSep
+                   )
 import           Path.IO
                    ( copyFile, doesDirExist, doesFileExist, ensureDir
-                   , forgivingAbsence, ignoringAbsence, removeDirRecur
-                   , removeFile, renameDir, renameFile, resolveFile
+                   , ignoringAbsence, removeDirRecur, removeFile, renameDir
+                   , renameFile
                    )
 import           RIO.Process
                    ( HasProcessContext, byteStringInput, doesExecutableExist
@@ -648,7 +651,7 @@ copyExecutables exes = do
             case loc of
                 Snap -> snapBin
                 Local -> localBin
-    mfp <- liftIO $ forgivingAbsence (resolveFile bindir $ T.unpack name ++ ext)
+    mfp <- liftIO $ forgivingResolveFile bindir (T.unpack name ++ ext)
       >>= rejectMissingFile
     case mfp of
       Nothing -> do
@@ -2528,7 +2531,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
       if isValidSuffix y
         then liftIO $
           fmap (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
-            forgivingAbsence (resolveFile pkgDir (T.unpack $ T.dropWhile isSpace x)) `catch`
+            forgivingResolveFile pkgDir (T.unpack $ T.dropWhile isSpace x) `catch`
               \(_ :: PathException) -> pure Nothing
         else pure Nothing
     case mabs of

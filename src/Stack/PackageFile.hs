@@ -15,8 +15,7 @@ import           Distribution.PackageDescription hiding ( FlagName )
 import           Distribution.Simple.Glob ( matchDirFileGlob )
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Path ( parent )
-import           Path.Extra ( rejectMissingFile )
-import           Path.IO ( forgivingAbsence, resolveFile )
+import           Path.Extra ( forgivingResolveFile, rejectMissingFile )
 import           Stack.ComponentFile
                    ( benchmarkFiles, executableFiles, libraryFiles
                    , resolveOrWarn, testFiles
@@ -36,7 +35,7 @@ resolveFileOrWarn :: FilePath.FilePath
                   -> RIO GetPackageFileContext (Maybe (Path Abs File))
 resolveFileOrWarn = resolveOrWarn "File" f
  where
-  f p x = liftIO (forgivingAbsence (resolveFile p x)) >>= rejectMissingFile
+  f p x = liftIO (forgivingResolveFile p x) >>= rejectMissingFile
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles ::

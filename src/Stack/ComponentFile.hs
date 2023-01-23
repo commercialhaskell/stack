@@ -39,11 +39,12 @@ import           Path
                    , stripProperPrefix
                    )
 import           Path.Extra
-                   ( parseCollapsedAbsFile, rejectMissingDir, rejectMissingFile
+                   ( forgivingResolveFile, parseCollapsedAbsFile
+                   , rejectMissingDir, rejectMissingFile
                    )
 import           Path.IO
                    ( doesDirExist, doesFileExist, forgivingAbsence
-                   , getCurrentDir, listDir, resolveDir, resolveFile
+                   , getCurrentDir, listDir, resolveDir
                    )
 import           Stack.Constants
                    ( haskellDefaultPreprocessorExts, haskellFileExts
@@ -290,7 +291,7 @@ parseHI hiPath = do
                         Iface.unList . Iface.dmods . Iface.deps
           resolveFileDependency file = do
             resolved <-
-              liftIO (forgivingAbsence (resolveFile dir file)) >>=
+              liftIO (forgivingResolveFile dir file) >>=
                 rejectMissingFile
             when (isNothing resolved) $
               prettyWarnL
