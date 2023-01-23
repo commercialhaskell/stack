@@ -91,7 +91,7 @@ import           Stack.Types.Config
                    )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent, renderPkgComponents )
+                   ( NamedComponent, renderPkgComponent )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), InstallLocation (..), Installed (..)
                    , LocalPackage (..), Package (..), PackageSource (..)
@@ -131,7 +131,6 @@ data BuildException
   | NoSetupHsFound (Path Abs Dir)
   | InvalidFlagSpecification (Set UnusedFlags)
   | InvalidGhcOptionsSpecification [PackageName]
-  | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   | TestSuiteExeMissing Bool String String String
   | CabalCopyFailed Bool String
   | LocalPackagesPresent [PackageIdentifier]
@@ -304,14 +303,6 @@ instance Exception BuildException where
       , packageNameString name
       , "' not found"
       ]
-  displayException (SomeTargetsNotBuildable xs) = unlines
-    [ "Error: [S-7086]"
-    , "The following components have 'buildable: False' set in the Cabal \
-      \configuration, and so cannot be targets:"
-    , "    " <> T.unpack (renderPkgComponents xs)
-    , "To resolve this, either provide flags such that these components \
-      \are buildable, or only specify buildable targets."
-    ]
   displayException (TestSuiteExeMissing isSimpleBuildType exeName pkgName' testName) =
     missingExeError "[S-7987]"
       isSimpleBuildType $ concat
@@ -384,6 +375,7 @@ data BuildPrettyException
       (Maybe (Path Abs File)) -- logfiles location
       [Text]     -- log contents
   | TargetParseException [StyleDoc]
+  | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
@@ -416,6 +408,20 @@ instance Pretty BuildPrettyException where
   pretty (TargetParseException errs) =
     "[S-8506]"
     <> pprintTargetParseErrors errs
+  pretty (SomeTargetsNotBuildable xs) =
+    "[S-7086]"
+    <> line
+    <> fillSep
+         (  [ flow "The following components have"
+            , style Shell (flow "buildable: False")
+            , flow "set in the Cabal configuration, and so cannot be targets:"
+            ]
+         <> mkNarrativeList (Just Target) False
+              (map (fromString . T.unpack . renderPkgComponent) xs :: [StyleDoc])
+         )
+    <> blankLine
+    <> flow "To resolve this, either provide flags such that these components \
+            \are buildable, or only specify buildable targets."
 
 instance Exception BuildPrettyException
 
