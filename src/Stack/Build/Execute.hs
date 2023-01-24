@@ -651,7 +651,7 @@ copyExecutables exes = do
             case loc of
                 Snap -> snapBin
                 Local -> localBin
-    mfp <- liftIO $ forgivingResolveFile bindir (T.unpack name ++ ext)
+    mfp <- forgivingResolveFile bindir (T.unpack name ++ ext)
       >>= rejectMissingFile
     case mfp of
       Nothing -> do
@@ -2482,12 +2482,13 @@ data KeepOutputOpen
   deriving Eq
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
-mungeBuildOutput :: forall m. MonadIO m
-                 => ExcludeTHLoading       -- ^ exclude TH loading?
-                 -> ConvertPathsToAbsolute -- ^ convert paths to absolute?
-                 -> Path Abs Dir           -- ^ package's root directory
-                 -> ActualCompiler         -- ^ compiler we're building with
-                 -> ConduitM Text Text m ()
+mungeBuildOutput ::
+     forall m. (MonadIO m, MonadUnliftIO m)
+  => ExcludeTHLoading       -- ^ exclude TH loading?
+  -> ConvertPathsToAbsolute -- ^ convert paths to absolute?
+  -> Path Abs Dir           -- ^ package's root directory
+  -> ActualCompiler         -- ^ compiler we're building with
+  -> ConduitM Text Text m ()
 mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
   CT.lines
   .| CL.map stripCR
@@ -2529,7 +2530,7 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
     let (x, y) = T.break (== ':') bs
     mabs <-
       if isValidSuffix y
-        then liftIO $
+        then
           fmap (fmap ((T.takeWhile isSpace x <>) . T.pack . toFilePath)) $
             forgivingResolveFile pkgDir (T.unpack $ T.dropWhile isSpace x) `catch`
               \(_ :: PathException) -> pure Nothing

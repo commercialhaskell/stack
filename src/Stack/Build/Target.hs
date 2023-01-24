@@ -68,8 +68,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Path ( isProperPrefixOf )
-import           Path.Extra ( rejectMissingDir )
-import           Path.IO ( forgivingAbsence, getCurrentDir, resolveDir )
+import           Path.Extra ( forgivingResolveDir, rejectMissingDir )
+import           Path.IO ( getCurrentDir )
 import           RIO.Process ( HasProcessContext )
 import           Stack.SourceMap ( additionalDepPackage )
 import           Stack.Prelude
@@ -150,8 +150,7 @@ parseRawTargetDirs root locals ri =
   case parseRawTarget t of
     Just rt -> pure $ Right [(ri, rt)]
     Nothing -> do
-      mdir <- liftIO $ forgivingAbsence (resolveDir root (T.unpack t))
-        >>= rejectMissingDir
+      mdir <- forgivingResolveDir root (T.unpack t) >>= rejectMissingDir
       case mdir of
         Nothing -> pure $ Left $
           fillSep

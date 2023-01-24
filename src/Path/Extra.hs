@@ -14,6 +14,7 @@ module Path.Extra
   , pathToLazyByteString
   , pathToText
   , tryGetModificationTime
+  , forgivingResolveDir
   , forgivingResolveFile
   , forgivingResolveFile'
   ) where
@@ -137,6 +138,24 @@ pathToText = T.pack . toFilePath
 tryGetModificationTime :: MonadIO m => Path Abs File -> m (Either () UTCTime)
 tryGetModificationTime =
   liftIO . tryJust (guard . isDoesNotExistError) . getModificationTime
+
+-- | 'Path.IO.resolveDir' (@path-io@ package) throws 'InvalidAbsDir' (@path@
+-- package) if the directory does not exist; this function yields 'Nothing'.
+forgivingResolveDir ::
+     MonadIO m
+  => Path Abs Dir
+     -- ^ Base directory
+  -> FilePath
+     -- ^ Path to resolve
+  -> m (Maybe (Path Abs Dir))
+forgivingResolveDir b p = liftIO $
+  D.canonicalizePath (toFilePath b FP.</> p) >>= \cp ->
+    catch
+      (Just <$> parseAbsDir cp)
+      ( \e -> case e of
+          InvalidAbsDir _ -> pure Nothing
+          _ -> throwIO e
+      )
 
 -- | 'Path.IO.resolveFile' (@path-io@ package) throws 'InvalidAbsFile' (@path@
 -- package) if the file does not exist; this function yields 'Nothing'.
