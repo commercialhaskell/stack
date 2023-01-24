@@ -39,13 +39,11 @@ import           Path
                    , stripProperPrefix
                    )
 import           Path.Extra
-                   ( forgivingResolveFile, parseCollapsedAbsFile
-                   , rejectMissingDir, rejectMissingFile
+                   ( forgivingResolveDir, forgivingResolveFile
+                   , parseCollapsedAbsFile, rejectMissingDir, rejectMissingFile
                    )
 import           Path.IO
-                   ( doesDirExist, doesFileExist, forgivingAbsence
-                   , getCurrentDir, listDir, resolveDir
-                   )
+                   ( doesDirExist, doesFileExist, getCurrentDir, listDir )
 import           Stack.Constants
                    ( haskellDefaultPreprocessorExts, haskellFileExts
                    , relDirAutogen, relDirBuild, relDirGlobalAutogen
@@ -290,9 +288,7 @@ parseHI hiPath = do
       let moduleNames = fmap (fromString . T.unpack . decodeUtf8Lenient . fst) .
                         Iface.unList . Iface.dmods . Iface.deps
           resolveFileDependency file = do
-            resolved <-
-              liftIO (forgivingResolveFile dir file) >>=
-                rejectMissingFile
+            resolved <- forgivingResolveFile dir file >>= rejectMissingFile
             when (isNothing resolved) $
               prettyWarnL
               [ flow "Dependent file listed in:"
@@ -500,7 +496,7 @@ resolveDirOrWarn :: FilePath.FilePath
                  -> RIO GetPackageFileContext (Maybe (Path Abs Dir))
 resolveDirOrWarn = resolveOrWarn "Directory" f
  where
-  f p x = liftIO (forgivingAbsence (resolveDir p x)) >>= rejectMissingDir
+  f p x = forgivingResolveDir p x >>= rejectMissingDir
 
 -- | Make the global autogen dir if Cabal version is new enough.
 packageAutogenDir :: Version -> Path Abs Dir -> Maybe (Path Abs Dir)

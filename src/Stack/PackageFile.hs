@@ -35,7 +35,7 @@ resolveFileOrWarn :: FilePath.FilePath
                   -> RIO GetPackageFileContext (Maybe (Path Abs File))
 resolveFileOrWarn = resolveOrWarn "File" f
  where
-  f p x = liftIO (forgivingResolveFile p x) >>= rejectMissingFile
+  f p x = forgivingResolveFile p x >>= rejectMissingFile
 
 -- | Get all files referenced by the package.
 packageDescModulesAndFiles ::

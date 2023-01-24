@@ -235,7 +235,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
         then do
             fileTargets <- forM fileTargetsRaw $ \fp0 -> do
                 let fp = T.unpack fp0
-                mpath <- liftIO $ forgivingResolveFile' fp
+                mpath <- forgivingResolveFile' fp
                 case mpath of
                     Nothing -> throwM (MissingFileTarget fp)
                     Just path -> pure path
