@@ -2088,7 +2088,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       [dp] -> do
         liftIO $ atomically $ modifyTVar' tvar (Map.insert (dpGhcPkgId dp) dp)
         pure $ Just (dpGhcPkgId dp)
-      _ -> throwM $ MulipleResultsBug name dps
+      _ -> throwM $ MultipleResultsBug name dps
 
 -- | Get the build status of all the package executables. Do so by
 -- testing whether their expected output file exists, e.g.

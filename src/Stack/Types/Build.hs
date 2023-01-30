@@ -135,7 +135,7 @@ data BuildException
   | TaskCycleBug PackageIdentifier
   | PackageIdMissingBug PackageIdentifier
   | AllInOneBuildBug
-  | MulipleResultsBug PackageName [DumpPackage]
+  | MultipleResultsBug PackageName [DumpPackage]
   | TemplateHaskellNotFoundBug
   | HaddockIndexNotFound
   | ShowBuildErrorBug
@@ -344,7 +344,7 @@ instance Exception BuildException where
     ++ show ident
   displayException AllInOneBuildBug = bugReport "[S-7371]"
     "Cannot have an all-in-one build that also has a final build step."
-  displayException (MulipleResultsBug name dps) = bugReport "[S-6739]"
+  displayException (MultipleResultsBug name dps) = bugReport "[S-6739]" $
     "singleBuild: multiple results when describing installed package "
     ++ show (name, dps)
   displayException TemplateHaskellNotFoundBug = bugReport "[S-3121]"

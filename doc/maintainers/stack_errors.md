@@ -333,7 +333,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-7868] | TaskCycleBug PackageIdentifier
         [S-8923] | PackageIdMissingBug PackageIdentifier
         [S-7371] | AllInOneBuildBug
-        [S-6739] | MulipleResultsBug PackageName [DumpPackage]
+        [S-6739] | MultipleResultsBug PackageName [DumpPackage]
         [S-3121] | TemplateHaskellNotFoundBug
         [S-6901] | HaddockIndexNotFound
         [S-5452] | ShowBuildErrorBug
