@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ViewPatterns        #-}
 
@@ -152,11 +153,14 @@ parseRawTargetDirs root locals ri =
     Nothing -> do
       mdir <- forgivingResolveDir root (T.unpack t) >>= rejectMissingDir
       case mdir of
-        Nothing -> pure $ Left $
-          fillSep
-            [ flow "Directory not found:"
-            , style Dir (fromString $ T.unpack t) <> "."
-            ]
+        Nothing -> pure . Left $
+          if | T.isPrefixOf "stack-yaml=" t -> projectOptionTypo
+             | T.isSuffixOf ".yaml" t -> projectYamlExtTypo
+             | otherwise ->
+                fillSep
+                  [ flow "Directory not found:"
+                  , style Dir (fromString $ T.unpack t) <> "."
+                  ]
         Just dir ->
           case mapMaybe (childOf dir) $ Map.toList locals of
             [] -> pure $ Left $
@@ -173,6 +177,22 @@ parseRawTargetDirs root locals ri =
       else Nothing
 
   RawInput t = ri
+
+  projectOptionTypo :: StyleDoc
+  projectOptionTypo = let o = "stack-yaml=" in projectTypo 2 (length o) o
+
+  projectYamlExtTypo :: StyleDoc
+  projectYamlExtTypo = let o = "stack-yaml " in projectTypo (2 + length o) 0 o
+
+  projectTypo :: Int -> Int -> String -> StyleDoc
+  projectTypo padLength dropLength option =
+    vsep
+      [ style Dir (fromString (replicate padLength ' ') <> fromString (T.unpack t))
+        <> " is not a directory."
+      , style Highlight (fromString $ "--" <> option)
+        <> style Dir (fromString . drop dropLength $ T.unpack t)
+        <> " might work as a project option."
+      ]
 
 -- | If this function returns @Nothing@, the input should be treated as a
 -- directory.
