@@ -9,7 +9,6 @@ module Stack.Build.ConstructPlan
   ) where
 
 import           Control.Monad.RWS.Strict hiding ( (<>) )
-import           Control.Monad.State.Strict ( execState )
 import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Strict as Map
@@ -21,6 +20,7 @@ import           Distribution.Types.PackageName ( mkPackageName )
 import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Path ( parent )
 import           RIO.Process ( HasProcessContext (..), findExecutable )
+import           RIO.State ( State, execState )
 import           Stack.Build.Cache ( tryGetFlagCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
@@ -363,7 +363,7 @@ data UnregisterState = UnregisterState
   }
 
 -- | Determine which packages to unregister based on the given tasks and
--- already registered local packages
+-- already registered local packages.
 mkUnregisterLocal ::
      Map PackageName Task
      -- ^ Tasks
@@ -376,12 +376,18 @@ mkUnregisterLocal ::
      -- unregister target packages.
   -> Map GhcPkgId (PackageIdentifier, Text)
 mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
-  -- We'll take multiple passes through the local packages. This
-  -- will allow us to detect that a package should be unregistered,
-  -- as well as all packages directly or transitively depending on
-  -- it.
+  -- We'll take multiple passes through the local packages. This will allow us
+  -- to detect that a package should be unregistered, as well as all packages
+  -- directly or transitively depending on it.
   loop Map.empty localDumpPkgs
  where
+  loop ::
+       Map GhcPkgId (PackageIdentifier, Text)
+       -- ^ Current local packages to unregister.
+    -> [DumpPackage]
+       -- ^ Current local packages to keep.
+    -> Map GhcPkgId (PackageIdentifier, Text)
+       -- ^ Revised local packages to unregister.
   loop toUnregister keep
     -- If any new packages were added to the unregister Map, we need to loop
     -- through the remaining packages again to detect if a transitive dependency
@@ -393,19 +399,21 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
    where
     -- Run the unregister checking function on all packages we currently think
     -- we'll be keeping.
-    us = execState (mapM_ go keep) UnregisterState
+    us = execState (mapM_ go keep) initialUnregisterState
+    initialUnregisterState = UnregisterState
       { usToUnregister = toUnregister
       , usKeep = []
       , usAnyAdded = False
       }
 
+  go :: DumpPackage -> State UnregisterState ()
   go dp = do
     us <- get
-    case go' (usToUnregister us) ident deps of
-      -- Not unregistering, add it to the keep list
+    case maybeUnregisterReason (usToUnregister us) ident mParentLibId deps of
+      -- Not unregistering, add it to the keep list.
       Nothing -> put us { usKeep = dp : usKeep us }
-      -- Unregistering, add it to the unregister Map and indicate that a package
-      -- was in fact added to the unregister Map so we loop again.
+      -- Unregistering, add it to the unregister Map; and indicate that a
+      -- package was in fact added to the unregister Map, so we loop again.
       Just reason -> put us
         { usToUnregister = Map.insert gid (ident, reason) (usToUnregister us)
         , usAnyAdded = True
@@ -413,23 +421,49 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
    where
     gid = dpGhcPkgId dp
     ident = dpPackageIdent dp
+    mParentLibId = dpParentLibIdent dp
     deps = dpDepends dp
 
-  go' toUnregister ident deps
-    -- If we're planning on running a task on it, then it must be unregistered,
-    -- unless it's a target and an initial-build-steps build is being done.
-    | Just task <- Map.lookup name tasks
-        = if initialBuildSteps && taskIsTarget task && taskProvides task == ident
-            then Nothing
-            else Just $ fromMaybe "" $ Map.lookup name dirtyReason
+  maybeUnregisterReason ::
+       Map GhcPkgId (PackageIdentifier, Text)
+       -- ^ Current local packages to unregister.
+    -> PackageIdentifier
+       -- ^ Package identifier.
+    -> Maybe PackageIdentifier
+       -- ^ If package for sub library, package identifier of the parent.
+    -> [GhcPkgId]
+       -- ^ Dependencies of the package.
+    -> Maybe Text
+       -- ^ If to be unregistered, the reason for doing so.
+  maybeUnregisterReason toUnregister ident mParentLibId deps
+    -- If the package is not for a sub library, then it is directly relevant. If
+    -- it is, then the relevant package is the parent. If we are planning on
+    -- running a task on the relevant package, then the package must be
+    -- unregistered, unless it is a target and an initial-build-steps build is
+    -- being done.
+    | Just task <- Map.lookup relevantPkgName tasks =
+        if    initialBuildSteps
+           && taskIsTarget task
+           && taskProvides task == relevantPkgId
+          then Nothing
+          else Just $ fromMaybe "" $ Map.lookup relevantPkgName dirtyReason
     -- Check if a dependency is going to be unregistered
-    | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps
-        = Just $ "Dependency being unregistered: " <> T.pack (packageIdentifierString dep)
+    | (dep, _):_ <- mapMaybe (`Map.lookup` toUnregister) deps =
+        Just $ "Dependency being unregistered: "
+          <> T.pack (packageIdentifierString dep)
     -- None of the above, keep it!
     | otherwise = Nothing
     where
-      name :: PackageName
-      name = pkgName ident
+      -- If the package is not for a sub library, then the relevant package
+      -- identifier is that of the package. If it is, then the relevant package
+      -- identifier is that of the parent.
+      relevantPkgId :: PackageIdentifier
+      relevantPkgId = fromMaybe ident mParentLibId
+      -- If the package is not for a sub library, then the relevant package name
+      -- is that of the package. If it is, then the relevant package name is
+      -- that of the parent.
+      relevantPkgName :: PackageName
+      relevantPkgName = maybe (pkgName ident) pkgName mParentLibId
 
 -- | Given a 'LocalPackage' and its 'lpTestBench', adds a 'Task' for running its
 -- tests and benchmarks.

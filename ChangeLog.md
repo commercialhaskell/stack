@@ -36,6 +36,9 @@ Bug fixes:
 * `stack build` with `--file-watch` or `--file-watch-poll` outputs 'pretty'
   error messages, as intended. See
   [#5978](https://github.com/commercialhaskell/stack/issues/5978).
+* `stack build` unregisters any local packages for the sub libraries of a local
+  package that is to be unregistered. See
+  [#6046](https://github.com/commercialhaskell/stack/issues/6046).
 
 ## v2.9.3
 
