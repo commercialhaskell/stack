@@ -275,14 +275,33 @@ updates with your pull request.
 
 ## Backwards Compatability
 
-The Stack executable does not need to, and does not, strive for the same broad
-compatibility with versions of GHC that a library package (such as `pantry`)
-would seek. Instead, Stack aims to define a well-known combination of
-dependencies on which its executable relies. That applies in particular to the
-`Cabal` package, where Stack aims to support one, and only one, version of
-`Cabal` with each release of its executable. At the time of writing (September
-2022) that combination is defined by resolver `nightly-2022-11-14` (for
-GHC 9.2.4, and including `Cabal-3.6.3.0`) - see `stack.yaml`.
+The Stack package provides a library and an executable (`stack`) that depends on
+the library. The library is intended for use only by the executable.
+
+Consequently, the Stack package does not need to, and does not, strive for the
+compatibility with a range of versions of GHC that a library package (such as
+`pantry`) would seek.
+
+Stack aims to depend on well-known packages. The specific versions on which it
+depends at any time are specified by `package.yaml` and `stack.yaml`. It does
+not aim to be compatible with more than one version of the `Cabal` package at
+any time. At the time of writing (January 2023) the package versions are
+primarily ones in Stackage snapshot LTS Haskell 20.8 (for GHC 9.2.5), together
+with extra-dep `Cabal-3.8.1.0`.
+
+A Stack executable makes use of Cabal (the library) through a small 'Setup'
+executable that it compiles from Haskell source code. The executable compiles
+that code with a dependency on the version of Cabal that ships with the
+specified GHC compiler. Each release of Stack will aim to support all versions
+of GHC and the Cabal package in Stackage snapshots published within seven years
+of the release. For example, snapshot LTS Haskell 2.22, published on
+9 August 2015, was the last to provide GHC 7.8.4 which comes with
+`Cabal-1.18.1.5`. Until, at least, 9 August 2022, Stack releases would aim
+to support GHC 7.8.4 and `Cabal-1.18.1.5`.
+
+When a version of the Stack executable actually ceases to support a version of
+GHC and `Cabal`, that should be recorded in Stack's
+[ChangeLog](https://github.com/commercialhaskell/stack/blob/master/ChangeLog.md).
 
 ## Code Quality
 
