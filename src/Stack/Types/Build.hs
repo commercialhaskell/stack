@@ -82,8 +82,8 @@ import           Stack.Types.Config
                    ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI
                    , BuildSubset (..), Config (..), DumpPackage, EnvConfig
                    , FileWatchOpts (..), GHCVariant, HasConfig (..)
-                   , TestOpts (..), actualCompilerVersionL, cabalVersionL
-                   , defaultBuildOpts, ghcVariantSuffix
+                   , TestOpts (..), actualCompilerVersionL, defaultBuildOpts
+                   , ghcVariantSuffix
                    )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.NamedComponent
@@ -1136,13 +1136,10 @@ configureOptsNoDir :: EnvConfig
                    -> [String]
 configureOptsNoDir econfig bco deps isLocal package = concat
   [ depOptions
-  , ["--enable-library-profiling" | boptsLibProfile bopts || boptsExeProfile bopts]
-  -- Cabal < 1.21.1 does not support --enable-profiling, use
-  -- --enable-executable-profiling instead
-  , let profFlag =  "--enable-"
-                 <> concat ["executable-" | not newerCabal]
-                 <> "profiling"
-    in  [ profFlag | boptsExeProfile bopts && isLocal]
+  , [ "--enable-library-profiling"
+    | boptsLibProfile bopts || boptsExeProfile bopts
+    ]
+  , ["--enable-profiling" | boptsExeProfile bopts && isLocal]
   , ["--enable-split-objs" | boptsSplitObjs bopts]
   , [ "--disable-library-stripping"
     | not $ boptsLibStrip bopts || boptsExeStrip bopts
@@ -1206,31 +1203,18 @@ configureOptsNoDir econfig bco deps isLocal package = concat
   config = view configL econfig
   bopts = bcoBuildOpts bco
 
-  newerCabal = view cabalVersionL econfig >= C.mkVersion [1, 22]
-
   -- Unioning atop defaults is needed so that all flags are specified with
   -- --exact-configuration.
   flags = packageFlags package `Map.union` packageDefaultFlags package
 
   depOptions = map (uncurry toDepOption) $ Map.toList deps
-   where
-    toDepOption = if newerCabal then toDepOption1_22 else toDepOption1_18
 
-  toDepOption1_22 (PackageIdentifier name _) gid = concat
+  toDepOption (PackageIdentifier name _) gid = concat
     [ "--dependency="
     , packageNameString name
     , "="
     , ghcPkgIdString gid
     ]
-
-  toDepOption1_18 ident _gid = concat
-    [ "--constraint="
-    , packageNameString name
-    , "=="
-    , versionString version'
-    ]
-   where
-    PackageIdentifier name version' = ident
 
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
