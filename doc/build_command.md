@@ -337,7 +337,15 @@ GHC's optimisations (which is GHC's default).
 
 ### `--ghc-options` option
 
-`stack build ghc-options <ghc_options>` passes the specified options to GHC.
+`stack build --ghc-options <ghc_options>` passes the specified command line
+options to GHC, depending on Stack's
+[`apply-ghc-options`](yaml_configuration.md#apply-ghc-options) YAML
+configuration option. This option can be specified multiple times.
+
+GHC's command line options are _order-dependent_ and evaluated from left to
+right. Later options can override earlier options. Stack applies the options
+specified at the command line last. Any existing GHC command line options of a
+package are applied after those specified at the command line.
 
 ### `--[no-]library-profiling` flag
 

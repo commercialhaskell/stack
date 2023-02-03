@@ -390,17 +390,21 @@ allow-newer-deps:
 
 Default: `locals`
 
-Which packages do ghc-options on the command line get applied to? Before Stack
-0.1.6, the default value was `targets`
+Related command line:
+[`stack build --ghc-options`](build_command.md#-ghc-options-option) option
 
-~~~yaml
-apply-ghc-options: locals # all local packages
-# apply-ghc-options: targets # all local packages that are targets
-# apply-ghc-options: everything # applied even to snapshot and extra-deps
-~~~
+Determines to which packages any GHC command line options specified on the
+command line are applied. Possible values are: `everything` (all packages, local
+or otherwise), `locals` (all local packages, targets or otherwise), and
+`targets` (all local packages that are targets).
 
-Note that `everything` is a slightly dangerous value, as it can break invariants
-about your snapshot database.
+!!! note
+
+    The use of `everything` can break invariants about your snapshot database.
+
+!!! note
+
+    Before Stack 0.1.6.0, the default value was `targets`.
 
 ### arch
 
@@ -760,18 +764,31 @@ arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-libc6-pre232`,
 
 [:octicons-tag-24: 0.1.4.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.4.0)
 
-Allows specifying per-package and global GHC options:
+Default: `{}`
+
+Related command line (takes precedence):
+[`stack build --ghc-options`](build_command.md#ghc-options-option) option
+
+`ghc-options` can specify GHC command line options for a named package, all
+local packages that are targets (using the `$targets` key), all local packages
+(targets or otherwise) (using the `$locals` key), or all packages (local or
+otherwise) (using the `$everything` key).
 
 ~~~yaml
 ghc-options:
-    # All packages
-    "$locals": -Wall
-    "$targets": -Werror
-    "$everything": -O2
-    some-package: -DSOME_CPP_FLAG
+  "$everything": -O2
+  "$locals": -Wall
+  "$targets": -Werror
+  some-package: -DSOME_CPP_FLAG
 ~~~
 
-Since Stack 1.6.0, setting a GHC options for a specific package will
+GHC's command line options are _order-dependent_ and evaluated from left to
+right. Later options can override earlier options. Stack applies options (as
+applicable) in the order of `$everything`, `$locals`, `$targets`, and then those
+for the named package. Any existing GHC command line options of a package are
+applied after those specified in Stack's YAML configuration.
+
+Since Stack 1.6.1, setting a GHC options for a specific package will
 automatically promote it to a local package (much like setting a custom package
 flag). However, setting options via `$everything` on all flags will not do so
 (see
@@ -779,17 +796,10 @@ flag). However, setting options via `$everything` on all flags will not do so
 for reasoning). This can lead to unpredictable behavior by affecting your
 snapshot packages.
 
-The behavior of the `$locals`, `$targets`, and `$everything` special keys
-mirrors the behavior for the
-[`apply-ghc-options` setting](#apply-ghc-options), which affects command line
-parameters.
-
 !!! note
 
-    Prior to Stack 1.6.0, the `$locals`, `$targets`, and `$everything` keys
-    were not supported. Instead, you could use `"*"` for the behavior
-    represented now by `$everything`. It is highly recommended to switch to the
-    new, more expressive, keys.
+    Before Stack 1.6.1, the key `*` (then deprecated) had the same function as
+    the key `$everything`.
 
 ### ghc-variant
 
