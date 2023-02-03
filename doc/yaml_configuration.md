@@ -391,7 +391,7 @@ allow-newer-deps:
 Default: `locals`
 
 Related command line:
-[`stack build --ghc-options`](build_command.md#ghc-options-option) option
+[`stack build --ghc-options`](build_command.md#-ghc-options-option) option
 
 Determines to which packages any GHC command line options specified on the
 command line are applied. Possible values are: `everything` (all packages, local
@@ -788,7 +788,7 @@ applicable) in the order of `$everything`, `$locals`, `$targets`, and then those
 for the named package. Any existing GHC command line options of a package are
 applied after those specified in Stack's YAML configuration.
 
-Since Stack 1.6.0, setting a GHC options for a specific package will
+Since Stack 1.6.1, setting a GHC options for a specific package will
 automatically promote it to a local package (much like setting a custom package
 flag). However, setting options via `$everything` on all flags will not do so
 (see
@@ -798,7 +798,7 @@ snapshot packages.
 
 !!! note
 
-    Before Stack 1.6.0, the key `*` (now deprecated) had the same function as
+    Before Stack 1.6.1, the key `*` (then deprecated) had the same function as
     the key `$everything`.
 
 ### ghc-variant
