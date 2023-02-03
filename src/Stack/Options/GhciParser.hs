@@ -43,7 +43,8 @@ ghciOptsParser = GhciOpts
               (  long "ghci-options"
               <> metavar "OPTIONS"
               <> completer ghcOptsCompleter
-              <> help "Additional options passed to GHCi"
+              <> help "Additional options passed to GHCi (can be specified \
+                      \multiple times)"
               ))
       )
   <*> (     concat
@@ -51,7 +52,8 @@ ghciOptsParser = GhciOpts
               (  long "ghc-options"
               <> metavar "OPTIONS"
               <> completer ghcOptsCompleter
-              <> help "Additional options passed to both GHC and GHCi"
+              <> help "Additional options passed to both GHC and GHCi (can be \
+                      \specified multiple times)"
               ))
       )
   <*> flagsParser

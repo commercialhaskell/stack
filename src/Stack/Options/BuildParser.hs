@@ -42,7 +42,8 @@ buildOptsParser cmd = BuildOptsCLI
             (  long "ghc-options"
             <> metavar "OPTIONS"
             <> completer ghcOptsCompleter
-            <> help "Additional options passed to GHC"
+            <> help "Additional options passed to GHC (can be specified \
+                    \multiple times)"
             ))
       )
   <*> flagsParser
