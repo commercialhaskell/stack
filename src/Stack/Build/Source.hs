@@ -14,49 +14,48 @@ module Stack.Build.Source
   , hashSourceMapData
   ) where
 
-import              Conduit ( ZipSink (..), withSourceFile )
-import              Data.ByteString.Builder ( toLazyByteString )
-import qualified    Data.List as L
-import qualified    Data.Map as Map
-import qualified    Data.Map.Strict as M
-import qualified    Data.Set as Set
-import qualified    Distribution.PackageDescription as C
-import qualified    Pantry.SHA256 as SHA256
-import              Stack.Build.Cache ( tryGetBuildCache )
-import              Stack.Build.Haddock ( shouldHaddockDeps )
-import              Stack.Package ( resolvePackage )
-import              Stack.Prelude
-import              Stack.SourceMap
-                      ( DumpedGlobalPackage, checkFlagsUsedThrowing
-                      , getCompilerInfo, immutableLocSha, mkProjectPackage
-                      , pruneGlobals
-                      )
-import              Stack.Types.Build ( FlagSource (..) )
-import              Stack.Types.Config
-                      ( ApplyCLIFlag (..), ApplyGhcOptions (..)
-                      , BuildConfig (..), BuildOpts (..), BuildOptsCLI (..)
-                      , CabalConfigKey (..), Config (..), Curator (..)
-                      , HasBuildConfig (..), HasCompiler, HasConfig (..)
-                      , HasEnvConfig (..), HasPlatform (..), HasSourceMap (..)
-                      , ProjectPackage (..), TestOpts (..)
-                      , actualCompilerVersionL, buildOptsL, envConfigSourceMap
-                      , getCompilerPath, ppGPD, ppRoot
-                      )
-import              Stack.Types.NamedComponent
-                      ( NamedComponent (..), isCInternalLib )
-import              Stack.Types.Package
-                      ( FileCacheInfo (..), LocalPackage (..), Package (..)
-                      , PackageConfig (..), PackageLibraries (..)
-                      , dotCabalGetPath, memoizeRefWith, runMemoizedWith
-                      )
-import              Stack.Types.PackageFile ( PackageWarning, getPackageFiles )
-import              Stack.Types.SourceMap
-                      ( CommonPackage (..), DepPackage (..), SMActual (..)
-                      , SMTargets (..), SourceMap (..), SourceMapHash (..)
-                      , Target (..)
-                      )
-import              System.FilePath ( takeFileName )
-import              System.IO.Error ( isDoesNotExistError )
+import           Conduit ( ZipSink (..), withSourceFile )
+import           Data.ByteString.Builder ( toLazyByteString )
+import qualified Data.List as L
+import qualified Data.Map as Map
+import qualified Data.Map.Strict as M
+import qualified Data.Set as Set
+import qualified Distribution.PackageDescription as C
+import qualified Pantry.SHA256 as SHA256
+import           Stack.Build.Cache ( tryGetBuildCache )
+import           Stack.Build.Haddock ( shouldHaddockDeps )
+import           Stack.Package ( resolvePackage )
+import           Stack.Prelude
+import           Stack.SourceMap
+                   ( DumpedGlobalPackage, checkFlagsUsedThrowing
+                   , getCompilerInfo, immutableLocSha, mkProjectPackage
+                   , pruneGlobals
+                   )
+import           Stack.Types.Build ( FlagSource (..) )
+import           Stack.Types.Config
+                   ( ApplyCLIFlag (..), ApplyGhcOptions (..), BuildConfig (..)
+                   , BuildOpts (..), BuildOptsCLI (..), CabalConfigKey (..)
+                   , Config (..), Curator (..), HasBuildConfig (..), HasCompiler
+                   , HasConfig (..), HasEnvConfig (..), HasPlatform (..)
+                   , HasSourceMap (..), ProjectPackage (..), TestOpts (..)
+                   , actualCompilerVersionL, buildOptsL, envConfigSourceMap
+                   , getCompilerPath, ppGPD, ppRoot
+                   )
+import           Stack.Types.NamedComponent
+                   ( NamedComponent (..), isCInternalLib )
+import           Stack.Types.Package
+                   ( FileCacheInfo (..), LocalPackage (..), Package (..)
+                   , PackageConfig (..), PackageLibraries (..)
+                   , dotCabalGetPath, memoizeRefWith, runMemoizedWith
+                   )
+import           Stack.Types.PackageFile ( PackageWarning, getPackageFiles )
+import           Stack.Types.SourceMap
+                   ( CommonPackage (..), DepPackage (..), SMActual (..)
+                   , SMTargets (..), SourceMap (..), SourceMapHash (..)
+                   , Target (..)
+                   )
+import           System.FilePath ( takeFileName )
+import           System.IO.Error ( isDoesNotExistError )
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env => RIO env [LocalPackage]
@@ -162,10 +161,10 @@ hashSourceMapData boptsCli sm = do
   compilerInfo <- getCompilerInfo
   immDeps <- forM (Map.elems (smDeps sm)) depPackageHashableContent
   bc <- view buildConfigL
-  let -- extra bytestring specifying GHC options supposed to be applied to
-      -- GHC boot packages so we'll have different hashes when bare
-      -- resolver 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds
-      -- with profiling or without
+  let -- extra bytestring specifying GHC options supposed to be applied to GHC
+      -- boot packages so we'll have different hashes when bare resolver
+      -- 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds with
+      -- profiling or without
       bootGhcOpts = map display (generalGhcOptions bc boptsCli False False)
       hashedContent =
            toLazyByteString $ compilerPath
@@ -287,7 +286,10 @@ loadLocalPackage pp = do
   let common = ppCommon pp
   bopts <- view buildOptsL
   mcurator <- view $ buildConfigL.to bcCurator
-  config <- getPackageConfig (cpFlags common) (cpGhcOptions common) (cpCabalConfigOpts common)
+  config <- getPackageConfig
+              (cpFlags common)
+              (cpGhcOptions common)
+              (cpCabalConfigOpts common)
   gpkg <- ppGPD pp
   let name = cpName common
       mtarget = M.lookup name (smtTargets $ smTargets sm)
@@ -313,10 +315,9 @@ loadLocalPackage pp = do
       -- See https://github.com/commercialhaskell/stack/issues/2862
       isWanted = case mtarget of
         Nothing -> False
-        -- FIXME: When issue #1406 ("stack 0.1.8 lost ability to
-        -- build individual executables or library") is resolved,
-        -- 'hasLibrary' is only relevant if the library is
-        -- part of the target spec.
+        -- FIXME: When issue #1406 ("stack 0.1.8 lost ability to build
+        -- individual executables or library") is resolved, 'hasLibrary' is only
+        -- relevant if the library is part of the target spec.
         Just _ ->
           let hasLibrary =
                 case packageLibraries pkg of
@@ -326,11 +327,13 @@ loadLocalPackage pp = do
               || not (Set.null nonLibComponents)
               || not (Set.null $ packageInternalLibraries pkg)
 
-      filterSkippedComponents = Set.filter (not . (`elem` boptsSkipComponents bopts))
+      filterSkippedComponents =
+        Set.filter (not . (`elem` boptsSkipComponents bopts))
 
-      (exes, tests, benches) = (filterSkippedComponents exeCandidates,
-                                filterSkippedComponents testCandidates,
-                                filterSkippedComponents benchCandidates)
+      (exes, tests, benches) = ( filterSkippedComponents exeCandidates
+                               , filterSkippedComponents testCandidates
+                               , filterSkippedComponents benchCandidates
+                               )
 
       nonLibComponents = toComponents exes tests benches
 
@@ -374,7 +377,8 @@ loadLocalPackage pp = do
 
   let dirtyFiles = do
         checkCacheResults' <- checkCacheResults
-        let allDirtyFiles = Set.unions $ map (\(_, (x, _)) -> x) checkCacheResults'
+        let allDirtyFiles =
+              Set.unions $ map (\(_, (x, _)) -> x) checkCacheResults'
         pure $
           if not (Set.null allDirtyFiles)
             then let tryStripPrefix y =
@@ -484,12 +488,11 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
   let necessaryComponents =
         Set.insert CLib $ Set.filter isCInternalLib (M.keysSet components')
       components = necessaryComponents `Set.union` nonLibComponents
-      componentsFiles =
-         M.map
-           (\files ->
-              Set.union otherFiles (Set.map dotCabalGetPath $ Set.fromList files)
-           )
-           $ M.filterWithKey (\component _ -> component `elem` components) compFiles
+      componentsFiles = M.map
+        (\files ->
+           Set.union otherFiles (Set.map dotCabalGetPath $ Set.fromList files)
+        )
+        $ M.filterWithKey (\component _ -> component `elem` components) compFiles
   pure (componentsFiles, warnings)
 
 -- | Get file digest, if it exists
