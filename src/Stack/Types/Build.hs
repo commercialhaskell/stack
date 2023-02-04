@@ -337,10 +337,10 @@ instance Exception BuildException where
     , "Maybe you're running another copy of Stack?"
     ]
   displayException (TaskCycleBug pid) = bugReport "[S-7868]" $
-    "Error: The impossible happened! Unexpected task cycle for "
+    "Unexpected task cycle for "
     ++ packageNameString (pkgName pid)
   displayException (PackageIdMissingBug ident) = bugReport "[S-8923]" $
-    "The impossible happened! singleBuild: missing package ID missing: "
+    "singleBuild: missing package ID missing: "
     ++ show ident
   displayException AllInOneBuildBug = bugReport "[S-7371]"
     "Cannot have an all-in-one build that also has a final build step."

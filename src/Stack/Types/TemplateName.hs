@@ -31,7 +31,7 @@ newtype TypeTemplateNameException
 
 instance Exception TypeTemplateNameException where
   displayException (DefaultTemplateNameNotParsedBug s) = bugReport "[S-7410]" $
-    "The impossible happened! Cannot parse default template name: "
+    "Cannot parse default template name: "
     ++ s
 
 -- | A template name.
