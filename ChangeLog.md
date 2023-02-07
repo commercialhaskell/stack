@@ -10,6 +10,8 @@ Major changes:
 
 Behavior changes:
 
+* Drop support for `Cabal` versions before 1.22 and, consequently, GHC versions
+  before 7.10.
 * `stack ghci` and `stack repl` now take into account the values of
   `default-language` keys in Cabal files, like they take into account the values
   of `default-extensions` keys.

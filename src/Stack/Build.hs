@@ -11,7 +11,6 @@ module Stack.Build
   , mkBaseConfigOpts
   , queryBuildInfo
   , splitObjsWarning
-  , CabalVersionException (..)
   ) where
 
 import           Data.Aeson ( Value (Object, Array), (.=), object )
@@ -62,27 +61,26 @@ import           Stack.Types.SourceMap
                    , SourceMap (..), Target (..) )
 import           System.Terminal ( fixCodePage )
 
-data CabalVersionException
-  = AllowNewerNotSupported Version
-  | CabalVersionNotSupported Version
+newtype CabalVersionPrettyException
+  = CabalVersionNotSupported Version
   deriving (Show, Typeable)
 
-instance Exception CabalVersionException where
-  displayException (AllowNewerNotSupported cabalVer) = concat
-    [ "Error: [S-8503]\n"
-    , "'--allow-newer' requires Cabal version 1.22 or greater, but "
-    , "version "
-    , versionString cabalVer
-    , " was found."
-    ]
-  displayException (CabalVersionNotSupported cabalVer) = concat
-    [ "Error: [S-5973]\n"
-    , "Stack no longer supports Cabal versions before 1.19.2, "
-    , "but version "
-    , versionString cabalVer
-    , " was found. To fix this, consider updating the resolver to lts-3.0 "
-    , "or later or to nightly-2015-05-05 or later."
-    ]
+instance Pretty CabalVersionPrettyException where
+  pretty (CabalVersionNotSupported cabalVer) =
+    "[S-5973]"
+    <> line
+    <> fillSep
+         [ flow "Stack does not support Cabal versions before 1.22, but \
+                \version"
+         , fromString $ versionString cabalVer
+         , flow "was found. To fix this, consider updating the snapshot to"
+         , style Shell "lts-3.0"
+         , flow "or later or to"
+         , style Shell "nightly-2015-05-05"
+         , flow "or later."
+         ]
+
+instance Exception CabalVersionPrettyException
 
 data QueryException
   = SelectorNotFound [Text]
@@ -193,17 +191,9 @@ justLocals =
 
 checkCabalVersion :: HasEnvConfig env => RIO env ()
 checkCabalVersion = do
-  allowNewer <- view $ configL.to configAllowNewer
   cabalVer <- view cabalVersionL
-  -- https://github.com/haskell/cabal/issues/2023
-  when (allowNewer && cabalVer < mkVersion [1, 22]) $ throwM $
-    AllowNewerNotSupported cabalVer
-  -- Since --exact-configuration is always passed, some old cabal
-  -- versions can no longer be used. See the following link for why
-  -- it's 1.19.2:
-  -- https://github.com/haskell/cabal/blob/580fe6b6bf4e1648b2f66c1cb9da9f1f1378492c/cabal-install/Distribution/Client/Setup.hs#L592
-  when (cabalVer < mkVersion [1, 19, 2]) $ throwM $
-    CabalVersionNotSupported cabalVer
+  when (cabalVer < mkVersion [1, 22]) $
+    prettyThrowM $ CabalVersionNotSupported cabalVer
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
 warnIfExecutablesWithSameNameCouldBeOverwritten ::
