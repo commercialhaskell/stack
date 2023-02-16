@@ -16,4 +16,7 @@ option.
 Pass the option `--package <package>` to add the initial GHC argument
 `-package-id=<unit_id>`, where `<unit_id>` is the unit ID of the specified
 package in the installed package database. The option can be specified multiple
-times.
+times. Alternatively, the option `--package "<packages>"` can be used, where
+`<packages>` is a white space-delimited list of packages. The approach taken to
+these packages is the same as if they were specified as targets to
+[`stack build`](build_command.md#target-syntax).
