@@ -29,9 +29,7 @@ The `--cwd` option can be used to set the working directory before the
 executable is run.
 
 The `--package` option (which can be specified multiple times) can be used to
-add a package name to build targets. Alternatively, the option
-`--package "<packages>"` can be used, where `<packages>` is a white
-space-delimited list of packages.
+add a package name to build targets.
 
 The `--rts-options` option (which can be specified multiple times) can be used
 to pass a list of GHC's
