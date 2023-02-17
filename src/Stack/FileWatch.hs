@@ -8,6 +8,7 @@ module Stack.FileWatch
   ) where
 
 import           Control.Concurrent.STM ( check )
+import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import           GHC.IO.Exception
@@ -56,10 +57,10 @@ fileWatchConf cfg inner =
         setWatched files = do
           atomically $ writeTVar allFiles $ Set.map toFilePath files
           watch0 <- readTVarIO watchVar
-          let actions = Map.mergeWithKey
-                keepListening
-                stopListening
-                startListening
+          let actions = Map.merge
+                (Map.mapMissing stopListening)
+                (Map.mapMissing startListening)
+                (Map.zipWithMatched keepListening)
                 watch0
                 newDirs
           watch1 <- forM (Map.toList actions) $ \(k, mmv) -> do
@@ -74,8 +75,8 @@ fileWatchConf cfg inner =
                   $ Set.toList
                   $ Set.map parent files
 
-          keepListening _dir listen () = Just $ pure $ Just listen
-          stopListening = Map.map $ \f -> do
+          keepListening _dir listen () = pure $ Just listen
+          stopListening _ f = do
             () <- f `catch` \ioe ->
               -- Ignore invalid argument error - it can happen if
               -- the directory is removed.
@@ -83,7 +84,7 @@ fileWatchConf cfg inner =
                 InvalidArgument -> pure ()
                 _ -> throwIO ioe
             pure Nothing
-          startListening = Map.mapWithKey $ \dir () -> do
+          startListening dir () = do
             let dir' = fromString $ toFilePath dir
             listen <- watchDir manager dir' (const True) onChange
             pure $ Just listen
