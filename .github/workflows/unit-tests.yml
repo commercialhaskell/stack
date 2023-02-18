@@ -52,6 +52,11 @@ jobs:
           extra-suffix: ""
           stack-args: ""
     steps:
+    - name: Setup macOS
+      if: startsWith(runner.os, 'macOS')
+      run: |
+        # pkg-config added because it is required by package digest-0.0.1.4.
+        brew install pkg-config
     - name: Clone project
       uses: actions/checkout@v3
     - name: Cache dependencies on Unix-like OS
