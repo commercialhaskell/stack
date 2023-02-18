@@ -10,7 +10,7 @@ module Stack.Build.ConstructPlan
 
 import           Control.Monad.RWS.Strict hiding ( (<>) )
 import qualified Data.List as L
-import qualified Data.Map.Strict as M
+import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Map.Strict as Map
 import           Data.Monoid.Map ( MonoidMap(..) )
 import qualified Data.Set as Set
@@ -93,10 +93,10 @@ combineSourceInstalled ps (location, installed) =
 type CombinedMap = Map PackageName PackageInfo
 
 combineMap :: Map PackageName PackageSource -> InstalledMap -> CombinedMap
-combineMap = Map.mergeWithKey
-  (\_ s i -> Just $ combineSourceInstalled s i)
-  (fmap PIOnlySource)
-  (fmap (uncurry PIOnlyInstalled))
+combineMap = Map.merge
+  (Map.mapMissing (\_ s -> PIOnlySource s))
+  (Map.mapMissing (\_ i -> uncurry PIOnlyInstalled i))
+  (Map.zipWithMatched (\_ s i -> combineSourceInstalled s i))
 
 data AddDepRes
   = ADRToInstall Task
@@ -243,29 +243,29 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
   let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
   ((), m, W efinals installExes dirtyReason warnings parents) <-
-    liftIO $ runRWST inner ctx M.empty
+    liftIO $ runRWST inner ctx Map.empty
   mapM_
     (prettyWarn . fromString . T.unpack . textDisplay) (warnings [])
   let toEither (_, Left e)  = Left e
       toEither (k, Right v) = Right (k, v)
-      (errlibs, adrs) = partitionEithers $ map toEither $ M.toList m
-      (errfinals, finals) = partitionEithers $ map toEither $ M.toList efinals
+      (errlibs, adrs) = partitionEithers $ map toEither $ Map.toList m
+      (errfinals, finals) = partitionEithers $ map toEither $ Map.toList efinals
       errs = errlibs ++ errfinals
   if null errs
     then do
       let toTask (_, ADRFound _ _) = Nothing
           toTask (name, ADRToInstall task) = Just (name, task)
-          tasks = M.fromList $ mapMaybe toTask adrs
+          tasks = Map.fromList $ mapMaybe toTask adrs
           takeSubset =
             case boptsCLIBuildSubset $ bcoBuildOptsCLI baseConfigOpts0 of
               BSAll -> pure
               BSOnlySnapshot -> pure . stripLocals
               BSOnlyDependencies ->
-                pure . stripNonDeps (M.keysSet $ smDeps sourceMap)
+                pure . stripNonDeps (Map.keysSet $ smDeps sourceMap)
               BSOnlyLocals -> errorOnSnapshot
       takeSubset Plan
         { planTasks = tasks
-        , planFinals = M.fromList finals
+        , planFinals = Map.fromList finals
         , planUnregisterLocal =
             mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps
         , planInstallExes =
@@ -794,9 +794,9 @@ packageBuildTypeConfig pkg = packageBuildType pkg == Configure
 -- error about cyclic dependencies, prefer the cyclic error.
 updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> M ()
 updateLibMap name val = modify $ \mp ->
-  case (M.lookup name mp, val) of
+  case (Map.lookup name mp, val) of
     (Just (Left DependencyCycleDetected{}), Left _) -> mp
-    _ -> M.insert name val mp
+    _ -> Map.insert name val mp
 
 addEllipsis :: Text -> Text
 addEllipsis t
@@ -935,7 +935,7 @@ addPackageDeps package = do
   -- Update the parents map, for later use in plan construction errors
   -- - see 'getShortestDepsPath'.
   addParent depname range mversion =
-    tell mempty { wParents = MonoidMap $ M.singleton depname val }
+    tell mempty { wParents = MonoidMap $ Map.singleton depname val }
    where
     val = (First mversion, [(packageIdentifier package, range)])
 
@@ -1150,7 +1150,7 @@ stripNonDeps deps plan = plan
     when (pid `elem` dependents) $
       impureThrow $ TaskCycleBug pid
     modify' (<> Set.singleton pid)
-    mapM_ (collectMissing (pid:dependents)) (fromMaybe mempty $ M.lookup pid missing)
+    mapM_ (collectMissing (pid:dependents)) (fromMaybe mempty $ Map.lookup pid missing)
 
 -- | Is the given package/version combo defined in the snapshot or in the global
 -- database?

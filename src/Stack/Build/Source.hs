@@ -18,6 +18,7 @@ import           Conduit ( ZipSink (..), withSourceFile )
 import           Data.ByteString.Builder ( toLazyByteString )
 import qualified Data.List as L
 import qualified Data.Map as Map
+import qualified Data.Map.Merge.Lazy as Map
 import qualified Data.Map.Strict as M
 import qualified Data.Set as Set
 import qualified Distribution.PackageDescription as C
@@ -422,10 +423,10 @@ checkBuildCache oldCache files = do
     mdigest <- liftIO (getFileDigestMaybe (toFilePath fp))
     pure (toFilePath fp, mdigest)
   fmap (mconcat . Map.elems) $ sequence $
-    Map.mergeWithKey
-      (\fp mdigest fci -> Just (go fp mdigest (Just fci)))
-      (Map.mapWithKey (\fp mdigest -> go fp mdigest Nothing))
-      (Map.mapWithKey (\fp fci -> go fp Nothing (Just fci)))
+    Map.merge
+      (Map.mapMissing (\fp mdigest -> go fp mdigest Nothing))
+      (Map.mapMissing (\fp fci -> go fp Nothing (Just fci)))
+      (Map.zipWithMatched (\fp mdigest fci -> go fp mdigest (Just fci)))
       fileTimes
       oldCache
  where

@@ -45,7 +45,7 @@ import qualified Data.List as L
 import           Data.List.NonEmpty ( nonEmpty )
 import qualified Data.List.NonEmpty as NonEmpty ( toList )
 import           Data.List.Split ( chunksOf )
-import qualified Data.Map.Strict as M
+import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -726,15 +726,15 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                  else Just <$> liftIO (newMVar ())
 
   let actions = concatMap (toActions installedMap' mtestLock run ee) $
-        Map.elems $ Map.mergeWithKey
-          (\_ b f -> Just (Just b, Just f))
-          (fmap (\b -> (Just b, Nothing)))
-          (fmap (\f -> (Nothing, Just f)))
+        Map.elems $ Map.merge
+          (Map.mapMissing (\_ b -> (Just b, Nothing)))
+          (Map.mapMissing (\_ f -> (Nothing, Just f)))
+          (Map.zipWithMatched (\_ b f -> (Just b, Just f)))
           (planTasks plan)
           (planFinals plan)
   threads <- view $ configL.to configJobs
   let keepGoing =
-        fromMaybe (not (M.null (planFinals plan))) (boptsKeepGoing eeBuildOpts)
+        fromMaybe (not (Map.null (planFinals plan))) (boptsKeepGoing eeBuildOpts)
   terminal <- view terminalL
   errs <- liftIO $ runActions threads keepGoing actions $
     \doneVar actionsVar -> do
@@ -2103,7 +2103,7 @@ getExecutableBuildStatuses package pkgDir = do
   distDir <- distDirFromDir pkgDir
   platform <- view platformL
   fmap
-    M.fromList
+    Map.fromList
     (mapM (checkExeStatus platform distDir) (Set.toList (packageExes package)))
 
 -- | Check whether the given executable is defined in the given dist directory.
@@ -2147,7 +2147,7 @@ checkForUnlistedFiles (TTLocalMutable lp) pkgDir = do
       (lpCabalFile lp)
       (lpComponents lp)
       caches
-  forM_ (M.toList addBuildCache) $ \(component, newToCache) -> do
+  forM_ (Map.toList addBuildCache) $ \(component, newToCache) -> do
     let cache = Map.findWithDefault Map.empty component caches
     writeBuildCache pkgDir component $
       Map.unions (cache : newToCache)
@@ -2279,7 +2279,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                          <> display (unGhcPkgId ghcId)
                          <> "\n"
                      )
-                     (pkgGhcIdList ++ thGhcId:M.elems allDepsMap)
+                     (pkgGhcIdList ++ thGhcId:Map.elems allDepsMap)
           writeFileUtf8Builder fp ghcEnv
           menv <- liftIO $
             setEnv fp =<< configProcessContextSettings config EnvSettings
@@ -2661,7 +2661,7 @@ exesToBuild executableBuildStatuses lp =
 
 -- | Do the current executables satisfy Cabal's bugged out requirements?
 cabalIsSatisfied :: Map k ExecutableBuildStatus -> Bool
-cabalIsSatisfied = all (== ExecutableBuilt) . M.elems
+cabalIsSatisfied = all (== ExecutableBuilt) . Map.elems
 
 -- Test-suite and benchmark build components.
 finalComponentOptions :: LocalPackage -> [String]
