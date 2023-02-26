@@ -224,7 +224,7 @@ wiredInPackages = case mparsed of
     [ "ghc-prim"
       -- A magic package
     , "integer-gmp"
-      -- No longer magic > 1.0.3.0. With GHC 9.2.5 at least, there seems to be
+      -- No longer magic > 1.0.3.0. With GHC 9.2.7 at least, there seems to be
       -- no problem in using it.
     , "integer-simple"
       -- A magic package
@@ -236,16 +236,16 @@ wiredInPackages = case mparsed of
       -- A magic package
     , "dph-seq"
       -- Deprecated in favour of dph-prim-seq, which does not appear to be
-      -- magic. With GHC 9.2.5 at least, there seems to be no problem in using
+      -- magic. With GHC 9.2.7 at least, there seems to be no problem in using
       -- it.
     , "dph-par"
       --  Deprecated in favour of dph-prim-par, which does not appear to be
-      -- magic. With GHC 9.2.5 at least, there seems to be no problem in using
+      -- magic. With GHC 9.2.7 at least, there seems to be no problem in using
       -- it.
     , "ghc"
       -- A magic package
     , "interactive"
-      -- Could not identify information about this package name. With GHC 9.2.5
+      -- Could not identify information about this package name. With GHC 9.2.7
       -- at least, there seems to be no problem in using it.
     , "ghc-bignum"
       -- A magic package

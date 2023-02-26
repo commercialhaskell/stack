@@ -1,4 +1,4 @@
-resolver: ghc-9.2.5
+resolver: ghc-9.2.7
 flags:
   text:
     integer-simple: false
