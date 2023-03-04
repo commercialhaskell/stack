@@ -28,6 +28,8 @@ module Stack.Prelude
   , ppException
   , prettyThrowIO
   , prettyThrowM
+  , mcons
+  , MungedPackageId (..)
   , MungedPackageName (..)
   , LibraryName (..)
   , module X
@@ -89,6 +91,7 @@ import           Data.Conduit.Process.Typed
                    ( byteStringInput, createSource, withLoggedProcess_ )
 import qualified Data.Text.IO as T
 import           Distribution.Types.LibraryName ( LibraryName (..) )
+import           Distribution.Types.MungedPackageId ( MungedPackageId (..) )
 import           Distribution.Types.MungedPackageName ( MungedPackageName (..) )
 import           Pantry as X hiding ( Package (..), loadSnapshot )
 import           Path as X
@@ -366,3 +369,7 @@ prettyThrowIO = throwIO . PrettyException
 -- the monad @m@.
 prettyThrowM :: (Exception e, MonadThrow m, Pretty e) => e -> m a
 prettyThrowM = throwM . PrettyException
+
+-- | Maybe cons.
+mcons :: Maybe a -> [a] -> [a]
+mcons ma as = maybe as (:as) ma
