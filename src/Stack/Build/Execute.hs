@@ -55,9 +55,12 @@ import           Data.Time
                    ( ZonedTime, getZonedTime, formatTime, defaultTimeLocale )
 import qualified Data.ByteString.Char8 as S8
 import qualified Distribution.PackageDescription as C
+import           Distribution.Pretty ( prettyShow )
 import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System ( OS (Windows), Platform (Platform) )
 import qualified Distribution.Text as C
+import           Distribution.Types.MungedPackageName
+                   ( encodeCompatPackageName )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.UnqualComponentName
                    ( mkUnqualComponentName )
@@ -1619,7 +1622,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       liftIO $ atomically $
         modifyTVar eeGhcPkgIds $ Map.insert taskProvides installed
  where
-  pname = pkgName taskProvides
+  PackageIdentifier pname pversion = taskProvides
   doHaddock mcurator package =
        taskBuildHaddock
     && not isFinalBuild
@@ -1710,20 +1713,17 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     -- However, we must unregister any such library in the new snapshot, in case
     -- it was built with different flags.
     let
-      subLibNames = map T.unpack . Set.toList $ case taskType of
+      subLibNames = Set.toList $ case taskType of
         TTLocalMutable lp -> packageInternalLibraries $ lpPackage lp
         TTRemotePackage _ p _ -> packageInternalLibraries p
-      PackageIdentifier name version = taskProvides
-      mainLibName = packageNameString name
-      mainLibVersion = versionString version
-      pkgName = mainLibName ++ "-" ++ mainLibVersion
-      -- z-package-z-internal for internal lib internal of package package
-      toCabalInternalLibName n =
-        concat ["z-", mainLibName, "-z-", n, "-", mainLibVersion]
-      allToUnregister =
-           map (const pkgName) (maybeToList mlib)
-        ++ map toCabalInternalLibName subLibNames
-      allToRegister = maybeToList mlib ++ sublibs
+      toMungedPackageId :: Text -> MungedPackageId
+      toMungedPackageId sublib =
+        let sublibName = LSubLibName $ mkUnqualComponentName $ T.unpack sublib
+        in  MungedPackageId (MungedPackageName pname sublibName) pversion
+      allToUnregister = mcons
+        (prettyShow taskProvides <$ mlib)
+        (map (prettyShow . toMungedPackageId) subLibNames)
+      allToRegister = mcons mlib sublibs
 
     unless (null allToRegister) $
       withMVar eeInstallLock $ \() -> do
@@ -2027,21 +2027,13 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       HasLibraries _ -> do
         sublibsPkgIds <- fmap catMaybes $
           forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
-            -- z-haddock-library-z-attoparsec for internal lib attoparsec of
-            -- haddock-library
-            let sublibName = T.concat
-                  [ "z-"
-                  , T.pack $ packageNameString $ packageName package
-                  , "-z-"
-                  , sublib
-                  ]
-            case parsePackageName $ T.unpack sublibName of
-              Nothing -> pure Nothing -- invalid lib, ignored
-              Just subLibName ->
-                loadInstalledPkg
-                  [installedPkgDb]
-                  installedDumpPkgsTVar
-                  subLibName
+            let sublibName = MungedPackageName
+                  (packageName package)
+                  (LSubLibName $ mkUnqualComponentName $ T.unpack sublib)
+            loadInstalledPkg
+              [installedPkgDb]
+              installedDumpPkgsTVar
+              (encodeCompatPackageName sublibName)
 
         mpkgid <- loadInstalledPkg
                     [installedPkgDb]
@@ -2080,6 +2072,11 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
     pure mpkgid
 
+  loadInstalledPkg ::
+       [Path Abs Dir]
+    -> TVar (Map GhcPkgId DumpPackage)
+    -> PackageName
+    -> RIO env (Maybe GhcPkgId)
   loadInstalledPkg pkgDbs tvar name = do
     pkgexe <- getGhcPkgExe
     dps <- ghcPkgDescribe pkgexe name pkgDbs $ conduitDumpPackage .| CL.consume
@@ -2098,7 +2095,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 -- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha.jsexe/ (NOTE: a dir)
 getExecutableBuildStatuses ::
      HasEnvConfig env
-  => Package -> Path Abs Dir -> RIO env (Map Text ExecutableBuildStatus)
+  => Package
+  -> Path Abs Dir
+  -> RIO env (Map Text ExecutableBuildStatus)
 getExecutableBuildStatuses package pkgDir = do
   distDir <- distDirFromDir pkgDir
   platform <- view platformL
