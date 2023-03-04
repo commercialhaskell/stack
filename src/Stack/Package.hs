@@ -25,6 +25,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import           Distribution.CabalSpecVersion ( cabalSpecToVersionDigits )
+import qualified Distribution.Compat.NonEmptySet as NES
 import           Distribution.Compiler
                    ( CompilerFlavor (..), PerCompilerFlavor (..) )
 import           Distribution.Package ( mkPackageName )
@@ -126,6 +127,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageDefaultFlags = M.fromList
     [(flagName flag, flagDefault flag) | flag <- pkgFlags]
   , packageAllDeps = M.keysSet deps
+  , packageSubLibDeps = subLibDeps
   , packageLibraries =
       let mlib = do
             lib <- library pkg
@@ -244,9 +246,18 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , asLibrary <$> fromMaybe M.empty msetupDeps
     , knownTools
     ])
+
   msetupDeps = fmap
     (M.fromList . map (depPkgName &&& depVerRange) . setupDepends)
     (setupBuildInfo pkg)
+
+  subLibDeps = M.fromList $ concatMap
+    (\(Dependency n vr libs) -> mapMaybe (getSubLibName n vr) (NES.toList libs))
+    (concatMap targetBuildDepends (allBuildInfo' pkg))
+
+  getSubLibName pn vr lib@(LSubLibName _) =
+    Just (MungedPackageName pn lib, asLibrary vr)
+  getSubLibName _ _ _ = Nothing
 
   asLibrary range = DepValue
     { dvVersionRange = range

@@ -164,6 +164,8 @@ data Package = Package
     -- the hard-coded lookup.
   , packageAllDeps :: !(Set PackageName)
     -- ^ Original dependencies (not sieved).
+  , packageSubLibDeps :: !(Map MungedPackageName DepValue)
+    -- ^ Original sub-library dependencies (not sieved).
   , packageGhcOptions :: ![Text]
     -- ^ Ghc options used on package.
   , packageCabalConfigOpts :: ![Text]
