@@ -1,6 +1,11 @@
-module Lib 
+module Lib
   ( someFunc
   ) where
 
+import Subproject.Lib ( libFunc )
+import Subproject.SubLib ( subLibFunc )
+
 someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+someFunc = do
+  libFunc
+  subLibFunc
