@@ -33,11 +33,10 @@ import           Distribution.PackageDescription
                    , CondTree (..), Condition (..), ConfVar (..)
                    , Dependency (..), Executable (..), ForeignLib (..)
                    , GenericPackageDescription (..), HookedBuildInfo
-                   , Library (..), LibraryName (..), PackageDescription (..)
-                   , PackageFlag (..), SetupBuildInfo (..), TestSuite (..)
-                   , allLanguages, allLibraries, buildType, depPkgName
-                   , depVerRange, libraryNameString, maybeToLibraryName
-                   , usedExtensions
+                   , Library (..), PackageDescription (..), PackageFlag (..)
+                   , SetupBuildInfo (..), TestSuite (..), allLanguages
+                   , allLibraries, buildType, depPkgName, depVerRange
+                   , libraryNameString, maybeToLibraryName, usedExtensions
                    )
 import           Distribution.Pretty ( prettyShow )
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
@@ -46,7 +45,6 @@ import           Distribution.Text ( display )
 import qualified Distribution.Types.CondTree as Cabal
 import qualified Distribution.Types.ExeDependency as Cabal
 import qualified Distribution.Types.LegacyExeDependency as Cabal
-import           Distribution.Types.MungedPackageName ( MungedPackageName (..) )
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Distribution.Utils.Path ( getSymbolicPath )
 import           Distribution.Verbosity ( silent )

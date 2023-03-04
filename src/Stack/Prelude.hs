@@ -28,6 +28,8 @@ module Stack.Prelude
   , ppException
   , prettyThrowIO
   , prettyThrowM
+  , MungedPackageName (..)
+  , LibraryName (..)
   , module X
   -- * Re-exports from the rio-pretty print package
   , HasStylesUpdate (..)
@@ -86,6 +88,8 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed
                    ( byteStringInput, createSource, withLoggedProcess_ )
 import qualified Data.Text.IO as T
+import           Distribution.Types.LibraryName ( LibraryName (..) )
+import           Distribution.Types.MungedPackageName ( MungedPackageName (..) )
 import           Pantry as X hiding ( Package (..), loadSnapshot )
 import           Path as X
                    ( Abs, Dir, File, Path, Rel, toFilePath )
