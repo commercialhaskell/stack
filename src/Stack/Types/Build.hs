@@ -58,10 +58,14 @@ import           Database.Persist.Sql
                    ( PersistField (..), PersistFieldSql (..)
                    , PersistValue (PersistText), SqlType (SqlString)
                    )
-import           Distribution.PackageDescription
-                   ( TestSuiteInterface, mkPackageName )
 import           Distribution.System ( Arch )
 import qualified Distribution.Text as C
+import           Distribution.Types.MungedPackageName
+                   ( decodeCompatPackageName )
+import           Distribution.Types.PackageName ( mkPackageName, unPackageName )
+import           Distribution.Types.TestSuiteInterface ( TestSuiteInterface )
+import           Distribution.Types.UnqualComponentName
+                   ( unUnqualComponentName )
 import qualified Distribution.Version as C
 import           Path ( parseRelDir, (</>), parent )
 import           Path.Extra ( toFilePathNoTrailingSep )
@@ -1207,14 +1211,20 @@ configureOptsNoDir econfig bco deps isLocal package = concat
   -- --exact-configuration.
   flags = packageFlags package `Map.union` packageDefaultFlags package
 
-  depOptions = map (uncurry toDepOption) $ Map.toList deps
+  depOptions = map toDepOption $ Map.toList deps
 
-  toDepOption (PackageIdentifier name _) gid = concat
+  toDepOption (PackageIdentifier name _, gid) = concat
     [ "--dependency="
-    , packageNameString name
+    , depOptionKey
     , "="
     , ghcPkgIdString gid
     ]
+   where
+    MungedPackageName subPkgName lib = decodeCompatPackageName name
+    depOptionKey = case lib of
+      LMainLibName -> unPackageName name
+      LSubLibName cn ->
+        unPackageName subPkgName <> ":" <> unUnqualComponentName cn
 
 -- | Get set of wanted package names from locals.
 wantedLocalPackages :: [LocalPackage] -> Set PackageName
