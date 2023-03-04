@@ -1,5 +1,5 @@
 {- stack script
-    --resolver nightly-2022-11-14
+    --resolver lts-20.13
     --extra-dep Cabal-3.6.3.0
     --extra-dep directory-1.3.6.2
     --ghc-options -Wall
