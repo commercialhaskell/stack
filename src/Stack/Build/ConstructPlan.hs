@@ -124,10 +124,11 @@ instance Monoid W where
   mempty = memptydefault
   mappend = (<>)
 
-type M = RWST -- TODO replace with more efficient WS stack on top of StackT
+type M = RWST -- TODO replace with more efficient WS stack on top of (RIO Ctx).
   Ctx
   W
   (Map PackageName (Either ConstructPlanException AddDepRes))
+  -- ^ Library map
   IO
 
 data Ctx = Ctx
@@ -509,7 +510,7 @@ addFinal lp package isAllInOne buildHaddocks = do
   tell mempty { wFinals = Map.singleton (packageName package) res }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the package, if
--- needed. First checks if the package name is in the lib map.
+-- needed. First checks if the package name is in the library map.
 --
 -- 'constructPlan' invokes this on all the target packages, setting
 -- @treatAsDep'@ to False, because those packages are direct build targets.
@@ -677,7 +678,7 @@ installPackage name ps minstalled = do
         Just tb -> do
           -- Attempt to find a plan which performs an all-in-one build. Ignore
           -- the writer action + reset the state if it fails.
-          s <- get
+          libMap <- get
           res <- pass $ do
             res <- addPackageDeps tb
             let writerFunc w = case res of
@@ -711,8 +712,8 @@ installPackage name ps minstalled = do
               planDebug $
                    "installPackage: Before trying cyclic plan, resetting lib \
                    \result map to "
-                <> show s
-              put s
+                <> show libMap
+              put libMap
               -- Otherwise, fall back on building the tests / benchmarks in a
               -- separate step.
               res' <- resolveDepsAndInstall
@@ -808,7 +809,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
 packageBuildTypeConfig :: Package -> Bool
 packageBuildTypeConfig pkg = packageBuildType pkg == Configure
 
--- Update response in the lib map. If it is an error, and there's already an
+-- Update response in the library map. If it is an error, and there's already an
 -- error about cyclic dependencies, prefer the cyclic error.
 updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> M ()
 updateLibMap name val = modify $ \mp ->
