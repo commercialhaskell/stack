@@ -202,9 +202,9 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     = T.pack . prettyShow . MungedPackageName (pkgName pkgId)
     . maybeToLibraryName . Just . Cabal.mkUnqualComponentName . T.unpack
 
-  -- Gets all of the modules, files, build files, and data files that
-  -- constitute the package. This is primarily used for dirtiness
-  -- checking during build, as well as use by "stack ghci"
+  -- Gets all of the modules, files, build files, and data files that constitute
+  -- the package. This is primarily used for dirtiness checking during build, as
+  -- well as use by "stack ghci"
   pkgFiles = GetPackageFiles $
     \cabalfp -> debugBracket ("getPackageFiles" <+> pretty cabalfp) $ do
       let pkgDir = parent cabalfp
