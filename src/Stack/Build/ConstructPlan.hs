@@ -306,10 +306,13 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   inSourceMap pname = pname `Map.member` smDeps sourceMap ||
                       pname `Map.member` smProject sourceMap
 
+  getSources :: Version -> RIO env (Map PackageName PackageSource)
   getSources globalCabalVersion = do
     let loadLocalPackage' pp = do
           lp <- loadLocalPackage pp
-          pure lp { lpPackage = applyForceCustomBuild globalCabalVersion $ lpPackage lp }
+          let lpPackage' =
+                applyForceCustomBuild globalCabalVersion $ lpPackage lp
+          pure lp { lpPackage = lpPackage' }
     pPackages <- for (smProject sourceMap) $ \pp -> do
       lp <- loadLocalPackage' pp
       pure $ PSFilePath lp
@@ -506,7 +509,7 @@ addFinal lp package isAllInOne buildHaddocks = do
   tell mempty { wFinals = Map.singleton (packageName package) res }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the package, if
--- needed.
+-- needed. First checks if the package name is in the lib map.
 --
 -- 'constructPlan' invokes this on all the target packages, setting
 -- @treatAsDep'@ to False, because those packages are direct build targets.
@@ -515,73 +518,88 @@ addFinal lp package isAllInOne buildHaddocks = do
 -- marked as a dependency, even if it is directly wanted. This makes sense - if
 -- we left out packages that are deps, it would break the --only-dependencies
 -- build plan.
-addDep :: PackageName
-       -> M (Either ConstructPlanException AddDepRes)
+addDep :: PackageName -> M (Either ConstructPlanException AddDepRes)
 addDep name = do
-  ctx <- ask
-  m <- get
-  case Map.lookup name m of
+  libMap <- get
+  case Map.lookup name libMap of
     Just res -> do
       planDebug $
         "addDep: Using cached result for " ++ show name ++ ": " ++ show res
       pure res
-    Nothing -> do
-      res <- if name `elem` callStack ctx
-        then do
+    Nothing -> addDep' name
+
+-- | Given a 'PackageName', adds all of the build tasks to build the package.
+-- First checks that the package name is not already in the call stack.
+addDep' :: PackageName -> M (Either ConstructPlanException AddDepRes)
+addDep' name = do
+  ctx <- ask
+  let mpackageInfo = Map.lookup name $ combinedMap ctx
+  res <- if name `elem` callStack ctx
+    then do
+      planDebug $
+           "addDep': Detected cycle "
+        <> show name
+        <> ": "
+        <> show (callStack ctx)
+      pure $ Left $ DependencyCycleDetected $ name : callStack ctx
+    else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
+      case mpackageInfo of
+        -- TODO look up in the package index and see if there's a
+        -- recommendation available
+        Nothing -> do
           planDebug $
-               "addDep: Detected cycle "
+               "addDep': No package info for "
             <> show name
-            <> ": "
-            <> show (callStack ctx)
-          pure $ Left $ DependencyCycleDetected $ name : callStack ctx
-        else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
-          let mpackageInfo = Map.lookup name $ combinedMap ctx
-          planDebug $
-               "addDep: Package info for "
-            <> show name
-            <> ": "
-            <> show mpackageInfo
-          case mpackageInfo of
-            -- TODO look up in the package index and see if there's a
-            -- recommendation available
-            Nothing -> pure $ Left $ UnknownPackage name
-            Just (PIOnlyInstalled loc installed) -> do
-              -- FIXME Slightly hacky, no flags since they likely won't affect
-              -- executable names. This code does not feel right.
-              let version = installedVersion installed
-                  askPkgLoc = liftRIO $ do
-                    mrev <- getLatestHackageRevision
-                              YesRequireHackageIndex name version
-                    case mrev of
-                      Nothing -> do
-                        -- this could happen for GHC boot libraries missing from
-                        -- Hackage
-                        prettyWarnL
-                          $ flow "No latest package revision found for"
-                          : style Current (fromString $ packageNameString name) <> ","
-                          : flow "dependency callstack:"
-                          : mkNarrativeList
-                              Nothing
-                              False
-                              ( map
-                                  (fromString . packageNameString)
-                                  (callStack ctx)
-                                :: [StyleDoc]
-                              )
-                        pure Nothing
-                      Just (_rev, cfKey, treeKey) ->
-                        pure . Just $
-                          PLIHackage (PackageIdentifier name version) cfKey treeKey
-              tellExecutablesUpstream name askPkgLoc loc Map.empty
-              pure $ Right $ ADRFound loc installed
-            Just (PIOnlySource ps) -> do
-              tellExecutables name ps
-              installPackage name ps Nothing
-            Just (PIBoth ps installed) -> do
-              tellExecutables name ps
-              installPackage name ps (Just installed)
-      updateLibMap name res
-      pure res
+          pure $ Left $ UnknownPackage name
+        Just packageInfo -> addDep'' name packageInfo
+  updateLibMap name res
+  pure res
+
+-- | Given a 'PackageName' and its 'PackageInfo' from the combined map, adds all
+-- of the build tasks to build the package. Assumes that the head of the call
+-- stack is the current package name.
+addDep'' ::
+     PackageName
+  -> PackageInfo
+  -> M (Either ConstructPlanException AddDepRes)
+addDep'' name packageInfo = do
+  planDebug $
+       "addDep'': Package info for "
+    <> show name
+    <> ": "
+    <> show packageInfo
+  case packageInfo of
+    PIOnlyInstalled loc installed -> do
+      -- FIXME Slightly hacky, no flags since they likely won't affect
+      -- executable names. This code does not feel right.
+      let version = installedVersion installed
+          askPkgLoc = liftRIO $ do
+            mrev <- getLatestHackageRevision YesRequireHackageIndex name version
+            case mrev of
+              Nothing -> do
+                -- This could happen for GHC boot libraries missing from
+                -- Hackage.
+                cs <- asks (L.tail . callStack)
+                prettyWarnL
+                  $ flow "No latest package revision found for"
+                  : style Current (fromString $ packageNameString name) <> ","
+                  : flow "dependency callstack:"
+                  : mkNarrativeList
+                      Nothing
+                      False
+                      (map (fromString . packageNameString) cs :: [StyleDoc])
+                pure Nothing
+              Just (_rev, cfKey, treeKey) ->
+                pure . Just $
+                  PLIHackage (PackageIdentifier name version) cfKey treeKey
+      tellExecutablesUpstream name askPkgLoc loc Map.empty
+      pure $ Right $ ADRFound loc installed
+    PIOnlySource ps -> do
+      tellExecutables name ps
+      installPackage name ps Nothing
+    PIBoth ps installed -> do
+      tellExecutables name ps
+      installPackage name ps (Just installed)
 
 -- FIXME what's the purpose of this? Add a Haddock!
 tellExecutables :: PackageName -> PackageSource -> M ()
