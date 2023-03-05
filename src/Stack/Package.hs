@@ -87,32 +87,30 @@ import           Stack.Types.PackageFile
                    , GetPackageFiles (..)
                    )
 import           Stack.PackageFile ( packageDescModulesAndFiles )
+
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
 -- derived from the package's Cabal file.
 --
 -- NOTE: not to be confused with BuildInfo, an Stack-internal datatype.
-readDotBuildinfo :: MonadIO m
-                 => Path Abs File
-                 -> m HookedBuildInfo
+readDotBuildinfo :: MonadIO m => Path Abs File -> m HookedBuildInfo
 readDotBuildinfo buildinfofp =
   liftIO $ readHookedBuildInfo silent (toFilePath buildinfofp)
 
 -- | Resolve a parsed Cabal file into a 'Package', which contains all of the
 -- info needed for Stack to build the 'Package' given the current configuration.
-resolvePackage :: PackageConfig
-               -> GenericPackageDescription
-               -> Package
+resolvePackage :: PackageConfig -> GenericPackageDescription -> Package
 resolvePackage packageConfig gpkg =
   packageFromPackageDescription
     packageConfig
     (genPackageFlags gpkg)
     (resolvePackageDescription packageConfig gpkg)
 
-packageFromPackageDescription :: PackageConfig
-                              -> [PackageFlag]
-                              -> PackageDescriptionPair
-                              -> Package
+packageFromPackageDescription ::
+     PackageConfig
+  -> [PackageFlag]
+  -> PackageDescriptionPair
+  -> Package
 packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkgNoMod pkg) =
   Package
   { packageName = name
@@ -125,7 +123,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig
   , packageFlags = packageConfigFlags packageConfig
   , packageDefaultFlags = M.fromList
-    [(flagName flag, flagDefault flag) | flag <- pkgFlags]
+      [(flagName flag, flagDefault flag) | flag <- pkgFlags]
   , packageAllDeps = M.keysSet deps
   , packageSubLibDeps = subLibDeps
   , packageLibraries =
@@ -139,38 +137,45 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
           Just _ -> HasLibraries foreignLibNames
   , packageInternalLibraries = subLibNames
   , packageTests = M.fromList
-    [(T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
-        | t <- testSuites pkgNoMod
-        , buildable (testBuildInfo t)
-    ]
+      [ (T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
+      | t <- testSuites pkgNoMod
+      , buildable (testBuildInfo t)
+      ]
   , packageBenchmarks = S.fromList
-    [T.pack (Cabal.unUnqualComponentName $ benchmarkName b)
-        | b <- benchmarks pkgNoMod
-        , buildable (benchmarkBuildInfo b)
-    ]
+      [ T.pack (Cabal.unUnqualComponentName $ benchmarkName b)
+      | b <- benchmarks pkgNoMod
+      , buildable (benchmarkBuildInfo b)
+      ]
       -- Same comment about buildable applies here too.
   , packageExes = S.fromList
-    [T.pack (Cabal.unUnqualComponentName $ exeName biBuildInfo)
+      [ T.pack (Cabal.unUnqualComponentName $ exeName biBuildInfo)
       | biBuildInfo <- executables pkg
-                                  , buildable (buildInfo biBuildInfo)]
+      , buildable (buildInfo biBuildInfo)
+      ]
   -- This is an action used to collect info needed for "stack ghci".
   -- This info isn't usually needed, so computation of it is deferred.
   , packageOpts = GetPackageOpts $
-    \installMap installedMap omitPkgs addPkgs cabalfp ->
-         do (componentsModules,componentFiles,_,_) <- getPackageFiles pkgFiles cabalfp
-            let internals = S.toList $ internalLibComponents $ M.keysSet componentsModules
-            excludedInternals <- mapM (parsePackageNameThrowing . T.unpack) internals
-            mungedInternals <- mapM (parsePackageNameThrowing . T.unpack .
-                                     toInternalPackageMungedName) internals
-            componentsOpts <-
-                generatePkgDescOpts installMap installedMap
-                (excludedInternals ++ omitPkgs) (mungedInternals ++ addPkgs)
-                cabalfp pkg componentFiles
-            pure (componentsModules,componentFiles,componentsOpts)
+      \installMap installedMap omitPkgs addPkgs cabalfp -> do
+        (componentsModules,componentFiles, _, _) <- getPackageFiles pkgFiles cabalfp
+        let internals =
+              S.toList $ internalLibComponents $ M.keysSet componentsModules
+        excludedInternals <- mapM (parsePackageNameThrowing . T.unpack) internals
+        mungedInternals <- mapM
+          (parsePackageNameThrowing . T.unpack . toInternalPackageMungedName)
+          internals
+        componentsOpts <- generatePkgDescOpts
+          installMap
+          installedMap
+          (excludedInternals ++ omitPkgs)
+          (mungedInternals ++ addPkgs)
+          cabalfp
+          pkg
+          componentFiles
+        pure (componentsModules, componentFiles, componentsOpts)
   , packageHasExposedModules = maybe
-        False
-        (not . null . exposedModules)
-        (library pkg)
+      False
+      (not . null . exposedModules)
+      (library pkg)
   , packageBuildType = buildType pkg
   , packageSetupDeps = msetupDeps
   , packageCabalSpec = specVersion pkg
@@ -216,11 +221,13 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
           let setupHsPath = pkgDir </> relFileSetupHs
               setupLhsPath = pkgDir </> relFileSetupLhs
           setupHsExists <- doesFileExist setupHsPath
-          if setupHsExists then pure (S.singleton setupHsPath) else do
-            setupLhsExists <- doesFileExist setupLhsPath
-            if setupLhsExists
-              then pure (S.singleton setupLhsPath)
-              else pure S.empty
+          if setupHsExists
+            then pure (S.singleton setupHsPath)
+            else do
+              setupLhsExists <- doesFileExist setupLhsPath
+              if setupLhsExists
+                then pure (S.singleton setupLhsPath)
+                else pure S.empty
         else pure S.empty
       buildFiles <- fmap (S.insert cabalfp . S.union setupFiles) $ do
         let hpackPath = pkgDir </> relFileHpackPackageConfig
@@ -264,8 +271,8 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     , dvType = AsLibrary
     }
 
-  -- Is the package dependency mentioned here me: either the package
-  -- name itself, or the name of one of the sub libraries
+  -- Is the package dependency mentioned here me: either the package name
+  -- itself, or the name of one of the sub libraries
   isMe name' =  name' == name
              || fromString (packageNameString name') `S.member` extraLibNames
 
@@ -478,10 +485,10 @@ generateBuildInfoOpts BioInput {..} =
 -- λ>
 makeObjectFilePathFromC ::
      MonadThrow m
-  => Path Abs Dir          -- ^ The cabal directory.
-  -> NamedComponent        -- ^ The name of the component.
-  -> Path Abs Dir          -- ^ Dist directory.
-  -> Path Abs File         -- ^ The path to the .c file.
+  => Path Abs Dir      -- ^ The cabal directory.
+  -> NamedComponent    -- ^ The name of the component.
+  -> Path Abs Dir      -- ^ Dist directory.
+  -> Path Abs File     -- ^ The path to the .c file.
   -> m (Path Abs File) -- ^ The path to the .o file for the component.
 makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
   relCFilePath <- stripProperPrefix cabalDir cFilePath
@@ -586,18 +593,18 @@ hardCodedMap = M.fromList
   , ("gtk2hsTypeGen", Distribution.Package.mkPackageName "gtk2hs-buildtools")
   ]
 
--- | Executable-only packages which come pre-installed with GHC and do
--- not need to be built. Without this exception, we would either end
--- up unnecessarily rebuilding these packages, or failing because the
--- packages do not appear in the Stackage snapshot.
+-- | Executable-only packages which come pre-installed with GHC and do not need
+-- to be built. Without this exception, we would either end up unnecessarily
+-- rebuilding these packages, or failing because the packages do not appear in
+-- the Stackage snapshot.
 preInstalledPackages :: Set PackageName
 preInstalledPackages = S.fromList
   [ mkPackageName "hsc2hs"
   , mkPackageName "haddock"
   ]
 
--- | Variant of 'allBuildInfo' from Cabal that, like versions before
--- 2.2, only includes buildable components.
+-- | Variant of 'allBuildInfo' from Cabal that, like versions before Cabal 2.2
+-- only includes buildable components.
 allBuildInfo' :: PackageDescription -> [BuildInfo]
 allBuildInfo' pkg_descr = [ bi | lib <- allLibraries pkg_descr
                                , let bi = libBuildInfo lib
@@ -615,23 +622,20 @@ allBuildInfo' pkg_descr = [ bi | lib <- allLibraries pkg_descr
                                , let bi = benchmarkBuildInfo tst
                                , buildable bi ]
 
--- | A pair of package descriptions: one which modified the buildable
--- values of test suites and benchmarks depending on whether they are
--- enabled, and one which does not.
+-- | A pair of package descriptions: one which modified the buildable values of
+-- test suites and benchmarks depending on whether they are enabled, and one
+-- which does not.
 --
--- Fields are intentionally lazy, we may only need one or the other
--- value.
+-- Fields are intentionally lazy, we may only need one or the other value.
 --
--- MSS 2017-08-29: The very presence of this data type is terribly
--- ugly, it represents the fact that the Cabal 2.0 upgrade did _not_
--- go well. Specifically, we used to have a field to indicate whether
--- a component was enabled in addition to buildable, but that's gone
--- now, and this is an ugly proxy. We should at some point clean up
--- the mess of Package, LocalPackage, etc, and probably pull in the
--- definition of PackageDescription from Cabal with our additionally
--- needed metadata. But this is a good enough hack for the
--- moment. Odds are, you're reading this in the year 2024 and thinking
--- "wtf?"
+-- Michael S Snoyman 2017-08-29: The very presence of this data type is terribly
+-- ugly, it represents the fact that the Cabal 2.0 upgrade did _not_ go well.
+-- Specifically, we used to have a field to indicate whether a component was
+-- enabled in addition to buildable, but that's gone now, and this is an ugly
+-- proxy. We should at some point clean up the mess of Package, LocalPackage,
+-- etc, and probably pull in the definition of PackageDescription from Cabal
+-- with our additionally needed metadata. But this is a good enough hack for the
+-- moment. Odds are, you're reading this in the year 2024 and thinking "wtf?"
 data PackageDescriptionPair = PackageDescriptionPair
   { pdpOrigBuildable :: PackageDescription
   , pdpModifiedBuildable :: PackageDescription
@@ -639,9 +643,10 @@ data PackageDescriptionPair = PackageDescriptionPair
 
 -- | Evaluates the conditions of a 'GenericPackageDescription', yielding
 -- a resolved 'PackageDescription'.
-resolvePackageDescription :: PackageConfig
-                          -> GenericPackageDescription
-                          -> PackageDescriptionPair
+resolvePackageDescription ::
+     PackageConfig
+  -> GenericPackageDescription
+  -> PackageDescriptionPair
 resolvePackageDescription
   packageConfig
   ( GenericPackageDescription
@@ -679,27 +684,24 @@ resolvePackageDescription
          (packageConfigPlatform packageConfig)
          flags
 
-  updateLibDeps lib deps =
-    lib {libBuildInfo =
-           (libBuildInfo lib) {targetBuildDepends = deps}}
-  updateForeignLibDeps lib deps =
-    lib {foreignLibBuildInfo =
-           (foreignLibBuildInfo lib) {targetBuildDepends = deps}}
-  updateExeDeps exe deps =
-    exe {buildInfo =
-           (buildInfo exe) {targetBuildDepends = deps}}
+  updateLibDeps lib deps = lib
+    { libBuildInfo = (libBuildInfo lib) {targetBuildDepends = deps} }
+  updateForeignLibDeps lib deps = lib
+    { foreignLibBuildInfo =
+        (foreignLibBuildInfo lib) {targetBuildDepends = deps}
+    }
+  updateExeDeps exe deps = exe
+    { buildInfo = (buildInfo exe) {targetBuildDepends = deps} }
 
-  -- Note that, prior to moving to Cabal 2.0, we would set
-  -- testEnabled/benchmarkEnabled here. These fields no longer
-  -- exist, so we modify buildable instead here.  The only
-  -- wrinkle in the Cabal 2.0 story is
-  -- https://github.com/haskell/cabal/issues/1725, where older
-  -- versions of Cabal (which may be used for actually building
-  -- code) don't properly exclude build-depends for
-  -- non-buildable components. Testing indicates that everything
-  -- is working fine, and that this comment can be completely
-  -- ignored. I'm leaving the comment anyway in case something
-  -- breaks and you, poor reader, are investigating.
+  -- Note that, prior to moving to Cabal 2.0, we would set testEnabled or
+  -- benchmarkEnabled here. These fields no longer exist, so we modify buildable
+  -- instead here. The only wrinkle in the Cabal 2.0 story is
+  -- https://github.com/haskell/cabal/issues/1725, where older versions of Cabal
+  -- (which may be used for actually building code) don't properly exclude
+  -- build-depends for non-buildable components. Testing indicates that
+  -- everything is working fine, and that this comment can be completely
+  -- ignored. I'm leaving the comment anyway in case something breaks and you,
+  -- poor reader, are investigating.
   updateTestDeps modBuildable test deps =
     let bi = testBuildInfo test
         bi' = bi
@@ -740,10 +742,11 @@ data ResolveConditions = ResolveConditions
   }
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
-mkResolveConditions :: ActualCompiler -- ^ Compiler version
-                    -> Platform -- ^ installation target platform
-                    -> Map FlagName Bool -- ^ enabled flags
-                    -> ResolveConditions
+mkResolveConditions ::
+     ActualCompiler -- ^ Compiler version
+  -> Platform -- ^ installation target platform
+  -> Map FlagName Bool -- ^ enabled flags
+  -> ResolveConditions
 mkResolveConditions compilerVersion (Platform arch os) flags = ResolveConditions
   { rcFlags = flags
   , rcCompilerVersion = compilerVersion
@@ -752,47 +755,46 @@ mkResolveConditions compilerVersion (Platform arch os) flags = ResolveConditions
   }
 
 -- | Resolve the condition tree for the library.
-resolveConditions :: (Semigroup target,Monoid target,Show target)
-                  => ResolveConditions
-                  -> (target -> cs -> target)
-                  -> CondTree ConfVar cs target
-                  -> target
+resolveConditions ::
+     (Semigroup target, Monoid target, Show target)
+  => ResolveConditions
+  -> (target -> cs -> target)
+  -> CondTree ConfVar cs target
+  -> target
 resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
  where
   basic = addDeps lib deps
   children = mconcat (map apply cs)
    where
     apply (Cabal.CondBranch cond node mcs) =
-          if condSatisfied cond
-             then resolveConditions rc addDeps node
-             else maybe mempty (resolveConditions rc addDeps) mcs
+      if condSatisfied cond
+         then resolveConditions rc addDeps node
+         else maybe mempty (resolveConditions rc addDeps) mcs
     condSatisfied c =
       case c of
         Var v -> varSatisfied v
         Lit b -> b
-        CNot c' ->
-          not (condSatisfied c')
-        COr cx cy ->
-          condSatisfied cx || condSatisfied cy
-        CAnd cx cy ->
-          condSatisfied cx && condSatisfied cy
+        CNot c' -> not (condSatisfied c')
+        COr cx cy -> condSatisfied cx || condSatisfied cy
+        CAnd cx cy -> condSatisfied cx && condSatisfied cy
     varSatisfied v =
       case v of
         OS os -> os == rcOS rc
         Arch arch -> arch == rcArch rc
-        PackageFlag flag ->
-          fromMaybe False $ M.lookup flag (rcFlags rc)
-          -- NOTE:  ^^^^^ This should never happen, as all flags
-          -- which are used must be declared. Defaulting to
-          -- False.
+        PackageFlag flag -> fromMaybe False $ M.lookup flag (rcFlags rc)
+        -- NOTE:  ^^^^^ This should never happen, as all flags which are used
+        -- must be declared. Defaulting to False.
         Impl flavor range ->
           case (flavor, rcCompilerVersion rc) of
             (GHC, ACGhc vghc) -> vghc `withinRange` range
             _ -> False
 
 -- | Path for the package's build log.
-buildLogPath :: (MonadReader env m, HasBuildConfig env, MonadThrow m)
-             => Package -> Maybe String -> m (Path Abs File)
+buildLogPath ::
+     (MonadReader env m, HasBuildConfig env, MonadThrow m)
+  => Package
+  -> Maybe String
+  -> m (Path Abs File)
 buildLogPath package' msuffix = do
   env <- ask
   let stack = getProjectWorkDir env
@@ -864,5 +866,5 @@ applyForceCustomBuild cabalVersion package
     orLaterVersion $ mkVersion $ cabalSpecToVersionDigits $
       packageCabalSpec package
   forceCustomBuild =
-    packageBuildType package == Simple &&
-    not (cabalVersion `withinRange` cabalVersionRange)
+       packageBuildType package == Simple
+    && not (cabalVersion `withinRange` cabalVersionRange)
