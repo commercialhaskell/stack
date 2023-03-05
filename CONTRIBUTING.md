@@ -294,10 +294,10 @@ executable that it compiles from Haskell source code. The executable compiles
 that code with a dependency on the version of Cabal that ships with the
 specified GHC compiler. Each release of Stack will aim to support all versions
 of GHC and the Cabal package in Stackage snapshots published within seven years
-of the release. For example, snapshot LTS Haskell 2.22, published on
-9 August 2015, was the last to provide GHC 7.8.4 which comes with
-`Cabal-1.18.1.5`. Until, at least, 9 August 2022, Stack releases would aim
-to support GHC 7.8.4 and `Cabal-1.18.1.5`.
+of the release. For example, snapshot LTS Haskell 7.0, published on
+14 September 2016, was the first LTS Haskell snapshot to provide GHC 8.0.1 which
+comes with `Cabal-1.24.0.0`. Until, at least, 13 September 2023, Stack releases
+would aim to support the immediate predecessor, GHC 7.10.3 and `Cabal-1.22.5.0`.
 
 When a version of the Stack executable actually ceases to support a version of
 GHC and `Cabal`, that should be recorded in Stack's
