@@ -90,11 +90,7 @@ import           System.Console.ANSI
 import           System.Environment
 import           System.Info.ShortPathName ( getShortPathName )
 import           System.PosixCompat.Files ( fileOwner, getFileStatus )
-#if MIN_VERSION_unix(0,7,0)
 import           System.Posix.User ( getEffectiveUserID )
-#else
-import           System.PosixCompat.User ( getEffectiveUserID )
-#endif
 
 -- | If deprecated path exists, use it and print a warning.
 -- Otherwise, return the new path.
