@@ -129,7 +129,7 @@ import           System.Console.ANSI
 import           System.Environment ( getEnvironment, lookupEnv )
 import           System.Info.ShortPathName ( getShortPathName )
 import           System.PosixCompat.Files ( fileOwner, getFileStatus )
-import           System.PosixCompat.User ( getEffectiveUserID )
+import           System.Posix.User ( getEffectiveUserID )
 
 -- | If deprecated path exists, use it and print a warning. Otherwise, return
 -- the new path.
