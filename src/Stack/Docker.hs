@@ -75,7 +75,7 @@ import           System.Environment
 import qualified System.FilePath as FP
 import           System.IO.Error ( isDoesNotExistError )
 import           System.IO.Unsafe ( unsafePerformIO )
-import qualified System.PosixCompat.User as User
+import qualified System.Posix.User as User
 import qualified System.PosixCompat.Files as Files
 import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
 import           Text.ParserCombinators.ReadP ( readP_to_S )

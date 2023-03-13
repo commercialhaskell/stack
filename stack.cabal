@@ -367,6 +367,7 @@ library
     other-modules:
         Stack.Constants.UsrLibDirs
         Stack.Docker.Handlers
+        System.Posix.User
         System.Uname
     hs-source-dirs:
         src/windows/
