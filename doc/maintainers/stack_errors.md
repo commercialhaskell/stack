@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-02-02.
+`master` branch of the Stack repository. Last updated: 2023-03-15.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -114,7 +114,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-6057] = WiredInPackagesNotParsedBug
         ~~~
 
-    -   `Stack.Coverage.CoverageException`
+    -   `Stack.Coverage.CoveragePrettyException`
 
         ~~~haskell
         [S-6361] = NonTestSuiteTarget PackageName

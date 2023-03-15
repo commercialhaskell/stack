@@ -58,31 +58,39 @@ import           System.FilePath ( isPathSeparator )
 import           Trace.Hpc.Tix ( Tix (..), TixModule (..), readTix, writeTix )
 import           Web.Browser ( openBrowser )
 
--- | Type representing exceptions thrown by functions exported by the
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Coverage" module.
-data CoverageException
+data CoveragePrettyException
   = NonTestSuiteTarget PackageName
   | NoTargetsOrTixSpecified
   | NotLocalPackage PackageName
   deriving (Show, Typeable)
 
-instance Exception CoverageException where
-  displayException (NonTestSuiteTarget name) = concat
-    [ "Error: [S-6361]\n"
-    , "Can't specify anything except test-suites as hpc report targets ("
-    , packageNameString name
-    , ") is used with a non test-suite target."
-    ]
-  displayException NoTargetsOrTixSpecified =
-    "Error: [S-2321]\n"
-    ++ "Not generating combined report, because no targets or tix files \
-       \are specified."
-  displayException (NotLocalPackage name) = concat
-    [ "Error: [S-9975]"
-    , "Expected a local package, but "
-    , packageNameString name
-    , " is either an extra-dep or in the snapshot."
-    ]
+instance Pretty CoveragePrettyException where
+  pretty (NonTestSuiteTarget name) =
+    "[S-6361]"
+    <> line
+    <> fillSep
+         [ flow "Can't specify anything except test-suites as hpc report \
+                \targets"
+         , parens (style Target . fromString . packageNameString $ name)
+         , flow "is used with a non test-suite target."
+         ]
+  pretty NoTargetsOrTixSpecified =
+    "[S-2321]"
+    <> line
+    <> flow "Not generating combined report, because no targets or tix files \
+            \are specified."
+  pretty (NotLocalPackage name) =
+    "[S-9975]"
+    <> line
+    <> fillSep
+         [ flow "Expected a local package, but"
+         , style Target . fromString . packageNameString $ name
+         , flow "is either an extra-dep or in the snapshot."
+         ]
+
+instance Exception CoveragePrettyException
 
 -- | Invoked at the beginning of running with "--coverage"
 deleteHpcReports :: HasEnvConfig env => RIO env ()
@@ -300,7 +308,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
         view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets
       fmap concat $ forM (Map.toList targets) $ \(name, target) ->
         case target of
-          TargetAll PTDependency -> throwIO $ NotLocalPackage name
+          TargetAll PTDependency -> prettyThrowIO $ NotLocalPackage name
           TargetComps comps -> do
             pkgPath <- hpcPkgPath name
             forM (toList comps) $
@@ -312,7 +320,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
                     ++ T.unpack testName
                     ++ ".tix"
                     )
-                _ -> throwIO $ NonTestSuiteTarget name
+                _ -> prettyThrowIO $ NonTestSuiteTarget name
           TargetAll PTProject -> do
             pkgPath <- hpcPkgPath name
             exists <- doesDirExist pkgPath
@@ -325,7 +333,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
               else pure []
   tixPaths <- (++ targetTixFiles) <$>
     mapM (resolveFile' . T.unpack) tixFiles
-  when (null tixPaths) $ throwIO NoTargetsOrTixSpecified
+  when (null tixPaths) $ prettyThrowIO NoTargetsOrTixSpecified
   outputDir <- hpcReportDir
   reportDir <- case hroptsDestDir opts of
     Nothing -> pure (outputDir </> relDirCombined </> relDirCustom)
