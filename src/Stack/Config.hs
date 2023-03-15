@@ -222,7 +222,10 @@ makeConcreteResolver ar = do
           then throwIO NoLTSFound
           else let (x, y) = IntMap.findMax $ snapshotsLts snapshots
                in  pure $ RSLSynonym $ LTS x y
-  logInfo $ "Selected resolver: " <> display r
+  prettyInfoL
+    [ flow "Selected resolver:"
+    , style Current (fromString $ T.unpack $ textDisplay r) <> "."
+    ]
   pure r
 
 -- | Get the latest snapshot resolver available.
@@ -345,13 +348,19 @@ configFromConfigMonoid
       shortLocalProgramsFilePath <-
         liftIO $ getShortPathName localProgramsFilePath
       when (' ' `elem` shortLocalProgramsFilePath) $
-        logError $ "Error: [S-8432]\n"<>
-          "Stack's 'programs' path contains a space character and has no " <>
-          "alternative short ('8 dot 3') name. This will cause problems " <>
-          "with packages that use the GNU project's 'configure' shell " <>
-          "script. Use the 'local-programs-path' configuration option to " <>
-          "specify an alternative path. The current path is: " <>
-          display (T.pack localProgramsFilePath)
+        prettyError $
+          "[S-8432]"
+          <> line
+          <> fillSep
+               [ flow "Stack's 'programs' path contains a space character and \
+                      \has no alternative short ('8 dot 3') name. This will \
+                      \cause problems with packages that use the GNU project's \
+                      \'configure' shell script. Use the"
+               , style Shell "local-programs-path"
+               , flow "configuration option to specify an alternative path. \
+                      \The current path is:"
+               , style File (fromString localProgramsFilePath) <> "."
+               ]
     platformOnlyDir <-
       runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
     let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
@@ -634,8 +643,14 @@ withBuildConfig inner = do
               Just _ -> pure ()
           pure (project, dest)
         else do
-          logInfo ("Writing implicit global project config file to: " <> fromString dest')
-          logInfo "Note: You can change the snapshot via the resolver field there."
+          prettyInfoL
+            [ flow "Writing the configuration file for the implicit \
+                   \global project to:"
+            , pretty dest <> "."
+            , flow "Note: You can change the snapshot via the"
+            , style Shell "resolver"
+            , flow "field there."
+            ]
           p <- getEmptyProject mresolver []
           liftIO $ do
             writeBinaryFileAtomic dest $ byteString $ S.concat
@@ -686,11 +701,18 @@ withBuildConfig inner = do
   getEmptyProject mresolver extraDeps = do
     r <- case mresolver of
       Just resolver -> do
-        logInfo ("Using resolver: " <> display resolver <> " specified on command line")
+        prettyInfoL
+          [ flow "Using the snapshot"
+          , style Current (fromString $ T.unpack $ textDisplay resolver)
+          , flow "specified on the command line."
+          ]
         pure resolver
       Nothing -> do
         r'' <- getLatestResolver
-        logInfo ("Using latest snapshot resolver: " <> display r'')
+        prettyInfoL
+          [ flow "Using the latest snapshot"
+          , style Current (fromString $ T.unpack $ textDisplay r'') <> "."
+          ]
         pure r''
     pure Project
       { projectUserMsg = Nothing
@@ -955,7 +977,7 @@ loadYaml parser path = do
           pure (Right res)
 
 -- | Get the location of the project config file, if it exists.
-getProjectConfig :: HasLogFunc env
+getProjectConfig :: HasTerm env
                  => StackYamlLoc
                  -- ^ Override stack.yaml
                  -> RIO env (ProjectConfig (Path Abs File))
@@ -965,7 +987,9 @@ getProjectConfig SYLDefault = do
   env <- liftIO getEnvironment
   case lookup "STACK_YAML" env of
     Just fp -> do
-      logInfo "Getting project config file from STACK_YAML environment"
+      prettyInfoS
+        "Getting the project-level configuration file from the \
+        \STACK_YAML environment variable."
       PCProject <$> resolveFile' fp
     Nothing -> do
       currDir <- getCurrentDir
@@ -985,7 +1009,7 @@ getProjectConfig (SYLNoProject extraDeps) = pure $ PCNoProject extraDeps
 -- and otherwise traversing parents. If no config is found, we supply a default
 -- based on current directory.
 loadProjectConfig ::
-     HasLogFunc env
+     HasTerm env
   => StackYamlLoc
      -- ^ Override stack.yaml
   -> RIO env (ProjectConfig (Project, Path Abs File, ConfigMonoid))

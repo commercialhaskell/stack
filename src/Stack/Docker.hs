@@ -388,14 +388,17 @@ pull = do
   either throwIO (pullImage docker) (dockerImage docker)
 
 -- | Pull Docker image from registry.
-pullImage :: (HasProcessContext env, HasLogFunc env)
+pullImage :: (HasProcessContext env, HasTerm env)
           => DockerOpts
           -> String
           -> RIO env ()
 pullImage docker image = do
-  logInfo ("Pulling image from registry: '" <> fromString image <> "'")
+  prettyInfoL
+    [ flow "Pulling image from registry:"
+    , style Current (fromString image) <> "."
+    ]
   when (dockerRegistryLogin docker) $ do
-    logInfo "You may need to log in."
+    prettyInfoS "You may need to log in."
     proc
       "docker"
       ( concat

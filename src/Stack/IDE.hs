@@ -28,8 +28,8 @@ data ListPackagesCmd
   = ListPackageNames
   | ListPackageCabalFiles
 
-outputFunc :: HasLogFunc env => OutputStream -> String -> RIO env ()
-outputFunc OutputLogInfo = logInfo . fromString
+outputFunc :: HasTerm env => OutputStream -> String -> RIO env ()
+outputFunc OutputLogInfo = prettyInfo . fromString
 outputFunc OutputStdout  = liftIO . putStrLn
 
 -- | List the packages inside the current project.

@@ -686,7 +686,7 @@ runTemplateInits dir = do
         )
 
 -- | Display help for the templates command.
-templatesHelp :: HasLogFunc env => RIO env ()
+templatesHelp :: HasTerm env => RIO env ()
 templatesHelp = do
   let url = defaultTemplatesHelpUrl
   req <- fmap setGitHubHeaders (parseUrlThrow url)
@@ -695,7 +695,7 @@ templatesHelp = do
     (prettyThrowM . DownloadTemplatesHelpFailed)
   case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
     Left err -> prettyThrowM $ TemplatesHelpEncodingInvalid url err
-    Right txt -> logInfo $ display txt
+    Right txt -> prettyInfo (string $ T.unpack txt)
 
 --------------------------------------------------------------------------------
 -- Defaults

@@ -106,9 +106,9 @@ hoogleCmd (args, setup, rebuild, startServer) =
                      , flow "to disable) ..."
                      ]
             buildHaddocks
-            logInfo "Built docs."
+            prettyInfoS "Built Haddock documentation."
             generateDb hooglePath
-            logInfo "Generated DB."
+            prettyInfoS "Generated Hoogle database."
           else throwIO HoogleDatabaseNotFound
 
   generateDb :: Path Abs File -> RIO EnvConfig ()

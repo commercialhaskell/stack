@@ -110,7 +110,8 @@ loadAuth config = do
   maybeHackageKey <- maybeGetHackageKey
   case maybeHackageKey of
     Just key -> do
-      logInfo "HACKAGE_KEY found in env, using that for credentials."
+      prettyInfoS
+        "HACKAGE_KEY environment variable found, using that for credentials."
       pure $ HAKey key
     Nothing -> HACreds <$> loadUserAndPassword config
 
@@ -118,10 +119,7 @@ loadAuth config = do
 -- line.
 --
 -- Since 0.1.0.0
-loadUserAndPassword ::
-     (HasLogFunc m, HasTerm m)
-  => Config
-  -> RIO m HackageCreds
+loadUserAndPassword :: HasTerm m => Config -> RIO m HackageCreds
 loadUserAndPassword config = do
   fp <- liftIO $ credsFile config
   elbs <- liftIO $ tryIO $ L.readFile fp
@@ -140,7 +138,7 @@ loadUserAndPassword config = do
           ]
       pure $ mkCreds fp
  where
-  fromPrompt :: HasLogFunc m => FilePath -> RIO m HackageCreds
+  fromPrompt :: HasTerm m => FilePath -> RIO m HackageCreds
   fromPrompt fp = do
     username <- liftIO $ withEnvVariable "HACKAGE_USERNAME" (prompt "Hackage username: ")
     password <- liftIO $ withEnvVariable "HACKAGE_PASSWORD" (promptPassword "Hackage password: ")
@@ -152,11 +150,15 @@ loadUserAndPassword config = do
 
     when (configSaveHackageCreds config) $ do
       shouldSave <- promptBool $ T.pack $
-        "Save hackage credentials to file at " ++ fp ++ " [y/n]? "
-      logInfo "NOTE: Avoid this prompt in the future by using: save-hackage-creds: false"
+        "Save Hackage credentials to file at " ++ fp ++ " [y/n]? "
+      prettyNoteL
+        [ flow "Avoid this prompt in the future by using the configuration \
+               \file option"
+        , style Shell (flow "save-hackage-creds: false") <> "."
+        ]
       when shouldSave $ do
         writeFilePrivate fp $ fromEncoding $ toEncoding hc
-        logInfo "Saved!"
+        prettyInfoS "Saved!"
         hFlush stdout
 
     pure hc
@@ -235,7 +237,7 @@ applyCreds creds req0 = do
 -- sending a file like 'upload', this sends a lazy bytestring.
 --
 -- Since 0.1.2.1
-uploadBytes :: (HasLogFunc m, HasTerm m)
+uploadBytes :: HasTerm m
             => String -- ^ Hackage base URL
             -> HackageAuth
             -> String -- ^ tar file name
@@ -256,14 +258,17 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
       formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
   req2 <- liftIO $ formDataBody formData req1
   req3 <- applyAuth auth req2
-  logInfo $ "Uploading " <> fromString tarName <> "... "
+  prettyInfoL
+    [ "Uploading"
+    , style Current (fromString tarName) <> "..."
+    ]
   hFlush stdout
   withRunInIO $ \runInIO -> withResponse req3 (runInIO . inner)
  where
-  inner :: HasLogFunc m => Response (ConduitM () S.ByteString IO ()) -> RIO m ()
+  inner :: HasTerm m => Response (ConduitM () S.ByteString IO ()) -> RIO m ()
   inner res =
     case getResponseStatusCode res of
-      200 -> logInfo "done!"
+      200 -> prettyInfoS "done!"
       401 -> do
         case auth of
           HACreds creds ->
@@ -273,19 +278,26 @@ uploadBytes baseUrl auth tarName uploadVariant bytes = do
           _ -> pure ()
         prettyThrowIO AuthenticationFailure
       403 -> do
-        logError "Error: [S-2804]"
-        logError "forbidden upload"
-        logError "Usually means: you've already uploaded this package/version \
-                 \combination"
-        logError "Ignoring error and continuing, full message from Hackage \
-                 \below:\n"
+        prettyError $
+          "[S-2804]"
+          <> line
+          <> flow "forbidden upload"
+          <> line
+          <> flow "Usually means: you've already uploaded this package/version \
+                  \combination. Ignoring error and continuing. The full \
+                  \message from Hackage is below:"
+          <> blankLine
         liftIO $ printBody res
       503 -> do
-        logError "Error: [S-4444]"
-        logError "service unavailable"
-        logError "This error some times gets sent even though the upload \
-                 \succeeded"
-        logError "Check on Hackage to see if your package is present"
+        prettyError $
+          "[S-4444]"
+          <> line
+          <> flow "service unavailable"
+          <> line
+          <> flow "This error some times gets sent even though the upload \
+                  \succeeded. Check on Hackage to see if your package is \
+                  \present. The full message form Hackage is below:"
+          <> blankLine
         liftIO $ printBody res
       code -> do
         let resBody = mapOutput show (getResponseBody res)

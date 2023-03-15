@@ -117,10 +117,13 @@ updateTixFile pkgName' tixSrc testName = do
     -- https://ghc.haskell.org/trac/ghc/ticket/1853
     mtix <- readTixOrLog tixSrc
     case mtix of
-      Nothing -> logError $
-        "Error: [S-2887]\n" <>
-        "Failed to read " <>
-        fromString (toFilePath tixSrc)
+      Nothing -> prettyError $
+        "[S-2887]"
+        <> line
+        <> fillSep
+             [ flow "Failed to read"
+             , pretty tixSrc <> "."
+             ]
       Just tix -> do
         liftIO $ writeTix (toFilePath tixDest) (removeExeModules tix)
         -- TODO: ideally we'd do a file move, but IIRC this can
@@ -152,8 +155,8 @@ generateHpcReport pkgDir package tests = do
   compilerVersion <- view actualCompilerVersionL
   -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
   -- https://github.com/commercialhaskell/stack/issues/785
-  let pkgName' = T.pack $ packageNameString (packageName package)
-      pkgId = packageIdentifierString (packageIdentifier package)
+  let pkgId = packageIdentifierString (packageIdentifier package)
+      pkgName' = packageNameString $ packageName package
       ghcVersion = getGhcVersion compilerVersion
       hasLibrary =
         case packageLibraries package of
@@ -184,7 +187,18 @@ generateHpcReport pkgDir package tests = do
         Right includeNames -> pure $ Right $ Just $ map T.unpack includeNames
   forM_ tests $ \testName -> do
     tixSrc <- tixFilePath (packageName package) (T.unpack testName)
-    let report = "coverage report for " <> pkgName' <> "'s test-suite \"" <> testName <> "\""
+    let report = fillSep
+          [ flow "coverage report for"
+          , fromString pkgName' <> "'s"
+          , "test-suite"
+          , fromString $ "\"" <> T.unpack testName <> "\""
+          ]
+        reportHtml =
+             "coverage report for"
+          <> T.pack pkgName'
+          <> "'s test-suite \""
+          <> testName
+          <> "\""
         reportDir = parent tixSrc
     case eincludeName of
       Left err -> generateHpcErrorReport reportDir (display (sanitize (T.unpack err)))
@@ -197,25 +211,35 @@ generateHpcReport pkgDir package tests = do
                   "--include"
                 : L.intersperse "--include" (map (++ ":") includeNames)
         mreportPath <-
-          generateHpcReportInternal tixSrc reportDir report extraArgs extraArgs
+          generateHpcReportInternal tixSrc reportDir report reportHtml extraArgs extraArgs
         forM_ mreportPath (displayReportPath "The" report . pretty)
 
-generateHpcReportInternal :: HasEnvConfig env
-                          => Path Abs File -> Path Abs Dir -> Text -> [String] -> [String]
-                          -> RIO env (Maybe (Path Abs File))
-generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArgs = do
+generateHpcReportInternal ::
+     HasEnvConfig env
+  => Path Abs File
+  -> Path Abs Dir
+  -> StyleDoc
+     -- ^ The pretty name for the report
+  -> Text
+     -- ^ The plain name for the report, used in HTML output
+  -> [String]
+  -> [String]
+  -> RIO env (Maybe (Path Abs File))
+generateHpcReportInternal tixSrc reportDir report reportHtml extraMarkupArgs extraReportArgs = do
   -- If a .tix file exists, move it to the HPC output directory and generate a
   -- report for it.
   tixFileExists <- doesFileExist tixSrc
   if not tixFileExists
     then do
-      logError $
-        "Error: [S-4634]\n" <>
-        "Didn't find .tix for " <>
-        display report <>
-        " - expected to find it at " <>
-        fromString (toFilePath tixSrc) <>
-        "."
+      prettyError $
+        "[S-4634]"
+        <> line
+        <> flow "Didn't find"
+        <> style File ".tix"
+        <> "for"
+        <> report
+        <> flow "- expected to find it at"
+        <> pretty tixSrc <> "."
       pure Nothing
     else (`catch` \(err :: ProcessException) -> do
            logError $ displayShow err
@@ -223,10 +247,12 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
                displayException err
            pure Nothing) $
        (`onException`
-           logError
-             ("Error: [S-8215]\n" <>
-              "Error occurred while producing " <>
-              display report)) $ do
+           prettyError
+             ( "[S-8215]"
+               <> line
+               <> flow "Error occurred while producing"
+               <> report <> "."
+             )) $ do
       -- Directories for .mix files.
       hpcRelDir <- hpcRelativeDir
       -- Compute arguments used for both "hpc markup" and "hpc report".
@@ -236,7 +262,10 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
             concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++
             -- Look for index files in the correct dir (relative to each pkgdir).
             ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
-      logInfo $ "Generating " <> display report
+      prettyInfoL
+        [ "Generating"
+        , report <> "."
+        ]
       outputLines <- map (S8.filter (/= '\r')) . S8.lines . BL.toStrict . fst <$>
         proc "hpc"
         ( "report"
@@ -246,23 +275,32 @@ generateHpcReportInternal tixSrc reportDir report extraMarkupArgs extraReportArg
         readProcess_
       if all ("(0/0)" `S8.isSuffixOf`) outputLines
         then do
-          let msg html =
-                   "Error: [S-6829]\n"
-                <> "The "
-                <> display report
-                <> " did not consider any code. One possible cause of this is"
-                <> " if your test-suite builds the library code (see Stack "
-                <> ( if html
-                       then "<a href='https://github.com/commercialhaskell/stack/issues/1008'>"
-                       else ""
-                   )
-                <> "issue #1008"
-                <> (if html then "</a>" else "")
-                <> "). It may also indicate a bug in Stack or"
-                <> " the hpc program. Please report this issue if you think"
-                <> " your coverage report should have meaningful results."
-          logError (msg False)
-          generateHpcErrorReport reportDir (msg True)
+          let msgHtml =
+                   "Error: [S-6829]\n\
+                   \The "
+                <> display reportHtml
+                <> " did not consider any code. One possible cause of this is \
+                   \if your test-suite builds the library code (see Stack \
+                   \<a href='https://github.com/commercialhaskell/stack/issues/1008'>\
+                   \issue #1008\
+                   \</a>\
+                   \). It may also indicate a bug in Stack or the hpc program. \
+                   \Please report this issue if you think your coverage report \
+                   \should have meaningful results."
+          prettyError $
+            "[S-6829]"
+            <> line
+            <> fillSep
+                 [ "The"
+                 , report
+                 , flow "did not consider any code. One possible cause of this \
+                        \is if your test-suite builds the library code (see \
+                        \Stack issue #1008). It may also indicate a bug in \
+                        \Stack or the hpc program. Please report this issue if \
+                        \you think your coverage report should have meaningful \
+                        \results."
+                 ]
+          generateHpcErrorReport reportDir msgHtml
           pure Nothing
         else do
           let reportPath = reportDir </> relFileHpcIndexHtml
@@ -341,8 +379,9 @@ generateHpcReportForTargets opts tixFiles targetNames = do
       dest <- resolveDir' destDir
       ensureDir dest
       pure dest
-  let report = "combined report"
-  mreportPath <- generateUnionReport report reportDir tixPaths
+  let report = flow "combined report"
+      reportHtml = "combined report"
+  mreportPath <- generateUnionReport report reportHtml reportDir tixPaths
   forM_ mreportPath $ \reportPath ->
     if hroptsOpenBrowser opts
       then do
@@ -363,44 +402,42 @@ generateHpcUnifiedReport = do
   extraTixFiles <- findExtraTixFiles
   let tixFiles = tixFiles0  ++ extraTixFiles
       reportDir = outputDir </> relDirCombined </> relDirAll
--- Previously, the test below was:
---
---  if length tixFiles < 2
---      then logInfo $
---          (if null tixFiles then "No tix files" else "Only one tix file") <>
---          " found in " <>
---          fromString (toFilePath outputDir) <>
---          ", so not generating a unified coverage report."
---      else ...
---
--- However, a single *.tix file does not necessarily mean that a unified
--- coverage report is redundant. For example, one package may test the library
--- of another package that does not test its own library. See
+-- A single *.tix file does not necessarily mean that a unified coverage report
+-- is redundant. For example, one package may test the library of another
+-- package that does not test its own library. See
 -- https://github.com/commercialhaskell/stack/issues/5713
 --
 -- As an interim solution, a unified coverage report will always be produced
 -- even if may be redundant in some circumstances.
   if null tixFiles
-    then logInfo $
-         "No tix files found in "
-      <> fromString (toFilePath outputDir)
-      <> ", so not generating a unified coverage report."
+    then prettyInfoL
+      [ flow "No tix files found in"
+      , pretty outputDir <> ","
+      , flow "so not generating a unified coverage report."
+      ]
     else do
-      let report = "unified report"
-      mreportPath <- generateUnionReport report reportDir tixFiles
+      let report = flow "unified report"
+          reportHtml = "unified report"
+      mreportPath <- generateUnionReport report reportHtml reportDir tixFiles
       forM_ mreportPath (displayReportPath "The" report . pretty)
 
-generateUnionReport :: HasEnvConfig env
-                    => Text -> Path Abs Dir -> [Path Abs File]
-                    -> RIO env (Maybe (Path Abs File))
-generateUnionReport report reportDir tixFiles = do
+generateUnionReport ::
+     HasEnvConfig env
+  => StyleDoc
+     -- ^ Pretty description of the report.
+  -> Text
+     -- ^ Plain description of the report, used in HTML reporting.
+  -> Path Abs Dir
+  -> [Path Abs File]
+  -> RIO env (Maybe (Path Abs File))
+generateUnionReport report reportHtml reportDir tixFiles = do
   (errs, tix) <- fmap (unionTixes . map removeExeModules) (mapMaybeM readTixOrLog tixFiles)
   logDebug $ "Using the following tix files: " <> fromString (show tixFiles)
   unless (null errs) $
     prettyWarn $
       fillSep
          [ flow "The following modules are left out of the"
-         , flow (T.unpack report)
+         , report
          , flow "due to version mismatches:"
          ]
     <> line
@@ -408,21 +445,26 @@ generateUnionReport report reportDir tixFiles = do
   tixDest <- (reportDir </>) <$> parseRelFile (dirnameString reportDir ++ ".tix")
   ensureDir (parent tixDest)
   liftIO $ writeTix (toFilePath tixDest) tix
-  generateHpcReportInternal tixDest reportDir report [] []
+  generateHpcReportInternal tixDest reportDir report reportHtml [] []
 
-readTixOrLog :: HasLogFunc env => Path b File -> RIO env (Maybe Tix)
+readTixOrLog :: HasTerm env => Path b File -> RIO env (Maybe Tix)
 readTixOrLog path = do
   mtix <- liftIO (readTix (toFilePath path)) `catchAny` \errorCall -> do
-    logError $
-         "Error: [S-3521]\n"
-      <> "Error while reading tix: "
-      <> fromString (displayException errorCall)
+    prettyError $
+      "[S-3521]"
+      <> line
+      <> flow "Error while reading tix:"
+      <> line
+      <> string (displayException errorCall)
     pure Nothing
   when (isNothing mtix) $
-    logError $
-         "Error: [S-7786]\n"
-      <> "Failed to read tix file "
-      <> fromString (toFilePath path)
+    prettyError $
+      "[S-7786]"
+      <> line
+      <> fillSep
+           [ flow "Failed to read tix file"
+           , pretty path <> "."
+           ]
   pure mtix
 
 -- | Module names which contain '/' have a package name, and so they weren't built into the
@@ -589,13 +631,19 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
             <> T.pack (toFilePath inplaceDir)
             <> ". Maybe try 'stack clean' on this package?"
 
-displayReportPath :: HasTerm env => StyleDoc -> Text -> StyleDoc -> RIO env ()
+displayReportPath ::
+     HasTerm env
+  => StyleDoc
+  -> StyleDoc
+  -> StyleDoc
+  -> RIO env ()
 displayReportPath prefix report reportPath =
-  prettyInfo $
-        prefix
-    <+> fromString (T.unpack report)
-    <+> "is available at"
-    <+> reportPath
+  prettyInfoL
+    [ prefix
+    , report
+    , flow "is available at"
+    , reportPath <> "."
+    ]
 
 findExtraTixFiles :: HasEnvConfig env => RIO env [Path Abs File]
 findExtraTixFiles = do

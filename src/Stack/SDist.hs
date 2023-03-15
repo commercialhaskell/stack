@@ -156,9 +156,15 @@ getSDistTarball mpvpBounds pkgDir = do
   let deps = Map.fromList
         [ (pid, ghcPkgId)
         | (_, Library pid ghcPkgId _) <- Map.elems installedMap]
-  logInfo $ "Getting file list for " <> fromString pkgFp
+  prettyInfoL
+    [ flow "Getting the file list for"
+    , style File (fromString  pkgFp) <> "."
+    ]
   (fileList, cabalfp) <- getSDistFileList lp deps
-  logInfo $ "Building sdist tarball for " <> fromString pkgFp
+  prettyInfoL
+    [ flow "Building a compressed archive file in the sdist format for"
+    , style File (fromString pkgFp) <> "."
+    ]
   files <-
     normalizeTarballPaths (map (T.unpack . stripCR . T.pack) (lines fileList))
   -- We're going to loop below and eventually find the cabal
@@ -479,10 +485,11 @@ checkPackageInExtractedTarball pkgDir = do
   gpd <- liftIO $ gpdio YesPrintWarnings
   config  <- getDefaultPackageConfig
   let PackageDescriptionPair pkgDesc _ = resolvePackageDescription config gpd
-  logInfo $
-       "Checking package '"
-    <> fromString (packageNameString name)
-    <> "' for common mistakes"
+  prettyInfoL
+    [ flow "Checking package"
+    , style Current (fromString $ packageNameString name)
+    , flow "for common mistakes."
+    ]
   let pkgChecks =
         -- MSS 2017-12-12: Try out a few different variants of
         -- pkgDesc to try and provoke an error or warning. I don't
