@@ -84,43 +84,53 @@ pkgName = fromMaybe failure . parsePackageName . T.unpack
 
 -- Stub, simulates the function to load package dependencies
 stubLoader :: PackageName -> Identity (Set PackageName, DotPayload)
-stubLoader name = pure . (, dummyPayload) . Set.fromList . map pkgName $ case show name of
-  "StateVar" -> ["stm","transformers"]
-  "array" -> []
-  "bifunctors" -> ["semigroupoids","semigroups","tagged"]
-  "binary" -> ["array","bytestring","containers"]
-  "bytestring" -> ["deepseq","ghc-prim","integer-gmp"]
-  "comonad" -> ["containers","contravariant","distributive"
-               ,"semigroups","tagged","transformers","transformers-compat"
-               ]
-  "cont" -> ["StateVar","semigroups","transformers","transformers-compat","void"]
-  "containers" -> ["array","deepseq","ghc-prim"]
-  "deepseq" -> ["array"]
-  "distributive" -> ["ghc-prim","tagged","transformers","transformers-compat"]
-  "free" -> ["bifunctors","comonad","distributive","mtl"
-            ,"prelude-extras","profunctors","semigroupoids"
-            ,"semigroups","template-haskell","transformers"
-            ]
-  "ghc" -> []
-  "hashable" -> ["bytestring","ghc-prim","integer-gmp","text"]
-  "integer" -> []
-  "mtl" -> ["transformers"]
-  "nats" -> []
-  "one" -> ["free"]
-  "prelude" -> []
-  "profunctors" -> ["comonad","distributive","semigroupoids","tagged","transformers"]
-  "semigroupoids" -> ["comonad","containers","contravariant","distributive"
-                     ,"semigroups","transformers","transformers-compat"
+stubLoader name = pure $ (, dummyPayload) . Set.fromList . map pkgName $
+  case show name of
+    "StateVar" -> ["stm", "transformers"]
+    "array" -> []
+    "bifunctors" -> ["semigroupoids", "semigroups", "tagged"]
+    "binary" -> ["array", "bytestring", "containers"]
+    "bytestring" -> ["deepseq", "ghc-prim", "integer-gmp"]
+    "comonad" -> [ "containers", "contravariant", "distributive", "semigroups"
+                 , "tagged","transformers","transformers-compat"
+                 ]
+    "cont" -> [ "StateVar", "semigroups", "transformers", "transformers-compat"
+              , "void"
+              ]
+    "containers" -> ["array", "deepseq", "ghc-prim"]
+    "deepseq" -> ["array"]
+    "distributive" -> [ "ghc-prim", "tagged", "transformers"
+                      , "transformers-compat"
+                      ]
+    "free" -> [ "bifunctors", "comonad", "distributive", "mtl", "prelude-extras"
+              , "profunctors", "semigroupoids", "semigroups", "template-haskell"
+              , "transformers"
+              ]
+    "ghc" -> []
+    "hashable" -> ["bytestring", "ghc-prim", "integer-gmp", "text"]
+    "integer" -> []
+    "mtl" -> ["transformers"]
+    "nats" -> []
+    "one" -> ["free"]
+    "prelude" -> []
+    "profunctors" -> [ "comonad", "distributive", "semigroupoids", "tagged"
+                     , "transformers"
                      ]
-  "semigroups" -> ["bytestring","containers","deepseq","hashable"
-                  ,"nats","text","unordered-containers"
-                  ]
-  "stm" -> ["array"]
-  "tagged" -> ["template-haskell"]
-  "template" -> []
-  "text" -> ["array","binary","bytestring","deepseq","ghc-prim","integer-gmp"]
-  "transformers" -> []
-  "two" -> ["free","mtl","one","transformers"]
-  "unordered" -> ["deepseq","hashable"]
-  "void" -> ["ghc-prim","hashable","semigroups"]
-  _ -> []
+    "semigroupoids" -> [ "comonad", "containers", "contravariant"
+                       , "distributive", "semigroups", "transformers"
+                       , "transformers-compat"
+                       ]
+    "semigroups" -> [ "bytestring", "containers", "deepseq", "hashable", "nats"
+                    , "text", "unordered-containers"
+                    ]
+    "stm" -> ["array"]
+    "tagged" -> ["template-haskell"]
+    "template" -> []
+    "text" -> [ "array", "binary", "bytestring", "deepseq", "ghc-prim"
+              , "integer-gmp"
+              ]
+    "transformers" -> []
+    "two" -> ["free", "mtl", "one", "transformers"]
+    "unordered" -> ["deepseq", "hashable"]
+    "void" -> ["ghc-prim", "hashable", "semigroups"]
+    _ -> []

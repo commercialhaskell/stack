@@ -598,7 +598,7 @@ packFileEntry filepath tarpath = do
 getModTime :: FilePath -> IO Tar.EpochTime
 getModTime path = do
   t <- getModificationTime path
-  pure . floor . utcTimeToPOSIXSeconds $ t
+  pure $ floor . utcTimeToPOSIXSeconds $ t
 
 getDefaultPackageConfig :: (MonadIO m, MonadReader env m, HasEnvConfig env)
   => m PackageConfig

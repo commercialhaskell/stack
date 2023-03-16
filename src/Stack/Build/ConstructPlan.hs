@@ -591,7 +591,7 @@ addDep'' name packageInfo = do
                       (map (fromString . packageNameString) cs :: [StyleDoc])
                 pure Nothing
               Just (_rev, cfKey, treeKey) ->
-                pure . Just $
+                pure $ Just $
                   PLIHackage (PackageIdentifier name version) cfKey treeKey
       tellExecutablesUpstream name askPkgLoc loc Map.empty
       pure $ Right $ ADRFound loc installed
