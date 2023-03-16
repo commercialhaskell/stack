@@ -83,7 +83,7 @@ We'll call our project `helloworld`, and we'll use the `new-template` project
 template. This template is used by default, but in our example we will refer to
 it expressly. Other templates are available. For further information about
 templates, see the `stack templates` command
-[documentation](GUIDE_advanced.md#the-stack-templates-command).
+[documentation](templates_command.md).
 
 From the root directory for all our Haskell projects, we command:
 
