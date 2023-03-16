@@ -32,7 +32,6 @@ Other enhancements:
 * Stack will use the value of the `GH_TOKEN`, or `GITHUB_TOKEN`, environment
   variable as credentials to authenticate its GitHub REST API requests.
 
-
 Bug fixes:
 
 * `stack build` with `--file-watch` or `--file-watch-poll` outputs 'pretty'
@@ -41,6 +40,8 @@ Bug fixes:
 * `stack build` unregisters any local packages for the sub libraries of a local
   package that is to be unregistered. See
   [#6046](https://github.com/commercialhaskell/stack/issues/6046).
+* The warning that sublibrary dependency is not supported is no longer triggered
+  by internal libraries.
 
 ## v2.9.3
 

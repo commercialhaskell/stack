@@ -11,7 +11,7 @@ main :: IO ()
 -- passes `--no-install-ghc` when `--alpine` is passed to its 'check' command.
 -- (See stack.yaml; using GHC 9.4.4.)
 main = stackErrStderr ["build", "--install-ghc"] $ \str ->
-  let msg = "SubLibrary dependency is not supported, this will almost \
+  let msg = "Sublibrary dependency is not supported, this will almost \
             \certainly fail."
   in  unless (msg `isInfixOf` str) $
         error $ "Expected a warning: \n" ++ show msg

@@ -28,7 +28,7 @@ import           Data.Text.Read ( decimal )
 import qualified Data.Vector as V
 import qualified Data.Yaml as Yaml
 import qualified Distribution.PackageDescription as C
-import           Distribution.Types.Dependency ( depLibraries )
+import           Distribution.Types.Dependency ( Dependency (..), depLibraries )
 import           Distribution.Version ( mkVersion )
 import           Path ( parent )
 import           Stack.Build.ConstructPlan ( constructPlan )
@@ -412,24 +412,28 @@ checkComponentsBuildable lps =
     , c <- Set.toList (lpUnbuildable lp)
     ]
 
--- | Find if sublibrary dependency exist in each project
+-- | Find if any sublibrary dependency (other than internal libraries) exists in
+-- each project package.
 checkSubLibraryDependencies :: HasTerm env => [ProjectPackage] -> RIO env ()
-checkSubLibraryDependencies proj =
-  forM_ proj $ \p -> do
-    C.GenericPackageDescription _ _ _ lib subLibs foreignLibs exes tests benches <-
-      liftIO $ cpGPD . ppCommon $ p
+checkSubLibraryDependencies projectPackages =
+  forM_ projectPackages $ \projectPackage -> do
+    C.GenericPackageDescription pkgDesc _ _ lib subLibs foreignLibs exes tests benches <-
+      liftIO $ cpGPD . ppCommon $ projectPackage
 
-    let dependencies = concatMap getDeps subLibs <>
+    let pName = pkgName . C.package $ pkgDesc
+        dependencies = concatMap getDeps subLibs <>
                        concatMap getDeps foreignLibs <>
                        concatMap getDeps exes <>
                        concatMap getDeps tests <>
                        concatMap getDeps benches <>
                        maybe [] C.condTreeConstraints lib
-        libraries = concatMap (toList . depLibraries) dependencies
+        notInternal (Dependency pName' _ _) = pName' /= pName
+        publicDependencies = filter notInternal dependencies
+        publicLibraries = concatMap (toList . depLibraries) publicDependencies
 
-    when (subLibDepExist libraries) $
+    when (subLibDepExist publicLibraries) $
       prettyWarnS
-        "SubLibrary dependency is not supported, this will almost certainly \
+        "Sublibrary dependency is not supported, this will almost certainly \
         \fail."
  where
   getDeps (_, C.CondNode _ dep _) = dep
