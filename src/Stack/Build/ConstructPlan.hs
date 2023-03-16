@@ -594,7 +594,7 @@ addDep'' name packageInfo = do
                       (map (fromString . packageNameString) cs :: [StyleDoc])
                 pure Nothing
               Just (_rev, cfKey, treeKey) ->
-                pure . Just $
+                pure $ Just $
                   PLIHackage (PackageIdentifier name version) cfKey treeKey
       tellExecutablesUpstream name askPkgLoc loc Map.empty
       pure $ Right $ ADRFound loc installed
@@ -1007,8 +1007,9 @@ checkDirtiness ps installed package present buildHaddocks = do
         , configCacheDeps = Set.fromList $ Map.elems present
         , configCacheComponents =
             case ps of
-                PSFilePath lp -> Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
-                PSRemote{} -> Set.empty
+              PSFilePath lp ->
+                Set.map (encodeUtf8 . renderComponent) $ lpComponents lp
+              PSRemote{} -> Set.empty
         , configCacheHaddock = buildHaddocks
         , configCachePkgSrc = toCachePkgSrc ps
         , configCachePathEnvVar = pathEnvVar ctx

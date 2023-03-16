@@ -153,7 +153,7 @@ parseRawTargetDirs root locals ri =
     Nothing -> do
       mdir <- forgivingResolveDir root (T.unpack t) >>= rejectMissingDir
       case mdir of
-        Nothing -> pure . Left $
+        Nothing -> pure $ Left $
           if | T.isPrefixOf "stack-yaml=" t -> projectOptionTypo
              | T.isSuffixOf ".yaml" t -> projectYamlExtTypo
              | otherwise ->

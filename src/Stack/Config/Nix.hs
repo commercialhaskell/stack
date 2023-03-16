@@ -42,7 +42,7 @@ instance Exception ConfigNixException where
 
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid ::
-     HasRunner env
+     (HasRunner env, HasTerm env)
   => NixOptsMonoid
   -> OS
   -> RIO env NixOpts
@@ -64,8 +64,8 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
   nixEnable <-
     if nixEnable0 && osIsWindows
       then do
-        logInfo
-          "Note: Disabling nix integration, since this is being run in Windows"
+        prettyNoteS
+          "Disabling Nix integration, since this is being run in Windows."
         pure False
       else pure nixEnable0
 

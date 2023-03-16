@@ -206,25 +206,32 @@ preFetch plan
       TTRemotePackage _ _ pkgloc -> Set.singleton pkgloc
 
 -- | Print a description of build plan for human consumption.
-printPlan :: HasRunner env => Plan -> RIO env ()
+printPlan :: (HasRunner env, HasTerm env) => Plan -> RIO env ()
 printPlan plan = do
   case Map.elems $ planUnregisterLocal plan of
-    [] -> logInfo "No packages would be unregistered."
+    [] -> prettyInfo $
+               flow "No packages would be unregistered."
+            <> line
     xs -> do
-      logInfo "Would unregister locally:"
-      forM_ xs $ \(ident, reason) -> logInfo $
-        fromString (packageIdentifierString ident) <>
-        if T.null reason
-          then ""
-          else " (" <> display reason <> ")"
-
-  logInfo ""
+      let unregisterMsg (ident, reason) = fillSep $
+              fromString (packageIdentifierString ident)
+            : [ parens $ flow (T.unpack reason) | not $ T.null reason ]
+      prettyInfo $
+           flow "Would unregister locally:"
+        <> line
+        <> bulletedList (map unregisterMsg xs)
+        <> line
 
   case Map.elems $ planTasks plan of
-    [] -> logInfo "Nothing to build."
+    [] -> prettyInfo $
+               flow "Nothing to build."
+            <> line
     xs -> do
-      logInfo "Would build:"
-      mapM_ (logInfo . displayTask) xs
+      prettyInfo $
+           flow "Would build:"
+        <> line
+        <> bulletedList (map displayTask xs)
+        <> line
 
   let hasTests = not . Set.null . testComponents . taskComponents
       hasBenches = not . Set.null . benchComponents . taskComponents
@@ -232,51 +239,63 @@ printPlan plan = do
       benches = Map.elems $ Map.filter hasBenches $ planFinals plan
 
   unless (null tests) $ do
-    logInfo ""
-    logInfo "Would test:"
-    mapM_ (logInfo . displayTask) tests
-  unless (null benches) $ do
-    logInfo ""
-    logInfo "Would benchmark:"
-    mapM_ (logInfo . displayTask) benches
+    prettyInfo $
+         flow "Would test:"
+      <> line
+      <> bulletedList (map displayTask tests)
+      <> line
 
-  logInfo ""
+  unless (null benches) $ do
+    prettyInfo $
+         flow "Would benchmark:"
+      <> line
+      <> bulletedList (map displayTask benches)
+      <> line
 
   case Map.toList $ planInstallExes plan of
-    [] -> logInfo "No executables to be installed."
+    [] -> prettyInfo $
+               flow "No executables to be installed."
+            <> line
     xs -> do
-      logInfo "Would install executables:"
-      forM_ xs $ \(name, loc) -> logInfo $
-        display name <>
-        " from " <>
-        (case loc of
-           Snap -> "snapshot"
-           Local -> "local") <>
-        " database"
+      let executableMsg (name, loc) = fillSep $
+              fromString (T.unpack name)
+            : "from"
+            : ( case loc of
+                  Snap -> "snapshot" :: StyleDoc
+                  Local -> "local" :: StyleDoc
+              )
+            : ["database."]
+      prettyInfo $
+           flow "Would install executables:"
+        <> line
+        <> bulletedList (map executableMsg xs)
+        <> line
 
 -- | For a dry run
-displayTask :: Task -> Utf8Builder
-displayTask task =
-     fromString (packageIdentifierString (taskProvides task))
-  <> ": database="
-  <> ( case taskLocation task of
-         Snap -> "snapshot"
-         Local -> "local"
-     )
-  <> ", source="
-  <> ( case taskType task of
-         TTLocalMutable lp -> fromString $ toFilePath $ parent $ lpCabalFile lp
-         TTRemotePackage _ _ pl -> display pl
-     )
-  <> ( if Set.null missing
-         then ""
-         else
-              ", after: "
-           <> mconcat
-                ( L.intersperse ","
-                    (fromString . packageIdentifierString <$> Set.toList missing)
-                )
-     )
+displayTask :: Task -> StyleDoc
+displayTask task = fillSep $
+     [ fromString (packageIdentifierString (taskProvides task)) <> ":"
+     ,    "database="
+       <> ( case taskLocation task of
+              Snap -> "snapshot" :: StyleDoc
+              Local -> "local" :: StyleDoc
+          )
+       <> ","
+     ,    "source="
+       <> ( case taskType task of
+              TTLocalMutable lp -> pretty $ parent $ lpCabalFile lp
+              TTRemotePackage _ _ pl -> fromString $ T.unpack $ textDisplay pl
+          )
+       <> if Set.null missing
+            then mempty
+            else ","
+     ]
+  <> [ fillSep $
+           "after:"
+         : mkNarrativeList Nothing False
+             (map (fromString . packageIdentifierString) (Set.toList missing) :: [StyleDoc])
+     | not $ Set.null missing
+     ]
  where
   missing = tcoMissing $ taskConfigOpts task
 
@@ -500,12 +519,16 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
           DumpWarningLogs -> mapM_ dumpLogIfWarning allLogs
           DumpNoLogs
               | totalWanted > 1 ->
-                  logInfo $
-                      "Build output has been captured to log files, use " <>
-                      "--dump-logs to see it on the console"
+                  prettyInfoL
+                    [ flow "Build output has been captured to log files, use"
+                    , style Shell "--dump-logs"
+                    , flow "to see it on the console."
+                    ]
               | otherwise -> pure ()
-        logInfo $ "Log files have been written to: " <>
-                  fromString (toFilePath (parent (snd firstLog)))
+        prettyInfoL
+          [ flow "Log files have been written to:"
+          , pretty (parent (snd firstLog))
+          ]
 
     -- We only strip the colors /after/ we've dumped logs, so that we get pretty
     -- colors in our dump output on the terminal.
@@ -540,12 +563,17 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
 
   dumpLog :: String -> (Path Abs Dir, Path Abs File) -> RIO env ()
   dumpLog msgSuffix (pkgDir, filepath) = do
-    logInfo $
-      "\n--  Dumping log file" <>
-      fromString msgSuffix <>
-      ": " <>
-      fromString (toFilePath filepath) <>
-      "\n"
+    prettyNote $
+         fillSep
+           ( ( fillSep
+                 ( flow "Dumping log file"
+                 : [ flow msgSuffix | L.null msgSuffix ]
+                 )
+             <> ":"
+             )
+           : [ pretty filepath <> "." ]
+           )
+      <> line
     compilerVer <- view actualCompilerVersionL
     withSourceFile (toFilePath filepath) $ \src ->
          runConduit
@@ -553,10 +581,12 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
       .| CT.decodeUtf8Lenient
       .| mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
       .| CL.mapM_ (logInfo . display)
-    logInfo $
-         "\n--  End of log file: "
-      <> fromString (toFilePath filepath)
-      <> "\n"
+    prettyNote $
+         fillSep
+           [ flow "End of log file:"
+           , pretty filepath <> "."
+           ]
+      <> line
 
   stripColors :: Path Abs File -> IO ()
   stripColors fp = do
@@ -667,11 +697,12 @@ copyExecutables exes = do
         pure Nothing
       Just file -> do
         let destFile = destDir' FP.</> T.unpack name ++ ext
-        logInfo $
-          "Copying from " <>
-          fromString (toFilePath file) <>
-          " to " <>
-          fromString destFile
+        prettyInfoL
+          [ flow "Copying from"
+          , pretty file
+          , "to"
+          , style File (fromString destFile) <> "."
+          ]
 
         liftIO $ case platform of
           Platform _ Windows | FP.equalFilePath destFile currExe ->
@@ -680,12 +711,14 @@ copyExecutables exes = do
         pure $ Just (name <> T.pack ext)
 
   unless (null installed) $ do
-    logInfo ""
-    logInfo $
-      "Copied executables to " <>
-      fromString destDir' <>
-      ":"
-  forM_ installed $ \exe -> logInfo ("- " <> display exe)
+    prettyInfo $
+         fillSep
+           [ flow "Copied executables to"
+           , pretty destDir <> ":"
+           ]
+      <> line
+      <> bulletedList
+           (map (fromString . T.unpack . textDisplay) installed :: [StyleDoc])
   unless compilerSpecific $ warnInstallSearchPathIssues destDir' installed
 
 
@@ -811,11 +844,12 @@ unregisterPackages ::
   -> RIO env ()
 unregisterPackages cv localDB ids = do
   let logReason ident reason =
-        logInfo $
-        fromString (packageIdentifierString ident) <> ": unregistering" <>
-        if T.null reason
-          then ""
-          else " (" <> display reason <> ")"
+        prettyInfoL
+          (  [ fromString (packageIdentifierString ident) <> ":"
+             , "unregistering"
+             ]
+          <> [ parens (flow $ T.unpack reason) | not $ T.null reason ]
+          )
   let unregisterSinglePkg select (gid, (ident, reason)) = do
         logReason ident reason
         pkg <- getGhcPkgExe
@@ -1089,9 +1123,10 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
     let fp = pkgDir </> relFileConfigure
     exists <- doesFileExist fp
     unless exists $ do
-      logInfo $
-           "Trying to generate configure with autoreconf in "
-        <> fromString (toFilePath pkgDir)
+      prettyInfoL
+        [ flow "Trying to generate configure with autoreconf in"
+        , pretty pkgDir <> "."
+        ]
       let autoreconf = if osIsWindows
                          then readProcessNull "sh" ["autoreconf", "-i"]
                          else readProcessNull "autoreconf" ["-i"]
@@ -1112,32 +1147,58 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
           <> blankLine
           <> string (displayException ex)
         when osIsWindows $ do
-          logInfo $ "Check that executable perl is on the path in Stack's " <>
-            "MSYS2 \\usr\\bin folder, and working, and that script file " <>
-            "autoreconf is on the path in that location. To check that " <>
-            "perl or autoreconf are on the path in the required location, " <>
-            "run commands:"
-          logInfo ""
-          logInfo "  stack exec where -- perl"
-          logInfo "  stack exec where -- autoreconf"
-          logInfo ""
-          logInfo $ "If perl or autoreconf is not on the path in the " <>
-            "required location, add them with command (note that the " <>
-            "relevant package name is 'autoconf' not 'autoreconf'):"
-          logInfo ""
-          logInfo "  stack exec pacman -- --sync --refresh autoconf"
-          logInfo ""
-          logInfo $ "Some versions of perl from MSYS2 are broken. See " <>
-            "https://github.com/msys2/MSYS2-packages/issues/1611 and " <>
-            "https://github.com/commercialhaskell/stack/pull/4781. To " <>
-            "test if perl in the required location is working, try command:"
-          logInfo ""
-          logInfo "  stack exec perl -- --version"
-          logInfo ""
+          prettyInfo $
+               fillSep
+                 [ flow "Check that executable"
+                 , style File "perl"
+                 , flow "is on the path in Stack's MSYS2"
+                 , style Dir "\\usr\\bin"
+                 , flow "folder, and working, and that script file"
+                 , style File "autoreconf"
+                 , flow "is on the path in that location. To check that"
+                 , style File "perl"
+                 , "or"
+                 , style File "autoreconf"
+                 , flow "are on the path in the required location, run commands:"
+                 ]
+            <> blankLine
+            <> indent 4 (style Shell $ flow "stack exec where -- perl")
+            <> line
+            <> indent 4 (style Shell $ flow "stack exec where -- autoreconf")
+            <> blankLine
+            <> fillSep
+                 [ "If"
+                 , style File "perl"
+                 , "or"
+                 , style File "autoreconf"
+                 , flow "is not on the path in the required location, add them \
+                        \with command (note that the relevant package name is"
+                 , style File "autoconf"
+                 , "not"
+                 , style File "autoreconf" <> "):"
+                 ]
+            <> blankLine
+            <> indent 4
+                 (style Shell $ flow "stack exec pacman -- --sync --refresh autoconf")
+            <> blankLine
+            <> fillSep
+                 [ flow "Some versions of"
+                 , style File "perl"
+                 , flow "from MSYS2 are broken. See"
+                 , style Url "https://github.com/msys2/MSYS2-packages/issues/1611"
+                 , "and"
+                 , style Url "https://github.com/commercialhaskell/stack/pull/4781" <> "."
+                 , "To test if"
+                 , style File "perl"
+                 , flow "in the required location is working, try command:"
+                 ]
+            <> blankLine
+            <> indent 4 (style Shell $ flow "stack exec perl -- --version")
+            <> blankLine
       fixupOnWindows
 
 -- | Make a padded prefix for log messages
-packageNamePrefix :: ExecuteEnv -> PackageName -> Utf8Builder
+packageNamePrefix :: ExecuteEnv -> PackageName -> String
 packageNamePrefix ee name' =
   let name = packageNameString name'
       paddedName =
@@ -1145,7 +1206,7 @@ packageNamePrefix ee name' =
           Nothing -> name
           Just len ->
             assert (len >= length name) $ take len $ name ++ L.repeat ' '
-  in  fromString paddedName <> "> "
+  in  paddedName <> "> "
 
 announceTask ::
      HasLogFunc env
@@ -1154,49 +1215,57 @@ announceTask ::
   -> Utf8Builder
   -> RIO env ()
 announceTask ee task action = logInfo $
-  packageNamePrefix ee (pkgName (taskProvides task)) <>
-  action
+  fromString (packageNamePrefix ee (pkgName (taskProvides task))) <> action
+
+prettyAnnounceTask ::
+     HasTerm env
+  => ExecuteEnv
+  -> Task
+  -> StyleDoc
+  -> RIO env ()
+prettyAnnounceTask ee task action = prettyInfo $
+  fromString (packageNamePrefix ee (pkgName (taskProvides task))) <> action
 
 -- | Ensure we're the only action using the directory.  See
 -- <https://github.com/commercialhaskell/stack/issues/2730>
 withLockedDistDir ::
      forall env a. HasEnvConfig env
-  => (Utf8Builder -> RIO env ()) -- ^ announce
+  => (StyleDoc -> RIO env ()) -- ^ A pretty announce function
   -> Path Abs Dir -- ^ root directory for package
   -> RIO env a
   -> RIO env a
 withLockedDistDir announce root inner = do
   distDir <- distRelativeDir
   let lockFP = root </> distDir </> relFileBuildLock
-      lockFP' = toFilePath lockFP
   ensureDir $ parent lockFP
 
   mres <-
     withRunInIO $ \run ->
-    withTryFileLock lockFP' Exclusive $ \_lock ->
+    withTryFileLock (toFilePath lockFP) Exclusive $ \_lock ->
     run inner
 
   case mres of
     Just res -> pure res
     Nothing -> do
-      withCompanion (complainer lockFP') $
+      let complainer :: Companion (RIO env)
+          complainer delay = do
+            delay 5000000 -- 5 seconds
+            announce $ fillSep
+              [ flow "blocking for directory lock on"
+              , pretty lockFP
+              ]
+            forever $ do
+              delay 30000000 -- 30 seconds
+              announce $ fillSep
+                [ flow "still blocking for directory lock on"
+                , pretty lockFP <> ";"
+                , flow "maybe another Stack process is running?"
+                ]
+      withCompanion complainer $
         \stopComplaining ->
           withRunInIO $ \run ->
-            withFileLock lockFP' Exclusive $ \_ ->
+            withFileLock (toFilePath lockFP) Exclusive $ \_ ->
               run $ stopComplaining *> inner
- where
-  complainer :: FilePath -> Companion (RIO env)
-  complainer fp delay = do
-    delay 5000000 -- 5 seconds
-    announce $
-         "blocking for directory lock on "
-      <> fromString fp
-    forever $ do
-      delay 30000000 -- 30 seconds
-      announce $
-           "still blocking for directory lock on "
-        <> fromString fp
-        <> "; maybe another Stack process is running?"
 
 -- | How we deal with output from GHC, either dumping to a log file or the
 -- console (with some prefix).
@@ -1232,7 +1301,7 @@ withSingleContext ::
      -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
         -- Function to run Cabal with args
      -> (Utf8Builder -> RIO env ())
-        -- An 'announce' function, for different build phases
+        -- An plain 'announce' function, for different build phases
      -> OutputType
      -> RIO env a)
   -> RIO env a
@@ -1243,6 +1312,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
   inner0 package cabalfp pkgDir cabal announce outputType
  where
   announce = announceTask ee task
+  prettyAnnounce = prettyAnnounceTask ee task
 
   wanted =
     case taskType of
@@ -1269,7 +1339,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
     case taskType of
       TTLocalMutable lp -> do
         let root = parent $ lpCabalFile lp
-        withLockedDistDir announce root $
+        withLockedDistDir prettyAnnounce root $
           inner (lpPackage lp) (lpCabalFile lp) root
       TTRemotePackage _ package pkgloc -> do
           suffix <- parseRelDir $ packageIdentifierString $ packageIdent package
@@ -1302,8 +1372,8 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
 
     -- If the user requested interleaved output, dump to the console with a
     -- prefix.
-    | boptsInterleavedOutput eeBuildOpts =
-        inner $ OTConsole $ Just $ packageNamePrefix ee $ packageName package
+    | boptsInterleavedOutput eeBuildOpts = inner $
+        OTConsole $ Just $ fromString (packageNamePrefix ee $ packageName package)
 
     -- Neither condition applies, dump to a file.
     | otherwise = do
@@ -1782,20 +1852,25 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       \package cabalfp pkgDir cabal0 announce _outputType -> do
         let cabal = cabal0 CloseOnException
         executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
-        when (not (cabalIsSatisfied executableBuildStatuses) && taskIsTarget task)
-          (logInfo
-            (  "Building all executables for `"
-            <> fromString (packageNameString (packageName package))
-            <> "' once. After a successful build of all of them, only \
-               \specified executables will be rebuilt."
-            ))
-
+        when (  not (cabalIsSatisfied executableBuildStatuses)
+             && taskIsTarget task
+             ) $
+          prettyInfoL
+            [ flow "Building all executables for"
+            , style Current (fromString $ packageNameString $ packageName package)
+            , flow "once. After a successful build of all of them, only \
+                   \specified executables will be rebuilt."
+            ]
         _neededConfig <-
           ensureConfig
             cache
             pkgDir
             ee
-            (announce ("configure" <> display (annSuffix executableBuildStatuses)))
+            ( announce
+                (  "configure"
+                <> display (annSuffix executableBuildStatuses)
+                )
+            )
             cabal
             cabalfp
             task
@@ -1838,6 +1913,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     -> Path Abs Dir
     -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
     -> (Utf8Builder -> RIO env ())
+       -- ^ A plain 'announce' function
     -> Map Text ExecutableBuildStatus
     -> RIO env Installed
   realBuild cache package pkgDir cabal0 announce executableBuildStatuses = do
@@ -1893,7 +1969,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       \undefined reference errors from the linker, along with \
                       \other problems."
 
-    () <- announce ("build" <> display (annSuffix executableBuildStatuses))
+    () <- announce
+      (  "build"
+      <> display (annSuffix executableBuildStatuses)
+      )
     config <- view configL
     extraOpts <- extraBuildOptions wc eeBuildOpts
     let stripTHLoading
@@ -2321,17 +2400,18 @@ singleTest topts testsToRun ac ee task installedMap = do
                     liftIO $ hFlush stderr
                   OTLogFile _ _ -> pure ()
 
-                let output =
-                      case outputType of
-                        OTConsole Nothing -> Nothing <$ inherit
-                        OTConsole (Just prefix) -> fmap
-                          (\src -> Just $ runConduit $ src .|
-                                   CT.decodeUtf8Lenient .|
-                                   CT.lines .|
-                                   CL.map stripCR .|
-                                   CL.mapM_ (\t -> logInfo $ prefix <> display t))
-                          createSource
-                        OTLogFile _ h -> Nothing <$ useHandleOpen h
+                let output = case outputType of
+                      OTConsole Nothing -> Nothing <$ inherit
+                      OTConsole (Just prefix) -> fmap
+                        ( \src -> Just $
+                               runConduit $ src
+                            .| CT.decodeUtf8Lenient
+                            .| CT.lines
+                            .| CL.map stripCR
+                            .| CL.mapM_ (\t -> logInfo $ prefix <> display t)
+                        )
+                        createSource
+                      OTLogFile _ h -> Nothing <$ useHandleOpen h
                     optionalTimeout action
                       | Just maxSecs <- toMaximumTimeSeconds topts, maxSecs > 0 =
                           timeout (maxSecs * 1000000) action
@@ -2373,7 +2453,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 -- Add a trailing newline, incase the test
                 -- output didn't finish with a newline.
                 case outputType of
-                  OTConsole Nothing -> logInfo ""
+                  OTConsole Nothing -> prettyInfo blankLine
                   _ -> pure ()
                 -- Move the .tix file out of the package
                 -- directory into the hpc work dir, for

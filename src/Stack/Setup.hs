@@ -1575,10 +1575,11 @@ ensureDockerStackExe containerPlatform = do
   let stackExePath = stackExeDir </> relFileStack
   stackExeExists <- doesFileExist stackExePath
   unless stackExeExists $ do
-    logInfo $
-         "Downloading Docker-compatible "
-      <> fromString stackProgName
-      <> " executable"
+    prettyInfoL
+      [ flow "Downloading Docker-compatible"
+      , fromString stackProgName
+      , "executable."
+      ]
     sri <-
       downloadStackReleaseInfo
         Nothing
@@ -1696,18 +1697,18 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
         case configPlatform config of
           Platform _ Cabal.Windows -> installGHCWindows
           _ -> installGHCPosix downloadInfo
-  logInfo $
-       "Preparing to install GHC"
-    <> ( case ghcVariant of
-           GHCStandard -> ""
-           v -> " (" <> fromString (ghcVariantName v) <> ")"
-       )
-    <> ( case ghcBuild of
-          CompilerBuildStandard -> ""
-          b -> " (" <> fromString (compilerBuildName b) <> ")"
-       )
-    <> " to an isolated location."
-  logInfo "This will not interfere with any system-level installation."
+  prettyInfo $
+    fillSep $
+         flow "Preparing to install GHC"
+      :  case ghcVariant of
+           GHCStandard -> []
+           v -> ["(" <> fromString (ghcVariantName v) <> ")"]
+      <> case ghcBuild of
+          CompilerBuildStandard -> []
+          b -> ["(" <> fromString (compilerBuildName b) <> ")"]
+      <> [ flow "to an isolated location. This will not interfere with any \
+                \system-level installation."
+         ]
   ghcPkgName <- parsePackageNameThrowing
     ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
   let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
@@ -2030,7 +2031,10 @@ installGHCWindows :: HasBuildConfig env
                   -> RIO env ()
 installGHCWindows si archiveFile archiveType _tempDir destDir = do
   withUnpackedTarball7z "GHC" si archiveFile archiveType destDir
-  logInfo $ "GHC installed to " <> fromString (toFilePath destDir)
+  prettyInfoL
+    [ flow "GHC installed to"
+    , pretty destDir <> "."
+    ]
 
 installMsys2Windows :: HasBuildConfig env
                   => SetupInfo
@@ -2131,13 +2135,16 @@ setup7z si = do
               [ "x"
               , "-o" ++ toFilePath outdir
               , "-y"
-              , toFilePath archive
+              , archiveFP
               ]
-        let archiveDisplay = fromString $ FP.takeFileName $ toFilePath archive
-            isExtract = FP.takeExtension (toFilePath archive) == ".tar"
-        logInfo $
-             (if isExtract then "Extracting " else "Decompressing ")
-          <> archiveDisplay <> "..."
+            archiveFP = toFilePath archive
+            archiveFileName = filename archive
+            archiveDisplay = fromString $ toFilePath archiveFileName
+            isExtract = FP.takeExtension archiveFP == ".tar"
+        prettyInfoL
+          [ if isExtract then "Extracting" else "Decompressing"
+          , pretty archiveFileName <> "..."
+          ]
         ec <-
           proc cmd args $ \pc ->
           if isExtract
@@ -2204,7 +2211,7 @@ chattyDownload label downloadInfo path = do
   x <- verifiedDownloadWithProgress dReq path label mtotalSize
   if x
     then logStickyDone ("Downloaded " <> display label <> ".")
-    else logStickyDone "Already downloaded."
+    else logStickyDone ("Already downloaded " <> display label <> ".")
  where
   mtotalSize = downloadInfoContentLength downloadInfo
 

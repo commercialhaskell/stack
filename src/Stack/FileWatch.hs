@@ -94,20 +94,38 @@ fileWatchConf cfg inner =
           unless (l == "quit") $ do
             run $ case l of
               "help" -> do
-                logInfo ""
-                logInfo "help: display this help"
-                logInfo "quit: exit"
-                logInfo "build: force a rebuild"
-                logInfo "watched: display watched files"
+                prettyInfo $
+                     line
+                  <> fillSep
+                       [ style Shell "help" <> ":"
+                       , flow "display this help."
+                       ]
+                  <> line
+                  <> fillSep
+                       [ style Shell "quit" <> ":"
+                       , "exit."
+                       ]
+                  <> line
+                  <> fillSep
+                       [ style Shell "build" <> ":"
+                       , flow "force a rebuild."
+                       ]
+                  <> line
+                  <> fillSep
+                       [ style Shell "watched" <> ":"
+                       , flow "display watched files."
+                       ]
               "build" -> atomically $ writeTVar dirtyVar True
               "watched" -> do
                 watch <- readTVarIO allFiles
-                mapM_ (logInfo . fromString) (Set.toList watch)
+                mapM_ (prettyInfo . style File . fromString) (Set.toList watch)
               "" -> atomically $ writeTVar dirtyVar True
-              _ -> logInfo $
-                "Unknown command: " <>
-                displayShow l <>
-                ". Try 'help'"
+              _ -> prettyInfoL
+                     [ flow "Unknown command:"
+                     , style Shell (fromString l) <> "."
+                     , "Try"
+                     , style Shell "help" <> "."
+                     ]
 
             watchInput
 
@@ -133,6 +151,11 @@ fileWatchConf cfg inner =
             _ -> case fromException e :: Maybe PrettyException of
               Just pe -> prettyError $ pretty pe
               _ -> prettyInfo $ style Error $ fromString $ displayException e
-        _ -> prettyInfo $ style Good "Success! Waiting for next file change."
+        _ -> prettyInfo $
+               style Good (flow "Success! Waiting for next file change.")
 
-      logInfo "Type help for available commands. Press enter to force a rebuild."
+      prettyInfoL
+        [ "Type"
+        , style Shell "help"
+        , flow "for the available commands. Press enter to force a rebuild."
+        ]

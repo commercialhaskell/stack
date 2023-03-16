@@ -472,7 +472,7 @@ addUnlistedToBuildCache pkg cabalFP nonLibComponents buildCaches = do
     mdigest <- getFileDigestMaybe fp
     case mdigest of
       Nothing -> pure Map.empty
-      Just digest' -> pure . Map.singleton fp $ FileCacheInfo digest'
+      Just digest' -> pure $ Map.singleton fp $ FileCacheInfo digest'
 
 -- | Gets list of Paths for files relevant to a set of components in a package.
 -- Note that the library component, if any, is always automatically added to the

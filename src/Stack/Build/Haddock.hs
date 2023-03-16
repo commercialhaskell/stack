@@ -15,6 +15,7 @@ import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import           Data.Time ( UTCTime )
 import           Path ( (</>), parent, parseRelDir )
 import           Path.Extra
@@ -106,7 +107,7 @@ shouldHaddockDeps bopts =
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex ::
-     (HasProcessContext env, HasLogFunc env, HasCompiler env)
+     (HasCompiler env, HasProcessContext env, HasTerm env)
   => BaseConfigOpts
   -> Map GhcPkgId DumpPackage  -- ^ Local package dump
   -> [LocalPackage]
@@ -132,7 +133,7 @@ generateLocalHaddockIndex bco localDumpPkgs locals = do
 -- | Generate Haddock index and contents for local packages and their
 -- dependencies.
 generateDepsHaddockIndex ::
-     (HasProcessContext env, HasLogFunc env, HasCompiler env)
+     (HasCompiler env, HasProcessContext env, HasTerm env)
   => BaseConfigOpts
   -> Map GhcPkgId DumpPackage  -- ^ Global dump information
   -> Map GhcPkgId DumpPackage  -- ^ Snapshot dump information
@@ -177,7 +178,7 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
 
 -- | Generate Haddock index and contents for all snapshot packages.
 generateSnapHaddockIndex ::
-     (HasProcessContext env, HasLogFunc env, HasCompiler env)
+     (HasCompiler env, HasProcessContext env, HasTerm env)
   => BaseConfigOpts
   -> Map GhcPkgId DumpPackage  -- ^ Global package dump
   -> Map GhcPkgId DumpPackage  -- ^ Snapshot package dump
@@ -192,7 +193,7 @@ generateSnapHaddockIndex bco globalDumpPkgs snapshotDumpPkgs =
 
 -- | Generate Haddock index and contents for specified packages.
 generateHaddockIndex ::
-     (HasProcessContext env, HasLogFunc env, HasCompiler env)
+     (HasCompiler env, HasProcessContext env, HasTerm env)
   => Text
   -> BaseConfigOpts
   -> [DumpPackage]
@@ -213,11 +214,12 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
               or [mt > indexModTime | (_, mt, _, _) <- interfaceOpts]
     if needUpdate
       then do
-        logInfo $
-             "Updating Haddock index for "
-          <> Stack.Prelude.display descr
-          <> " in\n"
-          <> fromString (toFilePath destIndexFile)
+        prettyInfoL
+          [ flow "Updating Haddock index for"
+          , style Current (fromString $ T.unpack descr)
+          , "in"
+          , pretty destIndexFile <> "."
+          ]
         liftIO (mapM_ copyPkgDocs interfaceOpts)
         haddockExeName <- view $ compilerPathsL.to (toFilePath . cpHaddock)
         withWorkingDir (toFilePath destDir) $ readProcessNull
@@ -230,11 +232,12 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
               ++ [x | (xs, _, _, _) <- interfaceOpts, x <- xs]
           )
       else
-        logInfo $
-             "Haddock index for "
-          <> Stack.Prelude.display descr
-          <> " already up to date at:\n"
-          <> fromString (toFilePath destIndexFile)
+        prettyInfoL
+          [ flow "Haddock index for"
+          , style Current (fromString $ T.unpack descr)
+          , flow "already up to date at"
+          , pretty destIndexFile <> "."
+          ]
  where
   toInterfaceOpt ::
        DumpPackage

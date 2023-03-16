@@ -75,7 +75,7 @@ import           System.Environment
 import qualified System.FilePath as FP
 import           System.IO.Error ( isDoesNotExistError )
 import           System.IO.Unsafe ( unsafePerformIO )
-import qualified System.PosixCompat.User as User
+import qualified System.Posix.User as User
 import qualified System.PosixCompat.Files as Files
 import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
 import           Text.ParserCombinators.ReadP ( readP_to_S )
@@ -388,14 +388,17 @@ pull = do
   either throwIO (pullImage docker) (dockerImage docker)
 
 -- | Pull Docker image from registry.
-pullImage :: (HasProcessContext env, HasLogFunc env)
+pullImage :: (HasProcessContext env, HasTerm env)
           => DockerOpts
           -> String
           -> RIO env ()
 pullImage docker image = do
-  logInfo ("Pulling image from registry: '" <> fromString image <> "'")
+  prettyInfoL
+    [ flow "Pulling image from registry:"
+    , style Current (fromString image) <> "."
+    ]
   when (dockerRegistryLogin docker) $ do
-    logInfo "You may need to log in."
+    prettyInfoS "You may need to log in."
     proc
       "docker"
       ( concat

@@ -92,12 +92,29 @@ setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
         WCGhc _ -> "GHC"
         WCGhcGit{} -> "GHC (built from source)"
         WCGhcjs {} -> "GHCJS"
+      compilerHelpMsg = fillSep
+        [ flow "To use this"
+        , compiler
+        , flow "and packages outside of a project, consider using:"
+        , style Shell (flow "stack ghc") <> ","
+        , style Shell (flow "stack ghci") <> ","
+        , style Shell (flow "stack runghc") <> ","
+        , "or"
+        , style Shell (flow "stack exec") <> "."
+        ]
   if sandboxedGhc
-    then logInfo $ "Stack will use a sandboxed " <> compiler <> " it installed."
-    else logInfo $ "Stack will use the " <> compiler <> " on your PATH."
-  logInfo "For more information on paths, see 'stack path' and 'stack exec env'."
-  logInfo
-    $  "To use this "
-    <> compiler
-    <> " and packages outside of a project, consider using:"
-  logInfo "'stack ghc', 'stack ghci', 'stack runghc', or 'stack exec'."
+    then prettyInfoL
+      [ flow "Stack will use a sandboxed"
+      , compiler
+      , flow "it installed."
+      , compilerHelpMsg
+      ]
+    else prettyInfoL
+      [ flow "Stack will use the"
+      , compiler
+      , flow "on your PATH. For more information on paths, see"
+      , style Shell (flow "stack path")
+      , "and"
+      , style Shell (flow "stack exec env") <> "."
+      , compilerHelpMsg
+      ]
