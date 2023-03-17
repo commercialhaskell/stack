@@ -338,9 +338,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
           $ "Since"
           : style Shell "--all"
           : flow "is used, it is redundant to specify these targets:"
-          : mkNarrativeList
-              (Just Target)
-              False
+          : mkNarrativeList (Just Target) False
               (map (fromString . T.unpack) targetNames :: [StyleDoc])
       targets <-
         view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets

@@ -354,10 +354,9 @@ resolveRawTarget sma allLocs (ri, rt) =
                   , flow "for package"
                   , style Target (fromString $ packageNameString name)
                   , flow "matches components:"
-                  , fillSep
-                      ( mkNarrativeList (Just PkgComponent) False $
-                          map ncToStyleDoc matches
-                      )
+                  , fillSep $
+                      mkNarrativeList (Just PkgComponent) False
+                        (map ncToStyleDoc matches)
                   ]
    where
     ncToStyleDoc :: NamedComponent -> StyleDoc
@@ -510,10 +509,9 @@ combineResolveResults results = do
                   [ flow "The package"
                   , style Target $ fromString $ packageNameString name
                   , flow "was specified in multiple, incompatible ways:"
-                  , fillSep
-                      ( mkNarrativeList (Just Target) False $
-                          map rrToStyleDoc rrs
-                      )
+                  , fillSep $
+                      mkNarrativeList (Just Target) False
+                        (map rrToStyleDoc rrs)
                   ]
   pure (errs, Map.unions ms, addedDeps)
  where

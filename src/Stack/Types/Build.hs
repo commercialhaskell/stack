@@ -388,14 +388,14 @@ data BuildPrettyException
 
 instance Pretty BuildPrettyException where
   pretty ( ConstructPlanFailed errs stackYaml stackRoot parents wanted prunedGlobalDeps ) =
-       "[S-4804]"
+    "[S-4804]"
     <> line
     <> flow "Stack failed to construct a build plan."
     <> blankLine
     <> pprintExceptions
            errs stackYaml stackRoot parents wanted prunedGlobalDeps
   pretty (ExecutionFailure es) =
-       "[S-7282]"
+    "[S-7282]"
     <> line
     <> flow "Stack failed to execute the build plan."
     <> blankLine
@@ -414,7 +414,7 @@ instance Pretty BuildPrettyException where
     showBuildError "[S-6374]"
       True exitCode mtaskProvides execName fullArgs logFiles bss
   pretty (TargetParseException errs) =
-       "[S-8506]"
+    "[S-8506]"
     <> pprintTargetParseErrors errs
 
 instance Exception BuildPrettyException
