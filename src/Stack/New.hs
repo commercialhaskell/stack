@@ -181,8 +181,7 @@ instance Pretty NewPrettyException where
     <> fillSep
          ( flow "The names blocked by Stack are:"
          : mkNarrativeList Nothing False
-             ( map toStyleDoc (L.sort $ S.toList wiredInPackages)
-             )
+             (map toStyleDoc (L.sort $ S.toList wiredInPackages))
          )
    where
     toStyleDoc :: PackageName -> StyleDoc
@@ -598,9 +597,7 @@ applyTemplate project template nonceParams dir templateText = do
        fillSep
          ( flow "The following parameters were needed by the template but \
                 \not provided:"
-         : mkNarrativeList
-             Nothing
-             False
+         : mkNarrativeList Nothing False
              (map toStyleDoc (S.toList missingKeys))
          )
     <> blankLine

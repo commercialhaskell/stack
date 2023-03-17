@@ -970,15 +970,11 @@ checkForIssues pkgs =
   mixedSettings (xs, ys) = xs /= [] && ys /= []
   showWhich (haveIt, don'tHaveIt) =
        [ flow "It is specified for:" ]
-    <> mkNarrativeList
-         (Just PkgComponent)
-         False
-         ( map (fromString . T.unpack . renderPkgComponent) haveIt :: [StyleDoc])
+    <> mkNarrativeList (Just PkgComponent) False
+         (map (fromString . T.unpack . renderPkgComponent) haveIt :: [StyleDoc])
     <> [ flow "But not for:" ]
-    <> mkNarrativeList
-         (Just PkgComponent)
-         False
-         ( map (fromString . T.unpack . renderPkgComponent) don'tHaveIt :: [StyleDoc])
+    <> mkNarrativeList (Just PkgComponent) False
+         (map (fromString . T.unpack . renderPkgComponent) don'tHaveIt :: [StyleDoc])
   partitionComps f = (map fst xs, map fst ys)
    where
     (xs, ys) = L.partition (any f . snd) compsWithOpts
