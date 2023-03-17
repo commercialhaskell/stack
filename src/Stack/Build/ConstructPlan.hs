@@ -585,9 +585,7 @@ addDep'' name packageInfo = do
                   $ flow "No latest package revision found for"
                   : style Current (fromString $ packageNameString name) <> ","
                   : flow "dependency callstack:"
-                  : mkNarrativeList
-                      Nothing
-                      False
+                  : mkNarrativeList Nothing False
                       (map (fromString . packageNameString) cs :: [StyleDoc])
                 pure Nothing
               Just (_rev, cfKey, treeKey) ->
