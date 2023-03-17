@@ -39,8 +39,9 @@ import           Stack.Package ( resolvePackage )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.Types.Build
-                   ( BaseConfigOpts (..), BuildException (..), Plan (..)
-                   , Task (..), TaskType (..), taskLocation
+                   ( BaseConfigOpts (..), BuildException (..)
+                   , BuildPrettyException (..), Plan (..), Task (..)
+                   , TaskType (..), taskLocation
                    )
 import           Stack.Types.Compiler ( compilerVersionText, getGhcVersion )
 import           Stack.Types.Config
@@ -404,7 +405,8 @@ rawBuildInfo = do
 
 checkComponentsBuildable :: MonadThrow m => [LocalPackage] -> m ()
 checkComponentsBuildable lps =
-  unless (null unbuildable) $ throwM $ SomeTargetsNotBuildable unbuildable
+  unless (null unbuildable) $
+    prettyThrowM $ SomeTargetsNotBuildable unbuildable
  where
   unbuildable =
     [ (packageName (lpPackage lp), c)
