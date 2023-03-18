@@ -10,14 +10,17 @@ stack init [DIR(S)] [--omit-packages] [--force] [--ignore-subdirs]
 (`stack.yaml`) for an existing project, based on the Cabal file or
 `package.yaml` file for each of its packages.
 
-Stack searches for Cabal and `package.yaml` files in the current directory,
-unless one or more directories are specified as arguments.
+By default:
 
-Stack also searches for Cabal and `package.yaml` files in subdirectories, unless
-the `--ignore-subdirs` flag is passed.
+* Stack searches for Cabal and `package.yaml` files in the current directory.
+  Specify one or more directories as arguments to cause Stack to search them;
 
-Stack will not overwrite an existing `stack.yaml` file, unless the `--force`
-flag is passed.
+* Stack also searches for Cabal and `package.yaml` files in subdirectories. Pass
+  the flag `--ignore-subdirs` to ignore subdirectories;
 
-Pass the `--ignore-subdirs` flag to cause Stack to ignore conflicting or
-incompatible user packages while initialising.
+* Stack will not overwrite an existing `stack.yaml` file. Pass the flag
+  `--force` to allow overwriting; and
+
+* Stack will not initialise if there are conflicting or incompatable user
+  packages. Pass the flag `--omit-packages` to cause Stack to ignore such
+  matters while initialising.
