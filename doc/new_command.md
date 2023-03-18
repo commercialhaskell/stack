@@ -7,7 +7,7 @@ stack new PACKAGE_NAME [--bare] [TEMPLATE_NAME] [-p|--param KEY:VALUE] [DIR(S)]
           [--omit-packages] [--force] [--ignore-subdirs]
 ~~~
 
-`stack new` creates a new Stack project for a package using a template.
+`stack new` creates a new Stack project for a package using a project template.
 
 The project is created in a new directory named after the package, unless the
 `--bare` flag is passed, in which case the project is created in the current
@@ -21,3 +21,67 @@ in a template. The option can be specified multiple times.
 
 The arguments specifying directories and the `--ignore-subdirs`, `--force` and
 `--omit-packages` flags are as for the [`stack init` command](init_command.md).
+
+## Project templates
+
+Project template files can be located in a repository named `stack-templates` on
+GitHub, GitLab or Bitbucket; at a URL; or on the local file system.
+
+Project template file names have the extension `.hsfiles`. The extension does
+not need to be specified.
+
+A project template file `my-template.hsfiles` in a repository
+`username/stack-templates` on GitHub, GitLab or Bitbucket can be specified as:
+
+~~~test
+<service>:username/my-template
+~~~
+
+where `<service>` is one of `github` for [GitHub](https://github.com/),
+`gitlab:` for [GitLab](https://gitlab.com), or `bitbucket:` for
+[Bitbucket](https://bitbucket.com).
+
+The default service is GitHub, the default username is `commercialhaskell` and
+the default project template name is `new-template`.
+
+## Examples
+
+Create a project with the default project template:
+
+~~~text
+stack new my-project
+~~~
+
+Create a project with the `rio` project template at the default repository:
+
+~~~text
+stack new my-project rio
+~~~
+
+Create a project with the `mysql` project template provided by the
+`yesodweb/stack-templates` repository on GitHub:
+
+~~~text
+stack new my-project yesodweb/mysql
+~~~
+
+Create a project with the `my-template` project template provided by the
+`username/stack-templates` repository on Bitbucket:
+
+~~~text
+stack new my-project bitbucket:username/my-template
+~~~
+
+Create a project with the `my-template.hsfiles` project template file at
+`https://example.com`:
+
+~~~text
+stack new my-project https://example.com/my-template
+~~~
+
+Create a project with the local project template file
+`<path_to_template>/my-template.hsfiles`:
+
+~~~text
+stack new my-project <path_to_template_file>/my-template
+~~~

@@ -6,70 +6,29 @@
 stack templates
 ~~~
 
-`stack templates` provides information about how to find templates available for
-`stack new`.
+`stack templates` provides information about project templates used with the
+[`stack new` command](new_command.md).
 
-Stack provides multiple templates to start a new project from. You can specify
-one of these templates following your project name in the `stack new` command:
+Project templates are specified in `.hsfiles` files. The format of those files
+is documented at the
+[`commercialhaskell/stack-templates`](https://github.com/commercialhaskell/stack-templates#project-template-format)
+repository on GitHub.
 
-~~~text
-stack new my-rio-project rio
-Downloading template "rio" to create project "my-rio-project" in my-rio-project/ ...
-Looking for .cabal or package.yaml files to use to init the project.
-Using cabal packages:
-- my-rio-project/
+Any GitHub, GitLab or Bitbucket repository named `stack-templates` can provide
+project template files. For example, a template file
+`username/stack-templates/my-template.hsfiles` on GitHub can be identified as
+`username/my-template` when using `stack new`. The relevant service can be
+specified by a prefix: `github:` for [GitHub](https://github.com/) (the default
+service), `gitlab:` for [GitLab](https://gitlab.com), or `bitbucket:` for
+[Bitbucket](https://bitbucket.com).
 
-Selecting the best among 18 snapshots...
+[`commercialhaskell/stack-templates`](https://github.com/commercialhaskell/stack-templates#project-template-format)
+on GitHub is the default repository for project templates. Its username
+(`commercialhaskell`) does not need to be specified when using `stack new`.
 
-* Matches ...
+The project template that `stack new` uses by default is named `new-template`
+and provided at the default repository.
 
-Selected resolver: ...
-Initialising configuration using resolver: ...
-Total number of user packages considered: 1
-Writing configuration to file: my-rio-project/stack.yaml
-All done.
-<Stack root>\templates\rio.hsfiles:   10.10 KiB downloaded...
-~~~
-
-The default templates repository is
-https://github.com/commercialhaskell/stack-templates. You can download templates
-from a different GitHub user by prefixing the username and a slash. Command:
-
-~~~text
-stack new my-yesod-project yesodweb/simple
-~~~
-
-Then template file `simple.hsfiles` would be downloaded from GitHub repository
-`yesodweb/stack-templates`.
-
-You can even download templates from a service other that GitHub, such as
-[GitLab](https://gitlab.com) or [Bitbucket](https://bitbucket.com). For example,
-command:
-
-~~~text
-stack new my-project gitlab:user29/foo
-~~~
-
-Template file `foo.hsfiles` would be downloaded from GitLab, user account
-`user29`, repository `stack-templates`.
-
-If you need more flexibility, you can specify the full URL of the template.
-Command:
-
-~~~text
-stack new my-project https://my-site.com/content/template9.hsfiles
-~~~
-
-(The `.hsfiles` extension is optional; it will be added if it's not specified.)
-
-Alternatively you can use a local template by specifying the path. Command:
-
-~~~text
-stack new project <path_to_template>/template.hsfiles
-~~~
-
-As a starting point for creating your own templates, you can use the
-["simple" template](https://github.com/commercialhaskell/stack-templates/blob/master/simple.hsfiles).
-The
-[stack-templates repository](https://github.com/commercialhaskell/stack-templates#readme)
-provides an introduction into creating templates.
+The default repository provides 24 other project templates. Its Wiki provides
+a description of some of those templates and information about the location of
+other templates.
