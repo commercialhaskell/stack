@@ -13,9 +13,6 @@ The project is created in a new directory named after the package, unless the
 `--bare` flag is passed, in which case the project is created in the current
 directory.
 
-The template used is a default one (named `new-template`), unless another
-template is specified as an argument.
-
 The `--param <key>:<value>` option specifies a key-value pair to populate a key
 in a template. The option can be specified multiple times.
 
@@ -24,21 +21,22 @@ The arguments specifying directories and the `--ignore-subdirs`, `--force` and
 
 ## Project templates
 
-Project template files can be located in a repository named `stack-templates` on
-GitHub, GitLab or Bitbucket; at a URL; or on the local file system.
+A project template file can be located in a repository named `stack-templates`
+on GitHub, GitLab or Bitbucket; at a URL; or on the local file system.
 
 Project template file names have the extension `.hsfiles`. The extension does
-not need to be specified.
+not need to be specified with `stack new`.
 
 A project template file `my-template.hsfiles` in a repository
-`username/stack-templates` on GitHub, GitLab or Bitbucket can be specified as:
+`username/stack-templates` on GitHub, GitLab or Bitbucket can be specified
+with `stack new` as:
 
 ~~~test
 <service>:username/my-template
 ~~~
 
 where `<service>` is one of `github` for [GitHub](https://github.com/),
-`gitlab:` for [GitLab](https://gitlab.com), or `bitbucket:` for
+`gitlab` for [GitLab](https://gitlab.com), or `bitbucket` for
 [Bitbucket](https://bitbucket.com).
 
 The default service is GitHub, the default username is `commercialhaskell` and
@@ -46,10 +44,18 @@ the default project template name is `new-template`.
 
 ## Examples
 
-Create a project with the default project template:
+Create a project for package `my-project` in new directory `my-project` with the
+default project template file:
 
 ~~~text
 stack new my-project
+~~~
+
+Create a project for package `my-package` in the current directory with the
+default project template file:
+
+~~~text
+stack new my-package --bare
 ~~~
 
 Create a project with the `rio` project template at the default repository:
