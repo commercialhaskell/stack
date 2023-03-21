@@ -2,7 +2,7 @@
 # built with GHC 9.4.4.
 
 # GHC 9.4.4
-resolver: nightly-2023-01-13
+resolver: nightly-2023-03-20
 
 packages:
 - .
