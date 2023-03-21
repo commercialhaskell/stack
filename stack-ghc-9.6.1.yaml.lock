@@ -446,9 +446,9 @@ packages:
   original:
     hackage: hourglass-0.2.12
 - completed:
-    hackage: hpack-0.35.2@sha256:75bf9b57539abae03d685532c64a30ad68da968be77e41f870b11e7de941935d,4793
+    hackage: hpack-0.35.2@sha256:f8fea65f195c455b809c992d643c5db1b69615eda385fcb5ea6fa59773037fa7,5024
     pantry-tree:
-      sha256: 10bf6eb29ef1f432a7f401644cafaf7e029bfe6cc825a5e7e41d8753b778ee7c
+      sha256: b1376940842ac0468aee17e289d35e5759758d7ba800569b9364e3b2522d7651
       size: 3742
   original:
     hackage: hpack-0.35.2
@@ -551,9 +551,9 @@ packages:
   original:
     hackage: lifted-base-0.2.3.12
 - completed:
-    hackage: lukko-0.1.1.3@sha256:efd4c08c4df1ac3f423858a834c0e3b5b4909febda66a901d12a8e1d57bddaa8,4570
+    hackage: lukko-0.1.1.3@sha256:9ab54ee4f80bbd8a3fddd639ea142b7039ee2deb27f7df031a93de1819e34146,4584
     pantry-tree:
-      sha256: fc107f7152114689dd77b97af63afca392332a932210087d9312c689210fb6b5
+      sha256: 2a07134b35bd9ee1e6b5aa005ff6b5e3c27a5fe21254e4f81f3d564c19bbfc93
       size: 1145
   original:
     hackage: lukko-0.1.1.3
@@ -712,9 +712,9 @@ packages:
   original:
     hackage: optparse-simple-0.1.1.4
 - completed:
-    hackage: pantry-0.8.1@sha256:196111414d2489499fda6213deebcb865bc12285023d5af9bd273bf27cdb185d,4099
+    hackage: pantry-0.8.1@sha256:8069f38bd6384fd921f11180902aef76569de2b8fdd82c0e72a4e6ae9a0131b3,4116
     pantry-tree:
-      sha256: f7032e124bda7deb3b70b0fc308e9bbe9ba6c81f79b88a1cd0b5b7932f4ab14a
+      sha256: 440419b64570060dfa9eabb77a9c38633c59a7990330055b73b1bb2e52ee9d68
       size: 2524
   original:
     hackage: pantry-0.8.1
