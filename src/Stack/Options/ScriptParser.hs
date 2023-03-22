@@ -9,7 +9,7 @@ module Stack.Options.ScriptParser
 
 import           Options.Applicative
                    ( Parser, completer, eitherReader, flag', help, long
-                   , metavar, option, strArgument, strOption
+                   , metavar, option, strArgument, strOption, switch
                    )
 import           Options.Applicative.Builder.Extra ( fileExtCompleter )
 import           Stack.Options.Completion ( ghcOptsCompleter )
@@ -23,6 +23,7 @@ data ScriptOpts = ScriptOpts
   , soGhcOptions :: ![String]
   , soScriptExtraDeps :: ![PackageIdentifierRevision]
   , soShouldRun :: !ShouldRun
+  , soHideBuiltFiles :: !Bool
   }
   deriving Show
 
@@ -79,6 +80,11 @@ scriptOptsParser = ScriptOpts
             <> help "Don't run, just compile."
             )
       <|> pure YesRun
+      )
+  <*> (switch
+        (  long "hide-built-files"
+        <> help "Write artifacts of compilation (.hi, .o, executable, etc.) to the Stack root scripts directory (usually ~/.stack/scripts) instead of the current directory."
+        )
       )
  where
   extraDepRead = eitherReader $

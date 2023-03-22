@@ -44,10 +44,14 @@ import           Stack.Types.Config
                    , HasEnvConfig (..), HasPlatform (..), Runner
                    , StackYamlLoc (..), actualCompilerVersionL
                    , appropriateGhcColorFlag, defaultEnvSettings, globalOptsL
+                   , stackRootL
                    )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), SourceMap (..) )
-import           System.FilePath ( dropExtension, replaceExtension )
+import           System.FilePath
+                   ( dropExtension, replaceExtension, (</>), takeBaseName
+                   , takeDirectory
+                   )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Script" module.
@@ -110,6 +114,19 @@ scriptCmd opts = do
         then (NoRun, SECompile)
         else (soShouldRun opts, soCompile opts)
 
+  root <- withConfig NoReexec $ view stackRootL
+
+  let sanitizeChar '/' = "#"
+      sanitizeChar '#' = "##"
+      sanitizeChar c = [c]
+      sanitize path = concatMap sanitizeChar path
+      outputDir = if soHideBuiltFiles opts
+        then toFilePath root </> "scripts" </> sanitize (toFilePath file)
+        else toFilePath scriptDir
+      exe = if osIsWindows
+        then replaceExtension (outputDir </> takeBaseName (toFilePath file)) "exe"
+        else dropExtension (outputDir </> takeBaseName (toFilePath file))
+
   case shouldRun of
     YesRun -> pure ()
     NoRun -> do
@@ -123,29 +140,28 @@ scriptCmd opts = do
   -- than the source file, run it immediately.
   local (over globalOptsL modifyGO) $
     case shouldCompile of
-      SEInterpret -> longWay shouldRun shouldCompile file scriptDir
-      SECompile -> shortCut shouldRun shouldCompile file scriptDir
-      SEOptimize -> shortCut shouldRun shouldCompile file scriptDir
+      SEInterpret -> longWay shouldRun shouldCompile file exe
+      SECompile -> shortCut shouldRun shouldCompile file exe
+      SEOptimize -> shortCut shouldRun shouldCompile file exe
 
  where
-  runCompiled shouldRun file = do
-    let exeName = toExeName $ toFilePath file
+  runCompiled shouldRun exe = do
     case shouldRun of
-      YesRun -> exec exeName (soArgs opts)
+      YesRun -> exec exe (soArgs opts)
       NoRun -> prettyInfoL
         [ flow "Compilation finished, executable available at"
-        , style File (fromString exeName) <> "."
+        , style File (fromString exe) <> "."
         ]
 
-  shortCut shouldRun shouldCompile file scriptDir =
-    handleIO (const $ longWay shouldRun shouldCompile file scriptDir) $ do
+  shortCut shouldRun shouldCompile file exe =
+    handleIO (const $ longWay shouldRun shouldCompile file exe) $ do
       srcMod <- getModificationTime file
-      exeMod <- Dir.getModificationTime $ toExeName $ toFilePath file
+      exeMod <- Dir.getModificationTime exe
       if srcMod < exeMod
-        then runCompiled shouldRun file
-        else longWay shouldRun shouldCompile file scriptDir
+        then runCompiled shouldRun exe
+        else longWay shouldRun shouldCompile file exe
 
-  longWay shouldRun shouldCompile file scriptDir =
+  longWay shouldRun shouldCompile file exe =
     withConfig YesReexec $
     withDefaultEnvConfig $ do
       config <- view configL
@@ -184,7 +200,7 @@ scriptCmd opts = do
               withNewLocalBuildTargets targets $ build Nothing
 
         let ghcArgs = concat
-              [ ["-i", "-i" ++ toFilePath scriptDir]
+              [ ["-i", "-i" ++ takeDirectory (toFilePath file)]
               , ["-hide-all-packages"]
               , maybeToList colorFlag
               , map ("-package" ++)
@@ -196,6 +212,12 @@ scriptCmd opts = do
                   SECompile -> []
                   SEOptimize -> ["-O2"]
               , soGhcOptions opts
+              , if soHideBuiltFiles opts
+                  then
+                    [ "-outputdir=" ++ takeDirectory exe
+                    , "-o", exe
+                    ]
+                  else []
               ]
         case shouldCompile of
           SEInterpret -> do
@@ -208,22 +230,18 @@ scriptCmd opts = do
             -- stdout, which could break scripts, and (2) if there's an
             -- exception, the standard output we did capture will be reported
             -- to the user.
+            liftIO $ Dir.createDirectoryIfMissing True (takeDirectory exe)
             compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
-            withWorkingDir (toFilePath scriptDir) $ proc
+            withWorkingDir (takeDirectory $ toFilePath file) $ proc
               compilerExeName
               (ghcArgs ++ [toFilePath file])
               (void . readProcessStdout_)
-            runCompiled shouldRun file
+            runCompiled shouldRun exe
 
   toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse
 
   -- Like words, but splits on both commas and spaces
   wordsComma = splitWhen (\c -> c == ' ' || c == ',')
-
-  toExeName fp =
-    if osIsWindows
-      then replaceExtension fp "exe"
-      else dropExtension fp
 
 getPackagesFromImports ::
      FilePath -- ^ script filename
