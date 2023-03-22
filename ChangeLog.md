@@ -4,6 +4,11 @@
 
 Release notes:
 
+Behavior changes:
+
+* `stack script --extra-dep=<...>` now recognizes all the kinds of extra-deps
+  that Stack can use (local packages, git repos, etc.), not just package names.
+
 **Changes since v2.9.3:**
 
 Major changes:
