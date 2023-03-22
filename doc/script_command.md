@@ -62,8 +62,8 @@ like:
 │   ├── Main.dyn_hi
 │   ├── Main.hi
 │   └── Main.o
-├── %2FUsers%2Fjohn%2FMain2.hs//
-└── %2FUsers%2Fjohn%2Fother%2FMain.hs//
+├── %2FUsers%2Fjohn%2FMain2.hs/
+└── %2FUsers%2Fjohn%2Fother%2FMain.hs/
 ```
 
 Additional options can be passed to GHC using the `--ghc-options` option.
