@@ -118,7 +118,7 @@ scriptCmd opts = do
   root <- withConfig NoReexec $ view stackRootL
 
   let escape = S8.unpack . urlEncode False . S8.pack
-      outputDir = if soHideBuiltFiles opts
+      outputDir = if soUseRoot opts
         then toFilePath root </> "scripts" </> escape (toFilePath file)
         else toFilePath scriptDir
       exe = if osIsWindows
@@ -210,7 +210,7 @@ scriptCmd opts = do
                   SECompile -> []
                   SEOptimize -> ["-O2"]
               , soGhcOptions opts
-              , if soHideBuiltFiles opts
+              , if soUseRoot opts
                   then
                     [ "-outputdir=" ++ takeDirectory exe
                     , "-o", exe

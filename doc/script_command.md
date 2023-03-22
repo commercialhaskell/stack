@@ -51,9 +51,9 @@ file is compiled, passing the `--no-run` flag will mean the compiled code is not
 run.
 
 The build artifacts like `Main.hi`, `Main.o`, and the executable itself `Main`
-can be hidden away under the Stack root so they don't clutter your project
-directory by passing the `--hide-built-files` flag. Here's what the directory
-structure looks like:
+can be written under the Stack root so they don't clutter your project directory
+by passing the `--use-root` flag. Here's what the directory structure looks
+like:
 
 ```
 ~/.stack/scripts/

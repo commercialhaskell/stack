@@ -23,7 +23,7 @@ data ScriptOpts = ScriptOpts
   , soGhcOptions :: ![String]
   , soScriptExtraDeps :: ![PackageIdentifierRevision]
   , soShouldRun :: !ShouldRun
-  , soHideBuiltFiles :: !Bool
+  , soUseRoot :: !Bool
   }
   deriving Show
 
@@ -82,7 +82,7 @@ scriptOptsParser = ScriptOpts
       <|> pure YesRun
       )
   <*> switch
-        (  long "hide-built-files"
+        (  long "use-root"
         <> help "Write artifacts of compilation (.hi, .o, executable, etc.) to the Stack root's scripts/ directory instead of the current directory."
         )
  where
