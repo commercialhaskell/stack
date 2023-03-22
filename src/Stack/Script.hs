@@ -52,6 +52,7 @@ import           System.FilePath
                    ( dropExtension, replaceExtension, (</>), takeBaseName
                    , takeDirectory
                    )
+import           Network.HTTP.Types ( urlEncode )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Script" module.
@@ -116,12 +117,9 @@ scriptCmd opts = do
 
   root <- withConfig NoReexec $ view stackRootL
 
-  let sanitizeChar '/' = "#"
-      sanitizeChar '#' = "##"
-      sanitizeChar c = [c]
-      sanitize = concatMap sanitizeChar
+  let escape = S8.unpack . urlEncode False . S8.pack
       outputDir = if soHideBuiltFiles opts
-        then toFilePath root </> "scripts" </> sanitize (toFilePath file)
+        then toFilePath root </> "scripts" </> escape (toFilePath file)
         else toFilePath scriptDir
       exe = if osIsWindows
         then replaceExtension (outputDir </> takeBaseName (toFilePath file)) "exe"
