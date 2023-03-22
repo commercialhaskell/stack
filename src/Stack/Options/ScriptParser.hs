@@ -13,7 +13,13 @@ import           Options.Applicative
                    )
 import           Options.Applicative.Builder.Extra ( fileExtCompleter )
 import           Stack.Options.Completion ( ghcOptsCompleter )
-import           Stack.Prelude
+import           Stack.Prelude hiding ( Path )
+import           Data.ByteString.Lazy.Char8 ( pack )
+import           Data.Aeson ( eitherDecode, FromJSON (parseJSON) )
+import           Pantry.Internal.AesonExtended ( WithJSONWarnings )
+import           Data.Aeson.Types ( parseEither )
+import qualified Data.Text as T
+import qualified Data.Aeson.Types as A
 
 data ScriptOpts = ScriptOpts
   { soPackages :: ![String]
@@ -21,10 +27,9 @@ data ScriptOpts = ScriptOpts
   , soArgs :: ![String]
   , soCompile :: !ScriptExecute
   , soGhcOptions :: ![String]
-  , soScriptExtraDeps :: ![PackageIdentifierRevision]
+  , soScriptExtraDeps :: ![WithJSONWarnings (Unresolved (NonEmpty RawPackageLocation))]
   , soShouldRun :: !ShouldRun
   }
-  deriving Show
 
 data ScriptExecute
   = SEInterpret
@@ -81,5 +86,6 @@ scriptOptsParser = ScriptOpts
       <|> pure YesRun
       )
  where
-  extraDepRead = eitherReader $
-                   mapLeft show . parsePackageIdentifierRevision . fromString
+  extraDepRead =
+      eitherReader (parseEither parseJSON . A.String . T.pack)
+      <|> eitherReader (eitherDecode . pack)

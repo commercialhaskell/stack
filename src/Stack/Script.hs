@@ -48,6 +48,9 @@ import           Stack.Types.Config
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), SourceMap (..) )
 import           System.FilePath ( dropExtension, replaceExtension )
+import           Pantry.Internal.AesonExtended
+                   ( WithJSONWarnings(..), logJSONWarnings )
+import           Control.Monad.Extra ( concatForM )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Script" module.
@@ -99,12 +102,16 @@ scriptCmd opts = do
   isNoRunCompile <- fromFirstFalse . configMonoidNoRunCompile <$>
                            view (globalOptsL.to globalConfigMonoid)
 
+  extraDeps <- concatForM (soScriptExtraDeps opts) $ \(WithJSONWarnings unresolved warnings) -> do
+    logJSONWarnings "in --extra-deps" warnings
+    toList <$> resolvePaths (Just $ parent file) unresolved
+
   let scriptDir = parent file
       modifyGO go = go
           { globalConfigMonoid = (globalConfigMonoid go)
               { configMonoidInstallGHC = FirstTrue $ Just True
               }
-          , globalStackYaml = SYLNoProject $ soScriptExtraDeps opts
+          , globalStackYaml = SYLNoProject extraDeps
           }
       (shouldRun, shouldCompile) = if isNoRunCompile
         then (NoRun, SECompile)

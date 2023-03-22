@@ -263,7 +263,7 @@ configFromConfigMonoid
           case configProject of
             PCProject _ -> True
             PCGlobalProject -> True
-            PCNoProject _ -> False
+            PCNoProject _ -> True
     configWorkDir0 <-
       let parseStackWorkEnv x =
             catch
@@ -681,7 +681,7 @@ withBuildConfig inner = do
  where
   getEmptyProject ::
        Maybe RawSnapshotLocation
-    -> [PackageIdentifierRevision]
+    -> [RawPackageLocation]
     -> RIO Config Project
   getEmptyProject mresolver extraDeps = do
     r <- case mresolver of
@@ -695,8 +695,7 @@ withBuildConfig inner = do
     pure Project
       { projectUserMsg = Nothing
       , projectPackages = []
-      , projectDependencies =
-          map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
+      , projectDependencies = extraDeps
       , projectFlags = mempty
       , projectResolver = r
       , projectCompiler = Nothing

@@ -830,7 +830,7 @@ data StackYamlLoc
     -- ^ Use the standard parent-directory-checking logic
   | SYLOverride !(Path Abs File)
     -- ^ Use a specific stack.yaml file provided
-  | SYLNoProject ![PackageIdentifierRevision]
+  | SYLNoProject ![RawPackageLocation]
     -- ^ Do not load up a project, just user configuration. Include
     -- the given extra dependencies with the resolver.
   | SYLGlobalProject
@@ -882,7 +882,7 @@ data ProjectConfig a
   | PCGlobalProject
     -- ^ No project was found when using 'SYLDefault'. Instead, use
     -- the implicit global.
-  | PCNoProject ![PackageIdentifierRevision]
+  | PCNoProject ![RawPackageLocation]
     -- ^ Use a no project run. This comes from 'SYLNoProject'.
 
 -- | Parsed global command-line options monoid.
