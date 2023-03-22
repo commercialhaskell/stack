@@ -48,9 +48,23 @@ version of GHC specified by the snapshot is always available.
 The source file can be compiled by passing either the `--compile` flag (no
 optimization) or the `--optimize` flag (compilation with optimization). If the
 file is compiled, passing the `--no-run` flag will mean the compiled code is not
-run. The build artifacts like `Main.hi`, `Main.o`, and the executable itself
-`Main` can be hidden away under the Stack root so they don't clutter your
-project directory by passing the `--hide-built-files` flag.
+run.
+
+The build artifacts like `Main.hi`, `Main.o`, and the executable itself `Main`
+can be hidden away under the Stack root so they don't clutter your project
+directory by passing the `--hide-built-files` flag. Here's what the directory
+structure looks like:
+
+```
+~/.stack/scripts/
+├── %2FUsers%2Fjohn%2FMain.hs/
+│   ├── Main
+│   ├── Main.dyn_hi
+│   ├── Main.hi
+│   └── Main.o
+├── %2FUsers%2Fjohn%2FMain2.hs//
+└── %2FUsers%2Fjohn%2Fother%2FMain.hs//
+```
 
 Additional options can be passed to GHC using the `--ghc-options` option.
 
