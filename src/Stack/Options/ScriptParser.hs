@@ -83,7 +83,7 @@ scriptOptsParser = ScriptOpts
       )
   <*> switch
         (  long "hide-built-files"
-        <> help "Write artifacts of compilation (.hi, .o, executable, etc.) to the Stack root scripts directory (usually ~/.stack/scripts) instead of the current directory."
+        <> help "Write artifacts of compilation (.hi, .o, executable, etc.) to the Stack root's scripts/ directory instead of the current directory."
         )
  where
   extraDepRead = eitherReader $

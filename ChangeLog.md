@@ -6,7 +6,7 @@ Release notes:
 
 New features:
 
-* `stack script` learned a new option `--hide-built-files` (used with `--compile` or `--optimize`) which will make it write build artifacts like `Main.hi`, `Main.o`, and the executable itself `Main` to `~/.stack` so that those files don't clutter up your project directory.
+* `stack script` learned a new option `--hide-built-files` (used with `--compile` or `--optimize`) which will make it write build artifacts like `Main.hi`, `Main.o`, and the executable itself `Main` to the Stack root so that those files don't clutter up your project directory.
 
 **Changes since v2.9.3:**
 
