@@ -81,11 +81,10 @@ scriptOptsParser = ScriptOpts
             )
       <|> pure YesRun
       )
-  <*> (switch
+  <*> switch
         (  long "hide-built-files"
         <> help "Write artifacts of compilation (.hi, .o, executable, etc.) to the Stack root scripts directory (usually ~/.stack/scripts) instead of the current directory."
         )
-      )
  where
   extraDepRead = eitherReader $
                    mapLeft show . parsePackageIdentifierRevision . fromString

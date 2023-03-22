@@ -119,7 +119,7 @@ scriptCmd opts = do
   let sanitizeChar '/' = "#"
       sanitizeChar '#' = "##"
       sanitizeChar c = [c]
-      sanitize path = concatMap sanitizeChar path
+      sanitize = concatMap sanitizeChar
       outputDir = if soHideBuiltFiles opts
         then toFilePath root </> "scripts" </> sanitize (toFilePath file)
         else toFilePath scriptDir
