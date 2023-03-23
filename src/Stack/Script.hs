@@ -422,7 +422,7 @@ parseImports =
             $ S8.takeWhile (\c -> c /= ' ' && c /= '(') bs3
         )
 
-data FailedToParseUrlEncodedPath
+newtype FailedToParseUrlEncodedPath
   = FailedToParseUrlEncodedPath (Path Abs File)
 
 instance Show FailedToParseUrlEncodedPath where
