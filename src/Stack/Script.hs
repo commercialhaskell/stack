@@ -149,7 +149,7 @@ scriptCmd opts = do
       SEOptimize -> shortCut shouldRun shouldCompile file exe
 
  where
-  runCompiled shouldRun (exe :: Path Abs File) = do
+  runCompiled shouldRun exe = do
     case shouldRun of
       YesRun -> exec (fromAbsFile exe) (soArgs opts)
       NoRun -> prettyInfoL
@@ -157,7 +157,7 @@ scriptCmd opts = do
         , style File (fromString (fromAbsFile exe)) <> "."
         ]
 
-  shortCut shouldRun shouldCompile file (exe :: Path Abs File) =
+  shortCut shouldRun shouldCompile file exe =
     handleIO (const $ longWay shouldRun shouldCompile file exe) $ do
       srcMod <- getModificationTime file
       exeMod <- Dir.getModificationTime (fromAbsFile exe)
@@ -165,7 +165,7 @@ scriptCmd opts = do
         then runCompiled shouldRun exe
         else longWay shouldRun shouldCompile file exe
 
-  longWay shouldRun shouldCompile file (exe :: Path Abs File) =
+  longWay shouldRun shouldCompile file exe =
     withConfig YesReexec $
     withDefaultEnvConfig $ do
       config <- view configL
