@@ -116,7 +116,7 @@ scriptCmd opts = do
         else (soShouldRun opts, soCompile opts)
 
   root <- withConfig NoReexec $ view stackRootL
-  let escape path = case parseRelDir $ S8.unpack $ urlEncode False $ S8.pack $ toFilePath path of
+  let escape path = case parseRelDir $ S8.unpack $ urlEncode True $ S8.pack $ toFilePath path of
         Nothing -> throwIO $ FailedToParseUrlEncodedDir file
         Just escaped -> return escaped
   outputDir <- if soUseRoot opts
