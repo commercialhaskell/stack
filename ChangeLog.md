@@ -4,6 +4,13 @@
 
 Release notes:
 
+New features:
+
+* `stack script` learned a new option `--use-root` (used with
+  `--compile` or `--optimize`) which will make it write build artifacts like
+  `Main.hi`, `Main.o`, and the executable itself `Main` to the Stack root so
+  that those files don't clutter up your project directory.
+
 **Changes since v2.9.3:**
 
 Major changes:

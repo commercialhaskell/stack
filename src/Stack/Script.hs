@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Stack.Script
     ( scriptCmd
     ) where
@@ -21,7 +22,10 @@ import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.VersionRange ( withinRange )
 import           Distribution.System ( Platform (..) )
 import qualified Pantry.SHA256 as SHA256
-import           Path ( parent )
+import           Path
+                   ( parent, (</>), mkRelDir, parseRelDir, fromAbsFile
+                   , filename, replaceExtension, splitExtension, fromAbsDir
+                   )
 import           Path.IO ( getModificationTime, resolveFile' )
 import qualified RIO.Directory as Dir
 import           RIO.Process ( exec, proc, readProcessStdout_, withWorkingDir )
@@ -44,10 +48,11 @@ import           Stack.Types.Config
                    , HasEnvConfig (..), HasPlatform (..), Runner
                    , StackYamlLoc (..), actualCompilerVersionL
                    , appropriateGhcColorFlag, defaultEnvSettings, globalOptsL
+                   , stackRootL
                    )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), SourceMap (..) )
-import           System.FilePath ( dropExtension, replaceExtension )
+import           Network.HTTP.Types ( urlEncode )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Script" module.
@@ -110,6 +115,22 @@ scriptCmd opts = do
         then (NoRun, SECompile)
         else (soShouldRun opts, soCompile opts)
 
+  root <- withConfig NoReexec $ view stackRootL
+  let escape path = case parseRelDir $ S8.unpack $ urlEncode True $ S8.pack $ toFilePath path of
+        Nothing -> throwIO $ FailedToParseUrlEncodedPath file
+        Just escaped -> return escaped
+  outputDir <- if soUseRoot opts
+    then do
+      escaped <- escape file
+      return $ root </> $(mkRelDir "scripts") </> escaped
+    else return scriptDir
+
+  let dropExtension path = fst <$> splitExtension path
+
+  exe <- if osIsWindows
+    then replaceExtension ".exe" (outputDir </> filename file)
+    else dropExtension (outputDir </> filename file)
+
   case shouldRun of
     YesRun -> pure ()
     NoRun -> do
@@ -123,29 +144,28 @@ scriptCmd opts = do
   -- than the source file, run it immediately.
   local (over globalOptsL modifyGO) $
     case shouldCompile of
-      SEInterpret -> longWay shouldRun shouldCompile file scriptDir
-      SECompile -> shortCut shouldRun shouldCompile file scriptDir
-      SEOptimize -> shortCut shouldRun shouldCompile file scriptDir
+      SEInterpret -> longWay shouldRun shouldCompile file exe
+      SECompile -> shortCut shouldRun shouldCompile file exe
+      SEOptimize -> shortCut shouldRun shouldCompile file exe
 
  where
-  runCompiled shouldRun file = do
-    let exeName = toExeName $ toFilePath file
+  runCompiled shouldRun exe = do
     case shouldRun of
-      YesRun -> exec exeName (soArgs opts)
+      YesRun -> exec (fromAbsFile exe) (soArgs opts)
       NoRun -> prettyInfoL
         [ flow "Compilation finished, executable available at"
-        , style File (fromString exeName) <> "."
+        , style File (fromString (fromAbsFile exe)) <> "."
         ]
 
-  shortCut shouldRun shouldCompile file scriptDir =
-    handleIO (const $ longWay shouldRun shouldCompile file scriptDir) $ do
+  shortCut shouldRun shouldCompile file exe =
+    handleIO (const $ longWay shouldRun shouldCompile file exe) $ do
       srcMod <- getModificationTime file
-      exeMod <- Dir.getModificationTime $ toExeName $ toFilePath file
+      exeMod <- Dir.getModificationTime (fromAbsFile exe)
       if srcMod < exeMod
-        then runCompiled shouldRun file
-        else longWay shouldRun shouldCompile file scriptDir
+        then runCompiled shouldRun exe
+        else longWay shouldRun shouldCompile file exe
 
-  longWay shouldRun shouldCompile file scriptDir =
+  longWay shouldRun shouldCompile file exe =
     withConfig YesReexec $
     withDefaultEnvConfig $ do
       config <- view configL
@@ -184,7 +204,7 @@ scriptCmd opts = do
               withNewLocalBuildTargets targets $ build Nothing
 
         let ghcArgs = concat
-              [ ["-i", "-i" ++ toFilePath scriptDir]
+              [ ["-i", "-i" ++ fromAbsDir (parent file)]
               , ["-hide-all-packages"]
               , maybeToList colorFlag
               , map ("-package" ++)
@@ -196,6 +216,12 @@ scriptCmd opts = do
                   SECompile -> []
                   SEOptimize -> ["-O2"]
               , soGhcOptions opts
+              , if soUseRoot opts
+                  then
+                    [ "-outputdir=" ++ fromAbsDir (parent exe)
+                    , "-o", fromAbsFile exe
+                    ]
+                  else []
               ]
         case shouldCompile of
           SEInterpret -> do
@@ -208,22 +234,18 @@ scriptCmd opts = do
             -- stdout, which could break scripts, and (2) if there's an
             -- exception, the standard output we did capture will be reported
             -- to the user.
+            liftIO $ Dir.createDirectoryIfMissing True (fromAbsDir (parent exe))
             compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
-            withWorkingDir (toFilePath scriptDir) $ proc
+            withWorkingDir (fromAbsDir (parent file)) $ proc
               compilerExeName
               (ghcArgs ++ [toFilePath file])
               (void . readProcessStdout_)
-            runCompiled shouldRun file
+            runCompiled shouldRun exe
 
   toPackageName = reverse . drop 1 . dropWhile (/= '-') . reverse
 
   -- Like words, but splits on both commas and spaces
   wordsComma = splitWhen (\c -> c == ' ' || c == ',')
-
-  toExeName fp =
-    if osIsWindows
-      then replaceExtension fp "exe"
-      else dropExtension fp
 
 getPackagesFromImports ::
      FilePath -- ^ script filename
@@ -399,3 +421,14 @@ parseImports =
             $ decodeUtf8With lenientDecode
             $ S8.takeWhile (\c -> c /= ' ' && c /= '(') bs3
         )
+
+newtype FailedToParseUrlEncodedPath
+  = FailedToParseUrlEncodedPath (Path Abs File)
+
+instance Show FailedToParseUrlEncodedPath where
+  show (FailedToParseUrlEncodedPath fp) = unlines
+    [ "Failed to parse URL-encoded file: " ++ fromAbsFile fp
+    , "This should never happen because URL-encoded strings are valid filenames."
+    ]
+
+instance Exception FailedToParseUrlEncodedPath

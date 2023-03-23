@@ -9,7 +9,7 @@ module Stack.Options.ScriptParser
 
 import           Options.Applicative
                    ( Parser, completer, eitherReader, flag', help, long
-                   , metavar, option, strArgument, strOption
+                   , metavar, option, strArgument, strOption, switch
                    )
 import           Options.Applicative.Builder.Extra ( fileExtCompleter )
 import           Stack.Options.Completion ( ghcOptsCompleter )
@@ -23,6 +23,7 @@ data ScriptOpts = ScriptOpts
   , soGhcOptions :: ![String]
   , soScriptExtraDeps :: ![PackageIdentifierRevision]
   , soShouldRun :: !ShouldRun
+  , soUseRoot :: !Bool
   }
   deriving Show
 
@@ -80,6 +81,10 @@ scriptOptsParser = ScriptOpts
             )
       <|> pure YesRun
       )
+  <*> switch
+        (  long "use-root"
+        <> help "Write artifacts of compilation (.hi, .o, executable, etc.) to the Stack root's scripts/ directory instead of the current directory."
+        )
  where
   extraDepRead = eitherReader $
                    mapLeft show . parsePackageIdentifierRevision . fromString
