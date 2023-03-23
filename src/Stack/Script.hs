@@ -117,7 +117,7 @@ scriptCmd opts = do
 
   root <- withConfig NoReexec $ view stackRootL
   let escape path = case parseRelDir $ S8.unpack $ urlEncode True $ S8.pack $ toFilePath path of
-        Nothing -> throwIO $ FailedToParseUrlEncodedDir file
+        Nothing -> throwIO $ FailedToParseUrlEncodedPath file
         Just escaped -> return escaped
   outputDir <- if soUseRoot opts
     then do
@@ -422,13 +422,13 @@ parseImports =
             $ S8.takeWhile (\c -> c /= ' ' && c /= '(') bs3
         )
 
-data FailedToParseUrlEncodedDir
-  = FailedToParseUrlEncodedDir (Path Abs File)
+data FailedToParseUrlEncodedPath
+  = FailedToParseUrlEncodedPath (Path Abs File)
 
-instance Show FailedToParseUrlEncodedDir where
-  show (FailedToParseUrlEncodedDir fp) = unlines
-    [ "Failed to parse URL-encoded directory: " ++ fromAbsFile fp
+instance Show FailedToParseUrlEncodedPath where
+  show (FailedToParseUrlEncodedPath fp) = unlines
+    [ "Failed to parse URL-encoded file: " ++ fromAbsFile fp
     , "This should never happen because URL-encoded strings are valid filenames."
     ]
 
-instance Exception FailedToParseUrlEncodedDir
+instance Exception FailedToParseUrlEncodedPath
