@@ -4,13 +4,6 @@
 
 Release notes:
 
-New features:
-
-* `stack script` learned a new option `--use-root` (used with
-  `--compile` or `--optimize`) which will make it write build artifacts like
-  `Main.hi`, `Main.o`, and the executable itself `Main` to the Stack root so
-  that those files don't clutter up your project directory.
-
 **Changes since v2.9.3:**
 
 Major changes:
@@ -34,6 +27,11 @@ Behavior changes:
 
 Other enhancements:
 
+* Add flag `--[no-]use-root` to `stack script` (default disabled). Used with
+  `--compile` or `--optimize`, when enabled all compilation outputs (including
+  the executable) are written to a script-specific location in the `scripts`
+  directory of the Stack root rather than the script's directory, avoiding
+  clutter of the latter directory.
 * Better error message if the value of the `STACK_WORK` environment variable or
   `--work-dir` option is not a valid relative path.
 * Stack will use the value of the `GH_TOKEN`, or `GITHUB_TOKEN`, environment

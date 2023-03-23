@@ -5,13 +5,13 @@
 ~~~text
 stack script [--package PACKAGE] FILE
              [-- ARGUMENT(S) (e.g. stack script X.hs -- argument(s) to program)]
-             [--compile | --optimize] [--ghc-options OPTIONS]
+             [--compile | --optimize] [--[no-]use-root] [--ghc-options OPTIONS]
              [--extra-dep PACKAGE-VERSION] [--no-run]
 ~~~
 
 The `stack script` command either runs a specified Haskell source file (using
-GHC's `runghc`) or, optionally, compiles a specified Haskell source file (using
-GHC) and, by default, runs it.
+GHC's `runghc`) or, optionally, compiles such a file (using GHC) and, by
+default, runs it.
 
 Unlike `stack ghc` and `stack runghc`, the command ignores all Stack YAML
 configuration files (global and project-level). A snapshot must be specified on
@@ -50,25 +50,17 @@ optimization) or the `--optimize` flag (compilation with optimization). If the
 file is compiled, passing the `--no-run` flag will mean the compiled code is not
 run.
 
-The build artifacts like `Main.hi`, `Main.o`, and the executable itself `Main`
-can be written under the Stack root so they don't clutter your project directory
-by passing the `--use-root` flag. Here's what the directory structure looks
-like:
-
-```
-~/.stack/scripts/
-├── %2FUsers%2Fjohn%2FMain.hs/
-│   ├── Main
-│   ├── Main.dyn_hi
-│   ├── Main.hi
-│   └── Main.o
-├── %2FUsers%2Fjohn%2FMain2.hs/
-└── %2FUsers%2Fjohn%2Fother%2FMain.hs/
-```
+By default, all the compilation outputs (including the executable) are written
+to the directory of the source file. Pass the `--use-root` flag to write such
+outputs to a script-specific location in the `scripts` directory of the Stack
+root. The location is an encoded version of the absolute path to the source
+file. This can avoid clutter in the source file directory.
 
 Additional options can be passed to GHC using the `--ghc-options` option.
 
-For example, `MyScript.hs`:
+## Examples
+
+For example, `MyScript.hs` at location `/Users/john`:
 
 ~~~haskell
 module Main (main) where
@@ -90,3 +82,8 @@ can be compiled and run, with arguments, with:
 ~~~text
 stack --resolver lts-20.4 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
 ~~~
+
+If compiled and run with the additional flag `--use-root`, all the compilation
+outputs (like `Main.hi`, `Main.o`, and the executable `MyScript`) will be
+written to the directory `%2FUsers%2Fjohn%2FMyScript.hs` in the `scripts`
+directory of the Stack root.

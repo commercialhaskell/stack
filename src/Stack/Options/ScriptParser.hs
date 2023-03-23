@@ -8,10 +8,11 @@ module Stack.Options.ScriptParser
   ) where
 
 import           Options.Applicative
-                   ( Parser, completer, eitherReader, flag', help, long
-                   , metavar, option, strArgument, strOption, switch
+                   ( Parser, completer, eitherReader, flag', help, long, metavar
+                   , option, strArgument, strOption
                    )
-import           Options.Applicative.Builder.Extra ( fileExtCompleter )
+import           Options.Applicative.Builder.Extra
+                   ( boolFlags, fileExtCompleter )
 import           Stack.Options.Completion ( ghcOptsCompleter )
 import           Stack.Prelude
 
@@ -20,10 +21,10 @@ data ScriptOpts = ScriptOpts
   , soFile :: !FilePath
   , soArgs :: ![String]
   , soCompile :: !ScriptExecute
+  , soUseRoot :: !Bool
   , soGhcOptions :: ![String]
   , soScriptExtraDeps :: ![PackageIdentifierRevision]
   , soShouldRun :: !ShouldRun
-  , soUseRoot :: !Bool
   }
   deriving Show
 
@@ -63,6 +64,11 @@ scriptOptsParser = ScriptOpts
             )
       <|> pure SEInterpret
       )
+  <*> boolFlags False
+        "use-root"
+        "writing of all compilation outputs to a location in the scripts \
+        \directory of the Stack root"
+        mempty
   <*> many (strOption
         (  long "ghc-options"
         <> metavar "OPTIONS"
@@ -81,10 +87,6 @@ scriptOptsParser = ScriptOpts
             )
       <|> pure YesRun
       )
-  <*> switch
-        (  long "use-root"
-        <> help "Write artifacts of compilation (.hi, .o, executable, etc.) to the Stack root's scripts/ directory instead of the current directory."
-        )
  where
   extraDepRead = eitherReader $
                    mapLeft show . parsePackageIdentifierRevision . fromString
