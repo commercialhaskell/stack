@@ -61,6 +61,7 @@ data ScriptException
   | AmbiguousModuleName ModuleName [PackageName]
   | ArgumentsWithNoRunInvalid
   | NoRunWithoutCompilationInvalid
+  | FailedToParseUrlEncodedPathBug (Path Abs File)
   deriving (Show, Typeable)
 
 instance Exception ScriptException where
@@ -82,6 +83,11 @@ instance Exception ScriptException where
   displayException NoRunWithoutCompilationInvalid =
     "Error: [S-9469]\n"
     ++ "'--no-run' requires either '--compile' or '--optimize'."
+  displayException (FailedToParseUrlEncodedPathBug fp) =
+    bugReport "[S-9464]" $ concat
+      [ "Failed to parse URL-encoded file:\n"
+      , fromAbsFile fp <> "\n"
+      ]
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()
@@ -116,9 +122,11 @@ scriptCmd opts = do
         else (soShouldRun opts, soCompile opts)
 
   root <- withConfig NoReexec $ view stackRootL
-  let escape path = case parseRelDir $ S8.unpack $ urlEncode True $ S8.pack $ toFilePath path of
-        Nothing -> throwIO $ FailedToParseUrlEncodedPath file
-        Just escaped -> return escaped
+  let escape path = case parseRelDir $ S8.unpack escapedPath of
+        Nothing -> throwIO $ FailedToParseUrlEncodedPathBug file
+        Just escaped -> pure escaped
+       where
+        escapedPath = urlEncode True $ S8.pack $ toFilePath path
   outputDir <- if soUseRoot opts
     then do
       escaped <- escape file
@@ -421,14 +429,3 @@ parseImports =
             $ decodeUtf8With lenientDecode
             $ S8.takeWhile (\c -> c /= ' ' && c /= '(') bs3
         )
-
-newtype FailedToParseUrlEncodedPath
-  = FailedToParseUrlEncodedPath (Path Abs File)
-
-instance Show FailedToParseUrlEncodedPath where
-  show (FailedToParseUrlEncodedPath fp) = unlines
-    [ "Failed to parse URL-encoded file: " ++ fromAbsFile fp
-    , "This should never happen because URL-encoded strings are valid filenames."
-    ]
-
-instance Exception FailedToParseUrlEncodedPath
