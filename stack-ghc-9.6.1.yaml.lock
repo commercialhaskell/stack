@@ -1111,9 +1111,9 @@ packages:
   original:
     hackage: unliftio-0.2.24.0
 - completed:
-    hackage: unliftio-core-0.2.1.0@sha256:9fc3506770b16cdc73114307f854d56ddb96c7b930e7a5ed9b48cd0a8f33fca6,1004
+    hackage: unliftio-core-0.2.1.0@sha256:cb78a95718f9cb2579a8a1208d4a148ea358f0774321c8cb905bfb0b96a2813c,1004
     pantry-tree:
-      sha256: 32c04ca24f220513837e1eec39a30c06054e670126c136aed38c5b4aab4d357b
+      sha256: 7b2b21bc7e1f73ddccbf2b1deb9c920147cff3de9a38cd9e0810c5a236ef6af6
       size: 328
   original:
     hackage: unliftio-core-0.2.1.0

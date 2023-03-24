@@ -169,8 +169,7 @@ extra-deps:
 - unix-compat-0.7
 - unix-time-0.4.9
 - unliftio-0.2.24.0
-- unliftio-core-0.2.1.0 # This is a problem because of base
-                        # See https://github.com/fpco/unliftio/pull/112#issuecomment-1478483362
+- unliftio-core-0.2.1.0@rev2
 - unordered-containers-0.2.19.1
 - uuid-types-1.0.5
 - vault-0.3.1.5
