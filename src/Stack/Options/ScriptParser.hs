@@ -66,8 +66,8 @@ scriptOptsParser = ScriptOpts
       )
   <*> boolFlags False
         "use-root"
-        "writing of all compilation outputs to a location in the scripts \
-        \directory of the Stack root"
+        "writing of all compilation outputs to a script-specific location in \
+        \the scripts directory of the Stack root"
         mempty
   <*> many (strOption
         (  long "ghc-options"
