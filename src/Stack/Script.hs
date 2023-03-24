@@ -3,8 +3,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 module Stack.Script
-    ( scriptCmd
-    ) where
+  ( scriptCmd
+  ) where
 
 import           Data.ByteString.Builder ( toLazyByteString )
 import qualified Data.ByteString.Char8 as S8
@@ -93,15 +93,14 @@ instance Exception ScriptException where
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()
 scriptCmd opts = do
-  -- Some warnings in case the user somehow tries to set a
-  -- stack.yaml location. Note that in this functions we use
-  -- logError instead of logWarn because, when using the
-  -- interpreter mode, only error messages are shown. See:
+  -- Some warnings in case the user somehow tries to set a stack.yaml location.
+  -- Note that in this functions we use logError instead of logWarn because,
+  -- when using the interpreter mode, only error messages are shown. See:
   -- https://github.com/commercialhaskell/stack/issues/3007
   view (globalOptsL.to globalStackYaml) >>= \case
     SYLOverride fp -> logError $
-      "Ignoring override stack.yaml file for script command: " <>
-      fromString (toFilePath fp)
+         "Ignoring override stack.yaml file for script command: "
+      <> fromString (toFilePath fp)
     SYLGlobalProject -> logError "Ignoring SYLGlobalProject for script command"
     SYLDefault -> pure ()
     SYLNoProject _ -> assert False (pure ())
@@ -114,11 +113,11 @@ scriptCmd opts = do
 
   let scriptDir = parent file
       modifyGO go = go
-          { globalConfigMonoid = (globalConfigMonoid go)
-              { configMonoidInstallGHC = FirstTrue $ Just True
-              }
-          , globalStackYaml = SYLNoProject $ soScriptExtraDeps opts
-          }
+        { globalConfigMonoid = (globalConfigMonoid go)
+            { configMonoidInstallGHC = FirstTrue $ Just True
+            }
+        , globalStackYaml = SYLNoProject $ soScriptExtraDeps opts
+        }
       (shouldRun, shouldCompile) = if isNoRunCompile
         then (NoRun, SECompile)
         else (soShouldRun opts, soCompile opts)
@@ -158,8 +157,8 @@ scriptCmd opts = do
         SECompile -> pure ()
         SEOptimize -> pure ()
 
-  -- Optimization: if we're compiling, and the executable is newer
-  -- than the source file, run it immediately.
+  -- Optimization: if we're compiling, and the executable is newer than the
+  -- source file, run it immediately.
   local (over globalOptsL modifyGO) $
     case shouldCompile of
       SEInterpret -> longWay shouldRun shouldCompile file exe
@@ -200,10 +199,10 @@ scriptCmd opts = do
               pure $ Set.fromList targets'
 
         unless (Set.null targetsSet) $ do
-          -- Optimization: use the relatively cheap ghc-pkg list
-          -- --simple-output to check which packages are installed
-          -- already. If all needed packages are available, we can
-          -- skip the (rather expensive) build call below.
+          -- Optimization: use the relatively cheap ghc-pkg list --simple-output
+          -- to check which packages are installed already. If all needed
+          -- packages are available, we can skip the (rather expensive) build
+          -- call below.
           GhcPkgExe pkg <- view $ compilerPathsL.to cpPkg
           -- https://github.com/haskell/process/issues/251
           bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
@@ -292,10 +291,9 @@ hashSnapshot :: RIO EnvConfig SnapshotCacheHash
 hashSnapshot = do
   sourceMap <- view $ envConfigL . to envConfigSourceMap
   compilerInfo <- getCompilerInfo
-  let eitherPliHash (pn, dep) | PLImmutable pli <- dpLocation dep =
-                                  Right $ immutableLocSha pli
-                              | otherwise =
-                                  Left pn
+  let eitherPliHash (pn, dep)
+        | PLImmutable pli <- dpLocation dep = Right $ immutableLocSha pli
+        | otherwise = Left pn
       deps = Map.toList (smDeps sourceMap)
   case partitionEithers (map eitherPliHash deps) of
     ([], pliHashes) -> do
@@ -303,15 +301,14 @@ hashSnapshot = do
       pure
         $ SnapshotCacheHash (SHA256.hashLazyBytes
         $ toLazyByteString hashedContent)
-    (mutables, _) ->
-      throwM $ MutableDependenciesForScript mutables
+    (mutables, _) -> throwM $ MutableDependenciesForScript mutables
 
 mapSnapshotPackageModules :: RIO EnvConfig (Map PackageName (Set ModuleName))
 mapSnapshotPackageModules = do
   sourceMap <- view $ envConfigL . to envConfigSourceMap
   installMap <- toInstallMap sourceMap
   (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
-      getInstalled installMap
+    getInstalled installMap
   let globals = dumpedPackageModules (smGlobal sourceMap) globalDumpPkgs
       notHidden = Map.filter (not . dpHidden)
       notHiddenDeps = notHidden $ smDeps sourceMap
@@ -321,13 +318,14 @@ mapSnapshotPackageModules = do
   otherDeps <- for notInstalledDeps $ \dep -> do
     gpd <- liftIO $ cpGPD (dpCommon dep)
     Set.fromList <$> allExposedModules gpd
-  -- source map construction process should guarantee unique package names
-  -- in these maps
+  -- source map construction process should guarantee unique package names in
+  -- these maps
   pure $ globals <> installedDeps <> otherDeps
 
-dumpedPackageModules :: Map PackageName a
-                     -> [DumpPackage]
-                     -> Map PackageName (Set ModuleName)
+dumpedPackageModules ::
+     Map PackageName a
+  -> [DumpPackage]
+  -> Map PackageName (Set ModuleName)
 dumpedPackageModules pkgs dumpPkgs =
   let pnames = Map.keysSet pkgs `Set.difference` blacklist
   in  Map.fromList
@@ -356,47 +354,26 @@ allExposedModules gpd = do
                 map moduleReexportName (PD.reexportedModules lib)
     Nothing  -> mempty
 
--- | The Stackage project introduced the concept of hidden packages,
--- to deal with conflicting module names. However, this is a
--- relatively recent addition (at time of writing). See:
--- http://www.snoyman.com/blog/2017/01/conflicting-module-names. To
--- kick this thing off a bit better, we're included a blacklist of
--- packages that should never be auto-parsed in.
+-- | The Stackage project introduced the concept of hidden packages, to deal
+-- with conflicting module names. However, this is a relatively recent addition
+-- (at time of writing). See:
+-- http://www.snoyman.com/blog/2017/01/conflicting-module-names. To kick this
+-- thing off a bit better, we're included a blacklist of packages that should
+-- never be auto-parsed in.
 blacklist :: Set PackageName
 blacklist = Set.fromList
-  [ mkPackageName "async-dejafu"
-  , mkPackageName "monads-tf"
-  , mkPackageName "crypto-api"
-  , mkPackageName "fay-base"
-  , mkPackageName "hashmap"
-  , mkPackageName "hxt-unicode"
-  , mkPackageName "hledger-web"
-  , mkPackageName "plot-gtk3"
-  , mkPackageName "gtk3"
-  , mkPackageName "regex-pcre-builtin"
-  , mkPackageName "regex-compat-tdfa"
-  , mkPackageName "log"
-  , mkPackageName "zip"
-  , mkPackageName "monad-extras"
-  , mkPackageName "control-monad-free"
-  , mkPackageName "prompt"
-  , mkPackageName "kawhi"
-  , mkPackageName "language-c"
-  , mkPackageName "gl"
-  , mkPackageName "svg-tree"
-  , mkPackageName "Glob"
-  , mkPackageName "nanospec"
+  [ mkPackageName "Glob"
   , mkPackageName "HTF"
-  , mkPackageName "courier"
-  , mkPackageName "newtype-generics"
-  , mkPackageName "objective"
+  , mkPackageName "async-dejafu"
   , mkPackageName "binary-ieee754"
-  , mkPackageName "rerebase"
   , mkPackageName "cipher-aes"
   , mkPackageName "cipher-blowfish"
   , mkPackageName "cipher-camellia"
   , mkPackageName "cipher-des"
   , mkPackageName "cipher-rc4"
+  , mkPackageName "control-monad-free"
+  , mkPackageName "courier"
+  , mkPackageName "crypto-api"
   , mkPackageName "crypto-cipher-types"
   , mkPackageName "crypto-numbers"
   , mkPackageName "crypto-pubkey"
@@ -406,14 +383,35 @@ blacklist = Set.fromList
   , mkPackageName "cryptohash-md5"
   , mkPackageName "cryptohash-sha1"
   , mkPackageName "cryptohash-sha256"
+  , mkPackageName "fay-base"
+  , mkPackageName "gl"
+  , mkPackageName "gtk3"
+  , mkPackageName "hashmap"
+  , mkPackageName "hledger-web"
+  , mkPackageName "hxt-unicode"
+  , mkPackageName "kawhi"
+  , mkPackageName "language-c"
+  , mkPackageName "log"
+  , mkPackageName "monad-extras"
+  , mkPackageName "monads-tf"
+  , mkPackageName "nanospec"
+  , mkPackageName "newtype-generics"
+  , mkPackageName "objective"
+  , mkPackageName "plot-gtk3"
+  , mkPackageName "prompt"
+  , mkPackageName "regex-compat-tdfa"
+  , mkPackageName "regex-pcre-builtin"
+  , mkPackageName "rerebase"
+  , mkPackageName "svg-tree"
+  , mkPackageName "zip"
   ]
 
 parseImports :: ByteString -> (Set PackageName, Set ModuleName)
 parseImports =
   fold . mapMaybe (parseLine . stripCR') . S8.lines
  where
-  -- Remove any carriage pure character present at the end, to
-  -- support Windows-style line endings (CRLF)
+  -- Remove any carriage pure character present at the end, to support
+  -- Windows-style line endings (CRLF)
   stripCR' bs
     | S8.null bs = bs
     | S8.last bs == '\r' = S8.init bs
