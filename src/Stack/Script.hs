@@ -83,11 +83,9 @@ instance Exception ScriptException where
   displayException NoRunWithoutCompilationInvalid =
     "Error: [S-9469]\n"
     ++ "'--no-run' requires either '--compile' or '--optimize'."
-  displayException (FailedToParseUrlEncodedPathBug fp) =
-    bugReport "[S-9464]" $ concat
-      [ "Failed to parse URL-encoded file:\n"
-      , fromAbsFile fp <> "\n"
-      ]
+  displayException (FailedToParseUrlEncodedPathBug fp) = bugReport "[S-9464]" $
+       "Failed to parse URL-encoded file:\n"
+    <> fromAbsFile fp <> "\n"
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()
