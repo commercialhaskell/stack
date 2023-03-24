@@ -241,7 +241,8 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-1691] | AmbiguousModuleName ModuleName [PackageName]
         [S-5067] | ArgumentsWithNoRunInvalid
         [S-9469] | NoRunWithoutCompilationInvalid
-        [S-9464] | FailedToParseUrlEncodedPathBug (Path Abs File)
+        [S-5055] | FailedToParseScriptFileAsDirBug (Path Rel File)
+        [S-9464] | FailedToParseFileAsDirBug (Path Abs Dir)
         ~~~
 
     -   `Stack.Setup.PerformPathCheckingException`

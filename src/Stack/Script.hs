@@ -23,8 +23,8 @@ import           Distribution.Types.VersionRange ( withinRange )
 import           Distribution.System ( Platform (..) )
 import qualified Pantry.SHA256 as SHA256
 import           Path
-                   ( parent, (</>), mkRelDir, parseRelDir, fromAbsFile
-                   , filename, replaceExtension, splitExtension, fromAbsDir
+                   ( (</>), filename, fromAbsDir, fromAbsFile, fromRelFile
+                   , parent, parseRelDir, replaceExtension, splitExtension
                    )
 import           Path.IO ( getModificationTime, resolveFile' )
 import qualified RIO.Directory as Dir
@@ -32,7 +32,7 @@ import           RIO.Process ( exec, proc, readProcessStdout_, withWorkingDir )
 import qualified RIO.Text as T
 import           Stack.Build ( build )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
-import           Stack.Constants ( osIsWindows )
+import           Stack.Constants ( osIsWindows, relDirScripts )
 import           Stack.Prelude
 import           Stack.Options.ScriptParser
                    ( ScriptExecute (..), ScriptOpts (..), ShouldRun (..) )
@@ -52,7 +52,7 @@ import           Stack.Types.Config
                    )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), SourceMap (..) )
-import           Network.HTTP.Types ( urlEncode )
+import           System.FilePath ( splitDrive )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Script" module.
@@ -61,7 +61,8 @@ data ScriptException
   | AmbiguousModuleName ModuleName [PackageName]
   | ArgumentsWithNoRunInvalid
   | NoRunWithoutCompilationInvalid
-  | FailedToParseUrlEncodedPathBug (Path Abs File)
+  | FailedToParseScriptFileAsDirBug (Path Rel File)
+  | FailedToParseFileAsDirBug (Path Abs Dir)
   deriving (Show, Typeable)
 
 instance Exception ScriptException where
@@ -83,9 +84,12 @@ instance Exception ScriptException where
   displayException NoRunWithoutCompilationInvalid =
     "Error: [S-9469]\n"
     ++ "'--no-run' requires either '--compile' or '--optimize'."
-  displayException (FailedToParseUrlEncodedPathBug fp) = bugReport "[S-9464]" $
-       "Failed to parse URL-encoded file:\n"
-    <> fromAbsFile fp <> "\n"
+  displayException (FailedToParseScriptFileAsDirBug fp) = bugReport "[S-5055]" $
+       "Failed to parse script file name as directory:\n"
+    <> fromRelFile fp <> "\n"
+  displayException (FailedToParseFileAsDirBug p) = bugReport "[S-9464]" $
+       "Failed to parse path to script file as directory:\n"
+    <> fromAbsDir p <> "\n"
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()
@@ -104,6 +108,7 @@ scriptCmd opts = do
     SYLNoProject _ -> assert False (pure ())
 
   file <- resolveFile' $ soFile opts
+  let scriptFile = filename file
 
   isNoRunCompile <- fromFirstFalse . configMonoidNoRunCompile <$>
                            view (globalOptsL.to globalConfigMonoid)
@@ -120,22 +125,30 @@ scriptCmd opts = do
         else (soShouldRun opts, soCompile opts)
 
   root <- withConfig NoReexec $ view stackRootL
-  let escape path = case parseRelDir $ S8.unpack escapedPath of
-        Nothing -> throwIO $ FailedToParseUrlEncodedPathBug file
-        Just escaped -> pure escaped
-       where
-        escapedPath = urlEncode True $ S8.pack $ toFilePath path
   outputDir <- if soUseRoot opts
     then do
-      escaped <- escape file
-      return $ root </> $(mkRelDir "scripts") </> escaped
-    else return scriptDir
+      scriptFileAsDir <- maybe
+        (throwIO $ FailedToParseScriptFileAsDirBug scriptFile)
+        pure
+        (parseRelDir $ fromRelFile scriptFile)
+      let fileAsDir = scriptDir </> scriptFileAsDir
+          -- We drop the information about the drive. On Windows, in principle,
+          -- the drive could distinguish between two otherwise identical
+          -- fileAsDir (eg C:\MyScript.hs\ D:\MyScript.hs\). In pactice, we
+          -- tolerate that possibility as being unlikely.
+          (_, escaped) = splitDrive (fromAbsDir fileAsDir)
+      escapedRelDir <- maybe
+        (throwIO $ FailedToParseFileAsDirBug fileAsDir)
+        pure
+        (parseRelDir escaped)
+      pure $ root </> relDirScripts </> escapedRelDir
+    else pure scriptDir
 
   let dropExtension path = fst <$> splitExtension path
 
   exe <- if osIsWindows
-    then replaceExtension ".exe" (outputDir </> filename file)
-    else dropExtension (outputDir </> filename file)
+    then replaceExtension ".exe" (outputDir </> scriptFile)
+    else dropExtension (outputDir </> scriptFile)
 
   case shouldRun of
     YesRun -> pure ()

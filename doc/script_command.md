@@ -53,14 +53,16 @@ run.
 By default, all the compilation outputs (including the executable) are written
 to the directory of the source file. Pass the `--use-root` flag to write such
 outputs to a script-specific location in the `scripts` directory of the Stack
-root. The location is an encoded version of the absolute path to the source
-file. This can avoid clutter in the source file directory.
+root. The location reflects the absolute path to the source file, but ignoring
+the drive. This can avoid clutter in the source file directory.
 
 Additional options can be passed to GHC using the `--ghc-options` option.
 
 ## Examples
 
-For example, `MyScript.hs` at location `/Users/john`:
+For example, Haskell source file `MyScript.hs` at location
+`<drive>Users/jane/my-project` (where `<drive>` could be `/` on Unix-like
+operating systems or `C:/` or similar on Windows):
 
 ~~~haskell
 module Main (main) where
@@ -83,7 +85,9 @@ can be compiled and run, with arguments, with:
 stack --resolver lts-20.4 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
 ~~~
 
+All the compilation outputs (like `Main.hi`, `Main.o`, and the executable
+`MyScript`) will be written to the `my-project` directory.
+
 If compiled and run with the additional flag `--use-root`, all the compilation
-outputs (like `Main.hi`, `Main.o`, and the executable `MyScript`) will be
-written to the directory `%2FUsers%2Fjohn%2FMyScript.hs` in the `scripts`
-directory of the Stack root.
+outputs will be written to a directory named `MyScript.hs` at
+`Users/jane/my-project/` in the `scripts` directory of the Stack root.

@@ -51,6 +51,7 @@ module Stack.Constants
   , relDirStackWork
   , relFileReadmeTxt
   , relDirScript
+  , relDirScripts
   , relFileConfigYaml
   , relDirSnapshots
   , relDirGlobalHints
@@ -376,6 +377,9 @@ relFileReadmeTxt = $(mkRelFile "README.txt")
 
 relDirScript :: Path Rel Dir
 relDirScript = $(mkRelDir "script")
+
+relDirScripts :: Path Rel Dir
+relDirScripts = $(mkRelDir "scripts")
 
 relFileConfigYaml :: Path Rel File
 relFileConfigYaml = $(mkRelFile "config.yaml")
