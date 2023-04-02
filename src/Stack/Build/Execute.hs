@@ -1109,6 +1109,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
     -- Stack.Types.Build.configureOpts
     cabal KeepTHLoading $ "configure" : concat
       [ concat exes
+      , progsOptionArgs eeBuildOptsCLI
       , dirs
       , nodirs
       ]
@@ -1207,6 +1208,25 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
             <> indent 4 (style Shell $ flow "stack exec perl -- --version")
             <> blankLine
       fixupOnWindows
+
+-- | Generate a list of --PROG-option="<option>" arguments for PROGs.
+progsOptionArgs :: BuildOptsCLI -> [String]
+progsOptionArgs boptsCLI =
+  concatMap progOptionArgs (boptsCLIProgsOptions boptsCLI)
+ where
+  -- Generate a list of --PROG-option="<option>" arguments for a PROG.
+  progOptionArgs :: (Text, [Text]) -> [String]
+  progOptionArgs (prog, opts) = map progOptionArg opts
+   where
+    -- Generate a --PROG-option="<option>" argument for a PROG and option.
+    progOptionArg :: Text -> String
+    progOptionArg opt = concat
+      [ "--"
+      , T.unpack prog
+      , "-option=\""
+      , T.unpack opt
+      , "\""
+      ]
 
 -- | Make a padded prefix for log messages
 packageNamePrefix :: ExecuteEnv -> PackageName -> String
@@ -1986,10 +2006,11 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       )
     config <- view configL
     extraOpts <- extraBuildOptions wc eeBuildOpts
-    let stripTHLoading
+    let progOpts = progsOptionArgs eeBuildOptsCLI
+        stripTHLoading
           | configHideTHLoading config = ExcludeTHLoading
           | otherwise                  = KeepTHLoading
-    cabal stripTHLoading (("build" :) $ (++ extraOpts) $
+    cabal stripTHLoading (("build" :) $ (++ progOpts) $ (++ extraOpts) $
         case (taskType, taskAllInOne, isFinalBuild) of
             (_, True, True) -> throwM AllInOneBuildBug
             (TTLocalMutable lp, False, False) ->

@@ -27,6 +27,11 @@ Behavior changes:
 
 Other enhancements:
 
+* Add options of the form `--PROG-option=<option>` to `stack build`, where
+  `PROG` is a program recognised by the Cabal library and one of `alex`, `ar`,
+  `c2hs`, `cpphs`, `gcc`, `greencard`, `happy`, `hsc2hs`, `hscolour`, `ld`,
+  `pkg-config`, `strip` and `tar`. If Cabal uses the program during
+  `configuration` or `build`, the option is passed to it.
 * Add flag `--[no-]use-root` to `stack script` (default disabled). Used with
   `--compile` or `--optimize`, when enabled all compilation outputs (including
   the executable) are written to a script-specific location in the `scripts`
