@@ -32,9 +32,9 @@ import           Stack.Constants
                    )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Prelude
-import           Stack.Types.BuildConfig ( HasBuildConfig (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.EnvConfig ( HasEnvConfig )
+import           Stack.Types.EnvConfig
+                   ( HasEnvConfig (..) )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.PackageFile
                    ( DotCabalPath (..), GetPackageFileContext (..)
@@ -42,13 +42,8 @@ import           Stack.Types.PackageFile
                    )
 import qualified System.FilePath as FilePath
 import           System.IO.Error ( isUserError )
-import Stack.Constants.Config ( distDirFromDir )
-import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.BuildConfig
                    ( HasBuildConfig(buildConfigL) )
-import           Stack.Constants
-                   ( relFileSetupHs, relFileSetupLhs, relFileHpackPackageConfig )
-import           Path.IO (doesFileExist)
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).

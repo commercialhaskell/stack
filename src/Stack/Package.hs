@@ -18,6 +18,7 @@ module Stack.Package
   , resolvePackageDescription
   , packageDependencies
   , applyForceCustomBuild
+  , hasMainBuildableLibrary
   ) where
 
 import           Data.List ( unzip )
@@ -76,7 +77,7 @@ import           Stack.Types.Package
                    ( BuildInfoOpts (..), ExeName (..), GetPackageOpts (..)
                    , InstallMap, Installed (..), InstalledMap, Package (..)
                    , PackageConfig (..), PackageException (..)
-                   , PackageLibraries (..), dotCabalCFilePath, packageIdentifier
+                   , dotCabalCFilePath, packageIdentifier
                    )
 import           Stack.Types.Version
                    ( VersionRange, intersectVersionRanges, withinRange )
@@ -133,16 +134,6 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageExecutables = foldAndMakeCollection stackExecutableFromCabal $ executables pkg
   , packageAllDeps = M.keysSet deps
   , packageSubLibDeps = subLibDeps
-  , packageLibraries =
-      let mlib = do
-            lib <- library pkg
-            guard $ buildable $ libBuildInfo lib
-            Just lib
-       in
-        case mlib of
-          Nothing -> NoLibraries
-          Just _ -> HasLibraries foreignLibNames
-  , packageSubLibraries = subLibNames
   , packageTests = M.fromList
       [ (T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
       | t <- testSuites pkgNoMod
@@ -812,3 +803,12 @@ applyForceCustomBuild cabalVersion package
   forceCustomBuild =
        packageBuildType package == Simple
     && not (cabalVersion `withinRange` cabalVersionRange)
+
+-- | Check if the main library is buildable.
+-- 
+-- Replace legacy logic with cabal shaped types.
+-- Previous logic beeing @Package@ field named packageLibraries, equal to either NoLibrary or v foreignLibNames.
+-- True here means HasLibraries _ in previous usage.
+-- 
+hasMainBuildableLibrary :: Package -> Bool
+hasMainBuildableLibrary package = maybe False isComponentBuildable $ packageLibrary package

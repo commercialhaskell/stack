@@ -24,7 +24,7 @@ import qualified Distribution.PackageDescription as C
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
-import           Stack.Package ( resolvePackage )
+import           Stack.Package ( hasMainBuildableLibrary, resolvePackage )
 import           Stack.Prelude
 import           Stack.SourceMap
                    ( DumpedGlobalPackage, checkFlagsUsedThrowing
@@ -52,7 +52,7 @@ import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCSubLib, splitComponents )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), LocalPackage (..), Package (..)
-                   , PackageConfig (..), PackageLibraries (..)
+                   , PackageConfig (..)
                    , dotCabalGetPath, memoizeRefWith, runMemoizedWith
                    )
 import           Stack.Types.PackageFile ( PackageWarning, getPackageFiles )
@@ -334,13 +334,10 @@ loadLocalPackage pp = do
         -- individual executables or library") is resolved, 'hasLibrary' is only
         -- relevant if the library is part of the target spec.
         Just _ ->
-          let hasLibrary =
-                case packageLibraries pkg of
-                  NoLibraries -> False
-                  HasLibraries _ -> True
+          let hasLibrary = hasMainBuildableLibrary pkg
           in     hasLibrary
               || not (Set.null nonLibComponents)
-              || not (Set.null $ packageSubLibraries pkg)
+              || not (null $ packageSubLibraries pkg)
 
       filterSkippedComponents =
         Set.filter (not . (`elem` boptsSkipComponents bopts))
