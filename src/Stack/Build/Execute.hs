@@ -124,7 +124,7 @@ import           Stack.Coverage
                    , generateHpcUnifiedReport, updateTixFile
                    )
 import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
-import           Stack.Package ( buildLogPath, hasMainBuildableLibrary )
+import           Stack.Package ( buildLogPath, hasMainBuildableLibrary, mainLibraryHasExposedModules )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
@@ -1714,7 +1714,7 @@ singleBuild
     && not isFinalBuild
        -- Works around haddock failing on bytestring-builder since it has no
        -- modules when bytestring is new enough.
-    && packageHasExposedModules package
+    && mainLibraryHasExposedModules package
        -- Special help for the curator tool to avoid haddocks that are known
        -- to fail
     && maybe True (Set.notMember pname . curatorSkipHaddock) mcurator
