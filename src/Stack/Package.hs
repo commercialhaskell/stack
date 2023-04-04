@@ -19,6 +19,7 @@ module Stack.Package
   , packageDependencies
   , applyForceCustomBuild
   , hasMainBuildableLibrary
+  , mainLibraryHasExposedModules
   ) where
 
 import           Data.List ( unzip )
@@ -170,10 +171,6 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
           pkg
           componentFiles
         pure (componentsModules, componentFiles, componentsOpts)
-  , packageHasExposedModules = maybe
-      False
-      (not . null . exposedModules)
-      (library pkg)
   , packageBuildType = buildType pkg
   , packageSetupDeps = msetupDeps
   , packageCabalSpec = specVersion pkg
@@ -812,3 +809,12 @@ applyForceCustomBuild cabalVersion package
 -- 
 hasMainBuildableLibrary :: Package -> Bool
 hasMainBuildableLibrary package = maybe False isComponentBuildable $ packageLibrary package
+
+-- | Check if the main library has any exposed modules.
+-- 
+-- Replace legacy packageHasExposedModule. This should become irrelevant at some point
+-- since there's nothing inherently wrong or different with packages exposing only modules in
+-- internal libraries (for instance). 
+-- 
+mainLibraryHasExposedModules :: Package -> Bool
+mainLibraryHasExposedModules package = maybe False (not . null . Stack.Types.Component.exposedModules) $ packageLibrary package

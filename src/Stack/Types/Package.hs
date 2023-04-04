@@ -192,8 +192,6 @@ data Package = Package
     -- ^ names of executables
   , packageOpts :: !GetPackageOpts
     -- ^ Args to pass to GHC.
-  , packageHasExposedModules :: !Bool
-    -- ^ Does the package have exposed modules?
   , packageBuildType :: !BuildType
     -- ^ Package build-type.
   , packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
