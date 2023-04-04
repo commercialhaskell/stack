@@ -40,11 +40,13 @@ import           Stack.Constants
                    , relFileHpcIndexHtml, relFileIndexHtml
                    )
 import           Stack.Constants.Config ( distDirFromDir, hpcRelativeDir )
+import           Stack.Package ( hasMainBuildableLibrary )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
+import           Stack.Types.CompCollection ( getBuildableSetText )
 import           Stack.Types.BuildOpts ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
@@ -52,7 +54,7 @@ import           Stack.Types.EnvConfig
                    )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Package
-                   ( Package (..), PackageLibraries (..), packageIdentifier )
+                   ( Package (..), packageIdentifier )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap
                    ( PackageType (..), SMTargets (..), SMWanted (..)
@@ -181,16 +183,13 @@ generateHpcReport pkgDir package tests = do
   let pkgId = packageIdentifierString (packageIdentifier package)
       pkgName' = packageNameString $ packageName package
       ghcVersion = getGhcVersion compilerVersion
-      hasLibrary =
-        case packageLibraries package of
-          NoLibraries -> False
-          HasLibraries _ -> True
+      hasLibrary = hasMainBuildableLibrary package
       subLibs = packageSubLibraries package
   eincludeName <-
     -- Pre-7.8 uses plain PKG-version in tix files.
     if ghcVersion < mkVersion [7, 10] then pure $ Right $ Just [pkgId]
     -- We don't expect to find a package key if there is no library.
-    else if not hasLibrary && Set.null subLibs then pure $ Right Nothing
+    else if not hasLibrary && null subLibs then pure $ Right Nothing
     -- Look in the inplace DB for the package key.
     -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
     else do
@@ -201,7 +200,7 @@ generateHpcReport pkgDir package tests = do
         findPackageFieldForBuiltPackage
           pkgDir
           (packageIdentifier package)
-          subLibs
+          (getBuildableSetText subLibs)
           hpcNameField
       case eincludeName of
         Left err -> do

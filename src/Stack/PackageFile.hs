@@ -34,7 +34,8 @@ import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Prelude
 import           Stack.Types.BuildConfig ( HasBuildConfig (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.EnvConfig ( HasEnvConfig )
+import           Stack.Types.EnvConfig
+                   ( HasEnvConfig (..) )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.PackageFile
                    ( DotCabalPath (..), GetPackageFileContext (..)
@@ -43,8 +44,6 @@ import           Stack.Types.PackageFile
 import qualified System.FilePath as FilePath
 import           System.IO.Error ( isUserError )
 import Stack.Constants.Config ( distDirFromDir )
-import Stack.Types.Config
-    ( HasBuildConfig(buildConfigL), cabalVersionL, HasEnvConfig )
 import Stack.Constants
     ( relFileSetupHs, relFileSetupLhs, relFileHpackPackageConfig )
 import Path.IO (doesFileExist)

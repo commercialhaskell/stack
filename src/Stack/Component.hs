@@ -29,7 +29,6 @@ import           Stack.Types.Dependency ( cabalExeToStackDep, cabalToStackDep )
 import           Distribution.PackageDescription (Library (libName), ForeignLib, TestSuite (testName, testBuildInfo, testInterface), Benchmark (benchmarkBuildInfo, benchmarkName), Executable)
 import           Distribution.Types.BuildInfo (BuildInfo)
 import qualified Distribution.Types.BuildInfo as BI
-import           Distribution.Types.LibraryName (LibraryName(LMainLibName, LSubLibName))
 import qualified Distribution.Types.Library
 import qualified Distribution.Types.ForeignLib
 import qualified Distribution.Types.Executable

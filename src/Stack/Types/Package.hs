@@ -183,9 +183,6 @@ data Package = Package
   , packageTestSuites :: CompCollection StackTest
   , packageBenchmarkSuites :: CompCollection StackBenchmark
   , packageExecutables :: CompCollection StackExecutable
-  , packageLibraries :: !PackageLibraries
-    -- ^ does the package have a buildable library stanza?
-  , packageSubLibraries :: !(Set Text)
     -- ^ Names of sub-libraries
   , packageTests :: !(Map Text TestSuiteInterface)
     -- ^ names and interfaces of test suites

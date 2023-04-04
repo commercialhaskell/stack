@@ -124,7 +124,7 @@ import           Stack.Coverage
                    , generateHpcUnifiedReport, updateTixFile
                    )
 import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
-import           Stack.Package ( buildLogPath )
+import           Stack.Package ( buildLogPath, hasMainBuildableLibrary )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
@@ -175,7 +175,7 @@ import           Stack.Types.NamedComponent
                    )
 import           Stack.Types.Package
                    ( InstallLocation (..), Installed (..), InstalledMap
-                   , LocalPackage (..), Package (..), PackageLibraries (..)
+                   , LocalPackage (..), Package (..)
                    , installedPackageIdentifier, packageIdentifier
                    , runMemoizedWith
                    )
@@ -195,6 +195,7 @@ import           System.IO.Error ( isDoesNotExistError )
 import           System.PosixCompat.Files
                    ( createLink, getFileStatus, modificationTime )
 import           System.Random ( randomIO )
+import           Stack.Types.CompCollection ( getBuildableListText, getBuildableSetText )
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus
@@ -1748,11 +1749,8 @@ singleBuild
     (hasLib, hasSubLib, hasExe) = case taskType of
       TTLocalMutable lp ->
         let package = lpPackage lp
-            hasLibrary =
-              case packageLibraries package of
-                NoLibraries -> False
-                HasLibraries _ -> True
-            hasSubLibraries = not . Set.null $ packageSubLibraries package
+            hasLibrary = hasMainBuildableLibrary package
+            hasSubLibraries = not . null $ packageSubLibraries package
             hasExecutables =
               not . Set.null $ exesToBuild executableBuildStatuses lp
         in  (hasLibrary, hasSubLibraries, hasExecutables)
@@ -1797,7 +1795,7 @@ singleBuild
     -- However, we must unregister any such library in the new snapshot, in case
     -- it was built with different flags.
     let
-      subLibNames = Set.toList $ case taskType of
+      subLibNames = getBuildableListText $ case taskType of
         TTLocalMutable lp -> packageSubLibraries $ lpPackage lp
         TTRemotePackage _ p _ -> packageSubLibraries p
       toMungedPackageId :: Text -> MungedPackageId
@@ -2038,12 +2036,9 @@ singleBuild
 
         cabal0 keep KeepTHLoading $ "haddock" : args
 
-    let hasLibrary =
-          case packageLibraries package of
-            NoLibraries -> False
-            HasLibraries _ -> True
+    let hasLibrary = hasMainBuildableLibrary package
         packageHasComponentSet f = not $ Set.null $ f package
-        hasSubLibraries = packageHasComponentSet packageSubLibraries
+        hasSubLibraries = not $ null $ packageSubLibraries package
         hasExecutables = packageHasComponentSet packageExes
         shouldCopy =
              not isFinalBuild
@@ -2093,10 +2088,10 @@ singleBuild
     let ident = PackageIdentifier (packageName package) (packageVersion package)
     -- only pure the sub-libraries to cache them if we also cache the main
     -- library (that is, if it exists)
-    (mpkgid, subLibsPkgIds) <- case packageLibraries package of
-      HasLibraries _ -> do
+    (mpkgid, subLibsPkgIds) <- if hasMainBuildableLibrary package then
+      do
         subLibsPkgIds <- fmap catMaybes $
-          forM (Set.toList $ packageSubLibraries package) $ \subLib -> do
+          forM (getBuildableListText $ packageSubLibraries package) $ \subLib -> do
             let subLibName = MungedPackageName
                   (packageName package)
                   (LSubLibName $ mkUnqualComponentName $ T.unpack subLib)
@@ -2112,10 +2107,10 @@ singleBuild
         case mpkgid of
           Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
           Just pkgid -> pure (Library ident pkgid Nothing, subLibsPkgIds)
-      NoLibraries -> do
+      else do
         markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
-                                                   -- with writeFlagCache?
-        pure (Executable ident, []) -- don't pure sub-libraries in this case
+                                                          -- with writeFlagCache?
+        pure (Executable ident, []) -- don't pure sublibs in this case
 
     case taskType of
       TTRemotePackage Immutable _ loc ->
@@ -2694,22 +2689,19 @@ primaryComponentOptions ::
   -> LocalPackage
   -> [String]
 primaryComponentOptions executableBuildStatuses lp =
-  -- TODO: get this information from target parsing instead, which will allow
-  -- users to turn off library building if desired
-     ( case packageLibraries package of
-         NoLibraries -> []
-         HasLibraries names -> map
-           T.unpack
-           ( T.append "lib:" (T.pack (packageNameString (packageName package)))
-           : map (T.append "flib:") (Set.toList names)
-           )
-     )
+    -- TODO: get this information from target parsing instead,
+    -- which will allow users to turn off library building if
+    -- desired
+  (if hasMainBuildableLibrary package then map T.unpack
+        $ T.append "lib:" (T.pack (packageNameString (packageName package)))
+        : map (T.append "flib:") (getBuildableListText (packageForeignLibraries package))
+    else [])
   ++ map
-       (T.unpack . T.append "lib:")
-       (Set.toList $ packageSubLibraries package)
+      (T.unpack . T.append "lib:")
+      (getBuildableListText $ packageSubLibraries package)
   ++ map
-       (T.unpack . T.append "exe:")
-       (Set.toList $ exesToBuild executableBuildStatuses lp)
+      (T.unpack . T.append "exe:")
+      (Set.toList $ exesToBuild executableBuildStatuses lp)
  where
   package = lpPackage lp
 

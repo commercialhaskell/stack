@@ -28,7 +28,10 @@ import           Stack.Build.Cache ( tryGetFlagCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
 import           Stack.Constants ( compilerOptionsCabalFlag )
-import           Stack.Package ( applyForceCustomBuild )
+import           Stack.Package
+                   ( applyForceCustomBuild
+                   , hasMainBuildableLibrary
+                   )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
 import           Stack.Types.Build
@@ -67,7 +70,7 @@ import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
                    ( ExeName (..), InstallLocation (..), Installed (..)
                    , InstalledMap, LocalPackage (..), Package (..)
-                   , PackageLibraries (..), PackageSource (..), installedVersion
+                   , PackageSource (..), installedVersion
                    , packageIdentifier, psVersion, runMemoizedWith
                    )
 import           Stack.Types.ParentMap ( ParentMap )
@@ -1162,10 +1165,8 @@ addPackageDeps package = do
   -- make sure we consider sub-libraries as libraries too
   packageHasLibrary :: Package -> Bool
   packageHasLibrary p =
-    not (Set.null (packageSubLibraries p)) ||
-    case packageLibraries p of
-      HasLibraries _ -> True
-      NoLibraries -> False
+    not (null (packageSubLibraries p)) ||
+    hasMainBuildableLibrary p
 
 checkDirtiness ::
      PackageSource

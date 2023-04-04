@@ -49,7 +49,7 @@ import           Stack.Ghci.Script
                    )
 import           Stack.Package
                    ( PackageDescriptionPair (..), packageFromPackageDescription
-                   , readDotBuildinfo, resolvePackageDescription
+                   , readDotBuildinfo, resolvePackageDescription, hasMainBuildableLibrary
                    )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
@@ -74,7 +74,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
                    ( BuildInfoOpts (..), InstallMap, InstalledMap
                    , LocalPackage (..), Package (..), PackageConfig (..)
-                   , PackageLibraries (..), dotCabalCFilePath, dotCabalGetPath
+                   , dotCabalCFilePath, dotCabalGetPath
                    , dotCabalMainPath, getPackageOpts
                    )
 import           Stack.Types.PackageFile ( getPackageFiles )
@@ -87,6 +87,7 @@ import           Stack.Types.SourceMap
                    )
 import           System.IO ( putStrLn )
 import           System.Permissions ( setScriptPerms )
+import           Stack.Types.CompCollection ( getBuildableListText )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Ghci" module.
@@ -937,11 +938,10 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
 wantedPackageComponents :: BuildOpts -> Target -> Package -> Set NamedComponent
 wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
-  (case packageLibraries pkg of
-    NoLibraries -> []
-    HasLibraries names -> CLib : map CSubLib (S.toList names)) ++
+  (if hasMainBuildableLibrary pkg then CLib : map CSubLib (getBuildableListText $ packageForeignLibraries pkg)
+     else []) ++
   map CExe (S.toList (packageExes pkg)) <>
-  map CSubLib (S.toList $ packageSubLibraries pkg) <>
+  map CSubLib (getBuildableListText $ packageSubLibraries pkg) <>
   (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
   (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty
