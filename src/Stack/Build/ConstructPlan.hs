@@ -109,7 +109,7 @@ data W = W
     -- ^ executable to be installed, and location where the binary is placed
   , wDirty :: !(Map PackageName Text)
     -- ^ why a local package is considered dirty
-  , wWarnings :: !([Text] -> [Text])
+  , wWarnings :: !([StyleDoc] -> [StyleDoc])
     -- ^ Warnings
   , wParents :: !ParentMap
     -- ^ Which packages a given package depends on, along with the package's
@@ -245,8 +245,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
   ((), m, W efinals installExes dirtyReason warnings parents) <-
     liftIO $ runRWST inner ctx Map.empty
-  mapM_
-    (prettyWarn . fromString . T.unpack . textDisplay) (warnings [])
+  mapM_ prettyWarn (warnings [])
   let toEither (_, Left e)  = Left e
       toEither (k, Right v) = Right (k, v)
       (errlibs, adrs) = partitionEithers $ map toEither $ Map.toList m
@@ -877,20 +876,22 @@ addPackageDeps package = do
           else do
             let warn_ isIgnoring reason = tell mempty { wWarnings = (msg:) }
                  where
-                  msg = T.concat
-                    [ if isIgnoring then "Ignoring " else "Not ignoring "
-                    , T.pack $ packageNameString $ packageName package
-                    , "'s bounds on "
-                    , T.pack $ packageNameString depname
-                    , " ("
-                    , versionRangeText range
-                    , ") and using "
-                    , T.pack $ packageIdentifierString $
-                        PackageIdentifier depname (adrVersion adr)
-                    , ".\nReason: "
-                    , reason
-                    , "."
-                    ]
+                  msg =
+                       fillSep
+                         [ if isIgnoring then "Ignoring" else flow "Not ignoring"
+                         , style Current (fromString . packageNameString $ packageName package) <> "'s"
+                         , flow "bounds on"
+                         , style Current (fromString $ packageNameString depname)
+                         , parens (fromString . T.unpack $ versionRangeText range)
+                         , flow "and using"
+                         , style Current (fromString . packageIdentifierString $
+                             PackageIdentifier depname (adrVersion adr)) <> "."
+                         ]
+                    <> line
+                    <> fillSep
+                         [ "Reason:"
+                         , reason <> "."
+                         ]
             allowNewer <- view $ configL.to configAllowNewer
             allowNewerDeps <- view $ configL.to configAllowNewerDeps
             let inSnapshotCheck = do
@@ -899,19 +900,34 @@ addPackageDeps package = do
                   y <- inSnapshot depname (adrVersion adr)
                   if x && y
                     then do
-                      warn_ True "trusting snapshot over Cabal file dependency information"
+                      warn_ True
+                        ( flow "trusting snapshot over Cabal file dependency \
+                               \information"
+                        )
                       pure True
                     else pure False
             if allowNewer
               then do
-                warn_ True "allow-newer enabled"
+                warn_ True $
+                  fillSep
+                    [ style Shell "allow-newer"
+                    , "enabled"
+                    ]
                 case allowNewerDeps of
                   Nothing -> pure True
                   Just boundsIgnoredDeps ->
-                      pure $ packageName package `elem` boundsIgnoredDeps
+                    pure $ packageName package `elem` boundsIgnoredDeps
               else do
                 when (isJust allowNewerDeps) $
-                    warn_ False "although allow-newer-deps are specified, allow-newer is false"
+                  warn_ False $
+                    fillSep
+                      [ "although"
+                      , style Shell "allow-newer-deps"
+                      , flow "are specified,"
+                      , style Shell "allow-newer"
+                      , "is"
+                      , style Shell "false"
+                      ]
                 inSnapshotCheck
         if inRange
           then case adr of
@@ -1130,12 +1146,13 @@ data ToolWarning
   = ToolWarning ExeName PackageName
   deriving Show
 
-toolWarningText :: ToolWarning -> Text
-toolWarningText (ToolWarning (ExeName toolName) pkgName') =
-     "No packages found in snapshot which provide a "
-  <> T.pack (show toolName)
-  <> " executable, which is a build-tool dependency of "
-  <> T.pack (packageNameString pkgName')
+toolWarningText :: ToolWarning -> StyleDoc
+toolWarningText (ToolWarning (ExeName toolName) pkgName') = fillSep
+  [ flow "No packages found in snapshot which provide a"
+  , style PkgComponent (fromString $ show toolName)
+  , flow "executable, which is a build-tool dependency of"
+  , style Current (fromString $ packageNameString pkgName')
+  ]
 
 -- | Strip out anything from the @Plan@ intended for the local database
 stripLocals :: Plan -> Plan

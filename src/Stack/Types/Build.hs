@@ -485,11 +485,13 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     if not onlyHasDependencyMismatches
       then []
       else
-        [ "  *" <+> align
-            (   flow "Set 'allow-newer: true' in "
-            <+> pretty (defaultUserConfigPath stackRoot)
-            <+> "to ignore all version constraints and build anyway."
-            )
+        [ "  *" <+> align (fillSep
+            [ "Set"
+            , style Shell (flow "allow-newer: true")
+            , "in"
+            , pretty (defaultUserConfigPath stackRoot)
+            , flow "to ignore all version constraints and build anyway."
+            ])
         , blankLine
         ]
     ++ addExtraDepsRecommendations
@@ -509,10 +511,13 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
          , line
         ]
     | otherwise =
-       [ "  *" <+> align
-         (style Recommendation (flow "Recommended action:") <+>
-          flow "try adding the following to your extra-deps in" <+>
-          pretty stackYaml <> ":")
+       [ "  *" <+> align (fillSep
+         [ style Recommendation (flow "Recommended action:")
+         , flow "try adding the following to your"
+         , style Shell "extra-deps"
+         , "in"
+         , pretty stackYaml <> ":"
+         ])
        , blankLine
        , vsep (map pprintExtra (Map.toList extras))
        , line

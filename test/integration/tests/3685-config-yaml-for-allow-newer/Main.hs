@@ -12,7 +12,7 @@ main = do
   -- config.yaml sitting either on the same line or on
   -- two consecutive lines
   let errLines = lines stdErr
-      hasNewer l = "'allow-newer: true'" `isInfixOf` l
+      hasNewer l = "allow-newer: true" `isInfixOf` l
       withNewer = map hasNewer errLines
       userConfig = "config.yaml"
       hasConfigForAllowNewer prevNewer l =
