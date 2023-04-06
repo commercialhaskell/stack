@@ -39,6 +39,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Fix incorrect warning if `allow-newer-deps` are specified but `allow-newer` is
+  `false`. See
+  [#6068](https://github.com/commercialhaskell/stack/issues/6086).
 * `stack build` with `--file-watch` or `--file-watch-poll` outputs 'pretty'
   error messages, as intended. See
   [#5978](https://github.com/commercialhaskell/stack/issues/5978).

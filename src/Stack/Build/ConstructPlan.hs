@@ -875,16 +875,16 @@ addPackageDeps package = do
         inRange <- if adrVersion adr `withinRange` range
           then pure True
           else do
-            let warn_ reason = tell mempty { wWarnings = (msg:) }
+            let warn_ isIgnoring reason = tell mempty { wWarnings = (msg:) }
                  where
                   msg = T.concat
-                    [ "WARNING: Ignoring "
+                    [ if isIgnoring then "Ignoring " else "Not ignoring "
                     , T.pack $ packageNameString $ packageName package
                     , "'s bounds on "
                     , T.pack $ packageNameString depname
                     , " ("
                     , versionRangeText range
-                    , "); using "
+                    , ") and using "
                     , T.pack $ packageIdentifierString $
                         PackageIdentifier depname (adrVersion adr)
                     , ".\nReason: "
@@ -899,19 +899,19 @@ addPackageDeps package = do
                   y <- inSnapshot depname (adrVersion adr)
                   if x && y
                     then do
-                      warn_ "trusting snapshot over Cabal file dependency information"
+                      warn_ True "trusting snapshot over Cabal file dependency information"
                       pure True
                     else pure False
             if allowNewer
               then do
-                warn_ "allow-newer enabled"
+                warn_ True "allow-newer enabled"
                 case allowNewerDeps of
                   Nothing -> pure True
                   Just boundsIgnoredDeps ->
                       pure $ packageName package `elem` boundsIgnoredDeps
               else do
                 when (isJust allowNewerDeps) $
-                    warn_ "allow-newer-deps are specified but allow-newer isn't enabled"
+                    warn_ False "although allow-newer-deps are specified, allow-newer is false"
                 inSnapshotCheck
         if inRange
           then case adr of
