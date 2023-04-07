@@ -827,7 +827,7 @@ checkDuplicateNames :: MonadThrow m => [(PackageName, PackageLocation)] -> m ()
 checkDuplicateNames locals =
   case filter hasMultiples $ Map.toList $ Map.fromListWith (++) $ map (second pure) locals of
     [] -> pure ()
-    x -> throwM $ DuplicateLocalPackageNames x
+    x -> prettyThrowM $ DuplicateLocalPackageNames x
  where
   hasMultiples (_, _:_:_) = True
   hasMultiples _ = False
