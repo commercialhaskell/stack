@@ -94,6 +94,7 @@ import qualified Stack.Types.Component
 import           GHC.Records (getField)
 import           Stack.Types.Component ( HasBuildInfo )
 import           Data.Foldable
+
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
 -- derived from the package's Cabal file.

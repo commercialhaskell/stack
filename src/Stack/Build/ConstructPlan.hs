@@ -31,6 +31,7 @@ import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
                    ( applyForceCustomBuild
                    , hasMainBuildableLibrary
+                   , packageUnknownTools
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
