@@ -324,7 +324,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3819] | TestSuiteTypeUnsupported TestSuiteInterface
         [S-5797] | LocalPackageDoesn'tMatchTarget PackageName Version Version
         [S-3118] | NoSetupHsFound (Path Abs Dir)
-        [S-8664] | InvalidFlagSpecification (Set UnusedFlags)
         [S-4925] | InvalidGhcOptionsSpecification [PackageName]
         [S-7987] | TestSuiteExeMissing Bool String String String
         [S-8027] | CabalCopyFailed Bool String
@@ -348,6 +347,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-6374] | SetupHsBuildFailure ExitCode (Maybe PackageIdentifier) (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
         [S-8506] | TargetParseException [StyleDoc]
         [S-7086] | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
+        [S-8664] | InvalidFlagSpecification (Set UnusedFlags)
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`

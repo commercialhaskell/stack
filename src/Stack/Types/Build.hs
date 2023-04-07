@@ -129,7 +129,6 @@ data BuildException
       Version -- local version
       Version -- version specified on command line
   | NoSetupHsFound (Path Abs Dir)
-  | InvalidFlagSpecification (Set UnusedFlags)
   | InvalidGhcOptionsSpecification [PackageName]
   | TestSuiteExeMissing Bool String String String
   | CabalCopyFailed Bool String
@@ -256,43 +255,6 @@ instance Exception BuildException where
     , "No Setup.hs or Setup.lhs file found in "
     , toFilePath dir
     ]
-  displayException (InvalidFlagSpecification unused) = unlines
-    $ "Error: [S-8664]"
-    : "Invalid flag specification:"
-    : map go (Set.toList unused)
-   where
-    showFlagSrc :: FlagSource -> String
-    showFlagSrc FSCommandLine = " (specified on command line)"
-    showFlagSrc FSStackYaml = " (specified in stack.yaml)"
-
-    go :: UnusedFlags -> String
-    go (UFNoPackage src name) = concat
-      [ "- Package '"
-      , packageNameString name
-      , "' not found"
-      , showFlagSrc src
-      ]
-    go (UFFlagsNotDefined src pname pkgFlags flags) = concat
-      [ "- Package '"
-      , name
-      , "' does not define the following flags"
-      , showFlagSrc src
-      , ":\n"
-      , intercalate "\n"
-                    (map (\flag -> "  " ++ flagNameString flag)
-                         (Set.toList flags))
-      , "\n- Flags defined by package '" ++ name ++ "':\n"
-      , intercalate "\n"
-                    (map (\flag -> "  " ++ name ++ ":" ++ flagNameString flag)
-                         (Set.toList pkgFlags))
-      ]
-     where
-      name = packageNameString pname
-    go (UFSnapshot name) = concat
-      [ "- Attempted to set flag on snapshot package "
-      , packageNameString name
-      , ", please add to extra-deps"
-      ]
   displayException (InvalidGhcOptionsSpecification unused) = unlines
     $ "Error: [S-4925]"
     : "Invalid GHC options specification:"
@@ -376,6 +338,7 @@ data BuildPrettyException
       [Text]     -- log contents
   | TargetParseException [StyleDoc]
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
+  | InvalidFlagSpecification (Set UnusedFlags)
   deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
@@ -422,6 +385,55 @@ instance Pretty BuildPrettyException where
     <> blankLine
     <> flow "To resolve this, either provide flags such that these components \
             \are buildable, or only specify buildable targets."
+  pretty (InvalidFlagSpecification unused) =
+    "[S-8664]"
+    <> line
+    <> flow "Invalid flag specification:"
+    <> line
+    <> bulletedList (map go (Set.toList unused))
+   where
+    showFlagSrc :: FlagSource -> StyleDoc
+    showFlagSrc FSCommandLine = flow "(specified on the command line)"
+    showFlagSrc FSStackYaml =
+      flow "(specified in the project-level configuration (e.g. stack.yaml))"
+
+    go :: UnusedFlags -> StyleDoc
+    go (UFNoPackage src name) = fillSep
+      [ "Package"
+      , style Error (fromString $ packageNameString name)
+      , flow "not found"
+      , showFlagSrc src
+      ]
+    go (UFFlagsNotDefined src pname pkgFlags flags) =
+         fillSep
+           ( "Package"
+           : style Current (fromString name)
+           : flow "does not define the following flags"
+           : showFlagSrc src <> ":"
+           : mkNarrativeList (Just Error) False
+               (map (fromString . flagNameString) (Set.toList flags) :: [StyleDoc])
+           )
+      <> line
+      <> if Set.null pkgFlags
+           then fillSep
+             [ flow "No flags are defined by package"
+             , style Current (fromString name) <> "."
+             ]
+           else fillSep
+           ( flow "Flags defined by package"
+           : style Current (fromString name)
+           : "are:"
+           : mkNarrativeList (Just Good) False
+               (map (fromString . flagNameString) (Set.toList pkgFlags) :: [StyleDoc])
+           )
+     where
+      name = packageNameString pname
+    go (UFSnapshot name) = fillSep
+      [ flow "Attempted to set flag on snapshot package"
+      , style Current (fromString $ packageNameString name) <> ","
+      , flow "please add the package to"
+      , style Shell "extra-deps" <> "."
+      ]
 
 instance Exception BuildPrettyException
 
