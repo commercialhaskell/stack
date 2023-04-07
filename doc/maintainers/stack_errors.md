@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-03-23.
+`master` branch of the Stack repository. Last updated: 2023-04-07.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -373,7 +373,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3605] | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
         [S-6816] | NixRequiresSystemGhc
         [S-5027] | NoResolverWhenUsingNoProject
-        [S-5470] | DuplicateLocalPackageNames [(PackageName, [PackageLocation])]
         [S-3803] | NoLTSWithMajorVersion Int
         [S-5472] | NoLTSFound
         ~~~
@@ -387,6 +386,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-6395] | ResolverMismatch RawSnapshotLocation String
         [S-2422] | ResolverPartial RawSnapshotLocation String
         [S-3251] | MultiplePackageIndices [PackageIndexConfig]
+        [S-5470] | DuplicateLocalPackageNames [(PackageName, [PackageLocation])]
         ~~~
 
     -   `Stack.Types.Config.ParseAbsolutePathException`

@@ -275,7 +275,6 @@ data ConfigException
   | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   | NixRequiresSystemGhc
   | NoResolverWhenUsingNoProject
-  | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
   | NoLTSWithMajorVersion Int
   | NoLTSFound
   deriving (Show, Typeable)
@@ -376,16 +375,6 @@ instance Exception ConfigException where
   displayException NoResolverWhenUsingNoProject =
     "Error: [S-5027]\n"
     ++ "When using the script command, you must provide a resolver argument"
-  displayException (DuplicateLocalPackageNames pairs) = concat
-    $ "Error: [S-5470]\n"
-    : "The same package name is used in multiple local packages\n"
-    : map go pairs
-   where
-    go (name, dirs) = unlines
-        $ ""
-        : (packageNameString name ++ " used in:")
-        : map goLoc dirs
-    goLoc loc = "- " ++ show loc
   displayException (NoLTSWithMajorVersion n) = concat
     [ "Error: [S-3803]\n"
     , "No LTS release found with major version "
@@ -405,6 +394,7 @@ data ConfigPrettyException
   | ResolverMismatch !RawSnapshotLocation String
   | ResolverPartial !RawSnapshotLocation !String
   | MultiplePackageIndices [PackageIndexConfig]
+  | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
   deriving (Show, Typeable)
 
 instance Pretty ConfigPrettyException where
@@ -490,6 +480,23 @@ instance Pretty ConfigPrettyException where
          ]
     <> blankLine
     <> packageIndicesWarning
+  pretty (DuplicateLocalPackageNames pairs) =
+    "[S-5470]"
+    <> line
+    <> fillSep
+        [ flow "The same package name is used in more than one local package or"
+        , style Shell "extra-deps" <> "."
+        ]
+    <> mconcat (map go pairs)
+   where
+    go (name, dirs) =
+         blankLine
+      <> fillSep
+           [ style Error (fromString $ packageNameString name)
+           , flow "used in:"
+           ]
+      <> line
+      <> bulletedList (map (fromString . T.unpack . textDisplay) dirs)
 
 instance Exception ConfigPrettyException
 
