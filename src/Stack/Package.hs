@@ -20,6 +20,7 @@ module Stack.Package
   , applyForceCustomBuild
   , hasMainBuildableLibrary
   , mainLibraryHasExposedModules
+  , packageUnknownTools
   ) where
 
 import           Data.List ( unzip )
@@ -87,10 +88,12 @@ import           Stack.Types.Dependency ( DepValue (..), DepType (..) )
 import           Stack.Types.PackageFile ( DotCabalPath , GetPackageFiles (..) )
 import           Stack.PackageFile ( getPackageFile )
 
-import           Stack.Types.CompCollection (foldAndMakeCollection)
+import           Stack.Types.CompCollection ( foldAndMakeCollection, CompCollection )
 import           Stack.Component
 import qualified Stack.Types.Component
-
+import           GHC.Records (getField)
+import           Stack.Types.Component ( HasBuildInfo )
+import           Data.Foldable
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
 -- derived from the package's Cabal file.
@@ -121,7 +124,6 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageLicense = licenseRaw pkg
   , packageDeps = deps
   , packageFiles = pkgFiles
-  , packageUnknownTools = unknownTools
   , packageGhcOptions = packageConfigGhcOptions packageConfig
   , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig
   , packageFlags = packageConfigFlags packageConfig
@@ -204,7 +206,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   pkgId = package pkg
   name = pkgName pkgId
 
-  (unknownTools, knownTools) = packageDescTools pkg
+  (_unknownTools, knownTools) = packageDescTools pkg
 
   deps = M.filterWithKey (const . not . isMe) (M.unionsWith (<>)
     [ asLibrary <$> packageDependencies pkg
@@ -818,3 +820,24 @@ hasMainBuildableLibrary package = maybe False isComponentBuildable $ packageLibr
 -- 
 mainLibraryHasExposedModules :: Package -> Bool
 mainLibraryHasExposedModules package = maybe False (not . null . Stack.Types.Component.exposedModules) $ packageLibrary package
+
+-- | Aggregate all unknown tools from all exe.
+-- Replaces packageUnknownTools field from Package datatype.
+-- Mostly meant for build tools specified in the legacy manner (build-tools:) that failed
+-- the hard-coded lookup.
+-- See sbiUnknownTools for more info.
+packageUnknownTools :: Package -> Set Text
+packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
+  where
+    lib setT = case packageLibrary pkg of
+      Just libV -> addUnknownTools libV setT
+      Nothing -> setT
+    bench = gatherUnknownTools $ packageBenchmarkSuites pkg
+    tests = gatherUnknownTools $ packageTestSuites pkg
+    flib = gatherUnknownTools $ packageForeignLibraries pkg
+    sublib = gatherUnknownTools $ packageSubLibraries pkg
+    exe = gatherUnknownTools $ packageExecutables pkg
+    addUnknownTools :: HasBuildInfo x => x -> Set Text -> Set Text
+    addUnknownTools = (<>) . Stack.Types.Component.sbiUnknownTools . getField @"buildInfo"
+    gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
+    gatherUnknownTools = foldr' addUnknownTools mempty

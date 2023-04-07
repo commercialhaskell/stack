@@ -162,9 +162,6 @@ data Package = Package
     -- ^ Get all files of the package.
   , packageDeps :: !(Map PackageName DepValue)
     -- ^ Packages that the package depends on, both as libraries and build tools.
-  , packageUnknownTools :: !(Set ExeName)
-    -- ^ Build tools specified in the legacy manner (build-tools:) that failed
-    -- the hard-coded lookup.
   , packageAllDeps :: !(Set PackageName)
     -- ^ Original dependencies (not sieved).
   , packageSubLibDeps :: !(Map MungedPackageName DepValue)
