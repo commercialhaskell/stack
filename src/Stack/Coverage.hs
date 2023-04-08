@@ -40,7 +40,7 @@ import           Stack.Constants
                    , relFileHpcIndexHtml, relFileIndexHtml
                    )
 import           Stack.Constants.Config ( distDirFromDir, hpcRelativeDir )
-import           Stack.Package ( hasMainBuildableLibrary )
+import           Stack.Package ( hasMainBuildableLibrary, packageInternalLibraries )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig

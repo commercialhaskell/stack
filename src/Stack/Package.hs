@@ -21,6 +21,7 @@ module Stack.Package
   , hasMainBuildableLibrary
   , mainLibraryHasExposedModules
   , packageUnknownTools
+  , packageInternalLibraries
   ) where
 
 import           Data.List ( unzip )
@@ -88,7 +89,7 @@ import           Stack.Types.Dependency ( DepValue (..), DepType (..) )
 import           Stack.Types.PackageFile ( DotCabalPath , GetPackageFiles (..) )
 import           Stack.PackageFile ( getPackageFile )
 
-import           Stack.Types.CompCollection ( foldAndMakeCollection, CompCollection )
+import           Stack.Types.CompCollection ( foldAndMakeCollection, CompCollection, getBuildableSetText )
 import           Stack.Component
 import qualified Stack.Types.Component
 import           GHC.Records (getField)
@@ -842,3 +843,6 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
     addUnknownTools = (<>) . Stack.Types.Component.sbiUnknownTools . getField @"buildInfo"
     gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
     gatherUnknownTools = foldr' addUnknownTools mempty
+
+packageInternalLibraries :: Package -> Set Text
+packageInternalLibraries pkg = getBuildableSetText (packageSubLibraries pkg)
