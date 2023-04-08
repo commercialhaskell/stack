@@ -50,6 +50,7 @@ import           Stack.Ghci.Script
 import           Stack.Package
                    ( PackageDescriptionPair (..), packageFromPackageDescription
                    , readDotBuildinfo, resolvePackageDescription, hasMainBuildableLibrary
+                   , packageExes
                    )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )

@@ -24,7 +24,7 @@ import qualified Distribution.PackageDescription as C
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
-import           Stack.Package ( hasMainBuildableLibrary, resolvePackage )
+import           Stack.Package ( hasMainBuildableLibrary, resolvePackage, packageExes )
 import           Stack.Prelude
 import           Stack.SourceMap
                    ( DumpedGlobalPackage, checkFlagsUsedThrowing

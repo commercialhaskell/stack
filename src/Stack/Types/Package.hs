@@ -183,8 +183,6 @@ data Package = Package
   , packageTests :: !(Map Text TestSuiteInterface)
     -- ^ names and interfaces of test suites
   , packageBenchmarks :: !(Set Text)
-    -- ^ names of benchmarks
-  , packageExes :: !(Set Text)
     -- ^ names of executables
   , packageOpts :: !GetPackageOpts
     -- ^ Args to pass to GHC.

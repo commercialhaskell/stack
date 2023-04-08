@@ -123,13 +123,8 @@ import           Stack.Coverage
                    ( deleteHpcReports, generateHpcMarkupIndex, generateHpcReport
                    , generateHpcUnifiedReport, updateTixFile
                    )
-<<<<<<< HEAD
 import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
-import           Stack.Package ( buildLogPath, hasMainBuildableLibrary, mainLibraryHasExposedModules )
-=======
-import           Stack.GhcPkg ( ghcPkgPathEnvVar, unregisterGhcPkgIds )
-import           Stack.Package ( buildLogPath, hasMainBuildableLibrary, mainLibraryHasExposedModules, packageInternalLibraries )
->>>>>>> 4a6fb3052 (refactoring: remove package based packageInternalLibraries)
+import           Stack.Package ( buildLogPath, hasMainBuildableLibrary, mainLibraryHasExposedModules, packageSubLibrariesNameSet, packageExes )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
@@ -1755,11 +1750,7 @@ singleBuild
       TTLocalMutable lp ->
         let package = lpPackage lp
             hasLibrary = hasMainBuildableLibrary package
-<<<<<<< HEAD
             hasSubLibraries = not . null $ packageSubLibraries package
-=======
-            hasSubLibrary = not . null $ packageSubLibraries package
->>>>>>> 4a6fb3052 (refactoring: remove package based packageInternalLibraries)
             hasExecutables =
               not . Set.null $ exesToBuild executableBuildStatuses lp
         in  (hasLibrary, hasSubLibraries, hasExecutables)
@@ -1804,15 +1795,9 @@ singleBuild
     -- However, we must unregister any such library in the new snapshot, in case
     -- it was built with different flags.
     let
-<<<<<<< HEAD
-      subLibNames = getBuildableListText $ case taskType of
-        TTLocalMutable lp -> packageSubLibraries $ lpPackage lp
-        TTRemotePackage _ p _ -> packageSubLibraries p
-=======
-      subLibNames = Set.toList $ packageInternalLibraries $ case taskType of
+      subLibNames = Set.toList $ packageSubLibrariesNameSet $ case taskType of
         TTLocalMutable lp -> lpPackage lp
         TTRemotePackage _ p _ -> p
->>>>>>> 4a6fb3052 (refactoring: remove package based packageInternalLibraries)
       toMungedPackageId :: Text -> MungedPackageId
       toMungedPackageId subLib =
         let subLibName = LSubLibName $ mkUnqualComponentName $ T.unpack subLib
@@ -2052,14 +2037,9 @@ singleBuild
         cabal0 keep KeepTHLoading $ "haddock" : args
 
     let hasLibrary = hasMainBuildableLibrary package
-<<<<<<< HEAD
         packageHasComponentSet f = not $ Set.null $ f package
         hasSubLibraries = not $ null $ packageSubLibraries package
-        hasExecutables = packageHasComponentSet packageExes
-=======
-        hasInternalLibrary = not $ null $ packageSubLibraries package
-        hasExecutables = not $ null $ packageExes package
->>>>>>> 4a6fb3052 (refactoring: remove package based packageInternalLibraries)
+        hasExecutables = not $ null $ packageExecutables package
         shouldCopy =
              not isFinalBuild
           && (hasLibrary || hasSubLibraries || hasExecutables)
