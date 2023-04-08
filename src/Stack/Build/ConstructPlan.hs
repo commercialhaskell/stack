@@ -32,6 +32,7 @@ import           Stack.Package
                    ( applyForceCustomBuild
                    , hasMainBuildableLibrary
                    , packageUnknownTools
+                   , packageExes
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
@@ -85,6 +86,7 @@ import           Stack.Types.SourceMap
 import           Stack.Types.Version
                    ( latestApplicableVersion, versionRangeText, withinRange )
 import           System.Environment ( lookupEnv )
+import           Stack.Types.CompCollection ( collectionMember )
 
 -- | Type representing information about packages, namely information about
 -- whether or not a package is already installed and, unless the package is not
@@ -1336,7 +1338,7 @@ checkAndWarnForUnknownTools p = do
   -- Check whether the tool is on the PATH or a package executable before
   -- warning about it.
   warnings <-
-    fmap catMaybes $ forM unknownTools $ \name@(ExeName toolName) ->
+    fmap catMaybes $ forM unknownTools $ \name@(toolName) ->
       runMaybeT $ notOnPath toolName *> notPackageExe toolName *> warn name
   tell mempty { wWarnings = (map toolWarningText warnings ++) }
   pure ()
@@ -1351,8 +1353,8 @@ checkAndWarnForUnknownTools p = do
     skipIf $ isRight eFound
   -- From Cabal 1.12, build-tools can specify another executable in the same
   -- package.
-  notPackageExe toolName = MaybeT $ skipIf $ toolName `Set.member` packageExes p
-  warn name = MaybeT . pure . Just $ ToolWarning name (packageName p)
+  notPackageExe toolName = MaybeT $ skipIf $ collectionMember toolName (packageExecutables p)
+  warn name = MaybeT . pure . Just $ ToolWarning (ExeName name) (packageName p)
   skipIf p' = pure $ if p' then Nothing else Just ()
 
 -- | Warn about tools in the snapshot definition. States the tool name

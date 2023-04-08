@@ -21,7 +21,8 @@ module Stack.Package
   , hasMainBuildableLibrary
   , mainLibraryHasExposedModules
   , packageUnknownTools
-  , packageInternalLibraries
+  , packageSubLibrariesNameSet
+  , packageExes
   ) where
 
 import           Data.List ( unzip )
@@ -148,12 +149,6 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
       [ T.pack (Cabal.unUnqualComponentName $ benchmarkName b)
       | b <- benchmarks pkgNoMod
       , buildable (benchmarkBuildInfo b)
-      ]
-      -- Same comment about buildable applies here too.
-  , packageExes = S.fromList
-      [ T.pack (Cabal.unUnqualComponentName $ exeName biBuildInfo)
-      | biBuildInfo <- executables pkg
-      , buildable (buildInfo biBuildInfo)
       ]
   -- This is an action used to collect info needed for "stack ghci".
   -- This info isn't usually needed, so computation of it is deferred.
@@ -844,5 +839,7 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
     gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
     gatherUnknownTools = foldr' addUnknownTools mempty
 
-packageInternalLibraries :: Package -> Set Text
-packageInternalLibraries pkg = getBuildableSetText (packageSubLibraries pkg)
+packageSubLibrariesNameSet :: Package -> Set Text
+packageSubLibrariesNameSet pkg = getBuildableSetText (packageSubLibraries pkg)
+packageExes :: Package -> Set Text
+packageExes pkg = getBuildableSetText (packageExecutables pkg)
