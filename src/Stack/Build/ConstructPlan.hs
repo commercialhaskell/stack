@@ -907,16 +907,37 @@ addPackageDeps package = do
                       pure True
                     else pure False
             if allowNewer
-              then do
-                warn_ True $
-                  fillSep
-                    [ style Shell "allow-newer"
-                    , "enabled"
-                    ]
-                case allowNewerDeps of
-                  Nothing -> pure True
-                  Just boundsIgnoredDeps ->
-                    pure $ packageName package `elem` boundsIgnoredDeps
+              then case allowNewerDeps of
+                Nothing -> do
+                  warn_ True $
+                    fillSep
+                      [ style Shell "allow-newer"
+                      , "enabled"
+                      ]
+                  pure True
+                Just boundsIgnoredDeps -> do
+                  let pkgName = packageName package
+                      pkgName' = fromString $ packageNameString pkgName
+                      isBoundsIgnoreDep = pkgName `elem` boundsIgnoredDeps
+                      reason = if isBoundsIgnoreDep
+                        then fillSep
+                          [ style Current pkgName'
+                          , flow "is an"
+                          , style Shell "allow-newer-dep"
+                          , flow "and"
+                          , style Shell "allow-newer"
+                          , "enabled"
+                          ]
+                        else fillSep
+                          [ style Current pkgName'
+                          , flow "is not an"
+                          , style Shell "allow-newer-dep"
+                          , flow "although"
+                          , style Shell "allow-newer"
+                          , "enabled"
+                          ]
+                  warn_ isBoundsIgnoreDep reason
+                  pure isBoundsIgnoreDep
               else do
                 when (isJust allowNewerDeps) $
                   warn_ False $
