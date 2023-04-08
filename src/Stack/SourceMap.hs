@@ -34,7 +34,7 @@ import qualified RIO.Set as Set
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDump )
 import           Stack.Prelude
 import           Stack.Types.Build
-                   ( BuildException (..), FlagSource, UnusedFlags (..) )
+                   ( BuildPrettyException (..), FlagSource, UnusedFlags (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler, actualToWanted, wantedToActual )
 import           Stack.Types.Config
@@ -219,7 +219,7 @@ checkFlagsUsedThrowing packageFlags source prjPackages deps = do
     forMaybeM (Map.toList packageFlags) $ \(pname, flags) ->
       getUnusedPackageFlags (pname, flags) source prjPackages deps
   unless (null unusedFlags) $
-    throwM $ InvalidFlagSpecification $ Set.fromList unusedFlags
+    prettyThrowM $ InvalidFlagSpecification $ Set.fromList unusedFlags
 
 getUnusedPackageFlags ::
      MonadIO m
