@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
@@ -313,7 +313,7 @@ library
     , network-uri
     , open-browser
     , optparse-applicative >=0.17.0.0
-    , pantry >=0.8.1
+    , pantry >=0.8.2
     , path
     , path-io
     , persistent >=2.14.0.0 && <2.15
@@ -442,7 +442,7 @@ executable stack
     , network-uri
     , open-browser
     , optparse-applicative >=0.17.0.0
-    , pantry >=0.8.1
+    , pantry >=0.8.2
     , path
     , path-io
     , persistent >=2.14.0.0 && <2.15
@@ -567,7 +567,7 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative >=0.17.0.0
     , optparse-generic
-    , pantry >=0.8.1
+    , pantry >=0.8.2
     , path
     , path-io
     , persistent >=2.14.0.0 && <2.15
@@ -696,7 +696,7 @@ test-suite stack-test
     , network-uri
     , open-browser
     , optparse-applicative >=0.17.0.0
-    , pantry >=0.8.1
+    , pantry >=0.8.2
     , path
     , path-io
     , persistent >=2.14.0.0 && <2.15

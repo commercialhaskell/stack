@@ -190,6 +190,7 @@ main = do
       withRunnerGlobal global $ run `catches`
         [ Handler handleExitCode
         , Handler handlePrettyException
+        , Handler handlePantryException
         , Handler handleSomeException
         ]
 
@@ -211,7 +212,15 @@ handleExitCode = exitWith
 
 -- | Handle PrettyException exceptions.
 handlePrettyException :: PrettyException -> RIO Runner a
-handlePrettyException e = do
+handlePrettyException = handleAnyPrettyException
+
+-- | Handle (pretty) PantryException exceptions.
+handlePantryException :: PantryException -> RIO Runner a
+handlePantryException = handleAnyPrettyException
+
+-- | Handle any pretty exception.
+handleAnyPrettyException :: (Exception e, Pretty e) => e -> RIO Runner a
+handleAnyPrettyException e = do
   -- The code below loads the entire Stack configuration, when all that is
   -- needed are the Stack colours. A tailored approach may be better.
   result <- tryAny $ withConfig NoReexec $ prettyError $ pretty e
