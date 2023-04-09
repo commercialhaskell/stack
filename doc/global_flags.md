@@ -152,11 +152,12 @@ information, see the
 [YAML configuration](yaml_configuration.md#resolver-or-snapshot) documentation.
 
 At the command line (only):
-* `--resolver lts-<major_version>` specifies the latest Stackage LTS Haskell
-  snapshot with the specified major version;
-* `--resolver lts` specifies, from those with the greatest major version, the
-  latest Stackage LTS Haskell snapshot; and
-* `--resolver nightly` specifies the most recent Stackage Nightly snapshot.
+
+*   `--resolver lts-<major_version>` specifies the latest Stackage LTS Haskell
+    snapshot with the specified major version;
+*   `--resolver lts` specifies, from those with the greatest major version, the
+    latest Stackage LTS Haskell snapshot; and
+*   `--resolver nightly` specifies the most recent Stackage Nightly snapshot.
 
 ## `--[no-]rsl-in-log` flag
 
