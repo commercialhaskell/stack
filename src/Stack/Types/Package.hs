@@ -50,7 +50,7 @@ import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License ( License )
 import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription
-                   ( TestSuiteInterface, BuildType )
+                   ( BuildType )
 import           Distribution.System ( Platform (..) )
 import qualified RIO.Text as T
 import           Stack.Prelude
@@ -180,10 +180,7 @@ data Package = Package
   , packageTestSuites :: CompCollection StackTest
   , packageBenchmarkSuites :: CompCollection StackBenchmark
   , packageExecutables :: CompCollection StackExecutable
-  , packageTests :: !(Map Text TestSuiteInterface)
-    -- ^ names and interfaces of test suites
-  , packageBenchmarks :: !(Set Text)
-    -- ^ names of executables
+    -- ^ does the package have a buildable library stanza?
   , packageOpts :: !GetPackageOpts
     -- ^ Args to pass to GHC.
   , packageBuildType :: !BuildType

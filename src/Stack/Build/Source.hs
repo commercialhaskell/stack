@@ -24,7 +24,7 @@ import qualified Distribution.PackageDescription as C
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
-import           Stack.Package ( hasMainBuildableLibrary, resolvePackage, packageExes )
+import           Stack.Package ( hasMainBuildableLibrary, resolvePackage, packageExes, packageBenchmarks )
 import           Stack.Prelude
 import           Stack.SourceMap
                    ( DumpedGlobalPackage, checkFlagsUsedThrowing
@@ -65,6 +65,7 @@ import           Stack.Types.SourceMap
 import           Stack.Types.UnusedFlags ( FlagSource (..) )
 import           System.FilePath ( takeFileName )
 import           System.IO.Error ( isDoesNotExistError )
+import           Stack.Types.CompCollection ( getBuildableSetText )
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env => RIO env [LocalPackage]
@@ -315,7 +316,7 @@ loadLocalPackage pp = do
             ( packageExes pkg
             , if    boptsTests bopts
                  && maybe True (Set.notMember name . curatorSkipTest) mcurator
-                then Map.keysSet (packageTests pkg)
+                then getBuildableSetText (packageTestSuites pkg)
                 else Set.empty
             , if    boptsBenchmarks bopts
                  && maybe
@@ -419,7 +420,7 @@ loadLocalPackage pp = do
       -- must not be buildable.
     , lpUnbuildable = toComponents
         (exes `Set.difference` packageExes pkg)
-        (tests `Set.difference` Map.keysSet (packageTests pkg))
+        (tests `Set.difference` getBuildableSetText (packageTestSuites pkg))
         (benches `Set.difference` packageBenchmarks pkg)
     }
 
