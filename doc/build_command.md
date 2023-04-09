@@ -543,16 +543,30 @@ input channel, an exception will be thown.
 
 ## Examples
 
-*   `stack build --test --copy-bins` or, equivalently, `stack test --copy-bins`
-    or `stack install --test`, will build libraries, executables, and test
-    suites, run the test suites, and then copy the executables to Stack's local
-    binary directory (see `stack path --local-bin`). This is an example of the
-    flags composing.
+All the following examples assume that:
 
-*   The following example uses the
-    `wai` [repository](https://github.com/yesodweb/wai/)). The `wai` project
-    comprises a number of packages, including `wai-extra` and `warp`. The
-    command:
+*   if `stack build` is commanded outside of a project directory, there is no
+    `stack.yaml` file in the current directory or ancestor directory and,
+    consequently, the project-level configuration will be determined by a
+    `stack.yaml` file in the `global-project` directory in the Stack root (for
+    further information, see the [YAML configuration](yaml_configuration.md)
+    documentation); and
+
+*   if `stack build` is commanded in a project directory, there is a
+    `stack.yaml` file in that directory.
+
+Examples:
+
+*   In the project directory, `stack build --test --copy-bins` or, equivalently,
+    `stack test --copy-bins` or `stack install --test`, will build libraries,
+    executables, and test suites, run the test suites, and then copy the
+    executables to Stack's local binary directory (see
+    `stack path --local-bin`). This is an example of the flags composing.
+
+*   The following example uses a clone of the
+    `wai` [repository](https://github.com/yesodweb/wai/). The `wai` project
+    comprises a number of packages, including `wai-extra` and `warp`. In the
+    `wai` project directory, the command:
 
     ~~~text
     stack build --file-watch --test --copy-bins --haddock wai-extra :warp warp:doctest --exec 'echo Yay, it worked!'
@@ -571,3 +585,38 @@ input channel, an exception will be thown.
           * Copy generated executables to Stack's local binary directory (see
             `stack path --local-bin`)
           * Run the command `echo Yay, it worked!`
+
+*   The following example uses the `Adga` package and assumes that `Adga-2.6.3`
+    is the latest version in the package index (e.g. Hackage) and is not a
+    version in the snapshot specified by the `stack.yaml` in the
+    `global-project` directory in the Stack root.
+
+    Outside a project directory, `stack build Adga-2.6.3 --copy-bins` or,
+    equivalently, `stack install Agda-2.6.3`, will attempt to build the
+    libraries and executables of the identified version of the package in the
+    package index (using the `stack.yaml` file in the `global-project`
+    directory in the Stack root), and then copy the executables to Stack's local
+    binary directory (see `stack path --local-bin`).
+
+    If a different snapshot is required to build the identified version of the
+    package, then that can be specified at the command line. For example, to use
+    the most recent Stackage Nightly snapshot:
+
+    ~~~text
+    stack --resolver nightly install Agda-2.6.3
+    ~~~
+
+    Alternatively, Stack can be used to unpack the package from the package
+    index into a local project directory named after the package identifier (for
+    further infomation, see the [`stack unpack` command](unpack_command.md)
+    documentation) and, if the package does not provide its own Stack
+    configuration file (`stack.yaml`), to attempt to initialise that
+    configuration (for further information, see the
+    [`stack init` command](init_command.md) documentation). For example:
+
+    ~~~text
+    stack unpack Agda-2.6.3
+    cd Agda-2.6.3  # Change to the project directory
+    stack init     # Attempt to create a project stack.yaml file
+    stack install  # Equivalent to stack build --copy-bins
+    ~~~
