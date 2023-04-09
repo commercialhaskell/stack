@@ -195,7 +195,13 @@ import           System.IO.Error ( isDoesNotExistError )
 import           System.PosixCompat.Files
                    ( createLink, getFileStatus, modificationTime )
 import           System.Random ( randomIO )
-import           Stack.Types.CompCollection ( getBuildableListText, getBuildableSetText )
+import           Stack.Types.CompCollection
+                  ( getBuildableListText
+                  , collectionKeyValueList
+                  , collectionLookup
+                  )
+import qualified Stack.Types.Component as Component
+import           GHC.Records ( getField )
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus
@@ -2037,7 +2043,6 @@ singleBuild
         cabal0 keep KeepTHLoading $ "haddock" : args
 
     let hasLibrary = hasMainBuildableLibrary package
-        packageHasComponentSet f = not $ Set.null $ f package
         hasSubLibraries = not $ null $ packageSubLibraries package
         hasExecutables = not $ null $ packageExecutables package
         shouldCopy =
@@ -2271,7 +2276,7 @@ singleTest topts testsToRun ac ee task installedMap = do
 
         let suitesToRun
               = [ testSuitePair
-                | testSuitePair <- Map.toList $ packageTests package
+                | testSuitePair <- (fmap . fmap) (getField @"interface") <$> collectionKeyValueList $ packageTestSuites package
                 , let testName = fst testSuitePair
                 , testName `elem` testsToRun
                 ]
@@ -2480,7 +2485,7 @@ singleTest topts testsToRun ac ee task installedMap = do
         when needHpc $ do
           let testsToRun' = map f testsToRun
               f tName =
-                  case Map.lookup tName (packageTests package) of
+                  case getField @"interface" <$> collectionLookup tName (packageTestSuites package) of
                     Just C.TestSuiteLibV09{} -> tName <> "Stub"
                     _ -> tName
           generateHpcReport pkgDir package testsToRun'

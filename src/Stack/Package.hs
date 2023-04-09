@@ -23,6 +23,7 @@ module Stack.Package
   , packageUnknownTools
   , packageSubLibrariesNameSet
   , packageExes
+  , packageBenchmarks
   ) where
 
 import           Data.List ( unzip )
@@ -135,21 +136,11 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageLibrary = stackLibraryFromCabal <$> library pkg
   , packageSubLibraries = foldAndMakeCollection stackLibraryFromCabal $ subLibraries pkg
   , packageForeignLibraries = foldAndMakeCollection stackForeignLibraryFromCabal $ foreignLibs pkg
-  , packageTestSuites = foldAndMakeCollection stackTestFromCabal $ testSuites pkg
-  , packageBenchmarkSuites = foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkg
+  , packageTestSuites = foldAndMakeCollection stackTestFromCabal $ testSuites pkgNoMod
+  , packageBenchmarkSuites = foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkgNoMod
   , packageExecutables = foldAndMakeCollection stackExecutableFromCabal $ executables pkg
   , packageAllDeps = M.keysSet deps
   , packageSubLibDeps = subLibDeps
-  , packageTests = M.fromList
-      [ (T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
-      | t <- testSuites pkgNoMod
-      , buildable (testBuildInfo t)
-      ]
-  , packageBenchmarks = S.fromList
-      [ T.pack (Cabal.unUnqualComponentName $ benchmarkName b)
-      | b <- benchmarks pkgNoMod
-      , buildable (benchmarkBuildInfo b)
-      ]
   -- This is an action used to collect info needed for "stack ghci".
   -- This info isn't usually needed, so computation of it is deferred.
   , packageOpts = GetPackageOpts $
@@ -843,3 +834,6 @@ packageSubLibrariesNameSet :: Package -> Set Text
 packageSubLibrariesNameSet pkg = getBuildableSetText (packageSubLibraries pkg)
 packageExes :: Package -> Set Text
 packageExes pkg = getBuildableSetText (packageExecutables pkg)
+-- packageTests ::
+packageBenchmarks :: Package -> Set Text
+packageBenchmarks pkg = getBuildableSetText (packageBenchmarkSuites pkg)

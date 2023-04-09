@@ -959,16 +959,16 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
 wantedPackageComponents :: BuildOpts -> Target -> Package -> Set NamedComponent
 wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
-  ( if hasMainBuildableLibrary pkg
-     then CLib : map CSubLib (getBuildableListText $ packageForeignLibraries pkg)
-     else []) ++
+  (if hasMainBuildableLibrary pkg
+    then CLib : map CSubLib (getBuildableListText $ packageForeignLibraries pkg)
+    else []) ++
   map CExe (S.toList (packageExes pkg)) <>
   map CSubLib (getBuildableListText $ packageSubLibraries pkg) <>
   (if boptsTests bopts
-    then map CTest (M.keys (packageTests pkg))
+    then map CTest (getBuildableListText (packageTestSuites pkg))
     else []) <>
   (if boptsBenchmarks bopts
-    then map CBench (S.toList (packageBenchmarks pkg))
+    then map CBench (getBuildableListText (packageBenchmarkSuites pkg))
     else [])
 wantedPackageComponents _ _ _ = S.empty
 
