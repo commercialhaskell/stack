@@ -4,6 +4,7 @@
 -- | A module which exports all package-level file-gathering logic.
 module Stack.PackageFile
   ( packageDescModulesAndFiles
+  , getPackageFile
   ) where
 
 import qualified Data.Map.Strict as M
@@ -14,7 +15,7 @@ import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription hiding ( FlagName )
 import           Distribution.Simple.Glob ( matchDirFileGlob )
 import qualified Distribution.Types.UnqualComponentName as Cabal
-import           Path ( parent )
+import           Path ( parent, (</>) )
 import           Path.Extra ( forgivingResolveFile, rejectMissingFile )
 import           Stack.ComponentFile
                    ( benchmarkFiles, executableFiles, libraryFiles
@@ -28,6 +29,10 @@ import           Stack.Types.PackageFile
                    )
 import qualified System.FilePath as FilePath
 import           System.IO.Error ( isUserError )
+import           Stack.Constants.Config ( distDirFromDir )
+import           Stack.Types.Config ( HasBuildConfig(buildConfigL), cabalVersionL, HasEnvConfig )
+import           Stack.Constants ( relFileSetupHs, relFileSetupLhs, relFileHpackPackageConfig )
+import           Path.IO ( doesFileExist )
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
@@ -136,3 +141,43 @@ resolveGlobFiles cabalFileVersion =
             pure []
           else throwIO e
       )
+
+getPackageFile :: (MonadReader s m, MonadThrow m, MonadUnliftIO m, HasEnvConfig s) =>
+  PackageDescription
+  -> Path Abs File
+  -> m (Map NamedComponent (Map ModuleName (Path Abs File)),
+        Map NamedComponent [DotCabalPath], Set (Path Abs File),
+        [PackageWarning])
+getPackageFile pkg cabalfp = debugBracket ("getPackageFiles" <+> pretty cabalfp) $ do
+      let pkgDir = parent cabalfp
+      distDir <- distDirFromDir pkgDir
+      bc <- view buildConfigL
+      cabalVer <- view cabalVersionL
+      (componentModules,componentFiles,dataFiles',warnings) <-
+        runRIO
+          (GetPackageFileContext cabalfp distDir bc cabalVer)
+          (packageDescModulesAndFiles pkg)
+      setupFiles <-
+        if buildType pkg == Custom
+        then do
+          let setupHsPath = pkgDir </> relFileSetupHs
+              setupLhsPath = pkgDir </> relFileSetupLhs
+          setupHsExists <- doesFileExist setupHsPath
+          if setupHsExists
+            then pure (S.singleton setupHsPath)
+            else do
+              setupLhsExists <- doesFileExist setupLhsPath
+              if setupLhsExists
+                then pure (S.singleton setupLhsPath)
+                else pure S.empty
+        else pure S.empty
+      buildFiles <- fmap (S.insert cabalfp . S.union setupFiles) $ do
+        let hpackPath = pkgDir </> relFileHpackPackageConfig
+        hpackExists <- doesFileExist hpackPath
+        pure $ if hpackExists then S.singleton hpackPath else S.empty
+      pure
+        ( componentModules
+        , componentFiles
+        , buildFiles <> dataFiles'
+        , warnings
+        )
