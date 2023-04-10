@@ -466,6 +466,15 @@ Where again, `<PATTERN>` is the name of the folder listed in the
 [test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
 directory.
 
+You can disable a few integration tests through the -n option : 
+
+~~~text
+stack build --flag stack:integration-tests stack --exec "stack-integration-test -n <PATTERN1> -n <PATTERN2>"
+~~~
+
+To disable folders named after `<PATTERN1>` and `<PATTERN2>`
+It's especially useful when some tests are taking a while to complete.
+
 ## Continuous integration (CI)
 
 We use [GitHub Actions](https://docs.github.com/en/actions) to do CI on Stack.
