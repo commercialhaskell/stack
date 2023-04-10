@@ -63,6 +63,7 @@ main = runSimpleApp $ do
 data Options = Options
   { optSpeed :: Maybe Speed
   , optMatch :: Maybe String
+  , optNot :: [String]
   }
   deriving Generic
 
@@ -101,9 +102,10 @@ runApp options inner = do
   logInfo $ "Using runghc located at " <> fromString runghc
   proc runghc ["--version"] runProcess_
 
-  let matchTest = case optMatch options of
-        Nothing -> const True
-        Just str -> (str `isInfixOf`)
+  let matchTest = case (optMatch options, optNot options) of
+        (Just str, _) -> (str `isInfixOf`)
+        (_, []) -> const True
+        (_, nl) -> \a -> all (\b -> not $ b `isInfixOf` a) nl
   testDirs
     <- runConduitRes
      $ sourceDirectory (testsRoot </> "tests")
