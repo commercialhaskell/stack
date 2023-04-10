@@ -151,6 +151,14 @@ Pass the option `--resolver <snapshot>` to specify the snapshot. For further
 information, see the
 [YAML configuration](yaml_configuration.md#resolver-or-snapshot) documentation.
 
+At the command line (only):
+
+*   `--resolver lts-<major_version>` specifies the latest Stackage LTS Haskell
+    snapshot with the specified major version;
+*   `--resolver lts` specifies, from those with the greatest major version, the
+    latest Stackage LTS Haskell snapshot; and
+*   `--resolver nightly` specifies the most recent Stackage Nightly snapshot.
+
 ## `--[no-]rsl-in-log` flag
 
 [:octicons-tag-24: 2.9.1](https://github.com/commercialhaskell/stack/releases/tag/v2.9.1)
