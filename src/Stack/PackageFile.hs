@@ -42,6 +42,12 @@ import           Stack.Types.PackageFile
                    )
 import qualified System.FilePath as FilePath
 import           System.IO.Error ( isUserError )
+import Stack.Constants.Config ( distDirFromDir )
+import Stack.Types.Config
+    ( HasBuildConfig(buildConfigL), cabalVersionL, HasEnvConfig )
+import Stack.Constants
+    ( relFileSetupHs, relFileSetupLhs, relFileHpackPackageConfig )
+import Path.IO (doesFileExist)
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
