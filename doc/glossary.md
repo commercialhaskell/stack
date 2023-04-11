@@ -18,6 +18,7 @@ The following terms are used in Stack's documentation.
 |FreeBSD            |A Unix-like operating system.                             |
 |GCC                |The [GNU Compiler Collection](https://gcc.gnu.org/) or its executable `gcc`.|
 |GHC                |The [Glasgow Haskell Compiler](https://www.haskell.org/ghc/).|
+|GHC boot package   |A package that comes with GHC, is included in GHC's global package database, and is not included in a Stackage snapshot. See the output of command `stack exec -- ghc-pkg list --global`.|
 |GHCi               |GHC's [interactive environment](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/ghci.html).|
 |GHCJS              |A Haskell to JavaScript [compiler](https://github.com/ghcjs/ghcjs).|
 |GHCup              |An [installer](https://www.haskell.org/ghcup/) for Haskell.
