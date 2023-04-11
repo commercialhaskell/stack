@@ -208,8 +208,8 @@ the default value.
 Default: `[]`
 
 This key allows you to specify extra dependencies on top of what is defined in
-your snapshot (specified by the `resolver` key mentioned above). These
-dependencies may either come from a local file path or a Pantry package
+your snapshot (specified by the `resolver` or `snapshot` key mentioned above).
+These dependencies may either come from a local file path or a Pantry package
 location.
 
 For the local file path case, the same relative path rules as apply to
@@ -244,6 +244,11 @@ extra-deps:
 
 For further information on the format for specifying dependencies, see the
 [Pantry](pantry.md) documentation.
+
+!!! note
+
+    GHC boot packages are special. An extra-dep with the same package name and
+    version as a GHC boot package will be ignored.
 
 ### flags
 

@@ -85,12 +85,12 @@ supported syntaxes for targets are:
     of the test suite and benchmark components, respectively, are selected to be
     built.
 
-    Stackage snapshots do not include directly the packages in GHC's global
-    package database which come with GHC (GHC boot libraries). For example, if
-    `Cabal` is not a local package or an extra dep, then `stack build Cabal`
-    will specify the latest version of that package in the package index, which
-    may differ from the version provided by the version of GHC specified by the
-    snapshot.
+    Stackage snapshots do not include directly GHC boot packages (packages that
+    come with GHC and are included in GHC's global package database). For
+    example, if `Cabal` is not a local package or an extra dep, then
+    `stack build Cabal` will specify the latest version of that package in the
+    package index, which may differ from the version provided by the version of
+    GHC specified by the snapshot.
 
 *   *package identifier*, e.g. `stack build foobar-1.2.3`, is usually used to
     include specific package versions from the package index. If the version
