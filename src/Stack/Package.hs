@@ -53,11 +53,7 @@ import           Distribution.Version
                    ( anyVersion, mkVersion, orLaterVersion )
 import           Path as FL hiding ( replaceExtension )
 import           Path.Extra ( concatAndCollapseAbsDir, toFilePathNoTrailingSep )
-import           Path.IO hiding ( findFiles )
-import           Stack.Constants
-                   ( relDirLogs, relFileCabalMacrosH, relFileHpackPackageConfig
-                   , relFileSetupHs, relFileSetupLhs
-                   )
+import           Stack.Constants (relFileCabalMacrosH, relDirLogs)
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Compiler ( ActualCompiler (..), getGhcVersion )
@@ -83,10 +79,10 @@ import           Stack.Types.Version
 import           System.FilePath ( replaceExtension )
 import           Stack.Types.Dependency ( DepValue (..), DepType (..) )
 import           Stack.Types.PackageFile
-                   ( GetPackageFileContext (..), DotCabalPath
+                   ( DotCabalPath
                    , GetPackageFiles (..)
                    )
-import           Stack.PackageFile ( packageDescModulesAndFiles )
+import           Stack.PackageFile ( getPackageFile )
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
@@ -205,40 +201,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   -- Gets all of the modules, files, build files, and data files that constitute
   -- the package. This is primarily used for dirtiness checking during build, as
   -- well as use by "stack ghci"
-  pkgFiles = GetPackageFiles $
-    \cabalfp -> debugBracket ("getPackageFiles" <+> pretty cabalfp) $ do
-      let pkgDir = parent cabalfp
-      distDir <- distDirFromDir pkgDir
-      bc <- view buildConfigL
-      cabalVer <- view cabalVersionL
-      (componentModules,componentFiles,dataFiles',warnings) <-
-        runRIO
-          (GetPackageFileContext cabalfp distDir bc cabalVer)
-          (packageDescModulesAndFiles pkg)
-      setupFiles <-
-        if buildType pkg == Custom
-        then do
-          let setupHsPath = pkgDir </> relFileSetupHs
-              setupLhsPath = pkgDir </> relFileSetupLhs
-          setupHsExists <- doesFileExist setupHsPath
-          if setupHsExists
-            then pure (S.singleton setupHsPath)
-            else do
-              setupLhsExists <- doesFileExist setupLhsPath
-              if setupLhsExists
-                then pure (S.singleton setupLhsPath)
-                else pure S.empty
-        else pure S.empty
-      buildFiles <- fmap (S.insert cabalfp . S.union setupFiles) $ do
-        let hpackPath = pkgDir </> relFileHpackPackageConfig
-        hpackExists <- doesFileExist hpackPath
-        pure $ if hpackExists then S.singleton hpackPath else S.empty
-      pure
-        ( componentModules
-        , componentFiles
-        , buildFiles <> dataFiles'
-        , warnings
-        )
+  pkgFiles = GetPackageFiles $ getPackageFile pkg
   pkgId = package pkg
   name = pkgName pkgId
 
