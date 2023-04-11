@@ -424,17 +424,23 @@ flag.
 
 ### `--[no-]copy-bins` flag
 
+[:octicons-tag-24: 0.1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.3.0)
+
 Default: Disabled
 
-Set the flag to enable copying binaries to Stack's local binary directory (see
-`stack path --local-bin`). The `stack install` synonym sets this flag.
+Set the flag to enable copying of built executable files (binaries) of targets
+to Stack's local binary directory (see `stack path --local-bin`). The
+`stack install` synonym sets this flag.
 
 ### `--[no-]copy-compiler-tool` flag
 
+[:octicons-tag-24: 1.6.1](https://github.com/commercialhaskell/stack/releases/tag/v1.6.1)
+
 Default: Disabled
 
-Set the flag to enable copying binaries of targets to Stack's compiler tools
-binary directory (see `stack path --compiler-tools-bin`).
+Set the flag to enable copying of built executable files (binaries) of targets
+to Stack's compiler tools binary directory (see
+`stack path --compiler-tools-bin`).
 
 ### `--coverage` flag
 
