@@ -155,7 +155,9 @@ configOptsParser currentDir hide0 =
         ( long "local-bin-path"
         <> metavar "DIR"
         <> completer dirCompleter
-        <> help "Install binaries to DIR"
+        <> help "Override the target directory for 'stack build --copy-bins' \
+                \and 'stack install'. DIR can be an absolute path or one \
+                \relative to the current directory."
         <> hide
         ))
   <*> many (strOption
