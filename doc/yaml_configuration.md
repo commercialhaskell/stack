@@ -918,7 +918,14 @@ Default (on Windows): `%APPDATA%\local\bin`
 
 Command line equivalent (takes precedence): `--local-bin-path` option
 
-Target directory for `stack install` and `stack build --copy-bins`.
+Specifies the target directory for
+[`stack build --copy-bins`](build_command.md#-no-copy-bins-flag) and
+`stack install`. An absolute or relative path can be specified.
+
+If the project-level configuration is provided in the `global-project` directory
+in the Stack root, a relative path is assumed to be relative to the current
+directory. Otherwise, it is assumed to be relative to the directory of the
+project-level configuration file.
 
 ### local-programs-path
 
