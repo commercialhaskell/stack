@@ -2128,7 +2128,7 @@ Behavior changes:
 * Remove deprecated valid-wanted field.
 * Docker: mount home directory in container
   [#1949](https://github.com/commercialhaskell/stack/issues/1949).
-* Deprecate `--local-bin-path` instead `--local-bin`.
+* Deprecate `stack path --local-bin-path`; instead use `--local-bin`.
 * `stack image`: allow absolute source paths for `add`.
 
 Other enhancements:
