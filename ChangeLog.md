@@ -976,6 +976,15 @@ Behavior changes:
   download a template, Stack will check whether that template had
   been downloaded before. In that case, the cached version will be
   used. See [#3850](https://github.com/commercialhaskell/stack/issues/3850).
+* In Stack's script interpreter, `-- stack --verbosity=info script` and
+  `-- stack script --verbosity=info` now have the same effect and both override
+  the `--verbosity=error` default in the interpreter. Previously the default
+  meant the former was equivalent to
+  `-- stack --verbosity=info script --verbosity=error` and the latter was
+  equivalent to `-- stack --verbosity=error script --verbosity=info`, with the
+  subcommand's global option having precedence over the Stack command's
+  global option in each case. See
+  [#5326](https://github.com/commercialhaskell/stack/issues/5326).
 
 Other enhancements:
 
