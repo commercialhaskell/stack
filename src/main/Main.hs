@@ -7,7 +7,7 @@
 
 module Main (main) where
 
-import           BuildInfo
+import           BuildInfo ( hpackVersion, maybeGitHash, versionString' )
 import           Conduit ( runConduitRes, sourceLazy, sinkFileCautious )
 import           Data.Attoparsec.Args ( EscapingMode (Escaping), parseArgs )
 import           Data.Attoparsec.Interpreter ( getInterpreterArgs )
@@ -15,7 +15,6 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           RIO.Process
 import           GHC.IO.Encoding ( mkTextEncoding, textEncodingName )
 import           Options.Applicative
                    ( Parser, ParserFailure, ParserHelp, ParserResult (..), flag
@@ -27,61 +26,87 @@ import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Complicated
                    ( addCommand, addSubCommands, complicatedOptions )
 import           Pantry ( loadSnapshot )
-import           Path
+import           Path ( (</>), parent, parseRelFile )
 import           Path.IO
-import           Stack.Build
+                   ( doesFileExist, ensureDir, getCurrentDir, resolveDir'
+                   , resolveFile'
+                   )
+import           RIO.Process ( exec, withProcessContextNoLogging )
+import           Stack.Build ( build, queryBuildInfo )
 import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Clean ( CleanCommand (..), CleanOpts (..), clean )
-import           Stack.Config
+import           Stack.Config ( makeConcreteResolver )
 import           Stack.ConfigCmd as ConfigCmd
-import           Stack.Constants
-import           Stack.Constants.Config
+import           Stack.Constants ( globalFooter, osIsWindows, stackDotYaml )
+import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Coverage
+                   ( HpcReportOpts (..), generateHpcReportForTargets )
 import qualified Stack.Docker as Docker
-import           Stack.Dot
+import           Stack.Dot ( dot )
+import           Stack.FileWatch ( fileWatch, fileWatchPoll )
 import           Stack.GhcPkg ( findGhcPkgField )
-import qualified Stack.Nix as Nix
-import           Stack.FileWatch
-import           Stack.Ghci
-import           Stack.Hoogle
-import           Stack.List
-import           Stack.Ls
+import           Stack.Ghci ( GhciOpts (..), ghci )
+import           Stack.Hoogle ( hoogleCmd )
 import qualified Stack.IDE as IDE
-import           Stack.Init
-import           Stack.New
-import           Stack.Options.BuildParser
-import           Stack.Options.CleanParser
-import           Stack.Options.DockerParser
-import           Stack.Options.DotParser
-import           Stack.Options.ExecParser
-import           Stack.Options.GhciParser
+import           Stack.Init ( InitOpts (..), initProject )
+import           Stack.List ( listPackages )
+import           Stack.Ls ( lsCmd, lsParser )
+import           Stack.New ( NewOpts, new, templatesHelp )
+import qualified Stack.Nix as Nix
+import           Stack.Options.BuildParser ( buildOptsParser )
+import           Stack.Options.CleanParser ( cleanOptsParser )
+import           Stack.Options.DockerParser ( dockerOptsParser )
+import           Stack.Options.DotParser ( dotOptsParser )
+import           Stack.Options.ExecParser ( evalOptsParser, execOptsParser )
+import           Stack.Options.GhciParser ( ghciOptsParser )
 import           Stack.Options.GlobalParser
-import           Stack.Options.HpcReportParser
-import           Stack.Options.NewParser
-import           Stack.Options.NixParser
+                   ( globalOptsFromMonoid, globalOptsParser, initOptsParser )
+import           Stack.Options.HpcReportParser ( hpcReportOptsParser )
+import           Stack.Options.NewParser ( newOptsParser )
+import           Stack.Options.NixParser ( nixOptsParser )
+import           Stack.Options.SDistParser ( sdistOptsParser )
 import           Stack.Options.ScriptParser
-import           Stack.Options.SDistParser
+                   ( ScriptOpts (..), scriptOptsParser )
 import           Stack.Options.UploadParser
-import           Stack.Options.Utils
-import qualified Stack.Path
+                   ( UploadOpts (..), uploadOptsParser )
+import           Stack.Options.Utils ( GlobalOptsContext (..) )
+import qualified Stack.Path ( path, pathParser)
 import           Stack.Prelude hiding (Display (..))
 import           Stack.Runners
-import           Stack.Script
+                   ( ShouldReexec (..), withBuildConfig, withConfig
+                   , withDefaultEnvConfig, withEnvConfig, withGlobalProject
+                   , withRunnerGlobal
+                   )
 import           Stack.SDist
                    ( SDistOpts (..), checkSDistTarball, checkSDistTarball'
                    , getSDistTarball
                    )
+import           Stack.Script ( scriptCmd )
 import           Stack.Setup ( withNewLocalBuildTargets )
-import           Stack.SetupCmd
+import           Stack.SetupCmd ( SetupCmdOpts (..), setup, setupParser )
+import           Stack.Types.Config
+                   ( AddCommand, BenchmarkOpts (..), BuildCommand (..)
+                   , BuildConfig (..), BuildOpts (..), BuildOptsCLI (..)
+                   , CompilerPaths (..), Config (..), EnvConfig, EvalOpts (..)
+                   , ExecOpts (..), ExecOptsExtra (..), FileWatchOpts (..)
+                   , GlobalOpts (..), GlobalOptsMonoid (..), Runner
+                   , SpecialExecCmd (..), TestOpts (..), buildConfigL
+                   , buildOptsL, buildOptsMonoidBenchmarksL
+                   , buildOptsMonoidHaddockL, buildOptsMonoidInstallExesL
+                   , buildOptsMonoidTestsL, compilerPathsL, configL
+                   , defaultBuildOptsCLI, getGhcPkgExe
+                   , globalOptsBuildOptsMonoidL, globalOptsL, ppComponents
+                   , ppRoot, stackGlobalConfigL, stackRootL, stackYamlL
+                   , wantedCompilerVersionL
+                   )
+import           Stack.Types.NamedComponent ( NamedComponent (..), isCExe )
+import           Stack.Types.SourceMap ( SMWanted (..) )
 import           Stack.Types.Version
                    ( VersionCheck (..), checkVersion, showStackVersion
                    , stackVersion
                    )
-import           Stack.Types.Config
-import           Stack.Types.NamedComponent
-import           Stack.Types.SourceMap
-import           Stack.Unpack
-import           Stack.Upgrade
+import           Stack.Unpack ( unpackPackages )
+import           Stack.Upgrade ( UpgradeOpts, upgrade, upgradeOpts )
 import qualified Stack.Upload as Upload
 import qualified System.Directory as D
 import           System.Environment ( getArgs, getProgName, withArgs )
@@ -959,7 +984,7 @@ sdistCmd sdistOpts =
  where
   copyTarToTarPath tarPath tarName targetDir = liftIO $ do
     let targetTarPath = targetDir FP.</> tarName
-    D.createDirectoryIfMissing True $ FP.takeDirectory targetTarPath
+    D.createDirectoryIfMissing True $ takeDirectory targetTarPath
     D.copyFile (toFilePath tarPath) targetTarPath
 
 -- | Execute a command.
