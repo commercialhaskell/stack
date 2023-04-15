@@ -36,9 +36,8 @@ import           Stack.Types.Docker ( dockerEntrypointArgName )
 globalOptsParser ::
      FilePath
   -> GlobalOptsContext
-  -> Maybe LogLevel
   -> Parser GlobalOptsMonoid
-globalOptsParser currentDir kind defLogLevel = GlobalOptsMonoid
+globalOptsParser currentDir kind = GlobalOptsMonoid
   <$> optionalFirst (strOption
         (  long Docker.reExecArgName
         <> hidden
@@ -49,7 +48,7 @@ globalOptsParser currentDir kind defLogLevel = GlobalOptsMonoid
         <> hidden
         <> internal
         ))
-  <*> (First <$> logLevelOptsParser hide0 defLogLevel)
+  <*> (First <$> logLevelOptsParser hide0)
   <*> firstBoolFlagsTrue
         "time-in-log"
         "inclusion of timings in logs, for the purposes of using diff with logs"

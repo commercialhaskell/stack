@@ -249,7 +249,10 @@ commandLineHandler ::
   -> Bool
   -> IO (GlobalOptsMonoid, RIO Runner ())
 commandLineHandler currentDir progName isInterpreter =
-  complicatedOptions
+  -- Append the relevant default (potentially affecting the LogLevel) *after*
+  -- appending the global options of the `stack` command to the global options
+  -- of the subcommand - see #5326.
+  first (<> defaultGlobalOpts) <$> complicatedOptions
     stackVersion
     (Just versionString')
     hpackVersion
@@ -262,6 +265,11 @@ commandLineHandler currentDir progName isInterpreter =
     (Just failureCallback)
     addCommands
  where
+  defaultGlobalOpts = if isInterpreter
+    then
+      -- Silent except when errors occur - see #2879
+      mempty { globalMonoidLogLevel = First (Just LevelError) }
+    else mempty
   failureCallback f args =
     case L.stripPrefix "Invalid argument" (fst (renderFailure f "")) of
       Just _ -> if isInterpreter
@@ -657,13 +665,7 @@ commandLineHandler currentDir progName isInterpreter =
           progName
           (Nix.nixCmdName ++ "*")
           Nix.nixHelpOptName
-    <*> globalOptsParser
-          currentDir kind
-          ( if isInterpreter
-              -- Silent except when errors occur - see #2879
-              then Just LevelError
-              else Nothing
-          )
+    <*> globalOptsParser currentDir kind
    where
     hide = kind /= OuterGlobalOpts
 
