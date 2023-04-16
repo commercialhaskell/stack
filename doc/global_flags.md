@@ -107,10 +107,13 @@ corresponding non-project specific configuration
 
 ## `--local-bin-path` option
 
-Pass the option `--local-bin-path <directory>` to specify the directory in which
-Stack installs executables. For further information, see the documentation for
-the corresponding non-project specific configuration
-[option](yaml_configuration.md#local-bin-path).
+Pass the option `--local-bin-path <directory>` to set the target directory for
+[`stack build --copy-bins`](build_command.md#-no-copy-bins-flag) and
+`stack install`. An absolute or relative path can be specified. A relative path
+at the command line is always assumed to be relative to the current directory.
+
+For further information, see the documentation for the corresponding non-project
+specific configuration [option](yaml_configuration.md#local-bin-path).
 
 ## `--lock-file` option
 
