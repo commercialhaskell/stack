@@ -28,7 +28,7 @@ By default:
 
 * the new version will be the latest available. Pass the
   `--binary-version <version>` option to specify the version (this implies
-  `--force-dowload`);
+  `--force-download`);
 
 * the binary distribution will be sought from the GitHub organisation/user
   `commercialhaskell`. Pass the `--github-org <user>` option to specify a
