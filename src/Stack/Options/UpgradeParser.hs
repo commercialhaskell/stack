@@ -6,8 +6,8 @@ module Stack.Options.UpgradeParser
   ) where
 
 import         Options.Applicative
-                 ( Parser, flag', help, long, showDefault, strOption, switch
-                 , value
+                 ( Parser, flag', help, long, metavar, showDefault, strOption
+                 , switch, value
                  )
 import         Stack.Prelude
 import         Stack.Upgrade
@@ -21,33 +21,39 @@ upgradeOptsParser = UpgradeOpts
  where
   binaryOnly = flag' Nothing
     (  long "binary-only"
-    <> help "Do not use a source upgrade path"
+    <> help "Do not use a source upgrade path."
     )
   sourceOnly = flag' Nothing
     (  long "source-only"
-    <> help "Do not use a binary upgrade path"
+    <> help "Do not use a binary upgrade path."
     )
 
   binaryOpts = BinaryOpts
     <$> optional (strOption
           (  long "binary-platform"
-          <> help "Platform type for archive to download"
+          <> help "Platform type for archive to download."
+          <> metavar "PLATFORM"
           ))
     <*> switch
           (  long "force-download"
-          <> help "Download the latest available Stack executable"
+          <> help "Download the latest available Stack executable, even if not \
+                  \newer."
           )
     <*> optional (strOption
           (  long "binary-version"
-          <> help "Download a specific Stack version"
+          <> help "Download a specific Stack version, even if already \
+                  \installed."
+          <> metavar "VERSION"
           ))
     <*> optional (strOption
           (  long "github-org"
-          <> help "GitHub organization name"
+          <> help "GitHub organization name."
+          <> metavar "USER"
           ))
     <*> optional (strOption
           (  long "github-repo"
-          <> help "GitHub repository name"
+          <> help "GitHub repository name."
+          <> metavar "REPO"
           ))
 
   sourceOpts = SourceOpts
@@ -59,17 +65,19 @@ upgradeOptsParser = UpgradeOpts
         <$> switch
               ( long "git"
               <> help "Clone from Git instead of downloading from Hackage \
-                      \(more dangerous)"
+                      \(more dangerous)."
               )
         <*> strOption
               (  long "git-repo"
-              <> help "Clone from specified git repository"
+              <> help "Clone from specified Git repository."
+              <> metavar "URL"
               <> value "https://github.com/commercialhaskell/stack"
               <> showDefault
               )
         <*> strOption
               (  long "git-branch"
-              <> help "Clone from this git branch"
+              <> help "Clone from specified Git branch."
+              <> metavar "BRANCH"
               <> value "master"
               <> showDefault
               )
