@@ -436,13 +436,18 @@ instance Pretty BuildPrettyException where
       , style Shell "extra-deps" <> "."
       ]
   pretty GHCProfOptionInvalid =
-       "[S-8100]"
+    "[S-8100]"
     <> line
-    <> flow "When building with Stack, you should not use GHC's '-prof' \
-            \option. Instead, please use Stack's '--library-profiling' and \
-            \'--executable-profiling' flags. See:" <+>
-            style Url "https://github.com/commercialhaskell/stack/issues/1015"
-    <> "."
+    <> fillSep
+         [ flow "When building with Stack, you should not use GHC's"
+         , style Shell "-prof"
+         , flow "option. Instead, please use Stack's"
+         , style Shell "--library-profiling"
+         , "and"
+         , style Shell "--executable-profiling"
+         , flow "flags. See:"
+         , style Url "https://github.com/commercialhaskell/stack/issues/1015" <> "."
+         ]
 
 instance Exception BuildPrettyException
 

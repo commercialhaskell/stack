@@ -307,24 +307,25 @@ commandLineHandler currentDir progName isInterpreter =
             OutputLogInfo
             OutputStdout
             (  long "stdout"
-            <> help "Send output to stdout instead of the default, stderr"
+            <> help "Send output to the standard output stream instead of the \
+                    \default, the standard error stream."
             )
           cabalFileFlag = flag
             ListPackageNames
             ListPackageCabalFiles
             (  long "cabal-files"
-            <> help "Print paths to package cabal-files instead of \
-                    \package names"
+            <> help "Print paths to package Cabal files instead of package \
+                    \names."
             )
        in  do
              addCommand'
                "packages"
-               "List all available local loadable packages"
+               "List all available local loadable packages."
                idePackagesCmd
                ((,) <$> outputFlag <*> cabalFileFlag)
              addCommand'
                "targets"
-               "List all available Stack targets"
+               "List all available Stack targets."
                ideTargetsCmd
                outputFlag
     )

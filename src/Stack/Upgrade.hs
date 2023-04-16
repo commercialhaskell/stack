@@ -74,10 +74,15 @@ data UpgradePrettyException
 
 instance Pretty UpgradePrettyException where
   pretty ResolverOptionInvalid =
-       "[S-8761]"
+    "[S-8761]"
     <> line
-    <> flow "The '--resolver' option cannot be used with Stack's 'upgrade' \
-            \command."
+    <> fillSep
+         [ "The"
+         , style Shell "--resolver"
+         , flow "option cannot be used with Stack's"
+         , style Shell "upgrade"
+         , "command."
+         ]
 
 instance Exception UpgradePrettyException
 
