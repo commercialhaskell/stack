@@ -339,6 +339,7 @@ data BuildPrettyException
   | TargetParseException [StyleDoc]
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   | InvalidFlagSpecification (Set UnusedFlags)
+  | GHCProfOptionInvalid
   deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
@@ -434,6 +435,14 @@ instance Pretty BuildPrettyException where
       , flow "please add the package to"
       , style Shell "extra-deps" <> "."
       ]
+  pretty GHCProfOptionInvalid =
+       "[S-8100]"
+    <> line
+    <> flow "When building with Stack, you should not use GHC's '-prof' \
+            \option. Instead, please use Stack's '--library-profiling' and \
+            \'--executable-profiling' flags. See:" <+>
+            style Url "https://github.com/commercialhaskell/stack/issues/1015"
+    <> "."
 
 instance Exception BuildPrettyException
 

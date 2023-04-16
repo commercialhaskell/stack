@@ -2,16 +2,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
--- | Handy path information.
+-- | Types and functions related to Stack's @path@ command.
 module Stack.Path
-  ( path
-  , pathParser
+  ( PathInfo
+  , path
+  , paths
   ) where
 
 import           Data.List ( intercalate )
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import qualified Options.Applicative as OA
 import           Path ( (</>), parent )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           RIO.Process ( HasProcessContext (..), exeSearchPathL )
@@ -96,19 +96,7 @@ fillPathInfo = do
   piCompiler <- getCompilerPath
   pure PathInfo {..}
 
-pathParser :: OA.Parser [Text]
-pathParser =
-  mapMaybeA
-    ( \(desc,name,_) ->
-        OA.flag Nothing
-                (Just name)
-                (  OA.long (T.unpack name)
-                <> OA.help desc
-                )
-    )
-    paths
-
--- | Passed to all the path printers as a source of info.
+-- | Type representing information passed to all the path printers.
 data PathInfo = PathInfo
   { piBuildConfig  :: !BuildConfig
   , piSnapDb       :: !(Path Abs Dir)
@@ -157,15 +145,14 @@ data UseHaddocks a
   = UseHaddocks a
   | WithoutHaddocks a
 
--- | The paths of interest to a user. The first tuple string is used
--- for a description that the optparse flag uses, and the second
--- string as a machine-readable key and also for @--foo@ flags. The user
--- can choose a specific path to list like @--stack-root@. But
--- really it's mainly for the documentation aspect.
+-- | The paths of interest to a user. The first tuple string is used for a
+-- description that the optparse flag uses, and the second string as a
+-- machine-readable key and also for @--foo@ flags. The user can choose a
+-- specific path to list like @--stack-root@. But really it's mainly for the
+-- documentation aspect.
 --
--- When printing output we generate @PathInfo@ and pass it to the
--- function to generate an appropriate string.  Trailing slashes are
--- removed, see #506
+-- When printing output we generate @PathInfo@ and pass it to the function to
+-- generate an appropriate string. Trailing slashes are removed, see #506.
 paths :: [(String, Text, UseHaddocks (PathInfo -> Text))]
 paths =
   [ ( "Global Stack root directory"

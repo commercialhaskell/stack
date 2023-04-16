@@ -1,18 +1,24 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+-- | Functions related to Stack's @unpack@ command.
 module Stack.Unpack
-  ( unpackPackages
+  ( unpackCmd
+  , unpackPackages
   ) where
 
 import           Path ( (</>), parseRelDir )
-import           Path.IO ( doesDirExist )
+import           Path.IO ( doesDirExist, resolveDir' )
+import           Pantry ( loadSnapshot )
 import           RIO.List ( intercalate )
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
 import qualified RIO.Set as Set
 import qualified RIO.Text as T
+import           Stack.Config ( makeConcreteResolver )
 import           Stack.Prelude
+import           Stack.Runners ( ShouldReexec (..), withConfig )
+import           Stack.Types.Config ( Runner, globalOptsL, globalResolver )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Unpack" module.
@@ -32,12 +38,29 @@ instance Exception UnpackException where
       \identifiers:"
     : map ("- " ++) strs
 
+-- | Function underlying the @stack unpack@ command. Unpack packages to the
+-- filesystem.
+unpackCmd ::
+     ([String], Maybe Text)
+     -- ^ A pair of a list of names or identifiers and an optional destination
+     -- path.
+  -> RIO Runner ()
+unpackCmd (names, Nothing) = unpackCmd (names, Just ".")
+unpackCmd (names, Just dstPath) = withConfig NoReexec $ do
+  mresolver <- view $ globalOptsL.to globalResolver
+  mSnapshot <- forM mresolver $ \resolver -> do
+    concrete <- makeConcreteResolver resolver
+    loc <- completeSnapshotLocation concrete
+    loadSnapshot loc
+  dstPath' <- resolveDir' $ T.unpack dstPath
+  unpackPackages mSnapshot dstPath' names
+
 -- | Intended to work for the command line command.
 unpackPackages ::
      forall env. (HasPantryConfig env, HasProcessContext env, HasTerm env)
-  => Maybe RawSnapshot -- ^ when looking up by name, take from this build plan
-  -> Path Abs Dir -- ^ destination
-  -> [String] -- ^ names or identifiers
+  => Maybe RawSnapshot -- ^ When looking up by name, take from this build plan.
+  -> Path Abs Dir -- ^ Destination.
+  -> [String] -- ^ Names or identifiers.
   -> RIO env ()
 unpackPackages mSnapshot dest input = do
   let (errs1, (names, pirs1)) =

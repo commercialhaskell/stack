@@ -4,10 +4,11 @@
 
 -- | Generate HPC (Haskell Program Coverage) reports
 module Stack.Coverage
-  ( deleteHpcReports
+  ( HpcReportOpts (..)
+  , hpcReportCmd
+  , deleteHpcReports
   , updateTixFile
   , generateHpcReport
-  , HpcReportOpts (..)
   , generateHpcReportForTargets
   , generateHpcUnifiedReport
   , generateHpcMarkupIndex
@@ -32,19 +33,20 @@ import           Path.IO
                    , resolveDir', resolveFile'
                    )
 import           RIO.Process ( ProcessException, proc, readProcess_ )
-import           Stack.Build.Target (  )
+import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Constants
                    ( relDirAll, relDirCombined, relDirCustom
                    , relDirExtraTixFiles, relDirPackageConfInplace
                    , relFileHpcIndexHtml, relFileIndexHtml
                    )
 import           Stack.Constants.Config ( distDirFromDir, hpcRelativeDir )
-import           Stack.Package (  )
 import           Stack.Prelude
+import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.Config
-                   ( BuildConfig (..), EnvConfig (..), HasBuildConfig (..)
-                   , HasEnvConfig (..), actualCompilerVersionL, cabalVersionL
+                   ( BuildConfig (..), BuildOptsCLI (..), EnvConfig (..)
+                   , HasBuildConfig (..), HasEnvConfig (..), Runner
+                   , actualCompilerVersionL, cabalVersionL, defaultBuildOptsCLI
                    , hpcReportDir, ppRoot
                    )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
@@ -91,6 +93,25 @@ instance Pretty CoveragePrettyException where
          ]
 
 instance Exception CoveragePrettyException
+
+-- | Type representing command line options for the @stack hpc report@ command.
+data HpcReportOpts = HpcReportOpts
+  { hroptsInputs :: [Text]
+  , hroptsAll :: Bool
+  , hroptsDestDir :: Maybe String
+  , hroptsOpenBrowser :: Bool
+  }
+  deriving Show
+
+-- | Function underlying the @stack hpc report@ command.
+hpcReportCmd :: HpcReportOpts -> RIO Runner ()
+hpcReportCmd hropts = do
+  let (tixFiles, targetNames) =
+        L.partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
+      boptsCLI = defaultBuildOptsCLI
+        { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
+  withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
+    generateHpcReportForTargets hropts tixFiles targetNames
 
 -- | Invoked at the beginning of running with "--coverage"
 deleteHpcReports :: HasEnvConfig env => RIO env ()
@@ -315,14 +336,6 @@ generateHpcReportInternal tixSrc reportDir report reportHtml extraMarkupArgs ext
             )
             readProcess_
           pure (Just reportPath)
-
-data HpcReportOpts = HpcReportOpts
-  { hroptsInputs :: [Text]
-  , hroptsAll :: Bool
-  , hroptsDestDir :: Maybe String
-  , hroptsOpenBrowser :: Bool
-  }
-  deriving Show
 
 generateHpcReportForTargets :: HasEnvConfig env
                             => HpcReportOpts -> [Text] -> [Text] -> RIO env ()

@@ -176,7 +176,10 @@ library
       Stack.Coverage
       Stack.DefaultColorWhen
       Stack.Docker
+      Stack.DockerCmd
       Stack.Dot
+      Stack.Eval
+      Stack.Exec
       Stack.FileWatch
       Stack.GhcPkg
       Stack.Ghci
@@ -197,6 +200,7 @@ library
       Stack.Options.Completion
       Stack.Options.DockerParser
       Stack.Options.DotParser
+      Stack.Options.EvalParser
       Stack.Options.ExecParser
       Stack.Options.GhcBuildParser
       Stack.Options.GhciParser
@@ -204,20 +208,26 @@ library
       Stack.Options.GlobalParser
       Stack.Options.HaddockParser
       Stack.Options.HpcReportParser
+      Stack.Options.InitParser
       Stack.Options.LogLevelParser
+      Stack.Options.LsParser
       Stack.Options.NewParser
       Stack.Options.NixParser
       Stack.Options.PackageParser
+      Stack.Options.PathParser
       Stack.Options.ResolverParser
-      Stack.Options.ScriptParser
       Stack.Options.SDistParser
+      Stack.Options.ScriptParser
+      Stack.Options.SetupParser
       Stack.Options.TestParser
+      Stack.Options.UpgradeParser
       Stack.Options.UploadParser
       Stack.Options.Utils
       Stack.Package
       Stack.PackageDump
       Stack.Path
       Stack.Prelude
+      Stack.Query
       Stack.Runners
       Stack.Script
       Stack.SDist
@@ -228,6 +238,7 @@ library
       Stack.Storage.Project
       Stack.Storage.User
       Stack.Storage.Util
+      Stack.Templates
       Stack.Types.Build
       Stack.Types.CompilerBuild
       Stack.Types.Compiler
@@ -243,7 +254,9 @@ library
       Stack.Types.SourceMap
       Stack.Types.TemplateName
       Stack.Types.Version
+      Stack.Uninstall
       Stack.Unpack
+      Stack.Update
       Stack.Upgrade
       Stack.Upload
       System.Info.ShortPathName
@@ -254,6 +267,7 @@ library
   other-modules:
       Path.Extended
       Stack.ComponentFile
+      Stack.Internal.BuildInfo
       Stack.PackageFile
       Stack.Types.Cache
       Stack.Types.Dependency
@@ -385,6 +399,7 @@ executable stack
   main-is: Main.hs
   other-modules:
       BuildInfo
+      Stack.CLI
       Build_stack
       Paths_stack
   autogen-modules:

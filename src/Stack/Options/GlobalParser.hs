@@ -1,24 +1,22 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RecordWildCards   #-}
 
+-- | Functions to parse Stack's \'global\' command line arguments.
 module Stack.Options.GlobalParser
   ( globalOptsFromMonoid
   , globalOptsParser
-  , initOptsParser
   ) where
 
 import           Options.Applicative
                    ( Parser, auto, completer, help, hidden, internal, long
-                   , metavar, option, strOption, switch, value
+                   , metavar, option, strOption, value
                    )
 import           Options.Applicative.Builder.Extra
-                   ( dirCompleter, fileExtCompleter, firstBoolFlagsFalse
+                   ( fileExtCompleter, firstBoolFlagsFalse
                    , firstBoolFlagsNoDefault, firstBoolFlagsTrue, optionalFirst
-                   , textArgument
                    )
 import           Path.IO ( getCurrentDir, resolveDir', resolveFile' )
 import qualified Stack.Docker as Docker
-import           Stack.Init ( InitOpts (..) )
 import           Stack.Prelude
 import           Stack.Options.ConfigParser ( configOptsParser )
 import           Stack.Options.LogLevelParser ( logLevelOptsParser )
@@ -144,32 +142,3 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
                 _ -> LFBReadOnly
         in  fromFirst defLFB globalMonoidLockFileBehavior
     }
-
-initOptsParser :: Parser InitOpts
-initOptsParser = InitOpts
-  <$> searchDirs
-  <*> omitPackages
-  <*> overwrite
-  <*> fmap not ignoreSubDirs
- where
-  searchDirs = many (textArgument
-    (  metavar "DIR(S)"
-    <> completer dirCompleter
-    <> help "Directory, or directories, to include in the search for .cabal \
-            \files, when initialising. The default is the current directory."
-    ))
-  ignoreSubDirs = switch
-    (  long "ignore-subdirs"
-    <> help "Do not search for .cabal files in subdirectories, when \
-            \initialising."
-    )
-  overwrite = switch
-    (  long "force"
-    <> help "Force an initialisation that overwrites any existing stack.yaml \
-            \file."
-    )
-  omitPackages = switch
-    (  long "omit-packages"
-    <> help "Exclude conflicting or incompatible user packages, when \
-            \initialising."
-    )

@@ -1,14 +1,20 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+-- | Types and functions related to Stack's @list@ command.
 module Stack.List
-  ( listPackages
+  ( listCmd
+  , listPackages
   ) where
 
+import           Pantry ( loadSnapshot )
 import           RIO.List ( intercalate )
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
+import           Stack.Config ( makeConcreteResolver )
 import           Stack.Prelude
+import           Stack.Runners ( ShouldReexec (..), withConfig )
+import           Stack.Types.Config ( Runner, globalOptsL, globalResolver )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.List" module.
@@ -21,11 +27,23 @@ instance Exception ListException where
     "Error: [S-4926]"
     : map ("- " ++) strs
 
+-- | Function underlying the @stack list@ command. List packages.
+listCmd :: [String] -> RIO Runner ()
+listCmd names = withConfig NoReexec $ do
+  mresolver <- view $ globalOptsL.to globalResolver
+  mSnapshot <- forM mresolver $ \resolver -> do
+    concrete <- makeConcreteResolver resolver
+    loc <- completeSnapshotLocation concrete
+    loadSnapshot loc
+  listPackages mSnapshot names
+
 -- | Intended to work for the command line command.
 listPackages ::
      forall env. (HasPantryConfig env, HasProcessContext env, HasTerm env)
-  => Maybe RawSnapshot -- ^ when looking up by name, take from this build plan
-  -> [String] -- ^ names or identifiers
+  => Maybe RawSnapshot
+     -- ^ When looking up by name, take from this build plan.
+  -> [String]
+     -- ^ Names or identifiers.
   -> RIO env ()
 listPackages mSnapshot input = do
   let (errs1, names) = case mSnapshot of

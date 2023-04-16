@@ -2,13 +2,13 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RecordWildCards    #-}
 
--- | Run a GHCi configured with the user's package(s).
-
+-- | Types and functions related to Stack's @ghci@ and @repl@ commands.
 module Stack.Ghci
   ( GhciOpts (..)
   , GhciPkgInfo (..)
   , GhciException (..)
   , GhciPrettyException (..)
+  , ghciCmd
   , ghci
   ) where
 
@@ -41,6 +41,7 @@ import           Stack.Constants.Config
 import           Stack.Ghci.Script
 import           Stack.Package
 import           Stack.Prelude
+import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Build
 import           Stack.Types.Config
 import           Stack.Types.NamedComponent
@@ -82,6 +83,8 @@ instance Exception GhciException where
         ++ "Cannot use 'stack ghci' with both file targets and '--main-is' \
            \flag."
 
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
+-- "Stack.Ghci" module.
 newtype GhciPrettyException
     = GhciTargetParseException [StyleDoc]
     deriving (Show, Typeable)
@@ -99,7 +102,8 @@ instance Pretty GhciPrettyException where
 
 instance Exception GhciPrettyException
 
--- | Command-line options for GHC.
+-- | Typre respresenting command line options for the @stack ghci@ and
+-- @stack repl@ commands.
 data GhciOpts = GhciOpts
     { ghciTargets            :: ![Text]
     , ghciArgs               :: ![String]
@@ -117,7 +121,7 @@ data GhciOpts = GhciOpts
     }
     deriving Show
 
--- | Necessary information to load a package or its components.
+-- | Type representing information required to load a package or its components.
 --
 -- NOTE: GhciPkgInfo has paths as list instead of a Set to preserve files order
 -- as a workaround for bug https://ghc.haskell.org/trac/ghc/ticket/13786
@@ -133,7 +137,7 @@ data GhciPkgInfo = GhciPkgInfo
     }
     deriving Show
 
--- | Loaded package description and related info.
+-- | Type representing loaded package description and related information.
 data GhciPkgDesc = GhciPkgDesc
     { ghciDescPkg :: !Package
     , ghciDescCabalFp :: !(Path Abs File)
@@ -148,6 +152,28 @@ type ModuleMap = Map ModuleName (Map (Path Abs File) (Set (PackageName, NamedCom
 
 unionModuleMaps :: [ModuleMap] -> ModuleMap
 unionModuleMaps = M.unionsWith (M.unionWith S.union)
+
+-- | Function underlying the @stack ghci@ and @stack repl@ commands. Run GHCi in
+-- the context of a project.
+ghciCmd :: GhciOpts -> RIO Runner ()
+ghciCmd ghciOpts =
+  let boptsCLI = defaultBuildOptsCLI
+        -- using only additional packages, targets then get overridden in `ghci`
+        { boptsCLITargets = map T.pack (ghciAdditionalPackages  ghciOpts)
+        , boptsCLIInitialBuildSteps = True
+        , boptsCLIFlags = ghciFlags ghciOpts
+        , boptsCLIGhcOptions = map T.pack (ghciGhcOptions ghciOpts)
+        }
+  in  withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
+        bopts <- view buildOptsL
+        -- override env so running of tests and benchmarks is disabled
+        let boptsLocal = bopts
+              { boptsTestOpts = (boptsTestOpts bopts) { toDisableRun = True }
+              , boptsBenchmarkOpts =
+                  (boptsBenchmarkOpts bopts) { beoDisableRun = True }
+              }
+        local (set buildOptsL boptsLocal)
+              (ghci ghciOpts)
 
 -- | Launch a GHCi session for the given local package targets with the
 -- given options and configure it with the load paths and extensions

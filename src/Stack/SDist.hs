@@ -2,17 +2,19 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TypeFamilies       #-}
 
--- Create a source distribution tarball
+-- Types and functions related to Stack's @sdist@ command.
 module Stack.SDist
-  ( getSDistTarball
+  ( SDistOpts (..)
+  , sdistCmd
+  , getSDistTarball
   , checkSDistTarball
   , checkSDistTarball'
-  , SDistOpts (..)
   ) where
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
+import           Conduit ( runConduitRes, sourceLazy, sinkFileCautious )
 import           Control.Concurrent.Execute
                    ( ActionContext (..), Concurrency (..) )
 import qualified Data.ByteString as S
@@ -41,6 +43,7 @@ import           Distribution.Version
                    , hasUpperBound, hasLowerBound
                    )
 import           Path ( (</>), parent, parseRelDir, parseRelFile )
+import           Path.IO ( ensureDir, resolveDir' )
 import           Stack.Build ( mkBaseConfigOpts, build, buildLocalTargets )
 import           Stack.Build.Execute
                    ( ExcludeTHLoading (..), KeepOutputOpen (..), withExecuteEnv
@@ -48,11 +51,14 @@ import           Stack.Build.Execute
                    )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source ( projectLocalPackages )
+import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Package
                    ( PackageDescriptionPair (..), resolvePackage
                    , resolvePackageDescription
                    )
 import           Stack.Prelude
+import           Stack.Runners
+                   ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.SourceMap ( mkProjectPackage )
 import           Stack.Types.Build
                    ( CachePkgSrc (..), ConfigureOpts (..), Task (..)
@@ -62,8 +68,9 @@ import           Stack.Types.Config
                    ( BuildConfig (..), BuildOpts (..), Config (..)
                    , EnvConfig (..), HasConfig (..), HasEnvConfig (..)
                    , HasPlatform (..), HasRunner, PvpBounds (..)
-                   , PvpBoundsType (..), actualCompilerVersionL
-                   , defaultBuildOpts, defaultBuildOptsCLI
+                   , PvpBoundsType (..), Runner, actualCompilerVersionL
+                   , buildConfigL, defaultBuildOpts, defaultBuildOptsCLI, ppRoot
+                   , stackYamlL
                    )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Package
@@ -78,7 +85,9 @@ import           Stack.Types.SourceMap
 import           Stack.Types.Version
                    ( intersectVersionRanges, nextMajorVersion )
 import           System.Directory
-                   ( executable, getModificationTime, getPermissions )
+                   ( copyFile, createDirectoryIfMissing, executable
+                   , getModificationTime, getPermissions
+                   )
 import qualified System.FilePath as FP
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -102,7 +111,7 @@ instance Exception SDistException where
   displayException (ToTarPathException e) =
     "Error: [S-7875\n"
     ++ e
-
+-- | Type representing command line options for @stack sdist@ command.
 data SDistOpts = SDistOpts
   { sdoptsDirsToWorkWith :: [String]
   -- ^ Directories to package
@@ -115,6 +124,47 @@ data SDistOpts = SDistOpts
   , sdoptsTarPath :: Maybe FilePath
   -- ^ Where to copy the tarball
   }
+
+-- | Function underlying the @stack sdist@ command.
+sdistCmd :: SDistOpts -> RIO Runner ()
+sdistCmd sdistOpts =
+  withConfig YesReexec $ withDefaultEnvConfig $ do
+    -- If no directories are specified, build all sdist tarballs.
+    dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
+      then do
+        dirs <- view $ buildConfigL.to (map ppRoot . Map.elems . smwProject . bcSMWanted)
+        when (null dirs) $ do
+          stackYaml <- view stackYamlL
+          prettyErrorL
+            [ style Shell "stack sdist"
+            , flow "expects a list of targets, and otherwise defaults to all of the project's packages."
+            , flow "However, the configuration at"
+            , pretty stackYaml
+            , flow "contains no packages, so no sdist tarballs will be generated."
+            ]
+          exitFailure
+        pure dirs
+      else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
+    forM_ dirs' $ \dir -> do
+      (tarName, tarBytes, _mcabalRevision) <-
+        getSDistTarball (sdoptsPvpBounds sdistOpts) dir
+      distDir <- distDirFromDir dir
+      tarPath <- (distDir </>) <$> parseRelFile tarName
+      ensureDir (parent tarPath)
+      runConduitRes $
+        sourceLazy tarBytes .|
+        sinkFileCautious (toFilePath tarPath)
+      prettyInfoL
+        [flow "Wrote sdist-format compressed archive to"
+        , pretty tarPath <> "."
+        ]
+      checkSDistTarball sdistOpts tarPath
+      forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
+ where
+  copyTarToTarPath tarPath tarName targetDir = liftIO $ do
+    let targetTarPath = targetDir FP.</> tarName
+    createDirectoryIfMissing True $ FP.takeDirectory targetTarPath
+    copyFile (toFilePath tarPath) targetTarPath
 
 -- | Given the path to a local package, creates its source
 -- distribution tarball.
