@@ -91,10 +91,10 @@ instance Exception UpgradePrettyException
 data BinaryOpts = BinaryOpts
   { _boPlatform :: !(Maybe String)
   , _boForce :: !Bool
-  -- ^ force a download, even if the downloaded version is older
-  -- than what we are
+    -- ^ force a download, even if the downloaded version is older than what we
+    -- are
   , _boVersion :: !(Maybe String)
-  -- ^ specific version to download
+    -- ^ specific version to download
   , _boGitHubOrg :: !(Maybe String)
   , _boGitHubRepo :: !(Maybe String)
   }
@@ -114,36 +114,32 @@ data UpgradeOpts = UpgradeOpts
 
 -- | Function underlying the @stack upgrade@ command.
 upgradeCmd :: UpgradeOpts -> RIO Runner ()
-upgradeCmd upgradeOpts' = do
+upgradeCmd upgradeOpts = do
   go <- view globalOptsL
   case globalResolver go of
     Just _ -> prettyThrowIO ResolverOptionInvalid
-    Nothing ->
-      withGlobalProject $
-      upgrade
-        maybeGitHash
-        upgradeOpts'
+    Nothing -> withGlobalProject $ upgrade maybeGitHash upgradeOpts
 
-upgrade :: Maybe String -- ^ git hash at time of building, if known
-        -> UpgradeOpts
-        -> RIO Runner ()
-upgrade builtHash (UpgradeOpts mbo mso) =
-  case (mbo, mso) of
-    -- FIXME It would be far nicer to capture this case in the options parser
-    -- itself so we get better error messages, but I can't think of a way to
-    -- make it happen.
-    (Nothing, Nothing) -> throwIO NeitherBinaryOrSourceSpecified
-    (Just bo, Nothing) -> binary bo
-    (Nothing, Just so) -> source so
-    -- See #2977 - if --git or --git-repo is specified, do source upgrade.
-    (_, Just so@(SourceOpts (Just _))) -> source so
-    (Just bo, Just so) -> binary bo `catchAny` \e -> do
-      prettyWarnL
-        [ flow "Exception occurred when trying to perform binary upgrade:"
-        , fromString . show $ e
-        , line <> flow "Falling back to source upgrade."
-        ]
-      source so
+upgrade ::
+     Maybe String -- ^ git hash at time of building, if known
+  -> UpgradeOpts
+  -> RIO Runner ()
+upgrade builtHash (UpgradeOpts mbo mso) = case (mbo, mso) of
+  -- FIXME It would be far nicer to capture this case in the options parser
+  -- itself so we get better error messages, but I can't think of a way to
+  -- make it happen.
+  (Nothing, Nothing) -> throwIO NeitherBinaryOrSourceSpecified
+  (Just bo, Nothing) -> binary bo
+  (Nothing, Just so) -> source so
+  -- See #2977 - if --git or --git-repo is specified, do source upgrade.
+  (_, Just so@(SourceOpts (Just _))) -> source so
+  (Just bo, Just so) -> binary bo `catchAny` \e -> do
+    prettyWarnL
+      [ flow "Exception occurred when trying to perform binary upgrade:"
+      , fromString . show $ e
+      , line <> flow "Falling back to source upgrade."
+      ]
+    source so
  where
   binary = binaryUpgrade
   source = sourceUpgrade builtHash
@@ -222,7 +218,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
         when (isNothing builtHash) $
           prettyWarnS
             "Information about the commit this version of Stack was built from \
-            \ is not available due to how it was built. Will continue by \
+            \is not available due to how it was built. Will continue by \
             \assuming an upgrade is needed because we have no information to \
             \the contrary."
         if builtHash == Just latestCommit
@@ -231,10 +227,10 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
               pure Nothing
             else do
               prettyInfoS "Cloning stack"
-              -- NOTE: "--recursive" was added after v1.0.0 (and before the
-              -- next release).  This means that we can't use submodules in
-              -- the Stack repo until we're comfortable with "stack upgrade
-              -- --git" not working for earlier versions.
+              -- NOTE: "--recursive" was added after v1.0.0 (and before the next
+              -- release).  This means that we can't use submodules in the Stack
+              -- repo until we're comfortable with "stack upgrade --git" not
+              -- working for earlier versions.
               let args =
                     [ "clone"
                     , repo
