@@ -1,10 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+-- | Functions to parse command line arguments for Stack's @script@ command.
 module Stack.Options.ScriptParser
-  ( ScriptExecute (..)
-  , ScriptOpts (..)
-  , ShouldRun (..)
-  , scriptOptsParser
+  ( scriptOptsParser
   ) where
 
 import           Options.Applicative
@@ -15,30 +13,10 @@ import           Options.Applicative.Builder.Extra
                    ( boolFlags, fileExtCompleter )
 import           Stack.Options.Completion ( ghcOptsCompleter )
 import           Stack.Prelude
+import           Stack.Script
+                   ( ScriptExecute (..), ScriptOpts (..), ShouldRun (..) )
 
-data ScriptOpts = ScriptOpts
-  { soPackages :: ![String]
-  , soFile :: !FilePath
-  , soArgs :: ![String]
-  , soCompile :: !ScriptExecute
-  , soUseRoot :: !Bool
-  , soGhcOptions :: ![String]
-  , soScriptExtraDeps :: ![PackageIdentifierRevision]
-  , soShouldRun :: !ShouldRun
-  }
-  deriving Show
-
-data ScriptExecute
-  = SEInterpret
-  | SECompile
-  | SEOptimize
-  deriving Show
-
-data ShouldRun
-  = YesRun
-  | NoRun
-  deriving Show
-
+-- | Parse command line arguments for Stack's @script@ command.
 scriptOptsParser :: Parser ScriptOpts
 scriptOptsParser = ScriptOpts
   <$> many (strOption

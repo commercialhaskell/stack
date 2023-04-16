@@ -2,9 +2,11 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
 
+-- | Types and functions related to Stack's @init@ command.
 module Stack.Init
-  ( initProject
-  , InitOpts (..)
+  ( InitOpts (..)
+  , initCmd
+  , initProject
   ) where
 
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -28,8 +30,8 @@ import           Path
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.Find ( findFiles )
 import           Path.IO
-                   ( AnyPath, RelPath, doesFileExist, makeRelativeToCurrentDir
-                   , resolveDir'
+                   ( AnyPath, RelPath, doesFileExist, getCurrentDir
+                   ,  makeRelativeToCurrentDir, resolveDir'
                    )
 import qualified RIO.FilePath as FP
 import           RIO.List ( (\\), intercalate, isSuffixOf, isPrefixOf )
@@ -41,11 +43,13 @@ import           Stack.BuildPlan
 import           Stack.Config ( getSnapshots, makeConcreteResolver )
 import           Stack.Constants ( stackDotYaml )
 import           Stack.Prelude
+import           Stack.Runners
+                   ( ShouldReexec (..), withConfig, withGlobalProject )
 import           Stack.SourceMap
                    ( SnapshotCandidate, loadProjectSnapshotCandidate )
 import           Stack.Types.Config
                    ( ConfigPrettyException (..), HasConfig, HasGHCVariant
-                   , Project (..)
+                   , Project (..), Runner, globalOptsL, globalResolver
                    )
 import           Stack.Types.Resolver ( AbstractResolver, Snapshots (..) )
 import           Stack.Types.Version ( stackMajorVersion )
@@ -60,6 +64,8 @@ instance Exception InitException where
   displayException NoPackagesToIgnoreBug = bugReport "[S-2747]"
     "No packages to ignore."
 
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
+-- "Stack.Init" module.
 data InitPrettyException
   = SnapshotDownloadFailure SomeException
   | ConfigFileAlreadyExists FilePath
@@ -124,7 +130,27 @@ instance Pretty InitPrettyException where
 
 instance Exception InitPrettyException
 
--- | Generate stack.yaml
+-- | Type representing command line options for the @stack init@ command.
+data InitOpts = InitOpts
+  { searchDirs     :: ![T.Text]
+    -- ^ List of sub directories to search for .cabal files
+  , omitPackages   :: Bool
+    -- ^ Exclude conflicting or incompatible user packages
+  , forceOverwrite :: Bool
+    -- ^ Overwrite existing stack.yaml
+  , includeSubDirs :: Bool
+    -- ^ If True, include all .cabal files found in any sub directories
+  }
+
+-- | Function underlying the @stack init@ command. Project initialization.
+initCmd :: InitOpts -> RIO Runner ()
+initCmd initOpts = do
+  pwd <- getCurrentDir
+  go <- view globalOptsL
+  withGlobalProject $
+    withConfig YesReexec (initProject pwd initOpts (globalResolver go))
+
+-- | Generate a @stack.yaml@ file.
 initProject ::
      (HasConfig env, HasGHCVariant env)
   => Path Abs Dir
@@ -555,17 +581,6 @@ minSupportedLts :: SnapName
 -- See https://github.com/commercialhaskell/stack/blob/master/ChangeLog.md
 -- under Stack version 2.1.1.
 minSupportedLts = LTS 3 0
-
-data InitOpts = InitOpts
-  { searchDirs     :: ![T.Text]
-    -- ^ List of sub directories to search for .cabal files
-  , omitPackages   :: Bool
-    -- ^ Exclude conflicting or incompatible user packages
-  , forceOverwrite :: Bool
-    -- ^ Overwrite existing stack.yaml
-  , includeSubDirs :: Bool
-    -- ^ If True, include all .cabal files found in any sub directories
-  }
 
 findCabalDirs ::
      HasConfig env

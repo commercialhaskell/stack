@@ -8,7 +8,7 @@ import qualified Data.Map.Strict as M
 import           Options.Applicative
 import           Stack.Init
 import           Stack.New
-import           Stack.Options.GlobalParser
+import           Stack.Options.InitParser
 import           Stack.Prelude
 import           Stack.Types.PackageName
 import           Stack.Types.TemplateName

@@ -10,7 +10,6 @@
 -- and therefore doesn't need to be recompiled as often.
 module BuildInfo
   ( versionString'
-  , maybeGitHash
   , hpackVersion
   ) where
 
@@ -25,7 +24,7 @@ import           Data.Version ( showVersion, versionBranch )
 import           Distribution.System ( buildArch )
 import qualified Distribution.Text as Cabal ( display )
 #ifdef USE_GIT_INFO
-import           GitHash ( giCommitCount, giHash, tGitInfoCwdTry )
+import           GitHash ( giCommitCount, tGitInfoCwdTry )
 #endif
 #ifdef USE_GIT_INFO
 import           Options.Applicative.Simple ( simpleVersion )
@@ -75,15 +74,6 @@ versionString' = showStackVersion ++ afterVersion
     , "not behave identically.  If you encounter problems, please try the latest"
     , "official build by running 'stack upgrade --force-download'."
     ]
-#endif
-
--- | If USE_GIT_INFO is enabled, the Git hash in the build directory, otherwise Nothing.
-maybeGitHash :: Maybe String
-maybeGitHash =
-#ifdef USE_GIT_INFO
-  (either (const Nothing) (Just . giHash) $$tGitInfoCwdTry)
-#else
-  Nothing
 #endif
 
 -- | Hpack version we're compiled against

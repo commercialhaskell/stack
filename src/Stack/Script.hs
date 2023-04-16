@@ -2,8 +2,13 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+
+-- Types and functions related to Stack's @script@ command.
 module Stack.Script
-  ( scriptCmd
+  ( ScriptOpts (..)
+  , ScriptExecute (..)
+  , ShouldRun (..)
+  , scriptCmd
   ) where
 
 import           Data.ByteString.Builder ( toLazyByteString )
@@ -33,8 +38,6 @@ import           Stack.Build ( build )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Constants ( osIsWindows, relDirScripts )
 import           Stack.Prelude
-import           Stack.Options.ScriptParser
-                   ( ScriptExecute (..), ScriptOpts (..), ShouldRun (..) )
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Setup ( withNewLocalBuildTargets )
@@ -89,6 +92,37 @@ instance Exception ScriptException where
   displayException (FailedToParseFileAsDirBug p) = bugReport "[S-9464]" $
        "Failed to parse path to script file as directory:\n"
     <> fromAbsDir p <> "\n"
+
+-- | Type representing choices of interpreting, compiling (without optimisation)
+-- and compiling (with optimisation).
+data ScriptExecute
+  = SEInterpret
+  | SECompile
+    -- ^ Without optimisation.
+  | SEOptimize
+    -- ^ Compile with optimisation.
+  deriving Show
+
+-- | Type representing choices of whether to run or not.
+data ShouldRun
+  = YesRun
+    -- ^ Run.
+  | NoRun
+    -- ^ Do not run.
+  deriving Show
+
+-- | Type representing command line options for the @stack script@ command.
+data ScriptOpts = ScriptOpts
+  { soPackages :: ![String]
+  , soFile :: !FilePath
+  , soArgs :: ![String]
+  , soCompile :: !ScriptExecute
+  , soUseRoot :: !Bool
+  , soGhcOptions :: ![String]
+  , soScriptExtraDeps :: ![PackageIdentifierRevision]
+  , soShouldRun :: !ShouldRun
+  }
+  deriving Show
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()

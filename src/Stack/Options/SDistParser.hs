@@ -1,5 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+-- | Functions to parse command line arguments for Stack's @sdist@ and @upload@
+-- commands.
 module Stack.Options.SDistParser
  ( sdistOptsParser
  ) where
@@ -10,7 +12,7 @@ import           Stack.Prelude
 import           Stack.SDist
 import           Stack.Options.HpcReportParser ( pvpBoundsOption )
 
--- | Parser for arguments to `stack sdist`
+-- | Parse command line arguments for Stack's @sdist@ and @upload@ commands.
 sdistOptsParser :: Parser SDistOpts
 sdistOptsParser = SDistOpts
   <$> many (strArgument

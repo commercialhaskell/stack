@@ -1,10 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Provide ability to upload tarballs to Hackage.
+-- | Types and functions related to Stack's @upload@ command.
 module Stack.Upload
   ( -- * Upload
-    upload
+    UploadOpts (..)
+  , UploadVariant (..)
+  , uploadCmd
+  , upload
   , uploadBytes
   , uploadRevision
     -- * Credentials
@@ -34,11 +37,20 @@ import           Network.HTTP.StackClient
                    , httpNoBody, parseRequest, partBS, partFileRequestBody
                    , partLBS, setRequestHeader, withResponse
                    )
-import           Stack.Options.UploadParser ( UploadVariant (..) )
+import           Path.IO ( resolveDir', resolveFile' )
 import           Stack.Prelude
-import           Stack.Types.Config ( Config (..), stackRootL )
+import           Stack.Runners
+                   ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
+import           Stack.SDist
+                   ( SDistOpts (..), checkSDistTarball, checkSDistTarball'
+                   , getSDistTarball
+                   )
+import           Stack.Types.Config
+                   ( Config (..), Runner, configL, stackRootL )
 import           System.Directory
-                   ( createDirectoryIfMissing, removeFile, renameFile )
+                   ( createDirectoryIfMissing, doesDirectoryExist, doesFileExist
+                   , removeFile, renameFile
+                   )
 import           System.Environment ( lookupEnv )
 import           System.FilePath ( (</>), takeDirectory, takeFileName )
 import           System.PosixCompat.Files ( setFileMode )
@@ -67,6 +79,73 @@ instance Pretty UploadPrettyException where
     <> vsep (map string res)
 
 instance Exception UploadPrettyException
+
+-- Type representing variants for uploading to Hackage.
+data UploadVariant
+  = Publishing
+  -- ^ Publish the package
+  | Candidate
+  -- ^ Create a package candidate
+
+-- | Type representing command line options for the @stack upload@ command.
+data UploadOpts = UploadOpts
+  { uoptsSDistOpts :: SDistOpts
+  , uoptsUploadVariant :: UploadVariant
+  -- ^ Says whether to publish the package or upload as a release candidate
+  }
+
+-- | Function underlying the @stack upload@ command. Upload to Hackage.
+uploadCmd :: UploadOpts -> RIO Runner ()
+uploadCmd (UploadOpts (SDistOpts [] _ _ _ _) _) = do
+  prettyErrorL
+    [ flow "To upload the current package, please run"
+    , style Shell "stack upload ."
+    , flow "(with the period at the end)"
+    ]
+  liftIO exitFailure
+uploadCmd uploadOpts = do
+  let partitionM _ [] = pure ([], [])
+      partitionM f (x:xs) = do
+        r <- f x
+        (as, bs) <- partitionM f xs
+        pure $ if r then (x:as, bs) else (as, x:bs)
+      sdistOpts = uoptsSDistOpts uploadOpts
+  (files, nonFiles) <-
+    liftIO $ partitionM doesFileExist (sdoptsDirsToWorkWith sdistOpts)
+  (dirs, invalid) <- liftIO $ partitionM doesDirectoryExist nonFiles
+  withConfig YesReexec $ withDefaultEnvConfig $ do
+    unless (null invalid) $ do
+      let invalidList = bulletedList $ map (style File . fromString) invalid
+      prettyErrorL
+        [ style Shell "stack upload"
+        , flow "expects a list of sdist tarballs or package directories."
+        , flow "Can't find:"
+        , line <> invalidList
+        ]
+      exitFailure
+    when (null files && null dirs) $ do
+      prettyErrorL
+        [ style Shell "stack upload"
+        , flow "expects a list of sdist tarballs or package directories, but none were specified."
+        ]
+      exitFailure
+    config <- view configL
+    let hackageUrl = T.unpack $ configHackageBaseUrl config
+        uploadVariant = uoptsUploadVariant uploadOpts
+    getCreds <- memoizeRef $ loadAuth config
+    mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
+    forM_ files $ \file -> do
+      tarFile <- resolveFile' file
+      creds <- runMemoized getCreds
+      upload hackageUrl creds (toFilePath tarFile) uploadVariant
+    forM_ dirs $ \dir -> do
+      pkgDir <- resolveDir' dir
+      (tarName, tarBytes, mcabalRevision) <-
+        getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
+      checkSDistTarball' sdistOpts tarName tarBytes
+      creds <- runMemoized getCreds
+      uploadBytes hackageUrl creds tarName uploadVariant tarBytes
+      forM_ mcabalRevision $ uncurry $ uploadRevision hackageUrl creds
 
 newtype HackageKey = HackageKey Text
   deriving (Eq, Show)

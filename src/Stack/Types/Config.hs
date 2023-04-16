@@ -130,12 +130,6 @@ module Stack.Types.Config
   , ghcInstallHook
   -- * Command-related types
   , AddCommand
-  -- ** Eval
-  , EvalOpts (..)
-  -- ** Exec
-  , ExecOpts (..)
-  , SpecialExecCmd (..)
-  , ExecOptsExtra (..)
   -- ** Setup
   , DownloadInfo (..)
   , VersionedDownloadInfo (..)
@@ -777,33 +771,6 @@ type AddCommand =
           (Writer (OA.Mod OA.CommandFields (RIO Runner (), GlobalOptsMonoid)))
           ()
 
-data ExecOpts = ExecOpts
-  { eoCmd :: !SpecialExecCmd
-  , eoArgs :: ![String]
-  , eoExtra :: !ExecOptsExtra
-  }
-  deriving Show
-
-data SpecialExecCmd
-  = ExecCmd String
-  | ExecRun
-  | ExecGhc
-  | ExecRunGhc
-  deriving (Eq, Show)
-
-data ExecOptsExtra = ExecOptsExtra
-  { eoEnvSettings :: !EnvSettings
-  , eoPackages :: ![String]
-  , eoRtsOptions :: ![String]
-  , eoCwd :: !(Maybe FilePath)
-  }
-  deriving Show
-
-data EvalOpts = EvalOpts
-  { evalArg :: !String
-  , evalExtra :: !ExecOptsExtra
-  }
-  deriving Show
 
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts

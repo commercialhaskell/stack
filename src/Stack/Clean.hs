@@ -1,11 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
--- | Clean a project.
+-- | Types and functions related to Stack's @clean@ and @purge@ commands.
 module Stack.Clean
-  ( clean
-  , CleanOpts (..)
+  ( CleanOpts (..)
   , CleanCommand (..)
+  , cleanCmd
+  , clean
   ) where
 
 import           Data.List ( (\\), intercalate )
@@ -14,8 +15,9 @@ import           Path.IO ( ignoringAbsence, removeDirRecur )
 import           Stack.Config ( withBuildConfig )
 import           Stack.Constants.Config ( rootDistDirFromDir, workDirFromDir )
 import           Stack.Prelude
+import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.Config
-                   ( BuildConfig (..), Config, HasBuildConfig (..)
+                   ( BuildConfig (..), Config, HasBuildConfig (..), Runner
                    , getProjectWorkDir, ppRoot
                    )
 import           Stack.Types.SourceMap ( SMWanted (..) )
@@ -41,6 +43,24 @@ instance Exception CleanException where
     , "Perhaps you do not have permission to delete these files or they are in \
       \use?"
     ]
+
+-- | Type representing command line options for the @stack clean@ command.
+data CleanOpts
+  = CleanShallow [PackageName]
+    -- ^ Delete the "dist directories" as defined in
+    -- 'Stack.Constants.Config.distRelativeDir' for the given local packages. If
+    -- no packages are given, all project packages should be cleaned.
+  | CleanFull
+    -- ^ Delete all work directories in the project.
+
+-- | Type representing Stack's cleaning commands.
+data CleanCommand
+    = Clean
+    | Purge
+
+-- | Function underlying the @stack clean@ command.
+cleanCmd :: CleanOpts -> RIO Runner ()
+cleanCmd = withConfig NoReexec . clean
 
 -- | Deletes build artifacts in the current project.
 clean :: CleanOpts -> RIO Config ()
@@ -75,17 +95,3 @@ dirsToDelete cleanOpts = do
       pkgWorkDirs <- mapM (workDirFromDir . ppRoot) $ Map.elems packages
       projectWorkDir <- getProjectWorkDir
       pure (projectWorkDir : pkgWorkDirs)
-
--- | Options for @stack clean@.
-data CleanOpts
-  = CleanShallow [PackageName]
-    -- ^ Delete the "dist directories" as defined in
-    -- 'Stack.Constants.Config.distRelativeDir' for the given local packages. If
-    -- no packages are given, all project packages should be cleaned.
-  | CleanFull
-    -- ^ Delete all work directories in the project.
-
--- | Clean commands
-data CleanCommand
-    = Clean
-    | Purge

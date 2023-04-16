@@ -1,19 +1,23 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+-- | Functions to parse command line arguments for Stack's @exec@, @ghc@, @run@,
+-- @runghc@ and @runhaskell@ commands.
 module Stack.Options.ExecParser
-  ( evalOptsParser
+  ( execOptsParser
   , execOptsExtraParser
-  , execOptsParser
   ) where
 
 import           Options.Applicative
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Args
+import           Stack.Exec
+                   ( ExecOpts (..), ExecOptsExtra (..), SpecialExecCmd (..) )
 import           Stack.Options.Completion
 import           Stack.Prelude
 import           Stack.Types.Config
 
--- | Parser for exec command
+-- | Parse command line arguments for Stack's @exec@, @ghc@, @run@,
+-- @runghc@ and @runhaskell@ commands.
 execOptsParser :: Maybe SpecialExecCmd -> Parser ExecOpts
 execOptsParser mcmd = ExecOpts
   <$> maybe eoCmdParser pure mcmd
@@ -34,15 +38,6 @@ execOptsParser mcmd = ExecOpts
       Just ExecGhc -> "-- ARGUMENT(S) (e.g. stack ghc -- X.hs -o x)"
       Just ExecRunGhc -> "-- ARGUMENT(S) (e.g. stack runghc -- X.hs)"
     normalTxt = "-- ARGUMENT(S) (e.g. stack exec ghc-pkg -- describe base)"
-
-evalOptsParser :: String -- ^ metavar
-               -> Parser EvalOpts
-evalOptsParser meta = EvalOpts
-  <$> eoArgsParser
-  <*> execOptsExtraParser
- where
-  eoArgsParser :: Parser String
-  eoArgsParser = strArgument (metavar meta)
 
 -- | Parser for extra options to exec command
 execOptsExtraParser :: Parser ExecOptsExtra

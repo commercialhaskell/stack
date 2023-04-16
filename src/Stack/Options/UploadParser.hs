@@ -1,36 +1,23 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+-- | Functions to parse command line arguments for Stack's @upload@ command.
 module Stack.Options.UploadParser
-  ( UploadOpts (..)
-  , UploadVariant (..)
-  , uploadOptsParser
+  ( uploadOptsParser
   ) where
 
 import           Options.Applicative
 import           Stack.Options.SDistParser ( sdistOptsParser )
 import           Stack.Prelude
-import           Stack.SDist ( SDistOpts (..) )
+import           Stack.Upload ( UploadOpts (..), UploadVariant (..) )
 
-data UploadOpts = UploadOpts
-  { uoptsSDistOpts :: SDistOpts
-  , uoptsUploadVariant :: UploadVariant
-  -- ^ Says whether to publish the package or upload as a release candidate
-  }
-
-data UploadVariant
-  = Publishing
-  -- ^ Publish the package
-  | Candidate
-  -- ^ Create a package candidate
-
--- | Parser for arguments to `stack upload`
+-- | Parse command line arguments for Stack's @upload@ command.
 uploadOptsParser :: Parser UploadOpts
 uploadOptsParser =
   UploadOpts
     <$> sdistOptsParser
     <*> uploadVariant
   where
-    uploadVariant =
-      flag Publishing Candidate
-        (long "candidate" <>
-         help "Upload as a package candidate")
+    uploadVariant = flag Publishing Candidate
+      (  long "candidate"
+      <> help "Upload as a package candidate"
+      )

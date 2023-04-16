@@ -1,14 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude         #-}
 {-# LANGUAGE OverloadedStrings         #-}
 
--- | Create new a new project directory populated with a basic working
--- project.
-
+-- | Types and functions related to Stack's @new@ command.
 module Stack.New
-    ( new
-    , NewOpts (..)
+    ( NewOpts (..)
     , TemplateName
-    , templatesHelp
+    , newCmd
+    , new
     ) where
 
 import           Control.Monad.Trans.Writer.Strict ( execWriterT )
@@ -31,9 +29,8 @@ import           Network.HTTP.Client ( applyBasicAuth )
 import           Network.HTTP.StackClient
                    ( HttpException (..), HttpExceptionContent (..)
                    , Response (..), VerifiedDownloadException (..)
-                   , getResponseBody, httpLbs, mkDownloadRequest, notFound404
-                   , parseRequest, parseUrlThrow, setForceDownload
-                   , setGitHubHeaders, setRequestCheckStatus
+                   , mkDownloadRequest, notFound404, parseRequest
+                   , setForceDownload, setRequestCheckStatus
                    , verifiedDownloadWithProgress
                    )
 import           Path ( (</>), dirname, parent, parseRelDir, parseRelFile )
@@ -42,11 +39,17 @@ import           Path.IO
 import           RIO.Process ( proc, runProcess_, withWorkingDir )
 import           Stack.Constants
                    ( altGitHubTokenEnvVar, backupUrlRelPath, gitHubBasicAuthType
-                   , gitHubTokenEnvVar, wiredInPackages
+                   , gitHubTokenEnvVar, stackDotYaml, wiredInPackages
                    )
 import           Stack.Constants.Config ( templatesDir )
+import           Stack.Init ( InitOpts (..), initProject )
 import           Stack.Prelude
-import           Stack.Types.Config ( Config (..), HasConfig (..), SCM (..) )
+import           Stack.Runners
+                   ( ShouldReexec (..), withConfig, withGlobalProject )
+import           Stack.Types.Config
+                   ( Config (..), HasConfig (..), Runner, SCM (..)
+                   , globalOptsL, globalResolver
+                   )
 import           Stack.Types.TemplateName
                    ( RepoService (..), RepoTemplatePath (..), TemplateName
                    , TemplatePath (..), defaultTemplateName
@@ -71,8 +74,6 @@ data NewPrettyException
   | TemplateInvalid !TemplateName !StyleDoc
   | MagicPackageNameInvalid !String
   | AttemptedOverwrites !Text ![Path Abs File]
-  | DownloadTemplatesHelpFailed !HttpException
-  | TemplatesHelpEncodingInvalid !String !UnicodeException
   deriving Typeable
 
 deriving instance Show NewPrettyException
@@ -204,38 +205,14 @@ instance Pretty NewPrettyException where
          , style Shell "--force"
          , "flag to ignore this and overwrite those files."
          ]
-  pretty (DownloadTemplatesHelpFailed err) =
-    "[S-8143]"
-    <> line
-    <> fillSep
-         [ flow "Stack failed to download the help for"
-         , style Shell "stack templates" <> "."
-         ]
-    <> blankLine
-    <> flow "While downloading, Stack encountered the following error:"
-    <> blankLine
-    <> string (displayException err)
-  pretty (TemplatesHelpEncodingInvalid url err) =
-    "[S-6670]"
-    <> line
-    <> fillSep
-         [ flow "Stack failed to decode the help for"
-         , style Shell "stack templates"
-         , flow "downloaded from"
-         , style Url (fromString url) <> "."
-         ]
-    <> blankLine
-    <> flow "While decoding, Stack encountered the following error:"
-    <> blankLine
-    <> string (displayException err)
-
 
 instance Exception NewPrettyException
 
 --------------------------------------------------------------------------------
 -- Main project creation
 
--- | Options for creating a new project.
+-- | Type representing command line options for the @stack new@ command (other
+-- than those applicable also to the @stack init@ command).
 data NewOpts = NewOpts
   { newOptsProjectName  :: PackageName
   -- ^ Name of the project to create.
@@ -246,6 +223,17 @@ data NewOpts = NewOpts
   , newOptsNonceParams  :: Map Text Text
   -- ^ Nonce parameters specified just for this invocation.
   }
+
+-- | Function underlying the @stack new@ command. Create a project directory
+-- structure and initialize the Stack config.
+newCmd :: (NewOpts, InitOpts) -> RIO Runner ()
+newCmd (newOpts, initOpts) =
+  withGlobalProject $ withConfig YesReexec $ do
+    dir <- new newOpts (forceOverwrite initOpts)
+    exists <- doesFileExist $ dir </> stackDotYaml
+    when (forceOverwrite initOpts || not exists) $ do
+      go <- view globalOptsL
+      initProject dir initOpts (globalResolver go)
 
 -- | Create a new project with the given options.
 new :: HasConfig env => NewOpts -> Bool -> RIO env (Path Abs Dir)
@@ -682,26 +670,9 @@ runTemplateInits dir = do
                     ]
         )
 
--- | Display help for the templates command.
-templatesHelp :: HasTerm env => RIO env ()
-templatesHelp = do
-  let url = defaultTemplatesHelpUrl
-  req <- fmap setGitHubHeaders (parseUrlThrow url)
-  resp <- catch
-    (httpLbs req)
-    (prettyThrowM . DownloadTemplatesHelpFailed)
-  case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
-    Left err -> prettyThrowM $ TemplatesHelpEncodingInvalid url err
-    Right txt -> prettyInfo (string $ T.unpack txt)
-
 --------------------------------------------------------------------------------
 -- Defaults
 
 -- | The default service to use to download templates.
 defaultRepoService :: RepoService
 defaultRepoService = GitHub
-
--- | Default web URL to get the `stack templates` help output.
-defaultTemplatesHelpUrl :: String
-defaultTemplatesHelpUrl =
-  "https://raw.githubusercontent.com/commercialhaskell/stack-templates/master/STACK_HELP.md"

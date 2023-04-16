@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-04-07.
+`master` branch of the Stack repository. Last updated: 2023-04-16.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -33,31 +33,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-2186] = InvalidReExecVersion String String
-        [S-1541] | InvalidPathForExec FilePath
-        ~~~
-
-    -   `Main.MainPrettyException`
-
-        ~~~haskell
-        [S-8100] = GHCProfOptionInvalid
-        [S-8761] | ResolverOptionInvalid
-        [S-8251] | PackageIdNotFoundBug String
-        [S-2483] | ExecutableToRunNotFound
         ~~~
 
     -   `Options.Applicative.Builder.Extra.OptionsApplicativeExtraException`
 
         ~~~haskell
         [S-2797] = FlagNotFoundBug
-        ~~~
-
-    -   `Stack.Build.QueryException`
-
-        ~~~haskell
-        [S-4419] = SelectorNotFound [Text]
-        [S-8422] | IndexOutOfRange [Text]
-        [S-4360] | NoNumericSelector [Text]
-        [S-1711] | CannotApplySelector Value [Text]
         ~~~
 
     -   `Stack.Build.CabalVersionPrettyException`
@@ -127,6 +108,19 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-7071] = DependencyNotFoundBug GhcPkgId
         [S-7151] | PackageNotFoundBug PackageName
+        ~~~
+
+    -   `Stack.Exec.ExecException`
+
+        ~~~haskell
+        [S-1541] = InvalidPathForExec FilePath
+        ~~~
+
+    -   `Stack.Exec.ExecPrettyException`
+
+        ~~~haskell
+        [S-8251] = PackageIdNotFoundBug String
+        [S-2483] | ExecutableToRunNotFound
         ~~~
 
     -   `Stack.Ghci.GhciException`
@@ -200,8 +194,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-9490] | TemplateInvalid TemplateName StyleDoc
         [S-5682] | MagicPackageNameInvalid String
         [S-3113] | AttemptedOverwrites [Path Abs File]
-        [S-8143] | DownloadTemplatesHelpFailed HttpException
-        [S-6670] | TemplatesHelpEncodingInvalid String UnicodeException
         ~~~
 
     -   `Stack.Nix.NixException`
@@ -215,6 +207,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-4257] = MissingSingleField Text (Map Text [Line])
         [S-2016] | Couldn'tParseField Text [Line]
+        ~~~
+
+    -   `Stack.Query.QueryException`
+
+        ~~~haskell
+        [S-4419] = SelectorNotFound [Text]
+        [S-8422] | IndexOutOfRange [Text]
+        [S-4360] | NoNumericSelector [Text]
+        [S-1711] | CannotApplySelector Value [Text]
         ~~~
 
     -   `Stack.Runners.RunnersException`
@@ -313,6 +314,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-8441] | CompilerCacheArchitectureInvalid Text
         ~~~
 
+    -   `Stack.Templates.TemplatesPrettyException`
+
+        ~~~haskell
+        [S-8143] = DownloadTemplatesHelpFailed HttpException
+        [S-6670] | TemplatesHelpEncodingInvalid String UnicodeException
+        ~~~
+
     -   `Stack.Types.Build.BuildException`
 
         ~~~haskell
@@ -348,6 +356,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-8506] | TargetParseException [StyleDoc]
         [S-7086] | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
         [S-8664] | InvalidFlagSpecification (Set UnusedFlags)
+        [S-8100] = GHCProfOptionInvalid
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`
@@ -468,6 +477,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-7114] | CommitsNotFound String String
         [S-9668] | StackInPackageIndexNotFound
         [S-6648] | VersionWithNoRevision
+        ~~~
+
+    -   `Stack.Upgrade.UpgradePrettyException`
+
+        ~~~haskell
+        [S-8761] = ResolverOptionInvalid
         ~~~
 
     -   `Stack.Upload.UploadPrettyException`

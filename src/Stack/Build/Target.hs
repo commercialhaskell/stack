@@ -90,7 +90,9 @@ import           Stack.Types.SourceMap
 
 -- | Do we need any targets? For example, `stack build` will fail if
 -- no targets are provided.
-data NeedTargets = NeedTargets | AllowNoTargets
+data NeedTargets
+  = NeedTargets
+  | AllowNoTargets
 
 --------------------------------------------------------------------------------
 -- Get the RawInput

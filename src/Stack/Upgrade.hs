@@ -1,25 +1,27 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
+-- | Types and functions related to Stack's @upgrade@ command.
 module Stack.Upgrade
-  ( upgrade
-  , UpgradeOpts
-  , upgradeOpts
+  ( UpgradeOpts (..)
+  , BinaryOpts (..)
+  , SourceOpts (..)
+  , upgradeCmd
+  , upgrade
   ) where
 
 import qualified Data.Text as T
-import           Options.Applicative
-                   ( Parser, flag', help, long, showDefault, strOption, switch
-                   , value
-                   )
 import           Path ( (</>), parseRelDir )
 import           RIO.Process ( proc, runProcess_, withWorkingDir )
 import           Stack.Build ( build )
 import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Constants
                    ( osIsWindows, relDirStackProgName, stackDotYaml )
+import           Stack.Internal.BuildInfo ( maybeGitHash )
 import           Stack.Prelude hiding ( force, Display (..) )
-import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
+import           Stack.Runners
+                   ( ShouldReexec (..), withConfig, withEnvConfig
+                   , withGlobalProject )
 import           Stack.Setup
                    ( downloadStackExe, downloadStackReleaseInfo
                    , getDownloadVersion, preferredPlatforms, stackVersion
@@ -64,67 +66,23 @@ instance Exception UpgradeException where
     "Error: [S-6648]\n"
     ++ "Latest version with no revision."
 
-upgradeOpts :: Parser UpgradeOpts
-upgradeOpts = UpgradeOpts
-  <$> (sourceOnly <|> optional binaryOpts)
-  <*> (binaryOnly <|> optional sourceOpts)
- where
-  binaryOnly = flag' Nothing
-    (  long "binary-only"
-    <> help "Do not use a source upgrade path"
-    )
-  sourceOnly = flag' Nothing
-    (  long "source-only"
-    <> help "Do not use a binary upgrade path"
-    )
+-- | Type representing \'pretty\' exceptions thrown by functions in the
+-- "Stack.Upgrade" module.
+data UpgradePrettyException
+  = ResolverOptionInvalid
+  deriving (Show, Typeable)
 
-  binaryOpts = BinaryOpts
-    <$> optional (strOption
-          (  long "binary-platform"
-          <> help "Platform type for archive to download"
-          ))
-    <*> switch
-          (  long "force-download"
-          <> help "Download the latest available Stack executable"
-          )
-    <*> optional (strOption
-          (  long "binary-version"
-          <> help "Download a specific Stack version"
-          ))
-    <*> optional (strOption
-          (  long "github-org"
-          <> help "GitHub organization name"
-          ))
-    <*> optional (strOption
-          (  long "github-repo"
-          <> help "GitHub repository name"
-          ))
+instance Pretty UpgradePrettyException where
+  pretty ResolverOptionInvalid =
+       "[S-8761]"
+    <> line
+    <> flow "The '--resolver' option cannot be used with Stack's 'upgrade' \
+            \command."
 
-  sourceOpts = SourceOpts
-    <$> (   ( \fromGit repo branch ->
-                if fromGit
-                  then Just (repo, branch)
-                  else Nothing
-            )
-        <$> switch
-              ( long "git"
-              <> help "Clone from Git instead of downloading from Hackage \
-                      \(more dangerous)"
-              )
-        <*> strOption
-              (  long "git-repo"
-              <> help "Clone from specified git repository"
-              <> value "https://github.com/commercialhaskell/stack"
-              <> showDefault
-              )
-        <*> strOption
-              (  long "git-branch"
-              <> help "Clone from this git branch"
-              <> value "master"
-              <> showDefault
-              )
-        )
+instance Exception UpgradePrettyException
 
+-- | Type representing options for upgrading Stack with a binary executable
+-- file.
 data BinaryOpts = BinaryOpts
   { _boPlatform :: !(Maybe String)
   , _boForce :: !Bool
@@ -137,15 +95,29 @@ data BinaryOpts = BinaryOpts
   }
   deriving Show
 
+-- | Type representing options for upgrading Stack from source code.
 newtype SourceOpts
   = SourceOpts (Maybe (String, String)) -- repo and branch
   deriving Show
 
+-- | Type representing command line options for the @stack upgrade@ command.
 data UpgradeOpts = UpgradeOpts
   { _uoBinary :: !(Maybe BinaryOpts)
   , _uoSource :: !(Maybe SourceOpts)
   }
   deriving Show
+
+-- | Function underlying the @stack upgrade@ command.
+upgradeCmd :: UpgradeOpts -> RIO Runner ()
+upgradeCmd upgradeOpts' = do
+  go <- view globalOptsL
+  case globalResolver go of
+    Just _ -> prettyThrowIO ResolverOptionInvalid
+    Nothing ->
+      withGlobalProject $
+      upgrade
+        maybeGitHash
+        upgradeOpts'
 
 upgrade :: Maybe String -- ^ git hash at time of building, if known
         -> UpgradeOpts

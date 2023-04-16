@@ -3,25 +3,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 
--- | Install GHC/GHCJS and Cabal.
+-- | Types and functions related to Stack's @setup@ command.
 module Stack.SetupCmd
-  ( setup
-  , setupParser
-  , SetupCmdOpts (..)
+  ( SetupCmdOpts (..)
+  , setupCmd
+  , setup
   ) where
 
-import qualified Data.Text as T
-import qualified Options.Applicative as OA
-import qualified Options.Applicative.Builder.Extra as OA
-import qualified Options.Applicative.Types as OA
 import           Stack.Prelude
+import           Stack.Runners
+                   ( ShouldReexec (..), withBuildConfig, withConfig )
 import           Stack.Setup ( SetupOpts (..), ensureCompilerAndMsys )
 import           Stack.Types.Config
                    ( CompilerPaths (..), Config (..), HasBuildConfig
-                   , HasConfig (..), HasGHCVariant
+                   , HasConfig (..), HasGHCVariant, Runner, stackYamlL
+                   , wantedCompilerVersionL
                    )
-import           Stack.Types.Version ( VersionCheck )
+import           Stack.Types.Version ( VersionCheck (..) )
 
+-- | Type representing command line options for the @stack setup@ command.
 data SetupCmdOpts = SetupCmdOpts
   { scoCompilerVersion :: !(Maybe WantedCompiler)
   , scoForceReinstall  :: !Bool
@@ -30,41 +30,29 @@ data SetupCmdOpts = SetupCmdOpts
   , scoGHCJSBootClean  :: !Bool
   }
 
-setupParser :: OA.Parser SetupCmdOpts
-setupParser = SetupCmdOpts
-  <$> OA.optional (OA.argument readVersion
-        (  OA.metavar "GHC_VERSION"
-        <> OA.help "Version of GHC to install, e.g. 7.10.2. The default is to \
-                   \install the version implied by the resolver."
-        ))
-  <*> OA.boolFlags False
-        "reinstall"
-        "reinstalling GHC, even if available (incompatible with --system-ghc)"
-        OA.idm
-  <*> OA.optional (OA.strOption
-        (  OA.long "ghc-bindist"
-        <> OA.metavar "URL"
-        <> OA.help "Alternate GHC binary distribution (requires custom \
-                   \--ghc-variant)"
-        ))
-  <*> OA.many (OA.strOption
-        (  OA.long "ghcjs-boot-options"
-        <> OA.metavar "GHCJS_BOOT"
-        <> OA.help "Additional ghcjs-boot options"
-        ))
-  <*> OA.boolFlags True
-        "ghcjs-boot-clean"
-        "Control if ghcjs-boot should have --clean option present"
-        OA.idm
- where
-  readVersion = do
-    s <- OA.readerAsk
-    case parseWantedCompiler ("ghc-" <> T.pack s) of
-      Left _ ->
-        case parseWantedCompiler (T.pack s) of
-          Left _ -> OA.readerError $ "Invalid version: " ++ s
-          Right x -> pure x
-      Right x -> pure x
+-- | Function underlying the @stack setup@ command.
+setupCmd :: SetupCmdOpts -> RIO Runner ()
+setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ do
+  installGHC <- view $ configL.to configInstallGHC
+  if installGHC
+    then
+       withBuildConfig $ do
+       (wantedCompiler, compilerCheck, mstack) <-
+         case scoCompilerVersion of
+           Just v -> pure (v, MatchMinor, Nothing)
+           Nothing -> (,,)
+             <$> view wantedCompilerVersionL
+             <*> view (configL.to configCompilerCheck)
+             <*> (Just <$> view stackYamlL)
+       setup sco wantedCompiler compilerCheck mstack
+    else
+      prettyWarnL
+        [ "The"
+        , style Shell "--no-install-ghc"
+        , flow "flag is inconsistent with"
+        , style Shell (flow "stack setup") <> "."
+        , flow "No action taken."
+        ]
 
 setup ::
      (HasBuildConfig env, HasGHCVariant env)
