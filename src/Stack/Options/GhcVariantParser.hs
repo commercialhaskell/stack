@@ -17,7 +17,7 @@ ghcVariantParser hide = option readGHCVariant
   (  long "ghc-variant"
   <> metavar "VARIANT"
   <> help "Specialized GHC variant, e.g. int-native or integersimple \
-          \(incompatible with --system-ghc)"
+          \(incompatible with --system-ghc)."
   <> hideMods hide
   )
  where

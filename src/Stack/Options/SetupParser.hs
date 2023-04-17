@@ -19,27 +19,27 @@ setupOptsParser :: OA.Parser SetupCmdOpts
 setupOptsParser = SetupCmdOpts
   <$> OA.optional (OA.argument readVersion
         (  OA.metavar "GHC_VERSION"
-        <> OA.help "Version of GHC to install, e.g. 7.10.2. The default is to \
-                   \install the version implied by the resolver."
+        <> OA.help "Version of GHC to install, e.g. 9.2.7. (default: install \
+                   \the version implied by the resolver)"
         ))
   <*> OA.boolFlags False
         "reinstall"
-        "reinstalling GHC, even if available (incompatible with --system-ghc)"
+        "reinstalling GHC, even if available (incompatible with --system-ghc)."
         OA.idm
   <*> OA.optional (OA.strOption
         (  OA.long "ghc-bindist"
         <> OA.metavar "URL"
         <> OA.help "Alternate GHC binary distribution (requires custom \
-                   \--ghc-variant)"
+                   \--ghc-variant)."
         ))
   <*> OA.many (OA.strOption
         (  OA.long "ghcjs-boot-options"
         <> OA.metavar "GHCJS_BOOT"
-        <> OA.help "Additional ghcjs-boot options"
+        <> OA.help "Additional ghcjs-boot options."
         ))
   <*> OA.boolFlags True
         "ghcjs-boot-clean"
-        "Control if ghcjs-boot should have --clean option present"
+        "Control if ghcjs-boot should have --clean option present."
         OA.idm
  where
   readVersion = do

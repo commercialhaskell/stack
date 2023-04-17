@@ -24,7 +24,7 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
           )
     <*> switch
           (  long "bare"
-          <> help "Do not create a subdirectory for the project"
+          <> help "Do not create a subdirectory for the project."
           )
     <*> optional (templateNameArgument
           (  metavar "TEMPLATE_NAME"
@@ -38,5 +38,5 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
           (  short 'p'
           <> long "param"
           <> metavar "KEY:VALUE"
-          <> help "Parameter for the template in the format key:value"
+          <> help "Parameter for the template in the format key:value."
           )))

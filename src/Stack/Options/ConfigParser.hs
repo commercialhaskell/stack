@@ -66,8 +66,8 @@ configOptsParser currentDir hide0 =
   <$> optionalFirst (absDirOption
         ( long stackRootOptionName
         <> metavar (map toUpper stackRootOptionName)
-        <> help "Absolute path to the global Stack root directory. (Overrides \
-                \any STACK_ROOT environment variable.)"
+        <> help "Absolute path to the global Stack root directory. Overrides \
+                \any STACK_ROOT environment variable."
         <> hide
         ))
   <*> optionalFirst (option (eitherReader (mapLeft showWorkDirError . parseRelDir))
@@ -79,8 +79,8 @@ configOptsParser currentDir hide0 =
                    { pcoAbsolute = False, pcoFileFilter = const False }
                )
              )
-        <> help "Relative path to Stack's work directory. (Overrides any STACK_WORK \
-                \environment variable, default is '.stack-work'.)"
+        <> help "Relative path to Stack's work directory. Overrides any \
+                \STACK_WORK environment variable. (default: '.stack-work')"
         <> hide
         ))
   <*> buildOptsMonoidParser hide0
@@ -89,17 +89,17 @@ configOptsParser currentDir hide0 =
   <*> firstBoolFlagsNoDefault
         "system-ghc"
         "using the system installed GHC (on the PATH) if it is available and \
-        \its version matches. Disabled by default."
+        \its version matches. (default: disabled)"
         hide
   <*> firstBoolFlagsTrue
         "install-ghc"
-        "downloading and installing GHC if necessary (can be done manually \
-        \with 'stack setup')"
+        "downloading and installing GHC if necessary. (Can be done manually \
+        \with 'stack setup'.)"
         hide
   <*> optionalFirst (strOption
         (  long "arch"
         <> metavar "ARCH"
-        <> help "System architecture, e.g. i386, x86_64"
+        <> help "System architecture, e.g. i386, x86_64."
         <> hide
         ))
   <*> optionalFirst (ghcVariantParser (hide0 /= OuterGlobalOpts))
@@ -108,48 +108,48 @@ configOptsParser currentDir hide0 =
         (  long "jobs"
         <> short 'j'
         <> metavar "JOBS"
-        <> help "Number of concurrent jobs to run"
+        <> help "Number of concurrent jobs to run."
         <> hide
         ))
   <*> many ((currentDir FilePath.</>) <$> strOption
         (  long "extra-include-dirs"
         <> metavar "DIR"
         <> completer dirCompleter
-        <> help "Extra directories to check for C header files"
+        <> help "Extra directories to check for C header files."
         <> hide
         ))
   <*> many ((currentDir FilePath.</>) <$> strOption
         (  long "extra-lib-dirs"
         <> metavar "DIR"
         <> completer dirCompleter
-        <> help "Extra directories to check for libraries"
+        <> help "Extra directories to check for libraries."
         <> hide
         ))
   <*> many (strOption
         (  long "custom-preprocessor-extensions"
         <> metavar "EXT"
-        <> help "Extensions used for custom preprocessors"
+        <> help "Extensions used for custom preprocessors."
         <> hide
         ))
   <*> optionalFirst (absFileOption
         (  long "with-gcc"
         <> metavar "PATH-TO-GCC"
-        <> help "Use gcc found at PATH-TO-GCC"
+        <> help "Use gcc found at PATH-TO-GCC."
         <> hide
         ))
   <*> optionalFirst (strOption
         (  long "with-hpack"
         <> metavar "HPACK"
-        <> help "Use HPACK executable (overrides bundled Hpack)"
+        <> help "Use HPACK executable (overrides bundled Hpack)."
         <> hide
         ))
   <*> firstBoolFlagsFalse
         "skip-ghc-check"
-        "skipping the GHC version and architecture check"
+        "skipping the GHC version and architecture check."
         hide
   <*> firstBoolFlagsFalse
         "skip-msys"
-        "skipping the local MSYS installation (Windows only)"
+        "skipping the local MSYS installation (Windows only)."
         hide
   <*> optionalFirst ((currentDir FilePath.</>) <$> strOption
         ( long "local-bin-path"
@@ -162,23 +162,23 @@ configOptsParser currentDir hide0 =
         ))
   <*> many (strOption
         (  long "setup-info-yaml"
-        <> help "Alternate URL or relative / absolute path for Stack \
-                \dependencies"
+        <> help "Alternate URL or path (relative or absolute) for Stack \
+                \dependencies."
         <> metavar "URL"
         ))
   <*> firstBoolFlagsTrue
         "modify-code-page"
-        "setting the codepage to support UTF-8 (Windows only)"
+        "setting the codepage to support UTF-8 (Windows only)."
         hide
   <*> firstBoolFlagsNoDefault
         "allow-different-user"
         "permission for users other than the owner of the Stack root directory \
-        \to use a Stack installation (POSIX only) (default: true inside \
-        \Docker, otherwise false)"
+        \to use a Stack installation (POSIX only). (default: inside Docker, \
+        \ true; otherwise, false)"
         hide
   <*> fmap toDumpLogs (firstBoolFlagsNoDefault
         "dump-logs"
-        "dump the build output logs for local packages to the console \
+        "dump the build output logs for local packages to the console. \
         \(default: dump warning logs)"
         hide)
   <*> optionalFirst (option readColorWhen
@@ -190,17 +190,17 @@ configOptsParser currentDir hide0 =
                 \'never', or 'auto'. On Windows versions before Windows \
                 \10, for terminals that do not support color codes, the \
                 \default is 'never'; color may work on terminals that \
-                \support color codes"
+                \support color codes."
         <> hide
         ))
   <*> optionalFirst (strOption
         (  long "snapshot-location-base"
-        <> help "The base location of LTS/Nightly snapshots"
+        <> help "The base location of LTS/Nightly snapshots."
         <> metavar "URL"
         ))
   <*> firstBoolFlagsFalse
         "script-no-run-compile"
-        "the use of options `--no-run --compile` with `stack script`"
+        "the use of options `--no-run --compile` with `stack script`."
         hide
  where
   hide = hideMods (hide0 /= OuterGlobalOpts)

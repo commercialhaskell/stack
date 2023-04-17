@@ -48,30 +48,30 @@ dotOptsParser externalDefault = DotOpts
  where
   includeExternal = boolFlags externalDefault
     "external"
-    "inclusion of external dependencies"
+    "inclusion of external dependencies."
     idm
   includeBase = boolFlags True
     "include-base"
-    "inclusion of dependencies on base"
+    "inclusion of dependencies on base."
     idm
   depthLimit = optional (option auto
     (  long "depth"
     <> metavar "DEPTH"
-    <> help "Limit the depth of dependency resolution (Default: No limit)"
+    <> help "Limit the depth of dependency resolution. (default: no limit)"
     ))
   prunedPkgs = optional (strOption
     (  long "prune"
     <> metavar "PACKAGES"
-    <> help "Prune each package name from the comma separated list of package \
-            \names PACKAGES"
+    <> help "Prune specified package(s). PACKAGES is a comma-separated list of \
+            \package names."
     ))
   testTargets = switch
     (  long "test"
-    <> help "Consider dependencies of test components"
+    <> help "Consider dependencies of test components."
     )
   benchTargets = switch
     (  long "bench"
-    <> help "Consider dependencies of benchmark components"
+    <> help "Consider dependencies of benchmark components."
     )
 
   splitNames :: String -> [PackageName]
@@ -85,7 +85,7 @@ dotOptsParser externalDefault = DotOpts
   globalHints = switch
     (  long "global-hints"
     <> help "Do not require an install GHC; instead, use a hints file for \
-            \global packages"
+            \global packages."
     )
 
 separatorParser :: Parser Text
@@ -105,7 +105,7 @@ separatorParser = fmap
 licenseParser :: Parser Bool
 licenseParser = boolFlags False
   "license"
-  "printing of dependency licenses instead of versions"
+  "printing of dependency licenses instead of versions."
   idm
 
 listDepsFormatOptsParser :: Parser ListDepsFormatOpts
@@ -143,19 +143,19 @@ listDepsOptsParser :: Parser ListDepsOpts
 listDepsOptsParser = subparser
       (  formatSubCommand
            "text"
-           "Print dependencies as text (default)"
+           "Print dependencies as text (default)."
            listDepsTextParser
       <> formatSubCommand
            "cabal"
-           "Print dependencies as exact Cabal constraints"
+           "Print dependencies as exact Cabal constraints."
            listDepsConstraintsParser
       <> formatSubCommand
            "tree"
-           "Print dependencies as tree"
+           "Print dependencies as tree."
            listDepsTreeParser
       <> formatSubCommand
            "json"
-           "Print dependencies as JSON"
+           "Print dependencies as JSON."
            listDepsJsonParser
       )
   <|> toListDepsOptsParser listDepsTextParser

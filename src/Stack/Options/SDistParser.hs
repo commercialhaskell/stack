@@ -24,14 +24,14 @@ sdistOptsParser = SDistOpts
   <*> buildPackageOption
   <*> optional (strOption
         (  long "tar-dir"
-        <> help "If specified, copy all the tar to this dir"
+        <> help "If specified, copy all the tar to this directory."
         ))
  where
   ignoreCheckSwitch = switch
     (  long "ignore-check"
-    <> help "Do not check package for common mistakes"
+    <> help "Do not check package for common mistakes."
     )
   buildPackageOption = boolFlags False
     "test-tarball"
-    "building of the resulting tarball"
+    "building of the resulting tarball."
     idm

@@ -24,12 +24,12 @@ initOptsParser = InitOpts
   searchDirs = many (textArgument
     (  metavar "DIR(S)"
     <> completer dirCompleter
-    <> help "Directory, or directories, to include in the search for .cabal \
+    <> help "Directory, or directories, to include in the search for Cabal \
             \files, when initialising. The default is the current directory."
     ))
   ignoreSubDirs = switch
     (  long "ignore-subdirs"
-    <> help "Do not search for .cabal files in subdirectories, when \
+    <> help "Do not search for Cabal files in subdirectories, when \
             \initialising."
     )
   overwrite = switch

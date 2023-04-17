@@ -207,7 +207,7 @@ extraHelpOption hide progName fakeName helpName =
     , takeBaseName progName
     , " --"
     , helpName
-    , "' for details"
+    , "' for details."
     ]
 
 -- | Display extra help if extra help option passed in arguments.

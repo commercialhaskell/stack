@@ -51,12 +51,12 @@ execOptsExtraParser = ExecOptsExtra
   eoEnvSettingsParser = EnvSettings True
     <$> boolFlags True
           "ghc-package-path"
-          "setting the GHC_PACKAGE_PATH variable for the subprocess"
+          "setting the GHC_PACKAGE_PATH variable for the subprocess."
           idm
     <*> boolFlags True
           "stack-exe"
           "setting the STACK_EXE environment variable to the path for the \
-          \stack executable"
+          \stack executable."
           idm
     <*> pure False
     <*> pure True
@@ -65,20 +65,20 @@ execOptsExtraParser = ExecOptsExtra
   eoPackagesParser = many (strOption
     (  long "package"
     <> metavar "PACKAGE"
-    <> help "Add a package (can be specified multiple times)"
+    <> help "Add a package (can be specified multiple times)."
     ))
 
   eoRtsOptionsParser :: Parser [String]
   eoRtsOptionsParser = concat <$> many (argsOption
     ( long "rts-options"
-    <> help "Explicit RTS options to pass to application"
+    <> help "Explicit RTS options to pass to application."
     <> metavar "RTSFLAG"
     ))
 
   eoCwdParser :: Parser (Maybe FilePath)
   eoCwdParser = optional (strOption
     (  long "cwd"
-    <> help "Sets the working directory before executing"
+    <> help "Sets the working directory before executing."
     <> metavar "DIR"
     <> completer dirCompleter
     ))

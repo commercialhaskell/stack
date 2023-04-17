@@ -38,17 +38,17 @@ listStylesOptsParser :: OA.Parser ListStylesOpts
 listStylesOptsParser = ListStylesOpts
   <$> boolFlags False
         "basic"
-        "a basic report of the styles used. The default is a fuller one"
+        "a basic report of the styles used. The default is a fuller one."
         idm
   <*> boolFlags True
         "sgr"
         "the provision of the equivalent SGR instructions (provided by \
-        \default). Flag ignored for a basic report"
+        \default). Flag ignored for a basic report."
         idm
   <*> boolFlags True
         "example"
         "the provision of an example of the applied style (provided by default \
-        \for colored output). Flag ignored for a basic report"
+        \for colored output). Flag ignored for a basic report."
         idm
 
 listToolsOptsParser :: OA.Parser ListToolsOpts
@@ -58,7 +58,7 @@ listToolsOptsParser = ListToolsOpts
         <> OA.metavar "TOOL_NAME"
         <> OA.value ""
         <> OA.help "Filter by a tool name (eg 'ghc', 'ghc-git' or 'msys2') \
-                   \- case sensitive. The default is no filter"
+                   \- case sensitive. (default: no filter)"
         )
 
 lsViewSnapCmd :: OA.Parser SnapshotOpts
@@ -67,24 +67,24 @@ lsViewSnapCmd = SnapshotOpts
   <*> OA.switch
         (  OA.long "lts"
         <> OA.short 'l'
-        <> OA.help "Only show lts snapshots"
+        <> OA.help "Only show LTS Haskell snapshots."
         )
   <*> OA.switch
         (  OA.long "nightly"
         <> OA.short 'n'
-        <> OA.help "Only show nightly snapshots"
+        <> OA.help "Only show Nightly snapshots."
         )
 
 lsSnapCmd :: OA.Mod OA.CommandFields LsCmds
 lsSnapCmd = OA.command "snapshots" $
   OA.info lsCmdOptsParser $
-       OA.progDesc "View snapshots (local by default)"
+       OA.progDesc "View snapshots. (default: local)"
     <> OA.footer localSnapshotMsg
 
 lsDepsCmd :: OA.Mod OA.CommandFields LsCmds
 lsDepsCmd = OA.command "dependencies" $
   OA.info lsDepOptsParser $
-       OA.progDesc "View the dependencies"
+       OA.progDesc "View the dependencies."
     <> OA.footer globalFooter
 
 lsStylesCmd :: OA.Mod OA.CommandFields LsCmds
@@ -92,30 +92,30 @@ lsStylesCmd =
      OA.command
        "stack-colors"
        (OA.info lsStylesOptsParser
-                (OA.progDesc "View Stack's output styles"))
+                (OA.progDesc "View Stack's output styles."))
   <> OA.command
        "stack-colours"
        (OA.info lsStylesOptsParser
                 (OA.progDesc "View Stack's output styles (alias for \
-                             \'stack-colors')"))
+                             \'stack-colors')."))
 
 lsToolsCmd :: OA.Mod OA.CommandFields LsCmds
 lsToolsCmd =
   OA.command
     "tools"
     (OA.info lsToolsOptsParser
-             (OA.progDesc "View Stack's installed tools"))
+             (OA.progDesc "View Stack's installed tools."))
 
 lsViewLocalCmd :: OA.Mod OA.CommandFields LsView
 lsViewLocalCmd = OA.command "local" $
   OA.info (pure Local) $
-       OA.progDesc "View local snapshots"
+       OA.progDesc "View local snapshots."
     <> OA.footer localSnapshotMsg
 
 lsViewRemoteCmd :: OA.Mod OA.CommandFields LsView
 lsViewRemoteCmd = OA.command "remote" $
   OA.info (pure Remote) $
-       OA.progDesc "View remote snapshots"
+       OA.progDesc "View remote snapshots."
     <> OA.footer pagerMsg
 
 pagerMsg :: String

@@ -21,7 +21,7 @@ benchOptsParser hide0 = BenchmarkOptsMonoid
         <> long "ba"
         <> metavar "BENCH_ARGS"
         <> help "Forward BENCH_ARGS to the benchmark suite. Supports templates \
-                \from `cabal bench`"
+                \from 'cabal bench'."
         <> hide
         ))
   <*> optionalFirst (flag' True

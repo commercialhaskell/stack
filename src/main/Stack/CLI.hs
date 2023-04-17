@@ -173,13 +173,13 @@ commandLineHandler currentDir progName isInterpreter =
 
   bench = addBuildCommand'
     "bench"
-    "Shortcut for 'build --bench'"
+    "Shortcut for 'build --bench'."
     buildCmd
     (buildOptsParser Bench)
 
   build = addBuildCommand'
     "build"
-    "Build the package(s) in this directory/configuration"
+    "Build the package(s) in this directory/configuration."
     buildCmd
     (buildOptsParser Build)
 
@@ -191,75 +191,75 @@ commandLineHandler currentDir progName isInterpreter =
 
   config = addSubCommands'
       ConfigCmd.cfgCmdName
-        "Subcommands for accessing and modifying configuration values"
+        "Subcommands for accessing and modifying configuration values."
         ( do
             addCommand'
               ConfigCmd.cfgCmdSetName
-              "Sets a key in YAML configuration file to value"
+              "Sets a key in YAML configuration file to value."
               (withConfig NoReexec . cfgCmdSet)
               configCmdSetParser
             addCommand'
               ConfigCmd.cfgCmdEnvName
-              "Print environment variables for use in a shell"
+              "Print environment variables for use in a shell."
               (withConfig YesReexec . withDefaultEnvConfig . cfgCmdEnv)
               configCmdEnvParser
         )
 
   docker = addSubCommands'
     dockerCmdName
-    "Subcommands specific to Docker use"
+    "Subcommands specific to Docker use."
     ( do
         addCommand'
           dockerPullCmdName
-          "Pull latest version of Docker image from registry"
+          "Pull latest version of Docker image from registry."
           dockerPullCmd
           (pure ())
         addCommand'
           "reset"
-          "Reset the Docker sandbox"
+          "Reset the Docker sandbox."
           dockerResetCmd
           ( switch
               (  long "keep-home"
-              <> help "Do not delete sandbox's home directory"
+              <> help "Do not delete sandbox's home directory."
               )
           )
     )
 
   dot = addCommand'
     "dot"
-    "Visualize your project's dependency graph using Graphviz dot"
+    "Visualize your project's dependency graph using Graphviz dot."
     Stack.Dot.dot
     (dotOptsParser False) -- Default for --external is False.
 
   eval = addCommand'
     "eval"
-    "Evaluate some haskell code inline. Shortcut for 'stack exec ghc -- \
-    \-e CODE'"
+    "Evaluate some Haskell code inline. Shortcut for \
+    \'stack exec ghc -- -e CODE'."
     evalCmd
     (evalOptsParser "CODE")
 
   exec = addCommand'
     "exec"
-    "Execute a command. If the command is absent, the first of any \
-    \arguments is taken as the command."
+    "Execute a command. If the command is absent, the first of any arguments \
+    \is taken as the command."
     execCmd
     (execOptsParser Nothing)
 
   ghc = addCommand'
     "ghc"
-    "Run ghc"
+    "Run ghc."
     execCmd
     (execOptsParser $ Just ExecGhc)
 
   ghci = addGhciCommand'
     "ghci"
-    "Run ghci in the context of package(s) (experimental)"
+    "Run ghci in the context of package(s)."
     ghciCmd
     ghciOptsParser
 
   haddock = addBuildCommand'
     "haddock"
-    "Shortcut for 'build --haddock'"
+    "Shortcut for 'build --haddock'."
     buildCmd
     (buildOptsParser Haddock)
 
@@ -276,33 +276,33 @@ commandLineHandler currentDir progName isInterpreter =
         <*> boolFlags
               True
               "setup"
-              "If needed: install hoogle, build haddocks and \
-              \generate a hoogle database"
+              "If needed: install Hoogle, build Haddock documentation and \
+              \generate a Hoogle database."
               idm
         <*> switch
               (  long "rebuild"
-              <> help "Rebuild the hoogle database"
+              <> help "Rebuild the Hoogle database."
               )
         <*> switch
               (  long "server"
-              <> help "Start local Hoogle server"
+              <> help "Start local Hoogle server."
               )
       )
 
   hpc = addSubCommands'
     "hpc"
-    "Subcommands specific to Haskell Program Coverage"
+    "Subcommands specific to Haskell Program Coverage."
     ( addCommand'
         "report"
         "Generate unified HPC coverage report from tix files and project \
-        \targets"
+        \targets."
         hpcReportCmd
         hpcReportOptsParser
     )
 
   ide = addSubCommands'
     "ide"
-    "IDE-specific commands"
+    "IDE-specific commands."
     ( let outputFlag = flag
             OutputLogInfo
             OutputStdout
@@ -333,26 +333,26 @@ commandLineHandler currentDir progName isInterpreter =
   init = addCommand'
     "init"
     "Create Stack project configuration from Cabal or Hpack package \
-    \specifications"
+    \specifications."
     initCmd
     initOptsParser
 
   install = addBuildCommand'
     "install"
-    "Shortcut for 'build --copy-bins'"
+    "Shortcut for 'build --copy-bins'."
     buildCmd
     (buildOptsParser Install)
 
   list = addCommand'
     "list"
-    "List package id's in snapshot (experimental)"
+    "List package id's in snapshot (experimental)."
     listCmd
     (many $ strArgument $ metavar "PACKAGE")
 
   ls = addCommand'
     "ls"
     "List command. (Supports snapshots, dependencies, Stack's styles and \
-    \installed tools)"
+    \installed tools.)"
     lsCmd
     lsOptsParser
 
@@ -367,27 +367,26 @@ commandLineHandler currentDir progName isInterpreter =
 
   path = addCommand'
     "path"
-    "Print out handy path information"
+    "Print out handy path information."
     Stack.Path.path
     pathParser
 
   purge = addCommand'
     "purge"
     "Delete the project Stack working directories (.stack-work by \
-    \default). Shortcut for 'stack clean --full'"
+    \default). Shortcut for 'stack clean --full'."
     cleanCmd
     (cleanOptsParser Purge)
 
   query = addCommand'
     "query"
-    "Query general build information (experimental)"
+    "Query general build information (experimental)."
     queryCmd
     (many $ strArgument $ metavar "SELECTOR...")
 
   repl = addGhciCommand'
     "repl"
-    "Run ghci in the context of package(s) (experimental) (alias for \
-    \'ghci')"
+    "Run ghci in the context of package(s) (alias for 'ghci')."
     ghciCmd
     ghciOptsParser
 
@@ -400,19 +399,19 @@ commandLineHandler currentDir progName isInterpreter =
 
   runghc = addCommand'
     "runghc"
-    "Run runghc"
+    "Run runghc."
     execCmd
     (execOptsParser $ Just ExecRunGhc)
 
   runhaskell = addCommand'
     "runhaskell"
-    "Run runghc (alias for 'runghc')"
+    "Run runghc (alias for 'runghc')."
     execCmd
     (execOptsParser $ Just ExecRunGhc)
 
   script = addCommand
     "script"
-    "Run a Stack Script"
+    "Run a Stack script."
     globalFooter
     scriptCmd
     ( \so gom ->
@@ -426,13 +425,13 @@ commandLineHandler currentDir progName isInterpreter =
 
   sdist = addCommand'
     "sdist"
-    "Create source distribution tarballs"
+    "Create source distribution tarballs."
     sdistCmd
     sdistOptsParser
 
   setup = addCommand'
     "setup"
-    "Get the appropriate GHC for your project"
+    "Get the appropriate GHC for your project."
     setupCmd
     setupOptsParser
 
@@ -446,7 +445,7 @@ commandLineHandler currentDir progName isInterpreter =
 
   test = addBuildCommand'
     "test"
-    "Shortcut for 'build --test'"
+    "Shortcut for 'build --test'."
     buildCmd
     (buildOptsParser Test)
 
@@ -459,20 +458,20 @@ commandLineHandler currentDir progName isInterpreter =
 
   unpack = addCommand'
     "unpack"
-    "Unpack one or more packages locally"
+    "Unpack one or more packages locally."
     unpackCmd
     ( (,)
         <$> some (strArgument $ metavar "PACKAGE")
         <*> optional (textOption
               (  long "to"
               <> help "Optional path to unpack the package into (will \
-                      \unpack into subdirectory)"
+                      \unpack into subdirectory)."
               ))
     )
 
   update = addCommand'
     "update"
-    "Update the package index"
+    "Update the package index."
     updateCmd
     (pure ())
 
@@ -480,7 +479,7 @@ commandLineHandler currentDir progName isInterpreter =
     "upgrade"
     "Upgrade Stack, installing to Stack's local-bin directory and, if \
     \different and permitted, the directory of the current Stack \
-    \executable"
+    \executable."
     upgradeCmd
     "Warning: if you use GHCup to install Stack, use only GHCup to \
     \upgrade Stack."
@@ -488,7 +487,7 @@ commandLineHandler currentDir progName isInterpreter =
 
   upload = addCommand'
     "upload"
-    "Upload a package to Hackage"
+    "Upload a package to Hackage."
     uploadCmd
     uploadOptsParser
 
@@ -611,7 +610,7 @@ secondaryCommandHandler args f =
   -- e.g. stack --verbosity silent cmd
   cmd = stackProgName ++ "-" ++ L.head args
   noSuchCmd name = errorHelp $ stringChunk
-    ("Auxiliary command not found in path `" ++ name ++ "'")
+    ("Auxiliary command not found in path '" ++ name ++ "'.")
 
 interpreterHandler ::
      Monoid t
@@ -653,7 +652,7 @@ interpreterHandler currentDir args f = do
 
   parseResultHandler fn = handleParseResult (overFailure fn (Failure f))
   noSuchFile name = errorHelp $ stringChunk
-    ("File does not exist or is not a regular file `" ++ name ++ "'")
+    ("File does not exist or is not a regular file '" ++ name ++ "'.")
 
   runInterpreterCommand path stackArgs fileArgs = do
     progName <- getProgName
