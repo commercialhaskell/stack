@@ -21,7 +21,8 @@ preference):
 1. A file specified by the `--stack-yaml` command line option.
 2. A file specified by the `STACK_YAML` environment variable.
 3. A file named `stack.yaml` in the current directory or an ancestor directory.
-4. A file name `stack.yaml` in the `global-project` directory in the Stack root.
+4. A file name `stack.yaml` in the `global-project` directory in the
+   [Stack root](stack_root.md).
 
 The **global** configuration file (`config.yaml`) contains only
 non-project-specific options.
@@ -33,19 +34,19 @@ use the XDG Base Directory Specification.
 === "Unix-like"
 
     `config.yaml` is located in `/etc/stack` (for system-wide options); and/or
-    in the Stack root (for user-specific options).
+    in the [Stack root](stack_root.md) (for user-specific options).
 
 === "Windows"
 
-    `config.yaml` is located in the Stack root.
+    `config.yaml` is located in the [Stack root](stack_root.md).
 
 === "XDG Base Directory Specification"
 
     On Unix-like operating systems and Windows, Stack can be configured to
     follow the XDG Base Directory Specification if the environment variable
     `STACK_XDG` is set to any non-empty value. However, Stack will ignore that
-    configuration if the Stack root location has been set on the command line or
-    the `STACK_ROOT` environment variable exists.
+    configuration if the [Stack root](stack_root.md) location has been set on
+    the command line or the `STACK_ROOT` environment variable exists.
 
     If Stack is following the XDG Base Directory Specification, the location of
     `config.yaml` (for user-specific options) is `<XDG_CONFIG_HOME>/stack`. If
@@ -345,8 +346,8 @@ Default: `false`
 
 Command line equivalent (takes precedence): `--[no-]allow-different-user` flag
 
-Allow users other than the owner of the Stack root to use the Stack
-installation.
+Allow users other than the owner of the [Stack root](stack_root.md) to use the
+Stack installation.
 
 ~~~yaml
 allow-different-user: true
@@ -923,46 +924,43 @@ Specifies the target directory for
 `stack install`. An absolute or relative path can be specified.
 
 If the project-level configuration is provided in the `global-project` directory
-in the Stack root, a relative path is assumed to be relative to the current
-directory. Otherwise, it is assumed to be relative to the directory of the
-project-level configuration file.
+in the [Stack root](stack_root.md), a relative path is assumed to be relative to
+the current directory. Otherwise, it is assumed to be relative to the directory
+of the project-level configuration file.
 
 ### local-programs-path
 
 [:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0)
 
-The behaviour of this option differs between Unix-like operating systems and
-Windows.
+This overrides the location of the Stack 'programs' directory, where tools like
+GHC get installed. The path must be an absolute one.
+
+Stack's defaults differ between Unix-like operating systems and Windows.
 
 === "Unix-like"
 
-    Default: `programs` directory in the Stack root.
-
-    This overrides the location of the Stack 'programs' directory, where tools
-    like GHC get installed.
+    Default: `programs` directory in the [Stack root](stack_root.md).
 
 === "Windows"
 
     Default: `%LOCALAPPDATA%\Programs\stack`, if the `%LOCALAPPDATA%`
-    environment variable exists.
+    environment variable exists. Otherwise, the `programs` directory in the
+    [Stack root](stack_root.md).
 
-    This overrides the location of the Stack 'programs' directory, where tools
-    like GHC and MSYS2 get installed.
+    The MSYS2 tool is also installed in the Stack 'programs' directory.
 
     !!! warning
 
-        If there is a space character in the `%LOCALAPPDATA%` path (which may be
-        the case if the relevant user account name and its corresponding user
-        profile path have a space) this may cause problems with building
-        packages that make use of the GNU project's `autoconf` package and
-        `configure` shell script files. That may be the case particularly if
-        there is no corresponding short name ('8 dot 3' name) for the directory
-        in the path with the space (which may be the case if '8 dot 3' names
-        have been stripped or their creation not enabled by default). If there
-        are problems building, it will be necessary to override the default
-        location of Stack's 'programs' directory to specify an alternative path
-        that does not contain space characters. Examples of packages on
-        Hackage that make use of `configure` are `network` and `process`.
+        If there is a space character in the path to Stack's 'programs'
+        directory this may cause problems with building packages that make use
+        of the GNU project's `autoconf` package and `configure` shell script
+        files. That may be the case particularly if there is no corresponding
+        short name ('8 dot 3' name) for the directory in the path with the space
+        (which may be the case if '8 dot 3' names have been stripped or their
+        creation not enabled by default). If there are problems building, it
+        will be necessary to specify an alternative path that does not contain
+        space characters. Examples of packages on Hackage that make use of
+        `configure` are `network` and `process`.
 
 ### modify-code-page
 
@@ -1605,10 +1603,10 @@ root directory of the project or package. The relative path cannot include a
 [:octicons-tag-24: 2.9.1](https://github.com/commercialhaskell/stack/releases/tag/v2.9.1)
 
 On Unix-like operating systems and Windows, Stack's installation procedure can
-be fully customised by placing a `sh` shell script (a 'hook') in the Stack root
-directory at `hooks/ghc-install.sh`. On Unix-like operating systems, the script
-file must be made executable. The script is run by the `sh` application (which
-is provided by MSYS2 on Windows).
+be fully customised by placing a `sh` shell script (a 'hook') in the
+[Stack root](stack_root.md) directory at `hooks/ghc-install.sh`. On Unix-like
+operating systems, the script file must be made executable. The script is run by
+the `sh` application (which is provided by MSYS2 on Windows).
 
 The script **must** return an exit code of `0` and the standard output **must**
 be the absolute path to the GHC binary that was installed. Otherwise Stack will

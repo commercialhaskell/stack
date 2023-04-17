@@ -554,9 +554,9 @@ All the following examples assume that:
 *   if `stack build` is commanded outside of a project directory, there is no
     `stack.yaml` file in the current directory or ancestor directory and,
     consequently, the project-level configuration will be determined by a
-    `stack.yaml` file in the `global-project` directory in the Stack root (for
-    further information, see the [YAML configuration](yaml_configuration.md)
-    documentation); and
+    `stack.yaml` file in the `global-project` directory in the
+    [Stack root](stack_root.md) (for further information, see the
+    [YAML configuration](yaml_configuration.md) documentation); and
 
 *   if `stack build` is commanded in a project directory, there is a
     `stack.yaml` file in that directory.

@@ -13,10 +13,10 @@ Restrictions: POSIX systems only
 
 Default: True, if inside Docker; false otherwise
 
-Enable/disable permitting users other than the owner of the Stack root directory
-to use a Stack installation. For further information, see the documentation for
-the corresponding non-project specific configuration
-[option](yaml_configuration.md#allow-different-user).
+Enable/disable permitting users other than the owner of the
+[Stack root](stack_root.md) directory to use a Stack installation. For further
+information, see the documentation for the corresponding non-project specific
+configuration [option](yaml_configuration.md#allow-different-user).
 
 ## `--arch` option
 
@@ -212,7 +212,8 @@ specific configuration [option](yaml_configuration.md#stack-colors).
 Overrides: `STACK_ROOT` environment variable
 
 Pass the option `--stack-root <absolute_path_to_the_Stack_root>` to specify the
-path to the Stack root directory. The path must be an absolute one.
+path to the [Stack root](stack_root.md) directory. The path must be an absolute
+one.
 
 ## `--stack-yaml` option
 
