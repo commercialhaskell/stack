@@ -42,10 +42,11 @@ package will be built against.
 
 Finally, Stack is __isolated__: it will not make changes outside of specific
 Stack directories. Stack-built files generally go in either the Stack root
-directory or `./.stack-work` directories local to each project. The Stack root
-directory holds packages belonging to snapshots and any Stack-installed versions
-of GHC. Stack will not tamper with any system version of GHC or interfere with
-packages installed by other build tools, such as Cabal (the tool).
+directory or `./.stack-work` directories local to each project. The
+[Stack root](stack_root.md) directory holds packages belonging to snapshots and
+any Stack-installed versions of GHC. Stack will not tamper with any system
+version of GHC or interfere with packages installed by other build tools, such
+as Cabal (the tool).
 
 ## Downloading and Installation
 
@@ -807,7 +808,7 @@ The reason we have this structure is that:
   non-standard content into the shared snapshot database.
 
 As you probably guessed, there can be multiple snapshot databases available. See
-the contents of the `snapshots` directory in the Stack root.
+the contents of the `snapshots` directory in the [Stack root](stack_root.md).
 
 * On Unix-like operating systems, each snapshot is in the last of a sequence of
   three subdirectories named after the platform, a 256-bit hash of the source
@@ -1428,87 +1429,6 @@ Keep in mind that there's nothing magical about this implicit global
 configuration. It has no effect on projects at all. Every package you install
 with it is put into isolated databases just like everywhere else. The only magic
 is that it's the catch-all project whenever you're running Stack somewhere else.
-
-## Setting the Stack root location
-
-The Stack root is a directory where Stack stores important files. The location
-and contents of the directory depend on the operating system and/or whether
-Stack is configured to use the XDG Base Directory Specification.
-
-The location of the Stack root can be configured by setting the `STACK_ROOT`
-environment variable or using Stack's `--stack-root` option on the command line.
-
-=== "Unix-like"
-
-    The Stack root contains snapshot packages; tools such as GHC, in a
-    `programs` directory; and Stack's global YAML configuration file
-    (`config.yaml`).
-
-    The default Stack root is `~/.stack`.
-
-=== "Windows"
-
-    The Stack root contains snapshot packages; and Stack's global YAML
-    configuration file (`config.yaml`). The default location of tools such as
-    GHC and MSYS2 is outside of the Stack root.
-
-    The default Stack root is `%APPDIR%\stack`.
-
-    The default location of tools is `%LOCALAPPDATA%\Programs\stack`.
-
-    On Windows, the length of filepaths may be limited (to
-    [MAX_PATH](https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=cmd)),
-    and things can break when this limit is exceeded. Setting a Stack root with
-    a short path to its location (for example, `C:\sr`) can help.
-
-=== "XDG Base Directory Specification"
-
-    On Unix-like operating systems and Windows, Stack can be configured to
-    follow the XDG Base Directory Specification if the environment variable
-    `STACK_XDG` is set to any non-empty value. However, Stack will ignore that
-    configuration if the Stack root location has been set on the command line or
-    the `STACK_ROOT` environment variable exists.
-
-    If Stack is following the XDG Base Directory Specification, the Stack root
-    contains what it would otherwise contain for the operating system, but
-    Stack's global YAML configuration file (`config.yaml`) may be located
-    elsewhere.
-
-    The Stack root is `<XDG_DATA_HOME>/stack`. If the `XDG_DATA_HOME`
-    environment variable does not exist, the default is `~/.local/share/stack`
-    on Unix-like operating systems and `%APPDIR%\stack` on Windows.
-
-    The location of `config.yaml` is `<XDG_CONFIG_HOME>/stack`. If the
-    `XDG_CONFIG_HOME` environment variable does not exist, the default is
-    `~/.config/stack` on Unix-like operating systems and `%APPDIR%\stack` on
-    Windows.
-
-    This approach treats:
-
-    *   the project-level YAML configuration file that is common to all projects
-        without another such file in their project directory or its ancestor
-        directories as _data_ rather than as part of Stack's own
-        _configuration_;
-
-    *   the snapshots database as essential data rather than as non-essential
-        data that would be part of a _cache_, notwithstanding that Stack will
-        rebuild that database as its contents are needed; and
-
-    *   the Pantry store as essential data rather than as non-essential data
-        that would be part of a _cache_, notwithstanding that Stack will
-        download the package index and rebuild the store if it is absent.
-
-The location of the Stack root is reported by command:
-
-~~~text
-stack path --stack-root
-~~~
-
-The full path of Stack's global YAML configuration file is reported by command:
-
-~~~text
-stack path --global-config
-~~~
 
 ## `stack.yaml` versus Cabal files
 

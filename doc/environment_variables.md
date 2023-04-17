@@ -76,8 +76,8 @@ file (`config.yaml`).
 Overridden by: Stack's global
 [`--stack-root`](global_flags.md#-stack-root-option) option.
 
-The environment variable `STACK_ROOT` can be used to specify the Stack root
-directory.
+The environment variable `STACK_ROOT` can be used to specify the
+[Stack root](stack_root.md) directory.
 
 ## `STACK_WORK`
 

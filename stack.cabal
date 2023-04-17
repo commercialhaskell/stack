@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.35.2.
 --
 -- see: https://github.com/sol/hpack
 
@@ -85,6 +85,7 @@ extra-source-files:
     doc/shell_autocompletion.md
     doc/SIGNING_KEY.md
     doc/Stack_and_VS_Code.md
+    doc/stack_root.md
     doc/stack_yaml_vs_cabal_package_file.md
     doc/templates_command.md
     doc/travis_ci.md
