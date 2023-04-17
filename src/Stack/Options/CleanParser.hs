@@ -17,7 +17,7 @@ cleanOptsParser Clean = CleanShallow
  where
   packages = many (packageNameArgument
     (  metavar "PACKAGE"
-    <> help "If none specified, clean all project packages"
+    <> help "If none specified, clean all project packages."
     ))
   doFullClean = flag' CleanFull
     (  long "full"

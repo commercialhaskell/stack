@@ -19,5 +19,5 @@ uploadOptsParser =
   where
     uploadVariant = flag Publishing Candidate
       (  long "candidate"
-      <> help "Upload as a package candidate"
+      <> help "Upload as a package candidate."
       )

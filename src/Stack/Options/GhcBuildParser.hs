@@ -28,7 +28,7 @@ ghcBuildParser hide = option readGHCBuild
        , "integersimple"
        ]
   <> help "Specialized GHC build, e.g. 'gmp4' or 'standard' (usually \
-          \auto-detected)"
+          \auto-detected)."
   <> hideMods hide
   )
  where

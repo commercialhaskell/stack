@@ -18,7 +18,7 @@ haddockOptsParser hide0 = HaddockOptsMonoid
         ( optional (argsOption
             (  long "haddock-arguments"
             <> metavar "HADDOCK_ARGS"
-            <> help "Arguments passed to the haddock program"
+            <> help "Arguments passed to the Haddock program."
             <> hide
             ))
         )

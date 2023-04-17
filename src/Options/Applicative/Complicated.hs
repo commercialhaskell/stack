@@ -86,19 +86,19 @@ complicatedOptions numericVersion stringVersion numericHpackVersion h pd
     infoOption
       s
       (  long "version"
-      <> help "Show version"
+      <> help "Show version."
       )
   numericVersionOption =
     infoOption
       (versionString numericVersion)
       (  long "numeric-version"
-      <> help "Show only version number"
+      <> help "Show only version number."
       )
   numericHpackVersionOption =
     infoOption
       numericHpackVersion
       (  long "hpack-numeric-version"
-      <> help "Show only Hpack's version number"
+      <> help "Show only Hpack's version number."
       )
 
 -- | Add a command to the options dispatcher.
@@ -189,4 +189,4 @@ helpOption :: Parser (a -> a)
 helpOption =
   abortOption showHelpText $
        long "help"
-    <> help "Show this help text"
+    <> help "Show this help text."

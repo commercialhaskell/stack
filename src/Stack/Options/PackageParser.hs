@@ -28,4 +28,4 @@ readFlag = do
                  Nothing -> readerError $ "Invalid flag name: " ++ flagS
                  Just x -> pure x
       pure $ Map.singleton pn' $ Map.singleton flagN b
-    _ -> readerError "Must have a colon"
+    _ -> readerError "Must have a colon."

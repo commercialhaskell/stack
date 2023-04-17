@@ -20,7 +20,7 @@ logLevelOptsParser hide = fmap (Just . parse)
         (  long "verbosity"
         <> metavar "VERBOSITY"
         <> completeWith ["silent", "error", "warn", "info", "debug"]
-        <> help "Verbosity: silent, error, warn, info, debug"
+        <> help "Set verbosity level: silent, error, warn, info or debug."
         <> hideMods hide
         ))
   <|> flag' (Just verboseLevel)
@@ -29,7 +29,7 @@ logLevelOptsParser hide = fmap (Just . parse)
         <> help
              (  "Enable verbose mode: verbosity level \""
              <> showLevel verboseLevel
-             <> "\""
+             <> "\"."
              )
         <> hideMods hide
         )
@@ -37,7 +37,7 @@ logLevelOptsParser hide = fmap (Just . parse)
         (  long "silent"
         <> help (  "Enable silent mode: verbosity level \""
                 <> showLevel silentLevel
-                <> "\""
+                <> "\"."
                 )
         <> hideMods hide
         )

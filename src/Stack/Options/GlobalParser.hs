@@ -49,11 +49,12 @@ globalOptsParser currentDir kind = GlobalOptsMonoid
   <*> (First <$> logLevelOptsParser hide0)
   <*> firstBoolFlagsTrue
         "time-in-log"
-        "inclusion of timings in logs, for the purposes of using diff with logs"
+        "inclusion of timings in logs, for the purposes of using diff with \
+        \logs."
         hide
   <*> firstBoolFlagsFalse
         "rsl-in-log"
-        "inclusion of raw snapshot layer (rsl) in logs"
+        "inclusion of raw snapshot layer (rsl) in logs."
         hide
   <*> configOptsParser currentDir kind
   <*> optionalFirst (abstractResolverOptsParser hide0)
@@ -62,7 +63,8 @@ globalOptsParser currentDir kind = GlobalOptsMonoid
       -- resolver root is only set via the script command
   <*> firstBoolFlagsNoDefault
         "terminal"
-        "overriding terminal detection in the case of running in a false terminal"
+        "overriding terminal detection in the case of running in a false \
+        \terminal."
         hide
   <*> option readStyles
         (  long "stack-colors"
@@ -82,23 +84,21 @@ globalOptsParser currentDir kind = GlobalOptsMonoid
         (  long "terminal-width"
         <> metavar "INT"
         <> help "Specify the width of the terminal, used for pretty-print \
-                \messages"
+                \messages."
         <> hide
         ))
   <*> optionalFirst (strOption
         (  long "stack-yaml"
         <> metavar "STACK-YAML"
         <> completer (fileExtCompleter [".yaml"])
-        <> help
-             (  "Override project stack.yaml file "
-             <> "(overrides any STACK_YAML environment variable)"
-             )
+        <> help "Override project stack.yaml file (overrides any STACK_YAML \
+                \environment variable)."
         <> hide
         ))
   <*> optionalFirst (option readLockFileBehavior
         (  long "lock-file"
-        <> help "Specify how to interact with lock files. Default: read/write. \
-                \If resolver is overridden: read-only"
+        <> help "Specify how to interact with lock files. (default: if \
+                \resolver is overridden: read-only; otherwise: read/write)"
         <> hide
         ))
  where
