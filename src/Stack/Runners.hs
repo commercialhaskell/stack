@@ -33,14 +33,16 @@ import qualified Stack.Nix as Nix
 import           Stack.Prelude
 import           Stack.Setup ( setupEnv )
 import           Stack.Storage.User ( logUpgradeCheck, upgradeChecksSince )
+import           Stack.Types.ColorWhen ( ColorWhen (..) )
 import           Stack.Types.Config
-                   ( BuildOptsCLI, ColorWhen (..), Config (..)
-                   , ConfigMonoid (..), EnvConfig, GlobalOpts (..), Runner (..)
-                   , StackYamlLoc (..), defaultBuildOptsCLI, globalOptsL
-                   , reExecL, stackYamlLocL
-                   )
+                   ( BuildOptsCLI, Config (..), EnvConfig, defaultBuildOptsCLI )
+import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.Docker ( dockerEnable )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Nix ( nixEnable )
+import           Stack.Types.Runner
+                   ( Runner (..), globalOptsL, reExecL, stackYamlLocL )
+import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
 import           Stack.Types.Version
                    ( minorVersion, stackMinorVersion, stackVersion )
 import           System.Console.ANSI ( hSupportsANSIWithoutEmulation )

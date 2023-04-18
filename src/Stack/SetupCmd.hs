@@ -16,9 +16,10 @@ import           Stack.Runners
 import           Stack.Setup ( SetupOpts (..), ensureCompilerAndMsys )
 import           Stack.Types.Config
                    ( CompilerPaths (..), Config (..), HasBuildConfig
-                   , HasConfig (..), HasGHCVariant, Runner, stackYamlL
+                   , HasConfig (..), HasGHCVariant, stackYamlL
                    , wantedCompilerVersionL
                    )
+import           Stack.Types.Runner ( Runner )
 import           Stack.Types.Version ( VersionCheck (..) )
 
 -- | Type representing command line options for the @stack setup@ command.

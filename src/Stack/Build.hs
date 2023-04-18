@@ -42,11 +42,11 @@ import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.Config
                    ( BuildOpts (..), BuildOptsCLI (..), Config (..)
                    , EnvConfig (..), HasBuildConfig, HasConfig (..)
-                   , HasEnvConfig (..), HasPlatform (..), HasSourceMap, Runner
+                   , HasEnvConfig (..), HasPlatform (..), HasSourceMap
                    , actualCompilerVersionL, buildOptsL
                    , buildOptsMonoidBenchmarksL, buildOptsMonoidHaddockL
                    , buildOptsMonoidInstallExesL, buildOptsMonoidTestsL
-                   , cabalVersionL, globalOptsL, globalOptsBuildOptsMonoidL
+                   , cabalVersionL, globalOptsBuildOptsMonoidL
                    , installationRootDeps, installationRootLocal
                    , packageDatabaseDeps, packageDatabaseExtra
                    , packageDatabaseLocal, stackYamlL
@@ -57,6 +57,7 @@ import           Stack.Types.NamedComponent ( exeComponents )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..)
                    , PackageConfig (..), lpFiles, lpFilesForComponents )
+import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), ProjectPackage (..), SMTargets (..)
                    , SourceMap (..), Target (..) )

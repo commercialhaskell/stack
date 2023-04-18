@@ -27,11 +27,12 @@ import           Stack.Setup
                    , getDownloadVersion, preferredPlatforms, stackVersion
                    )
 import           Stack.Types.Config
-                   ( BuildOptsCLI (..), Config (..), GlobalOpts (..)
-                   , HasConfig (..), Runner, StackYamlLoc (..)
+                   ( BuildOptsCLI (..), Config (..), HasConfig (..)
                    , buildOptsInstallExesL, buildOptsL, defaultBuildOptsCLI
-                   , globalOptsL
                    )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Runner ( Runner, globalOptsL )
+import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
 import           System.Console.ANSI ( hSupportsANSIWithoutEmulation )
 import           System.Process ( rawSystem, readProcess )
 

@@ -120,23 +120,28 @@ import           Stack.Types.CompilerBuild
                    )
 import           Stack.Types.Config
                    ( BuildConfig (..), BuildOptsCLI (..), CompilerPaths (..)
-                   , Config (..), DownloadInfo (..), DumpPackage (..)
-                   , EnvConfig (..), EnvSettings (..), ExtraDirs (..)
-                   , GHCDownloadInfo (..), GhcPkgExe (..), GHCVariant (..)
+                   , Config (..), DumpPackage (..), EnvConfig (..)
+                   , EnvSettings (..), ExtraDirs (..), GhcPkgExe (..)
                    , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
                    , HasEnvConfig (..), HasGHCVariant (..), HasPlatform (..)
-                   , HasRunner (..), PlatformVariant (..), SetupInfo (..)
-                   , VersionedDownloadInfo (..), envOverrideSettingsL
-                   , extraBinDirs, ghcInstallHook, ghcVariantName
-                   , ghcVariantSuffix, minimalEnvSettings, packageDatabaseDeps
+                   , PlatformVariant (..), envOverrideSettingsL, extraBinDirs
+                   , ghcInstallHook, minimalEnvSettings, packageDatabaseDeps
                    , packageDatabaseExtra, packageDatabaseLocal
                    , platformOnlyRelDir, projectRootL, wantedCompilerVersionL
                    , whichCompilerL
                    )
 import           Stack.Types.Docker ( dockerStackExeArgName )
+import           Stack.Types.DownloadInfo ( DownloadInfo (..) )
+import           Stack.Types.GHCDownloadInfo ( GHCDownloadInfo (..) )
+import           Stack.Types.GHCVariant
+                   ( GHCVariant (..), ghcVariantName, ghcVariantSuffix )
+import           Stack.Types.Runner ( HasRunner (..) )
+import           Stack.Types.SetupInfo ( SetupInfo (..) )
 import           Stack.Types.SourceMap ( SMActual (..), SourceMap (..) )
 import           Stack.Types.Version
                    ( VersionCheck, stackMinorVersion, stackVersion )
+import           Stack.Types.VersionedDownloadInfo
+                   ( VersionedDownloadInfo (..) )
 import qualified System.Directory as D
 import           System.Environment ( getExecutablePath, lookupEnv )
 import           System.IO.Error ( isPermissionError )

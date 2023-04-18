@@ -49,8 +49,10 @@ import           Stack.SourceMap
                    ( SnapshotCandidate, loadProjectSnapshotCandidate )
 import           Stack.Types.Config
                    ( ConfigPrettyException (..), HasConfig, HasGHCVariant
-                   , Project (..), Runner, globalOptsL, globalResolver
+                   , Project (..)
                    )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Runner (Runner, globalOptsL )
 import           Stack.Types.Resolver ( AbstractResolver, Snapshots (..) )
 import           Stack.Types.Version ( stackMajorVersion )
 

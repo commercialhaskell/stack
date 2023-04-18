@@ -18,7 +18,8 @@ import           Stack.Options.NixParser ( nixOptsParser )
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withRunnerGlobal )
-import           Stack.Types.Config ( GlobalOpts (..), Runner )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Runner ( Runner )
 import           Stack.Types.Version
                    ( VersionCheck (..), checkVersion, showStackVersion
                    , stackVersion

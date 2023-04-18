@@ -18,9 +18,10 @@ import           RIO.Process ( HasProcessContext (processContextL) )
 import           Stack.Prelude
 import           Stack.Types.Config
                    ( BuildConfig, HasBuildConfig (..), HasConfig (..)
-                   , HasEnvConfig, HasGHCVariant, HasPlatform, HasRunner (..)
+                   , HasEnvConfig, HasGHCVariant, HasPlatform
                    )
 import           Stack.Types.NamedComponent ( NamedComponent )
+import           Stack.Types.Runner ( HasRunner (..) )
 
 data GetPackageFileContext = GetPackageFileContext
   { ctxFile :: !(Path Abs File)

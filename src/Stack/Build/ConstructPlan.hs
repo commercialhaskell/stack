@@ -45,8 +45,8 @@ import           Stack.Types.Config
                    , Curator (..), DumpPackage (..), EnvConfig, EnvSettings (..)
                    , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
                    , HasEnvConfig (..), HasGHCVariant, HasPlatform
-                   , HasRunner (..), HasSourceMap (..), minimalEnvSettings
-                   , stackRootL, stackYamlL
+                   , HasSourceMap (..), minimalEnvSettings, stackRootL
+                   , stackYamlL
                    )
 import           Stack.Types.Dependency
                    ( DepValue (DepValue), DepType (AsLibrary) )
@@ -58,6 +58,7 @@ import           Stack.Types.Package
                    , PackageLibraries (..), PackageSource (..), installedVersion
                    , packageIdentifier, psVersion, runMemoizedWith
                    )
+import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), FromSnapshot (..)
                    , GlobalPackage (..), SMTargets (..), SourceMap (..)

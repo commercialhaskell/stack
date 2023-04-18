@@ -24,12 +24,10 @@ import           Path.Extended ( addExtension )
 import           Path.IO ( doesFileExist )
 import           Stack.Prelude
 import           Stack.SourceMap ( snapToDepPackage )
-import           Stack.Types.Config
-                   ( ConfigPrettyException (..), HasRunner
-                   , LockFileBehavior (..), lockFileBehaviorL, rslInLogL
-                   )
-import           Stack.Types.SourceMap
-                   ( DepPackage, SMWanted )
+import           Stack.Types.Config ( ConfigPrettyException (..) )
+import           Stack.Types.LockFileBehavior ( LockFileBehavior (..) )
+import           Stack.Types.Runner ( HasRunner, lockFileBehaviorL, rslInLogL )
+import           Stack.Types.SourceMap ( DepPackage, SMWanted )
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Lock" module.

@@ -44,6 +44,7 @@ import           Stack.Types.Build
 import           Stack.Types.Compiler ( wantedToActual )
 import           Stack.Types.Config
 import           Stack.Types.GhcPkgId
+import           Stack.Types.Runner ( HasRunner (..), Runner )
 import           Stack.Types.SourceMap
 
 -- | Type representing exceptions thrown by functions exported by the

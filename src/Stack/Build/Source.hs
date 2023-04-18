@@ -32,15 +32,17 @@ import           Stack.SourceMap
                    , getCompilerInfo, immutableLocSha, mkProjectPackage
                    , pruneGlobals
                    )
+import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build ( FlagSource (..) )
+import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
 import           Stack.Types.Config
-                   ( ApplyCLIFlag (..), ApplyGhcOptions (..), BuildConfig (..)
-                   , BuildOpts (..), BuildOptsCLI (..), CabalConfigKey (..)
-                   , Config (..), Curator (..), HasBuildConfig (..), HasCompiler
-                   , HasConfig (..), HasEnvConfig (..), HasPlatform (..)
-                   , HasSourceMap (..), ProjectPackage (..), TestOpts (..)
-                   , actualCompilerVersionL, buildOptsL, envConfigSourceMap
-                   , getCompilerPath, ppGPD, ppRoot
+                   ( ApplyCLIFlag (..), BuildConfig (..), BuildOpts (..)
+                   , BuildOptsCLI (..), Config (..), Curator (..)
+                   , HasBuildConfig (..), HasCompiler, HasConfig (..)
+                   , HasEnvConfig (..), HasPlatform (..), HasSourceMap (..)
+                   , ProjectPackage (..), TestOpts (..), actualCompilerVersionL
+                   , buildOptsL, envConfigSourceMap, getCompilerPath, ppGPD
+                   , ppRoot
                    )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCInternalLib )

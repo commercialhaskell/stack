@@ -17,9 +17,10 @@ import           Stack.Constants.Config ( rootDistDirFromDir, workDirFromDir )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.Config
-                   ( BuildConfig (..), Config, HasBuildConfig (..), Runner
+                   ( BuildConfig (..), Config, HasBuildConfig (..)
                    , getProjectWorkDir, ppRoot
                    )
+import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap ( SMWanted (..) )
 
 -- | Type representing exceptions thrown by functions exported by the

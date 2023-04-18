@@ -9,7 +9,7 @@ module Stack.DockerCmd
 import           Stack.Docker ( preventInContainer, pull, reset )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
-import           Stack.Types.Config ( Runner )
+import           Stack.Types.Runner ( Runner )
 
 -- | Function underlying the @stack docker pull@ command. Pull the current
 -- Docker image.

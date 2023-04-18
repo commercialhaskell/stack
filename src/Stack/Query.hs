@@ -24,9 +24,10 @@ import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Types.Compiler ( compilerVersionText )
 import           Stack.Types.Config
-                   ( HasEnvConfig, Runner, actualCompilerVersionL
+                   ( HasEnvConfig, actualCompilerVersionL
                    , wantedCompilerVersionL
                    )
+import           Stack.Types.Runner ( Runner )
 import           Stack.Types.Package ( LocalPackage (..), Package (..) )
 
 -- | Type representing exceptions thrown by functions exported by the

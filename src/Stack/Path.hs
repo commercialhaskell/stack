@@ -28,14 +28,14 @@ import           Stack.Types.Config
                    ( BuildConfig, CompilerPaths (..), Config (..), EnvConfig
                    , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
                    , HasEnvConfig (..), HasGHCVariant, HasPlatform
-                   , HasRunner (..), Runner, bindirCompilerTools
-                   , buildOptsMonoidHaddockL, getCompilerPath
-                   , globalOptsBuildOptsMonoidL, globalOptsL, hoogleRoot
+                   , bindirCompilerTools, buildOptsMonoidHaddockL
+                   , getCompilerPath, globalOptsBuildOptsMonoidL, hoogleRoot
                    , hpcReportDir, installationRootDeps, installationRootLocal
                    , packageDatabaseDeps, packageDatabaseExtra
                    , packageDatabaseLocal, projectRootL, stackGlobalConfigL
                    , stackRootL, stackYamlL
                    )
+import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import qualified System.FilePath as FP
 
 -- | Print out useful path information in a human-readable format (and

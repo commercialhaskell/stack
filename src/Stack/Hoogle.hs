@@ -26,11 +26,12 @@ import           Stack.Runners
                    )
 import           Stack.Types.Config
                    ( BuildOptsCLI (..), Config (..), EnvConfig, EnvSettings (..)
-                   , GlobalOpts (..), HasConfig (..), HasSourceMap (..), Runner
-                   , buildOptsMonoidHaddockL, defaultBuildOptsCLI
-                   , hoogleDatabasePath, hoogleRoot, globalOptsBuildOptsMonoidL
-                   , globalOptsL
+                   , HasConfig (..), HasSourceMap (..), buildOptsMonoidHaddockL
+                   , defaultBuildOptsCLI, hoogleDatabasePath, hoogleRoot
+                   , globalOptsBuildOptsMonoidL
                    )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap ( DepPackage (..), SourceMap (..) )
 
 -- | Type representing exceptions thrown by functions exported by the

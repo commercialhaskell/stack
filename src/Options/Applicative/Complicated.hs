@@ -29,7 +29,8 @@ import           Options.Applicative.Builder.Internal
                    ( Mod (..), mkCommand, mkParser )
 import           Options.Applicative.Types ( OptReader (..) )
 import           Stack.Prelude
-import           Stack.Types.Config ( AddCommand, GlobalOptsMonoid, Runner )
+import           Stack.Types.Config ( AddCommand, GlobalOptsMonoid )
+import           Stack.Types.Runner ( Runner )
 import           System.Environment ( getArgs )
 
 -- | Generate and execute a complicated options parser.

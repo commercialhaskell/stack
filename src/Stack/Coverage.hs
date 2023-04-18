@@ -45,13 +45,14 @@ import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.Config
                    ( BuildConfig (..), BuildOptsCLI (..), EnvConfig (..)
-                   , HasBuildConfig (..), HasEnvConfig (..), Runner
+                   , HasBuildConfig (..), HasEnvConfig (..)
                    , actualCompilerVersionL, cabalVersionL, defaultBuildOptsCLI
                    , hpcReportDir, ppRoot
                    )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Package
                    ( Package (..), PackageLibraries (..), packageIdentifier )
+import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap
                    ( PackageType (..), SMTargets (..), SMWanted (..)
                    , SourceMap (..), Target (..)

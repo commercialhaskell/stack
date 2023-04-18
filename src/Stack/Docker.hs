@@ -58,8 +58,7 @@ import           Stack.Setup ( ensureDockerStackExe )
 import           Stack.Storage.User
                    ( loadDockerImageExeCache, saveDockerImageExeCache )
 import           Stack.Types.Config
-                   ( Config (..), DockerEntrypoint (..), DockerUser (..)
-                   , HasConfig (..), configProjectRoot, stackRootL, terminalL
+                   ( Config (..), HasConfig (..), configProjectRoot, stackRootL
                    )
 import           Stack.Types.Docker
                   ( DockerException (..), DockerOpts (..), DockerStackExe (..)
@@ -67,6 +66,9 @@ import           Stack.Types.Docker
                   , dockerEntrypointArgName, dockerHelpOptName
                   , dockerPullCmdName, reExecArgName
                   )
+import           Stack.Types.DockerEntrypoint
+                   ( DockerEntrypoint (..), DockerUser (..) )
+import           Stack.Types.Runner ( terminalL )
 import           Stack.Types.Version ( showStackVersion, withinRange )
 import           System.Environment
                    ( getArgs, getEnv, getEnvironment, getExecutablePath

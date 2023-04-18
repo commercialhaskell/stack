@@ -3,7 +3,7 @@ module Stack.DefaultColorWhen
   ) where
 
 import           Stack.Prelude ( stdout )
-import           Stack.Types.Config ( ColorWhen (ColorAuto, ColorNever) )
+import           Stack.Types.ColorWhen ( ColorWhen (..) )
 import           System.Console.ANSI ( hSupportsANSIWithoutEmulation )
 import           System.Environment ( lookupEnv )
 

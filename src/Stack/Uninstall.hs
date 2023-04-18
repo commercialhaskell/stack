@@ -10,9 +10,10 @@ import          Stack.Constants ( osIsWindows )
 import          Stack.Prelude
 import          Stack.Runners ( ShouldReexec (..), withConfig )
 import          Stack.Types.Config
-                  ( Runner, configL, configLocalBin, configLocalProgramsBase
+                  ( configL, configLocalBin, configLocalProgramsBase
                   , stackGlobalConfigL, stackRootL
                   )
+import          Stack.Types.Runner ( Runner )
 
 -- | Function underlying the @stack uninstall@ command. Display help for the
 -- command.
