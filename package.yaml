@@ -260,6 +260,7 @@ library:
   - Stack.Storage.User
   - Stack.Storage.Util
   - Stack.Templates
+  - Stack.Types.AddCommand
   - Stack.Types.AllowNewerDeps
   - Stack.Types.ApplyGhcOptions
   - Stack.Types.Build
@@ -276,8 +277,11 @@ library:
   - Stack.Types.DumpLogs
   - Stack.Types.GHCDownloadInfo
   - Stack.Types.GHCVariant
+  - Stack.Types.GhcOptionKey
+  - Stack.Types.GhcOptions
   - Stack.Types.GhcPkgId
   - Stack.Types.GlobalOpts
+  - Stack.Types.GlobalOptsMonoid
   - Stack.Types.LockFileBehavior
   - Stack.Types.NamedComponent
   - Stack.Types.Nix

@@ -26,7 +26,8 @@ import           Stack.Config
 import           Stack.Prelude
 import           Stack.Runners
 import           Stack.Types.Config
-import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
+import           Stack.Types.ConfigMonoid
+                   ( ConfigMonoid (..), parseConfigMonoid )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           System.Directory
