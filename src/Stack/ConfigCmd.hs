@@ -39,12 +39,13 @@ import           Stack.Config
 import           Stack.Constants ( stackDotYaml )
 import           Stack.Prelude
 import           Stack.Types.Config
-                   ( Config (..), EnvConfig, EnvSettings (..), GlobalOpts (..)
+                   ( Config (..), EnvConfig, EnvSettings (..)
                    , HasConfig (..), HasGHCVariant, ProjectConfig (..)
                    , configMonoidInstallGHCName, configMonoidSystemGHCName
-                   , globalOptsL
                    )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Resolver ( AbstractResolver, readAbstractResolver )
+import           Stack.Types.Runner ( globalOptsL )
 import           System.Environment ( getEnvironment )
 
 -- | Type repesenting exceptions thrown by functions exported by the

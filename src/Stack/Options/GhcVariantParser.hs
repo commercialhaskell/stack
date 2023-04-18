@@ -9,7 +9,7 @@ import           Options.Applicative
 import           Options.Applicative.Types ( readerAsk )
 import           Stack.Prelude
 import           Stack.Options.Utils ( hideMods )
-import           Stack.Types.Config ( GHCVariant, parseGHCVariant )
+import           Stack.Types.GHCVariant ( GHCVariant, parseGHCVariant )
 
 -- | GHC variant parser
 ghcVariantParser :: Bool -> Parser GHCVariant

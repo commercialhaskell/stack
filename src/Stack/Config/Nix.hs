@@ -15,7 +15,7 @@ import qualified Data.Text.IO as TIO
 import           Distribution.System ( OS (..) )
 import           Stack.Constants ( osIsWindows )
 import           Stack.Prelude
-import           Stack.Types.Config ( HasRunner )
+import           Stack.Types.Runner ( HasRunner )
 import           Stack.Types.Nix ( NixOpts (..), NixOptsMonoid (..) )
 import           System.Directory ( doesFileExist )
 

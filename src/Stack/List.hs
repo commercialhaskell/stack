@@ -14,7 +14,8 @@ import           RIO.Process ( HasProcessContext )
 import           Stack.Config ( makeConcreteResolver )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
-import           Stack.Types.Config ( Runner, globalOptsL, globalResolver )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Runner ( Runner, globalOptsL )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.List" module.

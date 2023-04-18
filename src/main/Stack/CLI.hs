@@ -68,9 +68,8 @@ import           Stack.Script ( ScriptOpts (..), scriptCmd )
 import           Stack.SetupCmd ( setupCmd )
 import           Stack.Templates ( templatesCmd )
 import           Stack.Types.Config
-                   ( AddCommand, BuildCommand (..), GlobalOptsMonoid (..)
-                   , Runner
-                   )
+                   ( AddCommand, BuildCommand (..), GlobalOptsMonoid (..) )
+import           Stack.Types.Runner ( Runner )
 import           Stack.Types.Version ( stackVersion )
 import           Stack.Uninstall ( uninstallCmd )
 import           Stack.Unpack ( unpackCmd )

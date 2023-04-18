@@ -97,29 +97,38 @@ import           Stack.SourceMap
 import           Stack.Storage.Project ( initProjectStorage )
 import           Stack.Storage.User ( initUserStorage )
 import           Stack.Storage.Util ( handleMigrationException )
+import           Stack.Types.AllowNewerDeps ( AllowNewerDeps (..) )
+import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build ( BuildException (..), FlagSource (..) )
+import           Stack.Types.ColorWhen ( ColorWhen (..) )
 import           Stack.Types.Compiler ( defaultCompilerRepository )
 import           Stack.Types.Config
-                   ( AllowNewerDeps (..), ApplyGhcOptions (..), BuildConfig (..)
-                   , BuildOpts (..), ColorWhen (..), Config (..)
-                   , ConfigException (..), ConfigMonoid (..), DumpLogs (..)
-                   , ConfigPrettyException (..), GlobalOpts (..), HasConfig (..)
-                   , HasRunner (..), ParseAbsolutePathException (..)
+                   ( BuildConfig (..)
+                   , BuildOpts (..), Config (..)
+                   , ConfigException (..)
+                   , ConfigPrettyException (..), HasConfig (..)
+                   , ParseAbsolutePathException (..)
                    , PlatformVariant (..), Project (..)
                    , ProjectAndConfigMonoid (..), ProjectConfig (..)
-                   , PvpBounds (..), PvpBoundsType (..), Runner (..)
-                   , StackYamlLoc (..), askLatestSnapshotUrl, configProjectRoot
-                   , globalOptsL, packageIndicesWarning, parseConfigMonoid
+                   , askLatestSnapshotUrl, configProjectRoot
+                   , packageIndicesWarning, parseConfigMonoid
                    , parseProjectAndConfigMonoid, platformOnlyRelDir
-                   , runnerGlobalOpts, stackRootL, terminalL, workDirL
+                   , stackRootL, workDirL
                    )
+import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.Docker ( DockerOptsMonoid (..), dockerEnable )
+import           Stack.Types.DumpLogs ( DumpLogs (..) )
+import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
 import           Stack.Types.Nix ( nixEnable )
+import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
 import           Stack.Types.Resolver ( AbstractResolver (..), Snapshots (..) )
+import           Stack.Types.Runner
+                   ( HasRunner (..), Runner (..), globalOptsL, terminalL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
                    , SMWanted (..)
                    )
+import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
 import           Stack.Types.Version
                    ( IntersectingVersionRange (..), VersionCheck (..)
                    , stackVersion, withinRange

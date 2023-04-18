@@ -85,10 +85,10 @@ import           Stack.Types.CompilerBuild
 import           Stack.Types.Config
                    ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI
                    , BuildSubset (..), Config (..), DumpPackage, EnvConfig
-                   , FileWatchOpts (..), GHCVariant, HasConfig (..)
-                   , TestOpts (..), actualCompilerVersionL, defaultBuildOpts
-                   , ghcVariantSuffix
+                   , FileWatchOpts (..), HasConfig (..), TestOpts (..)
+                   , actualCompilerVersionL, defaultBuildOpts
                    )
+import           Stack.Types.GHCVariant ( GHCVariant, ghcVariantSuffix )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.NamedComponent
                    ( NamedComponent, renderPkgComponent )

@@ -25,10 +25,11 @@ import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Config
                    ( BuildConfig (..), BuildOptsCLI (..), CompilerPaths (..)
-                   , EnvConfig, EnvSettings (..), Runner
-                   , buildConfigL, compilerPathsL, configL, configProcessContextSettings, defaultBuildOptsCLI
+                   , EnvConfig, EnvSettings (..), buildConfigL, compilerPathsL
+                   , configL, configProcessContextSettings, defaultBuildOptsCLI
                    , getGhcPkgExe, ppComponents
                    )
+import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap ( SMWanted (..) )
 import           System.Directory ( withCurrentDirectory )
 import           System.FilePath ( isValid )

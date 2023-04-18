@@ -16,7 +16,7 @@ import           Options.Applicative.Types ( readerAsk )
 import           Stack.Coverage ( HpcReportOpts (..) )
 import           Stack.Options.Completion ( targetCompleter )
 import           Stack.Prelude
-import           Stack.Types.Config ( PvpBounds, parsePvpBounds )
+import           Stack.Types.PvpBounds ( PvpBounds, parsePvpBounds )
 
 -- | Parser for @stack hpc report@.
 hpcReportOptsParser :: Parser HpcReportOpts

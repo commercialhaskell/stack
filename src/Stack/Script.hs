@@ -44,16 +44,18 @@ import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.SourceMap ( getCompilerInfo, immutableLocSha )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.Config
-                   ( CompilerPaths (..), Config (..), ConfigMonoid (..)
-                   , DumpPackage (..), EnvConfig (..), GhcPkgExe (..)
-                   , GlobalOpts (..), HasCompiler (..), HasConfig (..)
-                   , HasEnvConfig (..), HasPlatform (..), Runner
-                   , StackYamlLoc (..), actualCompilerVersionL
-                   , appropriateGhcColorFlag, defaultEnvSettings, globalOptsL
-                   , stackRootL
+                   ( CompilerPaths (..), Config (..), DumpPackage (..)
+                   , EnvConfig (..), GhcPkgExe (..), HasCompiler (..)
+                   , HasConfig (..), HasEnvConfig (..), HasPlatform (..)
+                   , actualCompilerVersionL, appropriateGhcColorFlag
+                   , defaultEnvSettings, stackRootL
                    )
+import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), SourceMap (..) )
+import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
 import           System.FilePath ( splitDrive )
 
 -- | Type representing exceptions thrown by functions exported by the

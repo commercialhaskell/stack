@@ -15,7 +15,7 @@ import           Network.HTTP.StackClient
                    )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
-import           Stack.Types.Config ( Runner )
+import           Stack.Types.Runner ( Runner )
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Templates" module.

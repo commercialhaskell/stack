@@ -39,8 +39,9 @@ import           Stack.Types.Compiler
                    ( ActualCompiler, actualToWanted, wantedToActual )
 import           Stack.Types.Config
                    ( CompilerPaths (..), DumpPackage (..), GhcPkgExe
-                   , HasCompiler (..), HasConfig, HasPlatform (..), rslInLogL
+                   , HasCompiler (..), HasConfig, HasPlatform (..)
                    )
+import           Stack.Types.Runner ( rslInLogL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), FromSnapshot (..)
                    , GlobalPackage (..), GlobalPackageVersion (..)

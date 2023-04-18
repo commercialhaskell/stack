@@ -18,11 +18,10 @@ import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withBuildConfig, withConfig )
 import           Stack.Types.Config
-                   ( BuildConfig (..), HasBuildConfig (..), Runner
-                   , ppComponents
-                   )
+                   ( BuildConfig (..), HasBuildConfig (..), ppComponents )
 import           Stack.Types.NamedComponent
                    ( NamedComponent, renderPkgComponent )
+import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap ( ProjectPackage (..), SMWanted (..) )
 import           System.IO ( putStrLn )
 

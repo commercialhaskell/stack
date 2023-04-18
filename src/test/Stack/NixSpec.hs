@@ -8,22 +8,24 @@ module Stack.NixSpec
   , spec
   ) where
 
-import Data.Maybe (fromJust)
-import Options.Applicative
-import Path
-import Prelude (writeFile)
-import Stack.Config
-import Stack.Config.Nix
-import Stack.Constants
-import Stack.Options.GlobalParser (globalOptsFromMonoid)
-import Stack.Options.NixParser
-import Stack.Prelude
-import Stack.Runners
-import Stack.Types.Config
-import Stack.Types.Nix
-import System.Directory
-import System.Environment
-import Test.Hspec
+import           Data.Maybe ( fromJust )
+import           Options.Applicative
+import           Path
+import           Prelude ( writeFile )
+import           Stack.Config
+import           Stack.Config.Nix
+import           Stack.Constants
+import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
+import           Stack.Options.NixParser
+import           Stack.Prelude
+import           Stack.Runners
+import           Stack.Types.Config
+import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Nix
+import           System.Directory
+import           System.Environment
+import           Test.Hspec
 
 sampleConfigNixEnabled :: String
 sampleConfigNixEnabled =

@@ -45,8 +45,8 @@ import           Stack.SDist
                    ( SDistOpts (..), checkSDistTarball, checkSDistTarball'
                    , getSDistTarball
                    )
-import           Stack.Types.Config
-                   ( Config (..), Runner, configL, stackRootL )
+import           Stack.Types.Config ( Config (..), configL, stackRootL )
+import           Stack.Types.Runner ( Runner )
 import           System.Directory
                    ( createDirectoryIfMissing, doesDirectoryExist, doesFileExist
                    , removeFile, renameFile

@@ -12,7 +12,7 @@ import           Stack.Exec
                    , execCmd
                    )
 import           Stack.Prelude
-import           Stack.Types.Config ( Runner )
+import           Stack.Types.Runner ( Runner )
 
 -- Type representing command line options for the @stack eval@ command.
 data EvalOpts = EvalOpts

@@ -7,7 +7,7 @@ module Stack.Update
 
 import          Stack.Prelude
 import          Stack.Runners ( ShouldReexec (..), withConfig )
-import          Stack.Types.Config ( Runner )
+import          Stack.Types.Runner ( Runner )
 
 -- | Function underlying the @stack update@ command. Update the package index.
 updateCmd :: () -> RIO Runner ()

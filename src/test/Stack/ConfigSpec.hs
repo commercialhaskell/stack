@@ -15,22 +15,24 @@ module Stack.ConfigSpec
   , spec
   ) where
 
-import Control.Arrow
-import Distribution.Verbosity (verbose)
-import Pantry.Internal.AesonExtended
-import Data.Yaml
-import Pantry.Internal (pcHpackExecutable)
-import Path
-import Path.IO hiding (withSystemTempDir)
-import Stack.Config
-import Stack.Prelude
-import Stack.Runners
-import Stack.Types.Config
-import Stack.Options.GlobalParser (globalOptsFromMonoid)
-import System.Directory
-import System.Environment
-import System.IO (writeFile)
-import Test.Hspec
+import           Control.Arrow
+import           Distribution.Verbosity ( verbose )
+import           Pantry.Internal.AesonExtended
+import           Data.Yaml
+import           Pantry.Internal ( pcHpackExecutable )
+import           Path
+import           Path.IO hiding ( withSystemTempDir )
+import           Stack.Config
+import           Stack.Prelude
+import           Stack.Runners
+import           Stack.Types.Config
+import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
+import           System.Directory
+import           System.Environment
+import           System.IO ( writeFile )
+import           Test.Hspec
 
 sampleConfig :: String
 sampleConfig =

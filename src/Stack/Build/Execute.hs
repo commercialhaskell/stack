@@ -128,6 +128,7 @@ import           Stack.GhcPkg ( ghcPkgPathEnvVar, unregisterGhcPkgIds )
 import           Stack.Package ( buildLogPath )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
+import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build
                    ( BaseConfigOpts (..), BuildException (..)
                    , BuildPrettyException (..), ConfigCache (..)
@@ -141,22 +142,22 @@ import           Stack.Types.Compiler
                    , compilerVersionString, getGhcVersion
                    )
 import           Stack.Types.Config
-                   ( ApplyGhcOptions (..), BenchmarkOpts (..), BuildConfig (..)
-                   , BuildOpts (..), BuildOptsCLI (..), CabalVerbosity (..)
-                   , CompilerPaths (..), Config (..), Curator (..)
-                   , DumpLogs (..), DumpPackage (..), EnvSettings (..)
-                   , GhcPkgExe (..), GlobalOpts (..), HaddockOpts (..)
+                   ( BenchmarkOpts (..), BuildConfig (..), BuildOpts (..)
+                   , BuildOptsCLI (..), CabalVerbosity (..), CompilerPaths (..)
+                   , Config (..), Curator (..), DumpPackage (..)
+                   , EnvSettings (..), GhcPkgExe (..), HaddockOpts (..)
                    , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
-                   , HasEnvConfig, HasPlatform (..), HasRunner, TestOpts (..)
+                   , HasEnvConfig, HasPlatform (..), TestOpts (..)
                    , actualCompilerVersionL, appropriateGhcColorFlag
                    , bindirCompilerTools, buildOptsL, cabalVersionL, cpWhich
-                   , getCompilerPath, getGhcPkgExe, globalOptsL
-                   , installationRootDeps, installationRootLocal
-                   , packageDatabaseLocal, platformGhcRelDir, projectRootL
-                   , shouldForceGhcColorFlag, stackRootL, terminalL
-                   , whichCompilerL
+                   , getCompilerPath, getGhcPkgExe, installationRootDeps
+                   , installationRootLocal, packageDatabaseLocal
+                   , platformGhcRelDir, projectRootL, shouldForceGhcColorFlag
+                   , stackRootL, whichCompilerL
                    )
+import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString, unGhcPkgId )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.NamedComponent
                    ( NamedComponent, benchComponents, exeComponents, isCBench
                    , isCTest, renderComponent, testComponents
@@ -168,6 +169,7 @@ import           Stack.Types.Package
                    , runMemoizedWith
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
+import           Stack.Types.Runner ( HasRunner, globalOptsL, terminalL )
 import           Stack.Types.SourceMap ( Target )
 import           Stack.Types.Version ( withinRange )
 import qualified System.Directory as D

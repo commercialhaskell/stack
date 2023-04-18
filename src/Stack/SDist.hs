@@ -67,10 +67,8 @@ import           Stack.Types.Build
 import           Stack.Types.Config
                    ( BuildConfig (..), BuildOpts (..), Config (..)
                    , EnvConfig (..), HasConfig (..), HasEnvConfig (..)
-                   , HasPlatform (..), HasRunner, PvpBounds (..)
-                   , PvpBoundsType (..), Runner, actualCompilerVersionL
-                   , buildConfigL, defaultBuildOpts, defaultBuildOptsCLI, ppRoot
-                   , stackYamlL
+                   , HasPlatform (..), actualCompilerVersionL, buildConfigL
+                   , defaultBuildOpts, defaultBuildOptsCLI, ppRoot, stackYamlL
                    )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Package
@@ -78,6 +76,8 @@ import           Stack.Types.Package
                    , Package (..), PackageConfig (..), installedVersion
                    , packageIdentifier
                    )
+import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
+import           Stack.Types.Runner ( HasRunner, Runner )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), ProjectPackage (..), SMWanted (..)
                    , SourceMap (..)

@@ -46,10 +46,10 @@ import           Stack.Init ( InitOpts (..), initProject )
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withGlobalProject )
-import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), Runner, SCM (..)
-                   , globalOptsL, globalResolver
-                   )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Runner ( Runner, globalOptsL )
+import           Stack.Types.SCM ( SCM (..) )
 import           Stack.Types.TemplateName
                    ( RepoService (..), RepoTemplatePath (..), TemplateName
                    , TemplatePath (..), defaultTemplateName

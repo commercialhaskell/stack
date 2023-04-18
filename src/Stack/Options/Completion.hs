@@ -22,6 +22,7 @@ import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           Stack.Runners
 import           Stack.Prelude
 import           Stack.Types.Config
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 

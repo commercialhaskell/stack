@@ -24,10 +24,11 @@ import           Stack.Options.ResolverParser
                    ( abstractResolverOptsParser, compilerOptsParser )
 import           Stack.Options.Utils ( GlobalOptsContext (..), hideMods )
 import           Stack.Types.Config
-                   ( GlobalOpts (..), GlobalOptsMonoid (..)
-                   , LockFileBehavior (..), StackYamlLoc (..), defaultLogLevel
-                   , readLockFileBehavior, readStyles
-                   )
+                   ( GlobalOptsMonoid (..), defaultLogLevel, readStyles )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.LockFileBehavior
+                   ( LockFileBehavior (..), readLockFileBehavior )
+import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
 import           Stack.Types.Docker ( dockerEntrypointArgName )
 
 -- | Parser for global command-line options.

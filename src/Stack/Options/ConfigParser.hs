@@ -24,8 +24,9 @@ import           Stack.Options.GhcVariantParser ( ghcVariantParser )
 import           Stack.Options.NixParser ( nixOptsParser )
 import           Stack.Options.Utils ( GlobalOptsContext (..), hideMods )
 import           Stack.Prelude
-import           Stack.Types.Config
-                   ( ConfigMonoid (..), DumpLogs (..), readColorWhen )
+import           Stack.Types.ColorWhen ( readColorWhen )
+import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
+import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import qualified System.FilePath as FilePath
 
 -- | Command-line arguments parser for configuration.
