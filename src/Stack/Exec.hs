@@ -23,12 +23,14 @@ import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.Types.NamedComponent ( NamedComponent (..), isCExe )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
+import           Stack.Types.CompilerPaths
+                   ( CompilerPaths (..), HasCompiler (..), getGhcPkgExe )
 import           Stack.Types.Config
-                   ( BuildConfig (..), BuildOptsCLI (..), CompilerPaths (..)
-                   , EnvConfig, EnvSettings (..), buildConfigL, compilerPathsL
-                   , configL, configProcessContextSettings, defaultBuildOptsCLI
-                   , getGhcPkgExe, ppComponents
+                   ( BuildConfig (..), BuildOptsCLI (..), EnvSettings (..)
+                   , buildConfigL, configL, configProcessContextSettings
+                   , defaultBuildOptsCLI, ppComponents
                    )
+import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap ( SMWanted (..) )
 import           System.Directory ( withCurrentDirectory )

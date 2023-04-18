@@ -39,20 +39,23 @@ import           Stack.Types.Build
                    , TaskType (..), taskLocation
                    )
 import           Stack.Types.Compiler ( getGhcVersion )
+import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config
                    ( BuildOpts (..), BuildOptsCLI (..), Config (..)
-                   , EnvConfig (..), HasBuildConfig, HasConfig (..)
-                   , HasEnvConfig (..), HasPlatform (..), HasSourceMap
-                   , actualCompilerVersionL, buildOptsL
-                   , buildOptsMonoidBenchmarksL, buildOptsMonoidHaddockL
-                   , buildOptsMonoidInstallExesL, buildOptsMonoidTestsL
-                   , cabalVersionL, globalOptsBuildOptsMonoidL
-                   , installationRootDeps, installationRootLocal
-                   , packageDatabaseDeps, packageDatabaseExtra
-                   , packageDatabaseLocal, stackYamlL
+                   , HasBuildConfig, HasConfig (..), HasPlatform (..)
+                   , buildOptsL, buildOptsMonoidBenchmarksL
+                   , buildOptsMonoidHaddockL, buildOptsMonoidInstallExesL
+                   , buildOptsMonoidTestsL, globalOptsBuildOptsMonoidL
+                   , stackYamlL
                    )
 import           Stack.Types.Config.Build
                    ( BuildCommand (..), FileWatchOpts (..) )
+import           Stack.Types.EnvConfig
+                   ( EnvConfig (..), HasEnvConfig (..), HasSourceMap
+                   , actualCompilerVersionL, installationRootDeps
+                   , installationRootLocal, packageDatabaseDeps
+                   , packageDatabaseExtra, packageDatabaseLocal
+                   )
 import           Stack.Types.NamedComponent ( exeComponents )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..)

@@ -26,11 +26,12 @@ module Stack.Constants.Config
 import           Path ( (</>), mkRelDir, mkRelFile, parseRelDir )
 import           Stack.Constants ( cabalPackageName )
 import           Stack.Prelude
+import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config
-                   ( Config, HasBuildConfig, HasConfig, HasEnvConfig
-                   , cabalVersionL, platformGhcRelDir, projectRootL
-                   , stackRootL, useShaPathOnWindows, workDirL
+                   ( Config, HasBuildConfig, HasConfig, projectRootL, stackRootL
+                   , useShaPathOnWindows, workDirL
                    )
+import           Stack.Types.EnvConfig ( HasEnvConfig, platformGhcRelDir )
 
 -- | Output .o/.hi directory.
 objectInterfaceDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)

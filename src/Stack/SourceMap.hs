@@ -37,10 +37,10 @@ import           Stack.Types.Build
                    ( BuildPrettyException (..), FlagSource, UnusedFlags (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler, actualToWanted, wantedToActual )
-import           Stack.Types.Config
-                   ( CompilerPaths (..), DumpPackage (..), GhcPkgExe
-                   , HasCompiler (..), HasConfig, HasPlatform (..)
-                   )
+import           Stack.Types.CompilerPaths
+                   ( CompilerPaths (..), GhcPkgExe, HasCompiler (..) )
+import           Stack.Types.Config ( HasConfig, HasPlatform (..) )
+import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.Runner ( rslInLogL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), FromSnapshot (..)

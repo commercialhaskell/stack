@@ -106,9 +106,8 @@ import           Stack.Types.Config
                    ( BuildConfig (..), BuildOpts (..), Config (..)
                    , ConfigException (..), ConfigPrettyException (..)
                    , HasConfig (..), ParseAbsolutePathException (..)
-                   , PlatformVariant (..), Project (..)
-                   , ProjectAndConfigMonoid (..), ProjectConfig (..)
-                   , askLatestSnapshotUrl, configProjectRoot
+                   , Project (..), ProjectAndConfigMonoid (..)
+                   , ProjectConfig (..), askLatestSnapshotUrl, configProjectRoot
                    , packageIndicesWarning, parseProjectAndConfigMonoid
                    , platformOnlyRelDir, stackRootL, workDirL
                    )
@@ -118,6 +117,7 @@ import           Stack.Types.Docker ( DockerOptsMonoid (..), dockerEnable )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
 import           Stack.Types.Nix ( nixEnable )
+import           Stack.Types.PlatformVariant ( PlatformVariant (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
 import           Stack.Types.Resolver ( AbstractResolver (..), Snapshots (..) )
 import           Stack.Types.Runner

@@ -43,6 +43,8 @@ import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.Compiler ( wantedToActual )
 import           Stack.Types.Config
+import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.EnvConfig ( EnvConfig (..), HasSourceMap (..) )
 import           Stack.Types.GhcPkgId
 import           Stack.Types.Runner ( HasRunner (..), Runner )
 import           Stack.Types.SourceMap

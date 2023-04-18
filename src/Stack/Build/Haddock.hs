@@ -31,11 +31,11 @@ import           RIO.Process ( HasProcessContext, withWorkingDir )
 import           Stack.Constants ( docDirSuffix, relDirAll, relFileIndexHtml )
 import           Stack.Prelude
 import           Stack.Types.Build ( BaseConfigOpts (..), BuildException (..) )
+import           Stack.Types.CompilerPaths
+                   ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
-                   ( BuildOpts (..), BuildOptsCLI (..), CompilerPaths (..)
-                   , DumpPackage (..), HaddockOpts (..), HasCompiler
-                   , compilerPathsL
-                   )
+                   ( BuildOpts (..), BuildOptsCLI (..), HaddockOpts (..) )
+import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..) )

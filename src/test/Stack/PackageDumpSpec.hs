@@ -20,7 +20,7 @@ import           Distribution.Version ( mkVersion )
 import           Path ( parseAbsFile )
 import           Stack.PackageDump
 import           Stack.Prelude
-import           Stack.Types.Config
+import           Stack.Types.CompilerPaths ( GhcPkgExe (..) )
 import           Stack.Types.GhcPkgId
 import           RIO.PrettyPrint.Simple ( SimplePrettyApp, mkSimplePrettyApp )
 import           RIO.Process

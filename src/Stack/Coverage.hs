@@ -43,11 +43,14 @@ import           Stack.Constants.Config ( distDirFromDir, hpcRelativeDir )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Compiler ( getGhcVersion )
+import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config
-                   ( BuildConfig (..), BuildOptsCLI (..), EnvConfig (..)
-                   , HasBuildConfig (..), HasEnvConfig (..)
-                   , actualCompilerVersionL, cabalVersionL, defaultBuildOptsCLI
-                   , hpcReportDir, ppRoot
+                   ( BuildConfig (..), BuildOptsCLI (..), HasBuildConfig (..)
+                   , defaultBuildOptsCLI, ppRoot
+                   )
+import           Stack.Types.EnvConfig
+                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
+                   , hpcReportDir
                    )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Package

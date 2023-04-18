@@ -35,8 +35,8 @@ import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Setup.Installed
                    ( Tool (..), filterTools, listInstalled, toolString )
-import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), installationRootDeps )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.EnvConfig ( installationRootDeps )
 import           Stack.Types.Runner ( HasRunner, Runner, terminalL )
 import           System.Console.ANSI.Codes
                    ( SGR (Reset), setSGRCode, sgrToCode )

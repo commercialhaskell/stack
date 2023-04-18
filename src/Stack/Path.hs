@@ -24,16 +24,19 @@ import           Stack.GhcPkg as GhcPkg
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
+import           Stack.Types.CompilerPaths
+                   ( CompilerPaths (..), HasCompiler (..), getCompilerPath )
 import           Stack.Types.Config
-                   ( BuildConfig, CompilerPaths (..), Config (..), EnvConfig
-                   , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
-                   , HasEnvConfig (..), HasGHCVariant, HasPlatform
-                   , bindirCompilerTools, buildOptsMonoidHaddockL
-                   , getCompilerPath, globalOptsBuildOptsMonoidL, hoogleRoot
-                   , hpcReportDir, installationRootDeps, installationRootLocal
-                   , packageDatabaseDeps, packageDatabaseExtra
-                   , packageDatabaseLocal, projectRootL, stackGlobalConfigL
-                   , stackRootL, stackYamlL
+                   ( BuildConfig, Config (..), HasBuildConfig (..), HasConfig (..)
+                   , HasGHCVariant, HasPlatform, buildOptsMonoidHaddockL
+                   , globalOptsBuildOptsMonoidL, projectRootL
+                   , stackGlobalConfigL, stackRootL, stackYamlL
+                   )
+import           Stack.Types.EnvConfig
+                   ( EnvConfig, HasEnvConfig (..), bindirCompilerTools
+                   , hoogleRoot, hpcReportDir, installationRootDeps
+                   , installationRootLocal, packageDatabaseDeps
+                   , packageDatabaseExtra, packageDatabaseLocal
                    )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import qualified System.FilePath as FP

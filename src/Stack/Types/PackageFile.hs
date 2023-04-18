@@ -18,8 +18,9 @@ import           RIO.Process ( HasProcessContext (processContextL) )
 import           Stack.Prelude
 import           Stack.Types.Config
                    ( BuildConfig, HasBuildConfig (..), HasConfig (..)
-                   , HasEnvConfig, HasGHCVariant, HasPlatform
+                   , HasGHCVariant, HasPlatform
                    )
+import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.Runner ( HasRunner (..) )
 

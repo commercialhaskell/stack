@@ -39,11 +39,12 @@ import           Stack.Config
 import           Stack.Constants ( stackDotYaml )
 import           Stack.Prelude
 import           Stack.Types.Config
-                   ( Config (..), EnvConfig, EnvSettings (..), HasConfig (..)
+                   ( Config (..), EnvSettings (..), HasConfig (..)
                    , HasGHCVariant, ProjectConfig (..)
                    )
 import           Stack.Types.ConfigMonoid
                    ( configMonoidInstallGHCName, configMonoidSystemGHCName )
+import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Resolver ( AbstractResolver, readAbstractResolver )
 import           Stack.Types.Runner ( globalOptsL )
