@@ -25,12 +25,11 @@ import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
+import           Stack.Types.BuildOpts
+                   ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getGhcPkgExe )
-import           Stack.Types.Config
-                   ( BuildOptsCLI (..), Config (..), HasConfig (..)
-                   , defaultBuildOptsCLI
-                   )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.Runner ( Runner )

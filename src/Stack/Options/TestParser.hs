@@ -9,7 +9,8 @@ import           Options.Applicative.Args
 import           Options.Applicative.Builder.Extra
 import           Stack.Options.Utils
 import           Stack.Prelude
-import           Stack.Types.Config
+import           Stack.Types.BuildOpts ( TestOptsMonoid (..) )
+import           Stack.Types.Config ()
 
 -- | Parser for test arguments.
 -- FIXME hide args

@@ -40,13 +40,12 @@ import           Stack.Types.Build
                    )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
+import           Stack.Types.BuildOpts
+                   ( BuildOpts (..), BuildOptsCLI (..), BuildSubset (..) )
 import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
-import           Stack.Types.Config
-                   ( BuildOpts (..), BuildOptsCLI (..), BuildSubset (..)
-                   , Config (..), HasConfig (..), stackRootL
-                   )
+import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency
                    ( DepValue (DepValue), DepType (AsLibrary) )

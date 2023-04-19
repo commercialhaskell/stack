@@ -17,6 +17,7 @@ module Stack.Types.Compiler
   , wantedToActual
   , actualToWanted
   , parseActualCompiler
+  , whichCompilerL
   ) where
 
 import           Data.Aeson
@@ -141,3 +142,6 @@ instance FromJSON CompilerRepository where
 defaultCompilerRepository :: CompilerRepository
 defaultCompilerRepository =
   CompilerRepository "https://gitlab.haskell.org/ghc/ghc.git"
+
+whichCompilerL :: Getting r ActualCompiler WhichCompiler
+whichCompilerL = to whichCompiler

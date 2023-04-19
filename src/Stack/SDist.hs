@@ -66,10 +66,9 @@ import           Stack.Types.Build
                    )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
-import           Stack.Types.Config
-                   ( BuildOpts (..), Config (..), HasConfig (..)
-                   , defaultBuildOpts, defaultBuildOptsCLI
-                   )
+import           Stack.Types.BuildOpts
+                   ( BuildOpts (..), defaultBuildOpts, defaultBuildOptsCLI )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
 import           Stack.Types.GhcPkgId ( GhcPkgId )

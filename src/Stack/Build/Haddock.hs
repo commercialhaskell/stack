@@ -33,7 +33,7 @@ import           Stack.Prelude
 import           Stack.Types.Build ( BaseConfigOpts (..), BuildException (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
-import           Stack.Types.Config
+import           Stack.Types.BuildOpts
                    ( BuildOpts (..), BuildOptsCLI (..), HaddockOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )

@@ -11,7 +11,7 @@ module Stack.Config.Build
 
 import           Distribution.Verbosity ( normal )
 import           Stack.Prelude
-import           Stack.Types.Config
+import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BenchmarkOptsMonoid (..)
                    , BuildOpts (..), BuildOptsMonoid (..), CabalVerbosity (..)
                    , HaddockOpts (..), HaddockOptsMonoid (..), TestOpts (..)

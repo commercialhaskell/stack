@@ -113,11 +113,12 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL
                    , wantedCompilerVersionL
                    )
+import           Stack.Types.BuildOpts ( BuildOptsCLI (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), CompilerException (..)
                    , CompilerRepository (..), WhichCompiler (..)
                    , compilerVersionText, getGhcVersion, isWantedCompiler
-                   , wantedToActual, whichCompiler
+                   , wantedToActual, whichCompiler, whichCompilerL
                    )
 import           Stack.Types.CompilerBuild
                    ( CompilerBuild (..), compilerBuildName, compilerBuildSuffix
@@ -125,9 +126,8 @@ import           Stack.Types.CompilerBuild
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..) )
 import           Stack.Types.Config
-                   ( BuildOptsCLI (..), Config (..), ExtraDirs (..)
-                   , HasConfig (..), envOverrideSettingsL
-                   , ghcInstallHook, platformOnlyRelDir, whichCompilerL
+                   ( Config (..), HasConfig (..), envOverrideSettingsL
+                   , ghcInstallHook
                    )
 import           Stack.Types.Docker ( dockerStackExeArgName )
 import           Stack.Types.DownloadInfo ( DownloadInfo (..) )
@@ -138,12 +138,15 @@ import           Stack.Types.EnvConfig
                    , packageDatabaseLocal
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..), minimalEnvSettings )
+import           Stack.Types.ExtraDirs ( ExtraDirs (..) )
 import           Stack.Types.GHCDownloadInfo ( GHCDownloadInfo (..) )
 import           Stack.Types.GHCVariant
                    ( GHCVariant (..), HasGHCVariant (..), ghcVariantName
                    , ghcVariantSuffix
                    )
-import           Stack.Types.Platform ( HasPlatform (..), PlatformVariant (..) )
+import           Stack.Types.Platform
+                   ( HasPlatform (..), PlatformVariant (..)
+                   , platformOnlyRelDir )
 import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
 import           Stack.Types.SourceMap ( SMActual (..), SourceMap (..) )

@@ -245,13 +245,13 @@ library
       Stack.Types.ApplyGhcOptions
       Stack.Types.Build
       Stack.Types.BuildConfig
+      Stack.Types.BuildOpts
       Stack.Types.CabalConfigKey
       Stack.Types.ColorWhen
       Stack.Types.CompilerBuild
       Stack.Types.CompilerPaths
       Stack.Types.Compiler
       Stack.Types.Config
-      Stack.Types.Config.Build
       Stack.Types.Config.Exception
       Stack.Types.ConfigMonoid
       Stack.Types.Curator
@@ -262,6 +262,7 @@ library
       Stack.Types.DumpPackage
       Stack.Types.EnvConfig
       Stack.Types.EnvSettings
+      Stack.Types.ExtraDirs
       Stack.Types.GHCDownloadInfo
       Stack.Types.GHCVariant
       Stack.Types.GhcOptionKey
@@ -276,6 +277,7 @@ library
       Stack.Types.PackageName
       Stack.Types.Platform
       Stack.Types.Project
+      Stack.Types.ProjectAndConfigMonoid
       Stack.Types.ProjectConfig
       Stack.Types.PvpBounds
       Stack.Types.Resolver

@@ -2,10 +2,12 @@
 
 module Stack.Types.GlobalOpts
   ( GlobalOpts (..)
+  , globalOptsBuildOptsMonoidL
   ) where
 
 import          Stack.Prelude
-import          Stack.Types.ConfigMonoid ( ConfigMonoid )
+import          Stack.Types.BuildOpts ( BuildOptsMonoid )
+import          Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import          Stack.Types.DockerEntrypoint ( DockerEntrypoint )
 import          Stack.Types.LockFileBehavior ( LockFileBehavior )
 import          Stack.Types.Resolver ( AbstractResolver )
@@ -33,3 +35,13 @@ data GlobalOpts = GlobalOpts
   , globalLockFileBehavior :: !LockFileBehavior
   }
   deriving Show
+
+globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
+globalOptsBuildOptsMonoidL =
+  lens
+    globalConfigMonoid
+    (\x y -> x { globalConfigMonoid = y })
+  .
+  lens
+    configMonoidBuildOpts
+    (\x y -> x { configMonoidBuildOpts = y })

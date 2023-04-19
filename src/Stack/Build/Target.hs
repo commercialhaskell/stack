@@ -76,7 +76,8 @@ import           Stack.SourceMap ( additionalDepPackage )
 import           Stack.Prelude
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.Config ( BuildOptsCLI (..), Config (..) )
+import           Stack.Types.BuildOpts ( BuildOptsCLI (..) )
+import           Stack.Types.Config ( Config (..) )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), renderComponent )
 import           Stack.Types.Build ( BuildPrettyException (..) )

@@ -33,9 +33,10 @@ import qualified Stack.Nix as Nix
 import           Stack.Prelude
 import           Stack.Setup ( setupEnv )
 import           Stack.Storage.User ( logUpgradeCheck, upgradeChecksSince )
+import           Stack.Types.BuildOpts
+                   ( BuildOptsCLI, defaultBuildOptsCLI )
 import           Stack.Types.ColorWhen ( ColorWhen (..) )
-import           Stack.Types.Config
-                   ( BuildOptsCLI, Config (..), defaultBuildOptsCLI )
+import           Stack.Types.Config ( Config (..) )
 import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.Docker ( dockerEnable )
 import           Stack.Types.EnvConfig ( EnvConfig )

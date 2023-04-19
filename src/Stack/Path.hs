@@ -28,11 +28,11 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL
                    , stackYamlL
                    )
+import           Stack.Types.BuildOpts ( buildOptsMonoidHaddockL )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getCompilerPath )
 import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), buildOptsMonoidHaddockL
-                   , globalOptsBuildOptsMonoidL, stackGlobalConfigL, stackRootL
+                   ( Config (..), HasConfig (..), stackGlobalConfigL, stackRootL
                    )
 import           Stack.Types.EnvConfig
                    ( EnvConfig, HasEnvConfig (..), bindirCompilerTools
@@ -41,6 +41,7 @@ import           Stack.Types.EnvConfig
                    , packageDatabaseExtra, packageDatabaseLocal
                    )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
+import           Stack.Types.GlobalOpts ( globalOptsBuildOptsMonoidL )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import qualified System.FilePath as FP

@@ -46,7 +46,7 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.Config ( BuildOptsCLI (..), defaultBuildOptsCLI )
+import           Stack.Types.BuildOpts ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , hpcReportDir

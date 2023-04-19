@@ -43,14 +43,19 @@ import           Stack.SourceMap
 import           Stack.Types.Build
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
+import           Stack.Types.BuildOpts
+                   ( ApplyCLIFlag, BuildOptsCLI (..), buildOptsMonoidBenchmarksL
+                   , buildOptsMonoidTestsL, defaultBuildOptsCLI
+                   )
 import           Stack.Types.Compiler ( wantedToActual )
-import           Stack.Types.Config
+import           Stack.Types.Config ( HasConfig (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig ( EnvConfig (..), HasSourceMap (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GhcPkgId
+import           Stack.Types.GlobalOpts ( globalOptsBuildOptsMonoidL )
 import           Stack.Types.Platform ( HasPlatform (..) )
-import           Stack.Types.Runner ( HasRunner (..), Runner )
+import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import           Stack.Types.SourceMap
 
 -- | Type representing exceptions thrown by functions exported by the
