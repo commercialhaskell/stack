@@ -28,13 +28,14 @@ import           Stack.Runners
 import           Stack.Types.BuildConfig ( BuildConfig (..), projectRootL )
 import           Stack.Types.Config
                    ( BenchmarkOpts (..), BuildOpts (..), CabalVerbosity (..)
-                   , Config (..), ProjectAndConfigMonoid (..), TestOpts (..)
-                   , parseProjectAndConfigMonoid
+                   , Config (..), TestOpts (..)
                    )
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Project ( Project (..) )
+import           Stack.Types.ProjectAndConfigMonoid
+                   ( ProjectAndConfigMonoid (..), parseProjectAndConfigMonoid )
 import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           System.Directory
 import           System.Environment

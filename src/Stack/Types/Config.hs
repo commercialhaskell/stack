@@ -20,9 +20,6 @@ module Stack.Types.Config
   , askLatestSnapshotUrl
   , configProjectRoot
   -- * Details
-  -- ** Project & ProjectAndConfigMonoid
-  , ProjectAndConfigMonoid (..)
-  , parseProjectAndConfigMonoid
   -- * Paths
   , bindirSuffix
   , docDirSuffix
@@ -32,40 +29,26 @@ module Stack.Types.Config
   -- * Command-related types
   , module X
   -- * Lens helpers
-  , ExtraDirs (..)
   , buildOptsL
   , globalOptsL
   , globalOptsBuildOptsMonoidL
   , stackRootL
   , stackGlobalConfigL
-  , whichCompilerL
   , envOverrideSettingsL
   -- * Helper logging functions
   , prettyStackDevL
   ) where
 
-import           Pantry.Internal.AesonExtended
-                   ( Value, WithJSONWarnings (..), (...:), (..:?), (..!=)
-                   , jsonSubWarnings, jsonSubWarningsT, jsonSubWarningsTT
-                   , withObjectWarnings
-                   )
-import qualified Data.Set as Set
-import qualified Data.Yaml as Yaml
 import           Distribution.System ( Platform )
-import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Path ( (</>), parent, reldir, relfile )
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
 import           Stack.Constants ( bindirSuffix, docDirSuffix )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
-import           Stack.Types.Compiler
-                   ( ActualCompiler (..), CompilerRepository, WhichCompiler
-                   , whichCompiler
-                   )
+import           Stack.Types.Compiler ( CompilerRepository )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
-import           Stack.Types.ConfigMonoid
-                   ( ConfigMonoid (..), parseConfigMonoidObject)
+import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.Docker ( DockerOpts )
 import           Stack.Types.DumpLogs ( DumpLogs )
 import           Stack.Types.EnvSettings ( EnvSettings )
@@ -244,46 +227,6 @@ ghcInstallHook = do
   hd <- hooksDir
   pure (hd </> [relfile|ghc-install.sh|])
 
-data ProjectAndConfigMonoid
-  = ProjectAndConfigMonoid !Project !ConfigMonoid
-
-parseProjectAndConfigMonoid ::
-     Path Abs Dir
-  -> Value
-  -> Yaml.Parser (WithJSONWarnings (IO ProjectAndConfigMonoid))
-parseProjectAndConfigMonoid rootDir =
-  withObjectWarnings "ProjectAndConfigMonoid" $ \o -> do
-    packages <- o ..:? "packages" ..!= [RelFilePath "."]
-    deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
-    flags' <- o ..:? "flags" ..!= mempty
-    let flags = unCabalStringMap <$> unCabalStringMap
-                (flags' :: Map (CabalString PackageName) (Map (CabalString FlagName) Bool))
-
-    resolver <- jsonSubWarnings $ o ...: ["snapshot", "resolver"]
-    mcompiler <- o ..:? "compiler"
-    msg <- o ..:? "user-message"
-    config <- parseConfigMonoidObject rootDir o
-    extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
-    mcurator <- jsonSubWarningsT (o ..:? "curator")
-    drops <- o ..:? "drop-packages" ..!= mempty
-    pure $ do
-      deps' <- mapM (resolvePaths (Just rootDir)) deps
-      resolver' <- resolvePaths (Just rootDir) resolver
-      let project = Project
-            { projectUserMsg = msg
-            , projectResolver = resolver'
-            , projectCompiler = mcompiler -- FIXME make sure resolver' isn't SLCompiler
-            , projectExtraPackageDBs = extraPackageDBs
-            , projectPackages = packages
-            , projectDependencies =
-                concatMap toList (deps' :: [NonEmpty RawPackageLocation])
-            , projectFlags = flags
-            , projectCurator = mcurator
-            , projectDropPackages = Set.map unCabalString drops
-            }
-      pure $ ProjectAndConfigMonoid project config
-
-
 -----------------------------------
 -- Lens classes
 -----------------------------------
@@ -344,20 +287,6 @@ stackGlobalConfigL :: HasConfig s => Lens' s (Path Abs File)
 stackGlobalConfigL =
   configL.lens configUserConfigPath (\x y -> x { configUserConfigPath = y })
 
-data ExtraDirs = ExtraDirs
-  { edBins :: ![Path Abs Dir]
-  , edInclude :: ![Path Abs Dir]
-  , edLib :: ![Path Abs Dir]
-  }
-  deriving (Show, Generic)
-
-instance Semigroup ExtraDirs where
-  (<>) = mappenddefault
-
-instance Monoid ExtraDirs where
-  mempty = memptydefault
-  mappend = (<>)
-
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens
   configBuild
@@ -372,9 +301,6 @@ globalOptsBuildOptsMonoidL =
   lens
     configMonoidBuildOpts
     (\x y -> x { configMonoidBuildOpts = y })
-
-whichCompilerL :: Getting r ActualCompiler WhichCompiler
-whichCompilerL = to whichCompiler
 
 envOverrideSettingsL ::
      HasConfig env

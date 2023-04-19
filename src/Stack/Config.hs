@@ -105,9 +105,8 @@ import           Stack.Types.ColorWhen ( ColorWhen (..) )
 import           Stack.Types.Compiler ( defaultCompilerRepository )
 import           Stack.Types.Config
                    ( BuildOpts (..), Config (..), HasConfig (..)
-                   , ProjectAndConfigMonoid (..), askLatestSnapshotUrl
-                   , configProjectRoot, parseProjectAndConfigMonoid
-                   , platformOnlyRelDir, stackRootL, workDirL
+                   , askLatestSnapshotUrl, configProjectRoot, platformOnlyRelDir
+                   , stackRootL, workDirL
                    )
 import           Stack.Types.Config.Exception
                    ( ConfigException (..), ConfigPrettyException (..)
@@ -120,6 +119,8 @@ import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
 import           Stack.Types.Nix ( nixEnable )
 import           Stack.Types.Platform ( PlatformVariant (..) )
 import           Stack.Types.Project ( Project (..) )
+import           Stack.Types.ProjectAndConfigMonoid
+                   ( ProjectAndConfigMonoid (..), parseProjectAndConfigMonoid )
 import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
 import           Stack.Types.Resolver ( AbstractResolver (..), Snapshots (..) )

@@ -33,7 +33,8 @@ import           RIO.Process
 import           Stack.Constants
 import           Stack.Prelude
 import           Stack.Types.Compiler
-import           Stack.Types.Config
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.ExtraDirs ( ExtraDirs (..) )
 
 data Tool
   = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512

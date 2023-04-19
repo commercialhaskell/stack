@@ -141,7 +141,7 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
-                   , compilerVersionString, getGhcVersion
+                   , compilerVersionString, getGhcVersion, whichCompilerL
                    )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..)
@@ -151,7 +151,6 @@ import           Stack.Types.Config
                    ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI (..)
                    , CabalVerbosity (..), Config (..), HaddockOpts (..)
                    , HasConfig (..), TestOpts (..), buildOptsL, stackRootL
-                   , whichCompilerL
                    )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
