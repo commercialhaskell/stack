@@ -251,6 +251,7 @@ library
       Stack.Types.Compiler
       Stack.Types.Config
       Stack.Types.Config.Build
+      Stack.Types.Config.Exception
       Stack.Types.ConfigMonoid
       Stack.Types.Docker
       Stack.Types.DockerEntrypoint

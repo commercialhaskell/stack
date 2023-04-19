@@ -104,13 +104,14 @@ import           Stack.Types.ColorWhen ( ColorWhen (..) )
 import           Stack.Types.Compiler ( defaultCompilerRepository )
 import           Stack.Types.Config
                    ( BuildConfig (..), BuildOpts (..), Config (..)
-                   , ConfigException (..), ConfigPrettyException (..)
-                   , HasConfig (..), ParseAbsolutePathException (..)
-                   , Project (..), ProjectAndConfigMonoid (..)
+                   , HasConfig (..), Project (..), ProjectAndConfigMonoid (..)
                    , ProjectConfig (..), askLatestSnapshotUrl, configProjectRoot
-                   , packageIndicesWarning, parseProjectAndConfigMonoid
-                   , platformOnlyRelDir, stackRootL, workDirL
+                   , parseProjectAndConfigMonoid, platformOnlyRelDir, stackRootL
+                   , workDirL
                    )
+import           Stack.Types.Config.Exception
+                   ( ConfigException (..), ConfigPrettyException (..)
+                   , ParseAbsolutePathException (..), packageIndicesWarning )
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )
 import           Stack.Types.Docker ( DockerOptsMonoid (..), dockerEnable )
