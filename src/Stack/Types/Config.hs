@@ -9,32 +9,20 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ViewPatterns          #-}
 
--- | The Config type.
-
 module Stack.Types.Config
   (
-  -- * Main configuration types and classes
-  -- ** Config & HasConfig
     Config (..)
   , HasConfig (..)
   , askLatestSnapshotUrl
   , configProjectRoot
-  -- * Details
-  -- * Paths
-  , bindirSuffix
-  , docDirSuffix
-  , platformOnlyRelDir
-  , workDirL
   , ghcInstallHook
-  -- * Command-related types
-  , module X
   -- * Lens helpers
   , buildOptsL
-  , globalOptsL
-  , globalOptsBuildOptsMonoidL
-  , stackRootL
-  , stackGlobalConfigL
   , envOverrideSettingsL
+  , globalOptsL
+  , stackGlobalConfigL
+  , stackRootL
+  , workDirL
   -- * Helper logging functions
   , prettyStackDevL
   ) where
@@ -42,22 +30,18 @@ module Stack.Types.Config
 import           Distribution.System ( Platform )
 import           Path ( (</>), parent, reldir, relfile )
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
-import           Stack.Constants ( bindirSuffix, docDirSuffix )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
+import           Stack.Types.BuildOpts ( BuildOpts )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
 import           Stack.Types.Compiler ( CompilerRepository )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
-import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.Docker ( DockerOpts )
 import           Stack.Types.DumpLogs ( DumpLogs )
 import           Stack.Types.EnvSettings ( EnvSettings )
 import           Stack.Types.GHCVariant ( GHCVariant (..), HasGHCVariant (..) )
-import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Nix ( NixOpts )
-import           Stack.Types.Platform
-                   ( HasPlatform (..), PlatformVariant, platformOnlyRelDir
-                   )
+import           Stack.Types.Platform ( HasPlatform (..), PlatformVariant )
 import           Stack.Types.Project ( Project (..) )
 import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.PvpBounds ( PvpBounds )
@@ -68,9 +52,6 @@ import           Stack.Types.SetupInfo ( SetupInfo )
 import           Stack.Types.Storage ( UserStorage )
 import           Stack.Types.TemplateName ( TemplateName )
 import           Stack.Types.Version ( VersionCheck (..), VersionRange )
-
--- Re-exports
-import           Stack.Types.Config.Build as X
 
 -- | The top-level Stackage configuration.
 data Config = Config
@@ -211,10 +192,6 @@ configProjectRoot c =
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
 askLatestSnapshotUrl = view $ configL.to configLatestSnapshot
 
--- | @".stack-work"@
-workDirL :: HasConfig env => Lens' env (Path Rel Dir)
-workDirL = configL.lens configWorkDir (\x y -> x { configWorkDir = y })
-
 -- | @STACK_ROOT\/hooks\/@
 hooksDir :: HasConfig env => RIO env (Path Abs Dir)
 hooksDir = do
@@ -292,22 +269,16 @@ buildOptsL = configL.lens
   configBuild
   (\x y -> x { configBuild = y })
 
-globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
-globalOptsBuildOptsMonoidL =
-  lens
-    globalConfigMonoid
-    (\x y -> x { globalConfigMonoid = y })
-  .
-  lens
-    configMonoidBuildOpts
-    (\x y -> x { configMonoidBuildOpts = y })
-
 envOverrideSettingsL ::
      HasConfig env
   => Lens' env (EnvSettings -> IO ProcessContext)
 envOverrideSettingsL = configL.lens
   configProcessContextSettings
   (\x y -> x { configProcessContextSettings = y })
+
+-- | @".stack-work"@
+workDirL :: HasConfig env => Lens' env (Path Rel Dir)
+workDirL = configL.lens configWorkDir (\x y -> x { configWorkDir = y })
 
 -- | In dev mode, print as a warning, otherwise as debug
 prettyStackDevL :: HasConfig env => [StyleDoc] -> RIO env ()

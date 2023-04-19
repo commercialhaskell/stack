@@ -113,6 +113,7 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL
                    , wantedCompilerVersionL
                    )
+import           Stack.Types.BuildOpts ( BuildOptsCLI (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), CompilerException (..)
                    , CompilerRepository (..), WhichCompiler (..)
@@ -125,8 +126,8 @@ import           Stack.Types.CompilerBuild
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..) )
 import           Stack.Types.Config
-                   ( BuildOptsCLI (..), Config (..), HasConfig (..)
-                   , envOverrideSettingsL, ghcInstallHook
+                   ( Config (..), HasConfig (..), envOverrideSettingsL
+                   , ghcInstallHook
                    )
 import           Stack.Types.Docker ( dockerStackExeArgName )
 import           Stack.Types.DownloadInfo ( DownloadInfo (..) )

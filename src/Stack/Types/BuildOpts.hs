@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards   #-}
 
 -- | Configuration options for building.
-module Stack.Types.Config.Build
+module Stack.Types.BuildOpts
   ( BuildOpts (..)
   , buildOptsHaddockL
   , buildOptsInstallExesL

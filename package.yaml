@@ -265,13 +265,13 @@ library:
   - Stack.Types.ApplyGhcOptions
   - Stack.Types.Build
   - Stack.Types.BuildConfig
+  - Stack.Types.BuildOpts
   - Stack.Types.CabalConfigKey
   - Stack.Types.ColorWhen
   - Stack.Types.CompilerBuild
   - Stack.Types.CompilerPaths
   - Stack.Types.Compiler
   - Stack.Types.Config
-  - Stack.Types.Config.Build
   - Stack.Types.Config.Exception
   - Stack.Types.ConfigMonoid
   - Stack.Types.Curator

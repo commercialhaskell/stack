@@ -26,10 +26,11 @@ import           Stack.Setup
                    ( downloadStackExe, downloadStackReleaseInfo
                    , getDownloadVersion, preferredPlatforms, stackVersion
                    )
-import           Stack.Types.Config
-                   ( BuildOptsCLI (..), Config (..), HasConfig (..)
-                   , buildOptsInstallExesL, buildOptsL, defaultBuildOptsCLI
+import           Stack.Types.BuildOpts
+                   ( BuildOptsCLI (..), buildOptsInstallExesL
+                   , defaultBuildOptsCLI
                    )
+import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )

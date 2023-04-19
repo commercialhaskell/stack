@@ -45,12 +45,11 @@ import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Build
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
+import           Stack.Types.BuildOpts
+                   ( ApplyCLIFlag, BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
-import           Stack.Types.Config
-                   ( ApplyCLIFlag, BuildOptsCLI (..), Config (..)
-                   , HasConfig (..), buildOptsL, defaultBuildOptsCLI
-                   )
+import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , shaPathForBytes

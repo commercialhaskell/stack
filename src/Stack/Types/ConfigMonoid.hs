@@ -30,11 +30,11 @@ import           Pantry.Internal.AesonExtended
 import           Stack.Prelude
 import           Stack.Types.AllowNewerDeps ( AllowNewerDeps )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
+import           Stack.Types.BuildOpts ( BuildOptsMonoid )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
 import           Stack.Types.ColorWhen ( ColorWhen )
 import           Stack.Types.Compiler ( CompilerRepository )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
-import           Stack.Types.Config.Build ( BuildOptsMonoid )
 import           Stack.Types.Docker ( DockerOptsMonoid, VersionRangeJSON (..) )
 import           Stack.Types.DumpLogs ( DumpLogs )
 import           Stack.Types.GhcOptionKey ( GhcOptionKey (..) )

@@ -24,17 +24,19 @@ import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig
                    , withEnvConfig
                    )
-import           Stack.Types.Config
-                   ( BuildOptsCLI (..), Config (..), HasConfig (..)
-                   , buildOptsMonoidHaddockL, defaultBuildOptsCLI
-                   , globalOptsBuildOptsMonoidL
+import           Stack.Types.BuildOpts
+                   ( BuildOptsCLI (..), buildOptsMonoidHaddockL
+                   , defaultBuildOptsCLI
                    )
+import           Stack.Types.Config
+                   ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig, HasSourceMap (..), hoogleDatabasePath
                    , hoogleRoot
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
-import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.GlobalOpts
+                   ( GlobalOpts (..), globalOptsBuildOptsMonoidL )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap ( DepPackage (..), SourceMap (..) )
 

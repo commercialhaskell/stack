@@ -101,12 +101,12 @@ import           Stack.Types.AllowNewerDeps ( AllowNewerDeps (..) )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build ( BuildException (..), FlagSource (..) )
 import           Stack.Types.BuildConfig ( BuildConfig (..) )
+import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.ColorWhen ( ColorWhen (..) )
 import           Stack.Types.Compiler ( defaultCompilerRepository )
 import           Stack.Types.Config
-                   ( BuildOpts (..), Config (..), HasConfig (..)
-                   , askLatestSnapshotUrl, configProjectRoot, platformOnlyRelDir
-                   , stackRootL, workDirL
+                   ( Config (..), HasConfig (..), askLatestSnapshotUrl
+                   , configProjectRoot, stackRootL, workDirL
                    )
 import           Stack.Types.Config.Exception
                    ( ConfigException (..), ConfigPrettyException (..)
@@ -117,7 +117,8 @@ import           Stack.Types.Docker ( DockerOptsMonoid (..), dockerEnable )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
 import           Stack.Types.Nix ( nixEnable )
-import           Stack.Types.Platform ( PlatformVariant (..) )
+import           Stack.Types.Platform
+                   ( PlatformVariant (..), platformOnlyRelDir )
 import           Stack.Types.Project ( Project (..) )
 import           Stack.Types.ProjectAndConfigMonoid
                    ( ProjectAndConfigMonoid (..), parseProjectAndConfigMonoid )

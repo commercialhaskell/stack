@@ -14,7 +14,11 @@ import           Options.Applicative.Builder.Extra
 import           Stack.Options.Completion
 import           Stack.Options.PackageParser ( readFlag )
 import           Stack.Prelude
-import           Stack.Types.Config
+import           Stack.Types.BuildOpts
+                   ( ApplyCLIFlag, BuildCommand, BuildOptsCLI (..)
+                   , BuildSubset (..), FileWatchOpts (..)
+                   )
+import           Stack.Types.Config ()
 
 -- | Parser for CLI-only build arguments
 buildOptsParser :: BuildCommand

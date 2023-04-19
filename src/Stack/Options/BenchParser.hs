@@ -10,7 +10,7 @@ import           Options.Applicative
 import           Options.Applicative.Builder.Extra ( optionalFirst )
 import           Stack.Prelude
 import           Stack.Options.Utils ( hideMods )
-import           Stack.Types.Config ( BenchmarkOptsMonoid (..) )
+import           Stack.Types.BuildOpts ( BenchmarkOptsMonoid (..) )
 
 -- | Parser for bench arguments.
 -- FIXME hiding options

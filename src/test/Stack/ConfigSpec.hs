@@ -26,10 +26,11 @@ import           Stack.Config
 import           Stack.Prelude
 import           Stack.Runners
 import           Stack.Types.BuildConfig ( BuildConfig (..), projectRootL )
-import           Stack.Types.Config
+import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), CabalVerbosity (..)
-                   , Config (..), TestOpts (..)
+                   , TestOpts (..)
                    )
+import           Stack.Types.Config ( Config (..) )
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )

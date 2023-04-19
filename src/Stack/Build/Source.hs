@@ -36,12 +36,13 @@ import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build ( FlagSource (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
+import           Stack.Types.BuildOpts
+                   ( ApplyCLIFlag (..), BuildOpts (..), BuildOptsCLI (..)
+                   , TestOpts (..)
+                   )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
-import           Stack.Types.Config
-                   ( ApplyCLIFlag (..), BuildOpts (..), BuildOptsCLI (..)
-                   , Config (..), HasConfig (..), TestOpts (..), buildOptsL
-                   )
+import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..)

@@ -45,13 +45,13 @@ import           Stack.Constants
 import           Stack.Prelude
 import           Stack.Types.BuildConfig
                     ( BuildConfig (..), HasBuildConfig (..), getProjectWorkDir )
+import           Stack.Types.BuildOpts ( BuildOptsCLI )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), compilerVersionString, getGhcVersion )
 import           Stack.Types.CompilerBuild ( compilerBuildSuffix )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( HasConfig (..), stackRootL )
-import           Stack.Types.Config.Build ( BuildOptsCLI )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..), ghcVariantSuffix )
 import           Stack.Types.Platform
                    ( HasPlatform (..), platformVariantSuffix )

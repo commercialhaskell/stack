@@ -76,17 +76,18 @@ import           Stack.Constants
                    , relDirLibexec, relDirShare, wiredInPackages
                    )
 import           Stack.Prelude
+import           Stack.Types.BuildOpts
+                   ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI
+                   , BuildSubset (..), FileWatchOpts (..), TestOpts (..)
+                   , defaultBuildOpts
+                   )
 import           Stack.Types.Compiler
                    ( ActualCompiler, compilerVersionString, getGhcVersion
                    , whichCompiler
                    )
 import           Stack.Types.CompilerBuild
                    ( CompilerBuild, compilerBuildSuffix )
-import           Stack.Types.Config
-                   ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI
-                   , BuildSubset (..), Config (..), FileWatchOpts (..)
-                   , HasConfig (..), TestOpts (..), defaultBuildOpts
-                   )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.DumpPackage ( DumpPackage )
 import           Stack.Types.EnvConfig ( EnvConfig, actualCompilerVersionL )
 import           Stack.Types.GHCVariant ( GHCVariant, ghcVariantSuffix )

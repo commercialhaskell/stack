@@ -23,7 +23,7 @@ import           Stack.Options.BenchParser ( benchOptsParser )
 import           Stack.Options.TestParser ( testOptsParser )
 import           Stack.Options.HaddockParser ( haddockOptsParser )
 import           Stack.Options.Utils ( GlobalOptsContext (..), hideMods )
-import           Stack.Types.Config.Build
+import           Stack.Types.BuildOpts
                    ( BuildOptsMonoid (..), CabalVerbosity
                    , toFirstCabalVerbosity
                    )
