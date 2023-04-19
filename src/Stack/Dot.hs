@@ -41,11 +41,15 @@ import qualified Stack.Prelude ( pkgName )
 import           Stack.Runners
 import           Stack.SourceMap
 import           Stack.Types.Build
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( wantedToActual )
 import           Stack.Types.Config
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig ( EnvConfig (..), HasSourceMap (..) )
+import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GhcPkgId
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..), Runner )
 import           Stack.Types.SourceMap
 
@@ -618,23 +622,42 @@ data DotConfig = DotConfig
   , dcSourceMap :: !SourceMap
   , dcGlobalDump :: ![DumpPackage]
   }
+
 instance HasLogFunc DotConfig where
   logFuncL = runnerL.logFuncL
+
 instance HasPantryConfig DotConfig where
   pantryConfigL = configL.pantryConfigL
+
 instance HasTerm DotConfig where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
+
 instance HasStylesUpdate DotConfig where
   stylesUpdateL = runnerL.stylesUpdateL
-instance HasGHCVariant DotConfig
-instance HasPlatform DotConfig
+
+instance HasGHCVariant DotConfig where
+  ghcVariantL = configL.ghcVariantL
+  {-# INLINE ghcVariantL #-}
+
+instance HasPlatform DotConfig where
+  platformL = configL.platformL
+  {-# INLINE platformL #-}
+  platformVariantL = configL.platformVariantL
+  {-# INLINE platformVariantL #-}
+
 instance HasRunner DotConfig where
   runnerL = configL.runnerL
+
 instance HasProcessContext DotConfig where
   processContextL = runnerL.processContextL
-instance HasConfig DotConfig
+
+instance HasConfig DotConfig where
+  configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
+  {-# INLINE configL #-}
+
 instance HasBuildConfig DotConfig where
   buildConfigL = lens dcBuildConfig (\x y -> x { dcBuildConfig = y })
+
 instance HasSourceMap DotConfig where
   sourceMapL = lens dcSourceMap (\x y -> x { dcSourceMap = y })

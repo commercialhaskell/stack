@@ -22,8 +22,8 @@ import           Stack.Build.Source ( projectLocalPackages )
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
+import           Stack.Types.BuildConfig ( wantedCompilerVersionL )
 import           Stack.Types.Compiler ( compilerVersionText )
-import           Stack.Types.Config ( wantedCompilerVersionL )
 import           Stack.Types.EnvConfig ( HasEnvConfig, actualCompilerVersionL )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.Package ( LocalPackage (..), Package (..) )

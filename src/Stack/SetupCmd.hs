@@ -14,11 +14,11 @@ import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withBuildConfig, withConfig )
 import           Stack.Setup ( SetupOpts (..), ensureCompilerAndMsys )
+import           Stack.Types.BuildConfig
+                   ( HasBuildConfig, stackYamlL, wantedCompilerVersionL )
 import           Stack.Types.CompilerPaths ( CompilerPaths (..) )
-import           Stack.Types.Config
-                   ( Config (..), HasBuildConfig, HasConfig (..), HasGHCVariant
-                   , stackYamlL, wantedCompilerVersionL
-                   )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.GHCVariant ( HasGHCVariant )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.Version ( VersionCheck (..) )
 

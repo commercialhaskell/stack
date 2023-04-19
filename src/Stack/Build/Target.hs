@@ -74,9 +74,10 @@ import           Path.IO ( getCurrentDir )
 import           RIO.Process ( HasProcessContext )
 import           Stack.SourceMap ( additionalDepPackage )
 import           Stack.Prelude
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Config
-                   ( BuildConfig (..), BuildOptsCLI (..), Config (..)
-                   , HasBuildConfig, ProjectConfig (..), buildConfigL
+                   ( BuildOptsCLI (..), Config (..), ProjectConfig (..)
                    , ppComponents, ppRoot
                    )
 import           Stack.Types.NamedComponent

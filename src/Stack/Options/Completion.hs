@@ -21,6 +21,7 @@ import           Stack.Constants ( ghcShowOptionsOutput )
 import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           Stack.Runners
 import           Stack.Prelude
+import           Stack.Types.BuildConfig ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Config
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )

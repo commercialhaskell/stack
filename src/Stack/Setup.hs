@@ -109,6 +109,10 @@ import           Stack.SourceMap
                    ( actualFromGhc, globalsFromDump, pruneGlobals )
 import           Stack.Storage.User ( loadCompilerPaths, saveCompilerPaths )
 import           Stack.Types.Build ( BuildException (..) )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..), projectRootL
+                   , wantedCompilerVersionL
+                   )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), CompilerException (..)
                    , CompilerRepository (..), WhichCompiler (..)
@@ -121,11 +125,9 @@ import           Stack.Types.CompilerBuild
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..) )
 import           Stack.Types.Config
-                   ( BuildConfig (..), BuildOptsCLI (..), Config (..)
-                   , EnvSettings (..), ExtraDirs (..), HasBuildConfig (..)
-                   , HasConfig (..), HasGHCVariant (..), HasPlatform (..)
-                   , envOverrideSettingsL, ghcInstallHook, minimalEnvSettings
-                   , platformOnlyRelDir, projectRootL, wantedCompilerVersionL
+                   ( BuildOptsCLI (..), Config (..), EnvSettings (..)
+                   , ExtraDirs (..), HasConfig (..), envOverrideSettingsL
+                   , ghcInstallHook, minimalEnvSettings, platformOnlyRelDir
                    , whichCompilerL
                    )
 import           Stack.Types.Docker ( dockerStackExeArgName )
@@ -138,8 +140,10 @@ import           Stack.Types.EnvConfig
                    )
 import           Stack.Types.GHCDownloadInfo ( GHCDownloadInfo (..) )
 import           Stack.Types.GHCVariant
-                   ( GHCVariant (..), ghcVariantName, ghcVariantSuffix )
-import           Stack.Types.PlatformVariant ( PlatformVariant (..) )
+                   ( GHCVariant (..), HasGHCVariant (..), ghcVariantName
+                   , ghcVariantSuffix
+                   )
+import           Stack.Types.Platform ( HasPlatform (..), PlatformVariant (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
 import           Stack.Types.SourceMap ( SMActual (..), SourceMap (..) )
@@ -702,9 +706,15 @@ instance HasTerm env => HasTerm (WithGHC env) where
 instance HasPantryConfig env => HasPantryConfig (WithGHC env) where
   pantryConfigL = insideL.pantryConfigL
 
-instance HasConfig env => HasPlatform (WithGHC env)
+instance HasConfig env => HasPlatform (WithGHC env) where
+  platformL = configL.platformL
+  {-# INLINE platformL #-}
+  platformVariantL = configL.platformVariantL
+  {-# INLINE platformVariantL #-}
 
-instance HasConfig env => HasGHCVariant (WithGHC env)
+instance HasConfig env => HasGHCVariant (WithGHC env) where
+  ghcVariantL = configL.ghcVariantL
+  {-# INLINE ghcVariantL #-}
 
 instance HasConfig env => HasConfig (WithGHC env) where
   configL = insideL.configL

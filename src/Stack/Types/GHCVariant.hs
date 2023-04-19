@@ -2,6 +2,7 @@
 
 module Stack.Types.GHCVariant
   ( GHCVariant (..)
+  , HasGHCVariant (..)
   , ghcVariantName
   , ghcVariantSuffix
   , parseGHCVariant
@@ -30,6 +31,14 @@ instance FromJSON GHCVariant where
     withText
       "GHCVariant"
       (either (fail . show) pure . parseGHCVariant . T.unpack)
+
+-- | Class for environment values which have a GHCVariant
+class HasGHCVariant env where
+  ghcVariantL :: SimpleGetter env GHCVariant
+
+instance HasGHCVariant GHCVariant where
+  ghcVariantL = id
+  {-# INLINE ghcVariantL #-}
 
 -- | Render a GHC variant to a String.
 ghcVariantName :: GHCVariant -> String

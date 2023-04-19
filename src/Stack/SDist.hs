@@ -64,10 +64,11 @@ import           Stack.Types.Build
                    ( CachePkgSrc (..), ConfigureOpts (..), Task (..)
                    , TaskConfigOpts (..), TaskType (..)
                    )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
 import           Stack.Types.Config
-                   ( BuildConfig (..), BuildOpts (..), Config (..)
-                   , HasConfig (..), HasPlatform (..), buildConfigL
-                   , defaultBuildOpts, defaultBuildOptsCLI, ppRoot, stackYamlL
+                   ( BuildOpts (..), Config (..), HasConfig (..)
+                   , defaultBuildOpts, defaultBuildOptsCLI, ppRoot
                    )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
@@ -77,6 +78,7 @@ import           Stack.Types.Package
                    , Package (..), PackageConfig (..), installedVersion
                    , packageIdentifier
                    )
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
 import           Stack.Types.Runner ( HasRunner, Runner )
 import           Stack.Types.SourceMap

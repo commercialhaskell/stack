@@ -26,10 +26,11 @@ module Stack.Constants.Config
 import           Path ( (</>), mkRelDir, mkRelFile, parseRelDir )
 import           Stack.Constants ( cabalPackageName )
 import           Stack.Prelude
+import           Stack.Types.BuildConfig ( HasBuildConfig, projectRootL )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config
-                   ( Config, HasBuildConfig, HasConfig, projectRootL, stackRootL
-                   , useShaPathOnWindows, workDirL
+                   ( Config, HasConfig, stackRootL, useShaPathOnWindows
+                   , workDirL
                    )
 import           Stack.Types.EnvConfig ( HasEnvConfig, platformGhcRelDir )
 

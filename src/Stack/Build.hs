@@ -38,15 +38,14 @@ import           Stack.Types.Build
                    , BuildPrettyException (..), Plan (..), Task (..)
                    , TaskType (..), taskLocation
                    )
+import           Stack.Types.BuildConfig ( HasBuildConfig, stackYamlL )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config
                    ( BuildOpts (..), BuildOptsCLI (..), Config (..)
-                   , HasBuildConfig, HasConfig (..), HasPlatform (..)
-                   , buildOptsL, buildOptsMonoidBenchmarksL
+                   , HasConfig (..), buildOptsL, buildOptsMonoidBenchmarksL
                    , buildOptsMonoidHaddockL, buildOptsMonoidInstallExesL
                    , buildOptsMonoidTestsL, globalOptsBuildOptsMonoidL
-                   , stackYamlL
                    )
 import           Stack.Types.Config.Build
                    ( BuildCommand (..), FileWatchOpts (..) )
@@ -60,6 +59,7 @@ import           Stack.Types.NamedComponent ( exeComponents )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..)
                    , PackageConfig (..), lpFiles, lpFilesForComponents )
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), ProjectPackage (..), SMTargets (..)

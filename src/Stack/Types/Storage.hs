@@ -4,8 +4,11 @@
 -- | Types used by @Stack.Storage@ modules.
 module Stack.Types.Storage
   ( StoragePrettyException (..)
+  , ProjectStorage (..)
+  , UserStorage (..)
   ) where
 
+import           Pantry.Internal ( Storage )
 import           Stack.Prelude
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by
@@ -53,3 +56,13 @@ instance Pretty StoragePrettyException where
       "\\\\.\\NUL: hDuplicateTo: illegal operation (handles are incompatible)"
 
 instance Exception StoragePrettyException
+
+-- | A bit of type safety to ensure we're talking to the right database.
+newtype UserStorage = UserStorage
+  { unUserStorage :: Storage
+  }
+
+-- | A bit of type safety to ensure we're talking to the right database.
+newtype ProjectStorage = ProjectStorage
+  { unProjectStorage :: Storage
+  }

@@ -14,14 +14,15 @@ module Stack.Types.PackageFile
   ) where
 
 import           Distribution.ModuleName ( ModuleName )
-import           RIO.Process ( HasProcessContext (processContextL) )
+import           RIO.Process ( HasProcessContext (..) )
 import           Stack.Prelude
-import           Stack.Types.Config
-                   ( BuildConfig, HasBuildConfig (..), HasConfig (..)
-                   , HasGHCVariant, HasPlatform
-                   )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..) )
+import           Stack.Types.Config ( HasConfig (..) )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
+import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.NamedComponent ( NamedComponent )
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 
 data GetPackageFileContext = GetPackageFileContext
@@ -31,9 +32,15 @@ data GetPackageFileContext = GetPackageFileContext
   , ctxCabalVer :: !Version
   }
 
-instance HasPlatform GetPackageFileContext
+instance HasPlatform GetPackageFileContext where
+  platformL = configL.platformL
+  {-# INLINE platformL #-}
+  platformVariantL = configL.platformVariantL
+  {-# INLINE platformVariantL #-}
 
-instance HasGHCVariant GetPackageFileContext
+instance HasGHCVariant GetPackageFileContext where
+  ghcVariantL = configL.ghcVariantL
+  {-# INLINE ghcVariantL #-}
 
 instance HasLogFunc GetPackageFileContext where
   logFuncL = configL.logFuncL
@@ -48,16 +55,18 @@ instance HasTerm GetPackageFileContext where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
 
-instance HasConfig GetPackageFileContext
+instance HasConfig GetPackageFileContext where
+  configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
+  {-# INLINE configL #-}
+
+instance HasBuildConfig GetPackageFileContext where
+  buildConfigL = lens ctxBuildConfig (\x y -> x { ctxBuildConfig = y })
 
 instance HasPantryConfig GetPackageFileContext where
   pantryConfigL = configL.pantryConfigL
 
 instance HasProcessContext GetPackageFileContext where
   processContextL = configL.processContextL
-
-instance HasBuildConfig GetPackageFileContext where
-  buildConfigL = lens ctxBuildConfig (\x y -> x { ctxBuildConfig = y })
 
 -- | A path resolved from the Cabal file, which is either main-is or
 -- an exposed/internal/referenced module.

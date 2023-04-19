@@ -14,36 +14,19 @@
 module Stack.Types.Config
   (
   -- * Main configuration types and classes
-  -- ** HasPlatform & HasStackRoot
-    HasPlatform (..)
   -- ** Config & HasConfig
-  , Config (..)
+    Config (..)
   , HasConfig (..)
   , askLatestSnapshotUrl
   , configProjectRoot
   -- ** BuildConfig & HasBuildConfig
-  , BuildConfig (..)
   , ProjectPackage (..)
   , DepPackage (..)
   , ppRoot
   , ppVersion
   , ppComponents
   , ppGPD
-  , stackYamlL
-  , projectRootL
-  , HasBuildConfig (..)
-  -- ** Storage databases
-  , UserStorage (..)
-  , ProjectStorage (..)
-  -- ** GHCVariant & HasGHCVariant
-  , HasGHCVariant (..)
   -- * Details
-  -- ** ConfigException
-  , HpackExecutable (..)
-  , ConfigException (..)
-  , ConfigPrettyException (..)
-  , ParseAbsolutePathException (..)
-  , packageIndicesWarning
   -- ** EnvSettings
   , EnvSettings (..)
   , minimalEnvSettings
@@ -62,7 +45,6 @@ module Stack.Types.Config
   -- * Paths
   , bindirSuffix
   , GlobalInfoSource (..)
-  , getProjectWorkDir
   , docDirSuffix
   , platformOnlyRelDir
   , useShaPathOnWindows
@@ -73,7 +55,6 @@ module Stack.Types.Config
   -- * Command-related types
   , module X
   -- * Lens helpers
-  , wantedCompilerVersionL
   , ExtraDirs (..)
   , buildOptsL
   , globalOptsL
@@ -104,24 +85,20 @@ import           Pantry.Internal.AesonExtended
                    )
 import qualified Data.ByteArray.Encoding as Mem ( Base(Base16), convertToBase )
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Yaml ( ParseException )
 import qualified Data.Yaml as Yaml
 import           Distribution.PackageDescription ( GenericPackageDescription )
 import qualified Distribution.PackageDescription as C
 import           Distribution.System ( Platform )
 import qualified Distribution.Text ( display )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Lens.Micro ( _1, _2 )
 import           Options.Applicative ( ReadM )
 import qualified Options.Applicative.Types as OA
-import           Pantry.Internal ( Storage )
 import           Path
-                   ( (</>), dirname, filename, parent, parseAbsDir, parseAbsFile
-                   , parseRelDir, parseRelFile, reldir, relfile
+                   ( (</>), parent, parseAbsDir, parseAbsFile, parseRelDir
+                   , parseRelFile, reldir, relfile
                    )
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
 import           Stack.Constants ( bindirSuffix, docDirSuffix, osIsWindows )
@@ -134,291 +111,28 @@ import           Stack.Types.Compiler
                    )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
 import           Stack.Types.ConfigMonoid
-                   ( ConfigMonoid (..), configMonoidAllowDifferentUserName
-                   , configMonoidGHCVariantName, configMonoidSystemGHCName
-                   , parseConfigMonoidObject)
+                   ( ConfigMonoid (..), parseConfigMonoidObject)
 import           Stack.Types.Docker ( DockerOpts )
 import           Stack.Types.DumpLogs ( DumpLogs )
-import           Stack.Types.GHCVariant ( GHCVariant (..) )
+import           Stack.Types.GHCVariant ( GHCVariant (..), HasGHCVariant (..) )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Nix ( NixOpts )
-import           Stack.Types.PlatformVariant
-                   ( PlatformVariant, platformVariantSuffix )
+import           Stack.Types.Platform
+                   ( HasPlatform (..), PlatformVariant, platformVariantSuffix )
 import           Stack.Types.PvpBounds ( PvpBounds )
 import           Stack.Types.Resolver ( AbstractResolver )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import           Stack.Types.SCM ( SCM )
 import           Stack.Types.SetupInfo ( SetupInfo )
 import           Stack.Types.SourceMap
-                   ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
-                   , SMWanted (..)
-                   )
+                   ( CommonPackage (..), DepPackage (..), ProjectPackage (..) )
+import           Stack.Types.Storage ( UserStorage )
 import           Stack.Types.TemplateName ( TemplateName )
-import           Stack.Types.Version
-                   ( VersionCheck (..), VersionRange, stackVersion
-                   , versionRangeText
-                   )
+import           Stack.Types.Version ( VersionCheck (..), VersionRange )
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
-
--- | Type representing exceptions thrown by functions exported by the
--- "Stack.Config" module.
-data ConfigException
-  = ParseCustomSnapshotException Text ParseException
-  | NoProjectConfigFound (Path Abs Dir) (Maybe Text)
-  | UnexpectedArchiveContents [Path Abs Dir] [Path Abs File]
-  | UnableToExtractArchive Text (Path Abs File)
-  | BadStackVersionException VersionRange
-  | NoSuchDirectory FilePath
-  | ParseGHCVariantException String
-  | BadStackRoot (Path Abs Dir)
-  | Won'tCreateStackRootInDirectoryOwnedByDifferentUser
-      (Path Abs Dir)
-      (Path Abs Dir)
-    -- ^ @$STACK_ROOT@, parent dir
-  | UserDoesn'tOwnDirectory (Path Abs Dir)
-  | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
-  | NixRequiresSystemGhc
-  | NoResolverWhenUsingNoProject
-  | NoLTSWithMajorVersion Int
-  | NoLTSFound
-  deriving (Show, Typeable)
-
-instance Exception ConfigException where
-  displayException (ParseCustomSnapshotException url exception) = concat
-    [ "Error: [S-8981]\n"
-    , "Could not parse '"
-    , T.unpack url
-    , "':\n"
-    , Yaml.prettyPrintParseException exception
-    , "\nSee https://docs.haskellstack.org/en/stable/custom_snapshot/"
-    ]
-  displayException (NoProjectConfigFound dir mcmd) = concat
-    [ "Error: [S-2206]\n"
-    , "Unable to find a stack.yaml file in the current directory ("
-    , toFilePath dir
-    , ") or its ancestors"
-    , case mcmd of
-        Nothing -> ""
-        Just cmd -> "\nRecommended action: stack " ++ T.unpack cmd
-    ]
-  displayException (UnexpectedArchiveContents dirs files) = concat
-    [ "Error: [S-4964]\n"
-    , "When unpacking an archive specified in your stack.yaml file, "
-    , "did not find expected contents. Expected: a single directory. Found: "
-    , show ( map (toFilePath . dirname) dirs
-           , map (toFilePath . filename) files
-           )
-    ]
-  displayException (UnableToExtractArchive url file) = concat
-    [ "Error: [S-2040]\n"
-    , "Archive extraction failed. Tarballs and zip archives are supported, \
-      \couldn't handle the following URL, "
-    , T.unpack url
-    , " downloaded to the file "
-    , toFilePath $ filename file
-    ]
-  displayException (BadStackVersionException requiredRange) = concat
-    [ "Error: [S-1641]\n"
-    , "The version of Stack you are using ("
-    , show stackVersion
-    , ") is outside the required\n"
-    ,"version range specified in stack.yaml ("
-    , T.unpack (versionRangeText requiredRange)
-    , ").\n"
-    , "You can upgrade Stack by running:\n\n"
-    , "stack upgrade"
-    ]
-  displayException (NoSuchDirectory dir) = concat
-    [ "Error: [S-8773]\n"
-    , "No directory could be located matching the supplied path: "
-    , dir
-    ]
-  displayException (ParseGHCVariantException v) = concat
-    [ "Error: [S-3938]\n"
-    , "Invalid ghc-variant value: "
-    , v
-    ]
-  displayException (BadStackRoot stackRoot) = concat
-    [ "Error: [S-8530]\n"
-    , "Invalid Stack root: '"
-    , toFilePath stackRoot
-    , "'. Please provide a valid absolute path."
-    ]
-  displayException (Won'tCreateStackRootInDirectoryOwnedByDifferentUser envStackRoot parentDir) = concat
-    [ "Error: [S-7613]\n"
-    , "Preventing creation of Stack root '"
-    , toFilePath envStackRoot
-    , "'. Parent directory '"
-    , toFilePath parentDir
-    , "' is owned by someone else."
-    ]
-  displayException (UserDoesn'tOwnDirectory dir) = concat
-    [ "Error: [S-8707]\n"
-    , "You are not the owner of '"
-    , toFilePath dir
-    , "'. Aborting to protect file permissions."
-    , "\nRetry with '--"
-    , T.unpack configMonoidAllowDifferentUserName
-    , "' to disable this precaution."
-    ]
-  displayException ManualGHCVariantSettingsAreIncompatibleWithSystemGHC = T.unpack $ T.concat
-    [ "Error: [S-3605]\n"
-    , "Stack can only control the "
-    , configMonoidGHCVariantName
-    , " of its own GHC installations. Please use '--no-"
-    , configMonoidSystemGHCName
-    , "'."
-    ]
-  displayException NixRequiresSystemGhc = T.unpack $ T.concat
-    [ "Error: [S-6816]\n"
-    , "Stack's Nix integration is incompatible with '--no-system-ghc'. "
-    , "Please use '--"
-    , configMonoidSystemGHCName
-    , "' or disable the Nix integration."
-    ]
-  displayException NoResolverWhenUsingNoProject =
-    "Error: [S-5027]\n"
-    ++ "When using the script command, you must provide a resolver argument"
-  displayException (NoLTSWithMajorVersion n) = concat
-    [ "Error: [S-3803]\n"
-    , "No LTS release found with major version "
-    , show n
-    , "."
-    ]
-  displayException NoLTSFound =
-    "Error: [S-5472]\n"
-    ++ "No LTS releases found."
-
--- | Type representing \'pretty\' exceptions thrown by functions exported by the
--- "Stack.Config" module.
-data ConfigPrettyException
-  = ParseConfigFileException !(Path Abs File) !ParseException
-  | StackWorkEnvNotRelativeDir !String
-  | NoMatchingSnapshot !(NonEmpty SnapName)
-  | ResolverMismatch !RawSnapshotLocation String
-  | ResolverPartial !RawSnapshotLocation !String
-  | MultiplePackageIndices [PackageIndexConfig]
-  | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
-  deriving (Show, Typeable)
-
-instance Pretty ConfigPrettyException where
-  pretty (ParseConfigFileException configFile exception) =
-    "[S-6602]"
-    <> line
-    <> fillSep
-         [ flow "Stack could not load and parse"
-         , pretty configFile
-         , flow "as a YAML configuraton file."
-         ]
-    <> blankLine
-    <> flow "While loading and parsing, Stack encountered the following \
-            \error:"
-    <> blankLine
-    <> string (Yaml.prettyPrintParseException exception)
-    <> blankLine
-    <> fillSep
-         [ flow "For help about the content of Stack's YAML configuration \
-                \files, see (for the most recent release of Stack)"
-         ,    style
-                Url
-                "http://docs.haskellstack.org/en/stable/yaml_configuration/"
-           <> "."
-         ]
-  pretty (StackWorkEnvNotRelativeDir x) =
-    "[S-7462]"
-    <> line
-    <> flow "Stack failed to interpret the value of the STACK_WORK \
-            \environment variable as a valid relative path to a directory. \
-            \Stack will not accept an absolute path. A path containing a \
-            \.. (parent directory) component is not valid."
-    <> blankLine
-    <> fillSep
-         [ flow "If set, Stack expects the value to identify the location \
-                \of Stack's work directory, relative to the root directory \
-                \of the project or package. Stack encountered the value:"
-         , style Error (fromString x) <> "."
-         ]
-  pretty (NoMatchingSnapshot names) =
-    "[S-1833]"
-    <> line
-    <> flow "None of the following snapshots provides a compiler matching \
-            \your package(s):"
-    <> line
-    <> bulletedList (map (fromString . show) (NonEmpty.toList names))
-    <> blankLine
-    <> resolveOptions
-  pretty (ResolverMismatch resolver errDesc) =
-    "[S-6395]"
-    <> line
-    <> fillSep
-         [ "Snapshot"
-         , style Url (pretty $ PrettyRawSnapshotLocation resolver)
-         , flow "does not have a matching compiler to build some or all of \
-                \your package(s)."
-         ]
-    <> blankLine
-    <> indent 4 (string errDesc)
-    <> line
-    <> resolveOptions
-  pretty (ResolverPartial resolver errDesc) =
-    "[S-2422]"
-    <> line
-    <> fillSep
-         [ "Snapshot"
-         , style Url (pretty $ PrettyRawSnapshotLocation resolver)
-         , flow "does not have all the packages to match your requirements."
-         ]
-    <> blankLine
-    <> indent 4 (string errDesc)
-    <> line
-    <> resolveOptions
-  pretty (MultiplePackageIndices pics) =
-    "[S-3251]"
-    <> line
-    <> fillSep
-         [ flow "When using the"
-         , style Shell "package-indices"
-         , flow "key to override the default package index, you must \
-                \provide exactly one value, received:"
-         , bulletedList (map (string . show) pics)
-         ]
-    <> blankLine
-    <> packageIndicesWarning
-  pretty (DuplicateLocalPackageNames pairs) =
-    "[S-5470]"
-    <> line
-    <> fillSep
-        [ flow "The same package name is used in more than one local package or"
-        , style Shell "extra-deps" <> "."
-        ]
-    <> mconcat (map go pairs)
-   where
-    go (name, dirs) =
-         blankLine
-      <> fillSep
-           [ style Error (fromString $ packageNameString name)
-           , flow "used in:"
-           ]
-      <> line
-      <> bulletedList (map (fromString . T.unpack . textDisplay) dirs)
-
-instance Exception ConfigPrettyException
-
-data ParseAbsolutePathException
-  = ParseAbsolutePathException String String
-  deriving (Show, Typeable)
-
-instance Exception ParseAbsolutePathException where
-  displayException (ParseAbsolutePathException envVar dir) = concat
-    [ "Error: [S-9437]\n"
-    , "Failed to parse "
-    , envVar
-    , " environment variable (expected absolute directory): "
-    , dir
-    ]
 
 -- | The top-level Stackage configuration.
 data Config = Config
@@ -547,23 +261,6 @@ data Config = Config
     -- ^ Turn on Stack developer mode for additional messages?
   }
 
--- | Class for environment values which have a GHCVariant
-class HasGHCVariant env where
-  ghcVariantL :: SimpleGetter env GHCVariant
-  default ghcVariantL :: HasConfig env => SimpleGetter env GHCVariant
-  ghcVariantL = configL.ghcVariantL
-  {-# INLINE ghcVariantL #-}
-
--- | A bit of type safety to ensure we're talking to the right database.
-newtype UserStorage = UserStorage
-  { unUserStorage :: Storage
-  }
-
--- | A bit of type safety to ensure we're talking to the right database.
-newtype ProjectStorage = ProjectStorage
-  { unProjectStorage :: Storage
-  }
-
 -- | The project root directory, if in a project.
 configProjectRoot :: Config -> Maybe (Path Abs Dir)
 configProjectRoot c =
@@ -605,34 +302,6 @@ defaultLogLevel = LevelInfo
 
 readStyles :: ReadM StylesUpdate
 readStyles = parseStylesUpdateFromString <$> OA.readerAsk
-
--- | A superset of 'Config' adding information on how to build code. The reason
--- for this breakdown is because we will need some of the information from
--- 'Config' in order to determine the values here.
---
--- These are the components which know nothing about local configuration.
-data BuildConfig = BuildConfig
-  { bcConfig     :: !Config
-  , bcSMWanted :: !SMWanted
-  , bcExtraPackageDBs :: ![Path Abs Dir]
-    -- ^ Extra package databases
-  , bcStackYaml  :: !(Path Abs File)
-    -- ^ Location of the stack.yaml file.
-    --
-    -- Note: if the STACK_YAML environment variable is used, this may be
-    -- different from projectRootL </> "stack.yaml" if a different file
-    -- name is used.
-  , bcProjectStorage :: !ProjectStorage
-  -- ^ Database connection pool for project Stack database
-  , bcCurator :: !(Maybe Curator)
-  }
-
-stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
-stackYamlL = buildConfigL.lens bcStackYaml (\x y -> x { bcStackYaml = y })
-
--- | Directory containing the project's stack.yaml file
-projectRootL :: HasBuildConfig env => Getting r env (Path Abs Dir)
-projectRootL = stackYamlL.to parent
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
 ppGPD = liftIO . cpGPD . ppCommon
@@ -739,32 +408,6 @@ instance FromJSON (WithJSONWarnings Curator) where
     <*> fmap (Set.map unCabalString) (o ..:? "skip-haddock" ..!= mempty)
     <*> fmap (Set.map unCabalString) (o ..:? "expect-haddock-failure" ..!= mempty)
 
-packageIndicesWarning :: StyleDoc
-packageIndicesWarning =
-  fillSep
-    [ "The"
-    , style Shell "package-indices"
-    , flow "key is deprecated in favour of"
-    , style Shell "package-index" <> "."
-    ]
-
-resolveOptions :: StyleDoc
-resolveOptions =
-     flow "This may be resolved by:"
-  <> line
-  <> bulletedList
-       [ fillSep
-           [ "Using"
-           , style Shell "--omit-packages"
-           , "to exclude mismatching package(s)."
-           ]
-       , fillSep
-           [ "Using"
-           , style Shell "--resolver"
-           , "to specify a matching snapshot/resolver."
-           ]
-       ]
-
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
 askLatestSnapshotUrl = view $ configL.to configLatestSnapshot
@@ -784,13 +427,6 @@ ghcInstallHook :: HasConfig env => RIO env (Path Abs File)
 ghcInstallHook = do
   hd <- hooksDir
   pure (hd </> [relfile|ghc-install.sh|])
-
--- | Per-project work dir
-getProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
-getProjectWorkDir = do
-  root    <- view projectRootL
-  workDir <- view workDirL
-  pure (root </> workDir)
 
 -- | Relative directory for the platform identifier
 platformOnlyRelDir ::
@@ -926,17 +562,6 @@ parseProjectAndConfigMonoid rootDir =
 -- Lens classes
 -----------------------------------
 
--- | Class for environment values which have a Platform
-class HasPlatform env where
-  platformL :: Lens' env Platform
-  default platformL :: HasConfig env => Lens' env Platform
-  platformL = configL.platformL
-  {-# INLINE platformL #-}
-  platformVariantL :: Lens' env PlatformVariant
-  default platformVariantL :: HasConfig env => Lens' env PlatformVariant
-  platformVariantL = configL.platformVariantL
-  {-# INLINE platformVariantL #-}
-
 -- | Class for environment values that can provide a 'Config'.
 class ( HasPlatform env
       , HasGHCVariant env
@@ -946,83 +571,39 @@ class ( HasPlatform env
       , HasRunner env
       ) => HasConfig env where
   configL :: Lens' env Config
-  default configL :: HasBuildConfig env => Lens' env Config
-  configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
-  {-# INLINE configL #-}
-
-class HasConfig env => HasBuildConfig env where
-  buildConfigL :: Lens' env BuildConfig
 
 -----------------------------------
 -- Lens instances
 -----------------------------------
-
-instance HasPlatform (Platform, PlatformVariant) where
-  platformL = _1
-  platformVariantL = _2
 
 instance HasPlatform Config where
   platformL = lens configPlatform (\x y -> x { configPlatform = y })
   platformVariantL =
     lens configPlatformVariant (\x y -> x { configPlatformVariant = y })
 
-instance HasPlatform BuildConfig
-
-instance HasGHCVariant GHCVariant where
-  ghcVariantL = id
-  {-# INLINE ghcVariantL #-}
-
 instance HasGHCVariant Config where
   ghcVariantL = to $ fromMaybe GHCStandard . configGHCVariant
-
-instance HasGHCVariant BuildConfig
 
 instance HasProcessContext Config where
   processContextL = runnerL.processContextL
 
-instance HasProcessContext BuildConfig where
-  processContextL = configL.processContextL
-
 instance HasPantryConfig Config where
   pantryConfigL = lens configPantryConfig (\x y -> x { configPantryConfig = y })
-
-instance HasPantryConfig BuildConfig where
-  pantryConfigL = configL.pantryConfigL
 
 instance HasConfig Config where
   configL = id
   {-# INLINE configL #-}
 
-instance HasConfig BuildConfig where
-  configL = lens bcConfig (\x y -> x { bcConfig = y })
-
-instance HasBuildConfig BuildConfig where
-  buildConfigL = id
-  {-# INLINE buildConfigL #-}
-
 instance HasRunner Config where
   runnerL = lens configRunner (\x y -> x { configRunner = y })
 
-instance HasRunner BuildConfig where
-  runnerL = configL.runnerL
-
 instance HasLogFunc Config where
-  logFuncL = runnerL.logFuncL
-
-instance HasLogFunc BuildConfig where
   logFuncL = runnerL.logFuncL
 
 instance HasStylesUpdate Config where
   stylesUpdateL = runnerL.stylesUpdateL
 
-instance HasStylesUpdate BuildConfig where
-  stylesUpdateL = runnerL.stylesUpdateL
-
 instance HasTerm Config where
-  useColorL = runnerL.useColorL
-  termWidthL = runnerL.termWidthL
-
-instance HasTerm BuildConfig where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
 
@@ -1036,11 +617,6 @@ stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
 stackGlobalConfigL :: HasConfig s => Lens' s (Path Abs File)
 stackGlobalConfigL =
   configL.lens configUserConfigPath (\x y -> x { configUserConfigPath = y })
-
--- | The compiler specified by the @SnapshotDef@. This may be different from the
--- actual compiler used!
-wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
-wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
 data ExtraDirs = ExtraDirs
   { edBins :: ![Path Abs Dir]

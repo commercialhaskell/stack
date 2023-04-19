@@ -43,6 +43,8 @@ import           Stack.Package
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Build
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
@@ -51,6 +53,7 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageFile
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner, Runner )
 import           Stack.Types.SourceMap
 import           System.IO ( putStrLn )

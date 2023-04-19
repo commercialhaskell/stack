@@ -25,6 +25,7 @@ import           Path.IO hiding ( withSystemTempDir )
 import           Stack.Config
 import           Stack.Prelude
 import           Stack.Runners
+import           Stack.Types.BuildConfig ( BuildConfig (..), projectRootL )
 import           Stack.Types.Config
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )

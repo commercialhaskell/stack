@@ -16,10 +16,9 @@ import           Stack.Config ( withBuildConfig )
 import           Stack.Constants.Config ( rootDistDirFromDir, workDirFromDir )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
-import           Stack.Types.Config
-                   ( BuildConfig (..), Config, HasBuildConfig (..)
-                   , getProjectWorkDir, ppRoot
-                   )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..), getProjectWorkDir )
+import           Stack.Types.Config ( Config, ppRoot )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap ( SMWanted (..) )
 
