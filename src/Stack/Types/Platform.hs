@@ -4,10 +4,13 @@ module Stack.Types.Platform
   ( PlatformVariant (..)
   , HasPlatform (..)
   , platformVariantSuffix
+  , platformOnlyRelDir
   ) where
 
 import           Distribution.System ( Platform )
+import           Distribution.Text ( display )
 import           Lens.Micro ( _1, _2 )
+import           Path ( parseRelDir )
 import           Stack.Prelude
 
 -- | A variant of the platform, used to differentiate Docker builds from host
@@ -28,3 +31,15 @@ instance HasPlatform (Platform, PlatformVariant) where
 platformVariantSuffix :: PlatformVariant -> String
 platformVariantSuffix PlatformVariantNone = ""
 platformVariantSuffix (PlatformVariant v) = "-" ++ v
+
+-- | Relative directory for the platform identifier
+platformOnlyRelDir ::
+     (MonadReader env m, HasPlatform env, MonadThrow m)
+  => m (Path Rel Dir)
+platformOnlyRelDir = do
+  platform <- view platformL
+  platformVariant <- view platformVariantL
+  parseRelDir
+    (  Distribution.Text.display platform
+    ++ platformVariantSuffix platformVariant
+    )

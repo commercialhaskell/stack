@@ -68,7 +68,7 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
 import           Stack.Types.Config
                    ( BuildOpts (..), Config (..), HasConfig (..)
-                   , defaultBuildOpts, defaultBuildOptsCLI, ppRoot
+                   , defaultBuildOpts, defaultBuildOptsCLI
                    )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
@@ -83,7 +83,7 @@ import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
 import           Stack.Types.Runner ( HasRunner, Runner )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), ProjectPackage (..), SMWanted (..)
-                   , SourceMap (..)
+                   , SourceMap (..), ppRoot
                    )
 import           Stack.Types.Version
                    ( intersectVersionRanges, nextMajorVersion )

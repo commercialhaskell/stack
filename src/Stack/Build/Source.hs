@@ -40,9 +40,8 @@ import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
 import           Stack.Types.Config
                    ( ApplyCLIFlag (..), BuildOpts (..), BuildOptsCLI (..)
-                   , Config (..), Curator (..), HasConfig (..)
-                   , ProjectPackage (..), TestOpts (..), buildOptsL, ppGPD
-                   , ppRoot
+                   , Config (..), Curator (..), HasConfig (..), TestOpts (..)
+                   , buildOptsL
                    )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..)
@@ -58,9 +57,9 @@ import           Stack.Types.Package
 import           Stack.Types.PackageFile ( PackageWarning, getPackageFiles )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.SourceMap
-                   ( CommonPackage (..), DepPackage (..), SMActual (..)
-                   , SMTargets (..), SourceMap (..), SourceMapHash (..)
-                   , Target (..)
+                   ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
+                   , SMActual (..), SMTargets (..), SourceMap (..)
+                   , SourceMapHash (..), Target (..), ppGPD, ppRoot
                    )
 import           System.FilePath ( takeFileName )
 import           System.IO.Error ( isDoesNotExistError )

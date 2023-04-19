@@ -19,13 +19,6 @@ module Stack.Types.Config
   , HasConfig (..)
   , askLatestSnapshotUrl
   , configProjectRoot
-  -- ** BuildConfig & HasBuildConfig
-  , ProjectPackage (..)
-  , DepPackage (..)
-  , ppRoot
-  , ppVersion
-  , ppComponents
-  , ppGPD
   -- * Details
   -- ** EnvSettings
   , EnvSettings (..)
@@ -89,10 +82,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import           Distribution.PackageDescription ( GenericPackageDescription )
-import qualified Distribution.PackageDescription as C
 import           Distribution.System ( Platform )
-import qualified Distribution.Text ( display )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Options.Applicative ( ReadM )
 import qualified Options.Applicative.Types as OA
@@ -116,17 +106,15 @@ import           Stack.Types.Docker ( DockerOpts )
 import           Stack.Types.DumpLogs ( DumpLogs )
 import           Stack.Types.GHCVariant ( GHCVariant (..), HasGHCVariant (..) )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
-import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Nix ( NixOpts )
 import           Stack.Types.Platform
-                   ( HasPlatform (..), PlatformVariant, platformVariantSuffix )
+                   ( HasPlatform (..), PlatformVariant, platformOnlyRelDir
+                   )
 import           Stack.Types.PvpBounds ( PvpBounds )
 import           Stack.Types.Resolver ( AbstractResolver )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import           Stack.Types.SCM ( SCM )
 import           Stack.Types.SetupInfo ( SetupInfo )
-import           Stack.Types.SourceMap
-                   ( CommonPackage (..), DepPackage (..), ProjectPackage (..) )
 import           Stack.Types.Storage ( UserStorage )
 import           Stack.Types.TemplateName ( TemplateName )
 import           Stack.Types.Version ( VersionCheck (..), VersionRange )
@@ -303,33 +291,6 @@ defaultLogLevel = LevelInfo
 readStyles :: ReadM StylesUpdate
 readStyles = parseStylesUpdateFromString <$> OA.readerAsk
 
-ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
-ppGPD = liftIO . cpGPD . ppCommon
-
--- | Root directory for the given 'ProjectPackage'
-ppRoot :: ProjectPackage -> Path Abs Dir
-ppRoot = parent . ppCabalFP
-
--- | All components available in the given 'ProjectPackage'
-ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
-ppComponents pp = do
-  gpd <- ppGPD pp
-  pure $ Set.fromList $ concat
-    [ maybe []  (const [CLib]) (C.condLibrary gpd)
-    , go CExe   (fst <$> C.condExecutables gpd)
-    , go CTest  (fst <$> C.condTestSuites gpd)
-    , go CBench (fst <$> C.condBenchmarks gpd)
-    ]
- where
-  go :: (T.Text -> NamedComponent)
-     -> [C.UnqualComponentName]
-     -> [NamedComponent]
-  go wrapper = map (wrapper . T.pack . C.unUnqualComponentName)
-
--- | Version for the given 'ProjectPackage
-ppVersion :: MonadIO m => ProjectPackage -> m Version
-ppVersion = fmap gpdVersion . ppGPD
-
 -- | A project is a collection of packages. We can have multiple stack.yaml
 -- files, but only one of them may contain project information.
 data Project = Project
@@ -427,18 +388,6 @@ ghcInstallHook :: HasConfig env => RIO env (Path Abs File)
 ghcInstallHook = do
   hd <- hooksDir
   pure (hd </> [relfile|ghc-install.sh|])
-
--- | Relative directory for the platform identifier
-platformOnlyRelDir ::
-     (MonadReader env m, HasPlatform env, MonadThrow m)
-  => m (Path Rel Dir)
-platformOnlyRelDir = do
-  platform <- view platformL
-  platformVariant <- view platformVariantL
-  parseRelDir
-    (  Distribution.Text.display platform
-    ++ platformVariantSuffix platformVariant
-    )
 
 -- | This is an attempt to shorten Stack paths on Windows to decrease our
 -- chances of hitting 260 symbol path limit. The idea is to calculate

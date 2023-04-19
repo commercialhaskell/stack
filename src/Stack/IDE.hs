@@ -19,11 +19,11 @@ import           Stack.Runners
                    ( ShouldReexec (..), withBuildConfig, withConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.Config ( ppComponents )
 import           Stack.Types.NamedComponent
                    ( NamedComponent, renderPkgComponent )
 import           Stack.Types.Runner ( Runner )
-import           Stack.Types.SourceMap ( ProjectPackage (..), SMWanted (..) )
+import           Stack.Types.SourceMap
+                   ( ProjectPackage (..), SMWanted (..), ppComponents )
 import           System.IO ( putStrLn )
 
 -- Type representing output channel choices for the @stack ide packages@ and
