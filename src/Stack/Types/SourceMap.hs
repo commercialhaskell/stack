@@ -15,6 +15,10 @@ module Stack.Types.SourceMap
   , FromSnapshot (..)
   , DepPackage (..)
   , ProjectPackage (..)
+  , ppComponents
+  , ppGPD
+  , ppRoot
+  , ppVersion
   , CommonPackage (..)
   , GlobalPackageVersion (..)
   , GlobalPackage (..)
@@ -23,13 +27,15 @@ module Stack.Types.SourceMap
   , smRelDir
   ) where
 
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.PackageDescription ( GenericPackageDescription )
+import qualified Distribution.PackageDescription as C
 import qualified Pantry.SHA256 as SHA256
-import           Path ( parseRelDir )
+import           Path ( parent, parseRelDir )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( ActualCompiler )
-import           Stack.Types.NamedComponent ( NamedComponent )
+import           Stack.Types.NamedComponent ( NamedComponent (..) )
 
 -- | Common settings for both dependency and project package.
 data CommonPackage = CommonPackage
@@ -158,3 +164,30 @@ newtype SourceMapHash
 -- | Returns relative directory name with source map's hash
 smRelDir :: (MonadThrow m) => SourceMapHash -> m (Path Rel Dir)
 smRelDir (SourceMapHash smh) = parseRelDir $ T.unpack $ SHA256.toHexText smh
+
+ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
+ppGPD = liftIO . cpGPD . ppCommon
+
+-- | Root directory for the given 'ProjectPackage'
+ppRoot :: ProjectPackage -> Path Abs Dir
+ppRoot = parent . ppCabalFP
+
+-- | All components available in the given 'ProjectPackage'
+ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
+ppComponents pp = do
+  gpd <- ppGPD pp
+  pure $ Set.fromList $ concat
+    [ maybe []  (const [CLib]) (C.condLibrary gpd)
+    , go CExe   (fst <$> C.condExecutables gpd)
+    , go CTest  (fst <$> C.condTestSuites gpd)
+    , go CBench (fst <$> C.condBenchmarks gpd)
+    ]
+ where
+  go :: (T.Text -> NamedComponent)
+     -> [C.UnqualComponentName]
+     -> [NamedComponent]
+  go wrapper = map (wrapper . T.pack . C.unUnqualComponentName)
+
+-- | Version for the given 'ProjectPackage
+ppVersion :: MonadIO m => ProjectPackage -> m Version
+ppVersion = fmap gpdVersion . ppGPD

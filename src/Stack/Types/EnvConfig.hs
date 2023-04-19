@@ -22,14 +22,23 @@ module Stack.Types.EnvConfig
   , platformSnapAndCompilerRel
   , shouldForceGhcColorFlag
   , snapshotsDir
+  , useShaPathOnWindows
+  , shaPathForBytes
   ) where
 
+import           Crypto.Hash ( SHA1 (..), hashWith )
+import qualified Data.ByteArray.Encoding as Mem ( Base(Base16), convertToBase )
+import qualified Data.ByteString.Char8 as S8
+import qualified Data.Text as T
 import qualified Distribution.Text ( display )
 import           Distribution.Version ( mkVersion )
-import           Path ( (</>), parseRelDir )
+import           Path
+                   ( (</>), parseAbsDir, parseAbsFile, parseRelDir
+                   , parseRelFile
+                   )
 import           RIO.Process ( HasProcessContext (..) )
 import           Stack.Constants
-                   ( bindirSuffix, ghcColorForceFlag, relDirCompilerTools
+                   ( bindirSuffix, ghcColorForceFlag, osIsWindows, relDirCompilerTools
                    , relDirHoogle, relDirHpc, relDirInstall, relDirPkgdb
                    , relDirSnapshots, relFileDatabaseHoo
                    )
@@ -41,8 +50,7 @@ import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild ( compilerBuildSuffix )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
-import           Stack.Types.Config
-                    ( HasConfig (..), stackRootL, useShaPathOnWindows )
+import           Stack.Types.Config ( HasConfig (..), stackRootL )
 import           Stack.Types.Config.Build ( BuildOptsCLI )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..), ghcVariantSuffix )
 import           Stack.Types.Platform
@@ -275,3 +283,37 @@ platformGhcVerOnlyRelDirStr = do
   pure $ mconcat [ Distribution.Text.display platform
                    , platformVariantSuffix platformVariant
                    , ghcVariantSuffix ghcVariant ]
+
+-- | This is an attempt to shorten Stack paths on Windows to decrease our
+-- chances of hitting 260 symbol path limit. The idea is to calculate
+-- SHA1 hash of the path used on other architectures, encode with base
+-- 16 and take first 8 symbols of it.
+useShaPathOnWindows :: MonadThrow m => Path Rel Dir -> m (Path Rel Dir)
+useShaPathOnWindows
+  | osIsWindows = shaPath
+  | otherwise = pure
+
+shaPath :: (IsPath Rel t, MonadThrow m) => Path Rel t -> m (Path Rel t)
+shaPath = shaPathForBytes . encodeUtf8 . T.pack . toFilePath
+
+shaPathForBytes :: (IsPath Rel t, MonadThrow m) => ByteString -> m (Path Rel t)
+shaPathForBytes
+  = parsePath . S8.unpack . S8.take 8
+  . Mem.convertToBase Mem.Base16 . hashWith SHA1
+
+-- TODO: Move something like this into the path package. Consider
+-- subsuming path-io's 'AnyPath'?
+class IsPath b t where
+  parsePath :: MonadThrow m => FilePath -> m (Path b t)
+
+instance IsPath Abs Dir where
+  parsePath = parseAbsDir
+
+instance IsPath Rel Dir where
+  parsePath = parseRelDir
+
+instance IsPath Abs File where
+  parsePath = parseAbsFile
+
+instance IsPath Rel File where
+  parsePath = parseRelFile

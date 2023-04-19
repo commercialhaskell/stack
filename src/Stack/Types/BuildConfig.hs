@@ -15,8 +15,8 @@ module Stack.Types.BuildConfig
 import           Path ( (</>), parent )
 import           RIO.Process ( HasProcessContext (..) )
 import           Stack.Prelude
-import           Stack.Types.Config
-                   ( Config, Curator, HasConfig (..), workDirL )
+import           Stack.Types.Config ( Config, HasConfig (..), workDirL )
+import           Stack.Types.Curator ( Curator )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )

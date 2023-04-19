@@ -22,9 +22,11 @@ import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           Stack.Runners
 import           Stack.Prelude
 import           Stack.Types.BuildConfig ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.Config
+import           Stack.Types.Config ( Config (..) )
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Project ( Project (..) )
+import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.NamedComponent
 import           Stack.Types.SourceMap
 

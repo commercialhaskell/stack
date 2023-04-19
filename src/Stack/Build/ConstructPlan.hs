@@ -45,14 +45,15 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
                    ( BuildOpts (..), BuildOptsCLI (..), BuildSubset (..)
-                   , Config (..), Curator (..), EnvSettings (..), HasConfig (..)
-                   , minimalEnvSettings, stackRootL
+                   , Config (..), HasConfig (..), stackRootL
                    )
+import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency
                    ( DepValue (DepValue), DepType (AsLibrary) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
+import           Stack.Types.EnvSettings ( EnvSettings (..), minimalEnvSettings )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.NamedComponent ( exeComponents, renderComponent )

@@ -19,37 +19,14 @@ module Stack.Types.Config
   , HasConfig (..)
   , askLatestSnapshotUrl
   , configProjectRoot
-  -- ** BuildConfig & HasBuildConfig
-  , ProjectPackage (..)
-  , DepPackage (..)
-  , ppRoot
-  , ppVersion
-  , ppComponents
-  , ppGPD
   -- * Details
-  -- ** EnvSettings
-  , EnvSettings (..)
-  , minimalEnvSettings
-  , defaultEnvSettings
-  , plainEnvSettings
-  -- ** GlobalOpts & GlobalOptsMonoid
-  , defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
-  , Project (..)
-  , ProjectConfig (..)
-  , Curator (..)
   , ProjectAndConfigMonoid (..)
   , parseProjectAndConfigMonoid
-  -- ** Styles
-  , readStyles
   -- * Paths
   , bindirSuffix
-  , GlobalInfoSource (..)
   , docDirSuffix
   , platformOnlyRelDir
-  , useShaPathOnWindows
-  , shaPath
-  , shaPathForBytes
   , workDirL
   , ghcInstallHook
   -- * Command-related types
@@ -58,12 +35,6 @@ module Stack.Types.Config
   , ExtraDirs (..)
   , buildOptsL
   , globalOptsL
-  , buildOptsInstallExesL
-  , buildOptsMonoidHaddockL
-  , buildOptsMonoidTestsL
-  , buildOptsMonoidBenchmarksL
-  , buildOptsMonoidInstallExesL
-  , buildOptsHaddockL
   , globalOptsBuildOptsMonoidL
   , stackRootL
   , stackGlobalConfigL
@@ -71,37 +42,20 @@ module Stack.Types.Config
   , envOverrideSettingsL
   -- * Helper logging functions
   , prettyStackDevL
-  -- * Lens reexport
-  , view
-  , to
   ) where
 
-import           Crypto.Hash ( SHA1 (..), hashWith )
 import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), ToJSON (..), Value, WithJSONWarnings (..)
-                   , (.=), (...:), (..:?), (..!=), jsonSubWarnings
-                   , jsonSubWarningsT, jsonSubWarningsTT, object
+                   ( Value, WithJSONWarnings (..), (...:), (..:?), (..!=)
+                   , jsonSubWarnings, jsonSubWarningsT, jsonSubWarningsTT
                    , withObjectWarnings
                    )
-import qualified Data.ByteArray.Encoding as Mem ( Base(Base16), convertToBase )
-import qualified Data.ByteString.Char8 as S8
-import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import           Distribution.PackageDescription ( GenericPackageDescription )
-import qualified Distribution.PackageDescription as C
 import           Distribution.System ( Platform )
-import qualified Distribution.Text ( display )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Options.Applicative ( ReadM )
-import qualified Options.Applicative.Types as OA
-import           Path
-                   ( (</>), parent, parseAbsDir, parseAbsFile, parseRelDir
-                   , parseRelFile, reldir, relfile
-                   )
+import           Path ( (</>), parent, reldir, relfile )
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
-import           Stack.Constants ( bindirSuffix, docDirSuffix, osIsWindows )
+import           Stack.Constants ( bindirSuffix, docDirSuffix )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
@@ -114,19 +68,20 @@ import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoidObject)
 import           Stack.Types.Docker ( DockerOpts )
 import           Stack.Types.DumpLogs ( DumpLogs )
+import           Stack.Types.EnvSettings ( EnvSettings )
 import           Stack.Types.GHCVariant ( GHCVariant (..), HasGHCVariant (..) )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
-import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Nix ( NixOpts )
 import           Stack.Types.Platform
-                   ( HasPlatform (..), PlatformVariant, platformVariantSuffix )
+                   ( HasPlatform (..), PlatformVariant, platformOnlyRelDir
+                   )
+import           Stack.Types.Project ( Project (..) )
+import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.PvpBounds ( PvpBounds )
 import           Stack.Types.Resolver ( AbstractResolver )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import           Stack.Types.SCM ( SCM )
 import           Stack.Types.SetupInfo ( SetupInfo )
-import           Stack.Types.SourceMap
-                   ( CommonPackage (..), DepPackage (..), ProjectPackage (..) )
 import           Stack.Types.Storage ( UserStorage )
 import           Stack.Types.TemplateName ( TemplateName )
 import           Stack.Types.Version ( VersionCheck (..), VersionRange )
@@ -269,145 +224,6 @@ configProjectRoot c =
     PCGlobalProject -> Nothing
     PCNoProject _deps -> Nothing
 
--- | Controls which version of the environment is used
-data EnvSettings = EnvSettings
-  { esIncludeLocals :: !Bool
-  -- ^ include local project bin directory, GHC_PACKAGE_PATH, etc
-  , esIncludeGhcPackagePath :: !Bool
-  -- ^ include the GHC_PACKAGE_PATH variable
-  , esStackExe :: !Bool
-  -- ^ set the STACK_EXE variable to the current executable name
-  , esLocaleUtf8 :: !Bool
-  -- ^ set the locale to C.UTF-8
-  , esKeepGhcRts :: !Bool
-  -- ^ if True, keep GHCRTS variable in environment
-  }
-  deriving (Eq, Ord, Show)
-
--- | Project configuration information. Not every run of Stack has a
--- true local project; see constructors below.
-data ProjectConfig a
-  = PCProject a
-    -- ^ Normal run: we want a project, and have one. This comes from
-    -- either 'SYLDefault' or 'SYLOverride'.
-  | PCGlobalProject
-    -- ^ No project was found when using 'SYLDefault'. Instead, use
-    -- the implicit global.
-  | PCNoProject ![PackageIdentifierRevision]
-    -- ^ Use a no project run. This comes from 'SYLNoProject'.
-
--- | Default logging level should be something useful but not crazy.
-defaultLogLevel :: LogLevel
-defaultLogLevel = LevelInfo
-
-readStyles :: ReadM StylesUpdate
-readStyles = parseStylesUpdateFromString <$> OA.readerAsk
-
-ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
-ppGPD = liftIO . cpGPD . ppCommon
-
--- | Root directory for the given 'ProjectPackage'
-ppRoot :: ProjectPackage -> Path Abs Dir
-ppRoot = parent . ppCabalFP
-
--- | All components available in the given 'ProjectPackage'
-ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
-ppComponents pp = do
-  gpd <- ppGPD pp
-  pure $ Set.fromList $ concat
-    [ maybe []  (const [CLib]) (C.condLibrary gpd)
-    , go CExe   (fst <$> C.condExecutables gpd)
-    , go CTest  (fst <$> C.condTestSuites gpd)
-    , go CBench (fst <$> C.condBenchmarks gpd)
-    ]
- where
-  go :: (T.Text -> NamedComponent)
-     -> [C.UnqualComponentName]
-     -> [NamedComponent]
-  go wrapper = map (wrapper . T.pack . C.unUnqualComponentName)
-
--- | Version for the given 'ProjectPackage
-ppVersion :: MonadIO m => ProjectPackage -> m Version
-ppVersion = fmap gpdVersion . ppGPD
-
--- | A project is a collection of packages. We can have multiple stack.yaml
--- files, but only one of them may contain project information.
-data Project = Project
-  { projectUserMsg :: !(Maybe String)
-    -- ^ A warning message to display to the user when the auto generated
-    -- config may have issues.
-  , projectPackages :: ![RelFilePath]
-    -- ^ Packages which are actually part of the project (as opposed
-    -- to dependencies).
-  , projectDependencies :: ![RawPackageLocation]
-    -- ^ Dependencies defined within the stack.yaml file, to be applied on top
-    -- of the snapshot.
-  , projectFlags :: !(Map PackageName (Map FlagName Bool))
-    -- ^ Flags to be applied on top of the snapshot flags.
-  , projectResolver :: !RawSnapshotLocation
-    -- ^ How we resolve which @Snapshot@ to use
-  , projectCompiler :: !(Maybe WantedCompiler)
-    -- ^ Override the compiler in 'projectResolver'
-  , projectExtraPackageDBs :: ![FilePath]
-  , projectCurator :: !(Maybe Curator)
-    -- ^ Extra configuration intended exclusively for usage by the curator tool.
-    -- In other words, this is /not/ part of the documented and exposed Stack
-    -- API. SUBJECT TO CHANGE.
-  , projectDropPackages :: !(Set PackageName)
-    -- ^ Packages to drop from the 'projectResolver'.
-  }
-  deriving Show
-
-instance ToJSON Project where
-  -- Expanding the constructor fully to ensure we don't miss any fields.
-  toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator drops) = object $ concat
-    [ maybe [] (\cv -> ["compiler" .= cv]) mcompiler
-    , maybe [] (\msg -> ["user-message" .= msg]) userMsg
-    , [ "extra-package-dbs" .= extraPackageDBs | not (null extraPackageDBs) ]
-    , [ "extra-deps" .= extraDeps | not (null extraDeps) ]
-    , [ "flags" .= fmap toCabalStringMap (toCabalStringMap flags)
-      | not (Map.null flags)
-      ]
-    , ["packages" .= packages]
-    , ["resolver" .= resolver]
-    , maybe [] (\c -> ["curator" .= c]) mcurator
-    , [ "drop-packages" .= Set.map CabalString drops | not (Set.null drops) ]
-    ]
-
--- | Extra configuration intended exclusively for usage by the curator tool. In
--- other words, this is /not/ part of the documented and exposed Stack API.
--- SUBJECT TO CHANGE.
-data Curator = Curator
-  { curatorSkipTest :: !(Set PackageName)
-  , curatorExpectTestFailure :: !(Set PackageName)
-  , curatorSkipBenchmark :: !(Set PackageName)
-  , curatorExpectBenchmarkFailure :: !(Set PackageName)
-  , curatorSkipHaddock :: !(Set PackageName)
-  , curatorExpectHaddockFailure :: !(Set PackageName)
-  }
-  deriving Show
-
-instance ToJSON Curator where
-  toJSON c = object
-    [ "skip-test" .= Set.map CabalString (curatorSkipTest c)
-    , "expect-test-failure" .= Set.map CabalString (curatorExpectTestFailure c)
-    , "skip-bench" .= Set.map CabalString (curatorSkipBenchmark c)
-    , "expect-benchmark-failure" .=
-        Set.map CabalString (curatorExpectTestFailure c)
-    , "skip-haddock" .= Set.map CabalString (curatorSkipHaddock c)
-    , "expect-test-failure" .=
-        Set.map CabalString (curatorExpectHaddockFailure c)
-    ]
-
-instance FromJSON (WithJSONWarnings Curator) where
-  parseJSON = withObjectWarnings "Curator" $ \o -> Curator
-    <$> fmap (Set.map unCabalString) (o ..:? "skip-test" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "expect-test-failure" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "skip-bench" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "expect-benchmark-failure" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "skip-haddock" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "expect-haddock-failure" ..!= mempty)
-
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
 askLatestSnapshotUrl = view $ configL.to configLatestSnapshot
@@ -427,96 +243,6 @@ ghcInstallHook :: HasConfig env => RIO env (Path Abs File)
 ghcInstallHook = do
   hd <- hooksDir
   pure (hd </> [relfile|ghc-install.sh|])
-
--- | Relative directory for the platform identifier
-platformOnlyRelDir ::
-     (MonadReader env m, HasPlatform env, MonadThrow m)
-  => m (Path Rel Dir)
-platformOnlyRelDir = do
-  platform <- view platformL
-  platformVariant <- view platformVariantL
-  parseRelDir
-    (  Distribution.Text.display platform
-    ++ platformVariantSuffix platformVariant
-    )
-
--- | This is an attempt to shorten Stack paths on Windows to decrease our
--- chances of hitting 260 symbol path limit. The idea is to calculate
--- SHA1 hash of the path used on other architectures, encode with base
--- 16 and take first 8 symbols of it.
-useShaPathOnWindows :: MonadThrow m => Path Rel Dir -> m (Path Rel Dir)
-useShaPathOnWindows
-  | osIsWindows = shaPath
-  | otherwise = pure
-
-shaPath :: (IsPath Rel t, MonadThrow m) => Path Rel t -> m (Path Rel t)
-shaPath = shaPathForBytes . encodeUtf8 . T.pack . toFilePath
-
-shaPathForBytes :: (IsPath Rel t, MonadThrow m) => ByteString -> m (Path Rel t)
-shaPathForBytes
-  = parsePath . S8.unpack . S8.take 8
-  . Mem.convertToBase Mem.Base16 . hashWith SHA1
-
--- TODO: Move something like this into the path package. Consider
--- subsuming path-io's 'AnyPath'?
-class IsPath b t where
-  parsePath :: MonadThrow m => FilePath -> m (Path b t)
-
-instance IsPath Abs Dir where
-  parsePath = parseAbsDir
-
-instance IsPath Rel Dir where
-  parsePath = parseRelDir
-
-instance IsPath Abs File where
-  parsePath = parseAbsFile
-
-instance IsPath Rel File where
-  parsePath = parseRelFile
-
--- | Where do we get information on global packages for loading up a
--- 'LoadedSnapshot'?
-data GlobalInfoSource
-  = GISSnapshotHints
-    -- ^ Accept the hints in the snapshot definition
-  | GISCompiler ActualCompiler
-    -- ^ Look up the actual information in the installed compiler
-
-minimalEnvSettings :: EnvSettings
-minimalEnvSettings =
-  EnvSettings
-  { esIncludeLocals = False
-  , esIncludeGhcPackagePath = False
-  , esStackExe = False
-  , esLocaleUtf8 = False
-  , esKeepGhcRts = False
-  }
-
--- | Default @EnvSettings@ which includes locals and GHC_PACKAGE_PATH.
---
--- Note that this also passes through the GHCRTS environment variable.
--- See https://github.com/commercialhaskell/stack/issues/3444
-defaultEnvSettings :: EnvSettings
-defaultEnvSettings = EnvSettings
-  { esIncludeLocals = True
-  , esIncludeGhcPackagePath = True
-  , esStackExe = True
-  , esLocaleUtf8 = False
-  , esKeepGhcRts = True
-  }
-
--- | Environment settings which do not embellish the environment
---
--- Note that this also passes through the GHCRTS environment variable.
--- See https://github.com/commercialhaskell/stack/issues/3444
-plainEnvSettings :: EnvSettings
-plainEnvSettings = EnvSettings
-  { esIncludeLocals = False
-  , esIncludeGhcPackagePath = False
-  , esStackExe = False
-  , esLocaleUtf8 = False
-  , esKeepGhcRts = True
-  }
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
@@ -636,36 +362,6 @@ buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens
   configBuild
   (\x y -> x { configBuild = y })
-
-buildOptsMonoidHaddockL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidHaddockL =
-  lens (getFirstFalse . buildMonoidHaddock)
-    (\buildMonoid t -> buildMonoid {buildMonoidHaddock = FirstFalse t})
-
-buildOptsMonoidTestsL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidTestsL =
-  lens (getFirstFalse . buildMonoidTests)
-    (\buildMonoid t -> buildMonoid {buildMonoidTests = FirstFalse t})
-
-buildOptsMonoidBenchmarksL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidBenchmarksL =
-  lens (getFirstFalse . buildMonoidBenchmarks)
-    (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = FirstFalse t})
-
-buildOptsMonoidInstallExesL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidInstallExesL =
-  lens (getFirstFalse . buildMonoidInstallExes)
-    (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = FirstFalse t})
-
-buildOptsInstallExesL :: Lens' BuildOpts Bool
-buildOptsInstallExesL =
-  lens boptsInstallExes
-    (\bopts t -> bopts {boptsInstallExes = t})
-
-buildOptsHaddockL :: Lens' BuildOpts Bool
-buildOptsHaddockL =
-  lens boptsHaddock
-    (\bopts t -> bopts {boptsHaddock = t})
 
 globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL =

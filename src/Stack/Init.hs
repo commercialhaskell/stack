@@ -47,10 +47,11 @@ import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withGlobalProject )
 import           Stack.SourceMap
                    ( SnapshotCandidate, loadProjectSnapshotCandidate )
-import           Stack.Types.Config ( HasConfig, Project (..) )
+import           Stack.Types.Config ( HasConfig )
 import           Stack.Types.Config.Exception ( ConfigPrettyException (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Project ( Project (..) )
 import           Stack.Types.Runner (Runner, globalOptsL )
 import           Stack.Types.Resolver ( AbstractResolver, Snapshots (..) )
 import           Stack.Types.Version ( stackMajorVersion )

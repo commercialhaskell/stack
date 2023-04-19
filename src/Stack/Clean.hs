@@ -18,9 +18,9 @@ import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), getProjectWorkDir )
-import           Stack.Types.Config ( Config, ppRoot )
+import           Stack.Types.Config ( Config )
 import           Stack.Types.Runner ( Runner )
-import           Stack.Types.SourceMap ( SMWanted (..) )
+import           Stack.Types.SourceMap ( SMWanted (..), ppRoot )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Clean" module.

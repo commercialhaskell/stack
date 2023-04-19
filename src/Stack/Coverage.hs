@@ -46,8 +46,7 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.Config
-                   ( BuildOptsCLI (..), defaultBuildOptsCLI, ppRoot )
+import           Stack.Types.Config ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , hpcReportDir
@@ -58,7 +57,7 @@ import           Stack.Types.Package
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap
                    ( PackageType (..), SMTargets (..), SMWanted (..)
-                   , SourceMap (..), Target (..)
+                   , SourceMap (..), Target (..), ppRoot
                    )
 import           System.FilePath ( isPathSeparator )
 import           Trace.Hpc.Tix ( Tix (..), TixModule (..), readTix, writeTix )

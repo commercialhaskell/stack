@@ -125,10 +125,9 @@ import           Stack.Types.CompilerBuild
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..) )
 import           Stack.Types.Config
-                   ( BuildOptsCLI (..), Config (..), EnvSettings (..)
-                   , ExtraDirs (..), HasConfig (..), envOverrideSettingsL
-                   , ghcInstallHook, minimalEnvSettings, platformOnlyRelDir
-                   , whichCompilerL
+                   ( BuildOptsCLI (..), Config (..), ExtraDirs (..)
+                   , HasConfig (..), envOverrideSettingsL
+                   , ghcInstallHook, platformOnlyRelDir, whichCompilerL
                    )
 import           Stack.Types.Docker ( dockerStackExeArgName )
 import           Stack.Types.DownloadInfo ( DownloadInfo (..) )
@@ -138,6 +137,7 @@ import           Stack.Types.EnvConfig
                    , packageDatabaseDeps, packageDatabaseExtra
                    , packageDatabaseLocal
                    )
+import           Stack.Types.EnvSettings ( EnvSettings (..), minimalEnvSettings )
 import           Stack.Types.GHCDownloadInfo ( GHCDownloadInfo (..) )
 import           Stack.Types.GHCVariant
                    ( GHCVariant (..), HasGHCVariant (..), ghcVariantName

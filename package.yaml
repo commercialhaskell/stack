@@ -274,12 +274,14 @@ library:
   - Stack.Types.Config.Build
   - Stack.Types.Config.Exception
   - Stack.Types.ConfigMonoid
+  - Stack.Types.Curator
   - Stack.Types.Docker
   - Stack.Types.DockerEntrypoint
   - Stack.Types.DownloadInfo
   - Stack.Types.DumpLogs
   - Stack.Types.DumpPackage
   - Stack.Types.EnvConfig
+  - Stack.Types.EnvSettings
   - Stack.Types.GHCDownloadInfo
   - Stack.Types.GHCVariant
   - Stack.Types.GhcOptionKey
@@ -293,6 +295,8 @@ library:
   - Stack.Types.Package
   - Stack.Types.PackageName
   - Stack.Types.Platform
+  - Stack.Types.Project
+  - Stack.Types.ProjectConfig
   - Stack.Types.PvpBounds
   - Stack.Types.Resolver
   - Stack.Types.Runner

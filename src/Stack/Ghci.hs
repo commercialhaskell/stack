@@ -48,8 +48,14 @@ import           Stack.Types.BuildConfig
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
+                   ( ApplyCLIFlag, BuildOptsCLI (..), Config (..)
+                   , HasConfig (..), buildOptsL, defaultBuildOptsCLI
+                   )
 import           Stack.Types.EnvConfig
-                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
+                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
+                   , shaPathForBytes
+                   )
+import           Stack.Types.EnvSettings ( defaultEnvSettings )
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageFile
