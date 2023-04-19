@@ -40,9 +40,9 @@ import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
 import           Stack.Types.Config
                    ( ApplyCLIFlag (..), BuildOpts (..), BuildOptsCLI (..)
-                   , Config (..), Curator (..), HasConfig (..), TestOpts (..)
-                   , buildOptsL
+                   , Config (..), HasConfig (..), TestOpts (..), buildOptsL
                    )
+import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..)
                    , actualCompilerVersionL

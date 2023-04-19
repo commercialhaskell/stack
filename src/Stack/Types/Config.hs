@@ -20,19 +20,11 @@ module Stack.Types.Config
   , askLatestSnapshotUrl
   , configProjectRoot
   -- * Details
-  -- ** GlobalOpts & GlobalOptsMonoid
-  , defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
-  , Project (..)
-  , ProjectConfig (..)
-  , Curator (..)
   , ProjectAndConfigMonoid (..)
   , parseProjectAndConfigMonoid
-  -- ** Styles
-  , readStyles
   -- * Paths
   , bindirSuffix
-  , GlobalInfoSource (..)
   , docDirSuffix
   , platformOnlyRelDir
   , workDirL
@@ -50,24 +42,17 @@ module Stack.Types.Config
   , envOverrideSettingsL
   -- * Helper logging functions
   , prettyStackDevL
-  -- * Lens reexport
-  , view
-  , to
   ) where
 
 import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), ToJSON (..), Value, WithJSONWarnings (..)
-                   , (.=), (...:), (..:?), (..!=), jsonSubWarnings
-                   , jsonSubWarningsT, jsonSubWarningsTT, object
+                   ( Value, WithJSONWarnings (..), (...:), (..:?), (..!=)
+                   , jsonSubWarnings, jsonSubWarningsT, jsonSubWarningsTT
                    , withObjectWarnings
                    )
-import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Yaml as Yaml
 import           Distribution.System ( Platform )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Options.Applicative ( ReadM )
-import qualified Options.Applicative.Types as OA
 import           Path ( (</>), parent, reldir, relfile )
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
 import           Stack.Constants ( bindirSuffix, docDirSuffix )
@@ -90,6 +75,8 @@ import           Stack.Types.Nix ( NixOpts )
 import           Stack.Types.Platform
                    ( HasPlatform (..), PlatformVariant, platformOnlyRelDir
                    )
+import           Stack.Types.Project ( Project (..) )
+import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.PvpBounds ( PvpBounds )
 import           Stack.Types.Resolver ( AbstractResolver )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
@@ -237,103 +224,6 @@ configProjectRoot c =
     PCGlobalProject -> Nothing
     PCNoProject _deps -> Nothing
 
--- | Project configuration information. Not every run of Stack has a
--- true local project; see constructors below.
-data ProjectConfig a
-  = PCProject a
-    -- ^ Normal run: we want a project, and have one. This comes from
-    -- either 'SYLDefault' or 'SYLOverride'.
-  | PCGlobalProject
-    -- ^ No project was found when using 'SYLDefault'. Instead, use
-    -- the implicit global.
-  | PCNoProject ![PackageIdentifierRevision]
-    -- ^ Use a no project run. This comes from 'SYLNoProject'.
-
--- | Default logging level should be something useful but not crazy.
-defaultLogLevel :: LogLevel
-defaultLogLevel = LevelInfo
-
-readStyles :: ReadM StylesUpdate
-readStyles = parseStylesUpdateFromString <$> OA.readerAsk
-
--- | A project is a collection of packages. We can have multiple stack.yaml
--- files, but only one of them may contain project information.
-data Project = Project
-  { projectUserMsg :: !(Maybe String)
-    -- ^ A warning message to display to the user when the auto generated
-    -- config may have issues.
-  , projectPackages :: ![RelFilePath]
-    -- ^ Packages which are actually part of the project (as opposed
-    -- to dependencies).
-  , projectDependencies :: ![RawPackageLocation]
-    -- ^ Dependencies defined within the stack.yaml file, to be applied on top
-    -- of the snapshot.
-  , projectFlags :: !(Map PackageName (Map FlagName Bool))
-    -- ^ Flags to be applied on top of the snapshot flags.
-  , projectResolver :: !RawSnapshotLocation
-    -- ^ How we resolve which @Snapshot@ to use
-  , projectCompiler :: !(Maybe WantedCompiler)
-    -- ^ Override the compiler in 'projectResolver'
-  , projectExtraPackageDBs :: ![FilePath]
-  , projectCurator :: !(Maybe Curator)
-    -- ^ Extra configuration intended exclusively for usage by the curator tool.
-    -- In other words, this is /not/ part of the documented and exposed Stack
-    -- API. SUBJECT TO CHANGE.
-  , projectDropPackages :: !(Set PackageName)
-    -- ^ Packages to drop from the 'projectResolver'.
-  }
-  deriving Show
-
-instance ToJSON Project where
-  -- Expanding the constructor fully to ensure we don't miss any fields.
-  toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator drops) = object $ concat
-    [ maybe [] (\cv -> ["compiler" .= cv]) mcompiler
-    , maybe [] (\msg -> ["user-message" .= msg]) userMsg
-    , [ "extra-package-dbs" .= extraPackageDBs | not (null extraPackageDBs) ]
-    , [ "extra-deps" .= extraDeps | not (null extraDeps) ]
-    , [ "flags" .= fmap toCabalStringMap (toCabalStringMap flags)
-      | not (Map.null flags)
-      ]
-    , ["packages" .= packages]
-    , ["resolver" .= resolver]
-    , maybe [] (\c -> ["curator" .= c]) mcurator
-    , [ "drop-packages" .= Set.map CabalString drops | not (Set.null drops) ]
-    ]
-
--- | Extra configuration intended exclusively for usage by the curator tool. In
--- other words, this is /not/ part of the documented and exposed Stack API.
--- SUBJECT TO CHANGE.
-data Curator = Curator
-  { curatorSkipTest :: !(Set PackageName)
-  , curatorExpectTestFailure :: !(Set PackageName)
-  , curatorSkipBenchmark :: !(Set PackageName)
-  , curatorExpectBenchmarkFailure :: !(Set PackageName)
-  , curatorSkipHaddock :: !(Set PackageName)
-  , curatorExpectHaddockFailure :: !(Set PackageName)
-  }
-  deriving Show
-
-instance ToJSON Curator where
-  toJSON c = object
-    [ "skip-test" .= Set.map CabalString (curatorSkipTest c)
-    , "expect-test-failure" .= Set.map CabalString (curatorExpectTestFailure c)
-    , "skip-bench" .= Set.map CabalString (curatorSkipBenchmark c)
-    , "expect-benchmark-failure" .=
-        Set.map CabalString (curatorExpectTestFailure c)
-    , "skip-haddock" .= Set.map CabalString (curatorSkipHaddock c)
-    , "expect-test-failure" .=
-        Set.map CabalString (curatorExpectHaddockFailure c)
-    ]
-
-instance FromJSON (WithJSONWarnings Curator) where
-  parseJSON = withObjectWarnings "Curator" $ \o -> Curator
-    <$> fmap (Set.map unCabalString) (o ..:? "skip-test" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "expect-test-failure" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "skip-bench" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "expect-benchmark-failure" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "skip-haddock" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "expect-haddock-failure" ..!= mempty)
-
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
 askLatestSnapshotUrl = view $ configL.to configLatestSnapshot
@@ -353,14 +243,6 @@ ghcInstallHook :: HasConfig env => RIO env (Path Abs File)
 ghcInstallHook = do
   hd <- hooksDir
   pure (hd </> [relfile|ghc-install.sh|])
-
--- | Where do we get information on global packages for loading up a
--- 'LoadedSnapshot'?
-data GlobalInfoSource
-  = GISSnapshotHints
-    -- ^ Accept the hints in the snapshot definition
-  | GISCompiler ActualCompiler
-    -- ^ Look up the actual information in the installed compiler
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid

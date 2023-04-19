@@ -8,13 +8,14 @@ module Stack.Options.GlobalParser
   ) where
 
 import           Options.Applicative
-                   ( Parser, auto, completer, help, hidden, internal, long
-                   , metavar, option, strOption, value
+                   ( Parser, ReadM, auto, completer, help, hidden, internal
+                   , long, metavar, option, strOption, value
                    )
 import           Options.Applicative.Builder.Extra
                    ( fileExtCompleter, firstBoolFlagsFalse
                    , firstBoolFlagsNoDefault, firstBoolFlagsTrue, optionalFirst
                    )
+import           Options.Applicative.Types ( readerAsk )
 import           Path.IO ( getCurrentDir, resolveDir', resolveFile' )
 import qualified Stack.Docker as Docker
 import           Stack.Prelude
@@ -23,7 +24,6 @@ import           Stack.Options.LogLevelParser ( logLevelOptsParser )
 import           Stack.Options.ResolverParser
                    ( abstractResolverOptsParser, compilerOptsParser )
 import           Stack.Options.Utils ( GlobalOptsContext (..), hideMods )
-import           Stack.Types.Config ( defaultLogLevel, readStyles )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.GlobalOptsMonoid ( GlobalOptsMonoid (..) )
 import           Stack.Types.LockFileBehavior
@@ -143,3 +143,10 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
                 _ -> LFBReadOnly
         in  fromFirst defLFB globalMonoidLockFileBehavior
     }
+
+-- | Default logging level should be something useful but not crazy.
+defaultLogLevel :: LogLevel
+defaultLogLevel = LevelInfo
+
+readStyles :: ReadM StylesUpdate
+readStyles = parseStylesUpdateFromString <$> readerAsk

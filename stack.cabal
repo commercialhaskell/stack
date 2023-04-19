@@ -254,6 +254,7 @@ library
       Stack.Types.Config.Build
       Stack.Types.Config.Exception
       Stack.Types.ConfigMonoid
+      Stack.Types.Curator
       Stack.Types.Docker
       Stack.Types.DockerEntrypoint
       Stack.Types.DownloadInfo
@@ -274,6 +275,8 @@ library
       Stack.Types.Package
       Stack.Types.PackageName
       Stack.Types.Platform
+      Stack.Types.Project
+      Stack.Types.ProjectConfig
       Stack.Types.PvpBounds
       Stack.Types.Resolver
       Stack.Types.Runner

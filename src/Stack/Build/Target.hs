@@ -76,11 +76,11 @@ import           Stack.SourceMap ( additionalDepPackage )
 import           Stack.Prelude
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.Config
-                   ( BuildOptsCLI (..), Config (..), ProjectConfig (..) )
+import           Stack.Types.Config ( BuildOptsCLI (..), Config (..) )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), renderComponent )
 import           Stack.Types.Build ( BuildPrettyException (..) )
+import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.SourceMap
                    ( DepPackage (..), GlobalPackage (..), PackageType (..)
                    , ProjectPackage, SMActual (..), SMTargets (..)

@@ -45,8 +45,9 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
                    ( BuildOpts (..), BuildOptsCLI (..), BuildSubset (..)
-                   , Config (..), Curator (..), HasConfig (..), stackRootL
+                   , Config (..), HasConfig (..), stackRootL
                    )
+import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency
                    ( DepValue (DepValue), DepType (AsLibrary) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )

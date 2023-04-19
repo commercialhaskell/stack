@@ -149,9 +149,9 @@ import           Stack.Types.CompilerPaths
                    )
 import           Stack.Types.Config
                    ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI (..)
-                   , CabalVerbosity (..), Config (..), Curator (..)
-                   , HaddockOpts (..), HasConfig (..), TestOpts (..)
-                   , buildOptsL, stackRootL, whichCompilerL
+                   , CabalVerbosity (..), Config (..), HaddockOpts (..)
+                   , HasConfig (..), TestOpts (..), buildOptsL, stackRootL
+                   , whichCompilerL
                    )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
@@ -177,6 +177,7 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
+import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Runner ( HasRunner, globalOptsL, terminalL )
 import           Stack.Types.SourceMap ( Target )
 import           Stack.Types.Version ( withinRange )

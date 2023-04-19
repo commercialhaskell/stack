@@ -13,7 +13,7 @@ import           Data.List ( find )
 import qualified Data.Text as T
 import           Distribution.Version ( simplifyVersionRange )
 import           Stack.Prelude
-import           Stack.Types.Config ( Project (..) )
+import           Stack.Types.Project ( Project (..) )
 import           Stack.Types.Docker
                    ( DockerOpts (..), DockerMonoidRepoOrImage (..)
                    , DockerOptsMonoid (..), dockerImageArgName
