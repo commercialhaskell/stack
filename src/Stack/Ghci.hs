@@ -49,7 +49,9 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
 import           Stack.Types.EnvConfig
-                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
+                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
+                   , shaPathForBytes
+                   )
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageFile

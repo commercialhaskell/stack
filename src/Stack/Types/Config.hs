@@ -40,9 +40,6 @@ module Stack.Types.Config
   , GlobalInfoSource (..)
   , docDirSuffix
   , platformOnlyRelDir
-  , useShaPathOnWindows
-  , shaPath
-  , shaPathForBytes
   , workDirL
   , ghcInstallHook
   -- * Command-related types
@@ -69,29 +66,22 @@ module Stack.Types.Config
   , to
   ) where
 
-import           Crypto.Hash ( SHA1 (..), hashWith )
 import           Pantry.Internal.AesonExtended
                    ( FromJSON (..), ToJSON (..), Value, WithJSONWarnings (..)
                    , (.=), (...:), (..:?), (..!=), jsonSubWarnings
                    , jsonSubWarningsT, jsonSubWarningsTT, object
                    , withObjectWarnings
                    )
-import qualified Data.ByteArray.Encoding as Mem ( Base(Base16), convertToBase )
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import           Distribution.System ( Platform )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Options.Applicative ( ReadM )
 import qualified Options.Applicative.Types as OA
-import           Path
-                   ( (</>), parent, parseAbsDir, parseAbsFile, parseRelDir
-                   , parseRelFile, reldir, relfile
-                   )
+import           Path ( (</>), parent, reldir, relfile )
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
-import           Stack.Constants ( bindirSuffix, docDirSuffix, osIsWindows )
+import           Stack.Constants ( bindirSuffix, docDirSuffix )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
@@ -388,40 +378,6 @@ ghcInstallHook :: HasConfig env => RIO env (Path Abs File)
 ghcInstallHook = do
   hd <- hooksDir
   pure (hd </> [relfile|ghc-install.sh|])
-
--- | This is an attempt to shorten Stack paths on Windows to decrease our
--- chances of hitting 260 symbol path limit. The idea is to calculate
--- SHA1 hash of the path used on other architectures, encode with base
--- 16 and take first 8 symbols of it.
-useShaPathOnWindows :: MonadThrow m => Path Rel Dir -> m (Path Rel Dir)
-useShaPathOnWindows
-  | osIsWindows = shaPath
-  | otherwise = pure
-
-shaPath :: (IsPath Rel t, MonadThrow m) => Path Rel t -> m (Path Rel t)
-shaPath = shaPathForBytes . encodeUtf8 . T.pack . toFilePath
-
-shaPathForBytes :: (IsPath Rel t, MonadThrow m) => ByteString -> m (Path Rel t)
-shaPathForBytes
-  = parsePath . S8.unpack . S8.take 8
-  . Mem.convertToBase Mem.Base16 . hashWith SHA1
-
--- TODO: Move something like this into the path package. Consider
--- subsuming path-io's 'AnyPath'?
-class IsPath b t where
-  parsePath :: MonadThrow m => FilePath -> m (Path b t)
-
-instance IsPath Abs Dir where
-  parsePath = parseAbsDir
-
-instance IsPath Rel Dir where
-  parsePath = parseRelDir
-
-instance IsPath Abs File where
-  parsePath = parseAbsFile
-
-instance IsPath Rel File where
-  parsePath = parseRelFile
 
 -- | Where do we get information on global packages for loading up a
 -- 'LoadedSnapshot'?
