@@ -45,16 +45,14 @@ import           Stack.SourceMap ( getCompilerInfo, immutableLocSha )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..) )
-import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), defaultEnvSettings
-                   , stackRootL
-                   )
+import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , appropriateGhcColorFlag
                    )
+import           Stack.Types.EnvSettings ( defaultEnvSettings )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )

@@ -150,8 +150,8 @@ import           Stack.Types.CompilerPaths
 import           Stack.Types.Config
                    ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI (..)
                    , CabalVerbosity (..), Config (..), Curator (..)
-                   , EnvSettings (..), HaddockOpts (..), HasConfig (..)
-                   , TestOpts (..), buildOptsL, stackRootL, whichCompilerL
+                   , HaddockOpts (..), HasConfig (..), TestOpts (..)
+                   , buildOptsL, stackRootL, whichCompilerL
                    )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
@@ -162,6 +162,7 @@ import           Stack.Types.EnvConfig
                    , packageDatabaseLocal, platformGhcRelDir
                    , shouldForceGhcColorFlag
                    )
+import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString, unGhcPkgId )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.NamedComponent

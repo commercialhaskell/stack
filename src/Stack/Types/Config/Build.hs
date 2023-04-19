@@ -5,11 +5,17 @@
 -- | Configuration options for building.
 module Stack.Types.Config.Build
   ( BuildOpts (..)
+  , buildOptsHaddockL
+  , buildOptsInstallExesL
   , BuildCommand (..)
   , defaultBuildOpts
   , defaultBuildOptsCLI
   , BuildOptsCLI (..)
   , BuildOptsMonoid (..)
+  , buildOptsMonoidBenchmarksL
+  , buildOptsMonoidHaddockL
+  , buildOptsMonoidInstallExesL
+  , buildOptsMonoidTestsL
   , TestOpts (..)
   , defaultTestOpts
   , TestOptsMonoid (..)
@@ -531,3 +537,33 @@ instance FromJSON CabalVerbosity where
 
 instance Parsec CabalVerbosity where
   parsec = CabalVerbosity <$> parsec
+
+buildOptsMonoidHaddockL :: Lens' BuildOptsMonoid (Maybe Bool)
+buildOptsMonoidHaddockL =
+  lens (getFirstFalse . buildMonoidHaddock)
+    (\buildMonoid t -> buildMonoid {buildMonoidHaddock = FirstFalse t})
+
+buildOptsMonoidTestsL :: Lens' BuildOptsMonoid (Maybe Bool)
+buildOptsMonoidTestsL =
+  lens (getFirstFalse . buildMonoidTests)
+    (\buildMonoid t -> buildMonoid {buildMonoidTests = FirstFalse t})
+
+buildOptsMonoidBenchmarksL :: Lens' BuildOptsMonoid (Maybe Bool)
+buildOptsMonoidBenchmarksL =
+  lens (getFirstFalse . buildMonoidBenchmarks)
+    (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = FirstFalse t})
+
+buildOptsMonoidInstallExesL :: Lens' BuildOptsMonoid (Maybe Bool)
+buildOptsMonoidInstallExesL =
+  lens (getFirstFalse . buildMonoidInstallExes)
+    (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = FirstFalse t})
+
+buildOptsInstallExesL :: Lens' BuildOpts Bool
+buildOptsInstallExesL =
+  lens boptsInstallExes
+    (\bopts t -> bopts {boptsInstallExes = t})
+
+buildOptsHaddockL :: Lens' BuildOpts Bool
+buildOptsHaddockL =
+  lens boptsHaddock
+    (\bopts t -> bopts {boptsHaddock = t})

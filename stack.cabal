@@ -260,6 +260,7 @@ library
       Stack.Types.DumpLogs
       Stack.Types.DumpPackage
       Stack.Types.EnvConfig
+      Stack.Types.EnvSettings
       Stack.Types.GHCDownloadInfo
       Stack.Types.GHCVariant
       Stack.Types.GhcOptionKey

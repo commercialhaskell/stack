@@ -20,11 +20,6 @@ module Stack.Types.Config
   , askLatestSnapshotUrl
   , configProjectRoot
   -- * Details
-  -- ** EnvSettings
-  , EnvSettings (..)
-  , minimalEnvSettings
-  , defaultEnvSettings
-  , plainEnvSettings
   -- ** GlobalOpts & GlobalOptsMonoid
   , defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
@@ -48,12 +43,6 @@ module Stack.Types.Config
   , ExtraDirs (..)
   , buildOptsL
   , globalOptsL
-  , buildOptsInstallExesL
-  , buildOptsMonoidHaddockL
-  , buildOptsMonoidTestsL
-  , buildOptsMonoidBenchmarksL
-  , buildOptsMonoidInstallExesL
-  , buildOptsHaddockL
   , globalOptsBuildOptsMonoidL
   , stackRootL
   , stackGlobalConfigL
@@ -94,6 +83,7 @@ import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoidObject)
 import           Stack.Types.Docker ( DockerOpts )
 import           Stack.Types.DumpLogs ( DumpLogs )
+import           Stack.Types.EnvSettings ( EnvSettings )
 import           Stack.Types.GHCVariant ( GHCVariant (..), HasGHCVariant (..) )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Nix ( NixOpts )
@@ -247,21 +237,6 @@ configProjectRoot c =
     PCGlobalProject -> Nothing
     PCNoProject _deps -> Nothing
 
--- | Controls which version of the environment is used
-data EnvSettings = EnvSettings
-  { esIncludeLocals :: !Bool
-  -- ^ include local project bin directory, GHC_PACKAGE_PATH, etc
-  , esIncludeGhcPackagePath :: !Bool
-  -- ^ include the GHC_PACKAGE_PATH variable
-  , esStackExe :: !Bool
-  -- ^ set the STACK_EXE variable to the current executable name
-  , esLocaleUtf8 :: !Bool
-  -- ^ set the locale to C.UTF-8
-  , esKeepGhcRts :: !Bool
-  -- ^ if True, keep GHCRTS variable in environment
-  }
-  deriving (Eq, Ord, Show)
-
 -- | Project configuration information. Not every run of Stack has a
 -- true local project; see constructors below.
 data ProjectConfig a
@@ -387,42 +362,6 @@ data GlobalInfoSource
   | GISCompiler ActualCompiler
     -- ^ Look up the actual information in the installed compiler
 
-minimalEnvSettings :: EnvSettings
-minimalEnvSettings =
-  EnvSettings
-  { esIncludeLocals = False
-  , esIncludeGhcPackagePath = False
-  , esStackExe = False
-  , esLocaleUtf8 = False
-  , esKeepGhcRts = False
-  }
-
--- | Default @EnvSettings@ which includes locals and GHC_PACKAGE_PATH.
---
--- Note that this also passes through the GHCRTS environment variable.
--- See https://github.com/commercialhaskell/stack/issues/3444
-defaultEnvSettings :: EnvSettings
-defaultEnvSettings = EnvSettings
-  { esIncludeLocals = True
-  , esIncludeGhcPackagePath = True
-  , esStackExe = True
-  , esLocaleUtf8 = False
-  , esKeepGhcRts = True
-  }
-
--- | Environment settings which do not embellish the environment
---
--- Note that this also passes through the GHCRTS environment variable.
--- See https://github.com/commercialhaskell/stack/issues/3444
-plainEnvSettings :: EnvSettings
-plainEnvSettings = EnvSettings
-  { esIncludeLocals = False
-  , esIncludeGhcPackagePath = False
-  , esStackExe = False
-  , esLocaleUtf8 = False
-  , esKeepGhcRts = True
-  }
-
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
 
@@ -541,36 +480,6 @@ buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens
   configBuild
   (\x y -> x { configBuild = y })
-
-buildOptsMonoidHaddockL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidHaddockL =
-  lens (getFirstFalse . buildMonoidHaddock)
-    (\buildMonoid t -> buildMonoid {buildMonoidHaddock = FirstFalse t})
-
-buildOptsMonoidTestsL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidTestsL =
-  lens (getFirstFalse . buildMonoidTests)
-    (\buildMonoid t -> buildMonoid {buildMonoidTests = FirstFalse t})
-
-buildOptsMonoidBenchmarksL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidBenchmarksL =
-  lens (getFirstFalse . buildMonoidBenchmarks)
-    (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = FirstFalse t})
-
-buildOptsMonoidInstallExesL :: Lens' BuildOptsMonoid (Maybe Bool)
-buildOptsMonoidInstallExesL =
-  lens (getFirstFalse . buildMonoidInstallExes)
-    (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = FirstFalse t})
-
-buildOptsInstallExesL :: Lens' BuildOpts Bool
-buildOptsInstallExesL =
-  lens boptsInstallExes
-    (\bopts t -> bopts {boptsInstallExes = t})
-
-buildOptsHaddockL :: Lens' BuildOpts Bool
-buildOptsHaddockL =
-  lens boptsHaddock
-    (\bopts t -> bopts {boptsHaddock = t})
 
 globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL =

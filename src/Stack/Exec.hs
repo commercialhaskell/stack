@@ -28,10 +28,11 @@ import           Stack.Types.BuildConfig
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getGhcPkgExe )
 import           Stack.Types.Config
-                   ( BuildOptsCLI (..), Config (..), EnvSettings (..)
-                   , HasConfig (..), defaultBuildOptsCLI
+                   ( BuildOptsCLI (..), Config (..), HasConfig (..)
+                   , defaultBuildOptsCLI
                    )
 import           Stack.Types.EnvConfig ( EnvConfig )
+import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap ( SMWanted (..), ppComponents )
 import           System.Directory ( withCurrentDirectory )

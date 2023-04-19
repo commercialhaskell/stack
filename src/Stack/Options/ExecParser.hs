@@ -14,7 +14,7 @@ import           Stack.Exec
                    ( ExecOpts (..), ExecOptsExtra (..), SpecialExecCmd (..) )
 import           Stack.Options.Completion
 import           Stack.Prelude
-import           Stack.Types.Config
+import           Stack.Types.EnvSettings ( EnvSettings (..) )
 
 -- | Parse command line arguments for Stack's @exec@, @ghc@, @run@,
 -- @runghc@ and @runhaskell@ commands.
