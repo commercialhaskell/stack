@@ -11,7 +11,6 @@ module Stack.Types.Config.Exception
   , packageIndicesWarning
   ) where
 
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as T
 import           Data.Yaml ( ParseException )
 import qualified Data.Yaml as Yaml
@@ -158,9 +157,6 @@ instance Exception ConfigException where
 data ConfigPrettyException
   = ParseConfigFileException !(Path Abs File) !ParseException
   | StackWorkEnvNotRelativeDir !String
-  | NoMatchingSnapshot !(NonEmpty SnapName)
-  | ResolverMismatch !RawSnapshotLocation String
-  | ResolverPartial !RawSnapshotLocation !String
   | MultiplePackageIndices [PackageIndexConfig]
   | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
   deriving (Show, Typeable)
@@ -202,40 +198,6 @@ instance Pretty ConfigPrettyException where
                 \of the project or package. Stack encountered the value:"
          , style Error (fromString x) <> "."
          ]
-  pretty (NoMatchingSnapshot names) =
-    "[S-1833]"
-    <> line
-    <> flow "None of the following snapshots provides a compiler matching \
-            \your package(s):"
-    <> line
-    <> bulletedList (map (fromString . show) (NonEmpty.toList names))
-    <> blankLine
-    <> resolveOptions
-  pretty (ResolverMismatch resolver errDesc) =
-    "[S-6395]"
-    <> line
-    <> fillSep
-         [ "Snapshot"
-         , style Url (pretty $ PrettyRawSnapshotLocation resolver)
-         , flow "does not have a matching compiler to build some or all of \
-                \your package(s)."
-         ]
-    <> blankLine
-    <> indent 4 (string errDesc)
-    <> line
-    <> resolveOptions
-  pretty (ResolverPartial resolver errDesc) =
-    "[S-2422]"
-    <> line
-    <> fillSep
-         [ "Snapshot"
-         , style Url (pretty $ PrettyRawSnapshotLocation resolver)
-         , flow "does not have all the packages to match your requirements."
-         ]
-    <> blankLine
-    <> indent 4 (string errDesc)
-    <> line
-    <> resolveOptions
   pretty (MultiplePackageIndices pics) =
     "[S-3251]"
     <> line
@@ -289,20 +251,3 @@ packageIndicesWarning =
     , flow "key is deprecated in favour of"
     , style Shell "package-index" <> "."
     ]
-
-resolveOptions :: StyleDoc
-resolveOptions =
-     flow "This may be resolved by:"
-  <> line
-  <> bulletedList
-       [ fillSep
-           [ "Using"
-           , style Shell "--omit-packages"
-           , "to exclude mismatching package(s)."
-           ]
-       , fillSep
-           [ "Using"
-           , style Shell "--resolver"
-           , "to specify a matching snapshot/resolver."
-           ]
-       ]

@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-04-16.
+`master` branch of the Stack repository. Last updated: 2023-04-19.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -164,6 +164,9 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-8332] = SnapshotDownloadFailure SomeException
         [S-8009] | ConfigFileAlreadyExists FilePath
         [S-5267] | PackageNameInvalid [FilePath]
+        [S-1833] | NoMatchingSnapshot (NonEmpty SnapName)
+        [S-6395] | ResolverMismatch RawSnapshotLocation String
+        [S-2422] | ResolverPartial RawSnapshotLocation String
         ~~~
 
     -   `Stack.List.ListException`
@@ -366,7 +369,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-7972] | PantryException PantryException
         ~~~
 
-    -   `Stack.Types.Config.ConfigException`
+    -   `Stack.Types.Config.Exception.ConfigException`
 
         ~~~haskell
         [S-8981] | ParseCustomSnapshotException Text ParseException
@@ -386,14 +389,11 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-5472] | NoLTSFound
         ~~~
 
-    -   `Stack.Types.Config.ConfigPrettyException`
+    -   `Stack.Types.Config.Exception.ConfigPrettyException`
 
         ~~~haskell
         [S-6602] = ParseConfigFileException (Path Abs File) ParseException
         [S-7462] | StackWorkEnvNotRelativeDir String
-        [S-1833] | NoMatchingSnapshot (NonEmpty SnapName)
-        [S-6395] | ResolverMismatch RawSnapshotLocation String
-        [S-2422] | ResolverPartial RawSnapshotLocation String
         [S-3251] | MultiplePackageIndices [PackageIndexConfig]
         [S-5470] | DuplicateLocalPackageNames [(PackageName, [PackageLocation])]
         ~~~

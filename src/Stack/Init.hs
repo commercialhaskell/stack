@@ -48,7 +48,6 @@ import           Stack.Runners
 import           Stack.SourceMap
                    ( SnapshotCandidate, loadProjectSnapshotCandidate )
 import           Stack.Types.Config ( HasConfig )
-import           Stack.Types.Config.Exception ( ConfigPrettyException (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Project ( Project (..) )
@@ -72,6 +71,9 @@ data InitPrettyException
   = SnapshotDownloadFailure SomeException
   | ConfigFileAlreadyExists FilePath
   | PackageNameInvalid [(Path Abs File, PackageName)]
+  | NoMatchingSnapshot !(NonEmpty SnapName)
+  | ResolverMismatch !RawSnapshotLocation String
+  | ResolverPartial !RawSnapshotLocation !String
   deriving (Show, Typeable)
 
 instance Pretty InitPrettyException where
@@ -129,6 +131,57 @@ instance Pretty InitPrettyException where
             \following error:"
     <> blankLine
     <> string (displayException e)
+  pretty (NoMatchingSnapshot names) =
+    "[S-1833]"
+    <> line
+    <> flow "None of the following snapshots provides a compiler matching \
+            \your package(s):"
+    <> line
+    <> bulletedList (map (fromString . show) (NonEmpty.toList names))
+    <> blankLine
+    <> resolveOptions
+  pretty (ResolverMismatch resolver errDesc) =
+    "[S-6395]"
+    <> line
+    <> fillSep
+         [ "Snapshot"
+         , style Url (pretty $ PrettyRawSnapshotLocation resolver)
+         , flow "does not have a matching compiler to build some or all of \
+                \your package(s)."
+         ]
+    <> blankLine
+    <> indent 4 (string errDesc)
+    <> line
+    <> resolveOptions
+  pretty (ResolverPartial resolver errDesc) =
+    "[S-2422]"
+    <> line
+    <> fillSep
+         [ "Snapshot"
+         , style Url (pretty $ PrettyRawSnapshotLocation resolver)
+         , flow "does not have all the packages to match your requirements."
+         ]
+    <> blankLine
+    <> indent 4 (string errDesc)
+    <> line
+    <> resolveOptions
+
+resolveOptions :: StyleDoc
+resolveOptions =
+     flow "This may be resolved by:"
+  <> line
+  <> bulletedList
+       [ fillSep
+           [ "Using"
+           , style Shell "--omit-packages"
+           , "to exclude mismatching package(s)."
+           ]
+       , fillSep
+           [ "Using"
+           , style Shell "--resolver"
+           , "to specify a matching snapshot/resolver."
+           ]
+       ]
 
 instance Exception InitPrettyException
 
