@@ -103,23 +103,21 @@ import           Stack.Types.Build ( BuildException (..), FlagSource (..) )
 import           Stack.Types.ColorWhen ( ColorWhen (..) )
 import           Stack.Types.Compiler ( defaultCompilerRepository )
 import           Stack.Types.Config
-                   ( BuildConfig (..)
-                   , BuildOpts (..), Config (..)
-                   , ConfigException (..)
-                   , ConfigPrettyException (..), HasConfig (..)
-                   , ParseAbsolutePathException (..)
-                   , PlatformVariant (..), Project (..)
-                   , ProjectAndConfigMonoid (..), ProjectConfig (..)
-                   , askLatestSnapshotUrl, configProjectRoot
-                   , packageIndicesWarning, parseConfigMonoid
-                   , parseProjectAndConfigMonoid, platformOnlyRelDir
-                   , stackRootL, workDirL
+                   ( BuildConfig (..), BuildOpts (..), Config (..)
+                   , ConfigException (..), ConfigPrettyException (..)
+                   , HasConfig (..), ParseAbsolutePathException (..)
+                   , Project (..), ProjectAndConfigMonoid (..)
+                   , ProjectConfig (..), askLatestSnapshotUrl, configProjectRoot
+                   , packageIndicesWarning, parseProjectAndConfigMonoid
+                   , platformOnlyRelDir, stackRootL, workDirL
                    )
-import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
+import           Stack.Types.ConfigMonoid
+                   ( ConfigMonoid (..), parseConfigMonoid )
 import           Stack.Types.Docker ( DockerOptsMonoid (..), dockerEnable )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
 import           Stack.Types.Nix ( nixEnable )
+import           Stack.Types.PlatformVariant ( PlatformVariant (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
 import           Stack.Types.Resolver ( AbstractResolver (..), Snapshots (..) )
 import           Stack.Types.Runner

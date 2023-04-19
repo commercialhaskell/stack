@@ -260,12 +260,14 @@ library:
   - Stack.Storage.User
   - Stack.Storage.Util
   - Stack.Templates
+  - Stack.Types.AddCommand
   - Stack.Types.AllowNewerDeps
   - Stack.Types.ApplyGhcOptions
   - Stack.Types.Build
   - Stack.Types.CabalConfigKey
   - Stack.Types.ColorWhen
   - Stack.Types.CompilerBuild
+  - Stack.Types.CompilerPaths
   - Stack.Types.Compiler
   - Stack.Types.Config
   - Stack.Types.Config.Build
@@ -274,15 +276,21 @@ library:
   - Stack.Types.DockerEntrypoint
   - Stack.Types.DownloadInfo
   - Stack.Types.DumpLogs
+  - Stack.Types.DumpPackage
+  - Stack.Types.EnvConfig
   - Stack.Types.GHCDownloadInfo
   - Stack.Types.GHCVariant
+  - Stack.Types.GhcOptionKey
+  - Stack.Types.GhcOptions
   - Stack.Types.GhcPkgId
   - Stack.Types.GlobalOpts
+  - Stack.Types.GlobalOptsMonoid
   - Stack.Types.LockFileBehavior
   - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package
   - Stack.Types.PackageName
+  - Stack.Types.PlatformVariant
   - Stack.Types.PvpBounds
   - Stack.Types.Resolver
   - Stack.Types.Runner

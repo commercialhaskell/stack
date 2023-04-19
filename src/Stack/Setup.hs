@@ -118,23 +118,28 @@ import           Stack.Types.Compiler
 import           Stack.Types.CompilerBuild
                    ( CompilerBuild (..), compilerBuildName, compilerBuildSuffix
                    )
+import           Stack.Types.CompilerPaths
+                   ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..) )
 import           Stack.Types.Config
-                   ( BuildConfig (..), BuildOptsCLI (..), CompilerPaths (..)
-                   , Config (..), DumpPackage (..), EnvConfig (..)
-                   , EnvSettings (..), ExtraDirs (..), GhcPkgExe (..)
-                   , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
-                   , HasEnvConfig (..), HasGHCVariant (..), HasPlatform (..)
-                   , PlatformVariant (..), envOverrideSettingsL, extraBinDirs
-                   , ghcInstallHook, minimalEnvSettings, packageDatabaseDeps
-                   , packageDatabaseExtra, packageDatabaseLocal
+                   ( BuildConfig (..), BuildOptsCLI (..), Config (..)
+                   , EnvSettings (..), ExtraDirs (..), HasBuildConfig (..)
+                   , HasConfig (..), HasGHCVariant (..), HasPlatform (..)
+                   , envOverrideSettingsL, ghcInstallHook, minimalEnvSettings
                    , platformOnlyRelDir, projectRootL, wantedCompilerVersionL
                    , whichCompilerL
                    )
 import           Stack.Types.Docker ( dockerStackExeArgName )
 import           Stack.Types.DownloadInfo ( DownloadInfo (..) )
+import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.EnvConfig
+                   ( EnvConfig (..), HasEnvConfig (..), extraBinDirs
+                   , packageDatabaseDeps, packageDatabaseExtra
+                   , packageDatabaseLocal
+                   )
 import           Stack.Types.GHCDownloadInfo ( GHCDownloadInfo (..) )
 import           Stack.Types.GHCVariant
                    ( GHCVariant (..), ghcVariantName, ghcVariantSuffix )
+import           Stack.Types.PlatformVariant ( PlatformVariant (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
 import           Stack.Types.SourceMap ( SMActual (..), SourceMap (..) )

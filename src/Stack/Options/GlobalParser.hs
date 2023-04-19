@@ -23,9 +23,9 @@ import           Stack.Options.LogLevelParser ( logLevelOptsParser )
 import           Stack.Options.ResolverParser
                    ( abstractResolverOptsParser, compilerOptsParser )
 import           Stack.Options.Utils ( GlobalOptsContext (..), hideMods )
-import           Stack.Types.Config
-                   ( GlobalOptsMonoid (..), defaultLogLevel, readStyles )
+import           Stack.Types.Config ( defaultLogLevel, readStyles )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.GlobalOptsMonoid ( GlobalOptsMonoid (..) )
 import           Stack.Types.LockFileBehavior
                    ( LockFileBehavior (..), readLockFileBehavior )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )

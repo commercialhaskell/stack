@@ -62,10 +62,12 @@ import           Stack.Types.Build
                    , Installed (..), PrecompiledCache (..)
                    )
 import           Stack.Types.Cache ( ConfigCacheType (..) )
-import           Stack.Types.Config
-                   ( HasEnvConfig (..), actualCompilerVersionL, cabalVersionL
-                   , envConfigSourceMapHash, installationRootDeps
-                   , installationRootLocal, platformGhcRelDir, stackRootL
+import           Stack.Types.CompilerPaths ( cabalVersionL )
+import           Stack.Types.Config ( stackRootL )
+import           Stack.Types.EnvConfig
+                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
+                   , installationRootDeps, installationRootLocal
+                   , platformGhcRelDir
                    )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )

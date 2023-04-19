@@ -39,17 +39,20 @@ import           Stack.Types.Build
                    , toCachePkgSrc
                    )
 import           Stack.Types.Compiler ( WhichCompiler (..) )
+import           Stack.Types.CompilerPaths
+                   ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
                    ( BuildConfig (..), BuildOpts (..), BuildOptsCLI (..)
-                   , BuildSubset (..), CompilerPaths (..), Config (..)
-                   , Curator (..), DumpPackage (..), EnvConfig, EnvSettings (..)
-                   , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
-                   , HasEnvConfig (..), HasGHCVariant, HasPlatform
-                   , HasSourceMap (..), minimalEnvSettings, stackRootL
+                   , BuildSubset (..), Config (..), Curator (..)
+                   , EnvSettings (..), HasBuildConfig (..), HasConfig (..)
+                   , HasGHCVariant, HasPlatform, minimalEnvSettings, stackRootL
                    , stackYamlL
                    )
 import           Stack.Types.Dependency
                    ( DepValue (DepValue), DepType (AsLibrary) )
+import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.EnvConfig
+                   ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
@@ -174,7 +177,10 @@ instance HasPantryConfig Ctx where
 instance HasProcessContext Ctx where
   processContextL = configL.processContextL
 
-instance HasBuildConfig Ctx
+instance HasBuildConfig Ctx where
+  buildConfigL = envConfigL.lens
+    envConfigBuildConfig
+    (\x y -> x { envConfigBuildConfig = y })
 
 instance HasSourceMap Ctx where
   sourceMapL = envConfigL.sourceMapL

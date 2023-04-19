@@ -84,10 +84,11 @@ import           Stack.Types.CompilerBuild
                    ( CompilerBuild, compilerBuildSuffix )
 import           Stack.Types.Config
                    ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI
-                   , BuildSubset (..), Config (..), DumpPackage, EnvConfig
-                   , FileWatchOpts (..), HasConfig (..), TestOpts (..)
-                   , actualCompilerVersionL, defaultBuildOpts
+                   , BuildSubset (..), Config (..), FileWatchOpts (..)
+                   , HasConfig (..), TestOpts (..), defaultBuildOpts
                    )
+import           Stack.Types.DumpPackage ( DumpPackage )
+import           Stack.Types.EnvConfig ( EnvConfig, actualCompilerVersionL )
 import           Stack.Types.GHCVariant ( GHCVariant, ghcVariantSuffix )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.NamedComponent

@@ -141,21 +141,27 @@ import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
                    , compilerVersionString, getGhcVersion
                    )
+import           Stack.Types.CompilerPaths
+                   ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..)
+                   , cabalVersionL, cpWhich, getCompilerPath, getGhcPkgExe
+                   )
 import           Stack.Types.Config
                    ( BenchmarkOpts (..), BuildConfig (..), BuildOpts (..)
-                   , BuildOptsCLI (..), CabalVerbosity (..), CompilerPaths (..)
-                   , Config (..), Curator (..), DumpPackage (..)
-                   , EnvSettings (..), GhcPkgExe (..), HaddockOpts (..)
-                   , HasBuildConfig (..), HasCompiler (..), HasConfig (..)
-                   , HasEnvConfig, HasPlatform (..), TestOpts (..)
-                   , actualCompilerVersionL, appropriateGhcColorFlag
-                   , bindirCompilerTools, buildOptsL, cabalVersionL, cpWhich
-                   , getCompilerPath, getGhcPkgExe, installationRootDeps
-                   , installationRootLocal, packageDatabaseLocal
-                   , platformGhcRelDir, projectRootL, shouldForceGhcColorFlag
-                   , stackRootL, whichCompilerL
+                   , BuildOptsCLI (..), CabalVerbosity (..), Config (..)
+                   , Curator (..), EnvSettings (..), HaddockOpts (..)
+                   , HasBuildConfig (..), HasConfig (..), HasPlatform (..)
+                   , TestOpts (..), buildOptsL, projectRootL, stackRootL
+                   , whichCompilerL
                    )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
+import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.EnvConfig
+                   ( HasEnvConfig (..), actualCompilerVersionL
+                   , appropriateGhcColorFlag, bindirCompilerTools
+                   , installationRootDeps, installationRootLocal
+                   , packageDatabaseLocal, platformGhcRelDir
+                   , shouldForceGhcColorFlag
+                   )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString, unGhcPkgId )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.NamedComponent

@@ -43,7 +43,11 @@ import           Stack.Package
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Build
+import           Stack.Types.CompilerPaths
+                   ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
+import           Stack.Types.EnvConfig
+                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
 import           Stack.Types.NamedComponent
 import           Stack.Types.Package
 import           Stack.Types.PackageFile

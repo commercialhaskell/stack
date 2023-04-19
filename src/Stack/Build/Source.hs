@@ -35,14 +35,17 @@ import           Stack.SourceMap
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build ( FlagSource (..) )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
+import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
 import           Stack.Types.Config
                    ( ApplyCLIFlag (..), BuildConfig (..), BuildOpts (..)
                    , BuildOptsCLI (..), Config (..), Curator (..)
-                   , HasBuildConfig (..), HasCompiler, HasConfig (..)
-                   , HasEnvConfig (..), HasPlatform (..), HasSourceMap (..)
-                   , ProjectPackage (..), TestOpts (..), actualCompilerVersionL
-                   , buildOptsL, envConfigSourceMap, getCompilerPath, ppGPD
+                   , HasBuildConfig (..), HasConfig (..), HasPlatform (..)
+                   , ProjectPackage (..), TestOpts (..), buildOptsL, ppGPD
                    , ppRoot
+                   )
+import           Stack.Types.EnvConfig
+                   ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..)
+                   , actualCompilerVersionL
                    )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCInternalLib )

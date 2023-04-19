@@ -22,6 +22,7 @@ import           Stack.Runners
 import           Stack.Types.Config
 import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.GlobalOptsMonoid ( GlobalOptsMonoid (..) )
 import           Stack.Types.Nix
 import           System.Directory
 import           System.Environment

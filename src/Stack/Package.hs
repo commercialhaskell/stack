@@ -56,15 +56,17 @@ import           Path.Extra ( concatAndCollapseAbsDir, toFilePathNoTrailingSep )
 import           Stack.Constants (relFileCabalMacrosH, relDirLogs)
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Prelude hiding ( Display (..) )
-import           Stack.Types.Compiler ( ActualCompiler (..), getGhcVersion )
 import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
                    , componentOutputDir, packageAutogenDir
                    )
+import           Stack.Types.Compiler ( ActualCompiler (..), getGhcVersion )
+import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config
                    ( Config (..), HasBuildConfig (..), HasConfig (..)
-                   , HasEnvConfig, cabalVersionL, getProjectWorkDir
+                   , getProjectWorkDir
                    )
+import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), internalLibComponents )

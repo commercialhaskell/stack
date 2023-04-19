@@ -25,9 +25,9 @@ import           Path.IO
 import           RIO.Process ( HasProcessContext, proc, readProcess_ )
 import           Stack.Constants ( relFilePackageCache )
 import           Stack.Prelude
-import           Stack.Types.Config ( GhcPkgExe (..) )
-import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.Compiler ( WhichCompiler (..) )
+import           Stack.Types.CompilerPaths ( GhcPkgExe (..) )
+import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           System.FilePath ( searchPathSeparator )
 
 -- | Get the global package database

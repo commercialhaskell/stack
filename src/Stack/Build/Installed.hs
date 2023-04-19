@@ -20,11 +20,12 @@ import           Stack.PackageDump
                    ( conduitDumpPackage, ghcPkgDump, pruneDeps )
 import           Stack.Prelude
 import           Stack.SourceMap ( getPLIVersion, loadVersion )
-import           Stack.Types.Config
-                   ( DumpPackage (..), HasEnvConfig, getGhcPkgExe
-                   , packageDatabaseDeps, packageDatabaseExtra
-                   , packageDatabaseLocal
-                   )
+import           Stack.Types.CompilerPaths ( getGhcPkgExe )
+import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.EnvConfig
+                    ( HasEnvConfig, packageDatabaseDeps, packageDatabaseExtra
+                    , packageDatabaseLocal
+                    )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Package
                    ( InstallLocation (..), InstallMap, Installed (..)

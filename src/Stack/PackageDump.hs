@@ -26,8 +26,8 @@ import           RIO.Process ( HasProcessContext )
 import qualified RIO.Text as T
 import           Stack.GhcPkg ( createDatabase )
 import           Stack.Prelude
-import           Stack.Types.Config
-                   ( DumpPackage (..), GhcPkgExe (..), HasCompiler (..) )
+import           Stack.Types.CompilerPaths ( GhcPkgExe (..), HasCompiler (..) )
+import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId )
 
 -- | Type representing exceptions thrown by functions exported by the

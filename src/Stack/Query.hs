@@ -23,10 +23,8 @@ import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Types.Compiler ( compilerVersionText )
-import           Stack.Types.Config
-                   ( HasEnvConfig, actualCompilerVersionL
-                   , wantedCompilerVersionL
-                   )
+import           Stack.Types.Config ( wantedCompilerVersionL )
+import           Stack.Types.EnvConfig ( HasEnvConfig, actualCompilerVersionL )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.Package ( LocalPackage (..), Package (..) )
 

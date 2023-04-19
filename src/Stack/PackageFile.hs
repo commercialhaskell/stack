@@ -27,8 +27,9 @@ import           Stack.Constants
                    )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Prelude
-import           Stack.Types.Config
-                   ( HasBuildConfig (..), HasEnvConfig, cabalVersionL )
+import           Stack.Types.CompilerPaths ( cabalVersionL )
+import           Stack.Types.Config ( HasBuildConfig (..) )
+import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.PackageFile
                    ( DotCabalPath (..), GetPackageFileContext (..)

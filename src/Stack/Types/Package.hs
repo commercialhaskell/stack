@@ -53,8 +53,8 @@ import           Distribution.System ( Platform (..) )
 import qualified RIO.Text as T
 import           Stack.Prelude
 import           Stack.Types.Compiler ( ActualCompiler )
-import           Stack.Types.Config ( EnvConfig, HasEnvConfig (..) )
 import           Stack.Types.Dependency ( DepValue )
+import           Stack.Types.EnvConfig ( EnvConfig, HasEnvConfig (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.PackageFile

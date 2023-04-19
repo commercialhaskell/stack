@@ -16,7 +16,6 @@ module Stack.Types.Config
   -- * Main configuration types and classes
   -- ** HasPlatform & HasStackRoot
     HasPlatform (..)
-  , PlatformVariant (..)
   -- ** Config & HasConfig
   , Config (..)
   , HasConfig (..)
@@ -38,12 +37,6 @@ module Stack.Types.Config
   , ProjectStorage (..)
   -- ** GHCVariant & HasGHCVariant
   , HasGHCVariant (..)
-  , snapshotsDir
-  -- ** EnvConfig & HasEnvConfig
-  , EnvConfig (..)
-  , HasSourceMap (..)
-  , HasEnvConfig (..)
-  , getCompilerPath
   -- * Details
   -- ** ConfigException
   , HpackExecutable (..)
@@ -51,17 +44,12 @@ module Stack.Types.Config
   , ConfigPrettyException (..)
   , ParseAbsolutePathException (..)
   , packageIndicesWarning
-  -- ** ConfigMonoid
-  , configMonoidInstallGHCName
-  , configMonoidSystemGHCName
-  , parseConfigMonoid
   -- ** EnvSettings
   , EnvSettings (..)
   , minimalEnvSettings
   , defaultEnvSettings
   , plainEnvSettings
   -- ** GlobalOpts & GlobalOptsMonoid
-  , GlobalOptsMonoid (..)
   , defaultLogLevel
   -- ** Project & ProjectAndConfigMonoid
   , Project (..)
@@ -76,36 +64,16 @@ module Stack.Types.Config
   , GlobalInfoSource (..)
   , getProjectWorkDir
   , docDirSuffix
-  , extraBinDirs
-  , hpcReportDir
-  , installationRootDeps
-  , installationRootLocal
-  , bindirCompilerTools
-  , hoogleRoot
-  , hoogleDatabasePath
-  , packageDatabaseDeps
-  , packageDatabaseExtra
-  , packageDatabaseLocal
   , platformOnlyRelDir
-  , platformGhcRelDir
-  , platformGhcVerOnlyRelDir
   , useShaPathOnWindows
   , shaPath
   , shaPathForBytes
   , workDirL
   , ghcInstallHook
   -- * Command-related types
-  , AddCommand
   , module X
   -- * Lens helpers
   , wantedCompilerVersionL
-  , actualCompilerVersionL
-  , HasCompiler (..)
-  , DumpPackage (..)
-  , CompilerPaths (..)
-  , GhcPkgExe (..)
-  , getGhcPkgExe
-  , cpWhich
   , ExtraDirs (..)
   , buildOptsL
   , globalOptsL
@@ -118,11 +86,8 @@ module Stack.Types.Config
   , globalOptsBuildOptsMonoidL
   , stackRootL
   , stackGlobalConfigL
-  , cabalVersionL
   , whichCompilerL
   , envOverrideSettingsL
-  , shouldForceGhcColorFlag
-  , appropriateGhcColorFlag
   -- * Helper logging functions
   , prettyStackDevL
   -- * Lens reexport
@@ -130,72 +95,56 @@ module Stack.Types.Config
   , to
   ) where
 
-import           Control.Monad.Writer ( Writer, tell )
-import           Control.Monad.Trans.Except ( ExceptT )
 import           Crypto.Hash ( SHA1 (..), hashWith )
 import           Pantry.Internal.AesonExtended
-                   ( FromJSON, FromJSONKey (..)
-                   , FromJSONKeyFunction (FromJSONKeyTextParser), Object, ToJSON
-                   , Value, WarningParser, WithJSONWarnings (..), (.=)
-                   ,  (...:), (..:?), (..!=), jsonSubWarnings
-                   , jsonSubWarningsT, jsonSubWarningsTT, object, parseJSON
-                   , toJSON, withObjectWarnings, withText
+                   ( FromJSON (..), ToJSON (..), Value, WithJSONWarnings (..)
+                   , (.=), (...:), (..:?), (..!=), jsonSubWarnings
+                   , jsonSubWarningsT, jsonSubWarningsTT, object
+                   , withObjectWarnings
                    )
-import           Data.Attoparsec.Args ( EscapingMode (Escaping), parseArgs )
 import qualified Data.ByteArray.Encoding as Mem ( Base(Base16), convertToBase )
 import qualified Data.ByteString.Char8 as S8
-import           Data.Coerce ( coerce )
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
-import qualified Data.Map.Strict as M
-import qualified Data.Monoid as Monoid
-import           Data.Monoid.Map ( MonoidMap (..) )
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Yaml ( ParseException )
 import qualified Data.Yaml as Yaml
-import qualified Distribution.License as C
-import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription ( GenericPackageDescription )
 import qualified Distribution.PackageDescription as C
-import           Distribution.System ( Platform, Arch )
+import           Distribution.System ( Platform )
 import qualified Distribution.Text ( display )
-import           Distribution.Version ( anyVersion, mkVersion )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Lens.Micro ( _1, _2 )
 import           Options.Applicative ( ReadM )
-import qualified Options.Applicative as OA
 import qualified Options.Applicative.Types as OA
 import           Pantry.Internal ( Storage )
 import           Path
                    ( (</>), dirname, filename, parent, parseAbsDir, parseAbsFile
                    , parseRelDir, parseRelFile, reldir, relfile
                    )
-import           Stack.Constants
-                   ( bindirSuffix, docDirSuffix, ghcColorForceFlag, osIsWindows
-                   , relDirCompilerTools, relDirHoogle, relDirHpc, relDirInstall
-                   , relDirPkgdb, relDirSnapshots, relFileDatabaseHoo
-                   )
+import           RIO.Process ( HasProcessContext (..), ProcessContext )
+import           Stack.Constants ( bindirSuffix, docDirSuffix, osIsWindows )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), CompilerRepository, WhichCompiler
-                   , compilerVersionString, getGhcVersion, whichCompiler
+                   , whichCompiler
                    )
-import           Stack.Types.CompilerBuild
-                   ( CompilerBuild, compilerBuildSuffix )
-import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
-import           Stack.Types.Docker
-                   ( DockerOpts, VersionRangeJSON (..) )
-import           Stack.Types.DockerEntrypoint ( DockerEntrypoint )
+import           Stack.Types.CompilerBuild ( CompilerBuild )
+import           Stack.Types.ConfigMonoid
+                   ( ConfigMonoid (..), configMonoidAllowDifferentUserName
+                   , configMonoidGHCVariantName, configMonoidSystemGHCName
+                   , parseConfigMonoidObject)
+import           Stack.Types.Docker ( DockerOpts )
 import           Stack.Types.DumpLogs ( DumpLogs )
-import           Stack.Types.GHCVariant ( GHCVariant (..), ghcVariantSuffix )
-import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           Stack.Types.GHCVariant ( GHCVariant (..) )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
-import           Stack.Types.LockFileBehavior ( LockFileBehavior )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Nix ( NixOpts )
+import           Stack.Types.PlatformVariant
+                   ( PlatformVariant, platformVariantSuffix )
 import           Stack.Types.PvpBounds ( PvpBounds )
 import           Stack.Types.Resolver ( AbstractResolver )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
@@ -203,15 +152,13 @@ import           Stack.Types.SCM ( SCM )
 import           Stack.Types.SetupInfo ( SetupInfo )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
-                   , SMWanted (..), SourceMap (..), SourceMapHash, smRelDir
+                   , SMWanted (..)
                    )
 import           Stack.Types.TemplateName ( TemplateName )
 import           Stack.Types.Version
-                   ( IntersectingVersionRange (..), VersionCheck (..)
-                   , VersionRange, stackVersion, versionRangeText
+                   ( VersionCheck (..), VersionRange, stackVersion
+                   , versionRangeText
                    )
-import qualified System.FilePath as FilePath
-import           RIO.Process ( HasProcessContext (..), ProcessContext )
 
 -- Re-exports
 import           Stack.Types.Config.Build as X
@@ -640,12 +587,6 @@ data EnvSettings = EnvSettings
   }
   deriving (Eq, Ord, Show)
 
-type AddCommand =
-  ExceptT (RIO Runner ())
-          (Writer (OA.Mod OA.CommandFields (RIO Runner (), GlobalOptsMonoid)))
-          ()
-
-
 -- | Project configuration information. Not every run of Stack has a
 -- true local project; see constructors below.
 data ProjectConfig a
@@ -657,47 +598,6 @@ data ProjectConfig a
     -- the implicit global.
   | PCNoProject ![PackageIdentifierRevision]
     -- ^ Use a no project run. This comes from 'SYLNoProject'.
-
--- | Parsed global command-line options monoid.
-data GlobalOptsMonoid = GlobalOptsMonoid
-  { globalMonoidReExecVersion :: !(First String)
-    -- ^ Expected re-exec in container version
-  , globalMonoidDockerEntrypoint :: !(First DockerEntrypoint)
-    -- ^ Data used when Stack is acting as a Docker entrypoint (internal use
-    -- only)
-  , globalMonoidLogLevel     :: !(First LogLevel)
-    -- ^ Log level
-  , globalMonoidTimeInLog    :: !FirstTrue
-    -- ^ Whether to include timings in logs.
-  , globalMonoidRSLInLog     :: !FirstFalse
-    -- ^ Whether to include raw snapshot layer (RSL) in logs.
-  , globalMonoidConfigMonoid :: !ConfigMonoid
-    -- ^ Config monoid, for passing into 'loadConfig'
-  , globalMonoidResolver     :: !(First (Unresolved AbstractResolver))
-    -- ^ Resolver override
-  , globalMonoidResolverRoot :: !(First FilePath)
-    -- ^ root directory for resolver relative path
-  , globalMonoidCompiler     :: !(First WantedCompiler)
-    -- ^ Compiler override
-  , globalMonoidTerminal     :: !(First Bool)
-    -- ^ We're in a terminal?
-  , globalMonoidStyles       :: !StylesUpdate
-    -- ^ Stack's output styles
-  , globalMonoidTermWidth    :: !(First Int)
-    -- ^ Terminal width override
-  , globalMonoidStackYaml    :: !(First FilePath)
-    -- ^ Override project stack.yaml
-  , globalMonoidLockFileBehavior :: !(First LockFileBehavior)
-    -- ^ See 'globalLockFileBehavior'
-  }
-  deriving Generic
-
-instance Semigroup GlobalOptsMonoid where
-  (<>) = mappenddefault
-
-instance Monoid GlobalOptsMonoid where
-  mempty = memptydefault
-  mappend = (<>)
 
 -- | Default logging level should be something useful but not crazy.
 defaultLogLevel :: LogLevel
@@ -733,15 +633,6 @@ stackYamlL = buildConfigL.lens bcStackYaml (\x y -> x { bcStackYaml = y })
 -- | Directory containing the project's stack.yaml file
 projectRootL :: HasBuildConfig env => Getting r env (Path Abs Dir)
 projectRootL = stackYamlL.to parent
-
--- | Configuration after the environment has been setup.
-data EnvConfig = EnvConfig
-  {envConfigBuildConfig :: !BuildConfig
-  ,envConfigBuildOptsCLI :: !BuildOptsCLI
-  ,envConfigSourceMap :: !SourceMap
-  ,envConfigSourceMapHash :: !SourceMapHash
-  ,envConfigCompilerPaths :: !CompilerPaths
-  }
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
 ppGPD = liftIO . cpGPD . ppCommon
@@ -848,335 +739,6 @@ instance FromJSON (WithJSONWarnings Curator) where
     <*> fmap (Set.map unCabalString) (o ..:? "skip-haddock" ..!= mempty)
     <*> fmap (Set.map unCabalString) (o ..:? "expect-haddock-failure" ..!= mempty)
 
-parseConfigMonoid ::
-     Path Abs Dir
-  -> Value
-  -> Yaml.Parser (WithJSONWarnings ConfigMonoid)
-parseConfigMonoid = withObjectWarnings "ConfigMonoid" . parseConfigMonoidObject
-
--- | Parse a partial configuration.  Used both to parse both a standalone config
--- file and a project file, so that a sub-parser is not required, which would
--- interfere with warnings for missing fields.
-parseConfigMonoidObject :: Path Abs Dir -> Object -> WarningParser ConfigMonoid
-parseConfigMonoidObject rootDir obj = do
-  -- Parsing 'stackRoot' from 'stackRoot'/config.yaml would be nonsensical
-  let configMonoidStackRoot = First Nothing
-  configMonoidWorkDir <- First <$> obj ..:? configMonoidWorkDirName
-  configMonoidBuildOpts <-
-    jsonSubWarnings (obj ..:? configMonoidBuildOptsName ..!= mempty)
-  configMonoidDockerOpts <-
-    jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
-  configMonoidNixOpts <-
-    jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
-  configMonoidConnectionCount <-
-    First <$> obj ..:? configMonoidConnectionCountName
-  configMonoidHideTHLoading <-
-    FirstTrue <$> obj ..:? configMonoidHideTHLoadingName
-  configMonoidPrefixTimestamps <-
-    First <$> obj ..:? configMonoidPrefixTimestampsName
-
-  murls :: Maybe Value <- obj ..:? configMonoidUrlsName
-  configMonoidLatestSnapshot <-
-    case murls of
-      Nothing -> pure $ First Nothing
-      Just urls -> jsonSubWarnings $ lift $ withObjectWarnings
-        "urls"
-        (\o -> First <$> o ..:? "latest-snapshot" :: WarningParser (First Text))
-        urls
-
-  configMonoidPackageIndex <-
-    First <$> jsonSubWarningsT (obj ..:?  configMonoidPackageIndexName)
-  configMonoidPackageIndices <-
-    First <$> jsonSubWarningsTT (obj ..:?  configMonoidPackageIndicesName)
-  configMonoidSystemGHC <- First <$> obj ..:? configMonoidSystemGHCName
-  configMonoidInstallGHC <- FirstTrue <$> obj ..:? configMonoidInstallGHCName
-  configMonoidSkipGHCCheck <-
-    FirstFalse <$> obj ..:? configMonoidSkipGHCCheckName
-  configMonoidSkipMsys <- FirstFalse <$> obj ..:? configMonoidSkipMsysName
-  configMonoidRequireStackVersion <-
-    IntersectingVersionRange . unVersionRangeJSON <$>
-      ( obj ..:? configMonoidRequireStackVersionName
-          ..!= VersionRangeJSON anyVersion
-      )
-  configMonoidArch <- First <$> obj ..:? configMonoidArchName
-  configMonoidGHCVariant <- First <$> obj ..:? configMonoidGHCVariantName
-  configMonoidGHCBuild <- First <$> obj ..:? configMonoidGHCBuildName
-  configMonoidJobs <- First <$> obj ..:? configMonoidJobsName
-  configMonoidExtraIncludeDirs <- map (toFilePath rootDir FilePath.</>) <$>
-    obj ..:?  configMonoidExtraIncludeDirsName ..!= []
-  configMonoidExtraLibDirs <- map (toFilePath rootDir FilePath.</>) <$>
-    obj ..:?  configMonoidExtraLibDirsName ..!= []
-  configMonoidCustomPreprocessorExts <-
-    obj ..:?  configMonoidCustomPreprocessorExtsName ..!= []
-  configMonoidOverrideGccPath <-
-    First <$> obj ..:? configMonoidOverrideGccPathName
-  configMonoidOverrideHpack <-
-    First <$> obj ..:? configMonoidOverrideHpackName
-  configMonoidConcurrentTests <-
-    First <$> obj ..:? configMonoidConcurrentTestsName
-  configMonoidLocalBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
-  templates <- obj ..:? "templates"
-  (configMonoidScmInit,configMonoidTemplateParameters) <-
-    case templates of
-      Nothing -> pure (First Nothing,M.empty)
-      Just tobj -> do
-        scmInit <- tobj ..:? configMonoidScmInitName
-        params <- tobj ..:? configMonoidTemplateParametersName
-        pure (First scmInit,fromMaybe M.empty params)
-  configMonoidCompilerCheck <-
-    First <$> obj ..:? configMonoidCompilerCheckName
-  configMonoidCompilerRepository <-
-    First <$> (obj ..:? configMonoidCompilerRepositoryName)
-
-  options <-
-    Map.map unGhcOptions <$> obj ..:? configMonoidGhcOptionsName ..!= mempty
-
-  optionsEverything <-
-    case (Map.lookup GOKOldEverything options, Map.lookup GOKEverything options) of
-      (Just _, Just _) ->
-        fail "Cannot specify both `*` and `$everything` GHC options"
-      (Nothing, Just x) -> pure x
-      (Just x, Nothing) -> do
-        tell "The `*` ghc-options key is not recommended. Consider using \
-             \$locals, or if really needed, $everything"
-        pure x
-      (Nothing, Nothing) -> pure []
-
-  let configMonoidGhcOptionsByCat = coerce $ Map.fromList
-        [ (AGOEverything, optionsEverything)
-        , (AGOLocals, Map.findWithDefault [] GOKLocals options)
-        , (AGOTargets, Map.findWithDefault [] GOKTargets options)
-        ]
-
-      configMonoidGhcOptionsByName = coerce $ Map.fromList
-          [(name, opts) | (GOKPackage name, opts) <- Map.toList options]
-
-  configMonoidCabalConfigOpts' <- obj ..:? "configure-options" ..!= mempty
-  let configMonoidCabalConfigOpts =
-        coerce (configMonoidCabalConfigOpts' :: Map CabalConfigKey [Text])
-
-  configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
-  configMonoidSetupInfoLocations <-
-    obj ..:? configMonoidSetupInfoLocationsName ..!= []
-  configMonoidSetupInfoInline <-
-    jsonSubWarningsT (obj ..:? configMonoidSetupInfoInlineName) ..!= mempty
-  configMonoidLocalProgramsBase <-
-    First <$> obj ..:? configMonoidLocalProgramsBaseName
-  configMonoidPvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName
-  configMonoidModifyCodePage <-
-    FirstTrue <$> obj ..:? configMonoidModifyCodePageName
-  configMonoidRebuildGhcOptions <-
-    FirstFalse <$> obj ..:? configMonoidRebuildGhcOptionsName
-  configMonoidApplyGhcOptions <-
-    First <$> obj ..:? configMonoidApplyGhcOptionsName
-  configMonoidAllowNewer <- First <$> obj ..:? configMonoidAllowNewerName
-  configMonoidAllowNewerDeps <- obj ..:? configMonoidAllowNewerDepsName
-  configMonoidDefaultTemplate <-
-    First <$> obj ..:? configMonoidDefaultTemplateName
-  configMonoidAllowDifferentUser <-
-    First <$> obj ..:? configMonoidAllowDifferentUserName
-  configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
-  configMonoidSaveHackageCreds <-
-    First <$> obj ..:? configMonoidSaveHackageCredsName
-  configMonoidHackageBaseUrl <-
-    First <$> obj ..:? configMonoidHackageBaseUrlName
-
-  configMonoidColorWhenUS <- obj ..:? configMonoidColorWhenUSName
-  configMonoidColorWhenGB <- obj ..:? configMonoidColorWhenGBName
-  let configMonoidColorWhen =  First $   configMonoidColorWhenUS
-                                     <|> configMonoidColorWhenGB
-
-  configMonoidStylesUS <- obj ..:? configMonoidStylesUSName
-  configMonoidStylesGB <- obj ..:? configMonoidStylesGBName
-  let configMonoidStyles = fromMaybe mempty $   configMonoidStylesUS
-                                            <|> configMonoidStylesGB
-
-  configMonoidHideSourcePaths <-
-    FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
-  configMonoidRecommendUpgrade <-
-    FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
-
-  configMonoidCasaRepoPrefix <-
-    First <$> obj ..:? configMonoidCasaRepoPrefixName
-  configMonoidSnapshotLocation <-
-    First <$> obj ..:? configMonoidSnapshotLocationName
-  configMonoidNoRunCompile <-
-    FirstFalse <$> obj ..:? configMonoidNoRunCompileName
-
-  configMonoidStackDeveloperMode <-
-    First <$> obj ..:? configMonoidStackDeveloperModeName
-
-  pure ConfigMonoid {..}
-
-configMonoidWorkDirName :: Text
-configMonoidWorkDirName = "work-dir"
-
-configMonoidBuildOptsName :: Text
-configMonoidBuildOptsName = "build"
-
-configMonoidDockerOptsName :: Text
-configMonoidDockerOptsName = "docker"
-
-configMonoidNixOptsName :: Text
-configMonoidNixOptsName = "nix"
-
-configMonoidConnectionCountName :: Text
-configMonoidConnectionCountName = "connection-count"
-
-configMonoidHideTHLoadingName :: Text
-configMonoidHideTHLoadingName = "hide-th-loading"
-
-configMonoidPrefixTimestampsName :: Text
-configMonoidPrefixTimestampsName = "build-output-timestamps"
-
-configMonoidUrlsName :: Text
-configMonoidUrlsName = "urls"
-
-configMonoidPackageIndexName :: Text
-configMonoidPackageIndexName = "package-index"
-
--- Deprecated in favour of package-index
-configMonoidPackageIndicesName :: Text
-configMonoidPackageIndicesName = "package-indices"
-
-configMonoidSystemGHCName :: Text
-configMonoidSystemGHCName = "system-ghc"
-
-configMonoidInstallGHCName :: Text
-configMonoidInstallGHCName = "install-ghc"
-
-configMonoidSkipGHCCheckName :: Text
-configMonoidSkipGHCCheckName = "skip-ghc-check"
-
-configMonoidSkipMsysName :: Text
-configMonoidSkipMsysName = "skip-msys"
-
-configMonoidRequireStackVersionName :: Text
-configMonoidRequireStackVersionName = "require-stack-version"
-
-configMonoidArchName :: Text
-configMonoidArchName = "arch"
-
-configMonoidGHCVariantName :: Text
-configMonoidGHCVariantName = "ghc-variant"
-
-configMonoidGHCBuildName :: Text
-configMonoidGHCBuildName = "ghc-build"
-
-configMonoidJobsName :: Text
-configMonoidJobsName = "jobs"
-
-configMonoidExtraIncludeDirsName :: Text
-configMonoidExtraIncludeDirsName = "extra-include-dirs"
-
-configMonoidExtraLibDirsName :: Text
-configMonoidExtraLibDirsName = "extra-lib-dirs"
-
-configMonoidCustomPreprocessorExtsName  :: Text
-configMonoidCustomPreprocessorExtsName  = "custom-preprocessor-extensions"
-
-configMonoidOverrideGccPathName :: Text
-configMonoidOverrideGccPathName = "with-gcc"
-
-configMonoidOverrideHpackName :: Text
-configMonoidOverrideHpackName = "with-hpack"
-
-configMonoidConcurrentTestsName :: Text
-configMonoidConcurrentTestsName = "concurrent-tests"
-
-configMonoidLocalBinPathName :: Text
-configMonoidLocalBinPathName = "local-bin-path"
-
-configMonoidScmInitName :: Text
-configMonoidScmInitName = "scm-init"
-
-configMonoidTemplateParametersName :: Text
-configMonoidTemplateParametersName = "params"
-
-configMonoidCompilerCheckName :: Text
-configMonoidCompilerCheckName = "compiler-check"
-
-configMonoidCompilerRepositoryName :: Text
-configMonoidCompilerRepositoryName = "compiler-repository"
-
-configMonoidGhcOptionsName :: Text
-configMonoidGhcOptionsName = "ghc-options"
-
-configMonoidExtraPathName :: Text
-configMonoidExtraPathName = "extra-path"
-
-configMonoidSetupInfoLocationsName :: Text
-configMonoidSetupInfoLocationsName = "setup-info-locations"
-
-configMonoidSetupInfoInlineName :: Text
-configMonoidSetupInfoInlineName = "setup-info"
-
-configMonoidLocalProgramsBaseName :: Text
-configMonoidLocalProgramsBaseName = "local-programs-path"
-
-configMonoidPvpBoundsName :: Text
-configMonoidPvpBoundsName = "pvp-bounds"
-
-configMonoidModifyCodePageName :: Text
-configMonoidModifyCodePageName = "modify-code-page"
-
-configMonoidRebuildGhcOptionsName :: Text
-configMonoidRebuildGhcOptionsName = "rebuild-ghc-options"
-
-configMonoidApplyGhcOptionsName :: Text
-configMonoidApplyGhcOptionsName = "apply-ghc-options"
-
-configMonoidAllowNewerName :: Text
-configMonoidAllowNewerName = "allow-newer"
-
-configMonoidAllowNewerDepsName :: Text
-configMonoidAllowNewerDepsName = "allow-newer-deps"
-
-configMonoidDefaultTemplateName :: Text
-configMonoidDefaultTemplateName = "default-template"
-
-configMonoidAllowDifferentUserName :: Text
-configMonoidAllowDifferentUserName = "allow-different-user"
-
-configMonoidDumpLogsName :: Text
-configMonoidDumpLogsName = "dump-logs"
-
-configMonoidSaveHackageCredsName :: Text
-configMonoidSaveHackageCredsName = "save-hackage-creds"
-
-configMonoidHackageBaseUrlName :: Text
-configMonoidHackageBaseUrlName = "hackage-base-url"
-
-configMonoidColorWhenUSName :: Text
-configMonoidColorWhenUSName = "color"
-
-configMonoidColorWhenGBName :: Text
-configMonoidColorWhenGBName = "colour"
-
-configMonoidStylesUSName :: Text
-configMonoidStylesUSName = "stack-colors"
-
-configMonoidStylesGBName :: Text
-configMonoidStylesGBName = "stack-colours"
-
-configMonoidHideSourcePathsName :: Text
-configMonoidHideSourcePathsName = "hide-source-paths"
-
-configMonoidRecommendUpgradeName :: Text
-configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
-
-configMonoidCasaRepoPrefixName :: Text
-configMonoidCasaRepoPrefixName = "casa-repo-prefix"
-
-configMonoidSnapshotLocationName :: Text
-configMonoidSnapshotLocationName = "snapshot-location-base"
-
-configMonoidNoRunCompileName :: Text
-configMonoidNoRunCompileName = "script-no-run-compile"
-
-configMonoidStackDeveloperModeName :: Text
-configMonoidStackDeveloperModeName = "stack-developer-mode"
-
 packageIndicesWarning :: StyleDoc
 packageIndicesWarning =
   fillSep
@@ -1242,100 +804,6 @@ platformOnlyRelDir = do
     ++ platformVariantSuffix platformVariant
     )
 
--- | Directory containing snapshots
-snapshotsDir ::
-     (HasEnvConfig env, MonadReader env m, MonadThrow m)
-  => m (Path Abs Dir)
-snapshotsDir = do
-  root <- view stackRootL
-  platform <- platformGhcRelDir
-  pure $ root </> relDirSnapshots </> platform
-
--- | Installation root for dependencies
-installationRootDeps :: HasEnvConfig env => RIO env (Path Abs Dir)
-installationRootDeps = do
-  root <- view stackRootL
-  -- TODO: also useShaPathOnWindows here, once #1173 is resolved.
-  psc <- platformSnapAndCompilerRel
-  pure $ root </> relDirSnapshots </> psc
-
--- | Installation root for locals
-installationRootLocal :: HasEnvConfig env => RIO env (Path Abs Dir)
-installationRootLocal = do
-  workDir <- getProjectWorkDir
-  psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
-  pure $ workDir </> relDirInstall </> psc
-
--- | Installation root for compiler tools
-bindirCompilerTools ::
-     (HasEnvConfig env, MonadReader env m, MonadThrow m)
-  => m (Path Abs Dir)
-bindirCompilerTools = do
-  config <- view configL
-  platform <- platformGhcRelDir
-  compilerVersion <- view actualCompilerVersionL
-  compiler <- parseRelDir $ compilerVersionString compilerVersion
-  pure $
-    view stackRootL config </>
-    relDirCompilerTools </>
-    platform </>
-    compiler </>
-    bindirSuffix
-
--- | Hoogle directory.
-hoogleRoot :: HasEnvConfig env => RIO env (Path Abs Dir)
-hoogleRoot = do
-  workDir <- getProjectWorkDir
-  psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
-  pure $ workDir </> relDirHoogle </> psc
-
--- | Get the hoogle database path.
-hoogleDatabasePath :: HasEnvConfig env => RIO env (Path Abs File)
-hoogleDatabasePath = do
-  dir <- hoogleRoot
-  pure (dir </> relFileDatabaseHoo)
-
--- | Path for platform followed by snapshot name followed by compiler
--- name.
-platformSnapAndCompilerRel :: HasEnvConfig env => RIO env (Path Rel Dir)
-platformSnapAndCompilerRel = do
-  platform <- platformGhcRelDir
-  smh <- view $ envConfigL.to envConfigSourceMapHash
-  name <- smRelDir smh
-  ghc <- compilerVersionDir
-  useShaPathOnWindows (platform </> name </> ghc)
-
--- | Relative directory for the platform and GHC identifier
-platformGhcRelDir ::
-     (HasEnvConfig env, MonadReader env m, MonadThrow m)
-  => m (Path Rel Dir)
-platformGhcRelDir = do
-  cp <- view compilerPathsL
-  let cbSuffix = compilerBuildSuffix $ cpBuild cp
-  verOnly <- platformGhcVerOnlyRelDirStr
-  parseRelDir (mconcat [ verOnly, cbSuffix ])
-
--- | Relative directory for the platform and GHC identifier without GHC bindist
--- build
-platformGhcVerOnlyRelDir ::
-     (HasGHCVariant env, HasPlatform env, MonadReader env m, MonadThrow m)
-  => m (Path Rel Dir)
-platformGhcVerOnlyRelDir =
-  parseRelDir =<< platformGhcVerOnlyRelDirStr
-
--- | Relative directory for the platform and GHC identifier without GHC bindist
--- build (before parsing into a Path)
-platformGhcVerOnlyRelDirStr ::
-     (HasGHCVariant env, HasPlatform env, MonadReader env m)
-  => m FilePath
-platformGhcVerOnlyRelDirStr = do
-  platform <- view platformL
-  platformVariant <- view platformVariantL
-  ghcVariant <- view ghcVariantL
-  pure $ mconcat [ Distribution.Text.display platform
-                   , platformVariantSuffix platformVariant
-                   , ghcVariantSuffix ghcVariant ]
-
 -- | This is an attempt to shorten Stack paths on Windows to decrease our
 -- chances of hitting 260 symbol path limit. The idea is to calculate
 -- SHA1 hash of the path used on other architectures, encode with base
@@ -1370,33 +838,6 @@ instance IsPath Abs File where
 instance IsPath Rel File where
   parsePath = parseRelFile
 
-compilerVersionDir ::
-     (HasEnvConfig env, MonadReader env m, MonadThrow m)
-  => m (Path Rel Dir)
-compilerVersionDir = do
-  compilerVersion <- view actualCompilerVersionL
-  parseRelDir $ case compilerVersion of
-    ACGhc version -> versionString version
-    ACGhcGit {} -> compilerVersionString compilerVersion
-
--- | Package database for installing dependencies into
-packageDatabaseDeps :: HasEnvConfig env => RIO env (Path Abs Dir)
-packageDatabaseDeps = do
-  root <- installationRootDeps
-  pure $ root </> relDirPkgdb
-
--- | Package database for installing local packages into
-packageDatabaseLocal :: HasEnvConfig env => RIO env (Path Abs Dir)
-packageDatabaseLocal = do
-  root <- installationRootLocal
-  pure $ root </> relDirPkgdb
-
--- | Extra package databases
-packageDatabaseExtra ::
-     (HasEnvConfig env, MonadReader env m)
-  => m [Path Abs Dir]
-packageDatabaseExtra = view $ buildConfigL.to bcExtraPackageDBs
-
 -- | Where do we get information on global packages for loading up a
 -- 'LoadedSnapshot'?
 data GlobalInfoSource
@@ -1404,24 +845,6 @@ data GlobalInfoSource
     -- ^ Accept the hints in the snapshot definition
   | GISCompiler ActualCompiler
     -- ^ Look up the actual information in the installed compiler
-
--- | Where HPC reports and tix files get stored.
-hpcReportDir :: HasEnvConfig env => RIO env (Path Abs Dir)
-hpcReportDir = do
-  root <- installationRootLocal
-  pure $ root </> relDirHpc
-
--- | Get the extra bin directories (for the PATH). Puts more local first
---
--- Bool indicates whether or not to include the locals
-extraBinDirs :: HasEnvConfig env => RIO env (Bool -> [Path Abs Dir])
-extraBinDirs = do
-  deps <- installationRootDeps
-  local' <- installationRootLocal
-  tools <- bindirCompilerTools
-  pure $ \locals -> if locals
-    then [local' </> bindirSuffix, deps </> bindirSuffix, tools]
-    else [deps </> bindirSuffix, tools]
 
 minimalEnvSettings :: EnvSettings
 minimalEnvSettings =
@@ -1458,12 +881,6 @@ plainEnvSettings = EnvSettings
   , esLocaleUtf8 = False
   , esKeepGhcRts = True
   }
-
--- | Get the path for the given compiler ignoring any local binaries.
---
--- https://github.com/commercialhaskell/stack/issues/1052
-getCompilerPath :: HasCompiler env => RIO env (Path Abs File)
-getCompilerPath = view $ compilerPathsL.to cpCompiler
 
 data ProjectAndConfigMonoid
   = ProjectAndConfigMonoid !Project !ConfigMonoid
@@ -1504,45 +921,6 @@ parseProjectAndConfigMonoid rootDir =
             }
       pure $ ProjectAndConfigMonoid project config
 
--- | A variant of the platform, used to differentiate Docker builds from host
-data PlatformVariant
-  = PlatformVariantNone
-  | PlatformVariant String
-
--- | Render a platform variant to a String suffix.
-platformVariantSuffix :: PlatformVariant -> String
-platformVariantSuffix PlatformVariantNone = ""
-platformVariantSuffix (PlatformVariant v) = "-" ++ v
-
-data GhcOptionKey
-  = GOKOldEverything
-  | GOKEverything
-  | GOKLocals
-  | GOKTargets
-  | GOKPackage !PackageName
-  deriving (Eq, Ord)
-
-instance FromJSONKey GhcOptionKey where
-  fromJSONKey = FromJSONKeyTextParser $ \t ->
-    case t of
-      "*" -> pure GOKOldEverything
-      "$everything" -> pure GOKEverything
-      "$locals" -> pure GOKLocals
-      "$targets" -> pure GOKTargets
-      _ ->
-        case parsePackageName $ T.unpack t of
-          Nothing -> fail $ "Invalid package name: " ++ show t
-          Just x -> pure $ GOKPackage x
-  fromJSONKeyList =
-    FromJSONKeyTextParser $ \_ -> fail "GhcOptionKey.fromJSONKeyList"
-
-newtype GhcOptions = GhcOptions { unGhcOptions :: [Text] }
-
-instance FromJSON GhcOptions where
-  parseJSON = withText "GhcOptions" $ \t ->
-    case parseArgs Escaping t of
-      Left e -> fail e
-      Right opts -> pure $ GhcOptions $ map T.pack opts
 
 -----------------------------------
 -- Lens classes
@@ -1574,13 +952,6 @@ class ( HasPlatform env
 
 class HasConfig env => HasBuildConfig env where
   buildConfigL :: Lens' env BuildConfig
-  default buildConfigL :: HasEnvConfig env => Lens' env BuildConfig
-  buildConfigL = envConfigL.lens
-    envConfigBuildConfig
-    (\x y -> x { envConfigBuildConfig = y })
-
-class (HasBuildConfig env, HasSourceMap env, HasCompiler env) => HasEnvConfig env where
-  envConfigL :: Lens' env EnvConfig
 
 -----------------------------------
 -- Lens instances
@@ -1597,8 +968,6 @@ instance HasPlatform Config where
 
 instance HasPlatform BuildConfig
 
-instance HasPlatform EnvConfig
-
 instance HasGHCVariant GHCVariant where
   ghcVariantL = id
   {-# INLINE ghcVariantL #-}
@@ -1608,24 +977,16 @@ instance HasGHCVariant Config where
 
 instance HasGHCVariant BuildConfig
 
-instance HasGHCVariant EnvConfig
-
 instance HasProcessContext Config where
   processContextL = runnerL.processContextL
 
 instance HasProcessContext BuildConfig where
   processContextL = configL.processContextL
 
-instance HasProcessContext EnvConfig where
-  processContextL = configL.processContextL
-
 instance HasPantryConfig Config where
   pantryConfigL = lens configPantryConfig (\x y -> x { configPantryConfig = y })
 
 instance HasPantryConfig BuildConfig where
-  pantryConfigL = configL.pantryConfigL
-
-instance HasPantryConfig EnvConfig where
   pantryConfigL = configL.pantryConfigL
 
 instance HasConfig Config where
@@ -1635,28 +996,14 @@ instance HasConfig Config where
 instance HasConfig BuildConfig where
   configL = lens bcConfig (\x y -> x { bcConfig = y })
 
-instance HasConfig EnvConfig
-
 instance HasBuildConfig BuildConfig where
   buildConfigL = id
   {-# INLINE buildConfigL #-}
-
-instance HasBuildConfig EnvConfig
-
-instance HasCompiler EnvConfig where
-  compilerPathsL = to envConfigCompilerPaths
-
-instance HasEnvConfig EnvConfig where
-  envConfigL = id
-  {-# INLINE envConfigL #-}
 
 instance HasRunner Config where
   runnerL = lens configRunner (\x y -> x { configRunner = y })
 
 instance HasRunner BuildConfig where
-  runnerL = configL.runnerL
-
-instance HasRunner EnvConfig where
   runnerL = configL.runnerL
 
 instance HasLogFunc Config where
@@ -1665,16 +1012,10 @@ instance HasLogFunc Config where
 instance HasLogFunc BuildConfig where
   logFuncL = runnerL.logFuncL
 
-instance HasLogFunc EnvConfig where
-  logFuncL = runnerL.logFuncL
-
 instance HasStylesUpdate Config where
   stylesUpdateL = runnerL.stylesUpdateL
 
 instance HasStylesUpdate BuildConfig where
-  stylesUpdateL = runnerL.stylesUpdateL
-
-instance HasStylesUpdate EnvConfig where
   stylesUpdateL = runnerL.stylesUpdateL
 
 instance HasTerm Config where
@@ -1682,10 +1023,6 @@ instance HasTerm Config where
   termWidthL = runnerL.termWidthL
 
 instance HasTerm BuildConfig where
-  useColorL = runnerL.useColorL
-  termWidthL = runnerL.termWidthL
-
-instance HasTerm EnvConfig where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
 
@@ -1705,74 +1042,6 @@ stackGlobalConfigL =
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
 wantedCompilerVersionL = buildConfigL.to (smwCompiler . bcSMWanted)
 
--- | Location of the ghc-pkg executable
-newtype GhcPkgExe
-  = GhcPkgExe (Path Abs File)
-  deriving Show
-
--- | Get the 'GhcPkgExe' from a 'HasCompiler' environment
-getGhcPkgExe :: HasCompiler env => RIO env GhcPkgExe
-getGhcPkgExe = view $ compilerPathsL.to cpPkg
-
--- | Type representing dump information for a single package, as output by the
--- @ghc-pkg describe@ command.
-data DumpPackage = DumpPackage
-  { dpGhcPkgId :: !GhcPkgId
-    -- ^ The @id@ field.
-  , dpPackageIdent :: !PackageIdentifier
-    -- ^ The @name@ and @version@ fields. The @name@ field is the munged package
-    -- name. If the package is not for a sub library, its munged name is its
-    -- name.
-  , dpParentLibIdent :: !(Maybe PackageIdentifier)
-    -- ^ The @package-name@ and @version@ fields, if @package-name@ is present.
-    -- That field is present if the package is for a sub library.
-  , dpLicense :: !(Maybe C.License)
-  , dpLibDirs :: ![FilePath]
-    -- ^ The @library-dirs@ field.
-  , dpLibraries :: ![Text]
-    -- ^ The @hs-libraries@ field.
-  , dpHasExposedModules :: !Bool
-  , dpExposedModules :: !(Set ModuleName)
-  , dpDepends :: ![GhcPkgId]
-    -- ^ The @depends@ field (packages on which this package depends).
-  , dpHaddockInterfaces :: ![FilePath]
-  , dpHaddockHtml :: !(Maybe FilePath)
-  , dpIsExposed :: !Bool
-  }
-  deriving (Eq, Read, Show)
-
--- | Paths on the filesystem for the compiler we're using
-data CompilerPaths = CompilerPaths
-  { cpCompilerVersion :: !ActualCompiler
-  , cpArch :: !Arch
-  , cpBuild :: !CompilerBuild
-  , cpCompiler :: !(Path Abs File)
-  , cpPkg :: !GhcPkgExe
-    -- ^ ghc-pkg or equivalent
-  , cpInterpreter :: !(Path Abs File)
-    -- ^ runghc
-  , cpHaddock :: !(Path Abs File)
-    -- ^ haddock, in 'IO' to allow deferring the lookup
-  , cpSandboxed :: !Bool
-    -- ^ Is this a Stack-sandboxed installation?
-  , cpCabalVersion :: !Version
-    -- ^ This is the version of Cabal that Stack will use to compile Setup.hs
-    -- files in the build process.
-    --
-    -- Note that this is not necessarily the same version as the one that Stack
-    -- depends on as a library and which is displayed when running
-    -- @stack ls dependencies | grep Cabal@ in the Stack project.
-  , cpGlobalDB :: !(Path Abs Dir)
-    -- ^ Global package database
-  , cpGhcInfo :: !ByteString
-    -- ^ Output of @ghc --info@
-  , cpGlobalDump :: !(Map PackageName DumpPackage)
-  }
-  deriving Show
-
-cpWhich :: (MonadReader env m, HasCompiler env) => m WhichCompiler
-cpWhich = view $ compilerPathsL.to (whichCompiler.cpCompilerVersion)
-
 data ExtraDirs = ExtraDirs
   { edBins :: ![Path Abs Dir]
   , edInclude :: ![Path Abs Dir]
@@ -1786,26 +1055,6 @@ instance Semigroup ExtraDirs where
 instance Monoid ExtraDirs where
   mempty = memptydefault
   mappend = (<>)
-
--- | An environment which ensures that the given compiler is available on the
--- PATH
-class HasCompiler env where
-  compilerPathsL :: SimpleGetter env CompilerPaths
-
-instance HasCompiler CompilerPaths where
-  compilerPathsL = id
-
-class HasSourceMap env where
-  sourceMapL :: Lens' env SourceMap
-
-instance HasSourceMap EnvConfig where
-  sourceMapL = lens envConfigSourceMap (\x y -> x { envConfigSourceMap = y })
-
--- | The version of the compiler which will actually be used. May be different
--- than that specified in the 'SnapshotDef' and returned by
--- 'wantedCompilerVersionL'.
-actualCompilerVersionL :: HasSourceMap env => SimpleGetter env ActualCompiler
-actualCompilerVersionL = sourceMapL.to smCompiler
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL.lens
@@ -1852,9 +1101,6 @@ globalOptsBuildOptsMonoidL =
     configMonoidBuildOpts
     (\x y -> x { configMonoidBuildOpts = y })
 
-cabalVersionL :: HasCompiler env => SimpleGetter env Version
-cabalVersionL = compilerPathsL.to cpCabalVersion
-
 whichCompilerL :: Getting r ActualCompiler WhichCompiler
 whichCompilerL = to whichCompiler
 
@@ -1864,23 +1110,6 @@ envOverrideSettingsL ::
 envOverrideSettingsL = configL.lens
   configProcessContextSettings
   (\x y -> x { configProcessContextSettings = y })
-
-shouldForceGhcColorFlag ::
-     (HasEnvConfig env, HasRunner env)
-  => RIO env Bool
-shouldForceGhcColorFlag = do
-  canDoColor <- (>= mkVersion [8, 2, 1]) . getGhcVersion
-            <$> view actualCompilerVersionL
-  shouldDoColor <- view useColorL
-  pure $ canDoColor && shouldDoColor
-
-appropriateGhcColorFlag ::
-     (HasEnvConfig env, HasRunner env)
-  => RIO env (Maybe String)
-appropriateGhcColorFlag = f <$> shouldForceGhcColorFlag
- where
-  f True = Just ghcColorForceFlag
-  f False = Nothing
 
 -- | In dev mode, print as a warning, otherwise as debug
 prettyStackDevL :: HasConfig env => [StyleDoc] -> RIO env ()
