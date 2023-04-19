@@ -34,19 +34,19 @@ import           Stack.Constants
                    , relDirSnapshots, relFileDatabaseHoo
                    )
 import           Stack.Prelude
+import           Stack.Types.BuildConfig
+                    ( BuildConfig (..), HasBuildConfig (..), getProjectWorkDir )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), compilerVersionString, getGhcVersion )
 import           Stack.Types.CompilerBuild ( compilerBuildSuffix )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
-                    ( BuildConfig (..), HasBuildConfig (..), HasConfig (..)
-                    , HasGHCVariant (..), HasPlatform (..), getProjectWorkDir
-                    , stackRootL, useShaPathOnWindows
-                    )
+                    ( HasConfig (..), stackRootL, useShaPathOnWindows )
 import           Stack.Types.Config.Build ( BuildOptsCLI )
-import           Stack.Types.GHCVariant ( ghcVariantSuffix )
-import           Stack.Types.PlatformVariant ( platformVariantSuffix )
+import           Stack.Types.GHCVariant ( HasGHCVariant (..), ghcVariantSuffix )
+import           Stack.Types.Platform
+                   ( HasPlatform (..), platformVariantSuffix )
 import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SourceMap
                    ( SourceMap (..), SourceMapHash, smRelDir )
@@ -69,9 +69,15 @@ instance HasBuildConfig EnvConfig where
     envConfigBuildConfig
     (\x y -> x { envConfigBuildConfig = y })
 
-instance HasPlatform EnvConfig
+instance HasPlatform EnvConfig where
+  platformL = configL.platformL
+  {-# INLINE platformL #-}
+  platformVariantL = configL.platformVariantL
+  {-# INLINE platformVariantL #-}
 
-instance HasGHCVariant EnvConfig
+instance HasGHCVariant EnvConfig where
+  ghcVariantL = configL.ghcVariantL
+  {-# INLINE ghcVariantL #-}
 
 instance HasProcessContext EnvConfig where
   processContextL = configL.processContextL

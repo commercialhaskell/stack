@@ -17,8 +17,9 @@ import qualified Data.Text as T
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withBuildConfig, withConfig )
-import           Stack.Types.Config
-                   ( BuildConfig (..), HasBuildConfig (..), ppComponents )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..) )
+import           Stack.Types.Config ( ppComponents )
 import           Stack.Types.NamedComponent
                    ( NamedComponent, renderPkgComponent )
 import           Stack.Types.Runner ( Runner )

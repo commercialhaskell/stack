@@ -34,12 +34,13 @@ import           Stack.SourceMap
                    )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build ( FlagSource (..) )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
 import           Stack.Types.Config
-                   ( ApplyCLIFlag (..), BuildConfig (..), BuildOpts (..)
-                   , BuildOptsCLI (..), Config (..), Curator (..)
-                   , HasBuildConfig (..), HasConfig (..), HasPlatform (..)
+                   ( ApplyCLIFlag (..), BuildOpts (..), BuildOptsCLI (..)
+                   , Config (..), Curator (..), HasConfig (..)
                    , ProjectPackage (..), TestOpts (..), buildOptsL, ppGPD
                    , ppRoot
                    )
@@ -55,6 +56,7 @@ import           Stack.Types.Package
                    , dotCabalGetPath, memoizeRefWith, runMemoizedWith
                    )
 import           Stack.Types.PackageFile ( PackageWarning, getPackageFiles )
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), SMActual (..)
                    , SMTargets (..), SourceMap (..), SourceMapHash (..)

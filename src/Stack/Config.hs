@@ -100,12 +100,13 @@ import           Stack.Storage.Util ( handleMigrationException )
 import           Stack.Types.AllowNewerDeps ( AllowNewerDeps (..) )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build ( BuildException (..), FlagSource (..) )
+import           Stack.Types.BuildConfig ( BuildConfig (..) )
 import           Stack.Types.ColorWhen ( ColorWhen (..) )
 import           Stack.Types.Compiler ( defaultCompilerRepository )
 import           Stack.Types.Config
-                   ( BuildConfig (..), BuildOpts (..), Config (..)
-                   , HasConfig (..), Project (..), ProjectAndConfigMonoid (..)
-                   , ProjectConfig (..), askLatestSnapshotUrl, configProjectRoot
+                   ( BuildOpts (..), Config (..), HasConfig (..), Project (..)
+                   , ProjectAndConfigMonoid (..), ProjectConfig (..)
+                   , askLatestSnapshotUrl, configProjectRoot
                    , parseProjectAndConfigMonoid, platformOnlyRelDir, stackRootL
                    , workDirL
                    )
@@ -118,7 +119,7 @@ import           Stack.Types.Docker ( DockerOptsMonoid (..), dockerEnable )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
 import           Stack.Types.Nix ( nixEnable )
-import           Stack.Types.PlatformVariant ( PlatformVariant (..) )
+import           Stack.Types.Platform ( PlatformVariant (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
 import           Stack.Types.Resolver ( AbstractResolver (..), Snapshots (..) )
 import           Stack.Types.Runner

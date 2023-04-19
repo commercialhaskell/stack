@@ -137,6 +137,8 @@ import           Stack.Types.Build
                    , TaskType (..), configCacheComponents, taskIsTarget
                    , taskLocation
                    )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..), projectRootL )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
                    , compilerVersionString, getGhcVersion
@@ -146,12 +148,10 @@ import           Stack.Types.CompilerPaths
                    , cabalVersionL, cpWhich, getCompilerPath, getGhcPkgExe
                    )
 import           Stack.Types.Config
-                   ( BenchmarkOpts (..), BuildConfig (..), BuildOpts (..)
-                   , BuildOptsCLI (..), CabalVerbosity (..), Config (..)
-                   , Curator (..), EnvSettings (..), HaddockOpts (..)
-                   , HasBuildConfig (..), HasConfig (..), HasPlatform (..)
-                   , TestOpts (..), buildOptsL, projectRootL, stackRootL
-                   , whichCompilerL
+                   ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI (..)
+                   , CabalVerbosity (..), Config (..), Curator (..)
+                   , EnvSettings (..), HaddockOpts (..), HasConfig (..)
+                   , TestOpts (..), buildOptsL, stackRootL, whichCompilerL
                    )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
@@ -175,6 +175,7 @@ import           Stack.Types.Package
                    , runMemoizedWith
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner, globalOptsL, terminalL )
 import           Stack.Types.SourceMap ( Target )
 import           Stack.Types.Version ( withinRange )

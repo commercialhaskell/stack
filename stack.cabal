@@ -244,6 +244,7 @@ library
       Stack.Types.AllowNewerDeps
       Stack.Types.ApplyGhcOptions
       Stack.Types.Build
+      Stack.Types.BuildConfig
       Stack.Types.CabalConfigKey
       Stack.Types.ColorWhen
       Stack.Types.CompilerBuild
@@ -271,7 +272,7 @@ library
       Stack.Types.Nix
       Stack.Types.Package
       Stack.Types.PackageName
-      Stack.Types.PlatformVariant
+      Stack.Types.Platform
       Stack.Types.PvpBounds
       Stack.Types.Resolver
       Stack.Types.Runner

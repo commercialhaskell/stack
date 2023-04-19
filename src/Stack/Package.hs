@@ -60,12 +60,11 @@ import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
                    , componentOutputDir, packageAutogenDir
                    )
+import           Stack.Types.BuildConfig
+                   ( HasBuildConfig (..), getProjectWorkDir )
 import           Stack.Types.Compiler ( ActualCompiler (..), getGhcVersion )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.Config
-                   ( Config (..), HasBuildConfig (..), HasConfig (..)
-                   , getProjectWorkDir
-                   )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent

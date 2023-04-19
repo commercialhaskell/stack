@@ -36,6 +36,8 @@ import qualified Distribution.Version as C
 import           Stack.Constants
 import           Stack.Package
 import           Stack.SourceMap
+import           Stack.Types.GHCVariant ( HasGHCVariant )
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.SourceMap
 import           Stack.Types.Version
 import           Stack.Types.Config

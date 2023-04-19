@@ -46,8 +46,8 @@ import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..) )
 import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), HasPlatform (..)
-                   , defaultEnvSettings, stackRootL
+                   ( Config (..), HasConfig (..), defaultEnvSettings
+                   , stackRootL
                    )
 import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
@@ -56,6 +56,7 @@ import           Stack.Types.EnvConfig
                    , appropriateGhcColorFlag
                    )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), SourceMap (..) )

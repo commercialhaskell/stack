@@ -19,10 +19,9 @@ import           Stack.Constants
                    , platformVariantEnvVar
                    )
 import           Stack.Prelude
+import           Stack.Types.BuildConfig ( wantedCompilerVersionL )
 import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), configProjectRoot
-                   , wantedCompilerVersionL
-                   )
+                   ( Config (..), HasConfig (..), configProjectRoot )
 import           Stack.Types.Docker ( reExecArgName )
 import           Stack.Types.Nix ( NixOpts (..) )
 import           Stack.Types.Version ( showStackVersion )

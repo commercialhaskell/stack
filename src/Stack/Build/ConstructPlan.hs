@@ -38,21 +38,22 @@ import           Stack.Types.Build
                    , taskIsTarget, taskLocation, taskTargetIsMutable
                    , toCachePkgSrc
                    )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
 import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config
-                   ( BuildConfig (..), BuildOpts (..), BuildOptsCLI (..)
-                   , BuildSubset (..), Config (..), Curator (..)
-                   , EnvSettings (..), HasBuildConfig (..), HasConfig (..)
-                   , HasGHCVariant, HasPlatform, minimalEnvSettings, stackRootL
-                   , stackYamlL
+                   ( BuildOpts (..), BuildOptsCLI (..), BuildSubset (..)
+                   , Config (..), Curator (..), EnvSettings (..), HasConfig (..)
+                   , minimalEnvSettings, stackRootL
                    )
 import           Stack.Types.Dependency
                    ( DepValue (DepValue), DepType (AsLibrary) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
+import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
@@ -61,6 +62,7 @@ import           Stack.Types.Package
                    , PackageLibraries (..), PackageSource (..), installedVersion
                    , packageIdentifier, psVersion, runMemoizedWith
                    )
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), FromSnapshot (..)
@@ -152,9 +154,15 @@ data Ctx = Ctx
   , pathEnvVar     :: !Text
   }
 
-instance HasPlatform Ctx
+instance HasPlatform Ctx where
+  platformL = configL.platformL
+  {-# INLINE platformL #-}
+  platformVariantL = configL.platformVariantL
+  {-# INLINE platformVariantL #-}
 
-instance HasGHCVariant Ctx
+instance HasGHCVariant Ctx where
+  ghcVariantL = configL.ghcVariantL
+  {-# INLINE ghcVariantL #-}
 
 instance HasLogFunc Ctx where
   logFuncL = configL.logFuncL
@@ -169,7 +177,9 @@ instance HasTerm Ctx where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
 
-instance HasConfig Ctx
+instance HasConfig Ctx where
+  configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
+  {-# INLINE configL #-}
 
 instance HasPantryConfig Ctx where
   pantryConfigL = configL.pantryConfigL

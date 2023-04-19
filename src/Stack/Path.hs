@@ -24,13 +24,15 @@ import           Stack.GhcPkg as GhcPkg
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..), projectRootL
+                   , stackYamlL
+                   )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getCompilerPath )
 import           Stack.Types.Config
-                   ( BuildConfig, Config (..), HasBuildConfig (..), HasConfig (..)
-                   , HasGHCVariant, HasPlatform, buildOptsMonoidHaddockL
-                   , globalOptsBuildOptsMonoidL, projectRootL
-                   , stackGlobalConfigL, stackRootL, stackYamlL
+                   ( Config (..), HasConfig (..), buildOptsMonoidHaddockL
+                   , globalOptsBuildOptsMonoidL, stackGlobalConfigL, stackRootL
                    )
 import           Stack.Types.EnvConfig
                    ( EnvConfig, HasEnvConfig (..), bindirCompilerTools
@@ -38,6 +40,8 @@ import           Stack.Types.EnvConfig
                    , installationRootLocal, packageDatabaseDeps
                    , packageDatabaseExtra, packageDatabaseLocal
                    )
+import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
+import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import qualified System.FilePath as FP
 
@@ -115,7 +119,11 @@ data PathInfo = PathInfo
   , piCompiler     :: !(Path Abs File)
   }
 
-instance HasPlatform PathInfo
+instance HasPlatform PathInfo where
+  platformL = configL.platformL
+  {-# INLINE platformL #-}
+  platformVariantL = configL.platformVariantL
+  {-# INLINE platformVariantL #-}
 
 instance HasLogFunc PathInfo where
   logFuncL = configL.logFuncL
@@ -130,9 +138,13 @@ instance HasTerm PathInfo where
   useColorL = runnerL.useColorL
   termWidthL = runnerL.termWidthL
 
-instance HasGHCVariant PathInfo
+instance HasGHCVariant PathInfo where
+  ghcVariantL = configL.ghcVariantL
+  {-# INLINE ghcVariantL #-}
 
-instance HasConfig PathInfo
+instance HasConfig PathInfo where
+  configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
+  {-# INLINE configL #-}
 
 instance HasPantryConfig PathInfo where
   pantryConfigL = configL.pantryConfigL

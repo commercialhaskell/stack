@@ -37,12 +37,11 @@ import           Stack.Storage.Util
                    ( handleMigrationException, updateList, updateSet )
 import           Stack.Types.Build
                    ( CachePkgSrc, ConfigCache (..), ConfigureOpts (..) )
+import           Stack.Types.BuildConfig
+                   ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Cache ( ConfigCacheType )
-import           Stack.Types.Config
-                   ( HasBuildConfig, ProjectStorage (..), bcProjectStorage
-                   , buildConfigL
-                   )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           Stack.Types.Storage ( ProjectStorage (..) )
 
 share [ mkPersist sqlSettings
       , mkMigrate "migrateAll"
