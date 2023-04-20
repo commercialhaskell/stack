@@ -14,7 +14,7 @@ module Stack.Dot
   , pruneGraph
   ) where
 
-import           Data.Aeson
+import           Data.Aeson ( ToJSON (..), Value, (.=), encode, object )
 import qualified Data.ByteString.Lazy.Char8 as LBC8
 import qualified Data.Foldable as F
 import qualified Data.Sequence as Seq
@@ -28,19 +28,23 @@ import qualified Distribution.PackageDescription as PD
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.Text ( display )
 import           Distribution.Types.PackageName ( mkPackageName )
-import qualified Path
+import           Path ( parent )
 import           RIO.Process ( HasProcessContext (..) )
 import           Stack.Build ( loadPackage )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source
+                   ( loadCommonPackage, loadLocalPackage, loadSourceMap )
 import           Stack.Build.Target( NeedTargets (..), parseTargets )
-import           Stack.Constants
-import           Stack.Package
+import           Stack.Constants ( wiredInPackages )
+import           Stack.Package ( Package (..) )
 import           Stack.Prelude hiding ( Display (..), pkgName, loadPackage )
 import qualified Stack.Prelude ( pkgName )
 import           Stack.Runners
+                   ( ShouldReexec (..), withBuildConfig, withConfig
+                   , withEnvConfig
+                   )
 import           Stack.SourceMap
-import           Stack.Types.Build
+                   ( globalsFromHints, mkProjectPackage, pruneGlobals )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.BuildOpts
@@ -53,10 +57,15 @@ import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig ( EnvConfig (..), HasSourceMap (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GhcPkgId
+                   ( GhcPkgId, ghcPkgIdString, parseGhcPkgId )
 import           Stack.Types.GlobalOpts ( globalOptsBuildOptsMonoidL )
+import           Stack.Types.Package ( LocalPackage (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import           Stack.Types.SourceMap
+                   ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
+                   , SMActual (..), SMWanted (..), SourceMap (..)
+                   )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Dot" module.
@@ -80,43 +89,44 @@ instance Exception DotException where
 -- | Options record for @stack dot@
 data DotOpts = DotOpts
   { dotIncludeExternal :: !Bool
-  -- ^ Include external dependencies
+    -- ^ Include external dependencies
   , dotIncludeBase :: !Bool
-  -- ^ Include dependencies on base
+    -- ^ Include dependencies on base
   , dotDependencyDepth :: !(Maybe Int)
-  -- ^ Limit the depth of dependency resolution to (Just n) or continue until
-  -- fixpoint
+    -- ^ Limit the depth of dependency resolution to (Just n) or continue until
+    -- fixpoint
   , dotPrune :: !(Set PackageName)
-  -- ^ Package names to prune from the graph
+    -- ^ Package names to prune from the graph
   , dotTargets :: [Text]
-  -- ^ Stack TARGETs to trace dependencies for
+    -- ^ Stack TARGETs to trace dependencies for
   , dotFlags :: !(Map ApplyCLIFlag (Map FlagName Bool))
-  -- ^ Flags to apply when calculating dependencies
+    -- ^ Flags to apply when calculating dependencies
   , dotTestTargets :: Bool
-  -- ^ Like the "--test" flag for build, affects the meaning of 'dotTargets'.
+    -- ^ Like the "--test" flag for build, affects the meaning of 'dotTargets'.
   , dotBenchTargets :: Bool
-  -- ^ Like the "--bench" flag for build, affects the meaning of 'dotTargets'.
+    -- ^ Like the "--bench" flag for build, affects the meaning of 'dotTargets'.
   , dotGlobalHints :: Bool
-  -- ^ Use global hints instead of relying on an actual GHC installation.
+    -- ^ Use global hints instead of relying on an actual GHC installation.
   }
 
 data ListDepsFormatOpts = ListDepsFormatOpts
   { listDepsSep :: !Text
-  -- ^ Separator between the package name and details.
+    -- ^ Separator between the package name and details.
   , listDepsLicense :: !Bool
-  -- ^ Print dependency licenses instead of versions.
+    -- ^ Print dependency licenses instead of versions.
   }
 
-data ListDepsFormat = ListDepsText ListDepsFormatOpts
-                    | ListDepsTree ListDepsFormatOpts
-                    | ListDepsJSON
-                    | ListDepsConstraints
+data ListDepsFormat
+  = ListDepsText ListDepsFormatOpts
+  | ListDepsTree ListDepsFormatOpts
+  | ListDepsJSON
+  | ListDepsConstraints
 
 data ListDepsOpts = ListDepsOpts
   { listDepsFormat :: !ListDepsFormat
-  -- ^ Format of printing dependencies
+    -- ^ Format of printing dependencies
   , listDepsDotOpts :: !DotOpts
-  -- ^ The normal dot options.
+    -- ^ The normal dot options.
   }
 
 -- | Visualize the project's dependencies as a graphviz graph
@@ -128,11 +138,11 @@ dot dotOpts = do
 -- | Information about a package in the dependency graph, when available.
 data DotPayload = DotPayload
   { payloadVersion :: Maybe Version
-  -- ^ The package version.
+    -- ^ The package version.
   , payloadLicense :: Maybe (Either SPDX.License License)
-  -- ^ The license the package was released under.
+    -- ^ The license the package was released under.
   , payloadLocation :: Maybe PackageLocation
-  -- ^ The location of the package.
+    -- ^ The location of the package.
   }
   deriving (Eq, Show)
 
@@ -232,7 +242,7 @@ dependencyToJSON pkg (deps, payload) =
 pkgLocToJSON :: PackageLocation -> Value
 pkgLocToJSON (PLMutable (ResolvedPath _ dir)) = object
   [ "type" .= ("project package" :: Text)
-  , "url" .= ("file://" ++ Path.toFilePath dir)
+  , "url" .= ("file://" ++ toFilePath dir)
   ]
 pkgLocToJSON (PLImmutable (PLIHackage pkgid _ _)) = object
   [ "type" .= ("hackage" :: Text)
@@ -242,7 +252,7 @@ pkgLocToJSON (PLImmutable (PLIArchive archive _)) =
   let url = case archiveLocation archive of
               ALUrl u -> u
               ALFilePath (ResolvedPath _ path) ->
-                Text.pack $ "file://" ++ Path.toFilePath path
+                Text.pack $ "file://" ++ toFilePath path
   in  object
         [ "type" .= ("archive" :: Text)
         , "url" .= url
@@ -258,9 +268,10 @@ pkgLocToJSON (PLImmutable (PLIRepo repo _)) = object
   , "subdir" .= repoSubdir repo
   ]
 
-printJSON :: Set PackageName
-          -> Map PackageName (Set PackageName, DotPayload)
-          -> IO ()
+printJSON ::
+     Set PackageName
+  -> Map PackageName (Set PackageName, DotPayload)
+  -> IO ()
 printJSON pkgs dependencyMap =
   LBC8.putStrLn $ encode $ DependencyTree pkgs dependencyMap
 
@@ -271,13 +282,14 @@ treeRoots opts projectPackages' =
         then projectPackages'
         else Set.fromList $ map (mkPackageName . Text.unpack) targets
 
-printTree :: ListDepsFormatOpts
-          -> DotOpts
-          -> Int
-          -> [Int]
-          -> Set PackageName
-          -> Map PackageName (Set PackageName, DotPayload)
-          -> IO ()
+printTree ::
+     ListDepsFormatOpts
+  -> DotOpts
+  -> Int
+  -> [Int]
+  -> Set PackageName
+  -> Map PackageName (Set PackageName, DotPayload)
+  -> IO ()
 printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
   F.sequence_ $ Seq.mapWithIndex go (toSeq packages)
  where
@@ -294,14 +306,15 @@ printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
           -- TODO: Define this behaviour, maybe pure an error?
           Nothing -> pure ()
 
-printTreeNode :: ListDepsFormatOpts
-              -> DotOpts
-              -> Int
-              -> [Int]
-              -> Set PackageName
-              -> DotPayload
-              -> PackageName
-              -> IO ()
+printTreeNode ::
+     ListDepsFormatOpts
+  -> DotOpts
+  -> Int
+  -> [Int]
+  -> Set PackageName
+  -> DotPayload
+  -> PackageName
+  -> IO ()
 printTreeNode opts dotOpts depth remainingDepsCounts deps payload name =
   let remainingDepth = fromMaybe 999 (dotDependencyDepth dotOpts) - depth
       hasDeps = not $ null deps
@@ -343,11 +356,12 @@ versionText payload =
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
 -- @graph@ with a name in @toPrune@ and removes resulting orphans
 -- unless they are in @dontPrune@
-pruneGraph :: (F.Foldable f, F.Foldable g, Eq a)
-           => f PackageName
-           -> g PackageName
-           -> Map PackageName (Set PackageName, a)
-           -> Map PackageName (Set PackageName, a)
+pruneGraph ::
+     (F.Foldable f, F.Foldable g, Eq a)
+  => f PackageName
+  -> g PackageName
+  -> Map PackageName (Set PackageName, a)
+  -> Map PackageName (Set PackageName, a)
 pruneGraph dontPrune names =
   pruneUnreachable dontPrune . Map.mapMaybeWithKey (\pkg (pkgDeps,x) ->
     if pkg `F.elem` names
@@ -358,10 +372,11 @@ pruneGraph dontPrune names =
                  else Just (filtered,x))
 
 -- | Make sure that all unreachable nodes (orphans) are pruned
-pruneUnreachable :: (Eq a, F.Foldable f)
-                 => f PackageName
-                 -> Map PackageName (Set PackageName, a)
-                 -> Map PackageName (Set PackageName, a)
+pruneUnreachable ::
+     (Eq a, F.Foldable f)
+  => f PackageName
+  -> Map PackageName (Set PackageName, a)
+  -> Map PackageName (Set PackageName, a)
 pruneUnreachable dontPrune = fixpoint prune
  where
   fixpoint :: Eq a => (a -> a) -> a -> a
@@ -400,9 +415,14 @@ createDepLoader ::
      SourceMap
   -> Map PackageName DumpPackage
   -> Map GhcPkgId PackageIdentifier
-  -> (PackageName -> Version -> PackageLocationImmutable ->
-      Map FlagName Bool -> [Text] -> [Text] ->
-      RIO DotConfig (Set PackageName, DotPayload))
+  -> (  PackageName
+     -> Version
+     -> PackageLocationImmutable
+     -> Map FlagName Bool
+     -> [Text]
+     -> [Text]
+     -> RIO DotConfig (Set PackageName, DotPayload)
+     )
   -> PackageName
   -> RIO DotConfig (Set PackageName, DotPayload)
 createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
@@ -462,7 +482,7 @@ projectPackageDependencies ::
   -> [(PackageName, (Set PackageName, DotPayload))]
 projectPackageDependencies dotOpts locals =
   map (\lp -> let pkg = localPackageToPackage lp
-                  pkgDir = Path.parent $ lpCabalFile lp
+                  pkgDir = parent $ lpCabalFile lp
                   loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
               in  (packageName pkg, (deps pkg, lpPayload pkg loc)))
       locals
@@ -478,11 +498,12 @@ projectPackageDependencies dotOpts locals =
 
 -- | Print a graphviz graph of the edges in the Map and highlight the given
 -- local packages
-printGraph :: (Applicative m, MonadIO m)
-           => DotOpts
-           -> Set PackageName -- ^ all locals
-           -> Map PackageName (Set PackageName, DotPayload)
-           -> m ()
+printGraph ::
+     (Applicative m, MonadIO m)
+  => DotOpts
+  -> Set PackageName -- ^ all locals
+  -> Map PackageName (Set PackageName, DotPayload)
+  -> m ()
 printGraph dotOpts locals graph = do
   liftIO $ Text.putStrLn "strict digraph deps {"
   printLocalNodes dotOpts filteredLocals
@@ -494,10 +515,11 @@ printGraph dotOpts locals graph = do
     Set.filter (\local' -> local' `Set.notMember` dotPrune dotOpts) locals
 
 -- | Print the local nodes with a different style depending on options
-printLocalNodes :: (F.Foldable t, MonadIO m)
-                => DotOpts
-                -> t PackageName
-                -> m ()
+printLocalNodes ::
+     (F.Foldable t, MonadIO m)
+  => DotOpts
+  -> t PackageName
+  -> m ()
 printLocalNodes dotOpts locals =
   liftIO $ Text.putStrLn (Text.intercalate "\n" lpNodes)
  where
@@ -509,9 +531,10 @@ printLocalNodes dotOpts locals =
   lpNodes = map (applyStyle . nodeName) (F.toList locals)
 
 -- | Print nodes without dependencies
-printLeaves :: MonadIO m
-            => Map PackageName (Set PackageName, DotPayload)
-            -> m ()
+printLeaves ::
+     MonadIO m
+  => Map PackageName (Set PackageName, DotPayload)
+  -> m ()
 printLeaves = F.mapM_ printLeaf . Map.keysSet . Map.filter Set.null . fmap fst
 
 -- | @printDedges p ps@ prints an edge from p to every ps
@@ -547,9 +570,9 @@ localPackageToPackage lp =
 
 -- Plumbing for --test and --bench flags
 withDotConfig ::
-       DotOpts
-    -> RIO DotConfig a
-    -> RIO Runner a
+     DotOpts
+  -> RIO DotConfig a
+  -> RIO Runner a
 withDotConfig opts inner =
   local (over globalOptsL modifyGO) $
     if dotGlobalHints opts
