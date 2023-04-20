@@ -9,20 +9,22 @@ module Stack.Options.BuildParser
 
 import qualified Data.Map as Map
 import           Options.Applicative
-import           Options.Applicative.Args
-import           Options.Applicative.Builder.Extra
+                   ( Parser, completer, flag, flag', help, internal, long
+                   , metavar, option, switch
+                   )
+import           Options.Applicative.Args ( cmdOption )
+import           Options.Applicative.Builder.Extra ( textArgument, textOption )
 import           Stack.Options.Completion
+                   ( flagCompleter, ghcOptsCompleter, targetCompleter )
 import           Stack.Options.PackageParser ( readFlag )
 import           Stack.Prelude
 import           Stack.Types.BuildOpts
                    ( ApplyCLIFlag, BuildCommand, BuildOptsCLI (..)
                    , BuildSubset (..), FileWatchOpts (..)
                    )
-import           Stack.Types.Config ()
 
 -- | Parser for CLI-only build arguments
-buildOptsParser :: BuildCommand
-                -> Parser BuildOptsCLI
+buildOptsParser :: BuildCommand -> Parser BuildOptsCLI
 buildOptsParser cmd = BuildOptsCLI
   <$> targetsParser
   <*> switch

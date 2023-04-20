@@ -8,11 +8,14 @@ module Stack.Options.ExecParser
   ) where
 
 import           Options.Applicative
-import           Options.Applicative.Builder.Extra
-import           Options.Applicative.Args
+                   ( Parser, completer, help, idm, long, metavar, strArgument
+                   , strOption
+                   )
+import           Options.Applicative.Builder.Extra ( boolFlags, dirCompleter )
+import           Options.Applicative.Args ( argsOption )
 import           Stack.Exec
                    ( ExecOpts (..), ExecOptsExtra (..), SpecialExecCmd (..) )
-import           Stack.Options.Completion
+import           Stack.Options.Completion ( projectExeCompleter )
 import           Stack.Prelude
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 

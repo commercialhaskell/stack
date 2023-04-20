@@ -11,15 +11,17 @@ module Stack.Options.Completion
 import           Data.Char ( isSpace )
 import           Data.List ( isPrefixOf )
 import qualified Data.Map as Map
-import           Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
-import           Options.Applicative
-import           Options.Applicative.Builder.Extra
+import           Options.Applicative ( Completer, mkCompleter )
+import           Options.Applicative.Builder.Extra ( unescapeBashArg )
 import           Stack.Constants ( ghcShowOptionsOutput )
 import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           Stack.Runners
+                   ( ShouldReexec (..), withConfig, withDefaultEnvConfig
+                   , withRunnerGlobal
+                   )
 import           Stack.Prelude
 import           Stack.Types.BuildConfig ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Config ( Config (..) )
@@ -27,8 +29,8 @@ import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Project ( Project (..) )
 import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
-import           Stack.Types.NamedComponent
-import           Stack.Types.SourceMap
+import           Stack.Types.NamedComponent ( renderPkgComponent )
+import           Stack.Types.SourceMap ( SMWanted (..), ppComponents, ppGPD )
 
 ghcOptsCompleter :: Completer
 ghcOptsCompleter = mkCompleter $ \inputRaw -> pure $

@@ -5,12 +5,13 @@ module Stack.Options.TestParser
   ) where
 
 import           Options.Applicative
-import           Options.Applicative.Args
+                   ( Parser, auto, flag', help, long, metavar, option )
+import           Options.Applicative.Args ( argsOption )
 import           Options.Applicative.Builder.Extra
-import           Stack.Options.Utils
+                   ( firstBoolFlagsTrue, optionalFirst, optionalFirstFalse )
+import           Stack.Options.Utils ( hideMods )
 import           Stack.Prelude
 import           Stack.Types.BuildOpts ( TestOptsMonoid (..) )
-import           Stack.Types.Config ()
 
 -- | Parser for test arguments.
 -- FIXME hide args

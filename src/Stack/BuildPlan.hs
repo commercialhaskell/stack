@@ -17,31 +17,44 @@ module Stack.BuildPlan
     , showItems
     ) where
 
-import           Stack.Prelude hiding (Display (..))
 import qualified Data.Foldable as F
-import qualified Data.Set as Set
 import           Data.List (intercalate)
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.Package as C
-import           Distribution.PackageDescription (GenericPackageDescription,
-                                                  flagDefault, flagManual,
-                                                  flagName, genPackageFlags)
+import           Distribution.PackageDescription
+                   ( GenericPackageDescription, flagDefault, flagName
+                   , flagManual, genPackageFlags
+                   )
 import qualified Distribution.PackageDescription as C
-import           Distribution.System (Platform)
-import           Distribution.Text (display)
-import           Distribution.Types.UnqualComponentName (unUnqualComponentName)
+import           Distribution.System ( Platform )
+import           Distribution.Text ( display )
+import           Distribution.Types.UnqualComponentName
+                   ( unUnqualComponentName )
 import qualified Distribution.Version as C
-import           Stack.Constants
+import           Stack.Constants ( wiredInPackages )
 import           Stack.Package
+                   ( PackageConfig (..), packageDependencies
+                   , pdpModifiedBuildable, resolvePackageDescription
+                   )
+import           Stack.Prelude hiding ( Display (..) )
 import           Stack.SourceMap
+                   ( SnapshotCandidate, loadProjectSnapshotCandidate )
+import           Stack.Types.Compiler
+                   ( ActualCompiler, WhichCompiler (..), compilerVersionText
+                   , whichCompiler
+                   )
+import           Stack.Types.Config ( HasConfig )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.SourceMap
-import           Stack.Types.Version
-import           Stack.Types.Config
-import           Stack.Types.Compiler
+                   ( CommonPackage (..), DepPackage (..)
+                   , GlobalPackageVersion (..), ProjectPackage (..)
+                   , SMActual (..)
+                   )
+import           Stack.Types.Version ( VersionRange, withinRange )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.BuildPlan" module.

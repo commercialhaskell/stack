@@ -7,7 +7,7 @@ module Stack.Types.DumpPackage
 import qualified Distribution.License as C
 import           Distribution.ModuleName ( ModuleName )
 import           Stack.Prelude
-import           Stack.Types.GhcPkgId
+import           Stack.Types.GhcPkgId ( GhcPkgId )
 
 -- | Type representing dump information for a single package, as output by the
 -- @ghc-pkg describe@ command.

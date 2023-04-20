@@ -79,10 +79,7 @@ import           Stack.Types.Version
                    ( VersionRange, intersectVersionRanges, withinRange )
 import           System.FilePath ( replaceExtension )
 import           Stack.Types.Dependency ( DepValue (..), DepType (..) )
-import           Stack.Types.PackageFile
-                   ( DotCabalPath
-                   , GetPackageFiles (..)
-                   )
+import           Stack.Types.PackageFile ( DotCabalPath , GetPackageFiles (..) )
 import           Stack.PackageFile ( getPackageFile )
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.

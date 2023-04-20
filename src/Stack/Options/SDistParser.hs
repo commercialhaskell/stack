@@ -7,9 +7,12 @@ module Stack.Options.SDistParser
  ) where
 
 import           Options.Applicative
-import           Options.Applicative.Builder.Extra
+                   ( Parser, completer, help, idm, long, metavar, strArgument
+                   , strOption, switch
+                   )
+import           Options.Applicative.Builder.Extra ( boolFlags, dirCompleter )
 import           Stack.Prelude
-import           Stack.SDist
+import           Stack.SDist ( SDistOpts (..) )
 import           Stack.Options.HpcReportParser ( pvpBoundsOption )
 
 -- | Parse command line arguments for Stack's @sdist@ and @upload@ commands.

@@ -5,7 +5,7 @@ module Stack.Options.UploadParser
   ( uploadOptsParser
   ) where
 
-import           Options.Applicative
+import           Options.Applicative ( Parser, flag, help, long )
 import           Stack.Options.SDistParser ( sdistOptsParser )
 import           Stack.Prelude
 import           Stack.Upload ( UploadOpts (..), UploadVariant (..) )

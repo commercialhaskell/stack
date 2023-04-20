@@ -31,7 +31,6 @@ import           Database.Persist.TH
                    , sqlSettings
                    )
 import qualified Pantry.Internal as SQLite
-import           Path (  )
 import           Stack.Prelude
 import           Stack.Storage.Util
                    ( handleMigrationException, updateList, updateSet )

@@ -27,12 +27,16 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import           Distribution.System ( Platform (..) )
 import qualified Distribution.System as Cabal
-import           Path
-import           Path.IO
-import           RIO.Process
+import           Path ( (</>), filename, parseRelDir, parseRelFile )
+import           Path.IO ( doesDirExist, ignoringAbsence, listDir, removeFile )
+import           RIO.Process ( HasProcessContext, proc, readProcess_ )
 import           Stack.Constants
+                   ( relDirBin, relDirInclude, relDirLib, relDirLocal, relDirMingw
+                   , relDirMingw32, relDirMingw64, relDirUsr
+                   )
 import           Stack.Prelude
 import           Stack.Types.Compiler
+                   ( ActualCompiler (..), WhichCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ExtraDirs ( ExtraDirs (..) )
 

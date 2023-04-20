@@ -6,15 +6,17 @@ module Stack.Options.NewParser
 
 import qualified Data.Map.Strict as M
 import           Options.Applicative
-import           Stack.Init
-import           Stack.New
-import           Stack.Options.InitParser
+                   ( Parser, help, long, metavar, short, switch )
+import           Stack.Init ( InitOpts )
+import           Stack.New ( NewOpts (..) )
+import           Stack.Options.InitParser ( initOptsParser )
 import           Stack.Prelude
-import           Stack.Types.PackageName
+import           Stack.Types.PackageName ( packageNameArgument )
 import           Stack.Types.TemplateName
+                   ( templateNameArgument, templateParamArgument )
 
 -- | Parser for @stack new@.
-newOptsParser :: Parser (NewOpts,InitOpts)
+newOptsParser :: Parser (NewOpts, InitOpts)
 newOptsParser = (,) <$> newOpts <*> initOptsParser
  where
   newOpts = NewOpts
