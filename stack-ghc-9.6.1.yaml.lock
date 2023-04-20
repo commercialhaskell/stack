@@ -586,12 +586,12 @@ packages:
   original:
     hackage: microlens-mtl-0.2.0.3
 - completed:
-    hackage: microlens-th-0.4.3.11@sha256:d9e18ca8512608d5699f17b71ff11a483ac52f20ffeac9150fd62bfd9518d522,2420
+    hackage: microlens-th-0.4.3.12@sha256:3d20719cb1543a082e151cf75ad0e41832cc270298fd77e83f8b5299c874b670,2486
     pantry-tree:
-      sha256: 40e19316523a15b3317f6bf08dee084e7f53fab8d6343c8012648eb53991dc34
+      sha256: cbd7b68ea5aa60b13207ce444d4620eeb5540347375ddbe66645f8e2e8193a28
       size: 558
   original:
-    hackage: microlens-th-0.4.3.11
+    hackage: microlens-th-0.4.3.12
 - completed:
     hackage: mime-types-0.1.1.0@sha256:c68f421c569e325ec4c5595a6916cc6336cf11c7f11bc569a62c6a32214454ad,862
     pantry-tree:
