@@ -8,16 +8,22 @@ module Stack.LockSpec
   , spec
   ) where
 
-import           Pantry.Internal.AesonExtended ( WithJSONWarnings (..) )
 import qualified Data.Yaml as Yaml
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.Version ( mkVersion )
 import           Pantry
+                   ( BlobKey (..), FileSize (..), PackageIdentifier (..)
+                   , PackageLocationImmutable (..), PackageMetadata (..)
+                   , RawPackageLocationImmutable (..), RawPackageMetadata (..)
+                   , Repo (..), RepoType (..), SHA256, TreeKey (..)
+                   , resolvePaths
+                   )
+import           Pantry.Internal.AesonExtended ( WithJSONWarnings (..) )
 import qualified Pantry.SHA256 as SHA256
-import           RIO
-import           Stack.Lock
-import           Test.Hspec
-import           Text.RawString.QQ
+import           RIO ( ByteString, displayException, throwIO, unless )
+import           Stack.Lock ( Locked (..), LockedLocation (..) )
+import           Test.Hspec ( Spec, it, shouldBe )
+import           Text.RawString.QQ ( r )
 
 toBlobKey :: ByteString -> Word -> BlobKey
 toBlobKey string size = BlobKey (decodeSHA string) (FileSize size)

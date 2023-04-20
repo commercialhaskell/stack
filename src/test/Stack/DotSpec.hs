@@ -10,18 +10,16 @@ module Stack.DotSpec
   , stubLoader
   ) where
 
-import           Data.Functor.Identity
 import           Data.List ((\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import           Distribution.License (License (BSD3))
+import           Distribution.License ( License (BSD3) )
 import qualified RIO.Text as T
-import           Stack.Prelude hiding (pkgName)
-import           Test.Hspec
-import           Test.Hspec.QuickCheck (prop)
-import           Test.QuickCheck (forAll,choose,Gen)
-
-import           Stack.Dot
+import           Stack.Dot ( DotPayload (..), pruneGraph, resolveDependencies )
+import           Stack.Prelude hiding ( pkgName )
+import           Test.Hspec ( Spec, describe, it, shouldBe )
+import           Test.Hspec.QuickCheck ( prop )
+import           Test.QuickCheck ( Gen, choose, forAll )
 
 dummyPayload :: DotPayload
 dummyPayload = DotPayload (parseVersion "0.0.0.0") (Just (Right BSD3)) Nothing

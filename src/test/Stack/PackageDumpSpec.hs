@@ -9,7 +9,7 @@ module Stack.PackageDumpSpec
   , runEnvNoLogging
   ) where
 
-import           Conduit
+import           Conduit ( withSourceFile, yield )
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Text ( decodeUtf8 )
 import qualified Data.Map as Map
@@ -18,14 +18,21 @@ import           Distribution.License ( License (..) )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Version ( mkVersion )
 import           Path ( parseAbsFile )
-import           Stack.PackageDump
-import           Stack.Prelude
-import           Stack.Types.CompilerPaths ( GhcPkgExe (..) )
-import           Stack.Types.GhcPkgId
 import           RIO.PrettyPrint.Simple ( SimplePrettyApp, mkSimplePrettyApp )
 import           RIO.Process
+                   ( envVarsL, findExecutable, mkDefaultProcessContext
+                   , mkProcessContext
+                   )
+import           Stack.PackageDump
+                   ( DumpPackage (..), conduitDumpPackage, eachPair
+                   , eachSection, ghcPkgDump, pruneDeps, sinkMatching
+                   )
+import           Stack.Prelude
+import           Stack.Types.CompilerPaths ( GhcPkgExe (..) )
+import           Stack.Types.GhcPkgId ( parseGhcPkgId )
 import           Test.Hspec
-import           Test.Hspec.QuickCheck
+                   ( Spec, describe, hspec, it, shouldBe )
+import           Test.Hspec.QuickCheck ( prop )
 
 main :: IO ()
 main = hspec spec

@@ -8,7 +8,7 @@ module Path.CheckInstall
 import           Control.Monad.Extra ( (&&^), anyM )
 import qualified Data.Text as T
 import           Stack.Prelude
-import           Stack.Types.Config
+import           Stack.Types.Config ( HasConfig )
 import qualified System.Directory as D
 import qualified System.FilePath as FP
 

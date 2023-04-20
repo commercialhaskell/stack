@@ -4,9 +4,9 @@ module Path.Extended
   , replaceExtension
   ) where
 
-import           Control.Monad.Catch
-import qualified Path
-import           Path (Path, File)
+import           Control.Monad.Catch ( MonadThrow )
+import qualified Path ( addExtension, fileExtension, replaceExtension )
+import           Path ( File, Path )
 
 fileExtension :: MonadThrow m => Path b File -> m String
 fileExtension = Path.fileExtension
