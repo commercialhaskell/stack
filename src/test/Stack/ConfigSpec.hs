@@ -15,16 +15,17 @@ module Stack.ConfigSpec
   , spec
   ) where
 
-import           Control.Arrow
+import           Control.Arrow ( left )
+import           Data.Yaml ( decodeEither', parseEither )
 import           Distribution.Verbosity ( verbose )
-import           Pantry.Internal.AesonExtended
-import           Data.Yaml
 import           Pantry.Internal ( pcHpackExecutable )
-import           Path
+import           Pantry.Internal.AesonExtended
+import           Path ( (</>), parent, parseAbsDir, parseRelDir, parseRelFile )
 import           Path.IO hiding ( withSystemTempDir )
-import           Stack.Config
+import           Stack.Config (defaultConfigYaml, loadConfig, loadConfigYaml )
+import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           Stack.Prelude
-import           Stack.Runners
+import           Stack.Runners ( withBuildConfig, withRunnerGlobal )
 import           Stack.Types.BuildConfig ( BuildConfig (..), projectRootL )
 import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), CabalVerbosity (..)
@@ -37,11 +38,16 @@ import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Project ( Project (..) )
 import           Stack.Types.ProjectAndConfigMonoid
                    ( ProjectAndConfigMonoid (..), parseProjectAndConfigMonoid )
-import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           System.Directory
-import           System.Environment
+                   ( createDirectory, createDirectoryIfMissing
+                   , getCurrentDirectory, setCurrentDirectory
+                   )
+import           System.Environment ( lookupEnv, setEnv, unsetEnv )
 import           System.IO ( writeFile )
 import           Test.Hspec
+                   ( Selector, Spec, anyException, beforeAll, describe, example
+                   , it, shouldBe, shouldThrow
+                   )
 
 sampleConfig :: String
 sampleConfig =

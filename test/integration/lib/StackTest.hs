@@ -46,20 +46,36 @@ module StackTest
   , superslow
   ) where
 
-import Control.Monad
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
-import Control.Concurrent
-import Control.Exception
-import Data.Maybe (fromMaybe)
-import System.Environment
-import System.Directory
-import System.IO
-import System.IO.Error
-import System.Process
-import System.Exit
-import System.Info (arch, os)
-import GHC.Stack (HasCallStack)
+import           Control.Monad ( forever, unless, void, when )
+import           Control.Monad.IO.Class ( liftIO )
+import           Control.Monad.Trans.Reader ( ReaderT, ask, runReaderT )
+import           Control.Concurrent ( forkIO )
+import           Control.Exception
+                   ( Exception (..), IOException, bracket_, catch, throw
+                   , throwIO
+                   )
+import           Data.Maybe ( fromMaybe )
+import           GHC.Stack ( HasCallStack )
+import           System.Environment ( getEnv, lookupEnv )
+import           System.Directory
+                   ( copyFile, doesDirectoryExist, doesFileExist
+                   , getCurrentDirectory, removeDirectoryRecursive, removeFile
+                   , setCurrentDirectory
+                   )
+import           System.IO
+                   ( BufferMode (..), Handle, IOMode (..), hGetChar, hGetLine
+                   , hPutChar, hPutStr, hPutStrLn, hSetBuffering, stderr
+                   , withFile
+                   )
+import           System.IO.Error
+                   ( isDoesNotExistError, isEOFError )
+import           System.Process
+                   ( CreateProcess (..), StdStream (..), createProcess, proc
+                   , readCreateProcessWithExitCode, readProcessWithExitCode
+                   , shell, waitForProcess
+                   )
+import           System.Exit ( ExitCode (..) )
+import           System.Info ( arch, os )
 
 run' :: HasCallStack => FilePath -> [String] -> IO ExitCode
 run' cmd args = do

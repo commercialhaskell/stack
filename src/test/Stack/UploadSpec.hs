@@ -5,15 +5,23 @@ module Stack.UploadSpec
   ( spec
   ) where
 
-import RIO
-import RIO.Directory
-import RIO.FilePath ((</>))
-import Stack.Upload
-import Test.Hspec
-import System.Permissions (osIsWindows)
-import System.PosixCompat.Files (getFileStatus, fileMode)
-import System.Environment (setEnv, unsetEnv)
-import Data.Bits ((.&.))
+import           Data.Bits ((.&.))
+import           RIO
+                   ( Bool (..), IO, IsString, Maybe (..), String, ($), finally
+                   , readFileBinary, replicateM_, runRIO, unless
+                   , withSystemTempDirectory
+                   )
+import           RIO.Directory
+                   ( emptyPermissions, getPermissions, setOwnerReadable
+                   , setOwnerWritable
+                   )
+import           RIO.FilePath ( (</>) )
+import           Stack.Upload
+                   ( HackageKey (..), maybeGetHackageKey, writeFilePrivate )
+import           System.Environment ( setEnv, unsetEnv )
+import           System.Permissions ( osIsWindows )
+import           System.PosixCompat.Files ( getFileStatus, fileMode )
+import           Test.Hspec ( Spec, example, it, shouldBe, shouldReturn )
 
 spec :: Spec
 spec = do

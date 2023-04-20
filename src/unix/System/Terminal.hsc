@@ -10,7 +10,7 @@ module System.Terminal
 
 import           Foreign
 import           Foreign.C.Types
-import           RIO (MonadIO, Handle, hIsTerminalDevice)
+import           RIO ( Handle, MonadIO, hIsTerminalDevice )
 
 #include <sys/ioctl.h>
 #include <unistd.h>
