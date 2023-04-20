@@ -4,14 +4,15 @@
 
 ~~~text
 stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
-            [--flag PACKAGE:[-]FLAG] [--dependencies-only | --only-snapshot |
-              --only-dependencies | --only-locals] [--file-watch |
-              --file-watch-poll] [--watch-all] [--exec COMMAND [ARGUMENT(S)]]
-            [--only-configure] [--trace] [--profile] [--no-strip]
-            [--[no-]library-profiling] [--[no-]executable-profiling]
-            [--[no-]library-stripping] [--[no-]executable-stripping]
-            [--[no-]haddock] [--haddock-arguments HADDOCK_ARGS]
-            [--[no-]open] [--[no-]haddock-deps] [--[no-]haddock-internal]
+            [--PROG-option OPTION] [--flag PACKAGE:[-]FLAG]
+            [--dependencies-only | --only-snapshot | --only-dependencies |
+              --only-locals] [--file-watch | --file-watch-poll] [--watch-all]
+            [--exec COMMAND [ARGUMENT(S)]] [--only-configure] [--trace]
+            [--profile] [--no-strip] [--[no-]library-profiling]
+            [--[no-]executable-profiling] [--[no-]library-stripping]
+            [--[no-]executable-stripping] [--[no-]haddock]
+            [--haddock-arguments HADDOCK_ARGS] [--[no-]open]
+            [--[no-]haddock-deps] [--[no-]haddock-internal]
             [--[no-]haddock-hyperlink-source] [--[no-]copy-bins]
             [--[no-]copy-compiler-tool] [--[no-]prefetch] [--[no-]keep-going]
             [--[no-]keep-tmp-files] [--[no-]force-dirty] [--[no-]test]
@@ -405,6 +406,20 @@ symbols.
 
 Pass the flag to enable profiling in libraries, executables, etc. for all
 expressions, and generate a backtrace on exception.
+
+## Flags affecting other tools' behaviour
+
+### `--PROG-option` options
+
+`PROG` is a program recognised by Cabal (the library) and one of `alex`, `ar`,
+`c2hs`, `cpphs`, `gcc`, `greencard`, `happy`, `hsc2hs`, `hscolour`, `ld`,
+`pkg-config`, `strip` and `tar`.
+
+`stack build --PROG-option <PROG_option>` passes the specified command line
+option to `PROG`, if it used by Cabal during `configuration` or `build`. This
+option can be specified multiple times. For example, if the program `happy` is
+used by Cabal, you could command `stack build --happy-option --ghc` to pass its
+`--ghc` option to the program.
 
 ## Flags relating to build outputs
 
