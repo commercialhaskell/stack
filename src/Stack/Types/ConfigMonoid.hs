@@ -30,6 +30,7 @@ import           Pantry.Internal.AesonExtended
 import           Stack.Prelude
 import           Stack.Types.AllowNewerDeps ( AllowNewerDeps )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
+import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
 import           Stack.Types.BuildOpts ( BuildOptsMonoid )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
 import           Stack.Types.ColorWhen ( ColorWhen )
@@ -140,6 +141,8 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See 'configMonoidRebuildGhcOptions'
   , configMonoidApplyGhcOptions     :: !(First ApplyGhcOptions)
     -- ^ See 'configApplyGhcOptions'
+  , configMonoidApplyProgOptions     :: !(First ApplyProgOptions)
+    -- ^ See 'configApplyProgOptions'
   , configMonoidAllowNewer          :: !(First Bool)
     -- ^ See 'configMonoidAllowNewer'
   , configMonoidAllowNewerDeps      :: !(Maybe AllowNewerDeps)
@@ -283,7 +286,8 @@ parseConfigMonoidObject rootDir obj = do
       configMonoidGhcOptionsByName = coerce $ Map.fromList
           [(name, opts) | (GOKPackage name, opts) <- Map.toList options]
 
-  configMonoidCabalConfigOpts' <- obj ..:? "configure-options" ..!= mempty
+  configMonoidCabalConfigOpts' <-
+    obj ..:? configMonoidConfigureOptionsName ..!= mempty
   let configMonoidCabalConfigOpts =
         coerce (configMonoidCabalConfigOpts' :: Map CabalConfigKey [Text])
 
@@ -301,6 +305,8 @@ parseConfigMonoidObject rootDir obj = do
     FirstFalse <$> obj ..:? configMonoidRebuildGhcOptionsName
   configMonoidApplyGhcOptions <-
     First <$> obj ..:? configMonoidApplyGhcOptionsName
+  configMonoidApplyProgOptions <-
+    First <$> obj ..:? configMonoidApplyProgOptionsName
   configMonoidAllowNewer <- First <$> obj ..:? configMonoidAllowNewerName
   configMonoidAllowNewerDeps <- obj ..:? configMonoidAllowNewerDepsName
   configMonoidDefaultTemplate <-
@@ -351,6 +357,9 @@ configMonoidDockerOptsName = "docker"
 
 configMonoidNixOptsName :: Text
 configMonoidNixOptsName = "nix"
+
+configMonoidConfigureOptionsName :: Text
+configMonoidConfigureOptionsName = "configure-options"
 
 configMonoidConnectionCountName :: Text
 configMonoidConnectionCountName = "connection-count"
@@ -457,6 +466,9 @@ configMonoidRebuildGhcOptionsName = "rebuild-ghc-options"
 
 configMonoidApplyGhcOptionsName :: Text
 configMonoidApplyGhcOptionsName = "apply-ghc-options"
+
+configMonoidApplyProgOptionsName :: Text
+configMonoidApplyProgOptionsName = "apply-prog-options"
 
 configMonoidAllowNewerName :: Text
 configMonoidAllowNewerName = "allow-newer"

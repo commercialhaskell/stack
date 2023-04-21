@@ -412,6 +412,24 @@ or otherwise), `locals` (all local packages, targets or otherwise), and
 
     Before Stack 0.1.6.0, the default value was `targets`.
 
+### apply-prog-options
+
+:octicons-tag-24: UNRELEASED
+
+Default: `locals`
+
+Related command line:
+[`stack build --PROG-option`](build_command.md#-prog-option-options) options
+
+Determines to which packages all and any `--PROG-option` command line options
+specified on the command line are applied. Possible values are: `everything`
+(all packages, local or otherwise), `locals` (all local packages, targets or
+otherwise), and `targets` (all local packages that are targets).
+
+!!! note
+
+    The use of `everything` can break invariants about your snapshot database.
+
 ### arch
 
 Default: The machine architecture on which Stack is running.
@@ -628,16 +646,23 @@ concurrent-tests: false
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
-Options which are passed to the configure step of the Cabal build process.
-These can either be set by package name, or using the `$everything`,
-`$targets`, and `$locals` special keys. These special keys have the same
-meaning as in `ghc-options`.
+Related command line (takes precedence):
+[`stack build --PROG-option`](build_command.md#prog-option-options) options
+
+`configure-options` can specify Cabal (the library) options (including
+`--PROG-option` or `--PROG-options` options) for the configure step of the Cabal
+build process for a named package, all local packages that are targets (using
+the `$targets` key), all local packages (targets or otherwise) (using the
+`$locals` key), or all packages (local or otherwise) (using the `$everything`
+key).
 
 ~~~yaml
 configure-options:
   $everything:
   - --with-gcc
   - /some/path
+  $locals:
+  - --happy-option=--ghc
   my-package:
   - --another-flag
 ~~~

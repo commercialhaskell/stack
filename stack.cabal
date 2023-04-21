@@ -243,6 +243,7 @@ library
       Stack.Types.AddCommand
       Stack.Types.AllowNewerDeps
       Stack.Types.ApplyGhcOptions
+      Stack.Types.ApplyProgOptions
       Stack.Types.Build
       Stack.Types.BuildConfig
       Stack.Types.BuildOpts
