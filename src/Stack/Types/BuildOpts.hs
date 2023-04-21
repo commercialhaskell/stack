@@ -140,7 +140,6 @@ defaultBuildOptsCLI = BuildOptsCLI
   , boptsCLIDryrun = False
   , boptsCLIFlags = Map.empty
   , boptsCLIGhcOptions = []
-  , boptsCLIProgsOptions = []
   , boptsCLIBuildSubset = BSAll
   , boptsCLIFileWatch = NoFileWatch
   , boptsCLIWatchAll = False
@@ -174,7 +173,6 @@ data BuildOptsCLI = BuildOptsCLI
   { boptsCLITargets :: ![Text]
   , boptsCLIDryrun :: !Bool
   , boptsCLIGhcOptions :: ![Text]
-  , boptsCLIProgsOptions :: ![(Text, [Text])]
   , boptsCLIFlags :: !(Map ApplyCLIFlag (Map FlagName Bool))
   , boptsCLIBuildSubset :: !BuildSubset
   , boptsCLIFileWatch :: !FileWatchOpts
