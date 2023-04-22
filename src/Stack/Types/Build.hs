@@ -1171,12 +1171,13 @@ configureOptsDirs bco isMutable package = concat
     )
 
 -- | Same as 'configureOpts', but does not include directory path options
-configureOptsNoDir :: EnvConfig
-                   -> BaseConfigOpts
-                   -> Map PackageIdentifier GhcPkgId -- ^ dependencies
-                   -> Bool -- ^ is this a local, non-extra-dep?
-                   -> Package
-                   -> [String]
+configureOptsNoDir ::
+     EnvConfig
+  -> BaseConfigOpts
+  -> Map PackageIdentifier GhcPkgId -- ^ Dependencies.
+  -> Bool -- ^ Is this a local, non-extra-dep?
+  -> Package
+  -> [String]
 configureOptsNoDir econfig bco deps isLocal package = concat
   [ depOptions
   , [ "--enable-library-profiling"

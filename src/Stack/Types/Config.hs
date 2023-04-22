@@ -32,6 +32,7 @@ import           Path ( (</>), parent, reldir, relfile )
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
+import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
 import           Stack.Types.BuildOpts ( BuildOpts )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
 import           Stack.Types.Compiler ( CompilerRepository )
@@ -139,7 +140,10 @@ data Config = Config
   , configRebuildGhcOptions   :: !Bool
     -- ^ Rebuild on GHC options changes
   , configApplyGhcOptions     :: !ApplyGhcOptions
-    -- ^ Which packages to ghc-options on the command line apply to?
+    -- ^ Which packages do --ghc-options on the command line apply to?
+  , configApplyProgOptions     :: !ApplyProgOptions
+    -- ^ Which packages do all and any --PROG-option options on the command line
+    -- apply to?
   , configAllowNewer          :: !Bool
     -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
     -- match cabal.

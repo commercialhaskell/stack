@@ -11,6 +11,7 @@ module Stack.Types.BuildOpts
   , defaultBuildOpts
   , defaultBuildOptsCLI
   , BuildOptsCLI (..)
+  , boptsCLIAllProgOptions
   , BuildOptsMonoid (..)
   , buildOptsMonoidBenchmarksL
   , buildOptsMonoidHaddockL
@@ -140,6 +141,7 @@ defaultBuildOptsCLI = BuildOptsCLI
   , boptsCLIDryrun = False
   , boptsCLIFlags = Map.empty
   , boptsCLIGhcOptions = []
+  , boptsCLIProgsOptions = []
   , boptsCLIBuildSubset = BSAll
   , boptsCLIFileWatch = NoFileWatch
   , boptsCLIWatchAll = False
@@ -173,6 +175,7 @@ data BuildOptsCLI = BuildOptsCLI
   { boptsCLITargets :: ![Text]
   , boptsCLIDryrun :: !Bool
   , boptsCLIGhcOptions :: ![Text]
+  , boptsCLIProgsOptions :: ![(Text, [Text])]
   , boptsCLIFlags :: !(Map ApplyCLIFlag (Map FlagName Bool))
   , boptsCLIBuildSubset :: !BuildSubset
   , boptsCLIFileWatch :: !FileWatchOpts
@@ -183,6 +186,25 @@ data BuildOptsCLI = BuildOptsCLI
   , boptsCLIInitialBuildSteps :: !Bool
   }
   deriving Show
+
+-- | Generate a list of --PROG-option="<argument>" arguments for all PROGs.
+boptsCLIAllProgOptions :: BuildOptsCLI -> [Text]
+boptsCLIAllProgOptions boptsCLI =
+  concatMap progOptionArgs (boptsCLIProgsOptions boptsCLI)
+ where
+  -- Generate a list of --PROG-option="<argument>" arguments for a PROG.
+  progOptionArgs :: (Text, [Text]) -> [Text]
+  progOptionArgs (prog, opts) = map progOptionArg opts
+   where
+    -- Generate a --PROG-option="<argument>" argument for a PROG and option.
+    progOptionArg :: Text -> Text
+    progOptionArg opt = T.concat
+      [ "--"
+      , prog
+      , "-option=\""
+      , opt
+      , "\""
+      ]
 
 -- | Command sum type for conditional arguments.
 data BuildCommand

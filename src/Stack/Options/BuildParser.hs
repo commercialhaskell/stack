@@ -7,10 +7,12 @@ module Stack.Options.BuildParser
   , targetsParser
   ) where
 
+import qualified Data.List as L
 import qualified Data.Map as Map
+import qualified Data.Text as T
 import           Options.Applicative
                    ( Parser, completer, flag, flag', help, internal, long
-                   , metavar, option, switch
+                   , metavar, option, strOption, switch, value
                    )
 import           Options.Applicative.Args ( cmdOption )
 import           Options.Applicative.Builder.Extra ( textArgument, textOption )
@@ -52,6 +54,7 @@ buildOptsParser cmd = BuildOptsCLI
                     \multiple times)."
             ))
       )
+  <*> progsOptionsParser
   <*> flagsParser
   <*> (   flag' BSOnlyDependencies
             (  long "dependencies-only"
@@ -127,3 +130,50 @@ flagsParser = Map.unionsWith Map.union
        <> help "Override flags set in stack.yaml (applies to local packages \
                \and extra-deps)."
        ))
+
+progsOptionsParser :: Parser [(Text, [Text])]
+progsOptionsParser =
+     dummyProgOptionsParser
+  *> (filter (not . L.null . snd) <$> progsOptionsParser')
+ where
+  -- The purpose of this parser is only to generate the desired help text. The
+  -- actual --PROG-options parsers are all internal.
+  dummyProgOptionsParser :: Parser String
+  dummyProgOptionsParser = strOption
+    ( long "PROG-option"
+    <> help
+         (  "Pass an argument to PROG (can be specified multiple times). PROG \
+            \must be a program recognised by the Cabal library and one of "
+         <> T.unpack (T.intercalate " " progs) <> "."
+         )
+    <> metavar "ARG"
+    <> value ""
+    )
+  progs :: [Text]
+  progs = L.sort
+    [
+      -- configuration
+      "pkg-config"
+      -- preprocessors
+    , "alex"
+    , "c2hs"
+    , "cpphs"
+--  , "doctest -- Not present in Cabal-1.22.5.0.
+    , "greencard"
+    , "happy"
+    , "hsc2hs"
+    , "hscolour"
+      -- platform toolchain (GNU)
+    , "ar"  -- create, modify, and extract from archives
+    , "gcc" -- C/C++ compiler
+    , "ld" -- linker
+    , "strip" -- discards symbols and other data from object files
+    , "tar"
+    ]
+  progsOptionsParser' :: Parser [(Text, [Text])]
+  progsOptionsParser' = traverse mkProgOptionsParser progs
+  mkProgOptionsParser :: Text -> Parser (Text, [Text])
+  mkProgOptionsParser prog = fmap (prog,) $ many $ textOption
+    (  long (T.unpack prog <> "-option")
+    <> internal
+    )

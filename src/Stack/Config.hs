@@ -99,6 +99,7 @@ import           Stack.Storage.User ( initUserStorage )
 import           Stack.Storage.Util ( handleMigrationException )
 import           Stack.Types.AllowNewerDeps ( AllowNewerDeps (..) )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
+import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
 import           Stack.Types.Build ( BuildException (..), FlagSource (..) )
 import           Stack.Types.BuildConfig ( BuildConfig (..) )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
@@ -410,6 +411,7 @@ configFromConfigMonoid
         configModifyCodePage = fromFirstTrue configMonoidModifyCodePage
         configRebuildGhcOptions = fromFirstFalse configMonoidRebuildGhcOptions
         configApplyGhcOptions = fromFirst AGOLocals configMonoidApplyGhcOptions
+        configApplyProgOptions = fromFirst APOLocals configMonoidApplyProgOptions
         configAllowNewer = fromFirst False configMonoidAllowNewer
         configAllowNewerDeps = coerce configMonoidAllowNewerDeps
         configDefaultTemplate = getFirst configMonoidDefaultTemplate

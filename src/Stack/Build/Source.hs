@@ -33,12 +33,13 @@ import           Stack.SourceMap
                    , pruneGlobals
                    )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
+import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
 import           Stack.Types.Build ( FlagSource (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.BuildOpts
                    ( ApplyCLIFlag (..), BuildOpts (..), BuildOptsCLI (..)
-                   , TestOpts (..)
+                   , TestOpts (..), boptsCLIAllProgOptions
                    )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
@@ -107,7 +108,7 @@ loadSourceMap smt boptsCli sma = do
             ghcOptions =
               generalGhcOptions bconfig boptsCli isTarget isProjectPackage
             cabalConfigOpts =
-              loadCabalConfigOpts bconfig (cpName common) isTarget isProjectPackage
+              generalCabalConfigOpts bconfig boptsCli (cpName common) isTarget isProjectPackage
         in  common
               { cpFlags =
                   if M.null flags
@@ -215,8 +216,14 @@ getLocalFlags boptsCli name = Map.unions
   cliFlags = boptsCLIFlags boptsCli
 
 -- | Get the options to pass to @./Setup.hs configure@
-loadCabalConfigOpts :: BuildConfig -> PackageName -> Bool -> Bool -> [Text]
-loadCabalConfigOpts bconfig name isTarget isLocal = concat
+generalCabalConfigOpts ::
+     BuildConfig
+  -> BuildOptsCLI
+  -> PackageName
+  -> Bool
+  -> Bool
+  -> [Text]
+generalCabalConfigOpts bconfig boptsCli name isTarget isLocal = concat
   [ Map.findWithDefault [] CCKEverything (configCabalConfigOpts config)
   , if isLocal
       then Map.findWithDefault [] CCKLocals (configCabalConfigOpts config)
@@ -225,9 +232,17 @@ loadCabalConfigOpts bconfig name isTarget isLocal = concat
       then Map.findWithDefault [] CCKTargets (configCabalConfigOpts config)
       else []
   , Map.findWithDefault [] (CCKPackage name) (configCabalConfigOpts config)
+  , if includeExtraOptions
+      then boptsCLIAllProgOptions boptsCli
+      else []
   ]
  where
   config = view configL bconfig
+  includeExtraOptions =
+    case configApplyProgOptions config of
+      APOTargets -> isTarget
+      APOLocals -> isLocal
+      APOEverything -> True
 
 -- | Get the configured options to pass from GHC, based on the build
 -- configuration and commandline.

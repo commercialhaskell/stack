@@ -406,6 +406,35 @@ symbols.
 Pass the flag to enable profiling in libraries, executables, etc. for all
 expressions, and generate a backtrace on exception.
 
+## Flags affecting other tools' behaviour
+
+### `--PROG-option` options
+
+:octicons-tag-24: UNRELEASED
+
+`PROG` is a program recognised by Cabal (the library) and one of `alex`, `ar`,
+`c2hs`, `cpphs`, `gcc`, `greencard`, `happy`, `hsc2hs`, `hscolour`, `ld`,
+`pkg-config`, `strip` and `tar`.
+
+`stack build --PROG-option <PROG_argument>` passes the specified command line
+argument to `PROG`, if it used by Cabal during the configuration step. This
+option can be specified multiple times. For example, if the program `happy` is
+used by Cabal during the configuration step, you could command
+`stack build --happy-option=--ghc` or `stack build --happy-option --ghc` to pass
+to `happy` its `--ghc` flag.
+
+By default, all and any `--PROG-option` options on Stack's command line are
+applied to all local packages (targets or otherwise). This behaviour can be
+changed. See the
+[`apply-prog-options`](yaml_configuration.md#apply-prog-options) configuration
+option.
+
+Stack can also be configured to pass Cabal's `--PROG-option`, `--PROG-options`
+or other options to Cabal during the configuration step. For further
+information, see the documentation for the
+[configure-options](yaml_configuration.md#configure-options) configuration
+option.
+
 ## Flags relating to build outputs
 
 ### `--[no]-cabal-verbose` flag
