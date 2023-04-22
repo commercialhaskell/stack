@@ -57,13 +57,14 @@ import           Stack.Storage.User
                    , precompiledCacheKey, savePrecompiledCache
                    )
 import           Stack.Types.Build
-                   ( BuildCache (..), BaseConfigOpts (..), ConfigCache
-                   , ConfigureOpts (..), FileCacheInfo, InstallLocation (..)
-                   , Installed (..), PrecompiledCache (..)
+                   ( BuildCache (..), ConfigCache, FileCacheInfo
+                   , InstallLocation (..), Installed (..), PrecompiledCache (..)
                    )
 import           Stack.Types.Cache ( ConfigCacheType (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config ( stackRootL )
+import           Stack.Types.ConfigureOpts
+                   ( BaseConfigOpts (..), ConfigureOpts (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , installationRootDeps, installationRootLocal

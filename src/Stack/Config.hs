@@ -100,7 +100,7 @@ import           Stack.Storage.Util ( handleMigrationException )
 import           Stack.Types.AllowNewerDeps ( AllowNewerDeps (..) )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
-import           Stack.Types.Build ( BuildException (..), FlagSource (..) )
+import           Stack.Types.Build.Exception ( BuildException (..) )
 import           Stack.Types.BuildConfig ( BuildConfig (..) )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.ColorWhen ( ColorWhen (..) )
@@ -133,6 +133,7 @@ import           Stack.Types.SourceMap
                    , SMWanted (..)
                    )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
+import           Stack.Types.UnusedFlags ( FlagSource (..) )
 import           Stack.Types.Version
                    ( IntersectingVersionRange (..), VersionCheck (..)
                    , stackVersion, withinRange

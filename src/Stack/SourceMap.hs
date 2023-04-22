@@ -33,14 +33,14 @@ import           RIO.Process ( HasProcessContext )
 import qualified RIO.Set as Set
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDump )
 import           Stack.Prelude
-import           Stack.Types.Build
-                   ( BuildPrettyException (..), FlagSource, UnusedFlags (..) )
+import           Stack.Types.Build.Exception ( BuildPrettyException (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler, actualToWanted, wantedToActual )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe, HasCompiler (..) )
 import           Stack.Types.Config ( HasConfig )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.UnusedFlags ( FlagSource, UnusedFlags (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( rslInLogL )
 import           Stack.Types.SourceMap

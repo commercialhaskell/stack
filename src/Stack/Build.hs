@@ -34,10 +34,9 @@ import           Stack.Prelude hiding ( loadPackage )
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.Types.Build
-                   ( BaseConfigOpts (..), BuildException (..)
-                   , BuildPrettyException (..), Plan (..), Task (..)
-                   , TaskType (..), taskLocation
-                   )
+                   ( Plan (..), Task (..), TaskType (..), taskLocation )
+import           Stack.Types.Build.Exception
+                   ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig ( HasBuildConfig, stackYamlL )
 import           Stack.Types.BuildOpts
                    ( BuildCommand (..), BuildOpts (..), BuildOptsCLI (..)
@@ -50,6 +49,7 @@ import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), buildOptsL
                    )
+import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap
                    , actualCompilerVersionL, installationRootDeps

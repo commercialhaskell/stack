@@ -30,9 +30,10 @@ import           RIO.List ( intercalate )
 import           RIO.Process ( HasProcessContext, withWorkingDir )
 import           Stack.Constants ( docDirSuffix, relDirAll, relFileIndexHtml )
 import           Stack.Prelude
-import           Stack.Types.Build ( BaseConfigOpts (..), BuildException (..) )
+import           Stack.Types.Build.Exception ( BuildException (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
+import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import           Stack.Types.BuildOpts
                    ( BuildOpts (..), BuildOptsCLI (..), HaddockOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )

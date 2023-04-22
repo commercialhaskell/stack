@@ -130,13 +130,12 @@ import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build
-                   ( BaseConfigOpts (..), BuildException (..)
-                   , BuildPrettyException (..), ConfigCache (..)
-                   , ConfigureOpts (..), IsMutable (..), Plan (..)
-                   , PrecompiledCache (..), Task (..), TaskConfigOpts (..)
-                   , TaskType (..), configCacheComponents, taskIsTarget
-                   , taskLocation
+                   ( ConfigCache (..), Plan (..), PrecompiledCache (..)
+                   , Task (..), TaskConfigOpts (..), TaskType (..)
+                   , configCacheComponents, taskIsTarget, taskLocation
                    )
+import           Stack.Types.Build.Exception
+                   ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL )
 import           Stack.Types.BuildOpts
@@ -153,6 +152,8 @@ import           Stack.Types.CompilerPaths
                    )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), buildOptsL, stackRootL )
+import           Stack.Types.ConfigureOpts
+                   ( BaseConfigOpts (..), ConfigureOpts (..) )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
@@ -165,6 +166,7 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString, unGhcPkgId )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent
                    ( NamedComponent, benchComponents, exeComponents, isCBench
                    , isCTest, renderComponent, testComponents

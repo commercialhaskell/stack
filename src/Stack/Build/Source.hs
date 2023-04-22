@@ -34,7 +34,6 @@ import           Stack.SourceMap
                    )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
-import           Stack.Types.Build ( FlagSource (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.BuildOpts
@@ -63,6 +62,7 @@ import           Stack.Types.SourceMap
                    , SMActual (..), SMTargets (..), SourceMap (..)
                    , SourceMapHash (..), Target (..), ppGPD, ppRoot
                    )
+import           Stack.Types.UnusedFlags ( FlagSource (..) )
 import           System.FilePath ( takeFileName )
 import           System.IO.Error ( isDoesNotExistError )
 

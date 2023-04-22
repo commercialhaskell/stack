@@ -245,6 +245,7 @@ library
       Stack.Types.ApplyGhcOptions
       Stack.Types.ApplyProgOptions
       Stack.Types.Build
+      Stack.Types.Build.Exception
       Stack.Types.BuildConfig
       Stack.Types.BuildOpts
       Stack.Types.CabalConfigKey
@@ -255,6 +256,7 @@ library
       Stack.Types.Config
       Stack.Types.Config.Exception
       Stack.Types.ConfigMonoid
+      Stack.Types.ConfigureOpts
       Stack.Types.Curator
       Stack.Types.Docker
       Stack.Types.DockerEntrypoint
@@ -271,11 +273,13 @@ library
       Stack.Types.GhcPkgId
       Stack.Types.GlobalOpts
       Stack.Types.GlobalOptsMonoid
+      Stack.Types.IsMutable
       Stack.Types.LockFileBehavior
       Stack.Types.NamedComponent
       Stack.Types.Nix
       Stack.Types.Package
       Stack.Types.PackageName
+      Stack.Types.ParentMap
       Stack.Types.Platform
       Stack.Types.Project
       Stack.Types.ProjectAndConfigMonoid
@@ -288,6 +292,7 @@ library
       Stack.Types.SourceMap
       Stack.Types.StackYamlLoc
       Stack.Types.TemplateName
+      Stack.Types.UnusedFlags
       Stack.Types.Version
       Stack.Types.VersionedDownloadInfo
       Stack.Uninstall
