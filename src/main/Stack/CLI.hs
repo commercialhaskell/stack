@@ -451,8 +451,8 @@ commandLineHandler currentDir progName isInterpreter =
 
   uninstall = addCommand'
     "uninstall"
-    "Show how to uninstall Stack. This command does not itself uninstall \
-    \Stack."
+    "Show how to uninstall Stack or a Stack-supplied tool. This command does \
+    \not itself uninstall Stack or a Stack-supplied tool."
     uninstallCmd
     (pure ())
 

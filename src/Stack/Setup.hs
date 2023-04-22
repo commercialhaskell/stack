@@ -179,7 +179,6 @@ data SetupException
   | MSYS2NotFound Text
   | UnwantedCompilerVersion
   | UnwantedArchitecture
-  | SandboxedCompilerNotFound
   | GHCInfoNotValidUTF8 UnicodeException
   | GHCInfoNotListOfPairs
   | GHCInfoMissingGlobalPackageDB
@@ -282,9 +281,6 @@ instance Exception SetupException where
   displayException UnwantedArchitecture =
     "Error: [S-1540]\n"
     ++ "Not the architecture we want."
-  displayException SandboxedCompilerNotFound =
-    "Error: [S-9953]\n"
-    ++ "Could not find sandboxed compiler."
   displayException (GHCInfoNotValidUTF8 e) = concat
     [ "Error: [S-8668]\n"
     , "GHC info is not valid UTF-8: "
@@ -403,15 +399,16 @@ instance Exception SetupException where
 -- "Stack.Setup" module
 data SetupPrettyException
   = GHCInstallFailed
-      SomeException
-      String
-      String
-      [String]
-      (Path Abs Dir)
-      (Path Abs Dir)
-      (Path Abs Dir)
-  | InvalidGhcAt (Path Abs File) SomeException
-  | ExecutableNotFound [Path Abs File]
+      !SomeException
+      !String
+      !String
+      ![String]
+      !(Path Abs Dir)
+      !(Path Abs Dir)
+      !(Path Abs Dir)
+  | InvalidGhcAt !(Path Abs File) !SomeException
+  | ExecutableNotFound ![Path Abs File]
+  | SandboxedCompilerNotFound ![String] ![Path Abs Dir]
   deriving (Show, Typeable)
 
 instance Pretty SetupPrettyException where
@@ -465,6 +462,26 @@ instance Pretty SetupPrettyException where
     <> flow "Stack could not find any of the following executables:"
     <> line
     <> bulletedList (map pretty toTry)
+  pretty (SandboxedCompilerNotFound names fps) =
+    "[S-9953]"
+    <> line
+    <> fillSep
+         ( ( flow "Stack could not find the sandboxed compiler. It looked for \
+                   \one named one of:"
+            : mkNarrativeList Nothing False
+                ( map fromString names :: [StyleDoc] )
+            )
+         <> ( flow "However, it could not find any on one of the paths:"
+            : mkNarrativeList Nothing False fps
+            )
+         )
+    <> blankLine
+    <> fillSep
+         [ flow "Perhaps a previously-installed compiler was not completely \
+                \uninstalled. For further information about uninstalling \
+                \tools, see the output of"
+         , style Shell (flow "stack uninstall") <> "."
+         ]
 
 instance Exception SetupPrettyException
 
@@ -1149,7 +1166,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
         logError $
              "Could not find it on the paths "
           <> displayShow (edBins paths)
-        throwIO SandboxedCompilerNotFound
+        prettyThrowIO $ SandboxedCompilerNotFound names (edBins paths)
       loop (x:xs) = do
         res <- liftIO $
           D.findExecutablesInDirectories (map toFilePath (edBins paths)) x
