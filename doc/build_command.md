@@ -93,11 +93,15 @@ supported syntaxes for targets are:
     GHC specified by the snapshot.
 
 *   *package identifier*, e.g. `stack build foobar-1.2.3`, is usually used to
-    include specific package versions from the package index. If the version
-    selected conflicts with an existing local package or extra dep, then Stack
-    fails with an error. Otherwise, this is the same as using
-    `stack build foobar`, except instead of using the latest version from the
-    package index, the version specified is used.
+    include specific package versions from the package index.
+
+    If the package name conflicts with that of a local package, then Stack
+    fails with an error.
+
+    Otherwise, this is the same as using `stack build foobar` (that is, ignoring
+    the specified version), unless the specified version exists in the package
+    index. If it exists, then the latest revision of that version from the
+    package index is used.
 
 *   *component*. Instead of referring to an entire package and letting Stack
     decide which components to build, you select individual components from
