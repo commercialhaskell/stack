@@ -80,7 +80,7 @@ import           Stack.Types.BuildOpts ( BuildOptsCLI (..) )
 import           Stack.Types.Config ( Config (..) )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), renderComponent )
-import           Stack.Types.Build ( BuildPrettyException (..) )
+import           Stack.Types.Build.Exception ( BuildPrettyException (..) )
 import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.SourceMap
                    ( DepPackage (..), GlobalPackage (..), PackageType (..)

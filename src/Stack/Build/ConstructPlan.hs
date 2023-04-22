@@ -29,14 +29,14 @@ import           Stack.Package ( applyForceCustomBuild )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
 import           Stack.Types.Build
-                   ( BaseConfigOpts (..), BadDependency (..)
-                   , BuildException (..), BuildPrettyException (..)
-                   , CachePkgSrc (..), ConfigCache (..), ConfigureOpts (..)
-                   , ConstructPlanException (..), IsMutable (..), ParentMap
-                   , Plan (..), Task (..), TaskConfigOpts (..), TaskType (..)
-                   , configureOpts, installLocationIsMutable, isStackOpt
-                   , taskIsTarget, taskLocation, taskTargetIsMutable
-                   , toCachePkgSrc
+                   ( CachePkgSrc (..), ConfigCache (..), Plan (..), Task (..)
+                   , TaskConfigOpts (..), TaskType (..)
+                   , installLocationIsMutable, taskIsTarget, taskLocation
+                   , taskTargetIsMutable, toCachePkgSrc
+                   )
+import           Stack.Types.Build.Exception
+                   ( BadDependency (..), BuildException (..)
+                   , BuildPrettyException (..), ConstructPlanException (..)
                    )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
@@ -46,6 +46,8 @@ import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
+import           Stack.Types.ConfigureOpts
+                   ( BaseConfigOpts (..), ConfigureOpts (..), configureOpts )
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency
                    ( DepValue (DepValue), DepType (AsLibrary) )
@@ -55,6 +57,7 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.EnvSettings ( EnvSettings (..), minimalEnvSettings )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
                    ( ExeName (..), InstallLocation (..), Installed (..)
@@ -62,6 +65,7 @@ import           Stack.Types.Package
                    , PackageLibraries (..), PackageSource (..), installedVersion
                    , packageIdentifier, psVersion, runMemoizedWith
                    )
+import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SourceMap
@@ -1129,6 +1133,31 @@ describeConfigDiff config old new
            . map T.pack
            . (\(ConfigureOpts x y) -> x ++ y)
            . configCacheOpts
+   where
+    -- options set by Stack
+    isStackOpt :: Text -> Bool
+    isStackOpt t = any (`T.isPrefixOf` t)
+      [ "--dependency="
+      , "--constraint="
+      , "--package-db="
+      , "--libdir="
+      , "--bindir="
+      , "--datadir="
+      , "--libexecdir="
+      , "--sysconfdir"
+      , "--docdir="
+      , "--htmldir="
+      , "--haddockdir="
+      , "--enable-tests"
+      , "--enable-benchmarks"
+      , "--exact-configuration"
+      -- Treat these as causing dirtiness, to resolve
+      -- https://github.com/commercialhaskell/stack/issues/2984
+      --
+      -- , "--enable-library-profiling"
+      -- , "--enable-executable-profiling"
+      -- , "--enable-profiling"
+      ] || t == "--user"
 
   (oldOpts, newOpts) = removeMatching (userOpts old) (userOpts new)
 

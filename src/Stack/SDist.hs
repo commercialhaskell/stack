@@ -61,14 +61,15 @@ import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.SourceMap ( mkProjectPackage )
 import           Stack.Types.Build
-                   ( CachePkgSrc (..), ConfigureOpts (..), Task (..)
-                   , TaskConfigOpts (..), TaskType (..)
+                   ( CachePkgSrc (..), Task (..), TaskConfigOpts (..)
+                   , TaskType (..)
                    )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
 import           Stack.Types.BuildOpts
                    ( BuildOpts (..), defaultBuildOpts, defaultBuildOptsCLI )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.ConfigureOpts ( ConfigureOpts (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
 import           Stack.Types.GhcPkgId ( GhcPkgId )

@@ -34,11 +34,11 @@ import qualified Pantry.Internal as SQLite
 import           Stack.Prelude
 import           Stack.Storage.Util
                    ( handleMigrationException, updateList, updateSet )
-import           Stack.Types.Build
-                   ( CachePkgSrc, ConfigCache (..), ConfigureOpts (..) )
+import           Stack.Types.Build ( CachePkgSrc, ConfigCache (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Cache ( ConfigCacheType )
+import           Stack.Types.ConfigureOpts  ( ConfigureOpts (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Storage ( ProjectStorage (..) )
 

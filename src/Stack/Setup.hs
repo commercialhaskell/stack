@@ -108,7 +108,7 @@ import           Stack.Setup.Installed
 import           Stack.SourceMap
                    ( actualFromGhc, globalsFromDump, pruneGlobals )
 import           Stack.Storage.User ( loadCompilerPaths, saveCompilerPaths )
-import           Stack.Types.Build ( BuildException (..) )
+import           Stack.Types.Build.Exception ( BuildException (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL
                    , wantedCompilerVersionL

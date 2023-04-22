@@ -52,7 +52,7 @@ import           Stack.Package
                    )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
-import           Stack.Types.Build
+import           Stack.Types.Build.Exception
                    ( BuildPrettyException (..), pprintTargetParseErrors )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
