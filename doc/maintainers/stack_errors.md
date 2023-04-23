@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-04-19.
+`master` branch of the Stack repository. Last updated: 2023-04-22.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -272,7 +272,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-5308] | MSYS2NotFound Text
         [S-5127] | UnwantedCompilerVersion
         [S-1540] | UnwantedArchitecture
-        [S-9953] | SandboxedCompilerNotFound
         [S-8668] | GHCInfoNotValidUTF8 UnicodeException
         [S-4878] | GHCInfoNotListOfPairs
         [S-2965] | GHCInfoMissingGlobalPackageDB
@@ -306,6 +305,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-7441] = GHCInstallFailed SomeException StyleDoc String [String] (Path Abs Dir) (Path Abs Dir) (Path Abs Dir)
         [S-2476] | InvalidGhcAt (Path Abs File) SomeException
         [S-4764] | ExecutableNotFound [Path Abs File]
+        [S-9953] | SandboxedCompilerNotFound [String] [Path Abs Dir]
         ~~~
 
     -   `Stack.Storage.User.StorageUserException`

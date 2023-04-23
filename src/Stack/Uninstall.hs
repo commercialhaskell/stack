@@ -28,21 +28,57 @@ uninstallCmd () = withConfig NoReexec $ do
       globalConfig' = toStyleDoc globalConfig
       programsDir' = toStyleDoc programsDir
       localBinDir' = toStyleDoc localBinDir
-  prettyInfo $ vsep
-    [ flow "To uninstall Stack, it should be sufficient to delete:"
-    , hang 4 $ fillSep [flow "(1) the directory containing Stack's tools",
-      "(" <> softbreak <> programsDir' <> softbreak <> ");"]
-    , hang 4 $ fillSep [flow "(2) the Stack root directory",
-      "(" <> softbreak <> stackRoot' <> softbreak <> ");"]
-    , hang 4 $ fillSep [flow "(3) if different, the directory containing ",
-      flow "Stack's global YAML configuration file",
-      "(" <> softbreak <> globalConfig' <> softbreak <> ");", "and"]
-    , hang 4 $ fillSep [flow "(4) the 'stack' executable file (see the output",
-      flow "of command", howToFindStack <> ",", flow "if Stack is on the PATH;",
-      flow "Stack is often installed in", localBinDir' <> softbreak <> ")."]
-    , fillSep [flow "You may also want to delete", style File ".stack-work",
-      flow "directories in any Haskell projects that you have built."]
-    ]
+  prettyInfo $
+       vsep
+         [ flow "To uninstall Stack, it should be sufficient to delete:"
+         , hang 4 $ fillSep
+             [ flow "(1) the directory containing Stack's tools"
+             , "(" <> softbreak <> programsDir' <> softbreak <> ");"
+             ]
+         , hang 4 $ fillSep
+             [ flow "(2) the Stack root directory"
+             , "(" <> softbreak <> stackRoot' <> softbreak <> ");"
+             ]
+         , hang 4 $ fillSep
+             [ flow "(3) if different, the directory containing "
+             , flow "Stack's global YAML configuration file"
+             , parens globalConfig' <> ";"
+             , "and"
+             ]
+         , hang 4 $ fillSep
+             [ flow "(4) the 'stack' executable file (see the output"
+             , flow "of command"
+             , howToFindStack <> ","
+             , flow "if Stack is on the PATH;"
+             , flow "Stack is often installed in"
+             , localBinDir' <> softbreak <> ")."
+             ]
+         , fillSep
+             [flow "You may also want to delete"
+             , style File ".stack-work"
+             , flow "directories in any Haskell projects that you have built."
+             ]
+         ]
+      <> blankLine
+      <> vsep
+           [ fillSep
+               [ flow "To uninstall completely a Stack-supplied tool (such as \
+                      \GHC or, on Windows, MSYS2), delete from Stack's tools \
+                      \directory"
+               , parens programsDir' <> ":"
+               ]
+           , hang 4 $ fillSep
+               [ flow "(1) the tool's subdirectory;"
+               ]
+           , hang 4 $ fillSep
+               [ flow "(2) the tool's archive file"
+               , parens (style File "<tool>.tar.xz") <> "; and"
+               ]
+           , hang 4 $ fillSep
+               [ flow "(3) the file marking that the tool is installed"
+               , parens (style File "<tool>.installed") <> "."
+               ]
+           ]
  where
   styleShell = style Shell
   howToFindStack
