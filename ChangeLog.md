@@ -44,6 +44,10 @@ Other enhancements:
 * Stack will use the value of the `GH_TOKEN`, or `GITHUB_TOKEN`, environment
   variable as credentials to authenticate its GitHub REST API requests.
 * `stack uninstall` also shows how to uninstall Stack-supplied tools.
+* If `--docker-help` is an argument, Stack displays help for `--docker*`.
+  Otherwise, if `--nix-help` is an argument, Stack displays help for `--nix*`.
+  Previously, this was the behaviour only if `--docker-help` or `--nix-help` was
+  the only argument.
 
 Bug fixes:
 

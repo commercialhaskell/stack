@@ -192,17 +192,14 @@ extraHelpOption ::
   -> String           -- ^ Help option name, e.g. @"docker-help"@
   -> Parser (a -> a)
 extraHelpOption hide progName fakeName helpName =
-      infoOption
-        (optDesc' ++ ".")
-        (long helpName <> hidden <> internal)
-  <*> infoOption
-        (optDesc' ++ ".")
-        (  long fakeName
-        <> help optDesc'
-        <> (if hide then hidden <> internal else idm)
-        )
+  infoOption
+     optDesc
+     (  long fakeName
+     <> help optDesc
+     <> (if hide then hidden <> internal else idm)
+     )
  where
-  optDesc' = concat
+  optDesc = concat
     [ "Run '"
     , takeBaseName progName
     , " --"
@@ -222,7 +219,7 @@ execExtraHelp ::
   -> String    -- ^ Option description
   -> IO ()
 execExtraHelp args helpOpt parser pd =
-  when (args == ["--" ++ helpOpt]) $
+  when ("--" ++ helpOpt `elem` args) $
     withArgs ["--help"] $ do
       _ <- execParser (info
              (   hiddenHelper
