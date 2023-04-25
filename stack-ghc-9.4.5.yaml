@@ -1,8 +1,9 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.4.4.
+# built with GHC 9.4.5. Currently, it can not - see
+# https://github.com/haskell/cabal/issues/8858#issuecomment-1522424125
 
-# GHC 9.4.4
-resolver: nightly-2023-03-20
+# GHC 9.4.5
+resolver: nightly-2023-04-25
 
 packages:
 - .
