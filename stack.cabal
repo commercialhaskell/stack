@@ -350,7 +350,7 @@ library
     , generic-deriving
     , hackage-security
     , hashable
-    , hi-file-parser
+    , hi-file-parser >=0.1.4.0
     , hpack
     , hpc
     , http-client
@@ -480,7 +480,7 @@ executable stack
     , generic-deriving
     , hackage-security
     , hashable
-    , hi-file-parser
+    , hi-file-parser >=0.1.4.0
     , hpack
     , hpc
     , http-client
@@ -603,7 +603,7 @@ executable stack-integration-test
     , generic-deriving
     , hackage-security
     , hashable
-    , hi-file-parser
+    , hi-file-parser >=0.1.4.0
     , hpack
     , hpc
     , hspec
@@ -733,7 +733,7 @@ test-suite stack-test
     , generic-deriving
     , hackage-security
     , hashable
-    , hi-file-parser
+    , hi-file-parser >=0.1.4.0
     , hpack
     , hpc
     , hspec

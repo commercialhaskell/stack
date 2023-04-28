@@ -84,7 +84,7 @@ dependencies:
 - generic-deriving
 - hackage-security
 - hashable
-- hi-file-parser
+- hi-file-parser >= 0.1.4.0
 - hpack
 - hpc
 - http-client

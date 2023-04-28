@@ -3,10 +3,13 @@
 # https://github.com/haskell/cabal/issues/8858#issuecomment-1522424125
 
 # GHC 9.4.5
-resolver: nightly-2023-04-25
+resolver: nightly-2023-04-28
 
 packages:
 - .
+
+extra-deps:
+- hi-file-parser-0.1.4.0@sha256:4c3e1f4e2575809c7fe47229f8547c64e22760d77c73456bf017d27e0e736dd8,2660
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

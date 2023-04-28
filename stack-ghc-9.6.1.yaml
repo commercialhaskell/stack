@@ -70,7 +70,7 @@ extra-deps:
 - Glob-0.10.2
 - hackage-security-0.6.2.3
 - hashable-1.4.2.0
-- hi-file-parser-0.1.3.0
+- hi-file-parser-0.1.4.0
 - hourglass-0.2.12
 - hpack-0.35.2@rev1
 - http-api-data-0.5.1
