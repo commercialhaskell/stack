@@ -1159,14 +1159,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
   -- sandbox. This led to a specific issue on Windows with GHC 9.0.1. See
   -- https://gitlab.haskell.org/ghc/ghc/-/issues/20074. Instead, now, we look
   -- on the paths specified only.
-  let loop [] = do
-        logError $
-             "Looked for sandboxed compiler named one of: "
-          <> displayShow names
-        logError $
-             "Could not find it on the paths "
-          <> displayShow (edBins paths)
-        prettyThrowIO $ SandboxedCompilerNotFound names (edBins paths)
+  let loop [] = prettyThrowIO $ SandboxedCompilerNotFound names (edBins paths)
       loop (x:xs) = do
         res <- liftIO $
           D.findExecutablesInDirectories (map toFilePath (edBins paths)) x
