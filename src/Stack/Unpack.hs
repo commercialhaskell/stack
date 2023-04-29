@@ -10,7 +10,6 @@ module Stack.Unpack
 import           Path ( (</>), parseRelDir )
 import           Path.IO ( doesDirExist, resolveDir' )
 import           Pantry ( loadSnapshot )
-import           RIO.List ( intercalate )
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
 import qualified RIO.Set as Set
@@ -21,23 +20,30 @@ import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 
--- | Type representing exceptions thrown by functions exported by the
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Unpack" module.
-data UnpackException
+data UnpackPrettyException
   = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
-  | CouldNotParsePackageSelectors [String]
+  | CouldNotParsePackageSelectors [StyleDoc]
   deriving (Show, Typeable)
 
-instance Exception UnpackException where
-  displayException (UnpackDirectoryAlreadyExists dirs) = unlines
-    $ "Error: [S-3515]"
-    : "Unable to unpack due to already present directories:"
-    : map (("    " ++) . toFilePath) (Set.toList dirs)
-  displayException (CouldNotParsePackageSelectors strs) = unlines
-    $ "Error: [S-2628]"
-    : "The following package selectors are not valid package names or \
-      \identifiers:"
-    : map ("- " ++) strs
+instance Pretty UnpackPrettyException where
+  pretty (UnpackDirectoryAlreadyExists dirs) =
+    "[S-3515]"
+    <> line
+    <> flow "Stack was unable to unpack due to directories already being \
+            \present:"
+    <> line
+    <> bulletedList (map pretty $ Set.toList dirs)
+  pretty (CouldNotParsePackageSelectors errs) =
+    "[S-2628]"
+    <> line
+    <> flow "The following package selectors are not valid package names or \
+            \identifiers:"
+    <> line
+    <> bulletedList errs
+
+instance Exception UnpackPrettyException
 
 -- | Function underlying the @stack unpack@ command. Unpack packages to the
 -- filesystem.
@@ -72,7 +78,7 @@ unpackPackages mSnapshot dest input = do
   (errs2, locs2) <- partitionEithers <$> traverse toLoc names
   case errs1 ++ errs2 of
     [] -> pure ()
-    errs -> throwM $ CouldNotParsePackageSelectors errs
+    errs -> prettyThrowM $ CouldNotParsePackageSelectors errs
   locs <- Map.fromList <$> mapM
     (\(pir, ident) -> do
         suffix <- parseRelDir $ packageIdentifierString ident
@@ -83,7 +89,7 @@ unpackPackages mSnapshot dest input = do
   alreadyUnpacked <- filterM doesDirExist $ Map.elems locs
 
   unless (null alreadyUnpacked) $
-    throwM $ UnpackDirectoryAlreadyExists $ Set.fromList alreadyUnpacked
+    prettyThrowM $ UnpackDirectoryAlreadyExists $ Set.fromList alreadyUnpacked
 
   forM_ (Map.toList locs) $ \(loc, dest') -> do
     unpackPackageLocation dest' loc
@@ -99,7 +105,7 @@ unpackPackages mSnapshot dest input = do
 
   toLocNoSnapshot ::
        PackageName
-    -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
+    -> RIO env (Either StyleDoc (PackageLocationImmutable, PackageIdentifier))
   toLocNoSnapshot name = do
     mloc1 <- getLatestHackageLocation
       YesRequireHackageIndex
@@ -124,40 +130,42 @@ unpackPackages mSnapshot dest input = do
     case mloc of
       Nothing -> do
         candidates <- getHackageTypoCorrections name
-        pure $ Left $ concat
-          [ "Could not find package "
-          , packageNameString name
-          , " on Hackage"
+        pure $ Left $ fillSep
+          [ flow "Could not find package"
+          , style Current (fromString $ packageNameString name)
+          , flow "on Hackage."
           , if null candidates
-              then ""
-              else
-                ". Perhaps you meant: " ++
-                  intercalate ", " (map packageNameString candidates)
+              then mempty
+              else fillSep $
+                  flow "Perhaps you meant one of:"
+                : mkNarrativeList (Just Good) False
+                    (map (fromString . packageNameString) candidates :: [StyleDoc])
           ]
       Just loc -> pure $ Right (loc, packageLocationIdent loc)
 
   toLocSnapshot ::
        RawSnapshot
     -> PackageName
-    -> RIO env (Either String (PackageLocationImmutable, PackageIdentifier))
+    -> RIO env (Either StyleDoc (PackageLocationImmutable, PackageIdentifier))
   toLocSnapshot snapshot name =
     case Map.lookup name (rsPackages snapshot) of
       Nothing ->
-        pure
-          $ Left
-          $ "Package does not appear in snapshot: " ++ packageNameString name
+        pure $ Left $ fillSep
+          [ flow "Package does not appear in snapshot:"
+          , style Current (fromString $ packageNameString name) <> "."
+          ]
       Just sp -> do
         loc <- cplComplete <$> completePackageLocation (rspLocation sp)
         pure $ Right (loc, packageLocationIdent loc)
 
   -- Possible future enhancement: parse names as name + version range
   parse s =
-    case parsePackageName (T.unpack t) of
+    case parsePackageName s of
       Just x -> Right $ Left x
       Nothing ->
-        case parsePackageIdentifierRevision t of
+        case parsePackageIdentifierRevision (T.pack s) of
           Right x -> Right $ Right x
-          Left _ ->
-            Left $ "Could not parse as package name or identifier: " ++ s
-   where
-    t = T.pack s
+          Left _ -> Left $ fillSep
+            [ flow "Could not parse as package name or identifier:"
+            , style Current (fromString s) <> "."
+            ]
