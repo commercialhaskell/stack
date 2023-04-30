@@ -37,41 +37,15 @@ import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
 import           System.Console.ANSI ( hSupportsANSIWithoutEmulation )
 import           System.Process ( rawSystem, readProcess )
 
--- | Type representing exceptions thrown by functions exported by the
--- "Stack.Upgrade" module.
-data UpgradeException
-  = NeitherBinaryOrSourceSpecified
-  | ExecutableFailure
-  | CommitsNotFound String String
-  | StackInPackageIndexNotFound
-  | VersionWithNoRevision
-  deriving (Show, Typeable)
-
-instance Exception UpgradeException where
-  displayException NeitherBinaryOrSourceSpecified =
-    "Error: [S-3642]\n"
-    ++ "You must allow either binary or source upgrade paths."
-  displayException ExecutableFailure =
-    "Error: [S-8716]\n"
-    ++ "Non-success exit code from running newly downloaded executable."
-  displayException (CommitsNotFound branch repo) = concat
-    [ "Error: [S-7114]\n"
-    , "No commits found for branch "
-    , branch
-    , " on repo "
-    , repo
-    ]
-  displayException StackInPackageIndexNotFound =
-    "Error: [S-9668]\n"
-    ++ "No Stack version found in package indices."
-  displayException VersionWithNoRevision =
-    "Error: [S-6648]\n"
-    ++ "Latest version with no revision."
-
 -- | Type representing \'pretty\' exceptions thrown by functions in the
 -- "Stack.Upgrade" module.
 data UpgradePrettyException
   = ResolverOptionInvalid
+  | NeitherBinaryOrSourceSpecified
+  | ExecutableFailure
+  | CommitsNotFound String String
+  | StackInPackageIndexNotFound
+  | VersionWithNoRevision
   deriving (Show, Typeable)
 
 instance Pretty UpgradePrettyException where
@@ -85,6 +59,31 @@ instance Pretty UpgradePrettyException where
          , style Shell "upgrade"
          , "command."
          ]
+  pretty NeitherBinaryOrSourceSpecified =
+    "[S-3642]"
+    <> line
+    <> flow "You must allow either binary or source upgrade paths."
+  pretty ExecutableFailure =
+    "[S-8716]"
+    <> line
+    <> flow "Non-success exit code from running newly downloaded executable."
+  pretty (CommitsNotFound branch repo) =
+    "[S-7114]"
+    <> line
+    <> fillSep
+         [ flow "No commits found for branch"
+         , style Current (fromString branch)
+         , flow "on repo"
+         , style Url (fromString repo) <> "."
+         ]
+  pretty StackInPackageIndexNotFound =
+    "[S-9668]"
+    <> line
+    <> flow "No Stack version found in package indices."
+  pretty VersionWithNoRevision =
+    "[S-6648]"
+    <> line
+    <> flow "Latest version with no revision."
 
 instance Exception UpgradePrettyException
 
@@ -130,7 +129,7 @@ upgrade builtHash (UpgradeOpts mbo mso) = case (mbo, mso) of
   -- FIXME It would be far nicer to capture this case in the options parser
   -- itself so we get better error messages, but I can't think of a way to
   -- make it happen.
-  (Nothing, Nothing) -> throwIO NeitherBinaryOrSourceSpecified
+  (Nothing, Nothing) -> prettyThrowIO NeitherBinaryOrSourceSpecified
   (Just bo, Nothing) -> binary bo
   (Nothing, Just so) -> source so
   -- See #2977 - if --git or --git-repo is specified, do source upgrade.
@@ -199,7 +198,7 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) =
         \tmpFile -> do
           -- Sanity check!
           ec <- rawSystem (toFilePath tmpFile) ["--version"]
-          unless (ec == ExitSuccess) (throwIO ExecutableFailure)
+          unless (ec == ExitSuccess) (prettyThrowIO ExecutableFailure)
 
 sourceUpgrade ::
      Maybe String
@@ -215,7 +214,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
           []
         latestCommit <-
           case words remote of
-            [] -> throwIO $ CommitsNotFound branch repo
+            [] -> prettyThrowIO $ CommitsNotFound branch repo
             x:_ -> pure x
         when (isNothing builtHash) $
           prettyWarnS
@@ -225,10 +224,10 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
             \the contrary."
         if builtHash == Just latestCommit
             then do
-              prettyInfoS "Already up-to-date, no upgrade required"
+              prettyInfoS "Already up-to-date, no upgrade required."
               pure Nothing
             else do
-              prettyInfoS "Cloning stack"
+              prettyInfoS "Cloning stack."
               -- NOTE: "--recursive" was added after v1.0.0 (and before the next
               -- release).  This means that we can't use submodules in the Stack
               -- repo until we're comfortable with "stack upgrade --git" not
@@ -258,18 +257,18 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
       Nothing -> withConfig NoReexec $ do
         void
           $ updateHackageIndex
-          $ Just "Updating index to make sure we find the latest Stack version"
+          $ Just "Updating index to make sure we find the latest Stack version."
         mversion <- getLatestHackageVersion
           YesRequireHackageIndex
           "stack"
           UsePreferredVersions
         (PackageIdentifierRevision _ version _) <-
           case mversion of
-            Nothing -> throwIO StackInPackageIndexNotFound
+            Nothing -> prettyThrowIO StackInPackageIndexNotFound
             Just version -> pure version
         if version <= stackVersion
           then do
-            prettyInfoS "Already at latest version, no upgrade required"
+            prettyInfoS "Already at latest version, no upgrade required."
             pure Nothing
           else do
             suffix <- parseRelDir $ "stack-" ++ versionString version
@@ -279,7 +278,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
               "stack"
               version
             case mrev of
-              Nothing -> throwIO VersionWithNoRevision
+              Nothing -> prettyThrowIO VersionWithNoRevision
               Just (_rev, cfKey, treeKey) -> do
                 let ident = PackageIdentifier "stack" version
                 unpackPackageLocation dir $ PLIHackage ident cfKey treeKey
