@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-04-29.
+`master` branch of the Stack repository. Last updated: 2023-04-30.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -469,20 +469,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2628] | CouldNotParsePackageSelectors [String]
         ~~~
 
-    -   `Stack.Upgrade.UpgradeException`
-
-        ~~~haskell
-        [S-3642] = NeitherBinaryOrSourceSpecified
-        [S-8716] | ExecutableFailure
-        [S-7114] | CommitsNotFound String String
-        [S-9668] | StackInPackageIndexNotFound
-        [S-6648] | VersionWithNoRevision
-        ~~~
-
     -   `Stack.Upgrade.UpgradePrettyException`
 
         ~~~haskell
         [S-8761] = ResolverOptionInvalid
+        [S-3642] | NeitherBinaryOrSourceSpecified
+        [S-8716] | ExecutableFailure
+        [S-7114] | CommitsNotFound String String
+        [S-9668] | StackInPackageIndexNotFound
+        [S-6648] | VersionWithNoRevision
         ~~~
 
     -   `Stack.Upload.UploadPrettyException`
