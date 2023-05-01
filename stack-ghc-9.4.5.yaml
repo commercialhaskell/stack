@@ -1,15 +1,17 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.4.5. Currently, it can not - see
-# https://github.com/haskell/cabal/issues/8858#issuecomment-1522424125
+# built with GHC 9.4.5.
 
 # GHC 9.4.5
-resolver: nightly-2023-04-28
+resolver: nightly-2023-05-01
 
 packages:
 - .
 
 extra-deps:
 - hi-file-parser-0.1.4.0@sha256:4c3e1f4e2575809c7fe47229f8547c64e22760d77c73456bf017d27e0e736dd8,2660
+# See https://github.com/haskell/network/pull/552. Snapshot nightly-05-01 has
+# network-3.1.2.8.
+- network-3.1.2.9@sha256:eacdb7f78719cc5125b25856a9114984c5c03b484995f3074b3d756553ededee,5008
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
