@@ -432,12 +432,12 @@ packages:
   original:
     hackage: hashable-1.4.2.0
 - completed:
-    hackage: hi-file-parser-0.1.3.0@sha256:b868e1bcb73fffe5963de6879f0a0a4c5ced97e08fc09c2c9428af884cdcaa74,2488
+    hackage: hi-file-parser-0.1.4.0@sha256:4c3e1f4e2575809c7fe47229f8547c64e22760d77c73456bf017d27e0e736dd8,2660
     pantry-tree:
-      sha256: 43b8556254dde11c40335bf05e3f8ae5fa6e198fcf37d2cf51da141fe218be31
-      size: 1929
+      sha256: 39ac287c76db4428ba1f78de6d93441d5900609755049557f46c0508a65dcbe3
+      size: 2242
   original:
-    hackage: hi-file-parser-0.1.3.0
+    hackage: hi-file-parser-0.1.4.0
 - completed:
     hackage: hourglass-0.2.12@sha256:e083f5e030dfebe432e30a9c0fa07a99a54eac992f622442646be561fd7a44e8,3085
     pantry-tree:
@@ -656,12 +656,12 @@ packages:
   original:
     hackage: neat-interpolation-0.5.1.3
 - completed:
-    hackage: network-3.1.2.8@sha256:29b28d2e19ae9f5ff92cea4ab8d2e185408ee5de73b4127f7b485a904c9a8b15,4888
+    hackage: network-3.1.2.9@sha256:eacdb7f78719cc5125b25856a9114984c5c03b484995f3074b3d756553ededee,5008
     pantry-tree:
-      sha256: 3781923e8d4339a64793c349688fcdec7e348e213a1ee2a55f6e0ec43f860844
-      size: 3971
+      sha256: 51165c889117723710b3d1dd70d9ce0c2ffc023a04ba3fc53f71ed20b6909349
+      size: 3914
   original:
-    hackage: network-3.1.2.8
+    hackage: network-3.1.2.9
 - completed:
     hackage: network-uri-2.6.4.2@sha256:1fde59abf5d82a9666b4415bc2b2e9e33f6c1309074fda12d50410c7dbd95f3b,3163
     pantry-tree:

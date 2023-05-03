@@ -11,16 +11,9 @@ packages:
       size: 2242
   original:
     hackage: hi-file-parser-0.1.4.0@sha256:4c3e1f4e2575809c7fe47229f8547c64e22760d77c73456bf017d27e0e736dd8,2660
-- completed:
-    hackage: network-3.1.2.9@sha256:eacdb7f78719cc5125b25856a9114984c5c03b484995f3074b3d756553ededee,5008
-    pantry-tree:
-      sha256: 51165c889117723710b3d1dd70d9ce0c2ffc023a04ba3fc53f71ed20b6909349
-      size: 3914
-  original:
-    hackage: network-3.1.2.9@sha256:eacdb7f78719cc5125b25856a9114984c5c03b484995f3074b3d756553ededee,5008
 snapshots:
 - completed:
-    sha256: f0fabba5d552487306aa7ceb46dd66ed6030ce459739b094eee1116facde5c84
-    size: 626061
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/5/1.yaml
-  original: nightly-2023-05-01
+    sha256: 5eb95e9f352b5cc0f192b5039ee2f19c88bddf53928b29a2efc54bc1697ab1ea
+    size: 625217
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/5/3.yaml
+  original: nightly-2023-05-03

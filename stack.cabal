@@ -414,6 +414,9 @@ library
         unix
     build-tool-depends:
         hsc2hs:hsc2hs
+  if impl(ghc >= 9.4.5) && os(windows)
+    build-depends:
+        network >=3.1.2.9
   if flag(developer-mode)
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
@@ -545,6 +548,9 @@ executable stack
         unix
     build-tool-depends:
         hsc2hs:hsc2hs
+  if impl(ghc >= 9.4.5) && os(windows)
+    build-depends:
+        network >=3.1.2.9
   if flag(developer-mode)
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
@@ -669,6 +675,9 @@ executable stack-integration-test
         unix
     build-tool-depends:
         hsc2hs:hsc2hs
+  if impl(ghc >= 9.4.5) && os(windows)
+    build-depends:
+        network >=3.1.2.9
   if flag(developer-mode)
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
@@ -801,6 +810,9 @@ test-suite stack-test
         unix
     build-tool-depends:
         hsc2hs:hsc2hs
+  if impl(ghc >= 9.4.5) && os(windows)
+    build-depends:
+        network >=3.1.2.9
   if flag(developer-mode)
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else

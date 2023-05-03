@@ -153,6 +153,9 @@ when:
           hsc2hs:hsc2hs
     dependencies:
     - unix
+# See https://github.com/haskell/network/pull/552.
+- condition: impl(ghc >= 9.4.5) && os(windows)
+  dependencies: network >= 3.1.2.9
 - condition: flag(developer-mode)
   then:
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
