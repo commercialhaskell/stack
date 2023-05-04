@@ -119,137 +119,100 @@ packages:
 - .
 ~~~
 
-_NOTE_ From Stack 1.11, Stack moved over to Pantry for managing extra-deps, and
-removed some legacy syntax for specifying dependencies in `packages`. Some
-conversion notes are provided below.
-
 The `packages` key specifies a list of packages that are part of your local
-project. These are specified via paths to local directories. The paths are
+project. These are specified via paths to local directories. A path is
 considered relative to the directory containing the `stack.yaml` file. For
-example, if your `stack.yaml` is located at `/foo/bar/stack.yaml`, and you have:
+example, if the `stack.yaml` is located at `/dir1/dir2/stack.yaml`, and has:
 
 ~~~yaml
 packages:
-- hello
-- there/world
+- my-package
+- dir3/my-other-package
 ~~~
 
-Your configuration means "I have packages in `/foo/bar/hello` and
-`/foo/bar/there/world`.
+the configuration means "project packages in directories `/dir1/dir2/my-package`
+and `/dir1/dir2/dir3/my-other-package`".
 
-If these packages should be treated as dependencies instead, specify them in
-`extra-deps` key, described below.
+The `packages` key is optional. The default value, '`.`', means that the
+project has a single package located in the current directory.
 
-The `packages` key is _optional_. The default item, '`.`', means that your
-project has exactly one package, and it is located in the current directory.
+Each specified package directory must have a valid Cabal file or Hpack
+`package.yaml` file present. Any subdirectories of the directory are not
+searched for Cabal files. A subdirectory has to be specified as an independent
+item in the list of packages.
 
-Each package directory specified must have a valid Cabal file or Hpack
-`package.yaml` file present. The subdirectories of the directory are not
-searched for Cabal files. Subdirectories will have to be specified as
-independent items in the list of packages.
+A project package is different from a dependency, both a snapshot dependency
+(via the [`resolver` or `snapshot`](#resolver-or-snapshot) key) and an
+extra-deps dependency (via the [`extra-deps`](#extra-deps) key). For example:
 
-Project packages are different from snapshot dependencies (via `resolver`) and
-extra dependencies (via `extra-deps`) in multiple ways, e.g.:
-
-* Project packages will be built by default with a `stack build` without
-  specific targets. Dependencies will only be built if they are depended upon.
-* Test suites and benchmarks may be run for project packages. They are never run
-  for extra dependencies.
-
-__Legacy syntax__ Prior to Stack 1.11, it was possible to specify dependencies
-in your `packages` configuration value as well. This support was removed to
-simplify the file format. Instead, these values should be moved to `extra-deps`.
-As a concrete example, you would convert:
-
-~~~yaml
-packages:
-- .
-- location:
-    git: https://github.com/bitemyapp/esqueleto.git
-    commit: 08c9b4cdf977d5bcd1baba046a007940c1940758
-  extra-dep: true
-- location:
-    git: https://github.com/yesodweb/wai.git
-    commit: 6bf765e000c6fd14e09ebdea6c4c5b1510ff5376
-    subdirs:
-      - wai-extra
-  extra-dep: true
-
-extra-deps:
-  - streaming-commons-0.2.0.0
-  - time-1.9.1
-  - yesod-colonnade-1.3.0.1
-  - yesod-elements-1.1
-~~~
-
-into
-
-~~~yaml
-packages:
-- .
-
-extra-deps:
-  - streaming-commons-0.2.0.0
-  - time-1.9.1
-  - yesod-colonnade-1.3.0.1
-  - yesod-elements-1.1
-  - git: https://github.com/bitemyapp/esqueleto.git
-    commit: 08c9b4cdf977d5bcd1baba046a007940c1940758
-  - git: https://github.com/yesodweb/wai.git
-    commit: 6bf765e000c6fd14e09ebdea6c4c5b1510ff5376
-    subdirs:
-      - wai-extra
-~~~
-
-And, in fact, the `packages` value could be left off entirely since it's using
-the default value.
+* a project package will be built by default by commanding
+  [`stack build`](build_command.md) without specific targets. A dependency will
+  only be built if it is depended upon; and
+* test suites and benchmarks may be run for a project package. They are never
+  run for a dependency.
 
 ### extra-deps
 
 Default: `[]`
 
-This key allows you to specify extra dependencies on top of what is defined in
-your snapshot (specified by the `resolver` or `snapshot` key mentioned above).
-These dependencies may either come from a local file path or a Pantry package
-location.
+The `extra-deps` key specifies a list of extra dependencies on top of what is
+defined in the snapshot (specified by the
+[`resolver` or `snapshot`](#resolver-or-snapshot) key). A dependency may come
+from either a Pantry package location or a local file path.
 
-For the local file path case, the same relative path rules as apply to
-`packages` apply.
+A Pantry package location is one or three different kinds of sources:
 
-Pantry package locations allow you to include dependencies from three different
-kinds of sources:
+* the package index (Hackage);
+* an archive (a tarball or zip file, either local or over HTTP or HTTPS); or
+* a Git or Mercurial repository.
 
-* Hackage
-* Archives (tarballs or zip files, either local or over HTTP or HTTPS)
-* Git or Mercurial repositories
-
-Here's an example using all of the above:
+For further information on the format for specifying a Pantry package location,
+see the [Pantry](pantry.md) documentation. For example:
 
 ~~~yaml
 extra-deps:
-- vendor/hashable
-- streaming-commons-0.2.0.0
-- time-1.9.1
-- yesod-colonnade-1.3.0.1
-- yesod-elements-1.1
-- git: https://github.com/bitemyapp/esqueleto.git
+# The latest revision of a package in the package index (Hackage):
+- acme-missiles-0.3
+# A specific revision of a package in the package index (Hackage):
+- acme-missiles-0.3@rev:0
+# An *.tar.gz archive file over HTTPS:
+- url: https://github.com/example-user/my-repo/archive/08c9b4cdf977d5bcd1baba046a007940c1940758.tar.gz
+  subdirs:
+  - my-package
+# A Git repository at a specific commit:
+- git: https://github.com/example-user/my-repo.git
   commit: 08c9b4cdf977d5bcd1baba046a007940c1940758
-- url: https://github.com/yesodweb/wai/archive/6bf765e000c6fd14e09ebdea6c4c5b1510ff5376.tar.gz
+# An archive of files at a point in the history of a GitHub repository
+# (identified by a specific commit):
+- github: example-user/my-repo
+  commit: 08c9b4cdf977d5bcd1baba046a007940c1940758
   subdirs:
-    - wai-extra
-- github: snoyberg/conduit
-  commit: 2e3e41de93821bcfe8ec6210aeca21be3f2087bf
-  subdirs:
-    - network-conduit-tls
+  - my-package
 ~~~
-
-For further information on the format for specifying dependencies, see the
-[Pantry](pantry.md) documentation.
 
 !!! note
 
     GHC boot packages are special. An extra-dep with the same package name and
     version as a GHC boot package will be ignored.
+
+For a local file path source, the path is considered relative to the directory
+containing the `stack.yaml` file. For example, if the `stack.yaml` is located
+at `/dir1/dir2/stack.yaml`, and has:
+
+~~~yaml
+extra-deps:
+- my-package
+- dir3/my-other-package
+~~~
+
+the configuration means "extra-deps packages in directories
+`/dir1/dir2/my-package` and `/dir1/dir2/dir3/my-other-package`".
+
+!!! note
+
+    A specified extra-dep that does not have the format of a valid Pantry
+    package location (for example, a reference to a package on Hackage that
+    omits the package's version) will be interpreted as a local file path.
 
 ### flags
 
