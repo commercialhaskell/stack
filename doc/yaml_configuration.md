@@ -138,7 +138,7 @@ project has a single package located in the current directory.
 
 Each specified package directory must have a valid Cabal file or Hpack
 `package.yaml` file present. Any subdirectories of the directory are not
-searched for Cabal files. A subdirectories has to be specified as an independent
+searched for Cabal files. A subdirectory has to be specified as an independent
 item in the list of packages.
 
 A project package is different from a dependency, both a snapshot dependency
