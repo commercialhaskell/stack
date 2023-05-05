@@ -9,9 +9,8 @@ on:
     - rc/**
   workflow_dispatch:
 
-# As of 26 December 2022, ubuntu-latest, windows-latest and macos-latest come
-# with Stack 2.9.1. ubuntu-latest and macos-latest come with GHC 9.4.3.
-# windows-latest comes with GHC 9.4.2.
+# As of 5 May 2023, ubuntu-latest, windows-latest and macos-latest come
+# with Stack 2.9.3 and GHC 9.6.1.
 
 jobs:
   pedantic:
@@ -69,19 +68,10 @@ jobs:
           ~\AppData\Local\Programs\stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.extra-suffix }}
 
-    # Separating out Unix-like OS from Windows because of the problem of
-    # upgrading GitHub-supplied Stack 2.9.1 to 2.9.3 on Windows
-    - name: Run tests on Unix-like OS
-      if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
+    - name: Run tests
       shell: bash
       run: |
         set -ex
-
-        # Stack 2.9.3 is required to build Stack.
-        stack upgrade
-
-        # Check the Stack version
-        stack --version
 
         if [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
         then
@@ -102,6 +92,9 @@ jobs:
         if [[ "${{ matrix.os }}" == "macos-latest" ]]
         then
             echo "Skipping ldd check on Mac"
+        elif [[ "${{ matrix.os }}" == "windows-latest" ]]
+        then
+            echo "Skipping ldd check on Windows"
         elif [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
         then
             # ldd returns exit code 1 if it's static, so failure is success
@@ -109,29 +102,5 @@ jobs:
         else
             ldd ./bin/stack
         fi
-
-        ./bin/stack --version
-
-    # Separating out Windows because of the problem of upgrading GitHub-supplied
-    # Stack 2.9.1 to 2.9.3 on Windows
-    - name: Run tests on Windows
-      if: startsWith(runner.os, 'Windows')
-      shell: bash
-      run: |
-        set -ex
-
-        # Stack 2.9.3 is required to build Stack. The --local-bin-path is
-        # required to allow Stack (effectively) to overwrite the currently
-        # running Stack executable. The should be fixed in later versions of
-        # Stack that reflect
-        # https://github.com/commercialhaskell/stack/pull/6023
-        stack --local-bin-path /c/hostedtoolcache/windows/stack/2.9.1/x64 upgrade
-
-        # Check the Stack version
-        stack --version
-
-        stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror -O0" --copy-bins --local-bin-path bin
-
-        echo "Skipping ldd check on Windows"
 
         ./bin/stack --version
