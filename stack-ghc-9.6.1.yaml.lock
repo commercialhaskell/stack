@@ -712,12 +712,12 @@ packages:
   original:
     hackage: optparse-simple-0.1.1.4
 - completed:
-    hackage: pantry-0.8.2.1@sha256:b2b6eb8733a74a43a545ca91c262d91bfa6541e1daa328b17c05b169cc08da18,5500
+    hackage: pantry-0.8.2.2@sha256:579aa8538c0fde65f9c08fb97d1d5aee8f59e5cc44e5f8feb350ec54bd2b14a6,6026
     pantry-tree:
-      sha256: 04b6fcfd9edb494994c701df5c7042f2c274435d85f0bf73d3eeb62bc7e00803
+      sha256: f979dadd233a05272bfee435de5d66532692532453d199adb902079a75cb878d
       size: 2970
   original:
-    hackage: pantry-0.8.2.1
+    hackage: pantry-0.8.2.2
 - completed:
     hackage: parser-combinators-1.3.0@sha256:edd54ba56cbae8fadbcceebcfef31b2c70a835e92e5eda41151b939c40647281,1570
     pantry-tree:
