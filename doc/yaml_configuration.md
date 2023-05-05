@@ -96,10 +96,10 @@ installation, and various settings like build flags. It is called a resolver
 since a snapshot states how dependencies are resolved. There are currently
 four resolver types:
 
-* LTS Haskell snapshots, e.g. `resolver: lts-19.17`
-* Stackage Nightly snapshots, e.g. `resolver: nightly-2002-08-04`
+* LTS Haskell snapshots, e.g. `resolver: lts-20.19`
+* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-05-05`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
-  like `resolver: ghc-9.2.4`
+  like `resolver: ghc-9.6.1`
 * Custom snapshot, via a URL or relative file path. For further information, see
   the [Pantry](pantry.md) documentation.
 
@@ -377,7 +377,7 @@ or otherwise), `locals` (all local packages, targets or otherwise), and
 
 ### apply-prog-options
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.11.1](https://github.com/commercialhaskell/stack/releases/tag/v2.11.1)
 
 Default: `locals`
 
@@ -488,12 +488,12 @@ Command line equivalent (takes precedence): `--compiler` option
 
 Overrides the compiler version in the resolver. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
-resolvers like `ghc-9.2.4`. This can be used to override the
+resolvers like `ghc-9.6.1`. This can be used to override the
 compiler for a Stackage snapshot, like this:
 
 ~~~yaml
-resolver: lts-14.20
-compiler: ghc-8.6.4
+resolver: lts-20.19
+compiler: ghc-9.6.1
 compiler-check: match-exact
 ~~~
 
@@ -1223,7 +1223,7 @@ setup-info:
 
 'Platforms' are pairs of an operating system and a machine architecture (for
 example, 32-bit i386 or 64-bit x86-64) (represented by the
-`Cabal.Distribution.Systems.Platform` type). Stack currently (version UNRELEASED)
+`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.11.1)
 supports the following pairs in the format of the `setup-info` key:
 
 |Operating system|I386 arch|X86_64 arch|Other machine architectures                                 |

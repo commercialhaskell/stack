@@ -7,7 +7,7 @@ behaves.
 
 ## `GH_TOKEN` or `GITHUB_TOKEN`
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.11.1](https://github.com/commercialhaskell/stack/releases/tag/v2.11.1)
 
 Stack will use the value of the `GH_TOKEN` or, in the alternative,
 `GITHUB_TOKEN` environment variable (if not an empty string) as credentials to

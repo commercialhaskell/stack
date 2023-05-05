@@ -64,8 +64,8 @@ requires that you have chosen a specific version for each package available.
 
 The most common means by which this set of packages is defined is via a
 snapshot provided by Stackage. For example, if you go to the page
-<https://www.stackage.org/lts-19.17>, you will see a list of 2,910 packages at
-specific version numbers. When you then specify `resolver: lts-19.17`, you're
+<https://www.stackage.org/lts-20.19>, you will see a list of 3,051 packages at
+specific version numbers. When you then specify `resolver: lts-20.19`, you're
 telling Stack to use those package versions in resolving dependencies down to
 specific versions of packages.
 

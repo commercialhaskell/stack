@@ -57,7 +57,7 @@ When compiling from source code, by default:
 * `stack upgrade --force-download` seeks an upgrade to the latest version of
   Stack available as a binary distribution for the platform, even if not newer.
 
-* `stack upgrade --binary-version 2.9.3` seeks an upgrade to Stack 2.9.3 if
+* `stack upgrade --binary-version 2.11.1` seeks an upgrade to Stack 2.11.1 if
   available as a binary distribution for the platform, even if not newer.
 
 * `stack upgrade --source-only` seeks an upgrade by building Stack with
