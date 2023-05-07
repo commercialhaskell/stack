@@ -2,10 +2,14 @@
 {-# LANGUAGE PackageImports #-}
 module StackSetupShim where
 import Main
+#if defined(MIN_VERSION_Cabal)
 #if MIN_VERSION_Cabal(3,8,1)
 import Distribution.PackageDescription (PackageDescription, emptyHookedBuildInfo)
 #else
 import "Cabal" Distribution.PackageDescription (PackageDescription, emptyHookedBuildInfo)
+#endif
+#else
+import Distribution.PackageDescription (PackageDescription, emptyHookedBuildInfo)
 #endif
 import Distribution.Simple
 import Distribution.Simple.Build
