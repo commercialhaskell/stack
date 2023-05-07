@@ -59,3 +59,7 @@
     name: "Avoid lambda using `infix`"
     within:
     - System.Process.Pager.pageWriter
+- ignore:
+    name: "Unused LANGUAGE pragma"
+    within:
+    - StackSetupShim
