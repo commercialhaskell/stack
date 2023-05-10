@@ -50,6 +50,7 @@ import           Distribution.Version ( anyVersion )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Pantry.Internal.AesonExtended
 import           Path
+import           Stack.Constants ( stackProgName )
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Version
 import           Text.Read ( Read (..) )

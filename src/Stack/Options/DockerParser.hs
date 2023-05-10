@@ -17,6 +17,7 @@ import           Options.Applicative.Builder.Extra
                    , firstBoolFlagsFalse, firstBoolFlagsNoDefault
                    , firstBoolFlagsTrue, optionalFirst
                    )
+import           Stack.Constants ( stackProgName )
 import           Stack.Docker ( dockerCmdName )
 import           Stack.Prelude
 import           Stack.Options.Utils ( hideMods )

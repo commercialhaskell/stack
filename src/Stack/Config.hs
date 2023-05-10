@@ -85,8 +85,8 @@ import           Stack.Constants
                    , platformVariantEnvVar, relDirBin, relDirStackWork
                    , relFileReadmeTxt, relFileStorage, relDirPantry
                    , relDirPrograms, relDirStackProgName, relDirUpperPrograms
-                   , stackDeveloperModeDefault, stackDotYaml, stackRootEnvVar
-                   , stackWorkEnvVar, stackXdgEnvVar
+                   , stackDeveloperModeDefault, stackDotYaml, stackProgName
+                   , stackRootEnvVar, stackWorkEnvVar, stackXdgEnvVar
                    )
 import           Stack.Lock ( lockCachedWanted )
 import           Stack.Prelude

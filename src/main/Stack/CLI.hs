@@ -21,7 +21,7 @@ import           RIO.Process ( withProcessContextNoLogging )
 import           Stack.Build ( buildCmd )
 import           Stack.Clean ( CleanCommand (..), cleanCmd )
 import           Stack.ConfigCmd as ConfigCmd
-import           Stack.Constants ( globalFooter )
+import           Stack.Constants ( globalFooter, stackProgName )
 import           Stack.Coverage ( hpcReportCmd )
 import           Stack.Docker
                    ( dockerCmdName, dockerHelpOptName, dockerPullCmdName )

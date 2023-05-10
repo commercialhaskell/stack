@@ -93,7 +93,7 @@ import           Stack.Constants
                    , relFileLibgmpSo3, relFileLibncurseswSo6, relFileLibtinfoSo5
                    , relFileLibtinfoSo6, relFileMainHs, relFileStack
                    , relFileStackDotExe, relFileStackDotTmp
-                   , relFileStackDotTmpDotExe, usrLibDirs
+                   , relFileStackDotTmpDotExe, stackProgName, usrLibDirs
                    )
 import           Stack.Constants.Config ( distRelativeDir )
 import           Stack.GhcPkg

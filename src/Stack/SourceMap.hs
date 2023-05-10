@@ -31,6 +31,7 @@ import qualified Pantry.SHA256 as SHA256
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
 import qualified RIO.Set as Set
+import           Stack.Constants ( stackProgName' )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDump )
 import           Stack.Prelude
 import           Stack.Types.Build.Exception ( BuildPrettyException (..) )

@@ -308,6 +308,7 @@ library
   other-modules:
       Path.Extended
       Stack.ComponentFile
+      Stack.Constants.StackProgName
       Stack.Internal.BuildInfo
       Stack.PackageFile
       Stack.Types.Cache
@@ -388,7 +389,6 @@ library
     , streaming-commons
     , tar
     , template-haskell
-    , temporary
     , text
     , text-metrics
     , th-reify-many
@@ -522,7 +522,6 @@ executable stack
     , streaming-commons
     , tar
     , template-haskell
-    , temporary
     , text
     , text-metrics
     , th-reify-many
@@ -649,7 +648,6 @@ executable stack-integration-test
     , streaming-commons
     , tar
     , template-haskell
-    , temporary
     , text
     , text-metrics
     , th-reify-many
@@ -784,7 +782,6 @@ test-suite stack-test
     , streaming-commons
     , tar
     , template-haskell
-    , temporary
     , text
     , text-metrics
     , th-reify-many
