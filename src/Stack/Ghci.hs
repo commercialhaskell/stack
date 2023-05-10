@@ -25,9 +25,10 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Distribution.PackageDescription as C
-import           Path ((</>), parent, parseAbsDir, parseRelFile )
+import           Path ((</>), parent, parseRelFile )
 import           Path.Extra ( forgivingResolveFile', toFilePathNoTrailingSep )
-import           Path.IO ( doesFileExist, ensureDir )
+import           Path.IO
+                   ( XdgDirectory (..), doesFileExist, ensureDir, getXdgDir )
 import           RIO.Process
                    ( HasProcessContext, exec, proc, readProcess_
                    , withWorkingDir
@@ -38,7 +39,7 @@ import           Stack.Build.Source
                    ( getLocalFlags, localDependencies, projectLocalPackages )
 import           Stack.Build.Target ( NeedTargets (..), parseTargets )
 import           Stack.Constants
-                   ( relDirHaskellStackGhci, relFileCabalMacrosH
+                   ( relDirGhciScript, relDirStackProgName, relFileCabalMacrosH
                    , relFileGhciScript, stackProgName'
                    )
 import           Stack.Constants.Config ( ghciDirL, objectInterfaceDirL )
@@ -85,7 +86,6 @@ import           Stack.Types.SourceMap
                    , SMTargets (..), SMWanted (..), SourceMap (..), Target (..)
                    )
 import           System.IO ( putStrLn )
-import           System.IO.Temp ( getCanonicalTemporaryDirectory )
 import           System.Permissions ( setScriptPerms )
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -566,9 +566,8 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     -- file names are determined by hashing. This also has the nice side
     -- effect of making it possible to copy the ghci invocation out of
     -- the log and have it still work.
-    tmpDirectory <-
-        (</> relDirHaskellStackGhci) <$>
-        (parseAbsDir =<< liftIO getCanonicalTemporaryDirectory)
+    tmpDirectory <- getXdgDir XdgCache $
+      Just (relDirStackProgName </> relDirGhciScript)
     ghciDir <- view ghciDirL
     ensureDir ghciDir
     ensureDir tmpDirectory

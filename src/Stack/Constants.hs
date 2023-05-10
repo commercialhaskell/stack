@@ -46,6 +46,8 @@ module Stack.Constants
   , relFileCabalMacrosH
   , relDirBuild
   , relDirBin
+  , relDirGhci
+  , relDirGhciScript
   , relDirPantry
   , relDirPrograms
   , relDirUpperPrograms
@@ -90,7 +92,6 @@ module Stack.Constants
   , relDirAll
   , relFilePackageCache
   , relFileDockerfile
-  , relDirHaskellStackGhci
   , relFileGhciScript
   , relDirCombined
   , relFileHpcIndexHtml
@@ -365,6 +366,12 @@ relDirBuild = $(mkRelDir "build")
 relDirBin :: Path Rel Dir
 relDirBin = $(mkRelDir "bin")
 
+relDirGhci :: Path Rel Dir
+relDirGhci = $(mkRelDir "ghci")
+
+relDirGhciScript :: Path Rel Dir
+relDirGhciScript = $(mkRelDir "ghci-script")
+
 relDirPantry :: Path Rel Dir
 relDirPantry = $(mkRelDir "pantry")
 
@@ -501,9 +508,6 @@ relFilePackageCache = $(mkRelFile "package.cache")
 relFileDockerfile :: Path Rel File
 relFileDockerfile = $(mkRelFile "Dockerfile")
 
-relDirHaskellStackGhci :: Path Rel Dir
-relDirHaskellStackGhci = $(mkRelDir "haskell-stack-ghci")
-
 relFileGhciScript :: Path Rel File
 relFileGhciScript = $(mkRelFile "ghci-script")
 
@@ -542,9 +546,6 @@ relDirUnderHome = $(mkRelDir "_home")
 
 relDirSrc :: Path Rel Dir
 relDirSrc = $(mkRelDir "src")
-
-relDirStack :: Path Rel File
-relDirStack = $(mkRelFile "stack")
 
 relFileLibtinfoSo5 :: Path Rel File
 relFileLibtinfoSo5 = $(mkRelFile "libtinfo.so.5")

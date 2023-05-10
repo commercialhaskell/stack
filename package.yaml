@@ -125,7 +125,6 @@ dependencies:
 - streaming-commons
 - tar
 - template-haskell
-- temporary
 - text
 - text-metrics
 - th-reify-many
