@@ -51,6 +51,7 @@ import           Stack.Build.Execute
                    )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source ( projectLocalPackages )
+import           Stack.Constants ( stackProgName, stackProgName' )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Package
                    ( PackageDescriptionPair (..), resolvePackage

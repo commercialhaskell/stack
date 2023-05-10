@@ -19,6 +19,7 @@ import qualified RIO.Map as Map
 import           RIO.Process ( findExecutable, proc, readProcess_, runProcess_)
 import qualified Stack.Build ( build )
 import           Stack.Build.Target ( NeedTargets (NeedTargets) )
+import           Stack.Constants ( stackProgName' )
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig

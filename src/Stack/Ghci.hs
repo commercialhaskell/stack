@@ -39,7 +39,7 @@ import           Stack.Build.Source
 import           Stack.Build.Target ( NeedTargets (..), parseTargets )
 import           Stack.Constants
                    ( relDirHaskellStackGhci, relFileCabalMacrosH
-                   , relFileGhciScript
+                   , relFileGhciScript, stackProgName'
                    )
 import           Stack.Constants.Config ( ghciDirL, objectInterfaceDirL )
 import           Stack.Ghci.Script

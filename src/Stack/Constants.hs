@@ -10,6 +10,8 @@ module Stack.Constants
   , buildPlanCacheDir
   , haskellFileExts
   , haskellDefaultPreprocessorExts
+  , stackProgName
+  , stackProgName'
   , stackDotYaml
   , stackWorkEnvVar
   , stackRootEnvVar
@@ -134,10 +136,12 @@ import           Data.ByteString.Builder ( byteString )
 import           Data.Char ( toUpper )
 import           Data.FileEmbed ( embedFile, makeRelativeToProject )
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import           Distribution.Package ( mkPackageName )
 import           Hpack.Config ( packageConfig )
 import qualified Language.Haskell.TH.Syntax as TH ( runIO, lift )
 import           Path ( (</>), mkRelDir, mkRelFile, parseAbsFile )
+import           Stack.Constants.StackProgName ( stackProgName )
 import           Stack.Constants.UsrLibDirs ( usrLibDirs )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( WhichCompiler (..) )
@@ -153,6 +157,10 @@ data ConstantsException
 instance Exception ConstantsException where
   displayException WiredInPackagesNotParsedBug = bugReport "[S-6057]"
     "Parse error in wiredInPackages."
+
+-- | Name of the Stack program.
+stackProgName' :: Text
+stackProgName' = T.pack stackProgName
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
@@ -534,6 +542,9 @@ relDirUnderHome = $(mkRelDir "_home")
 
 relDirSrc :: Path Rel Dir
 relDirSrc = $(mkRelDir "src")
+
+relDirStack :: Path Rel File
+relDirStack = $(mkRelFile "stack")
 
 relFileLibtinfoSo5 :: Path Rel File
 relFileLibtinfoSo5 = $(mkRelFile "libtinfo.so.5")

@@ -308,6 +308,7 @@ library
   other-modules:
       Path.Extended
       Stack.ComponentFile
+      Stack.Constants.StackProgName
       Stack.Internal.BuildInfo
       Stack.PackageFile
       Stack.Types.Cache
