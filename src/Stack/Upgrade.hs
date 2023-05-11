@@ -92,10 +92,12 @@ instance Exception UpgradePrettyException
 data BinaryOpts = BinaryOpts
   { _boPlatform :: !(Maybe String)
   , _boForce :: !Bool
-    -- ^ force a download, even if the downloaded version is older than what we
-    -- are
+    -- ^ Force a download, even if the downloaded version is older than what we
+    -- are.
+  , _boOnlyLocalBin :: !Bool
+    -- ^ Only download to Stack's local binary directory.
   , _boVersion :: !(Maybe String)
-    -- ^ specific version to download
+    -- ^ Specific version to download
   , _boGitHubOrg :: !(Maybe String)
   , _boGitHubRepo :: !(Maybe String)
   }
@@ -146,7 +148,7 @@ upgrade builtHash (UpgradeOpts mbo mso) = case (mbo, mso) of
   source = sourceUpgrade builtHash
 
 binaryUpgrade :: BinaryOpts -> RIO Runner ()
-binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) =
+binaryUpgrade (BinaryOpts mplatform force' onlyLocalBin mver morg mrepo) =
   withConfig NoReexec $ do
     platforms0 <-
       case mplatform of
@@ -194,11 +196,12 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) =
         pure True
     when toUpgrade $ do
       config <- view configL
-      downloadStackExe platforms0 archiveInfo (configLocalBin config) True $
-        \tmpFile -> do
-          -- Sanity check!
-          ec <- rawSystem (toFilePath tmpFile) ["--version"]
-          unless (ec == ExitSuccess) (prettyThrowIO ExecutableFailure)
+      downloadStackExe
+        platforms0 archiveInfo (configLocalBin config) (not onlyLocalBin) $
+          \tmpFile -> do
+            -- Sanity check!
+            ec <- rawSystem (toFilePath tmpFile) ["--version"]
+            unless (ec == ExitSuccess) (prettyThrowIO ExecutableFailure)
 
 sourceUpgrade ::
      Maybe String

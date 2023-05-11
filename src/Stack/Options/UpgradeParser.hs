@@ -6,16 +6,20 @@ module Stack.Options.UpgradeParser
   ) where
 
 import         Options.Applicative
-                 ( Parser, flag', help, long, metavar, showDefault, strOption
-                 , switch, value
+                 ( Parser, flag', help, idm, long, metavar, showDefault
+                 , strOption, switch, value
                  )
+import         Options.Applicative.Builder.Extra ( boolFlags )
 import         Stack.Prelude
 import         Stack.Upgrade
                  ( BinaryOpts (..), SourceOpts (..), UpgradeOpts (..) )
 
 -- | Parse command line arguments for Stack's @upgrade@ command.
-upgradeOptsParser :: Parser UpgradeOpts
-upgradeOptsParser = UpgradeOpts
+upgradeOptsParser ::
+     Bool
+     -- ^ The default for --[no]-only-local-bin
+  -> Parser UpgradeOpts
+upgradeOptsParser onlyLocalBin = UpgradeOpts
   <$> (sourceOnly <|> optional binaryOpts)
   <*> (binaryOnly <|> optional sourceOpts)
  where
@@ -39,6 +43,10 @@ upgradeOptsParser = UpgradeOpts
           <> help "Download the latest available Stack executable, even if not \
                   \newer."
           )
+    <*> boolFlags onlyLocalBin
+          "only-local-bin"
+          "downloading only to Stack's local binary directory"
+          idm
     <*> optional (strOption
           (  long "binary-version"
           <> help "Download a specific Stack version, even if already \
