@@ -466,7 +466,9 @@ buildDepsAndInitialSteps GhciOpts{..} localTargets = do
       case eres of
         Right () -> pure ()
         Left err -> do
-          prettyError $ fromString (displayException err)
+          case fromException err of
+            Just (PrettyException prettyErr) -> prettyError $ pretty prettyErr
+            Nothing -> prettyError $ fromString (displayException err)
           prettyWarn "Build failed, but trying to launch GHCi anyway"
     _ ->
       pure ()
