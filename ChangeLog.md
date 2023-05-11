@@ -10,6 +10,13 @@ Major changes:
 
 Behavior changes:
 
+* Add flag `--[no-]-only-local-bin` to Stack's `upgrade` command for a binary
+  upgrade. If the Stack executable is `my-stack`, the default is
+  `my-stack upgrade --only-local-bin` where previously it was, effectively,
+  `my-stack upgrade --no-only-local-bin`. If the Stack executable is `stack`,
+  the default is `stack upgrade --no-only-local-bin`, the same behaviour as
+  previously.
+
 * Use `$XDG_CACHE_HOME/stack/ghci-script`, rather than `<temp>/haskell-stack-ghci`
   (where `<temp>` is the directory yielded by the `temporary` package's
   `System.IO.Temp.getCanonicalTemporaryDirectory`), as the base location for
