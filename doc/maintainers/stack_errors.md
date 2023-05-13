@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-05-05.
+`master` branch of the Stack repository. Last updated: 2023-05-12.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -258,16 +258,25 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Stack.Setup.SetupException`
 
         ~~~haskell
-        [S-1852] = UnsupportedSetupCombo OS Arch
+        [S-2076] = WorkingDirectoryInvalidBug
+        [S-3967] | StackBinaryArchiveZipUnsupportedBug
+        ~~~
+
+    -   `Stack.Setup.SetupPrettyException`
+
+        ~~~haskell
+        [S-7441] = GHCInstallFailed SomeException StyleDoc String [String] (Path Abs Dir) (Path Abs Dir) (Path Abs Dir)
+        [S-2476] | InvalidGhcAt (Path Abs File) SomeException
+        [S-4764] | ExecutableNotFound [Path Abs File]
+        [S-9953] | SandboxedCompilerNotFound [String] [Path Abs Dir]
+        [S-1852] | UnsupportedSetupCombo OS Arch
         [S-2126] | MissingDependencies [String]
         [S-9443] | UnknownCompilerVersion (Set Text) WantedCompiler (Set ActualCompiler)
         [S-6810] | UnknownOSKey Text
         [S-5159] | GHCSanityCheckCompileFailed SomeException (Path Abs File)
-        [S-9030] | WantedMustBeGHC
         [S-8948] | RequireCustomGHCVariant
         [S-2905] | ProblemWhileDecompressing (Path Abs File)
         [S-9561] | SetupInfoMissingSevenz
-        [S-1457] | DockerStackExeNotFound Version Text
         [S-7748] | UnsupportedSetupConfiguration
         [S-5308] | MSYS2NotFound Text
         [S-5127] | UnwantedCompilerVersion
@@ -287,25 +296,14 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-1827] | UnknownArchiveStructure (Path Abs File)
         [S-9476] | StackReleaseInfoNotFound String
         [S-4461] | StackBinaryArchiveNotFound [String]
-        [S-2076] | WorkingDirectoryInvalidBug
         [S-6617] | HadrianBindistNotFound
         [S-7227] | DownloadAndInstallCompilerError
-        [S-3967] | StackBinaryArchiveZipUnsupportedBug
         [S-6636] | StackBinaryArchiveUnsupported Text
         [S-7871] | StackBinaryNotInArchive String Text
         [S-5046] | FileTypeInArchiveInvalid Entry Text
         [S-4132] | BinaryUpgradeOnOSUnsupported OS
         [S-3249] | BinaryUpgradeOnArchUnsupported Arch
         [S-4230] | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
-        ~~~
-
-    -   `Stack.Setup.SetupPrettyException`
-
-        ~~~haskell
-        [S-7441] = GHCInstallFailed SomeException StyleDoc String [String] (Path Abs Dir) (Path Abs Dir) (Path Abs Dir)
-        [S-2476] | InvalidGhcAt (Path Abs File) SomeException
-        [S-4764] | ExecutableNotFound [Path Abs File]
-        [S-9953] | SandboxedCompilerNotFound [String] [Path Abs Dir]
         ~~~
 
     -   `Stack.Storage.User.StorageUserException`
