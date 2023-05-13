@@ -41,6 +41,14 @@ By default:
 * the binary distribution will be sought for the current platform. Pass the
   `--binary-platform <platform>` option to specify a different platform (`<operating_system>-<architecture>-<suffix>`).
 
+When applicable, an existing binary distribution will be:
+
+* put in Stack's local binary directory (see `stack path --local-bin`) and named
+  `stack` (replacing any existing executable there named `stack`); and
+
+* (if different) named the same as, and replace, the current running Stack
+  executable.
+
 When compiling from source code, by default:
 
 *   Stack will obtain the source code for the most recent version in the package

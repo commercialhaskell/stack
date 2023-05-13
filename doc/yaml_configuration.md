@@ -210,6 +210,12 @@ the configuration means "extra-deps packages in directories
 
 !!! note
 
+    A local file path that has the format of a package identifier will be
+    interpreted as a reference to a package on Hackage. Prefix it with `./` to
+    avoid that confusion.
+
+!!! note
+
     A specified extra-dep that does not have the format of a valid Pantry
     package location (for example, a reference to a package on Hackage that
     omits the package's version) will be interpreted as a local file path.
