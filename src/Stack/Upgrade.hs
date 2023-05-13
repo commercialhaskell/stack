@@ -15,8 +15,7 @@ import           Path ( (</>), parseRelDir )
 import           RIO.Process ( proc, runProcess_, withWorkingDir )
 import           Stack.Build ( build )
 import           Stack.Build.Target ( NeedTargets (..) )
-import           Stack.Constants
-                   ( osIsWindows, relDirStackProgName, stackDotYaml )
+import           Stack.Constants ( relDirStackProgName, stackDotYaml )
 import           Stack.Internal.BuildInfo ( maybeGitHash )
 import           Stack.Prelude hiding ( force, Display (..) )
 import           Stack.Runners
@@ -34,7 +33,6 @@ import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
-import           System.Console.ANSI ( hSupportsANSIWithoutEmulation )
 import           System.Process ( rawSystem, readProcess )
 
 -- | Type representing \'pretty\' exceptions thrown by functions in the
@@ -246,12 +244,6 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                     , branch
                     ]
               withWorkingDir (toFilePath tmp) $ proc "git" args runProcess_
-              -- On Windows 10, an upstream issue with the `git clone` command
-              -- means that command clears, but does not then restore, the
-              -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals.
-              -- The following hack re-enables the lost ANSI-capability.
-              when osIsWindows $
-                void $ liftIO $ hSupportsANSIWithoutEmulation stdout
               pure $ Just $ tmp </> relDirStackProgName
       -- We need to access the Pantry database to find out about the latest
       -- Stack available on Hackage. We first use a standard Config to do this,

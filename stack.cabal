@@ -324,7 +324,7 @@ library
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
     , annotated-wl-pprint
-    , ansi-terminal
+    , ansi-terminal >=1.0
     , array
     , async
     , attoparsec
@@ -456,7 +456,7 @@ executable stack
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
     , annotated-wl-pprint
-    , ansi-terminal
+    , ansi-terminal >=1.0
     , array
     , async
     , attoparsec
@@ -581,7 +581,7 @@ executable stack-integration-test
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
     , annotated-wl-pprint
-    , ansi-terminal
+    , ansi-terminal >=1.0
     , array
     , async
     , attoparsec
@@ -713,7 +713,7 @@ test-suite stack-test
     , QuickCheck
     , aeson >=2.0.3.0
     , annotated-wl-pprint
-    , ansi-terminal
+    , ansi-terminal >=1.0
     , array
     , async
     , attoparsec

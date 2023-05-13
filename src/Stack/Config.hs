@@ -138,8 +138,7 @@ import           Stack.Types.Version
                    ( IntersectingVersionRange (..), VersionCheck (..)
                    , stackVersion, withinRange
                    )
-import           System.Console.ANSI
-                   ( hSupportsANSIWithoutEmulation, setSGRCode )
+import           System.Console.ANSI ( hSupportsANSI, setSGRCode )
 import           System.Environment ( getEnvironment, lookupEnv )
 import           System.Info.ShortPathName ( getShortPathName )
 import           System.PosixCompat.Files ( fileOwner, getFileStatus )
@@ -428,8 +427,7 @@ configFromConfigMonoid
         Just True -> pure True
         _ -> getInContainer
     configRunner' <- view runnerL
-    useAnsi <- liftIO $ fromMaybe True <$>
-                        hSupportsANSIWithoutEmulation stderr
+    useAnsi <- liftIO $ hSupportsANSI stderr
     let stylesUpdate' = (configRunner' ^. stylesUpdateL) <>
           configMonoidStyles
         useColor' = runnerUseColor configRunner'

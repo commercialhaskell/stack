@@ -5,22 +5,15 @@
 
 packages:
 - completed:
-    hackage: hi-file-parser-0.1.4.0@sha256:4c3e1f4e2575809c7fe47229f8547c64e22760d77c73456bf017d27e0e736dd8,2660
+    hackage: ansi-terminal-1.0@sha256:640ffecfd95471388d939fcacb57bdc0cef15f0457746c234a12cdd5a6c6d1e8,2706
     pantry-tree:
-      sha256: 39ac287c76db4428ba1f78de6d93441d5900609755049557f46c0508a65dcbe3
-      size: 2242
+      sha256: d2028688664a01877fcbf4a7dc820574bec07f17393e570a98c00c49cd28d5cf
+      size: 1061
   original:
-    hackage: hi-file-parser-0.1.4.0@sha256:4c3e1f4e2575809c7fe47229f8547c64e22760d77c73456bf017d27e0e736dd8,2660
-- completed:
-    hackage: pantry-0.8.2.2@sha256:579aa8538c0fde65f9c08fb97d1d5aee8f59e5cc44e5f8feb350ec54bd2b14a6,6026
-    pantry-tree:
-      sha256: f979dadd233a05272bfee435de5d66532692532453d199adb902079a75cb878d
-      size: 2970
-  original:
-    hackage: pantry-0.8.2.2@sha256:579aa8538c0fde65f9c08fb97d1d5aee8f59e5cc44e5f8feb350ec54bd2b14a6,6026
+    hackage: ansi-terminal-1.0@sha256:640ffecfd95471388d939fcacb57bdc0cef15f0457746c234a12cdd5a6c6d1e8,2706
 snapshots:
 - completed:
-    sha256: 5eb95e9f352b5cc0f192b5039ee2f19c88bddf53928b29a2efc54bc1697ab1ea
-    size: 625217
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/5/3.yaml
-  original: nightly-2023-05-03
+    sha256: a638975b3da9a4182e4b4f0866c5fb01825dc04d74b503cb8e402f38c861368d
+    size: 629111
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/5/13.yaml
+  original: nightly-2023-05-13
