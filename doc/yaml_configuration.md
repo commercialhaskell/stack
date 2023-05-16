@@ -456,6 +456,18 @@ of the same name. For further information, see the
 [`stack build` command](build_command.md) documentation and the
 [users guide](GUIDE.md#the-build-command).
 
+### casa-repo-prefix
+
+[:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
+
+Default: https://casa.fpcomplete.com
+
+This option specifies the prefix for the URL used to pull information from the
+Casa (content-addressable storage archive) server that is used by Stack to cache
+Cabal files and all other files in packages. For further information, see this
+blog post about
+[Casa and Stack](https://www.fpcomplete.com/blog/casa-and-stack/).
+
 ### color
 
 Command line equivalent (takes precedence): `--color` option
