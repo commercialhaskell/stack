@@ -460,7 +460,7 @@ of the same name. For further information, see the
 
 [:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
 
-Default: https://casa.fpcomplete.com
+Default: `https://casa.fpcomplete.com`
 
 This option specifies the prefix for the URL used to pull information from the
 Casa (content-addressable storage archive) server that is used by Stack to cache
