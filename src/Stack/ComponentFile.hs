@@ -20,6 +20,7 @@ module Stack.ComponentFile
 
 import           Control.Exception ( throw )
 import           Data.List ( find, isPrefixOf )
+import           Data.Foldable (foldrM)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -166,34 +167,38 @@ resolveFilesAndDeps ::
        GetPackageFileContext
        (Map ModuleName (Path Abs File),[DotCabalPath],[PackageWarning])
 resolveFilesAndDeps component dirs names0 = do
-  (dotCabalPaths, foundModules, missingModules) <- loop names0 S.empty
+  (dotCabalPaths, foundModules, missingModules, _) <- loop names0 S.empty M.empty
   warnings <-
     liftM2 (++) (warnUnlisted foundModules) (warnMissing missingModules)
   pure (foundModules, dotCabalPaths, warnings)
  where
-  loop [] _ = pure ([], M.empty, [])
-  loop names doneModules0 = do
+  loop [] _ _ = pure ([], M.empty, [], M.empty)
+  loop names doneModules0 knownUsages = do
     resolved <- resolveFiles dirs names
     let foundFiles = mapMaybe snd resolved
         foundModules = mapMaybe toResolvedModule resolved
         missingModules = mapMaybe toMissingModule resolved
-    pairs <- mapM (getDependencies component dirs) foundFiles
+        getDependenciesFold c (ps, ku) = do
+          p <- getDependencies ku component dirs c
+          pure (p : ps, ku <> snd p)
+    (pairs, foundUsages) <- foldrM getDependenciesFold ([], knownUsages) foundFiles
     let doneModules = S.union
                         doneModules0
                         (S.fromList (mapMaybe dotCabalModule names))
         moduleDeps = S.unions (map fst pairs)
-        thDepFiles = concatMap snd pairs
+        thDepFiles = concatMap (M.elems . snd) pairs
         modulesRemaining = S.difference moduleDeps doneModules
       -- Ignore missing modules discovered as dependencies - they may
       -- have been deleted.
-    (resolvedFiles, resolvedModules, _) <-
-      loop (map DotCabalModule (S.toList modulesRemaining)) doneModules
+    (resolvedFiles, resolvedModules, _, foundUsages') <-
+      loop (map DotCabalModule (S.toList modulesRemaining)) doneModules foundUsages
     pure
       ( nubOrd $ foundFiles <> map DotCabalFilePath thDepFiles <> resolvedFiles
       , M.union
             (M.fromList foundModules)
             resolvedModules
       , missingModules
+      , foundUsages'
       )
   warnUnlisted foundModules = do
     let unlistedModules =
@@ -238,16 +243,17 @@ resolveFilesAndDeps component dirs names0 = do
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies ::
-     NamedComponent
+     Map FilePath (Path Abs File)
+  -> NamedComponent
   -> [Path Abs Dir]
   -> DotCabalPath
-  -> RIO GetPackageFileContext (Set ModuleName, [Path Abs File])
-getDependencies component dirs dotCabalPath =
+  -> RIO GetPackageFileContext (Set ModuleName, Map FilePath (Path Abs File))
+getDependencies knownUsages component dirs dotCabalPath =
   case dotCabalPath of
     DotCabalModulePath resolvedFile -> readResolvedHi resolvedFile
     DotCabalMainPath resolvedFile -> readResolvedHi resolvedFile
-    DotCabalFilePath{} -> pure (S.empty, [])
-    DotCabalCFilePath{} -> pure (S.empty, [])
+    DotCabalFilePath{} -> pure (S.empty, M.empty)
+    DotCabalCFilePath{} -> pure (S.empty, M.empty)
  where
   readResolvedHi resolvedFile = do
     dumpHIDir <- componentOutputDir component <$> asks ctxDistDir
@@ -255,21 +261,22 @@ getDependencies component dirs dotCabalPath =
     let sourceDir = fromMaybe dir $ find (`isProperPrefixOf` resolvedFile) dirs
         stripSourceDir d = stripProperPrefix d resolvedFile
     case stripSourceDir sourceDir of
-      Nothing -> pure (S.empty, [])
+      Nothing -> pure (S.empty, M.empty)
       Just fileRel -> do
         let hiPath = FilePath.replaceExtension
                        (toFilePath (dumpHIDir </> fileRel))
                        ".hi"
         dumpHIExists <- liftIO $ D.doesFileExist hiPath
         if dumpHIExists
-          then parseHI hiPath
-          else pure (S.empty, [])
+          then parseHI knownUsages hiPath
+          else pure (S.empty, M.empty)
 
 -- | Parse a .hi file into a set of modules and files.
 parseHI ::
-     FilePath
-  -> RIO GetPackageFileContext (Set ModuleName, [Path Abs File])
-parseHI hiPath = do
+     Map FilePath (Path Abs File)
+  -> FilePath
+  -> RIO GetPackageFileContext (Set ModuleName, Map FilePath (Path Abs File))
+parseHI knownUsages hiPath = do
   dir <- asks (parent . ctxFile)
   result <-
     liftIO $ catchAnyDeep
@@ -283,24 +290,28 @@ parseHI hiPath = do
         , flow "Decoding failure:"
         , style Error $ fromString msg
         ]
-      pure (S.empty, [])
+      pure (S.empty, M.empty)
     Right iface -> do
       let moduleNames = fmap (fromString . T.unpack . decodeUtf8Lenient . fst) .
                         Iface.unList . Iface.dmods . Iface.deps
-          resolveFileDependency file = do
-            resolved <- forgivingResolveFile dir file >>= rejectMissingFile
-            when (isNothing resolved) $
-              prettyWarnL
-              [ flow "Dependent file listed in:"
-              , style File $ fromString hiPath
-              , flow "does not exist:"
-              , style File $ fromString file
-              ]
-            pure resolved
+          resolveFileDependency file =
+            case M.lookup file knownUsages of
+              Just p ->
+                pure $ Just (file, p)
+              Nothing -> do
+                resolved <- forgivingResolveFile dir file >>= rejectMissingFile
+                when (isNothing resolved) $
+                  prettyWarnL
+                  [ flow "Dependent file listed in:"
+                  , style File $ fromString hiPath
+                  , flow "does not exist:"
+                  , style File $ fromString file
+                  ]
+                pure $ (file,) <$> resolved
           resolveUsages = traverse
             (resolveFileDependency . Iface.unUsage) . Iface.unList . Iface.usage
       resolvedUsages <- catMaybes <$> resolveUsages iface
-      pure (S.fromList $ moduleNames iface, resolvedUsages)
+      pure (S.fromList $ moduleNames iface, M.fromList resolvedUsages)
 
 -- | The directory where generated files are put like .o or .hs (from .x files).
 componentOutputDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir
