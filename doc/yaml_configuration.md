@@ -210,6 +210,12 @@ the configuration means "extra-deps packages in directories
 
 !!! note
 
+    A local file path that has the format of a package identifier will be
+    interpreted as a reference to a package on Hackage. Prefix it with `./` to
+    avoid that confusion.
+
+!!! note
+
     A specified extra-dep that does not have the format of a valid Pantry
     package location (for example, a reference to a package on Hackage that
     omits the package's version) will be interpreted as a local file path.
@@ -467,6 +473,18 @@ The meanings of these settings correspond directly with the command line flags
 of the same name. For further information, see the
 [`stack build` command](build_command.md) documentation and the
 [users guide](GUIDE.md#the-build-command).
+
+### casa-repo-prefix
+
+[:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
+
+Default: `https://casa.fpcomplete.com`
+
+This option specifies the prefix for the URL used to pull information from the
+Casa (content-addressable storage archive) server that is used by Stack to cache
+Cabal files and all other files in packages. For further information, see this
+blog post about
+[Casa and Stack](https://www.fpcomplete.com/blog/casa-and-stack/).
 
 ### color
 
