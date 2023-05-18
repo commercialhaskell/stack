@@ -43,7 +43,7 @@ command are inconsistent and take no action.
     required on Linux, Stack will refer to the presence or absence of certain
     libraries or the versions of those libraries.
 
-    For example, Stack UNRELEASED considers:
+    For example, Stack 2.11.1 considers:
 
     *   the version of `libc6`, the
         [GNU C Library](https://www.gnu.org/software/libc/) (glibc), that is
@@ -60,7 +60,7 @@ command are inconsistent and take no action.
         provided by different versions of a shared low-level terminfo library
         for terminal handling.
 
-    Stack UNRELEASED uses `ghc-build`:
+    Stack 2.11.1 uses `ghc-build`:
 
     * `tinfo6` to indicate `libgmp.so.10` and `libtinfo.so.6` are present and
       `libc6` is compatible with `libc6` 2.32.

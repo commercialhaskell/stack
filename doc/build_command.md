@@ -414,7 +414,7 @@ expressions, and generate a backtrace on exception.
 
 ### `--PROG-option` options
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.11.1](https://github.com/commercialhaskell/stack/releases/tag/v2.11.1)
 
 `PROG` is a program recognised by Cabal (the library) and one of `alex`, `ar`,
 `c2hs`, `cpphs`, `gcc`, `greencard`, `happy`, `hsc2hs`, `hscolour`, `ld`,

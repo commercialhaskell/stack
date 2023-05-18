@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module StackTest
   ( run'
   , run
@@ -37,6 +39,7 @@ module StackTest
   , isLinux
   , getIsAlpine
   , isARM
+  , isAarch64
   , isMacOSX
   , defaultResolverArg
   , removeFileIgnore
@@ -333,6 +336,10 @@ getIsAlpine = doesFileExist "/etc/alpine-release"
 -- | Is the architecture ARM?
 isARM :: Bool
 isARM = arch == "arm"
+
+-- | Is the architecture Aarch64?
+isAarch64 :: Bool
+isAarch64 = arch == "aarch64"
 
 -- | Is the OS Mac OS X?
 isMacOSX :: Bool

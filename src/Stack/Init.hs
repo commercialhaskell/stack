@@ -41,7 +41,7 @@ import           Stack.BuildPlan
                    , removeSrcPkgDefaultFlags, selectBestSnapshot
                    )
 import           Stack.Config ( getSnapshots, makeConcreteResolver )
-import           Stack.Constants ( stackDotYaml )
+import           Stack.Constants ( stackDotYaml, stackProgName' )
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withGlobalProject )

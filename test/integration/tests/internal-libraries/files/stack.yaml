@@ -11,4 +11,10 @@
 # See https://github.com/haskell/cabal/issues/7763, which includes "Cabal is
 # currently unable to build foreign libraries with GHC 9.0 or 9.2." 'Currently'
 # refers to Cabal versions before 3.8.
-resolver: ghc-8.10.7
+#
+# Also see https://github.com/haskell/cabal/issues/7763. On macOS (Apple
+# silicon), fails with resolver: ghc-8.10.7 with Cabal error:
+# "Cabal-simple_SvXsv1f__3.2.1.0_ghc-8.10.7: Cannot build some foreign libraries:
+# Building foreign libraries is currently only supported on OSX, Linux and
+# Windows"
+resolver: ghc-9.4.5

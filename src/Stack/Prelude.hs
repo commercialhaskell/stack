@@ -13,8 +13,6 @@ module Stack.Prelude
   , prompt
   , promptPassword
   , promptBool
-  , stackProgName
-  , stackProgName'
   , FirstTrue (..)
   , fromFirstTrue
   , defaultFirstTrue
@@ -258,16 +256,6 @@ promptBool txt = liftIO $ do
     _ -> do
       T.putStrLn "Please press either 'y' or 'n', and then enter."
       promptBool txt
-
--- | Name of the 'stack' program.
---
--- NOTE: Should be defined in "Stack.Constants", but not doing so due to the
--- GHC stage restrictions.
-stackProgName :: String
-stackProgName = "stack"
-
-stackProgName' :: Text
-stackProgName' = T.pack stackProgName
 
 -- | Like @First Bool@, but the default is @True@.
 newtype FirstTrue

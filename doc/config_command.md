@@ -85,8 +85,8 @@ stack config set resolver SNAPSHOT
 project-level configuration file (`stack.yaml`).
 
 A snapshot of `lts` or `nightly` will be translated into the most recent
-available. A snapshot of `lts-19` will be translated into the most recent
-available in the `lts-19` sequence.
+available. A snapshot of `lts-20` will be translated into the most recent
+available in the `lts-20` sequence.
 
 Known bug:
 

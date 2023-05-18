@@ -15,8 +15,7 @@ import           Path ( (</>), parseRelDir )
 import           RIO.Process ( proc, runProcess_, withWorkingDir )
 import           Stack.Build ( build )
 import           Stack.Build.Target ( NeedTargets (..) )
-import           Stack.Constants
-                   ( osIsWindows, relDirStackProgName, stackDotYaml )
+import           Stack.Constants ( relDirStackProgName, stackDotYaml )
 import           Stack.Internal.BuildInfo ( maybeGitHash )
 import           Stack.Prelude hiding ( force, Display (..) )
 import           Stack.Runners
@@ -34,7 +33,6 @@ import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
-import           System.Console.ANSI ( hSupportsANSIWithoutEmulation )
 import           System.Process ( rawSystem, readProcess )
 
 -- | Type representing \'pretty\' exceptions thrown by functions in the
@@ -92,10 +90,12 @@ instance Exception UpgradePrettyException
 data BinaryOpts = BinaryOpts
   { _boPlatform :: !(Maybe String)
   , _boForce :: !Bool
-    -- ^ force a download, even if the downloaded version is older than what we
-    -- are
+    -- ^ Force a download, even if the downloaded version is older than what we
+    -- are.
+  , _boOnlyLocalBin :: !Bool
+    -- ^ Only download to Stack's local binary directory.
   , _boVersion :: !(Maybe String)
-    -- ^ specific version to download
+    -- ^ Specific version to download
   , _boGitHubOrg :: !(Maybe String)
   , _boGitHubRepo :: !(Maybe String)
   }
@@ -146,7 +146,7 @@ upgrade builtHash (UpgradeOpts mbo mso) = case (mbo, mso) of
   source = sourceUpgrade builtHash
 
 binaryUpgrade :: BinaryOpts -> RIO Runner ()
-binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) =
+binaryUpgrade (BinaryOpts mplatform force' onlyLocalBin mver morg mrepo) =
   withConfig NoReexec $ do
     platforms0 <-
       case mplatform of
@@ -194,11 +194,12 @@ binaryUpgrade (BinaryOpts mplatform force' mver morg mrepo) =
         pure True
     when toUpgrade $ do
       config <- view configL
-      downloadStackExe platforms0 archiveInfo (configLocalBin config) True $
-        \tmpFile -> do
-          -- Sanity check!
-          ec <- rawSystem (toFilePath tmpFile) ["--version"]
-          unless (ec == ExitSuccess) (prettyThrowIO ExecutableFailure)
+      downloadStackExe
+        platforms0 archiveInfo (configLocalBin config) (not onlyLocalBin) $
+          \tmpFile -> do
+            -- Sanity check!
+            ec <- rawSystem (toFilePath tmpFile) ["--version"]
+            unless (ec == ExitSuccess) (prettyThrowIO ExecutableFailure)
 
 sourceUpgrade ::
      Maybe String
@@ -243,12 +244,6 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                     , branch
                     ]
               withWorkingDir (toFilePath tmp) $ proc "git" args runProcess_
-              -- On Windows 10, an upstream issue with the `git clone` command
-              -- means that command clears, but does not then restore, the
-              -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals.
-              -- The following hack re-enables the lost ANSI-capability.
-              when osIsWindows $
-                void $ liftIO $ hSupportsANSIWithoutEmulation stdout
               pure $ Just $ tmp </> relDirStackProgName
       -- We need to access the Pantry database to find out about the latest
       -- Stack available on Hackage. We first use a standard Config to do this,

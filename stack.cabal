@@ -109,7 +109,7 @@ source-repository head
 
 custom-setup
   setup-depends:
-      Cabal
+      Cabal <3.10
     , base >=4.14.3.0 && <5
     , filepath
 
@@ -308,6 +308,7 @@ library
   other-modules:
       Path.Extended
       Stack.ComponentFile
+      Stack.Constants.StackProgName
       Stack.Internal.BuildInfo
       Stack.PackageFile
       Stack.Types.Cache
@@ -323,7 +324,7 @@ library
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
     , annotated-wl-pprint
-    , ansi-terminal
+    , ansi-terminal >=1.0
     , array
     , async
     , attoparsec
@@ -388,7 +389,6 @@ library
     , streaming-commons
     , tar
     , template-haskell
-    , temporary
     , text
     , text-metrics
     , th-reify-many
@@ -456,7 +456,7 @@ executable stack
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
     , annotated-wl-pprint
-    , ansi-terminal
+    , ansi-terminal >=1.0
     , array
     , async
     , attoparsec
@@ -522,7 +522,6 @@ executable stack
     , streaming-commons
     , tar
     , template-haskell
-    , temporary
     , text
     , text-metrics
     , th-reify-many
@@ -582,7 +581,7 @@ executable stack-integration-test
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
     , annotated-wl-pprint
-    , ansi-terminal
+    , ansi-terminal >=1.0
     , array
     , async
     , attoparsec
@@ -649,7 +648,6 @@ executable stack-integration-test
     , streaming-commons
     , tar
     , template-haskell
-    , temporary
     , text
     , text-metrics
     , th-reify-many
@@ -715,7 +713,7 @@ test-suite stack-test
     , QuickCheck
     , aeson >=2.0.3.0
     , annotated-wl-pprint
-    , ansi-terminal
+    , ansi-terminal >=1.0
     , array
     , async
     , attoparsec
@@ -784,7 +782,6 @@ test-suite stack-test
     , streaming-commons
     , tar
     , template-haskell
-    , temporary
     , text
     , text-metrics
     , th-reify-many

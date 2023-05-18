@@ -29,6 +29,14 @@ but not another is quite likely to cause failures. GHCi will be run with
 `-XNoImplicitPrelude`, but it is likely that modules in the other component
 assume that the `Prelude` is implicitly imported.
 
+`stack ghci` configures GHCi by using a GHCi script file. Such files are located
+in subdirectories of `<XDG_CACHE_HOME>/stack/ghci-script`, where
+`<XDG_CACHE_HOME>` refers to the
+[XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html)
+for user-specific non-essential (cached) data. On Unix-like operating systems,
+the default for `<XDG_CACHE_HOME>` is `$HOME/.cache`. On Windows, the default
+is `%LOCALAPPDATA%`.
+
 ## Selecting Main module
 
 When loading multiple packages, there may be multiple definitions for the `Main`

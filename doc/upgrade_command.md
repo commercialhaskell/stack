@@ -6,7 +6,8 @@ Either:
 
 ~~~text
 stack upgrade [--binary-only] [--binary-platform ARG] [--force-download]
-              [--binary-version ARG] [--github-org ARG] [--github-repo ARG]
+              [--[no-]only-local-bin] [--binary-version ARG] [--github-org ARG]
+              [--github-repo ARG]
 ~~~
 
 or:
@@ -26,6 +27,20 @@ By default:
 * the new version will not overwrite the existing version unless it is newer.
   Pass the `--force-download` flag to force a download;
 
+* when an existing binary distribution is applicable, it will be put in Stack's
+  local binary directory (see `stack path --local-bin`) and named `stack`
+  (replacing any existing executable named `stack` there);
+
+* if the current running Stack executable is named `stack` (or, on Windows,
+  `stack.exe`) (this is case insensitive), an existing binary distribution will
+  replace it. If the executable is located outside of Stack's local binary
+  directory, pass the `--only-local-bin` flag to skip that step;
+
+* if the current running Stack executable is named other than `stack` (and, on
+  Windows, `stack.exe`), an existing binary distribution will only be put in
+  Stack's local binary directory and named `stack`. Pass the
+  `--no-only-local-bin` flag to replace also the current running executable;
+
 * the new version will be the latest available. Pass the
   `--binary-version <version>` option to specify the version (this implies
   `--force-download`);
@@ -39,15 +54,8 @@ By default:
   repository; and
 
 * the binary distribution will be sought for the current platform. Pass the
-  `--binary-platform <platform>` option to specify a different platform (`<operating_system>-<architecture>-<suffix>`).
-
-When applicable, an existing binary distribution will be:
-
-* put in Stack's local binary directory (see `stack path --local-bin`) and named
-  `stack` (replacing any existing executable there named `stack`); and
-
-* (if different) named the same as, and replace, the current running Stack
-  executable.
+  `--binary-platform <platform>` option to specify a different platform
+  (`<operating_system>-<architecture>-<suffix>`).
 
 When compiling from source code, by default:
 
@@ -65,13 +73,19 @@ When compiling from source code, by default:
 * `stack upgrade --force-download` seeks an upgrade to the latest version of
   Stack available as a binary distribution for the platform, even if not newer.
 
-* `stack upgrade --binary-version 2.9.3` seeks an upgrade to Stack 2.9.3 if
+* If the Stack executable is named `my-stack`, `my-stack upgrade` seeks only to
+  put the latest version of Stack available as a binary distribution for the
+  platform, if newer, in Stack's local binary directory and name it `stack`.
+  `my-stack upgrade --no-only-local-bin` seeks also to upgrade `my-stack` to the
+  latest version of Stack available.
+
+* `stack upgrade --binary-version 2.11.1` seeks an upgrade to Stack 2.11.1 if
   available as a binary distribution for the platform, even if not newer.
 
 * `stack upgrade --source-only` seeks an upgrade by building Stack with
-   Stack from the latest version of the source code in the package index
-   (i.e. Hackage).
+  Stack from the latest version of the source code in the package index
+  (i.e. Hackage).
 
 * `stack upgrade --source-only --git` seeks an upgrade by building Stack with
-   Stack from the latest version of the source code in the `master` branch of
-   Stack's repository.
+  Stack from the latest version of the source code in the `master` branch of
+  Stack's repository.

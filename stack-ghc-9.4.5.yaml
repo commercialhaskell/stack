@@ -2,14 +2,20 @@
 # built with GHC 9.4.5.
 
 # GHC 9.4.5
-resolver: nightly-2023-05-03
+resolver: nightly-2023-05-13
 
 packages:
 - .
 
 extra-deps:
-- hi-file-parser-0.1.4.0@sha256:4c3e1f4e2575809c7fe47229f8547c64e22760d77c73456bf017d27e0e736dd8,2660
-- pantry-0.8.2.2@sha256:579aa8538c0fde65f9c08fb97d1d5aee8f59e5cc44e5f8feb350ec54bd2b14a6,6026
+- ansi-terminal-1.0@sha256:640ffecfd95471388d939fcacb57bdc0cef15f0457746c234a12cdd5a6c6d1e8,2706
+
+allow-newer: true
+
+allow-newer-deps:
+# Required because ansi-wl-pprint-0.6.9 specifies ansi-terminal < 0.12. See:
+# https://github.com/ekmett/ansi-wl-pprint/issues/29
+- ansi-wl-pprint
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
@@ -26,8 +32,6 @@ nix:
   - unzip
 
 flags:
-  ansi-terminal:
-    win32-2-13-1: false
   hackage-security:
     cabal-syntax: true
   mintty:

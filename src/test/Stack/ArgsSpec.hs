@@ -14,6 +14,7 @@ import           Data.Attoparsec.Interpreter ( interpreterArgsParser )
 import qualified Data.Attoparsec.Text as P
 import           Data.Text ( pack )
 import           Prelude ( head )
+import           Stack.Constants ( stackProgName )
 import           Stack.Prelude
 import           Test.Hspec ( Spec, describe, it )
 

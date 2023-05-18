@@ -26,7 +26,7 @@ homepage: http://haskellstack.org
 custom-setup:
   dependencies:
   - base >= 4.14.3.0 && < 5
-  - Cabal
+  - Cabal < 3.10
   - filepath
 extra-source-files:
 # note: leaving out 'package.yaml' because it causes confusion with hackage metadata revisions
@@ -58,7 +58,7 @@ dependencies:
 - Cabal >= 3.8.1.0
 - aeson >= 2.0.3.0
 - annotated-wl-pprint
-- ansi-terminal
+- ansi-terminal >= 1.0
 - array
 - async
 - attoparsec
@@ -125,7 +125,6 @@ dependencies:
 - streaming-commons
 - tar
 - template-haskell
-- temporary
 - text
 - text-metrics
 - th-reify-many

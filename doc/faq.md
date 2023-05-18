@@ -9,7 +9,7 @@ here is to be as helpful and concise as possible.
 ## What version of GHC is used when I run something like `stack ghci`?
 
 The version of GHC, as well as which packages can be installed, are specified by
-the _resolver_. This may be something like `lts-19.19`, which is from
+the _resolver_. This may be something like `lts-20.19`, which is from
 [Stackage](https://www.stackage.org/). The [user's guide](GUIDE.md) discusses
 the resolver in more detail.
 
@@ -76,11 +76,11 @@ You can make tweaks to a snapshot by modifying the `extra-deps` configuration
 value in your `stack.yaml` file, e.g.:
 
 ~~~yaml
-resolver: lts-19.19
+resolver: lts-20.19
 packages:
-- '.'
+- .
 extra-deps:
-- text-2.0.1
+- text-2.0.2
 ~~~
 
 ## I need to use a package (or version of a package) that is not available on Hackage, what should I do?
@@ -91,9 +91,9 @@ Add it to the
 directory where your `stack.yaml` file lives, e.g.
 
 ~~~yaml
-resolver: lts-19.19
+resolver: lts-20.19
 packages:
-- '.'
+- .
 extra-deps:
 - third-party/proprietary-dep
 - github-version-of/conduit

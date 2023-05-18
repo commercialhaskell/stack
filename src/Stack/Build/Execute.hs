@@ -113,7 +113,7 @@ import           Stack.Constants
                    , relDirSetupExeCache, relDirSetupExeSrc, relFileBuildLock
                    , relFileConfigure, relFileSetupHs, relFileSetupLhs
                    , relFileSetupLower, relFileSetupMacrosH, setupGhciShimCode
-                   , testGhcEnvRelFile
+                   , stackProgName, testGhcEnvRelFile
                    )
 import           Stack.Constants.Config
                    ( distDirFromDir, distRelativeDir, hpcDirFromDir

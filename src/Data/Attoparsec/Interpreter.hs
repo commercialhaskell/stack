@@ -61,6 +61,7 @@ import           Conduit ( decodeUtf8C, withSourceFile )
 import           Data.Conduit.Attoparsec ( ParseError (..), Position (..), sinkParserEither )
 import           Data.List ( intercalate )
 import           Data.Text ( pack )
+import           Stack.Constants ( stackProgName )
 import           Stack.Prelude
 import           System.FilePath ( takeExtension )
 import           System.IO ( hPutStrLn )

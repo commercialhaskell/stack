@@ -24,7 +24,8 @@ module Stack.Constants.Config
   ) where
 
 import           Path ( (</>), mkRelDir, mkRelFile, parseRelDir )
-import           Stack.Constants ( cabalPackageName )
+import           Stack.Constants
+                   ( cabalPackageName, relDirDist, relDirGhci, relDirHpc )
 import           Stack.Prelude
 import           Stack.Types.BuildConfig ( HasBuildConfig, projectRootL )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
@@ -44,7 +45,7 @@ ghciDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)
 ghciDirL = to $ \env -> -- FIXME is this idiomatic lens code?
   let workDir = view workDirL env
       root = view projectRootL env
-  in  root </> workDir </> $(mkRelDir "ghci/")
+  in  root </> workDir </> relDirGhci
 
 -- | The directory containing the files used for dirtiness check of source files.
 buildCachesDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -112,7 +113,7 @@ hpcDirFromDir fp =
 hpcRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                => m (Path Rel Dir)
 hpcRelativeDir =
-  fmap (</> $(mkRelDir "hpc")) distRelativeDir
+  fmap (</> relDirHpc) distRelativeDir
 
 -- | Package's setup-config storing Cabal configuration
 setupConfigFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
@@ -145,7 +146,7 @@ rootDistRelativeDir ::
   => m (Path Rel Dir)
 rootDistRelativeDir = do
     workDir <- view workDirL
-    pure $ workDir </> $(mkRelDir "dist")
+    pure $ workDir </> relDirDist
 
 -- | Package's working directory.
 workDirFromDir :: (MonadReader env m, HasConfig env)

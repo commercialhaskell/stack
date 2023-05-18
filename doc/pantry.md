@@ -147,6 +147,9 @@ Optionally, you can specify also the Pantry tree information. For example:
     sha256: 614bc0cca76937507ea0a5ccc17a504c997ce458d7f2f9e43b15a10c8eaeb033
 ~~~
 
+A Pantry tree is a list of CAS (content-addressable storage)
+'SHA256 hash'-'size in bytes' keys for each of the files in a package.
+
 The SHA256 hash of the contents of the Cabal file and its size in bytes is
 provided in Stack's lock file. For further information, see the
 [lock files](lock_files.md) documentation. The SHA256 hash and file size

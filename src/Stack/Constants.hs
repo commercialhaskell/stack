@@ -10,6 +10,8 @@ module Stack.Constants
   , buildPlanCacheDir
   , haskellFileExts
   , haskellDefaultPreprocessorExts
+  , stackProgName
+  , stackProgName'
   , stackDotYaml
   , stackWorkEnvVar
   , stackRootEnvVar
@@ -44,6 +46,8 @@ module Stack.Constants
   , relFileCabalMacrosH
   , relDirBuild
   , relDirBin
+  , relDirGhci
+  , relDirGhciScript
   , relDirPantry
   , relDirPrograms
   , relDirUpperPrograms
@@ -88,7 +92,6 @@ module Stack.Constants
   , relDirAll
   , relFilePackageCache
   , relFileDockerfile
-  , relDirHaskellStackGhci
   , relFileGhciScript
   , relDirCombined
   , relFileHpcIndexHtml
@@ -134,10 +137,12 @@ import           Data.ByteString.Builder ( byteString )
 import           Data.Char ( toUpper )
 import           Data.FileEmbed ( embedFile, makeRelativeToProject )
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import           Distribution.Package ( mkPackageName )
 import           Hpack.Config ( packageConfig )
 import qualified Language.Haskell.TH.Syntax as TH ( runIO, lift )
 import           Path ( (</>), mkRelDir, mkRelFile, parseAbsFile )
+import           Stack.Constants.StackProgName ( stackProgName )
 import           Stack.Constants.UsrLibDirs ( usrLibDirs )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( WhichCompiler (..) )
@@ -153,6 +158,10 @@ data ConstantsException
 instance Exception ConstantsException where
   displayException WiredInPackagesNotParsedBug = bugReport "[S-6057]"
     "Parse error in wiredInPackages."
+
+-- | Name of the Stack program.
+stackProgName' :: Text
+stackProgName' = T.pack stackProgName
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
@@ -357,6 +366,12 @@ relDirBuild = $(mkRelDir "build")
 relDirBin :: Path Rel Dir
 relDirBin = $(mkRelDir "bin")
 
+relDirGhci :: Path Rel Dir
+relDirGhci = $(mkRelDir "ghci")
+
+relDirGhciScript :: Path Rel Dir
+relDirGhciScript = $(mkRelDir "ghci-script")
+
 relDirPantry :: Path Rel Dir
 relDirPantry = $(mkRelDir "pantry")
 
@@ -492,9 +507,6 @@ relFilePackageCache = $(mkRelFile "package.cache")
 
 relFileDockerfile :: Path Rel File
 relFileDockerfile = $(mkRelFile "Dockerfile")
-
-relDirHaskellStackGhci :: Path Rel Dir
-relDirHaskellStackGhci = $(mkRelDir "haskell-stack-ghci")
 
 relFileGhciScript :: Path Rel File
 relFileGhciScript = $(mkRelFile "ghci-script")

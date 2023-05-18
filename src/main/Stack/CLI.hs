@@ -6,6 +6,7 @@ module Stack.CLI
 
 import           BuildInfo ( hpackVersion, versionString' )
 import           Data.Attoparsec.Interpreter ( getInterpreterArgs )
+import           Data.Char ( toLower )
 import qualified Data.List as L
 import           Options.Applicative
                    ( Parser, ParserFailure, ParserHelp, ParserResult (..), flag
@@ -21,7 +22,7 @@ import           RIO.Process ( withProcessContextNoLogging )
 import           Stack.Build ( buildCmd )
 import           Stack.Clean ( CleanCommand (..), cleanCmd )
 import           Stack.ConfigCmd as ConfigCmd
-import           Stack.Constants ( globalFooter )
+import           Stack.Constants ( globalFooter, osIsWindows, stackProgName )
 import           Stack.Coverage ( hpcReportCmd )
 import           Stack.Docker
                    ( dockerCmdName, dockerHelpOptName, dockerPullCmdName )
@@ -483,7 +484,14 @@ commandLineHandler currentDir progName isInterpreter =
     upgradeCmd
     "Warning: if you use GHCup to install Stack, use only GHCup to \
     \upgrade Stack."
-    upgradeOptsParser
+    (upgradeOptsParser onlyLocalBins)
+   where
+    onlyLocalBins =
+         (lowercase progName /= lowercase stackProgName)
+      && not ( osIsWindows
+             && lowercase progName == lowercase (stackProgName <> ".EXE")
+             )
+    lowercase = map toLower
 
   upload = addCommand'
     "upload"
