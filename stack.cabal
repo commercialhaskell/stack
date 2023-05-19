@@ -5,7 +5,7 @@ cabal-version: 2.0
 -- see: https://github.com/sol/hpack
 
 name:           stack
-version:        2.11.1
+version:        2.11.2
 synopsis:       The Haskell Tool Stack
 description:    Please see the documentation at <https://docs.haskellstack.org>
                 for usage information.
@@ -109,7 +109,7 @@ source-repository head
 
 custom-setup
   setup-depends:
-      Cabal
+      Cabal <3.10
     , base >=4.14.3.0 && <5
     , filepath
 
