@@ -1,8 +1,22 @@
 # Changelog
 
-## v2.11.1 - 2023-05-18
+## Unreleased changes
+
+Release notes:
 
 **Changes since v2.11.1:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+## v2.11.1 - 2023-05-18
+
+**Changes since v2.9.3:**
 
 Behavior changes:
 
