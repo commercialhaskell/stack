@@ -240,6 +240,32 @@ GitHub repository.
 
 === "macOS"
 
+    macOS does not come with all the tools required for software development 
+    but a collection of useful tools, known as the Xcode Command Line Tools,
+    is readily available. That collection is provided with Xcode (Apple’s 
+    integrated development environment) and can also be obtained from Apple 
+    separately from Xcode. The collection also includes the macOS SDK (software 
+    development kit). The macOS SDK provides header files for macOS APIs.
+
+    If you use a command that refers to a common Xcode Command Line Tool and
+    the Xcode Command Line Tools are not installed, macOS may prompt you to 
+    install the Xcode Command Line Tools.
+
+    macOS also comes with a command line tool, `xcode-select`, that can be used
+    to obtain the Xcode Command Line Tools. Command `xcode-select --print-path`
+    to print the path to the currently selected (active) developer directory. If 
+    the directory does not exist, or is empty, then the Xcode Command Line Tools
+    are not installed.
+
+    If the Xcode Command Line Tools are not installed, command 
+    `xcode-select --install` to open a user interface dialog to request automatic 
+    installation of the tools.
+
+    An upgrade of macOS may sometimes require the existing Xcode Command Line Tools 
+    to be uninstalled and an updated version of the tools to be installed. The 
+    existing tools can be uninstalled by deleting the directory reported by 
+    `xcode-select --print-path`.
+    
     From late 2020, Apple began a transition from Mac computers with Intel
     processors (Intel-based Mac) to
     [Mac computers with Apple silicon](https://support.apple.com/en-gb/HT211814).
