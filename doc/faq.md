@@ -238,12 +238,6 @@ with the various requirements (version, architecture) that your project needs.
 See issue [#420](https://github.com/commercialhaskell/stack/issues/420) for a
 detailed discussion of Stack's behavior when `system-ghc` is enabled.
 
-## How do I upgrade to GHC 7.10.2 with stack?
-
-If you already have a prior version of GHC use
-`stack --resolver ghc-7.10 setup --reinstall`.
-If you don't have any GHC installed, you can skip the `--reinstall`.
-
 ## How do I get extra build tools?
 
 Stack will automatically install build tools required by your packages or their
@@ -534,14 +528,6 @@ workarounds:
     [#1161](https://github.com/commercialhaskell/stack/issues/1161#issuecomment-186690904)).
 
 ## <a name="usr-bin-ar-permission-denied"></a>Why do I get a `/usr/bin/ar: permission denied` error?
-
-If you are on OS X 10.11 ("El Capitan") or later, GHC 7.8.4 is incompatible with
-System Integrity Protection (a.k.a. "rootless") (see issue
-[#563](https://github.com/commercialhaskell/stack/issues/563)). GHC 7.10.2
-includes a fix, so this only affects users of GHC 7.8.4. If you cannot upgrade
-to GHC 7.10.2, you can work around it by
-[disabling System Integrity Protection](http://osxdaily.com/2015/10/05/disable-rootless-system-integrity-protection-mac-os-x/).
-**WARNING: Disabling SIP will severely reduce the security of your system, so only do this if absolutely necessary!**
 
 ## Why is the `--` argument separator ignored in Windows PowerShell
 
