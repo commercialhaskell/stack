@@ -320,15 +320,18 @@ commandLineHandler currentDir progName isInterpreter =
             )
           exeFlag = switch
             (  long "exes"
-            <> help "Include executables."
+            <> help "List exes (list with --tests and --benchmarks). \
+                    \The default is to list every target but you can use \
+                    \--exes with --tests and --benchmarks to limit the \
+                    \output to 1, 2 or 3 of these component types."
             )
           testFlag = switch
             (  long "tests"
-            <> help "Include test suites."
+            <> help "List tests (list with --exes and --benchmarks)."
             )
           benchFlag = switch
             (  long "benchmarks"
-            <> help "Include benchmarks."
+            <> help "List benchmarks (list with --exes and --tests)."
             )
        in  do
              addCommand'
@@ -340,7 +343,7 @@ commandLineHandler currentDir progName isInterpreter =
                "targets"
                "List all available Stack targets."
                ideTargetsCmd
-               ((,) <$> outputFlag <*> ((,,) <$> exeFlag <*> testFlag <*> benchFlag))
+               ((,) <$> ((,,) <$> exeFlag <*> testFlag <*> benchFlag) <*> outputFlag)
     )
 
   init = addCommand'

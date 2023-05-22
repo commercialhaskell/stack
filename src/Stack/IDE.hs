@@ -26,6 +26,7 @@ import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap
                    ( ProjectPackage (..), SMWanted (..), ppComponentsMaybe )
 import           System.IO ( putStrLn )
+import Data.Tuple (swap)
 
 -- Type representing output channel choices for the @stack ide packages@ and
 -- @stack ide targets@ commands.
@@ -65,8 +66,8 @@ compTypes (False, True, True) = \x -> isCTest x || isCBench x
 
 -- | Function underlying the @stack ide targets@ command. List targets in the
 -- project.
-ideTargetsCmd :: (OutputStream, (Bool, Bool, Bool))  -> RIO Runner ()
-ideTargetsCmd = withConfig NoReexec . withBuildConfig . uncurry listTargets . fmap compTypes
+ideTargetsCmd :: ((Bool, Bool, Bool), OutputStream)  -> RIO Runner ()
+ideTargetsCmd = withConfig NoReexec . withBuildConfig . uncurry listTargets . fmap compTypes . swap
 
 outputFunc :: HasTerm env => OutputStream -> String -> RIO env ()
 outputFunc OutputLogInfo = prettyInfo . fromString
