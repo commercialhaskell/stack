@@ -5,6 +5,7 @@
 module Stack.IDE
   ( OutputStream (..)
   , ListPackagesCmd (..)
+  , CompTypeCmd (..)
   , idePackagesCmd
   , ideTargetsCmd
   , listPackages
@@ -20,10 +21,10 @@ import           Stack.Runners
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent, renderPkgComponent )
+                   ( NamedComponent, renderPkgComponent, isCExe, isCTest, isCBench )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap
-                   ( ProjectPackage (..), SMWanted (..), ppComponents )
+                   ( ProjectPackage (..), SMWanted (..), ppComponentsMaybe )
 import           System.IO ( putStrLn )
 
 -- Type representing output channel choices for the @stack ide packages@ and
@@ -41,16 +42,31 @@ data ListPackagesCmd
   | ListPackageCabalFiles
     -- ^ Paths to Cabal files.
 
+-- Type representing output choices for the @stack ide packages@ command.
+data CompTypeCmd
+  = CompTypeTest
+  | CompTypeBench
+
 -- | Function underlying the @stack ide packages@ command. List packages in the
 -- project.
 idePackagesCmd :: (OutputStream, ListPackagesCmd) -> RIO Runner ()
 idePackagesCmd =
   withConfig NoReexec . withBuildConfig . uncurry listPackages
 
+compTypes :: (Bool, Bool, Bool) -> NamedComponent -> Bool
+compTypes (False, False, False) = const True
+compTypes (True, False, False) = isCExe
+compTypes (False, True, False) = isCTest
+compTypes (False, False, True) = isCBench
+compTypes (True, True, False) = \x -> isCExe x || isCTest x
+compTypes (True, False, True) = \x -> isCExe x || isCBench x
+compTypes (True, True, True) = \x -> isCExe x || isCTest x || isCBench x
+compTypes (False, True, True) = \x -> isCTest x || isCBench x
+
 -- | Function underlying the @stack ide targets@ command. List targets in the
 -- project.
-ideTargetsCmd :: OutputStream -> RIO Runner ()
-ideTargetsCmd = withConfig NoReexec . withBuildConfig . listTargets
+ideTargetsCmd :: (OutputStream, (Bool, Bool, Bool))  -> RIO Runner ()
+ideTargetsCmd = withConfig NoReexec . withBuildConfig . uncurry listTargets . fmap compTypes
 
 outputFunc :: HasTerm env => OutputStream -> String -> RIO env ()
 outputFunc OutputLogInfo = prettyInfo . fromString
@@ -72,8 +88,8 @@ listPackages stream flag = do
   mapM_ (outputFunc stream) strs
 
 -- | List the targets in the current project.
-listTargets :: forall env. HasBuildConfig env => OutputStream -> RIO env ()
-listTargets stream = do
+listTargets :: forall env. HasBuildConfig env => OutputStream -> (NamedComponent -> Bool) -> RIO env ()
+listTargets stream isCompType = do
   packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   pairs <- concat <$> Map.traverseWithKey toNameAndComponent packages
   outputFunc stream $ T.unpack $ T.intercalate "\n" $
@@ -84,4 +100,5 @@ listTargets stream = do
     -> ProjectPackage
     -> RIO env [(PackageName, NamedComponent)]
   toNameAndComponent pkgName' =
-    fmap (map (pkgName', ) . Set.toList) . ppComponents
+    fmap (map (pkgName', ) . Set.toList) . ppComponentsMaybe (\x ->
+      if isCompType x then Just x else Nothing)

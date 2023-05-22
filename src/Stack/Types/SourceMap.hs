@@ -16,6 +16,7 @@ module Stack.Types.SourceMap
   , DepPackage (..)
   , ProjectPackage (..)
   , ppComponents
+  , ppComponentsMaybe
   , ppGPD
   , ppRoot
   , ppVersion
@@ -174,19 +175,22 @@ ppRoot = parent . ppCabalFP
 
 -- | All components available in the given 'ProjectPackage'
 ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
-ppComponents pp = do
+ppComponents = ppComponentsMaybe Just
+
+ppComponentsMaybe :: MonadIO m => (NamedComponent -> Maybe NamedComponent) -> ProjectPackage -> m (Set NamedComponent)
+ppComponentsMaybe compType pp = do
   gpd <- ppGPD pp
   pure $ Set.fromList $ concat
-    [ maybe []  (const [CLib]) (C.condLibrary gpd)
-    , go CExe   (fst <$> C.condExecutables gpd)
-    , go CTest  (fst <$> C.condTestSuites gpd)
-    , go CBench (fst <$> C.condBenchmarks gpd)
+    [ maybe [] (const $ catMaybes [compType CLib]) (C.condLibrary gpd)
+    , go (compType . CExe)   (fst <$> C.condExecutables gpd)
+    , go (compType . CTest)  (fst <$> C.condTestSuites gpd)
+    , go (compType . CBench) (fst <$> C.condBenchmarks gpd)
     ]
  where
-  go :: (T.Text -> NamedComponent)
+  go :: (T.Text -> Maybe NamedComponent)
      -> [C.UnqualComponentName]
      -> [NamedComponent]
-  go wrapper = map (wrapper . T.pack . C.unUnqualComponentName)
+  go wrapper = mapMaybe (wrapper . T.pack . C.unUnqualComponentName)
 
 -- | Version for the given 'ProjectPackage
 ppVersion :: MonadIO m => ProjectPackage -> m Version
