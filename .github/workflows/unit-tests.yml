@@ -9,7 +9,7 @@ on:
     - rc/**
   workflow_dispatch:
 
-# As of 5 May 2023, ubuntu-latest, windows-latest and macos-latest come
+# As of 22 May 2023, ubuntu-latest, windows-latest and macos-latest come
 # with Stack 2.9.3 and GHC 9.6.1.
 
 jobs:
@@ -28,9 +28,10 @@ jobs:
           ${{ runner.os }}-
     - name: Pedantic build
       run: |
-        # Stack 2.9.3 is required to build Stack
-        stack upgrade
         stack build --pedantic
+    - name: disable-git-info build
+      run: |
+        stack build --pedantic --flag stack:disable-git-info
   unit-tests:
     name: Unit tests
     runs-on: ${{ matrix.os }}

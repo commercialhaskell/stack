@@ -14,6 +14,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Restore building of Stack with Cabal flag `disable-git-info` (broken with
+  Stack 2.11.1).
+
 ## v2.11.1 - 2023-05-18
 
 **Changes since v2.9.3:**
