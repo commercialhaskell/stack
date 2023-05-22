@@ -5,7 +5,6 @@
 module Stack.IDE
   ( OutputStream (..)
   , ListPackagesCmd (..)
-  , CompTypeCmd (..)
   , idePackagesCmd
   , ideTargetsCmd
   , listPackages
@@ -42,11 +41,6 @@ data ListPackagesCmd
     -- ^ Package names.
   | ListPackageCabalFiles
     -- ^ Paths to Cabal files.
-
--- Type representing output choices for the @stack ide packages@ command.
-data CompTypeCmd
-  = CompTypeTest
-  | CompTypeBench
 
 -- | Function underlying the @stack ide packages@ command. List packages in the
 -- project.
