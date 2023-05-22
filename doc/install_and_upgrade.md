@@ -240,6 +240,10 @@ GitHub repository.
 
 === "macOS"
 
+    Most users of Stack on macOS will also have up to date tools for software
+    development (see [Xcode Command Line Tools](#xcode-command-line-tools)
+    below).
+
     From late 2020, Apple began a transition from Mac computers with Intel
     processors (Intel-based Mac) to
     [Mac computers with Apple silicon](https://support.apple.com/en-gb/HT211814).
@@ -373,33 +377,49 @@ GitHub repository.
       will take hours), see
       [their FAQ on the topic](https://github.com/Homebrew/brew/blob/master/docs/FAQ.md#why-do-you-compile-everything).
 
-    ### Notes
+    ### Xcode Command Line Tools
 
-    After installation, running `stack setup` might fail with
-    `configure: error: cannot run C compiled programs.` in which case you should
-    command:
+    macOS does not come with all the tools required for software development but
+    a collection of useful tools, known as the Xcode Command Line Tools, is
+    readily available. A version of that collection is provided with each
+    version of Xcode (Apple’s integrated development environment) and can also
+    be obtained from Apple separately from Xcode. The collection also includes
+    the macOS SDK (software development kit). The macOS SDK provides header
+    files for macOS APIs.
 
-    ~~~text
-    xcode-select --install
-    ~~~
+    If you use a command that refers to a common Xcode Command Line Tool and
+    the Xcode Command Line Tools are not installed, macOS may prompt you to
+    install the tools.
 
-    Starting with macOs 10.14 (Mojave) running `xcode-select --install`
-    [might not be enough](https://forums.developer.apple.com/thread/104296). You
-    will need to install additional headers with commands:
+    macOS also comes with a command line tool, `xcode-select`, that can be used
+    to obtain the Xcode Command Line Tools. Command `xcode-select --print-path`
+    to print the path to the currently selected (active) developer directory. If
+    the directory does not exist, or is empty, then the Xcode Command Line Tools
+    are not installed.
 
-    ~~~text
-    cd /Library/Developer/CommandLineTools/Packages/
-    open macOS_SDK_headers_for_macOS_10.14.pkg
-    ~~~
+    If the Xcode Command Line Tools are not installed, command
+    `xcode-select --install` to open a user interface dialog to request
+    automatic installation of the tools.
 
-    If you are on OS X 10.11 (El Capitan) and encounter either of these problems,
-    see the linked FAQ entries:
+    An upgrade of macOS may sometimes require the existing Xcode Command Line
+    Tools to be uninstalled and an updated version of the tools to be installed.
+    The existing tools can be uninstalled by deleting the directory reported by
+    `xcode-select --print-path`.
 
-    * [GHC 7.8.4 fails with `/usr/bin/ar: permission denied`](faq.md#usr-bin-ar-permission-denied)
-    * [DYLD_LIBRARY_PATH is ignored](faq.md#dyld-library-path-ignored)
+    If, after the installation of Stack, running `stack setup` fails with
+    `configure: error: cannot run C compiled programs.` that indicates that the
+    Xcode Command Line Tools are not installed.
 
-    If you are on macOS 10.12 (Sierra) and encounter GHC panic while building,
-    see this [issue](https://github.com/commercialhaskell/stack/issues/2577).
+    If building fails with messages that `*.h` files are not found, that may
+    also indicate that Xcode Command Line Tools are not up to date.
+
+    Xcode 10 provided an SDK for macOS 10.14 (Mojave) and
+    [changed the location](https://developer.apple.com/documentation/xcode-release-notes/xcode-10-release-notes#Command-Line-Tools)
+    of the macOS system headers. As a workaround, an extra package was provided
+    by Apple which installed the headers to the base system under
+    `/usr/include`.
+
+    ### Auto-completion of Stack commands
 
     It is possible to set up auto-completion of Stack commands. For further
     information, see the [shell auto-completion](shell_autocompletion.md)
