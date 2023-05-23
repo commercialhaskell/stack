@@ -19,8 +19,8 @@ module Stack.ComponentFile
   ) where
 
 import           Control.Exception ( throw )
+import           Data.Foldable ( foldrM )
 import           Data.List ( find, isPrefixOf )
-import           Data.Foldable (foldrM)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -165,13 +165,25 @@ resolveFilesAndDeps ::
   -> [DotCabalDescriptor] -- ^ Base names.
   -> RIO
        GetPackageFileContext
-       (Map ModuleName (Path Abs File),[DotCabalPath],[PackageWarning])
+       (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
 resolveFilesAndDeps component dirs names0 = do
   (dotCabalPaths, foundModules, missingModules, _) <- loop names0 S.empty M.empty
   warnings <-
     liftM2 (++) (warnUnlisted foundModules) (warnMissing missingModules)
   pure (foundModules, dotCabalPaths, warnings)
  where
+  loop ::
+       [DotCabalDescriptor]
+    -> Set ModuleName
+    -> Map FilePath (Path Abs File)
+       -- ^ Known file usages, where the file path has already been resolved.
+    -> RIO
+         GetPackageFileContext
+         ( [DotCabalPath]
+         , Map ModuleName (Path Abs File)
+         , [ModuleName]
+         , Map k a
+         )
   loop [] _ _ = pure ([], M.empty, [], M.empty)
   loop names doneModules0 knownUsages = do
     resolved <- resolveFiles dirs names
@@ -194,9 +206,7 @@ resolveFilesAndDeps component dirs names0 = do
       loop (map DotCabalModule (S.toList modulesRemaining)) doneModules foundUsages
     pure
       ( nubOrd $ foundFiles <> map DotCabalFilePath thDepFiles <> resolvedFiles
-      , M.union
-            (M.fromList foundModules)
-            resolvedModules
+      , M.union (M.fromList foundModules) resolvedModules
       , missingModules
       , foundUsages'
       )
@@ -244,6 +254,7 @@ resolveFilesAndDeps component dirs names0 = do
 -- | Get the dependencies of a Haskell module file.
 getDependencies ::
      Map FilePath (Path Abs File)
+     -- ^ Known file usages, where the file path has already been resolved.
   -> NamedComponent
   -> [Path Abs Dir]
   -> DotCabalPath
@@ -271,10 +282,13 @@ getDependencies knownUsages component dirs dotCabalPath =
           then parseHI knownUsages hiPath
           else pure (S.empty, M.empty)
 
--- | Parse a .hi file into a set of modules and files.
+-- | Parse a .hi file into a set of modules and files (a map from a given path
+-- to a file to the resolved absolute path to the file).
 parseHI ::
      Map FilePath (Path Abs File)
+     -- ^ Known file usages, where the file path has already been resolved.
   -> FilePath
+     -- ^ The path to the *.hi file to be parsed
   -> RIO GetPackageFileContext (Set ModuleName, Map FilePath (Path Abs File))
 parseHI knownUsages hiPath = do
   dir <- asks (parent . ctxFile)
@@ -302,11 +316,11 @@ parseHI knownUsages hiPath = do
                 resolved <- forgivingResolveFile dir file >>= rejectMissingFile
                 when (isNothing resolved) $
                   prettyWarnL
-                  [ flow "Dependent file listed in:"
-                  , style File $ fromString hiPath
-                  , flow "does not exist:"
-                  , style File $ fromString file
-                  ]
+                    [ flow "Dependent file listed in:"
+                    , style File $ fromString hiPath
+                    , flow "does not exist:"
+                    , style File $ fromString file
+                    ]
                 pure $ (file,) <$> resolved
           resolveUsages = traverse
             (resolveFileDependency . Iface.unUsage) . Iface.unList . Iface.usage
