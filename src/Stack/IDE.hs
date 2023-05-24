@@ -50,13 +50,7 @@ idePackagesCmd =
 
 compTypes :: (Bool, Bool, Bool) -> NamedComponent -> Bool
 compTypes (False, False, False) = const True
-compTypes (True, False, False) = isCExe
-compTypes (False, True, False) = isCTest
-compTypes (False, False, True) = isCBench
-compTypes (True, True, False) = \x -> isCExe x || isCTest x
-compTypes (True, False, True) = \x -> isCExe x || isCBench x
-compTypes (True, True, True) = \x -> isCExe x || isCTest x || isCBench x
-compTypes (False, True, True) = \x -> isCTest x || isCBench x
+compTypes (exe, test, bench) = \x -> (exe && isCExe x) || (test && isCTest x) || (bench && isCBench x)
 
 -- | Function underlying the @stack ide targets@ command. List targets in the
 -- project.
