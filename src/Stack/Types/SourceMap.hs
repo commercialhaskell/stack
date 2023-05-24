@@ -177,19 +177,24 @@ ppRoot = parent . ppCabalFP
 ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
 ppComponents = ppComponentsMaybe Just
 
-ppComponentsMaybe :: MonadIO m => (NamedComponent -> Maybe NamedComponent) -> ProjectPackage -> m (Set NamedComponent)
+ppComponentsMaybe ::
+     MonadIO m
+  => (NamedComponent -> Maybe NamedComponent)
+  -> ProjectPackage
+  -> m (Set NamedComponent)
 ppComponentsMaybe compType pp = do
   gpd <- ppGPD pp
   pure $ Set.fromList $ concat
     [ maybe [] (const $ catMaybes [compType CLib]) (C.condLibrary gpd)
-    , go (compType . CExe)   (fst <$> C.condExecutables gpd)
-    , go (compType . CTest)  (fst <$> C.condTestSuites gpd)
+    , go (compType . CExe) (fst <$> C.condExecutables gpd)
+    , go (compType . CTest) (fst <$> C.condTestSuites gpd)
     , go (compType . CBench) (fst <$> C.condBenchmarks gpd)
     ]
  where
-  go :: (T.Text -> Maybe NamedComponent)
-     -> [C.UnqualComponentName]
-     -> [NamedComponent]
+  go ::
+       (T.Text -> Maybe NamedComponent)
+    -> [C.UnqualComponentName]
+    -> [NamedComponent]
   go wrapper = mapMaybe (wrapper . T.pack . C.unUnqualComponentName)
 
 -- | Version for the given 'ProjectPackage

@@ -320,11 +320,11 @@ commandLineHandler currentDir progName isInterpreter =
             )
           exeFlag = switch
             (  long "exes"
-            <> help "Include exes."
+            <> help "Include executables."
             )
           testFlag = switch
             (  long "tests"
-            <> help "Include tests."
+            <> help "Include test suites."
             )
           benchFlag = switch
             (  long "benchmarks"
@@ -340,7 +340,10 @@ commandLineHandler currentDir progName isInterpreter =
                "targets"
                "List all targets or pick component types to list."
                ideTargetsCmd
-               ((,) <$> ((,,) <$> exeFlag <*> testFlag <*> benchFlag) <*> outputFlag)
+                 (   (,)
+                 <$> ((,,) <$> exeFlag <*> testFlag <*> benchFlag)
+                 <*> outputFlag
+                 )
     )
 
   init = addCommand'

@@ -32,10 +32,12 @@ By default:
 ## The `stack ide targets` command
 
 ~~~text
-stack ide targets [--stdout]
+stack ide targets [--exes] [--tests] [--benchmarks] [--stdout]
 ~~~
 
-`stack ide targets` lists all available Stack targets.
+`stack ide targets` lists all available Stack targets. Alternatively, pass one
+or more of the flags `--exes`, `--tests` and `--benchmarks` to list only targets
+of those component types.
 
 By default, its output is sent to the standard error channel. Pass the flag
 `--stdout` to change to the standard output channel.
@@ -54,4 +56,17 @@ stack:lib
 stack:exe:stack
 stack:exe:stack-integration-test
 stack:test:stack-test
+~~~
+
+or command:
+
+~~~text
+stack ide targets --exes
+~~~
+
+and the output is:
+
+~~~text
+stack:exe:stack
+stack:exe:stack-integration-test
 ~~~
