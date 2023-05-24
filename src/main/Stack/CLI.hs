@@ -338,7 +338,7 @@ commandLineHandler currentDir progName isInterpreter =
                ((,) <$> outputFlag <*> cabalFileFlag)
              addCommand'
                "targets"
-               "List targets, all of them (by default) or only some component types."
+               "List all targets or pick component types to list."
                ideTargetsCmd
                ((,) <$> ((,,) <$> exeFlag <*> testFlag <*> benchFlag) <*> outputFlag)
     )
