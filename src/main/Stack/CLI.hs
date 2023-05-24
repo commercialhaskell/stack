@@ -9,7 +9,7 @@ import           Data.Attoparsec.Interpreter ( getInterpreterArgs )
 import           Data.Char ( toLower )
 import qualified Data.List as L
 import           Options.Applicative
-                   ( Parser, ParserFailure, ParserHelp, ParserResult (..), flag
+                   ( Parser, ParserFailure, ParserHelp, ParserResult (..), flag, switch
                    , handleParseResult, help, helpError, idm, long, metavar
                    , overFailure, renderFailure, strArgument, switch )
 import           Options.Applicative.Help ( errorHelp, stringChunk, vcatChunks )
@@ -318,6 +318,18 @@ commandLineHandler currentDir progName isInterpreter =
             <> help "Print paths to package Cabal files instead of package \
                     \names."
             )
+          exeFlag = switch
+            (  long "exes"
+            <> help "Include exes."
+            )
+          testFlag = switch
+            (  long "tests"
+            <> help "Include tests."
+            )
+          benchFlag = switch
+            (  long "benchmarks"
+            <> help "Include benchmarks."
+            )
        in  do
              addCommand'
                "packages"
@@ -326,9 +338,9 @@ commandLineHandler currentDir progName isInterpreter =
                ((,) <$> outputFlag <*> cabalFileFlag)
              addCommand'
                "targets"
-               "List all available Stack targets."
+               "List all targets or pick component types to list."
                ideTargetsCmd
-               outputFlag
+               ((,) <$> ((,,) <$> exeFlag <*> testFlag <*> benchFlag) <*> outputFlag)
     )
 
   init = addCommand'
