@@ -144,8 +144,14 @@ supported syntaxes for targets are:
 
 `stack build` with no targets specified will build all local packages.
 
-Command `stack ide targets` to get a list of the available targets in your
-project.
+## Listing targets
+
+`stack ide targets` lists every available target in your project.
+
+With one or more component type flags this listing can be restricted.
+
+`stack ide targets --exes` lists only exe targets.
+`stack ide targets --tests --benchmarks` lists test and benchmark targets.
 
 ## Controlling what gets built
 
