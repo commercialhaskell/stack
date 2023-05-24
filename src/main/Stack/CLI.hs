@@ -320,15 +320,15 @@ commandLineHandler currentDir progName isInterpreter =
             )
           exeFlag = switch
             (  long "exes"
-            <> help "Restriction includes exes."
+            <> help "Include exes."
             )
           testFlag = switch
             (  long "tests"
-            <> help "Restriction includes tests."
+            <> help "Include tests."
             )
           benchFlag = switch
             (  long "benchmarks"
-            <> help "Restriction includes benchmarks."
+            <> help "Include benchmarks."
             )
        in  do
              addCommand'
@@ -338,7 +338,7 @@ commandLineHandler currentDir progName isInterpreter =
                ((,) <$> outputFlag <*> cabalFileFlag)
              addCommand'
                "targets"
-               "List every target. Restrict to runnable targets with component type flags."
+               "List targets, all of them (by default) or only some component types."
                ideTargetsCmd
                ((,) <$> ((,,) <$> exeFlag <*> testFlag <*> benchFlag) <*> outputFlag)
     )
