@@ -320,18 +320,15 @@ commandLineHandler currentDir progName isInterpreter =
             )
           exeFlag = switch
             (  long "exes"
-            <> help "List exes (list with --tests and --benchmarks). \
-                    \The default is to list every target but you can use \
-                    \--exes with --tests and --benchmarks to limit the \
-                    \output to 1, 2 or 3 of these component types."
+            <> help "Restriction includes exes."
             )
           testFlag = switch
             (  long "tests"
-            <> help "List tests (list with --exes and --benchmarks)."
+            <> help "Restriction includes tests."
             )
           benchFlag = switch
             (  long "benchmarks"
-            <> help "List benchmarks (list with --exes and --tests)."
+            <> help "Restriction includes benchmarks."
             )
        in  do
              addCommand'
@@ -341,7 +338,7 @@ commandLineHandler currentDir progName isInterpreter =
                ((,) <$> outputFlag <*> cabalFileFlag)
              addCommand'
                "targets"
-               "List all available Stack targets."
+               "List every target. Restrict to runnable targets with component type flags."
                ideTargetsCmd
                ((,) <$> ((,,) <$> exeFlag <*> testFlag <*> benchFlag) <*> outputFlag)
     )
