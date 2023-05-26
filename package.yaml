@@ -42,6 +42,9 @@ extra-source-files:
 - test/package-dump/ghc-head.txt
 - src/test/Stack/Untar/test1.tar.gz
 - src/test/Stack/Untar/test2.tar.gz
+# Support for people who prefer, or need, to build Stack with Cabal (the tool):
+- cabal.project
+- cabal.config
 # GHC's GHC2021 language extension is supported by GHC >= 9.2.1
 language: GHC2021
 ghc-options:
