@@ -18,16 +18,13 @@ module Options.Applicative.Complicated
 import           Control.Monad.Trans.Except ( runExceptT )
 import           Control.Monad.Trans.Writer ( runWriter, tell )
 import           Options.Applicative
-                   ( CommandFields, Parser, ParserFailure, ParserHelp
-                   , ParserInfo (..), ParserResult (..), (<**>), abortOption
-                   , command, execParserPure, footer, fullDesc
+                   ( Parser, ParserFailure, ParserHelp, ParserResult (..)
+                   , abortOption, command, execParserPure, footer, fullDesc
                    , handleParseResult, header, help, info, infoOption, long
                    , metavar, noBacktrack, prefs, progDesc, showHelpOnEmpty
+                   , hsubparser
                    )
 import           Options.Applicative.Builder.Extra ( showHelpText )
-import           Options.Applicative.Builder.Internal
-                   ( Mod (..), mkCommand, mkParser )
-import           Options.Applicative.Types ( OptReader (..) )
 import           Stack.Prelude
 import           Stack.Types.AddCommand ( AddCommand )
 import           Stack.Types.GlobalOptsMonoid ( GlobalOptsMonoid )
@@ -172,19 +169,8 @@ complicatedParser commandMetavar commonParser commandParser =
   (,)
     <$> commonParser
     <*> case runWriter (runExceptT commandParser) of
-          (Right (), d) -> hsubparser' commandMetavar d
+          (Right (), m) -> hsubparser (m <> metavar commandMetavar)
           (Left b, _) -> pure (b, mempty)
-
--- | Subparser with @--help@ argument. Borrowed with slight modification
--- from Options.Applicative.Extra.
-hsubparser' :: String -> Mod CommandFields a -> Parser a
-hsubparser' commandMetavar m = mkParser d g rdr
- where
-  Mod _ d g = metavar commandMetavar `mappend` m
-  (groupName, cmds, subs) = mkCommand m
-  rdr = CmdReader groupName cmds (fmap add_helper . subs)
-  add_helper pinfo = pinfo
-    { infoParser = infoParser pinfo <**> helpOption }
 
 -- | Non-hidden help option.
 helpOption :: Parser (a -> a)
