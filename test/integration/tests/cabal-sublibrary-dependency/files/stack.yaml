@@ -1,4 +1,4 @@
-resolver: nightly-2023-03-04 # GHC 9.4.4
+resolver: nightly-2023-05-26 # GHC 9.4.5
 packages:
 - .
 - subproject

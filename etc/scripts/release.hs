@@ -1,5 +1,5 @@
 {- stack script
-    --resolver lts-20.13
+    --resolver lts-20.22
     --extra-dep Cabal-3.6.3.0
     --extra-dep directory-1.3.6.2
     --ghc-options -Wall

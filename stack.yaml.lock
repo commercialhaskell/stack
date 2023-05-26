@@ -26,6 +26,13 @@ packages:
   original:
     hackage: fsnotify-0.4.1.0@sha256:44540beabea36aeeef930aa4d5f28091d431904bc9923b6ac4d358831c651235,2854
 - completed:
+    hackage: network-3.1.4.0@sha256:d50e055f45bd09a8238200ec64ffa0f17492c32cdb5807487894388ce1c2f839,5186
+    pantry-tree:
+      sha256: b8307960df0995ffc0d06c4c536d7b2fb2da4af8ff1e99575ca058b68ea8c5f8
+      size: 3977
+  original:
+    hackage: network-3.1.4.0@sha256:d50e055f45bd09a8238200ec64ffa0f17492c32cdb5807487894388ce1c2f839,5186
+- completed:
     hackage: pantry-0.8.2.2@sha256:579aa8538c0fde65f9c08fb97d1d5aee8f59e5cc44e5f8feb350ec54bd2b14a6,6026
     pantry-tree:
       sha256: f979dadd233a05272bfee435de5d66532692532453d199adb902079a75cb878d
@@ -62,7 +69,7 @@ packages:
     hackage: Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
 snapshots:
 - completed:
-    sha256: 401a0e813162ba62f04517f60c7d25e93a0f867f94a902421ebf07d1fb5a8c46
-    size: 650044
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/21.yaml
-  original: lts-20.21
+    sha256: dcf4fc28f12d805480ddbe8eb8c370e11db12f0461d0110a4240af27ac88d725
+    size: 650255
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/22.yaml
+  original: lts-20.22

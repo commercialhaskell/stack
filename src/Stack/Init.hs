@@ -421,15 +421,15 @@ renderStackYaml p ignoredPackages dupPackages =
     , "A snapshot resolver dictates the compiler version and the set of packages"
     , "to be used for project dependencies. For example:"
     , ""
-    , "resolver: lts-3.5"
-    , "resolver: nightly-2015-09-21"
-    , "resolver: ghc-7.10.2"
+    , "resolver: lts-20.22"
+    , "resolver: nightly-2023-05-26"
+    , "resolver: ghc-9.6.2"
     , ""
     , "The location of a snapshot can be provided as a file or url. Stack assumes"
     , "a snapshot provided as a file might change, whereas a url resource does not."
     , ""
     , "resolver: ./custom-snapshot.yaml"
-    , "resolver: https://example.com/snapshots/2018-01-01.yaml"
+    , "resolver: https://example.com/snapshots/2023-01-01.yaml"
     ]
   userMsgHelp = commentHelp
     [ "A warning or info to be displayed to the user on config load." ]
