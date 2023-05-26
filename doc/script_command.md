@@ -18,13 +18,13 @@ configuration files (global and project-level). A snapshot must be specified on
 the command line (with the `--resolver` option). For example:
 
 ~~~text
-stack --resolver lts-20.19 MyScript.hs
+stack --resolver lts-20.22 MyScript.hs
 ~~~
 
 or, equivalently:
 
 ~~~text
-stack script --resolver lts-20.19 MyScript.hs
+stack script --resolver lts-20.22 MyScript.hs
 ~~~
 
 The `stack script` command behaves as if the `--install-ghc` flag had been
@@ -82,7 +82,7 @@ main = do
 can be compiled and run, with arguments, with:
 
 ~~~text
-stack --resolver lts-20.19 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
+stack --resolver lts-20.22 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
 ~~~
 
 All the compilation outputs (like `Main.hi`, `Main.o`, and the executable

@@ -1,5 +1,5 @@
 ---
-resolver: lts-20.13
+resolver: lts-20.22
 name: remote-snapshot
 packages:
 - archive: https://s3.amazonaws.com/hackage.fpcomplete.com/package/ghc-prim-0.8.0.tar.gz
