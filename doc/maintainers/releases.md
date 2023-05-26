@@ -67,13 +67,18 @@ Examples:
 ## Pre-release checks
 
 1.  Check for any P0 and P1 issues that should be dealt with before release.
+
 2.  Check for un-merged pull requests that should be merged before release.
+
 3.  Ensure the `release` and `stable` branches are merged to the `master`
     branch.
+
 4.  Check the copyright dates, and update if needed.
+
 5.  Ensure CI matrices in docs (travis-complex, appveyor, azure) have current
     stackage snapshots and GHC versions (e.g.
     https://github.com/commercialhaskell/stack/pull/4565/files)
+
 6.  Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest
     nightly (go over the extra-deps too) and ensure the project builds and tests
     pass. For example, command:
@@ -83,6 +88,12 @@ Examples:
     ~~~
 
 7.  Ensure the integration tests pass on Linux, macOS and Windows.
+
+8.  Some people prefer, or need, to build Stack with Cabal (the tool). Check
+    that `cabal.project` is up to date (the specified `with-compiler:`). Check
+    that `cabal.config` is up to date and is not missing dependencies relevant
+    on Windows and non-Windows operating systems, following the instructions in
+    `cabal.project`.
 
 ## Release preparation
 
@@ -107,19 +118,19 @@ branch.
 
 ### C: Return to the `master` branch
 
-* `package.yaml`: bump version to the next unstable version (bump the second
-  component to the next even number, ensure the third component is `0`; e.g.
-  from `1.9.0` to `1.10.0`).
+1.  `package.yaml`: bump version to the next unstable version (bump the second
+    component to the next even number, ensure the third component is `0`; e.g.
+    from `1.9.0` to `1.10.0`).
 
     !!! attention
 
         Be sure to update also `stack.cabal` (for example by using
         `stack build --dry-run`).
 
-* `Changelog.md`:
-    * Change the title of the existing **Unreleased changes** section to what
-      will be the next final (non-RC) release (e.g. `v2.1.1`).
-    * Add new "Unreleased changes" section:
+2.  `Changelog.md`:
+    *   Change the title of the existing **Unreleased changes** section to what
+        will be the next final (non-RC) release (e.g. `v2.1.1`).
+    *   Add new "Unreleased changes" section:
 
         ~~~markdown
         ## Unreleased changes
@@ -136,6 +147,9 @@ branch.
 
         Bug fixes:
         ~~~
+
+3.  `cabal.config`: Ensure the `stack` constraint is set to the same version as
+    in the `package.yaml`.
 
 ### D: In the release candidate branch
 
@@ -176,51 +190,56 @@ Check for any platform entries that need to be added to (or removed from):
 
 ### E: For the first release candidate
 
-1. Re-do the pre-release checks (see the section above).
-2. `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`).
+1.  Re-do the pre-release checks (see the section above).
+2.  `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`).
 
     !!! attention
 
         Be sure to update also `stack.cabal` (for example by using
         `stack build --dry-run`).
 
-3. `ChangeLog.md`: Rename the “Unreleased changes” section to the same version
-   as `package.yaml`, and mark it clearly as a release candidate (e.g.
-   `vX.Y.0.1 (release candidate)`). Remove any empty sections.
-4. Follow the steps in the *Release process* section below that apply to a
-   release candidate.
+3.  `ChangeLog.md`: Rename the “Unreleased changes” section to the same version
+    as `package.yaml`, and mark it clearly as a release candidate (e.g.
+    `vX.Y.0.1 (release candidate)`). Remove any empty sections.
+4.  Ensure the `stack` constraint in `cabal.config` is set to `==X.Y.0.1`.
+5.  Follow the steps in the *Release process* section below that apply to a
+    release candidate.
 
 ### F: For any subsequent release candidates
 
-1. Re-do the pre-release checks (see the section above).
-2. `package.yaml`: bump to next odd patchlevel version (e.g. `X.Y.0.3`).
+1.  Re-do the pre-release checks (see the section above).
+2.  `package.yaml`: bump to next odd patchlevel version (e.g. `X.Y.0.3`).
 
     !!! attention
 
         Be sure to update also `stack.cabal` (for example by using
         `stack build --dry-run`).
 
-3. `ChangeLog.md`: Rename the "Unreleased changes" section to the new version,
-   clearly marked as a release candidate (e.g. `vX.Y.0.3 (release candidate)`).
-   Remove any empty sections.
-4. Follow the steps in the *Release process* section below that apply to a
-   release candidate.
+3.  `ChangeLog.md`: Rename the "Unreleased changes" section to the new version,
+    clearly marked as a release candidate (e.g. `vX.Y.0.3 (release candidate)`).
+    Remove any empty sections.
+4.  Ensure the `stack` constraint in `cabal.config` is set to the same version
+    as in `package.yaml`.
+5.  Follow the steps in the *Release process* section below that apply to a
+    release candidate.
 
 ### G: For the final release
 
-1. Re-do the pre-release checks (see the section above).
-2. `package.yaml`: bump version to odd last component and no patchlevel
-   (e.g. from `X.Y.0.2` to `X.Y.1`).
+1.  Re-do the pre-release checks (see the section above).
+2.  `package.yaml`: bump version to odd last component and no patchlevel
+    (e.g. from `X.Y.0.2` to `X.Y.1`).
 
     !!! attention
 
         Be sure to update also `stack.cabal` (for example by using
         `stack build --dry-run`).
 
-3. `ChangeLog.md`: consolidate all the release candidate changes into a single
-   section for the final release version.
-4. Follow all of the steps in the *Release process* section below that apply to
-   a final release.
+3.  `ChangeLog.md`: consolidate all the release candidate changes into a single
+    section for the final release version.
+4.  Ensure the `stack` constraint in `cabal.config` is set to the same version
+    as in `package.yaml` (e.g. to `==X.Y.1`).
+5.  Follow all of the steps in the *Release process* section below that apply to
+    a final release.
 
 ## Release process
 
