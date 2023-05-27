@@ -50,5 +50,5 @@ RUN stack build shake
 
 COPY etc/scripts/release.hs /src
 
-RUN stack script --resolver lts-20.22 --extra-dep Cabal-3.6.3.0 --compile /src/release.hs -- --version
+RUN stack script --resolver lts-20.23 --extra-dep Cabal-3.6.3.0 --compile /src/release.hs -- --version
 RUN cp /src/release /home/stack

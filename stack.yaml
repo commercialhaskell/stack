@@ -1,5 +1,5 @@
 # GHC 9.2.7
-resolver: lts-20.22
+resolver: lts-20.23
 
 packages:
 - .
@@ -8,15 +8,15 @@ extra-deps:
 - ansi-terminal-1.0@sha256:640ffecfd95471388d939fcacb57bdc0cef15f0457746c234a12cdd5a6c6d1e8,2706
 - ansi-terminal-types-0.11.5@sha256:f78440dfd95c4509e88855ac7cc2d9566ddf956a92c1290404cac93ad1a1b00a,1482
 - fsnotify-0.4.1.0@sha256:44540beabea36aeeef930aa4d5f28091d431904bc9923b6ac4d358831c651235,2854
-# lts-20.22 specifies network-3.1.3.0, but that appears to be broken on Windows.
-# See https://github.com/haskell/network/issues/550
-- network-3.1.4.0@sha256:d50e055f45bd09a8238200ec64ffa0f17492c32cdb5807487894388ce1c2f839,5186
+# lts-20.23 specifies optparse-applicative-0.17.1.0, but that is broken. See:
+# https://github.com/pcapriotti/optparse-applicative/issues/475
+- optparse-applicative-0.17.0.0@sha256:0713e54cbb341e5cae979e2ac441eb3a5ff42e303001f432bd58c19e5638bdda,4967
 - pantry-0.8.2.2@sha256:579aa8538c0fde65f9c08fb97d1d5aee8f59e5cc44e5f8feb350ec54bd2b14a6,6026
 - persistent-2.14.5.0@sha256:c3c7a6a200930f956b2a6bb15b9d2cd512980692f6a2d95368a6db335c34c916,7199
 - rio-prettyprint-0.1.4.0@sha256:1f8eb3ead0ef33d3736d53e1de5e9b2c91a0c207cdca23321bd74c401e85f23a,1301
-# lts-20.22 specifies Cabal-3.6.3.0
+# lts-20.23 specifies Cabal-3.6.3.0
 - Cabal-3.8.1.0@sha256:155d64beeecbae2b19e5d67844532494af88bc8795d4db4146a0c29296f59967,12220
-# lts-20.22 specifies Cabal-syntax-3.6.0.0
+# lts-20.23 specifies Cabal-syntax-3.6.0.0
 - Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
 
 allow-newer: true
