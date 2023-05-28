@@ -906,16 +906,18 @@ Whether or not to automatically install GHC when necessary.
 
 ### jobs
 
-Default: the number of processors reported by your CPU.
+Default: the number of CPUs (cores) that the machine has.
 
-Command line equivalent (takes precedence): `-j`, `--jobs` option
+Command line equivalent (takes precedence):
+[`-j`, `--jobs` option](global_flags.md#-jobs-or--j-option)
 
-Specifies how many build tasks should be run in parallel. One usage for this
-might be to avoid running out of memory by setting it to 1, like this:
+Specifies the number of concurrent jobs (Stack actions during building) to run.
 
-~~~yaml
-jobs: 1
-~~~
+In some circumstances, the default can cause some machines to run out of memory
+during building. If those circumstances arise, specify `jobs: 1`.
+
+This configuration option is distinct from GHC's own `-j[<n>]` flag, which
+relates to parallel compilation of modules within a package.
 
 ### local-bin-path
 
