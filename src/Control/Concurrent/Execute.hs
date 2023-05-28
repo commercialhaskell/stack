@@ -82,13 +82,13 @@ runActions :: Int -- ^ threads
            -> [Action]
            -> (TVar Int -> TVar (Set ActionId) -> IO ()) -- ^ progress updated
            -> IO [SomeException]
-runActions threads keepGoing actions0 withProgress = do
+runActions threads keepGoing actions withProgress = do
   es <- ExecuteState
-    <$> newTVarIO (sortActions actions0)
-    <*> newTVarIO []
-    <*> newTVarIO Set.empty
-    <*> newTVarIO 0
-    <*> pure keepGoing
+    <$> newTVarIO (sortActions actions) -- esActions
+    <*> newTVarIO [] -- esExceptions
+    <*> newTVarIO Set.empty -- esInAction
+    <*> newTVarIO 0 -- esCompleted
+    <*> pure keepGoing -- esKeepGoing
   _ <- async $ withProgress (esCompleted es) (esInAction es)
   if threads <= 1
     then runActions' es
@@ -110,16 +110,19 @@ sortActions = sortBy (compareConcurrency `on` actionConcurrency)
 runActions' :: ExecuteState -> IO ()
 runActions' ExecuteState {..} = loop
  where
+  breakOnErrs :: STM (IO ()) -> STM (IO ())
   breakOnErrs inner = do
     errs <- readTVar esExceptions
     if null errs || esKeepGoing
       then inner
       else pure $ pure ()
+  withActions :: ([Action] -> STM (IO ())) -> STM (IO ())
   withActions inner = do
     as <- readTVar esActions
     if null as
       then pure $ pure ()
       else inner as
+  loop :: IO ()
   loop = join $ atomically $ breakOnErrs $ withActions $ \as ->
     case break (Set.null . actionDeps) as of
       (_, []) -> do
