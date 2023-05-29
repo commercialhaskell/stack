@@ -103,6 +103,9 @@ configuration [option](yaml_configuration.md#install-ghc).
 Pass the option `--jobs <number_of_jobs>` to specify the number of concurrent
 jobs (Stack actions during building) to run.
 
+When [building GHC from source](yaml_configuration.md#building-ghc-from-source),
+specifies the `-j[<n>]` flag of GHC's Hadrian build system.
+
 By default, Stack specifies a number of concurrent jobs equal to the number of
 CPUs (cores) that the machine has. In some circumstances, that default can cause
 some machines to run out of memory during building. If those circumstances

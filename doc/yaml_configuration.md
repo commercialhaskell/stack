@@ -909,9 +909,13 @@ Whether or not to automatically install GHC when necessary.
 Default: the number of CPUs (cores) that the machine has.
 
 Command line equivalent (takes precedence):
-[`-j`, `--jobs` option](global_flags.md#-jobs-or--j-option)
+[`-j`, `--jobs` option](global_flags.md#-jobs-or-j-option)
 
-Specifies the number of concurrent jobs (Stack actions during building) to run.
+Specifies the number of concurrent jobs (principally, Stack actions during
+building - see further below) to run.
+
+When [building GHC from source](#building-ghc-from-source), specifies the
+`-j[<n>]` flag of GHC's Hadrian build system.
 
 In some circumstances, the default can cause some machines to run out of memory
 during building. If those circumstances arise, specify `jobs: 1`.
