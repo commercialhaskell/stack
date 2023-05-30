@@ -60,7 +60,6 @@ dependencies:
 - base >= 4.14.3.0 && < 5
 - Cabal >= 3.8.1.0
 - aeson >= 2.0.3.0
-- annotated-wl-pprint
 - ansi-terminal >= 1.0
 - array
 - async
@@ -68,14 +67,10 @@ dependencies:
 - base64-bytestring
 - bytestring
 - casa-client
-- casa-types
-- colour
 - conduit
 - conduit-extra
 - containers
 - cryptonite
-- cryptonite-conduit
-- deepseq
 - directory
 - echo
 - exceptions
@@ -85,8 +80,6 @@ dependencies:
 - filepath
 - fsnotify >= 0.4.1
 - generic-deriving
-- hackage-security
-- hashable
 - hi-file-parser >= 0.1.4.0
 - hpack
 - hpc
@@ -97,14 +90,11 @@ dependencies:
 - http-types
 - memory
 - microlens
-- mintty
-- mono-traversable
 - mtl
 - mustache
 - neat-interpolation
-- network-uri
 - open-browser
-- optparse-applicative >= 0.17.0.0
+- optparse-applicative >= 0.18.1.0
 - pantry >= 0.8.2.2
 - path
 - path-io
@@ -113,35 +103,23 @@ dependencies:
 # https://github.com/commercialhaskell/stack/pull/5677#issuecomment-1193318542
 - persistent >= 2.14.0.0 && < 2.15
 - persistent-sqlite
-- persistent-template
 - pretty
-- primitive
 - process >= 1.6.13.2
 - project-template
 - random
-- retry
 - rio >= 0.1.22.0
 - rio-prettyprint >= 0.1.4.0
-- semigroups
 - split
 - stm
-- streaming-commons
 - tar
 - template-haskell
 - text
-- text-metrics
-- th-reify-many
 - time
-- tls
 - transformers
-- typed-process
-- unicode-transforms
 - unix-compat
-- unliftio
 - unordered-containers
 - vector
 - yaml
-- zip-archive
 - zlib
 when:
 - condition: os(windows)
@@ -399,7 +377,6 @@ tests:
     - hspec
     - raw-strings-qq
     - stack
-    - smallcheck
     verbatim: |
       build-tool-depends:
           hspec-discover:hspec-discover
