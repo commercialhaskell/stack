@@ -10,6 +10,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
     libncurses-dev libncurses5 libtinfo5 libnuma-dev xz-utils g++ gcc \
     libc6-dev libffi-dev libgmp-dev make zlib1g-dev git gnupg netbase pkg-config
 
+# This is added in an attempt to avoid the failure:
+#   <stderr>: commitAndReleaseBuffer: invalid argument (invalid character)
+ENV LANG="C.UTF-8"
+
 RUN cd /tmp && \
     curl -L https://github.com/llvm/llvm-project/releases/download/llvmorg-9.0.1/clang+llvm-9.0.1-aarch64-linux-gnu.tar.xz --output /tmp/llvm.tar.xz && \
     unxz /tmp/llvm.tar.xz && \
