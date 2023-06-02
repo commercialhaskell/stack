@@ -1449,9 +1449,9 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
           <> display flavour
           <> "` flavour. It can take a long time (more than one hour)..."
 
-        -- We need to provide an absolute path to the script since
-        -- the process package only sets working directory _after_
-        -- discovering the executable
+        -- We need to provide an absolute path to the script since the process
+        -- package only sets working directory _after_ discovering the
+        -- executable.
         proc (toFilePath hadrianPath) hadrianArgs runProcess_
 
         -- find the bindist and install it
@@ -1676,7 +1676,8 @@ sysRelease =
 ensureDockerStackExe :: HasConfig env => Platform -> RIO env (Path Abs File)
 ensureDockerStackExe containerPlatform = do
   config <- view configL
-  containerPlatformDir <- runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
+  containerPlatformDir <-
+    runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
   let programsPath = configLocalProgramsBase config </> containerPlatformDir
       tool = Tool (PackageIdentifier (mkPackageName "stack") stackVersion)
   stackExeDir <- installDir programsPath tool
@@ -1700,7 +1701,7 @@ ensureDockerStackExe containerPlatform = do
 
 -- | Get all executables on the path that might match the wanted compiler
 sourceSystemCompilers ::
-     (HasProcessContext env, HasLogFunc env)
+     (HasLogFunc env, HasProcessContext env)
   => WantedCompiler
   -> ConduitT i (Path Abs File) (RIO env) ()
 sourceSystemCompilers wanted = do
@@ -1742,10 +1743,11 @@ getSetupInfo = do
       logJSONWarnings urlOrFile warnings
     pure si
 
-getInstalledTool :: [Tool]            -- ^ already installed
-                 -> PackageName       -- ^ package to find
-                 -> (Version -> Bool) -- ^ which versions are acceptable
-                 -> Maybe Tool
+getInstalledTool ::
+     [Tool]            -- ^ already installed
+  -> PackageName       -- ^ package to find
+  -> (Version -> Bool) -- ^ which versions are acceptable
+  -> Maybe Tool
 getInstalledTool installed name goodVersion = Tool <$>
   maximumByMaybe (comparing pkgVersion) (filterTools name goodVersion installed)
 
@@ -1774,13 +1776,14 @@ downloadAndInstallTool programsDir downloadInfo tool installer = do
   liftIO $ ignoringAbsence (removeDirRecur tempDir)
   pure tool
 
-downloadAndInstallCompiler :: (HasBuildConfig env, HasGHCVariant env)
-                           => CompilerBuild
-                           -> SetupInfo
-                           -> WantedCompiler
-                           -> VersionCheck
-                           -> Maybe String
-                           -> RIO env Tool
+downloadAndInstallCompiler ::
+     (HasBuildConfig env, HasGHCVariant env)
+  => CompilerBuild
+  -> SetupInfo
+  -> WantedCompiler
+  -> VersionCheck
+  -> Maybe String
+  -> RIO env Tool
 downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbindistURL = do
   ghcVariant <- view ghcVariantL
   (selectedVersion, downloadInfo) <- case mbindistURL of
@@ -1788,12 +1791,15 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
       case ghcVariant of
         GHCCustom _ -> pure ()
         _ -> prettyThrowM RequireCustomGHCVariant
-      pure (version, GHCDownloadInfo mempty mempty DownloadInfo
-               { downloadInfoUrl = T.pack bindistURL
-               , downloadInfoContentLength = Nothing
-               , downloadInfoSha1 = Nothing
-               , downloadInfoSha256 = Nothing
-               })
+      pure
+        ( version
+        , GHCDownloadInfo mempty mempty DownloadInfo
+            { downloadInfoUrl = T.pack bindistURL
+            , downloadInfoContentLength = Nothing
+            , downloadInfoSha1 = Nothing
+            , downloadInfoSha256 = Nothing
+            }
+        )
     _ -> do
       ghcKey <- getGhcKey ghcBuild
       case Map.lookup ghcKey $ siGHCs si of
@@ -1812,8 +1818,8 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
            GHCStandard -> []
            v -> ["(" <> fromString (ghcVariantName v) <> ")"]
       <> case ghcBuild of
-          CompilerBuildStandard -> []
-          b -> ["(" <> fromString (compilerBuildName b) <> ")"]
+           CompilerBuildStandard -> []
+           b -> ["(" <> fromString (compilerBuildName b) <> ")"]
       <> [ flow "to an isolated location. This will not interfere with any \
                 \system-level installation."
          ]
@@ -1831,13 +1837,14 @@ downloadAndInstallCompiler _ _ WCGhcjs{} _ _ = throwIO GhcjsNotSupported
 downloadAndInstallCompiler _ _ WCGhcGit{} _ _ =
   prettyThrowIO DownloadAndInstallCompilerError
 
-getWantedCompilerInfo :: (Ord k, MonadThrow m)
-                      => Text
-                      -> VersionCheck
-                      -> WantedCompiler
-                      -> (k -> ActualCompiler)
-                      -> Map k a
-                      -> m (k, a)
+getWantedCompilerInfo ::
+     (Ord k, MonadThrow m)
+  => Text
+  -> VersionCheck
+  -> WantedCompiler
+  -> (k -> ActualCompiler)
+  -> Map k a
+  -> m (k, a)
 getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
   case mpair of
     Just pair -> pure pair
@@ -1856,13 +1863,13 @@ getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
 
 -- | Download and install the first available compiler build.
 downloadAndInstallPossibleCompilers ::
-       (HasGHCVariant env, HasBuildConfig env)
-    => [CompilerBuild]
-    -> SetupInfo
-    -> WantedCompiler
-    -> VersionCheck
-    -> Maybe String
-    -> RIO env (Tool, CompilerBuild)
+     (HasGHCVariant env, HasBuildConfig env)
+  => [CompilerBuild]
+  -> SetupInfo
+  -> WantedCompiler
+  -> VersionCheck
+  -> Maybe String
+  -> RIO env (Tool, CompilerBuild)
 downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbindistURL =
   go possibleCompilers Nothing
  where
@@ -1911,9 +1918,7 @@ getGhcKey ghcBuild = do
     <> T.pack (ghcVariantSuffix ghcVariant)
     <> T.pack (compilerBuildSuffix ghcBuild)
 
-getOSKey :: (MonadThrow m)
-         => Platform
-         -> m Text
+getOSKey :: (MonadThrow m) => Platform -> m Text
 getOSKey platform =
   case platform of
     Platform I386                  Cabal.Linux   -> pure "linux32"
@@ -1963,8 +1968,8 @@ downloadOrUseLocal downloadLabel downloadInfo destination =
           } = downloadInfo
     when (isJust contentLength) $
       prettyWarnS
-         "`content-length` is not checked and should not be specified when \
-         \`url` is a file path."
+        "`content-length` is not checked and should not be specified when \
+        \`url` is a file path."
     when (isJust sha1) $
       prettyWarnS
         "`sha1` is not checked and should not be specified when `url` is a \
@@ -2012,14 +2017,15 @@ data ArchiveType
   | TarGz
   | SevenZ
 
-installGHCPosix :: HasConfig env
-                => GHCDownloadInfo
-                -> SetupInfo
-                -> Path Abs File
-                -> ArchiveType
-                -> Path Abs Dir
-                -> Path Abs Dir
-                -> RIO env ()
+installGHCPosix ::
+     HasConfig env
+  => GHCDownloadInfo
+  -> SetupInfo
+  -> Path Abs File
+  -> ArchiveType
+  -> Path Abs Dir
+  -> Path Abs Dir
+  -> RIO env ()
 installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
   platform <- view platformL
   menv0 <- view processContextL
@@ -2130,13 +2136,14 @@ instance Alternative (CheckDependency env) where
       Left _ -> y
       Right x' -> pure $ Right x'
 
-installGHCWindows :: HasBuildConfig env
-                  => SetupInfo
-                  -> Path Abs File
-                  -> ArchiveType
-                  -> Path Abs Dir
-                  -> Path Abs Dir
-                  -> RIO env ()
+installGHCWindows ::
+     HasBuildConfig env
+  => SetupInfo
+  -> Path Abs File
+  -> ArchiveType
+  -> Path Abs Dir
+  -> Path Abs Dir
+  -> RIO env ()
 installGHCWindows si archiveFile archiveType _tempDir destDir = do
   withUnpackedTarball7z "GHC" si archiveFile archiveType destDir
   prettyInfoL
@@ -2144,13 +2151,14 @@ installGHCWindows si archiveFile archiveType _tempDir destDir = do
     , pretty destDir <> "."
     ]
 
-installMsys2Windows :: HasBuildConfig env
-                  => SetupInfo
-                  -> Path Abs File
-                  -> ArchiveType
-                  -> Path Abs Dir
-                  -> Path Abs Dir
-                  -> RIO env ()
+installMsys2Windows ::
+     HasBuildConfig env
+  => SetupInfo
+  -> Path Abs File
+  -> ArchiveType
+  -> Path Abs Dir
+  -> Path Abs Dir
+  -> RIO env ()
 installMsys2Windows si archiveFile archiveType _tempDir destDir = do
   exists <- liftIO $ D.doesDirectoryExist $ toFilePath destDir
   when exists $
@@ -2159,10 +2167,9 @@ installMsys2Windows si archiveFile archiveType _tempDir destDir = do
 
   withUnpackedTarball7z "MSYS2" si archiveFile archiveType destDir
 
-
   -- I couldn't find this officially documented anywhere, but you need to run
-  -- the MSYS shell once in order to initialize some pacman stuff. Once that
-  -- run happens, you can just run commands as usual.
+  -- the MSYS shell once in order to initialize some pacman stuff. Once that run
+  -- happens, you can just run commands as usual.
   menv0 <- view processContextL
   newEnv0 <- modifyEnvVars menv0 $ Map.insert "MSYSTEM" "MSYS"
   newEnv <- either throwM pure $ augmentPathMap
@@ -2179,15 +2186,16 @@ installMsys2Windows si archiveFile archiveType _tempDir destDir = do
   -- Install git. We could install other useful things in the future too.
   -- runCmd (Cmd (Just destDir) "pacman" menv ["-Sy", "--noconfirm", "git"]) Nothing
 
--- | Unpack a compressed tarball using 7zip.  Expects a single directory in
--- the unpacked results, which is renamed to the destination directory.
-withUnpackedTarball7z :: HasBuildConfig env
-                      => String -- ^ Name of tool, used in error messages
-                      -> SetupInfo
-                      -> Path Abs File -- ^ Path to archive file
-                      -> ArchiveType
-                      -> Path Abs Dir -- ^ Destination directory.
-                      -> RIO env ()
+-- | Unpack a compressed tarball using 7zip. Expects a single directory in the
+-- unpacked results, which is renamed to the destination directory.
+withUnpackedTarball7z ::
+     HasBuildConfig env
+  => String -- ^ Name of tool, used in error messages
+  -> SetupInfo
+  -> Path Abs File -- ^ Path to archive file
+  -> ArchiveType
+  -> Path Abs Dir -- ^ Destination directory.
+  -> RIO env ()
 withUnpackedTarball7z name si archiveFile archiveType destDir = do
   suffix <-
     case archiveType of
@@ -2225,9 +2233,10 @@ expectSingleUnpackedDir archiveFile destDir = do
 -- | Download 7z as necessary, and get a function for unpacking things.
 --
 -- Returned function takes an unpack directory and archive.
-setup7z :: (HasBuildConfig env, MonadIO m)
-        => SetupInfo
-        -> RIO env (Path Abs Dir -> Path Abs File -> m ())
+setup7z ::
+     (HasBuildConfig env, MonadIO m)
+  => SetupInfo
+  -> RIO env (Path Abs Dir -> Path Abs File -> m ())
 setup7z si = do
   dir <- view $ configL.to configLocalPrograms
   ensureDir dir
@@ -2278,11 +2287,12 @@ setup7z si = do
           liftIO $ prettyThrowM (ProblemWhileDecompressing archive)
     _ -> prettyThrowM SetupInfoMissingSevenz
 
-chattyDownload :: HasTerm env
-               => Text          -- ^ label
-               -> DownloadInfo  -- ^ URL, content-length, sha1, and sha256
-               -> Path Abs File -- ^ destination
-               -> RIO env ()
+chattyDownload ::
+     HasTerm env
+  => Text          -- ^ label
+  -> DownloadInfo  -- ^ URL, content-length, sha1, and sha256
+  -> Path Abs File -- ^ destination
+  -> RIO env ()
 chattyDownload label downloadInfo path = do
   let url = downloadInfoUrl downloadInfo
   req <- parseUrlThrow $ T.unpack url
@@ -2324,8 +2334,10 @@ chattyDownload label downloadInfo path = do
   mtotalSize = downloadInfoContentLength downloadInfo
 
 -- | Perform a basic sanity check of GHC
-sanityCheck :: (HasProcessContext env, HasLogFunc env)
-            => Path Abs File -> RIO env ()
+sanityCheck ::
+     (HasLogFunc env, HasProcessContext env)
+  => Path Abs File
+  -> RIO env ()
 sanityCheck ghc = withSystemTempDir "stack-sanity-check" $ \dir -> do
   let fp = toFilePath $ dir </> relFileMainHs
   liftIO $ S.writeFile fp $ T.encodeUtf8 $ T.pack $ unlines
@@ -2355,7 +2367,8 @@ removeHaskellEnvVars =
   -- https://github.com/commercialhaskell/stack/issues/3444
   Map.delete "GHCRTS"
 
--- | Get map of environment variables to set to change the GHC's encoding to UTF-8
+-- | Get map of environment variables to set to change the GHC's encoding to
+-- UTF-8.
 getUtf8EnvVars ::
      (HasPlatform env, HasProcessContext env, HasTerm env)
   => ActualCompiler
@@ -2505,7 +2518,7 @@ data HaskellStackOrg = HaskellStackOrg
   deriving Show
 
 downloadStackReleaseInfo ::
-     (HasPlatform env, HasLogFunc env)
+     (HasLogFunc env, HasPlatform env)
   => Maybe String -- GitHub org
   -> Maybe String -- GitHub repo
   -> Maybe String -- ^ optional version
@@ -2615,8 +2628,9 @@ downloadStackReleaseInfoGitHub morg mrepo mver = liftIO $ do
     then pure $ SRIGitHub $ getResponseBody res
     else prettyThrowIO $ StackReleaseInfoNotFound url
 
-preferredPlatforms :: (MonadReader env m, HasPlatform env, MonadThrow m)
-                   => m [(Bool, String)]
+preferredPlatforms ::
+     (MonadReader env m, HasPlatform env, MonadThrow m)
+  => m [(Bool, String)]
 preferredPlatforms = do
   Platform arch' os' <- view platformL
   (isWindows, os) <-
