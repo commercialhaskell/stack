@@ -2348,6 +2348,12 @@ sanityCheck ghc = withSystemTempDir "stack-sanity-check" $ \dir -> do
   eres <- withWorkingDir (toFilePath dir) $ proc (toFilePath ghc)
     [ fp
     , "-no-user-package-db"
+    -- Required to stop GHC looking for a package environment in default
+    -- locations.
+    , "-hide-all-packages"
+    -- Required because GHC flag -hide-all-packages is passed.
+    , "-package base"
+    , "-package Cabal" -- required for "import Distribution.Simple"
     ] $ try . readProcess_
   case eres of
     Left e -> prettyThrowIO $ GHCSanityCheckCompileFailed e ghc

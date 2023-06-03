@@ -22,6 +22,9 @@ Bug fixes:
 
 * Restore building of Stack with Cabal flag `disable-git-info` (broken with
   Stack 2.11.1).
+* Stack's sanity check on a selected GHC now passes GHC flag
+  `-hide-all-packages`, stopping GHC from looking for a package environment in
+  default locations.
 
 ## v2.11.1 - 2023-05-18
 
