@@ -25,6 +25,9 @@ Bug fixes:
 * With `stack hoogle`, avoid the message
   `Minimum version is hoogle-5.0. Found acceptable hoogle-<x.y.z> in your index, requiring its installation.`
   when a `hoogle` executable has already been found on the `PATH`.
+* Stack's sanity check on a selected GHC now passes GHC flag
+  `-hide-all-packages`, stopping GHC from looking for a package environment in
+  default locations.
 
 ## v2.11.1 - 2023-05-18
 
