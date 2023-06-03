@@ -22,6 +22,9 @@ Bug fixes:
 
 * Restore building of Stack with Cabal flag `disable-git-info` (broken with
   Stack 2.11.1).
+* With `stack hoogle`, avoid the message
+  `Minimum version is hoogle-5.0. Found acceptable hoogle-<x.y.z> in your index, requiring its installation.`
+  when a `hoogle` executable has already been found on the `PATH`.
 
 ## v2.11.1 - 2023-05-18
 
