@@ -8,6 +8,7 @@ module Stack.Hoogle
 
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import           Data.Char ( isSpace )
+import           Data.Either.Extra ( eitherToMaybe )
 import qualified Data.Text as T
 import           Distribution.PackageDescription ( packageDescription, package )
 import           Distribution.Types.PackageName ( mkPackageName )
@@ -226,11 +227,13 @@ hoogleCmd (args, setup, rebuild, startServer) =
   ensureHoogleInPath = do
     config <- view configL
     menv <- liftIO $ configProcessContextSettings config envSettings
-    mhooglePath <- runRIO menv (findExecutable "hoogle") <>
-      requiringHoogle NotMuted (findExecutable "hoogle")
-    eres <- case mhooglePath of
-      Left _ -> pure $ Left (flow "Hoogle isn't installed.")
-      Right hooglePath -> do
+    mHooglePath' <- eitherToMaybe <$> runRIO menv (findExecutable "hoogle")
+    let mHooglePath'' =
+          eitherToMaybe <$> requiringHoogle NotMuted (findExecutable "hoogle")
+    mHooglePath <- maybe mHooglePath'' (pure . Just) mHooglePath'
+    eres <- case mHooglePath of
+      Nothing -> pure $ Left (flow "Hoogle isn't installed.")
+      Just hooglePath -> do
         result <- withProcessContext menv
           $ proc hooglePath ["--numeric-version"]
           $ tryAny . fmap fst . readProcess_
