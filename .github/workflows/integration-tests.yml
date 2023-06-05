@@ -124,13 +124,13 @@ jobs:
       env:
         SELF_HOSTED_RUNNERS: ${{ secrets.SELF_HOSTED_RUNNERS || (github.repository_owner == 'commercialhaskell' && 'arm64') }}
       run: |
-        echo "::set-output name=runners::$SELF_HOSTED_RUNNERS"
+        echo "runners=$SELF_HOSTED_RUNNERS" >> $GITHUB_OUTPUT
         if echo "$SELF_HOSTED_RUNNERS" | grep -q 'arm64'; then
-          echo "::set-output name=arm64::['self-hosted', 'linux', 'ARM64']"
-          echo ::set-output name=test-arm64::true
+          echo "arm64=['self-hosted', 'linux', 'ARM64']" >> $GITHUB_OUTPUT
+          echo "test-arm64=true" >> $GITHUB_OUTPUT
         else
-          echo "::set-output name=arm64::'ubuntu-latest'"
-          echo ::set-output name=test-arm64::false
+          echo "arm64='ubuntu-latest'" >> $GITHUB_OUTPUT
+          echo "test-arm64=false" >> $GITHUB_OUTPUT
         fi
 
   linux-arm64:
