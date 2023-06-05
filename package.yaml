@@ -388,31 +388,35 @@ flags:
     manual: true
     default: false
   disable-git-info:
-    description: Disable compile-time inclusion of current git info in stack
+    description: >-
+      Disable inclusion of current Git information in the Stack executable when
+      it is built.
     manual: true
     default: false
   hide-dependency-versions:
-    description: "Hides dependency versions from 'stack --version', used only by building
-      Stack and the default 'stack.yaml'.  Note to packagers/distributors:
-      DO NOT OVERRIDE THIS FLAG IF YOU ARE BUILDING 'stack' ANY OTHER WAY
-      (e.g. using cabal or from Hackage), as it makes debugging support
-      requests more difficult."
+    description: >-
+      Hides dependency versions from 'stack --version'. Used only when building
+      a Stack executable for official release. Note to packagers/distributors:
+      DO NOT OVERRIDE THIS FLAG IF YOU ARE BUILDING STACK ANY OTHER WAY (e.g.
+      using Cabal or from Hackage), as it makes debugging support requests more
+      difficult.
     manual: true
     default: false
   integration-tests:
-    description: Run the integration test suite
+    description: Run the integration test suite.
     manual: true
     default: false
   supported-build:
-    description: "If false, causes 'stack --version' to issue a warning about
-      the build being unsupported.  Should be True only if building with
-      Stack and the default 'stack.yaml'.  Note to packagers/distributors:
-      DO NOT OVERRIDE THIS FLAG IF YOU ARE BUILDING 'stack' ANY OTHER WAY
-      (e.g. using cabal or from Hackage), as it makes debugging support
-      requests more difficult."
+    description: >-
+      If false, causes 'stack --version' to issue a warning about the build
+      being unsupported. Used only when building a Stack executable for official
+      release. Note to packagers/distributors: DO NOT OVERRIDE THIS FLAG IF YOU
+      ARE BUILDING STACK ANY OTHER WAY (e.g. using Cabal or from Hackage), as it
+      makes debugging support requests more difficult.
     manual: true
     default: false
   developer-mode:
-    description: "By default, should extra developer information be output?"
+    description: >-
+      By default, output extra developer information.
     manual: true
     default: false
