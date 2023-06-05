@@ -382,7 +382,9 @@ tests:
           hspec-discover:hspec-discover
 flags:
   static:
-    description: Pass -static/-pthread to ghc when linking the stack binary.
+    description: >-
+      When building the Stack executable, or the stack-integration-test
+      executable, pass the -static and -pthread flags to the linker used by GHC.
     manual: true
     default: false
   disable-git-info:
