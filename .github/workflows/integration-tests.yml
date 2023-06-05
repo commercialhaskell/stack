@@ -62,15 +62,22 @@ jobs:
 
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
         then
-          # Retry installing nix due to nondeterministic error
+          # Install Nix via the single-user installation...
+          #
+          # Retry installing Nix due to nondeterministic error
           #   Fatal error: glibc detected an invalid stdio handle
           # See:
           #   https://github.com/nh2/static-haskell-nix/pull/27#issuecomment-502652181
           #   https://github.com/NixOS/nix/issues/2733
           (for i in {1..5}; do bash <(curl -sSL https://nixos.org/nix/install) --no-daemon && exit 0; done; exit 1)
+          # Enter the Nix environment...
           . ~/.nix-profile/etc/profile.d/nix.sh
-          nix-channel --add https://nixos.org/channels/nixos-22.05 nixpkgs
-          nix-channel --update # Get GHC 8.2.2
+          # Add a channel named 'nixpkgs' to the list of subscribed channels...
+          nix-channel --add https://nixos.org/channels/nixos-23.05 nixpkgs
+          # Download the Nix expressions for all subscribed channels...
+          #
+          # As at 2023-06-05, nixos-23.05 provides GHC 9.2.7.
+          nix-channel --update
         fi
 
         if [[ "${{ matrix.release-args }}" == "--alpine" ]]
