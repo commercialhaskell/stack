@@ -62,9 +62,11 @@ jobs:
 
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
         then
+          # Set up Nix for Stack's tests that require it.
+          #
           # Install Nix via the single-user installation...
           #
-          # Retry installing Nix due to nondeterministic error
+          # Retry installing Nix due to nondeterministic error:
           #   Fatal error: glibc detected an invalid stdio handle
           # See:
           #   https://github.com/nh2/static-haskell-nix/pull/27#issuecomment-502652181
@@ -78,6 +80,14 @@ jobs:
           #
           # As at 2023-06-05, nixos-23.05 provides GHC 9.2.7.
           nix-channel --update
+          # The NIX_PATH environment variable sets a list of directories used to
+          # look up the location of Nix expressions using paths enclosed in
+          # angle brackets (e.g. <nixpkgs>). nix.sh no longer sets the NIX_PATH.
+          # If NIX_PATH is not set, Nix will fall back to
+          # $HOME/.nix-defexpr/channels, but only in impure and unrestricted
+          # evaluation mode. See https://github.com/NixOS/nixpkgs/issues/149791.
+          # Set NIX_PATH...
+          export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels
         fi
 
         if [[ "${{ matrix.release-args }}" == "--alpine" ]]
