@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-05-12.
+`master` branch of the Stack repository. Last updated: 2023-06-07.
 
 *   `Main.main`: catches exceptions from action `commandLineHandler`.
 
@@ -142,14 +142,14 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Stack.Hoogle.HoogleException`
 
         ~~~haskell
-        [S-3025] = HoogleDatabaseNotFound
-        [S-9669] | HoogleOnPathNotFoundBug
+        [S-9669] = HoogleOnPathNotFoundBug
         ~~~
 
     -   `Stack.Hoogle.HooglePrettyException`
 
         ~~~haskell
         [S-1329] = HoogleNotFound StyleDoc
+        [S-3025] | HoogleDatabaseNotFound
         ~~~
 
     -   `Stack.Init.InitException`

@@ -45,21 +45,18 @@ import           Stack.Types.SourceMap ( DepPackage (..), SourceMap (..) )
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Hoogle" module.
 data HoogleException
-  = HoogleDatabaseNotFound
-  | HoogleOnPathNotFoundBug
+  = HoogleOnPathNotFoundBug
   deriving (Show, Typeable)
 
 instance Exception HoogleException where
-  displayException HoogleDatabaseNotFound =
-    "Error: [S-3025]\n"
-    ++ "No Hoogle database. Not building one due to '--no-setup'."
   displayException HoogleOnPathNotFoundBug = bugReport "[S-9669]"
     "Cannot find Hoogle executable on PATH, after installing."
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Hoogle" module.
-newtype HooglePrettyException
+data HooglePrettyException
   = HoogleNotFound StyleDoc
+  | HoogleDatabaseNotFound
   deriving (Show, Typeable)
 
 instance Pretty HooglePrettyException where
@@ -70,6 +67,13 @@ instance Pretty HooglePrettyException where
     <> line
     <> fillSep
          [ flow "Not installing Hoogle due to"
+         , style Shell "--no-setup" <> "."
+         ]
+  pretty HoogleDatabaseNotFound =
+    "[S-3025]"
+    <> line
+    <> fillSep
+         [ flow "No Hoogle database. Not building one due to"
          , style Shell "--no-setup" <> "."
          ]
 
@@ -106,19 +110,19 @@ hoogleCmd (args, setup, rebuild, startServer) =
           then do
             prettyWarn $
               if rebuild
-                 then flow "Rebuilding database ..."
-                 else
-                   fillSep
-                     [ flow "No Hoogle database yet. Automatically building \
-                            \Haddock documentation and Hoogle database (use"
-                     , style Shell "--no-setup"
-                     , flow "to disable) ..."
-                     ]
+                then flow "Rebuilding database ..."
+                else
+                  fillSep
+                    [ flow "No Hoogle database yet. Automatically building \
+                           \Haddock documentation and Hoogle database (use"
+                    , style Shell "--no-setup"
+                    , flow "to disable) ..."
+                    ]
             buildHaddocks
             prettyInfoS "Built Haddock documentation."
             generateDb hooglePath
             prettyInfoS "Generated Hoogle database."
-          else throwIO HoogleDatabaseNotFound
+          else prettyThrowIO HoogleDatabaseNotFound
 
   generateDb :: Path Abs File -> RIO EnvConfig ()
   generateDb hooglePath = do
