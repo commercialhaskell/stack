@@ -56,6 +56,18 @@ You should either:
 2. add the command `source ~/.nix-profile/etc/profile.d/nix.sh` to your
    `~/.bashrc` or `~/.bash_profile` file.
 
+A Nix path can be specified between angle brackets, e.g. `<nixpkgs>`, and the
+directories listed in the `NIX_PATH` environment variable will be searched for
+the given file or directory name. Stack makes use of path `<nixpkgs>`. From
+Nix 2.4, `NIX_PATH` is not set by `nix.sh`. If `NIX_PATH` is not set, Nix will
+fall back to (first) `$HOME/.nix-defexpr/channels` in impure and unrestricted
+evaluation mode. However, Stack may use a pure Nix mode (see further
+[below](#pure-and-impure-nix-shells)). That directory can be appended to
+`NIX_PATH` with
+`export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels`. For
+information about how Stack itself can configure `NIX_PATH`, see further
+[below](#nix-package-sources).
+
 ### Enable Nix integration
 
 To enable Nix integration, add the following section to your Stack YAML
