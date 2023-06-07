@@ -68,7 +68,6 @@ main =
                 gTestHaddocks = True
                 gProjectRoot = "" -- Set to real value below.
                 gBuildArgs = ["--flag", "stack:-developer-mode"]
-                gStaticLinux = False
                 gCertificateName = Nothing
                 global0 = foldl (flip id) Global{..} flags
 
@@ -103,9 +102,8 @@ options =
         (NoArg $ Right $ \g ->
           g{gBuildArgs =
               gBuildArgs g ++
-              ["--flag=stack:static", "--docker", "--system-ghc", "--no-install-ghc"],
-            gStaticLinux = True})
-        "Build a static binary using Alpine Docker image."
+              ["--flag=stack:static", "--docker", "--system-ghc", "--no-install-ghc"]})
+        "Build a statically linked binary using an Alpine Docker image."
     , Option "" [buildArgsOptName]
         (ReqArg
             (\v -> Right $ \g -> g{gBuildArgs = gBuildArgs g ++ words v})
@@ -177,13 +175,6 @@ rules global@Global{..} args = do
     releaseDir </> binaryPkgTarGzFileName %> \out -> do
         stageFiles <- getBinaryPkgStageFiles
         writeTarGz id out releaseStageDir stageFiles
-
-    releaseDir </> binaryPkgStaticTarGzFileName %> \out -> do
-        stageFiles <- getBinaryPkgStageFiles
-        let fixPath path =
-                let (x, y) = break (== '/') path
-                in  concat [x, "-static", y]
-        writeTarGz fixPath out releaseStageDir stageFiles
 
     releaseStageDir </> binaryName </> stackExeFileName %> \out -> do
         copyFileChanged (releaseDir </> binaryExeFileName) out
@@ -286,33 +277,24 @@ rules global@Global{..} args = do
     binaryPkgFileNames =
         case platformOS of
             Windows -> [binaryExeFileName, binaryPkgZipFileName, binaryPkgTarGzFileName, binaryInstallerFileName]
-            Linux -> concat
-              [ [binaryExeFileName, binaryPkgTarGzFileName]
-              , [binaryPkgStaticTarGzFileName | gStaticLinux]
-              ]
+            Linux -> [binaryExeFileName, binaryPkgTarGzFileName]
             _ -> [binaryExeFileName, binaryPkgTarGzFileName]
     binaryPkgZipFileName = binaryName <.> zipExt
     binaryPkgTarGzFileName = binaryName <.> tarGzExt
-    binaryPkgStaticTarGzFileName = binaryStaticName <.> tarGzExt
-    -- Adding '-bin' to name to work around https://github.com/commercialhaskell/stack/issues/4961
     binaryExeFileName = binaryName ++ "-bin" <.> exe
     -- Prefix with 'installer-' so it doesn't get included in release artifacts
     -- (due to NSIS limitation, needs to be in same directory as executable)
     binaryInstallerNSIFileName = "installer-" ++ binaryName <.> nsiExt
     binaryInstallerFileName = binaryName ++ "-installer" <.> exe
-    mkBinaryName isStatic =
-        concat
-            [ stackProgName
-            , "-"
-            , stackVersionStr global
-            , "-"
-            , display platformOS
-            , "-"
-            , display gArch
-            , if isStatic then "-static" else ""
-            , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
-    binaryName = mkBinaryName False
-    binaryStaticName = mkBinaryName True
+    binaryName = concat
+        [ stackProgName
+        , "-"
+        , stackVersionStr global
+        , "-"
+        , display platformOS
+        , "-"
+        , display gArch
+        , if null gBinarySuffix then "" else "-" ++ gBinarySuffix ]
     stackExeFileName = stackProgName <.> exe
 
     zipExt = ".zip"
@@ -412,7 +394,6 @@ data Global = Global
     , gBinarySuffix :: !String
     , gTestHaddocks :: !Bool
     , gBuildArgs :: [String]
-    , gStaticLinux :: !Bool
     , gCertificateName :: !(Maybe String)
     }
     deriving Show

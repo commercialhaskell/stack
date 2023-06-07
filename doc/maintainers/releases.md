@@ -7,15 +7,6 @@
     Just release from the `master` branch (but keep the `stable` branch
     tracking the latest stable release plus updates to documentation).
 
-!!! todo "To do - Remove the `-static` version"
-
-    At some point (a couple of major releases after Stack 2.3.1), remove the
-    `-static` version from
-    https://github.com/commercialhaskell/stackage-content/blob/master/stack/releases.yaml.
-    People still using that will get an error, and we'll add a release note to
-    switch over to https://get.haskellstack.org/stable/linux-x86_64.tar.gz
-    instead (and note that www.stackage.org/stack is deprecated).
-
 ## Version scheme
 
 A Stack package or executable may have a version with three or four components:

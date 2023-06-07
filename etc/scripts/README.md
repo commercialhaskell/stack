@@ -14,7 +14,8 @@ Prerequisites
 These must be installed in the PATH to use the release tool:
 
 - stack
-- git (for Windows, [msysgit](https://msysgit.github.io) is recommended).
+- git (for Windows, [Git for Windows](https://gitforwindows.org/) is
+  recommended).
 
 Invocation
 ----------
@@ -30,7 +31,13 @@ addition, the following options are accepted:
 
 * `--allow-dirty`: by default, the `check` rule aborts if the working tree is
   dirty, but this will allow it to continue.
-  uploaded to.
+* `--arch=ARCHITECTURE`: Architecture to build (e.g. 'i386' or 'x86_64').
+* `--binary-variant=SUFFIX`: Extra suffix to add to binary executable archive
+  filename.
+* `--no-test-haddocks`: Disable testing building Haddock documentation.
+* `--alpine`: Build a statically linked binary using an Alpine Docker image.
+* `--build-args="ARG1 ARG2 ..."`: Additional arguments to pass to `stack build`.
+* `--certificate-name=NAME`: Certificate name for code signing on Windows.
 
 ### Targets
 
