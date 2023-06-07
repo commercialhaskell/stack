@@ -101,9 +101,21 @@ configuration [option](yaml_configuration.md#install-ghc).
 ## `--jobs` or `-j` option
 
 Pass the option `--jobs <number_of_jobs>` to specify the number of concurrent
-jobs to run. For further information, see the documentation for the
-corresponding non-project specific configuration
-[option](yaml_configuration.md#jobs).
+jobs (Stack actions during building) to run.
+
+When [building GHC from source](yaml_configuration.md#building-ghc-from-source),
+specifies the `-j[<n>]` flag of GHC's Hadrian build system.
+
+By default, Stack specifies a number of concurrent jobs equal to the number of
+CPUs (cores) that the machine has. In some circumstances, that default can cause
+some machines to run out of memory during building. If those circumstances
+arise, specify `--jobs 1`.
+
+This configuration option is distinct from GHC's own `-j[<n>]` flag, which
+relates to parallel compilation of modules within a package.
+
+For further information, see the documentation for the corresponding non-project
+specific configuration option: [`jobs`](yaml_configuration.md#jobs).
 
 ## `--local-bin-path` option
 
