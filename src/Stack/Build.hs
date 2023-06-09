@@ -158,6 +158,19 @@ build msetLocalFiles = do
     checkComponentsBuildable allLocals
 
     installMap <- toInstallMap sourceMap
+
+    let installToString (pn, (l, v)) =
+             packageNameString pn
+          <> "-"
+          <> versionString v
+          <> " ("
+          <> show l
+          <> ")"
+    prettyDebugL
+      $ flow "Packages in install map:"
+      : mkNarrativeList Nothing False
+          (map (fromString . installToString) (Map.toAscList installMap) :: [StyleDoc])
+
     (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
         getInstalled installMap
 

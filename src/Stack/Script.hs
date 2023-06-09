@@ -307,10 +307,17 @@ getPackagesFromImports ::
      FilePath -- ^ script filename
   -> RIO EnvConfig (Set PackageName)
 getPackagesFromImports scriptFP = do
-  (pns, mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
-  if Set.null mns
-    then pure pns
-    else Set.union pns <$> getPackagesFromModuleNames mns
+  (pns', mns) <- liftIO $ parseImports <$> S8.readFile scriptFP
+  pns <- if Set.null mns
+    then pure pns'
+    else Set.union pns' <$> getPackagesFromModuleNames mns
+  prettyDebugL
+      $ "Script"
+      : style File (fromString scriptFP)
+      : flow "requires packages:"
+      : mkNarrativeList Nothing False
+          (map (fromString . packageNameString) (Set.toList pns) :: [StyleDoc])
+  pure pns
 
 getPackagesFromModuleNames ::
      Set ModuleName
