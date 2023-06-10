@@ -98,7 +98,7 @@ supported syntaxes for targets are:
     some boot packages. In particular, some snapshots include directly `Win32`
     (which is a boot package on Windows) while others do not. For example, if
     `Cabal` (a boot package) is not a local package or an extra dep, then
-    `stack build Cabal` with Stackage snapshot LTS Haskell 19.25 will:
+    `stack build Cabal` with Stackage snapshot LTS Haskell 20.25 will:
 
     * on Windows, try to build the latest version of `Cabal` in the package
       index (because that snapshot includes `Win32` directly, and `Cabal`
