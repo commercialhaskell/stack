@@ -85,12 +85,26 @@ supported syntaxes for targets are:
     of the test suite and benchmark components, respectively, are selected to be
     built.
 
-    Stackage snapshots do not include directly GHC boot packages (packages that
-    come with GHC and are included in GHC's global package database). For
-    example, if `Cabal` is not a local package or an extra dep, then
-    `stack build Cabal` will specify the latest version of that package in the
+    If *package* is a GHC boot package (packages that come with GHC and are
+    included in GHC's global package database), the behaviour can be complex.
+    If the boot package has not been 'replaced', then `stack build` will,
+    effectively, do nothing. However, if the boot package has been 'replaced'
+    then `stack build` will specify the latest version of that package in the
     package index, which may differ from the version provided by the version of
-    GHC specified by the snapshot.
+    GHC specified by the snapshot. A boot package will be treated as 'replaced'
+    if the package is included directly in the Stackage snapshot or it depends
+    on a package included directly in the snapshot. Stackage snapshots do not
+    include directly most boot packages but some snapshots may include directly
+    some boot packages. In particular, some snapshots include directly `Win32`
+    (which is a boot package on Windows) while others do not. For example, if
+    `Cabal` (a boot package) is not a local package or an extra dep, then
+    `stack build Cabal` with Stackage snapshot LTS Haskell 19.25 will:
+
+    * on Windows, try to build the latest version of `Cabal` in the package
+      index (because that snapshot includes `Win32` directly, and `Cabal`
+      depends on `Win32` and so is treated as 'replaced'); and
+    * on non-Windows, effectively, do nothing (because `Cabal` is not
+      'replaced').
 
 *   *package identifier*, e.g. `stack build foobar-1.2.3`, is usually used to
     include specific package versions from the package index.
