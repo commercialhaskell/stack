@@ -149,7 +149,9 @@ import           Stack.Types.Platform
 import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
 import           Stack.Types.SourceMap
-                   ( SMActual (..), SMTargets (..), SourceMap (..) )
+                   ( GlobalPackage (..), SMActual (..), SMTargets (..)
+                   , SourceMap (..)
+                   )
 import           Stack.Types.Version
                    ( VersionCheck, stackMinorVersion, stackVersion )
 import           Stack.Types.VersionedDownloadInfo
@@ -644,11 +646,23 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
 
   (sourceMap, sourceMapHash) <- runWithGHC menv compilerPaths $ do
     smActual <- actualFromGhc (bcSMWanted bc) compilerVer
+    let globalDpToString (pn, g) = packageNameString pn <> "(" <> show (dpPackageIdent g) <> ")"
+    let globalToString (pn, g) = packageNameString pn <> case g of
+          GlobalPackage v -> "-" <> versionString v
+          ReplacedGlobalPackage pns -> " (replaced by: " <> show (map packageNameString pns) <> ")"
+    prettyDebugL
+      $ flow "Globals in actual source map:"
+      : mkNarrativeList Nothing False
+          (map (fromString . globalDpToString) (Map.toAscList $ smaGlobal smActual) :: [StyleDoc])
     let actualPkgs = Map.keysSet (smaDeps smActual) <>
                      Map.keysSet (smaProject smActual)
         prunedActual = smActual
           { smaGlobal = pruneGlobals (smaGlobal smActual) actualPkgs }
         haddockDeps = shouldHaddockDeps (configBuild config)
+    prettyDebugL
+      $ flow "Globals in 'pruned' actual source map:"
+      : mkNarrativeList Nothing False
+          (map (fromString . globalToString) (Map.toAscList $ smaGlobal prunedActual) :: [StyleDoc])
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     prettyDebugL
       $ flow "Parsed targets:"
