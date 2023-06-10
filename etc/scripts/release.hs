@@ -1,15 +1,17 @@
 {- stack script
-    --resolver lts-20.23
-    --extra-dep Cabal-3.6.3.0
-    --extra-dep directory-1.3.6.2
-    --ghc-options -Wall
+   --resolver lts-20.23
+   --extra-dep Cabal-3.6.3.0
+   --extra-dep directory-1.3.6.2
+   --ghc-options -Wall
 -}
 
--- The GitHub workflow `integration-tests.yml` works on all operating systems
--- other than Windows without the `--extra-dep Cabal-3.6.3.0` and
--- `--extra-dep directory-1.3.6.2` above. However, on Windows, if they are
--- omitted, then `stack release.hs` somehow calls on Cabal-3.8.1.0 and
--- directory-1.3.8.0, which causes an error.
+-- As no packages are specified in the `stack script` command in the Stack
+-- interpreter options comment, Stack deduces the required packages from the
+-- module imports, being: Cabal, base, bytestring, directory, extra, process,
+-- shake, tar, zip-archive and zlib. These are either GHC boot packages or in
+-- the snapshot. However, Stackage LTS 20.23 includes `Win32` directly, which
+-- results in `Cabal` and `directory` being 'replaced' on Windows. Consequently,
+-- they need to be specified as extra deps.
 
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
