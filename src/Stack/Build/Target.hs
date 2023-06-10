@@ -245,7 +245,7 @@ data ResolveResult = ResolveResult
 -- | Convert a 'RawTarget' into a 'ResolveResult' (see description on the
 -- module).
 resolveRawTarget ::
-     (HasLogFunc env, HasPantryConfig env, HasProcessContext env)
+     (HasLogFunc env, HasPantryConfig env, HasProcessContext env, HasTerm env)
   => SMActual GlobalPackage
   -> Map PackageName PackageLocation
   -> (RawInput, RawTarget)
@@ -372,13 +372,36 @@ resolveRawTarget sma allLocs (ri, rt) =
         , rrAddedDep = Nothing
         , rrPackageType = PTProject
         }
-    | Map.member name deps =
+    | Map.member name deps = do
+        prettyDebugL
+          [ "Deferring"
+          , fromString $ packageNameString name
+          , flow "as in dependencies."
+          ]
         pure $ deferToConstructPlan name
     | Just gp <- Map.lookup name globals =
         case gp of
-          GlobalPackage _ -> pure $ deferToConstructPlan name
-          ReplacedGlobalPackage _ -> hackageLatest name
-    | otherwise = hackageLatest name
+          GlobalPackage _ -> do
+            prettyDebugL
+              [ "Deferring"
+              , fromString $ packageNameString name
+              , flow "as is a GHC boot package."
+              ]
+            pure $ deferToConstructPlan name
+          ReplacedGlobalPackage _ -> do
+            prettyDebugL
+              [ flow "Getting latest from Hackage as"
+              , fromString $ packageNameString name
+              , flow "is a replaced GHC boot package."
+              ]
+            hackageLatest name
+    | otherwise = do
+        prettyDebugL
+          [ flow "Getting latest from Hackage as"
+          , fromString $ packageNameString name
+          , flow "is not otherwise recognised."
+          ]
+        hackageLatest name
 
   -- Note that we use getLatestHackageRevision below, even though it's
   -- non-reproducible, to avoid user confusion. In any event, reproducible
@@ -533,6 +556,14 @@ parseTargets ::
   -> RIO env SMTargets
 parseTargets needTargets haddockDeps boptscli smActual = do
   logDebug "Parsing the targets"
+  prettyDebugL
+    $ flow "Packages in the actual source map dependencies:"
+    : mkNarrativeList Nothing False
+        (map (fromString . packageNameString) (Map.keys $ smaDeps smActual) :: [StyleDoc])
+  prettyDebugL
+    $ flow "Packages in the actual source map globals:"
+    : mkNarrativeList Nothing False
+        (map (fromString . packageNameString) (Map.keys $ smaGlobal smActual) :: [StyleDoc])
   bconfig <- view buildConfigL
   workingDir <- getCurrentDir
   locals <- view $ buildConfigL.to (smwProject . bcSMWanted)
