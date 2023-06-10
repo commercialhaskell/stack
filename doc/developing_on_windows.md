@@ -14,11 +14,16 @@ environment too by executing all programs through
 `stack exec -- <program_name>`.
 
 Executables and libraries can be installed with the MSYS2 package manager
-`pacman`. All tools can be found in the
-[package list](https://github.com/msys2/msys2/wiki/Packages). A [list of
-commands](https://github.com/msys2/msys2/wiki/Using-packages) that work with
-`pacman` is also available. Just remember that `pacman` &mdash; like all other
-tools &mdash; should be started with `stack exec -- pacman`.
+`pacman`. All tools can be found in the [index](https://packages.msys2.org) to
+MSYS2 packages. A [guide](https://www.msys2.org/docs/package-management/) to
+package management with `pacman` is also available. `pacman` &mdash; like all
+other tools in the Stack environment &mdash; should be started with
+`stack exec -- pacman`. Help about `pacman` commands (operations) can be
+obtained by `stack exec -- pacman --help`. Help about a specific `pacman`
+operation can be obtained by using `--help` (or `-h`) with an operation. For
+example, help about the operation `--sync` (or `-S`) can be obtained with
+`stack exec -- pacman --sync --help` or, equivalently,
+`stack exec -- pacman -Sh`.
 
 Command `stack path --bin-path` to see the PATH in the Stack environment. On
 Windows, it includes the `\mingw64\bin`, `\usr\bin` and `\usr\local\bin`
@@ -27,13 +32,14 @@ directories of the Stack-supplied MSYS2. If your executable depends on files
 it outside of the Stack environment, you will need to ensure copies of those
 files are on the PATH.
 
+## Updating the Stack-supplied MSYS2 ##
+
 The Stack-supplied MSYS2 can itself be updated with the Stack-supplied `pacman`.
-See the MSYS2 guide
-['III. Updating packages'](https://www.msys2.org/wiki/MSYS2-installation/). If
+See the MSYS2 guide [Updating MSYS2](https://www.msys2.org/docs/updating/). If
 the Stack-supplied `pacman` has a version that is 5.0.1.6403 or greater (see
 `stack exec -- pacman --version`) then the command to update is simply:
 
-    stack exec -- pacman -Syuu
+    stack exec -- pacman -Suy
 
 This command may need to be run more than once, until everything is reported by
 `pacman` as 'up to date' and 'nothing to do'.
