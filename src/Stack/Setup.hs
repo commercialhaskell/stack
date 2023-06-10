@@ -148,7 +148,8 @@ import           Stack.Types.Platform
                    , platformOnlyRelDir )
 import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
-import           Stack.Types.SourceMap ( SMActual (..), SourceMap (..) )
+import           Stack.Types.SourceMap
+                   ( SMActual (..), SMTargets (..), SourceMap (..) )
 import           Stack.Types.Version
                    ( VersionCheck, stackMinorVersion, stackVersion )
 import           Stack.Types.VersionedDownloadInfo
@@ -649,6 +650,14 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
           { smaGlobal = pruneGlobals (smaGlobal smActual) actualPkgs }
         haddockDeps = shouldHaddockDeps (configBuild config)
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
+    prettyDebugL
+      $ flow "Parsed targets:"
+      : mkNarrativeList Nothing False
+          (map (fromString . packageNameString) (Map.keys $ smtTargets targets) :: [StyleDoc])
+    prettyDebugL
+      $ flow "Parsed target dependencies:"
+      : mkNarrativeList Nothing False
+          (map (fromString . packageNameString) (Map.keys $ smtDeps targets) :: [StyleDoc])
     sourceMap <- loadSourceMap targets boptsCLI smActual
     sourceMapHash <- hashSourceMapData boptsCLI sourceMap
     pure (sourceMap, sourceMapHash)
