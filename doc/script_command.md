@@ -18,12 +18,6 @@ configuration files (global and project-level). A snapshot must be specified on
 the command line (with the `--resolver` option). For example:
 
 ~~~text
-stack --resolver lts-20.23 MyScript.hs
-~~~
-
-or, equivalently:
-
-~~~text
 stack script --resolver lts-20.23 MyScript.hs
 ~~~
 
@@ -39,11 +33,35 @@ A package can be added to the snapshot on the command line with the
 Each required package can be specified by name on the command line with the
 `--package` option (which can be specified multiple times). A single `--package`
 option can also refer to a list of package names, separated by a space or comma
-character. If the package is not in the snapshot, the most recent version on
-Hackage will be obtained. If no packages are specified in that way, all the
-required packages that are in the snapshot will be deduced by reference to the
+character. If the package is not in the snapshot, the most recent version in the
+package index (e.g. Hackage) will be obtained.
+
+If no packages are specified in that way, all the required packages that are in
+the snapshot or are a GHC boot package (packages that come with GHC and are
+included in GHC's global package database) will be deduced by reference to the
 `import` statements in the source file. The `base` package associated with the
 version of GHC specified by the snapshot is always available.
+
+If a required package is a GHC boot package, the behaviour can be complex. If
+the boot package has not been 'replaced', then it will be used in Stack's build
+plan. However, if the boot package has been 'replaced', the latest version of
+that package in the package index will be used in Stack's build plan, which may
+differ from the version provided by the version of GHC specified by the
+snapshot. A boot package will be treated as 'replaced' if the package i
+included directly in the Stackage snapshot or it depends on a package included
+directly in the snapshot. Stackage snapshots do not include directly most boot
+packages but some snapshots may include directly some boot packages. In
+particular, some snapshots include directly `Win32` (which is a boot package on
+Windows) while others do not. For example, if `Cabal` (a boot package) is a
+required package then, with Stackage snapshot LTS Haskell 20.25, Stack will:
+
+* on Windows, try to construct a build plan based on the latest version of
+  `Cabal` in the package index (because that snapshot includes `Win32` directly,
+  and `Cabal` depends on `Win32` and so is treated as 'replaced'); and
+* on non-Windows, use the boot package in the build plan (because `Cabal` is not
+  'replaced').
+
+Boot packages that have been 'replaced' can be specified as an `--extra-dep`.
 
 The source file can be compiled by passing either the `--compile` flag (no
 optimization) or the `--optimize` flag (compilation with optimization). If the
@@ -91,3 +109,69 @@ All the compilation outputs (like `Main.hi`, `Main.o`, and the executable
 If compiled and run with the additional flag `--use-root`, all the compilation
 outputs will be written to a directory named `MyScript.hs` at
 `Users/jane/my-project/` in the `scripts` directory of the Stack root.
+
+For example, consider the following script extract, based on snapshot Stackage
+LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
+`stack script` command is specified using Stack's
+[script interpreter](scripts.md).
+
+=== "Windows"
+
+    The snapshot includes `Win32` directly. As a consequence, GHC boot packages
+    `directory`, `process` and `time` (which depend on `Win32`) are all treated
+    as 'replaced'.
+
+    ~~~haskell
+    {- stack script
+       --resolver lts-20.25
+       --extra-dep acme-missiles-0.3
+       --extra-dep directory-1.3.6.2
+       --extra-dep process-1.6.16.0
+       --extra-dep time-1.11.1.1
+    -}
+
+    import Acme.Missiles -- from acme-missiles
+    import Data.Time.Clock.System -- from time
+    import System.Time.Extra -- from extra
+
+    ...
+    ~~~
+
+    `acme-missiles` is not in the snapshot and so needs to be specified as an
+    extra dep.
+
+    Stack can deduce that the module imports imply that the required packages
+    are `acme-missiles`, `time` and `extra` (which is in the snapshot).
+
+    `extra` depends on `directory` and `process`. If `directory` and `process`
+    are not specified as extra deps, Stack will complain that they have been
+    'pruned'.
+
+    `directory-1.3.6.2` depends on `time < 1.12`. If `time` is not specified as
+    an extra dep, Stack will try to construct a build plan based on the latest
+    version in the package index (which will fail, as the latest version is
+    `>= 1.12`)
+
+=== "Unix-like"
+
+    ~~~haskell
+    {- stack script
+       --resolver lts-20.25
+       --extra-dep acme-missiles-0.3
+    -}
+
+    import Acme.Missiles -- from acme-missiles
+    import Data.Time.Clock.System -- from time
+    import System.Time.Extra -- from extra
+
+    ...
+    ~~~
+
+    `acme-missiles` is not in the snapshot and so needs to be specified as an
+    extra dep.
+
+    Stack can deduce that the module imports imply that the required packages
+    are `acme-missiles`, `time` and `extra` (which is in the snapshot).
+
+    All the other dependencies required are either GHC boot packages (which have
+    not been 'replaced') or in the snapshot.
