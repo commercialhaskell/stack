@@ -2715,21 +2715,22 @@ primaryComponentOptions ::
   -> LocalPackage
   -> [String]
 primaryComponentOptions executableBuildStatuses lp =
-    -- TODO: get this information from target parsing instead,
-    -- which will allow users to turn off library building if
-    -- desired
-    (case packageLibraries package of
-      NoLibraries -> []
-      HasLibraries names ->
-          map T.unpack
-        $ T.append "lib:" (T.pack (packageNameString (packageName package)))
-        : map (T.append "flib:") (Set.toList names)) ++
-    map
-      (T.unpack . T.append "lib:")
-      (Set.toList $ packageInternalLibraries package) ++
-    map
-      (T.unpack . T.append "exe:")
-      (Set.toList $ exesToBuild executableBuildStatuses lp)
+  -- TODO: get this information from target parsing instead, which will allow
+  -- users to turn off library building if desired
+     ( case packageLibraries package of
+         NoLibraries -> []
+         HasLibraries names -> map
+           T.unpack
+           ( T.append "lib:" (T.pack (packageNameString (packageName package)))
+           : map (T.append "flib:") (Set.toList names)
+           )
+     )
+  ++ map
+       (T.unpack . T.append "lib:")
+       (Set.toList $ packageInternalLibraries package)
+  ++ map
+       (T.unpack . T.append "exe:")
+       (Set.toList $ exesToBuild executableBuildStatuses lp)
  where
   package = lpPackage lp
 
