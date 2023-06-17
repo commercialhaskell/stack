@@ -87,9 +87,14 @@ Examples:
     stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
     ~~~
 
-7.  Ensure the integration tests pass on Linux, macOS and Windows.
+7.  The Windows installer is built using an
+    [NSIS compiler](https://nsis.sourceforge.io/Main_Page). Check that the NSIS
+    compiler that will be used is capable of handling
+    [large strings](https://nsis.sourceforge.io/Special_Builds).
 
-8.  Some people prefer, or need, to build Stack with Cabal (the tool). Check
+8.  Ensure the integration tests pass on Linux, macOS and Windows.
+
+9.  Some people prefer, or need, to build Stack with Cabal (the tool). Check
     that `cabal.project` is up to date (the specified `with-compiler:`). Check
     that `cabal.config` is up to date and is not missing dependencies relevant
     on Windows and non-Windows operating systems, following the instructions in
