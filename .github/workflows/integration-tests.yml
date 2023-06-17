@@ -16,9 +16,12 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 5 May 2023, ubuntu-latest, windows-latest and macos-latest come
-# with Stack 2.9.3 and GHC 9.6.1. windows-latest comes with NSIS 3.08, for which
-# the default value of the 'Unicode' installer attribute is 'true'.
+# As of 16 June 2023, ubuntu-latest, windows-latest and macos-latest come
+# with Stack 2.11.1 and GHC 9.6.2. windows-latest comes with NSIS 3.08, for
+# which the default value of the 'Unicode' installer attribute is 'true'.
+# However, that is not the 'large strings' build of NSIS and creates installers
+# that corrupt the PATH environment variable if the default string length of
+# 1024 characters is exceeded.
 
 jobs:
   integration-tests:
@@ -101,6 +104,20 @@ jobs:
             - /lib
             - /usr/lib
         EOF
+        fi
+
+        # Updates NSIS 3.08 to a 'large strings' build of the same tool. See
+        # https://nsis.sourceforge.io/Special_Builds.
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]
+        then
+          # wget is not available but the Stack-supplied MSYS2 will provide it
+          stack exec -- wget -O nsis-3.08-strlen_8192.zip https://downloads.sourceforge.net/nsis/NSIS%203/3.08/nsis-3.08-strlen_8192.zip
+          7z x -aoa -o"/c/Program Files (x86)/NSIS" nsis-3.08-strlen_8192.zip
+          # Clean up
+          rm nsis-3.08-strlen_8192.zip
+          makensis -VERSION && echo
+          # Should include defined symbol NSIS_MAX_STRLEN=8192
+          makensis -HDRINFO
         fi
 
         # In case GHCup hooks have been created, remove them
