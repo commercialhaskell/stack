@@ -8,8 +8,10 @@
 -- module imports, being: Cabal, base, bytestring, directory, extra, process,
 -- shake, tar, zip-archive and zlib. These are either GHC boot packages or in
 -- the snapshot. Stackage LTS Haskell 21.8 does not include boot packages
--- directly.
+-- directly. As GHC 9.4.6 boot packages Cabal and Cabal-syntax expose modules
+-- with the same names, the language extension PackageImports is required.
 
+{-# LANGUAGE PackageImports  #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -32,15 +34,15 @@ import           Development.Shake
 import           Development.Shake.FilePath
                    ( (<.>), (</>), dropFileName, exe, takeDirectory, toStandard
                    )
-import           Distribution.PackageDescription
+import           "Cabal" Distribution.PackageDescription
                    ( PackageDescription (..), packageDescription, pkgVersion
                    )
-import           Distribution.PackageDescription.Parsec
+import           "Cabal" Distribution.PackageDescription.Parsec
                    ( readGenericPackageDescription )
-import           Distribution.System
+import           "Cabal" Distribution.System
                    ( Arch, OS (..), Platform (..), buildPlatform )
-import           Distribution.Text ( display, simpleParse )
-import           Distribution.Utils.ShortText ( fromShortText )
+import           "Cabal" Distribution.Text ( display, simpleParse )
+import           "Cabal" Distribution.Utils.ShortText ( fromShortText )
 import           Distribution.Verbosity ( silent )
 import           System.Console.GetOpt ( ArgDescr (..), OptDescr (..) )
 import           System.Directory ( copyFile, getHomeDirectory, removeFile )
