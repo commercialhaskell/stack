@@ -11,9 +11,23 @@ packages:
       size: 1061
   original:
     hackage: ansi-terminal-1.0@sha256:640ffecfd95471388d939fcacb57bdc0cef15f0457746c234a12cdd5a6c6d1e8,2706
+- completed:
+    hackage: ansi-wl-pprint-1.0.2@sha256:b817853b5310b8e7847469847608b664c3e75b4b30c332f2cb8c0d00751ef9c1,1915
+    pantry-tree:
+      sha256: 3be652ff37d9ff697cb60ac1a7c544ee2cfb22f56e570f800f896355e04dd2e1
+      size: 390
+  original:
+    hackage: ansi-wl-pprint-1.0.2@sha256:b817853b5310b8e7847469847608b664c3e75b4b30c332f2cb8c0d00751ef9c1,1915
+- completed:
+    hackage: optparse-applicative-0.18.1.0@sha256:b4cf8d9018e5e67cb1f14edb5130b6d05ad8bc1b5f6bd4efaa6ec0b7f28f559d,5132
+    pantry-tree:
+      sha256: 32f52adc150eb146bf4d167ff0cb21fc1e3cd7ecc1b9e5e83b986a1cd1bc58cd
+      size: 3124
+  original:
+    hackage: optparse-applicative-0.18.1.0@sha256:b4cf8d9018e5e67cb1f14edb5130b6d05ad8bc1b5f6bd4efaa6ec0b7f28f559d,5132
 snapshots:
 - completed:
-    sha256: a638975b3da9a4182e4b4f0866c5fb01825dc04d74b503cb8e402f38c861368d
-    size: 629111
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/5/13.yaml
-  original: nightly-2023-05-13
+    sha256: 77d87bfafc69c55ea4b20e1017ef63add05cd0fbd6c1465a0d5a94fa4d6f7ae0
+    size: 639351
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/6/18.yaml
+  original: nightly-2023-06-18

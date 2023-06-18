@@ -1,21 +1,24 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.4.5.
 
-# GHC 9.4.5
-resolver: nightly-2023-05-13
+resolver: nightly-2023-06-18 # GHC 9.4.5
 
 packages:
 - .
 
 extra-deps:
 - ansi-terminal-1.0@sha256:640ffecfd95471388d939fcacb57bdc0cef15f0457746c234a12cdd5a6c6d1e8,2706
+# Required because ansi-wl-pprint-0.6.9 specifies ansi-terminal < 0.12. See:
+# https://github.com/ekmett/ansi-wl-pprint/issues/29
+- ansi-wl-pprint-1.0.2@sha256:b817853b5310b8e7847469847608b664c3e75b4b30c332f2cb8c0d00751ef9c1,1915
+- optparse-applicative-0.18.1.0@sha256:b4cf8d9018e5e67cb1f14edb5130b6d05ad8bc1b5f6bd4efaa6ec0b7f28f559d,5132
 
 allow-newer: true
 
 allow-newer-deps:
-# Required because ansi-wl-pprint-0.6.9 specifies ansi-terminal < 0.12. See:
-# https://github.com/ekmett/ansi-wl-pprint/issues/29
-- ansi-wl-pprint
+# Required because optparse-generic has not yet caught up with
+# optparse-applicative-0.18.1.0
+- optparse-generic
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
@@ -23,6 +26,7 @@ drop-packages:
 
 docker:
   enable: false
+  # Needs to be replaced by the equivalent for GHC 9.4.5, when available
   repo: fpco/alpine-haskell-stack:8.10.4
 
 nix:
@@ -34,6 +38,7 @@ nix:
 flags:
   hackage-security:
     cabal-syntax: true
+  # GHC 9.4.5's boot library is Win32-2.12.0.1
   mintty:
     win32-2-13-1: false
   stack:
