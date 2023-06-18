@@ -24,11 +24,11 @@ module Stack.Constants.Config
   ) where
 
 import           Path ( (</>), mkRelDir, mkRelFile, parseRelDir )
-import           Stack.Constants
-                   ( cabalPackageName, relDirDist, relDirGhci, relDirHpc )
+import           Stack.Constants ( relDirDist, relDirGhci, relDirHpc )
 import           Stack.Prelude
 import           Stack.Types.BuildConfig ( HasBuildConfig, projectRootL )
-import           Stack.Types.CompilerPaths ( cabalVersionL )
+import           Stack.Types.Compiler ( compilerVersionString )
+import           Stack.Types.CompilerPaths ( compilerVersionL )
 import           Stack.Types.Config ( Config, HasConfig, stackRootL, workDirL )
 import           Stack.Types.EnvConfig
                    ( HasEnvConfig, platformGhcRelDir, useShaPathOnWindows )
@@ -162,13 +162,11 @@ templatesDir config = view stackRootL config </> $(mkRelDir "templates")
 distRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
                 => m (Path Rel Dir)
 distRelativeDir = do
-    cabalPkgVer <- view cabalVersionL
+    compilerVer <- view compilerVersionL
     platform <- platformGhcRelDir
     -- Cabal version
     envDir <-
-        parseRelDir $
-        packageIdentifierString $
-        PackageIdentifier cabalPackageName cabalPkgVer
+        parseRelDir $ compilerVersionString compilerVer
     platformAndCabal <- useShaPathOnWindows (platform </> envDir)
     allDist <- rootDistRelativeDir
     pure $ allDist </> platformAndCabal
