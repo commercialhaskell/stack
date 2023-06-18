@@ -37,7 +37,7 @@ import           Development.Shake.FilePath
 import           "Cabal" Distribution.PackageDescription
                    ( PackageDescription (..), packageDescription, pkgVersion
                    )
-import           "Cabal" Distribution.PackageDescription.Parsec
+import           Distribution.Simple.PackageDescription
                    ( readGenericPackageDescription )
 import           "Cabal" Distribution.System
                    ( Arch, OS (..), Platform (..), buildPlatform )
