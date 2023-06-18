@@ -7,10 +7,10 @@ import StackTest
 -- sub, each of which exposes a module that exports a function.
 
 main :: IO ()
--- The '--install-ghc' flag is passed here, because etc/scripts/release.hs
--- passes `--no-install-ghc` when `--alpine` is passed to its 'check' command.
--- (See stack.yaml; using GHC 9.4.4.)
-main = stackErrStderr ["build", "--install-ghc"] $ \str ->
+-- The '--install-ghc' flag is passed here, because IntegrationSpec.runApp sets
+-- up `config.yaml` with `system-ghc: true` and `install-ghc: false`.
+-- (See stack.yaml; using GHC 9.4.6.)
+main = stackErrStderr ["--install-ghc", "build"] $ \str ->
   let msg = "Sublibrary dependency is not supported, this will almost \
             \certainly fail."
   in  unless (msg `isInfixOf` str) $

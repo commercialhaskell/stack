@@ -1,4 +1,4 @@
-resolver: ghc-9.2.8
+resolver: ghc-9.4.6
 name: custom1
 packages:
 - stm-2.5.0.0
