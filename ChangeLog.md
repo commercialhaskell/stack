@@ -13,9 +13,10 @@ Major changes:
 
 Behavior changes:
 
-* The path dist directory path '.stack-work/dist/<platform>/Cabal-*/'
-  changes to '.stack-work/dist/<platform>/ghc-*/' so that build artifacts are
-  clearly distinguished by ghc version.
+* Build artefacts are placed in `.stack-work/dist/<platform>/<GHC_version>`
+  (hashed to a shorter path on Windows), rather than
+  `.stack-work/dist/<platform>/<Cabal_version>`. This allows build artifacts to
+  be distinguished by GHC version.
 
 Other enhancements:
 
