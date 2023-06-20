@@ -3,24 +3,24 @@
 {-# LANGUAGE TemplateHaskell   #-}
 
 module Stack.Constants.Config
-  ( distDirFromDir
+  ( buildCachesDir
+  , configCabalMod
+  , configPackageProjectRoot
+  , configSetupConfigMod
+  , distDirFromDir
+  , distRelativeDir
+  , ghciDirL
+  , hpcDirFromDir
+  , hpcRelativeDir
+  , imageStagingDir
+  , objectInterfaceDirL
+  , projectDockerSandboxDir
   , rootDistDirFromDir
   , setupConfigFromDir
-  , workDirFromDir
-  , distRelativeDir
-  , imageStagingDir
-  , projectDockerSandboxDir
-  , configCabalMod
-  , configSetupConfigMod
-  , configPackageProjectRoot
-  , buildCachesDir
-  , testSuccessFile
-  , testBuiltFile
-  , hpcRelativeDir
-  , hpcDirFromDir
-  , objectInterfaceDirL
-  , ghciDirL
   , templatesDir
+  , testBuiltFile
+  , testSuccessFile
+  , workDirFromDir
   ) where
 
 import           Path ( (</>), mkRelDir, mkRelFile, parseRelDir )
@@ -47,55 +47,62 @@ ghciDirL = to $ \env -> -- FIXME is this idiomatic lens code?
       root = view projectRootL env
   in  root </> workDir </> relDirGhci
 
--- | The directory containing the files used for dirtiness check of source files.
-buildCachesDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-               => Path Abs Dir      -- ^ Package directory.
-               -> m (Path Abs Dir)
+-- | The directory containing the files used for dirtiness check of source
+-- files.
+buildCachesDir ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => Path Abs Dir  -- ^ Package directory.
+  -> m (Path Abs Dir)
 buildCachesDir dir =
   fmap
     (</> $(mkRelDir "stack-build-caches"))
     (distDirFromDir dir)
 
--- | The filename used to mark tests as having succeeded
-testSuccessFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-                => Path Abs Dir -- ^ Package directory
-                -> m (Path Abs File)
+-- | The filename used to mark tests as having succeeded.
+testSuccessFile ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => Path Abs Dir  -- ^ Package directory
+  -> m (Path Abs File)
 testSuccessFile dir =
   fmap
     (</> $(mkRelFile "stack-test-success"))
     (distDirFromDir dir)
 
--- | The filename used to mark tests as having built
-testBuiltFile :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-              => Path Abs Dir -- ^ Package directory
-              -> m (Path Abs File)
+-- | The filename used to mark tests as having built.
+testBuiltFile ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => Path Abs Dir  -- ^ Package directory
+  -> m (Path Abs File)
 testBuiltFile dir =
   fmap
     (</> $(mkRelFile "stack-test-built"))
     (distDirFromDir dir)
 
--- | The filename used for modification check of .cabal
-configCabalMod :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-               => Path Abs Dir      -- ^ Package directory.
-               -> m (Path Abs File)
+-- | The filename used for modification check of a Cabal file.
+configCabalMod ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => Path Abs Dir  -- ^ Package directory.
+  -> m (Path Abs File)
 configCabalMod dir =
   fmap
     (</> $(mkRelFile "stack-cabal-mod"))
     (distDirFromDir dir)
 
--- | The filename used for modification check of setup-config
-configSetupConfigMod :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-                     => Path Abs Dir      -- ^ Package directory.
-                     -> m (Path Abs File)
+-- | The filename used for modification check of setup-config.
+configSetupConfigMod ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => Path Abs Dir  -- ^ Package directory.
+  -> m (Path Abs File)
 configSetupConfigMod dir =
   fmap
     (</> $(mkRelFile "stack-setup-config-mod"))
     (distDirFromDir dir)
 
--- | The filename used for the project root from the last build of a package
-configPackageProjectRoot :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-                     => Path Abs Dir      -- ^ Package directory.
-                     -> m (Path Abs File)
+-- | The filename used for the project root from the last build of a package.
+configPackageProjectRoot ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => Path Abs Dir  -- ^ Package directory.
+  -> m (Path Abs File)
 configPackageProjectRoot dir =
   fmap
     (</> $(mkRelFile "stack-project-root"))
@@ -103,55 +110,59 @@ configPackageProjectRoot dir =
 
 -- | Directory for HPC work.
 hpcDirFromDir ::
-       (MonadThrow m, MonadReader env m, HasEnvConfig env)
-    => Path Abs Dir  -- ^ Package directory.
-    -> m (Path Abs Dir)
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => Path Abs Dir  -- ^ Package directory.
+  -> m (Path Abs Dir)
 hpcDirFromDir fp =
   fmap (fp </>) hpcRelativeDir
 
 -- | Relative location of directory for HPC work.
-hpcRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-               => m (Path Rel Dir)
+hpcRelativeDir ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => m (Path Rel Dir)
 hpcRelativeDir =
   fmap (</> relDirHpc) distRelativeDir
 
--- | Package's setup-config storing Cabal configuration
-setupConfigFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-                   => Path Abs Dir
-                   -> m (Path Abs File)
+-- | Package's setup-config storing Cabal configuration.
+setupConfigFromDir ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => Path Abs Dir
+  -> m (Path Abs File)
 setupConfigFromDir fp = do
-    dist <- distDirFromDir fp
-    pure $ dist </> $(mkRelFile "setup-config")
+  dist <- distDirFromDir fp
+  pure $ dist </> $(mkRelFile "setup-config")
 
 -- | Package's build artifacts directory.
-distDirFromDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-               => Path Abs Dir
-               -> m (Path Abs Dir)
+distDirFromDir ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => Path Abs Dir
+  -> m (Path Abs Dir)
 distDirFromDir fp =
   fmap (fp </>) distRelativeDir
 
 -- | The directory containing all dist directories, including all
--- different GHC/Cabal combos.
+-- different platform/compiler combinations.
 rootDistDirFromDir ::
-     (MonadReader env m, HasConfig env)
+     (HasConfig env, MonadReader env m)
   => Path Abs Dir
   -> m (Path Abs Dir)
 rootDistDirFromDir fp =
   fmap (fp </>) rootDistRelativeDir
 
 -- | Relative directory to the top dist directory, containing
--- individual GHC/Cabal combo as subdirs.
+-- individual platform/compiler combinations as subdirs.
 rootDistRelativeDir ::
-     (MonadReader env m, HasConfig env)
+     (HasConfig env, MonadReader env m)
   => m (Path Rel Dir)
 rootDistRelativeDir = do
-    workDir <- view workDirL
-    pure $ workDir </> relDirDist
+  workDir <- view workDirL
+  pure $ workDir </> relDirDist
 
 -- | Package's working directory.
-workDirFromDir :: (MonadReader env m, HasConfig env)
-               => Path Abs Dir
-               -> m (Path Abs Dir)
+workDirFromDir ::
+     (HasConfig env, MonadReader env m)
+  => Path Abs Dir
+  -> m (Path Abs Dir)
 workDirFromDir fp = view $ workDirL.to (fp </>)
 
 -- | Directory for project templates.
@@ -159,20 +170,21 @@ templatesDir :: Config -> Path Abs Dir
 templatesDir config = view stackRootL config </> $(mkRelDir "templates")
 
 -- | Relative location of build artifacts.
-distRelativeDir :: (MonadThrow m, MonadReader env m, HasEnvConfig env)
-                => m (Path Rel Dir)
+distRelativeDir ::
+     (HasEnvConfig env, MonadReader env m, MonadThrow m)
+  => m (Path Rel Dir)
 distRelativeDir = do
-    compilerVer <- view compilerVersionL
-    platform <- platformGhcRelDir
-    -- Cabal version
-    envDir <-
-        parseRelDir $ compilerVersionString compilerVer
-    platformAndCabal <- useShaPathOnWindows (platform </> envDir)
-    allDist <- rootDistRelativeDir
-    pure $ allDist </> platformAndCabal
+  compilerVer <- view compilerVersionL
+  platform <- platformGhcRelDir
+  -- Compiler version: allows build artefacts to be distinguished by compiler
+  -- version, which will also distinguish one Cabal version from another.
+  compilerDir <- parseRelDir $ compilerVersionString compilerVer
+  platformAndCompiler <- useShaPathOnWindows (platform </> compilerDir)
+  allDist <- rootDistRelativeDir
+  pure $ allDist </> platformAndCompiler
 
 -- | Docker sandbox from project root.
-projectDockerSandboxDir :: (MonadReader env m, HasConfig env)
+projectDockerSandboxDir :: (HasConfig env, MonadReader env m)
   => Path Abs Dir      -- ^ Project root
   -> m (Path Abs Dir)  -- ^ Docker sandbox
 projectDockerSandboxDir projectRoot = do
@@ -180,7 +192,8 @@ projectDockerSandboxDir projectRoot = do
   pure $ projectRoot </> workDir </> $(mkRelDir "docker/")
 
 -- | Image staging dir from project root.
-imageStagingDir :: (MonadReader env m, HasConfig env, MonadThrow m)
+imageStagingDir ::
+     (HasConfig env, MonadReader env m, MonadThrow m)
   => Path Abs Dir      -- ^ Project root
   -> Int               -- ^ Index of image
   -> m (Path Abs Dir)  -- ^ Docker sandbox
