@@ -5,6 +5,7 @@ module Stack.Types.CompilerPaths
   , GhcPkgExe (..)
   , HasCompiler (..)
   , cabalVersionL
+  , compilerVersionL
   , cpWhich
   , getCompilerPath
   , getGhcPkgExe
@@ -61,6 +62,9 @@ newtype GhcPkgExe
 
 cabalVersionL :: HasCompiler env => SimpleGetter env Version
 cabalVersionL = compilerPathsL.to cpCabalVersion
+
+compilerVersionL :: HasCompiler env => SimpleGetter env ActualCompiler
+compilerVersionL = compilerPathsL.to cpCompilerVersion
 
 cpWhich :: (MonadReader env m, HasCompiler env) => m WhichCompiler
 cpWhich = view $ compilerPathsL.to (whichCompiler.cpCompilerVersion)

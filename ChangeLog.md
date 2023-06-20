@@ -13,6 +13,10 @@ Major changes:
 
 Behavior changes:
 
+* The path dist directory path '.stack-work/dist/<platform>/Cabal-*/'
+  changes to '.stack-work/dist/<platform>/ghc-*/' so that build artifacts are
+  clearly distinguished by ghc version.
+
 Other enhancements:
 
 * Avoid the duplicate resolving of usage files when parsing `*.hi` files into a
