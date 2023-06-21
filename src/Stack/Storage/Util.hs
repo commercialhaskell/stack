@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE CPP                   #-}
 
 -- | Utils for the other Stack.Storage modules
 module Stack.Storage.Util
@@ -26,6 +27,9 @@ updateSet ::
        , PersistEntity record
        , MonadIO m
        , PersistQueryWrite backend
+#if MIN_VERSION_persistent(2,14,0)
+       , SafeToInsert record
+#endif
        )
     => (parentid -> value -> record)
     -> EntityField record parentid
@@ -51,6 +55,9 @@ updateList ::
        , PersistEntity record
        , MonadIO m
        , PersistQueryWrite backend
+#if MIN_VERSION_persistent(2,14,0)
+       , SafeToInsert record
+#endif
        )
     => (parentid -> Int -> value -> record)
     -> EntityField record parentid
