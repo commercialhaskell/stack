@@ -365,6 +365,7 @@ library
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
   if os(windows)
     other-modules:
+        System.Posix.User
         System.Uname
     hs-source-dirs:
         src/windows/

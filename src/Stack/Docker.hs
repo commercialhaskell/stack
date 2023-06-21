@@ -66,7 +66,7 @@ import           System.IO.Unsafe ( unsafePerformIO )
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
-import qualified System.PosixCompat.User as User
+import           System.Posix.User as User
 import qualified System.PosixCompat.Files as Files
 import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
 import           Text.ParserCombinators.ReadP ( readP_to_S )
