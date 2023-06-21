@@ -7,6 +7,7 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP                 #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -66,7 +67,11 @@ import           System.IO.Unsafe ( unsafePerformIO )
 import           System.Posix.Signals
 import qualified System.Posix.User as PosixUser
 #endif
+#if MIN_VERSION_unix(0,7,0)
+import           System.Posix.User as User
+#else
 import qualified System.PosixCompat.User as User
+#endif
 import qualified System.PosixCompat.Files as Files
 import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
 import           Text.ParserCombinators.ReadP ( readP_to_S )
