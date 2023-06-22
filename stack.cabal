@@ -101,6 +101,8 @@ extra-source-files:
     test/package-dump/ghc-head.txt
     src/test/Stack/Untar/test1.tar.gz
     src/test/Stack/Untar/test2.tar.gz
+    cabal.project
+    cabal.config
 
 source-repository head
   type: git
