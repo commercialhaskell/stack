@@ -80,6 +80,17 @@ Bug fixes:
 * The warning that sublibrary dependency is not supported is no longer triggered
   by internal libraries.
 
+## v2.9.3.1 - 2023-06-22
+
+Hackage-only release of the `stack` package:
+
+* Supports building against snapshot Stackage LTS Haskell 21.0 (GHC 9.4.5),
+  without extra deps.
+* Supports build with `persistent-2.14.5.0`, using CPP directives.
+* Supports build with `unix-compat-0.7`, by removing reliance on the module
+  `System.PosixCompat.User` removed in that package.
+* Includes `cabal.project` and `cabal.config` files in the package.
+
 ## v2.9.3 - 2022-12-16
 
 **Changes since v2.9.1:**
