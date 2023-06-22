@@ -1,5 +1,5 @@
 name: stack
-version: '2.9.3'
+version: '2.9.3.1'
 synopsis: The Haskell Tool Stack
 description: |
   Please see the documentation at <https://docs.haskellstack.org>
@@ -23,7 +23,7 @@ homepage: http://haskellstack.org
 custom-setup:
   dependencies:
   - base >= 4.14.3.0 && < 5
-  - Cabal
+  - Cabal < 3.10
   - filepath
 extra-source-files:
 # note: leaving out 'package.yaml' because it causes confusion with hackage metadata revisions
@@ -39,6 +39,8 @@ extra-source-files:
 - test/package-dump/ghc-head.txt
 - src/test/Stack/Untar/test1.tar.gz
 - src/test/Stack/Untar/test2.tar.gz
+- cabal.project
+- cabal.config
 ghc-options:
 - -fwrite-ide-info
 - -hiedir=.hie

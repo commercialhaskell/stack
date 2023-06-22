@@ -5,7 +5,7 @@ cabal-version: 2.0
 -- see: https://github.com/sol/hpack
 
 name:           stack
-version:        2.9.3
+version:        2.9.3.1
 synopsis:       The Haskell Tool Stack
 description:    Please see the documentation at <https://docs.haskellstack.org>
                 for usage information.
@@ -101,6 +101,8 @@ extra-source-files:
     test/package-dump/ghc-head.txt
     src/test/Stack/Untar/test1.tar.gz
     src/test/Stack/Untar/test2.tar.gz
+    cabal.project
+    cabal.config
 
 source-repository head
   type: git
@@ -108,7 +110,7 @@ source-repository head
 
 custom-setup
   setup-depends:
-      Cabal
+      Cabal <3.10
     , base >=4.14.3.0 && <5
     , filepath
 

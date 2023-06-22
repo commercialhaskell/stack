@@ -1,14 +1,8 @@
-# GHC 9.2.5
-resolver: lts-20.0
+# GHC 9.4.5
+resolver: lts-21.0
 
 packages:
 - .
-
-extra-deps:
-- hpack-0.35.1@sha256:ef816234cbc7b52b0a6c55f7e904b6bc5292b8dd8f2d81ffcbcbc69ab80d75e5,4762
-- pantry-0.8.1@sha256:196111414d2489499fda6213deebcb865bc12285023d5af9bd273bf27cdb185d,4099
-- rio-prettyprint-0.1.4.0@sha256:1f8eb3ead0ef33d3736d53e1de5e9b2c91a0c207cdca23321bd74c401e85f23a,1301
-- fsnotify-0.4.1.0@sha256:44540beabea36aeeef930aa4d5f28091d431904bc9923b6ac4d358831c651235,2854
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712
