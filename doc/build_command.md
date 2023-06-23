@@ -329,6 +329,8 @@ using events to determine if a file has changed.
 
 ### `--watch-all` flag
 
+[:octicons-tag-24: 2.5.1](https://github.com/commercialhaskell/stack/releases/tag/v2.5.1)
+
 Pass the flag to rebuild your project every time any local file changes (from
 project packages or from local dependencies). See also the `--file-watch` flag.
 
