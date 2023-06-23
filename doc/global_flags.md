@@ -160,6 +160,16 @@ Stack can be configured to integrate with Nix. For further information, see
 Pass the flag `--numeric-version` to cause Stack to report its numeric version
 to standard output (e.g. `2.9.1`) and quit.
 
+## `--[no-]plan-in-log` flag
+
+:octicons-tag-24: UNRELEASED
+
+Default: Disabled
+
+Enables/disables the logging of build plan construction in debug output.
+Information about the build plan construction can be lengthy. If you do not need
+it, it is best omitted from the debug output.
+
 ## `--resolver` option
 
 Pass the option `--resolver <snapshot>` to specify the snapshot. For further

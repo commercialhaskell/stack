@@ -24,6 +24,9 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     -- ^ Whether to include timings in logs.
   , globalMonoidRSLInLog     :: !FirstFalse
     -- ^ Whether to include raw snapshot layer (RSL) in logs.
+  , globalMonoidPlanInLog :: !FirstFalse
+    -- ^ Whether to include debug information about the construction of the
+    -- build plan in logs.
   , globalMonoidConfigMonoid :: !ConfigMonoid
     -- ^ Config monoid, for passing into 'loadConfig'
   , globalMonoidResolver     :: !(First (Unresolved AbstractResolver))

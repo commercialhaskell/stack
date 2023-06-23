@@ -24,6 +24,9 @@ data GlobalOpts = GlobalOpts
   , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
   , globalRSLInLog     :: !Bool
     -- ^ Whether to include raw snapshot layer (RSL) in logs.
+  , globalPlanInLog :: !Bool
+    -- ^ Whether to include debug information about the construction of the
+    -- build plan in logs.
   , globalConfigMonoid :: !ConfigMonoid
     -- ^ Config monoid, for passing into 'loadConfig'
   , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override

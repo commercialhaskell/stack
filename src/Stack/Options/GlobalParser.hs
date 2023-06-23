@@ -57,6 +57,10 @@ globalOptsParser currentDir kind = GlobalOptsMonoid
         "rsl-in-log"
         "inclusion of raw snapshot layer (rsl) in logs."
         hide
+  <*> firstBoolFlagsFalse
+        "plan-in-log"
+        "inclusion of information about build plan construction in logs."
+        hide
   <*> configOptsParser currentDir kind
   <*> optionalFirst (abstractResolverOptsParser hide0)
   <*> pure (First Nothing)
@@ -129,6 +133,7 @@ globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
     , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
     , globalTimeInLog = fromFirstTrue globalMonoidTimeInLog
     , globalRSLInLog = fromFirstFalse globalMonoidRSLInLog
+    , globalPlanInLog = fromFirstFalse globalMonoidPlanInLog
     , globalConfigMonoid = globalMonoidConfigMonoid
     , globalResolver = resolver
     , globalCompiler = getFirst globalMonoidCompiler

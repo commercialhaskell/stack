@@ -57,6 +57,7 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.EnvSettings ( EnvSettings (..), minimalEnvSettings )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
@@ -67,7 +68,7 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Platform ( HasPlatform (..) )
-import           Stack.Types.Runner ( HasRunner (..) )
+import           Stack.Types.Runner ( HasRunner (..), globalOptsL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), FromSnapshot (..)
                    , GlobalPackage (..), SMTargets (..), SourceMap (..)
@@ -75,7 +76,6 @@ import           Stack.Types.SourceMap
 import           Stack.Types.Version
                    ( latestApplicableVersion, versionRangeText, withinRange )
 import           System.Environment ( lookupEnv )
-import           System.IO ( putStrLn )
 
 data PackageInfo
   = PIOnlyInstalled InstallLocation Installed
@@ -260,7 +260,7 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
   sources <- getSources globalCabalVersion
   mcur <- view $ buildConfigL.to bcCurator
 
-  let onTarget = void . addDep
+  let onTarget = void . getCachedDepOrAddDep
   let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
   pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
   let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
@@ -296,7 +296,6 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
                 else Map.empty
         }
     else do
-      planDebug $ show errs
       stackYaml <- view stackYamlL
       stackRoot <- view stackRootL
       prettyThrowM $ ConstructPlanFailed
@@ -539,56 +538,64 @@ addFinal lp package isAllInOne buildHaddocks = do
 -- marked as a dependency, even if it is directly wanted. This makes sense - if
 -- we left out packages that are deps, it would break the --only-dependencies
 -- build plan.
-addDep :: PackageName -> M (Either ConstructPlanException AddDepRes)
-addDep name = do
+getCachedDepOrAddDep ::
+     PackageName
+  -> M (Either ConstructPlanException AddDepRes)
+getCachedDepOrAddDep name = do
   libMap <- get
   case Map.lookup name libMap of
     Just res -> do
-      planDebug $
-        "addDep: Using cached result for " ++ show name ++ ": " ++ show res
+      logDebugPlanS "getCachedDepOrAddDep" $
+           "Using cached result for "
+        <> fromString (packageNameString name)
+        <> ": "
+        <> fromString (show res)
       pure res
-    Nothing -> addDep' name
+    Nothing -> checkCallStackAndAddDep name
 
 -- | Given a 'PackageName', adds all of the build tasks to build the package.
 -- First checks that the package name is not already in the call stack.
-addDep' :: PackageName -> M (Either ConstructPlanException AddDepRes)
-addDep' name = do
+checkCallStackAndAddDep ::
+     PackageName
+  -> M (Either ConstructPlanException AddDepRes)
+checkCallStackAndAddDep name = do
   ctx <- ask
   let mpackageInfo = Map.lookup name $ combinedMap ctx
   res <- if name `elem` callStack ctx
     then do
-      planDebug $
-           "addDep': Detected cycle "
-        <> show name
+      logDebugPlanS "checkCallStackAndAddDep" $
+           "Detected cycle "
+        <> fromString (packageNameString name)
         <> ": "
-        <> show (callStack ctx)
+        <> fromString (show $ map packageNameString (callStack ctx))
       pure $ Left $ DependencyCycleDetected $ name : callStack ctx
     else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
       case mpackageInfo of
         -- TODO look up in the package index and see if there's a
         -- recommendation available
         Nothing -> do
-          planDebug $
-               "addDep': No package info for "
-            <> show name
+          logDebugPlanS "checkCallStackAndAddDep" $
+               "No package info for "
+            <> fromString (packageNameString name)
+            <> "."
           pure $ Left $ UnknownPackage name
-        Just packageInfo -> addDep'' name packageInfo
+        Just packageInfo -> addDep name packageInfo
   updateLibMap name res
   pure res
 
 -- | Given a 'PackageName' and its 'PackageInfo' from the combined map, adds all
 -- of the build tasks to build the package. Assumes that the head of the call
 -- stack is the current package name.
-addDep'' ::
+addDep ::
      PackageName
   -> PackageInfo
   -> M (Either ConstructPlanException AddDepRes)
-addDep'' name packageInfo = do
-  planDebug $
-       "addDep'': Package info for "
-    <> show name
+addDep name packageInfo = do
+  logDebugPlanS "addDep" $
+       "Package info for "
+    <> fromString (packageNameString name)
     <> ": "
-    <> show packageInfo
+    <> fromString (show packageInfo)
   case packageInfo of
     PIOnlyInstalled loc installed -> do
       -- FIXME Slightly hacky, no flags since they likely won't affect
@@ -678,18 +685,19 @@ installPackage name ps minstalled = do
   ctx <- ask
   case ps of
     PSRemote pkgLoc _version _fromSnapshot cp -> do
-      planDebug $
-           "installPackage: Doing all-in-one build for upstream package "
-        <> show name
+      logDebugPlanS "installPackage" $
+           "Doing all-in-one build for upstream package "
+        <> fromString (packageNameString name)
+        <> "."
       package <- loadPackage
         ctx pkgLoc (cpFlags cp) (cpGhcOptions cp) (cpCabalConfigOpts cp)
       resolveDepsAndInstall True (cpHaddocks cp) ps package minstalled
     PSFilePath lp -> do
       case lpTestBench lp of
         Nothing -> do
-          planDebug $
-               "installPackage: No test / bench component for "
-            <> show name
+          logDebugPlanS "installPackage" $
+               "No test or bench component for "
+            <> fromString (packageNameString name)
             <> " so doing an all-in-one build."
           resolveDepsAndInstall
             True (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
@@ -705,10 +713,10 @@ installPackage name ps minstalled = do
             pure (res, writerFunc)
           case res of
             Right deps -> do
-              planDebug $
-                   "installPackage: For "
-                <> show name
-                <> ", successfully added package deps"
+              logDebugPlanS "installPackage" $
+                   "For "
+                <> fromString (packageNameString name)
+                <> ", successfully added package deps."
               -- in curator builds we can't do all-in-one build as
               -- test/benchmark failure could prevent library from being
               -- available to its dependencies but when it's already available
@@ -727,10 +735,9 @@ installPackage name ps minstalled = do
             Left _ -> do
               -- Reset the state to how it was before attempting to find an
               -- all-in-one build plan.
-              planDebug $
-                   "installPackage: Before trying cyclic plan, resetting lib \
-                   \result map to "
-                <> show libMap
+              logDebugPlanS "installPackage" $
+                   "Before trying cyclic plan, resetting lib result map to: "
+                <> fromString (show libMap)
               put libMap
               -- Otherwise, fall back on building the tests / benchmarks in a
               -- separate step.
@@ -863,7 +870,7 @@ addPackageDeps package = do
   checkAndWarnForUnknownTools package
   let deps' = packageDeps package
   deps <- forM (Map.toList deps') $ \(depname, DepValue range depType) -> do
-    eres <- addDep depname
+    eres <- getCachedDepOrAddDep depname
     let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
         getLatestApplicableVersionAndRev = do
           vsAndRevs <-
@@ -1276,6 +1283,11 @@ inSnapshot name version = do
 -- TODO: Consider intersecting version ranges for multiple deps on a
 -- package.  This is why VersionRange is in the parent map.
 
--- Switch this to 'True' to enable some debugging putStrLn in this module
-planDebug :: MonadIO m => String -> m ()
-planDebug = if False then liftIO . putStrLn else \_ -> pure ()
+logDebugPlanS ::
+     (HasCallStack, HasRunner env, MonadIO m, MonadReader env m)
+  => LogSource
+  -> Utf8Builder
+  -> m ()
+logDebugPlanS s msg = do
+  debugPlan <- view $ globalOptsL.to globalPlanInLog
+  when debugPlan $ logDebugS s msg
