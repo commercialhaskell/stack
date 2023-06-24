@@ -17,7 +17,12 @@ replThread :: IO ()
 replThread = repl [] $ do
   replCommand ":main"
   line <- replGetLine
-  when (line /= "hello world") $ error "Main module didn't load correctly."
+  let expected = "hello world"
+  when (line /= expected) $
+    error $
+         "Main module didn't load correctly.\n"
+      <> "Expected: " <> expected <> "\n"
+      <> "Actual  : " <> line <> "\n"
   liftIO $ threadDelay 1000000 -- wait for an edit of the internal library
   reloadAndTest "testInt" "42" "Internal library didn't reload."
   liftIO $ threadDelay 1000000 -- wait for an edit of the internal library

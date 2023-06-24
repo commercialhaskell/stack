@@ -7,4 +7,9 @@ main = do
     repl [] $ do
         replCommand "putStrLn greeting"
         line <- replGetLine
-        when (line /= "Hello, world!") $ error "Didn't load correctly."
+        let expected = "Hello, world!"
+        when (line /= expected) $
+          error $
+               "Didn't load correctly.\n"
+            <> "Expected: " <> expected <> "\n"
+            <> "Actual  : " <> line <> "\n"

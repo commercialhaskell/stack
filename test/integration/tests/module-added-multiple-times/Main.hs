@@ -6,5 +6,9 @@ main :: IO ()
 main = repl [] $ do
     replCommand ":main"
     line <- replGetLine
-    when (line /= "Hello World!")
-        $ error "Main module didn't load correctly."
+    let expected = "Hello World!"
+    when (line /= expected) $
+      error $
+           "Main module didn't load correctly.\n"
+        <> "Expected: " <> expected <> "\n"
+        <> "Actual  : " <> line <> "\n"
