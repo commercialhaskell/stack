@@ -206,7 +206,7 @@ runRepl cmd args actions = do
       catch
         (hGetChar rStderr >>= hPutChar logFileHandle)
         (\e -> unless (isEOFError e) $ throw e)
-  runReaderT (nextPrompt >> actions) (ReplConnection rStdin rStdout)
+  runReaderT actions (ReplConnection rStdin rStdout)
   waitForProcess ph
 
 repl :: HasCallStack => [String] -> Repl () -> IO ()
