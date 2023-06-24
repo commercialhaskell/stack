@@ -10,6 +10,8 @@ Release notes:
   matching cargo behavior and preventing logSticky spam on narrow 
   terminals and lots of dependencies building simultaneously
 
+* Add unpacking of source repository packages (`extra-deps`).
+
 **Changes since v2.11.1:**
 
 Major changes:
