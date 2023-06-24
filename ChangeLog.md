@@ -25,6 +25,9 @@ Other enhancements:
   [#6123](https://github.com/commercialhaskell/stack/pull/6123).
 * Add composable component type flags `--exes`, `--tests` and `--benchmarks` to
   Stack's `ide targets` command, to list only those components.
+* `stack --verbose` excludes lengthy information about build plan construction
+  in the debug output by default. The new `stack --[no-]plan-in-log` flag
+  enables or disables the inclusion of the information in the debug output.
 
 Bug fixes:
 
