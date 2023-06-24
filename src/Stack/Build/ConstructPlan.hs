@@ -553,14 +553,14 @@ getCachedDepOrAddDep name = do
       pure res
     Nothing -> checkCallStackAndAddDep name
 
--- | Given a 'PackageName', adds all of the build tasks to build the package.
--- First checks that the package name is not already in the call stack.
+-- | Given a 'PackageName', known not to be in the library map, adds all of the
+-- build tasks to build the package. First checks that the package name is not
+-- already in the call stack.
 checkCallStackAndAddDep ::
      PackageName
   -> M (Either ConstructPlanException AddDepRes)
 checkCallStackAndAddDep name = do
   ctx <- ask
-  let mpackageInfo = Map.lookup name $ combinedMap ctx
   res <- if name `elem` callStack ctx
     then do
       logDebugPlanS "checkCallStackAndAddDep" $
@@ -569,17 +569,19 @@ checkCallStackAndAddDep name = do
         <> ": "
         <> fromString (show $ map packageNameString (callStack ctx))
       pure $ Left $ DependencyCycleDetected $ name : callStack ctx
-    else local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $ do
-      case mpackageInfo of
-        -- TODO look up in the package index and see if there's a
-        -- recommendation available
-        Nothing -> do
-          logDebugPlanS "checkCallStackAndAddDep" $
-               "No package info for "
-            <> fromString (packageNameString name)
-            <> "."
-          pure $ Left $ UnknownPackage name
-        Just packageInfo -> addDep name packageInfo
+    else case Map.lookup name $ combinedMap ctx of
+      -- TODO look up in the package index and see if there's a
+      -- recommendation available
+      Nothing -> do
+        logDebugPlanS "checkCallStackAndAddDep" $
+             "No package info for "
+          <> fromString (packageNameString name)
+          <> "."
+        pure $ Left $ UnknownPackage name
+      Just packageInfo ->
+        -- Add the current package name to the head of the call stack.
+        local (\ctx' -> ctx' { callStack = name : callStack ctx' }) $
+          addDep name packageInfo
   updateLibMap name res
   pure res
 
