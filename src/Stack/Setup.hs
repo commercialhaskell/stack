@@ -923,7 +923,7 @@ warnUnsupportedCompiler ghcVersion =
         pure True
     | ghcVersion >= mkVersion [9, 7] -> do
         prettyWarnL
-          [ flow "Stack has not been tested with GHC versions above 9.8, and \
+          [ flow "Stack has not been tested with GHC versions 9.8 and above, and \
                  \using"
           , fromString (versionString ghcVersion) <> ","
           , flow "this may fail."
@@ -957,7 +957,7 @@ warnUnsupportedCompilerCabal cp didWarn = do
           ]
     | cabalVersion >= mkVersion [3, 11] ->
         prettyWarnL
-          [ flow "Stack has not been tested with Cabal versions above 3.12, \
+          [ flow "Stack has not been tested with Cabal versions 3.12 and above, \
                  \but version"
           , fromString (versionString cabalVersion)
           , flow "was found, this may fail."
