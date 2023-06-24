@@ -18,6 +18,7 @@
 module Stack.Config
   ( loadConfig
   , loadConfigYaml
+  , loadProjectConfig
   , packagesParser
   , getImplicitGlobalProjectDir
   , getSnapshots
