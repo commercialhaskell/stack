@@ -248,7 +248,7 @@ longestUnique ::
      [(PackageName, RawPackageLocationImmutable)]
   -> [(PackageName, RawPackageLocationImmutable)]
 longestUnique xs =
-  L.concat $ L.groupBy (\(_, p1) (_, p2) -> p1 == p2) (L.take 1 $ L.sortBy (flip (comparing fst)) xs)
+  L.concat $ L.groupBy (\(_, p1) (_, p2) -> p1 == p2) (L.take 1 $ L.sortOn (Down . fst) xs)
 
 unpackMessage :: Display a => a -> Path Abs Dir -> [StyleDoc]
 unpackMessage loc dest =
