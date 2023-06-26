@@ -5,17 +5,25 @@ import Data.List
 import StackTest
 
 main :: IO ()
-main = do
-  stack ["clean"] -- to make sure we can load the code even after a clean
-  copy "src/Lib.v1" "src/Lib.hs"
-  copy "src-internal/Internal.v1" "src-internal/Internal.hs"
-  stack ["build"] -- need a build before ghci at the moment, see #4148
-  forkIO fileEditingThread
-  replThread
+main
+  | isWindows =
+      putStrLn "This test was disabled on Windows on 25 June 2023 (see \
+               \https://github.com/commercialhaskell/stack/issues/6170)."
+  | otherwise = do
+      stack ["clean"] -- to make sure we can load the code even after a clean
+      copy "src/Lib.v1" "src/Lib.hs"
+      copy "src-internal/Internal.v1" "src-internal/Internal.hs"
+      stack ["build"] -- need a build before ghci at the moment, see #4148
+      forkIO fileEditingThread
+      replThread
 
 replThread :: IO ()
 replThread = repl [] $ do
+  -- The command must be issued before searching the output for the next prompt,
+  -- otherwise, on Windows from msys2-20230526, `stack repl` encounters a EOF
+  -- and terminates gracefully.
   replCommand ":main"
+  nextPrompt
   line <- replGetLine
   let expected = "hello world"
   when (line /= expected) $
