@@ -27,6 +27,7 @@ module Stack.Types.Config
   , prettyStackDevL
   ) where
 
+import           Casa.Client ( CasaRepoPrefix )
 import           Distribution.System ( Platform )
 import           Path ( (</>), parent, reldir, relfile )
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
@@ -182,6 +183,8 @@ data Config = Config
     -- ^ Use --no-run and --compile options when using `stack script`
   , configStackDeveloperMode  :: !Bool
     -- ^ Turn on Stack developer mode for additional messages?
+  , configCasa                :: !(Maybe (CasaRepoPrefix, Int))
+    -- ^ Optional Casa configuration
   }
 
 -- | The project root directory, if in a project.

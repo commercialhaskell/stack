@@ -474,17 +474,39 @@ of the same name. For further information, see the
 [`stack build` command](build_command.md) documentation and the
 [users guide](GUIDE.md#the-build-command).
 
+### casa
+
+:octicons-tag-24: UNRELEASED
+
+Default:
+
+~~~yaml
+casa:
+  enable: true # Use a Casa server?
+  repo-prefix: https://casa.fpcomplete.com # Unless casa-repo-prefix is set.
+  max-keys-per-request: 1280 # Maximum number of keys per request.
+~~~
+
+This option specifies whether or not Stack should use a Casa
+(content-addressable storage archive) server to cache Cabal files and all other
+files in packages; and, if so, the prefix for the URL used to pull information
+from the server and the maximum number of keys per request. For further
+information, see this blog post about
+[Casa and Stack](https://www.fpcomplete.com/blog/casa-and-stack/).
+
+`repo-prefix` replaces [`casa-repo-prefix`](#casa-repo-prefix) (which is
+deprecated) and has precedence if both keys are set.
+
 ### casa-repo-prefix
 
 [:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
 
+Deprecated in favour of [`casa`](#casa), which takes precedence if present.
+
 Default: `https://casa.fpcomplete.com`
 
 This option specifies the prefix for the URL used to pull information from the
-Casa (content-addressable storage archive) server that is used by Stack to cache
-Cabal files and all other files in packages. For further information, see this
-blog post about
-[Casa and Stack](https://www.fpcomplete.com/blog/casa-and-stack/).
+Casa server.
 
 ### color
 

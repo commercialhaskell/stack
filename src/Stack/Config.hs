@@ -114,6 +114,7 @@ import           Stack.Types.Config.Exception
                    , ParseAbsolutePathException (..), packageIndicesWarning )
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )
+import           Stack.Types.Casa ( CasaOptsMonoid (..) )
 import           Stack.Types.Docker ( DockerOptsMonoid (..), dockerEnable )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
@@ -482,16 +483,33 @@ configFromConfigMonoid
                 addr' = display $ T.dropWhileEnd (=='/') addr
     let configStackDeveloperMode =
           fromFirst stackDeveloperModeDefault configMonoidStackDeveloperMode
+        configCasa = if fromFirstTrue $ casaMonoidEnable configMonoidCasaOpts
+          then
+            let casaRepoPrefix = fromFirst
+                  (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)
+                  (casaMonoidRepoPrefix configMonoidCasaOpts)
+                casaMaxKeysPerRequest = fromFirst
+                  defaultCasaMaxPerRequest
+                  (casaMonoidMaxKeysPerRequest configMonoidCasaOpts)
+            in  Just (casaRepoPrefix, casaMaxKeysPerRequest)
+          else Nothing
     withNewLogFunc go useColor'' stylesUpdate' $ \logFunc -> do
       let configRunner = configRunner'' & logFuncL .~ logFunc
-      withLocalLogFunc logFunc $ handleMigrationException $
-        withPantryConfig
+      withLocalLogFunc logFunc $ handleMigrationException $ do
+        logDebug $ case configCasa of
+          Nothing -> "Use of Casa server disabled."
+          Just (repoPrefix, maxKeys) ->
+               "Use of Casa server enabled: ("
+            <> fromString (show repoPrefix)
+            <> ", "
+            <> fromString (show maxKeys)
+            <> ")."
+        withPantryConfig'
           pantryRoot
           pic
           (maybe HpackBundled HpackCommand $ getFirst configMonoidOverrideHpack)
           clConnectionCount
-          (fromFirst defaultCasaRepoPrefix configMonoidCasaRepoPrefix)
-          defaultCasaMaxPerRequest
+          configCasa
           snapLoc
           (\configPantryConfig -> initUserStorage
             (configStackRoot </> relFileStorage)
