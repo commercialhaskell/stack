@@ -6,6 +6,9 @@ Release notes:
 
 * Further to the release notes for Stack 2.3.1, the `-static` suffix has been
   removed from the statically linked Linux/x86_64 binaries.
+* The build progress line gets ellipsized in order to fit one terminal line
+  matching cargo behavior and preventing logSticky spam on narrow 
+  terminals and lots of dependencies building simultaneously
 
 **Changes since v2.11.1:**
 
