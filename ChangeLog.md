@@ -28,6 +28,11 @@ Other enhancements:
 * `stack --verbose` excludes lengthy information about build plan construction
   in the debug output by default. The new `stack --[no-]plan-in-log` flag
   enables or disables the inclusion of the information in the debug output.
+* In YAML configuration files, the `casa` key is introduced, which takes
+  precedence over the existing `casa-repo-prefix` key. The latter is deprecated.
+  The new key also allows Stack's use of a Casa (content-addressable storage
+  archive) server to be disabled and the maximum number of keys per request to
+  be configured. The defaults are unchanged.
 
 Bug fixes:
 

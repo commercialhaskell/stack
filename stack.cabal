@@ -314,6 +314,7 @@ library
       Stack.Internal.BuildInfo
       Stack.PackageFile
       Stack.Types.Cache
+      Stack.Types.Casa
       Stack.Types.Dependency
       Stack.Types.PackageFile
       Stack.Types.Storage
@@ -361,7 +362,7 @@ library
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.8.2.2
+    , pantry >=0.8.3
     , path
     , path-io
     , persistent >=2.14.0.0 && <2.15
@@ -471,7 +472,7 @@ executable stack
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.8.2.2
+    , pantry >=0.8.3
     , path
     , path-io
     , persistent >=2.14.0.0 && <2.15
@@ -576,7 +577,7 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative >=0.18.1.0
     , optparse-generic
-    , pantry >=0.8.2.2
+    , pantry >=0.8.3
     , path
     , path-io
     , persistent >=2.14.0.0 && <2.15
@@ -685,7 +686,7 @@ test-suite stack-test
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.8.2.2
+    , pantry >=0.8.3
     , path
     , path-io
     , persistent >=2.14.0.0 && <2.15
