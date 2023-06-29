@@ -140,7 +140,8 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL )
 import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI (..)
-                   , CabalVerbosity (..), HaddockOpts (..), TestOpts (..)
+                   , CabalVerbosity (..), HaddockOpts (..)
+                   , ProgressBarFormat (..), TestOpts (..)
                    )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
@@ -804,15 +805,19 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                         ": "
                       : L.intersperse ", "
                           (map (fromString . packageNameString) names)
-                    progressLine prev' total' = 
-                        "Progress " <> display prev' <> "/" <> display total' <>
-                            nowBuilding packageNames
-                    ellipsize n text = 
-                        if T.length text <= n
+                    progressFormat = boptsProgressBar eeBuildOpts
+                    progressLine prev' total' =
+                         "Progress "
+                      <> display prev' <> "/" <> display total'
+                      <> if progressFormat == CountOnlyBar
+                           then mempty
+                           else nowBuilding packageNames
+                    ellipsize n text =
+                      if T.length text <= n || progressFormat /= CappedBar
                         then text
                         else T.take (n - 1) text <> "…"
-                when terminal $ run $
-                  logSticky $ display $ ellipsize terminalWidth $ 
+                when (terminal && progressFormat /= NoBar) $
+                  run $ logSticky $ display $ ellipsize terminalWidth $
                     utf8BuilderToText $ progressLine prev total
                 done <- atomically $ do
                   done <- readTVar doneVar

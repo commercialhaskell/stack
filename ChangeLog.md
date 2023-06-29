@@ -6,9 +6,6 @@ Release notes:
 
 * Further to the release notes for Stack 2.3.1, the `-static` suffix has been
   removed from the statically linked Linux/x86_64 binaries.
-* The build progress line gets ellipsized in order to fit one terminal line
-  matching cargo behavior and preventing logSticky spam on narrow 
-  terminals and lots of dependencies building simultaneously
 
 **Changes since v2.11.1:**
 
@@ -20,6 +17,8 @@ Behavior changes:
   (hashed to a shorter path on Windows), rather than
   `.stack-work/dist/<platform>/<Cabal_version>`. This allows build artifacts to
   be distinguished by GHC version.
+* By default, the `stack build` progress bar is capped to a length equal to the
+  terminal width.
 
 Other enhancements:
 
@@ -36,6 +35,10 @@ Other enhancements:
   The new key also allows Stack's use of a Casa (content-addressable storage
   archive) server to be disabled and the maximum number of keys per request to
   be configured. The defaults are unchanged.
+* Add option `--progress-bar=<format>` to Stack's `build` command to configure
+  the format of the progress bar, where `<format>` is one of `none`,
+  `count-only` (only the package count), `capped` (capped to a length equal to
+  the terminal width) and `full` (the previous format).
 
 Bug fixes:
 
