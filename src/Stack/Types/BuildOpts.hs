@@ -13,6 +13,8 @@ module Stack.Types.BuildOpts
   , BuildOptsCLI (..)
   , boptsCLIAllProgOptions
   , BuildOptsMonoid (..)
+  , ProgressBarFormat (..)
+  , readProgressBarFormat
   , buildOptsMonoidBenchmarksL
   , buildOptsMonoidHaddockL
   , buildOptsMonoidInstallExesL
@@ -100,6 +102,8 @@ data BuildOpts = BuildOpts
   , boptsInterleavedOutput :: !Bool
     -- ^ Should we use the interleaved GHC output when building
     -- multiple packages?
+  , boptsProgressBar :: !ProgressBarFormat
+    -- ^ Format of the progress bar
   , boptsDdumpDir :: !(Maybe Text)
   }
   deriving Show
@@ -132,6 +136,7 @@ defaultBuildOpts = BuildOpts
   , boptsSplitObjs = defaultFirstFalse buildMonoidSplitObjs
   , boptsSkipComponents = []
   , boptsInterleavedOutput = defaultFirstTrue buildMonoidInterleavedOutput
+  , boptsProgressBar = CappedBar
   , boptsDdumpDir = Nothing
   }
 
@@ -245,6 +250,7 @@ data BuildOptsMonoid = BuildOptsMonoid
   , buildMonoidSplitObjs :: !FirstFalse
   , buildMonoidSkipComponents :: ![Text]
   , buildMonoidInterleavedOutput :: !FirstTrue
+  , buildMonoidProgressBar :: !(First ProgressBarFormat)
   , buildMonoidDdumpDir :: !(First Text)
   }
   deriving (Generic, Show)
@@ -294,6 +300,8 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
       o ..:? buildMonoidSkipComponentsName ..!= mempty
     buildMonoidInterleavedOutput <-
       FirstTrue <$> o ..:? buildMonoidInterleavedOutputName
+    buildMonoidProgressBar <-
+      First <$> o ..:? buildMonoidProgressBarName
     buildMonoidDdumpDir <- o ..:? buildMonoidDdumpDirName ..!= mempty
     pure BuildOptsMonoid{..}
 
@@ -374,6 +382,9 @@ buildMonoidSkipComponentsName = "skip-components"
 
 buildMonoidInterleavedOutputName :: Text
 buildMonoidInterleavedOutputName = "interleaved-output"
+
+buildMonoidProgressBarName :: Text
+buildMonoidProgressBarName = "progress-bar"
 
 buildMonoidDdumpDirName :: Text
 buildMonoidDdumpDirName = "ddump-dir"
@@ -589,3 +600,26 @@ buildOptsHaddockL :: Lens' BuildOpts Bool
 buildOptsHaddockL =
   lens boptsHaddock
     (\bopts t -> bopts {boptsHaddock = t})
+
+-- Type representing formats of Stack's progress bar when building.
+data ProgressBarFormat
+  = NoBar -- No progress bar at all.
+  | CountOnlyBar -- A bar that only counts packages.
+  | CappedBar -- A bar capped at a length equivalent to the terminal's width.
+  | FullBar -- A full progress bar.
+  deriving (Eq, Show)
+
+instance FromJSON ProgressBarFormat where
+  parseJSON = withText "ProgressBarFormat" $ \t -> either
+    fail
+    pure
+    (readProgressBarFormat $ T.unpack t)
+
+-- | Parse ProgressBarFormat from a String.
+readProgressBarFormat :: String -> Either String ProgressBarFormat
+readProgressBarFormat s
+  | s == "none" = pure NoBar
+  | s == "count-only" = pure CountOnlyBar
+  | s == "capped" = pure CappedBar
+  | s == "full" = pure FullBar
+  | otherwise = Left $ "Invalid progress bar format: " ++ s

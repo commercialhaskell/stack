@@ -582,6 +582,20 @@ Default: Disabled
 Set the flag to enable fetching packages necessary for the build immediately.
 This can be useful with `stack build --dry-run`.
 
+### `--progress-bar` option
+
+:octicons-tag-24: UNRELEASED
+
+Default: `capped`
+
+`stack build --progress-bar <format>` sets the format of the progress bar, where
+`<format>` is one of `none` (no bar), `count-only` (only the package count is
+displayed), `capped` (the bar showing package builds in progress is capped to a
+length equal to the terminal width), and `full` (the bar is uncapped). On
+terminals where 'backspace' has no effect if the cursor is in the first column,
+bars longer than the terminal width will not be 'sticky' at the bottom of the
+screen.
+
 ### `--tests-allow-stdin` flag
 
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)

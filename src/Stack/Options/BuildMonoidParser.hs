@@ -24,7 +24,7 @@ import           Stack.Options.TestParser ( testOptsParser )
 import           Stack.Options.HaddockParser ( haddockOptsParser )
 import           Stack.Options.Utils ( GlobalOptsContext (..), hideMods )
 import           Stack.Types.BuildOpts
-                   ( BuildOptsMonoid (..), CabalVerbosity
+                   ( BuildOptsMonoid (..), CabalVerbosity, readProgressBarFormat
                    , toFirstCabalVerbosity
                    )
 
@@ -58,6 +58,7 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
   <*> splitObjs
   <*> skipComponents
   <*> interleavedOutput
+  <*> progressBar
   <*> ddumpDir
  where
   hideBool = hide0 /= BuildCmdGlobalOpts
@@ -198,6 +199,13 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
     "printing concurrent GHC output to the console with a prefix for the \
     \package name."
     hide
+  progressBar = First <$> optional (option (eitherReader readProgressBarFormat)
+    (  long "progress-bar"
+    <> metavar "FORMAT"
+    <> help "Progress bar format (accepts none, count-only, capped and full). \
+            \(default: capped)"
+    <> hide
+    ))
   ddumpDir = optionalFirst (strOption
     (  long "ddump-dir"
     <> help "Specify output directory for ddump-files."

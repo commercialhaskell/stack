@@ -14,9 +14,9 @@ import           Stack.Prelude
 import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BenchmarkOptsMonoid (..)
                    , BuildOpts (..), BuildOptsMonoid (..), CabalVerbosity (..)
-                   , HaddockOpts (..), HaddockOptsMonoid (..), TestOpts (..)
-                   , TestOptsMonoid (..), defaultBenchmarkOpts
-                   , defaultHaddockOpts, defaultTestOpts
+                   , HaddockOpts (..), HaddockOptsMonoid (..)
+                   , ProgressBarFormat (..), TestOpts (..), TestOptsMonoid (..)
+                   , defaultBenchmarkOpts, defaultHaddockOpts, defaultTestOpts
                    )
 
 -- | Interprets BuildOptsMonoid options.
@@ -59,6 +59,7 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
   , boptsSplitObjs = fromFirstFalse buildMonoidSplitObjs
   , boptsSkipComponents = buildMonoidSkipComponents
   , boptsInterleavedOutput = fromFirstTrue buildMonoidInterleavedOutput
+  , boptsProgressBar = fromFirst CappedBar buildMonoidProgressBar
   , boptsDdumpDir = getFirst buildMonoidDdumpDir
   }
  where

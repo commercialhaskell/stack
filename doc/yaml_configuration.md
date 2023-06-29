@@ -426,16 +426,15 @@ build:
   prefetch: false
   keep-going: false
   keep-tmp-files: false
-
   # NOTE: global usage of haddock can cause build failures when documentation is
   # incorrectly formatted.  This could also affect scripts which use Stack.
   haddock: false
   haddock-arguments:
-    haddock-args: []      # Additional arguments passed to haddock, --haddock-arguments
+    haddock-args: [] # Additional arguments passed to haddock, --haddock-arguments
     # haddock-args:
     # - "--css=/home/user/my-css"
-  open-haddocks: false    # --open
-  haddock-deps: false     # if unspecified, defaults to true if haddock is set
+  open-haddocks: false # --open
+  haddock-deps: false # if unspecified, defaults to true if haddock is set
   haddock-internal: false
 
   # These are inadvisable to use in your global configuration, as they make the
@@ -460,8 +459,9 @@ build:
 
   # Since 1.8. Starting with 2.0, the default is true
   interleaved-output: true
-
-  # Since 1.10
+  # Since UNRELEASED. Available options are none, count-only, capped and full.
+  progress-bar: capped
+  # Since 1.10.
   ddump-dir: ""
 ~~~
 
