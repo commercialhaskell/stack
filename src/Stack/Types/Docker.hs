@@ -44,15 +44,21 @@ module Stack.Types.Docker
 
 import           Data.List ( intercalate )
 import qualified Data.Text as T
-import           Distribution.System ( Platform (..), OS (..), Arch (..) )
-import           Distribution.Text ( simpleParse, display )
+import           Distribution.System ( Arch (..), OS (..), Platform (..) )
+import           Distribution.Text ( display, simpleParse )
 import           Distribution.Version ( anyVersion )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Pantry.Internal.AesonExtended
-import           Path
+                   ( FromJSON (..), WithJSONWarnings, (..:), (..:?), (..!=)
+                   , withObjectWarnings, withText
+                   )
+import           Path ( parseAbsFile )
 import           Stack.Constants ( stackProgName )
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Version
+                   ( IntersectingVersionRange (..), VersionRange
+                   , versionRangeText
+                   )
 import           Text.Read ( Read (..) )
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -249,11 +255,11 @@ data DockerOpts = DockerOpts
   , dockerDetach :: !Bool
      -- ^ Whether to run a detached container
   , dockerPersist :: !Bool
-     -- ^ Create a persistent container (don't remove it when finished).  Implied by
-     -- `dockerDetach`.
+     -- ^ Create a persistent container (don't remove it when finished). Implied
+     -- by `dockerDetach`.
   , dockerContainerName :: !(Maybe String)
-     -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
-     -- or `dockerDetach`.
+     -- ^ Container name to use, only makes sense from command-line with
+     -- `dockerPersist` or `dockerDetach`.
   , dockerNetwork :: !(Maybe String)
     -- ^ The network docker uses.
   , dockerRunArgs :: ![String]
@@ -273,43 +279,45 @@ data DockerOpts = DockerOpts
   }
   deriving Show
 
--- | An uninterpreted representation of docker options.
--- Configurations may be "cascaded" using mappend (left-biased).
+-- | An uninterpreted representation of docker options. Configurations may be
+-- "cascaded" using mappend (left-biased).
 data DockerOptsMonoid = DockerOptsMonoid
   { dockerMonoidDefaultEnable :: !Any
-     -- ^ Should Docker be defaulted to enabled (does @docker:@ section exist in the config)?
+    -- ^ Should Docker be defaulted to enabled (does @docker:@ section exist in
+    -- the config)?
   , dockerMonoidEnable :: !(First Bool)
-     -- ^ Is using Docker enabled?
+    -- ^ Is using Docker enabled?
   , dockerMonoidRepoOrImage :: !(First DockerMonoidRepoOrImage)
-     -- ^ Docker repository name (e.g. @fpco/stack-build@ or @fpco/stack-full:lts-2.8@)
+    -- ^ Docker repository name (e.g. @fpco/stack-build@ or
+    -- @fpco/stack-full:lts-2.8@)
   , dockerMonoidRegistryLogin :: !(First Bool)
-     -- ^ Does registry require login for pulls?
+    -- ^ Does registry require login for pulls?
   , dockerMonoidRegistryUsername :: !(First String)
-     -- ^ Optional username for Docker registry.
+    -- ^ Optional username for Docker registry.
   , dockerMonoidRegistryPassword :: !(First String)
-     -- ^ Optional password for Docker registry.
+    -- ^ Optional password for Docker registry.
   , dockerMonoidAutoPull :: !FirstTrue
-     -- ^ Automatically pull new images.
+    -- ^ Automatically pull new images.
   , dockerMonoidDetach :: !FirstFalse
-     -- ^ Whether to run a detached container
+    -- ^ Whether to run a detached container
   , dockerMonoidPersist :: !FirstFalse
-     -- ^ Create a persistent container (don't remove it when finished).  Implied by
-     -- `dockerDetach`.
+    -- ^ Create a persistent container (don't remove it when finished). Implied
+    -- by -- `dockerDetach`.
   , dockerMonoidContainerName :: !(First String)
-     -- ^ Container name to use, only makes sense from command-line with `dockerPersist`
-     -- or `dockerDetach`.
+    -- ^ Container name to use, only makes sense from command-line with
+    -- `dockerPersist` or `dockerDetach`.
   , dockerMonoidNetwork :: !(First String)
-     -- ^ See: 'dockerNetwork'
+    -- ^ See: 'dockerNetwork'
   , dockerMonoidRunArgs :: ![String]
-     -- ^ Arguments to pass directly to @docker run@
+    -- ^ Arguments to pass directly to @docker run@
   , dockerMonoidMount :: ![Mount]
-     -- ^ Volumes to mount in the container
+    -- ^ Volumes to mount in the container
   , dockerMonoidMountMode :: !(First String)
-     -- ^ Volume mount mode
+    -- ^ Volume mount mode
   , dockerMonoidEnv :: ![String]
-     -- ^ Environment variables to set in the container
+    -- ^ Environment variables to set in the container
   , dockerMonoidStackExe :: !(First DockerStackExe)
-     -- ^ Location of container-compatible Stack executable
+    -- ^ Location of container-compatible Stack executable
   , dockerMonoidSetUser :: !(First Bool)
     -- ^ Set in-container user to match host's
   , dockerMonoidRequireDockerVersion :: !IntersectingVersionRange
@@ -320,33 +328,37 @@ data DockerOptsMonoid = DockerOptsMonoid
 -- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
   parseJSON = withObjectWarnings "DockerOptsMonoid"
-    (\o -> do
-      let dockerMonoidDefaultEnable = Any True
-      dockerMonoidEnable           <- First <$> o ..:? dockerEnableArgName
-      dockerMonoidRepoOrImage      <- First <$>
-        (   (Just . DockerMonoidImage <$> o ..: dockerImageArgName)
-        <|> (Just . DockerMonoidRepo <$> o ..: dockerRepoArgName)
-        <|> pure Nothing
-        )
-      dockerMonoidRegistryLogin    <- First <$> o ..:? dockerRegistryLoginArgName
-      dockerMonoidRegistryUsername <- First <$> o ..:? dockerRegistryUsernameArgName
-      dockerMonoidRegistryPassword <- First <$> o ..:? dockerRegistryPasswordArgName
-      dockerMonoidAutoPull         <- FirstTrue <$> o ..:? dockerAutoPullArgName
-      dockerMonoidDetach           <- FirstFalse <$> o ..:? dockerDetachArgName
-      dockerMonoidPersist          <- FirstFalse <$> o ..:? dockerPersistArgName
-      dockerMonoidContainerName    <- First <$> o ..:? dockerContainerNameArgName
-      dockerMonoidNetwork          <- First <$> o ..:? dockerNetworkArgName
-      dockerMonoidRunArgs          <- o ..:? dockerRunArgsArgName ..!= []
-      dockerMonoidMount            <- o ..:? dockerMountArgName ..!= []
-      dockerMonoidMountMode        <- First <$> o ..:? dockerMountModeArgName
-      dockerMonoidEnv              <- o ..:? dockerEnvArgName ..!= []
-      dockerMonoidStackExe         <- First <$> o ..:? dockerStackExeArgName
-      dockerMonoidSetUser          <- First <$> o ..:? dockerSetUserArgName
-      dockerMonoidRequireDockerVersion <- IntersectingVersionRange . unVersionRangeJSON <$>
-        ( o ..:? dockerRequireDockerVersionArgName
-          ..!= VersionRangeJSON anyVersion
-        )
-      pure DockerOptsMonoid{..})
+    ( \o -> do
+       let dockerMonoidDefaultEnable = Any True
+       dockerMonoidEnable <- First <$> o ..:? dockerEnableArgName
+       dockerMonoidRepoOrImage <- First <$>
+         (   (Just . DockerMonoidImage <$> o ..: dockerImageArgName)
+         <|> (Just . DockerMonoidRepo <$> o ..: dockerRepoArgName)
+         <|> pure Nothing
+         )
+       dockerMonoidRegistryLogin <- First <$> o ..:? dockerRegistryLoginArgName
+       dockerMonoidRegistryUsername <-
+         First <$> o ..:? dockerRegistryUsernameArgName
+       dockerMonoidRegistryPassword <-
+         First <$> o ..:? dockerRegistryPasswordArgName
+       dockerMonoidAutoPull <- FirstTrue <$> o ..:? dockerAutoPullArgName
+       dockerMonoidDetach <- FirstFalse <$> o ..:? dockerDetachArgName
+       dockerMonoidPersist <- FirstFalse <$> o ..:? dockerPersistArgName
+       dockerMonoidContainerName <- First <$> o ..:? dockerContainerNameArgName
+       dockerMonoidNetwork <- First <$> o ..:? dockerNetworkArgName
+       dockerMonoidRunArgs <- o ..:? dockerRunArgsArgName ..!= []
+       dockerMonoidMount <- o ..:? dockerMountArgName ..!= []
+       dockerMonoidMountMode <- First <$> o ..:? dockerMountModeArgName
+       dockerMonoidEnv <- o ..:? dockerEnvArgName ..!= []
+       dockerMonoidStackExe <- First <$> o ..:? dockerStackExeArgName
+       dockerMonoidSetUser <- First <$> o ..:? dockerSetUserArgName
+       dockerMonoidRequireDockerVersion <-
+         IntersectingVersionRange . unVersionRangeJSON <$>
+           ( o ..:? dockerRequireDockerVersionArgName
+             ..!= VersionRangeJSON anyVersion
+           )
+       pure DockerOptsMonoid {..}
+    )
 
 -- | Left-biased combine Docker options
 instance Semigroup DockerOptsMonoid where
@@ -389,15 +401,13 @@ data Mount = Mount String String
 instance Read Mount where
   readsPrec _ s =
     case break (== ':') s of
-      (a,':':b) -> [(Mount a b,"")]
-      (a,[]) -> [(Mount a a,"")]
+      (a, ':':b) -> [(Mount a b, "")]
+      (a, []) -> [(Mount a a, "")]
       _ -> fail "Invalid value for Docker mount (expect '/host/path:/container/path')"
 
 -- | Show instance.
 instance Show Mount where
-  show (Mount a b) = if a == b
-                       then a
-                       else concat [a,":",b]
+  show (Mount a b) = if a == b then a else concat [a, ":", b]
 
 -- | For YAML.
 instance FromJSON Mount where
