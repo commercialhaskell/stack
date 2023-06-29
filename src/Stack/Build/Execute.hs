@@ -785,6 +785,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
   let keepGoing =
         fromMaybe (not (Map.null (planFinals plan))) (boptsKeepGoing eeBuildOpts)
   terminal <- view terminalL
+  terminalWidth <- view termWidthL
   errs <- liftIO $ runActions threads keepGoing actions $
     \doneVar actionsVar -> do
       let total = length actions
@@ -803,10 +804,16 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                         ": "
                       : L.intersperse ", "
                           (map (fromString . packageNameString) names)
+                    progressLine prev' total' = 
+                        "Progress " <> display prev' <> "/" <> display total' <>
+                            nowBuilding packageNames
+                    ellipsize n text = 
+                        if T.length text <= n
+                        then text
+                        else T.take (n - 1) text <> "…"
                 when terminal $ run $
-                  logSticky $
-                    "Progress " <> display prev <> "/" <> display total <>
-                        nowBuilding packageNames
+                  logSticky $ display $ ellipsize terminalWidth $ 
+                    utf8BuilderToText $ progressLine prev total
                 done <- atomically $ do
                   done <- readTVar doneVar
                   check $ done /= prev
