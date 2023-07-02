@@ -286,6 +286,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-5219] | GHCInfoMissingTargetPlatform
         [S-8299] | GHCInfoTargetPlatformInvalid String
         [S-2574] | CabalNotFound (Path Abs File)
+        [S-8488] | GhcBootScriptNotFound
         [S-1128] | HadrianScriptNotFound
         [S-1906] | URLInvalid String
         [S-1648] | UnknownArchiveExtension String

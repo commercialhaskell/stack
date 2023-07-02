@@ -19,6 +19,10 @@ Behavior changes:
   be distinguished by GHC version.
 * By default, the `stack build` progress bar is capped to a length equal to the
   terminal width.
+* When building GHC from source, Stack no longer uses Hadrian's deprecated
+  `--configure`\\`-c` flag and, instead, seeks to run GHC's Python `boot` and
+  sh `configure` scripts, and ensure that the `happy` and `alex` executables are
+  on the PATH.
 
 Other enhancements:
 

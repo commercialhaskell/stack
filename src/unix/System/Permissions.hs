@@ -3,17 +3,26 @@
 -- | The module of this name differs as between Windows and non-Windows builds.
 -- This is the non-Windows version.
 module System.Permissions
-  ( setScriptPerms
+  ( osIsMacOS
   , osIsWindows
   , setFileExecutable
+  , setScriptPerms
   ) where
 
 import           RIO
 import qualified System.Posix.Files as Posix
+import           System.Info ( os )
 
--- | True if using Windows OS.
+-- | True if using macOS.
+osIsMacOS :: Bool
+osIsMacOS = os == "darwin"
+
+-- | False if not using Windows.
 osIsWindows :: Bool
 osIsWindows = False
+
+setFileExecutable :: MonadIO m => FilePath -> m ()
+setFileExecutable fp = liftIO $ Posix.setFileMode fp 0o755
 
 setScriptPerms :: MonadIO m => FilePath -> m ()
 setScriptPerms fp =
@@ -22,6 +31,3 @@ setScriptPerms fp =
     Posix.ownerWriteMode `Posix.unionFileModes`
     Posix.groupReadMode `Posix.unionFileModes`
     Posix.otherReadMode
-
-setFileExecutable :: MonadIO m => FilePath -> m ()
-setFileExecutable fp = liftIO $ Posix.setFileMode fp 0o755

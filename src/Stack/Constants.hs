@@ -36,6 +36,7 @@ module Stack.Constants
   , minTerminalWidth
   , maxTerminalWidth
   , defaultTerminalWidth
+  , osIsMacOS
   , osIsWindows
   , relFileSetupHs
   , relFileSetupLhs
@@ -121,6 +122,13 @@ module Stack.Constants
   , relFileStackDotTmpDotExe
   , relFileStackDotTmp
   , ghcShowOptionsOutput
+  , ghcBootScript
+  , ghcConfigureScript
+  , ghcConfigureWindows
+  , ghcConfigureMacOS
+  , ghcConfigurePosix
+  , relDirHadrian
+  , relFileHadrianStackDotYaml
   , hadrianScriptsWindows
   , hadrianScriptsPosix
   , usrLibDirs
@@ -146,7 +154,7 @@ import           Stack.Constants.StackProgName ( stackProgName )
 import           Stack.Constants.UsrLibDirs ( usrLibDirs )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( WhichCompiler (..) )
-import           System.Permissions ( osIsWindows )
+import           System.Permissions ( osIsMacOS, osIsWindows )
 import           System.Process ( readProcess )
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -598,15 +606,48 @@ ghcShowOptionsOutput :: [String]
 ghcShowOptionsOutput =
   $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift . lines)
 
+-- | Relative paths inside a GHC repo to the boot script.
+ghcBootScript :: Path Rel File
+ghcBootScript = $(mkRelFile "boot")
+
+-- | Relative paths inside a GHC repo to the configure script.
+ghcConfigureScript :: Path Rel File
+ghcConfigureScript = $(mkRelFile "configure")
+
+-- | Command applicable to GHC's configure script on Windows. See:
+-- https://gitlab.haskell.org/ghc/ghc/-/blob/master/hadrian/README.md
+ghcConfigureWindows :: [String]
+ghcConfigureWindows = ["sh", "configure", "--enable-tarballs-autodownload"]
+
+-- | Command applicable to GHC's configure script on macOS. See:
+-- https://gitlab.haskell.org/ghc/ghc/-/blob/master/hadrian/README.md
+ghcConfigureMacOS :: [String]
+ghcConfigureMacOS = ["./configure", "--with-intree-gmp"]
+
+-- | Command applicable to GHC's configure script on non-Windows, non-macOS.
+-- See: https://gitlab.haskell.org/ghc/ghc/-/blob/master/hadrian/README.md
+ghcConfigurePosix :: [String]
+ghcConfigurePosix = ["./configure"]
+
+relDirHadrian :: Path Rel Dir
+relDirHadrian = $(mkRelDir "hadrian")
+
+relFileHadrianStackDotYaml :: Path Rel File
+relFileHadrianStackDotYaml = relDirHadrian </> stackDotYaml
+
 -- | Relative paths inside a GHC repo to the Hadrian build batch script.
 -- The second path is maintained for compatibility with older GHC versions.
 hadrianScriptsWindows :: [Path Rel File]
-hadrianScriptsWindows = [$(mkRelFile "hadrian/build-stack.bat"), $(mkRelFile "hadrian/build.stack.bat")]
+hadrianScriptsWindows =
+  [ $(mkRelFile "hadrian/build-stack.bat")
+  , $(mkRelFile "hadrian/build.stack.bat")
+  ]
 
 -- | Relative paths inside a GHC repo to the Hadrian build shell script
 -- The second path is maintained for compatibility with older GHC versions.
 hadrianScriptsPosix :: [Path Rel File]
-hadrianScriptsPosix = [$(mkRelFile "hadrian/build-stack"), $(mkRelFile "hadrian/build.stack.sh")]
+hadrianScriptsPosix =
+  [$(mkRelFile "hadrian/build-stack"), $(mkRelFile "hadrian/build.stack.sh")]
 
 -- | Relative file path for a temporary GHC environment file for tests
 testGhcEnvRelFile :: Path Rel File

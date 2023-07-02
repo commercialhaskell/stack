@@ -87,10 +87,13 @@ import           RIO.Process
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( hashSourceMapData, loadSourceMap )
 import           Stack.Build.Target ( NeedTargets (..), parseTargets )
+import           Stack.Config.ConfigureScript ( ensureConfigureScript )
 import           Stack.Constants
-                   ( cabalPackageName, hadrianScriptsPosix
-                   , hadrianScriptsWindows, relDirBin, relDirUsr, relFile7zdll
-                   , relFile7zexe, relFileConfigure, relFileLibgmpSo10
+                   ( cabalPackageName, ghcBootScript,ghcConfigureMacOS
+                   , ghcConfigurePosix, ghcConfigureWindows, hadrianScriptsPosix
+                   , hadrianScriptsWindows, osIsMacOS, osIsWindows, relDirBin
+                   , relDirUsr, relFile7zdll, relFile7zexe, relFileConfigure
+                   , relFileHadrianStackDotYaml, relFileLibgmpSo10
                    , relFileLibgmpSo3, relFileLibncurseswSo6, relFileLibtinfoSo5
                    , relFileLibtinfoSo6, relFileMainHs, relFileStack
                    , relFileStackDotExe, relFileStackDotTmp
@@ -159,7 +162,7 @@ import           System.Environment ( getExecutablePath, lookupEnv )
 import           System.IO.Error ( isPermissionError )
 import           System.FilePath ( searchPathSeparator )
 import qualified System.FilePath as FP
-import           System.Permissions ( osIsWindows, setFileExecutable )
+import           System.Permissions ( setFileExecutable )
 import           System.Uname ( getRelease )
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -210,6 +213,7 @@ data SetupPrettyException
   | GHCInfoMissingTargetPlatform
   | GHCInfoTargetPlatformInvalid !String
   | CabalNotFound !(Path Abs File)
+  | GhcBootScriptNotFound
   | HadrianScriptNotFound
   | URLInvalid !String
   | UnknownArchiveExtension !String
@@ -433,6 +437,10 @@ instance Pretty SetupPrettyException where
          [ flow "Cabal library not found in global package database for"
          , pretty compiler <> "."
          ]
+  pretty GhcBootScriptNotFound =
+    "[S-8488]"
+    <> line
+    <> flow "No GHC boot script found."
   pretty HadrianScriptNotFound =
     "[S-1128]"
     <> line
@@ -834,6 +842,71 @@ runWithGHC pc cp inner = do
           set processContextL pc env
   runRIO envg inner
 
+-- | A modified environment which we know has MSYS2 on the PATH.
+newtype WithMSYS env = WithMSYS env
+
+insideMSYSL :: Lens' (WithMSYS env) env
+insideMSYSL = lens (\(WithMSYS x) -> x) (\(WithMSYS _) -> WithMSYS)
+
+instance HasLogFunc env => HasLogFunc (WithMSYS env) where
+  logFuncL = insideMSYSL.logFuncL
+
+instance HasRunner env => HasRunner (WithMSYS env) where
+  runnerL = insideMSYSL.runnerL
+
+instance HasProcessContext env => HasProcessContext (WithMSYS env) where
+  processContextL = insideMSYSL.processContextL
+
+instance HasStylesUpdate env => HasStylesUpdate (WithMSYS env) where
+  stylesUpdateL = insideMSYSL.stylesUpdateL
+
+instance HasTerm env => HasTerm (WithMSYS env) where
+  useColorL = insideMSYSL.useColorL
+  termWidthL = insideMSYSL.termWidthL
+
+instance HasPantryConfig env => HasPantryConfig (WithMSYS env) where
+  pantryConfigL = insideMSYSL.pantryConfigL
+
+instance HasConfig env => HasPlatform (WithMSYS env) where
+  platformL = configL.platformL
+  {-# INLINE platformL #-}
+  platformVariantL = configL.platformVariantL
+  {-# INLINE platformVariantL #-}
+
+instance HasConfig env => HasGHCVariant (WithMSYS env) where
+  ghcVariantL = configL.ghcVariantL
+  {-# INLINE ghcVariantL #-}
+
+instance HasConfig env => HasConfig (WithMSYS env) where
+  configL = insideMSYSL.configL
+
+instance HasBuildConfig env => HasBuildConfig (WithMSYS env) where
+  buildConfigL = insideMSYSL.buildConfigL
+
+-- | Set up a modified environment which includes the modified PATH that MSYS2
+-- can be found on.
+runWithMSYS ::
+     HasConfig env
+  => Maybe ExtraDirs
+  -> RIO (WithMSYS env) a
+  -> RIO env a
+runWithMSYS mmsysPaths inner = do
+  env <- ask
+  pc0 <- view processContextL
+  pc <- case mmsysPaths of
+    Nothing -> pure pc0
+    Just msysPaths -> do
+      envars <- either throwM pure $
+        augmentPathMap
+          (map toFilePath $ edBins msysPaths)
+          (view envVarsL pc0)
+      mkProcessContext envars
+  let envMsys
+        = WithMSYS $
+          set envOverrideSettingsL (\_ -> pure pc) $
+          set processContextL pc env
+  runRIO envMsys inner
+
 -- | special helper for GHCJS which needs an updated source map
 -- only project dependencies should get included otherwise source map hash will
 -- get changed and EnvConfig will become inconsistent
@@ -895,16 +968,16 @@ ensureCompilerAndMsys ::
 ensureCompilerAndMsys sopts = do
   getSetupInfo' <- memoizeRef getSetupInfo
   mmsys2Tool <- ensureMsys sopts getSetupInfo'
-  msysPaths <- maybe (pure Nothing) (fmap Just . extraDirs) mmsys2Tool
-
+  mmsysPaths <- maybe (pure Nothing) (fmap Just . extraDirs) mmsys2Tool
   actual <- either throwIO pure $ wantedToActual $ soptsWantedCompiler sopts
   didWarn <- warnUnsupportedCompiler $ getGhcVersion actual
-
-  (cp, ghcPaths) <- ensureCompiler sopts getSetupInfo'
+  -- Modify the initial environment to include the MSYS2 path, if MSYS2 is being
+  -- used
+  (cp, ghcPaths) <- runWithMSYS mmsysPaths $ ensureCompiler sopts getSetupInfo'
 
   warnUnsupportedCompilerCabal cp didWarn
 
-  let paths = maybe ghcPaths (ghcPaths <>) msysPaths
+  let paths = maybe ghcPaths (ghcPaths <>) mmsysPaths
   pure (cp, paths)
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
@@ -1068,12 +1141,12 @@ installGhcBindist sopts getSetupInfo' installed = do
             (soptsStackYaml sopts)
             suggestion
 
--- | Ensure compiler is installed, without worrying about msys
+-- | Ensure compiler is installed.
 ensureCompiler ::
      forall env. (HasConfig env, HasBuildConfig env, HasGHCVariant env)
   => SetupOpts
   -> Memoized SetupInfo
-  -> RIO env (CompilerPaths, ExtraDirs)
+  -> RIO (WithMSYS env) (CompilerPaths, ExtraDirs)
 ensureCompiler sopts getSetupInfo' = do
   let wanted = soptsWantedCompiler sopts
   wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
@@ -1095,7 +1168,7 @@ ensureCompiler sopts getSetupInfo' = do
       isWanted =
         isWantedCompiler (soptsCompilerCheck sopts) (soptsWantedCompiler sopts)
 
-  let checkCompiler :: Path Abs File -> RIO env (Maybe CompilerPaths)
+  let checkCompiler :: Path Abs File -> RIO (WithMSYS env) (Maybe CompilerPaths)
       checkCompiler compiler = do
         eres <- tryAny $
           pathsFromCompiler wc CompilerBuildStandard False compiler >>= canUseCompiler
@@ -1194,7 +1267,7 @@ ensureSandboxedCompiler ::
      HasBuildConfig env
   => SetupOpts
   -> Memoized SetupInfo
-  -> RIO env (CompilerPaths, ExtraDirs)
+  -> RIO (WithMSYS env) (CompilerPaths, ExtraDirs)
 ensureSandboxedCompiler sopts getSetupInfo' = do
   let wanted = soptsWantedCompiler sopts
   -- List installed tools
@@ -1414,42 +1487,78 @@ buildGhcFromSource ::
   -> [Tool]
   -> CompilerRepository
   -> Text
+     -- ^ Commit ID.
   -> Text
-  -> RIO env (Tool, CompilerBuild)
+     -- ^ Hadrain flavour.
+  -> RIO (WithMSYS env) (Tool, CompilerBuild)
 buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId flavour = do
   config <- view configL
   let compilerTool = ToolGhcGit commitId flavour
-
   -- detect when the correct GHC is already installed
   if compilerTool `elem` installed
-    then pure (compilerTool,CompilerBuildStandard)
+    then pure (compilerTool, CompilerBuildStandard)
     else
       -- clone the repository and execute the given commands
       withRepo (SimpleRepo url commitId RepoGit) $ do
         -- withRepo is guaranteed to set workingDirL, so let's get it
         mcwd <- traverse parseAbsDir =<< view workingDirL
         cwd <- maybe (throwIO WorkingDirectoryInvalidBug) pure mcwd
-        threads <- view $ configL.to configJobs
-        let hadrianArgs = fmap T.unpack
-              [ "-c"                    -- run ./boot and ./configure
-              , "-j" <> tshow threads   -- parallel build
-              , "--flavour=" <> flavour -- selected flavour
-              , "binary-dist"
-              ]
+        let threads = configJobs config
+            relFileHadrianStackDotYaml' = toFilePath relFileHadrianStackDotYaml
+            ghcBootScriptPath = cwd </> ghcBootScript
+            boot = if osIsWindows
+              then proc "python3" ["boot"] runProcess_
+              else
+                proc (toFilePath ghcBootScriptPath) [] runProcess_
+            stack args = proc "stack" args'' runProcess_
+             where
+              args'' = "--stack-yaml=" <> relFileHadrianStackDotYaml' : args'
+              -- If a resolver is specified on the command line, Stack will
+              -- apply it. This allows the resolver specified in Hadrian's
+              -- stack.yaml file to be overridden.
+              args' = maybe args addResolver (configResolver config)
+              addResolver resolver = "--resolver=" <> show resolver : args
+            happy = stack ["install", "happy"]
+            alex = stack ["install", "alex"]
+            -- Executed in the Stack environment, because GHC is required.
+            configure = stack ("exec" : "--" : ghcConfigure)
+            ghcConfigure
+              | osIsWindows = ghcConfigureWindows
+              | osIsMacOS = ghcConfigureMacOS
+              | otherwise   = ghcConfigurePosix
             hadrianScripts
               | osIsWindows = hadrianScriptsWindows
               | otherwise   = hadrianScriptsPosix
-
+            hadrianArgs = fmap T.unpack
+              [ "-j" <> tshow threads   -- parallel build
+              , "--flavour=" <> flavour -- selected flavour
+              , "binary-dist"
+              ]
         foundHadrianPaths <-
           filterM doesFileExist $ (cwd </>) <$> hadrianScripts
         hadrianPath <- maybe (prettyThrowIO HadrianScriptNotFound) pure $
           listToMaybe foundHadrianPaths
-
+        exists <- doesFileExist ghcBootScriptPath
+        unless exists $ prettyThrowIO GhcBootScriptNotFound
+        ensureConfigureScript cwd
+        logInfo "Running GHC boot script..."
+        boot
+        doesExecutableExist "happy" >>= \case
+          True -> logInfo "happy executable installed on the PATH."
+          False -> do
+            logInfo "Installing happy executable..."
+            happy
+        doesExecutableExist "alex" >>= \case
+          True -> logInfo "alex executable installed on the PATH."
+          False -> do
+            logInfo "Installing alex executable..."
+            alex
+        logInfo "Running GHC configure script..."
+        configure
         logSticky $
              "Building GHC from source with `"
           <> display flavour
           <> "` flavour. It can take a long time (more than one hour)..."
-
         -- We need to provide an absolute path to the script since the process
         -- package only sets working directory _after_ discovering the
         -- executable.
@@ -2209,7 +2318,9 @@ withUnpackedTarball7z name si archiveFile archiveType destDir = do
       Nothing -> prettyThrowIO $ TarballFileInvalid name archiveFile
       Just x -> parseRelFile $ T.unpack x
   run7z <- setup7z si
-  let tmpName = toFilePathNoTrailingSep (dirname destDir) ++ "-tmp"
+  -- Truncate the name of the temporary directory, to reduce risk of Windows'
+  -- default file path length of 260 characters being exceeded.
+  let tmpName = take 15 (toFilePathNoTrailingSep (dirname destDir)) ++ "-tmp"
   ensureDir (parent destDir)
   withRunInIO $ \run ->
     withTempDir (parent destDir) tmpName $ \tmpDir ->

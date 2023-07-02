@@ -107,13 +107,13 @@ import           Stack.Build.Installed (  )
 import           Stack.Build.Source ( addUnlistedToBuildCache )
 import           Stack.Build.Target (  )
 import           Stack.Config ( checkOwnership )
+import           Stack.Config.ConfigureScript ( ensureConfigureScript )
 import           Stack.Constants
                    ( bindirSuffix, cabalPackageName, compilerOptionsCabalFlag
-                   , osIsWindows, relDirBuild, relDirDist, relDirSetup
-                   , relDirSetupExeCache, relDirSetupExeSrc, relFileBuildLock
-                   , relFileConfigure, relFileSetupHs, relFileSetupLhs
-                   , relFileSetupLower, relFileSetupMacrosH, setupGhciShimCode
-                   , stackProgName, testGhcEnvRelFile
+                   , relDirBuild, relDirDist, relDirSetup, relDirSetupExeCache
+                   , relDirSetupExeSrc, relFileBuildLock, relFileSetupHs
+                   , relFileSetupLhs, relFileSetupLower, relFileSetupMacrosH
+                   , setupGhciShimCode, stackProgName, testGhcEnvRelFile
                    )
 import           Stack.Constants.Config
                    ( distDirFromDir, distRelativeDir, hpcDirFromDir
@@ -123,7 +123,6 @@ import           Stack.Coverage
                    ( deleteHpcReports, generateHpcMarkupIndex, generateHpcReport
                    , generateHpcUnifiedReport, updateTixFile
                    )
-import           Stack.DefaultColorWhen ( defaultColorWhen )
 import           Stack.GhcPkg ( ghcPkgPathEnvVar, unregisterGhcPkgIds )
 import           Stack.Package ( buildLogPath )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
@@ -1101,7 +1100,11 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
           || mOldProjectRoot /= Just newProjectRoot
   let ConfigureOpts dirs nodirs = configCacheOpts newConfigCache
 
-  when (taskBuildTypeConfig task) ensureConfigureScript
+  when (taskBuildTypeConfig task) $
+    -- When build-type is Configure, we need to have a configure script in the
+    -- local directory. If it doesn't exist, build it with autoreconf -i. See:
+    -- https://github.com/commercialhaskell/stack/issues/3534
+    ensureConfigureScript pkgDir
 
   when needConfig $ withMVar eeConfigureLock $ \_ -> do
     deleteCaches pkgDir
@@ -1138,89 +1141,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
     -- reasonable too.
     getNewSetupConfigMod >>= writeSetupConfigMod pkgDir
     writePackageProjectRoot pkgDir newProjectRoot
-
   pure needConfig
- where
-  -- When build-type is Configure, we need to have a configure script in the
-  -- local directory. If it doesn't exist, build it with autoreconf -i. See:
-  -- https://github.com/commercialhaskell/stack/issues/3534
-  ensureConfigureScript = do
-    let fp = pkgDir </> relFileConfigure
-    exists <- doesFileExist fp
-    unless exists $ do
-      prettyInfoL
-        [ flow "Trying to generate configure with autoreconf in"
-        , pretty pkgDir <> "."
-        ]
-      let autoreconf = if osIsWindows
-                         then readProcessNull "sh" ["autoreconf", "-i"]
-                         else readProcessNull "autoreconf" ["-i"]
-          -- On Windows 10, an upstream issue with the `sh autoreconf -i`
-          -- command means that command clears, but does not then restore, the
-          -- ENABLE_VIRTUAL_TERMINAL_PROCESSING flag for native terminals. The
-          -- following hack re-enables the lost ANSI-capability.
-          fixupOnWindows = when osIsWindows (void $ liftIO defaultColorWhen)
-      withWorkingDir (toFilePath pkgDir) $ autoreconf `catchAny` \ex -> do
-        fixupOnWindows
-        prettyWarn $
-             fillSep
-               [ flow "Stack failed to run"
-               , style Shell "autoreconf" <> "."
-               ]
-          <> blankLine
-          <> flow "Stack encountered the following error:"
-          <> blankLine
-          <> string (displayException ex)
-        when osIsWindows $ do
-          prettyInfo $
-               fillSep
-                 [ flow "Check that executable"
-                 , style File "perl"
-                 , flow "is on the path in Stack's MSYS2"
-                 , style Dir "\\usr\\bin"
-                 , flow "folder, and working, and that script file"
-                 , style File "autoreconf"
-                 , flow "is on the path in that location. To check that"
-                 , style File "perl"
-                 , "or"
-                 , style File "autoreconf"
-                 , flow "are on the path in the required location, run commands:"
-                 ]
-            <> blankLine
-            <> indent 4 (style Shell $ flow "stack exec where -- perl")
-            <> line
-            <> indent 4 (style Shell $ flow "stack exec where -- autoreconf")
-            <> blankLine
-            <> fillSep
-                 [ "If"
-                 , style File "perl"
-                 , "or"
-                 , style File "autoreconf"
-                 , flow "is not on the path in the required location, add them \
-                        \with command (note that the relevant package name is"
-                 , style File "autoconf"
-                 , "not"
-                 , style File "autoreconf" <> "):"
-                 ]
-            <> blankLine
-            <> indent 4
-                 (style Shell $ flow "stack exec pacman -- --sync --refresh autoconf")
-            <> blankLine
-            <> fillSep
-                 [ flow "Some versions of"
-                 , style File "perl"
-                 , flow "from MSYS2 are broken. See"
-                 , style Url "https://github.com/msys2/MSYS2-packages/issues/1611"
-                 , "and"
-                 , style Url "https://github.com/commercialhaskell/stack/pull/4781" <> "."
-                 , "To test if"
-                 , style File "perl"
-                 , flow "in the required location is working, try command:"
-                 ]
-            <> blankLine
-            <> indent 4 (style Shell $ flow "stack exec perl -- --version")
-            <> blankLine
-      fixupOnWindows
 
 -- | Make a padded prefix for log messages
 packageNamePrefix :: ExecuteEnv -> PackageName -> String
