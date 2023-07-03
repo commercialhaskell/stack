@@ -16,12 +16,13 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 21 August 2023, ubuntu-latest, windows-latest and macos-latest come
-# with Stack 2.11.1 (2.9.3 on macos-latest) and GHC 9.6.2. windows-latest comes
-# with NSIS 3.08, for which the default value of the 'Unicode' installer
-# attribute is 'true'. However, that is not the 'large strings' build of NSIS
-# and creates installers that corrupt the PATH environment variable if the
-# default string length of 1024 characters is exceeded.
+# As of 8 September 2023, ubuntu-latest and windows-latest come with
+# Stack 2.11.1 and GHC 9.6.2. macos-13 comes with Stack 2.9.3 and GHC 9.6.2 but
+# does not come with pkg-config. windows-latest comes with NSIS 3.08, for which
+# the default value of the 'Unicode' installer attribute is 'true'. However,
+# that is not the 'large strings' build of NSIS and creates installers that
+# corrupt the PATH environment variable if the default string length of 1024
+# characters is exceeded.
 
 jobs:
   integration-tests:
@@ -37,9 +38,11 @@ jobs:
         - os: windows-latest
           release-args: ""
           cache-bust: "13"
-        - os: macos-latest
+        # Use of macos-13 to investigate
+        # git https://github.com/commercialhaskell/stack/issues/6182
+        - os: macos-13
           release-args: ""
-          cache-bust: "23"
+          cache-bust: ""
     steps:
     - name: Clone project
       uses: actions/checkout@v3
@@ -91,6 +94,11 @@ jobs:
           # evaluation mode. See https://github.com/NixOS/nixpkgs/issues/149791.
           # Set NIX_PATH...
           export NIX_PATH=${NIX_PATH:+$NIX_PATH:}$HOME/.nix-defexpr/channels
+        fi
+
+        if [[ "${{ matrix.os }}" == "macos-13" ]]
+        then
+          brew install pkg-config
         fi
 
         if [[ "${{ matrix.release-args }}" == "--alpine" ]]
