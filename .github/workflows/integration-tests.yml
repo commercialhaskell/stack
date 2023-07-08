@@ -142,6 +142,9 @@ jobs:
     - name: Build bindist
       shell: bash
       run: |
+        # Temporarily get information about iconv
+        which -a iconv
+        iconv --version
         stack etc/scripts/release.hs build ${{ matrix.release-args }}
 
     - name: Upload bindist
