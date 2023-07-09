@@ -322,6 +322,7 @@ library
       Paths_stack
   other-modules:
       Stack.Config.ConfigureScript
+      Stack.FileDigestCache
   autogen-modules:
       Build_stack
       Paths_stack
