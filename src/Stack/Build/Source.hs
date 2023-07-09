@@ -14,7 +14,6 @@ module Stack.Build.Source
   , hashSourceMapData
   ) where
 
-import           Conduit ( ZipSink (..), withSourceFile )
 import           Data.ByteString.Builder ( toLazyByteString )
 import qualified Data.List as L
 import qualified Data.Map as Map
@@ -523,13 +522,13 @@ getFileDigestMaybe :: MonadIO m => FilePath -> m (Maybe SHA256)
 getFileDigestMaybe fp =
   liftIO $
     catch
-      (fmap Just . withSourceFile fp $ getDigest)
+      (fmap Just getDigest)
       (\e ->
             if isDoesNotExistError e
                 then pure Nothing
                 else throwM e)
  where
-  getDigest src = runConduit $ src .| getZipSink (ZipSink SHA256.sinkHash)
+  getDigest = SHA256.hashFile fp
 
 -- | Get 'PackageConfig' for package given its name.
 getPackageConfig ::
