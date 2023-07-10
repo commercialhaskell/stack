@@ -94,27 +94,38 @@ import           System.Directory
                    )
 import qualified System.FilePath as FP
 
--- | Type representing exceptions thrown by functions exported by the
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.SDist" module.
-data SDistException
+data SDistPrettyException
   = CheckException (NonEmpty Check.PackageCheck)
   | CabalFilePathsInconsistentBug (Path Abs File) (Path Abs File)
   | ToTarPathException String
   deriving (Show, Typeable)
 
-instance Exception SDistException where
-  displayException (CheckException xs) = unlines $
-    [ "Error: [S-6439]"
-    , "Package check reported the following errors:"
-    ] <> fmap show (NE.toList xs)
-  displayException (CabalFilePathsInconsistentBug cabalfp cabalfp') = concat
-    [ "Error: [S-9595]\n"
-    , "The impossible happened! Two Cabal file paths are inconsistent: "
-    , show (cabalfp, cabalfp')
-    ]
-  displayException (ToTarPathException e) =
-    "Error: [S-7875\n"
-    ++ e
+instance Pretty SDistPrettyException where
+  pretty (CheckException xs) =
+    "[S-6439]"
+    <> line
+    <> flow "Package check reported the following errors:"
+    <> line
+    <> bulletedList (map (string . show) (NE.toList xs) :: [StyleDoc])
+  pretty (CabalFilePathsInconsistentBug cabalfp cabalfp') =
+    "[S-9595]"
+    <> line
+    <> fillSep
+         [ flow "The impossible happened! Two Cabal file paths are \
+                \inconsistent:"
+         , pretty cabalfp
+         , "and"
+         , pretty cabalfp' <> "."
+         ]
+  pretty (ToTarPathException e) =
+    "[S-7875]"
+    <> line
+    <> string e
+
+instance Exception SDistPrettyException
+
 -- | Type representing command line options for @stack sdist@ command.
 data SDistOpts = SDistOpts
   { sdoptsDirsToWorkWith :: [String]
@@ -232,7 +243,7 @@ getSDistTarball mpvpBounds pkgDir = do
   -- everything in at once, so that's what we're doing for now:
   let tarPath isDir fp =
         case Tar.toTarPath isDir (forceUtf8Enc (pkgId FP.</> fp)) of
-          Left e -> throwIO $ ToTarPathException e
+          Left e -> prettyThrowIO $ ToTarPathException e
           Right tp -> pure tp
       -- convert a String of proper characters to a String of bytes
       -- in UTF8 encoding masquerading as characters. This is
@@ -280,7 +291,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     loadCabalFilePath (Just stackProgName') (parent cabalfp)
   gpd <- liftIO $ gpdio NoPrintWarnings
   unless (cabalfp == cabalfp') $
-    throwIO $ CabalFilePathsInconsistentBug cabalfp cabalfp'
+    prettyThrowIO $ CabalFilePathsInconsistentBug cabalfp cabalfp'
   installMap <- toInstallMap sourceMap
   (installedMap, _, _, _) <- getInstalled installMap
   let internalPackages = Set.fromList $
@@ -572,7 +583,7 @@ checkPackageInExtractedTarball pkgDir = do
       <> bulletedList (map (fromString . show) warnings)
   case NE.nonEmpty errors of
     Nothing -> pure ()
-    Just ne -> throwM $ CheckException ne
+    Just ne -> prettyThrowM $ CheckException ne
 
 buildExtractedTarball :: HasEnvConfig env => ResolvedPath Dir -> RIO env ()
 buildExtractedTarball pkgDir = do
