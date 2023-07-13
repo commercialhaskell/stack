@@ -1,7 +1,7 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.4.5.
 
-resolver: nightly-2023-06-18 # GHC 9.4.5
+resolver: lts-21.2 # GHC 9.4.5
 
 packages:
 - .
@@ -12,13 +12,7 @@ extra-deps:
 # https://github.com/ekmett/ansi-wl-pprint/issues/29
 - ansi-wl-pprint-1.0.2@sha256:b817853b5310b8e7847469847608b664c3e75b4b30c332f2cb8c0d00751ef9c1,1915
 - optparse-applicative-0.18.1.0@sha256:b4cf8d9018e5e67cb1f14edb5130b6d05ad8bc1b5f6bd4efaa6ec0b7f28f559d,5132
-
-allow-newer: true
-
-allow-newer-deps:
-# Required because optparse-generic has not yet caught up with
-# optparse-applicative-0.18.1.0
-- optparse-generic
+- optparse-generic-1.5.0@sha256:1de163cf439350d2c5817dd9067b51eeb62d6fdd4e2f0a70c06c9e1b931c38d7,2285
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

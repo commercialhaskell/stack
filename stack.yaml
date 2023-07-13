@@ -9,6 +9,7 @@ extra-deps:
 - ansi-terminal-types-0.11.5@sha256:f78440dfd95c4509e88855ac7cc2d9566ddf956a92c1290404cac93ad1a1b00a,1482
 - fsnotify-0.4.1.0@sha256:44540beabea36aeeef930aa4d5f28091d431904bc9923b6ac4d358831c651235,2854
 - optparse-applicative-0.18.1.0@sha256:b4cf8d9018e5e67cb1f14edb5130b6d05ad8bc1b5f6bd4efaa6ec0b7f28f559d,5132
+- optparse-generic-1.5.0@sha256:1de163cf439350d2c5817dd9067b51eeb62d6fdd4e2f0a70c06c9e1b931c38d7,2285
 - pantry-0.8.3@sha256:3717b64fa283624832cf2ed5042c5f4ec549276633d1e1c6845c6c0d462a17dc,5750
 - persistent-2.14.5.0@sha256:c3c7a6a200930f956b2a6bb15b9d2cd512980692f6a2d95368a6db335c34c916,7199
 - rio-prettyprint-0.1.4.0@sha256:1f8eb3ead0ef33d3736d53e1de5e9b2c91a0c207cdca23321bd74c401e85f23a,1301
@@ -16,13 +17,6 @@ extra-deps:
 - Cabal-3.8.1.0@sha256:155d64beeecbae2b19e5d67844532494af88bc8795d4db4146a0c29296f59967,12220
 # lts-20.23 specifies Cabal-syntax-3.6.0.0
 - Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
-
-allow-newer: true
-
-allow-newer-deps:
-# Required because optparse-generic has not yet caught up with
-# optparse-applicative-0.18.1.0
-- optparse-generic
 
 drop-packages:
 # See https://github.com/commercialhaskell/stack/pull/4712

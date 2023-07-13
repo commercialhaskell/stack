@@ -25,9 +25,16 @@ packages:
       size: 3124
   original:
     hackage: optparse-applicative-0.18.1.0@sha256:b4cf8d9018e5e67cb1f14edb5130b6d05ad8bc1b5f6bd4efaa6ec0b7f28f559d,5132
+- completed:
+    hackage: optparse-generic-1.5.0@sha256:1de163cf439350d2c5817dd9067b51eeb62d6fdd4e2f0a70c06c9e1b931c38d7,2285
+    pantry-tree:
+      sha256: a526054c13aa0bfdb80af0a99ec62520347ac2e4cfc4fe29b105d0047864cd1e
+      size: 411
+  original:
+    hackage: optparse-generic-1.5.0@sha256:1de163cf439350d2c5817dd9067b51eeb62d6fdd4e2f0a70c06c9e1b931c38d7,2285
 snapshots:
 - completed:
-    sha256: 77d87bfafc69c55ea4b20e1017ef63add05cd0fbd6c1465a0d5a94fa4d6f7ae0
-    size: 639351
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/6/18.yaml
-  original: nightly-2023-06-18
+    sha256: bd34dcded0f9d502275871b7bcd9bbe356bf060276bc6b62fb9e8a225589c74c
+    size: 639151
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/2.yaml
+  original: lts-21.2
