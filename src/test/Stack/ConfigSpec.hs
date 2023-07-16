@@ -16,10 +16,10 @@ module Stack.ConfigSpec
   ) where
 
 import           Control.Arrow ( left )
+import           Data.Aeson.WarningParser ( WithJSONWarnings )
 import           Data.Yaml ( decodeEither', parseEither )
 import           Distribution.Verbosity ( verbose )
-import           Pantry.Internal ( pcHpackExecutable )
-import           Pantry.Internal.AesonExtended
+import           Pantry.Internal.Stackage ( pcHpackExecutable )
 import           Path ( (</>), parent, parseAbsDir, parseRelDir, parseRelFile )
 import           Path.IO hiding ( withSystemTempDir )
 import           Stack.Config (defaultConfigYaml, loadConfig, loadConfigYaml )

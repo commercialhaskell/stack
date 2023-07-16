@@ -5,11 +5,10 @@ module Stack.Types.Curator
   ( Curator (..)
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..), ToJSON (..), (.=), object )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings (..), (..:?), (..!=), withObjectWarnings )
 import qualified Data.Set as Set
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), ToJSON (..), WithJSONWarnings (..), (.=)
-                   , (..:?), (..!=), object, withObjectWarnings
-                   )
 import           Stack.Prelude
 
 -- | Extra configuration intended exclusively for usage by the curator tool. In

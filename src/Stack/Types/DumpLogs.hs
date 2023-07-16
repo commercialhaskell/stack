@@ -6,8 +6,7 @@ module Stack.Types.DumpLogs
   ( DumpLogs (..)
   ) where
 
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), Value (..), withText )
+import           Data.Aeson.Types ( FromJSON (..), Value (..), withText )
 import           Stack.Prelude
 
 -- | Which build log files to dump

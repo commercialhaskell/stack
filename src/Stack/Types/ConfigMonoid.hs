@@ -12,6 +12,12 @@ module Stack.Types.ConfigMonoid
   , configMonoidSystemGHCName
   ) where
 
+import           Data.Aeson.Types ( Object, Value )
+import           Data.Aeson.WarningParser
+                   ( WarningParser, WithJSONWarnings, (..:?), (..!=)
+                   , jsonSubWarnings, jsonSubWarningsT, jsonSubWarningsTT
+                   , withObjectWarnings
+                   )
 import           Casa.Client ( CasaRepoPrefix )
 import           Control.Monad.Writer ( tell )
 import           Data.Coerce ( coerce )
@@ -22,11 +28,6 @@ import           Data.Monoid.Map ( MonoidMap (..) )
 import qualified Data.Yaml as Yaml
 import           Distribution.Version ( anyVersion )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Pantry.Internal.AesonExtended
-                   ( Object, Value, WarningParser, WithJSONWarnings, (..:?)
-                   , (..!=), jsonSubWarnings, jsonSubWarningsT
-                   , jsonSubWarningsTT, withObjectWarnings
-                   )
 import           Stack.Prelude
 import           Stack.Types.AllowNewerDeps ( AllowNewerDeps )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )

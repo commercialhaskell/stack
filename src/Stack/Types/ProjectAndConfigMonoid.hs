@@ -6,12 +6,13 @@ module Stack.Types.ProjectAndConfigMonoid
   , parseProjectAndConfigMonoid
   ) where
 
+import           Data.Aeson.Types ( Value )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings, (...:), (..:?), (..!=), jsonSubWarnings
+                   , jsonSubWarningsT, jsonSubWarningsTT, withObjectWarnings
+                   )
 import qualified Data.Set as Set
 import qualified Data.Yaml as Yaml
-import           Pantry.Internal.AesonExtended
-                   ( WithJSONWarnings, Value, (...:), (..:?), (..!=)
-                   , jsonSubWarnings, jsonSubWarningsT, jsonSubWarningsTT
-                   , withObjectWarnings )
 import           Stack.Prelude
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid, parseConfigMonoidObject )

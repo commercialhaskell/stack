@@ -4,9 +4,9 @@ module Stack.Types.AllowNewerDeps
   ( AllowNewerDeps (..)
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..) )
 import qualified Distribution.PackageDescription as C
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Pantry.Internal.AesonExtended ( FromJSON (..) )
 import           Stack.Prelude
 
 newtype AllowNewerDeps

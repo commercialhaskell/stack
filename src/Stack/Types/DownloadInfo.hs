@@ -6,9 +6,10 @@ module Stack.Types.DownloadInfo
   , parseDownloadInfoFromObject
   ) where
 
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), Object, WarningParser
-                   , WithJSONWarnings (..), (..:), (..:?), withObjectWarnings
+import           Data.Aeson.Types ( FromJSON (..), Object )
+import           Data.Aeson.WarningParser
+                   ( WarningParser, WithJSONWarnings (..), (..:), (..:?)
+                   , withObjectWarnings
                    )
 import           Stack.Prelude
 

@@ -6,11 +6,11 @@ module Stack.Types.CabalConfigKey
   , parseCabalConfigKey
   ) where
 
-import qualified Data.Text as T
-import           Pantry.Internal.AesonExtended
+import           Data.Aeson.Types
                    ( FromJSON (..), FromJSONKey (..), FromJSONKeyFunction (..)
                    , withText
                    )
+import qualified Data.Text as T
 import           Stack.Prelude
 
 -- | Which packages do configure opts apply to?

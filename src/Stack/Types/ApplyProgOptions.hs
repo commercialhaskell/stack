@@ -5,7 +5,7 @@ module Stack.Types.ApplyProgOptions
   ( ApplyProgOptions (..)
   ) where
 
-import           Pantry.Internal.AesonExtended ( FromJSON (..), withText )
+import           Data.Aeson.Types ( FromJSON (..), withText )
 import           Stack.Prelude
 
 -- | Which packages do all and any --PROG-option options on the command line

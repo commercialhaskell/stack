@@ -29,6 +29,9 @@ import           Conduit
 import           Control.Applicative ( empty )
 import           Crypto.Hash ( SHA1 (..), SHA256 (..) )
 import qualified Data.Aeson.KeyMap as KeyMap
+import           Data.Aeson.Types ( Value (..) )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings (..), logJSONWarnings )
 import qualified Data.Attoparsec.Text as P
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as LBS
@@ -61,8 +64,6 @@ import           Network.HTTP.StackClient
                    , verifiedDownloadWithProgress, withResponse
                    )
 import           Network.HTTP.Simple ( getResponseHeader )
-import           Pantry.Internal.AesonExtended
-                   ( Value (..), WithJSONWarnings (..), logJSONWarnings )
 import           Path
                    ( (</>), addExtension, dirname, filename, parent, parseAbsDir
                    , parseAbsFile, parseRelDir, parseRelFile, toFilePath

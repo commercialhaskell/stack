@@ -326,6 +326,7 @@ library
   build-depends:
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
+    , aeson-warning-parser
     , ansi-terminal >=1.0
     , array
     , async
@@ -334,6 +335,7 @@ library
     , base64-bytestring
     , bytestring
     , casa-client
+    , companion
     , conduit
     , conduit-extra
     , containers
@@ -436,6 +438,7 @@ executable stack
   build-depends:
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
+    , aeson-warning-parser
     , ansi-terminal >=1.0
     , array
     , async
@@ -444,6 +447,7 @@ executable stack
     , base64-bytestring
     , bytestring
     , casa-client
+    , companion
     , conduit
     , conduit-extra
     , containers
@@ -539,6 +543,7 @@ executable stack-integration-test
   build-depends:
       Cabal >=3.8.1.0
     , aeson >=2.0.3.0
+    , aeson-warning-parser
     , ansi-terminal >=1.0
     , array
     , async
@@ -547,6 +552,7 @@ executable stack-integration-test
     , base64-bytestring
     , bytestring
     , casa-client
+    , companion
     , conduit
     , conduit-extra
     , containers
@@ -649,6 +655,7 @@ test-suite stack-test
       Cabal >=3.8.1.0
     , QuickCheck
     , aeson >=2.0.3.0
+    , aeson-warning-parser
     , ansi-terminal >=1.0
     , array
     , async
@@ -657,6 +664,7 @@ test-suite stack-test
     , base64-bytestring
     , bytestring
     , casa-client
+    , companion
     , conduit
     , conduit-extra
     , containers

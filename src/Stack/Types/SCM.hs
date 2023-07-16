@@ -5,7 +5,7 @@ module Stack.Types.SCM
   ( SCM (..)
   ) where
 
-import           Pantry.Internal.AesonExtended ( FromJSON (..), ToJSON (..) )
+import           Data.Aeson.Types ( FromJSON (..), ToJSON (..) )
 import           Stack.Prelude
 
 -- | A software control system.

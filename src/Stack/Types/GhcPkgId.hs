@@ -10,14 +10,13 @@ module Stack.Types.GhcPkgId
   , ghcPkgIdString
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..), ToJSON (..), withText )
 import           Data.Attoparsec.Text
                    ( Parser, choice, digit, endOfInput, letter, many1, parseOnly
                    , satisfy
                    )
 import qualified Data.Text as T
 import           Database.Persist.Sql ( PersistField, PersistFieldSql )
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), ToJSON (..), withText )
 import           Prelude ( Read (..) )
 import           Stack.Prelude
 

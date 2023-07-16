@@ -8,11 +8,12 @@ module Stack.Types.SetupInfo
   ( SetupInfo (..)
   ) where
 
-import qualified Data.Map as Map
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), WithJSONWarnings, (..:?), (..!=)
-                   , jsonSubWarningsT, jsonSubWarningsTT, withObjectWarnings
+import           Data.Aeson.Types ( FromJSON (..) )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings, (..:?), (..!=), jsonSubWarningsT
+                   , jsonSubWarningsTT, withObjectWarnings
                    )
+import qualified Data.Map as Map
 import           Stack.Prelude
 import           Stack.Types.DownloadInfo ( DownloadInfo )
 import           Stack.Types.VersionedDownloadInfo ( VersionedDownloadInfo )

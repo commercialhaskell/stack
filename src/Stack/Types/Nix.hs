@@ -15,11 +15,10 @@ module Stack.Types.Nix
   , nixShellOptsArgName
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..) )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings, (..:?), withObjectWarnings )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), WithJSONWarnings, (..:?)
-                   , withObjectWarnings
-                   )
 import           Stack.Prelude
 
 -- | Nix configuration. Parameterize by resolver type to avoid cyclic

@@ -5,6 +5,13 @@
 
 packages:
 - completed:
+    hackage: aeson-warning-parser-0.1.0@sha256:f2c1c42b73aa35d352060abcbb867c410cbbf57d0cb0fed607bcd1e2a74954ad,1308
+    pantry-tree:
+      sha256: 645c42c1e52c3a0e7fcedf06cd97d1fca590bf83a0eb19eed08314f4a3cf6b5f
+      size: 336
+  original:
+    hackage: aeson-warning-parser-0.1.0@sha256:f2c1c42b73aa35d352060abcbb867c410cbbf57d0cb0fed607bcd1e2a74954ad,1308
+- completed:
     hackage: ansi-terminal-1.0@sha256:640ffecfd95471388d939fcacb57bdc0cef15f0457746c234a12cdd5a6c6d1e8,2706
     pantry-tree:
       sha256: d2028688664a01877fcbf4a7dc820574bec07f17393e570a98c00c49cd28d5cf
@@ -19,6 +26,13 @@ packages:
   original:
     hackage: ansi-wl-pprint-1.0.2@sha256:b817853b5310b8e7847469847608b664c3e75b4b30c332f2cb8c0d00751ef9c1,1915
 - completed:
+    hackage: companion-0.1.0@sha256:99f6de52c832d433639232a6d77d33abbca3b3037e49b7db6242fb9f569a8a2b,1093
+    pantry-tree:
+      sha256: 7d36c8a038ab4db197c0a395c63523b47beec9f6c72a64271bb0f6b112d1ebd1
+      size: 328
+  original:
+    hackage: companion-0.1.0@sha256:99f6de52c832d433639232a6d77d33abbca3b3037e49b7db6242fb9f569a8a2b,1093
+- completed:
     hackage: optparse-applicative-0.18.1.0@sha256:b4cf8d9018e5e67cb1f14edb5130b6d05ad8bc1b5f6bd4efaa6ec0b7f28f559d,5132
     pantry-tree:
       sha256: 32f52adc150eb146bf4d167ff0cb21fc1e3cd7ecc1b9e5e83b986a1cd1bc58cd
@@ -32,6 +46,20 @@ packages:
       size: 411
   original:
     hackage: optparse-generic-1.5.0@sha256:1de163cf439350d2c5817dd9067b51eeb62d6fdd4e2f0a70c06c9e1b931c38d7,2285
+- completed:
+    hackage: pantry-0.9.1@sha256:69058b32be71d0fbc51727ddd677eb6429657c2c1cebbd9802e6b4f8a5eda51c,7530
+    pantry-tree:
+      sha256: b3bbe99504efc22d7f0d776cb6ecd692df435966f0107eeb4d5ba9085f99b56a
+      size: 2665
+  original:
+    hackage: pantry-0.9.1@sha256:69058b32be71d0fbc51727ddd677eb6429657c2c1cebbd9802e6b4f8a5eda51c,7530
+- completed:
+    hackage: static-bytes-0.1.0@sha256:35dbf30f617baa0151682c97687042516be07872a39984f9fe31f78125b962bf,1627
+    pantry-tree:
+      sha256: 38980443d7bdf00dde4c34babbb1e4b858cdc3aca8973c50f22444cfb03135a2
+      size: 440
+  original:
+    hackage: static-bytes-0.1.0@sha256:35dbf30f617baa0151682c97687042516be07872a39984f9fe31f78125b962bf,1627
 snapshots:
 - completed:
     sha256: bd34dcded0f9d502275871b7bcd9bbe356bf060276bc6b62fb9e8a225589c74c

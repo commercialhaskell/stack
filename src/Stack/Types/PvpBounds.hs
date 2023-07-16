@@ -7,11 +7,10 @@ module Stack.Types.PvpBounds
   , pvpBoundsText
   , parsePvpBounds
   ) where
+
+import           Data.Aeson.Types ( FromJSON (..), ToJSON (..), withText )
 import qualified Data.Map as Map
 import qualified Data.Text as T
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), ToJSON (..), withText
-                   )
 import           Stack.Prelude
 
 -- | How PVP bounds should be added to .cabal files
