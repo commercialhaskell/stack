@@ -18,6 +18,9 @@ module Stack.Docker
   ) where
 
 import qualified Crypto.Hash as Hash ( Digest, MD5, hash )
+import           Data.Aeson ( eitherDecode )
+import           Data.Aeson.Types ( FromJSON (..), (.!=) )
+import           Data.Aeson.WarningParser ( (.:), (.:?) )
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -32,8 +35,6 @@ import qualified Data.Text.Encoding as T
 import           Data.Time ( UTCTime )
 import qualified Data.Version ( parseVersion )
 import           Distribution.Version ( mkVersion, mkVersion' )
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), (.:), (.:?), (.!=), eitherDecode )
 import           Path
                    ( (</>), dirname, filename, parent, parseAbsDir
                    , splitExtension

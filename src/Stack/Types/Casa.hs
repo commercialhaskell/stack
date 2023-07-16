@@ -8,11 +8,11 @@ module Stack.Types.Casa
   ( CasaOptsMonoid (..)
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..) )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings, (..:?), withObjectWarnings )
 import           Casa.Client ( CasaRepoPrefix )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), WithJSONWarnings, (..:?), withObjectWarnings
-                   )
 import           Stack.Prelude
 
 -- | An uninterpreted representation of Casa configuration options.

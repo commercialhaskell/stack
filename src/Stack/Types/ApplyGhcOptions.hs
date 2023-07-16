@@ -5,7 +5,7 @@ module Stack.Types.ApplyGhcOptions
   ( ApplyGhcOptions (..)
   ) where
 
-import           Pantry.Internal.AesonExtended ( FromJSON (..), withText )
+import           Data.Aeson.Types ( FromJSON (..), withText )
 import           Stack.Prelude
 
 -- | Which packages do ghc-options on the command line apply to?

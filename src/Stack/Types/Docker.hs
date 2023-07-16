@@ -42,16 +42,16 @@ module Stack.Types.Docker
   , reExecArgName
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..), withText )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings, (..:), (..:?), (..!=), withObjectWarnings
+                   )
 import           Data.List ( intercalate )
 import qualified Data.Text as T
 import           Distribution.System ( Arch (..), OS (..), Platform (..) )
 import           Distribution.Text ( display, simpleParse )
 import           Distribution.Version ( anyVersion )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), WithJSONWarnings, (..:), (..:?), (..!=)
-                   , withObjectWarnings, withText
-                   )
 import           Path ( parseAbsFile )
 import           Stack.Constants ( stackProgName )
 import           Stack.Prelude hiding ( Display (..) )

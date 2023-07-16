@@ -8,17 +8,16 @@ module Stack.Lock
   , Locked (..)
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..), ToJSON, Value, (.=), object )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings (..), (..:), jsonSubWarnings
+                   , jsonSubWarningsT, logJSONWarnings, withObjectWarnings
+                   )
 import           Data.ByteString.Builder ( byteString )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), ToJSON, Value, WithJSONWarnings (..), (.=)
-                   , (..:), jsonSubWarnings, jsonSubWarningsT, logJSONWarnings
-                   , object
-                   , withObjectWarnings
-                   )
 import           Path ( parent )
 import           Path.Extended ( addExtension )
 import           Path.IO ( doesFileExist )

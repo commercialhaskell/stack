@@ -5,10 +5,9 @@ module Stack.Types.GHCDownloadInfo
   ( GHCDownloadInfo (..)
   ) where
 
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), WithJSONWarnings (..), (..:?), (..!=)
-                   , withObjectWarnings
-                   )
+import           Data.Aeson.Types ( FromJSON (..) )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings (..), (..:?), (..!=), withObjectWarnings )
 import           Stack.Prelude
 import           Stack.Types.DownloadInfo
                    ( DownloadInfo, parseDownloadInfoFromObject )

@@ -6,9 +6,9 @@ module Stack.Types.ColorWhen
   , readColorWhen
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..) )
 import           Options.Applicative ( ReadM )
 import qualified Options.Applicative.Types as OA
-import           Pantry.Internal.AesonExtended ( FromJSON (..) )
 import           Stack.Prelude
 
 data ColorWhen

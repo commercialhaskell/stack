@@ -30,7 +30,7 @@ import           Database.Persist.TH
                    ( mkMigrate, mkPersist, persistLowerCase, share
                    , sqlSettings
                    )
-import qualified Pantry.Internal as SQLite
+import           Pantry.SQLite ( initStorage, withStorage_ )
 import           Stack.Prelude
 import           Stack.Storage.Util
                    ( handleMigrationException, updateList, updateSet )
@@ -90,7 +90,7 @@ initProjectStorage ::
   -> (ProjectStorage -> RIO env a)
   -> RIO env a
 initProjectStorage fp f = handleMigrationException $
-  SQLite.initStorage "Stack" migrateAll fp $ f . ProjectStorage
+  initStorage "Stack" migrateAll fp $ f . ProjectStorage
 
 -- | Run an action in a database transaction
 withProjectStorage ::
@@ -99,7 +99,7 @@ withProjectStorage ::
   -> RIO env a
 withProjectStorage inner = do
   storage <- view (buildConfigL . to bcProjectStorage . to unProjectStorage)
-  SQLite.withStorage_ storage inner
+  withStorage_ storage inner
 
 -- | Key used to retrieve configuration or flag cache
 type ConfigCacheKey = Unique ConfigCacheParent

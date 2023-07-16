@@ -4,9 +4,9 @@ module Stack.Types.GhcOptions
   ( GhcOptions (..)
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..), withText )
 import           Data.Attoparsec.Args ( EscapingMode (Escaping), parseArgs )
 import qualified Data.Text as T
-import           Pantry.Internal.AesonExtended ( FromJSON (..), withText )
 import           Stack.Prelude
 
 newtype GhcOptions = GhcOptions { unGhcOptions :: [Text] }

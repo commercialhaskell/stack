@@ -32,6 +32,9 @@ module Stack.Config
   ) where
 
 import           Control.Monad.Extra ( firstJustM )
+import           Data.Aeson.Types ( Value )
+import           Data.Aeson.WarningParser
+                    ( WithJSONWarnings (..), logJSONWarnings )
 import           Data.Array.IArray ( (!), (//) )
 import qualified Data.ByteString as S
 import           Data.ByteString.Builder ( byteString )
@@ -51,8 +54,6 @@ import           GHC.Conc ( getNumProcessors )
 import           Network.HTTP.StackClient
                    ( httpJSON, parseUrlThrow, getResponseBody )
 import           Options.Applicative ( Parser, help, long, metavar, strOption )
-import           Pantry.Internal.AesonExtended
-                    ( Value, WithJSONWarnings (..), logJSONWarnings )
 import           Path
                    ( PathException (..), (</>), parent, parseAbsDir
                    , parseAbsFile, parseRelDir, stripProperPrefix

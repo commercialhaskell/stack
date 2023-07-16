@@ -5,9 +5,8 @@ module Stack.Types.GhcOptionKey
   ( GhcOptionKey (..)
   ) where
 
+import           Data.Aeson.Types ( FromJSONKey (..), FromJSONKeyFunction (..) )
 import qualified Data.Text as T
-import           Pantry.Internal.AesonExtended
-                   ( FromJSONKey (..), FromJSONKeyFunction (..) )
 import           Stack.Prelude
 
 data GhcOptionKey

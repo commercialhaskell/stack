@@ -8,7 +8,7 @@ module Stack.Types.Storage
   , UserStorage (..)
   ) where
 
-import           Pantry.Internal ( Storage )
+import           Pantry.SQLite ( Storage )
 import           Stack.Prelude
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by

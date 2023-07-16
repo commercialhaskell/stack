@@ -8,6 +8,7 @@ module Stack.LockSpec
   , spec
   ) where
 
+import           Data.Aeson.WarningParser ( WithJSONWarnings (..) )
 import qualified Data.Yaml as Yaml
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.Version ( mkVersion )
@@ -18,7 +19,6 @@ import           Pantry
                    , Repo (..), RepoType (..), SHA256, TreeKey (..)
                    , resolvePaths
                    )
-import           Pantry.Internal.AesonExtended ( WithJSONWarnings (..) )
 import qualified Pantry.SHA256 as SHA256
 import           RIO ( ByteString, displayException, throwIO, unless )
 import           Stack.Lock ( Locked (..), LockedLocation (..) )

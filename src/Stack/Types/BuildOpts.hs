@@ -36,15 +36,16 @@ module Stack.Types.BuildOpts
   , toFirstCabalVerbosity
   ) where
 
+import           Data.Aeson.Types ( FromJSON (..), withText )
+import           Data.Aeson.WarningParser
+                   ( WithJSONWarnings, (..:?), (..!=), jsonSubWarnings
+                   , withObjectWarnings
+                   )
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Distribution.Parsec ( Parsec (..), simpleParsec )
 import           Distribution.Verbosity ( Verbosity, normal, verbose )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), WithJSONWarnings, (..:?), (..!=)
-                   , jsonSubWarnings, withObjectWarnings, withText
-                   )
 import           Stack.Prelude
 
 -- | Build options that is interpreted by the build command. This is built up

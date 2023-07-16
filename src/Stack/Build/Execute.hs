@@ -17,6 +17,7 @@ module Stack.Build.Execute
   , KeepOutputOpen (..)
   ) where
 
+import           Control.Concurrent.Companion ( Companion, withCompanion )
 import           Control.Concurrent.Execute
                    ( Action (..), ActionContext (..), ActionId (..)
                    , ActionType (..)
@@ -66,7 +67,6 @@ import           Distribution.Types.UnqualComponentName
                    ( mkUnqualComponentName )
 import           Distribution.Verbosity ( showForCabal )
 import           Distribution.Version ( mkVersion )
-import           Pantry.Internal.Companion ( Companion, withCompanion )
 import           Path
                    ( PathException, (</>), addExtension, filename
                    , isProperPrefixOf, parent, parseRelDir, parseRelFile

@@ -5,9 +5,9 @@ module Stack.Types.Project
   ( Project (..)
   ) where
 
+import           Data.Aeson.Types ( ToJSON (..), (.=), object )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import           Pantry.Internal.AesonExtended ( ToJSON (..), (.=), object )
 import           Stack.Prelude
 import           Stack.Types.Curator ( Curator )
 

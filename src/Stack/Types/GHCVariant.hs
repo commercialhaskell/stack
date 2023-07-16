@@ -8,9 +8,9 @@ module Stack.Types.GHCVariant
   , parseGHCVariant
   ) where
 
+import           Data.Aeson.Types ( FromJSON, parseJSON, withText )
 import           Data.List ( stripPrefix )
 import qualified Data.Text as T
-import           Pantry.Internal.AesonExtended ( FromJSON, parseJSON, withText )
 import           Stack.Prelude
 
 -- | Specialized variant of GHC (e.g. libgmp4 or integer-simple)

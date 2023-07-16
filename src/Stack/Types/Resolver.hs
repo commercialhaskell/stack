@@ -13,14 +13,15 @@ module Stack.Types.Resolver
 
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
+import           Data.Aeson.Types
+                   ( FromJSON, parseJSON, withObject, withText )
+import           Data.Aeson.WarningParser ( (.:) )
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 import           Data.Text.Read ( decimal )
 import           Data.Time ( Day )
 import           Options.Applicative ( ReadM )
 import qualified Options.Applicative.Types as OA
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON, parseJSON, withObject, (.:), withText )
 import           Stack.Prelude
 
 -- | Type representing exceptions thrown by functions exported by the

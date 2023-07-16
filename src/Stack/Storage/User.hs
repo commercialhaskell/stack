@@ -39,7 +39,7 @@ import           Database.Persist.TH
                    )
 import           Distribution.Text ( simpleParse, display )
 import           Foreign.C.Types ( CTime (..) )
-import qualified Pantry.Internal as SQLite
+import           Pantry.SQLite ( initStorage, withStorage_ )
 import           Path ( (</>), mkRelFile, parseRelFile )
 import           Path.IO ( resolveFile', resolveDir' )
 import qualified RIO.FilePath as FP
@@ -159,7 +159,7 @@ initUserStorage ::
   -> (UserStorage -> RIO env a)
   -> RIO env a
 initUserStorage fp f = handleMigrationException $
-  SQLite.initStorage "Stack" migrateAll fp $ f . UserStorage
+  initStorage "Stack" migrateAll fp $ f . UserStorage
 
 -- | Run an action in a database transaction
 withUserStorage ::
@@ -168,7 +168,7 @@ withUserStorage ::
   -> RIO env a
 withUserStorage inner = do
   storage <- view (configL . to configUserStorage . to unUserStorage)
-  SQLite.withStorage_ storage inner
+  withStorage_ storage inner
 
 -- | Key used to retrieve the precompiled cache
 type PrecompiledCacheKey = Unique PrecompiledCacheParent

@@ -21,14 +21,14 @@ module Stack.Types.Version
   , stackMinorVersion
   ) where
 
+import           Data.Aeson.Types
+                   ( FromJSON (..), ToJSON (..), Value (..), withText )
 import           Data.List ( find )
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Version ( showVersion )
 import           Distribution.Pretty ( pretty )
 import qualified Distribution.Version as Cabal
-import           Pantry.Internal.AesonExtended
-                   ( FromJSON (..), ToJSON (..), Value (..), withText )
 import qualified Paths_stack as Meta
 import           Stack.Prelude hiding ( Vector, pretty )
 import           Text.PrettyPrint ( render )
