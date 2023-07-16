@@ -26,7 +26,7 @@ homepage: http://haskellstack.org
 custom-setup:
   dependencies:
   - base >= 4.14.3.0 && < 5
-  - Cabal < 3.10
+  - Cabal < 3.12
   - filepath
 extra-source-files:
 # note: leaving out 'package.yaml' because it causes confusion with hackage metadata revisions
