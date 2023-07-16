@@ -922,9 +922,9 @@ warnUnsupportedCompiler ghcVersion =
           , style Url "https://github.com/commercialhaskell/stack/issues/648" <> "."
           ]
         pure True
-    | ghcVersion >= mkVersion [9, 5] -> do
+    | ghcVersion >= mkVersion [9, 7] -> do
         prettyWarnL
-          [ flow "Stack has not been tested with GHC versions above 9.6, and \
+          [ flow "Stack has not been tested with GHC versions 9.8 and above, and \
                  \using"
           , fromString (versionString ghcVersion) <> ","
           , flow "this may fail."
@@ -956,9 +956,9 @@ warnUnsupportedCompilerCabal cp didWarn = do
                  \resolver. Acceptable resolvers: lts-3.0/nightly-2015-05-05 \
                  \or later."
           ]
-    | cabalVersion >= mkVersion [3, 9] ->
+    | cabalVersion >= mkVersion [3, 11] ->
         prettyWarnL
-          [ flow "Stack has not been tested with Cabal versions above 3.10, \
+          [ flow "Stack has not been tested with Cabal versions 3.12 and above, \
                  \but version"
           , fromString (versionString cabalVersion)
           , flow "was found, this may fail."
