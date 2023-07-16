@@ -8,7 +8,8 @@ module Stack.Build.ConstructPlan
   ( constructPlan
   ) where
 
-import           Control.Monad.RWS.Strict hiding ( (<>) )
+import           Control.Monad.RWS.Strict
+                   ( RWST, get, modify, modify', pass, put, runRWST, tell )
 import qualified Data.List as L
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Map.Strict as Map
