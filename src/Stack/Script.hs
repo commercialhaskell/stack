@@ -181,7 +181,8 @@ scriptCmd opts = do
       pure $ root </> relDirScripts </> escapedRelDir
     else pure scriptDir
 
-  let dropExtension path = fst <$> splitExtension path
+  -- path does not necessarily end with an extension.
+  let dropExtension path = pure $ maybe path fst $ splitExtension path
 
   exe <- if osIsWindows
     then replaceExtension ".exe" (outputDir </> scriptFile)

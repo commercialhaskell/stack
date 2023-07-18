@@ -50,6 +50,7 @@ Bug fixes:
 * Stack's sanity check on a selected GHC now passes GHC flag
   `-hide-all-packages`, stopping GHC from looking for a package environment in
   default locations.
+* Restore Stack script files without extensions (broken with Stack 2.11.1).
 
 ## v2.11.1 - 2023-05-18
 
