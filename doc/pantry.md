@@ -181,6 +181,19 @@ extra-deps:
     that your build will not be deterministic, because when someone else tries
     to build the project they can get a different checkout of the package.
 
+!!! warning
+
+    For the contents of a Git repository, Stack cannot handle filepaths or
+    symbolic link names that are longer than those supported by the `ustar`
+    (Unix Standard TAR) archive format defined by
+    [POSIX.1-1988](https://nvlpubs.nist.gov/nistpubs/Legacy/FIPS/fipspub151-1.pdf).
+
+    Stack uses `git archive` to convert the content of a Git repository to a
+    TAR archive, which it then seeks to consume. Git produces `pax` format
+    archives which use 'extended' headers for matters that the `ustar` format
+    cannot handle. Unfortunately, Stack cannot consume an extended header and
+    will silently discard the item.
+
 A common practice in the Haskell world is to use "megarepos", or repositories
 with multiple packages in various subdirectories. Some common examples include
 [wai](https://github.com/yesodweb/wai/) and
