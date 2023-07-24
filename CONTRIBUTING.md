@@ -212,7 +212,7 @@ that contain the link text  See the
 ## Error messages
 
 Stack catches exceptions thrown by its dependencies or by Stack itself in
-`Main.main`. In addition to exceptions that halt Stack's execution, Stack logs
+`Stack.main`. In addition to exceptions that halt Stack's execution, Stack logs
 certain other matters as 'errors'.
 
 To support the Haskell Foundation's

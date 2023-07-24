@@ -4,7 +4,6 @@ module Stack.CLI
   ( commandLineHandler
   ) where
 
-import           BuildInfo ( hpackVersion, versionString' )
 import           Data.Attoparsec.Interpreter ( getInterpreterArgs )
 import           Data.Char ( toLower )
 import qualified Data.List as L
@@ -20,6 +19,7 @@ import           Options.Applicative.Complicated
 import qualified RIO.Process ( exec )
 import           RIO.Process ( withProcessContextNoLogging )
 import           Stack.Build ( buildCmd )
+import           Stack.BuildInfo ( hpackVersion, versionString' )
 import           Stack.Clean ( CleanCommand (..), cleanCmd )
 import           Stack.ConfigCmd as ConfigCmd
 import           Stack.Constants ( globalFooter, osIsWindows, stackProgName )
@@ -82,6 +82,7 @@ import qualified System.Directory as D
 import           System.Environment ( getProgName, withArgs )
 import           System.FilePath ( pathSeparator, takeDirectory )
 
+-- | Stack's command line handler.
 commandLineHandler ::
      FilePath
   -> String
