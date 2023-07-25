@@ -1,17 +1,22 @@
 -- | The module of this name differs as between Windows and non-Windows builds.
 -- This is the Windows version.
 module System.Permissions
-  ( setScriptPerms
+  ( osIsMacOS
   , osIsWindows
   , setFileExecutable
+  , setScriptPerms
   ) where
 
--- | True if using Windows OS.
+-- | False if using Windows.
+osIsMacOS :: Bool
+osIsMacOS = False
+
+-- | True if using Windows.
 osIsWindows :: Bool
 osIsWindows = True
 
-setScriptPerms :: Monad m => FilePath -> m ()
-setScriptPerms _ = pure ()
-
 setFileExecutable :: Monad m => FilePath -> m ()
 setFileExecutable _ = pure ()
+
+setScriptPerms :: Monad m => FilePath -> m ()
+setScriptPerms _ = pure ()
