@@ -4,11 +4,13 @@
 
 -- | Main Stack tool entry point.
 
-module Main (main) where
+module Stack
+  ( main
+  ) where
 
-import           BuildInfo ( versionString' )
 import           GHC.IO.Encoding ( mkTextEncoding, textEncodingName )
 import           Options.Applicative.Builder.Extra ( execExtraHelp )
+import           Stack.BuildInfo ( versionString' )
 import           Stack.CLI ( commandLineHandler )
 import           Stack.Constants ( stackProgName )
 import           Stack.Docker ( dockerCmdName, dockerHelpOptName )
@@ -30,12 +32,12 @@ import           System.Environment ( getArgs, getProgName )
 import           System.IO ( hGetEncoding, hPutStrLn, hSetEncoding )
 import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
 
--- | Type representing exceptions thrown by functions in the "Main" module.
-data MainException
+-- | Type representing exceptions thrown by functions in the "Stack" module.
+data StackException
   = InvalidReExecVersion String String
   deriving (Show, Typeable)
 
-instance Exception MainException where
+instance Exception StackException where
   displayException (InvalidReExecVersion expected actual) = concat
     [ "Error: [S-2186]\n"
     , "When re-executing '"

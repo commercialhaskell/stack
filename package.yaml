@@ -144,10 +144,11 @@ when:
   else:
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
 library:
-  source-dirs: src/
+  source-dirs: src
   ghc-options:
   - -Widentities
   generated-exposed-modules:
+  - Build_stack
   - Paths_stack
   exposed-modules:
   - Control.Concurrent.Execute
@@ -160,8 +161,10 @@ library:
   - Options.Applicative.Builder.Extra
   - Options.Applicative.Complicated
   - Path.CheckInstall
+  - Path.Extended
   - Path.Extra
   - Path.Find
+  - Stack
   - Stack.Build
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
@@ -171,7 +174,10 @@ library:
   - Stack.Build.Source
   - Stack.Build.Target
   - Stack.BuildPlan
+  - Stack.BuildInfo
+  - Stack.CLI
   - Stack.Clean
+  - Stack.ComponentFile
   - Stack.Config
   - Stack.Config.Build
   - Stack.Config.Docker
@@ -179,6 +185,7 @@ library:
   - Stack.ConfigCmd
   - Stack.Constants
   - Stack.Constants.Config
+  - Stack.Constants.StackProgName
   - Stack.Coverage
   - Stack.DefaultColorWhen
   - Stack.Docker
@@ -231,6 +238,7 @@ library:
   - Stack.Options.Utils
   - Stack.Package
   - Stack.PackageDump
+  - Stack.PackageFile
   - Stack.Path
   - Stack.Prelude
   - Stack.Query
@@ -254,6 +262,8 @@ library:
   - Stack.Types.BuildConfig
   - Stack.Types.BuildOpts
   - Stack.Types.CabalConfigKey
+  - Stack.Types.Cache
+  - Stack.Types.Casa
   - Stack.Types.ColorWhen
   - Stack.Types.CompilerBuild
   - Stack.Types.CompilerPaths
@@ -263,6 +273,7 @@ library:
   - Stack.Types.ConfigMonoid
   - Stack.Types.ConfigureOpts
   - Stack.Types.Curator
+  - Stack.Types.Dependency
   - Stack.Types.Docker
   - Stack.Types.DockerEntrypoint
   - Stack.Types.DownloadInfo
@@ -283,6 +294,7 @@ library:
   - Stack.Types.NamedComponent
   - Stack.Types.Nix
   - Stack.Types.Package
+  - Stack.Types.PackageFile
   - Stack.Types.PackageName
   - Stack.Types.ParentMap
   - Stack.Types.Platform
@@ -296,6 +308,7 @@ library:
   - Stack.Types.SetupInfo
   - Stack.Types.SourceMap
   - Stack.Types.StackYamlLoc
+  - Stack.Types.Storage
   - Stack.Types.TemplateName
   - Stack.Types.UnusedFlags
   - Stack.Types.Version
@@ -316,13 +329,19 @@ library:
     else:
       source-dirs: src/unix/
       c-sources: src/unix/cbits/uname.c
+  - condition: ! '!(flag(disable-git-info))'
+    cpp-options: -DUSE_GIT_INFO
+    dependencies:
+    - githash
+    - optparse-simple
+  - condition: flag(hide-dependency-versions)
+    cpp-options: -DHIDE_DEP_VERSIONS
+  - condition: flag(supported-build)
+    cpp-options: -DSUPPORTED_BUILD
 executables:
   stack:
     main: Main.hs
-    source-dirs: src/main
-    generated-other-modules:
-    - Build_stack
-    - Paths_stack
+    source-dirs: app
     ghc-options:
     - -threaded
     - -rtsopts
@@ -333,15 +352,6 @@ executables:
       ld-options:
       - -static
       - -pthread
-    - condition: ! '!(flag(disable-git-info))'
-      cpp-options: -DUSE_GIT_INFO
-      dependencies:
-      - githash
-      - optparse-simple
-    - condition: flag(hide-dependency-versions)
-      cpp-options: -DHIDE_DEP_VERSIONS
-    - condition: flag(supported-build)
-      cpp-options: -DSUPPORTED_BUILD
   stack-integration-test:
     main: IntegrationSpec.hs
     source-dirs:

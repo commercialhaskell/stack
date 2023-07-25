@@ -15,8 +15,8 @@ import           Path ( (</>), parseRelDir )
 import           RIO.Process ( proc, runProcess_, withWorkingDir )
 import           Stack.Build ( build )
 import           Stack.Build.Target ( NeedTargets (..) )
+import           Stack.BuildInfo ( maybeGitHash )
 import           Stack.Constants ( relDirStackProgName, stackDotYaml )
-import           Stack.Internal.BuildInfo ( maybeGitHash )
 import           Stack.Prelude hiding ( force, Display (..) )
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withEnvConfig

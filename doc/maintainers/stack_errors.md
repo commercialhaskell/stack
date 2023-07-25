@@ -5,15 +5,20 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-07-10.
+`master` branch of the Stack repository. Last updated: 2023-07-24.
 
-*   `Main.main`: catches exceptions from action `commandLineHandler`.
+*   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
-    `ExitCode`
+    -   `ExitCode`
+    -   `throwIO`
 
-    `throwIO`
+*   `Stack.StackException`
 
-*   `Main.main`: catches exceptions from action `run`:
+    ~~~haskell
+    [S-2186] = InvalidReExecVersion String String
+    ~~~
+
+*   `Stack.main`: catches exceptions from action `run`:
 
     -   `ExitCode` (`exitWith`)
     -   `PrettyException` (`exitFailure`)
@@ -27,12 +32,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-2816] = InconsistentDependenciesBug
-        ~~~
-
-    -   `Main.MainException`
-
-        ~~~haskell
-        [S-2186] = InvalidReExecVersion String String
         ~~~
 
     -   `Options.Applicative.Builder.Extra.OptionsApplicativeExtraException`

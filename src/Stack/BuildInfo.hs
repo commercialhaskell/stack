@@ -6,11 +6,12 @@
 {-# LANGUAGE TemplateHaskell   #-}
 #endif
 
--- Extracted from Main so that the Main module does not use CPP or TH,
+-- Extracted from "Stack" so that module does not use CPP or Template Haskell,
 -- and therefore doesn't need to be recompiled as often.
-module BuildInfo
+module Stack.BuildInfo
   ( versionString'
   , hpackVersion
+  , maybeGitHash
   ) where
 
 #ifndef HIDE_DEP_VERSIONS
@@ -20,7 +21,7 @@ import           Data.Version ( versionBranch )
 import           Distribution.System ( buildArch )
 import qualified Distribution.Text as Cabal ( display )
 #ifdef USE_GIT_INFO
-import           GitHash ( giCommitCount, tGitInfoCwdTry )
+import           GitHash ( giCommitCount, giHash, tGitInfoCwdTry )
 import           Options.Applicative.Simple ( simpleVersion )
 #endif
 import qualified Paths_stack as Meta
@@ -76,3 +77,13 @@ versionString' = showStackVersion ++ afterVersion
 -- | Hpack version we're compiled against
 hpackVersion :: String
 hpackVersion = VERSION_hpack
+
+-- | If USE_GIT_INFO is enabled, the Git hash in the build directory, otherwise
+-- Nothing.
+maybeGitHash :: Maybe String
+maybeGitHash =
+#ifdef USE_GIT_INFO
+  (either (const Nothing) (Just . giHash) $$tGitInfoCwdTry)
+#else
+  Nothing
+#endif
