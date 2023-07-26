@@ -67,12 +67,12 @@ dependencies:
 - attoparsec
 - base64-bytestring
 - bytestring
-- casa-client
+- casa-client >= 0.0.2
 - companion
 - conduit
 - conduit-extra
 - containers
-- cryptonite
+- crypton
 - directory
 - echo
 - exceptions
@@ -83,12 +83,12 @@ dependencies:
 - fsnotify >= 0.4.1
 - generic-deriving
 - hi-file-parser >= 0.1.4.0
-- hpack
+- hpack >= 0.35.3
 - hpc
 - http-client
-- http-client-tls
+- http-client-tls >= 0.3.6.2
 - http-conduit
-- http-download
+- http-download >= 0.2.1.0
 - http-types
 - memory
 - microlens
@@ -97,7 +97,7 @@ dependencies:
 - neat-interpolation
 - open-browser
 - optparse-applicative >= 0.18.1.0
-- pantry >= 0.8.3
+- pantry >= 0.9.2
 - path
 - path-io
 # In order for Cabal (the tool) to build Stack, it needs to be told of the
