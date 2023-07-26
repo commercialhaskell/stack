@@ -50,6 +50,47 @@
     within:
     - Network.HTTP.StackClient
 
+# A number of extensions are implied by the use of GHC2021.
+- extensions:
+  - default: false
+  # The following list provides an inventory of extensions used over and above
+  # the GHC2021 set. Other extensions can be added, if need be.
+  - name:
+    - NoImplicitPrelude
+    - DataKinds
+    - DefaultSignatures
+    - DerivingStrategies
+    - GADTs
+    - LambdaCase
+    - MultiWayIf
+    - OverloadedLists
+    - OverloadedStrings
+    - QuasiQuotes
+    - RecordWildCards
+    - TypeFamilies
+    - UndecidableInstances
+    - ViewPatterns
+  # Stack's code generally avoids the use of C preprocessor (CPP) directives.
+  - name: CPP
+    within:
+    - Stack.BuildInfo
+    - Stack.Constants
+  # The following list provides an inventory of the small number of modules
+  # where Template Haskell is used.
+  - name: TemplateHaskell
+    within:
+    - Stack.Constants
+    - Stack.Constants.Config
+    - Stack.Constants.UsrLibDirs
+    - Stack.Ghci.ScriptSpec
+    - Stack.Storage.Project
+    - Stack.Storage.User
+  # src/setup-shim/StackSetupShim.hs is a resource, not part of Stack's code.
+  - within: StackSetupShim
+    name:
+    - CPP
+    - PackageImports
+
 # Not considered useful hints
 - ignore:
     name: "Use camelCase"

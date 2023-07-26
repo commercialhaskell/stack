@@ -1,0 +1,15 @@
+# HLint configuration file for test directory
+# https://github.com/ndmitchell/hlint
+
+# A number of extensions are implied by the use of GHC2021.
+- extensions:
+  - default: false
+  # The following list provides an inventory of extensions used over and above
+  # the GHC2021 set. Other extensions can be added, if need be.
+  - name:
+    - NoImplicitPrelude
+    - CPP
+    - OverloadedStrings
+    - ScopedTypeVariables
+    - TemplateHaskell
+    - ViewPatterns
