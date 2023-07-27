@@ -26,7 +26,6 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import           Data.Char ( isAscii, isDigit )
 import           Data.Conduit.List ( sinkNull )
-import           Data.Conduit.Process.Typed hiding ( proc )
 import           Data.List ( dropWhileEnd, isInfixOf, isPrefixOf )
 import           Data.List.Extra ( trim )
 import qualified Data.Map.Strict as Map
@@ -40,11 +39,18 @@ import           Path
                    , splitExtension
                    )
 import           Path.Extra ( toFilePathNoTrailingSep )
-import           Path.IO hiding ( canonicalizePath )
+import           Path.IO
+                   ( copyFile, doesDirExist, doesFileExist, ensureDir
+                   , getCurrentDir, getHomeDir, getModificationTime, listDir
+                   , removeDirRecur, removeFile, resolveFile'
+                   )
 import qualified RIO.Directory ( makeAbsolute )
 import           RIO.Process
-                   ( HasProcessContext, augmentPath, doesExecutableExist, proc
-                   , processContextL, withWorkingDir
+                   ( ExitCodeException (..), HasProcessContext, augmentPath
+                   , closed, doesExecutableExist, proc, processContextL
+                   , readProcessStdout_, readProcess_, runProcess, runProcess_
+                   , setStderr, setStdin, setStdout, useHandleOpen
+                   , withWorkingDir
                    )
 import           Stack.Config ( getInContainer )
 import           Stack.Constants

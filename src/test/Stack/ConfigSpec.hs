@@ -21,7 +21,7 @@ import           Data.Yaml ( decodeEither', parseEither )
 import           Distribution.Verbosity ( verbose )
 import           Pantry.Internal.Stackage ( pcHpackExecutable )
 import           Path ( (</>), parent, parseAbsDir, parseRelDir, parseRelFile )
-import           Path.IO hiding ( withSystemTempDir )
+import           Path.IO ( getCurrentDir )
 import           Stack.Config (defaultConfigYaml, loadConfig, loadConfigYaml )
 import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           Stack.Prelude

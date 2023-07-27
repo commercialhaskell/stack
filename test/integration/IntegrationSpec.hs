@@ -14,7 +14,10 @@ import           Options.Generic
                    )
 import           RIO
 import           RIO.Char ( toLower )
-import           RIO.Directory hiding ( findExecutable )
+import           RIO.Directory
+                   ( canonicalizePath, copyFile, createDirectoryIfMissing
+                   , doesFileExist, getAppUserDataDirectory
+                   )
 import           RIO.FilePath
                    ( (</>), (<.>), isPathSeparator, takeDirectory
                    , takeExtensions, takeFileName

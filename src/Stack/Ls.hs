@@ -18,7 +18,7 @@ import           Data.Array.IArray ( (//), elems )
 import           Distribution.Package ( mkPackageName )
 import qualified Data.Aeson.Types as A
 import qualified Data.List as L
-import           Data.Text hiding ( filter, intercalate, pack, reverse )
+import           Data.Text ( isPrefixOf )
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V

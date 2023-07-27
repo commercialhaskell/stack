@@ -83,7 +83,11 @@ import           Network.HTTP.Client.TLS
                    )
 import           Network.HTTP.Conduit ( requestHeaders )
 import           Network.HTTP.Download
-                   hiding ( download, redownload, verifiedDownload )
+                   ( CheckHexDigest (..), DownloadRequest, HashCheck (..)
+                   , VerifiedDownloadException (..), drRetryPolicyDefault
+                   , mkDownloadRequest, modifyRequest, setForceDownload
+                   , setHashChecks, setLengthCheck, setRetryPolicy
+                   )
 import qualified Network.HTTP.Download as Download
 import           Network.HTTP.Simple
                    ( addRequestHeader, getResponseBody, getResponseHeaders
