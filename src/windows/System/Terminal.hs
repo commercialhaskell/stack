@@ -15,7 +15,7 @@ import           Foreign.Ptr ( Ptr )
 import           Foreign.Storable ( peekByteOff )
 import           RIO.Partial ( read )
 import           Stack.Prelude
-import           System.IO hiding ( hIsTerminalDevice )
+import           System.IO ( hGetContents )
 import           System.Process
                    ( StdStream (..), createProcess, shell, std_err, std_in
                    , std_out, waitForProcess

@@ -51,7 +51,10 @@ import           Distribution.Utils.Path ( getSymbolicPath )
 import           Distribution.Verbosity ( silent )
 import           Distribution.Version
                    ( anyVersion, mkVersion, orLaterVersion )
-import           Path as FL hiding ( replaceExtension )
+import           Path
+                   ( (</>), parent, parseAbsDir, parseRelDir, parseRelFile
+                   , stripProperPrefix
+                   )
 import           Path.Extra ( concatAndCollapseAbsDir, toFilePathNoTrailingSep )
 import           Stack.Constants (relFileCabalMacrosH, relDirLogs)
 import           Stack.Constants.Config ( distDirFromDir )

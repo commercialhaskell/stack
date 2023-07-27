@@ -12,7 +12,12 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import           Distribution.CabalSpecVersion ( CabalSpecVersion )
 import           Distribution.ModuleName ( ModuleName )
-import           Distribution.PackageDescription hiding ( FlagName )
+import           Distribution.PackageDescription
+                   ( BuildType (..), PackageDescription, benchmarkName
+                   , benchmarks, buildType, dataDir, dataFiles, exeName
+                   , executables, extraSrcFiles, libName, library
+                   , libraryNameString, specVersion, subLibraries, testName
+                   , testSuites )
 import           Distribution.Simple.Glob ( matchDirFileGlob )
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Path ( parent, (</>) )

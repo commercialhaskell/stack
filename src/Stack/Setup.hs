@@ -71,7 +71,11 @@ import           Path
 import           Path.CheckInstall ( warnInstallSearchPathIssues )
 import           Path.Extended ( fileExtension )
 import           Path.Extra ( toFilePathNoTrailingSep )
-import           Path.IO hiding ( findExecutable, withSystemTempDir )
+import           Path.IO
+                   ( canonicalizePath, doesFileExist, ensureDir, executable
+                   , getPermissions, ignoringAbsence, listDir, removeDirRecur
+                   , renameDir, renameFile, resolveFile', withTempDir
+                   )
 import           RIO.List
                    ( headMaybe, intercalate, intersperse, isPrefixOf
                    , maximumByMaybe, sort, sortOn, stripPrefix )
