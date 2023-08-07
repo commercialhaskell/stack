@@ -39,8 +39,8 @@ import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint
                    ( showGenericPackageDescription )
 import           Distribution.Version
-                   ( simplifyVersionRange, orLaterVersion, earlierVersion
-                   , hasUpperBound, hasLowerBound
+                   ( earlierVersion, hasLowerBound, hasUpperBound, isAnyVersion
+                   , orLaterVersion, simplifyVersionRange
                    )
 import           Path ( (</>), parent, parseRelDir, parseRelFile )
 import           Path.IO ( ensureDir, resolveDir' )
@@ -398,7 +398,9 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
                 then addUpper version
                 else id
             )
-          $ ( if toAddLower && not (hasLowerBound range)
+            -- From Cabal-3.4.0.0, 'hasLowerBound isAnyVersion' is 'True'.
+          $ ( if    toAddLower
+                 && (isAnyVersion range || not (hasLowerBound range))
                 then addLower version
                 else id
             )

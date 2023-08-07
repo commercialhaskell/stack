@@ -46,6 +46,7 @@ Other enhancements:
 
 Bug fixes:
 
+* Restore `stack sdist --pvp-bounds lower` (broken with Stack 2.9.1).
 * Restore building of Stack with Cabal flag `disable-git-info` (broken with
   Stack 2.11.1).
 * With `stack hoogle`, avoid the message
