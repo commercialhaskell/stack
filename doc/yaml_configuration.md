@@ -1229,13 +1229,14 @@ bounds.
 #### Basic use
 
 Values are `none` (unchanged), `upper` (add upper bounds), `lower` (add
-lower bounds), and both (and upper and lower bounds). The algorithm it follows
-is:
+lower bounds), and both (and upper and lower bounds). The algorithm Stack
+follows is:
 
-* If an upper or lower bound already exists on a dependency, it's left alone
-* When adding a lower bound, we look at the current version specified by
-  `stack.yaml`, and set it as the lower bound (e.g., `foo >= 1.2.3`)
-* When adding an upper bound, we require less than the next major version
+* If an upper or lower bound (other than `>= 0` - 'any version') already exists
+  on a dependency, it is left alone
+* When adding a lower bound, Stack looks at the current version specified by
+  `stack.yaml`, and sets it as the lower bound (e.g., `foo >= 1.2.3`)
+* When adding an upper bound, Stack sets it as less than the next major version
   (e.g., `foo < 1.3`)
 
 ~~~yaml
