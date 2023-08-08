@@ -62,7 +62,7 @@ packages:
     hackage: static-bytes-0.1.0@sha256:35dbf30f617baa0151682c97687042516be07872a39984f9fe31f78125b962bf,1627
 snapshots:
 - completed:
-    sha256: bd34dcded0f9d502275871b7bcd9bbe356bf060276bc6b62fb9e8a225589c74c
-    size: 639151
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/2.yaml
-  original: lts-21.2
+    sha256: 2e7d4a730d8eb5373b2d383fac84efcf7c81e3b7a5fce71b4c2e19a1768f25a6
+    size: 640239
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/6.yaml
+  original: lts-21.6

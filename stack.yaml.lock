@@ -5,6 +5,20 @@
 
 packages:
 - completed:
+    hackage: Cabal-3.8.1.0@sha256:155d64beeecbae2b19e5d67844532494af88bc8795d4db4146a0c29296f59967,12220
+    pantry-tree:
+      sha256: 0df207f33a2167f23ab8192b3c1e5722b60836bcdde18a0b5b24fb85b41c05ef
+      size: 8955
+  original:
+    hackage: Cabal-3.8.1.0@sha256:155d64beeecbae2b19e5d67844532494af88bc8795d4db4146a0c29296f59967,12220
+- completed:
+    hackage: Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
+    pantry-tree:
+      sha256: 0471cade235bb93e1fd32630f6d5fa69735a879d2712f47067c51bed0c46d536
+      size: 11052
+  original:
+    hackage: Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
+- completed:
     hackage: aeson-warning-parser-0.1.0@sha256:f2c1c42b73aa35d352060abcbb867c410cbbf57d0cb0fed607bcd1e2a74954ad,1308
     pantry-tree:
       sha256: 645c42c1e52c3a0e7fcedf06cd97d1fca590bf83a0eb19eed08314f4a3cf6b5f
@@ -81,20 +95,6 @@ packages:
       size: 440
   original:
     hackage: static-bytes-0.1.0@sha256:35dbf30f617baa0151682c97687042516be07872a39984f9fe31f78125b962bf,1627
-- completed:
-    hackage: Cabal-3.8.1.0@sha256:155d64beeecbae2b19e5d67844532494af88bc8795d4db4146a0c29296f59967,12220
-    pantry-tree:
-      sha256: 0df207f33a2167f23ab8192b3c1e5722b60836bcdde18a0b5b24fb85b41c05ef
-      size: 8955
-  original:
-    hackage: Cabal-3.8.1.0@sha256:155d64beeecbae2b19e5d67844532494af88bc8795d4db4146a0c29296f59967,12220
-- completed:
-    hackage: Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
-    pantry-tree:
-      sha256: 0471cade235bb93e1fd32630f6d5fa69735a879d2712f47067c51bed0c46d536
-      size: 11052
-  original:
-    hackage: Cabal-syntax-3.8.1.0@sha256:4936765e9a7a8ecbf8fdbe9067f6d972bc0299220063abb2632a9950af64b966,7619
 snapshots:
 - completed:
     sha256: 4c972e067bae16b95961dbfdd12e07f1ee6c8fffabbfa05c3d65100b03f548b7

@@ -1,10 +1,7 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.4.5.
 
-resolver: lts-21.2 # GHC 9.4.5
-
-packages:
-- .
+resolver: lts-21.6 # GHC 9.4.5
 
 extra-deps:
 - aeson-warning-parser-0.1.0@sha256:f2c1c42b73aa35d352060abcbb867c410cbbf57d0cb0fed607bcd1e2a74954ad,1308
@@ -41,6 +38,3 @@ flags:
     win32-2-13-1: false
   stack:
     developer-mode: true
-
-ghc-options:
-  "$locals": -fhide-source-paths
