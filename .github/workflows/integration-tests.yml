@@ -16,12 +16,12 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 16 June 2023, ubuntu-latest, windows-latest and macos-latest come
-# with Stack 2.11.1 and GHC 9.6.2. windows-latest comes with NSIS 3.08, for
-# which the default value of the 'Unicode' installer attribute is 'true'.
-# However, that is not the 'large strings' build of NSIS and creates installers
-# that corrupt the PATH environment variable if the default string length of
-# 1024 characters is exceeded.
+# As of 8 August 2023, ubuntu-latest, windows-latest and macos-latest come
+# with Stack 2.11.1 (2.9.3 on macos-latest) and GHC 9.6.2. windows-latest comes
+# with NSIS 3.08, for which the default value of the 'Unicode' installer
+# attribute is 'true'. However, that is not the 'large strings' build of NSIS
+# and creates installers that corrupt the PATH environment variable if the
+# default string length of 1024 characters is exceeded.
 
 jobs:
   integration-tests:
@@ -81,7 +81,7 @@ jobs:
           nix-channel --add https://nixos.org/channels/nixos-23.05 nixpkgs
           # Download the Nix expressions for all subscribed channels...
           #
-          # As at 2023-06-05, nixos-23.05 provides GHC 9.2.7.
+          # As at 2023-08-11, nixos-23.05 provides GHC 9.2.8.
           nix-channel --update
           # The NIX_PATH environment variable sets a list of directories used to
           # look up the location of Nix expressions using paths enclosed in
