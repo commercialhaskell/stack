@@ -65,7 +65,7 @@ import           Network.HTTP.StackClient
                    )
 import           Network.HTTP.Simple ( getResponseHeader )
 import           Path
-                   ( (</>), addExtension, dirname, filename, parent, parseAbsDir
+                   ( (</>), addExtension, filename, parent, parseAbsDir
                    , parseAbsFile, parseRelDir, parseRelFile, toFilePath
                    )
 import           Path.CheckInstall ( warnInstallSearchPathIssues )
@@ -74,7 +74,7 @@ import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
                    ( canonicalizePath, doesFileExist, ensureDir, executable
                    , getPermissions, ignoringAbsence, listDir, removeDirRecur
-                   , renameDir, renameFile, resolveFile', withTempDir
+                   , renameDir, renameFile, resolveFile'
                    )
 import           RIO.List
                    ( headMaybe, intercalate, intersperse, isPrefixOf
@@ -2322,12 +2322,16 @@ withUnpackedTarball7z name si archiveFile archiveType destDir = do
       Nothing -> prettyThrowIO $ TarballFileInvalid name archiveFile
       Just x -> parseRelFile $ T.unpack x
   run7z <- setup7z si
-  -- Truncate the name of the temporary directory, to reduce risk of Windows'
-  -- default file path length of 260 characters being exceeded.
-  let tmpName = take 15 (toFilePathNoTrailingSep (dirname destDir)) ++ "-tmp"
+  -- We use a short name for the temporary directory to reduce the risk of a
+  -- filepath length of more than 260 characters, which can be problematic for
+  -- 7-Zip even if Long Filepaths are enabled on Windows.
+  let tmpName = "tmp"
   ensureDir (parent destDir)
   withRunInIO $ \run ->
-    withTempDir (parent destDir) tmpName $ \tmpDir ->
+  -- We use the system temporary directory to reduce the risk of a filepath
+  -- length of more than 260 characters, which can be problematic for
+  -- 7-Zip even if Long Filepaths are enabled on Windows.
+    withSystemTempDir tmpName $ \tmpDir ->
       run $ do
         liftIO $ ignoringAbsence (removeDirRecur destDir)
         run7z tmpDir archiveFile
@@ -2340,8 +2344,8 @@ expectSingleUnpackedDir ::
   => Path Abs File
   -> Path Abs Dir
   -> m (Path Abs Dir)
-expectSingleUnpackedDir archiveFile destDir = do
-  contents <- listDir destDir
+expectSingleUnpackedDir archiveFile unpackDir = do
+  contents <- listDir unpackDir
   case contents of
     ([dir], _ ) -> pure dir
     _ -> prettyThrowIO $ UnknownArchiveStructure archiveFile
