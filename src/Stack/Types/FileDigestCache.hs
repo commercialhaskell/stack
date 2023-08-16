@@ -1,13 +1,16 @@
-module Stack.FileDigestCache
+{-# LANGUAGE NoImplicitPrelude #-}
+
+module Stack.Types.FileDigestCache
   ( FileDigestCache
   , newFileDigestCache
   , readFileDigest
   ) where
 
-import           Stack.Prelude
 import qualified Data.Map.Strict as Map
+import           Stack.Prelude
 import qualified Pantry.SHA256 as SHA256
 
+-- | Type synonym representing caches of digests of files.
 type FileDigestCache = IORef (Map FilePath SHA256)
 
 newFileDigestCache :: MonadIO m => m FileDigestCache

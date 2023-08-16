@@ -104,7 +104,6 @@ import           Stack.Constants
                    , relFileStackDotTmpDotExe, stackProgName, usrLibDirs
                    )
 import           Stack.Constants.Config ( distRelativeDir )
-import           Stack.FileDigestCache ( newFileDigestCache )
 import           Stack.GhcPkg
                    ( createDatabase, getGlobalDB, ghcPkgPathEnvVar
                    , mkGhcPackagePath )
@@ -147,6 +146,7 @@ import           Stack.Types.EnvConfig
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..), minimalEnvSettings )
 import           Stack.Types.ExtraDirs ( ExtraDirs (..) )
+import           Stack.Types.FileDigestCache ( newFileDigestCache )
 import           Stack.Types.GHCDownloadInfo ( GHCDownloadInfo (..) )
 import           Stack.Types.GHCVariant
                    ( GHCVariant (..), HasGHCVariant (..), ghcVariantName
