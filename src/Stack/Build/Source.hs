@@ -24,7 +24,6 @@ import qualified Distribution.PackageDescription as C
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
-import           Stack.FileDigestCache ( readFileDigest )
 import           Stack.Package ( resolvePackage )
 import           Stack.Prelude
 import           Stack.SourceMap
@@ -48,6 +47,7 @@ import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..)
                    , actualCompilerVersionL
                    )
+import           Stack.Types.FileDigestCache ( readFileDigest )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCInternalLib )
 import           Stack.Types.Package
@@ -436,12 +436,13 @@ loadLocalPackage pp = do
 
 -- | Compare the current filesystem state to the cached information, and
 -- determine (1) if the files are dirty, and (2) the new cache values.
-checkBuildCache :: HasEnvConfig env
-                => Map FilePath FileCacheInfo -- ^ old cache
-                -> [Path Abs File] -- ^ files in package
-                -> RIO env (Set FilePath, Map FilePath FileCacheInfo)
+checkBuildCache ::
+     HasEnvConfig env
+  => Map FilePath FileCacheInfo -- ^ old cache
+  -> [Path Abs File] -- ^ files in package
+  -> RIO env (Set FilePath, Map FilePath FileCacheInfo)
 checkBuildCache oldCache files = do
-  fileTimes <- fmap Map.fromList $ forM files $ \fp -> do
+  fileDigests <- fmap Map.fromList $ forM files $ \fp -> do
     mdigest <- getFileDigestMaybe (toFilePath fp)
     pure (toFilePath fp, mdigest)
   fmap (mconcat . Map.elems) $ sequence $
@@ -449,7 +450,7 @@ checkBuildCache oldCache files = do
       (Map.mapMissing (\fp mdigest -> go fp mdigest Nothing))
       (Map.mapMissing (\fp fci -> go fp Nothing (Just fci)))
       (Map.zipWithMatched (\fp mdigest fci -> go fp mdigest (Just fci)))
-      fileTimes
+      fileDigests
       oldCache
  where
   go :: FilePath
@@ -524,10 +525,7 @@ getFileDigestMaybe fp = do
   cache <- view $ envConfigL.to envConfigFileDigestCache
   catch
     (Just <$> readFileDigest cache fp)
-    (\e ->
-          if isDoesNotExistError e
-              then pure Nothing
-              else throwM e)
+    (\e -> if isDoesNotExistError e then pure Nothing else throwM e)
 
 -- | Get 'PackageConfig' for package given its name.
 getPackageConfig ::

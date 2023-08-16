@@ -42,7 +42,6 @@ import           Stack.Constants
                    , relDirHoogle, relDirHpc, relDirInstall, relDirPkgdb
                    , relDirSnapshots, relFileDatabaseHoo
                    )
-import           Stack.FileDigestCache (FileDigestCache)
 import           Stack.Prelude
 import           Stack.Types.BuildConfig
                     ( BuildConfig (..), HasBuildConfig (..), getProjectWorkDir )
@@ -53,6 +52,7 @@ import           Stack.Types.CompilerBuild ( compilerBuildSuffix )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( HasConfig (..), stackRootL )
+import           Stack.Types.FileDigestCache ( FileDigestCache )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..), ghcVariantSuffix )
 import           Stack.Types.Platform
                    ( HasPlatform (..), platformVariantSuffix )
