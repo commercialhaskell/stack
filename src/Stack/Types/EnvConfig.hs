@@ -42,6 +42,7 @@ import           Stack.Constants
                    , relDirHoogle, relDirHpc, relDirInstall, relDirPkgdb
                    , relDirSnapshots, relFileDatabaseHoo
                    )
+import           Stack.FileDigestCache (FileDigestCache)
 import           Stack.Prelude
 import           Stack.Types.BuildConfig
                     ( BuildConfig (..), HasBuildConfig (..), getProjectWorkDir )
@@ -63,6 +64,7 @@ import           Stack.Types.SourceMap
 data EnvConfig = EnvConfig
   { envConfigBuildConfig :: !BuildConfig
   , envConfigBuildOptsCLI :: !BuildOptsCLI
+  , envConfigFileDigestCache :: !FileDigestCache
   , envConfigSourceMap :: !SourceMap
   , envConfigSourceMapHash :: !SourceMapHash
   , envConfigCompilerPaths :: !CompilerPaths

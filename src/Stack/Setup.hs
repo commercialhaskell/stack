@@ -104,6 +104,7 @@ import           Stack.Constants
                    , relFileStackDotTmpDotExe, stackProgName, usrLibDirs
                    )
 import           Stack.Constants.Config ( distRelativeDir )
+import           Stack.FileDigestCache ( newFileDigestCache )
 import           Stack.GhcPkg
                    ( createDatabase, getGlobalDB, ghcPkgPathEnvVar
                    , mkGhcPackagePath )
@@ -666,9 +667,12 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     sourceMapHash <- hashSourceMapData boptsCLI sourceMap
     pure (sourceMap, sourceMapHash)
 
+  fileDigestCache <- newFileDigestCache
+
   let envConfig0 = EnvConfig
         { envConfigBuildConfig = bc
         , envConfigBuildOptsCLI = boptsCLI
+        , envConfigFileDigestCache = fileDigestCache
         , envConfigSourceMap = sourceMap
         , envConfigSourceMapHash = sourceMapHash
         , envConfigCompilerPaths = compilerPaths
@@ -780,6 +784,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             }
         }
     , envConfigBuildOptsCLI = boptsCLI
+    , envConfigFileDigestCache = fileDigestCache
     , envConfigSourceMap = sourceMap
     , envConfigSourceMapHash = sourceMapHash
     , envConfigCompilerPaths = compilerPaths
