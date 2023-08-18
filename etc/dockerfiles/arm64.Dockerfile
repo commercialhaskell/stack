@@ -1,3 +1,18 @@
+# This Dockerfile was previously used to build dynamically-linked Stack for
+# Linux/Aarch64. It was used with the following step in the GitHub Actions CI:
+#
+#   run: |
+#     set -ex
+#     docker build . -f etc/dockerfiles/arm64.Dockerfile -t stack --build-arg USERID=$(id -u) --build-arg GROUPID=$(id -g)
+#     rm -rf _release
+#     mkdir -p _release
+#     docker run --rm -v $(pwd):/src -w /src stack bash -c "/home/stack/release build"
+#
+# However, after Stack 2.11.1, it was replaced with a step that makes use of
+# https://gitlab.com/benz0li/ghc-musl.
+#
+# ------------------------------------------------------------------------------
+#
 # Stack is built with GHC 9.2.8. GHC 9.2.8 for Linux/AArch64 says it was made on
 # a Debian 10 system and requires GMP 6.1. Debian 10 is codename 'buster' and
 # includes libc6 (2.28-10+deb10u1).
