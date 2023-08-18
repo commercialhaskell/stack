@@ -38,7 +38,7 @@ drop-packages:
 
 docker:
   enable: false
-  repo: ghcr.io/fpco/alpine-haskell-stack:9.2.8v2
+  repo: glcr.b-data.ch/ghc/ghc-musl:9.2.8
 
 nix:
   # --nix on the command-line to enable.
