@@ -27,6 +27,8 @@ Behavior changes:
 Other enhancements:
 
 * Bump to Hpack 0.35.4.
+* Depend on `pantry-0.9.2`, for support for long filenames and directory names
+  in archives created by `git archive`.
 * Avoid the duplicate resolving of usage files when parsing `*.hi` files into a
   set of modules and a collection of resolved usage files. See
   [#6123](https://github.com/commercialhaskell/stack/pull/6123).
