@@ -18,7 +18,8 @@ main = do
   stack ["exec", "--", "baz-exe" ++ exeExt]
   stackErr ["exec", "--", "bar-exe" ++ exeExt]
   stackCleanFull
-  -- See #4936 for details regarding the windows condition
+  -- See #4936. The Windows condition is because `stackCleanFull` may have
+  -- failed.
   unless isWindows $ stackErr ["exec", "--", "baz-exe" ++ exeExt]
 
   -- install one exe normally
@@ -50,7 +51,9 @@ main = do
 
   -- foo was installed as a normal exe (in .binny/, which can't be on PATH),
   -- so shouldn't
-  stackErr ["exec", "--", "foo-exe" ++ exeExt]
+  -- See #4936. The Windows condition is because `stackCleanFull` may have
+  -- failed.
+  unless isWindows $ stackErr ["exec", "--", "foo-exe" ++ exeExt]
 
   -- check existences make sense
   doesExist $ "./binny/foo-exe" ++ exeExt

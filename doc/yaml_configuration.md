@@ -96,10 +96,10 @@ installation, and various settings like build flags. It is called a resolver
 since a snapshot states how dependencies are resolved. There are currently
 four resolver types:
 
-* LTS Haskell snapshots, e.g. `resolver: lts-20.23`
-* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-05-05`
+* LTS Haskell snapshots, e.g. `resolver: lts-20.26`
+* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-08-06`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
-  like `resolver: ghc-9.6.1`
+  like `resolver: ghc-9.6.2`
 * Custom snapshot, via a URL or relative file path. For further information, see
   the [Pantry](pantry.md) documentation.
 
@@ -528,12 +528,12 @@ Command line equivalent (takes precedence): `--compiler` option
 
 Overrides the compiler version in the resolver. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
-resolvers like `ghc-9.6.1`. This can be used to override the
+resolvers like `ghc-9.6.2`. This can be used to override the
 compiler for a Stackage snapshot, like this:
 
 ~~~yaml
-resolver: lts-20.23
-compiler: ghc-9.6.1
+resolver: lts-20.26
+compiler: ghc-9.6.2
 compiler-check: match-exact
 ~~~
 

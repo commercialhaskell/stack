@@ -1,4 +1,4 @@
-resolver: lts-20.23
+resolver: lts-20.26
 packages:
 - .
 - ../package-c
