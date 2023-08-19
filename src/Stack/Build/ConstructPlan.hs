@@ -69,6 +69,7 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Platform ( HasPlatform (..) )
+import           Stack.Types.ProjectConfig ( isPCGlobalProject )
 import           Stack.Types.Runner ( HasRunner (..), globalOptsL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), FromSnapshot (..)
@@ -299,8 +300,9 @@ constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap 
     else do
       stackYaml <- view stackYamlL
       stackRoot <- view stackRootL
+      isImplicitGlobal <- view $ configL.to (isPCGlobalProject . configProject)
       prettyThrowM $ ConstructPlanFailed
-        errs stackYaml stackRoot parents (wanted ctx) prunedGlobalDeps
+        errs stackYaml stackRoot isImplicitGlobal parents (wanted ctx) prunedGlobalDeps
  where
   hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
 
