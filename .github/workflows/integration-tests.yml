@@ -177,20 +177,36 @@ jobs:
       shell: bash
       run: |
         echo '::notice title=ARM64 skipped::To build ARM64, a self-hosted runner needs to be configured and the SELF_HOSTED_RUNNERS secret must contain arm64'
-
     - name: Clone project
       if: needs.configuration.outputs.test-arm64 == 'true'
       uses: actions/checkout@v3
+    - name: Install deps
+      shell: bash
+      run: |
+        set -ex
 
+        # The release.hs script depends on digest, and digest requires
+        # pkg-config. TO DO: Perhaps the self-hosted runner's software should
+        # include pkg-config.
+        sudo apt-get update
+        sudo apt-get install -y pkg-config
+
+        # As of 19 August 2023, the self-hosted runner comes with Stack 2.11.1,
+        # but it is not on the PATH. Logging the version for information.
+        /usr/local/bin/stack --version
+
+        set +ex
     - name: Build bindist
       if: needs.configuration.outputs.test-arm64 == 'true'
       shell: bash
       run: |
-        set -ex
-        docker build . -f etc/dockerfiles/arm64.Dockerfile -t stack --build-arg USERID=$(id -u) --build-arg GROUPID=$(id -g)
-        rm -rf _release
-        mkdir -p _release
-        docker run --rm -v $(pwd):/src -w /src stack bash -c "/home/stack/release build"
+        # Stack's project-level configuration (stack.yaml) specifies the
+        # multi-architecture (including Linux/Aarch64) Docker image published by
+        # Oliver Benz (@benz0li, on GitHub). That image comes with Stack 2.11.1.
+        # (Note that the online documentation for '--docker-stack-exe image'
+        # specifies that the host Stack and image Stack must have the same
+        # version number.)
+        /usr/local/bin/stack etc/scripts/release.hs build --alpine --build-args --docker-stack-exe=image
 
     - name: Upload bindist
       if: needs.configuration.outputs.test-arm64 == 'true'
