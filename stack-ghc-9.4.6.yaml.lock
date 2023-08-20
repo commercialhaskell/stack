@@ -26,26 +26,12 @@ packages:
   original:
     hackage: ansi-wl-pprint-1.0.2@sha256:b817853b5310b8e7847469847608b664c3e75b4b30c332f2cb8c0d00751ef9c1,1915
 - completed:
-    hackage: casa-client-0.0.2@sha256:1e27a6678c511b3372c4e97ab1a4a9eca4eca8a0a090eac103a1806ce7c8584d,888
-    pantry-tree:
-      sha256: c72d43eca832cc3c9a3074e86b39815de788cda6de966dfae4471194e9abd17d
-      size: 167
-  original:
-    hackage: casa-client-0.0.2@sha256:1e27a6678c511b3372c4e97ab1a4a9eca4eca8a0a090eac103a1806ce7c8584d,888
-- completed:
     hackage: companion-0.1.0@sha256:99f6de52c832d433639232a6d77d33abbca3b3037e49b7db6242fb9f569a8a2b,1093
     pantry-tree:
       sha256: 7d36c8a038ab4db197c0a395c63523b47beec9f6c72a64271bb0f6b112d1ebd1
       size: 328
   original:
     hackage: companion-0.1.0@sha256:99f6de52c832d433639232a6d77d33abbca3b3037e49b7db6242fb9f569a8a2b,1093
-- completed:
-    hackage: crypton-conduit-0.2.3@sha256:31f44243b42f344c65be6cd2c39c07994d9186d19d15988656620d1de85aca37,1946
-    pantry-tree:
-      sha256: 06781001956f2ccfae0e6b4f33c213bd3121c6462f8534e9dca87bf51e4663e0
-      size: 592
-  original:
-    hackage: crypton-conduit-0.2.3@sha256:31f44243b42f344c65be6cd2c39c07994d9186d19d15988656620d1de85aca37,1946
 - completed:
     hackage: crypton-connection-0.3.1@sha256:4d0958537197956b536ea91718b1749949757022532f50b8f683290056a19021,1581
     pantry-tree:
@@ -146,7 +132,7 @@ packages:
     hackage: tls-1.7.0@sha256:fa82e9ca8fd887b66fba8433b3ba1db4e5e047fe7c815707f06209679d04177b,5566
 snapshots:
 - completed:
-    sha256: 2e7d4a730d8eb5373b2d383fac84efcf7c81e3b7a5fce71b4c2e19a1768f25a6
-    size: 640239
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/6.yaml
-  original: lts-21.6
+    sha256: 0be74c2dd964ab0e8887c1ece93b7c02e1cc2af11f5e3cc334300a5871e73917
+    size: 640028
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/8.yaml
+  original: lts-21.8

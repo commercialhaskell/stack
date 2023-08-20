@@ -1,7 +1,7 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.4.5.
+# built with GHC 9.4.6.
 
-resolver: lts-21.6 # GHC 9.4.5
+resolver: lts-21.8 # GHC 9.4.6
 
 extra-deps:
 - aeson-warning-parser-0.1.0@sha256:f2c1c42b73aa35d352060abcbb867c410cbbf57d0cb0fed607bcd1e2a74954ad,1308
@@ -9,9 +9,7 @@ extra-deps:
 # Required because ansi-wl-pprint-0.6.9 specifies ansi-terminal < 0.12. See:
 # https://github.com/ekmett/ansi-wl-pprint/issues/29
 - ansi-wl-pprint-1.0.2@sha256:b817853b5310b8e7847469847608b664c3e75b4b30c332f2cb8c0d00751ef9c1,1915
-- casa-client-0.0.2@sha256:1e27a6678c511b3372c4e97ab1a4a9eca4eca8a0a090eac103a1806ce7c8584d,888
 - companion-0.1.0@sha256:99f6de52c832d433639232a6d77d33abbca3b3037e49b7db6242fb9f569a8a2b,1093
-- crypton-conduit-0.2.3@sha256:31f44243b42f344c65be6cd2c39c07994d9186d19d15988656620d1de85aca37,1946
 - crypton-connection-0.3.1@sha256:4d0958537197956b536ea91718b1749949757022532f50b8f683290056a19021,1581
 - crypton-x509-1.7.6@sha256:c567657a705b6d6521f9dd2de999bf530d618ec00f3b939df76a41fb0fe94281,2339
 - crypton-x509-store-1.6.9@sha256:422b9b9f87a7382c66385d047615b16fc86a68c08ea22b1e0117c143a2d44050,1750
@@ -33,8 +31,7 @@ drop-packages:
 
 docker:
   enable: false
-  # Needs to be replaced by the equivalent for GHC 9.4.5, when available
-  repo: fpco/alpine-haskell-stack:8.10.4
+  repo: glcr.b-data.ch/ghc/ghc-musl:9.4.6
 
 nix:
   # --nix on the command-line to enable.
@@ -45,7 +42,7 @@ nix:
 flags:
   hackage-security:
     cabal-syntax: true
-  # GHC 9.4.5's boot library is Win32-2.12.0.1
+  # GHC 9.4.6's boot library is Win32-2.12.0.1
   mintty:
     win32-2-13-1: false
   stack:
