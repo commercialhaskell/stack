@@ -3,8 +3,7 @@ import Data.List (isInfixOf)
 import StackTest
 
 planFailure :: String
-planFailure =
-  "but this GHC boot package has been pruned (issue #4510);"
+planFailure = "but this GHC boot package has been pruned"
 
 main :: IO ()
 main = do
