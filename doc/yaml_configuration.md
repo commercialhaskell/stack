@@ -13,7 +13,9 @@ Stack's YAML configuration options break down into
 configured at the project-level or globally.
 
 The **project-level** configuration file (`stack.yaml`) contains
-project-specific options and may contain non-project-specific options.
+project-specific options and may contain non-project-specific options. However,
+non-project-specific options in the project-level configuration file in the
+`global-project` directory (see below) are ignored by Stack.
 
 Stack obtains project-level configuration from one of the following (in order of
 preference):
@@ -301,8 +303,10 @@ TODO: Add a simple example of how to use custom preprocessors.
 
 ## Non-project-specific configuration
 
-Non-project configuration options are valid in a project-level configuration
-file (`stack.yaml`) or in global configuration files (`config.yaml`). The
+Non-project configuration options can be included in a project-level
+configuration file (`stack.yaml`) or in global configuration files
+(`config.yaml`). However, non-project-specific options in the project-level
+configuration file in the `global-project` directory are ignored by Stack. The
 options below are listed in alphabetic order.
 
 ### allow-different-user
