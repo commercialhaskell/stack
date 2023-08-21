@@ -14,7 +14,7 @@ The following terms are used in Stack's documentation.
 |`config.yaml`      |A global and non-project-specific configuration file used by Stack.|
 |Docker             |A [platform](https://www.docker.com/) for developing,  shipping, and running applications. It can package and run an application in a loosely isolated environment called a _container_.|
 |Emacs              |[GNU Emacs](https://www.gnu.org/software/emacs/), an extensible, customisable text editor.|
-|extra-deps         |Packages in addition to those in a snapshot, named after a key used in `stack.yaml` files.|
+|extra-deps         |Packages (one version of each) that add to, or amend, those specified in a snapshot. Named after a key used in `stack.yaml` files.|
 |FreeBSD            |A Unix-like operating system.                             |
 |GCC                |The [GNU Compiler Collection](https://gcc.gnu.org/) or its executable `gcc`.|
 |GHC                |The [Glasgow Haskell Compiler](https://www.haskell.org/ghc/).|
@@ -43,7 +43,7 @@ The following terms are used in Stack's documentation.
 |REPL               |An interactive (run-eval-print loop) programming environment.|
 |resolver           |A synonym for snapshot.                                   |
 |`Setup.hs`         |A project-specific file used by Cabal to perform setup tasks.|
-|snapshot           |A snapshot defines a GHC version, a set of packages, and build flags or other settings.|
+|snapshot           |A snapshot defines a GHC version, a set of packages (one version of each), and build flags or other settings.|
 |Stack              |The Haskell Tool Stack project or its executable `stack`. |
 |`stack.yaml`       |A project-level configuration file used by Stack, which may also contain non-project-specific options.|
 |Stackage           |A [distribution](https://www.stackage.org/) of compatible Haskell packages.|
