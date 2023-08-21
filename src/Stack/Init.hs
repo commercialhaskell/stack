@@ -422,7 +422,7 @@ renderStackYaml p ignoredPackages dupPackages =
     , "to be used for project dependencies. For example:"
     , ""
     , "resolver: lts-21.8"
-    , "resolver: nightly-2023-08-19"
+    , "resolver: nightly-2023-08-21"
     , "resolver: ghc-9.6.2"
     , ""
     , "The location of a snapshot can be provided as a file or url. Stack assumes"

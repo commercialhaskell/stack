@@ -285,9 +285,10 @@ compatibility with a range of versions of GHC that a library package (such as
 Stack aims to depend on well-known packages. The specific versions on which it
 depends at any time are specified by `package.yaml` and `stack.yaml`. It does
 not aim to be compatible with more than one version of the `Cabal` package at
-any time. At the time of writing (May 2023) the package versions are primarily
-ones in Stackage snapshot LTS Haskell 20.26 (for GHC 9.2.8), together with
-extra-dep `Cabal-3.8.1.0`.
+any time. At the time of writing (August 2023) the package versions are
+primarily ones in Stackage snapshot LTS Haskell 21.8 (for GHC 9.4.5), together
+with extra-deps to depend on the latest versions of `ansi-terminal`, `crypton`
+(instead of `cryptonite`), `hpack`, `pantry` and `tar-conduit`.
 
 A Stack executable makes use of Cabal (the library) through a small 'Setup'
 executable that it compiles from Haskell source code. The executable compiles
