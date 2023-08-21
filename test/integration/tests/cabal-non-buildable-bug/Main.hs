@@ -4,7 +4,7 @@ main :: IO ()
 main = do
   -- Newer Cabal: dry run and building should succeed, because they'll
   -- both ignore the do-not-build
-  writeFile "stack.yaml" "resolver: ghc-9.2.8"
+  writeFile "stack.yaml" "resolver: lts-21.8"
   stack ["build", "--dry-run"]
   stack ["build"]
 
@@ -14,5 +14,7 @@ main = do
   -- and build will fail (because Cabal will be using its broken
   -- logic).
   writeFile "stack.yaml" "resolver: ghc-7.10.3"
-  stackErr ["build"]
-  stackErr ["build", "--dry-run"]
+  -- The '--install-ghc' flag is passed here, because IntegrationSpec.runApp
+  -- sets up `config.yaml` with `system-ghc: true` and `install-ghc: false`.
+  stackErr ["--install-ghc", "build"]
+  stackErr ["--install-ghc", "build", "--dry-run"]

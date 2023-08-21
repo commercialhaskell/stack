@@ -1,7 +1,5 @@
 {- stack script
-   --resolver lts-20.26
-   --extra-dep Cabal-3.6.3.0
-   --extra-dep directory-1.3.6.2
+   --resolver lts-21.8
    --ghc-options -Wall
 -}
 
@@ -9,10 +7,11 @@
 -- interpreter options comment, Stack deduces the required packages from the
 -- module imports, being: Cabal, base, bytestring, directory, extra, process,
 -- shake, tar, zip-archive and zlib. These are either GHC boot packages or in
--- the snapshot. However, Stackage LTS 20.26 includes `Win32` directly, which
--- results in `Cabal` and `directory` being 'replaced' on Windows. Consequently,
--- they need to be specified as extra deps.
+-- the snapshot. Stackage LTS Haskell 21.8 does not include boot packages
+-- directly. As GHC 9.4.6 boot packages Cabal and Cabal-syntax expose modules
+-- with the same names, the language extension PackageImports is required.
 
+{-# LANGUAGE PackageImports  #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -35,15 +34,15 @@ import           Development.Shake
 import           Development.Shake.FilePath
                    ( (<.>), (</>), dropFileName, exe, takeDirectory, toStandard
                    )
-import           Distribution.PackageDescription
+import           "Cabal" Distribution.PackageDescription
                    ( PackageDescription (..), packageDescription, pkgVersion
                    )
-import           Distribution.PackageDescription.Parsec
+import           Distribution.Simple.PackageDescription
                    ( readGenericPackageDescription )
-import           Distribution.System
+import           "Cabal" Distribution.System
                    ( Arch, OS (..), Platform (..), buildPlatform )
-import           Distribution.Text ( display, simpleParse )
-import           Distribution.Utils.ShortText ( fromShortText )
+import           "Cabal" Distribution.Text ( display, simpleParse )
+import           "Cabal" Distribution.Utils.ShortText ( fromShortText )
 import           Distribution.Verbosity ( silent )
 import           System.Console.GetOpt ( ArgDescr (..), OptDescr (..) )
 import           System.Directory ( copyFile, getHomeDirectory, removeFile )

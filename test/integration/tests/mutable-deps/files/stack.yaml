@@ -1,6 +1,6 @@
-resolver: lts-20.26
+resolver: lts-21.8
 packages:
 - .
 extra-deps:
 - ./filepath-1.4.2.2
-- directory-1.3.6.2
+- directory-1.3.7.1
