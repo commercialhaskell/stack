@@ -78,6 +78,7 @@ module Stack.Prelude
   , sep
   , softbreak
   , softline
+  , spacedBulletedList
   , string
   , style
   , vsep
@@ -109,8 +110,8 @@ import           RIO.PrettyPrint
                    , prettyErrorL, prettyInfo, prettyInfoL, prettyInfoS
                    , prettyNote, prettyNoteL, prettyNoteS, prettyWarn
                    , prettyWarnL, prettyWarnNoIndent, prettyWarnS, punctuate
-                   , sep, softbreak, softline, string, style, stylesUpdateL
-                   , useColorL, vsep
+                   , sep, softbreak, softline, spacedBulletedList, string, style
+                   , stylesUpdateL, useColorL, vsep, spacedBulletedList
                    )
 import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
