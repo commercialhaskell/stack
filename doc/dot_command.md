@@ -27,7 +27,7 @@ By default:
 * there is no limit to the depth of the resolution of dependencies. Pass the
   `--depth <depth>` option to limit the depth;
 * all relevant packages are included in the output. Pass the
-  `--prude <packages>` option to exclude the specified packages, where
+  `--prune <packages>` option to exclude the specified packages, where
   `<packages>` is a list of package names separated by commas;
 * all packages in the project are included in the output. However, the target
   for the command can be specified as an argument. It uses the same format
