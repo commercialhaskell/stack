@@ -106,6 +106,7 @@ module Stack.Constants
   , relDirDotStackProgName
   , relDirUnderHome
   , relDirSrc
+  , relFileLibcMuslx86_64So1
   , relFileLibtinfoSo5
   , relFileLibtinfoSo6
   , relFileLibncurseswSo6
@@ -131,6 +132,7 @@ module Stack.Constants
   , relFileHadrianStackDotYaml
   , hadrianScriptsWindows
   , hadrianScriptsPosix
+  , libDirs
   , usrLibDirs
   , testGhcEnvRelFile
   , relFileBuildLock
@@ -151,7 +153,7 @@ import           Hpack.Config ( packageConfig )
 import qualified Language.Haskell.TH.Syntax as TH ( runIO, lift )
 import           Path ( (</>), mkRelDir, mkRelFile, parseAbsFile )
 import           Stack.Constants.StackProgName ( stackProgName )
-import           Stack.Constants.UsrLibDirs ( usrLibDirs )
+import           Stack.Constants.UsrLibDirs ( libDirs, usrLibDirs )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           System.Permissions ( osIsMacOS, osIsWindows )
@@ -554,6 +556,9 @@ relDirUnderHome = $(mkRelDir "_home")
 
 relDirSrc :: Path Rel Dir
 relDirSrc = $(mkRelDir "src")
+
+relFileLibcMuslx86_64So1 :: Path Rel File
+relFileLibcMuslx86_64So1 = $(mkRelFile "libc.musl-x86_64.so.1")
 
 relFileLibtinfoSo5 :: Path Rel File
 relFileLibtinfoSo5 = $(mkRelFile "libtinfo.so.5")
