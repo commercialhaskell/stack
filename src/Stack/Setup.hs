@@ -1902,6 +1902,8 @@ downloadAndInstallTool programsDir downloadInfo tool installer = do
   liftIO $ ignoringAbsence (removeDirRecur tempDir)
   pure tool
 
+-- Exceptions thrown by this function are caught by
+-- 'downloadAndInstallPossibleCompilers'.
 downloadAndInstallCompiler ::
      (HasBuildConfig env, HasGHCVariant env)
   => CompilerBuild
@@ -1916,7 +1918,7 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
     Just bindistURL -> do
       case ghcVariant of
         GHCCustom _ -> pure ()
-        _ -> prettyThrowM RequireCustomGHCVariant
+        _ -> throwM RequireCustomGHCVariant
       pure
         ( version
         , GHCDownloadInfo mempty mempty DownloadInfo
@@ -1929,7 +1931,7 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
     _ -> do
       ghcKey <- getGhcKey ghcBuild
       case Map.lookup ghcKey $ siGHCs si of
-        Nothing -> prettyThrowM $ UnknownOSKey ghcKey
+        Nothing -> throwM $ UnknownOSKey ghcKey
         Just pairs_ ->
           getWantedCompilerInfo ghcKey versionCheck wanted ACGhc pairs_
   config <- view configL
@@ -1961,8 +1963,10 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
 downloadAndInstallCompiler _ _ WCGhcjs{} _ _ = throwIO GhcjsNotSupported
 
 downloadAndInstallCompiler _ _ WCGhcGit{} _ _ =
-  prettyThrowIO DownloadAndInstallCompilerError
+  throwIO DownloadAndInstallCompilerError
 
+-- Exceptions thrown by this function are caught by
+-- 'downloadAndInstallPossibleCompilers'.
 getWantedCompilerInfo ::
      (Ord k, MonadThrow m)
   => Text
@@ -1974,7 +1978,7 @@ getWantedCompilerInfo ::
 getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
   case mpair of
     Just pair -> pure pair
-    Nothing -> prettyThrowM $
+    Nothing -> throwM $
       UnknownCompilerVersion
         (Set.singleton key)
         wanted
