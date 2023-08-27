@@ -24,6 +24,8 @@ Behavior changes:
   `--configure`\\`-c` flag and, instead, seeks to run GHC's Python `boot` and
   sh `configure` scripts, and ensure that the `happy` and `alex` executables are
   on the PATH.
+* When auto-detecting `--ghc-build` on Linux, the `musl` build is now preferred
+  over others if `libc.musl-x86_64.so.1` is found in `\lib` or `\lib64`.
 
 Other enhancements:
 

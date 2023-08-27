@@ -83,10 +83,9 @@ import           RIO.Process
                    ( EnvVars, HasProcessContext (..), ProcessContext
                    , augmentPath, augmentPathMap, doesExecutableExist, envVarsL
                    , exeSearchPathL, getStdout, mkProcessContext, modifyEnvVars
-                   , proc, readProcess_, readProcessStdout, readProcessStdout_
-                   , runProcess, runProcess_, setStdout, waitExitCode
-                   , withModifyEnvVars, withProcessWait, withWorkingDir
-                   , workingDirL
+                   , proc, readProcess_, readProcessStdout, runProcess
+                   , runProcess_, setStdout, waitExitCode, withModifyEnvVars
+                   , withProcessWait, withWorkingDir, workingDirL
                    )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( hashSourceMapData, loadSourceMap )
@@ -95,9 +94,10 @@ import           Stack.Config.ConfigureScript ( ensureConfigureScript )
 import           Stack.Constants
                    ( cabalPackageName, ghcBootScript,ghcConfigureMacOS
                    , ghcConfigurePosix, ghcConfigureWindows, hadrianScriptsPosix
-                   , hadrianScriptsWindows, osIsMacOS, osIsWindows, relDirBin
-                   , relDirUsr, relFile7zdll, relFile7zexe, relFileConfigure
-                   , relFileHadrianStackDotYaml, relFileLibgmpSo10
+                   , hadrianScriptsWindows, libDirs, osIsMacOS, osIsWindows
+                   , relDirBin, relDirUsr, relFile7zdll, relFile7zexe
+                   , relFileConfigure, relFileHadrianStackDotYaml
+                   , relFileLibcMuslx86_64So1, relFileLibgmpSo10
                    , relFileLibgmpSo3, relFileLibncurseswSo6, relFileLibtinfoSo5
                    , relFileLibtinfoSo6, relFileMainHs, relFileStack
                    , relFileStackDotExe, relFileStackDotTmp
@@ -1667,36 +1667,41 @@ getGhcBuilds = do
               | osIsWindows =
                   -- Cannot parse /usr/lib on Windows
                   pure False
-              | otherwise = do
+              | otherwise = hasMatches lib usrLibDirs
               -- This is a workaround for the fact that libtinfo.so.x doesn't
               -- appear in the 'ldconfig -p' output on Arch or Slackware even
               -- when it exists. There doesn't seem to be an easy way to get the
               -- true list of directories to scan for shared libs, but this
               -- works for our particular cases.
-                  matches <- filterM (doesFileExist .(</> lib)) usrLibDirs
-                  case matches of
-                    [] ->
-                         logDebug
-                           (  "Did not find shared library "
-                           <> libD
-                           )
-                      >> pure False
-                    (path:_) ->
-                         logDebug
-                           (  "Found shared library "
-                           <> libD
-                           <> " in "
-                           <> fromString (Path.toFilePath path)
-                           )
-                      >> pure True
              where
+              libD = fromString (toFilePath lib)
               libT = T.pack (toFilePath lib)
+            hasMatches lib dirs = do
+              matches <- filterM (doesFileExist .(</> lib)) dirs
+              case matches of
+                [] ->
+                     logDebug
+                       (  "Did not find shared library "
+                       <> libD
+                       )
+                  >> pure False
+                (path:_) ->
+                     logDebug
+                       (  "Found shared library "
+                       <> libD
+                       <> " in "
+                       <> fromString (Path.toFilePath path)
+                       )
+                  >> pure True
+             where
               libD = fromString (toFilePath lib)
             getLibc6Version = do
               elddOut <-
-                proc "ldd" ["--version"] $ tryAny . readProcessStdout_
+                -- On Alpine Linux, 'ldd --version' will send output to stderr,
+                -- which we wish to smother.
+                proc "ldd" ["--version"] $ tryAny . readProcess_
               pure $ case elddOut of
-                Right lddOut ->
+                Right (lddOut, _) ->
                   let lddOut' =
                         decodeUtf8Lenient (LBS.toStrict lddOut)
                   in  case P.parse lddVersion lddOut' of
@@ -1718,6 +1723,7 @@ getGhcBuilds = do
               lddMinorVersion <- P.decimal
               P.skip (not . isDigit)
               pure $ mkVersion [ lddMajorVersion, lddMinorVersion ]
+        hasMusl <- hasMatches relFileLibcMuslx86_64So1 libDirs
         mLibc6Version <- getLibc6Version
         case mLibc6Version of
           Just libc6Version -> logDebug $
@@ -1733,15 +1739,16 @@ getGhcBuilds = do
         hasgmp5 <- checkLib relFileLibgmpSo10
         hasgmp4 <- checkLib relFileLibgmpSo3
         let libComponents = concat
-              [ if hastinfo6 && hasgmp5
+              [ [ ["musl"] | hasMusl ]
+              , if hastinfo6 && hasgmp5
                   then
                     if hasLibc6_2_32
                       then [["tinfo6"]]
                       else [["tinfo6-libc6-pre232"]]
                   else [[]]
-              , [[] | hastinfo5 && hasgmp5]
-              , [["ncurses6"] | hasncurses6 && hasgmp5 ]
-              , [["gmp4"] | hasgmp4 ]
+              , [ [] | hastinfo5 && hasgmp5 ]
+              , [ ["ncurses6"] | hasncurses6 && hasgmp5 ]
+              , [ ["gmp4"] | hasgmp4 ]
               ]
         useBuilds $ map
           (\c -> case c of
