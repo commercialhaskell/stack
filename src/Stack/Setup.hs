@@ -1738,18 +1738,21 @@ getGhcBuilds = do
         hasncurses6 <- checkLib relFileLibncurseswSo6
         hasgmp5 <- checkLib relFileLibgmpSo10
         hasgmp4 <- checkLib relFileLibgmpSo3
-        let libComponents = concat
-              [ [ ["musl"] | hasMusl ]
-              , if hastinfo6 && hasgmp5
-                  then
-                    if hasLibc6_2_32
-                      then [["tinfo6"]]
-                      else [["tinfo6-libc6-pre232"]]
-                  else [[]]
-              , [ [] | hastinfo5 && hasgmp5 ]
-              , [ ["ncurses6"] | hasncurses6 && hasgmp5 ]
-              , [ ["gmp4"] | hasgmp4 ]
-              ]
+        let libComponents = if hasMusl
+              then
+                [ ["musl"] ]
+              else
+                concat
+                  [ if hastinfo6 && hasgmp5
+                      then
+                        if hasLibc6_2_32
+                          then [["tinfo6"]]
+                          else [["tinfo6-libc6-pre232"]]
+                      else [[]]
+                  , [ [] | hastinfo5 && hasgmp5 ]
+                  , [ ["ncurses6"] | hasncurses6 && hasgmp5 ]
+                  , [ ["gmp4"] | hasgmp4 ]
+                  ]
         useBuilds $ map
           (\c -> case c of
             [] -> CompilerBuildStandard
