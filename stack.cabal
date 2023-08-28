@@ -321,6 +321,7 @@ library
       Build_stack
       Paths_stack
   other-modules:
+      GHC.Utils.GhcPkg.Main.Compat
       Stack.Config.ConfigureScript
       Stack.Types.FileDigestCache
   autogen-modules:
@@ -355,6 +356,7 @@ library
     , filepath
     , fsnotify >=0.4.1
     , generic-deriving
+    , ghc-boot
     , hi-file-parser >=0.1.4.0
     , hpack >=0.35.3
     , hpc
@@ -472,6 +474,7 @@ executable stack
     , filepath
     , fsnotify >=0.4.1
     , generic-deriving
+    , ghc-boot
     , hi-file-parser >=0.1.4.0
     , hpack >=0.35.3
     , hpc
@@ -568,6 +571,7 @@ executable stack-integration-test
     , filepath
     , fsnotify >=0.4.1
     , generic-deriving
+    , ghc-boot
     , hi-file-parser >=0.1.4.0
     , hpack >=0.35.3
     , hpc
@@ -680,6 +684,7 @@ test-suite stack-unit-test
     , filepath
     , fsnotify >=0.4.1
     , generic-deriving
+    , ghc-boot
     , hi-file-parser >=0.1.4.0
     , hpack >=0.35.3
     , hpc

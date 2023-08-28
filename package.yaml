@@ -82,6 +82,7 @@ dependencies:
 - filepath
 - fsnotify >= 0.4.1
 - generic-deriving
+- ghc-boot
 - hi-file-parser >= 0.1.4.0
 - hpack >= 0.35.3
 - hpc
