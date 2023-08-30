@@ -8,6 +8,7 @@ module Stack.GhcPkg
   ( createDatabase
   , findGhcPkgField
   , getGlobalDB
+  , ghcPkg
   , ghcPkgPathEnvVar
   , mkGhcPackagePath
   , unregisterGhcPkgIds
@@ -139,18 +140,23 @@ findGhcPkgField pkgexe pkgDbs name field = do
 -- using GHC package id where available (from GHC 7.9)
 unregisterGhcPkgIds ::
      (HasProcessContext env, HasTerm env)
-  => GhcPkgExe
+  => Bool
+     -- ^ Report exceptions as warnings?
+  -> GhcPkgExe
   -> Path Abs Dir -- ^ package database
   -> NonEmpty (Either PackageIdentifier GhcPkgId)
   -> RIO env ()
-unregisterGhcPkgIds pkgexe pkgDb epgids = do
+unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
+  -- The ghcPkg function supplies initial arguments
+  -- --no-user-package-db --package-db=<db1> ... --package-db=<dbn>
   eres <- ghcPkg pkgexe [pkgDb] args
   case eres of
-    Left e -> prettyWarn $ string $ displayException e
+    Left e -> when isWarn $
+      prettyWarn $ string $ displayException e
     Right _ -> pure ()
  where
   (idents, gids) = partitionEithers $ toList epgids
-  args = "unregister" : "--user" : "--force" :
+  args = "unregister" : "--force" :
     map packageIdentifierString idents ++
     if null gids then [] else "--ipid" : map ghcPkgIdString gids
 
