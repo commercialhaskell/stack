@@ -162,7 +162,7 @@ findGhcPkgField pkgexe pkgDbs name field = do
 unregisterGhcPkgIds ::
      (HasCompiler env, HasProcessContext env, HasTerm env)
   => Bool
-     -- ^ Report exceptions as warnings?
+     -- ^ Report pretty exceptions as warnings?
   -> GhcPkgExe
   -> Path Abs Dir -- ^ package database
   -> NonEmpty (Either PackageIdentifier GhcPkgId)
@@ -173,7 +173,13 @@ unregisterGhcPkgIds isWarn _pkgexe pkgDb epgids = do
     ghcPkgUnregisterUserForce globalDb pkgDb hasIpid pkgarg_strs
   case eres of
     Left e -> when isWarn $
-      prettyWarn $ string $ displayException e
+      prettyWarn $
+        "[S-8729]"
+        <> line
+        <> flow "While unregistering packages, Stack encountered the following \
+                \error:"
+        <> blankLine
+        <> string (displayException e)
     Right _ -> pure ()
  where
   (idents, gids) = partitionEithers $ toList epgids
