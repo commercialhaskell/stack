@@ -19,7 +19,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.List as L
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           GHC.Utils.GhcPkg.Main.Compat ( ghcPkgUnregisterUserForce )
+import           GHC.Utils.GhcPkg.Main.Compat ( ghcPkgUnregisterForce )
 import           Path ( (</>), parent )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
@@ -167,10 +167,14 @@ unregisterGhcPkgIds ::
   -> Path Abs Dir -- ^ package database
   -> NonEmpty (Either PackageIdentifier GhcPkgId)
   -> RIO env ()
-unregisterGhcPkgIds isWarn _pkgexe pkgDb epgids = do
+unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
   globalDb <- view $ compilerPathsL.to cpGlobalDB
-  eres <- tryAny $ liftIO $
-    ghcPkgUnregisterUserForce globalDb pkgDb hasIpid pkgarg_strs
+  eres <- tryAny $ do
+    liftIO $ ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs
+    -- ghcPkgUnregisterForce does not perform an effective
+    -- 'ghc-pkg recache', as that depends on a specific version of the Cabal
+    -- package.
+    ghcPkg pkgexe [pkgDb] ["recache"]
   case eres of
     Left e -> when isWarn $
       prettyWarn $
