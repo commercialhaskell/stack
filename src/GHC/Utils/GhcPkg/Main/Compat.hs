@@ -9,8 +9,10 @@
 
 -- This module is based on GHC's utils\ghc-pkg\Main.hs at
 -- commit f66fc15f2e6849125074bcfeb44334a663323ca6 (see GHC merge request
--- !11142), with redundant code deleted, Hlint applied and explicit import
--- lists.
+-- !11142), with:
+-- * redundant code deleted,
+-- * Hlint applied, and
+-- * explicit import lists.
 --
 -- The version of the ghc-pkg executable supplied with GHCs published before
 -- 28 August 2023 does not efficiently bulk unregister. This module exports a
@@ -52,7 +54,7 @@ import           Distribution.Package
                    )
 import qualified Distribution.Parsec as Cabal
 import           Distribution.Pretty (Pretty (..))
-import           Distribution.Simple.Utils (toUTF8BS, writeUTF8File)
+import           Distribution.Simple.Utils ( toUTF8BS )
 import           Distribution.Text ( display )
 import           Distribution.Types.UnqualComponentName
                    ( unUnqualComponentName )
@@ -768,9 +770,7 @@ mungePackageInfo ipi = ipi
 -- -----------------------------------------------------------------------------
 -- Making changes to a package database
 
-data DBOp = RemovePackage InstalledPackageInfo
-          | AddPackage    InstalledPackageInfo
-          | ModifyPackage InstalledPackageInfo
+newtype DBOp = RemovePackage InstalledPackageInfo
 
 changeNewDB :: Verbosity
             -> [DBOp]
@@ -795,12 +795,6 @@ changeDBDir verbosity cmds db db_stack = do
     let file = location db </> display (installedUnitId p) <.> "conf"
     when (verbosity > Normal) $ infoLn ("removing " ++ file)
     removeFileSafe file
-  do_cmd (AddPackage p) = do
-    let file = location db </> display (installedUnitId p) <.> "conf"
-    when (verbosity > Normal) $ infoLn ("writing " ++ file)
-    writeUTF8File file (showInstalledPackageInfo p)
-  do_cmd (ModifyPackage p) =
-    do_cmd (AddPackage p)
 
 updateDBCache :: Verbosity
               -> PackageDB 'GhcPkg.DbReadWrite
