@@ -13,6 +13,7 @@
 -- * changeDBDir' does not perform an effective @ghc-pkg recache@,
 -- * the cache is not used,
 -- * consistency checks are not performed,
+-- * use Stack program name,
 -- * redundant code deleted,
 -- * Hlint applied, and
 -- * explicit import lists.
@@ -34,7 +35,7 @@ module GHC.Utils.GhcPkg.Main.Compat
 -----------------------------------------------------------------------------
 
 import qualified Control.Exception as Exception
-import           Control.Monad ( ap, forM, forM_, liftM, unless, when )
+import           Control.Monad ( forM, forM_, unless, when )
 import qualified Data.ByteString as BS
 import qualified Data.Foldable as F
 import           Data.List ( foldl', isPrefixOf, isSuffixOf )
@@ -51,12 +52,13 @@ import           GHC.IO.Exception (IOErrorType(InappropriateType))
 import qualified GHC.Unit.Database as GhcPkg
 import           Path ( Abs, Dir, Path, toFilePath )
 import           Prelude
+import           Stack.Constants ( stackProgName )
 import           System.Directory
                    ( createDirectoryIfMissing, doesDirectoryExist
                    , getDirectoryContents, removeFile
                    )
 import           System.Exit ( exitWith, ExitCode (..) )
-import           System.Environment ( getProgName, getEnv )
+import           System.Environment ( getEnv )
 import           System.FilePath as FilePath
 import           System.IO ( hFlush, hPutStrLn, stderr, stdout )
 import           System.IO.Error
@@ -389,7 +391,7 @@ adjustOldDatabasePath :: FilePath -> FilePath
 adjustOldDatabasePath = (<.> "d")
 
 parsePackageInfo :: BS.ByteString
-                 -> IO (InstalledPackageInfo, [ValidateWarning])
+                 -> IO (InstalledPackageInfo, [String])
 parsePackageInfo str =
   case parseInstalledPackageInfo str of
     Right (warnings, ok) -> pure (mungePackageInfo ok, ws)
@@ -530,42 +532,13 @@ matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Substring _ m) `matchesPkg` pkg = m (display (mungedId pkg))
 
 -----------------------------------------------------------------------------
--- Sanity-check a new package config, and automatically build GHCi libs
--- if requested.
-
-type ValidateError   = String
-type ValidateWarning = String
-
-newtype Validate a = V { runValidate :: IO (a, [ValidateError],[ValidateWarning]) }
-
-instance Functor Validate where
-    fmap = liftM
-
-instance Applicative Validate where
-    pure a = V $ pure (a, [], [])
-    (<*>) = ap
-
-instance Monad Validate where
-   m >>= k = V $ do
-      (a, es, ws) <- runValidate m
-      (b, es', ws') <- runValidate (k a)
-      return (b,es++es',ws++ws')
-
------------------------------------------------------------------------------
-
-getProgramName :: IO String
-getProgramName = fmap (`withoutSuffix` ".bin") getProgName
-   where str `withoutSuffix` suff
-            | suff `isSuffixOf` str = take (length str - length suff) str
-            | otherwise             = str
 
 die :: String -> IO a
 die = dieWith 1
 
 dieWith :: Int -> String -> IO a
 dieWith ec s = do
-  prog <- getProgramName
-  reportError (prog ++ ": " ++ s)
+  reportError (stackProgName ++ ": " ++ s)
   exitWith (ExitFailure ec)
 
 warn :: String -> IO ()
