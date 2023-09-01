@@ -38,7 +38,6 @@ import           Control.Monad ( ap, forM, forM_, liftM, unless, when )
 import qualified Data.ByteString as BS
 import qualified Data.Foldable as F
 import           Data.List ( foldl', isPrefixOf, isSuffixOf, nub, stripPrefix )
-import qualified Data.Map as Map
 import           Data.Maybe ( mapMaybe )
 import qualified Data.Traversable as F
 import           Distribution.InstalledPackageInfo as Cabal
@@ -50,17 +49,12 @@ import           Distribution.Types.MungedPackageId ( MungedPackageId (..) )
 import           Distribution.Version ( nullVersion )
 import           GHC.IO ( catchException )
 import           GHC.IO.Exception (IOErrorType(InappropriateType))
-import           GHC.Platform.Host (hostPlatformArchOS)
-import           GHC.Settings.Utils (getTargetArchOS, maybeReadFuzzy)
-import           GHC.UniqueSubdir (uniqueSubdir)
 import qualified GHC.Unit.Database as GhcPkg
 import           Path ( Abs, Dir, Path, toFilePath )
 import           Prelude
 import           System.Directory
-                   ( XdgDirectory (..), createDirectoryIfMissing
-                   , doesDirectoryExist, doesFileExist, getAppUserDataDirectory
-                   , getCurrentDirectory, getDirectoryContents, getXdgDirectory
-                   , removeFile
+                   ( createDirectoryIfMissing, doesDirectoryExist
+                   , getCurrentDirectory, getDirectoryContents, removeFile
                    )
 import           System.Exit ( exitWith, ExitCode(..) )
 import           System.Environment ( getProgName, getEnv )
@@ -85,11 +79,7 @@ ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs = do
   unregisterPackages globalDb pkgargs verbosity cli
  where
   verbosity = Normal
-  cli = concat
-    [ [FlagNoUserDb]
-    , [FlagConfig $ toFilePath pkgDb]
-    , [FlagUnitId | hasIpid]
-    ]
+  cli = [FlagConfig $ toFilePath pkgDb] <> [FlagUnitId | hasIpid]
   as_arg | FlagUnitId `elem` cli = AsUnitId
          | otherwise             = AsDefault
 
@@ -97,13 +87,7 @@ ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs = do
 -- Command-line syntax
 
 data Flag
-  = FlagUser
-  | FlagGlobal
-  | FlagConfig FilePath
-  | FlagGlobalConfig FilePath
-  | FlagUserConfig FilePath
-  | FlagNoUserDb
-  | FlagVerbosity (Maybe String)
+  = FlagConfig FilePath
   | FlagUnitId
   deriving Eq
 
@@ -197,7 +181,6 @@ getPkgDatabases :: Path Abs Dir
                    -- ^ Path to the global package database.
                 -> Verbosity
                 -> GhcPkg.DbOpenMode mode DbModifySelector
-                -> Bool    -- use the user db
                 -> Bool    -- expand vars, like ${pkgroot} and $topdir
                 -> [Flag]
                 -> IO (PackageDBStack,
@@ -211,7 +194,7 @@ getPkgDatabases :: Path Abs Dir
                           -- is used as the list of package DBs for
                           -- commands that just read the DB, such as 'list'.
 
-getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
+getPkgDatabases globalDb verbosity mode expand_vars my_flags = do
   -- Second we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-package-db flag by the
@@ -224,70 +207,7 @@ getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
   -- package db lives in ghc's libdir.
   top_dir <- absolutePath (takeDirectory global_conf)
 
-  let no_user_db = FlagNoUserDb `elem` my_flags
-
-  -- get the location of the user package database, and create it if necessary
-  -- getXdgDirectory can fail (e.g. if $HOME isn't set)
-
-  mb_user_conf <-
-    case [ f | FlagUserConfig f <- my_flags ] of
-      _ | no_user_db -> return Nothing
-      [] -> do
-        -- See Note [Settings file] about this file, and why we need GHC to share it with us.
-        let settingsFile = top_dir </> "settings"
-        exists_settings_file <- doesFileExist settingsFile
-        targetArchOS <- if exists_settings_file
-          then do
-            settingsStr <- readFile settingsFile
-            mySettings <- case maybeReadFuzzy settingsStr of
-              Just s -> pure $ Map.fromList s
-              -- It's excusable to not have a settings file (for now at
-              -- least) but completely inexcusable to have a malformed one.
-              Nothing -> die $ "Can't parse settings file " ++ show settingsFile
-            case getTargetArchOS settingsFile mySettings of
-              Right archOS -> pure archOS
-              Left e -> die e
-          else do
-            warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
-            warn "cannot know target platform so guessing target == host (native compiler)."
-            pure hostPlatformArchOS
-
-        let subdir = uniqueSubdir targetArchOS
-
-            getFirstSuccess :: [IO a] -> IO (Maybe a)
-            getFirstSuccess [] = pure Nothing
-            getFirstSuccess (a:as) = tryIO a >>= \case
-              Left _ -> getFirstSuccess as
-              Right d -> pure (Just d)
-        -- The appdir used to be in ~/.ghc but to respect the XDG specification
-        -- we want to move it under $XDG_DATA_HOME/
-        -- However, old tooling (like cabal) might still write package environments
-        -- to the old directory, so we prefer that if a subdirectory of ~/.ghc
-        -- with the correct target and GHC version exists.
-        --
-        -- i.e. if ~/.ghc/$UNIQUE_SUBDIR exists we prefer that
-        -- otherwise we use $XDG_DATA_HOME/$UNIQUE_SUBDIR
-        --
-        -- UNIQUE_SUBDIR is typically a combination of the target platform and GHC version
-        m_appdir <- getFirstSuccess $ map (fmap (</> subdir))
-          [ getAppUserDataDirectory "ghc"  -- this is ~/.ghc/
-          , getXdgDirectory XdgData "ghc"  -- this is $XDG_DATA_HOME/
-          ]
-        case m_appdir of
-          Nothing -> return Nothing
-          Just dir -> do
-            lookForPackageDBIn dir >>= \case
-              Nothing -> return (Just (dir </> "package.conf.d", False))
-              Just f  -> return (Just (f, True))
-      fs -> return (Just (last fs, True))
-
-  -- If the user database exists, and for "use_user" commands (which includes
-  -- "ghc-pkg check" and all commands that modify the db) we will attempt to
-  -- use the user db.
-  let sys_databases
-        | Just (user_conf,user_exists) <- mb_user_conf,
-          use_user || user_exists = [user_conf, global_conf]
-        | otherwise               = [global_conf]
+  let sys_databases = [global_conf]
 
   e_pkg_path <- tryIO (System.Environment.getEnv "GHC_PACKAGE_PATH")
   let env_stack =
@@ -304,11 +224,7 @@ getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
       virt_global_conf = last env_stack
 
   let db_flags = mapMaybe is_db_flag my_flags
-         where is_db_flag FlagUser
-                      | Just (user_conf, _user_exists) <- mb_user_conf
-                      = Just user_conf
-               is_db_flag FlagGlobal     = Just virt_global_conf
-               is_db_flag (FlagConfig f) = Just f
+         where is_db_flag (FlagConfig f) = Just f
                is_db_flag _              = Nothing
 
   let flag_db_names | null db_flags = env_stack
@@ -330,7 +246,7 @@ getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
                then virt_global_conf
                else last db_flags
 
-  (db_stack, db_to_operate_on) <- getDatabases top_dir mb_user_conf
+  (db_stack, db_to_operate_on) <- getDatabases top_dir
                                                flag_db_names final_stack top_db
 
   let flag_db_stack = [ db | db_name <- flag_db_names,
@@ -344,7 +260,7 @@ getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
 
   return (db_stack, db_to_operate_on, flag_db_stack)
   where
-    getDatabases top_dir mb_user_conf flag_db_names
+    getDatabases top_dir flag_db_names
                  final_stack top_db = case mode of
       -- When we open in read only mode, we simply read all of the databases/
       GhcPkg.DbOpenReadOnly -> do
@@ -360,7 +276,7 @@ getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
               Nothing -> if db_path /= top_db
                 then (, Nothing) <$> readDatabase db_path
                 else do
-                  db <- readParseDatabase verbosity mb_user_conf mode db_path
+                  db <- readParseDatabase verbosity mode db_path
                     `catchException` couldntOpenDbForModification db_path
                   let ro_db = db { packageDbLock = GhcPkg.DbOpenReadOnly }
                   return (ro_db, Just db)
@@ -396,7 +312,7 @@ getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
                   -- to check if it's for modification first before throwing an
                   -- error, so we attempt to open it in read only mode.
                   Exception.handle openRo $ do
-                    db <- readParseDatabase verbosity mb_user_conf mode db_path
+                    db <- readParseDatabase verbosity mode db_path
                     let ro_db = db { packageDbLock = GhcPkg.DbOpenReadOnly }
                     if hasPkg db
                       then return (ro_db, Just db)
@@ -423,8 +339,7 @@ getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
         -- Parse package db in read-only mode.
         readDatabase :: FilePath -> IO (PackageDB 'GhcPkg.DbReadOnly)
         readDatabase db_path = do
-          db <- readParseDatabase verbosity mb_user_conf
-                                  GhcPkg.DbOpenReadOnly db_path
+          db <- readParseDatabase verbosity GhcPkg.DbOpenReadOnly db_path
           if expand_vars
             then return $ mungePackageDBPaths top_dir db
             else return db
@@ -436,36 +351,18 @@ getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
       (as, s'') <- stateSequence s' ms
       return (a : as, s'')
 
-lookForPackageDBIn :: FilePath -> IO (Maybe FilePath)
-lookForPackageDBIn dir = do
-  let path_dir = dir </> "package.conf.d"
-  exists_dir <- doesDirectoryExist path_dir
-  if exists_dir then return (Just path_dir) else do
-    let path_file = dir </> "package.conf"
-    exists_file <- doesFileExist path_file
-    if exists_file then return (Just path_file) else return Nothing
-
 readParseDatabase :: forall mode t. Verbosity
-                  -> Maybe (FilePath,Bool)
                   -> GhcPkg.DbOpenMode mode t
                   -> FilePath
                   -> IO (PackageDB mode)
-readParseDatabase verbosity mb_user_conf mode path
-  -- the user database (only) is allowed to be non-existent
-  | Just (user_conf,False) <- mb_user_conf, path == user_conf
-  = do lock <- F.forM mode $ \_ -> do
-         createDirectoryIfMissing True path
-         GhcPkg.lockPackageDb cache
-       mkPackageDB [] lock
-  | otherwise
-  = do e <- tryIO $ getDirectoryContents path
+readParseDatabase verbosity mode path = do
+       e <- tryIO $ getDirectoryContents path
        case e of
          Left err
            | ioeGetErrorType err == InappropriateType -> do
               -- We provide a limited degree of backwards compatibility for
               -- old single-file style db:
-              mdb <- tryReadParseOldFileStyleDatabase verbosity
-                       mb_user_conf mode path
+              mdb <- tryReadParseOldFileStyleDatabase verbosity mode path
               case mdb of
                 Just db -> return db
                 Nothing ->
@@ -593,11 +490,10 @@ mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
 
 tryReadParseOldFileStyleDatabase ::
      Verbosity
-  -> Maybe (FilePath, Bool)
   -> GhcPkg.DbOpenMode mode t
   -> FilePath
   -> IO (Maybe (PackageDB mode))
-tryReadParseOldFileStyleDatabase verbosity mb_user_conf mode path = do
+tryReadParseOldFileStyleDatabase verbosity mode path = do
   -- assumes we've already established that path exists and is not a dir
   content <- readFile path `catchIO` \_ -> return ""
   if take 2 content == "[]"
@@ -608,7 +504,7 @@ tryReadParseOldFileStyleDatabase verbosity mb_user_conf mode path = do
       direxists <- doesDirectoryExist path_dir
       if direxists
         then do
-          db <- readParseDatabase verbosity mb_user_conf mode path_dir
+          db <- readParseDatabase verbosity mode path_dir
           -- but pretend it was at the original location
           return $ Just db {
               location         = path,
@@ -718,7 +614,7 @@ unregisterPackages globalDb pkgargs verbosity my_flags = do
   getPkgsByPkgDBs pkgsByPkgDBs [] pkgarg = do
     (_, GhcPkg.DbOpenReadWrite db, _flag_dbs) <-
       getPkgDatabases globalDb verbosity (GhcPkg.DbOpenReadWrite $ ContainsPkg pkgarg)
-        True{-use user-} False{-expand vars-} my_flags
+        False{-expand vars-} my_flags
     pks <- do
       let pkgs = packages db
           ps = findPackage pkgarg pkgs
