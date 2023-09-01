@@ -172,17 +172,17 @@ type PackageDBStack = [PackageDB 'GhcPkg.DbReadOnly]
 -- | Selector for picking the right package DB to modify as 'register' and
 -- 'recache' operate on the database on top of the stack, whereas 'modify'
 -- changes the first database that contains a specific package.
-data DbModifySelector = TopOne | ContainsPkg PackageArg
+newtype DbModifySelector = ContainsPkg PackageArg
 
 getPkgDatabases :: Path Abs Dir
                    -- ^ Path to the global package database.
                 -> Verbosity
-                -> GhcPkg.DbOpenMode mode DbModifySelector
+                -> PackageArg
                 -> [Flag]
                 -> IO (PackageDBStack,
                           -- the real package DB stack: [global,user] ++
                           -- DBs specified on the command line with -f.
-                       GhcPkg.DbOpenMode mode (PackageDB mode),
+                       GhcPkg.DbOpenMode GhcPkg.DbReadWrite (PackageDB GhcPkg.DbReadWrite),
                           -- which one to modify, if any
                        PackageDBStack)
                           -- the package DBs specified on the command
@@ -190,7 +190,7 @@ getPkgDatabases :: Path Abs Dir
                           -- is used as the list of package DBs for
                           -- commands that just read the DB, such as 'list'.
 
-getPkgDatabases globalDb verbosity mode my_flags = do
+getPkgDatabases globalDb verbosity pkgarg my_flags = do
   -- Second we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-package-db flag by the
@@ -208,10 +208,6 @@ getPkgDatabases globalDb verbosity mode my_flags = do
                   -> splitSearchPath (init path) ++ sys_databases
                   | otherwise
                   -> splitSearchPath path
-
-        -- The "global" database is always the one at the bottom of the stack.
-        -- This is the database we modify by default.
-      virt_global_conf = last env_stack
 
   let db_flags = mapMaybe is_db_flag my_flags
          where is_db_flag (FlagConfig f) = Just f
@@ -231,11 +227,7 @@ getPkgDatabases globalDb verbosity mode my_flags = do
                      [ f | FlagConfig f <- reverse my_flags ]
                      ++ env_stack
 
-      top_db = if null db_flags
-               then virt_global_conf
-               else last db_flags
-
-  (db_stack, db_to_operate_on) <- getDatabases flag_db_names final_stack top_db
+  (db_stack, db_to_operate_on) <- getDatabases flag_db_names final_stack
 
   let flag_db_stack = [ db | db_name <- flag_db_names,
                         db <- db_stack, location db == db_name ]
@@ -248,38 +240,11 @@ getPkgDatabases globalDb verbosity mode my_flags = do
 
   return (db_stack, db_to_operate_on, flag_db_stack)
   where
-    getDatabases flag_db_names final_stack top_db = case mode of
-      -- When we open in read only mode, we simply read all of the databases/
-      GhcPkg.DbOpenReadOnly -> do
-        db_stack <- mapM readDatabase final_stack
-        return (db_stack, GhcPkg.DbOpenReadOnly)
-
-      -- The only package db we open in read write mode is the one on the top of
-      -- the stack.
-      GhcPkg.DbOpenReadWrite TopOne -> do
-        (db_stack, mto_modify) <- stateSequence Nothing
-          [ \case
-              to_modify@(Just _) -> (, to_modify) <$> readDatabase db_path
-              Nothing -> if db_path /= top_db
-                then (, Nothing) <$> readDatabase db_path
-                else do
-                  db <- readParseDatabase verbosity mode db_path
-                    `catchException` couldntOpenDbForModification db_path
-                  let ro_db = db { packageDbLock = GhcPkg.DbOpenReadOnly }
-                  return (ro_db, Just db)
-          | db_path <- final_stack ]
-
-        to_modify <- case mto_modify of
-          Just db -> return db
-          Nothing -> die "no database selected for modification"
-
-        return (db_stack, GhcPkg.DbOpenReadWrite to_modify)
-
+    getDatabases flag_db_names final_stack = do
       -- The package db we open in read write mode is the first one included in
       -- flag_db_names that contains specified package. Therefore we need to
       -- open each one in read/write mode first and decide whether it's for
       -- modification based on its contents.
-      GhcPkg.DbOpenReadWrite (ContainsPkg pkgarg) -> do
         (db_stack, mto_modify) <- stateSequence Nothing
           [ \case
               to_modify@(Just _) -> (, to_modify) <$> readDatabase db_path
@@ -299,7 +264,7 @@ getPkgDatabases globalDb verbosity mode my_flags = do
                   -- to check if it's for modification first before throwing an
                   -- error, so we attempt to open it in read only mode.
                   Exception.handle openRo $ do
-                    db <- readParseDatabase verbosity mode db_path
+                    db <- readParseDatabase verbosity (GhcPkg.DbOpenReadWrite $ ContainsPkg pkgarg) db_path
                     let ro_db = db { packageDbLock = GhcPkg.DbOpenReadOnly }
                     if hasPkg db
                       then return (ro_db, Just db)
@@ -531,8 +496,7 @@ unregisterPackages globalDb pkgargs verbosity my_flags = do
   -- another package database.
   getPkgsByPkgDBs pkgsByPkgDBs [] pkgarg = do
     (_, GhcPkg.DbOpenReadWrite db, _flag_dbs) <-
-      getPkgDatabases globalDb verbosity (GhcPkg.DbOpenReadWrite $ ContainsPkg pkgarg)
-        my_flags
+      getPkgDatabases globalDb verbosity pkgarg my_flags
     pks <- do
       let pkgs = packages db
           ps = findPackage pkgarg pkgs
