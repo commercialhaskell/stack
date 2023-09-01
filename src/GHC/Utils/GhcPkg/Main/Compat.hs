@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
@@ -14,6 +15,7 @@
 -- * the cache is not used,
 -- * consistency checks are not performed,
 -- * use Stack program name,
+-- * use "Stack.Prelude" rather than "Prelude",
 -- * redundant code deleted,
 -- * Hlint applied, and
 -- * explicit import lists.
@@ -35,34 +37,28 @@ module GHC.Utils.GhcPkg.Main.Compat
 -----------------------------------------------------------------------------
 
 import qualified Control.Exception as Exception
-import           Control.Monad ( forM, forM_, unless, when )
 import qualified Data.ByteString as BS
 import qualified Data.Foldable as F
-import           Data.List ( foldl', isPrefixOf, isSuffixOf )
+import           Data.List ( init, isPrefixOf, isSuffixOf, last )
 import qualified Data.Traversable as F
 import           Distribution.InstalledPackageInfo as Cabal
 import           Distribution.Package ( UnitId, mungedId )
 import qualified Distribution.Parsec as Cabal
 import           Distribution.Text ( display )
-import           Distribution.Types.MungedPackageName ( MungedPackageName )
-import           Distribution.Types.MungedPackageId ( MungedPackageId (..) )
 import           Distribution.Version ( nullVersion )
-import           GHC.IO ( catchException )
 import           GHC.IO.Exception (IOErrorType(InappropriateType))
 import qualified GHC.Unit.Database as GhcPkg
-import           Path ( Abs, Dir, Path, toFilePath )
-import           Prelude
 import           Stack.Constants ( stackProgName )
+import           Stack.Prelude hiding ( display )
 import           System.Directory
                    ( createDirectoryIfMissing, doesDirectoryExist
                    , getDirectoryContents, removeFile
                    )
-import           System.Exit ( exitWith, ExitCode (..) )
 import           System.Environment ( getEnv )
 import           System.FilePath as FilePath
-import           System.IO ( hFlush, hPutStrLn, stderr, stdout )
+import           System.IO ( hPutStrLn, putStrLn, readFile )
 import           System.IO.Error
-                   ( ioeGetErrorType, isDoesNotExistError )
+                   ( ioeGetErrorType, ioError, isDoesNotExistError )
 
 -- | Function equivalent to:
 --
@@ -220,7 +216,7 @@ getPkgDatabases globalDb verbosity pkgarg pkgDb = do
                 let hasPkg :: PackageDB mode -> Bool
                     hasPkg = not . null . findPackage pkgarg . packages
 
-                    openRo (e::IOError) = do
+                    openRo (e::IOException) = do
                       db <- readDatabase db_path
                       if hasPkg db
                         then couldntOpenDbForModification db_path e
@@ -250,7 +246,7 @@ getPkgDatabases globalDb verbosity pkgarg pkgDb = do
 
       pure (db_stack, GhcPkg.DbOpenReadWrite to_modify)
    where
-    couldntOpenDbForModification :: FilePath -> IOError -> IO a
+    couldntOpenDbForModification :: FilePath -> IOException -> IO a
     couldntOpenDbForModification db_path e = die $ "Couldn't open database "
       ++ db_path ++ " for modification: " ++ show e
 
@@ -541,12 +537,6 @@ infoLn = putStrLn
 
 reportError :: String -> IO ()
 reportError s = do hFlush stdout; hPutStrLn stderr s
-
-catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
-catchIO = catchException
-
-tryIO :: IO a -> IO (Either Exception.IOException a)
-tryIO = Exception.try
 
 -- removeFileSave doesn't throw an exceptions, if the file is already deleted
 removeFileSafe :: FilePath -> IO ()
