@@ -79,16 +79,14 @@ ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs = do
   unregisterPackages globalDb pkgargs verbosity cli
  where
   verbosity = Normal
-  cli = [FlagConfig $ toFilePath pkgDb] <> [FlagUnitId | hasIpid]
-  as_arg | FlagUnitId `elem` cli = AsUnitId
-         | otherwise             = AsDefault
+  cli = [FlagConfig $ toFilePath pkgDb]
+  as_arg = if hasIpid then AsUnitId else AsDefault
 
 -- -----------------------------------------------------------------------------
 -- Command-line syntax
 
-data Flag
+newtype Flag
   = FlagConfig FilePath
-  | FlagUnitId
   deriving Eq
 
 data Verbosity = Silent | Normal | Verbose
@@ -225,7 +223,6 @@ getPkgDatabases globalDb verbosity mode expand_vars my_flags = do
 
   let db_flags = mapMaybe is_db_flag my_flags
          where is_db_flag (FlagConfig f) = Just f
-               is_db_flag _              = Nothing
 
   let flag_db_names | null db_flags = env_stack
                     | otherwise     = reverse (nub db_flags)
