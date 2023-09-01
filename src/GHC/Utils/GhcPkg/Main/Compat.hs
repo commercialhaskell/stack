@@ -37,8 +37,7 @@ import qualified Control.Exception as Exception
 import           Control.Monad ( ap, forM, forM_, liftM, unless, when )
 import qualified Data.ByteString as BS
 import qualified Data.Foldable as F
-import           Data.List ( foldl', isPrefixOf, isSuffixOf, nub )
-import           Data.Maybe ( mapMaybe )
+import           Data.List ( foldl', isPrefixOf, isSuffixOf )
 import qualified Data.Traversable as F
 import           Distribution.InstalledPackageInfo as Cabal
 import           Distribution.Package ( UnitId, mungedId )
@@ -75,18 +74,14 @@ ghcPkgUnregisterForce ::
   -> IO ()
 ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs = do
   pkgargs <- forM pkgarg_strs $ readPackageArg as_arg
-  unregisterPackages globalDb pkgargs verbosity cli
+  unregisterPackages globalDb pkgargs verbosity pkgDb'
  where
   verbosity = Normal
-  cli = [FlagConfig $ toFilePath pkgDb]
+  pkgDb' = toFilePath pkgDb
   as_arg = if hasIpid then AsUnitId else AsDefault
 
 -- -----------------------------------------------------------------------------
 -- Command-line syntax
-
-newtype Flag
-  = FlagConfig FilePath
-  deriving Eq
 
 data Verbosity = Silent | Normal | Verbose
     deriving (Show, Eq, Ord)
@@ -178,7 +173,8 @@ getPkgDatabases :: Path Abs Dir
                    -- ^ Path to the global package database.
                 -> Verbosity
                 -> PackageArg
-                -> [Flag]
+                -> FilePath
+                   -- ^ Path the package database.
                 -> IO (PackageDBStack,
                           -- the real package DB stack: [global,user] ++
                           -- DBs specified on the command line with -f.
@@ -190,15 +186,13 @@ getPkgDatabases :: Path Abs Dir
                           -- is used as the list of package DBs for
                           -- commands that just read the DB, such as 'list'.
 
-getPkgDatabases globalDb verbosity pkgarg my_flags = do
+getPkgDatabases globalDb verbosity pkgarg pkgDb = do
   -- Second we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-package-db flag by the
   -- wrapper script.
-  let  global_conf = toFilePath globalDb
-
-  let sys_databases = [global_conf]
-
+  let global_conf = toFilePath globalDb
+      sys_databases = [global_conf]
   e_pkg_path <- tryIO (System.Environment.getEnv "GHC_PACKAGE_PATH")
   let env_stack =
         case e_pkg_path of
@@ -209,28 +203,13 @@ getPkgDatabases globalDb verbosity pkgarg my_flags = do
                   | otherwise
                   -> splitSearchPath path
 
-  let db_flags = mapMaybe is_db_flag my_flags
-         where is_db_flag (FlagConfig f) = Just f
+  -- -f flags on the command line add to the database stack, unless any of them
+  -- are present in the stack already.
+  let final_stack = [pkgDb | pkgDb `notElem` env_stack] <> env_stack
 
-  let flag_db_names | null db_flags = env_stack
-                    | otherwise     = reverse (nub db_flags)
+  (db_stack, db_to_operate_on) <- getDatabases [pkgDb] final_stack
 
-  -- For a "modify" command, treat all the databases as
-  -- a stack, where we are modifying the top one, but it
-  -- can refer to packages in databases further down the
-  -- stack.
-
-  -- -f flags on the command line add to the database
-  -- stack, unless any of them are present in the stack
-  -- already.
-  let final_stack = filter (`notElem` env_stack)
-                     [ f | FlagConfig f <- reverse my_flags ]
-                     ++ env_stack
-
-  (db_stack, db_to_operate_on) <- getDatabases flag_db_names final_stack
-
-  let flag_db_stack = [ db | db_name <- flag_db_names,
-                        db <- db_stack, location db == db_name ]
+  let flag_db_stack = [ db | db <- db_stack, location db == pkgDb ]
 
   when (verbosity > Normal) $ do
     infoLn ("db stack: " ++ show (map location db_stack))
@@ -477,9 +456,9 @@ unregisterPackages ::
      -- ^ Path to the global package database.
   -> [PackageArg]
   -> Verbosity
-  -> [Flag]
+  -> String
   -> IO ()
-unregisterPackages globalDb pkgargs verbosity my_flags = do
+unregisterPackages globalDb pkgargs verbosity pkgDb = do
   pkgsByPkgDBs <- F.foldlM (getPkgsByPkgDBs []) [] pkgargs
   forM_ pkgsByPkgDBs unregisterPackages'
  where
@@ -496,7 +475,7 @@ unregisterPackages globalDb pkgargs verbosity my_flags = do
   -- another package database.
   getPkgsByPkgDBs pkgsByPkgDBs [] pkgarg = do
     (_, GhcPkg.DbOpenReadWrite db, _flag_dbs) <-
-      getPkgDatabases globalDb verbosity pkgarg my_flags
+      getPkgDatabases globalDb verbosity pkgarg pkgDb
     pks <- do
       let pkgs = packages db
           ps = findPackage pkgarg pkgs
