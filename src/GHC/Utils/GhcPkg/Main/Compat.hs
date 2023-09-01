@@ -11,6 +11,7 @@
 -- commit f66fc15f2e6849125074bcfeb44334a663323ca6 (see GHC merge request
 -- !11142), with:
 -- * redundant code deleted,
+-- * changeDBDir' does not perform an effective @ghc-pkg recache@,
 -- * Hlint applied, and
 -- * explicit import lists.
 --
@@ -19,7 +20,7 @@
 -- function that does efficiently bulk unregister.
 
 module GHC.Utils.GhcPkg.Main.Compat
-  ( ghcPkgUnregisterUserForce
+  ( ghcPkgUnregisterForce
   ) where
 
 -----------------------------------------------------------------------------
@@ -32,45 +33,27 @@ module GHC.Utils.GhcPkg.Main.Compat
 
 import qualified Control.Exception as Exception
 import           Control.Monad ( ap, forM, forM_, liftM, unless, when )
-import           Data.Bifunctor ( bimap )
 import qualified Data.ByteString as BS
 import qualified Data.Foldable as F
 import           Data.List
-                   ( foldl', isPrefixOf, isSuffixOf, nub, partition, sort
-                   , stripPrefix
+                   ( foldl', isPrefixOf, isSuffixOf, nub, partition, stripPrefix
                    )
 import qualified Data.Map as Map
-import           Data.Maybe ( catMaybes, mapMaybe )
+import           Data.Maybe ( mapMaybe )
 import qualified Data.Traversable as F
-import qualified Data.Version as Version
-import           Distribution.Backpack ( OpenModule (..), OpenUnitId (..) )
 import           Distribution.InstalledPackageInfo as Cabal
-import           Distribution.ModuleName (ModuleName)
-import           Distribution.Package
-                   ( PackageIdentifier, PackageName, UnitId, mkPackageName
-                   , mkUnitId, mungedId, packageId, packageName, packageVersion
-                   , pkgName, unAbiHash, unComponentId, unDefUnitId
-                   , unPackageName
-                   )
+import           Distribution.Package ( UnitId, mungedId )
 import qualified Distribution.Parsec as Cabal
-import           Distribution.Pretty (Pretty (..))
-import           Distribution.Simple.Utils ( toUTF8BS )
 import           Distribution.Text ( display )
-import           Distribution.Types.UnqualComponentName
-                   ( unUnqualComponentName )
-import           Distribution.Types.LibraryName ( libraryNameString )
 import           Distribution.Types.MungedPackageName ( MungedPackageName )
 import           Distribution.Types.MungedPackageId ( MungedPackageId (..) )
-import           Distribution.Version ( versionNumbers, nullVersion )
-import qualified GHC.Data.ShortText as ST
+import           Distribution.Version ( nullVersion )
 import           GHC.IO ( catchException )
 import           GHC.IO.Exception (IOErrorType(InappropriateType))
 import           GHC.Platform.Host (hostPlatformArchOS)
 import           GHC.Settings.Utils (getTargetArchOS, maybeReadFuzzy)
 import           GHC.UniqueSubdir (uniqueSubdir)
 import qualified GHC.Unit.Database as GhcPkg
-import           GHC.Unit.Database
-                   ( DbInstUnitId (..), DbMode (..), DbModule (..) )
 import           Path ( Abs, Dir, Path, toFilePath )
 import           Prelude
 import           System.Directory
@@ -85,19 +68,19 @@ import           System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import           System.IO ( hFlush, hPutStrLn, stderr, stdout )
 import           System.IO.Error
-                   ( ioeGetErrorType, isDoesNotExistError, isPermissionError )
+                   ( ioeGetErrorType, isDoesNotExistError )
 
 -- | Function equivalent to:
 --
--- > ghc-pkg --no-user-package-db --package-db=<pkgDb> unregister --user --force [--ipid] <P>
+-- > ghc-pkg --no-user-package-db --package-db=<pkgDb> unregister --force [--ipid] <P>
 --
-ghcPkgUnregisterUserForce ::
+ghcPkgUnregisterForce ::
      Path Abs Dir -- ^ Path to the global package database
-  -> Path Abs Dir -- ^ package database
+  -> Path Abs Dir -- ^ Path to the package database
   -> Bool -- ^ Apply ghc-pkg's --ipid, --unit-id flag?
   -> [String] -- ^ Packages to unregister
   -> IO ()
-ghcPkgUnregisterUserForce globalDb pkgDb hasIpid pkgarg_strs = do
+ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs = do
   pkgargs <- forM pkgarg_strs $ readPackageArg as_arg
   unregisterPackages globalDb pkgargs verbosity cli force
  where
@@ -231,15 +214,6 @@ data DbModifySelector = TopOne | ContainsPkg PackageArg
 
 allPackagesInStack :: PackageDBStack -> [InstalledPackageInfo]
 allPackagesInStack = concatMap packages
-
--- | Retain only the part of the stack up to and including the given package
--- DB (where the global package DB is the bottom of the stack). The resulting
--- package DB stack contains exactly the packages that packages from the
--- specified package DB can depend on, since dependencies can only extend
--- down the stack, not up (e.g. global packages cannot depend on user
--- packages).
-stackUpTo :: FilePath -> PackageDBStack -> PackageDBStack
-stackUpTo to_modify = dropWhile ((/= to_modify) . location)
 
 getPkgDatabases :: Path Abs Dir
                    -- ^ Path to the global package database.
@@ -775,205 +749,25 @@ newtype DBOp = RemovePackage InstalledPackageInfo
 changeNewDB :: Verbosity
             -> [DBOp]
             -> PackageDB 'GhcPkg.DbReadWrite
-            -> PackageDBStack
             -> IO ()
-changeNewDB verbosity cmds new_db db_stack = do
+changeNewDB verbosity cmds new_db = do
   new_db' <- adjustOldFileStylePackageDB new_db
   createDirectoryIfMissing True (location new_db')
-  changeDBDir verbosity cmds new_db' db_stack
+  changeDBDir' verbosity cmds new_db'
 
-changeDBDir :: Verbosity
-            -> [DBOp]
-            -> PackageDB 'GhcPkg.DbReadWrite
-            -> PackageDBStack
-            -> IO ()
-changeDBDir verbosity cmds db db_stack = do
+changeDBDir' :: Verbosity
+             -> [DBOp]
+             -> PackageDB 'GhcPkg.DbReadWrite
+             -> IO ()
+changeDBDir' verbosity cmds db = do
   mapM_ do_cmd cmds
-  updateDBCache verbosity db db_stack
+  case packageDbLock db of
+    GhcPkg.DbOpenReadWrite lock -> liftIO $ GhcPkg.unlockPackageDb lock
  where
   do_cmd (RemovePackage p) = do
     let file = location db </> display (installedUnitId p) <.> "conf"
     when (verbosity > Normal) $ infoLn ("removing " ++ file)
     removeFileSafe file
-
-updateDBCache :: Verbosity
-              -> PackageDB 'GhcPkg.DbReadWrite
-              -> PackageDBStack
-              -> IO ()
-updateDBCache verbosity db db_stack = do
-  let filename = location db </> cachefilename
-      db_stack_below = stackUpTo (location db) db_stack
-
-      pkgsCabalFormat :: [InstalledPackageInfo]
-      pkgsCabalFormat = packages db
-
-      -- | All the packages we can legally depend on in this step.
-      dependablePkgsCabalFormat :: [InstalledPackageInfo]
-      dependablePkgsCabalFormat = allPackagesInStack db_stack_below
-
-      pkgsGhcCacheFormat :: [(PackageCacheFormat, Bool)]
-      pkgsGhcCacheFormat
-        -- See Note [Recompute abi-depends]
-        = map (recomputeValidAbiDeps dependablePkgsCabalFormat .
-            convertPackageInfoToCacheFormat)
-          pkgsCabalFormat
-
-      hasAnyAbiDepends :: InstalledPackageInfo -> Bool
-      hasAnyAbiDepends x = not (null (abiDepends x))
-
-  -- warn when we find any (possibly-)bogus abi-depends fields;
-  -- See Note [Recompute abi-depends]
-  when (verbosity >= Normal) $ do
-    let definitelyBrokenPackages =
-          nub
-            . sort
-            . map (unPackageName . GhcPkg.unitPackageName . fst)
-            . filter snd
-            $ pkgsGhcCacheFormat
-    when (definitelyBrokenPackages /= []) $ do
-      warn "the following packages have broken abi-depends fields:"
-      forM_ definitelyBrokenPackages $ \pkg ->
-        warn $ "    " ++ pkg
-    when (verbosity > Normal) $ do
-      let possiblyBrokenPackages =
-            nub
-              . sort
-              . filter (not . (`elem` definitelyBrokenPackages))
-              . map (unPackageName . pkgName . packageId)
-              . filter hasAnyAbiDepends
-              $ pkgsCabalFormat
-      when (possiblyBrokenPackages /= []) $ do
-          warn $
-            "the following packages have correct abi-depends, " ++
-            "but may break in the future:"
-          forM_ possiblyBrokenPackages $ \pkg ->
-            warn $ "    " ++ pkg
-
-  when (verbosity > Normal) $
-      infoLn ("writing cache " ++ filename)
-
-  let d = fmap (fromPackageCacheFormat . fst) pkgsGhcCacheFormat
-  GhcPkg.writePackageDb filename d pkgsCabalFormat
-    `catchIO` \e ->
-      if isPermissionError e
-      then die $ filename ++ ": you don't have permission to modify this file"
-      else ioError e
-
-  case packageDbLock db of
-    GhcPkg.DbOpenReadWrite lock -> GhcPkg.unlockPackageDb lock
-
-type PackageCacheFormat = GhcPkg.GenericUnitInfo
-                            PackageIdentifier
-                            PackageName
-                            UnitId
-                            ModuleName
-                            OpenModule
-
-{- Note [Recompute abi-depends]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Like most fields, `ghc-pkg` relies on who-ever is performing package
-registration to fill in fields; this includes the `abi-depends` field present
-for the package.
-
-However, this was likely a mistake, and is not very robust; in certain cases,
-versions of Cabal may use bogus abi-depends fields for a package when doing
-builds. Why? Because package database information is aggressively cached; it is
-possible to work Cabal into a situation where it uses a cached version of
-`abi-depends`, rather than the one in the actual database after it has been
-recomputed.
-
-However, there is an easy fix: ghc-pkg /already/ knows the `abi-depends` of a
-package, because they are the ABIs of the packages pointed at by the `depends`
-field. So it can simply look up the abi from the dependencies in the original
-database, and ignore whatever the system registering gave it.
-
-So, instead, we do two things here:
-
-  - We throw away the information for a registered package's `abi-depends` field.
-
-  - We recompute it: we simply look up the unit ID of the package in the original
-    database, and use *its* abi-depends.
-
-See #14381, and Cabal issue #4728.
-
-Additionally, because we are throwing away the original (declared) ABI deps, we
-return a boolean that indicates whether any abi-depends were actually
-overridden.
-
--}
-
-recomputeValidAbiDeps :: [InstalledPackageInfo]
-                      -> PackageCacheFormat
-                      -> (PackageCacheFormat, Bool)
-recomputeValidAbiDeps db pkg =
-  (pkg { GhcPkg.unitAbiDepends = newAbiDeps }, abiDepsUpdated)
-  where
-    newAbiDeps =
-      catMaybes . flip map (GhcPkg.unitAbiDepends pkg) $ \(k, _) ->
-        case filter (\d -> installedUnitId d == k) db of
-          [x] -> Just (k, ST.pack $ unAbiHash (abiHash x))
-          _   -> Nothing
-    abiDepsUpdated =
-      GhcPkg.unitAbiDepends pkg /= newAbiDeps
-
-
--- | Convert from PackageCacheFormat to DbUnitInfo (the format used in
--- Ghc.PackageDb to store into the database)
-fromPackageCacheFormat :: PackageCacheFormat -> GhcPkg.DbUnitInfo
-fromPackageCacheFormat = GhcPkg.mapGenericUnitInfo
-     mkUnitId' mkPackageIdentifier' mkPackageName' mkModuleName' mkModule'
-   where
-     displayBS :: Pretty a => a -> BS.ByteString
-     displayBS            = toUTF8BS . display
-     mkPackageIdentifier' = displayBS
-     mkPackageName'       = displayBS
-     mkComponentId'       = displayBS
-     mkUnitId'            = displayBS
-     mkModuleName'        = displayBS
-     mkInstUnitId' i      = case i of
-       IndefFullUnitId cid insts -> DbInstUnitId (mkComponentId' cid)
-                                                 (fmap (bimap mkModuleName' mkModule') (Map.toList insts))
-       DefiniteUnitId uid        -> DbUnitId (mkUnitId' (unDefUnitId uid))
-     mkModule' m = case m of
-       OpenModule uid n -> DbModule (mkInstUnitId' uid) (mkModuleName' n)
-       OpenModuleVar n  -> DbModuleVar  (mkModuleName' n)
-
-convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
-convertPackageInfoToCacheFormat pkg =
-    GhcPkg.GenericUnitInfo {
-       GhcPkg.unitId             = installedUnitId pkg,
-       GhcPkg.unitInstanceOf     = mkUnitId (unComponentId (installedComponentId pkg)),
-       GhcPkg.unitInstantiations = instantiatedWith pkg,
-       GhcPkg.unitPackageId      = sourcePackageId pkg,
-       GhcPkg.unitPackageName    = packageName pkg,
-       GhcPkg.unitPackageVersion = Version.Version (versionNumbers (packageVersion pkg)) [],
-       GhcPkg.unitComponentName  =
-         fmap (mkPackageName . unUnqualComponentName) (libraryNameString $ sourceLibName pkg),
-       GhcPkg.unitDepends        = depends pkg,
-       GhcPkg.unitAbiDepends     = map (\(AbiDependency k v) -> (k,ST.pack $ unAbiHash v)) (abiDepends pkg),
-       GhcPkg.unitAbiHash        = ST.pack $ unAbiHash (abiHash pkg),
-       GhcPkg.unitImportDirs     = map ST.pack $ importDirs pkg,
-       GhcPkg.unitLibraries      = map ST.pack $ hsLibraries pkg,
-       GhcPkg.unitExtDepLibsSys  = map ST.pack $ extraLibraries pkg,
-       GhcPkg.unitExtDepLibsGhc  = map ST.pack $ extraGHCiLibraries pkg,
-       GhcPkg.unitLibraryDirs    = map ST.pack $ libraryDirs pkg,
-       GhcPkg.unitLibraryDynDirs = map ST.pack $ libraryDynDirs pkg,
-       GhcPkg.unitExtDepFrameworks = map ST.pack $ frameworks pkg,
-       GhcPkg.unitExtDepFrameworkDirs = map ST.pack $ frameworkDirs pkg,
-       GhcPkg.unitLinkerOptions  = map ST.pack $ ldOptions pkg,
-       GhcPkg.unitCcOptions      = map ST.pack $ ccOptions pkg,
-       GhcPkg.unitIncludes       = map ST.pack $ includes pkg,
-       GhcPkg.unitIncludeDirs    = map ST.pack $ includeDirs pkg,
-       GhcPkg.unitHaddockInterfaces = map ST.pack $ haddockInterfaces pkg,
-       GhcPkg.unitHaddockHTMLs   = map ST.pack $ haddockHTMLs pkg,
-       GhcPkg.unitExposedModules = map convertExposed (exposedModules pkg),
-       GhcPkg.unitHiddenModules  = hiddenModules pkg,
-       GhcPkg.unitIsIndefinite   = indefinite pkg,
-       GhcPkg.unitIsExposed      = exposed pkg,
-       GhcPkg.unitIsTrusted      = trusted pkg
-    }
-  where
-    convertExposed (ExposedModule n reexport) = (n, reexport)
 
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
@@ -993,13 +787,13 @@ unregisterPackages globalDb pkgargs verbosity my_flags force = do
   -- Update a list of 'packages by package database (and database stack)' for a
   -- package. Assumes that a package to be unregistered is in no more than one
   -- database.
-  getPkgsByPkgDBs :: [(PackageDBAndStack 'DbReadWrite, [UnitId])]
+  getPkgsByPkgDBs :: [(PackageDBAndStack GhcPkg.DbReadWrite, [UnitId])]
                   -- ^ List of considered 'packages by package database'
-                  -> [(PackageDBAndStack 'DbReadWrite, [UnitId])]
+                  -> [(PackageDBAndStack GhcPkg.DbReadWrite, [UnitId])]
                   -- ^ List of to be considered 'packages by package database'
                   -> PackageArg
                   -- Package to update
-                  -> IO [(PackageDBAndStack 'DbReadWrite, [UnitId])]
+                  -> IO [(PackageDBAndStack GhcPkg.DbReadWrite, [UnitId])]
   -- No more 'packages by package database' to consider? We need to try to get
   -- another package database.
   getPkgsByPkgDBs pkgsByPkgDBs [] pkgarg = do
@@ -1035,7 +829,7 @@ unregisterPackages globalDb pkgargs verbosity my_flags force = do
         -- duplicated requests to unregister.
         pure (pkgsByPkgDBs <> (pkgByPkgDB' : pkgsByPkgDBs'))
 
-  unregisterPackages' :: (PackageDBAndStack 'DbReadWrite, [UnitId]) -> IO ()
+  unregisterPackages' :: (PackageDBAndStack GhcPkg.DbReadWrite, [UnitId]) -> IO ()
   unregisterPackages' (PackageDBAndStack db db_stack, pks) = do
     let db_name = location db
         pkgs = packages db
@@ -1057,7 +851,7 @@ unregisterPackages globalDb pkgargs verbosity my_flags force = do
     consistencyChecks new_db db_name db_stack force
     -- Use changeNewDB, rather than changeDB, to avoid duplicating
     -- updateInternalDB db cmds
-    changeNewDB verbosity cmds new_db db_stack
+    changeNewDB verbosity cmds new_db
 
 -- Do consistency checks with regards to the full stack
 consistencyChecks :: PackageDB mode -> FilePath -> PackageDBStack -> Force -> IO ()
