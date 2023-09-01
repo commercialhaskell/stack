@@ -37,7 +37,7 @@ import qualified Control.Exception as Exception
 import           Control.Monad ( ap, forM, forM_, liftM, unless, when )
 import qualified Data.ByteString as BS
 import qualified Data.Foldable as F
-import           Data.List ( foldl', isPrefixOf, isSuffixOf, nub, stripPrefix )
+import           Data.List ( foldl', isPrefixOf, isSuffixOf, nub )
 import           Data.Maybe ( mapMaybe )
 import qualified Data.Traversable as F
 import           Distribution.InstalledPackageInfo as Cabal
@@ -59,7 +59,6 @@ import           System.Directory
 import           System.Exit ( exitWith, ExitCode(..) )
 import           System.Environment ( getProgName, getEnv )
 import           System.FilePath as FilePath
-import qualified System.FilePath.Posix as FilePath.Posix
 import           System.IO ( hFlush, hPutStrLn, stderr, stdout )
 import           System.IO.Error
                    ( ioeGetErrorType, isDoesNotExistError )
@@ -179,7 +178,6 @@ getPkgDatabases :: Path Abs Dir
                    -- ^ Path to the global package database.
                 -> Verbosity
                 -> GhcPkg.DbOpenMode mode DbModifySelector
-                -> Bool    -- expand vars, like ${pkgroot} and $topdir
                 -> [Flag]
                 -> IO (PackageDBStack,
                           -- the real package DB stack: [global,user] ++
@@ -192,18 +190,12 @@ getPkgDatabases :: Path Abs Dir
                           -- is used as the list of package DBs for
                           -- commands that just read the DB, such as 'list'.
 
-getPkgDatabases globalDb verbosity mode expand_vars my_flags = do
+getPkgDatabases globalDb verbosity mode my_flags = do
   -- Second we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-package-db flag by the
   -- wrapper script.
   let  global_conf = toFilePath globalDb
-
-  -- The value of the $topdir variable used in some package descriptions
-  -- Note that the way we calculate this is slightly different to how it
-  -- is done in ghc itself. We rely on the convention that the global
-  -- package db lives in ghc's libdir.
-  top_dir <- absolutePath (takeDirectory global_conf)
 
   let sys_databases = [global_conf]
 
@@ -243,8 +235,7 @@ getPkgDatabases globalDb verbosity mode expand_vars my_flags = do
                then virt_global_conf
                else last db_flags
 
-  (db_stack, db_to_operate_on) <- getDatabases top_dir
-                                               flag_db_names final_stack top_db
+  (db_stack, db_to_operate_on) <- getDatabases flag_db_names final_stack top_db
 
   let flag_db_stack = [ db | db_name <- flag_db_names,
                         db <- db_stack, location db == db_name ]
@@ -257,8 +248,7 @@ getPkgDatabases globalDb verbosity mode expand_vars my_flags = do
 
   return (db_stack, db_to_operate_on, flag_db_stack)
   where
-    getDatabases top_dir flag_db_names
-                 final_stack top_db = case mode of
+    getDatabases flag_db_names final_stack top_db = case mode of
       -- When we open in read only mode, we simply read all of the databases/
       GhcPkg.DbOpenReadOnly -> do
         db_stack <- mapM readDatabase final_stack
@@ -335,11 +325,7 @@ getPkgDatabases globalDb verbosity mode expand_vars my_flags = do
 
         -- Parse package db in read-only mode.
         readDatabase :: FilePath -> IO (PackageDB 'GhcPkg.DbReadOnly)
-        readDatabase db_path = do
-          db <- readParseDatabase verbosity GhcPkg.DbOpenReadOnly db_path
-          if expand_vars
-            then return $ mungePackageDBPaths top_dir db
-            else return db
+        readDatabase = readParseDatabase verbosity GhcPkg.DbOpenReadOnly
 
     stateSequence :: Monad m => s -> [s -> m (a, s)] -> m ([a], s)
     stateSequence s []     = return ([], s)
@@ -405,71 +391,6 @@ parseSingletonPackageConf verbosity file = do
 
 cachefilename :: FilePath
 cachefilename = "package.cache"
-
-mungePackageDBPaths :: FilePath -> PackageDB mode -> PackageDB mode
-mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } =
-    db { packages = map (mungePackagePaths top_dir pkgroot) pkgs }
-  where
-    pkgroot = takeDirectory $ dropTrailingPathSeparator (locationAbsolute db)
-    -- It so happens that for both styles of package db ("package.conf"
-    -- files and "package.conf.d" dirs) the pkgroot is the parent directory
-    -- ${pkgroot}/package.conf  or  ${pkgroot}/package.conf.d/
-
--- | Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
--- (http://www.haskell.org/pipermail/libraries/2009-May/011772.html)
--- Paths/URLs can be relative to ${pkgroot} or ${pkgrooturl}.
--- The "pkgroot" is the directory containing the package database.
---
--- Also perform a similar substitution for the older GHC-specific
--- "$topdir" variable. The "topdir" is the location of the ghc
--- installation (obtained from the -B option).
-mungePackagePaths :: FilePath -> FilePath
-                  -> InstalledPackageInfo -> InstalledPackageInfo
-mungePackagePaths top_dir pkgroot pkg =
-   -- TODO: similar code is duplicated in GHC.Unit.Database
-    pkg {
-      importDirs  = munge_paths (importDirs pkg),
-      includeDirs = munge_paths (includeDirs pkg),
-      libraryDirs = munge_paths (libraryDirs pkg),
-      libraryDynDirs = munge_paths (libraryDynDirs pkg),
-      frameworkDirs = munge_paths (frameworkDirs pkg),
-      haddockInterfaces = munge_paths (haddockInterfaces pkg),
-      -- haddock-html is allowed to be either a URL or a file
-      haddockHTMLs = munge_paths (munge_urls (haddockHTMLs pkg))
-    }
-  where
-    munge_paths = map munge_path
-    munge_urls  = map munge_url
-    (munge_path,munge_url) = mkMungePathUrl top_dir pkgroot
-
-mkMungePathUrl :: FilePath -> FilePath -> (FilePath -> FilePath, FilePath -> FilePath)
-mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
-   where
-    munge_path p
-      | Just p' <- stripVarPrefix "${pkgroot}" p = pkgroot ++ p'
-      | Just p' <- stripVarPrefix "$topdir"    p = top_dir ++ p'
-      | otherwise                                = p
-
-    munge_url p
-      | Just p' <- stripVarPrefix "${pkgrooturl}" p = toUrlPath pkgroot p'
-      | Just p' <- stripVarPrefix "$httptopdir"   p = toUrlPath top_dir p'
-      | otherwise                                   = p
-
-    toUrlPath r p = "file:///"
-                 -- URLs always use posix style '/' separators:
-                 ++ FilePath.Posix.joinPath
-                        (r : -- We need to drop a leading "/" or "\\"
-                             -- if there is one:
-                             dropWhile (all isPathSeparator)
-                                       (FilePath.splitDirectories p))
-
-    -- We could drop the separator here, and then use </> above. However,
-    -- by leaving it in and using ++ we keep the same path separator
-    -- rather than letting FilePath change it to use \ as the separator
-    stripVarPrefix var path = case stripPrefix var path of
-                              Just [] -> Just []
-                              Just cs@(c : _) | isPathSeparator c -> Just cs
-                              _ -> Nothing
 
 -- -----------------------------------------------------------------------------
 -- Workaround for old single-file style package dbs
@@ -611,7 +532,7 @@ unregisterPackages globalDb pkgargs verbosity my_flags = do
   getPkgsByPkgDBs pkgsByPkgDBs [] pkgarg = do
     (_, GhcPkg.DbOpenReadWrite db, _flag_dbs) <-
       getPkgDatabases globalDb verbosity (GhcPkg.DbOpenReadWrite $ ContainsPkg pkgarg)
-        False{-expand vars-} my_flags
+        my_flags
     pks <- do
       let pkgs = packages db
           ps = findPackage pkgarg pkgs
