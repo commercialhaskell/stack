@@ -82,14 +82,12 @@ ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs = do
   pkgDb' = toFilePath pkgDb
   as_arg = if hasIpid then AsUnitId else AsDefault
 
--- -----------------------------------------------------------------------------
--- Command-line syntax
-
+-- Verbosity has been retained in order to facilitate debugging.
 data Verbosity
   = Silent
   | Normal
   | Verbose
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 -- -----------------------------------------------------------------------------
 -- Do the business
@@ -140,45 +138,41 @@ readPackageArg AsDefault str = Id <$> readGlobPkgId str
 -- -----------------------------------------------------------------------------
 -- Package databases
 
-data PackageDB (mode :: GhcPkg.DbMode)
-  = PackageDB {
-      location :: !FilePath,
-      -- We only need possibly-relative package db location. The relative
-      -- location is used as an identifier for the db, so it is important we do
-      -- not modify it.
+data PackageDB (mode :: GhcPkg.DbMode) = PackageDB
+  { location :: !FilePath
+    -- We only need possibly-relative package db location. The relative
+    -- location is used as an identifier for the db, so it is important we do
+    -- not modify it.
+  , packageDbLock :: !(GhcPkg.DbOpenMode mode GhcPkg.PackageDbLock)
+    -- If package db is open in read write mode, we keep its lock around for
+    -- transactional updates.
+  , packages :: [InstalledPackageInfo]
+  }
 
-      packageDbLock :: !(GhcPkg.DbOpenMode mode GhcPkg.PackageDbLock),
-      -- If package db is open in read write mode, we keep its lock around for
-      -- transactional updates.
-
-      packages :: [InstalledPackageInfo]
-    }
-
+-- | A stack of package databases. Convention: head is the topmost in the stack.
 type PackageDBStack = [PackageDB 'GhcPkg.DbReadOnly]
-        -- A stack of package databases.  Convention: head is the topmost
-        -- in the stack.
 
 -- | Selector for picking the right package DB to modify as 'modify' changes the
 -- first database that contains a specific package.
 newtype DbModifySelector = ContainsPkg PackageArg
 
-getPkgDatabases :: Path Abs Dir
-                   -- ^ Path to the global package database.
-                -> Verbosity
-                -> PackageArg
-                -> FilePath
-                   -- ^ Path the package database.
-                -> IO (PackageDBStack,
-                          -- the real package DB stack: [global,user] ++
-                          -- DBs specified on the command line with -f.
-                       GhcPkg.DbOpenMode GhcPkg.DbReadWrite (PackageDB GhcPkg.DbReadWrite),
-                          -- which one to modify, if any
-                       PackageDBStack)
-                          -- the package DBs specified on the command
-                          -- line, or [global,user] otherwise.  This
-                          -- is used as the list of package DBs for
-                          -- commands that just read the DB, such as 'list'.
-
+getPkgDatabases ::
+     Path Abs Dir
+     -- ^ Path to the global package database.
+  -> Verbosity
+  -> PackageArg
+  -> FilePath
+     -- ^ Path to the package database.
+  -> IO ( PackageDBStack
+          -- the real package DB stack: [global,user] ++ DBs specified on the
+          -- command line with -f.
+        , GhcPkg.DbOpenMode GhcPkg.DbReadWrite (PackageDB GhcPkg.DbReadWrite)
+          -- which one to modify, if any
+        , PackageDBStack
+          -- the package DBs specified on the command line, or [global,user]
+          -- otherwise. This is used as the list of package DBs for commands
+          -- that just read the DB, such as 'list'.
+        )
 getPkgDatabases globalDb verbosity pkgarg pkgDb = do
   -- Second we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
@@ -212,106 +206,107 @@ getPkgDatabases globalDb verbosity pkgarg pkgDb = do
 
   pure (db_stack, db_to_operate_on, flag_db_stack)
  where
-    getDatabases flag_db_names final_stack = do
-      -- The package db we open in read write mode is the first one included in
-      -- flag_db_names that contains specified package. Therefore we need to
-      -- open each one in read/write mode first and decide whether it's for
-      -- modification based on its contents.
-        (db_stack, mto_modify) <- stateSequence Nothing
-          [ \case
-              to_modify@(Just _) -> (, to_modify) <$> readDatabase db_path
-              Nothing -> if db_path `notElem` flag_db_names
-                then (, Nothing) <$> readDatabase db_path
-                else do
-                  let hasPkg :: PackageDB mode -> Bool
-                      hasPkg = not . null . findPackage pkgarg . packages
+  getDatabases flag_db_names final_stack = do
+    -- The package db we open in read write mode is the first one included in
+    -- flag_db_names that contains specified package. Therefore we need to
+    -- open each one in read/write mode first and decide whether it's for
+    -- modification based on its contents.
+      (db_stack, mto_modify) <- stateSequence Nothing
+        [ \case
+            to_modify@(Just _) -> (, to_modify) <$> readDatabase db_path
+            Nothing -> if db_path `notElem` flag_db_names
+              then (, Nothing) <$> readDatabase db_path
+              else do
+                let hasPkg :: PackageDB mode -> Bool
+                    hasPkg = not . null . findPackage pkgarg . packages
 
-                      openRo (e::IOError) = do
-                        db <- readDatabase db_path
-                        if hasPkg db
-                          then couldntOpenDbForModification db_path e
-                          else pure (db, Nothing)
+                    openRo (e::IOError) = do
+                      db <- readDatabase db_path
+                      if hasPkg db
+                        then couldntOpenDbForModification db_path e
+                        else pure (db, Nothing)
 
-                  -- If we fail to open the database in read/write mode, we need
-                  -- to check if it's for modification first before throwing an
-                  -- error, so we attempt to open it in read only mode.
-                  Exception.handle openRo $ do
-                    db <- readParseDatabase verbosity (GhcPkg.DbOpenReadWrite $ ContainsPkg pkgarg) db_path
-                    let ro_db = db { packageDbLock = GhcPkg.DbOpenReadOnly }
-                    if hasPkg db
-                      then pure (ro_db, Just db)
-                      else do
-                        -- If the database is not for modification after all,
-                        -- drop the write lock as we are already finished with
-                        -- the database.
-                        case packageDbLock db of
-                          GhcPkg.DbOpenReadWrite lock ->
-                            GhcPkg.unlockPackageDb lock
-                        pure (ro_db, Nothing)
-          | db_path <- final_stack ]
+                -- If we fail to open the database in read/write mode, we need
+                -- to check if it's for modification first before throwing an
+                -- error, so we attempt to open it in read only mode.
+                Exception.handle openRo $ do
+                  db <- readParseDatabase verbosity (GhcPkg.DbOpenReadWrite $ ContainsPkg pkgarg) db_path
+                  let ro_db = db { packageDbLock = GhcPkg.DbOpenReadOnly }
+                  if hasPkg db
+                    then pure (ro_db, Just db)
+                    else do
+                      -- If the database is not for modification after all,
+                      -- drop the write lock as we are already finished with
+                      -- the database.
+                      case packageDbLock db of
+                        GhcPkg.DbOpenReadWrite lock ->
+                          GhcPkg.unlockPackageDb lock
+                      pure (ro_db, Nothing)
+        | db_path <- final_stack ]
 
-        to_modify <- case mto_modify of
-          Just db -> pure db
-          Nothing -> cannotFindPackage pkgarg Nothing
+      to_modify <- case mto_modify of
+        Just db -> pure db
+        Nothing -> cannotFindPackage pkgarg Nothing
 
-        pure (db_stack, GhcPkg.DbOpenReadWrite to_modify)
-      where
-        couldntOpenDbForModification :: FilePath -> IOError -> IO a
-        couldntOpenDbForModification db_path e = die $ "Couldn't open database "
-          ++ db_path ++ " for modification: " ++ show e
+      pure (db_stack, GhcPkg.DbOpenReadWrite to_modify)
+   where
+    couldntOpenDbForModification :: FilePath -> IOError -> IO a
+    couldntOpenDbForModification db_path e = die $ "Couldn't open database "
+      ++ db_path ++ " for modification: " ++ show e
 
-        -- Parse package db in read-only mode.
-        readDatabase :: FilePath -> IO (PackageDB 'GhcPkg.DbReadOnly)
-        readDatabase = readParseDatabase verbosity GhcPkg.DbOpenReadOnly
+    -- Parse package db in read-only mode.
+    readDatabase :: FilePath -> IO (PackageDB 'GhcPkg.DbReadOnly)
+    readDatabase = readParseDatabase verbosity GhcPkg.DbOpenReadOnly
 
-    stateSequence :: Monad m => s -> [s -> m (a, s)] -> m ([a], s)
-    stateSequence s []     = return ([], s)
-    stateSequence s (m:ms) = do
-      (a, s')   <- m s
-      (as, s'') <- stateSequence s' ms
-      return (a : as, s'')
+  stateSequence :: Monad m => s -> [s -> m (a, s)] -> m ([a], s)
+  stateSequence s []     = pure ([], s)
+  stateSequence s (m:ms) = do
+    (a, s')   <- m s
+    (as, s'') <- stateSequence s' ms
+    pure (a : as, s'')
 
 readParseDatabase :: forall mode t. Verbosity
-                  -> GhcPkg.DbOpenMode mode t
-                  -> FilePath
-                  -> IO (PackageDB mode)
+  -> GhcPkg.DbOpenMode mode t
+  -> FilePath
+  -> IO (PackageDB mode)
 readParseDatabase verbosity mode path = do
-       e <- tryIO $ getDirectoryContents path
-       case e of
-         Left err
-           | ioeGetErrorType err == InappropriateType -> do
-              -- We provide a limited degree of backwards compatibility for
-              -- old single-file style db:
-              mdb <- tryReadParseOldFileStyleDatabase verbosity mode path
-              case mdb of
-                Just db -> pure db
-                Nothing ->
-                  die $ "ghc no longer supports single-file style package "
-                     ++ "databases (" ++ path ++ ") use 'ghc-pkg init'"
-                     ++ "to create the database with the correct format."
+  e <- tryIO $ getDirectoryContents path
+  case e of
+    Left err
+      | ioeGetErrorType err == InappropriateType -> do
+         -- We provide a limited degree of backwards compatibility for
+         -- old single-file style db:
+         mdb <- tryReadParseOldFileStyleDatabase verbosity mode path
+         case mdb of
+           Just db -> pure db
+           Nothing ->
+             die $ "ghc no longer supports single-file style package "
+                ++ "databases (" ++ path ++ ") use 'ghc-pkg init'"
+                ++ "to create the database with the correct format."
 
-           | otherwise -> ioError err
-         Right fs -> ignore_cache (const $ return ())
-            where
-              confs = map (path </>) $ filter (".conf" `isSuffixOf`) fs
+      | otherwise -> ioError err
+    Right fs -> ignore_cache (const $ return ())
+     where
+      confs = map (path </>) $ filter (".conf" `isSuffixOf`) fs
 
-              ignore_cache :: (FilePath -> IO ()) -> IO (PackageDB mode)
-              ignore_cache checkTime = do
-                -- If we're opening for modification, we need to acquire a
-                -- lock even if we don't open the cache now, because we are
-                -- going to modify it later.
-                lock <- F.mapM (const $ GhcPkg.lockPackageDb cache) mode
-                let doFile f = do checkTime f
-                                  parseSingletonPackageConf verbosity f
-                pkgs <- mapM doFile confs
-                mkPackageDB pkgs lock
-
+      ignore_cache :: (FilePath -> IO ()) -> IO (PackageDB mode)
+      ignore_cache checkTime = do
+        -- If we're opening for modification, we need to acquire a
+        -- lock even if we don't open the cache now, because we are
+        -- going to modify it later.
+        lock <- F.mapM (const $ GhcPkg.lockPackageDb cache) mode
+        let doFile f = do
+              checkTime f
+              parseSingletonPackageConf verbosity f
+        pkgs <- mapM doFile confs
+        mkPackageDB pkgs lock
  where
   cache = path </> cachefilename
 
-  mkPackageDB :: [InstalledPackageInfo]
-              -> GhcPkg.DbOpenMode mode GhcPkg.PackageDbLock
-              -> IO (PackageDB mode)
+  mkPackageDB ::
+       [InstalledPackageInfo]
+    -> GhcPkg.DbOpenMode mode GhcPkg.PackageDbLock
+    -> IO (PackageDB mode)
   mkPackageDB pkgs lock = do
     pure $ PackageDB
       { location = path
@@ -348,7 +343,7 @@ tryReadParseOldFileStyleDatabase ::
   -> IO (Maybe (PackageDB mode))
 tryReadParseOldFileStyleDatabase verbosity mode path = do
   -- assumes we've already established that path exists and is not a dir
-  content <- readFile path `catchIO` \_ -> return ""
+  content <- readFile path `catchIO` \_ -> pure ""
   if take 2 content == "[]"
     then do
       let path_dir = adjustOldDatabasePath path
@@ -379,25 +374,24 @@ adjustOldFileStylePackageDB db = do
   case fmap (take 2) mcontent of
     -- it is an old style and empty db, so look for a dir kind in location.d/
     Just "[]" -> pure db
-      { location         = adjustOldDatabasePath $ location db }
+      { location = adjustOldDatabasePath $ location db }
     -- it is old style but not empty, we have to bail
-    Just  _   -> die $ "ghc no longer supports single-file style package "
-                    ++ "databases (" ++ location db ++ ") use 'ghc-pkg init'"
-                    ++ "to create the database with the correct format."
+    Just _ -> die $ "ghc no longer supports single-file style package "
+                ++ "databases (" ++ location db ++ ") use 'ghc-pkg init'"
+                ++ "to create the database with the correct format."
     -- probably not old style, carry on as normal
-    Nothing   -> pure db
+    Nothing -> pure db
 
 adjustOldDatabasePath :: FilePath -> FilePath
 adjustOldDatabasePath = (<.> "d")
 
-parsePackageInfo :: BS.ByteString
-                 -> IO (InstalledPackageInfo, [String])
+parsePackageInfo :: BS.ByteString -> IO (InstalledPackageInfo, [String])
 parsePackageInfo str =
   case parseInstalledPackageInfo str of
     Right (warnings, ok) -> pure (mungePackageInfo ok, ws)
-      where
-        ws = [ msg | msg <- warnings
-                   , not ("Unrecognized field pkgroot" `isPrefixOf` msg) ]
+     where
+      ws = [ msg | msg <- warnings
+                 , not ("Unrecognized field pkgroot" `isPrefixOf` msg) ]
     Left err -> die (unlines (F.toList err))
 
 mungePackageInfo :: InstalledPackageInfo -> InstalledPackageInfo
@@ -430,9 +424,6 @@ changeDBDir' verbosity cmds db = do
     let file = location db </> display (installedUnitId p) <.> "conf"
     when (verbosity > Normal) $ infoLn ("removing " ++ file)
     removeFileSafe file
-
--- -----------------------------------------------------------------------------
--- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
 
 unregisterPackages ::
      Path Abs Dir
@@ -502,8 +493,7 @@ unregisterPackages globalDb pkgargs verbosity pkgDb = do
           deleteBy' _ [] _ = []
           deleteBy' eq (y:ys) x = if y `eq` x then ys else y : deleteBy' eq ys x
 
-          pkgs' = deleteFirstsBy'
-            (\p1 p2 -> installedUnitId p1 == p2) pkgs pks
+          pkgs' = deleteFirstsBy' (\p1 p2 -> installedUnitId p1 == p2) pkgs pks
     -- Use changeNewDB, rather than changeDB, to avoid duplicating
     -- updateInternalDB db cmds
     changeNewDB verbosity cmds new_db
@@ -514,17 +504,18 @@ findPackage pkgarg = filter (pkgarg `matchesPkg`)
 cannotFindPackage :: PackageArg -> Maybe (PackageDB mode) -> IO a
 cannotFindPackage pkgarg mdb = die $ "cannot find package " ++ pkg_msg pkgarg
   ++ maybe "" (\db -> " in " ++ location db) mdb
-  where
-    pkg_msg (Id pkgid)           = displayGlobPkgId pkgid
-    pkg_msg (IUId ipid)          = display ipid
-    pkg_msg (Substring pkgpat _) = "matching " ++ pkgpat
+ where
+  pkg_msg (Id pkgid)           = displayGlobPkgId pkgid
+  pkg_msg (IUId ipid)          = display ipid
+  pkg_msg (Substring pkgpat _) = "matching " ++ pkgpat
 
 matches :: GlobPackageIdentifier -> MungedPackageId -> Bool
-GlobPackageIdentifier pn `matches` pid'
-  = pn == mungedName pid'
-ExactPackageIdentifier pid `matches` pid'
-  = mungedName pid == mungedName pid' &&
-    (mungedVersion pid == mungedVersion pid' || mungedVersion pid == nullVersion)
+GlobPackageIdentifier pn `matches` pid' = pn == mungedName pid'
+ExactPackageIdentifier pid `matches` pid' =
+     mungedName pid == mungedName pid'
+  && (  mungedVersion pid == mungedVersion pid'
+     || mungedVersion pid == nullVersion
+     )
 
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Id pid)        `matchesPkg` pkg = pid `matches` mungedId pkg
