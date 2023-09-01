@@ -10,8 +10,9 @@
 -- This module is based on GHC's utils\ghc-pkg\Main.hs at
 -- commit f66fc15f2e6849125074bcfeb44334a663323ca6 (see GHC merge request
 -- !11142), with:
--- * redundant code deleted,
 -- * changeDBDir' does not perform an effective @ghc-pkg recache@,
+-- * the cache is not used,
+-- * redundant code deleted,
 -- * Hlint applied, and
 -- * explicit import lists.
 --
@@ -59,8 +60,8 @@ import           Prelude
 import           System.Directory
                    ( XdgDirectory (..), createDirectoryIfMissing
                    , doesDirectoryExist, doesFileExist, getAppUserDataDirectory
-                   , getCurrentDirectory, getDirectoryContents
-                   , getModificationTime, getXdgDirectory, removeFile
+                   , getCurrentDirectory, getDirectoryContents, getXdgDirectory
+                   , removeFile
                    )
 import           System.Exit ( exitWith, ExitCode(..) )
 import           System.Environment ( getProgName, getEnv )
@@ -95,15 +96,6 @@ ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs = do
   force = ForceAll
   as_arg | FlagUnitId `elem` cli = AsUnitId
          | otherwise             = AsDefault
-
--- | Short-circuit 'any' with a \"monadic predicate\".
-anyM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
-anyM _ [] = return False
-anyM p (x:xs) = do
-  b <- p x
-  if b
-    then return True
-    else anyM p xs
 
 -- -----------------------------------------------------------------------------
 -- Command-line syntax
@@ -220,7 +212,6 @@ getPkgDatabases :: Path Abs Dir
                 -> Verbosity
                 -> GhcPkg.DbOpenMode mode DbModifySelector
                 -> Bool    -- use the user db
-                -> Bool    -- read caches, if available
                 -> Bool    -- expand vars, like ${pkgroot} and $topdir
                 -> [Flag]
                 -> IO (PackageDBStack,
@@ -234,7 +225,7 @@ getPkgDatabases :: Path Abs Dir
                           -- is used as the list of package DBs for
                           -- commands that just read the DB, such as 'list'.
 
-getPkgDatabases globalDb verbosity mode use_user use_cache expand_vars my_flags = do
+getPkgDatabases globalDb verbosity mode use_user expand_vars my_flags = do
   -- Second we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-package-db flag by the
@@ -383,8 +374,7 @@ getPkgDatabases globalDb verbosity mode use_user use_cache expand_vars my_flags 
               Nothing -> if db_path /= top_db
                 then (, Nothing) <$> readDatabase db_path
                 else do
-                  db <- readParseDatabase verbosity mb_user_conf
-                                          mode use_cache db_path
+                  db <- readParseDatabase verbosity mb_user_conf mode db_path
                     `catchException` couldntOpenDbForModification db_path
                   let ro_db = db { packageDbLock = GhcPkg.DbOpenReadOnly }
                   return (ro_db, Just db)
@@ -420,8 +410,7 @@ getPkgDatabases globalDb verbosity mode use_user use_cache expand_vars my_flags 
                   -- to check if it's for modification first before throwing an
                   -- error, so we attempt to open it in read only mode.
                   Exception.handle openRo $ do
-                    db <- readParseDatabase verbosity mb_user_conf
-                                            mode use_cache db_path
+                    db <- readParseDatabase verbosity mb_user_conf mode db_path
                     let ro_db = db { packageDbLock = GhcPkg.DbOpenReadOnly }
                     if hasPkg db
                       then return (ro_db, Just db)
@@ -449,7 +438,7 @@ getPkgDatabases globalDb verbosity mode use_user use_cache expand_vars my_flags 
         readDatabase :: FilePath -> IO (PackageDB 'GhcPkg.DbReadOnly)
         readDatabase db_path = do
           db <- readParseDatabase verbosity mb_user_conf
-                                  GhcPkg.DbOpenReadOnly use_cache db_path
+                                  GhcPkg.DbOpenReadOnly db_path
           if expand_vars
             then return $ mungePackageDBPaths top_dir db
             else return db
@@ -473,10 +462,9 @@ lookForPackageDBIn dir = do
 readParseDatabase :: forall mode t. Verbosity
                   -> Maybe (FilePath,Bool)
                   -> GhcPkg.DbOpenMode mode t
-                  -> Bool -- use cache
                   -> FilePath
                   -> IO (PackageDB mode)
-readParseDatabase verbosity mb_user_conf mode use_cache path
+readParseDatabase verbosity mb_user_conf mode path
   -- the user database (only) is allowed to be non-existent
   | Just (user_conf,False) <- mb_user_conf, path == user_conf
   = do lock <- F.forM mode $ \_ -> do
@@ -491,7 +479,7 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
               -- We provide a limited degree of backwards compatibility for
               -- old single-file style db:
               mdb <- tryReadParseOldFileStyleDatabase verbosity
-                       mb_user_conf mode use_cache path
+                       mb_user_conf mode path
               case mdb of
                 Just db -> return db
                 Nothing ->
@@ -500,52 +488,7 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
                      ++ "to create the database with the correct format."
 
            | otherwise -> ioError err
-         Right fs
-           | not use_cache -> ignore_cache (const $ return ())
-           | otherwise -> do
-              e_tcache <- tryIO $ getModificationTime cache
-              case e_tcache of
-                Left ex -> do
-                  whenReportCacheErrors $
-                    if isDoesNotExistError ex
-                      then
-                        -- It's fine if the cache is not there as long as the
-                        -- database is empty.
-                        unless (null confs) $ do
-                            warn ("WARNING: cache does not exist: " ++ cache)
-                            warn ("ghc will fail to read this package db. " ++
-                                  recacheAdvice)
-                      else do
-                        warn ("WARNING: cache cannot be read: " ++ show ex)
-                        warn "ghc will fail to read this package db."
-                  ignore_cache (const $ return ())
-                Right tcache -> do
-                  when (verbosity >= Verbose) $ do
-                      warn ("Timestamp " ++ show tcache ++ " for " ++ cache)
-                  -- If any of the .conf files is newer than package.cache, we
-                  -- assume that cache is out of date.
-                  cache_outdated <- (`anyM` confs)
-                    (fmap (tcache <) . getModificationTime)
-                  if not cache_outdated
-                      then do
-                          when (verbosity > Normal) $
-                             infoLn ("using cache: " ++ cache)
-                          GhcPkg.readPackageDbForGhcPkg cache mode
-                            >>= uncurry mkPackageDB
-                      else do
-                          whenReportCacheErrors $ do
-                              warn ("WARNING: cache is out of date: " ++ cache)
-                              warn ("ghc will see an old view of this " ++
-                                    "package db. " ++ recacheAdvice)
-                          ignore_cache $ \file -> do
-                            when (verbosity >= Verbose) $ do
-                              tFile <- getModificationTime file
-                              let rel = case tcache `compare` tFile of
-                                    LT -> " (NEWER than cache)"
-                                    GT -> " (older than cache)"
-                                    EQ -> " (same as cache)"
-                              warn ("Timestamp " ++ show tFile
-                                ++ " for " ++ file ++ rel)
+         Right fs -> ignore_cache (const $ return ())
             where
                  confs = map (path </>) $ filter (".conf" `isSuffixOf`) fs
 
@@ -560,18 +503,8 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
                      pkgs <- mapM doFile confs
                      mkPackageDB pkgs lock
 
-                 -- We normally report cache errors for read-only commands,
-                 -- since modify commands will usually fix the cache.
-                 whenReportCacheErrors = when $ verbosity > Normal
-                   || verbosity >= Normal && GhcPkg.isDbOpenReadMode mode
   where
     cache = path </> cachefilename
-
-    recacheAdvice
-      | Just (user_conf, True) <- mb_user_conf, path == user_conf
-      = "Use 'ghc-pkg recache --user' to fix."
-      | otherwise
-      = "Use 'ghc-pkg recache' to fix."
 
     mkPackageDB :: [InstalledPackageInfo]
                 -> GhcPkg.DbOpenMode mode GhcPkg.PackageDbLock
@@ -672,11 +605,13 @@ mkMungePathUrl top_dir pkgroot = (munge_path, munge_url)
 
 -- ghc itself also cooperates in this workaround
 
-tryReadParseOldFileStyleDatabase :: Verbosity -> Maybe (FilePath, Bool)
-                                 -> GhcPkg.DbOpenMode mode t -> Bool -> FilePath
-                                 -> IO (Maybe (PackageDB mode))
-tryReadParseOldFileStyleDatabase verbosity mb_user_conf
-                                 mode use_cache path = do
+tryReadParseOldFileStyleDatabase ::
+     Verbosity
+  -> Maybe (FilePath, Bool)
+  -> GhcPkg.DbOpenMode mode t
+  -> FilePath
+  -> IO (Maybe (PackageDB mode))
+tryReadParseOldFileStyleDatabase verbosity mb_user_conf mode path = do
   -- assumes we've already established that path exists and is not a dir
   content <- readFile path `catchIO` \_ -> return ""
   if take 2 content == "[]"
@@ -687,7 +622,7 @@ tryReadParseOldFileStyleDatabase verbosity mb_user_conf
       direxists <- doesDirectoryExist path_dir
       if direxists
         then do
-          db <- readParseDatabase verbosity mb_user_conf mode use_cache path_dir
+          db <- readParseDatabase verbosity mb_user_conf mode path_dir
           -- but pretend it was at the original location
           return $ Just db {
               location         = path,
@@ -799,7 +734,7 @@ unregisterPackages globalDb pkgargs verbosity my_flags force = do
   getPkgsByPkgDBs pkgsByPkgDBs [] pkgarg = do
     (db_stack, GhcPkg.DbOpenReadWrite db, _flag_dbs) <-
       getPkgDatabases globalDb verbosity (GhcPkg.DbOpenReadWrite $ ContainsPkg pkgarg)
-        True{-use user-} True{-use cache-} False{-expand vars-} my_flags
+        True{-use user-} False{-expand vars-} my_flags
     pks <- do
       let pkgs = packages db
           ps = findPackage pkgarg pkgs
