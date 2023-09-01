@@ -12,6 +12,7 @@
 -- !11142), with:
 -- * changeDBDir' does not perform an effective @ghc-pkg recache@,
 -- * the cache is not used,
+-- * consistency checks are not performed,
 -- * redundant code deleted,
 -- * Hlint applied, and
 -- * explicit import lists.
@@ -36,9 +37,7 @@ import qualified Control.Exception as Exception
 import           Control.Monad ( ap, forM, forM_, liftM, unless, when )
 import qualified Data.ByteString as BS
 import qualified Data.Foldable as F
-import           Data.List
-                   ( foldl', isPrefixOf, isSuffixOf, nub, partition, stripPrefix
-                   )
+import           Data.List ( foldl', isPrefixOf, isSuffixOf, nub, stripPrefix )
 import qualified Data.Map as Map
 import           Data.Maybe ( mapMaybe )
 import qualified Data.Traversable as F
@@ -73,7 +72,7 @@ import           System.IO.Error
 
 -- | Function equivalent to:
 --
--- > ghc-pkg --no-user-package-db --package-db=<pkgDb> unregister --force [--ipid] <P>
+-- > ghc-pkg --no-user-package-db --package-db=<pkgDb> unregister [--ipid] <P>
 --
 ghcPkgUnregisterForce ::
      Path Abs Dir -- ^ Path to the global package database
@@ -83,17 +82,14 @@ ghcPkgUnregisterForce ::
   -> IO ()
 ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs = do
   pkgargs <- forM pkgarg_strs $ readPackageArg as_arg
-  unregisterPackages globalDb pkgargs verbosity cli force
+  unregisterPackages globalDb pkgargs verbosity cli
  where
   verbosity = Normal
   cli = concat
     [ [FlagNoUserDb]
     , [FlagConfig $ toFilePath pkgDb]
-    , [FlagUser]
-    , [FlagForce]
     , [FlagUnitId | hasIpid]
     ]
-  force = ForceAll
   as_arg | FlagUnitId `elem` cli = AsUnitId
          | otherwise             = AsDefault
 
@@ -106,7 +102,6 @@ data Flag
   | FlagConfig FilePath
   | FlagGlobalConfig FilePath
   | FlagUserConfig FilePath
-  | FlagForce
   | FlagNoUserDb
   | FlagVerbosity (Maybe String)
   | FlagUnitId
@@ -117,9 +112,6 @@ data Verbosity = Silent | Normal | Verbose
 
 -- -----------------------------------------------------------------------------
 -- Do the business
-
-data Force = ForceAll
-  deriving (Eq,Ord)
 
 -- | Enum flag representing argument type
 data AsPackageArg
@@ -196,16 +188,10 @@ type PackageDBStack = [PackageDB 'GhcPkg.DbReadOnly]
         -- A stack of package databases.  Convention: head is the topmost
         -- in the stack.
 
-data PackageDBAndStack (mode :: GhcPkg.DbMode)
-  = PackageDBAndStack (PackageDB mode) PackageDBStack
-
 -- | Selector for picking the right package DB to modify as 'register' and
 -- 'recache' operate on the database on top of the stack, whereas 'modify'
 -- changes the first database that contains a specific package.
 data DbModifySelector = TopOne | ContainsPkg PackageArg
-
-allPackagesInStack :: PackageDBStack -> [InstalledPackageInfo]
-allPackagesInStack = concatMap packages
 
 getPkgDatabases :: Path Abs Dir
                    -- ^ Path to the global package database.
@@ -713,26 +699,24 @@ unregisterPackages ::
   -> [PackageArg]
   -> Verbosity
   -> [Flag]
-  -> Force
   -> IO ()
-unregisterPackages globalDb pkgargs verbosity my_flags force = do
+unregisterPackages globalDb pkgargs verbosity my_flags = do
   pkgsByPkgDBs <- F.foldlM (getPkgsByPkgDBs []) [] pkgargs
   forM_ pkgsByPkgDBs unregisterPackages'
  where
-  -- Update a list of 'packages by package database (and database stack)' for a
-  -- package. Assumes that a package to be unregistered is in no more than one
-  -- database.
-  getPkgsByPkgDBs :: [(PackageDBAndStack GhcPkg.DbReadWrite, [UnitId])]
+  -- Update a list of 'packages by package database' for a package. Assumes that
+  -- a package to be unregistered is in no more than one database.
+  getPkgsByPkgDBs :: [(PackageDB GhcPkg.DbReadWrite, [UnitId])]
                   -- ^ List of considered 'packages by package database'
-                  -> [(PackageDBAndStack GhcPkg.DbReadWrite, [UnitId])]
+                  -> [(PackageDB GhcPkg.DbReadWrite, [UnitId])]
                   -- ^ List of to be considered 'packages by package database'
                   -> PackageArg
                   -- Package to update
-                  -> IO [(PackageDBAndStack GhcPkg.DbReadWrite, [UnitId])]
+                  -> IO [(PackageDB GhcPkg.DbReadWrite, [UnitId])]
   -- No more 'packages by package database' to consider? We need to try to get
   -- another package database.
   getPkgsByPkgDBs pkgsByPkgDBs [] pkgarg = do
-    (db_stack, GhcPkg.DbOpenReadWrite db, _flag_dbs) <-
+    (_, GhcPkg.DbOpenReadWrite db, _flag_dbs) <-
       getPkgDatabases globalDb verbosity (GhcPkg.DbOpenReadWrite $ ContainsPkg pkgarg)
         True{-use user-} False{-expand vars-} my_flags
     pks <- do
@@ -741,17 +725,16 @@ unregisterPackages globalDb pkgargs verbosity my_flags force = do
       -- This shouldn't happen if getPkgsByPkgDBs picks the DB correctly.
       when (null ps) $ cannotFindPackage pkgarg $ Just db
       pure (map installedUnitId ps)
-    let pkgsByPkgDB = (PackageDBAndStack db db_stack, pks)
+    let pkgsByPkgDB = (db, pks)
     pure (pkgsByPkgDB : pkgsByPkgDBs)
   -- Consider the next 'packages by package database' in the list of ones to
   -- consider.
   getPkgsByPkgDBs pkgsByPkgDBs ( pkgsByPkgDB : pkgsByPkgDBs') pkgarg = do
-    let (packageDBAndStack, pks') = pkgsByPkgDB
-        PackageDBAndStack db _ = packageDBAndStack
+    let (db, pks') = pkgsByPkgDB
         pkgs = packages db
         ps = findPackage pkgarg pkgs
         pks = map installedUnitId ps
-        pkgByPkgDB' = (packageDBAndStack, pks <> pks')
+        pkgByPkgDB' = (db, pks <> pks')
     if null ps
       then
         -- Not found in the package database? Add the package database to those
@@ -764,10 +747,9 @@ unregisterPackages globalDb pkgargs verbosity my_flags force = do
         -- duplicated requests to unregister.
         pure (pkgsByPkgDBs <> (pkgByPkgDB' : pkgsByPkgDBs'))
 
-  unregisterPackages' :: (PackageDBAndStack GhcPkg.DbReadWrite, [UnitId]) -> IO ()
-  unregisterPackages' (PackageDBAndStack db db_stack, pks) = do
-    let db_name = location db
-        pkgs = packages db
+  unregisterPackages' :: (PackageDB GhcPkg.DbReadWrite, [UnitId]) -> IO ()
+  unregisterPackages' (db, pks) = do
+    let pkgs = packages db
         cmds = [ RemovePackage pkg
                | pkg <- pkgs, installedUnitId pkg `elem` pks
                ]
@@ -782,31 +764,9 @@ unregisterPackages globalDb pkgargs verbosity my_flags force = do
 
           pkgs' = deleteFirstsBy'
             (\p1 p2 -> installedUnitId p1 == p2) pkgs pks
-    -- ...but do consistency checks with regards to the full stack
-    consistencyChecks new_db db_name db_stack force
     -- Use changeNewDB, rather than changeDB, to avoid duplicating
     -- updateInternalDB db cmds
     changeNewDB verbosity cmds new_db
-
--- Do consistency checks with regards to the full stack
-consistencyChecks :: PackageDB mode -> FilePath -> PackageDBStack -> Force -> IO ()
-consistencyChecks new_db db_name db_stack force = do
-  let new_db_ro = new_db { packageDbLock = GhcPkg.DbOpenReadOnly }
-      old_broken = brokenPackages (allPackagesInStack db_stack)
-      rest_of_stack = filter ((/= db_name) . location) db_stack
-      new_stack = new_db_ro : rest_of_stack
-      new_broken = brokenPackages (allPackagesInStack new_stack)
-      newly_broken = filter ((`notElem` map installedUnitId old_broken)
-                            . installedUnitId) new_broken
-      displayQualPkgId pkg
-        | [_] <- filter ((== pkgid) . mungedId)
-                        (allPackagesInStack db_stack)
-            = display pkgid
-        | otherwise = display pkgid ++ "@" ++ display (installedUnitId pkg)
-        where pkgid = mungedId pkg
-  unless (null newly_broken) $
-      dieOrForceAll force ("unregistering would break the following packages: "
-              ++ unwords (map displayQualPkgId newly_broken))
 
 findPackage :: PackageArg -> [InstalledPackageInfo] -> [InstalledPackageInfo]
 findPackage pkgarg = filter (pkgarg `matchesPkg`)
@@ -831,32 +791,11 @@ matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (IUId ipid)     `matchesPkg` pkg = ipid == installedUnitId pkg
 (Substring _ m) `matchesPkg` pkg = m (display (mungedId pkg))
 
-closure :: [InstalledPackageInfo] -> [InstalledPackageInfo]
-        -> ([InstalledPackageInfo], [InstalledPackageInfo])
-closure = go
- where
-   go avail not_avail =
-     case partition (depsAvailable avail) not_avail of
-        ([],        not_avail') -> (avail, not_avail')
-        (new_avail, not_avail') -> go (new_avail ++ avail) not_avail'
-
-   depsAvailable :: [InstalledPackageInfo] -> InstalledPackageInfo
-                 -> Bool
-   depsAvailable pkgs_ok pkg = null dangling
-        where dangling = filter (`notElem` pids) (depends pkg)
-              pids = map installedUnitId pkgs_ok
-
-        -- we want mutually recursive groups of package to show up
-        -- as broken. (#1750)
-
-brokenPackages :: [InstalledPackageInfo] -> [InstalledPackageInfo]
-brokenPackages pkgs = snd (closure [] pkgs)
-
 -----------------------------------------------------------------------------
 -- Sanity-check a new package config, and automatically build GHCi libs
 -- if requested.
 
-type ValidateError   = (Force,String)
+type ValidateError   = String
 type ValidateWarning = String
 
 newtype Validate a = V { runValidate :: IO (a, [ValidateError],[ValidateWarning]) }
@@ -891,18 +830,12 @@ dieWith ec s = do
   reportError (prog ++ ": " ++ s)
   exitWith (ExitFailure ec)
 
-dieOrForceAll :: Force -> String -> IO ()
-dieOrForceAll ForceAll = ignoreError
-
 warn :: String -> IO ()
 warn = reportError
 
 -- send info messages to stdout
 infoLn :: String -> IO ()
 infoLn = putStrLn
-
-ignoreError :: String -> IO ()
-ignoreError s = reportError (s ++ " (ignoring)")
 
 reportError :: String -> IO ()
 reportError s = do hFlush stdout; hPutStrLn stderr s
