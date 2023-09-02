@@ -169,21 +169,21 @@ unregisterGhcPkgIds ::
   -> RIO env ()
 unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
   globalDb <- view $ compilerPathsL.to cpGlobalDB
-  eres <- tryAny $ do
-    liftIO $ ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs
+  eres <- try $ do
+    ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs
     -- ghcPkgUnregisterForce does not perform an effective
     -- 'ghc-pkg recache', as that depends on a specific version of the Cabal
     -- package.
     ghcPkg pkgexe [pkgDb] ["recache"]
   case eres of
-    Left e -> when isWarn $
+    Left (PrettyException e) -> when isWarn $
       prettyWarn $
         "[S-8729]"
         <> line
         <> flow "While unregistering packages, Stack encountered the following \
                 \error:"
         <> blankLine
-        <> string (displayException e)
+        <> pretty e
     Right _ -> pure ()
  where
   (idents, gids) = partitionEithers $ toList epgids

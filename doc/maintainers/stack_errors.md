@@ -5,7 +5,18 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-08-31.
+`master` branch of the Stack repository. Last updated: 2023-09-02.
+
+*   `GHC.GHC.Utils.GhcPkg.Main.Compat`
+
+    ~~~haskell
+    [S-6512] = CannotParse String String String
+    [S-3384] | CannotOpenDBForModification FilePath IOException
+    [S-1430] | SingleFileDBUnsupported FilePath
+    [S-5996] | ParsePackageInfoExceptions String
+    [S-3189] | CannotFindPackage PackageArg (Maybe FilePath)
+
+    ~~~
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
