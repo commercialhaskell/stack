@@ -18,6 +18,7 @@
 -- * use Stack program name,
 -- * use "Stack.Prelude" rather than "Prelude",
 -- * use 'RIO' @env@ monad,
+-- * use well-typed representations of paths from the @path@ package,
 -- * add pretty messages and exceptions,
 -- * redundant code deleted,
 -- * Hlint applied, and
@@ -49,10 +50,16 @@ import           Distribution.Text ( display )
 import           Distribution.Version ( nullVersion )
 import           GHC.IO.Exception (IOErrorType(InappropriateType))
 import qualified GHC.Unit.Database as GhcPkg
+import           Path
+                   ( SomeBase (..), fileExtension, mapSomeBase, parseRelFile
+                   , parseSomeDir, prjSomeBase
+                   )
+import qualified Path as P
+import           Path.IO
+                   ( createDirIfMissing, doesDirExist, listDir, removeFile )
 import qualified RIO.ByteString as BS
-import           RIO.Directory
-                   ( createDirectoryIfMissing, doesDirectoryExist
-                   , getDirectoryContents, removeFile )
+import           RIO.Partial ( fromJust )
+import           Stack.Constants ( relFilePackageCache )
 import           Stack.Prelude hiding ( display )
 import           System.Environment ( getEnv )
 import           System.FilePath as FilePath
@@ -78,19 +85,18 @@ ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs = do
     : (pretty pkgDb <> ":")
     : mkNarrativeList (Just Current) False
         (map (fromString . show) pkgargs :: [StyleDoc])
-  unregisterPackages globalDb pkgargs pkgDb'
+  unregisterPackages globalDb pkgargs pkgDb
  where
-  pkgDb' = toFilePath pkgDb
   as_arg = if hasIpid then AsUnitId else AsDefault
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "GHC.Utils.GhcPkg.Main.Compat" module.
 data GhcPkgPrettyException
   = CannotParse !String !String !String
-  | CannotOpenDBForModification !FilePath !IOException
-  | SingleFileDBUnsupported !FilePath
+  | CannotOpenDBForModification !(SomeBase Dir) !IOException
+  | SingleFileDBUnsupported !(SomeBase Dir)
   | ParsePackageInfoExceptions !String
-  | CannotFindPackage !PackageArg !(Maybe FilePath)
+  | CannotFindPackage !PackageArg !(Maybe (SomeBase Dir))
   deriving (Show, Typeable)
 
 instance Pretty GhcPkgPrettyException where
@@ -110,7 +116,7 @@ instance Pretty GhcPkgPrettyException where
     <> line
     <> fillSep
          [ flow "Couldn't open database"
-         , style Dir (fromString db_path)
+         , pretty db_path
          , flow "for modification:"
          ]
     <> blankLine
@@ -120,7 +126,7 @@ instance Pretty GhcPkgPrettyException where
     <> line
     <> fillSep
          [ flow "ghc no longer supports single-file style package databases"
-         , parens (style Dir (fromString path))
+         , parens (pretty path)
          , "use"
          , style Shell (flow "ghc-pkg init")
          , flow "to create the database with the correct format."
@@ -137,7 +143,7 @@ instance Pretty GhcPkgPrettyException where
          , style Current (pkg_msg pkgarg)
          , maybe
              ""
-             (\db_path -> fillSep ["in", style Dir (fromString db_path)])
+             (\db_path -> fillSep ["in", pretty db_path])
              mdb_path
          ]
    where
@@ -201,7 +207,7 @@ readPackageArg AsDefault str = Id <$> readGlobPkgId str
 -- Package databases
 
 data PackageDB (mode :: GhcPkg.DbMode) = PackageDB
-  { location :: !FilePath
+  { location :: !(SomeBase Dir)
     -- We only need possibly-relative package db location. The relative
     -- location is used as an identifier for the db, so it is important we do
     -- not modify it.
@@ -223,7 +229,7 @@ getPkgDatabases ::
   => Path Abs Dir
      -- ^ Path to the global package database.
   -> PackageArg
-  -> FilePath
+  -> Path Abs Dir
      -- ^ Path to the package database.
   -> RIO
        env
@@ -242,41 +248,40 @@ getPkgDatabases globalDb pkgarg pkgDb = do
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-package-db flag by the
   -- wrapper script.
-  let global_conf = toFilePath globalDb
-      sys_databases = [global_conf]
+  let sys_databases = [Abs globalDb]
   e_pkg_path <- tryIO (liftIO $ System.Environment.getEnv "GHC_PACKAGE_PATH")
   let env_stack =
         case e_pkg_path of
           Left _ -> sys_databases
           Right path
             | not (null path) && isSearchPathSeparator (last path)
-            -> splitSearchPath (init path) ++ sys_databases
+            -> mapMaybe parseSomeDir (splitSearchPath (init path)) <> sys_databases
             | otherwise
-            -> splitSearchPath path
+            -> mapMaybe parseSomeDir (splitSearchPath path)
 
   -- -f flags on the command line add to the database stack, unless any of them
   -- are present in the stack already.
-  let final_stack = [pkgDb | pkgDb `notElem` env_stack] <> env_stack
+  let final_stack = [Abs pkgDb | Abs pkgDb `notElem` env_stack] <> env_stack
 
-  (db_stack, db_to_operate_on) <- getDatabases [pkgDb] final_stack
+  (db_stack, db_to_operate_on) <- getDatabases pkgDb final_stack
 
-  let flag_db_stack = [ db | db <- db_stack, location db == pkgDb ]
+  let flag_db_stack = [ db | db <- db_stack, location db == Abs pkgDb ]
 
   prettyDebugL
     $ flow "Db stack:"
-    : map (style Dir . fromString . location) db_stack
+    : map (pretty . location) db_stack
   F.forM_ db_to_operate_on $ \db ->
     prettyDebugL
       [ "Modifying:"
-      , style Dir (fromString $ location db)
+      , pretty $ location db
       ]
   prettyDebugL
     $ flow "Flag db stack:"
-    : map (style Dir . fromString . location) flag_db_stack
+    : map (pretty . location) flag_db_stack
 
   pure (db_stack, db_to_operate_on, flag_db_stack)
  where
-  getDatabases flag_db_names final_stack = do
+  getDatabases flag_db_name final_stack = do
     -- The package db we open in read write mode is the first one included in
     -- flag_db_names that contains specified package. Therefore we need to
     -- open each one in read/write mode first and decide whether it's for
@@ -284,7 +289,7 @@ getPkgDatabases globalDb pkgarg pkgDb = do
       (db_stack, mto_modify) <- stateSequence Nothing
         [ \case
             to_modify@(Just _) -> (, to_modify) <$> readDatabase db_path
-            Nothing -> if db_path `notElem` flag_db_names
+            Nothing -> if db_path /= Abs flag_db_name
               then (, Nothing) <$> readDatabase db_path
               else do
                 let hasPkg :: PackageDB mode -> Bool
@@ -293,7 +298,8 @@ getPkgDatabases globalDb pkgarg pkgDb = do
                     openRo (e::IOException) = do
                       db <- readDatabase db_path
                       if hasPkg db
-                        then couldntOpenDbForModification db_path e
+                        then
+                          prettyThrowIO $ CannotOpenDBForModification db_path e
                         else pure (db, Nothing)
 
                 -- If we fail to open the database in read/write mode, we need
@@ -321,12 +327,8 @@ getPkgDatabases globalDb pkgarg pkgDb = do
 
       pure (db_stack, GhcPkg.DbOpenReadWrite to_modify)
    where
-    couldntOpenDbForModification :: FilePath -> IOException -> RIO env a
-    couldntOpenDbForModification db_path e = prettyThrowIO $
-      CannotOpenDBForModification db_path e
-
     -- Parse package db in read-only mode.
-    readDatabase :: FilePath -> RIO env (PackageDB 'GhcPkg.DbReadOnly)
+    readDatabase :: SomeBase Dir -> RIO env (PackageDB 'GhcPkg.DbReadOnly)
     readDatabase = readParseDatabase GhcPkg.DbOpenReadOnly
 
   stateSequence :: Monad m => s -> [s -> m (a, s)] -> m ([a], s)
@@ -339,10 +341,10 @@ getPkgDatabases globalDb pkgarg pkgDb = do
 readParseDatabase ::
      forall mode t env. HasTerm env
   => GhcPkg.DbOpenMode mode t
-  -> FilePath
+  -> SomeBase Dir
   -> RIO env (PackageDB mode)
 readParseDatabase mode path = do
-  e <- tryIO $ getDirectoryContents path
+  e <- tryIO $ prjSomeBase listDir path
   case e of
     Left err
       | ioeGetErrorType err == InappropriateType -> do
@@ -354,23 +356,25 @@ readParseDatabase mode path = do
            Nothing -> prettyThrowIO $ SingleFileDBUnsupported path
 
       | otherwise -> liftIO $ ioError err
-    Right fs -> ignore_cache (const $ pure ())
+    Right (_, fs) -> ignore_cache
      where
-      confs = map (path </>) $ filter (".conf" `isSuffixOf`) fs
+      confs = filter isConf fs
 
-      ignore_cache :: (FilePath -> RIO env ()) -> RIO env (PackageDB mode)
-      ignore_cache checkTime = do
-        -- If we're opening for modification, we need to acquire a
-        -- lock even if we don't open the cache now, because we are
-        -- going to modify it later.
-        lock <- liftIO $ F.mapM (const $ GhcPkg.lockPackageDb cache) mode
-        let doFile f = do
-              checkTime f
-              parseSingletonPackageConf f
-        pkgs <- mapM doFile confs
+      isConf :: Path Abs File -> Bool
+      isConf f = case fileExtension f of
+        Nothing -> False
+        Just ext -> ext == ".conf"
+
+      ignore_cache :: RIO env (PackageDB mode)
+      ignore_cache = do
+        -- If we're opening for modification, we need to acquire a lock even if
+        -- we don't open the cache now, because we are going to modify it later.
+        lock <- liftIO $
+          F.mapM (const $ GhcPkg.lockPackageDb (prjSomeBase toFilePath cache)) mode
+        pkgs <- mapM parseSingletonPackageConf confs
         mkPackageDB pkgs lock
  where
-  cache = path </> cachefilename
+  cache = mapSomeBase (P.</> relFilePackageCache) path
 
   mkPackageDB ::
        [InstalledPackageInfo]
@@ -385,17 +389,14 @@ readParseDatabase mode path = do
 
 parseSingletonPackageConf ::
      HasTerm env
-  => FilePath
+  => Path Abs File
   -> RIO env InstalledPackageInfo
 parseSingletonPackageConf file = do
   prettyDebugL
     [ flow "Reading package config:"
-    , style File (fromString file)
+    , pretty file
     ]
-  BS.readFile file >>= fmap fst . parsePackageInfo
-
-cachefilename :: FilePath
-cachefilename = "package.cache"
+  BS.readFile (toFilePath file) >>= fmap fst . parsePackageInfo
 
 -- -----------------------------------------------------------------------------
 -- Workaround for old single-file style package dbs
@@ -414,19 +415,19 @@ cachefilename = "package.cache"
 tryReadParseOldFileStyleDatabase ::
      HasTerm env
   => GhcPkg.DbOpenMode mode t
-  -> FilePath
+  -> SomeBase Dir
   -> RIO env (Maybe (PackageDB mode))
 tryReadParseOldFileStyleDatabase mode path = do
   -- assumes we've already established that path exists and is not a dir
-  content <- liftIO $ readFile path `catchIO` \_ -> pure ""
+  content <- liftIO $ readFile (prjSomeBase toFilePath path) `catchIO` \_ -> pure ""
   if take 2 content == "[]"
     then do
       let path_dir = adjustOldDatabasePath path
       prettyWarnL
         [ flow "Ignoring old file-style db and trying"
-        , style Dir (fromString path_dir)
+        , pretty path_dir
         ]
-      direxists <- doesDirectoryExist path_dir
+      direxists <- prjSomeBase doesDirExist path_dir
       if direxists
         then do
           db <- readParseDatabase mode path_dir
@@ -434,8 +435,9 @@ tryReadParseOldFileStyleDatabase mode path = do
           pure $ Just db { location         = path }
          else do
            lock <- F.forM mode $ \_ -> do
-             createDirectoryIfMissing True path_dir
-             liftIO $ GhcPkg.lockPackageDb $ path_dir </> cachefilename
+             prjSomeBase (createDirIfMissing True) path_dir
+             liftIO $ GhcPkg.lockPackageDb $
+               prjSomeBase (toFilePath . (P.</> relFilePackageCache)) path_dir
            pure $ Just PackageDB
              { location         = path
              , packageDbLock    = lock
@@ -449,7 +451,7 @@ adjustOldFileStylePackageDB :: PackageDB mode -> RIO env (PackageDB mode)
 adjustOldFileStylePackageDB db = do
   -- assumes we have not yet established if it's an old style or not
   mcontent <- liftIO $
-    fmap Just (readFile (location db)) `catchIO` \_ -> pure Nothing
+    fmap Just (readFile (prjSomeBase toFilePath (location db))) `catchIO` \_ -> pure Nothing
   case fmap (take 2) mcontent of
     -- it is an old style and empty db, so look for a dir kind in location.d/
     Just "[]" -> pure db
@@ -459,8 +461,9 @@ adjustOldFileStylePackageDB db = do
     -- probably not old style, carry on as normal
     Nothing -> pure db
 
-adjustOldDatabasePath :: FilePath -> FilePath
-adjustOldDatabasePath = (<.> "d")
+adjustOldDatabasePath :: SomeBase Dir -> SomeBase Dir
+adjustOldDatabasePath =
+  fromJust . prjSomeBase (parseSomeDir . (<> ".d") . toFilePath)
 
 parsePackageInfo :: BS.ByteString -> RIO env (InstalledPackageInfo, [String])
 parsePackageInfo str =
@@ -486,7 +489,7 @@ changeNewDB ::
   -> RIO env ()
 changeNewDB cmds new_db = do
   new_db' <- adjustOldFileStylePackageDB new_db
-  createDirectoryIfMissing True (location new_db')
+  prjSomeBase (createDirIfMissing True) (location new_db')
   changeDBDir' cmds new_db'
 
 changeDBDir' ::
@@ -500,10 +503,12 @@ changeDBDir' cmds db = do
     GhcPkg.DbOpenReadWrite lock -> liftIO $ GhcPkg.unlockPackageDb lock
  where
   do_cmd (RemovePackage p) = do
-    let file = location db </> display (installedUnitId p) <.> "conf"
+    let relFileConf =
+          fromJust (parseRelFile $ display (installedUnitId p) <> ".conf")
+        file = mapSomeBase (P.</> relFileConf) (location db)
     prettyDebugL
       [ "Removing"
-      , style File (fromString file)
+      , pretty file
       ]
     removeFileSafe file
 
@@ -512,7 +517,8 @@ unregisterPackages ::
   => Path Abs Dir
      -- ^ Path to the global package database.
   -> [PackageArg]
-  -> String
+  -> Path Abs Dir
+     -- ^ Path to the package database.
   -> RIO env ()
 unregisterPackages globalDb pkgargs pkgDb = do
   pkgsByPkgDBs <- F.foldlM (getPkgsByPkgDBs []) [] pkgargs
@@ -601,7 +607,7 @@ matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Substring _ m) `matchesPkg` pkg = m (display (mungedId pkg))
 
 -- removeFileSave doesn't throw an exceptions, if the file is already deleted
-removeFileSafe :: FilePath -> RIO env ()
+removeFileSafe :: SomeBase File -> RIO env ()
 removeFileSafe fn = do
-  removeFile fn `catchIO` \ e ->
+  prjSomeBase removeFile fn `catchIO` \ e ->
     unless (isDoesNotExistError e) $ liftIO $ ioError e

@@ -111,7 +111,7 @@ dependencies:
 - project-template
 - random
 - rio >= 0.1.22.0
-- rio-prettyprint >= 0.1.4.0
+- rio-prettyprint >= 0.1.5.0
 - split
 - stm
 - tar
