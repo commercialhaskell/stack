@@ -103,8 +103,10 @@ Subcommands specify the format of the output, as follows:
 The `--separator` option specifies the separator between the package name and
 its version. The default is a space character.
 
-Set the `--licence` flag, after the `text` or `tree` subcommand, to replace each
-package's version with its licence.
+Set the `--license` flag, after the `text` or `tree` subcommand, to replace each
+package's version with its licence. (Consistent with the Cabal package
+description format specification, only the American English spelling (license)
+is accepted.)
 
 Set the `--no-external` flag to exclude external dependencies.
 
@@ -112,8 +114,9 @@ Set the `--no-include-base` flag to exclude dependencies on the `base` package.
 
 The `--depth` option limits the depth of dependency resolution.
 
-The `--prune <packages>` option prunes the specified packages from the output,
-where `<packages>` is a comma separated list of package names.
+The `--prune <packages>` option prunes the specified packages and their
+dependencies from the tree of packages used to generate the output, where
+`<packages>` is a comma separated list of package names.
 
 The `--flag` option allows Cabal flags to be specified.
 
