@@ -96,12 +96,12 @@ extra-source-files:
     doc/upload_command.md
     doc/yaml_configuration.md
     src/setup-shim/StackSetupShim.hs
-    test/package-dump/ghc-7.10.txt
-    test/package-dump/ghc-7.8.4-osx.txt
-    test/package-dump/ghc-7.8.txt
-    test/package-dump/ghc-head.txt
-    src/test/Stack/Untar/test1.tar.gz
-    src/test/Stack/Untar/test2.tar.gz
+    tests/unit/package-dump/ghc-7.10.txt
+    tests/unit/package-dump/ghc-7.8.4-osx.txt
+    tests/unit/package-dump/ghc-7.8.txt
+    tests/unit/package-dump/ghc-head.txt
+    tests/unit/Stack/Untar/test1.tar.gz
+    tests/unit/Stack/Untar/test2.tar.gz
     cabal.project
     cabal.config
 
@@ -539,8 +539,8 @@ executable stack-integration-test
   autogen-modules:
       Paths_stack
   hs-source-dirs:
-      test/integration
-      test/integration/lib
+      tests/integration
+      tests/integration/lib
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Cabal >=3.8.1.0
@@ -630,7 +630,7 @@ executable stack-integration-test
   if flag(static)
     ld-options: -static -pthread
 
-test-suite stack-test
+test-suite stack-unit-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
@@ -651,7 +651,7 @@ test-suite stack-test
   autogen-modules:
       Paths_stack
   hs-source-dirs:
-      src/test
+      tests/unit
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded
   build-depends:
       Cabal >=3.8.1.0
@@ -742,11 +742,11 @@ test-suite stack-test
     other-modules:
         Stack.Ghci.FakePaths
     hs-source-dirs:
-        src/test/windows/
+        tests/unit/windows/
   else
     other-modules:
         Stack.Ghci.FakePaths
     hs-source-dirs:
-        src/test/unix/
+        tests/unit/unix/
   build-tool-depends:
       hspec-discover:hspec-discover

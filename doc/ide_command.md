@@ -55,7 +55,7 @@ and the output from the second command is:
 stack:lib
 stack:exe:stack
 stack:exe:stack-integration-test
-stack:test:stack-test
+stack:test:stack-unit-test
 ~~~
 
 or command:

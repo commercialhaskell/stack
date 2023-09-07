@@ -27,4 +27,4 @@ jobs:
       run: |
         set -ex
         hlint src/
-        hlint --hint=.hlint-test.yaml test/
+        hlint --hint=.hlint-test.yaml tests/unit

@@ -393,13 +393,14 @@ That said, the following may help:
 
 ## Testing
 
-The Stack code has both unit tests and integration tests. Integration tests can
-be found in the
-[test/integration](https://github.com/commercialhaskell/stack/tree/master/test/integration)
-folder and unit tests, in the
-[src/test](https://github.com/commercialhaskell/stack/tree/master/src/test)
-folder. Tests are written using the [Hspec](https://hspec.github.io/) framework.
-In order to run the full test suite, you can simply command:
+The Stack code has both unit tests and integration tests.
+
+### Working with Unit Tests
+
+Unit tests can be found in the
+[tests/unit](https://github.com/commercialhaskell/stack/tree/master/tests/unit)
+directory. Tests are written using the [Hspec](https://hspec.github.io/)
+framework. In order to run the full test suite, you can simply command:
 
 ~~~text
 stack test
@@ -411,18 +412,17 @@ need to specify which test suite (unit test or integration) and pass arguments
 to specify which module you'd specifically like to run to get quick feedback. A
 description of this follows below.
 
-### Working with Unit Tests
 
 If you would like to run the unit tests on their own, you can command:
 
 ~~~text
-stack test stack:stack-test
+stack test stack:stack-unit-test
 ~~~
 
 Running an individual module works with a command like this:
 
 ~~~text
-stack test stack:stack-test --ta "-m <PATTERN>"
+stack test stack:stack-unit-test --ta "-m <PATTERN>"
 ~~~
 
 Where `<PATTERN>` is the name of the module without `Spec.hs`.
@@ -430,7 +430,7 @@ Where `<PATTERN>` is the name of the module without `Spec.hs`.
 You may also load tests into GHCi and run them with these command:
 
 ~~~text
-stack ghci stack:stack-test --only-main
+stack ghci stack:stack-unit-test --only-main
 # GHCi starting up output ...
 > :main -m "<PATTERN>"
 ~~~
@@ -438,6 +438,10 @@ stack ghci stack:stack-test --only-main
 Where again, `<PATTERN>` is the name of the module without `Spec.hs`.
 
 ### Working with Integration Tests
+
+Integration tests can be found in the
+[tests/integration](https://github.com/commercialhaskell/stack/tree/master/tests/integration)
+folder.
 
 Running the integration tests is a little involved, you'll need to command:
 

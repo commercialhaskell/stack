@@ -36,12 +36,12 @@ extra-source-files:
 - stack.yaml
 - doc/*.md
 - src/setup-shim/StackSetupShim.hs
-- test/package-dump/ghc-7.10.txt
-- test/package-dump/ghc-7.8.4-osx.txt
-- test/package-dump/ghc-7.8.txt
-- test/package-dump/ghc-head.txt
-- src/test/Stack/Untar/test1.tar.gz
-- src/test/Stack/Untar/test2.tar.gz
+- tests/unit/package-dump/ghc-7.10.txt
+- tests/unit/package-dump/ghc-7.8.4-osx.txt
+- tests/unit/package-dump/ghc-7.8.txt
+- tests/unit/package-dump/ghc-head.txt
+- tests/unit/Stack/Untar/test1.tar.gz
+- tests/unit/Stack/Untar/test2.tar.gz
 # Support for people who prefer, or need, to build Stack with Cabal (the tool):
 - cabal.project
 - cabal.config
@@ -355,8 +355,8 @@ executables:
   stack-integration-test:
     main: IntegrationSpec.hs
     source-dirs:
-    - test/integration
-    - test/integration/lib
+    - tests/integration
+    - tests/integration/lib
     ghc-options:
     - -threaded
     - -rtsopts
@@ -373,15 +373,15 @@ executables:
       - -static
       - -pthread
 tests:
-  stack-test:
+  stack-unit-test:
     main: Spec.hs
-    source-dirs: src/test
+    source-dirs: tests/unit
     when:
     - condition: 'os(windows)'
       then:
-        source-dirs: src/test/windows/
+        source-dirs: tests/unit/windows/
       else:
-        source-dirs: src/test/unix/
+        source-dirs: tests/unit/unix/
     ghc-options:
     - -threaded
     dependencies:
