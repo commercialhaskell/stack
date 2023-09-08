@@ -6,13 +6,16 @@ dist-newstyle/
 
 # Haskell Tool Stack-related
 .stack-work/
-test/integration/tests/**/*.yaml.lock
+tests/integration/tests/**/*.yaml.lock
 
 # Stack's GitHub workflow-related
 _release/
 
 # MkDocs-related
 _site/
+
+# Haskell Language Server-related
+hie.yaml
 
 # Stan-related
 .hie
