@@ -67,6 +67,7 @@
     - OverloadedStrings
     - QuasiQuotes
     - RecordWildCards
+    - ScopedTypeVariables
     - TypeFamilies
     - UndecidableInstances
     - ViewPatterns
