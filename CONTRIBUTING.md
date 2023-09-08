@@ -467,7 +467,7 @@ Where again, `<PATTERN>` is the name of the folder listed in the
 [test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
 directory.
 
-You can disable a few integration tests through the -n option : 
+You can disable a few integration tests through the -n option :
 
 ~~~text
 stack build --flag stack:integration-tests stack --exec "stack-integration-test -n <PATTERN1> -n <PATTERN2>"
@@ -562,6 +562,22 @@ for each file.
 Stan is a Haskell static analysis tool. As of 29 August 2022, it does not
 support GHC >= 9.0.1 and Stack is built with GHC >= 9.2.4. Consequently, this
 workflow does not run. Its intent is to apply Stan to Stack.
+
+## Haskell Language Server
+
+If you use Stack to build Stack, then you should find that, after having
+commanded `stack build`, command `stack ghci` will work as expected.
+(`stack build` causes Cabal (the library) to create the automatically generated
+module `Stack_build`.) Consequently, the following
+[cradle (`hie.yaml`)](https://github.com/haskell/hie-bios) should suffice to
+configure Haskell Language Server (HLS) explicitly:
+~~~yaml
+cradle:
+  stack:
+~~~
+
+A cradle is not committed to Stack's repository because it imposes a choice of
+build tool.
 
 ## Slack channel
 
