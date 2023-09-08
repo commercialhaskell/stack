@@ -598,12 +598,20 @@ following error about `Stack.Constants.ghcShowOptionsOutput`:
 stack exec -- code .
 ~~~
 
-Consequently, the following
-[cradle (`hie.yaml`)](https://github.com/haskell/hie-bios) should suffice to
-configure Haskell Language Server (HLS) explicitly:
+The following [cradle (`hie.yaml`)](https://github.com/haskell/hie-bios)
+should suffice to configure Haskell Language Server (HLS) explicitly for each of
+the buildable components in Stack's Cabal file:
 ~~~yaml
 cradle:
   stack:
+  - path: "./src"
+    component: "stack:lib"
+  - path: "./app"
+    component: "stack:exe:stack"
+  - path: "./tests/integration"
+    component: "stack:exe:stack-integration-test"
+  - path: "./tests/unit"
+    component: "stack:test:stack-unit-test"
 ~~~
 
 A cradle is not committed to Stack's repository because it imposes a choice of
