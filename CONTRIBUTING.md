@@ -565,10 +565,35 @@ workflow does not run. Its intent is to apply Stan to Stack.
 
 ## Haskell Language Server
 
-If you use Stack to build Stack, then you should find that, after having
-commanded `stack build`, command `stack ghci` will work as expected.
-(`stack build` causes Cabal (the library) to create the automatically generated
-module `Stack_build`.) Consequently, the following
+You may be using [Visual Studio Code](https://code.visualstudio.com/) (VS Code)
+with its
+[Haskell extension](https://marketplace.visualstudio.com/items?itemName=haskell.haskell),
+which is powered by the
+[Haskell Language Server](https://github.com/haskell/haskell-language-server)
+(HLS).
+
+If you use Stack to build Stack, command `stack ghci` in the root directory of
+the Stack project should work as expected, if you have first commanded
+`stack build` once. `stack build` causes Cabal (the library) to create the automatically generated module `Stack_build`.
+
+If `ghc` is not on your PATH, then Haskell Language Server may report the
+following error about `Stack.Constants.ghcShowOptionsOutput`:
+~~~text
+• Exception when trying to run compile-time code:
+    ghc: readCreateProcess: does not exist (No such file or directory)
+  Code: (TH.runIO (readProcess "ghc" ["--show-options"] "")
+           >>= TH.lift . lines)
+• In the untyped splice:
+    $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift
+        . lines)
+~~~
+
+`ghc` should be on the PATH if you run VS Code itself in the Stack environment:
+~~~text
+stack exec -- code .
+~~~
+
+Consequently, the following
 [cradle (`hie.yaml`)](https://github.com/haskell/hie-bios) should suffice to
 configure Haskell Language Server (HLS) explicitly:
 ~~~yaml
