@@ -45,7 +45,6 @@ import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
-import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.BuildOpts ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
@@ -590,60 +589,57 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
   distDir <- distDirFromDir pkgDir
   let inplaceDir = distDir </> relDirPackageConfInplace
       pkgIdStr = packageIdentifierString pkgId
-      notFoundErr = pure $ Left $ "Failed to find package key for " <> T.pack pkgIdStr
+      notFoundErr = pure $
+        Left $ "Failed to find package key for " <> T.pack pkgIdStr
       extractField path = do
         contents <- readFileUtf8 (toFilePath path)
         case asum (map (T.stripPrefix (field <> ": ")) (T.lines contents)) of
           Just result -> pure $ Right $ T.strip result
           Nothing -> notFoundErr
-  cabalVer <- view cabalVersionL
-  if cabalVer < mkVersion [1, 24]
-    then do
-      -- here we don't need to handle internal libs
-      path <- (inplaceDir </>) <$> parseRelFile (pkgIdStr ++ "-inplace.conf")
-      logDebug $
-           "Parsing config in Cabal < 1.24 location: "
-        <> fromString (toFilePath path)
-      exists <- doesFileExist path
-      if exists then fmap (:[]) <$> extractField path else notFoundErr
-    else do
-      -- With Cabal-1.24, it's in a different location.
-      logDebug $ "Scanning " <> fromString (toFilePath inplaceDir) <> " for files matching " <> fromString pkgIdStr
-      (_, files) <- handleIO (const $ pure ([], [])) $ listDir inplaceDir
-      logDebug $ displayShow files
-      -- From all the files obtained from the scanning process above, we
-      -- need to identify which are .conf files and then ensure that
-      -- there is at most one .conf file for each library and internal
-      -- library (some might be missing if that component has not been
-      -- built yet). We should error if there are more than one .conf
-      -- file for a component or if there are no .conf files at all in
-      -- the searched location.
-      let toFilename = T.pack . toFilePath . filename
-          -- strip known prefix and suffix from the found files to determine only the conf files
-          stripKnown =  T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-"))
-          stripped = mapMaybe (\file -> fmap (,file) . stripKnown . toFilename $ file) files
-          -- which component could have generated each of these conf files
-          stripHash n = let z = T.dropWhile (/= '-') n in if T.null z then "" else T.tail z
-          matchedComponents = map (\(n, f) -> (stripHash n, [f])) stripped
-          byComponents = Map.restrictKeys (Map.fromListWith (++) matchedComponents) $ Set.insert "" internalLibs
-      logDebug $ displayShow byComponents
-      if Map.null $ Map.filter (\fs -> length fs > 1) byComponents
-      then case concat $ Map.elems byComponents of
-        [] -> notFoundErr
-        -- for each of these files, we need to extract the requested field
-        paths -> do
-          (errors, keys) <-  partitionEithers <$> traverse extractField paths
-          case errors of
-            (a:_) -> pure $ Left a -- the first error only, since they're repeated anyway
-            [] -> pure $ Right keys
-      else
-        pure
-          $ Left
-          $    "Multiple files matching "
-            <> T.pack (pkgIdStr ++ "-*.conf")
-            <> " found in "
-            <> T.pack (toFilePath inplaceDir)
-            <> ". Maybe try 'stack clean' on this package?"
+  logDebug $
+       "Scanning "
+    <> fromString (toFilePath inplaceDir)
+    <> " for files matching "
+    <> fromString pkgIdStr
+  (_, files) <- handleIO (const $ pure ([], [])) $ listDir inplaceDir
+  logDebug $ displayShow files
+  -- From all the files obtained from the scanning process above, we need to
+  -- identify which are .conf files and then ensure that there is at most one
+  -- .conf file for each library and internal library (some might be missing if
+  -- that component has not been built yet). We should error if there are more
+  -- than one .conf file for a component or if there are no .conf files at all
+  -- in the searched location.
+  let toFilename = T.pack . toFilePath . filename
+      -- strip known prefix and suffix from the found files to determine only the conf files
+      stripKnown =
+        T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-"))
+      stripped =
+        mapMaybe (\file -> fmap (,file) . stripKnown . toFilename $ file) files
+      -- which component could have generated each of these conf files
+      stripHash n =
+        let z = T.dropWhile (/= '-') n
+        in  if T.null z then "" else T.tail z
+      matchedComponents = map (\(n, f) -> (stripHash n, [f])) stripped
+      byComponents =
+        Map.restrictKeys (Map.fromListWith (++) matchedComponents) $ Set.insert "" internalLibs
+  logDebug $ displayShow byComponents
+  if Map.null $ Map.filter (\fs -> length fs > 1) byComponents
+    then case concat $ Map.elems byComponents of
+      [] -> notFoundErr
+      -- for each of these files, we need to extract the requested field
+      paths -> do
+        (errors, keys) <-  partitionEithers <$> traverse extractField paths
+        case errors of
+          (a:_) -> pure $ Left a -- the first error only, since they're repeated anyway
+          [] -> pure $ Right keys
+    else
+      pure
+        $ Left
+        $    "Multiple files matching "
+          <> T.pack (pkgIdStr ++ "-*.conf")
+          <> " found in "
+          <> T.pack (toFilePath inplaceDir)
+          <> ". Maybe try 'stack clean' on this package?"
 
 displayReportPath ::
      HasTerm env

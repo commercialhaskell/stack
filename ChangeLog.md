@@ -27,6 +27,9 @@ Behavior changes:
 * When auto-detecting `--ghc-build` on Linux, the `musl` GHC build only is
   considered a possible GHC build if `libc.musl-x86_64.so.1` is found in `\lib`
   or `\lib64`.
+* No longer supports Cabal versions older than `1.24.0.0`. This means projects
+  using snapshots earlier than `lts-7.0` or `nightly-2016-05-26` will no longer
+  build.
 
 Other enhancements:
 
