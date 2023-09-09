@@ -77,13 +77,13 @@ instance Pretty CabalVersionPrettyException where
     "[S-5973]"
     <> line
     <> fillSep
-         [ flow "Stack does not support Cabal versions before 1.22, but \
+         [ flow "Stack does not support Cabal versions before 1.24, but \
                 \version"
          , fromString $ versionString cabalVer
          , flow "was found. To fix this, consider updating the snapshot to"
-         , style Shell "lts-3.0"
+         , style Shell "lts-7.0"
          , flow "or later or to"
-         , style Shell "nightly-2015-05-05"
+         , style Shell "nightly-2016-05-26"
          , flow "or later."
          ]
 
@@ -206,7 +206,7 @@ justLocals =
 checkCabalVersion :: HasEnvConfig env => RIO env ()
 checkCabalVersion = do
   cabalVer <- view cabalVersionL
-  when (cabalVer < mkVersion [1, 22]) $
+  when (cabalVer < mkVersion [1, 24]) $
     prettyThrowM $ CabalVersionNotSupported cabalVer
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.

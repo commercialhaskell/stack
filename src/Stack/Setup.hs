@@ -1028,14 +1028,14 @@ warnUnsupportedCompilerCabal cp didWarn = do
   let cabalVersion = cpCabalVersion cp
 
   if
-    | cabalVersion < mkVersion [1, 19, 2] -> do
+    | cabalVersion < mkVersion [1, 24, 0] -> do
         prettyWarnL
-          [ flow "Stack no longer supports Cabal versions below 1.19.2, but \
+          [ flow "Stack no longer supports Cabal versions below 1.24.0.0, but \
                  \version"
           , fromString (versionString cabalVersion)
           , flow "was found. This invocation will most likely fail. To fix \
                  \this, either use an older version of Stack or a newer \
-                 \resolver. Acceptable resolvers: lts-3.0/nightly-2015-05-05 \
+                 \resolver. Acceptable resolvers: lts-7.0/nightly-2016-05-26 \
                  \or later."
           ]
     | cabalVersion >= mkVersion [3, 11] ->
