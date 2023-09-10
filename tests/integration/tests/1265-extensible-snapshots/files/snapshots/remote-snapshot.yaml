@@ -1,5 +1,5 @@
 ---
-resolver: lts-21.8
+resolver: lts-21.11
 name: remote-snapshot
 packages:
 - archive: https://s3.amazonaws.com/hackage.fpcomplete.com/package/acme-missiles-0.3.tar.gz
