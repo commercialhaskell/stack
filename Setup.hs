@@ -19,7 +19,7 @@ import           Distribution.Simple.LocalBuildInfo
 import           Distribution.Simple.PackageIndex
                    ( allPackages, dependencyClosure )
 import           Distribution.Simple.Setup
-                   ( BuildFlags (buildVerbosity), fromFlag )
+                   ( BuildFlags (..), ReplFlags (..), fromFlag )
 import           Distribution.Simple.Utils
                    ( rewriteFileEx, createDirectoryIfMissingVerbose )
 import           Distribution.Types.PackageName ( unPackageName )
@@ -31,8 +31,11 @@ import           System.FilePath ( (</>) )
 main :: IO ()
 main = defaultMainWithHooks simpleUserHooks
   { buildHook = \pkg lbi hooks flags -> do
-     generateBuildModule (fromFlag (buildVerbosity flags)) pkg lbi
-     buildHook simpleUserHooks pkg lbi hooks flags
+      generateBuildModule (fromFlag (buildVerbosity flags)) pkg lbi
+      buildHook simpleUserHooks pkg lbi hooks flags
+  , replHook = \pkg lbi hooks flags args -> do
+      generateBuildModule (fromFlag (replVerbosity flags)) pkg lbi
+      replHook simpleUserHooks pkg lbi hooks flags args
   }
 
 generateBuildModule :: Verbosity -> PackageDescription -> LocalBuildInfo -> IO ()

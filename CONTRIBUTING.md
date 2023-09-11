@@ -577,52 +577,117 @@ which is powered by the
 [Haskell Language Server](https://github.com/haskell/haskell-language-server)
 (HLS).
 
-If you use Stack to build Stack, command `stack ghci` in the root directory of
-the Stack project should work as expected, if you have first commanded
-`stack build` once. `stack build` causes Cabal (the library) to create the
-automatically generated module `Stack_build`.
+Stack can be built with Stack (which is recommended) or with Cabal (the tool).
 
-If `ghc` is not on your PATH, then Haskell Language Server may report the
-following error about `Stack.Constants.ghcShowOptionsOutput`:
-~~~text
-• Exception when trying to run compile-time code:
-    ghc: readCreateProcess: does not exist (No such file or directory)
-  Code: (TH.runIO (readProcess "ghc" ["--show-options"] "")
-           >>= TH.lift . lines)
-• In the untyped splice:
-    $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift
-        . lines)
-~~~
+=== "Stack"
 
-`ghc` should be on the PATH if you run VS Code itself in the Stack environment:
-~~~text
-stack exec -- code .
-~~~
+    If you use Stack to build Stack, command `stack ghci` in the root directory
+    of the Stack project should work as expected, if you have first commanded
+    `stack build` once. `stack build` causes Cabal (the library) to create the
+    automatically generated module `Stack_build`.
 
-The following [cradle (`hie.yaml`)](https://github.com/haskell/hie-bios)
-should suffice to configure Haskell Language Server (HLS) explicitly for
-`./Setup.hs` and each of the buildable components in Stack's Cabal file:
-~~~yaml
-cradle:
-  multi:
-  - path: "./Setup.hs"
-    config:
-      cradle:
-        direct:
-          arguments: []
-  - path: "./"
-    config:
-      cradle:
-        stack:
-        - path: "./src"
-          component: "stack:lib"
-        - path: "./app"
-          component: "stack:exe:stack"
-        - path: "./tests/integration"
-          component: "stack:exe:stack-integration-test"
-        - path: "./tests/unit"
-          component: "stack:test:stack-unit-test"
-~~~
+    If `ghc` is not on your PATH, then Haskell Language Server may report the
+    following error about `Stack.Constants.ghcShowOptionsOutput`:
+    ~~~text
+    • Exception when trying to run compile-time code:
+        ghc: readCreateProcess: does not exist (No such file or directory)
+      Code: (TH.runIO (readProcess "ghc" ["--show-options"] "")
+               >>= TH.lift . lines)
+    • In the untyped splice:
+        $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift
+            . lines)
+    ~~~
+
+    `ghc` should be on the PATH if you run VS Code itself in the Stack
+    environment:
+    ~~~text
+    stack exec -- code .
+    ~~~
+
+    The following [cradle (`hie.yaml`)](https://github.com/haskell/hie-bios)
+    should suffice to configure Haskell Language Server (HLS) explicitly for
+    `./Setup.hs` and each of the buildable components in Stack's Cabal file:
+    ~~~yaml
+    cradle:
+      multi:
+      - path: "./Setup.hs"
+        config:
+          cradle:
+            direct:
+              arguments: []
+      - path: "./"
+        config:
+          cradle:
+            stack:
+            - path: "./src"
+              component: "stack:lib"
+            - path: "./app"
+              component: "stack:exe:stack"
+            - path: "./tests/integration"
+              component: "stack:exe:stack-integration-test"
+            - path: "./tests/unit"
+              component: "stack:test:stack-unit-test"
+    ~~~
+
+=== "Cabal (the tool)"
+
+    If you use Cabal (the tool) to build Stack, command `cabal repl` in the root
+    directory of the Stack project should work as expected, if you have GHC and
+    (on Windows) MSYS2 on the PATH. Stack's custom `./Setup.hs` causes
+    `cabal repl` to cause Cabal (the library) to create the automatically
+    generated module `Stack_build`.
+
+    If `ghc` is not on your PATH, then Haskell Language Server may report the
+    following error about `Stack.Constants.ghcShowOptionsOutput`:
+    ~~~text
+    • Exception when trying to run compile-time code:
+        ghc: readCreateProcess: does not exist (No such file or directory)
+      Code: (TH.runIO (readProcess "ghc" ["--show-options"] "")
+               >>= TH.lift . lines)
+    • In the untyped splice:
+        $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift
+            . lines)
+    ~~~
+
+    `ghc` and (on Windows) MSYS2 should be on the PATH if you run commands
+    (including `cabal`) in the Stack environment:
+    ~~~text
+    stack exec --no-ghc-package-path -- cabal repl
+    ~~~
+
+    or
+    ~~~text
+    stack exec --no-ghc-package-path -- code .
+    ~~~
+
+    Use of GHC's environment variable `GHC_PACKAGE_PATH` is not compatible with
+    Cabal (the tool). That is why the `--no-ghc-package-path` flag must be
+    specified with `stack exec` when relying on Cabal (the tool).
+
+    The following [cradle (`hie.yaml`)](https://github.com/haskell/hie-bios)
+    should suffice to configure Haskell Language Server (HLS) explicitly for
+    `./Setup.hs` and each of the buildable components in Stack's Cabal file:
+    ~~~yaml
+    cradle:
+      multi:
+      - path: "./Setup.hs"
+        config:
+          cradle:
+            direct:
+              arguments: []
+      - path: "./"
+        config:
+          cradle:
+            cabal:
+            - path: "./src"
+              component: "lib:stack"
+            - path: "./app"
+              component: "exe:stack"
+            - path: "./tests/integration"
+              component: "exe:stack-integration-test"
+            - path: "./tests/unit"
+              component: "test:stack-unit-test"
+    ~~~
 
 A cradle is not committed to Stack's repository because it imposes a choice of
 build tool.
