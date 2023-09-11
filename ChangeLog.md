@@ -8,6 +8,8 @@ Release notes:
   removed from the statically linked Linux/x86_64 binaries.
 * The binaries for Linux/Aarch64 are now statically linked.
 
+* Add unpacking of source repository packages (`extra-deps`).
+
 **Changes since v2.11.1:**
 
 Major changes:

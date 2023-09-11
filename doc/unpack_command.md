@@ -17,3 +17,6 @@ By default:
 *   the package is unpacked into a directory named after the package and its
     version. Pass the option `--to <directory>` to specify the destination
     directory.
+
+If PACKAGE is the name of a source repository package or a suffix of its URL
+then the unpacking is direct, not via a package index.
