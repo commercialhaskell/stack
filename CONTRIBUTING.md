@@ -579,7 +579,8 @@ which is powered by the
 
 If you use Stack to build Stack, command `stack ghci` in the root directory of
 the Stack project should work as expected, if you have first commanded
-`stack build` once. `stack build` causes Cabal (the library) to create the automatically generated module `Stack_build`.
+`stack build` once. `stack build` causes Cabal (the library) to create the
+automatically generated module `Stack_build`.
 
 If `ghc` is not on your PATH, then Haskell Language Server may report the
 following error about `Stack.Constants.ghcShowOptionsOutput`:
@@ -599,19 +600,28 @@ stack exec -- code .
 ~~~
 
 The following [cradle (`hie.yaml`)](https://github.com/haskell/hie-bios)
-should suffice to configure Haskell Language Server (HLS) explicitly for each of
-the buildable components in Stack's Cabal file:
+should suffice to configure Haskell Language Server (HLS) explicitly for
+`./Setup.hs` and each of the buildable components in Stack's Cabal file:
 ~~~yaml
 cradle:
-  stack:
-  - path: "./src"
-    component: "stack:lib"
-  - path: "./app"
-    component: "stack:exe:stack"
-  - path: "./tests/integration"
-    component: "stack:exe:stack-integration-test"
-  - path: "./tests/unit"
-    component: "stack:test:stack-unit-test"
+  multi:
+  - path: "./Setup.hs"
+    config:
+      cradle:
+        direct:
+          arguments: []
+  - path: "./"
+    config:
+      cradle:
+        stack:
+        - path: "./src"
+          component: "stack:lib"
+        - path: "./app"
+          component: "stack:exe:stack"
+        - path: "./tests/integration"
+          component: "stack:exe:stack-integration-test"
+        - path: "./tests/unit"
+          component: "stack:test:stack-unit-test"
 ~~~
 
 A cradle is not committed to Stack's repository because it imposes a choice of
