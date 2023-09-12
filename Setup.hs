@@ -33,6 +33,9 @@ main = defaultMainWithHooks simpleUserHooks
   { buildHook = \pkg lbi hooks flags -> do
       generateBuildModule (fromFlag (buildVerbosity flags)) pkg lbi
       buildHook simpleUserHooks pkg lbi hooks flags
+    -- The 'cabal repl' hook corresponds to the 'cabal build' hook and is added
+    -- because, with a Cabal-based cradle, Haskell Language Server makes use of
+    -- 'cabal repl'.
   , replHook = \pkg lbi hooks flags args -> do
       generateBuildModule (fromFlag (replVerbosity flags)) pkg lbi
       replHook simpleUserHooks pkg lbi hooks flags args
