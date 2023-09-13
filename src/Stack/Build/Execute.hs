@@ -44,7 +44,7 @@ import           Data.Conduit.Process.Typed ( createSource )
 import qualified Data.Conduit.Text as CT
 import qualified Data.List as L
 import           Data.List.NonEmpty ( nonEmpty )
-import qualified Data.List.NonEmpty as NonEmpty ( toList )
+import qualified Data.List.NonEmpty as NonEmpty
 import           Data.List.Split ( chunksOf )
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Map.Strict as Map
@@ -56,7 +56,6 @@ import           Data.Time
                    ( ZonedTime, getZonedTime, formatTime, defaultTimeLocale )
 import qualified Data.ByteString.Char8 as S8
 import qualified Distribution.PackageDescription as C
-import           Distribution.Pretty ( prettyShow )
 import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System ( OS (Windows), Platform (Platform) )
 import qualified Distribution.Text as C
@@ -85,10 +84,9 @@ import           Path.IO
 import           RIO.Process
                    ( HasProcessContext, byteStringInput, doesExecutableExist
                    , eceExitCode, findExecutable, getStderr, getStdout, inherit
-                   , modifyEnvVars, proc, readProcess_, runProcess_, setStderr
-                   , setStdin, setStdout, showProcessArgDebug, useHandleOpen
-                   , waitExitCode, withModifyEnvVars, withProcessWait
-                   , withWorkingDir
+                   , modifyEnvVars, proc, runProcess_, setStderr, setStdin
+                   , setStdout, showProcessArgDebug, useHandleOpen, waitExitCode
+                   , withProcessWait, withWorkingDir
                    )
 import           Stack.Build.Cache
                    ( TestStatus (..), deleteCaches, getTestStatus
@@ -123,7 +121,7 @@ import           Stack.Coverage
                    ( deleteHpcReports, generateHpcMarkupIndex, generateHpcReport
                    , generateHpcUnifiedReport, updateTixFile
                    )
-import           Stack.GhcPkg ( ghcPkgPathEnvVar, unregisterGhcPkgIds )
+import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
 import           Stack.Package ( buildLogPath )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
@@ -877,7 +875,7 @@ unregisterPackages cv localDB ids = do
   let unregisterSinglePkg select (gid, (ident, reason)) = do
         logReason ident reason
         pkg <- getGhcPkgExe
-        unregisterGhcPkgIds pkg localDB $ select ident gid :| []
+        unregisterGhcPkgIds True pkg localDB $ select ident gid :| []
   case cv of
     -- GHC versions >= 8.2.1 support batch unregistering of packages. See
     -- https://gitlab.haskell.org/ghc/ghc/issues/12637
@@ -897,7 +895,7 @@ unregisterPackages cv localDB ids = do
       for_ (chunksOfNE batchSize ids) $ \batch -> do
         for_ batch $ \(_, (ident, reason)) -> logReason ident reason
         pkg <- getGhcPkgExe
-        unregisterGhcPkgIds pkg localDB $ fmap (Right . fst) batch
+        unregisterGhcPkgIds True pkg localDB $ fmap (Right . fst) batch
 
     -- GHC versions >= 7.9 support unregistering of packages via their GhcPkgId.
     ACGhc v | v >= mkVersion [7, 9] ->
@@ -1721,7 +1719,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       _ -> pure Nothing
 
   copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
-    wc <- view $ actualCompilerVersionL.whichCompilerL
     announceTask ee task "using precompiled package"
 
     -- We need to copy .conf files for the main library and all sublibraries
@@ -1736,39 +1733,32 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       toMungedPackageId sublib =
         let sublibName = LSubLibName $ mkUnqualComponentName $ T.unpack sublib
         in  MungedPackageId (MungedPackageName pname sublibName) pversion
+      toPackageId :: MungedPackageId -> PackageIdentifier
+      toPackageId (MungedPackageId n v) =
+        PackageIdentifier (encodeCompatPackageName n) v
+      allToUnregister :: [Either PackageIdentifier GhcPkgId]
       allToUnregister = mcons
-        (prettyShow taskProvides <$ mlib)
-        (map (prettyShow . toMungedPackageId) subLibNames)
+        (Left taskProvides <$ mlib)
+        (map (Left . toPackageId . toMungedPackageId) subLibNames)
       allToRegister = mcons mlib sublibs
 
     unless (null allToRegister) $
       withMVar eeInstallLock $ \() -> do
-        -- We want to ignore the global and user databases.
-        -- Unfortunately, ghc-pkg doesn't take such arguments on the
-        -- command line. Instead, we'll set GHC_PACKAGE_PATH. See:
-        -- https://github.com/commercialhaskell/stack/issues/1146
-
-        let modifyEnv = Map.insert
-              (ghcPkgPathEnvVar wc)
-              (T.pack $ toFilePathNoTrailingSep $ bcoSnapDB eeBaseConfigOpts)
-
-        withModifyEnvVars modifyEnv $ do
-          GhcPkgExe ghcPkgExe <- getGhcPkgExe
-
-          -- first unregister everything that needs to be unregistered
-          forM_ allToUnregister $ \packageName -> catchAny
-            ( readProcessNull
-                (toFilePath ghcPkgExe)
-                [ "unregister", "--force", packageName]
+        -- We want to ignore the global and user package databases. ghc-pkg
+        -- allows us to specify --no-user-package-db and --package-db=<db> on
+        -- the command line.
+        let pkgDb = bcoSnapDB eeBaseConfigOpts
+        ghcPkgExe <- getGhcPkgExe
+        -- First unregister, silently, everything that needs to be unregistered.
+        unless (null allToUnregister) $
+          catchAny
+            ( unregisterGhcPkgIds False ghcPkgExe pkgDb $
+                NonEmpty.fromList allToUnregister
             )
             (const (pure ()))
-
-          -- now, register the cached conf files
-          forM_ allToRegister $ \libpath ->
-            proc
-              (toFilePath ghcPkgExe)
-              [ "register", "--force", toFilePath libpath]
-              readProcess_
+        -- Now, register the cached conf files.
+        forM_ allToRegister $ \libpath ->
+          ghcPkg ghcPkgExe [pkgDb] ["register", "--force", toFilePath libpath]
 
     liftIO $ forM_ exes $ \exe -> do
       ensureDir bindir
