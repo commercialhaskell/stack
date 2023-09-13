@@ -38,6 +38,8 @@ RUN sysArch="$(uname -m)" \
   && apk upgrade --no-cache ca-certificates openssl-dev \
   ## Install yamllint
   && apk add --no-cache yamllint \
+  ## Install pip
+  && apk add --no-cache py3-pip \
   ## Install hadolint
   && case "$sysArch" in \
     x86_64) tarArch="x86_64" ;; \

@@ -33,7 +33,6 @@
         "haskell.haskell",
         "mhutchie.git-graph",
         "mutantdino.resourcemonitor",
-        "esbenp.prettier-vscode",
         "timonwong.shellcheck"
       ],
       "settings": {
@@ -51,11 +50,16 @@
   "mounts": [
     "source=stack-default-home-vscode,target=/home/vscode,type=volume"
     // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-default-home-vscode,target=/home/vscode,type=bind"
-  ]
+  ],
 
   // "remoteUser": "root",
   // "mounts": [
   //   "source=stack-default-root,target=/root,type=volume"
   //   // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-default-root,target=/root,type=bind"
-  // ]
+  // ],
+
+  // Pip: Install packages to the user site
+  "remoteEnv": {
+    "PIP_USER": "1"
+  }
 }

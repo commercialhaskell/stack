@@ -32,7 +32,6 @@
         "GitHub.vscode-pull-request-github",
         "mhutchie.git-graph",
         "mutantdino.resourcemonitor",
-        "esbenp.prettier-vscode",
         "timonwong.shellcheck"
       ],
       "settings": {
@@ -49,11 +48,16 @@
   "mounts": [
     "source=stack-ghc-9.6.2-home-vscode,target=/home/vscode,type=volume"
     // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.6.2-home-vscode,target=/home/vscode,type=bind"
-  ]
+  ],
 
   // "remoteUser": "root",
   // "mounts": [
   //   "source=stack-ghc-9.6.2-root,target=/root,type=volume"
   //   // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.6.2-root,target=/root,type=bind"
-  // ]
+  // ],
+
+  // Pip: Install packages to the user site
+  "remoteEnv": {
+    "PIP_USER": "1"
+  }
 }
