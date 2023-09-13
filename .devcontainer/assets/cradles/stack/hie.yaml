@@ -1,0 +1,19 @@
+cradle:
+  multi:
+  - path: "./Setup.hs"
+    config:
+      cradle:
+        direct:
+          arguments: []
+  - path: "./"
+    config:
+      cradle:
+        stack:
+        - path: "./src"
+          component: "stack:lib"
+        - path: "./app"
+          component: "stack:exe:stack"
+        - path: "./tests/integration"
+          component: "stack:exe:stack-integration-test"
+        - path: "./tests/unit"
+          component: "stack:test:stack-unit-test"
