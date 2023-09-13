@@ -1,18 +1,50 @@
 # Dev Containers
 
-These Dev Containers are based on the same docker images that are used to build
-the *statically linked* Linux amd64 and arm64 binary releases of Stack.
+Dev Containers provide all the required tools to contribute to a project. For
+Stack these are:
 
-Those multi-arch (`linux/amd64`, `linux/arm64/v8`) docker images themselves are
-based on Alpine Linux and contain *unofficial* builds of GHC.
+1. The [**Haskell Toolchain**](https://www.haskell.org/ghcup/install/#supported-tools)
+    * [GHC](https://www.haskell.org/ghc)
+    * [Cabal](https://cabal.readthedocs.io)
+    * [Stack](https://docs.haskellstack.org)
+    * [HLS](https://haskell-language-server.readthedocs.io)  
+      :exclamation: Default Dev Container only
+1. In addition
+    * [Git](https://git-scm.com)
+    * [HLint](https://hackage.haskell.org/package/hlint)
+    * [yamllint](https://yamllint.readthedocs.io)
+    * [ShellCheck](https://www.shellcheck.net)
+    * [hadolint](https://github.com/hadolint/hadolint)
 
-Only use the GHC available in the Dev Containers, because
+[VS Code](https://code.visualstudio.com) is used as IDE, with the following
+extensions pre-installed:
+
+* [Haskell](https://marketplace.visualstudio.com/items?itemName=haskell.haskell)  
+  :exclamation: Default Dev Container only
+* [GitHub Pull Requests and Issues](https://marketplace.visualstudio.com/items?itemName=GitHub.vscode-pull-request-github)
+* [GitLens — Git supercharged](https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens)  
+  :information_source: Pinned to version 11.7.0 due to unsolicited AI content
+  in recent versions
+* [Git Graph](https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph)
+* [ShellCheck](https://marketplace.visualstudio.com/items?itemName=timonwong.shellcheck)
+* [hadolint](https://marketplace.visualstudio.com/items?itemName=exiasr.hadolint)
+* [Resource Monitor](https://marketplace.visualstudio.com/items?itemName=mutantdino.resourcemonitor)
+
+## Parent images
+
+Stack's Dev Containers are derived from the same docker images used to build
+the *statically linked* Linux amd64 and arm64 binary releases of Stack itself.
+
+Those multi-arch (`linux/amd64`, `linux/arm64/v8`) *ghc-musl* images are based
+on Alpine Linux (i.e. [musl libc](https://musl.libc.org) and
+[BusyBox](https://www.busybox.net)) and contain *unofficial* builds of GHC.
+
+To make sure only the GHC available in the Dev Containers is used, flags
+`--system-ghc` and `--no-install-ghc` are set system-wide in
+`/etc/stack/config.yaml`. Reason:
 
 1. the *official* GHC bindists for Alpine Linux (`x86_64`) are just too buggy.
 2. there are currently (2023-09-05) no bindists for Alpine Linux (`AArch64`).
-
-Therefore, flags `--system-ghc` and `--no-install-ghc` are set system-wide in
-`/etc/stack/config.yaml`.
 
 ## Usage
 
@@ -42,7 +74,7 @@ Codespaces) and is preconfigured.
 
 ### Using cabal
 
-:information_source: Default Dev Container only.
+:exclamation: Default Dev Container only.
 
 Command `cabal build` to build the `stack` executable.
 
@@ -64,8 +96,8 @@ experimental project-level configuration with the appropriate Dev Container.
 The
 [Haskell Language Server](https://github.com/haskell/haskell-language-server)
 and the
-[Haskell](https://marketplace.visualstudio.com/items?itemName=haskell.haskell)
-extension are only available in the default Dev Container.
+[Haskell extension](https://marketplace.visualstudio.com/items?itemName=haskell.haskell)
+are only available in the default Dev Container.
 
 In order to use the Haskell extension, you must first configure the project for
 the build tool of your choice:
