@@ -30,10 +30,13 @@ Behavior changes:
 * No longer supports Cabal versions older than `1.24.0.0`. This means projects
   using snapshots earlier than `lts-7.0` or `nightly-2016-05-26` will no longer
   build.
+* When unregistering many packages in a single step, Stack can now do that
+  efficiently. Stack no longer uses GHC-supplied `ghc-pkg unregister` (which is,
+  currently, slower).
 
 Other enhancements:
 
-* Bump to Hpack 0.35.4.
+* Bump to Hpack 0.35.5.
 * Depend on `pantry-0.9.2`, for support for long filenames and directory names
   in archives created by `git archive`.
 * Avoid the duplicate resolving of usage files when parsing `*.hi` files into a
