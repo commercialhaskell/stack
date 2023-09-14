@@ -37,5 +37,8 @@ if ! grep -q "cabal's bin" "$HOME/.zshrc"; then
   echo -e "\n# set PATH so it includes cabal's bin if it exists\nif [ -d \"\$HOME/.cabal/bin\" ] && [[ \"\$PATH\" != *\"\$HOME/.cabal/bin\"* ]] ; then\n    PATH=\"\$HOME/.cabal/bin:\$PATH\"\nfi" >> "$HOME/.zshrc";
 fi
 
+# Enable Oh My Zsh plugins
+sed -i "s/plugins=(git)/plugins=(cabal git pip stack)/g" "$HOME/.zshrc"
+
 # Remove old .zcompdump files
 rm -f "$HOME"/.zcompdump*
