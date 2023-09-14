@@ -156,7 +156,7 @@ root of the workspace: `cp -f .devcontainer/assets/cradles/cabal/hie.yaml .`
 -->
 
 See the documentation at
-[Contributing: Haskell Language Server](../CONTRIBUTING.md#haskell-language-server)
+[Contributing: Haskell Language Server](CONTRIBUTING.md#haskell-language-server)
 for cradles (`hie.yaml` files) that should suffice to configure the HLS
 explicitly for `./Setup.hs` and each of the buildable components in Stack's
 Cabal file.
