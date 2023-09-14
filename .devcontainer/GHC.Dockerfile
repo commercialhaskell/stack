@@ -40,6 +40,8 @@ RUN sysArch="$(uname -m)" \
   && apk add --no-cache yamllint \
   ## Install pip
   && apk add --no-cache py3-pip \
+  ## Install terminal multiplexers
+  && apk add --no-cache screen tmux \
   ## Install hadolint
   && case "$sysArch" in \
     x86_64) tarArch="x86_64" ;; \

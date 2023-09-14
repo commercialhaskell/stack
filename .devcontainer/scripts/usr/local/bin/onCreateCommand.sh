@@ -38,7 +38,7 @@ if ! grep -q "cabal's bin" "$HOME/.zshrc"; then
 fi
 
 # Enable Oh My Zsh plugins
-sed -i "s/plugins=(git)/plugins=(cabal git pip stack)/g" "$HOME/.zshrc"
+sed -i "s/plugins=(git)/plugins=(cabal git pip stack screen tmux vscode)/g" "$HOME/.zshrc"
 
 # Remove old .zcompdump files
 rm -f "$HOME"/.zcompdump*
