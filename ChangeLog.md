@@ -7,6 +7,8 @@ Release notes:
 * Further to the release notes for Stack 2.3.1, the `-static` suffix has been
   removed from the statically linked Linux/x86_64 binaries.
 * The binaries for Linux/Aarch64 are now statically linked.
+* Dev Containers are now available for this repository. See
+  [#6228](https://github.com/commercialhaskell/stack/pull/6228).
 
 **Changes since v2.11.1:**
 
