@@ -697,7 +697,7 @@ build tool.
 A [Development Container](https://containers.dev) (or Dev Container for short)
 allows you to use a container as a full‑featured development environment.
 
-You can run Dev Containers locally/remotely (with VS Code) or create a
+You can run Dev Containers locally/remotely (with VS Code), or create a
 [Codespace](https://github.com/features/codespaces) for a branch in a
 repository to develop online.
 
@@ -705,8 +705,8 @@ Stack's default Dev Container is intended for use with its default
 project‑level configuration (`stack.yaml`). But there are also Dev Containers
 for the experimental project‑level configurations.
 
-See [Stack's code (advanced) > Maintainers > Dev Containers](../maintainers/devcontainers)
-for more information.
+For further information, see the documentation for
+[Dev Containers](doc/dev_containers.md).
 
 ## Slack channel
 

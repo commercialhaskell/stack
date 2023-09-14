@@ -74,11 +74,19 @@ and `install-ghc: false`. That ensures that only the GHC available in the Dev Co
 
 ## Usage
 
-For local/remote usage with VS Code, please follow the instructions at
-[Developing inside a Container](https://code.visualstudio.com/docs/devcontainers/containers).
+You can run Dev Containers locally/remotely with VS Code, or create a
+[GitHub Codespace](https://github.com/features/codespaces) for a branch in a
+repository to develop online.
 
-For use with Github Codespaces, please follow the instruction at
-[Creating a codespace for a repository](https://docs.github.com/en/codespaces/developing-in-codespaces/creating-a-codespace-for-a-repository#creating-a-codespace-for-a-repository).
+=== "VS Code"
+
+    Follow the instructions at
+    [Developing inside a Container](https://code.visualstudio.com/docs/devcontainers/containers).
+
+=== "GitHub Codespaces"
+
+    For use with GitHub Codespaces, follow the instructions at
+    [Creating a codespace for a repository](https://docs.github.com/en/codespaces/developing-in-codespaces/creating-a-codespace-for-a-repository#creating-a-codespace-for-a-repository).
 
 ### Persistence
 
