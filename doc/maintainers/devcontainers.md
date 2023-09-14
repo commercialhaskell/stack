@@ -4,7 +4,8 @@
 
 Stack's Dev Containers provide the following tools:
 
-1. The [**Haskell Toolchain**](https://www.haskell.org/ghcup/install/#supported-tools):
+1. The [**Haskell Toolchain**](https://www.haskell.org/ghcup/install/#supported-tools):  
+   (installed at `/usr/local/bin`[^1])
     * [GHC](https://www.haskell.org/ghc)
     * [Cabal](https://cabal.readthedocs.io)
     * Stack
@@ -15,6 +16,14 @@ Stack's Dev Containers provide the following tools:
     * [yamllint](https://yamllint.readthedocs.io)
     * [ShellCheck](https://www.shellcheck.net)
     * [hadolint](https://github.com/hadolint/hadolint)
+
+[^1]: `PATH=$HOME/.cabal/bin:$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
+
+!!! info
+
+    Executables installed with Cabal (at `$HOME/.cabal/bin`) or Stack/Pip (at
+    `$HOME/.local/bin`) take precedence over the same executable installed at
+    `/usr/local/sbin`, `/usr/local/bin`, etc.
 
 [VS Code](https://code.visualstudio.com) is used as IDE, with the following
 extensions pre‑installed:
@@ -58,10 +67,10 @@ For use with Github Codespaces, please follow the instruction at
 
 Data in the following locations is persisted:
 
-1. The user's home directory (`/home/vscode`)[^1]
+1. The user's home directory (`/home/vscode`)[^2]
 2. The Dev Container's workspace (`/workspaces`)
 
-[^1]: Alternatively for the root user (`/root`). Use with Docker/Podman in
+[^2]: Alternatively for the root user (`/root`). Use with Docker/Podman in
 *rootless mode*.
 
 This is accomplished either via a *volume* or *bind mount* (or *loop device*
