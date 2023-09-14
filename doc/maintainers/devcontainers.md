@@ -67,15 +67,18 @@ Data in the following locations is persisted:
 This is accomplished either via a *volume* or *bind mount* (or *loop device*
 on Codespaces) and is preconfigured.
 
-!!! info "Codespaces: A 'Full Rebuild Container' resets the home directory"
+!!! info
 
+    **Codespaces: A 'Full Rebuild Container' resets the home directory.**  
     This is never necessary unless you want exactly that.
 
 ## Build Stack
 
 ### Using cabal
 
-!!! info "Default Dev Container only"
+!!! info
+
+    Default Dev Container only.
 
 Command <nobr>`cabal build`</nobr> to build the `stack` executable.
 

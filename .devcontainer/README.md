@@ -1,7 +1,7 @@
 # Dev Containers
 
-See [haskellstack.org](https://docs.haskellstack.org) \> Stack's code
-(advanced) \> Maintainers \> Dev Containers or
+See [haskellstack.org](https://docs.haskellstack.org): Stack's code (advanced)
+\> Maintainers \> Dev Containers or
 [../doc/maintainers/devcontainers.md](../doc/maintainers/devcontainers.md)
 for more information.
 
