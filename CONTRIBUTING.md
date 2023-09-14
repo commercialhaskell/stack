@@ -692,6 +692,22 @@ Stack can be built with Stack (which is recommended) or with Cabal (the tool).
 A cradle is not committed to Stack's repository because it imposes a choice of
 build tool.
 
+## Dev Containers
+
+A [Development Container](https://containers.dev) (or Dev Container for short)
+allows you to use a container as a full‑featured development environment.
+
+You can run Dev Containers locally/remotely (with VS Code) or create a
+[Codespace](https://github.com/features/codespaces) for a branch in a
+repository to develop online.
+
+Stack's default Dev Container is intended for use with its default
+project‑level configuration (`stack.yaml`). But there are also Dev Containers
+for the experimental project‑level configurations.
+
+See [Stack's code (advanced) > Maintainers > Dev Containers](../maintainers/devcontainers)
+for more information.
+
 ## Slack channel
 
 If you're making deep changes and real-time communication with the Stack team
