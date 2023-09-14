@@ -93,12 +93,12 @@ nav:
 - Stack's code (advanced):
   - Contributors:
     - Contributor's guide: CONTRIBUTING.md
+    - Dev Containers: dev_containers.md
   - Maintainers:
     - Releases: maintainers/releases.md
     - Maintainer team process: maintainers/team_process.md
     - Add GHC version: maintainers/ghc.md
     - Docker images: maintainers/docker.md
-    - Dev Containers: maintainers/devcontainers.md
     - Upgrading MSYS2: maintainers/msys.md
     - Upgrading 7-Zip: maintainers/7zip.md
     - HaskellStack.org: maintainers/haskellstack.org.md
