@@ -124,7 +124,7 @@ Cabal file.
 
 Choose `Manually via PATH` when asked the following question:
 
-<img width="520" alt="Manage HLS" src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/manageHLS.png">>
+<img width="520" alt="Manage HLS" src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/manageHLS.png">
 
 ## Issues
 
