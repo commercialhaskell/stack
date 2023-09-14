@@ -706,7 +706,7 @@ project‑level configuration (`stack.yaml`). But there are also Dev Containers
 for the experimental project‑level configurations.
 
 For further information, see the documentation for
-[Dev Containers](doc/dev_containers.md).
+[Dev Containers](dev_containers.md).
 
 ## Slack channel
 
