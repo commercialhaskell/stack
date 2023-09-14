@@ -8,6 +8,7 @@ Dev Container for short) allows a container to be used as a full‑featured
 development environment.
 
 Stack provides the following Dev Containers:
+
 * a default Dev Container, intended for use with Stack's project‑level
   configuration (`stack.yaml`); and
 * alternative Dev Containers, intended for use with Stack's experimental
@@ -63,6 +64,7 @@ These Docker images are multi-architecture (`linux/amd64`, `linux/arm64/v8`)
 
 The images contain *unofficial* binary distributions of GHC 9.4.6 and 9.6.2
 (that is, ones not released by the GHC developers). That is because:
+
 1.  the official GHC binary distributions for Alpine Linux/x86_64 have known
     bugs; and
 2.  there are no official binary distributions for Alpine Linux/AArch64.
@@ -82,19 +84,19 @@ For use with Github Codespaces, please follow the instruction at
 
 Data in the following locations is persisted:
 
-1. The user's home directory (`/home/vscode`)[^2]
+1. The user's home directory (`/home/vscode` or, for the root user, `/root`).
+   Use with Docker/Podman in *rootless mode*.
 2. The Dev Container's workspace (`/workspaces`)
 
-[^2]: Alternatively for the root user (`/root`). Use with Docker/Podman in
-*rootless mode*.
-
-This is accomplished either via a *volume* or *bind mount* (or *loop device*
+This is accomplished via either a *volume* or *bind mount* (or *loop device*
 on Codespaces) and is preconfigured.
 
 !!! info
 
-    **Codespaces: A 'Full Rebuild Container' resets the home directory.**
-    This is never necessary unless you want exactly that.
+    The VS Code Command Palette command
+    ['Codespaces: Full Rebuild Container'](https://docs.github.com/en/codespaces/developing-in-codespaces/rebuilding-the-container-in-a-codespace#rebuilding-a-container)
+    resets the home directory. This is never necessary unless you want exactly
+    that.
 
 ## Build Stack
 
