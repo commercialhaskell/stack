@@ -621,10 +621,9 @@ buildExtractedTarball pkgDir = do
         pure
           $  packageName (lpPackage localPackage)
           == packageName (lpPackage localPackageToBuild)
-  pathsToKeep <- fmap Map.fromList $
-    flip filterM
-      (Map.toList (smwProject (bcSMWanted (envConfigBuildConfig envConfig))))
+  pathsToKeep <- Map.fromList <$> filterM
       (fmap not . isPathToRemove . resolvedAbsolute . ppResolvedDir . snd)
+      (Map.toList (smwProject (bcSMWanted (envConfigBuildConfig envConfig))))
   pp <- mkProjectPackage YesPrintWarnings pkgDir False
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
