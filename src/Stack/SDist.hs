@@ -651,7 +651,7 @@ checkSDistTarball' ::
   -> L.ByteString -- ^ Tarball contents as a byte string
   -> RIO env ()
 checkSDistTarball' opts name bytes = withSystemTempDir "stack" $ \tpath -> do
-  npath   <- (tpath </>) <$> parseRelFile name
+  npath <- (tpath </>) <$> parseRelFile name
   liftIO $ L.writeFile (toFilePath npath) bytes
   checkSDistTarball opts npath
 
