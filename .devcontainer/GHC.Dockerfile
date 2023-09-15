@@ -36,12 +36,12 @@ RUN sysArch="$(uname -m)" \
   ## Ensure that common CA certificates
   ## and OpenSSL libraries are up to date
   && apk upgrade --no-cache ca-certificates openssl-dev \
-  ## Install yamllint
-  && apk add --no-cache yamllint \
   ## Install pip
   && apk add --no-cache py3-pip \
   ## Install terminal multiplexers
   && apk add --no-cache screen tmux \
+  ## Install yamllint
+  && apk add --no-cache yamllint \
   ## Install hadolint
   && case "$sysArch" in \
     x86_64) tarArch="x86_64" ;; \
@@ -53,11 +53,7 @@ RUN sysArch="$(uname -m)" \
   && downloadUrl="$(echo "$apiResponse" | grep -e \
     "browser_download_url.*Linux-$tarArch\"" | cut -d : -f 2,3 | tr -d \")" \
   && echo "$downloadUrl" | xargs curl -sSLo /usr/local/bin/hadolint \
-  && chmod 755 /usr/local/bin/hadolint \
-  ## Create folders in root directory
-  && mkdir -p /root/.local/bin \
-  ## Create folders in skeleton directory
-  && mkdir -p /etc/skel/.local/bin
+  && chmod 755 /usr/local/bin/hadolint
 
 ## Update environment
 ARG USE_ZSH_FOR_ROOT
