@@ -22,9 +22,11 @@ jobs:
     - name: Set up HLint
       uses: haskell/actions/hlint-setup@v2
       with:
-        version: "3.5"
+        version: "3.6.1"
     - name: Apply HLint
       run: |
         set -ex
+        hlint app/
         hlint src/
         hlint --hint=.hlint-test.yaml tests/unit
+        hlint --hint=.hlint-test.yaml tests/integration

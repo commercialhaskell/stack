@@ -64,10 +64,10 @@ targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do
   packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
   comps <- for packages ppComponents
-  pure
-    $ filter (input `isPrefixOf`)
-    $ concatMap allComponentNames
-    $ Map.toList comps
+  pure $
+    concatMap
+      (filter (input `isPrefixOf`) . allComponentNames)
+      (Map.toList comps)
  where
   allComponentNames (name, comps) =
     map (T.unpack . renderPkgComponent . (name,)) (Set.toList comps)
