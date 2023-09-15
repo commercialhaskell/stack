@@ -34,10 +34,11 @@ provided in the default Dev Container only.
 !!! info
 
     The PATH is
-    `$HOME/.cabal/bin:$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`. Consequently, executables installed with Cabal (the tool)
-    (at `$HOME/.cabal/bin`) or Stack or Pip (at `$HOME/.local/bin`) take
-    precedence over the same executable installed at `/usr/local/sbin`,
-    `/usr/local/bin`, etc.
+    `$HOME/.cabal/bin:$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`.
+    Consequently, executables installed with Cabal (the tool) (at
+    `$HOME/.cabal/bin`) or Stack or Pip (at `$HOME/.local/bin`) take precedence
+    over the same executable installed at `/usr/local/sbin`, `/usr/local/bin`,
+    etc.
 
 [VS Code](https://code.visualstudio.com) is used as IDE, with the following
 extensions pre‑installed:
@@ -62,15 +63,16 @@ These Docker images are multi-architecture (`linux/amd64`, `linux/arm64/v8`)
 *ghc‑musl* images. They are based on Alpine Linux (that is
 [musl libc](https://musl.libc.org) and [BusyBox](https://www.busybox.net)).
 
-The images contain *unofficial* binary distributions of GHC 9.4.6 and 9.6.2
+The images contain *unofficial* binary distributions of GHC 9.4.7 and 9.6.2
 (that is, ones not released by the GHC developers). That is because:
 
-1.  the official GHC binary distributions for Alpine Linux/x86_64 have known
-    bugs; and
+1.  the official GHC 9.6.2 binary distributions for Alpine Linux/x86_64 have
+    known bugs; and
 2.  there are no official binary distributions for Alpine Linux/AArch64.
 
 Stack's global configuration (`/etc/stack/config.yaml`) sets `system-ghc: true`
-and `install-ghc: false`. That ensures that only the GHC available in the Dev Containers is used.
+and `install-ghc: false`. That ensures that only the GHC available in the Dev
+Containers is used.
 
 ## Usage
 

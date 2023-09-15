@@ -1,4 +1,4 @@
-resolver: lts-21.11 # GHC 9.4.6
+resolver: lts-21.12 # GHC 9.4.7
 packages:
 - .
 - subproject
