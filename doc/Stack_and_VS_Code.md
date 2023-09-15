@@ -75,9 +75,9 @@ enabled). For further information about these options, see the `install-ghc`
 
 For this workaround to work, each time that a resolver is used that references a
 different version of GHC, then GHCup must be used to install it (if GHCup has
-not already installed that version). For example, to use `resolver: lts-21.11`
-(GHC 9.4.6), the command `ghcup install ghc 9.4.6` must have been used to
-install GHC 9.4.6. That may be a minor inconvenience for some people, as one the
+not already installed that version). For example, to use `resolver: lts-21.12`
+(GHC 9.4.7), the command `ghcup install ghc 9.4.7` must have been used to
+install GHC 9.4.7. That may be a minor inconvenience for some people, as one the
 primary benefits of Stack over other Haskell build tools has been that Stack
 automatically ensures that the necessary version of GHC is available.
 

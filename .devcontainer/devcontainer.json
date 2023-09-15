@@ -3,8 +3,8 @@
   "build": {
     "dockerfile": "GHC.Dockerfile",
     "args": {
-      "GHC_VERSION": "9.4.6",
-      "HLS_VERSION": "2.1.0.0",
+      "GHC_VERSION": "9.4.7",
+      "HLS_VERSION": "2.2.0.0",
       "USE_ZSH_FOR_ROOT": "unset-to-use-ash",
       "SET_LANG": "C.UTF-8",
       "SET_TZ": ""
