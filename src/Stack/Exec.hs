@@ -138,7 +138,7 @@ execCmd ExecOpts {..} =
   getRunCmd args = do
     packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
     pkgComponents <- for (Map.elems packages) ppComponents
-    let executables = filter isCExe $ concatMap Set.toList pkgComponents
+    let executables = concatMap (filter isCExe . Set.toList) pkgComponents
     let (exe, args') = case args of
                        []   -> (firstExe, args)
                        x:xs -> case L.find (\y -> y == CExe (T.pack x)) executables of
