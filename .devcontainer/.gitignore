@@ -4,7 +4,7 @@
 !/assets/cradles/
 !/assets/cradles/cabal/
 !/assets/cradles/stack/
-!/assets/screenshots/
+!/backups/
 !/bind-mounts/
 !/conf/
 !/conf/etc/
@@ -17,7 +17,6 @@
 
 !/assets/cradles/cabal/hie.yaml
 !/assets/cradles/stack/hie.yaml
-!/assets/screenshots/manageHLS.png
 !/conf/etc/stack/config.yaml
 !/ghc-*/devcontainer.json
 !/scripts/usr/local/bin/*.sh
