@@ -43,25 +43,30 @@ command are inconsistent and take no action.
     required on Linux, Stack will refer to the presence or absence of certain
     libraries or the versions of those libraries.
 
-    For example, Stack 2.11.1 considers:
+    For example, Stack 2.13.1 considers:
 
-    *   the version of `libc6`, the
+    *   If `libc.musl-x86_64.so.1` is present. This file is provided by the
+        [musl libc](https://musl.libc.org/).
+
+    *   The version of `libc6` (if musl libc is not applicable), the
         [GNU C Library](https://www.gnu.org/software/libc/) (glibc), that is
         present. The GNU C Library is designed to be backwards compatible.
 
-    *   if `libgmp.so.3` or `libgmp.so.10` is present. These files are provided
+    *   If `libgmp.so.3` or `libgmp.so.10` is present. These files are provided
         by different versions of the
         [GNU Multiple Precision Arithmetic Library](https://gmplib.org/).
 
-    *   if `libncursesw.so.6` is present. This file is provided by a shared
+    *   If `libncursesw.so.6` is present. This file is provided by a shared
         library for terminal handling with wide character support.
 
-    *   if `libtinfo.so.5` or `libtinfo.so.6` is present. These files are
+    *   If `libtinfo.so.5` or `libtinfo.so.6` is present. These files are
         provided by different versions of a shared low-level terminfo library
         for terminal handling.
 
-    Stack 2.11.1 uses `ghc-build`:
+    Stack 2.13.1 uses `ghc-build`:
 
+    * `musl` to indicate `libc.musl-x86_64.so.1` is present and Stack should use
+       the GHC binary distribution for Alpine Linux.
     * `tinfo6` to indicate `libgmp.so.10` and `libtinfo.so.6` are present and
       `libc6` is compatible with `libc6` 2.32.
     * `tinfo6-libc6-pre232` to indicate `libgmp.so.10` and `libtinfo.so.6` are

@@ -585,7 +585,7 @@ This can be useful with `stack build --dry-run`.
 
 ### `--progress-bar` option
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.13.1](https://github.com/commercialhaskell/stack/releases/tag/v2.13.1)
 
 Default: `capped`
 
