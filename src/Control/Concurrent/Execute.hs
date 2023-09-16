@@ -124,13 +124,15 @@ runActions' ExecuteState {..} = loop
     errs <- readTVar esExceptions
     if null errs || esKeepGoing
       then inner
-      else pure $ pure ()
+      else doNothing
+
   withActions :: ([Action] -> STM (IO ())) -> STM (IO ())
   withActions inner = do
-    as <- readTVar esActions
-    if null as
-      then pure $ pure ()
-      else inner as
+    actions <- readTVar esActions
+    if null actions
+      then doNothing
+      else inner actions
+
   loop :: IO ()
   loop = join $ atomically $ breakOnErrs $ withActions $ \as ->
     case break (Set.null . actionDeps) as of
@@ -140,7 +142,7 @@ runActions' ExecuteState {..} = loop
           then do
             unless esKeepGoing $
               modifyTVar esExceptions (toException InconsistentDependenciesBug:)
-            pure $ pure ()
+            doNothing
           else retry
       (xs, action:ys) -> do
         inAction <- readTVar esInAction
@@ -174,3 +176,7 @@ runActions' ExecuteState {..} = loop
   -- action.
   downstreamActions :: ActionId -> [Action] -> [Action]
   downstreamActions aid = filter (\a -> aid `Set.member` actionDeps a)
+  
+  -- | @IO ()@ lifted into 'STM'.
+  doNothing :: STM (IO ())
+  doNothing = pure $ pure ()
