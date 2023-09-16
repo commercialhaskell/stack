@@ -687,12 +687,13 @@ Command line equivalent (takes precedence): `--[no-]dump-logs` flag
 
 In the case of *non-interleaved* output and *more than one* target package,
 Stack sends the build output from GHC for each target package to a log file,
-unless an error occurs. For further information, see the
-[`stack build --[no-]interleaved-output` flag](build_command.md#the-stack-build---no-interleaved-output-flag)
+unless an error occurs that prevents that. For further information, see the
+[`stack build --[no-]interleaved-output` flag](build_command.md#-no-interleaved-output-flag)
 documentation.
 
 The value of the `dump-logs` key controls what, if any, log file content is sent
-('dumped') to the console at the end of the build. Possible values are:
+('dumped') to the standard error output stream of the console at the end of the
+build. Possible values are:
 
 ~~~yaml
 dump-logs: none      # don't dump the content of any log files
@@ -702,6 +703,15 @@ dump-logs: all       # dump all of the content of log files
 
 At the command line, `--no-dump-logs` is equivalent to `dump-logs: none` and
 `--dump-logs` is equivalent to `dump-logs: all`.
+
+If GHC reports an error during the build and a log file is created, that build
+output will be included in the log file. Stack will also report errors during
+building to the standard error output stream. That stream can be piped to a
+file. For example, for a file named `stderr.log`:
+
+~~~text
+stack --no-dump-logs --color always build --no-interleaved-output 2> stderr.log
+~~~
 
 ### extra-include-dirs
 
