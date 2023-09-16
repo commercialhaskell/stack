@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-09-02.
+`master` branch of the Stack repository. Last updated: 2023-09-16.
 
 *   `GHC.GHC.Utils.GhcPkg.Main.Compat`
 
@@ -183,10 +183,10 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2422] | ResolverPartial RawSnapshotLocation String
         ~~~
 
-    -   `Stack.List.ListException`
+    -   `Stack.List.ListPrettyException`
 
         ~~~haskell
-        [S-4926] = CouldNotParsePackageSelectors [String]
+        [S-4926] = CouldNotParsePackageSelectors [StyleDoc]
         ~~~
 
     -   `Stack.Lock.LockPrettyException`
