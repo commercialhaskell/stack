@@ -4,13 +4,25 @@
 
 Release notes:
 
+**Changes since v2.13.1:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+## v2.13.1
+
+Release notes:
+
 * Further to the release notes for Stack 2.3.1, the `-static` suffix has been
   removed from the statically linked Linux/x86_64 binaries.
 * The binaries for Linux/Aarch64 are now statically linked.
 
 **Changes since v2.11.1:**
-
-Major changes:
 
 Behavior changes:
 
