@@ -28,33 +28,41 @@ instance Exception ExecuteException where
     "Inconsistent dependencies were discovered while executing your build \
     \plan."
 
+-- | Type representing types of Stack build actions.
 data ActionType
   = ATBuild
     -- ^ Action for building a package's library and executables. If
-    -- 'taskAllInOne' is 'True', then this will also build benchmarks
-    -- and tests. It is 'False' when then library's benchmarks or
-    -- test-suites have cyclic dependencies.
+    -- 'taskAllInOne' is 'True', then this will also build benchmarks and tests.
+    -- It is 'False' when the library's benchmarks or test-suites have cyclic
+    -- dependencies.
   | ATBuildFinal
-    -- ^ Task for building the package's benchmarks and test-suites.
-    -- Requires that the library was already built.
+    -- ^ Task for building the package's benchmarks and test-suites. Requires
+    -- that the library was already built.
   | ATRunTests
     -- ^ Task for running the package's test-suites.
   | ATRunBenchmarks
     -- ^ Task for running the package's benchmarks.
   deriving (Show, Eq, Ord)
 
+-- | Types representing the unique ids of Stack build actions.
 data ActionId
   = ActionId !PackageIdentifier !ActionType
   deriving (Eq, Ord, Show)
 
-data Action
-  = Action
+-- | Type representing Stack build actions.
+data Action = Action
   { actionId :: !ActionId
+    -- ^ The action's unique id.
   , actionDeps :: !(Set ActionId)
+    -- ^ Actions on which this action depends.
   , actionDo :: !(ActionContext -> IO ())
+    -- ^ The action's 'IO' action, given a context.
   , actionConcurrency :: !Concurrency
+    -- ^ Whether this action may be run concurrently with others.
   }
 
+-- | Type representing permissions for actions to be run concurrently with
+-- others.
 data Concurrency
   = ConcurrencyAllowed
   | ConcurrencyDisallowed
@@ -62,11 +70,11 @@ data Concurrency
 
 data ActionContext = ActionContext
   { acRemaining :: !(Set ActionId)
-    -- ^ Does not include the current action
+    -- ^ Does not include the current action.
   , acDownstream :: [Action]
-    -- ^ Actions which depend on the current action
+    -- ^ Actions which depend on the current action.
   , acConcurrency :: !Concurrency
-    -- ^ Whether this action may be run concurrently with others
+    -- ^ Whether this action may be run concurrently with others.
   }
 
 data ExecuteState = ExecuteState
@@ -77,11 +85,12 @@ data ExecuteState = ExecuteState
   , esKeepGoing  :: Bool
   }
 
-runActions :: Int -- ^ threads
-           -> Bool -- ^ keep going after one task has failed
-           -> [Action]
-           -> (TVar Int -> TVar (Set ActionId) -> IO ()) -- ^ progress updated
-           -> IO [SomeException]
+runActions :: 
+     Int -- ^ threads
+  -> Bool -- ^ keep going after one task has failed
+  -> [Action]
+  -> (TVar Int -> TVar (Set ActionId) -> IO ()) -- ^ progress updated
+  -> IO [SomeException]
 runActions threads keepGoing actions withProgress = do
   es <- ExecuteState
     <$> newTVarIO (sortActions actions) -- esActions
@@ -161,5 +170,7 @@ runActions' ExecuteState {..} = loop
                 in  modifyTVar esActions $ map dropDep
           restore loop
 
+-- | Filter a list of actions to include only those that depend on the given
+-- action.
 downstreamActions :: ActionId -> [Action] -> [Action]
 downstreamActions aid = filter (\a -> aid `Set.member` actionDeps a)
