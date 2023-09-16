@@ -119,6 +119,9 @@ sortActions = sortBy (compareConcurrency `on` actionConcurrency)
 runActions' :: ExecuteState -> IO ()
 runActions' ExecuteState {..} = loop
  where
+  loop :: IO ()
+  loop = join $ atomically $ breakOnErrs $ withActions processActions
+
   breakOnErrs :: STM (IO ()) -> STM (IO ())
   breakOnErrs inner = do
     errs <- readTVar esExceptions
@@ -132,9 +135,6 @@ runActions' ExecuteState {..} = loop
     if null actions
       then doNothing
       else inner actions
-
-  loop :: IO ()
-  loop = join $ atomically $ breakOnErrs $ withActions processActions
 
   processActions :: [Action] -> STM (IO ())
   processActions actions = do
