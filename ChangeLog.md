@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased changes
+## v2.13.0.1 (release candidate) - 2023-09-16
 
 Release notes:
 
@@ -9,8 +9,6 @@ Release notes:
 * The binaries for Linux/Aarch64 are now statically linked.
 
 **Changes since v2.11.1:**
-
-Major changes:
 
 Behavior changes:
 
