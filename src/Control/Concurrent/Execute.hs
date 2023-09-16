@@ -12,7 +12,7 @@ module Control.Concurrent.Execute
     , runActions
     ) where
 
-import           Control.Concurrent.STM ( retry )
+import           Control.Concurrent.STM ( check )
 import           Stack.Prelude
 import           Data.List ( sortBy )
 import qualified Data.Set as Set
@@ -134,48 +134,55 @@ runActions' ExecuteState {..} = loop
       else inner actions
 
   loop :: IO ()
-  loop = join $ atomically $ breakOnErrs $ withActions $ \as ->
-    case break (Set.null . actionDeps) as of
+  loop = join $ atomically $ breakOnErrs $ withActions processActions
+
+  processActions :: [Action] -> STM (IO ())
+  processActions actions = do
+    inAction <- readTVar esInAction
+    case break (Set.null . actionDeps) actions of
       (_, []) -> do
-        inAction <- readTVar esInAction
-        if Set.null inAction
-          then do
-            unless esKeepGoing $
-              modifyTVar esExceptions (toException InconsistentDependenciesBug:)
-            doNothing
-          else retry
-      (xs, action:ys) -> do
-        inAction <- readTVar esInAction
-        case actionConcurrency action of
-          ConcurrencyAllowed -> pure ()
-          ConcurrencyDisallowed -> unless (Set.null inAction) retry
-        let as' = xs ++ ys
-            remaining = Set.union
-              (Set.fromList $ map actionId as')
-              inAction
-        writeTVar esActions as'
-        modifyTVar esInAction (Set.insert $ actionId action)
-        pure $ mask $ \restore -> do
-          eres <- try $ restore $ actionDo action ActionContext
-            { acRemaining = remaining
-            , acDownstream = downstreamActions (actionId action) as'
-            , acConcurrency = actionConcurrency action
-            }
-          atomically $ do
-            modifyTVar esInAction (Set.delete $ actionId action)
-            modifyTVar esCompleted (+1)
-            case eres of
-              Left err -> modifyTVar esExceptions (err:)
-              Right () ->
-                let dropDep a =
-                      a { actionDeps = Set.delete (actionId action) $ actionDeps a }
-                in  modifyTVar esActions $ map dropDep
-          restore loop
+        check (Set.null inAction)
+        unless esKeepGoing $
+          modifyTVar esExceptions (toException InconsistentDependenciesBug:)
+        doNothing
+      (xs, action:ys) -> processAction inAction (xs ++ ys) action
+
+  processAction :: Set ActionId -> [Action] -> Action -> STM (IO ())
+  processAction inAction otherActions action = do
+    let concurrency = actionConcurrency action
+    unless (concurrency == ConcurrencyAllowed) $
+      check (Set.null inAction)
+    let action' = actionId action
+        otherActions' = Set.fromList $ map actionId otherActions
+        remaining = Set.union otherActions' inAction
+        actionContext = ActionContext
+          { acRemaining = remaining
+          , acDownstream = downstreamActions action' otherActions
+          , acConcurrency = concurrency
+          }
+    writeTVar esActions otherActions
+    modifyTVar esInAction (Set.insert action')
+    pure $ do
+      mask $ \restore -> do
+        eres <- try $ restore $ actionDo action actionContext
+        atomically $ do
+          modifyTVar esInAction (Set.delete action')
+          modifyTVar esCompleted (+1)
+          case eres of
+            Left err -> modifyTVar esExceptions (err:)
+            Right () -> modifyTVar esActions $ map (dropDep action')
+      loop
 
   -- | Filter a list of actions to include only those that depend on the given
   -- action.
   downstreamActions :: ActionId -> [Action] -> [Action]
   downstreamActions aid = filter (\a -> aid `Set.member` actionDeps a)
+  
+  -- | Given two actions (the first specified by its id) yield an action
+  -- equivalent to the second but excluding any dependency on the first action.
+  dropDep :: ActionId -> Action -> Action
+  dropDep action' action =
+    action { actionDeps = Set.delete action' $ actionDeps action }
   
   -- | @IO ()@ lifted into 'STM'.
   doNothing :: STM (IO ())
