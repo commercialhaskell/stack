@@ -99,7 +99,7 @@ since a snapshot states how dependencies are resolved. There are currently
 four resolver types:
 
 * LTS Haskell snapshots, e.g. `resolver: lts-21.12`
-* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-09-09`
+* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-09-16`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
   like `resolver: ghc-9.6.2`
 * Custom snapshot, via a URL or relative file path. For further information, see

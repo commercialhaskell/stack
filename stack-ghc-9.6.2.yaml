@@ -2,7 +2,7 @@
 # built with GHC 9.6.2.
 
 # GHC 9.6.2
-resolver: nightly-2023-09-09
+resolver: nightly-2023-09-16
 
 docker:
   enable: false

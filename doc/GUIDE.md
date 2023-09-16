@@ -525,13 +525,13 @@ towards by default as well).
 Let's explore package sets a bit further. Instead of `lts-21.12`, let's change
 our `stack.yaml` file to use the
 [latest nightly](https://www.stackage.org/nightly). Right now, this is currently
-2023-09-09 - please see the resolver from the link above to get the latest.
+2023-09-16 - please see the resolver from the link above to get the latest.
 
 Then, commanding `stack build` again will produce:
 
 ~~~text
 stack build
-# Downloaded nightly-2023-09-09 build plan.
+# Downloaded nightly-2023-09-16 build plan.
 # build output ...
 ~~~
 
