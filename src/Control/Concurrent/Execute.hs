@@ -170,7 +170,7 @@ runActions' ExecuteState {..} = loop
                 in  modifyTVar esActions $ map dropDep
           restore loop
 
--- | Filter a list of actions to include only those that depend on the given
--- action.
-downstreamActions :: ActionId -> [Action] -> [Action]
-downstreamActions aid = filter (\a -> aid `Set.member` actionDeps a)
+  -- | Filter a list of actions to include only those that depend on the given
+  -- action.
+  downstreamActions :: ActionId -> [Action] -> [Action]
+  downstreamActions aid = filter (\a -> aid `Set.member` actionDeps a)
