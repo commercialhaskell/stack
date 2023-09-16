@@ -39,14 +39,16 @@ Could not find package paltry, updating
 ...
 Package index cache populated
 Error: [S-4926]
-- Could not find package paltry on Hackage. Perhaps you meant: pantry, pretty, pasty, xattr, alloy, para, pappy, alure, polar, factory
+       * Could not find package paltry on Hackage. Perhaps you meant one of:
+         pantry, pretty, pasty, xattr, alloy, para, pappy, alure, polar and
+         factory.
 
 stack --resolver lts-21.12 list base unix Win32 acme-missiles pantry
 Error: [S-4926]
-- Package does not appear in snapshot: base
-- Package does not appear in snapshot: unix
-- Package does not appear in snapshot: Win32
-- Package does not appear in snapshot: acme-missiles
+       * Package does not appear in snapshot: base.
+       * Package does not appear in snapshot: unix.
+       * Package does not appear in snapshot: Win32.
+       * Package does not appear in snapshot: acme-missiles.
 
 stack --resolver lts-21.12 list pantry
 pantry-0.8.3

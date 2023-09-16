@@ -8,7 +8,6 @@ module Stack.List
   ) where
 
 import           Pantry ( loadSnapshot )
-import           RIO.List ( intercalate )
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
 import           Stack.Config ( makeConcreteResolver )
@@ -19,14 +18,17 @@ import           Stack.Types.Runner ( Runner, globalOptsL )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.List" module.
-newtype ListException
-  = CouldNotParsePackageSelectors [String]
+newtype ListPrettyException
+  = CouldNotParsePackageSelectors [StyleDoc]
   deriving (Show, Typeable)
 
-instance Exception ListException where
-  displayException (CouldNotParsePackageSelectors strs) = unlines $
-    "Error: [S-4926]"
-    : map ("- " ++) strs
+instance Pretty ListPrettyException where
+  pretty (CouldNotParsePackageSelectors errs) =
+    "[S-4926]"
+    <> line
+    <> bulletedList errs
+
+instance Exception ListPrettyException
 
 -- | Function underlying the @stack list@ command. List packages.
 listCmd :: [String] -> RIO Runner ()
@@ -53,13 +55,13 @@ listPackages mSnapshot input = do
   (errs2, locs) <- partitionEithers <$> traverse toLoc names
   case errs1 ++ errs2 of
     [] -> pure ()
-    errs -> throwM $ CouldNotParsePackageSelectors errs
+    errs -> prettyThrowM $ CouldNotParsePackageSelectors errs
   mapM_ (prettyInfo . fromString . packageIdentifierString) locs
  where
   toLoc | Just snapshot <- mSnapshot = toLocSnapshot snapshot
         | otherwise = toLocNoSnapshot
 
-  toLocNoSnapshot :: PackageName -> RIO env (Either String PackageIdentifier)
+  toLocNoSnapshot :: PackageName -> RIO env (Either StyleDoc PackageIdentifier)
   toLocNoSnapshot name = do
     mloc1 <-
       getLatestHackageLocation YesRequireHackageIndex name UsePreferredVersions
@@ -82,26 +84,30 @@ listPackages mSnapshot input = do
     case mloc of
       Nothing -> do
         candidates <- getHackageTypoCorrections name
-        pure $ Left $ concat
-          [ "Could not find package "
-          , packageNameString name
-          , " on Hackage"
+        pure $ Left $ fillSep
+          [ flow "Could not find package"
+          , style Current (fromString $ packageNameString name)
+          , flow "on Hackage."
           , if null candidates
-              then ""
-              else ". Perhaps you meant: " ++
-                     intercalate ", " (map packageNameString candidates)
+              then mempty
+              else fillSep $
+                  flow "Perhaps you meant one of:"
+                : mkNarrativeList (Just Good) False
+                    (map (fromString . packageNameString) candidates :: [StyleDoc])
           ]
       Just loc -> pure $ Right (packageLocationIdent loc)
 
   toLocSnapshot ::
        RawSnapshot
     -> PackageName
-    -> RIO env (Either String PackageIdentifier)
+    -> RIO env (Either StyleDoc PackageIdentifier)
   toLocSnapshot snapshot name =
     case Map.lookup name (rsPackages snapshot) of
       Nothing ->
-        pure $ Left $
-          "Package does not appear in snapshot: " ++ packageNameString name
+        pure $ Left $ fillSep
+          [ flow "Package does not appear in snapshot:"
+          , style Current (fromString $ packageNameString name) <> "."
+          ]
       Just sp -> do
         loc <- cplComplete <$> completePackageLocation (rspLocation sp)
         pure $ Right (packageLocationIdent loc)
@@ -109,4 +115,7 @@ listPackages mSnapshot input = do
   parse s =
     case parsePackageName s of
       Just x -> Right x
-      Nothing -> Left $ "Could not parse as package name or identifier: " ++ s
+      Nothing -> Left $ fillSep
+        [ flow "Could not parse as package name or identifier:"
+        , style Current (fromString s) <> "."
+        ]
