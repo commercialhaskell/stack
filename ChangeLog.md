@@ -14,6 +14,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Restore message suffix `due to warnings` with `dump-logs: warning` (broken
+  with Stack 2.11.1).
+
 ## v2.13.0.1 (release candidate) - 2023-09-16
 
 Release notes:

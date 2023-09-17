@@ -578,7 +578,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
          fillSep
            ( ( fillSep
                  ( flow "Dumping log file"
-                 : [ flow msgSuffix | L.null msgSuffix ]
+                 : [ flow msgSuffix | not (L.null msgSuffix) ]
                  )
              <> ":"
              )
