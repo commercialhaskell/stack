@@ -559,14 +559,16 @@ package is targetted in a multi-package project (for example, using
 
 * **More than one target package:** The build output from GHC (as opposed to
   from Stack) for each target package is sent to a log file for that package,
-  unless an error occurs that prevents that. At the end of the build, the
-  location of the directory containing the log files is reported. To also output
-  the contents of the log files to the standard error output stream of the
-  console at the end of the build, use Stack's `dump-logs` option. For further
+  unless an error occurs that prevents that. If color in output is in use, there
+  will be two files, one with extension `.log` without color codes and one with
+  extension `.log-color` with color codes. At the end of the build, the location
+  of the directory containing the log files is reported. To also output the
+  contents of the log files to the standard error output stream of the console
+  at the end of the build, use Stack's `dump-logs` option. For further
   information about that option, see the
   [YAML configuration](yaml_configuration.md#dump-logs) documentation. The
-  default `dump-logs` mode is to output the contents of the log files that are
-  warnings.
+  default `dump-logs` mode is to output the contents of any log files that
+  include GHC warnings.
 
 ### `--[no]-open` flag
 
