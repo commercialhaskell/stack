@@ -10,6 +10,7 @@ module Stack.Build.ConstructPlan
 
 import           Control.Monad.RWS.Strict
                    ( RWST, get, modify, modify', pass, put, runRWST, tell )
+import           Control.Monad.Trans.Maybe ( MaybeT (..) )
 import qualified Data.List as L
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Map.Strict as Map
@@ -1206,18 +1207,28 @@ psLocation PSRemote{} = Snap
 -- tool dependencies.
 checkAndWarnForUnknownTools :: Package -> M ()
 checkAndWarnForUnknownTools p = do
-  -- Check whether the tool is on the PATH before warning about it.
-  warnings <- fmap catMaybes $ forM (Set.toList $ packageUnknownTools p) $
-    \name@(ExeName toolName) -> do
-      let settings = minimalEnvSettings { esIncludeLocals = True }
-      config <- view configL
-      menv <- liftIO $ configProcessContextSettings config settings
-      mfound <- runRIO menv $ findExecutable $ T.unpack toolName
-      case mfound of
-        Left _ -> pure $ Just $ ToolWarning name (packageName p)
-        Right _ -> pure Nothing
+  let unknownTools = Set.toList $ packageUnknownTools p
+  -- Check whether the tool is on the PATH or a package executable before
+  -- warning about it.
+  warnings <-
+    fmap catMaybes $ forM unknownTools $ \name@(ExeName toolName) ->
+      runMaybeT $ notOnPath toolName *> notPackageExe toolName *> warn name
   tell mempty { wWarnings = (map toolWarningText warnings ++) }
   pure ()
+ where
+  -- From Cabal 2.0, build-tools can specify a pre-built executable that should
+  -- already be on the PATH.
+  notOnPath toolName = MaybeT $ do
+    let settings = minimalEnvSettings { esIncludeLocals = True }
+    config <- view configL
+    menv <- liftIO $ configProcessContextSettings config settings
+    eFound <- runRIO menv $ findExecutable $ T.unpack toolName
+    skipIf $ isRight eFound
+  -- From Cabal 1.12, build-tools can specify another executable in the same
+  -- package.
+  notPackageExe toolName = MaybeT $ skipIf $ toolName `Set.member` packageExes p
+  warn name = MaybeT . pure . Just $ ToolWarning name (packageName p)
+  skipIf p' = pure $ if p' then Nothing else Just ()
 
 -- | Warn about tools in the snapshot definition. States the tool name
 -- expected and the package name using it.
