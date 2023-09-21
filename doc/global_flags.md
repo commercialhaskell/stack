@@ -162,7 +162,7 @@ to standard output (e.g. `2.9.1`) and quit.
 
 ## `--[no-]plan-in-log` flag
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.13.1](https://github.com/commercialhaskell/stack/releases/tag/v2.13.1)
 
 Default: Disabled
 

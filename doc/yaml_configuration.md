@@ -463,7 +463,7 @@ build:
 
   # Since 1.8. Starting with 2.0, the default is true
   interleaved-output: true
-  # Since UNRELEASED. Available options are none, count-only, capped and full.
+  # Since 2.13.1. Available options are none, count-only, capped and full.
   progress-bar: capped
   # Since 1.10.
   ddump-dir: ""
@@ -480,7 +480,7 @@ of the same name. For further information, see the
 
 ### casa
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.13.1](https://github.com/commercialhaskell/stack/releases/tag/v2.13.1)
 
 Default:
 
@@ -1366,7 +1366,7 @@ setup-info:
 
 'Platforms' are pairs of an operating system and a machine architecture (for
 example, 32-bit i386 or 64-bit x86-64) (represented by the
-`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.11.1)
+`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.13.1)
 supports the following pairs in the format of the `setup-info` key:
 
 |Operating system|I386 arch|X86_64 arch|Other machine architectures                                 |

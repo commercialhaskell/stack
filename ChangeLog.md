@@ -4,17 +4,22 @@
 
 Release notes:
 
-**Changes since v2.13.1:**
+**Changes since v2.13.0.1:**
 
 Major changes:
 
 Behavior changes:
 
+* `stack list` outputs to standard output rather than to standard error.
+
 Other enhancements:
 
 Bug fixes:
 
-## v2.13.1
+* Restore message suffix `due to warnings` with `dump-logs: warning` (broken
+  with Stack 2.11.1).
+
+## v2.13.0.1 (release candidate) - 2023-09-16
 
 Release notes:
 
