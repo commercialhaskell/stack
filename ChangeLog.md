@@ -10,6 +10,8 @@ Major changes:
 
 Behavior changes:
 
+* `stack list` outputs to standard output rather than to standard error.
+
 Other enhancements:
 
 Bug fixes:
