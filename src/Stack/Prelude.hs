@@ -23,6 +23,8 @@ module Stack.Prelude
   , bugReport
   , bugPrettyReport
   , blankLine
+  , putUtf8Builder
+  , putBuilder
   , ppException
   , prettyThrowIO
   , prettyThrowM
@@ -46,6 +48,7 @@ module Stack.Prelude
   , bulletedList
   , debugBracket
   , defaultStyles
+  , displayWithColor
   , encloseSep
   , fill
   , fillSep
@@ -104,14 +107,15 @@ import           RIO.File as X hiding ( writeBinaryFileAtomic )
 import           RIO.PrettyPrint
                    ( HasStylesUpdate (..), HasTerm (..), Pretty (..), Style (..)
                    , StyleDoc, (<+>), align, blankLine, bulletedList
-                   , debugBracket, encloseSep, fill, fillSep, flow, hang, hcat
-                   , hsep, indent, line, logLevelToStyle, mkNarrativeList
-                   , parens, prettyDebug, prettyDebugL, prettyError
-                   , prettyErrorL, prettyGeneric, prettyInfo, prettyInfoL
-                   , prettyInfoS, prettyNote, prettyNoteL, prettyNoteS
-                   , prettyWarn, prettyWarnL, prettyWarnNoIndent, prettyWarnS
-                   , punctuate, sep, softbreak, softline, spacedBulletedList
-                   , string, style, stylesUpdateL, useColorL, vsep
+                   , debugBracket, displayWithColor, encloseSep, fill, fillSep
+                   , flow, hang, hcat, hsep, indent, line, logLevelToStyle
+                   , mkNarrativeList, parens, prettyDebug, prettyDebugL
+                   , prettyError, prettyErrorL, prettyGeneric, prettyInfo
+                   , prettyInfoL, prettyInfoS, prettyNote, prettyNoteL
+                   , prettyNoteS, prettyWarn, prettyWarnL, prettyWarnNoIndent
+                   , prettyWarnS, punctuate, sep, softbreak, softline
+                   , spacedBulletedList, string, style, stylesUpdateL, useColorL
+                   , vsep
                    )
 import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.PrettyPrint.PrettyException
@@ -350,3 +354,11 @@ bugRequest =  "Please report this bug at Stack's repository."
 -- | Maybe cons.
 mcons :: Maybe a -> [a] -> [a]
 mcons ma as = maybe as (:as) ma
+
+-- | Write a 'Utf8Builder' to the standard output stream.
+putUtf8Builder :: MonadIO m => Utf8Builder -> m ()
+putUtf8Builder = putBuilder . getUtf8Builder
+
+-- | Write a 'Builder' to the standard output stream.
+putBuilder :: MonadIO m => Builder -> m ()
+putBuilder = hPutBuilder stdout

@@ -6,8 +6,8 @@
 stack templates
 ~~~
 
-`stack templates` provides information about project templates used with the
-[`stack new` command](new_command.md).
+`stack templates` provides information to the standard output stream about
+project templates used with the [`stack new` command](new_command.md).
 
 Project templates are specified in `.hsfiles` files. The format of those files
 is documented at the

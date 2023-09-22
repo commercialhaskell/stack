@@ -29,13 +29,13 @@ import           Stack.Types.SourceMap
                    ( ProjectPackage (..), SMWanted (..), ppComponentsMaybe )
 import           System.IO ( putStrLn )
 
--- Type representing output channel choices for the @stack ide packages@ and
+-- Type representing output stream choices for the @stack ide packages@ and
 -- @stack ide targets@ commands.
 data OutputStream
   = OutputLogInfo
-    -- ^ To the same output channel as other log information.
+    -- ^ To the same output stream as other log information.
   | OutputStdout
-    -- ^ To the standard output channel.
+    -- ^ To the standard output stream.
 
 -- Type representing output choices for the @stack ide packages@ command.
 data ListPackagesCmd
