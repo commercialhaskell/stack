@@ -37,7 +37,7 @@ The `stack hpc report` command generates a report for a selection of targets and
 
 Pass the flag `--all` for a report that uses all stored results.
 
-Pass the flag --open` to open the HTML report in your browser.
+Pass the flag `--open` to open the HTML report in your browser.
 
 ## The `extra-tix-files` directory
 
