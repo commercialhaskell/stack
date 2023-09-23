@@ -1278,12 +1278,10 @@ issues for Stackage maintenance.
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
+Default: `true`
+
 When Stack notices that a new version of Stack is available, should it notify
 the user?
-
-~~~yaml
-recommend-stack-upgrade: true
-~~~
 
 ### rebuild-ghc-options
 
@@ -1291,16 +1289,15 @@ recommend-stack-upgrade: true
 
 Default: `false`
 
-Should we rebuild a package when its GHC options change? Before Stack 0.1.6,
-this was a non-configurable `true`. However, in most cases, the flag is used to
-affect optimization levels and warning behavior, for which GHC itself doesn't
-actually recompile the modules anyway. Therefore, the new behavior is to not
-recompile on an options change, but this behavior can be changed back with the
-following:
+Should Stack rebuild a package when its GHC options change?
 
-~~~yaml
-rebuild-ghc-options: true
-~~~
+The default value reflects that, in most cases, GHC options are used to affect
+optimization levels and warning behavior, for which GHC does not recompile the
+modules.
+
+!!! note
+
+    Before Stack 0.1.6.0, Stack rebuilt a package when its GHC options changed.
 
 ### require-stack-version
 
