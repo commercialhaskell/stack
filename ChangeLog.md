@@ -10,8 +10,9 @@ Major changes:
 
 Behavior changes:
 
-* `stack list`, `stack templates` and `stack uninstall` output to the standard
-  output stream rather than to the standard error stream.
+* `stack hpc report`, `stack list`, `stack templates` and `stack uninstall`
+  output their information to the standard output stream rather than to the
+  standard error stream. Logging is still to the standard error stream.
 
 Other enhancements:
 

@@ -63,8 +63,9 @@ unified report with just two, we can instead command:
 stack hpc report A B
 ~~~
 
-This will output a textual report for the combined coverage from `A` and `B`'s
-test suites, along with a path to the HTML for the report.
+This will output to the standard output stream a summary report for the combined
+coverage from `A` and `B`'s test suites. It will also log the path to the HTML
+for the corresponding full report.
 
 This command also supports taking extra `.tix` files.  If you've also built an
 executable, against exactly the same library versions of `A`, `B`, and `C`, then
@@ -101,13 +102,17 @@ This report will consider all test results as well as the newly generated
 
 When your project has these properties, you will get the following:
 
-1.  Textual coverage reports in the build output.
+1.  Summary coverage reports, sent to the standard output stream in the build
+    output, and a log of the paths to the HTML for the corresponding full
+    reports.
 
-2.  A unified textual and HTML report, considering the coverage on all local
-    libraries, based on all of the tests that were run.
+2.  A summary unified report, sent to the standard output stream, and a log of
+    the path to the HTML for the corresponding full report. These reports
+    consider the coverage on all local libraries, based on all of the tests that
+    were run.
 
 3.  An index of all generated HTML reports, in `index.html` in the local
-    HPC root directory.
+    HPC root directory, and a log of the path to the HTML for that index.
 
 ## Implementation details
 
@@ -147,10 +152,10 @@ However, advanced users may want to understand exactly how `--coverage` works:
    executable. See issue
    [#1359](https://github.com/commercialhaskell/stack/issues/1359).
 
-5. Once we have a `.tix` file for a test, we also generate a textual and HTML
-   report for it. The textual report is sent to the terminal. The index of the
-   test-specific HTML report is available `pkg-name/test-name/index.html` in the
-   local HPC root directory.
+5. Once we have a `.tix` file for a test, we also generate a summary report and
+   a corresponding full report using HTML. The summary report is sent to the
+   standard output stream. The index of the test-specific HTML report is
+   available at `pkg-name/test-name/index.html` in the local HPC root directory.
 
 6. After the build completes, if there are multiple output `*.tix` files, they
    get combined into a unified report. The index of this report will be
