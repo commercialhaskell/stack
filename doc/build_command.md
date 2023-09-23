@@ -555,14 +555,14 @@ package is targetted in a multi-package project (for example, using
 `stack build <package_name>`).
 
 * **One target package:** The build output for the target package is sent to the
-  standard error output stream of the console as it happens.
+  standard error stream of the console as it happens.
 
 * **More than one target package:** The build output from GHC (as opposed to
   from Stack) for each target package is sent to a log file for that package,
   unless an error occurs that prevents that. At the end of the build, the
   location of the directory containing the log files is reported. To also output
-  the contents of the log files to the standard error output stream of the
-  console at the end of the build, use Stack's `dump-logs` option. For further
+  the contents of the log files to the standard error stream of the console at
+  the end of the build, use Stack's `dump-logs` option. For further
   information about that option, see the
   [YAML configuration](yaml_configuration.md#dump-logs) documentation. The
   default `dump-logs` mode is to output the contents of the log files that are
@@ -606,10 +606,10 @@ Default: Enabled
 Cabal defines a test suite interface
 ['exitcode-stdio-1.0'](https://hackage.haskell.org/package/Cabal-syntax-3.8.1.0/docs/Distribution-Types-TestSuiteInterface.html#v:TestSuiteExeV1.0)
 where the test suite takes the form of an executable and the executable takes
-nothing on the standard input channel (`stdin`). Pass this flag to override that
-specification and allow the executable to receive input on that channel. If you
+nothing on the standard input stream (`stdin`). Pass this flag to override that
+specification and allow the executable to receive input on that stream. If you
 pass `--no-tests-allow-stdin` and the executable seeks input on the standard
-input channel, an exception will be thown.
+input stream, an exception will be thown.
 
 ## Examples
 

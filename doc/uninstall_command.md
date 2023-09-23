@@ -6,6 +6,6 @@
 stack uninstall
 ~~~
 
-`stack uninstall` provides information about how to uninstall Stack or a
-Stack-supplied tool (such as GHC or, on Windows, MSYS2). It does not
-itself uninstall Stack or a Stack-supplied tool.
+`stack uninstall` provides information to the standard output stream about how
+to uninstall Stack or a Stack-supplied tool (such as GHC or, on Windows, MSYS2).
+It does not itself uninstall Stack or a Stack-supplied tool.

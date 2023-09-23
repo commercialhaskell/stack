@@ -8,21 +8,22 @@
 stack list [PACKAGE]
 ~~~
 
-`stack list <package_name>` will list the latest version of the package from
-Hackage. If the package name cannot be found on Hackage, even after updating the
-package index, suggestions (not necessarily good ones) will be made about the
-intended package name.
+`stack list <package_name>` will send to the standard output stream the latest
+version of the package from Hackage. If the package name cannot be found on
+Hackage, even after updating the package index, suggestions (not  necessarily
+good ones) will be made about the intended package name.
 
-`stack --resolver <snapshot> list <package_name>` will list the version of the
-package in the specified snapshot, unless the package comes with GHC on
-Unix-like operating systems. If the package name cannot be found in the
-snapshot, the command will fail, identifying only the package(s) that did not
-appear in the snapshot.
+`stack --resolver <snapshot> list <package_name>` will send to the standard
+output stream the version of the package in the specified snapshot, unless the
+package comes with GHC on Unix-like operating systems. If the package name
+cannot be found in the snapshot, the command will fail, identifying only the
+package(s) that did not appear in the snapshot.
 
 More than one package name can be specified.
 
-`stack --resolver <snapshot> list` will list all the packages in the specified
-snapshot, except those which come with GHC on Unix-like operating systems.
+`stack --resolver <snapshot> list` will send to the standard output stream a
+list of all the packages in the specified snapshot, except those which come with
+GHC on Unix-like operating systems.
 
 For example:
 

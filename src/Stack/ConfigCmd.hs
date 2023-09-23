@@ -364,4 +364,4 @@ cfgCmdEnv es = do
         encodeUtf8Builder key <> ";\n"
       escape '\'' = "'\"'\"'"
       escape c = T.singleton c
-  hPutBuilder stdout $ Map.foldMapWithKey toLine actions
+  putBuilder $ Map.foldMapWithKey toLine actions

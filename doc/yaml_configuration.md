@@ -796,8 +796,8 @@ unless an error occurs that prevents that. For further information, see the
 documentation.
 
 The value of the `dump-logs` key controls what, if any, log file content is sent
-('dumped') to the standard error output stream of the console at the end of the
-build. Possible values are:
+('dumped') to the standard error stream of the console at the end of the build.
+Possible values are:
 
 ~~~yaml
 dump-logs: none      # don't dump the content of any log files
@@ -810,8 +810,8 @@ At the command line, `--no-dump-logs` is equivalent to `dump-logs: none` and
 
 If GHC reports an error during the build and a log file is created, that build
 output will be included in the log file. Stack will also report errors during
-building to the standard error output stream. That stream can be piped to a
-file. For example, for a file named `stderr.log`:
+building to the standard error stream. That stream can be piped to a file. For
+example, for a file named `stderr.log`:
 
 ~~~text
 stack --no-dump-logs --color always build --no-interleaved-output 2> stderr.log
