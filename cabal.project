@@ -33,7 +33,7 @@
 -- specified by the snapshot specifed in Stack's project-level YAML
 -- configuration file (`stack.yaml`). The relevant version of GHC can be
 -- confirmed by reviewing the snapshot on Stackage. For example, at:
--- https://www.stackage.org/lts-21.12/cabal.config.
+-- https://www.stackage.org/lts-21.13/cabal.config.
 --
 with-compiler: ghc-9.4.7
 import: cabal.config
