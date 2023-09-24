@@ -1,3 +1,4 @@
+# See https://github.com/commercialhaskell/stack/issues/6252#issuecomment-1732106343
 # See https://github.com/mxschmitt/action-tmate
 
 name: tmate
@@ -14,6 +15,12 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
+    - name: Sign assets
+      shell: bash
+      env:
+        RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+      run: |
+        echo "$RELEASE_SIGNING_KEY"|gpg --import
     # Enable tmate debugging of manually-triggered workflows if the input
     # option was provided
     - name: Setup tmate session
