@@ -14,10 +14,10 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-      # Enable tmate debugging of manually-triggered workflows if the input
-      # option was provided
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
-        with:
-          limit-access-to-actor: true
+    # Enable tmate debugging of manually-triggered workflows if the input
+    # option was provided
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+      with:
+        limit-access-to-actor: true
