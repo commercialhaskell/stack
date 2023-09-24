@@ -75,12 +75,12 @@ packages:
   original:
     hackage: crypton-x509-validation-1.6.12@sha256:85989721b64be4b90de9f66ef641c26f57575cffed1a50d707065fb60176f386,2227
 - completed:
-    hackage: hpack-0.35.5@sha256:22b46f28b53ec6fb2d05517b569a74b8b3e5e8c2e89c6b7ca25b345af62f22fa,5119
+    hackage: hpack-0.36.0@sha256:c2daa6556afc57367a5d1dbd878bf515d442d201e24b27473051359abd47ed08,5187
     pantry-tree:
-      sha256: d129102d5c4a66111877f48f6f4ba93615df574eb85195faf185c53a3cb215bd
+      sha256: 981e8f8ab3dc8305c5131f4686c835f55d4a841abcc867bfdcbf9e6757e9a638
       size: 3742
   original:
-    hackage: hpack-0.35.5@sha256:22b46f28b53ec6fb2d05517b569a74b8b3e5e8c2e89c6b7ca25b345af62f22fa,5119
+    hackage: hpack-0.36.0@sha256:c2daa6556afc57367a5d1dbd878bf515d442d201e24b27473051359abd47ed08,5187
 - completed:
     hackage: http-client-tls-0.3.6.3@sha256:a5909ce412ee65c141b8547f8fe22236f175186c95c708e86a46b5547394f910,2046
     pantry-tree:

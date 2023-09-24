@@ -359,7 +359,7 @@ library
     , generic-deriving
     , ghc-boot
     , hi-file-parser >=0.1.4.0
-    , hpack >=0.35.3
+    , hpack >=0.36.0
     , hpc
     , http-client
     , http-client-tls >=0.3.6.2
@@ -477,7 +477,7 @@ executable stack
     , generic-deriving
     , ghc-boot
     , hi-file-parser >=0.1.4.0
-    , hpack >=0.35.3
+    , hpack >=0.36.0
     , hpc
     , http-client
     , http-client-tls >=0.3.6.2
@@ -574,7 +574,7 @@ executable stack-integration-test
     , generic-deriving
     , ghc-boot
     , hi-file-parser >=0.1.4.0
-    , hpack >=0.35.3
+    , hpack >=0.36.0
     , hpc
     , hspec
     , http-client
@@ -687,7 +687,7 @@ test-suite stack-unit-test
     , generic-deriving
     , ghc-boot
     , hi-file-parser >=0.1.4.0
-    , hpack >=0.35.3
+    , hpack >=0.36.0
     , hpc
     , hspec
     , http-client

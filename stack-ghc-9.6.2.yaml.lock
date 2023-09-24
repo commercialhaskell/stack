@@ -13,7 +13,7 @@ packages:
     hackage: rio-prettyprint-0.1.7.0@sha256:4f0f2dabcbc3be1f9871de7c2ff3d090b82462ca5924afa24f7b2540c5511d84,1428
 snapshots:
 - completed:
-    sha256: a25fd287afcd300f35a2019a03c990169f7507ae0f43dfec763062c9ad891193
-    size: 667855
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/9/16.yaml
-  original: nightly-2023-09-16
+    sha256: 93137bc0122de394fa2c43e933971b2996cd7dc600989b721ad971810b9a2f3f
+    size: 669537
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/9/22.yaml
+  original: nightly-2023-09-22

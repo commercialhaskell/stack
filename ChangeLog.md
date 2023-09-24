@@ -16,6 +16,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Bump to Hpack 0.36.0.
+
 Bug fixes:
 
 * Restore message suffix `due to warnings` with `dump-logs: warning` (broken
