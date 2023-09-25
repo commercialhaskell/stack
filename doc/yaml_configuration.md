@@ -800,9 +800,9 @@ The value of the `dump-logs` key controls what, if any, log file content is sent
 Possible values are:
 
 ~~~yaml
-dump-logs: none      # don't dump the content of any log files
-dump-logs: warning   # dump the content of log files that are warnings
-dump-logs: all       # dump all of the content of log files
+dump-logs: none    # don't dump the content of any log files
+dump-logs: warning # dump the content of any log files that include GHC warnings
+dump-logs: all     # dump the content of all log files
 ~~~
 
 At the command line, `--no-dump-logs` is equivalent to `dump-logs: none` and
