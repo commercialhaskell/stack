@@ -4,6 +4,8 @@
 
 Release notes:
 
+* Binaries are now provided for macOS/AArch64.
+
 **Changes since v2.13.0.1:**
 
 Major changes:
