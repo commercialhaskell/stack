@@ -117,13 +117,6 @@ packages:
   original:
     hackage: pantry-0.9.2@sha256:e1c5444d1b4003435d860853abd21e91e5fc337f2b2e2c8c992a2bac04712dc0,7650
 - completed:
-    hackage: rio-prettyprint-0.1.7.0@sha256:4f0f2dabcbc3be1f9871de7c2ff3d090b82462ca5924afa24f7b2540c5511d84,1428
-    pantry-tree:
-      sha256: 5d18c4b8e4a0a959ab3e8544ea1baae1674ebbe01f379a2a75215c05f7d255ee
-      size: 779
-  original:
-    hackage: rio-prettyprint-0.1.7.0@sha256:4f0f2dabcbc3be1f9871de7c2ff3d090b82462ca5924afa24f7b2540c5511d84,1428
-- completed:
     hackage: static-bytes-0.1.0@sha256:35dbf30f617baa0151682c97687042516be07872a39984f9fe31f78125b962bf,1627
     pantry-tree:
       sha256: 38980443d7bdf00dde4c34babbb1e4b858cdc3aca8973c50f22444cfb03135a2
@@ -146,7 +139,7 @@ packages:
     hackage: tls-1.9.0@sha256:8ad332dc0224decb1b137bf6c9678b4f786487b9aaa5c9068cd3ad19d42c39a7,5571
 snapshots:
 - completed:
-    sha256: 9313df78f49519315342f4c51ffc5da12659d3735f8ac3c54a1fb98ff874474e
-    size: 640036
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/12.yaml
-  original: lts-21.12
+    sha256: 8017c7970c2a8a9510c60cc70ac245d59e0c34eb932b91d37af09fe59855d854
+    size: 640038
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/13.yaml
+  original: lts-21.13
