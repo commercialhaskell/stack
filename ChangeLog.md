@@ -24,6 +24,8 @@ Bug fixes:
 
 * Restore message suffix `due to warnings` with `dump-logs: warning` (broken
   with Stack 2.11.1).
+* On Windows, the `local-programs-path` directory can now be on a different
+  drive to the system temporary directory and MSYS2 will still be installed.
 
 ## v2.13.0.1 (release candidate) - 2023-09-16
 

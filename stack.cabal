@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.35.5.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -40,10 +40,8 @@ extra-source-files:
     doc/clean_command.md
     doc/config_command.md
     doc/CONTRIBUTING.md
-    doc/coverage.md
     doc/custom_snapshot.md
     doc/debugging.md
-    doc/dependency_visualization.md
     doc/dev_containers.md
     doc/developing_on_windows.md
     doc/docker_command.md

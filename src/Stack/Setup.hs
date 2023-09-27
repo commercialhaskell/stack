@@ -43,6 +43,7 @@ import           Data.Conduit.Process.Typed ( createSource )
 import           Data.Conduit.Zlib ( ungzip )
 import           Data.List.Split ( splitOn )
 import qualified Data.Map as Map
+import           Data.Maybe ( fromJust )
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
@@ -65,8 +66,9 @@ import           Network.HTTP.StackClient
                    )
 import           Network.HTTP.Simple ( getResponseHeader )
 import           Path
-                   ( (</>), addExtension, filename, parent, parseAbsDir
-                   , parseAbsFile, parseRelDir, parseRelFile, toFilePath
+                   ( (</>), addExtension, filename, fromAbsDir, parent
+                   , parseAbsDir, parseAbsFile, parseRelDir, parseRelFile
+                   , toFilePath
                    )
 import           Path.CheckInstall ( warnInstallSearchPathIssues )
 import           Path.Extended ( fileExtension )
@@ -74,7 +76,7 @@ import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
                    ( canonicalizePath, doesFileExist, ensureDir, executable
                    , getPermissions, ignoringAbsence, listDir, removeDirRecur
-                   , renameDir, renameFile, resolveFile'
+                   , renameDir, renameFile, resolveFile', withTempDir
                    )
 import           RIO.List
                    ( headMaybe, intercalate, intersperse, isPrefixOf
@@ -165,7 +167,7 @@ import           Stack.Types.VersionedDownloadInfo
 import qualified System.Directory as D
 import           System.Environment ( getExecutablePath, lookupEnv )
 import           System.IO.Error ( isPermissionError )
-import           System.FilePath ( searchPathSeparator )
+import           System.FilePath ( searchPathSeparator, takeDrive )
 import qualified System.FilePath as FP
 import           System.Permissions ( setFileExecutable )
 import           System.Uname ( getRelease )
@@ -2344,18 +2346,23 @@ withUnpackedTarball7z name si archiveFile archiveType destDir = do
   -- We use a short name for the temporary directory to reduce the risk of a
   -- filepath length of more than 260 characters, which can be problematic for
   -- 7-Zip even if Long Filepaths are enabled on Windows.
-  let tmpName = "tmp"
+  let tmpName = "stack-tmp"
+      destDrive = fromJust $ parseAbsDir $ takeDrive $ fromAbsDir destDir
   ensureDir (parent destDir)
   withRunInIO $ \run ->
-  -- We use the system temporary directory to reduce the risk of a filepath
-  -- length of more than 260 characters, which can be problematic for
-  -- 7-Zip even if Long Filepaths are enabled on Windows.
-    withSystemTempDir tmpName $ \tmpDir ->
+  -- We use a temporary directory in the same drive as that of 'destDir' to
+  -- reduce the risk of a filepath length of more than 260 characters, which can
+  -- be problematic for 7-Zip even if Long Filepaths are enabled on Windows. We
+  -- do not use the system temporary directory as it may be on a different
+  -- drive.
+    withTempDir destDrive tmpName $ \tmpDir ->
       run $ do
         liftIO $ ignoringAbsence (removeDirRecur destDir)
         run7z tmpDir archiveFile
         run7z tmpDir (tmpDir </> tarFile)
         absSrcDir <- expectSingleUnpackedDir archiveFile tmpDir
+        -- On Windows, 'renameDir' does not work across drives. However, we have
+        -- ensured that 'tmpDir' has the same drive as 'destDir'.
         renameDir absSrcDir destDir
 
 expectSingleUnpackedDir ::
