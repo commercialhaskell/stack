@@ -15,6 +15,8 @@ Behavior changes:
 * `stack hpc report`, `stack list`, `stack templates` and `stack uninstall`
   output their information to the standard output stream rather than to the
   standard error stream. Logging is still to the standard error stream.
+* `stack upgrade` no longer assumes that binary upgrade is not supported on a
+  AArch64 machine architecture.
 
 Other enhancements:
 
