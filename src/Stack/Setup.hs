@@ -2797,11 +2797,14 @@ preferredPlatforms = do
       I386 -> pure "i386"
       X86_64 -> pure "x86_64"
       Arm -> pure "arm"
+      AArch64 -> pure "aarch64"
       _ -> prettyThrowM $ BinaryUpgradeOnArchUnsupported arch'
   let hasgmp4 = False -- FIXME import relevant code from Stack.Setup?
                       -- checkLib $(mkRelFile "libgmp.so.3")
       suffixes
+          -- 'gmp4' ceased to be relevant after Stack 1.9.3 (December 2018).
         | hasgmp4 = ["-static", "-gmp4", ""]
+          -- 'static' will cease to be relevant after Stack 2.11.1 (May 2023).
         | otherwise = ["-static", ""]
   pure $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
 
