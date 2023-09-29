@@ -1,41 +1,13 @@
 # Changelog
 
-## Unreleased changes
-
-Release notes:
-
-* Binaries are now provided for macOS/AArch64.
-
-**Changes since v2.13.0.1:**
-
-Major changes:
-
-Behavior changes:
-
-* `stack hpc report`, `stack list`, `stack templates` and `stack uninstall`
-  output their information to the standard output stream rather than to the
-  standard error stream. Logging is still to the standard error stream.
-* `stack upgrade` no longer assumes that binary upgrade is not supported on a
-  AArch64 machine architecture.
-
-Other enhancements:
-
-* Bump to Hpack 0.36.0.
-
-Bug fixes:
-
-* Restore message suffix `due to warnings` with `dump-logs: warning` (broken
-  with Stack 2.11.1).
-* On Windows, the `local-programs-path` directory can now be on a different
-  drive to the system temporary directory and MSYS2 will still be installed.
-
-## v2.13.0.1 (release candidate) - 2023-09-16
+## v2.13.1 - 2023-09-29
 
 Release notes:
 
 * Further to the release notes for Stack 2.3.1, the `-static` suffix has been
   removed from the statically linked Linux/x86_64 binaries.
 * The binaries for Linux/Aarch64 are now statically linked.
+* Binaries are now provided for macOS/AArch64.
 
 **Changes since v2.11.1:**
 
@@ -60,10 +32,15 @@ Behavior changes:
 * When unregistering many packages in a single step, Stack can now do that
   efficiently. Stack no longer uses GHC-supplied `ghc-pkg unregister` (which is,
   currently, slower).
+* `stack hpc report`, `stack list`, `stack templates` and `stack uninstall`
+  output their information to the standard output stream rather than to the
+  standard error stream. Logging is still to the standard error stream.
+* `stack upgrade` no longer assumes that binary upgrade is not supported on a
+  AArch64 machine architecture.
 
 Other enhancements:
 
-* Bump to Hpack 0.35.5.
+* Bump to Hpack 0.36.0.
 * Depend on `pantry-0.9.2`, for support for long filenames and directory names
   in archives created by `git archive`.
 * Avoid the duplicate resolving of usage files when parsing `*.hi` files into a
@@ -96,6 +73,10 @@ Bug fixes:
   `-hide-all-packages`, stopping GHC from looking for a package environment in
   default locations.
 * Restore Stack script files without extensions (broken with Stack 2.11.1).
+* Restore message suffix `due to warnings` with `dump-logs: warning` (broken
+  with Stack 2.11.1).
+* On Windows, the `local-programs-path` directory can now be on a different
+  drive to the system temporary directory and MSYS2 will still be installed.
 
 ## v2.11.1 - 2023-05-18
 
@@ -411,8 +392,8 @@ Other enhancements:
 
 Bug fixes:
 
-* `stack new` now supports branches other than `master` as default for
-  GitHub repositories. See
+* `stack new` now supports branches other than `master` as default for GitHub
+  repositories. See
   [#5422](https://github.com/commercialhaskell/stack/issues/5422)
 
 * Ignore all errors from `hi-file-parser`. See
@@ -448,8 +429,8 @@ Major changes:
 
 Behavior changes:
 
-* File watching now takes into account specified targets, old behavior could
-  be restored using the new flag `--watch-all`
+* File watching now takes into account specified targets, old behavior could be
+  restored using the new flag `--watch-all`
   [#5310](https://github.com/commercialhaskell/stack/issues/5310)
 
 Other enhancements:
@@ -486,8 +467,8 @@ Other enhancements:
 Bug fixes:
 
 * When using the `STACK_YAML` env var with Docker, make the path absolute.
-* Fix the problem of `stack repl foo:test:bar` failing without a project
-  build before that. See
+* Fix the problem of `stack repl foo:test:bar` failing without a project build
+  before that. See
   [#5213](https://github.com/commercialhaskell/stack/issues/5213)
 * Fix `stack sdist` introducing unnecessary sublibrary syntax when using
   pvp-bounds. See
@@ -518,8 +499,8 @@ Release notes:
   former, nothing needs to change). For this release, both are supported, but
   the next release will no longer have the `-static` variant.
 
-* We are also deprecating the download links at https://stackage.org/stack.
-  See this page for the current installation instructions:
+* We are also deprecating the download links at https://stackage.org/stack. See
+  this page for the current installation instructions:
   https://docs.haskellstack.org/en/stable/install_and_upgrade/.
 
 * These are the canonical locations to download the latest stable binaries from,
@@ -575,11 +556,11 @@ Behavior changes:
 
 Other enhancements:
 
-* Add `build-output-timestamps` flag in yaml. Setting it to true
-  prefixes each build log output line with a timestamp.
+* Add `build-output-timestamps` flag in yaml. Setting it to true prefixes each
+  build log output line with a timestamp.
 
-* Show warning about `local-programs-path` with spaces on windows
-  when running scripts. See
+* Show warning about `local-programs-path` with spaces on windows when running
+  scripts. See
   [#5013](https://github.com/commercialhaskell/stack/pull/5013)
 
 * Add `ls dependencies json` which will print dependencies as JSON.
@@ -641,8 +622,8 @@ Hackage-only release:
 
 Behavior changes:
 
-* Disable WAL mode for SQLite3 databases, to improve compatibility with
-  some platforms and filesystems.  See
+* Disable WAL mode for SQLite3 databases, to improve compatibility with some
+  platforms and filesystems. See
   [#4876](https://github.com/commercialhaskell/stack/issues/4876).
 
 * By default, do not perform expiry checks in Hackage Security. See
@@ -650,13 +631,12 @@ Behavior changes:
 
 Other enhancements:
 
-* Do not rerun expected test failures. This is mostly a change that
-  will only affect the Stackage Curator use case, but there is now an
-  additional message letting the user know when a previously-failed
-  test case is being rerun.
+* Do not rerun expected test failures. This is mostly a change that will only
+  affect the Stackage Curator use case, but there is now an additional message
+  letting the user know when a previously-failed test case is being rerun.
 
-* Move configure information for local packages back to .stack-work to
-  improve caching. See
+* Move configure information for local packages back to .stack-work to improve
+  caching. See
   [#4893](https://github.com/commercialhaskell/stack/issues/4893).
 
 Bug fixes:
@@ -675,12 +655,12 @@ Bug fixes:
   avoiding a SIGTERM screwing up GHC installation. See
   [#4888](https://github.com/commercialhaskell/stack/issues/4888).
 
-* Use package complete locations from lock files when resolving dependencies
-  in `extra-deps`. See
+* Use package complete locations from lock files when resolving dependencies in
+  `extra-deps`. See
   [#4887](https://github.com/commercialhaskell/stack/issues/4887).
 
-* Set the `HASKELL_DIST_DIR` environment to a proper package dist
-  directory so `doctest` is able to load modules autogenerated by Cabal.
+* Set the `HASKELL_DIST_DIR` environment to a proper package dist directory so
+  `doctest` is able to load modules autogenerated by Cabal.
 
 * Expose package library when running tests.
 
@@ -702,11 +682,11 @@ Hackage-only release that removes `stack.yaml` from the sdist.  This is because
 basis on individual packages (see
 [#4860](https://github.com/commercialhaskell/stack/issues/4860))
 
-If building a `stack` executable for distribution, please download the
-source code from https://github.com/commercialhaskell/stack/releases/tag/v2.1.1
-and build it using Stack itself in order to ensure identical behaviour
-to official binaries.  This package on Hackage is provided for convenience
-and bootstrapping purposes.
+If building a `stack` executable for distribution, please download the source
+code from https://github.com/commercialhaskell/stack/releases/tag/v2.1.1 and
+build it using Stack itself in order to ensure identical behaviour to official
+binaries. This package on Hackage is provided for convenience and bootstrapping
+purposes.
 
 
 ## v2.1.1 - 2019-06-13
@@ -724,9 +704,8 @@ features, as listed below.
 
 Major changes:
 
-* Switch over to pantry for managing packages. This is a major change
-  to Stack's internals, and affects user-visible behavior in a few
-  places. Some highlights:
+* Switch over to pantry for managing packages. This is a major change to Stack's
+  internals, and affects user-visible behavior in a few places. Some highlights:
     * Drop support for multiple package indices and legacy
       `00-index.tar` style indices. See
       [#4137](https://github.com/commercialhaskell/stack/issues/4137).
