@@ -2,7 +2,7 @@ flags: {}
 packages:
 - '.'
 extra-deps: []
-resolver: lts-21.12
+resolver: lts-21.13
 build:
   haddock-arguments:
     haddock-args:

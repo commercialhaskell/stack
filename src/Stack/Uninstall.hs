@@ -6,14 +6,14 @@ module Stack.Uninstall
   ( uninstallCmd
   ) where
 
-import          Stack.Constants ( osIsWindows )
-import          Stack.Prelude
-import          Stack.Runners ( ShouldReexec (..), withConfig )
-import          Stack.Types.Config
-                  ( configL, configLocalBin, configLocalProgramsBase
-                  , stackGlobalConfigL, stackRootL
-                  )
-import          Stack.Types.Runner ( Runner )
+import           Stack.Constants ( osIsWindows )
+import           Stack.Prelude
+import           Stack.Runners ( ShouldReexec (..), withConfig )
+import           Stack.Types.Config
+                   ( configL, configLocalBin, configLocalProgramsBase
+                   , stackGlobalConfigL, stackRootL
+                   )
+import           Stack.Types.Runner ( Runner )
 
 -- | Function underlying the @stack uninstall@ command. Display help for the
 -- command.
@@ -28,8 +28,8 @@ uninstallCmd () = withConfig NoReexec $ do
       globalConfig' = toStyleDoc globalConfig
       programsDir' = toStyleDoc programsDir
       localBinDir' = toStyleDoc localBinDir
-  prettyInfo $
-       vsep
+  putUtf8Builder =<< displayWithColor
+    (  vsep
          [ flow "To uninstall Stack, it should be sufficient to delete:"
          , hang 4 $ fillSep
              [ flow "(1) the directory containing Stack's tools"
@@ -59,26 +59,27 @@ uninstallCmd () = withConfig NoReexec $ do
              , flow "directories in any Haskell projects that you have built."
              ]
          ]
-      <> blankLine
-      <> vsep
-           [ fillSep
-               [ flow "To uninstall completely a Stack-supplied tool (such as \
-                      \GHC or, on Windows, MSYS2), delete from Stack's tools \
-                      \directory"
-               , parens programsDir' <> ":"
-               ]
-           , hang 4 $ fillSep
-               [ flow "(1) the tool's subdirectory;"
-               ]
-           , hang 4 $ fillSep
-               [ flow "(2) the tool's archive file"
-               , parens (style File "<tool>.tar.xz") <> "; and"
-               ]
-           , hang 4 $ fillSep
-               [ flow "(3) the file marking that the tool is installed"
-               , parens (style File "<tool>.installed") <> "."
-               ]
-           ]
+    <> blankLine
+    <> vsep
+         [ fillSep
+             [ flow "To uninstall completely a Stack-supplied tool (such as \
+                    \GHC or, on Windows, MSYS2), delete from Stack's tools \
+                    \directory"
+             , parens programsDir' <> ":"
+             ]
+         , hang 4 $ fillSep
+             [ flow "(1) the tool's subdirectory;"
+             ]
+         , hang 4 $ fillSep
+             [ flow "(2) the tool's archive file"
+             , parens (style File "<tool>.tar.xz") <> "; and"
+             ]
+         , hang 4 $ fillSep
+             [ flow "(3) the file marking that the tool is installed"
+             , parens (style File "<tool>.installed") <> "."
+             ]
+         ]
+    )
  where
   styleShell = style Shell
   howToFindStack

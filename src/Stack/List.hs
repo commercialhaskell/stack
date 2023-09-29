@@ -8,6 +8,7 @@ module Stack.List
   ) where
 
 import           Pantry ( loadSnapshot )
+import qualified RIO.ByteString.Lazy as Lazy
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
 import           Stack.Config ( makeConcreteResolver )
@@ -56,7 +57,7 @@ listPackages mSnapshot input = do
   case errs1 ++ errs2 of
     [] -> pure ()
     errs -> prettyThrowM $ CouldNotParsePackageSelectors errs
-  mapM_ (prettyInfo . fromString . packageIdentifierString) locs
+  mapM_ (Lazy.putStrLn . fromString . packageIdentifierString) locs
  where
   toLoc | Just snapshot <- mSnapshot = toLocSnapshot snapshot
         | otherwise = toLocNoSnapshot

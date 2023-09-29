@@ -8,7 +8,7 @@ module Stack.Templates
   ) where
 
 import qualified Data.ByteString.Lazy as LB
-import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import           Network.HTTP.StackClient
                    ( HttpException (..), getResponseBody, httpLbs, parseUrlThrow
                    , setGitHubHeaders
@@ -69,7 +69,7 @@ templatesHelp = do
     (prettyThrowM . DownloadTemplatesHelpFailed)
   case decodeUtf8' $ LB.toStrict $ getResponseBody resp of
     Left err -> prettyThrowM $ TemplatesHelpEncodingInvalid url err
-    Right txt -> prettyInfo (string $ T.unpack txt)
+    Right txt -> liftIO $ T.putStrLn txt
 
 -- | Default web URL to get the `stack templates` help output.
 defaultTemplatesHelpUrl :: String

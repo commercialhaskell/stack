@@ -98,8 +98,8 @@ installation, and various settings like build flags. It is called a resolver
 since a snapshot states how dependencies are resolved. There are currently
 four resolver types:
 
-* LTS Haskell snapshots, e.g. `resolver: lts-21.12`
-* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-09-16`
+* LTS Haskell snapshots, e.g. `resolver: lts-21.13`
+* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-09-24`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
   like `resolver: ghc-9.6.2`
 * Custom snapshot, via a URL or relative file path. For further information, see
@@ -463,7 +463,7 @@ build:
 
   # Since 1.8. Starting with 2.0, the default is true
   interleaved-output: true
-  # Since UNRELEASED. Available options are none, count-only, capped and full.
+  # Since 2.13.1. Available options are none, count-only, capped and full.
   progress-bar: capped
   # Since 1.10.
   ddump-dir: ""
@@ -480,7 +480,7 @@ of the same name. For further information, see the
 
 ### casa
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.13.1](https://github.com/commercialhaskell/stack/releases/tag/v2.13.1)
 
 Default:
 
@@ -536,7 +536,7 @@ resolvers like `ghc-9.6.2`. This can be used to override the
 compiler for a Stackage snapshot, like this:
 
 ~~~yaml
-resolver: lts-21.12
+resolver: lts-21.13
 compiler: ghc-9.6.2
 compiler-check: match-exact
 ~~~
@@ -796,13 +796,13 @@ unless an error occurs that prevents that. For further information, see the
 documentation.
 
 The value of the `dump-logs` key controls what, if any, log file content is sent
-('dumped') to the standard error output stream of the console at the end of the
-build. Possible values are:
+('dumped') to the standard error stream of the console at the end of the build.
+Possible values are:
 
 ~~~yaml
-dump-logs: none      # don't dump the content of any log files
-dump-logs: warning   # dump the content of log files that are warnings
-dump-logs: all       # dump all of the content of log files
+dump-logs: none    # don't dump the content of any log files
+dump-logs: warning # dump the content of any log files that include GHC warnings
+dump-logs: all     # dump the content of all log files
 ~~~
 
 At the command line, `--no-dump-logs` is equivalent to `dump-logs: none` and
@@ -810,8 +810,8 @@ At the command line, `--no-dump-logs` is equivalent to `dump-logs: none` and
 
 If GHC reports an error during the build and a log file is created, that build
 output will be included in the log file. Stack will also report errors during
-building to the standard error output stream. That stream can be piped to a
-file. For example, for a file named `stderr.log`:
+building to the standard error stream. That stream can be piped to a file. For
+example, for a file named `stderr.log`:
 
 ~~~text
 stack --no-dump-logs --color always build --no-interleaved-output 2> stderr.log
@@ -1278,12 +1278,10 @@ issues for Stackage maintenance.
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
+Default: `true`
+
 When Stack notices that a new version of Stack is available, should it notify
 the user?
-
-~~~yaml
-recommend-stack-upgrade: true
-~~~
 
 ### rebuild-ghc-options
 
@@ -1291,16 +1289,15 @@ recommend-stack-upgrade: true
 
 Default: `false`
 
-Should we rebuild a package when its GHC options change? Before Stack 0.1.6,
-this was a non-configurable `true`. However, in most cases, the flag is used to
-affect optimization levels and warning behavior, for which GHC itself doesn't
-actually recompile the modules anyway. Therefore, the new behavior is to not
-recompile on an options change, but this behavior can be changed back with the
-following:
+Should Stack rebuild a package when its GHC options change?
 
-~~~yaml
-rebuild-ghc-options: true
-~~~
+The default value reflects that, in most cases, GHC options are used to affect
+optimization levels and warning behavior, for which GHC does not recompile the
+modules.
+
+!!! note
+
+    Before Stack 0.1.6.0, Stack rebuilt a package when its GHC options changed.
 
 ### require-stack-version
 
@@ -1366,7 +1363,7 @@ setup-info:
 
 'Platforms' are pairs of an operating system and a machine architecture (for
 example, 32-bit i386 or 64-bit x86-64) (represented by the
-`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.11.1)
+`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.13.1)
 supports the following pairs in the format of the `setup-info` key:
 
 |Operating system|I386 arch|X86_64 arch|Other machine architectures                                 |

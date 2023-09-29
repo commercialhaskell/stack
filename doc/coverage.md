@@ -1,1 +1,0 @@
-./hpc_command.md

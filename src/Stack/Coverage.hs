@@ -14,8 +14,7 @@ module Stack.Coverage
   , generateHpcMarkupIndex
   ) where
 
-import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -32,6 +31,7 @@ import           Path.IO
                    , ignoringAbsence, listDir, removeDirRecur, removeFile
                    , resolveDir', resolveFile'
                    )
+import           RIO.ByteString.Lazy ( putStrLn )
 import           RIO.Process ( ProcessException, proc, readProcess_ )
 import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Constants
@@ -212,9 +212,9 @@ generateHpcReport pkgDir package tests = do
     tixSrc <- tixFilePath (packageName package) (T.unpack testName)
     let report = fillSep
           [ flow "coverage report for"
-          , fromString pkgName' <> "'s"
+          , style Current (fromString pkgName') <> "'s"
           , "test-suite"
-          , fromString $ "\"" <> T.unpack testName <> "\""
+          , style PkgComponent (fromString $ T.unpack testName)
           ]
         reportHtml =
              "coverage report for"
@@ -289,14 +289,15 @@ generateHpcReportInternal tixSrc reportDir report reportHtml extraMarkupArgs ext
         [ "Generating"
         , report <> "."
         ]
-      outputLines <- map (S8.filter (/= '\r')) . S8.lines . BL.toStrict . fst <$>
+      -- Strip @\r@ characters because Windows.
+      outputLines <- map (L8.filter (/= '\r')) . L8.lines . fst <$>
         proc "hpc"
         ( "report"
         : toFilePath tixSrc
         : (args ++ extraReportArgs)
         )
         readProcess_
-      if all ("(0/0)" `S8.isSuffixOf`) outputLines
+      if all ("(0/0)" `L8.isSuffixOf`) outputLines
         then do
           let msgHtml =
                    "Error: [S-6829]\n\
@@ -327,9 +328,16 @@ generateHpcReportInternal tixSrc reportDir report reportHtml extraMarkupArgs ext
           pure Nothing
         else do
           let reportPath = reportDir </> relFileHpcIndexHtml
-          -- Print output, stripping @\r@ characters because Windows.
-          forM_ outputLines (logInfo . displayBytesUtf8)
-          -- Generate the markup.
+          -- Print the summary report to the standard output stream.
+          putUtf8Builder =<< displayWithColor
+            (  fillSep
+                 [ "Summary"
+                 , report <> ":"
+                 ]
+            <> line
+            )
+          forM_ outputLines putStrLn
+          -- Generate the HTML markup.
           void $ proc "hpc"
             ( "markup"
             : toFilePath tixSrc
@@ -392,8 +400,8 @@ generateHpcReportForTargets opts tixFiles targetNames = do
       dest <- resolveDir' destDir
       ensureDir dest
       pure dest
-  let report = flow "combined report"
-      reportHtml = "combined report"
+  let report = flow "combined coverage report"
+      reportHtml = "combined coverage report"
   mreportPath <- generateUnionReport report reportHtml reportDir tixPaths
   forM_ mreportPath $ \reportPath ->
     if hroptsOpenBrowser opts
@@ -429,8 +437,8 @@ generateHpcUnifiedReport = do
       , flow "so not generating a unified coverage report."
       ]
     else do
-      let report = flow "unified report"
-          reportHtml = "unified report"
+      let report = flow "unified coverage report"
+          reportHtml = "unified coverage report"
       mreportPath <- generateUnionReport report reportHtml reportDir tixFiles
       forM_ mreportPath (displayReportPath "The" report . pretty)
 
