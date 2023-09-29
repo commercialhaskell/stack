@@ -135,11 +135,13 @@ upgrade builtHash (UpgradeOpts mbo mso) = case (mbo, mso) of
   -- See #2977 - if --git or --git-repo is specified, do source upgrade.
   (_, Just so@(SourceOpts (Just _))) -> source so
   (Just bo, Just so) -> binary bo `catchAny` \e -> do
-    prettyWarnL
-      [ flow "Exception occurred when trying to perform binary upgrade:"
-      , fromString . show $ e
-      , line <> flow "Falling back to source upgrade."
-      ]
+    prettyWarn $
+         flow "When trying to perform binary upgrade, Stack encountered the \
+              \following error:"
+      <> blankLine
+      <> ppException e
+      <> blankLine
+      <> flow "Falling back to source upgrade."
     source so
  where
   binary = binaryUpgrade
