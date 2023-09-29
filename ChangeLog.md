@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+**Changes since v2.13.1:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
 ## v2.13.1 - 2023-09-29
 
 Release notes:
