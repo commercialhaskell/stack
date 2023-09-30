@@ -428,10 +428,10 @@ GitHub repository.
 
     !!! warning "Long user PATH environment variable"
 
-        The Windows installer for Stack 2.9.1, 2.9.3 and 2.11.1 (current) (only)
-        will replace the user `PATH` environment variable (rather than append to
-        it) if a 1024 character limit is exceeded. If the content of your
-        existing user `PATH` is long, preserve it before running the installer.
+        The Windows installer for Stack 2.9.1, 2.9.3 and 2.11.1 (only) will
+        replace the user `PATH` environment variable (rather than append to it)
+        if a 1024 character limit is exceeded. If the content of your existing
+        user `PATH` is long, preserve it before running the installer.
 
     !!! note "Anti-virus software"
 
