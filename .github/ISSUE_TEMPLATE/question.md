@@ -16,7 +16,7 @@ the [stack-templates](https://github.com/commercialhaskell/stack-templates)
 repository instead.
 
 If you still want to ask the question here instead, please make sure that you
-are using the latest release (currently Stack 2.11.1). See the
+are using the latest release (currently Stack 2.13.1). See the
 [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade)
 to upgrade.
 
@@ -24,7 +24,7 @@ to upgrade.
 
 ~~~text
 stack --version
-Version 2.11.1, Git revision c1167a6abc3f4978ccded5ba0246a57387da0e2f x86_64 hpack-0.35.2
+Version 2.13.1, Git revision 8102bb8afce90fc954f48efae38b87f37cabc988 x86_64 hpack-0.36.0
 ~~~
 
 ### Method of installation
