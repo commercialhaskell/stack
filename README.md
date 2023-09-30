@@ -24,4 +24,7 @@ You can participate with the Stack community in the following areas:
   [Slack workspace](https://haskell-foundation.slack.com/join/shared_invite/zt-z45o9x38-8L55P27r12YO0YeEufcO2w#/shared-invite/email)
     * `#stack-users` channel, for general Stack discussion
     * `#stack-collaborators` channel, for working on Stack's code base
-* the [Google Group mailing list](https://groups.google.com/g/haskell-stack) for Stack
+* the [Haskell Stack room](https://matrix.to/#/#haskell-stack:matrix.org) on
+  [Matrix](https://matrix.org/)
+* the [Google Group mailing list](https://groups.google.com/g/haskell-stack) for
+  Stack

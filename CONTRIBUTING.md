@@ -714,3 +714,9 @@ If you're making deep changes and real-time communication with the Stack team
 would be helpful, we have a `#stack-collaborators` Slack channel in the
 Haskell Foundation workspace. To join the workspace, follow this
 [link](https://haskell-foundation.slack.com/join/shared_invite/zt-z45o9x38-8L55P27r12YO0YeEufcO2w#/shared-invite/email).
+
+## Matrix room
+
+There is also a
+[Haskell Stack room](https://matrix.to/#/#haskell-stack:matrix.org)
+at address `#haskell-stack:matrix.org` on [Matrix](https://matrix.org/).

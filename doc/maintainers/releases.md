@@ -404,6 +404,10 @@ final release.
     Announce the release candidate in the `#stack-users` channel of the Haskell
     Foundation's Slack workspace.
 
+    Announce the release candidate in the
+    [Haskell Stack room](https://matrix.to/#/#haskell-stack:matrix.org)
+    (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/).
+
     Announce the release candidate in Reddit's
     [Haskell](https://www.reddit.com/r/haskell/) community.
 
@@ -673,6 +677,10 @@ final release.
 
     Announce the release in the `#stack-users` channel of the Haskell
     Foundation's Slack workspace.
+
+    Announce the release in the
+    [Haskell Stack room](https://matrix.to/#/#haskell-stack:matrix.org)
+    (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/).
 
     Announce the release in Reddit's
     [Haskell](https://www.reddit.com/r/haskell/) community.
