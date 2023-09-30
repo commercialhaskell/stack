@@ -87,8 +87,8 @@ specific configuration [option](yaml_configuration.md#ghc-variant).
 ## `--hpack-numeric-version` flag
 
 Pass the flag `--hpack-numeric-version` to cause Stack to report the numeric
-version of its built-in Hpack library to standard output (e.g. `0.35.0`) and
-quit.
+version of its built-in Hpack library to the standard output stream (e.g.
+`0.35.0`) and quit.
 
 ## `--[no-]install-ghc` flag
 
@@ -158,11 +158,11 @@ Stack can be configured to integrate with Nix. For further information, see
 ## `--numeric-version` flag
 
 Pass the flag `--numeric-version` to cause Stack to report its numeric version
-to standard output (e.g. `2.9.1`) and quit.
+to the standard output stream (e.g. `2.9.1`) and quit.
 
 ## `--[no-]plan-in-log` flag
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.13.1](https://github.com/commercialhaskell/stack/releases/tag/v2.13.1)
 
 Default: Disabled
 

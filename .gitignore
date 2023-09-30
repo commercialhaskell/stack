@@ -42,6 +42,9 @@ stan.html
 # HSpec-related
 .hspec-failures
 
+# macOS-related
+.DS_Store
+
 # Unexplained
 *~
 *.imports

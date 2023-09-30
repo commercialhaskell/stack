@@ -15,7 +15,7 @@ graphs and the `dot` executable for drawing directed graphs. Graphviz is
 available to [download](https://www.graphviz.org/download/) for Linux, Windows,
 macOS and FreeBSD.
 
-`stack dot` produces output, to the standard output channel, in the DOT language
+`stack dot` produces output, to the standard output stream, in the DOT language
 to represent the relationships between your packages and their dependencies.
 
 By default:

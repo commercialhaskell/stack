@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.35.5.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -40,10 +40,8 @@ extra-source-files:
     doc/clean_command.md
     doc/config_command.md
     doc/CONTRIBUTING.md
-    doc/coverage.md
     doc/custom_snapshot.md
     doc/debugging.md
-    doc/dependency_visualization.md
     doc/dev_containers.md
     doc/developing_on_windows.md
     doc/docker_command.md
@@ -359,7 +357,7 @@ library
     , generic-deriving
     , ghc-boot
     , hi-file-parser >=0.1.4.0
-    , hpack >=0.35.3
+    , hpack >=0.36.0
     , hpc
     , http-client
     , http-client-tls >=0.3.6.2
@@ -383,7 +381,7 @@ library
     , project-template
     , random
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.5.0
+    , rio-prettyprint >=0.1.7.0
     , split
     , stm
     , tar
@@ -477,7 +475,7 @@ executable stack
     , generic-deriving
     , ghc-boot
     , hi-file-parser >=0.1.4.0
-    , hpack >=0.35.3
+    , hpack >=0.36.0
     , hpc
     , http-client
     , http-client-tls >=0.3.6.2
@@ -501,7 +499,7 @@ executable stack
     , project-template
     , random
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.5.0
+    , rio-prettyprint >=0.1.7.0
     , split
     , stack
     , stm
@@ -574,7 +572,7 @@ executable stack-integration-test
     , generic-deriving
     , ghc-boot
     , hi-file-parser >=0.1.4.0
-    , hpack >=0.35.3
+    , hpack >=0.36.0
     , hpc
     , hspec
     , http-client
@@ -600,7 +598,7 @@ executable stack-integration-test
     , project-template
     , random
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.5.0
+    , rio-prettyprint >=0.1.7.0
     , split
     , stm
     , tar
@@ -687,7 +685,7 @@ test-suite stack-unit-test
     , generic-deriving
     , ghc-boot
     , hi-file-parser >=0.1.4.0
-    , hpack >=0.35.3
+    , hpack >=0.36.0
     , hpc
     , hspec
     , http-client
@@ -713,7 +711,7 @@ test-suite stack-unit-test
     , random
     , raw-strings-qq
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.5.0
+    , rio-prettyprint >=0.1.7.0
     , split
     , stack
     , stm

@@ -280,7 +280,68 @@ final release.
 
     Publish the GitHub release.
 
-    ### D: Update versions and `ChangeLog.md` for 'unreleased'
+    ### D: Consider adding other platforms to the GitHub release
+
+    The
+    [Integration Tests workflow](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22)
+    is limited to the platforms supported by the GitHub-hosted runners
+    (currently, only x86_64) and any self-hosted runners (currently, only
+    Linux/AArch64). However, it is possible to edit the GitHub release to
+    include binary distributions for other platforms (for example,
+    macOS/AArch64). The prerequisites are:
+
+    * a computer with that platform (operating system, machine architecture);
+    * a sufficiently-recent existing version of Stack for that platform (for
+      example, GHCup has published versions of Stack for macOS/AArch64);
+    * a tool to print SHA checksums, such as `shasum` on Linux and macOS; and
+    * the GNU Privacy Guard tool (`gpg`), which has had imported the private key
+      used to sign Stack executables (see further below).
+
+    The steps are similar to those in the workflow:
+
+    1.  Change to the root directory of the Stack project.
+
+    2.  `stack etc/scripts/release.hs check`, to check before building.
+
+    3.  `stack etc/scripts/release.hs build`, to build. The output 'assets'
+        (`stack-<version>-<os>-<architecture> ...`) will be in
+        the `_release` directory in the root directory of the Stack project.
+
+    4.  For each of the output assets, create a corresponding SHA 256 file with
+        a `.sha256` extension. For example (where `<asset>` is the name of the
+        file):
+
+        ~~~text
+        shasum -a 256 <asset> > <asset>.sha256
+        ~~~
+
+    5.  For each of the output assets, create a corresponding ASCII-armored
+        signature file with an `.asc` extension using `gpg`. For example (where
+        `<asset>` is the name of the file):
+
+        ~~~text
+        gpg --digest-algo=sha512 --detach-sig --armor -u 0x575159689BEFB442 <asset>
+        ~~~
+
+    6.  Edit the GitHub release to include the output assets and their
+        corresponding `.sha256` and `.asc` files.
+
+    The private key used to sign Stack executables can be exported from a
+    version of `gpg` to which it has previously been imported with:
+
+    ~~~text
+    gpg --armor --export-secret-key 0x575159689BEFB442
+    ~~~
+
+    The private key, so obtained, can be imported into `gpg` by:
+
+    1.  Commanding `gpg --import`.
+
+    2.  Pasting the private key.
+
+    3.  Entering Ctrl+D and Enter.
+
+    ### E: Update versions and `ChangeLog.md` for 'unreleased'
 
     In the `rc/vX.Y` branch:
 
@@ -311,7 +372,7 @@ final release.
         Bug fixes:
         ~~~
 
-    ### E: Announce the release candidate
+    ### F: Announce the release candidate
 
     Announce the release candidate to the following mailing lists
 
@@ -408,7 +469,68 @@ final release.
 
     Publish the GitHub release.
 
-    ### D: Upload to Hackage and reset branches
+    ### D: Consider adding other platforms to the GitHub release
+
+    The
+    [Integration Tests workflow](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22)
+    is limited to the platforms supported by the GitHub-hosted runners
+    (currently, only x86_64) and any self-hosted runners (currently, only
+    Linux/AArch64). However, it is possible to edit the GitHub release to
+    include binary distributions for other platforms (for example,
+    macOS/AArch64). The prerequisites are:
+
+    * a computer with that platform (operating system, machine architecture);
+    * a sufficiently-recent existing version of Stack for that platform (for
+      example, GHCup has published versions of Stack for macOS/AArch64);
+    * a tool to print SHA checksums, such as `shasum` on Linux and macOS; and
+    * the GNU Privacy Guard tool (`gpg`), which has had imported the private key
+      used to sign Stack executables (see further below).
+
+    The steps are similar to those in the workflow:
+
+    1.  Change to the root directory of the Stack project.
+
+    2.  `stack etc/scripts/release.hs check`, to check before building.
+
+    3.  `stack etc/scripts/release.hs build`, to build. The output 'assets'
+        (`stack-<version>-<os>-<architecture> ...`) will be in
+        the `_release` directory in the root directory of the Stack project.
+
+    4.  For each of the output assets, create a corresponding SHA 256 file with
+        a `.sha256` extension. For example (where `<asset>` is the name of the
+        file):
+
+        ~~~text
+        shasum -a 256 <asset> > <asset>.sha256
+        ~~~
+
+    5.  For each of the output assets, create a corresponding ASCII-armored
+        signature file with an `.asc` extension using `gpg`. For example (where
+        `<asset>` is the name of the file):
+
+        ~~~text
+        gpg --digest-algo=sha512 --detach-sig --armor -u 0x575159689BEFB442 <asset>
+        ~~~
+
+    6.  Edit the GitHub release to include the output assets and their
+        corresponding `.sha256` and `.asc` files.
+
+    The private key used to sign Stack executables can be exported from a
+    version of `gpg` to which it has previously been imported with:
+
+    ~~~text
+    gpg --armor --export-secret-key 0x575159689BEFB442
+    ~~~
+
+    The private key, so obtained, can be imported into `gpg` by:
+
+    1.  Commanding `gpg --import`.
+
+    2.  Pasting the private key.
+
+    3.  Entering Ctrl+D and Enter.
+
+    ### E: Upload to Hackage and reset branches
 
     Upload the `stack` package to Hackage with the command:
 
@@ -448,14 +570,14 @@ final release.
     git push origin :rc/vX.Y
     ~~~
 
-    ### E: Activate the version on Read The Docs
+    ### F: Activate the version on Read The Docs
 
     Activate the version for new release tag, on
     [readthedocs.org](https://readthedocs.org/projects/stack/versions/).
 
     Ensure that the `stable` documentation has updated.
 
-    ### F: Update get.haskellstack.org redirects
+    ### G: Update get.haskellstack.org redirects
 
     Update the https://get.haskellstack.org redirects by updating the
     `_redirects` file in the root of the
@@ -484,7 +606,7 @@ final release.
 
     and make sure it redirects to the new version.
 
-    ### G: Update versions and `ChangeLog.md` for 'unreleased'
+    ### H: Update versions and `ChangeLog.md` for 'unreleased'
 
     In the `stable` branch:
 
@@ -515,12 +637,12 @@ final release.
         Bug fixes:
         ~~~
 
-    ### H: Update the repository's issue and pull request templates
+    ### I: Update the repository's issue and pull request templates
 
     The repository's issue and pull request templates are the `.github`
     directory. Update them to refer to the new release version (`X.Y.Z`).
 
-    ### I: Announce the release
+    ### J: Announce the release
 
     Announce the release to the following mailing lists
 
@@ -562,7 +684,7 @@ final release.
 
     * the release description from Github.
 
-    ### J: Update Docker images
+    ### K: Update Docker images
 
     Docker Hub includes Docker images under
     [`fpco/stack-build'](https://hub.docker.com/r/fpco/stack-build).
