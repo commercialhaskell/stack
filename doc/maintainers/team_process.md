@@ -15,7 +15,6 @@ distributed team
 ](https://github.com/commercialhaskell/stackage/blob/master/CURATORS.md))
 and we hope to replicate that success here.
 
-
 ## Goals
 
 The goals of the `Stack` maintainer team are to:
@@ -38,7 +37,6 @@ The goals of the `Stack` maintainer team are to:
 
 The sections below detail various activities by the `Stack` team to realize
 these goals.
-
 
 ## Issue triage
 
@@ -65,7 +63,6 @@ This is one path to getting a lot of experience with the codebase, plus great
 interaction with the rest of the maintainer team, without necessarily taking on
 major coding tasks.
 
-
 ## Time commitment
 
 Someone considering joining the issue triager team may be wondering:
@@ -86,7 +83,6 @@ process, but for now we anticipate growing the team to about eight members
 (which is the size of the `Stackage` team as well), each of whom is likely to
 spend about two hours in total on upkeep work every eight weeks.
 
-
 ## Issue and pull request interaction guidelines
 
 These guidelines apply to all members of the maintainer team.
@@ -102,7 +98,6 @@ These guidelines apply to all members of the maintainer team.
 
 - If you know you’ll be unable to answer for a significant period of time, say
   so. Even better: ask someone else to take over from you.
-
 
 ## Assessing feature requests and enhancement PRs
 
@@ -158,14 +153,12 @@ With respect to assessing a PR's code, @snoyberg has outlined some
 into his projects which may be helpful to `Stack` triagers when performing
 reviews, as well.
 
-
 ## Real-time communications
 
 At present, the maintainer team mostly communicates via a rather quiet channel
-called [`#stack-collaborators`](../CONTRIBUTING/#slack-channel) on FP
-Complete's Slack workspace, although we may migrate to some other platform in
-the near future.
-
+called [`#stack-collaborators`](../CONTRIBUTING/#slack-channel) in the
+Haskell Foundation's Slack workspace, although we may migrate to some other
+platform in the future.
 
 ## Dealing with support issues
 
@@ -177,7 +170,6 @@ maintainers team makes no guarantees about regularly checking them.
 *We may decide to offload support questions elsewhere in the future, but for
 now the most important thing is to direct users to a single destination.*
 
-
 ## Issue vs pull request
 
 Sometimes it is ambiguous whether something should be opened as an issue to
@@ -187,7 +179,6 @@ PR. As an extreme example: if you have a small documentation typo correction,
 open a PR, it will _definitely_ take less time than opening an issue and
 describing the change you'd like to make. This logic can sometimes apply to
 minor code changes. Use your best judgement.
-
 
 ## Issue closing policy
 

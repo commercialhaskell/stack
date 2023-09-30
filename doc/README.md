@@ -122,10 +122,10 @@ Windows.
 
     !!! warning
 
-        The Windows installer for Stack 2.9.1, 2.9.3 and 2.11.1 (current) (only)
-        will replace the user `PATH` environment variable (rather than append to
-        it) if a 1024 character limit is exceeded. If the content of your
-        existing user `PATH` is long, preserve it before running the installer.
+        The Windows installer for Stack 2.9.1, 2.9.3 and 2.11.1 (only) will
+        replace the user `PATH` environment variable (rather than append to it)
+        if a 1024 character limit is exceeded. If the content of your existing
+        user `PATH` is long, preserve it before running the installer.
 
     !!! note
 
@@ -325,8 +325,12 @@ label on the GitHub issue tracker.
 
 ## How to contribute to the maintenance or development of Stack
 
-The following assumes that you already have installed a version of Stack and the
-[Git application](https://git-scm.com/).
+A [guide](CONTRIBUTING.md) is provided to help potential contributors to the
+Stack project.
+
+If you have already installed a version of Stack and the
+[Git application](https://git-scm.com/) the followings steps should get you
+started with building Stack from source with Stack:
 
 1.  Clone the `stack` repository from GitHub with the command:
 
@@ -334,8 +338,8 @@ The following assumes that you already have installed a version of Stack and the
     git clone https://github.com/commercialhaskell/stack.git
     ~~~
 
-2.  Change the current working directory to the cloned `stack` directory with the
-    command:
+2.  Change the current working directory to the cloned `stack` directory with
+    the command:
 
     ~~~text
     cd stack
