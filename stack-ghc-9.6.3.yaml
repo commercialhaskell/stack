@@ -1,12 +1,12 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.6.2.
+# built with GHC 9.6.3.
 
-# GHC 9.6.2
-resolver: nightly-2023-09-24
+# GHC 9.6.3
+resolver: nightly-2023-10-01
 
 docker:
   enable: false
-  repo: glcr.b-data.ch/ghc/ghc-musl:9.6.2
+  repo: glcr.b-data.ch/ghc/ghc-musl:9.6.2 # Still GHC 9.6.2. See https://github.com/benz0li/ghc-musl/issues/5
 
 nix:
   # --nix on the command-line to enable.
