@@ -12,6 +12,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Add flag `--no-init` to Stack's `new` command to skip the initialisation of
+  the newly-created project for use with Stack.
+
 Bug fixes:
 
 ## v2.13.1 - 2023-09-29

@@ -215,13 +215,15 @@ instance Exception NewPrettyException
 -- than those applicable also to the @stack init@ command).
 data NewOpts = NewOpts
   { newOptsProjectName  :: PackageName
-  -- ^ Name of the project to create.
+    -- ^ Name of the project to create.
   , newOptsCreateBare   :: Bool
-  -- ^ Whether to create the project without a directory.
+    -- ^ Whether to create the project without a directory.
+  , newOptsInit         :: Bool
+    -- ^ Whether to initialise the project for use with Stack.
   , newOptsTemplate     :: Maybe TemplateName
-  -- ^ Name of the template to use.
+    -- ^ Name of the template to use.
   , newOptsNonceParams  :: Map Text Text
-  -- ^ Nonce parameters specified just for this invocation.
+    -- ^ Nonce parameters specified just for this invocation.
   }
 
 -- | Function underlying the @stack new@ command. Create a project directory
@@ -231,7 +233,7 @@ newCmd (newOpts, initOpts) =
   withGlobalProject $ withConfig YesReexec $ do
     dir <- new newOpts (forceOverwrite initOpts)
     exists <- doesFileExist $ dir </> stackDotYaml
-    when (forceOverwrite initOpts || not exists) $ do
+    when (newOptsInit newOpts && (forceOverwrite initOpts || not exists)) $ do
       go <- view globalOptsL
       initProject dir initOpts (globalResolver go)
 
