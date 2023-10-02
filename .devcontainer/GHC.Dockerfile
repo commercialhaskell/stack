@@ -108,7 +108,7 @@ RUN if [ -n "$STACK_VERSION_OVERRIDE" ]; then \
     curl -sSLO https://github.com/commercialhaskell/stack/releases/download/v"$STACK_VERSION"/stack-"$STACK_VERSION"-linux-"$(uname -m)".tar.gz.sha256; \
     sha256sum -cs stack-"$STACK_VERSION"-linux-"$(uname -m)".tar.gz.sha256; \
     tar -xzf stack-"$STACK_VERSION"-linux-"$(uname -m)".tar.gz; \
-    if $(dpkg --compare-versions "${GHC_VERSION%.*}" le "9.2"); then \
+    if dpkg --compare-versions "${GHC_VERSION%.*}" le "9.2"; then \
       mv -f stack-"$STACK_VERSION"-linux-"$(uname -m)"/stack /usr/bin/stack; \
     else \
       mv -f stack-"$STACK_VERSION"-linux-"$(uname -m)"/stack /usr/local/bin/stack; \
