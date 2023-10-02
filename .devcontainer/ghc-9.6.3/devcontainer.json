@@ -1,10 +1,10 @@
 {
-  "name": "GHC 9.6.2",
+  "name": "GHC 9.6.3",
   "build": {
     "dockerfile": "../GHC.Dockerfile",
     "context": "..",
     "args": {
-      "GHC_VERSION": "9.6.2",
+      "GHC_VERSION": "9.6.3",
       "USE_ZSH_FOR_ROOT": "unset-to-use-ash",
       "SET_LANG": "C.UTF-8",
       "SET_TZ": ""
@@ -46,14 +46,14 @@
   // Set 'remoteUser' to 'root' to connect as root instead.
   "remoteUser": "vscode",
   "mounts": [
-    "source=stack-ghc-9.6.2-home-vscode,target=/home/vscode,type=volume"
-    // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.6.2-home-vscode,target=/home/vscode,type=bind"
+    "source=stack-ghc-9.6.3-home-vscode,target=/home/vscode,type=volume"
+    // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.6.3-home-vscode,target=/home/vscode,type=bind"
   ],
 
   // "remoteUser": "root",
   // "mounts": [
-  //   "source=stack-ghc-9.6.2-root,target=/root,type=volume"
-  //   // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.6.2-root,target=/root,type=bind"
+  //   "source=stack-ghc-9.6.3-root,target=/root,type=volume"
+  //   // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.6.3-root,target=/root,type=bind"
   // ],
 
   // Pip: Install packages to the user site

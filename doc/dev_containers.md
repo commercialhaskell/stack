@@ -55,24 +55,24 @@ extensions pre‑installed:
 
 ## Parent images
 
-Stack's Dev Containers are derived from Docker images that are used to build the
-*statically linked* Linux/x86_64 and Linux/AArch64 binary distributions of
+Stack's Dev Containers are derived from Docker images that are used to build
+the *statically linked* Linux/x86_64 and Linux/AArch64 binary distributions of
 Stack.
 
-These Docker images are multi-architecture (`linux/amd64`, `linux/arm64/v8`)
-*ghc‑musl* images. They are based on Alpine Linux (that is
+These Docker images are multi‑architecture (`linux/amd64`, `linux/arm64/v8`)
+<nobr>*GHC musl*</nobr> images. They are based on Alpine Linux (that is
 [musl libc](https://musl.libc.org) and [BusyBox](https://www.busybox.net)).
 
-The images contain *unofficial* binary distributions of GHC 9.4.7 and 9.6.2
-(that is, ones not released by the GHC developers). That is because:
+The images contain *unofficial* binary distributions of GHC (that is, ones not
+released by the GHC developers). That is because:
 
-1.  the official GHC 9.6.2 binary distributions for Alpine Linux/x86_64 have
-    known bugs; and
+1.  the official GHC binary distributions for Alpine Linux/x86_64 have known
+    bugs; and
 2.  there are no official binary distributions for Alpine Linux/AArch64.
 
-Stack's global configuration (`/etc/stack/config.yaml`) sets `system-ghc: true`
-and `install-ghc: false`. That ensures that only the GHC available in the Dev
-Containers is used.
+Stack's global configuration (`/etc/stack/config.yaml`) sets
+<nobr>`system-ghc: true`</nobr> and <nobr>`install-ghc: false`</nobr>. That
+ensures that only the GHC available in the Dev Containers is used.
 
 ## Usage
 

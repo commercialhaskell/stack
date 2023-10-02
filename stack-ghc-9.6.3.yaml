@@ -6,7 +6,7 @@ resolver: nightly-2023-10-01
 
 docker:
   enable: false
-  repo: glcr.b-data.ch/ghc/ghc-musl:9.6.2 # Still GHC 9.6.2. See https://github.com/benz0li/ghc-musl/issues/5
+  repo: glcr.b-data.ch/ghc/ghc-musl:9.6.3
 
 nix:
   # --nix on the command-line to enable.
