@@ -423,6 +423,12 @@ getSetupExe setupHs setupShimHs tmpdir = do
             , toFilePath setupShimHs
             , "-o"
             , toFilePath tmpOutputPath
+              -- See https://github.com/commercialhaskell/stack/issues/6267. As
+              -- corrupt *.hi and/or *.o files can be problematic, we aim to
+              -- to leave none behind. This can be dropped when Stack drops
+              -- support for the problematic versions of GHC.
+            , "-no-keep-hi-files"
+            , "-no-keep-o-files"
             ]
       compilerPath <- getCompilerPath
       withWorkingDir (toFilePath tmpdir) $
@@ -462,16 +468,35 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
             view stackRootL config </>
             relDirSetupExeSrc
     ensureDir setupSrcDir
-    setupFileName <- parseRelFile ("setup-" ++ simpleSetupHash ++ ".hs")
+    let setupStub = "setup-" ++ simpleSetupHash
+    setupFileName <- parseRelFile (setupStub ++ ".hs")
+    setupHiName <- parseRelFile (setupStub ++ ".hi")
+    setupOName <- parseRelFile (setupStub ++ ".o")
     let setupHs = setupSrcDir </> setupFileName
+        setupHi = setupSrcDir </> setupHiName
+        setupO =  setupSrcDir </> setupOName
     setupHsExists <- doesFileExist setupHs
     unless setupHsExists $ writeBinaryFileAtomic setupHs simpleSetupCode
-    setupShimFileName <-
-      parseRelFile ("setup-shim-" ++ simpleSetupHash ++ ".hs")
+    -- See https://github.com/commercialhaskell/stack/issues/6267. Remove any
+    -- historical *.hi or *.o files. This can be dropped when Stack drops
+    -- support for the problematic versions of GHC.
+    ignoringAbsence (removeFile setupHi)
+    ignoringAbsence (removeFile setupO)
+    let setupShimStub = "setup-shim-" ++ simpleSetupHash
+    setupShimFileName <- parseRelFile (setupShimStub ++ ".hs")
+    setupShimHiName <- parseRelFile (setupShimStub ++ ".hi")
+    setupShimOName <- parseRelFile (setupShimStub ++ ".o")
     let setupShimHs = setupSrcDir </> setupShimFileName
+        setupShimHi = setupSrcDir </> setupShimHiName
+        setupShimO = setupSrcDir </> setupShimOName
     setupShimHsExists <- doesFileExist setupShimHs
     unless setupShimHsExists $
       writeBinaryFileAtomic setupShimHs setupGhciShimCode
+    -- See https://github.com/commercialhaskell/stack/issues/6267. Remove any
+    -- historical *.hi or *.o files. This can be dropped when Stack drops
+    -- support for the problematic versions of GHC.
+    ignoringAbsence (removeFile setupShimHi)
+    ignoringAbsence (removeFile setupShimO)
     setupExe <- getSetupExe setupHs setupShimHs tmpdir
 
     cabalPkgVer <- view cabalVersionL

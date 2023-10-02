@@ -10,6 +10,11 @@ Major changes:
 
 Behavior changes:
 
+* Stack does not leave `*.hi` or `*.o` files in the `setup-exe-src` directory of
+  the Stack root, and deletes any corresponding to a `setup-<hash>.hs` or
+  `setup-shim-<hash>.hs` file, to avoid GHC issue
+  [#21250](https://gitlab.haskell.org/ghc/ghc/-/issues/21250).
+
 Other enhancements:
 
 * Add flag `--no-init` to Stack's `new` command to skip the initialisation of
