@@ -1116,13 +1116,13 @@ Default:
 
 ~~~yaml
 nix:
-  add-gc-roots: false
-  enable: false
-  nix-shell-options: []
-  packages: []
-  path: []
+  enable: false # Except on NixOS, where `enable: true`
   pure: true
+  packages: []
   shell-file:
+  nix-shell-options: []
+  path: []
+  add-gc-roots: false
 ~~~
 
 Command line equivalents: `--nix-*` flags and options (see `stack --nix-help`

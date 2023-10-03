@@ -70,12 +70,13 @@ information about how Stack itself can configure `NIX_PATH`, see further
 
 ### Enable Nix integration
 
-To enable Nix integration, add the following section to your Stack YAML
-configuration file (`stack.yaml` or `config.yaml`):
+On NixOS, Nix integration is enabled by default; on other operating systems it
+is disabled. To enable Nix integration, add the following section to your Stack
+YAML configuration file (`stack.yaml` or `config.yaml`):
 
 ~~~yaml
 nix:
-  enable: true  # false by default
+  enable: true  # false by default, except on NixOS
 ~~~
 
 The equivalent command line flag (which will prevail) is `--[no-]nix`. Passing
@@ -366,34 +367,32 @@ branch, or edit the Nix descriptions of some packages.
 The Tweag example [repository][tweag-example] shows how you can pin a package
 set.
 
-## Configuration options
+## Non-project specific configuration
 
-Below is a summary of the Stack YAML configuration file settings, identifying
-default values:
+Below is a summary of the non-project specific configuration options and their
+default values. The options can be set in Stack's project-level configuration
+file (`stack.yaml`) or its global configuration file (`config.yaml`).
 
 ~~~yaml
 nix:
 
-  # false by default. Must be present and set to `true` to enable Nix, except on
-  # NixOS where it is enabled by default (see #3938).  You can set it in
-  # your `$HOME/.stack/config.yaml` to enable Nix for all your projects without
-  # having to repeat it
+  # false by default, except on NixOS. Is Nix integration enabled?
   enable: true
 
-  # true by default. Tells Nix whether to run in a pure shell or not.
+  # true by default. Should Nix run in a pure shell?
   pure: true
 
-  # Empty by default. The list of packages you want to be
-  # available in the nix-shell at build time (with `stack
-  # build`) and run time (with `stack exec`).
+  # Empty by default. The list of packages you want to be available in the
+  # nix-shell at build time (with `stack build`) and run time (with
+  # `stack exec`).
   packages: []
 
   # Unset by default. You cannot set this option if `packages:`
   # is already present and not empty.
   shell-file: shell.nix
 
-  # A list of strings, empty by default. Additional options that
-  # will be passed verbatim to the `nix-shell` command.
+  # A list of strings, empty by default. Additional options that will be passed
+  # verbatim to the `nix-shell` command.
   nix-shell-options: []
 
   # A list of strings, empty by default, such as
@@ -405,6 +404,7 @@ nix:
   # collection roots. This way, calling nix-collect-garbage will not remove
   # those packages from the Nix store, saving you some time when running
   # stack build again with Nix support activated.
+  #
   # This creates a `nix-gc-symlinks` directory in the project `.stack-work`.
   # To revert that, just delete this `nix-gc-symlinks` directory.
   add-gc-roots: false
