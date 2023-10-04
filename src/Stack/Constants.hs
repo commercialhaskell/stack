@@ -12,6 +12,7 @@ module Stack.Constants
   , haskellDefaultPreprocessorExts
   , stackProgName
   , stackProgName'
+  , nixProgName
   , stackDotYaml
   , stackWorkEnvVar
   , stackRootEnvVar
@@ -172,6 +173,10 @@ instance Exception ConstantsException where
 -- | Name of the Stack program.
 stackProgName' :: Text
 stackProgName' = T.pack stackProgName
+
+-- | Name of the Nix package manager command
+nixProgName :: String
+nixProgName = "nix"
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]

@@ -1131,6 +1131,15 @@ for details).
 For further information, see the
 [Nix integration](nix_integration.md#configuration) documentation.
 
+### notify-if-nix-on-path
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+If Stack's integration with the Nix package manager is not enabled, should Stack
+notify the user if a `nix` executable is on the PATH?
+
 ### package-index
 
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)

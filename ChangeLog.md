@@ -14,6 +14,10 @@ Behavior changes:
   the Stack root, and deletes any corresponding to a `setup-<hash>.hs` or
   `setup-shim-<hash>.hs` file, to avoid GHC issue
   [#21250](https://gitlab.haskell.org/ghc/ghc/-/issues/21250).
+* If Stack's Nix integration is not enabled, Stack will notify the user if a
+  `nix` executable is on the PATH. This usually indicates the Nix package
+  manager is available. In YAML configuration files, the `notify-if-nix-on-path`
+  key is introduced, to allow the notification to be muted if unwanted.
 
 Other enhancements:
 
