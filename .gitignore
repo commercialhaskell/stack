@@ -45,6 +45,9 @@ stan.html
 # macOS-related
 .DS_Store
 
+# VS Code Counter (Visual Studio Code Extension)-related
+.VSCodeCounter
+
 # Unexplained
 *~
 *.imports
