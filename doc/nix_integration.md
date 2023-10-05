@@ -82,6 +82,12 @@ nix:
 The equivalent command line flag (which will prevail) is `--[no-]nix`. Passing
 any `--nix-*` option on the command line will imply the `--nix` option.
 
+If Nix integration is not enabled, Stack will notify the user if a `nix`
+executable is on the PATH. If that notification is unwanted, it can be muted by
+setting Stack's configuration option
+[`notify-if-nix-on-path`](yaml_configuration.md#notify-if-nix-on-path) to
+`false`.
+
 With Nix integration enabled, `stack build` and `stack exec` will automatically
 launch themselves in a local build environment (using `nix-shell` behind the
 scenes). It is not necessary to run `stack setup`, unless you want to cache a

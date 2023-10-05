@@ -168,6 +168,8 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See 'configHideSourcePaths'
   , configMonoidRecommendUpgrade   :: !FirstTrue
     -- ^ See 'configRecommendUpgrade'
+  , configMonoidNotifyIfNixOnPath  :: !FirstTrue
+    -- ^ See 'configNotifyIfNixOnPath'
   , configMonoidCasaOpts :: !CasaOptsMonoid
     -- ^ Casa configuration options.
   , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
@@ -338,6 +340,8 @@ parseConfigMonoidObject rootDir obj = do
     FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
   configMonoidRecommendUpgrade <-
     FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
+  configMonoidNotifyIfNixOnPath <-
+    FirstTrue <$> obj ..:? configMonoidNotifyIfNixOnPathName
   configMonoidCasaOpts <-
     jsonSubWarnings (obj ..:? configMonoidCasaOptsName ..!= mempty)
   configMonoidCasaRepoPrefix <-
@@ -514,6 +518,9 @@ configMonoidHideSourcePathsName = "hide-source-paths"
 
 configMonoidRecommendUpgradeName :: Text
 configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
+
+configMonoidNotifyIfNixOnPathName :: Text
+configMonoidNotifyIfNixOnPathName = "notify-if-nix-on-path"
 
 configMonoidCasaOptsName :: Text
 configMonoidCasaOptsName = "casa"
