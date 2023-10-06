@@ -206,11 +206,8 @@ Stack will seek to rebuild it.
 
 See the documentation for the
 [`setup-exe-cache` directory](#setup-exe-cache-directorysetup-exe-cache). This
-contains:
-
-* the two source files (`setup-<hash>.hs` and `setup-shim-<hash>.hs`) that Stack
-  uses to build the executable; and
-* associated GHC build artefacts (`*.hi` and `*.o` files).
+contains the two source files (`setup-<hash>.hs` and `setup-shim-<hash>.hs`)
+that Stack uses to build the executable.
 
 If the contents of the directory are deleted, and Stack needs the executable,
 Stack will recreate them.
