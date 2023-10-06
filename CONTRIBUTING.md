@@ -299,7 +299,7 @@ of the release. For example, snapshot LTS Haskell 8.0, published on
 12 February 2017, was the first LTS Haskell snapshot to provide GHC 8.0.2 which
 comes with `base-4.9.1.0` and `Cabal-1.24.2.0`. Until, at least,
 13 February 2024, Stack releases would aim to support the immediate
-predecessor, GHC 8.0.1 and `base-4.9.0.0` and `Cabal-1.24.0.0`.
+predecessor, GHC 8.0.1 and `base-4.9.0.0`, `Cabal-1.24.0.0` and Haddock 2.17.2.
 
 When a version of the Stack executable actually ceases to support a version of
 GHC and `Cabal`, that should be recorded in Stack's
