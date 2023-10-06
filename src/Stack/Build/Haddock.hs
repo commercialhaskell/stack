@@ -219,7 +219,8 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
           [ flow "Updating Haddock index for"
           , style Current (fromString $ T.unpack descr)
           , "in"
-          , pretty destIndexFile <> "."
+          , "\n"
+          , pretty destIndexFile
           ]
         liftIO (mapM_ copyPkgDocs interfaceOpts)
         haddockExeName <- view $ compilerPathsL.to (toFilePath . cpHaddock)
@@ -237,7 +238,8 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
           [ flow "Haddock index for"
           , style Current (fromString $ T.unpack descr)
           , flow "already up to date at"
-          , pretty destIndexFile <> "."
+          , "\n"
+          , pretty destIndexFile
           ]
  where
   toInterfaceOpt ::
