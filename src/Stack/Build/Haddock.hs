@@ -213,15 +213,17 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
             Left _ -> True
             Right indexModTime ->
               or [mt > indexModTime | (_, mt, _, _) <- interfaceOpts]
+        prettyDescr = style Current (fromString $ T.unpack descr)
     if needUpdate
       then do
-        prettyInfoL
-          [ flow "Updating Haddock index for"
-          , style Current (fromString $ T.unpack descr)
-          , "in"
-          , "\n"
-          , pretty destIndexFile
-          ]
+        prettyInfo $
+             fillSep
+               [ flow "Updating Haddock index for"
+               , prettyDescr
+               , "in:"
+               ]
+          <> line
+          <> pretty destIndexFile
         liftIO (mapM_ copyPkgDocs interfaceOpts)
         haddockExeName <- view $ compilerPathsL.to (toFilePath . cpHaddock)
         withWorkingDir (toFilePath destDir) $ readProcessNull
@@ -234,13 +236,14 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
               ++ [x | (xs, _, _, _) <- interfaceOpts, x <- xs]
           )
       else
-        prettyInfoL
-          [ flow "Haddock index for"
-          , style Current (fromString $ T.unpack descr)
-          , flow "already up to date at"
-          , "\n"
-          , pretty destIndexFile
-          ]
+        prettyInfo $
+             fillSep
+               [ flow "Haddock index for"
+               , prettyDescr
+               , flow "already up to date at:"
+               ]
+          <> line
+          <> pretty destIndexFile
  where
   toInterfaceOpt ::
        DumpPackage
