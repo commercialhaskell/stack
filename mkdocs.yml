@@ -71,7 +71,7 @@ nav:
     - upgrade command: upgrade_command.md
     - upload command: upload_command.md
   - Specific topics:
-    - Stack root location: stack_root.md
+    - Stack root: stack_root.md
     - Snapshot and package location: pantry.md
     - Snapshot specification: custom_snapshot.md
     - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
