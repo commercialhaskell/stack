@@ -23,6 +23,8 @@ Other enhancements:
 
 * Add flag `--no-init` to Stack's `new` command to skip the initialisation of
   the newly-created project for use with Stack.
+* The HTML file paths produced at the end of `stack haddock` are printed on
+  separate lines and without a trailing dot.
 
 Bug fixes:
 
