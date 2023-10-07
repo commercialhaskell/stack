@@ -55,8 +55,8 @@ Behavior changes:
   considered a possible GHC build if `libc.musl-x86_64.so.1` is found in `\lib`
   or `\lib64`.
 * No longer supports Cabal versions older than `1.24.0.0`. This means projects
-  using snapshots earlier than `lts-7.0` or `nightly-2016-05-26` will no longer
-  build.
+  using snapshots earlier than `lts-7.0` or `nightly-2016-05-26` (GHC 8.0.1)
+  will no longer build. GHC 8.0.1 comes with Haddock 2.17.2.
 * When unregistering many packages in a single step, Stack can now do that
   efficiently. Stack no longer uses GHC-supplied `ghc-pkg unregister` (which is,
   currently, slower).

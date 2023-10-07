@@ -82,8 +82,8 @@ import           Path.IO
                    , renameFile
                    )
 import           RIO.Process
-                   ( HasProcessContext, byteStringInput, doesExecutableExist
-                   , eceExitCode, findExecutable, getStderr, getStdout, inherit
+                   ( HasProcessContext, byteStringInput, eceExitCode
+                   , findExecutable, getStderr, getStdout, inherit
                    , modifyEnvVars, proc, runProcess_, setStderr, setStdin
                    , setStdout, showProcessArgDebug, useHandleOpen, waitExitCode
                    , withProcessWait, withWorkingDir
@@ -1958,33 +1958,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     mcurator <- view $ buildConfigL.to bcCurator
     when (doHaddock mcurator package) $ do
       announce "haddock"
-      sourceFlag <- if not (boptsHaddockHyperlinkSource eeBuildOpts)
-        then pure []
-        else do
-          -- See #2429 for why the temp dir is used
-          ec
-            <- withWorkingDir (toFilePath eeTempDir)
-             $ proc "haddock" ["--hyperlinked-source"]
-             $ \pc -> withProcessWait
-               (setStdout createSource $ setStderr createSource pc) $ \p ->
-                 runConcurrently
-                   $ Concurrently (runConduit $ getStdout p .| CL.sinkNull)
-                  *> Concurrently (runConduit $ getStderr p .| CL.sinkNull)
-                  *> Concurrently (waitExitCode p)
-          case ec of
-            -- Fancy crosslinked source
-            ExitSuccess -> pure ["--haddock-option=--hyperlinked-source"]
-            -- Older hscolour colouring
-            ExitFailure _ -> do
-              hscolourExists <- doesExecutableExist "HsColour"
-              unless hscolourExists $
-                prettyWarnL
-                  [ flow "Warning: Haddock is not generating hyperlinked \
-                         \sources because 'HsColour' not found on PATH (use"
-                  , style Shell (flow "stack install hscolour")
-                  , flow "to install)."
-                  ]
-              pure ["--hyperlink-source" | hscolourExists]
+      let sourceFlag =
+            [ "--haddock-option=--hyperlinked-source"
+            | boptsHaddockHyperlinkSource eeBuildOpts
+            ]
 
       -- For GHC 8.4 and later, provide the --quickjump option.
       actualCompiler <- view actualCompilerVersionL
