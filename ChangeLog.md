@@ -25,6 +25,9 @@ Other enhancements:
   the newly-created project for use with Stack.
 * The HTML file paths produced at the end of `stack haddock` are printed on
   separate lines and without a trailing dot.
+* Add option of the form `--doctest-option=<argument>` to `stack build`, where
+  `doctest` is a program recognised by versions of the Cabal library from
+  `1.24.0.0`.
 
 Bug fixes:
 
