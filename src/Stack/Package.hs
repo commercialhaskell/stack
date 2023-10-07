@@ -65,7 +65,7 @@ import           Stack.ComponentFile
                    )
 import           Stack.Types.BuildConfig
                    ( HasBuildConfig (..), getProjectWorkDir )
-import           Stack.Types.Compiler ( ActualCompiler (..), getGhcVersion )
+import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
@@ -209,7 +209,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   (unknownTools, knownTools) = packageDescTools pkg
 
   deps = M.filterWithKey (const . not . isMe) (M.unionsWith (<>)
-    [ asLibrary <$> packageDependencies packageConfig pkg
+    [ asLibrary <$> packageDependencies pkg
     -- We include all custom-setup deps - if present - in the package deps
     -- themselves. Stack always works with the invariant that there will be a
     -- single installed package relating to a package name, and this applies at
@@ -461,44 +461,14 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
   pure (componentOutputDir namedComponent distDir </> relOFilePath)
 
 -- | Get all dependencies of the package (buildable targets only).
---
--- Note that for Cabal versions 1.22 and earlier, there is a bug where Cabal
--- requires dependencies for non-buildable components to be present. We're going
--- to use GHC version as a proxy for Cabal library version in this case for
--- simplicity, so we'll check for GHC being 7.10 or earlier. This obviously
--- makes our function a lot more fun to write...
 packageDependencies ::
-     PackageConfig
-  -> PackageDescription
+     PackageDescription
   -> Map PackageName VersionRange
-packageDependencies pkgConfig pkg' =
+packageDependencies pkg =
   M.fromListWith intersectVersionRanges $
-  map (depPkgName &&& depVerRange) $
-  concatMap targetBuildDepends (allBuildInfo' pkg) ++
-  maybe [] setupDepends (setupBuildInfo pkg)
- where
-  pkg
-    | getGhcVersion (packageConfigCompilerVersion pkgConfig) >= mkVersion [8, 0] = pkg'
-    -- Set all components to buildable. Only need to worry  library, exe, test,
-    -- and bench, since others didn't exist in older Cabal versions
-    | otherwise = pkg'
-      { library =
-          (\c -> c { libBuildInfo = go (libBuildInfo c) }) <$> library pkg'
-      , executables =
-          (\c -> c { buildInfo = go (buildInfo c) }) <$> executables pkg'
-      , testSuites =
-          if packageConfigEnableTests pkgConfig
-            then (\c -> c { testBuildInfo = go (testBuildInfo c) }) <$>
-                   testSuites pkg'
-            else testSuites pkg'
-      , benchmarks =
-          if packageConfigEnableBenchmarks pkgConfig
-            then (\c -> c { benchmarkBuildInfo = go (benchmarkBuildInfo c) }) <$>
-                   benchmarks pkg'
-            else benchmarks pkg'
-      }
-
-  go bi = bi { buildable = True }
+    map (depPkgName &&& depVerRange) $
+         concatMap targetBuildDepends (allBuildInfo' pkg)
+      <> maybe [] setupDepends (setupBuildInfo pkg)
 
 -- | Get all dependencies of the package (buildable targets only).
 --
