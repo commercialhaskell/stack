@@ -4,6 +4,9 @@
 
 Release notes:
 
+* The hash used as a key for Stack's pre-compiled package cache has changed,
+  following the dropping of support for Cabal versions older than `1.24.0.0`.
+
 **Changes since v2.13.1:**
 
 Major changes:

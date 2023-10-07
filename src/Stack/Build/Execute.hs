@@ -1719,7 +1719,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                  loc
                  (configCacheOpts cache)
                  (configCacheHaddock cache)
-                 (configCacheDeps cache)
         case mpc of
           Nothing -> pure Nothing
           -- Only pay attention to precompiled caches that refer to packages
@@ -2071,7 +2070,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
           loc
           (configCacheOpts cache)
           (configCacheHaddock cache)
-          (configCacheDeps cache)
           mpkgid sublibsPkgIds (packageExes package)
       _ -> pure ()
 
