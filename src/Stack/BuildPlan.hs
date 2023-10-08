@@ -166,7 +166,7 @@ gpdPackageDeps ::
     -> Map FlagName Bool
     -> Map PackageName VersionRange
 gpdPackageDeps gpd ac platform flags =
-    Map.filterWithKey (const . not . isLocalLibrary) (packageDependencies pkgConfig pkgDesc)
+    Map.filterWithKey (const . not . isLocalLibrary) (packageDependencies pkgDesc)
     where
         isLocalLibrary name' = name' == name || name' `Set.member` subs
 
