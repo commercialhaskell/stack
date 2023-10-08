@@ -1673,6 +1673,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     && maybe True (Set.notMember pname . curatorSkipHaddock) mcurator
   expectHaddockFailure =
       maybe False (Set.member pname . curatorExpectHaddockFailure)
+  isHaddockForHackage = boptsHaddockForHackage eeBuildOpts
   fulfillHaddockExpectations mcurator action
     | expectHaddockFailure mcurator = do
         eres <- tryAny $ action KeepOpen
@@ -1957,11 +1958,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
     mcurator <- view $ buildConfigL.to bcCurator
     when (doHaddock mcurator package) $ do
-      announce "haddock"
-      let sourceFlag =
-            [ "--haddock-option=--hyperlinked-source"
-            | boptsHaddockHyperlinkSource eeBuildOpts
-            ]
+      announce $ if isHaddockForHackage
+        then "haddock for Hackage"
+        else "haddock"
 
       -- For GHC 8.4 and later, provide the --quickjump option.
       actualCompiler <- view actualCompilerVersionL
@@ -1971,19 +1970,29 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 | ghcVer >= mkVersion [8, 4] -> ["--haddock-option=--quickjump"]
               _ -> []
 
-      fulfillHaddockExpectations mcurator $ \keep ->
-        cabal0 keep KeepTHLoading $ concat
-          [ [ "haddock"
-            , "--html"
-            , "--hoogle"
-            , "--html-location=../$pkg-$version/"
-            ]
-          , sourceFlag
-          , ["--internal" | boptsHaddockInternal eeBuildOpts]
-          , [ "--haddock-option=" <> opt
-            | opt <- hoAdditionalArgs (boptsHaddockOpts eeBuildOpts) ]
-          , quickjump
-          ]
+      fulfillHaddockExpectations mcurator $ \keep -> do
+        let args = concat
+              (  if isHaddockForHackage
+                   then
+                     [ [ "--for-hackage" ] ]
+                   else
+                     [ [ "--html"
+                       , "--hoogle"
+                       , "--html-location=../$pkg-$version/"
+                       ]
+                     , [ "--haddock-option=--hyperlinked-source"
+                       | boptsHaddockHyperlinkSource eeBuildOpts
+                       ]
+                     , [ "--internal" | boptsHaddockInternal eeBuildOpts ]
+                     , quickjump
+                     ]
+              <> [ [ "--haddock-option=" <> opt
+                   | opt <- hoAdditionalArgs (boptsHaddockOpts eeBuildOpts)
+                   ]
+                 ]
+              )
+
+        cabal0 keep KeepTHLoading $ "haddock" : args
 
     let hasLibrary =
           case packageLibraries package of
