@@ -434,41 +434,61 @@ build:
   # incorrectly formatted.  This could also affect scripts which use Stack.
   haddock: false
   haddock-arguments:
-    haddock-args: [] # Additional arguments passed to haddock, --haddock-arguments
+
+    # Additional arguments passed to haddock. The corresponding command line
+    # option is --haddock-arguments. Example of use:
+    #
     # haddock-args:
     # - "--css=/home/user/my-css"
-  open-haddocks: false # --open
-  haddock-deps: false # if unspecified, defaults to true if haddock is set
-  haddock-for-hackage: false # if specified, implies haddock-internal: false and
-                             # haddock-hyperlink-source: true
-  haddock-internal: false # ignored, if haddock-for-hackage: true
-  haddock-hyperlink-source: true  # ignored, if haddock-for-hackage: true
+    haddock-args: []
+
+  # The corresponding command line flag is --[no-]open.
+  open-haddocks: false
+
+  # If Stack is configured to build Haddock documentation, defaults to true.
+  haddock-deps: false
+
+  # If specified, implies haddock-internal: false and
+  # haddock-hyperlink-source: true. Since Stack UNRELEASED.
+  haddock-for-hackage: false
+
+  # The configuration is ignored, if haddock-for-hackage: true.
+  haddock-internal: false
+
+  # The configuration is ignored, if haddock-for-hackage: true.
+  haddock-hyperlink-source: true
 
   # These are inadvisable to use in your global configuration, as they make the
   # Stack build command line behave quite differently.
   test: false
   test-arguments:
     rerun-tests: true   # Rerun successful tests
-    additional-args: [] # --test-arguments
+
+    # The corresponding command line option is --test-arguments. Example of use:
+    #
     # additional-args:
     # - "--fail-fast"
+    additional-args: []
     coverage: false
     no-run-tests: false
   bench: false
   benchmark-opts:
-    benchmark-arguments: ""
+
+    # Example of use:
+    #
     # benchmark-arguments: "--csv bench.csv"
+    benchmark-arguments: ""
     no-run-benchmarks: false
   force-dirty: false
   reconfigure: false
   cabal-verbose: false
   split-objs: false
 
-  # Since 1.8. Starting with 2.0, the default is true
+  # Since Stack 1.8. Starting with Stack 2.0, the default is true
   interleaved-output: true
-  # Since 2.13.1. Available options are none, count-only, capped and full.
+  # Since Stack 2.13.1. Available options are none, count-only, capped and full.
   progress-bar: capped
-  # Since 1.10.
+  # Since Stack 1.10.
   ddump-dir: ""
 ~~~
 

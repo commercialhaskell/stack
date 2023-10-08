@@ -247,13 +247,13 @@ upload to Hackage.
 
 For each local package, the generated Haddock documentation files are in
 directory `doc\html\<package_version>-docs\`, relative to Stack's dist work
-directory (see `stack path --dist-dir`).
+directory (see [`stack path --dist-dir`](path_command.md)).
 
 If the flag is set:
 
-* the [`--[no-]haddock-hyperlink-source`](#no-haddock-hyperlink-source-flag)
+* the [`--[no-]haddock-hyperlink-source`](#-no-haddock-hyperlink-source-flag)
   flag is ignored and `--haddock-hyperlink-source` is implied; and
-* the [`--[no-]haddock-internal`](#no-haddock-hyperlink-internal-flag) flag is
+* the [`--[no-]haddock-internal`](#-no-haddock-hyperlink-internal-flag) flag is
   ignored and `--no-haddock-internal` is implied.
 
 !!! note
@@ -274,7 +274,7 @@ Default: Enabled
 
 Unset the flag to disable building building hyperlinked source for Haddock.
 
-If the [`--haddock-for-hackage`](#no-haddock-for-haddock-flag) flag is passed,
+If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
 this flag is ignored.
 
 ### `--[no-]haddock-internal` flag
@@ -283,7 +283,7 @@ Default: Disabled
 
 Set the flag to enable building Haddock documentation for internal modules.
 
-If the [`--haddock-for-hackage`](#no-haddock-for-haddock-flag) flag is passed,
+If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
 this flag is ignored.
 
 ### `--[no-]keep-going` flag
