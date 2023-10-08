@@ -41,6 +41,7 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
   , boptsHaddockInternal = fromFirstFalse buildMonoidHaddockInternal
   , boptsHaddockHyperlinkSource =
       fromFirstTrue buildMonoidHaddockHyperlinkSource
+  , boptsHaddockForHackage = fromFirstFalse buildMonoidHaddockForHackage
   , boptsInstallExes = fromFirstFalse buildMonoidInstallExes
   , boptsInstallCompilerTool = fromFirstFalse buildMonoidInstallCompilerTool
   , boptsPreFetch = fromFirstFalse buildMonoidPreFetch

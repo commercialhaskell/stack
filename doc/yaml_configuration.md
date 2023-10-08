@@ -439,7 +439,10 @@ build:
     # - "--css=/home/user/my-css"
   open-haddocks: false # --open
   haddock-deps: false # if unspecified, defaults to true if haddock is set
-  haddock-internal: false
+  haddock-for-hackage: false # if specified, implies haddock-internal: false and
+                             # haddock-hyperlink-source: true
+  haddock-internal: false # ignored, if haddock-for-hackage: true
+  haddock-hyperlink-source: true  # ignored, if haddock-for-hackage: true
 
   # These are inadvisable to use in your global configuration, as they make the
   # Stack build command line behave quite differently.
