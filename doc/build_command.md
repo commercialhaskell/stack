@@ -12,11 +12,11 @@ stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
             [--[no-]library-stripping] [--[no-]executable-stripping]
             [--[no-]haddock] [--haddock-arguments HADDOCK_ARGS]
             [--[no-]open] [--[no-]haddock-deps] [--[no-]haddock-internal]
-            [--[no-]haddock-hyperlink-source] [--[no-]copy-bins]
-            [--[no-]copy-compiler-tool] [--[no-]prefetch] [--[no-]keep-going]
-            [--[no-]keep-tmp-files] [--[no-]force-dirty] [--[no-]test]
-            [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS] [--coverage]
-            [--no-run-tests] [--test-suite-timeout ARG]
+            [--[no-]haddock-hyperlink-source] [--[no-]haddock-for-hackage]
+            [--[no-]copy-bins] [--[no-]copy-compiler-tool] [--[no-]prefetch]
+            [--[no-]keep-going] [--[no-]keep-tmp-files] [--[no-]force-dirty]
+            [--[no-]test] [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS]
+            [--coverage] [--no-run-tests] [--test-suite-timeout ARG]
             [--[no-]tests-allow-stdin] [--[no-]bench]
             [--ba|--benchmark-arguments BENCH_ARGS] [--no-run-benchmarks]
             [--[no-]reconfigure] [--cabal-verbosity VERBOSITY |
@@ -234,17 +234,57 @@ Default: Enabled (if building Haddock documnentation)
 
 Unset the flag to disable building Haddock documentation for dependencies.
 
+### `--[no-]haddock-for-haddock` flag
+
+:octicons-beaker-24: Experimental
+
+:octicons-tag-24: UNRELEASED
+
+Default: Disabled
+
+Set the flag to build with flags to generate Haddock documentation suitable for
+upload to Hackage.
+
+For each local package, the generated Haddock documentation files are in
+directory `doc\html\<package_version>-docs\`, relative to Stack's dist work
+directory (see `stack path --dist-dir`).
+
+If the flag is set:
+
+* the [`--[no-]haddock-hyperlink-source`](#no-haddock-hyperlink-source-flag)
+  flag is ignored and `--haddock-hyperlink-source` is implied; and
+* the [`--[no-]haddock-internal`](#no-haddock-hyperlink-internal-flag) flag is
+  ignored and `--no-haddock-internal` is implied.
+
+!!! note
+
+    If set, Haddock will warn that `-source-*` options are ignored when
+    `--hyperlinked-source` is enabled. That is due to a known bug in Cabal
+    (the libiary).
+
+!!! note
+
+    If set, Cabal (the library) will report that documentation has been created
+    in `index.html` and `<package_name>.txt` files. Those files do not exist.
+    That false report is due to a known bug in Cabal (the library).
+
 ### `--[no-]haddock-hyperlink-source` flag
 
 Default: Enabled
 
 Unset the flag to disable building building hyperlinked source for Haddock.
 
+If the [`--haddock-for-hackage`](#no-haddock-for-haddock-flag) flag is passed,
+this flag is ignored.
+
 ### `--[no-]haddock-internal` flag
 
 Default: Disabled
 
 Set the flag to enable building Haddock documentation for internal modules.
+
+If the [`--haddock-for-hackage`](#no-haddock-for-haddock-flag) flag is passed,
+this flag is ignored.
 
 ### `--[no-]keep-going` flag
 

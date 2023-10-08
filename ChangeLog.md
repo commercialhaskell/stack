@@ -28,6 +28,9 @@ Other enhancements:
 * Add option of the form `--doctest-option=<argument>` to `stack build`, where
   `doctest` is a program recognised by versions of the Cabal library from
   `1.24.0.0`.
+* Experimental: Add flag `--haddock-for-hackage` to Stack's `build` command
+  (including the `haddock` synonym for `build --haddock`) to enable building
+  with flags to generate Haddock documentation suitable for upload to Hackage.
 
 Bug fixes:
 
@@ -228,8 +231,8 @@ Other enhancements:
   `STACK_ROOT` environment variable.
 * Add `stack path --global-config`, to yield the full path of Stack's
   user-specific global YAML configuration file (`config.yaml`).
-* Add an experimental option, `allow-newer-deps`, which allows users to
-  specify a subset of dependencies for which version bounds should be ignored
+* Experimental: Add option `allow-newer-deps`, which allows users to specify a
+  subset of dependencies for which version bounds should be ignored
   (`allow-newer-deps: ['foo', 'bar']`). This field has no effect unless
   `allow-newer` is enabled.
 
@@ -781,7 +784,7 @@ Major changes:
 * Remove the `stack image` command. With the advent of Docker multistage
   builds, this functionality is no longer useful. For an example, please see
   [Building Haskell Apps with Docker](https://www.fpcomplete.com/blog/2017/12/building-haskell-apps-with-docker).
-* Support building GHC from source (experimental)
+* Experimental: Support building GHC from source
     * Stack now supports building and installing GHC from source. The built GHC
       is uniquely identified by a commit id and an Hadrian "flavour" (Hadrian is
       the newer GHC build system), hence `compiler` can be set to use a GHC
@@ -1664,11 +1667,10 @@ Other enhancements:
   [#3126](https://github.com/commercialhaskell/stack/issues/3126)
 * When using Nix, nix-shell now depends always on git to prevent runtime errors
   while fetching metadata
-* The `stack unpack` command now accepts a form where an explicit
-  Hackage revision hash is specified, e.g. `stack unpack
-  foo-1.2.3@gitsha1:deadbeef`. Note that this should be considered
-  _experimental_, Stack will likely move towards a different hash
-  format in the future.
+* Experimental: The `stack unpack` command now accepts a form where an explicit
+  Hackage revision hash is specified, e.g.
+  `stack unpack foo-1.2.3@gitsha1:deadbeef`. Note that Stack will likely move
+  towards a different hash format in the future.
 * Binary "stack upgrade" will now warn if the installed executable is not
   on the PATH or shadowed by another entry.
 * Allow running tests on tarball created by sdist and upload
@@ -2283,7 +2285,7 @@ Other enhancements:
 * Fix too much rebuilding when enabling/disabling profiling flags.
 * `stack build pkg-1.0` will now build `pkg-1.0` even if the snapshot specifies
   a different version (it introduces a temporary extra-dep)
-* Experimental support for `--split-objs` added
+* Experimental: Support for `--split-objs` added
   [#1284](https://github.com/commercialhaskell/stack/issues/1284).
 * `git` packages with submodules are supported by passing the `--recursive`
   flag to `git clone`.
@@ -2762,7 +2764,7 @@ Other enhancements:
   [#1070](https://github.com/commercialhaskell/stack/pull/1070)
 * Use Stack-installed GHCs for `stack init --solver`
   [#1072](https://github.com/commercialhaskell/stack/issues/1072)
-* New experimental `stack query` command
+* Experimental: Add `stack query` command
   [#1087](https://github.com/commercialhaskell/stack/issues/1087)
 * By default, Stack no longer rebuilds a package due to GHC options changes.
   This behavior can be tweaked with the `rebuild-ghc-options` setting.
