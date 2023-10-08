@@ -98,8 +98,10 @@ import           Stack.Build.Cache
                    , writePackageProjectRoot, writeSetupConfigMod
                    )
 import           Stack.Build.Haddock
-                   ( generateDepsHaddockIndex, generateLocalHaddockIndex
-                   , generateSnapHaddockIndex, openHaddocksInBrowser
+                   ( generateDepsHaddockIndex
+                   , generateLocalHaddockForHackageArchives
+                   , generateLocalHaddockIndex, generateSnapHaddockIndex
+                   , openHaddocksInBrowser
                    )
 import           Stack.Build.Installed (  )
 import           Stack.Build.Source ( addUnlistedToBuildCache )
@@ -853,29 +855,33 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
   unless (null errs) $
     prettyThrowM $ ExecutionFailure errs
   when (boptsHaddock eeBuildOpts) $ do
-    snapshotDumpPkgs <- liftIO (readTVarIO eeSnapshotDumpPkgs)
-    localDumpPkgs <- liftIO (readTVarIO eeLocalDumpPkgs)
-    generateLocalHaddockIndex eeBaseConfigOpts localDumpPkgs eeLocals
-    generateDepsHaddockIndex
-      eeBaseConfigOpts
-      eeGlobalDumpPkgs
-      snapshotDumpPkgs
-      localDumpPkgs
-      eeLocals
-    generateSnapHaddockIndex eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs
-    when (boptsOpenHaddocks eeBuildOpts) $ do
-      let planPkgs, localPkgs, installedPkgs, availablePkgs
-            :: Map PackageName (PackageIdentifier, InstallLocation)
-          planPkgs = Map.map (taskProvides &&& taskLocation) (planTasks plan)
-          localPkgs =
-            Map.fromList
-              [ (packageName p, (packageIdentifier p, Local))
-              | p <- map lpPackage eeLocals
-              ]
-          installedPkgs =
-            Map.map (swap . second installedPackageIdentifier) installedMap'
-          availablePkgs = Map.unions [planPkgs, localPkgs, installedPkgs]
-      openHaddocksInBrowser eeBaseConfigOpts availablePkgs (Map.keysSet targets)
+    if boptsHaddockForHackage eeBuildOpts
+      then
+        generateLocalHaddockForHackageArchives eeLocals
+      else do
+        snapshotDumpPkgs <- liftIO (readTVarIO eeSnapshotDumpPkgs)
+        localDumpPkgs <- liftIO (readTVarIO eeLocalDumpPkgs)
+        generateLocalHaddockIndex eeBaseConfigOpts localDumpPkgs eeLocals
+        generateDepsHaddockIndex
+          eeBaseConfigOpts
+          eeGlobalDumpPkgs
+          snapshotDumpPkgs
+          localDumpPkgs
+          eeLocals
+        generateSnapHaddockIndex eeBaseConfigOpts eeGlobalDumpPkgs snapshotDumpPkgs
+        when (boptsOpenHaddocks eeBuildOpts) $ do
+          let planPkgs, localPkgs, installedPkgs, availablePkgs
+                :: Map PackageName (PackageIdentifier, InstallLocation)
+              planPkgs = Map.map (taskProvides &&& taskLocation) (planTasks plan)
+              localPkgs =
+                Map.fromList
+                  [ (packageName p, (packageIdentifier p, Local))
+                  | p <- map lpPackage eeLocals
+                  ]
+              installedPkgs =
+                Map.map (swap . second installedPackageIdentifier) installedMap'
+              availablePkgs = Map.unions [planPkgs, localPkgs, installedPkgs]
+          openHaddocksInBrowser eeBaseConfigOpts availablePkgs (Map.keysSet targets)
  where
   installedMap' = Map.difference installedMap0
                 $ Map.fromList

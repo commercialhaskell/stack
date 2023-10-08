@@ -71,6 +71,7 @@ module Stack.Constants
   , relDirLoadedSnapshotCache
   , bindirSuffix
   , docDirSuffix
+  , htmlDirSuffix
   , relDirHpc
   , relDirLib
   , relDirShare
@@ -451,6 +452,10 @@ bindirSuffix = relDirBin
 -- | Suffix applied to an installation root to get the doc dir
 docDirSuffix :: Path Rel Dir
 docDirSuffix = $(mkRelDir "doc")
+
+-- | Suffix applied to a path to get the @html@ directory.
+htmlDirSuffix :: Path Rel Dir
+htmlDirSuffix = $(mkRelDir "html")
 
 relDirHpc :: Path Rel Dir
 relDirHpc = $(mkRelDir "hpc")

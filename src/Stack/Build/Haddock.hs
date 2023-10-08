@@ -9,15 +9,22 @@ module Stack.Build.Haddock
   , openHaddocksInBrowser
   , shouldHaddockDeps
   , shouldHaddockPackage
+  , generateLocalHaddockForHackageArchives
   ) where
 
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Compression.GZip as GZip
 import qualified Data.Foldable as F
 import qualified Data.HashSet as HS
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Time ( UTCTime )
-import           Path ( (</>), parent, parseRelDir )
+import           Distribution.Text ( display )
+import           Path
+                   ( (</>), addExtension, fromAbsDir, fromAbsFile, fromRelDir
+                   , parent, parseRelDir, parseRelFile
+                   )
 import           Path.Extra
                    ( parseCollapsedAbsFile, toFilePathNoTrailingSep
                    , tryGetModificationTime
@@ -26,10 +33,13 @@ import           Path.IO
                    ( copyDirRecur', doesFileExist, ensureDir, ignoringAbsence
                    , removeDirRecur
                    )
+import qualified RIO.ByteString.Lazy as BL
 import           RIO.List ( intercalate )
 import           RIO.Process ( HasProcessContext, withWorkingDir )
-import           Stack.Constants ( docDirSuffix, relDirAll, relFileIndexHtml )
-import           Stack.Prelude
+import           Stack.Constants
+                   ( docDirSuffix, htmlDirSuffix, relDirAll, relFileIndexHtml )
+import           Stack.Constants.Config ( distDirFromDir )
+import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Build.Exception ( BuildException (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
@@ -37,6 +47,7 @@ import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import           Stack.Types.BuildOpts
                    ( BuildOpts (..), BuildOptsCLI (..), HaddockOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.EnvConfig ( HasEnvConfig (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..) )
@@ -320,3 +331,64 @@ localDepsDocDir bco = localDocDir bco </> relDirAll
 -- | Path of snapshot packages documentation directory.
 snapDocDir :: BaseConfigOpts -> Path Abs Dir
 snapDocDir bco = bcoSnapInstallRoot bco </> docDirSuffix
+
+generateLocalHaddockForHackageArchives ::
+     (HasEnvConfig env, HasTerm env)
+  => [LocalPackage]
+  -> RIO env ()
+generateLocalHaddockForHackageArchives =
+  mapM_
+    ( \lp ->
+        let pkg = lpPackage lp
+            pkgId = PackageIdentifier (packageName pkg) (packageVersion pkg)
+            pkgDir = parent (lpCabalFile lp)
+        in generateLocalHaddockForHackageArchive pkgDir pkgId
+    )
+
+-- | Generate an archive file containing local Haddock documentation for
+-- Hackage, in a form accepted by Hackage.
+generateLocalHaddockForHackageArchive ::
+     (HasEnvConfig env, HasTerm env)
+  => Path Abs Dir
+     -- ^ The package directory.
+  -> PackageIdentifier
+     -- ^ The package name and version.
+  -> RIO env ()
+generateLocalHaddockForHackageArchive pkgDir pkgId = do
+  distDir <- distDirFromDir pkgDir
+  let pkgIdName = display pkgId
+      name = pkgIdName <> "-docs"
+      (nameRelDir, tarGzFileName) = fromMaybe
+        (error "impossible")
+        ( do relDir <- parseRelDir name
+             nameRelFile <- parseRelFile name
+             tarGz <- addExtension ".gz" =<< addExtension ".tar" nameRelFile
+             pure (relDir, tarGz)
+        )
+      tarGzFile = distDir </> tarGzFileName
+      docDir = distDir </> docDirSuffix </> htmlDirSuffix
+  createTarGzFile tarGzFile docDir nameRelDir
+  prettyInfo $
+       fillSep
+         [ flow "Archive of Haddock documentation for Hackage for"
+         , style Current (fromString pkgIdName)
+         , flow "created at:"
+         ]
+    <> line
+    <> pretty tarGzFile
+
+createTarGzFile
+  :: Path Abs File
+  -- ^ Full path to archive file
+  -> Path Abs Dir
+  -- ^ Base directory
+  -> Path Rel Dir
+  -- ^ Directory to archive, relative to base directory
+  -> RIO env ()
+createTarGzFile tar base dir = do
+   entries <- liftIO $ Tar.pack base' [dir']
+   BL.writeFile tar' $ GZip.compress $ Tar.write entries
+ where
+  base' = fromAbsDir base
+  dir' = fromRelDir dir
+  tar' = fromAbsFile tar

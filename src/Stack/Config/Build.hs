@@ -36,18 +36,23 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
        FirstTrue (if noStripping then Just False else Nothing))
   , boptsHaddock = fromFirstFalse buildMonoidHaddock
   , boptsHaddockOpts = haddockOptsFromMonoid buildMonoidHaddockOpts
-  , boptsOpenHaddocks = fromFirstFalse buildMonoidOpenHaddocks
-  , boptsHaddockDeps = getFirst buildMonoidHaddockDeps
-  , boptsHaddockInternal = fromFirstFalse buildMonoidHaddockInternal
+  , boptsOpenHaddocks =
+      not isHaddockFromHackage && fromFirstFalse buildMonoidOpenHaddocks
+  , boptsHaddockDeps = if isHaddockFromHackage
+      then Nothing
+      else getFirst buildMonoidHaddockDeps
+  , boptsHaddockInternal =
+      not isHaddockFromHackage && fromFirstFalse buildMonoidHaddockInternal
   , boptsHaddockHyperlinkSource =
-      fromFirstTrue buildMonoidHaddockHyperlinkSource
-  , boptsHaddockForHackage = fromFirstFalse buildMonoidHaddockForHackage
+      isHaddockFromHackage || fromFirstTrue buildMonoidHaddockHyperlinkSource
+  , boptsHaddockForHackage = isHaddockFromHackage
   , boptsInstallExes = fromFirstFalse buildMonoidInstallExes
   , boptsInstallCompilerTool = fromFirstFalse buildMonoidInstallCompilerTool
   , boptsPreFetch = fromFirstFalse buildMonoidPreFetch
   , boptsKeepGoing = getFirst buildMonoidKeepGoing
   , boptsKeepTmpFiles = fromFirstFalse buildMonoidKeepTmpFiles
-  , boptsForceDirty = fromFirstFalse buildMonoidForceDirty
+  , boptsForceDirty =
+      isHaddockFromHackage || fromFirstFalse buildMonoidForceDirty
   , boptsTests = fromFirstFalse buildMonoidTests
   , boptsTestOpts =
       testOptsFromMonoid buildMonoidTestOpts additionalArgs
@@ -64,6 +69,7 @@ buildOptsFromMonoid BuildOptsMonoid{..} = BuildOpts
   , boptsDdumpDir = getFirst buildMonoidDdumpDir
   }
  where
+  isHaddockFromHackage = fromFirstFalse buildMonoidHaddockForHackage
   -- These options are not directly used in bopts, instead they
   -- transform other options.
   tracing = getAny buildMonoidTrace
