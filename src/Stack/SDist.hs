@@ -456,8 +456,8 @@ readLocalPackage pkgDir = do
     , lpWanted = False -- HACK: makes it so that sdist output goes to a log
                        -- instead of a file.
     , lpCabalFile = cabalfp
-    -- NOTE: these aren't the 'correct values, but aren't used in
-    -- the usage of this function in this module.
+    -- NOTE: these aren't the 'correct' values, but aren't used in the usage of
+    -- this function in this module.
     , lpTestBench = Nothing
     , lpBuildHaddocks = False
     , lpForceDirty = False

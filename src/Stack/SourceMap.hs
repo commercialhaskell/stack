@@ -80,6 +80,7 @@ mkProjectPackage printWarnings dir buildHaddocks = do
 additionalDepPackage ::
      forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Bool
+     -- ^ Should Haddock documentation be built for the package?
   -> PackageLocation
   -> RIO env DepPackage
 additionalDepPackage buildHaddocks pl = do
@@ -111,6 +112,7 @@ additionalDepPackage buildHaddocks pl = do
 snapToDepPackage ::
      forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Bool
+     -- ^ Should Haddock documentation be built for the package?
   -> PackageName
   -> SnapshotPackage
   -> RIO env DepPackage
@@ -281,6 +283,7 @@ loadProjectSnapshotCandidate ::
   => RawSnapshotLocation
   -> PrintWarnings
   -> Bool
+     -- ^ Should Haddock documentation be build for the package?
   -> RIO env (SnapshotCandidate env)
 loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
   debugRSL <- view rslInLogL
