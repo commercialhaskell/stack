@@ -290,11 +290,11 @@ psVersion :: PackageSource -> Version
 psVersion (PSFilePath lp) = packageVersion $ lpPackage lp
 psVersion (PSRemote _ v _ _) = v
 
--- | Information on a locally available package of source code
+-- | Information on a locally available package of source code.
 data LocalPackage = LocalPackage
   { lpPackage       :: !Package
-     -- ^ The @Package@ info itself, after resolution with package flags,
-     -- with tests and benchmarks disabled
+     -- ^ The @Package@ info itself, after resolution with package flags, with
+     -- tests and benchmarks disabled
   , lpComponents    :: !(Set NamedComponent)
     -- ^ Components to build, not including the library component.
   , lpUnbuildable   :: !(Set NamedComponent)
@@ -304,11 +304,12 @@ data LocalPackage = LocalPackage
                              -- terminology, it's unclear
     -- ^ Whether this package is wanted as a target.
   , lpTestBench     :: !(Maybe Package)
-    -- ^ This stores the 'Package' with tests and benchmarks enabled, if
-    -- either is asked for by the user.
+    -- ^ This stores the 'Package' with tests and benchmarks enabled, if either
+    -- is asked for by the user.
   , lpCabalFile     :: !(Path Abs File)
     -- ^ The Cabal file
   , lpBuildHaddocks :: !Bool
+    -- ^ Is Haddock documentation being built for this package?
   , lpForceDirty    :: !Bool
   , lpDirtyFiles    :: !(MemoizedWith EnvConfig (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if

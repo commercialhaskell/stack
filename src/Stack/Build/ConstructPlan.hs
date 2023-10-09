@@ -502,7 +502,13 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
 -- This will also add all the deps needed to build the tests / benchmarks. If
 -- @isAllInOne@ is 'True' (the common case), then all of these should have
 -- already been taken care of as part of the build step.
-addFinal :: LocalPackage -> Package -> Bool -> Bool -> M ()
+addFinal ::
+     LocalPackage
+  -> Package
+  -> Bool
+  -> Bool
+     -- ^ Should Haddock documentation be built?
+  -> M ()
 addFinal lp package isAllInOne buildHaddocks = do
   depsRes <- addPackageDeps package
   res <- case depsRes of
@@ -760,12 +766,14 @@ installPackage name ps minstalled = do
     pure $ Set.member name (curatorExpectTestFailure curator) ||
            Set.member name (curatorExpectBenchmarkFailure curator)
 
-resolveDepsAndInstall :: Bool
-                      -> Bool
-                      -> PackageSource
-                      -> Package
-                      -> Maybe Installed
-                      -> M (Either ConstructPlanException AddDepRes)
+resolveDepsAndInstall ::
+     Bool
+  -> Bool
+     -- ^ Should Haddock documentation be built?
+  -> PackageSource
+  -> Package
+  -> Maybe Installed
+  -> M (Either ConstructPlanException AddDepRes)
 resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
   res <- addPackageDeps package
   case res of
@@ -778,15 +786,17 @@ resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
 -- | Checks if we need to install the given 'Package', given the results
 -- of 'addPackageDeps'. If dependencies are missing, the package is dirty, or
 -- it's not installed, then it needs to be installed.
-installPackageGivenDeps :: Bool
-                        -> Bool
-                        -> PackageSource
-                        -> Package
-                        -> Maybe Installed
-                        -> ( Set PackageIdentifier
-                           , Map PackageIdentifier GhcPkgId
-                           , IsMutable )
-                        -> M AddDepRes
+installPackageGivenDeps ::
+     Bool
+  -> Bool
+     -- ^ Should Haddock documentation be built?
+  -> PackageSource
+  -> Package
+  -> Maybe Installed
+  -> ( Set PackageIdentifier
+     , Map PackageIdentifier GhcPkgId
+     , IsMutable )
+  -> M AddDepRes
 installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
   (missing, present, minMutable) = do
     let name = packageName package
@@ -1046,12 +1056,14 @@ addPackageDeps package = do
       HasLibraries _ -> True
       NoLibraries -> False
 
-checkDirtiness :: PackageSource
-               -> Installed
-               -> Package
-               -> Map PackageIdentifier GhcPkgId
-               -> Bool
-               -> M Bool
+checkDirtiness ::
+     PackageSource
+  -> Installed
+  -> Package
+  -> Map PackageIdentifier GhcPkgId
+  -> Bool
+     -- ^ Is Haddock documentation being built?
+  -> M Bool
 checkDirtiness ps installed package present buildHaddocks = do
   ctx <- ask
   moldOpts <- runRIO ctx $ tryGetFlagCache installed

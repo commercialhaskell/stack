@@ -56,6 +56,7 @@ mkProjectPackage ::
   => PrintWarnings
   -> ResolvedPath Dir
   -> Bool
+     -- ^ Should Haddock documentation be built for the package?
   -> RIO env ProjectPackage
 mkProjectPackage printWarnings dir buildHaddocks = do
   (gpd, name, cabalfp) <-
