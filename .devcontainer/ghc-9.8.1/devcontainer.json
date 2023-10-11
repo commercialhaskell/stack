@@ -1,10 +1,10 @@
 {
-  "name": "Default",
+  "name": "GHC 9.8.1",
   "build": {
-    "dockerfile": "GHC.Dockerfile",
+    "dockerfile": "../GHC.Dockerfile",
+    "context": "..",
     "args": {
-      "GHC_VERSION": "9.4.7",
-      "HLS_VERSION": "2.4.0.0",
+      "GHC_VERSION": "9.8.1",
       "USE_ZSH_FOR_ROOT": "unset-to-use-ash",
       "SET_LANG": "C.UTF-8",
       "SET_TZ": ""
@@ -30,7 +30,6 @@
         "eamodio.gitlens@11.7.0",
         "exiasr.hadolint",
         "GitHub.vscode-pull-request-github",
-        "haskell.haskell",
         "mhutchie.git-graph",
         "mutantdino.resourcemonitor",
         "timonwong.shellcheck"
@@ -38,7 +37,6 @@
       "settings": {
         "gitlens.showWelcomeOnInstall": false,
         "gitlens.showWhatsNewAfterUpgrades": false,
-        "haskell.manageHLS": "PATH",
         "resmon.show.battery": false,
         "resmon.show.cpufreq": false
       }
@@ -48,14 +46,14 @@
   // Set 'remoteUser' to 'root' to connect as root instead.
   "remoteUser": "vscode",
   "mounts": [
-    "source=stack-default-home-vscode,target=/home/vscode,type=volume"
-    // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-default-home-vscode,target=/home/vscode,type=bind"
+    "source=stack-ghc-9.8.1-home-vscode,target=/home/vscode,type=volume"
+    // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.8.1-home-vscode,target=/home/vscode,type=bind"
   ],
 
   // "remoteUser": "root",
   // "mounts": [
-  //   "source=stack-default-root,target=/root,type=volume"
-  //   // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-default-root,target=/root,type=bind"
+  //   "source=stack-ghc-9.8.1-root,target=/root,type=volume"
+  //   // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.8.1-root,target=/root,type=bind"
   // ],
 
   // Pip: Install packages to the user site
