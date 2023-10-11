@@ -12,6 +12,13 @@ packages:
   original:
     hackage: Cabal-3.10.1.0@sha256:6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94,12316
 - completed:
+    hackage: hi-file-parser-0.1.5.0@sha256:112ca75860d12ac12e603acf16fc685fdbff3b7b07ac5e2cf79bc14d91baf2fc,2850
+    pantry-tree:
+      sha256: bb86b1a331d75f58399499cd8cab40164f16df2c405e485373bfed06a6b63503
+      size: 2392
+  original:
+    hackage: hi-file-parser-0.1.5.0@sha256:112ca75860d12ac12e603acf16fc685fdbff3b7b07ac5e2cf79bc14d91baf2fc,2850
+- completed:
     hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
     pantry-tree:
       sha256: 3f9fef1f9a6ed1a6923578ada0bc8c16d016344cc67614473384524334463cc2
@@ -20,7 +27,7 @@ packages:
     hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
 snapshots:
 - completed:
-    sha256: a3bfe0e7a268a5b892695cb9b16894c09125e13b5da34b4cc3dba713cfa59c48
-    size: 678950
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/10/4.yaml
-  original: nightly-2023-10-04
+    sha256: 917b397e40f0d5bc99e350f5bc5921456f091cf35b61a869838e14dfbc46e6e1
+    size: 684486
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/10/9.yaml
+  original: nightly-2023-10-09
