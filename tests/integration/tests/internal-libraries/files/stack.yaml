@@ -17,4 +17,4 @@
 # "Cabal-simple_SvXsv1f__3.2.1.0_ghc-8.10.7: Cannot build some foreign libraries:
 # Building foreign libraries is currently only supported on OSX, Linux and
 # Windows"
-resolver: ghc-9.4.5
+resolver: ghc-9.4.7
