@@ -4,7 +4,7 @@
     "dockerfile": "GHC.Dockerfile",
     "args": {
       "GHC_VERSION": "9.4.7",
-      "HLS_VERSION": "2.3.0.0",
+      "HLS_VERSION": "2.4.0.0",
       "USE_ZSH_FOR_ROOT": "unset-to-use-ash",
       "SET_LANG": "C.UTF-8",
       "SET_TZ": ""
