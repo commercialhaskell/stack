@@ -33,7 +33,8 @@ Other enhancements:
   `1.24.0.0`.
 * Experimental: Add flag `--haddock-for-hackage` to Stack's `build` command
   (including the `haddock` synonym for `build --haddock`) to enable building
-  with flags to generate Haddock documentation suitable for upload to Hackage.
+  with flags to generate Haddock documentation, and an archive file, suitable
+  for upload to Hackage.
 
 Bug fixes:
 

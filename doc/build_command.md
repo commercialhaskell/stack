@@ -243,18 +243,35 @@ Unset the flag to disable building Haddock documentation for dependencies.
 Default: Disabled
 
 Set the flag to build with flags to generate Haddock documentation suitable for
-upload to Hackage.
+upload to Hackage. This requires Haddock documentation for dependencies to have
+been built previously (command `stack haddock`).
 
-For each local package, the generated Haddock documentation files are in
-directory `doc\html\<package_version>-docs\`, relative to Stack's dist work
-directory (see [`stack path --dist-dir`](path_command.md)).
+For each local package:
+
+* the generated Haddock documentation files are in directory
+  `doc\html\<package_version>-docs\`, relative to Stack's dist work directory
+  (see [`stack path --dist-dir`](path_command.md)); and
+* an archive of the `<package_version>-docs` directory and its contents is in
+  Stack's dist work directory.
 
 If the flag is set:
 
 * the [`--[no-]haddock-hyperlink-source`](#-no-haddock-hyperlink-source-flag)
-  flag is ignored and `--haddock-hyperlink-source` is implied; and
+  flag is ignored and `--haddock-hyperlink-source` is implied;
+* the [`--[no-]haddock-deps`](#-no-haddock-deps-flag) flag is ignored and
+  `--no-haddock-deps` is implied;
 * the [`--[no-]haddock-internal`](#-no-haddock-hyperlink-internal-flag) flag is
-  ignored and `--no-haddock-internal` is implied.
+  ignored and `--no-haddock-internal` is implied;
+* the [`--[no-]open`](#-no-open-flag) flag is ignored and `--no-open` is
+  implied; and
+* the [`--[no-]force-dirty`](#-no-force-dirty-flag) flag is ignored and
+  `--force-dirty` is implied.
+
+!!! info
+
+    Stack does not distinguish the building of Haddock documentation for Hackage
+    from the building of Haddock documentation generally. If the former has
+    occurred, use the `--force-dirty` flag.
 
 !!! note
 
