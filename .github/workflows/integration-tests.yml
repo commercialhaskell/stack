@@ -126,8 +126,15 @@ jobs:
             rm -Rf $(stack path --stack-root)/hooks
         fi
 
+        # Report the file system disk space usage before checks, for
+        # information.
+        df -h
+
         # Do this in the same step as installing deps to get relevant env var modifications
         stack etc/scripts/release.hs check ${{ matrix.release-args }}
+
+        # Report the file system disk space usage after checks, for information.
+        df -h
 
         set +ex
 
