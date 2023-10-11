@@ -33,7 +33,7 @@ jobs:
         include:
         - os: ubuntu-latest
           release-args: "--alpine"
-          cache-bust: ""
+          cache-bust: "2023-10-11"
         - os: windows-latest
           release-args: ""
           cache-bust: "13"
