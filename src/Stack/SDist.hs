@@ -9,6 +9,7 @@ module Stack.SDist
   , getSDistTarball
   , checkSDistTarball
   , checkSDistTarball'
+  , readLocalPackage
   ) where
 
 import qualified Codec.Archive.Tar as Tar
@@ -129,15 +130,15 @@ instance Exception SDistPrettyException
 -- | Type representing command line options for @stack sdist@ command.
 data SDistOpts = SDistOpts
   { sdoptsDirsToWorkWith :: [String]
-  -- ^ Directories to package
+    -- ^ Directories to package
   , sdoptsPvpBounds :: Maybe PvpBounds
-  -- ^ PVP Bounds overrides
+    -- ^ PVP Bounds overrides
   , sdoptsIgnoreCheck :: Bool
-  -- ^ Whether to ignore check of the package for common errors
+    -- ^ Whether to ignore check of the package for common errors
   , sdoptsBuildTarball :: Bool
-  -- ^ Whether to build the tarball
+    -- ^ Whether to build the tarball
   , sdoptsTarPath :: Maybe FilePath
-  -- ^ Where to copy the tarball
+    -- ^ Where to copy the tarball
   }
 
 -- | Function underlying the @stack sdist@ command.
@@ -193,7 +194,12 @@ getSDistTarball ::
      -- ^ Override Config value
   -> Path Abs Dir
      -- ^ Path to local package
-  -> RIO env (FilePath, L.ByteString, Maybe (PackageIdentifier, L.ByteString))
+  -> RIO
+       env
+       ( FilePath
+       , L.ByteString
+       , Maybe (PackageIdentifier, L.ByteString)
+       )
      -- ^ Filename, tarball contents, and option Cabal file revision to upload
 getSDistTarball mpvpBounds pkgDir = do
   config <- view configL
@@ -243,7 +249,7 @@ getSDistTarball mpvpBounds pkgDir = do
   -- prone and more predictable to read everything in at once, so that's what
   -- we're doing for now:
   let tarPath isDir fp =
-        case Tar.toTarPath isDir (forceUtf8Enc (pkgId FP.</> fp)) of
+        case Tar.toTarPath isDir (forceUtf8Enc (pkgIdName FP.</> fp)) of
           Left e -> prettyThrowIO $ ToTarPathException e
           Right tp -> pure tp
       -- convert a String of proper characters to a String of bytes in UTF8
@@ -268,8 +274,9 @@ getSDistTarball mpvpBounds pkgDir = do
             pure $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
         | otherwise = packWith packFileEntry False fp
       isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
-      tarName = pkgId FP.<.> "tar.gz"
-      pkgId = packageIdentifierString (packageIdentifier (lpPackage lp))
+      tarName = pkgIdName FP.<.> "tar.gz"
+      pkgIdName = packageIdentifierString pkgId
+      pkgId = packageIdentifier (lpPackage lp)
   dirEntries <- mapM packDir (dirsFromFiles files)
   fileEntries <- mapM packFile files
   mcabalFileRevision <- liftIO (readIORef cabalFileRevisionRef)

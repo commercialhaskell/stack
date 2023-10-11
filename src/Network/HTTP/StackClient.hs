@@ -14,6 +14,7 @@ module Network.HTTP.StackClient
   , setRequestCheckStatus
   , setRequestMethod
   , setRequestHeader
+  , setRequestHeaders
   , addRequestHeader
   , setRequestBody
   , getResponseHeaders
@@ -37,6 +38,8 @@ module Network.HTTP.StackClient
   , hAccept
   , hContentLength
   , hContentMD5
+  , method
+  , methodPost
   , methodPut
   , formDataBody
   , partFileRequestBody
@@ -45,6 +48,7 @@ module Network.HTTP.StackClient
   , setGitHubHeaders
   , download
   , redownload
+  , requestBody
   , verifiedDownload
   , verifiedDownloadWithProgress
   , CheckHexDigest (..)
@@ -73,7 +77,7 @@ import           Data.Time.Clock
 import           Network.HTTP.Client
                    ( HttpException (..), HttpExceptionContent (..), Request
                    , RequestBody (..), Response (..), checkResponse, getUri
-                   , parseRequest, parseUrlThrow, path
+                   , method, parseRequest, parseUrlThrow, path, requestBody
                    )
 import           Network.HTTP.Client.MultipartFormData
                    ( formDataBody, partBS, partFileRequestBody, partLBS )
@@ -92,12 +96,13 @@ import qualified Network.HTTP.Download as Download
 import           Network.HTTP.Simple
                    ( addRequestHeader, getResponseBody, getResponseHeaders
                    , getResponseStatusCode, setRequestBody
-                   , setRequestCheckStatus, setRequestHeader, setRequestMethod
+                   , setRequestCheckStatus, setRequestHeader, setRequestHeaders
+                   , setRequestMethod
                    )
 import qualified Network.HTTP.Simple
                    ( httpJSON, httpLbs, httpNoBody, httpSink, withResponse )
 import           Network.HTTP.Types
-                   ( hAccept, hContentLength, hContentMD5, methodPut
+                   ( hAccept, hContentLength, hContentMD5, methodPost, methodPut
                    , notFound404
                    )
 import           Path ( Abs, File, Path )

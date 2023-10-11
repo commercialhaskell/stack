@@ -139,6 +139,7 @@ module Stack.Constants
   , testGhcEnvRelFile
   , relFileBuildLock
   , stackDeveloperModeDefault
+  , isStackUploadDisabled
   , globalFooter
   , gitHubBasicAuthType
   , gitHubTokenEnvVar
@@ -675,6 +676,10 @@ relFileBuildLock = $(mkRelFile "build-lock")
 -- | What should the default be for stack-developer-mode
 stackDeveloperModeDefault :: Bool
 stackDeveloperModeDefault = STACK_DEVELOPER_MODE_DEFAULT
+
+-- | What should the default be for stack-developer-mode
+isStackUploadDisabled :: Bool
+isStackUploadDisabled = STACK_DISABLE_STACK_UPLOAD
 
 -- | The footer to the help for Stack's subcommands
 globalFooter :: String

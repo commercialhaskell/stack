@@ -25,6 +25,7 @@ import           GitHash ( giCommitCount, giHash, tGitInfoCwdTry )
 import           Options.Applicative.Simple ( simpleVersion )
 #endif
 import qualified Paths_stack as Meta
+import           Stack.Constants ( isStackUploadDisabled )
 import           Stack.Prelude
 #ifndef USE_GIT_INFO
 import           Stack.Types.Version ( showStackVersion )
@@ -51,6 +52,7 @@ versionString' = showStackVersion ++ afterVersion
     , ' ' : Cabal.display buildArch
     , depsString
     , warningString
+    , stackUploadDisabledWarningString
     ]
   preReleaseString =
     case versionBranch Meta.version of
@@ -73,6 +75,14 @@ versionString' = showStackVersion ++ afterVersion
     , "official build by running 'stack upgrade --force-download'."
     ]
 #endif
+  stackUploadDisabledWarningString = if isStackUploadDisabled
+    then unlines
+      [ ""
+      , "Warning: 'stack upload' is disabled and will not make HTTP request(s). It will"
+      , "output information about the HTTP request(s) that would have been made if it"
+      , "was enabled."
+      ]
+    else ""
 
 -- | Hpack version we're compiled against
 hpackVersion :: String
