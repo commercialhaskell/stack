@@ -1,10 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
 
 -- | Types and functions related to Stack's @upload@ command.
 module Stack.Upload
   ( -- * Upload
     UploadOpts (..)
+  , SDistOpts (..)
+  , UploadContent (..)
   , UploadVariant (..)
   , uploadCmd
   , upload
@@ -34,25 +37,33 @@ import           Network.HTTP.StackClient
                    ( Request, RequestBody (RequestBodyLBS), Response
                    , applyDigestAuth, displayDigestAuthException, formDataBody
                    , getGlobalManager, getResponseBody, getResponseStatusCode
-                   , httpNoBody, parseRequest, partBS, partFileRequestBody
-                   , partLBS, setRequestHeader, withResponse
+                   , httpNoBody, method, methodPost, methodPut, parseRequest
+                   , partBS, partFileRequestBody, partLBS, requestBody
+                   , setRequestHeader, setRequestHeaders, withResponse
                    )
+import           Path ( (</>), addExtension, parseRelFile )
 import           Path.IO ( resolveDir', resolveFile' )
+import qualified Path.IO as Path
+import           Stack.Constants ( isStackUploadDisabled )
+import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.SDist
                    ( SDistOpts (..), checkSDistTarball, checkSDistTarball'
-                   , getSDistTarball
+                   , getSDistTarball, readLocalPackage
                    )
 import           Stack.Types.Config ( Config (..), configL, stackRootL )
+import           Stack.Types.EnvConfig ( HasEnvConfig )
+import           Stack.Types.Package ( LocalPackage (..), packageIdentifier )
+import           Stack.Types.PvpBounds (PvpBounds)
 import           Stack.Types.Runner ( Runner )
 import           System.Directory
                    ( createDirectoryIfMissing, doesDirectoryExist, doesFileExist
                    , removeFile, renameFile
                    )
 import           System.Environment ( lookupEnv )
-import           System.FilePath ( (</>), takeDirectory, takeFileName )
+import qualified System.FilePath as FP
 import           System.PosixCompat.Files ( setFileMode )
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
@@ -80,72 +91,155 @@ instance Pretty UploadPrettyException where
 
 instance Exception UploadPrettyException
 
--- Type representing variants for uploading to Hackage.
+-- | Type representing forms of content for upload to Hackage.
+data UploadContent
+  = SDist
+    -- ^ Content in the form of an sdist tarball.
+  | DocArchive
+    -- ^ Content in the form of an archive file of package documentation.
+
+-- | Type representing variants for uploading to Hackage.
 data UploadVariant
   = Publishing
-  -- ^ Publish the package
+    -- ^ Publish the package/a published package.
   | Candidate
-  -- ^ Create a package candidate
+    -- ^ Create a package candidate/a package candidate.
 
 -- | Type representing command line options for the @stack upload@ command.
 data UploadOpts = UploadOpts
-  { uoptsSDistOpts :: SDistOpts
-  , uoptsUploadVariant :: UploadVariant
-  -- ^ Says whether to publish the package or upload as a release candidate
+  { uoItemsToWorkWith :: ![String]
+    -- ^ The items to work with.
+  , uoDocumentation :: !Bool
+    -- ^ Uploading documentation for packages?
+  , uoPvpBounds :: !(Maybe PvpBounds)
+  , uoCheck :: !Bool
+  , uoBuildPackage :: !Bool
+  , uoTarPath :: !(Maybe FilePath)
+  , uoUploadVariant :: !UploadVariant
   }
 
 -- | Function underlying the @stack upload@ command. Upload to Hackage.
 uploadCmd :: UploadOpts -> RIO Runner ()
-uploadCmd (UploadOpts (SDistOpts [] _ _ _ _) _) = do
+uploadCmd (UploadOpts [] uoDocumentation _ _ _ _ _) = do
+  let subject = if uoDocumentation
+        then "documentation for the current package,"
+        else "the current package,"
   prettyErrorL
-    [ flow "To upload the current package, please run"
+    [ flow "An item must be specified. To upload"
+    , flow subject
+    , flow "please run"
     , style Shell "stack upload ."
     , flow "(with the period at the end)"
     ]
   liftIO exitFailure
-uploadCmd uploadOpts = do
-  let partitionM _ [] = pure ([], [])
-      partitionM f (x:xs) = do
-        r <- f x
-        (as, bs) <- partitionM f xs
-        pure $ if r then (x:as, bs) else (as, x:bs)
-      sdistOpts = uoptsSDistOpts uploadOpts
-  (files, nonFiles) <-
-    liftIO $ partitionM doesFileExist (sdoptsDirsToWorkWith sdistOpts)
-  (dirs, invalid) <- liftIO $ partitionM doesDirectoryExist nonFiles
-  withConfig YesReexec $ withDefaultEnvConfig $ do
-    unless (null invalid) $ do
-      let invalidList = bulletedList $ map (style File . fromString) invalid
-      prettyErrorL
-        [ style Shell "stack upload"
-        , flow "expects a list of sdist tarballs or package directories."
-        , flow "Can't find:"
-        , line <> invalidList
-        ]
-      exitFailure
-    when (null files && null dirs) $ do
-      prettyErrorL
-        [ style Shell "stack upload"
-        , flow "expects a list of sdist tarballs or package directories, but none were specified."
-        ]
-      exitFailure
-    config <- view configL
-    let hackageUrl = T.unpack $ configHackageBaseUrl config
-        uploadVariant = uoptsUploadVariant uploadOpts
-    getCreds <- memoizeRef $ loadAuth config
-    mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
-    forM_ files $ \file -> do
-      tarFile <- resolveFile' file
-      creds <- runMemoized getCreds
-      upload hackageUrl creds (toFilePath tarFile) uploadVariant
-    forM_ dirs $ \dir -> do
+uploadCmd (UploadOpts {..}) = withConfig YesReexec $ withDefaultEnvConfig $ do
+  config <- view configL
+  let hackageUrl = T.unpack $ configHackageBaseUrl config
+  if uoDocumentation
+    then do
+      (dirs, invalid) <-
+        liftIO $ partitionM doesDirectoryExist uoItemsToWorkWith
+      unless (null invalid) $ do
+        let invalidList =
+              bulletedList $ map (style Current . fromString) invalid
+        prettyError $
+          flow "For documentation upload, Stack expects a list of relative \
+               \paths to package directories. Stack can't find:"
+          <> line
+          <> invalidList
+        exitFailure
+      (failed, items) <- partitionEithers <$> forM dirs checkDocsTarball
+      unless (null failed) $ do
+        let invalidItem (pkgIdName, tarGzFile) = fillSep
+              [ pretty tarGzFile
+              , "for"
+              , style Current (fromString pkgIdName) <> "."
+              ]
+            invalidList = bulletedList $ map invalidItem failed
+        prettyError $
+          flow "Stack can't find:"
+          <> line
+          <> invalidList
+        exitFailure
+      getCreds <- memoizeRef $ loadAuth config
+      forM_ items $ \(pkgIdName, tarGzFile) -> do
+        creds <- runMemoized getCreds
+        upload
+          hackageUrl
+          creds
+          DocArchive
+          (Just pkgIdName)
+          (toFilePath tarGzFile)
+          uoUploadVariant
+    else do
+      (files, nonFiles) <- liftIO $ partitionM doesFileExist uoItemsToWorkWith
+      (dirs, invalid) <- liftIO $ partitionM doesDirectoryExist nonFiles
+      unless (null invalid) $ do
+        let invalidList = bulletedList $ map (style File . fromString) invalid
+        prettyError $
+             flow "For package upload, Stack expects a list of relative paths \
+                  \to tosdist tarballs or package directories. Stack can't \
+                  \find:"
+          <> line
+          <> invalidList
+        exitFailure
+      let sdistOpts = SDistOpts
+            uoItemsToWorkWith
+            uoPvpBounds
+            uoCheck
+            uoBuildPackage
+            uoTarPath
+      getCreds <- memoizeRef $ loadAuth config
+      mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
+      forM_ files $ \file -> do
+        tarFile <- resolveFile' file
+        creds <- runMemoized getCreds
+        upload
+          hackageUrl
+          creds
+          SDist
+          Nothing
+          (toFilePath tarFile)
+          uoUploadVariant
+      forM_ dirs $ \dir -> do
+        pkgDir <- resolveDir' dir
+        (tarName, tarBytes, mcabalRevision) <- getSDistTarball uoPvpBounds pkgDir
+        checkSDistTarball' sdistOpts tarName tarBytes
+        creds <- runMemoized getCreds
+        uploadBytes
+          hackageUrl
+          creds
+          SDist
+          Nothing
+          tarName
+          uoUploadVariant
+          tarBytes
+        forM_ mcabalRevision $ uncurry $ uploadRevision hackageUrl creds
+   where
+    checkDocsTarball ::
+         HasEnvConfig env
+      => FilePath
+      -> RIO env (Either (String, Path Abs File) (String, Path Abs File))
+    checkDocsTarball dir = do
       pkgDir <- resolveDir' dir
-      (tarName, tarBytes, mcabalRevision) <-
-        getSDistTarball (sdoptsPvpBounds sdistOpts) pkgDir
-      checkSDistTarball' sdistOpts tarName tarBytes
-      creds <- runMemoized getCreds
-      uploadBytes hackageUrl creds tarName uploadVariant tarBytes
-      forM_ mcabalRevision $ uncurry $ uploadRevision hackageUrl creds
+      distDir <- distDirFromDir pkgDir
+      lp <- readLocalPackage pkgDir
+      let pkgId = packageIdentifier (lpPackage lp)
+          pkgIdName = packageIdentifierString pkgId
+          name = pkgIdName <> "-docs"
+          tarGzFileName = fromMaybe
+            (error "impossible")
+            ( do nameRelFile <- parseRelFile name
+                 addExtension ".gz" =<< addExtension ".tar" nameRelFile
+            )
+          tarGzFile = distDir Path.</> tarGzFileName
+      isFile <- Path.doesFileExist tarGzFile
+      pure $ (if isFile then Right else Left) (pkgIdName, tarGzFile)
+    partitionM _ [] = pure ([], [])
+    partitionM f (x:xs) = do
+      r <- f x
+      (as, bs) <- partitionM f xs
+      pure $ if r then (x:as, bs) else (as, x:bs)
 
 newtype HackageKey = HackageKey Text
   deriving (Eq, Show)
@@ -251,7 +345,7 @@ loadUserAndPassword config = do
 -- * https://github.com/commercialhaskell/stack/pull/4665
 writeFilePrivate :: MonadIO m => FilePath -> Builder -> m ()
 writeFilePrivate fp builder =
-  liftIO $ withTempFile (takeDirectory fp) (takeFileName fp) $ \fpTmp h -> do
+  liftIO $ withTempFile (FP.takeDirectory fp) (FP.takeFileName fp) $ \fpTmp h -> do
     -- Temp file is created such that only current user can read and write it.
     -- See docs for openTempFile:
     -- https://www.stackage.org/haddock/lts-13.14/base-4.12.0.0/System-IO.html#v:openTempFile
@@ -268,9 +362,9 @@ writeFilePrivate fp builder =
 
 credsFile :: Config -> IO FilePath
 credsFile config = do
-  let dir = toFilePath (view stackRootL config) </> "upload"
+  let dir = toFilePath (view stackRootL config) FP.</> "upload"
   createDirectoryIfMissing True dir
-  pure $ dir </> "credentials.json"
+  pure $ dir FP.</> "credentials.json"
 
 addAPIKey :: HackageKey -> Request -> Request
 addAPIKey (HackageKey key) = setRequestHeader
@@ -294,11 +388,16 @@ applyCreds ::
   -> RIO m Request
 applyCreds creds req0 = do
   manager <- liftIO getGlobalManager
-  ereq <- liftIO $ applyDigestAuth
-    (encodeUtf8 $ hcUsername creds)
-    (encodeUtf8 $ hcPassword creds)
-    req0
-    manager
+  ereq <- if isStackUploadDisabled
+    then do
+      debugRequest "applyCreds" req0
+      pure (Left $ toException ExitSuccess )
+    else
+      liftIO $ applyDigestAuth
+        (encodeUtf8 $ hcUsername creds)
+        (encodeUtf8 $ hcPassword creds)
+        req0
+        manager
   case ereq of
     Left e -> do
       prettyWarn $
@@ -312,37 +411,68 @@ applyCreds creds req0 = do
       pure req0
     Right req -> pure req
 
--- | Upload a single tarball with the given @Uploader@.  Instead of
--- sending a file like 'upload', this sends a lazy bytestring.
+-- | Upload a single tarball with the given @Uploader@. Instead of sending a
+-- file like 'upload', this sends a lazy bytestring.
 --
 -- Since 0.1.2.1
-uploadBytes :: HasTerm m
-            => String -- ^ Hackage base URL
-            -> HackageAuth
-            -> String -- ^ tar file name
-            -> UploadVariant
-            -> L.ByteString -- ^ tar file contents
-            -> RIO m ()
-uploadBytes baseUrl auth tarName uploadVariant bytes = do
-  let req1 = setRequestHeader
-               "Accept"
-               ["text/plain"]
-               (fromString
-                  $  baseUrl
-                  <> "packages/"
-                  <> case uploadVariant of
-                       Publishing -> ""
-                       Candidate -> "candidates/"
-               )
-      formData = [partFileRequestBody "package" tarName (RequestBodyLBS bytes)]
-  req2 <- liftIO $ formDataBody formData req1
-  req3 <- applyAuth auth req2
+uploadBytes ::
+     HasTerm m
+  => String -- ^ Hackage base URL
+  -> HackageAuth
+  -> UploadContent
+     -- ^ Form of the content to be uploaded.
+  -> Maybe String
+     -- ^ Optional package identifier name, applies only to the upload of
+     -- documentation.
+  -> String -- ^ tar file name
+  -> UploadVariant
+  -> L.ByteString -- ^ tar file contents
+  -> RIO m ()
+uploadBytes baseUrl auth contentForm mPkgIdName tarName uploadVariant bytes = do
+  (url, headers, uploadMethod) <- case contentForm of
+    SDist -> do
+      unless (isNothing mPkgIdName) $
+        error "uploadBytes: package identified specified"
+      let variant = case uploadVariant of
+            Publishing -> ""
+            Candidate -> "candidates/"
+      pure
+        ( baseUrl <> "packages/" <> variant
+        , [("Accept", "text/plain")]
+        , methodPost
+        )
+    DocArchive -> case mPkgIdName of
+      Nothing -> error "uploadBytes: package identified not specified"
+      Just pkgIdName -> do
+        let variant = case uploadVariant of
+              Publishing -> ""
+              Candidate -> "candidate/"
+        pure
+          ( baseUrl <> "package/" <> pkgIdName <> "/" <> variant <> "docs"
+          , [ ("Content-Type", "application/x-tar")
+            , ("Content-Encoding", "gzip")
+            ]
+          , methodPut
+          )
+  let req1 = setRequestHeaders headers (fromString url)
+      reqData = RequestBodyLBS bytes
+      formData = [partFileRequestBody "package" tarName reqData]
+
+  req2 <- case contentForm of
+    SDist -> liftIO $ formDataBody formData req1
+    DocArchive -> pure $ req1 { requestBody = reqData }
+  let req3 = req2 { method = uploadMethod }
+  req4 <- applyAuth auth req3
   prettyInfoL
     [ "Uploading"
     , style Current (fromString tarName) <> "..."
     ]
   hFlush stdout
-  withRunInIO $ \runInIO -> withResponse req3 (runInIO . inner)
+  if isStackUploadDisabled
+    then
+      debugRequest "uploadBytes" req4
+    else
+      withRunInIO $ \runInIO -> withResponse req4 (runInIO . inner)
  where
   inner :: HasTerm m => Response (ConduitM () S.ByteString IO ()) -> RIO m ()
   inner res =
@@ -389,22 +519,30 @@ printBody res = runConduit $ getResponseBody res .| CB.sinkHandle stdout
 -- | Upload a single tarball with the given @Uploader@.
 --
 -- Since 0.1.0.0
-upload :: (HasLogFunc m, HasTerm m)
-       => String -- ^ Hackage base URL
-       -> HackageAuth
-       -> FilePath
-       -> UploadVariant
-       -> RIO m ()
-upload baseUrl auth fp uploadVariant =
-  uploadBytes baseUrl auth (takeFileName fp) uploadVariant
-    =<< liftIO (L.readFile fp)
+upload ::
+     (HasLogFunc m, HasTerm m)
+  => String -- ^ Hackage base URL
+  -> HackageAuth
+  -> UploadContent
+  -> Maybe String
+     -- ^ Optional package identifier name, applies only to the upload of
+     -- documentation.
+  -> FilePath
+     -- ^ Path to archive file.
+  -> UploadVariant
+  -> RIO m ()
+upload baseUrl auth contentForm mPkgIdName fp uploadVariant =
+  uploadBytes
+    baseUrl auth contentForm mPkgIdName (FP.takeFileName fp) uploadVariant
+      =<< liftIO (L.readFile fp)
 
-uploadRevision :: (HasLogFunc m, HasTerm m)
-               => String -- ^ Hackage base URL
-               -> HackageAuth
-               -> PackageIdentifier
-               -> L.ByteString
-               -> RIO m ()
+uploadRevision ::
+     (HasLogFunc m, HasTerm m)
+  => String -- ^ Hackage base URL
+  -> HackageAuth
+  -> PackageIdentifier
+  -> L.ByteString
+  -> RIO m ()
 uploadRevision baseUrl auth ident@(PackageIdentifier name _) cabalFile = do
   req0 <- parseRequest $ concat
     [ baseUrl
@@ -420,4 +558,17 @@ uploadRevision baseUrl auth ident@(PackageIdentifier name _) cabalFile = do
     ]
     req0
   req2 <- applyAuth auth req1
-  void $ httpNoBody req2
+  if isStackUploadDisabled
+    then
+      debugRequest "uploadRevision" req2
+    else
+      void $ httpNoBody req2
+
+debugRequest :: HasTerm env => String -> Request -> RIO env ()
+debugRequest callSite req = prettyInfo $
+     fillSep
+       [ fromString callSite <> ":"
+       , flow "When enabled, would apply the following request:"
+       ]
+  <> line
+  <> fromString (show req)

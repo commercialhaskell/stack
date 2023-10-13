@@ -124,6 +124,11 @@ flag disable-git-info
   manual: True
   default: False
 
+flag disable-stack-upload
+  description: For use only during development and debugging. Disable 'stack upload' so that it does not make HTTP requests. Stack will output information about the HTTP request(s) that it would have made if the command was enabled.
+  manual: True
+  default: False
+
 flag hide-dependency-versions
   description: Hides dependency versions from 'stack --version'. Used only when building a Stack executable for official release. Note to packagers/distributors: DO NOT OVERRIDE THIS FLAG IF YOU ARE BUILDING STACK ANY OTHER WAY (e.g. using Cabal or from Hackage), as it makes debugging support requests more difficult.
   manual: True
@@ -411,6 +416,10 @@ library
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+  if flag(disable-stack-upload)
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=True
+  else
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
   if os(windows)
     other-modules:
         Stack.Constants.UsrLibDirs
@@ -530,6 +539,10 @@ executable stack
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+  if flag(disable-stack-upload)
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=True
+  else
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
   if flag(static)
     ld-options: -static -pthread
 
@@ -628,6 +641,10 @@ executable stack-integration-test
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+  if flag(disable-stack-upload)
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=True
+  else
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
   if !(flag(integration-tests))
     buildable: False
   if flag(static)
@@ -742,6 +759,10 @@ test-suite stack-unit-test
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+  if flag(disable-stack-upload)
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=True
+  else
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
   if os(windows)
     other-modules:
         Stack.Ghci.FakePaths

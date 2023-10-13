@@ -144,6 +144,11 @@ when:
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else:
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+- condition: flag(disable-stack-upload)
+  then:
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=True
+  else:
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
 library:
   source-dirs: src
   ghc-options:
@@ -431,5 +436,12 @@ flags:
   developer-mode:
     description: >-
       By default, output extra developer information.
+    manual: true
+    default: false
+  disable-stack-upload:
+    description: >-
+      For use only during development and debugging. Disable 'stack upload' so
+      that it does not make HTTP requests. Stack will output information about
+      the HTTP request(s) that it would have made if the command was enabled.
     manual: true
     default: false

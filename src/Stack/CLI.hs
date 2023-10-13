@@ -511,7 +511,8 @@ commandLineHandler currentDir progName isInterpreter =
 
   upload = addCommand'
     "upload"
-    "Upload a package to Hackage."
+    "Upload one or more packages, or documentation for one or more packages, \
+    \to Hackage."
     uploadCmd
     uploadOptsParser
 
