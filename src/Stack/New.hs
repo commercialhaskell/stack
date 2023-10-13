@@ -520,7 +520,7 @@ applyTemplate project template nonceParams dir templateText = do
       template
       (flow "the template does not contain any files.")
 
-  let isPkgSpec f = ".cabal" `L.isSuffixOf` f || f == "package.yaml"
+  let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
   unless (any isPkgSpec . M.keys $ files) $
     prettyThrowM $ TemplateInvalid
       template
