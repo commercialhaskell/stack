@@ -6,6 +6,9 @@ Release notes:
 
 * The hash used as a key for Stack's pre-compiled package cache has changed,
   following the dropping of support for Cabal versions older than `1.24.0.0`.
+* The check used in `stack new` now does a suffix match to find `package.yaml`
+  rather than an exact match. This supports defining templates with packages in
+  subdirectories.
 
 **Changes since v2.13.1:**
 
