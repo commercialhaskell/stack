@@ -6,9 +6,6 @@ Release notes:
 
 * The hash used as a key for Stack's pre-compiled package cache has changed,
   following the dropping of support for Cabal versions older than `1.24.0.0`.
-* The check used in `stack new` now does a suffix match to find `package.yaml`
-  rather than an exact match. This supports defining templates with packages in
-  subdirectories.
 
 **Changes since v2.13.1:**
 
@@ -38,6 +35,10 @@ Other enhancements:
   (including the `haddock` synonym for `build --haddock`) to enable building
   with flags to generate Haddock documentation, and an archive file, suitable
   for upload to Hackage.
+* Experimental: Add flag `--documentation` (`-d` for short) to Stack's `upload`
+  command to allow uploading of documentation for packages to Hackage.
+* `stack new` no longer rejects project templates that specify a `package.yaml`
+  in a subdirectory of the project directory.
 
 Bug fixes:
 
