@@ -424,6 +424,8 @@ configFromConfigMonoid
         configHideSourcePaths = fromFirstTrue configMonoidHideSourcePaths
         configRecommendUpgrade = fromFirstTrue configMonoidRecommendUpgrade
         configNotifyIfNixOnPath = fromFirstTrue configMonoidNotifyIfNixOnPath
+        configNotifyIfGhcUntested = fromFirstTrue configMonoidNotifyIfGhcUntested
+        configNotifyIfCabalUntested = fromFirstTrue configMonoidNotifyIfCabalUntested
         configNoRunCompile = fromFirstFalse configMonoidNoRunCompile
     configAllowDifferentUser <-
       case getFirst configMonoidAllowDifferentUser of

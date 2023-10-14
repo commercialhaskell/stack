@@ -992,8 +992,12 @@ ensureCompilerAndMsys sopts = do
   pure (cp, paths)
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
-warnUnsupportedCompiler :: HasTerm env => Version -> RIO env Bool
-warnUnsupportedCompiler ghcVersion =
+warnUnsupportedCompiler ::
+     (HasConfig env, HasTerm env)
+  => Version
+  -> RIO env Bool
+warnUnsupportedCompiler ghcVersion = do
+  notifyIfGhcUntested <- view $ configL.to configNotifyIfGhcUntested
   if
     | ghcVersion < mkVersion [7, 8] -> do
         prettyWarnL
@@ -1006,10 +1010,10 @@ warnUnsupportedCompiler ghcVersion =
           , style Url "https://github.com/commercialhaskell/stack/issues/648" <> "."
           ]
         pure True
-    | ghcVersion >= mkVersion [9, 7] -> do
+    | ghcVersion >= mkVersion [9, 7] && notifyIfGhcUntested -> do
         prettyWarnL
-          [ flow "Stack has not been tested with GHC versions 9.8 and above, and \
-                 \using"
+          [ flow "Stack has not been tested with GHC versions 9.8 and above, \
+                 \and using"
           , fromString (versionString ghcVersion) <> ","
           , flow "this may fail."
           ]
@@ -1020,7 +1024,7 @@ warnUnsupportedCompiler ghcVersion =
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
 warnUnsupportedCompilerCabal ::
-     HasTerm env
+     (HasConfig env, HasTerm env)
   => CompilerPaths
   -> Bool -- ^ already warned about GHC?
   -> RIO env ()
@@ -1028,7 +1032,7 @@ warnUnsupportedCompilerCabal cp didWarn = do
   unless didWarn $
     void $ warnUnsupportedCompiler $ getGhcVersion $ cpCompilerVersion cp
   let cabalVersion = cpCabalVersion cp
-
+  notifyIfCabalUntested <- view $ configL.to configNotifyIfCabalUntested
   if
     | cabalVersion < mkVersion [1, 24, 0] -> do
         prettyWarnL
@@ -1040,10 +1044,10 @@ warnUnsupportedCompilerCabal cp didWarn = do
                  \resolver. Acceptable resolvers: lts-7.0/nightly-2016-05-26 \
                  \or later."
           ]
-    | cabalVersion >= mkVersion [3, 11] ->
+    | cabalVersion >= mkVersion [3, 11] && notifyIfCabalUntested ->
         prettyWarnL
-          [ flow "Stack has not been tested with Cabal versions 3.12 and above, \
-                 \but version"
+          [ flow "Stack has not been tested with Cabal versions 3.12 and \
+                 \above, but version"
           , fromString (versionString cabalVersion)
           , flow "was found, this may fail."
           ]

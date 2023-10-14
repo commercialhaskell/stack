@@ -39,6 +39,11 @@ Other enhancements:
   command to allow uploading of documentation for packages to Hackage.
 * `stack new` no longer rejects project templates that specify a `package.yaml`
   in a subdirectory of the project directory.
+* Stack will notify the user if Stack has not been tested with the version of
+  GHC that is being user or a version of Cabal (the library) that has been
+  found. In YAML configuration files, the `notify-if-ghc-untested` and
+  `notify-if-cabal-untested` keys are introduced, to allow the notification to
+  be muted if unwanted.
 
 Bug fixes:
 

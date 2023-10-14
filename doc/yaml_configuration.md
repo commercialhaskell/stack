@@ -1154,6 +1154,24 @@ for details).
 For further information, see the
 [Nix integration](nix_integration.md#configuration) documentation.
 
+### notify-if-cabal-untested
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+If Stack has not been tested with the version of Cabal (the library) that has
+been found, should Stack notify the user of that?
+
+### notify-if-ghc-untested
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+If Stack has not been tested with the version of GHC that is being used, should
+Stack notify the user of that?
+
 ### notify-if-nix-on-path
 
 :octicons-tag-24: UNRELEASED
