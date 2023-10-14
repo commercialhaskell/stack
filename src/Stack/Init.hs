@@ -421,7 +421,7 @@ renderStackYaml p ignoredPackages dupPackages =
     , "A snapshot resolver dictates the compiler version and the set of packages"
     , "to be used for project dependencies. For example:"
     , ""
-    , "resolver: lts-21.13"
+    , "resolver: lts-21.16"
     , "resolver: nightly-2023-09-24"
     , "resolver: ghc-9.6.2"
     , ""

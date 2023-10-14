@@ -82,13 +82,6 @@ packages:
   original:
     hackage: crypton-x509-validation-1.6.12@sha256:85989721b64be4b90de9f66ef641c26f57575cffed1a50d707065fb60176f386,2227
 - completed:
-    hackage: hi-file-parser-0.1.5.0@sha256:112ca75860d12ac12e603acf16fc685fdbff3b7b07ac5e2cf79bc14d91baf2fc,2850
-    pantry-tree:
-      sha256: bb86b1a331d75f58399499cd8cab40164f16df2c405e485373bfed06a6b63503
-      size: 2392
-  original:
-    hackage: hi-file-parser-0.1.5.0@sha256:112ca75860d12ac12e603acf16fc685fdbff3b7b07ac5e2cf79bc14d91baf2fc,2850
-- completed:
     hackage: hpack-0.36.0@sha256:c2daa6556afc57367a5d1dbd878bf515d442d201e24b27473051359abd47ed08,5187
     pantry-tree:
       sha256: 981e8f8ab3dc8305c5131f4686c835f55d4a841abcc867bfdcbf9e6757e9a638
@@ -163,4 +156,4 @@ snapshots:
     sha256: 8017c7970c2a8a9510c60cc70ac245d59e0c34eb932b91d37af09fe59855d854
     size: 640038
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/13.yaml
-  original: lts-21.13
+  original: lts-21.16

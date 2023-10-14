@@ -2,14 +2,12 @@
 # built with GHC 9.6.3.
 
 # GHC 9.6.3
-resolver: nightly-2023-10-09
+resolver: nightly-2023-10-14
 
 extra-deps:
 # Cabal is pruned because process is a GHC boot package, and has to be specified
 # again.
 - Cabal-3.10.1.0@sha256:6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94,12316
-# nightly-2023-10-09 specifies hi-file-parser-0.1.4.0
-- hi-file-parser-0.1.5.0@sha256:112ca75860d12ac12e603acf16fc685fdbff3b7b07ac5e2cf79bc14d91baf2fc,2850
 # GHC 9.6.3 comes with process-1.6.17.0, which can segfault on macOS.
 - process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
 
