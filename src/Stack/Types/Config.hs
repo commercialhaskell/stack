@@ -182,6 +182,10 @@ data Config = Config
   , configNotifyIfNixOnPath   :: !Bool
     -- ^ Notify if the Nix package manager (nix) is on the PATH, but
     -- Stack's Nix integration is not enabled?
+  , configNotifyIfGhcUntested :: !Bool
+    -- ^ Notify if Stack has not been tested with the GHC version?
+  , configNotifyIfCabalUntested :: !Bool
+    -- ^ Notify if Stack has not been tested with the Cabal version?
   , configNoRunCompile   :: !Bool
     -- ^ Use --no-run and --compile options when using `stack script`
   , configStackDeveloperMode  :: !Bool
