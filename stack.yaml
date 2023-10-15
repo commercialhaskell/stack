@@ -1,4 +1,4 @@
-resolver: lts-21.13 # GHC 9.4.7
+resolver: lts-21.16 # GHC 9.4.7
 
 extra-deps:
 # Cabal is pruned because process is a GHC boot package, and has to be specified
@@ -16,16 +16,14 @@ extra-deps:
 - crypton-x509-store-1.6.9@sha256:422b9b9f87a7382c66385d047615b16fc86a68c08ea22b1e0117c143a2d44050,1750
 - crypton-x509-system-1.6.7@sha256:023ed573d82983bc473a37a89e0434a085b413be9f68d07e085361056afd4637,1532
 - crypton-x509-validation-1.6.12@sha256:85989721b64be4b90de9f66ef641c26f57575cffed1a50d707065fb60176f386,2227
-# lts-21.13 specifies hi-file-parser-0.1.4.0
-- hi-file-parser-0.1.5.0@sha256:112ca75860d12ac12e603acf16fc685fdbff3b7b07ac5e2cf79bc14d91baf2fc,2850
-# lts-21.13 specifies hpack-0.35.2
+# lts-21.16 specifies hpack-0.35.2
 - hpack-0.36.0@sha256:c2daa6556afc57367a5d1dbd878bf515d442d201e24b27473051359abd47ed08,5187
 - http-client-tls-0.3.6.3@sha256:a5909ce412ee65c141b8547f8fe22236f175186c95c708e86a46b5547394f910,2046
 - http-download-0.2.1.0@sha256:a97863e96f7d44efc3d0e3061db7fe2540b8374ca44ae90d0b56040140cb7506,1716
 - optparse-applicative-0.18.1.0@sha256:b4cf8d9018e5e67cb1f14edb5130b6d05ad8bc1b5f6bd4efaa6ec0b7f28f559d,5132
 - optparse-generic-1.5.1@sha256:c65a7d3429feedf870f5a9f7f0d2aaf75609888b52449f85f22871b5f5a7e95f,2204
 - pantry-0.9.2@sha256:e1c5444d1b4003435d860853abd21e91e5fc337f2b2e2c8c992a2bac04712dc0,7650
-# GHC 9.6.3 comes with process-1.6.17.0, which can segfault on macOS.
+# GHC 9.4.7 comes with process-1.6.17.0, which can segfault on macOS.
 - process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
 - static-bytes-0.1.0@sha256:35dbf30f617baa0151682c97687042516be07872a39984f9fe31f78125b962bf,1627
 - tar-conduit-0.4.0@sha256:f333649770f5ec42a83a93b0d424cf6bb895d80dfbee05a54340395f81d036ae,3126

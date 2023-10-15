@@ -1,5 +1,5 @@
 {- stack script
-   --resolver lts-21.13
+   --resolver lts-21.16
    --ghc-options -Wall
 -}
 
@@ -7,7 +7,7 @@
 -- interpreter options comment, Stack deduces the required packages from the
 -- module imports, being: Cabal, base, bytestring, directory, extra, process,
 -- shake, tar, zip-archive and zlib. These are either GHC boot packages or in
--- the snapshot. Stackage LTS Haskell 21.13 does not include boot packages
+-- the snapshot. Stackage LTS Haskell 21.16 does not include boot packages
 -- directly. As GHC 9.4.7 boot packages Cabal and Cabal-syntax expose modules
 -- with the same names, the language extension PackageImports is required.
 
