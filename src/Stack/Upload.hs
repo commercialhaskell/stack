@@ -70,24 +70,83 @@ import           System.PosixCompat.Files ( setFileMode )
 -- "Stack.Upload" module.
 data UploadPrettyException
   = AuthenticationFailure
-  | ArchiveUploadFailure Int [String] String
+  | ArchiveUploadFailure !Int ![String] !String
+  | DocsTarballInvalid ![(String, Path Abs File)]
+  | ItemsInvalid ![FilePath]
+  | NoItemSpecified !String
+  | PackageDirectoryInvalid ![FilePath]
+  | PackageIdNotSpecifiedForDocsUploadBug
+  | PackageIdSpecifiedForPackageUploadBug
+  | TarGzFileNameInvalidBug !String
   deriving (Show, Typeable)
 
 instance Pretty UploadPrettyException where
   pretty AuthenticationFailure =
-       "[S-2256]"
+    "[S-2256]"
     <> line
     <> flow "authentification failure"
     <> line
     <> flow "Authentication failure uploading to server"
   pretty (ArchiveUploadFailure code res tarName) =
-       "[S-6108]"
+    "[S-6108]"
     <> line
     <> flow "unhandled status code:" <+> fromString (show code)
     <> line
     <> flow "Upload failed on" <+> style File (fromString tarName)
     <> line
     <> vsep (map string res)
+  pretty (DocsTarballInvalid invalidItems) =
+    "[S-2837]"
+    <> line
+    <> flow "Stack can't find:"
+    <> line
+    <> invalidList
+   where
+    invalidItem (pkgIdName, tarGzFile) = fillSep
+      [ pretty tarGzFile
+      , "for"
+      , style Current (fromString pkgIdName) <> "."
+      ]
+    invalidList = bulletedList $ map invalidItem invalidItems
+  pretty (ItemsInvalid invalidItems) =
+    "[S-3179]"
+    <> line
+    <> flow "For package upload, Stack expects a list of relative paths to \
+            \tosdist tarballs or package directories. Stack can't find:"
+    <> line
+    <> invalidList
+   where
+    invalidList = bulletedList $ map (style File . fromString) invalidItems
+  pretty (NoItemSpecified subject) =
+    "[S-3030]"
+    <> line
+    <> fillSep
+         [ flow "An item must be specified. To upload"
+         , flow subject
+         , flow "please run"
+         , style Shell "stack upload ."
+         , flow "(with the period at the end)."
+         ]
+  pretty (PackageDirectoryInvalid invalidItems) =
+    "[S-5908]"
+    <> line
+    <> flow "For documentation upload, Stack expects a list of relative paths \
+            \to package directories. Stack can't find:"
+    <> line
+    <> invalidList
+   where
+    invalidList = bulletedList $ map (style Current . fromString) invalidItems
+  pretty PackageIdNotSpecifiedForDocsUploadBug = bugPrettyReport "[S-7274]" $
+    flow "uploadBytes: Documentation upload but package identifier not \
+         \specified."
+  pretty PackageIdSpecifiedForPackageUploadBug = bugPrettyReport "[S-5860]" $
+    flow "uploadBytes: Package upload but package identifier specified."
+  pretty (TarGzFileNameInvalidBug name) = bugPrettyReport "[S-5955]" $
+    fillSep
+      [ flow "uploadCmd: the name of the"
+      , fromString name <> ".tar.gz"
+      , flow "file could not be parsed."
+      ]
 
 instance Exception UploadPrettyException
 
@@ -124,14 +183,7 @@ uploadCmd (UploadOpts [] uoDocumentation _ _ _ _ _) = do
   let subject = if uoDocumentation
         then "documentation for the current package,"
         else "the current package,"
-  prettyErrorL
-    [ flow "An item must be specified. To upload"
-    , flow subject
-    , flow "please run"
-    , style Shell "stack upload ."
-    , flow "(with the period at the end)"
-    ]
-  liftIO exitFailure
+  prettyThrowIO $ NoItemSpecified subject
 uploadCmd (UploadOpts {..}) = withConfig YesReexec $ withDefaultEnvConfig $ do
   config <- view configL
   let hackageUrl = T.unpack $ configHackageBaseUrl config
@@ -139,28 +191,11 @@ uploadCmd (UploadOpts {..}) = withConfig YesReexec $ withDefaultEnvConfig $ do
     then do
       (dirs, invalid) <-
         liftIO $ partitionM doesDirectoryExist uoItemsToWorkWith
-      unless (null invalid) $ do
-        let invalidList =
-              bulletedList $ map (style Current . fromString) invalid
-        prettyError $
-          flow "For documentation upload, Stack expects a list of relative \
-               \paths to package directories. Stack can't find:"
-          <> line
-          <> invalidList
-        exitFailure
+      unless (null invalid) $
+        prettyThrowIO $ PackageDirectoryInvalid invalid
       (failed, items) <- partitionEithers <$> forM dirs checkDocsTarball
       unless (null failed) $ do
-        let invalidItem (pkgIdName, tarGzFile) = fillSep
-              [ pretty tarGzFile
-              , "for"
-              , style Current (fromString pkgIdName) <> "."
-              ]
-            invalidList = bulletedList $ map invalidItem failed
-        prettyError $
-          flow "Stack can't find:"
-          <> line
-          <> invalidList
-        exitFailure
+        prettyThrowIO $ DocsTarballInvalid failed
       getCreds <- memoizeRef $ loadAuth config
       forM_ items $ \(pkgIdName, tarGzFile) -> do
         creds <- runMemoized getCreds
@@ -175,14 +210,7 @@ uploadCmd (UploadOpts {..}) = withConfig YesReexec $ withDefaultEnvConfig $ do
       (files, nonFiles) <- liftIO $ partitionM doesFileExist uoItemsToWorkWith
       (dirs, invalid) <- liftIO $ partitionM doesDirectoryExist nonFiles
       unless (null invalid) $ do
-        let invalidList = bulletedList $ map (style File . fromString) invalid
-        prettyError $
-             flow "For package upload, Stack expects a list of relative paths \
-                  \to tosdist tarballs or package directories. Stack can't \
-                  \find:"
-          <> line
-          <> invalidList
-        exitFailure
+        prettyThrowIO $ ItemsInvalid invalid
       let sdistOpts = SDistOpts
             uoItemsToWorkWith
             uoPvpBounds
@@ -227,12 +255,13 @@ uploadCmd (UploadOpts {..}) = withConfig YesReexec $ withDefaultEnvConfig $ do
       let pkgId = packageIdentifier (lpPackage lp)
           pkgIdName = packageIdentifierString pkgId
           name = pkgIdName <> "-docs"
-          tarGzFileName = fromMaybe
-            (error "impossible")
-            ( do nameRelFile <- parseRelFile name
-                 addExtension ".gz" =<< addExtension ".tar" nameRelFile
-            )
-          tarGzFile = distDir Path.</> tarGzFileName
+      tarGzFileName <- maybe
+        (prettyThrowIO $ TarGzFileNameInvalidBug name)
+        pure
+        ( do nameRelFile <- parseRelFile name
+             addExtension ".gz" =<< addExtension ".tar" nameRelFile
+        )
+      let tarGzFile = distDir Path.</> tarGzFileName
       isFile <- Path.doesFileExist tarGzFile
       pure $ (if isFile then Right else Left) (pkgIdName, tarGzFile)
     partitionM _ [] = pure ([], [])
@@ -305,8 +334,11 @@ loadUserAndPassword config = do
 
       unless (configSaveHackageCreds config) $ do
         prettyWarnL
-          [ flow "You've set save-hackage-creds to false. However, credentials \
-                 \ were found at:"
+          [ flow "You've set"
+          , style Shell "save-hackage-creds"
+          , "to"
+          , style Shell "false" <> "."
+          , flow "However, credentials were found at:"
           , style File (fromString fp) <> "."
           ]
       pure $ mkCreds fp
@@ -432,7 +464,7 @@ uploadBytes baseUrl auth contentForm mPkgIdName tarName uploadVariant bytes = do
   (url, headers, uploadMethod) <- case contentForm of
     SDist -> do
       unless (isNothing mPkgIdName) $
-        error "uploadBytes: package identified specified"
+        prettyThrowIO PackageIdSpecifiedForPackageUploadBug
       let variant = case uploadVariant of
             Publishing -> ""
             Candidate -> "candidates/"
@@ -442,7 +474,7 @@ uploadBytes baseUrl auth contentForm mPkgIdName tarName uploadVariant bytes = do
         , methodPost
         )
     DocArchive -> case mPkgIdName of
-      Nothing -> error "uploadBytes: package identified not specified"
+      Nothing -> prettyThrowIO PackageIdNotSpecifiedForDocsUploadBug
       Just pkgIdName -> do
         let variant = case uploadVariant of
               Publishing -> ""
