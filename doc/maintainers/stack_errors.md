@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-09-16.
+`master` branch of the Stack repository. Last updated: 2023-10-16.
 
 *   `GHC.GHC.Utils.GhcPkg.Main.Compat`
 
@@ -498,6 +498,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-2256] = AuthenticationFailure
         [S-6108] | ArchiveUploadFailure Int [String] String
+        [S-2837] | DocsTarballInvalid [(String, Path Abs File)]
+        [S-3179] | ItemsInvalid [FilePath]
+        [S-3030] | NoItemSpecified String
+        [S-5908] | PackageDirectoryInvalid [FilePath]
+        [S-7274] | PackageIdNotSpecifiedForDocsUploadBug
+        [S-5860] | PackageIdSpecifiedForPackageUploadBug
+        [S-5955] | TarGzFileNameInvalidBug String
         ~~~
 
     -   `System.Process.Pager.PagerException`
