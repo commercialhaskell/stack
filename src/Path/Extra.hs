@@ -4,7 +4,6 @@
 -- | Extra Path utilities.
 module Path.Extra
   ( toFilePathNoTrailingSep
-  , dropRoot
   , parseCollapsedAbsDir
   , parseCollapsedAbsFile
   , concatAndCollapseAbsDir
@@ -17,6 +16,10 @@ module Path.Extra
   , forgivingResolveDir
   , forgivingResolveFile
   , forgivingResolveFile'
+  , splitDrive
+  , takeDrive
+  , dropDrive
+  , isDrive
   ) where
 
 import           Data.Time ( UTCTime )
@@ -88,11 +91,6 @@ collapseFilePath = FP.joinPath . reverse . foldl' go [] . FP.splitDirectories
   go rs x = x:rs
   checkPathSeparator [x] = FP.isPathSeparator x
   checkPathSeparator _ = False
-
--- | Drop the root (either @\/@ on POSIX or @C:\\@, @D:\\@, etc. on
--- Windows).
-dropRoot :: Path Abs t -> Path Rel t
-dropRoot (Path l) = Path (FP.dropDrive l)
 
 -- | If given file in 'Maybe' does not exist, ensure we have 'Nothing'. This
 -- is to be used in conjunction with 'forgivingAbsence' and
@@ -183,3 +181,31 @@ forgivingResolveFile' ::
      -- ^ Path to resolve
   -> m (Maybe (Path Abs File))
 forgivingResolveFile' p = getCurrentDir >>= flip forgivingResolveFile p
+
+-- The following functions may be added to a future version of the path package.
+-- See https://github.com/commercialhaskell/path/pull/191
+
+-- | Split an absolute path into a drive and, perhaps, a path. On POSIX, @/@ is
+-- a drive.
+splitDrive :: Path Abs t -> (Path Abs Dir, Maybe (Path Rel t))
+splitDrive (Path fp) =
+    let (d, rest) = FP.splitDrive fp
+        mRest = if null rest then Nothing else Just (Path rest)
+    in  (Path d, mRest)
+
+-- | Get the drive from an absolute path. On POSIX, @/@ is a drive.
+--
+-- > takeDrive x = fst (splitDrive x)
+takeDrive :: Path Abs t -> Path Abs Dir
+takeDrive = fst . splitDrive
+
+-- | Drop the drive from an absolute path. May result in 'Nothing' if the path
+-- is just a drive.
+--
+-- > dropDrive x = snd (splitDrive x)
+dropDrive :: Path Abs t -> Maybe (Path Rel t)
+dropDrive = snd . splitDrive
+
+-- | Is an absolute directory path a drive?
+isDrive :: Path Abs Dir -> Bool
+isDrive = isNothing . dropDrive
