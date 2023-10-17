@@ -81,6 +81,7 @@ data BuildException
   | TemplateHaskellNotFoundBug
   | HaddockIndexNotFound
   | ShowBuildErrorBug
+  | CallStackEmptyBug
   deriving (Show, Typeable)
 
 instance Exception BuildException where
@@ -251,6 +252,8 @@ instance Exception BuildException where
     ++ "No local or snapshot doc index found to open."
   displayException ShowBuildErrorBug = bugReport "[S-5452]"
     "Unexpected case in showBuildError."
+  displayException CallStackEmptyBug = bugReport "[S-2696]"
+    "addDep: call stack is empty."
 
 data BuildPrettyException
   = ConstructPlanFailed
