@@ -57,8 +57,17 @@ complicatedOptions ::
   -> AddCommand
      -- ^ commands (use 'addCommand')
   -> IO (GlobalOptsMonoid, RIO Runner ())
-complicatedOptions numericVersion stringVersion numericHpackVersion h pd
-  footerStr commonParser mOnFailure commandParser = do
+complicatedOptions
+    numericVersion
+    stringVersion
+    numericHpackVersion
+    h
+    pd
+    footerStr
+    commonParser
+    mOnFailure
+    commandParser
+  = do
     args <- getArgs
     (a, (b, c)) <- let parserPrefs = prefs $ noBacktrack <> showHelpOnEmpty
                    in  case execParserPure parserPrefs parser args of
