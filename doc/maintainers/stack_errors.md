@@ -5,29 +5,12 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-10-17.
-
-*   `GHC.GHC.Utils.GhcPkg.Main.Compat`
-
-    ~~~haskell
-    [S-6512] = CannotParse String String String
-    [S-3384] | CannotOpenDBForModification FilePath IOException
-    [S-1430] | SingleFileDBUnsupported FilePath
-    [S-5996] | ParsePackageInfoExceptions String
-    [S-3189] | CannotFindPackage PackageArg (Maybe FilePath)
-
-    ~~~
+`master` branch of the Stack repository. Last updated: 2023-10-18.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
     -   `ExitCode`
     -   `throwIO`
-
-*   `Stack.StackException`
-
-    ~~~haskell
-    [S-2186] = InvalidReExecVersion String String
-    ~~~
 
 *   `Stack.main`: catches exceptions from action `run`:
 
@@ -43,6 +26,16 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-2816] = InconsistentDependenciesBug
+        ~~~
+
+    -   `GHC.GHC.Utils.GhcPkg.Main.Compat`
+
+        ~~~haskell
+        [S-6512] = CannotParse String String String
+        [S-3384] | CannotOpenDBForModification FilePath IOException
+        [S-1430] | SingleFileDBUnsupported FilePath
+        [S-5996] | ParsePackageInfoExceptions String
+        [S-3189] | CannotFindPackage PackageArg (Maybe FilePath)
         ~~~
 
     -   `Options.Applicative.Builder.Extra.OptionsApplicativeExtraException`
@@ -70,6 +63,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2045] | SnapshotNotFound SnapName
         [S-8559] | NeitherCompilerOrResolverSpecified Text
         [S-5743] | DuplicatePackagesBug
+        ~~~
+
+    -   `Stack.CLI.CliPrettyException`
+
+        ~~~haskell
+        [S-4639] = NoArgumentsBug
         ~~~
 
     -   `Stack.Clean.CleanException`
@@ -320,6 +319,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-4132] | BinaryUpgradeOnOSUnsupported OS
         [S-3249] | BinaryUpgradeOnArchUnsupported Arch
         [S-4230] | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
+        ~~~
+
+    -   `Stack.StackException`
+
+        ~~~haskell
+        [S-2186] = InvalidReExecVersion String String
         ~~~
 
     -   `Stack.Storage.User.StorageUserException`

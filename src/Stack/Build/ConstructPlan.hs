@@ -80,7 +80,6 @@ import           Stack.Types.SourceMap
 import           Stack.Types.Version
                    ( latestApplicableVersion, versionRangeText, withinRange )
 import           System.Environment ( lookupEnv )
-import Data.List.NonEmpty (nonEmpty)
 
 data PackageInfo
   = PIOnlyInstalled InstallLocation Installed
@@ -621,7 +620,7 @@ addDep name packageInfo = do
               Nothing -> do
                 -- This could happen for GHC boot libraries missing from
                 -- Hackage.
-                cs <- asks (nonEmpty . callStack)
+                cs <- asks (NE.nonEmpty . callStack)
                 cs' <- maybe
                   (throwIO CallStackEmptyBug)
                   (pure . NE.tail)
