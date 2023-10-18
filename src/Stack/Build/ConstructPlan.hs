@@ -21,6 +21,7 @@ import           Distribution.Types.BuildType ( BuildType (Configure) )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Path ( parent )
+import qualified RIO.NonEmpty as NE
 import           RIO.Process ( HasProcessContext (..), findExecutable )
 import           RIO.State ( State, execState )
 import           Stack.Build.Cache ( tryGetFlagCache )
@@ -79,6 +80,7 @@ import           Stack.Types.SourceMap
 import           Stack.Types.Version
                    ( latestApplicableVersion, versionRangeText, withinRange )
 import           System.Environment ( lookupEnv )
+import Data.List.NonEmpty (nonEmpty)
 
 data PackageInfo
   = PIOnlyInstalled InstallLocation Installed
@@ -619,13 +621,17 @@ addDep name packageInfo = do
               Nothing -> do
                 -- This could happen for GHC boot libraries missing from
                 -- Hackage.
-                cs <- asks (L.tail . callStack)
+                cs <- asks (nonEmpty . callStack)
+                cs' <- maybe
+                  (throwIO CallStackEmptyBug)
+                  (pure . NE.tail)
+                  cs
                 prettyWarnL
                   $ flow "No latest package revision found for"
                   : style Current (fromString $ packageNameString name) <> ","
                   : flow "dependency callstack:"
                   : mkNarrativeList Nothing False
-                      (map (fromString . packageNameString) cs :: [StyleDoc])
+                      (map (fromString . packageNameString) cs' :: [StyleDoc])
                 pure Nothing
               Just (_rev, cfKey, treeKey) ->
                 pure $ Just $

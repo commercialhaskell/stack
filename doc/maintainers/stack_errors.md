@@ -361,6 +361,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3121] | TemplateHaskellNotFoundBug
         [S-6901] | HaddockIndexNotFound
         [S-5452] | ShowBuildErrorBug
+        [S-2696] | CallStackEmptyBug
         ~~~
 
     -   `Stack.Types.Build.BuildPrettyException`
