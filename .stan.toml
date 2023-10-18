@@ -1,3 +1,19 @@
+# Partial: base/last
+# On Windows
+# To exclude .stack-work\dist\<hash>\build\stack\autogen\Paths_stack.hs
+[[check]]
+  id = "STAN-0004"
+  directory = ".stack-work\\dist"
+  type = "Exclude"
+
+# Partial: base/last
+# On Unix-like operating systems
+# To exclude .stack-work/dist/<hash>/build/stack/autogen/Paths_stack.hs
+[[check]]
+  id = "STAN-0004"
+  directory = ".stack-work/dist"
+  type = "Exclude"
+
 # Partial: base/!!
 [[check]]
   id = "STAN-0005"
@@ -65,16 +81,52 @@
   type = "Exclude"
 
 # Anti-pattern: Slow 'length' for Text
+# On Windows
 [[check]]
   id = "STAN-0208"
-  scope = "all"
+  file = "src\\Stack\\Build\\ConstructPlan.hs"
   type = "Exclude"
 
-# Anti-pattern: unsafe functions
+# Anti-pattern: Slow 'length' for Text
+# On Unix-like operating systems
 [[check]]
-  id = "STAN-0212"
-  scope = "all"
+  id = "STAN-0208"
+  file = "src/Stack/Build/ConstructPlan.hs"
   type = "Exclude"
+
+# Anti-pattern: Slow 'length' for Text
+# On Windows
+[[check]]
+  id = "STAN-0208"
+  file = "src\\Stack\\Build\\Execute.hs"
+  type = "Exclude"
+
+# Anti-pattern: Slow 'length' for Text
+# On Unix-like operating systems
+[[check]]
+  id = "STAN-0208"
+  file = "src/Stack/Build/Execute.hs"
+  type = "Exclude"
+
+# Anti-pattern: Slow 'length' for Text
+# On Windows
+[[check]]
+  id = "STAN-0208"
+  file = "src\\Stack\\PackageDump.hs"
+  type = "Exclude"
+
+# Anti-pattern: Slow 'length' for Text
+# On Unix-like operating systems
+[[check]]
+  id = "STAN-0208"
+  file = "src/Stack/PackageDump.hs"
+  type = "Exclude"
+
+# # Anti-pattern: unsafe functions
+# [[check]]
+#   id = "STAN-0212"
+#   scope = "all"
+#   type = "Exclude"
 
 # Anti-pattern: Pattern matching on '_'
 [[check]]
