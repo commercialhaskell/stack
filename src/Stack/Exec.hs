@@ -15,6 +15,7 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import           RIO.NonEmpty ( head, nonEmpty )
 import           RIO.Process ( exec )
 import           Stack.Build ( build )
 import           Stack.Build.Target ( NeedTargets (..) )
@@ -56,17 +57,21 @@ instance Exception ExecException where
 data ExecPrettyException
   = PackageIdNotFoundBug !String
   | ExecutableToRunNotFound
+  | NoPackageIdReportedBug
   deriving (Show, Typeable)
 
 instance Pretty ExecPrettyException where
   pretty (PackageIdNotFoundBug name) = bugPrettyReport "[S-8251]" $
-    "Could not find the package id of the package" <+>
-      style Target (fromString name)
-    <> "."
+    fillSep
+      [ flow "Could not find the package id of the package"
+      , style Target (fromString name) <> "."
+      ]
   pretty ExecutableToRunNotFound =
        "[S-2483]"
     <> line
     <> flow "No executables found."
+  pretty NoPackageIdReportedBug = bugPrettyReport "S-8600" $
+    flow "execCmd: findGhcPkgField returned Just \"\"."
 
 instance Exception ExecPrettyException
 
@@ -128,7 +133,10 @@ execCmd ExecOpts {..} =
     pkg <- getGhcPkgExe
     mId <- findGhcPkgField pkg [] name "id"
     case mId of
-      Just i -> pure (L.head $ words (T.unpack i))
+      Just i -> maybe
+        (prettyThrowIO NoPackageIdReportedBug)
+        (pure . head)
+        (nonEmpty $ words $ T.unpack i)
       -- should never happen as we have already installed the packages
       _      -> prettyThrowIO (PackageIdNotFoundBug name)
 

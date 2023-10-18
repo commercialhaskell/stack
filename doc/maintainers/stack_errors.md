@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-10-16.
+`master` branch of the Stack repository. Last updated: 2023-10-17.
 
 *   `GHC.GHC.Utils.GhcPkg.Main.Compat`
 
@@ -131,6 +131,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-8251] = PackageIdNotFoundBug String
         [S-2483] | ExecutableToRunNotFound
+        [S-8600] | NoPackageIdReportedBug
         ~~~
 
     -   `Stack.GhcPkg`
