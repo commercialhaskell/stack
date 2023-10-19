@@ -13,7 +13,6 @@ import           Distribution.Types.Version ( mkVersion )
 import           Foreign.Marshal.Alloc ( allocaBytes )
 import           Foreign.Ptr ( Ptr )
 import           Foreign.Storable ( peekByteOff )
-import           RIO.Partial ( read )
 import           Stack.Prelude
 import           System.IO ( hGetContents )
 import           System.Process
@@ -66,8 +65,8 @@ getTerminalWidth = do
             maybe (pure Nothing)
                   (\hSize -> do
                       sizeStr <- hGetContents hSize
-                      case map read $ words sizeStr :: [Int] of
-                        [_r, c] -> pure $ Just c
+                      case map readMaybe $ words sizeStr :: [Maybe Int] of
+                        [Just _r, Just c] -> pure $ Just c
                         _ -> pure Nothing
                   )
                   mbStdout
