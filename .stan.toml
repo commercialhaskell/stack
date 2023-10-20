@@ -56,12 +56,6 @@
   scope = "all"
   type = "Exclude"
 
-# Anti-pattern: foldl
-[[check]]
-  id = "STAN-0202"
-  scope = "all"
-  type = "Exclude"
-
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
   id = "OBS-STAN-0203-fki0nd-1098:21"

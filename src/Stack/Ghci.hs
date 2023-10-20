@@ -16,7 +16,6 @@ import           Control.Monad.State.Strict ( State, execState, get, modify )
 import           Data.ByteString.Builder ( byteString )
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
-import           Data.Foldable ( foldl )
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
@@ -384,11 +383,11 @@ findFileTargets locals fileTargets = do
         pure $ Right (fp, x)
   let (extraFiles, associatedFiles) = partitionEithers results
       targetMap =
-          foldl unionTargets M.empty $
+          foldl' unionTargets M.empty $
           map (\(_, (name, comp)) -> M.singleton name (TargetComps (S.singleton comp)))
               associatedFiles
       infoMap =
-          foldl (M.unionWith (<>)) M.empty $
+          foldl' (M.unionWith (<>)) M.empty $
           map (\(fp, (name, _)) -> M.singleton name [fp])
               associatedFiles
   pure (targetMap, infoMap, extraFiles)

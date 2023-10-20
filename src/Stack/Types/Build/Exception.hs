@@ -559,7 +559,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
     , Set.Set PackageName
       -- ^ Set of names of packages with one or more DependencyMismatch errors.
     )
-  filterExceptions = L.foldl go acc0 exceptions'
+  filterExceptions = L.foldl' go acc0 exceptions'
    where
     acc0 = (True, False, Map.empty, Set.empty)
     go acc (DependencyPlanFailures pkg m) = Map.foldrWithKey go' acc m
