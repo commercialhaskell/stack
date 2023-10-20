@@ -1554,7 +1554,7 @@ withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps m
                     (sinkWithTimestamps prefixWithTimestamps h)
                     (sinkWithTimestamps prefixWithTimestamps h)
                 OTConsole mprefix ->
-                  let prefix = fold mprefix
+                  let prefix = fromMaybe mempty mprefix
                   in  void $ sinkProcessStderrStdout
                         (toFilePath exeName)
                         fullArgs

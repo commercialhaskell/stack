@@ -123,12 +123,6 @@
   scope = "all"
   type = "Exclude"
 
-# Anti-pattern: Foldable methods on possibly error-prone structures
-[[check]]
-  id = "STAN-0207"
-  scope = "all"
-  type = "Exclude"
-
 # Anti-pattern: Slow 'length' for Text
 # On Windows
 [[check]]
