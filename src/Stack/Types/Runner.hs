@@ -3,6 +3,7 @@
 module Stack.Types.Runner
   ( Runner (..)
   , HasRunner (..)
+  , HasDockerEntrypointMVar (..)
   , globalOptsL
   , stackYamlLocL
   , lockFileBehaviorL
@@ -17,15 +18,17 @@ import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.LockFileBehavior ( LockFileBehavior )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc )
 
--- | The base environment that almost everything in Stack runs in,
--- based off of parsing command line options in 'GlobalOpts'. Provides
--- logging and process execution.
+-- | The base environment that almost everything in Stack runs in, based off of
+-- parsing command line options in 'GlobalOpts'. Provides logging, process
+-- execution, and the MVar used to ensure that the Docker entrypoint is
+-- performed exactly once.
 data Runner = Runner
   { runnerGlobalOpts :: !GlobalOpts
   , runnerUseColor   :: !Bool
   , runnerLogFunc    :: !LogFunc
   , runnerTermWidth  :: !Int
   , runnerProcessContext :: !ProcessContext
+  , runnerDockerEntrypointMVar :: !(MVar Bool)
   }
 
 instance HasLogFunc Runner where
@@ -45,9 +48,17 @@ instance HasTerm Runner where
   useColorL = lens runnerUseColor (\x y -> x { runnerUseColor = y })
   termWidthL = lens runnerTermWidth (\x y -> x { runnerTermWidth = y })
 
+instance HasDockerEntrypointMVar Runner where
+  dockerEntrypointMVarL =
+    lens runnerDockerEntrypointMVar (\x y -> x { runnerDockerEntrypointMVar = y })
+
 -- | Class for environment values which have a 'Runner'.
 class (HasProcessContext env, HasLogFunc env) => HasRunner env where
   runnerL :: Lens' env Runner
+
+-- | Class for environment values which have a Docker entrypoint 'MVar'.
+class HasRunner env => HasDockerEntrypointMVar env where
+  dockerEntrypointMVarL :: Lens' env (MVar Bool)
 
 stackYamlLocL :: HasRunner env => Lens' env StackYamlLoc
 stackYamlLocL =
