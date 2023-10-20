@@ -183,12 +183,15 @@
 #   480 ┃
 
 # Anti-pattern: Pattern matching on '_'
+# Stack uses pattern matching on '_' in many places.
 [[check]]
   id = "STAN-0213"
   scope = "all"
   type = "Exclude"
 
 # Using tuples of big size (>= 4) can decrease code readability
+# In a number of places Stack uses 4-tuples and in one place Stack uses a
+# 5-tuple.
 [[check]]
   id = "STAN-0302"
   scope = "all"
