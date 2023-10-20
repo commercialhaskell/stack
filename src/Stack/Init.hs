@@ -15,7 +15,9 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Foldable as F
 import qualified Data.IntMap as IntMap
 import           Data.List.Extra ( groupSortOn )
+import           Data.List.NonEmpty ( nonEmpty )
 import qualified Data.List.NonEmpty as NonEmpty
+import           Data.List.NonEmpty.Extra ( minimumBy1 )
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -35,7 +37,6 @@ import           Path.IO
                    )
 import qualified RIO.FilePath as FP
 import           RIO.List ( (\\), intercalate, isSuffixOf, isPrefixOf )
-import           RIO.List.Partial ( minimumBy )
 import           Stack.BuildPlan
                    ( BuildPlanCheck (..), checkSnapBuildPlan, deNeededBy
                    , removeSrcPkgDefaultFlags, selectBestSnapshot
@@ -702,22 +703,21 @@ cabalPackagesCheck cabaldirs = do
   let (nameMismatchPkgs, packages) = partitionEithers ePackages
   when (nameMismatchPkgs /= []) $
     prettyThrowIO $ PackageNameInvalid nameMismatchPkgs
-  let dupGroups = filter ((> 1) . length)
-                          . groupSortOn (gpdPackageName . snd)
-      dupAll    = concat $ dupGroups packages
+  let dupGroups = mapMaybe nonEmpty . groupSortOn (gpdPackageName . snd)
+      dupAll    = concatMap NonEmpty.toList $ dupGroups packages
       -- Among duplicates prefer to include the ones in upper level dirs
       pathlen     = length . FP.splitPath . toFilePath . fst
-      getmin      = minimumBy (compare `on` pathlen)
+      getmin      = minimumBy1 (compare `on` pathlen)
       dupSelected = map getmin (dupGroups packages)
       dupIgnored  = dupAll \\ dupSelected
       unique      = packages \\ dupIgnored
   when (dupIgnored /= []) $ do
-    dups <- mapM (mapM (prettyPath. fst)) (dupGroups packages)
+    dups <- mapM (mapM (prettyPath . fst)) (dupGroups packages)
     prettyWarn $
          flow "The following packages have duplicate package names:"
       <> line
       <> foldMap
-           ( \dup ->    bulletedList (map fromString dup)
+           ( \dup ->    bulletedList (map fromString (NonEmpty.toList dup))
                      <> line
            )
            dups
