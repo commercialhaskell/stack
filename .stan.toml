@@ -20,12 +20,6 @@
   scope = "all"
   type = "Exclude"
 
-# Partial: base/minimum
-[[check]]
-  id = "STAN-0014"
-  scope = "all"
-  type = "Exclude"
-
 # Infinite: base/reverse
 # Usage of the 'reverse' function that hangs on infinite lists
 # Stack uses Data.List.reverse in many places

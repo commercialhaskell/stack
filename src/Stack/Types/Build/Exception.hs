@@ -24,6 +24,7 @@ import qualified Distribution.Text as C
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.TestSuiteInterface ( TestSuiteInterface )
 import qualified Distribution.Version as C
+import           RIO.NonEmpty ( nonEmpty )
 import           RIO.Process ( showProcessArgDebug )
 import           Stack.Constants
                    ( defaultUserConfigPath, wiredInPackages )
@@ -852,10 +853,12 @@ getShortestDepsPath (MonoidMap parentsMap) wanted' name =
     ]
   findShortest _ paths | M.null paths = []
   findShortest fuel paths =
-    case targets of
-      [] -> findShortest (fuel - 1) $ M.fromListWith chooseBest $
+    case nonEmpty targets of
+      Nothing -> findShortest (fuel - 1) $ M.fromListWith chooseBest $
               concatMap extendPath recurses
-      _ -> let (DepsPath _ _ path) = L.minimum (map snd targets) in path
+      Just targets' ->
+        let (DepsPath _ _ path) = minimum (snd <$> targets')
+        in  path
    where
     (targets, recurses) =
       L.partition (\(n, _) -> n `Set.member` wanted') (M.toList paths)
