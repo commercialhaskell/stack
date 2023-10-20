@@ -229,14 +229,18 @@ withRunnerGlobal go inner = do
                                     <$> getTerminalWidth)
                                    pure (globalTermWidth go)
   menv <- mkDefaultProcessContext
+  -- MVar used to ensure the Docker entrypoint is performed exactly once.
+  dockerEntrypointMVar <- newMVar False
   let update = globalStylesUpdate go
-  withNewLogFunc go useColor update $ \logFunc -> runRIO Runner
-    { runnerGlobalOpts = go
-    , runnerUseColor = useColor
-    , runnerLogFunc = logFunc
-    , runnerTermWidth = termWidth
-    , runnerProcessContext = menv
-    } inner
+  withNewLogFunc go useColor update $ \logFunc -> do
+    runRIO Runner
+      { runnerGlobalOpts = go
+      , runnerUseColor = useColor
+      , runnerLogFunc = logFunc
+      , runnerTermWidth = termWidth
+      , runnerProcessContext = menv
+      , runnerDockerEntrypointMVar = dockerEntrypointMVar
+      } inner
  where
   clipWidth w
     | w < minTerminalWidth = minTerminalWidth
