@@ -75,7 +75,7 @@ import           Stack.Types.Docker
                   )
 import           Stack.Types.DockerEntrypoint
                    ( DockerEntrypoint (..), DockerUser (..) )
-import           Stack.Types.Runner ( terminalL )
+import           Stack.Types.Runner ( HasDockerEntrypointMVar (..), terminalL )
 import           Stack.Types.Version ( showStackVersion, withinRange )
 import           System.Environment
                    ( getArgs, getEnv, getEnvironment, getExecutablePath
@@ -83,7 +83,6 @@ import           System.Environment
                    )
 import qualified System.FilePath as FP
 import           System.IO.Error ( isDoesNotExistError )
-import           System.IO.Unsafe ( unsafePerformIO )
 import qualified System.Posix.User as User
 import qualified System.PosixCompat.Files as Files
 import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
@@ -476,11 +475,13 @@ reset keepHome = do
 -- | The Docker container "entrypoint": special actions performed when first
 -- entering a container, such as switching the UID/GID to the "outside-Docker"
 -- user's.
-entrypoint :: (HasProcessContext env, HasLogFunc env)
-           => Config
-           -> DockerEntrypoint
-           -> RIO env ()
-entrypoint config@Config{} DockerEntrypoint{..} =
+entrypoint ::
+     (HasDockerEntrypointMVar env, HasProcessContext env, HasLogFunc env)
+  => Config
+  -> DockerEntrypoint
+  -> RIO env ()
+entrypoint config@Config{} DockerEntrypoint{..} = do
+  entrypointMVar <- view dockerEntrypointMVarL
   modifyMVar_ entrypointMVar $ \alreadyRan -> do
     -- Only run the entrypoint once
     unless alreadyRan $ do
@@ -555,11 +556,6 @@ entrypoint config@Config{} DockerEntrypoint{..} =
       _ <- Files.setFileCreationMask duUmask
       pure ()
   stackUserName = "stack" :: String
-
--- | MVar used to ensure the Docker entrypoint is performed exactly once
-entrypointMVar :: MVar Bool
-{-# NOINLINE entrypointMVar #-}
-entrypointMVar = unsafePerformIO (newMVar False)
 
 -- | Remove the contents of a directory, without removing the directory itself.
 -- This is used instead of 'FS.removeTree' to clear bind-mounted directories,
