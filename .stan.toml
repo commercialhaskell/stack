@@ -106,7 +106,7 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-axv1UG-347:32"
+  id = "OBS-STAN-0203-axv1UG-346:32"
 #  ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 #  ✦ Category:      #AntiPattern
 #  ✦ File:          src\Stack\Docker.hs
