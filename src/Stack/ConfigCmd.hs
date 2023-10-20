@@ -130,20 +130,22 @@ cfgCmdSet cmd = do
   --   key2:
   --     key3: value
   --
-  writeLines yamlLines spaces cmdKeys value = case NE.tail cmdKeys of
-    [] -> yamlLines <> [spaces <> NE.head cmdKeys <> ": " <> value]
-    ks -> writeLines (yamlLines <> [spaces <> NE.head cmdKeys <> ":"])
-                     (spaces <> "  ")
-                     (NE.fromList ks)
-                     value
+  writeLines yamlLines spaces cmdKeys value =
+    case NE.nonEmpty $ NE.tail cmdKeys of
+      Nothing -> yamlLines <> [spaces <> NE.head cmdKeys <> ": " <> value]
+      Just ks -> writeLines
+                   (yamlLines <> [spaces <> NE.head cmdKeys <> ":"])
+                   (spaces <> "  ")
+                   ks
+                   value
 
   inConfig v cmdKeys = case v of
     Yaml.Object obj ->
       case KeyMap.lookup (Key.fromText (NE.head cmdKeys)) obj of
         Nothing -> Nothing
-        Just v' -> case NE.tail cmdKeys of
-          [] -> Just v'
-          ks -> inConfig v' (NE.fromList ks)
+        Just v' -> case NE.nonEmpty $ NE.tail cmdKeys of
+          Nothing -> Just v'
+          Just ks -> inConfig v' ks
     _ -> Nothing
 
   switchLine file cmdKey _ searched [] = do

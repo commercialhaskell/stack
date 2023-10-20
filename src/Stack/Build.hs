@@ -258,14 +258,14 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   warnings :: Map Text ([PackageName],[PackageName])
   warnings =
     Map.mapMaybe
-      (\(pkgsToBuild,localPkgs) ->
-        case (pkgsToBuild,NE.toList localPkgs \\ NE.toList pkgsToBuild) of
-          (_ :| [],[]) ->
+      (\(pkgsToBuild, localPkgs) ->
+        case (pkgsToBuild, NE.toList localPkgs \\ NE.toList pkgsToBuild) of
+          (_ :| [], []) ->
             -- We want to build the executable of single local package
             -- and there are no other local packages with an executable of
             -- the same name. Nothing to warn about, ignore.
             Nothing
-          (_,otherLocals) ->
+          (_, otherLocals) ->
             -- We could be here for two reasons (or their combination):
             -- 1) We are building two or more executables with the same
             --    name that will end up overwriting each other.
@@ -273,25 +273,25 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
             --    there are other local packages with an executable of the
             --    same name that might get overwritten.
             -- Both cases warrant a warning.
-            Just (NE.toList pkgsToBuild,otherLocals))
+            Just (NE.toList pkgsToBuild, otherLocals))
       (Map.intersectionWith (,) exesToBuild localExes)
   exesToBuild :: Map Text (NonEmpty PackageName)
   exesToBuild =
     collect
-      [ (exe,pkgName')
-      | (pkgName',task) <- Map.toList (planTasks plan)
+      [ (exe, pkgName')
+      | (pkgName', task) <- Map.toList (planTasks plan)
       , TTLocalMutable lp <- [taskType task]
       , exe <- (Set.toList . exeComponents . lpComponents) lp
       ]
   localExes :: Map Text (NonEmpty PackageName)
   localExes =
     collect
-      [ (exe,packageName pkg)
+      [ (exe, packageName pkg)
       | pkg <- map lpPackage locals
       , exe <- Set.toList (packageExes pkg)
       ]
-  collect :: Ord k => [(k,v)] -> Map k (NonEmpty v)
-  collect = Map.map NE.fromList . Map.fromDistinctAscList . groupSort
+  collect :: Ord k => [(k, v)] -> Map k (NonEmpty v)
+  collect = Map.mapMaybe NE.nonEmpty . Map.fromDistinctAscList . groupSort
 
 warnAboutSplitObjs :: HasTerm env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts =

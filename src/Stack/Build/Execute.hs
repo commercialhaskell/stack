@@ -1781,11 +1781,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         let pkgDb = bcoSnapDB eeBaseConfigOpts
         ghcPkgExe <- getGhcPkgExe
         -- First unregister, silently, everything that needs to be unregistered.
-        unless (null allToUnregister) $
-          catchAny
-            ( unregisterGhcPkgIds False ghcPkgExe pkgDb $
-                NonEmpty.fromList allToUnregister
-            )
+        case nonEmpty allToUnregister of
+          Nothing -> pure ()
+          Just allToUnregister' -> catchAny
+            (unregisterGhcPkgIds False ghcPkgExe pkgDb allToUnregister')
             (const (pure ()))
         -- Now, register the cached conf files.
         forM_ allToRegister $ \libpath ->
