@@ -116,6 +116,8 @@
 #   348 ┃                                ^^^^^^^
 
 # Data types with non-strict fields
+# Defining lazy fields in data types can lead to unexpected space leaks
+# Stack uses lazy fields in many places
 [[check]]
   id = "STAN-0206"
   scope = "all"
@@ -183,12 +185,14 @@
 #   480 ┃
 
 # Anti-pattern: Pattern matching on '_'
+# Pattern matching on '_' for sum types can create maintainability issues
 # Stack uses pattern matching on '_' in many places.
 [[check]]
   id = "STAN-0213"
   scope = "all"
   type = "Exclude"
 
+# Big tuples
 # Using tuples of big size (>= 4) can decrease code readability
 # In a number of places Stack uses 4-tuples and in one place Stack uses a
 # 5-tuple.
