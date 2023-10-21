@@ -70,6 +70,7 @@ import           Data.Conduit
                    ( ConduitM, ConduitT, awaitForever, (.|), yield, await )
 import           Data.Conduit.Lift ( evalStateC )
 import qualified Data.Conduit.List as CL
+import           Data.List.Extra ( (!?) )
 import           Data.Monoid ( Sum (..) )
 import qualified Data.Text as T
 import           Data.Time.Clock
@@ -106,7 +107,7 @@ import           Network.HTTP.Types
                    , notFound404
                    )
 import           Path ( Abs, File, Path )
-import           Prelude ( until, (!!) )
+import           Prelude ( until )
 import           RIO
 import           RIO.PrettyPrint ( HasTerm )
 import           Text.Printf ( printf )
@@ -253,14 +254,17 @@ chattyDownloadProgress label mtotalSize _ = do
 bytesfmt :: Integral a => String -> a -> String
 bytesfmt formatter bs = printf (formatter <> " %s")
                                (fromIntegral (signum bs) * dec :: Double)
-                               (bytesSuffixes !! i)
+                               bytesSuffix
  where
-  (dec,i) = getSuffix (abs bs)
-  getSuffix n = until p (\(x,y) -> (x / 1024, y+1)) (fromIntegral n,0)
+  (dec, i) = getSuffix (abs bs)
+  getSuffix n = until p (\(x, y) -> (x / 1024, y + 1)) (fromIntegral n, 0)
    where
-    p (n',numDivs) = n' < 1024 || numDivs == length bytesSuffixes - 1
+    p (n', numDivs) = n' < 1024 || numDivs == length bytesSuffixes - 1
   bytesSuffixes :: [String]
   bytesSuffixes = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"]
+  bytesSuffix = fromMaybe
+    (error "bytesfmt: the impossible happened! Index out of range.")
+    (bytesSuffixes !? i)
 
 -- Await eagerly (collect with monoidal append),
 -- but space out yields by at least the given amount of time.

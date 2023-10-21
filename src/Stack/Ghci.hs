@@ -17,6 +17,7 @@ import           Data.ByteString.Builder ( byteString )
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.List as L
+import           Data.List.Extra ( (!?) )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -90,9 +91,9 @@ import           System.Permissions ( setScriptPerms )
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Ghci" module.
 data GhciException
-  = InvalidPackageOption String
+  = InvalidPackageOption !String
   | LoadingDuplicateModules
-  | MissingFileTarget String
+  | MissingFileTarget !String
   | Can'tSpecifyFilesAndTargets
   | Can'tSpecifyFilesAndMainIs
   deriving (Show, Typeable)
@@ -120,8 +121,9 @@ instance Exception GhciException where
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Ghci" module.
-newtype GhciPrettyException
-  = GhciTargetParseException [StyleDoc]
+data GhciPrettyException
+  = GhciTargetParseException ![StyleDoc]
+  | CandidatesIndexOutOfRangeBug
   deriving (Show, Typeable)
 
 instance Pretty GhciPrettyException where
@@ -134,6 +136,8 @@ instance Pretty GhciPrettyException where
          , style Shell "--ghci-options"
          , "option."
          ]
+  pretty CandidatesIndexOutOfRangeBug = bugPrettyReport "[S-1939]" $
+    flow "figureOutMainFile: index out of range."
 
 instance Exception GhciPrettyException
 
@@ -774,7 +778,10 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
         putStrLn ""
         pure Nothing
       Just op -> do
-        let (_,_,fp) = candidates L.!! op
+        (_, _, fp) <- maybe
+              (prettyThrowIO CandidatesIndexOutOfRangeBug)
+              pure
+              (candidates !? op)
         putStrLn
           ("Loading main module from candidate " <>
           show (op + 1) <> ", --main-is " <>
