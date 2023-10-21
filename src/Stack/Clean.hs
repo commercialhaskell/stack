@@ -55,8 +55,8 @@ data CleanOpts
 
 -- | Type representing Stack's cleaning commands.
 data CleanCommand
-    = Clean
-    | Purge
+  = Clean
+  | Purge
 
 -- | Function underlying the @stack clean@ command.
 cleanCmd :: CleanOpts -> RIO Runner ()

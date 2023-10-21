@@ -692,8 +692,8 @@ interpreterHandler currentDir args f = do
   -- interpreter error message and exclude the command related error messages.
   errorCombine =
     if pathSeparator `elem` firstArg
-    then overrideErrorHelp
-    else vcatErrorHelp
+      then overrideErrorHelp
+      else vcatErrorHelp
 
   overrideErrorHelp h1 h2 = h2 { helpError = helpError h1 }
 

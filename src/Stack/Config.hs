@@ -401,7 +401,7 @@ configFromConfigMonoid
         Nothing -> liftIO getNumProcessors
         Just i -> pure i
     let configConcurrentTests = fromFirst True configMonoidConcurrentTests
-    let configTemplateParams = configMonoidTemplateParameters
+        configTemplateParams = configMonoidTemplateParameters
         configScmInit = getFirst configMonoidScmInit
         configCabalConfigOpts = coerce configMonoidCabalConfigOpts
         configGhcOptionsByName = coerce configMonoidGhcOptionsByName
@@ -570,8 +570,7 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
           Nothing ->
             throwM $ ParseAbsolutePathException "LOCALAPPDATA" t
           Just lad ->
-            pure $ lad </> relDirUpperPrograms </>
-                   relDirStackProgName
+            pure $ lad </> relDirUpperPrograms </> relDirStackProgName
         Nothing -> pure defaultBase
     _ -> pure defaultBase
  where
@@ -987,7 +986,8 @@ getExtraConfigs userConfigPath = do
 -- 'ParseConfigFileException' when there's a decoding error.
 loadConfigYaml ::
      HasLogFunc env
-  => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
+  => (Value -> Yaml.Parser (WithJSONWarnings a))
+  -> Path Abs File -> RIO env a
 loadConfigYaml parser path = do
   eres <- loadYaml parser path
   case eres of

@@ -1280,11 +1280,17 @@ withSingleContext ::
      -> OutputType
      -> RIO env a)
   -> RIO env a
-withSingleContext ActionContext {..} ee@ExecuteEnv {..} task@Task {..} allDeps msuffix inner0 =
-  withPackage $ \package cabalfp pkgDir ->
-  withOutputType pkgDir package $ \outputType ->
-  withCabal package pkgDir outputType $ \cabal ->
-  inner0 package cabalfp pkgDir cabal announce outputType
+withSingleContext
+    ActionContext {..}
+    ee@ExecuteEnv {..}
+    task@Task {..}
+    allDeps
+    msuffix
+    inner0
+  = withPackage $ \package cabalfp pkgDir ->
+      withOutputType pkgDir package $ \outputType ->
+        withCabal package pkgDir outputType $ \cabal ->
+          inner0 package cabalfp pkgDir cabal announce outputType
  where
   announce = announceTask ee task
   prettyAnnounce = prettyAnnounceTask ee task
@@ -1650,22 +1656,28 @@ singleBuild :: forall env. (HasEnvConfig env, HasRunner env)
             -> InstalledMap
             -> Bool             -- ^ Is this a final build?
             -> RIO env ()
-singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap isFinalBuild = do
-  (allDepsMap, cache) <-
-    getConfigCache ee task installedMap enableTests enableBenchmarks
-  mprecompiled <- getPrecompiled cache
-  minstalled <-
-    case mprecompiled of
-      Just precompiled -> copyPreCompiled precompiled
-      Nothing -> do
-        mcurator <- view $ buildConfigL.to bcCurator
-        realConfigAndBuild cache mcurator allDepsMap
-  case minstalled of
-    Nothing -> pure ()
-    Just installed -> do
-      writeFlagCache installed cache
-      liftIO $ atomically $
-        modifyTVar eeGhcPkgIds $ Map.insert taskProvides installed
+singleBuild
+    ac@ActionContext {..}
+    ee@ExecuteEnv {..}
+    task@Task {..}
+    installedMap
+    isFinalBuild
+  = do
+    (allDepsMap, cache) <-
+      getConfigCache ee task installedMap enableTests enableBenchmarks
+    mprecompiled <- getPrecompiled cache
+    minstalled <-
+      case mprecompiled of
+        Just precompiled -> copyPreCompiled precompiled
+        Nothing -> do
+          mcurator <- view $ buildConfigL.to bcCurator
+          realConfigAndBuild cache mcurator allDepsMap
+    case minstalled of
+      Nothing -> pure ()
+      Just installed -> do
+        writeFlagCache installed cache
+        liftIO $ atomically $
+          modifyTVar eeGhcPkgIds $ Map.insert taskProvides installed
  where
   PackageIdentifier pname pversion = taskProvides
   doHaddock mcurator package =

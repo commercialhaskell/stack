@@ -163,7 +163,13 @@ build msetLocalFiles = do
         getInstalled installMap
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- constructPlan baseConfigOpts localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    plan <- constructPlan
+              baseConfigOpts
+              localDumpPkgs
+              loadPackage
+              sourceMap
+              installedMap
+              (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
