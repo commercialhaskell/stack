@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-10-18.
+`master` branch of the Stack repository. Last updated: 2023-10-21.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -151,6 +151,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-6948] = GhciTargetParseException [StyleDoc]
+        [S-1939] | CandidatesIndexOutOfRangeBug
         ~~~
 
     -   `Stack.Hoogle.HoogleException`
