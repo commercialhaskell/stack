@@ -26,12 +26,6 @@
   scope = "all"
   type = "Exclude"
 
-# Partial: base/minimumBy
-[[check]]
-  id = "STAN-0016"
-  scope = "all"
-  type = "Exclude"
-
 # Infinite: base/reverse
 # Usage of the 'reverse' function that hangs on infinite lists
 # Stack uses Data.List.reverse in many places
@@ -101,7 +95,7 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-hTeu0Y-379:17"
+  id = "OBS-STAN-0203-hTeu0Y-380:17"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Init.hs
@@ -111,7 +105,7 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-hTeu0Y-396:26"
+  id = "OBS-STAN-0203-hTeu0Y-397:26"
 #  ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 #  ✦ Category:      #AntiPattern
 #  ✦ File:          src\Stack\Init.hs
