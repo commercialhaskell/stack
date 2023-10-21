@@ -10,14 +10,13 @@ module Stack.Ghci.ScriptSpec
 
 import qualified Data.Set as S
 import           Distribution.ModuleName
-import           Test.Hspec
-import qualified System.FilePath as FP
-import           Stack.Ghci.FakePaths
-import           Stack.Prelude hiding (fromString)
 import           Path
-import           Path.Extra (pathToLazyByteString)
-
+import           Path.Extra ( pathToLazyByteString )
+import           Stack.Ghci.FakePaths
 import           Stack.Ghci.Script
+import           Stack.Prelude hiding ( fromString )
+import qualified System.FilePath as FP
+import           Test.Hspec
 
 spec :: Spec
 spec = do
