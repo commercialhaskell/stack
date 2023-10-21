@@ -238,73 +238,81 @@ constructPlan ::
   -> InstalledMap
   -> Bool
   -> RIO env Plan
-constructPlan baseConfigOpts0 localDumpPkgs loadPackage0 sourceMap installedMap initialBuildSteps = do
-  logDebug "Constructing the build plan"
+constructPlan
+    baseConfigOpts0
+    localDumpPkgs
+    loadPackage0
+    sourceMap
+    installedMap
+    initialBuildSteps
+  = do
+    logDebug "Constructing the build plan"
 
-  when hasBaseInDeps $
-    prettyWarn $
-         fillSep
-           [ flow "You are trying to upgrade or downgrade the"
-           , style Current "base"
-           , flow "package, which is almost certainly not what you really \
-                  \want. Please, consider using another GHC version if you \
-                  \need a certain version of"
-           , style Current "base" <> ","
-           , flow "or removing"
-           , style Current "base"
-           , flow "as an"
-           , style Shell "extra-deps" <> "."
-           , flow "For further information, see"
-           , style Url "https://github.com/commercialhaskell/stack/issues/3940" <> "."
-           ]
-      <> line
+    when hasBaseInDeps $
+      prettyWarn $
+           fillSep
+             [ flow "You are trying to upgrade or downgrade the"
+             , style Current "base"
+             , flow "package, which is almost certainly not what you really \
+                    \want. Please, consider using another GHC version if you \
+                    \need a certain version of"
+             , style Current "base" <> ","
+             , flow "or removing"
+             , style Current "base"
+             , flow "as an"
+             , style Shell "extra-deps" <> "."
+             , flow "For further information, see"
+             , style Url "https://github.com/commercialhaskell/stack/issues/3940" <> "."
+             ]
+        <> line
 
-  econfig <- view envConfigL
-  globalCabalVersion <- view $ compilerPathsL.to cpCabalVersion
-  sources <- getSources globalCabalVersion
-  mcur <- view $ buildConfigL.to bcCurator
+    econfig <- view envConfigL
+    globalCabalVersion <- view $ compilerPathsL.to cpCabalVersion
+    sources <- getSources globalCabalVersion
+    mcur <- view $ buildConfigL.to bcCurator
 
-  let onTarget = void . getCachedDepOrAddDep
-  let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
-  pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
-  let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
-  ((), m, W efinals installExes dirtyReason warnings parents) <-
-    liftIO $ runRWST inner ctx Map.empty
-  mapM_ prettyWarn (warnings [])
-  let toEither (_, Left e)  = Left e
-      toEither (k, Right v) = Right (k, v)
-      (errlibs, adrs) = partitionEithers $ map toEither $ Map.toList m
-      (errfinals, finals) = partitionEithers $ map toEither $ Map.toList efinals
-      errs = errlibs ++ errfinals
-  if null errs
-    then do
-      let toTask (_, ADRFound _ _) = Nothing
-          toTask (name, ADRToInstall task) = Just (name, task)
-          tasks = Map.fromList $ mapMaybe toTask adrs
-          takeSubset =
-            case boptsCLIBuildSubset $ bcoBuildOptsCLI baseConfigOpts0 of
-              BSAll -> pure
-              BSOnlySnapshot -> pure . stripLocals
-              BSOnlyDependencies ->
-                pure . stripNonDeps (Map.keysSet $ smDeps sourceMap)
-              BSOnlyLocals -> errorOnSnapshot
-      takeSubset Plan
-        { planTasks = tasks
-        , planFinals = Map.fromList finals
-        , planUnregisterLocal =
-            mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps
-        , planInstallExes =
-            if boptsInstallExes (bcoBuildOpts baseConfigOpts0) ||
-               boptsInstallCompilerTool (bcoBuildOpts baseConfigOpts0)
-                then installExes
-                else Map.empty
-        }
-    else do
-      stackYaml <- view stackYamlL
-      stackRoot <- view stackRootL
-      isImplicitGlobal <- view $ configL.to (isPCGlobalProject . configProject)
-      prettyThrowM $ ConstructPlanFailed
-        errs stackYaml stackRoot isImplicitGlobal parents (wanted ctx) prunedGlobalDeps
+    let onTarget = void . getCachedDepOrAddDep
+    let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
+    pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
+    let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
+    ((), m, W efinals installExes dirtyReason warnings parents) <-
+      liftIO $ runRWST inner ctx Map.empty
+    mapM_ prettyWarn (warnings [])
+    let toEither (_, Left e)  = Left e
+        toEither (k, Right v) = Right (k, v)
+        (errlibs, adrs) = partitionEithers $ map toEither $ Map.toList m
+        (errfinals, finals) =
+          partitionEithers $ map toEither $ Map.toList efinals
+        errs = errlibs ++ errfinals
+    if null errs
+      then do
+        let toTask (_, ADRFound _ _) = Nothing
+            toTask (name, ADRToInstall task) = Just (name, task)
+            tasks = Map.fromList $ mapMaybe toTask adrs
+            takeSubset =
+              case boptsCLIBuildSubset $ bcoBuildOptsCLI baseConfigOpts0 of
+                BSAll -> pure
+                BSOnlySnapshot -> pure . stripLocals
+                BSOnlyDependencies ->
+                  pure . stripNonDeps (Map.keysSet $ smDeps sourceMap)
+                BSOnlyLocals -> errorOnSnapshot
+        takeSubset Plan
+          { planTasks = tasks
+          , planFinals = Map.fromList finals
+          , planUnregisterLocal =
+              mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps
+          , planInstallExes =
+              if boptsInstallExes (bcoBuildOpts baseConfigOpts0) ||
+                 boptsInstallCompilerTool (bcoBuildOpts baseConfigOpts0)
+                  then installExes
+                  else Map.empty
+          }
+      else do
+        stackYaml <- view stackYamlL
+        stackRoot <- view stackRootL
+        isImplicitGlobal <- view $ configL.to (isPCGlobalProject . configProject)
+        prettyThrowM $ ConstructPlanFailed
+          errs stackYaml stackRoot isImplicitGlobal parents (wanted ctx) prunedGlobalDeps
  where
   hasBaseInDeps = Map.member (mkPackageName "base") (smDeps sourceMap)
 
@@ -1023,11 +1031,10 @@ addPackageDeps package = do
                 )
               )
   case partitionEithers deps of
-    -- Note that the Monoid for 'InstallLocation' means that if any
-    -- is 'Local', the result is 'Local', indicating that the parent
-    -- package must be installed locally. Otherwise the result is
-    -- 'Snap', indicating that the parent can either be installed
-    -- locally or in the snapshot.
+    -- Note that the Monoid for 'InstallLocation' means that if any is 'Local',
+    -- the result is 'Local', indicating that the parent package must be
+    -- installed locally. Otherwise the result is 'Snap', indicating that the
+    -- parent can either be installed locally or in the snapshot.
     ([], pairs) -> pure $ Right $ mconcat pairs
     (errs, _) -> pure $ Left $ DependencyPlanFailures
       package

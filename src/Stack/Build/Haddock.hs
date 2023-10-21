@@ -377,13 +377,13 @@ generateLocalHaddockForHackageArchive pkgDir pkgId = do
     <> line
     <> pretty tarGzFile
 
-createTarGzFile
-  :: Path Abs File
-  -- ^ Full path to archive file
+createTarGzFile ::
+     Path Abs File
+     -- ^ Full path to archive file
   -> Path Abs Dir
-  -- ^ Base directory
+     -- ^ Base directory
   -> Path Rel Dir
-  -- ^ Directory to archive, relative to base directory
+     -- ^ Directory to archive, relative to base directory
   -> RIO env ()
 createTarGzFile tar base dir = do
    entries <- liftIO $ Tar.pack base' [dir']

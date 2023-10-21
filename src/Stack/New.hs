@@ -3,11 +3,11 @@
 
 -- | Types and functions related to Stack's @new@ command.
 module Stack.New
-    ( NewOpts (..)
-    , TemplateName
-    , newCmd
-    , new
-    ) where
+  ( NewOpts (..)
+  , TemplateName
+  , newCmd
+  , new
+  ) where
 
 import           Control.Monad.Trans.Writer.Strict ( execWriterT )
 import           Data.Aeson as A
