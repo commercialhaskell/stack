@@ -490,6 +490,7 @@ The current active workflows are:
 ### Linting - `lint.yml`
 
 This workflow will run if:
+
 * there is a pull request
 * commits are pushed to these branches: `master`, `stable` and `rc/**`
 
@@ -499,6 +500,7 @@ yamllint and Hlint.
 ### Test suite - `unit-tests.yml`
 
 This workflow will run if:
+
 * there is a pull request
 * commits are pushed to these branches: `master`, `stable` and `rc/**`.
 * requested
@@ -521,6 +523,7 @@ of the Stack root.
 ### Integration-based - `integration-tests.yml`
 
 This workflow will run if:
+
 * there is a pull request
 * commits are pushed to these branches: `master`, `stable` and `rc/**`
 * any tag is created
@@ -562,11 +565,16 @@ variable contains the private key for the GPG key with ID 0x575159689BEFB442.
 That key is imported into GPG and then used by GPG to create a detached signature
 for each file.
 
-### Inactive - `stan.yml`
+### Stan tool - `stan.yml`
 
-Stan is a Haskell static analysis tool. As of 29 August 2022, it does not
-support GHC >= 9.0.1 and Stack is built with GHC >= 9.2.4. Consequently, this
-workflow does not run. Its intent is to apply Stan to Stack.
+[Stan](https://hackage.haskell.org/package/stan) is a Haskell static analysis
+tool. As of `stan-0.1.0.1`, it supports GHC >= 9.6.3 and Stack is built with
+GHC 9.4.7. The tool is configured by the contents of the `.stan.toml` file.
+
+This workflow will run if:
+
+* there is a pull request
+* requested
 
 ## Haskell Language Server
 
