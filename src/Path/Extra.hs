@@ -16,18 +16,13 @@ module Path.Extra
   , forgivingResolveDir
   , forgivingResolveFile
   , forgivingResolveFile'
-  , splitDrive
-  , takeDrive
-  , dropDrive
-  , isDrive
   ) where
 
 import           Data.Time ( UTCTime )
 import           Path
-                   ( Abs, Dir, File, PathException (..), Rel, parseAbsDir
+                   ( Abs, Dir, File, Path, PathException (..), parseAbsDir
                    , parseAbsFile, toFilePath
                    )
-import           Path.Internal ( Path (Path) )
 import           Path.IO
                    ( doesDirExist, doesFileExist, getCurrentDir
                    , getModificationTime
@@ -181,31 +176,3 @@ forgivingResolveFile' ::
      -- ^ Path to resolve
   -> m (Maybe (Path Abs File))
 forgivingResolveFile' p = getCurrentDir >>= flip forgivingResolveFile p
-
--- The following functions may be added to a future version of the path package.
--- See https://github.com/commercialhaskell/path/pull/191
-
--- | Split an absolute path into a drive and, perhaps, a path. On POSIX, @/@ is
--- a drive.
-splitDrive :: Path Abs t -> (Path Abs Dir, Maybe (Path Rel t))
-splitDrive (Path fp) =
-    let (d, rest) = FP.splitDrive fp
-        mRest = if null rest then Nothing else Just (Path rest)
-    in  (Path d, mRest)
-
--- | Get the drive from an absolute path. On POSIX, @/@ is a drive.
---
--- > takeDrive x = fst (splitDrive x)
-takeDrive :: Path Abs t -> Path Abs Dir
-takeDrive = fst . splitDrive
-
--- | Drop the drive from an absolute path. May result in 'Nothing' if the path
--- is just a drive.
---
--- > dropDrive x = snd (splitDrive x)
-dropDrive :: Path Abs t -> Maybe (Path Rel t)
-dropDrive = snd . splitDrive
-
--- | Is an absolute directory path a drive?
-isDrive :: Path Abs Dir -> Bool
-isDrive = isNothing . dropDrive

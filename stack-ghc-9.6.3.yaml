@@ -2,7 +2,7 @@
 # built with GHC 9.6.3.
 
 # GHC 9.6.3
-resolver: nightly-2023-10-14
+resolver: nightly-2023-10-21
 
 extra-deps:
 # Cabal is pruned because process is a GHC boot package, and has to be specified

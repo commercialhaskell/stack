@@ -20,7 +20,7 @@ packages:
     hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
 snapshots:
 - completed:
-    sha256: 9958d138d45a2ff29479d3922047054b4e31f7fd3c3d10432192086b8ee121ad
-    size: 693188
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/10/14.yaml
-  original: nightly-2023-10-14
+    sha256: 215cd7b317bc056574f30bdaaf10326af4c95c9f8e412462a126e55bbb6d66c6
+    size: 695331
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/10/21.yaml
+  original: nightly-2023-10-21

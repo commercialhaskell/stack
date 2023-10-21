@@ -124,6 +124,13 @@ packages:
   original:
     hackage: pantry-0.9.2@sha256:e1c5444d1b4003435d860853abd21e91e5fc337f2b2e2c8c992a2bac04712dc0,7650
 - completed:
+    hackage: path-0.9.5@sha256:3bdc437c4b120b90c222adf8324cbbe4fc35f7272a872dc4d003ea9292c56d1e,3273
+    pantry-tree:
+      sha256: 1eacdfa4e7c0aa278229a9548692fe1e95fb0a6b21ec0c9bd3a73cc0b50d4878
+      size: 1206
+  original:
+    hackage: path-0.9.5@sha256:3bdc437c4b120b90c222adf8324cbbe4fc35f7272a872dc4d003ea9292c56d1e,3273
+- completed:
     hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
     pantry-tree:
       sha256: 3f9fef1f9a6ed1a6923578ada0bc8c16d016344cc67614473384524334463cc2
