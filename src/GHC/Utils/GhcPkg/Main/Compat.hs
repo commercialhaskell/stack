@@ -41,7 +41,6 @@ module GHC.Utils.GhcPkg.Main.Compat
 -----------------------------------------------------------------------------
 
 import qualified Data.Foldable as F
-import           Data.List ( init, isPrefixOf, isSuffixOf, last )
 import qualified Data.Traversable as F
 import           Distribution.InstalledPackageInfo as Cabal
 import           Distribution.Package ( UnitId, mungedId )
@@ -58,7 +57,9 @@ import qualified Path as P
 import           Path.IO
                    ( createDirIfMissing, doesDirExist, listDir, removeFile )
 import qualified RIO.ByteString as BS
-import           RIO.Partial ( fromJust )
+import           RIO.List ( isPrefixOf, stripSuffix )
+import           RIO.NonEmpty ( nonEmpty )
+import qualified RIO.NonEmpty as NE
 import           Stack.Constants ( relFilePackageCache )
 import           Stack.Prelude hiding ( display )
 import           System.Environment ( getEnv )
@@ -97,6 +98,8 @@ data GhcPkgPrettyException
   | SingleFileDBUnsupported !(SomeBase Dir)
   | ParsePackageInfoExceptions !String
   | CannotFindPackage !PackageArg !(Maybe (SomeBase Dir))
+  | CannotParseRelFileBug !String
+  | CannotParseDirectoryWithDBug !String
   deriving (Show, Typeable)
 
 instance Pretty GhcPkgPrettyException where
@@ -149,6 +152,18 @@ instance Pretty GhcPkgPrettyException where
    where
     pkg_msg (Substring pkgpat _) = fillSep ["matching", fromString pkgpat]
     pkg_msg pkgarg' = fromString $ show pkgarg'
+  pretty (CannotParseRelFileBug relFileName) = bugPrettyReport "[S-9323]" $
+    fillSep
+      [ flow "changeDBDir': Could not parse"
+      , style File (fromString relFileName)
+      , flow "as a relative path to a file."
+      ]
+  pretty (CannotParseDirectoryWithDBug dirName) = bugPrettyReport "[S-7651]" $
+    fillSep
+      [ flow "adjustOldDatabasePath: Could not parse"
+      , style Dir (fromString dirName)
+      , flow "as a directory."
+      ]
 
 instance Exception GhcPkgPrettyException
 
@@ -194,10 +209,11 @@ displayGlobPkgId (ExactPackageIdentifier pid) = display pid
 displayGlobPkgId (GlobPackageIdentifier pn) = display pn ++ "-*"
 
 readGlobPkgId :: String -> RIO env GlobPackageIdentifier
-readGlobPkgId str
-  | "-*" `isSuffixOf` str =
-    GlobPackageIdentifier <$> parseCheck (init (init str)) "package identifier (glob)"
-  | otherwise = ExactPackageIdentifier <$> parseCheck str "package identifier (exact)"
+readGlobPkgId str = case stripSuffix "-*" str of
+  Nothing ->
+    ExactPackageIdentifier <$> parseCheck str "package identifier (exact)"
+  Just str' ->
+    GlobPackageIdentifier <$> parseCheck str' "package identifier (glob)"
 
 readPackageArg :: AsPackageArg -> String -> RIO env PackageArg
 readPackageArg AsUnitId str = IUId <$> parseCheck str "installed package id"
@@ -251,13 +267,14 @@ getPkgDatabases globalDb pkgarg pkgDb = do
   let sys_databases = [Abs globalDb]
   e_pkg_path <- tryIO (liftIO $ System.Environment.getEnv "GHC_PACKAGE_PATH")
   let env_stack =
-        case e_pkg_path of
+        case nonEmpty <$> e_pkg_path of
           Left _ -> sys_databases
-          Right path
-            | not (null path) && isSearchPathSeparator (last path)
-            -> mapMaybe parseSomeDir (splitSearchPath (init path)) <> sys_databases
+          Right Nothing -> []
+          Right (Just path)
+            | isSearchPathSeparator (NE.last path)
+            -> mapMaybe parseSomeDir (splitSearchPath (NE.init path)) <> sys_databases
             | otherwise
-            -> mapMaybe parseSomeDir (splitSearchPath path)
+            -> mapMaybe parseSomeDir (splitSearchPath $ NE.toList path)
 
   -- -f flags on the command line add to the database stack, unless any of them
   -- are present in the stack already.
@@ -422,7 +439,7 @@ tryReadParseOldFileStyleDatabase mode path = do
   content <- liftIO $ readFile (prjSomeBase toFilePath path) `catchIO` \_ -> pure ""
   if take 2 content == "[]"
     then do
-      let path_dir = adjustOldDatabasePath path
+      path_dir <- adjustOldDatabasePath path
       prettyWarnL
         [ flow "Ignoring old file-style db and trying"
         , pretty path_dir
@@ -454,16 +471,23 @@ adjustOldFileStylePackageDB db = do
     fmap Just (readFile (prjSomeBase toFilePath (location db))) `catchIO` \_ -> pure Nothing
   case fmap (take 2) mcontent of
     -- it is an old style and empty db, so look for a dir kind in location.d/
-    Just "[]" -> pure db
-      { location = adjustOldDatabasePath $ location db }
+    Just "[]" -> do
+      adjustedDatabasePath <- adjustOldDatabasePath $ location db
+      pure db { location = adjustedDatabasePath }
     -- it is old style but not empty, we have to bail
     Just _ -> prettyThrowIO $ SingleFileDBUnsupported (location db)
     -- probably not old style, carry on as normal
     Nothing -> pure db
 
-adjustOldDatabasePath :: SomeBase Dir -> SomeBase Dir
-adjustOldDatabasePath =
-  fromJust . prjSomeBase (parseSomeDir . (<> ".d") . toFilePath)
+adjustOldDatabasePath :: SomeBase Dir -> RIO env (SomeBase Dir)
+adjustOldDatabasePath = prjSomeBase addDToDirName
+ where
+  addDToDirName dir = do
+    let dirNameWithD = toFilePath dir <> ".d"
+    maybe
+      (prettyThrowIO $ CannotParseDirectoryWithDBug dirNameWithD)
+      pure
+      (parseSomeDir dirNameWithD)
 
 parsePackageInfo :: BS.ByteString -> RIO env (InstalledPackageInfo, [String])
 parsePackageInfo str =
@@ -503,9 +527,12 @@ changeDBDir' cmds db = do
     GhcPkg.DbOpenReadWrite lock -> liftIO $ GhcPkg.unlockPackageDb lock
  where
   do_cmd (RemovePackage p) = do
-    let relFileConf =
-          fromJust (parseRelFile $ display (installedUnitId p) <> ".conf")
-        file = mapSomeBase (P.</> relFileConf) (location db)
+    let relFileConfName = display (installedUnitId p) <> ".conf"
+    relFileConf <- maybe
+      (prettyThrowIO $ CannotParseRelFileBug relFileConfName)
+      pure
+      (parseRelFile relFileConfName)
+    let file = mapSomeBase (P.</> relFileConf) (location db)
     prettyDebugL
       [ "Removing"
       , pretty file

@@ -36,6 +36,8 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-1430] | SingleFileDBUnsupported FilePath
         [S-5996] | ParsePackageInfoExceptions String
         [S-3189] | CannotFindPackage PackageArg (Maybe FilePath)
+        [S-9323] | CannotParseRelFileBug String
+        [S-7651] | CannotParseDirectoryWithDBug String
         ~~~
 
     -   `Options.Applicative.Builder.Extra.OptionsApplicativeExtraException`
