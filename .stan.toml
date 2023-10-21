@@ -25,16 +25,6 @@
 # Infinite: base/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-MEZP5/-198:10"
-# ✦ Category:      #Infinite #List
-# ✦ File:          src\GHC\Utils\GhcPkg\Main\Compat.hs
-#  197 ┃
-#  198 ┃   | "-*" `isSuffixOf` str =
-#  199 ┃          ^^^^^^^^^^^^
-
-# Infinite: base/isSuffixOf
-# Usage of the 'isSuffixOf' function that hangs on infinite lists
-[[ignore]]
   id = "OBS-STAN-0102-luLR/n-523:30"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\New.hs
