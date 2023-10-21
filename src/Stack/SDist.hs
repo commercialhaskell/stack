@@ -24,7 +24,6 @@ import qualified Data.ByteString.Lazy as L
 import           Data.Char ( toLower )
 import           Data.Data ( cast )
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -45,6 +44,8 @@ import           Distribution.Version
                    )
 import           Path ( (</>), parent, parseRelDir, parseRelFile )
 import           Path.IO ( ensureDir, resolveDir' )
+import           RIO.NonEmpty ( nonEmpty )
+import qualified RIO.NonEmpty as NE
 import           Stack.Build ( mkBaseConfigOpts, build, buildLocalTargets )
 import           Stack.Build.Execute
                    ( ExcludeTHLoading (..), KeepOutputOpen (..), withExecuteEnv
@@ -209,7 +210,7 @@ getSDistTarball mpvpBounds pkgDir = do
       pkgFp = toFilePath pkgDir
   lp <- readLocalPackage pkgDir
   forM_ (packageSetupDeps (lpPackage lp)) $ \customSetupDeps ->
-    case NE.nonEmpty (map (T.pack . packageNameString) (Map.keys customSetupDeps)) of
+    case nonEmpty (map (T.pack . packageNameString) (Map.keys customSetupDeps)) of
       Just nonEmptyDepTargets -> do
         eres <- buildLocalTargets nonEmptyDepTargets
         case eres of
@@ -614,7 +615,7 @@ checkPackageInExtractedTarball pkgDir = do
          flow "Package check reported the following warnings:"
       <> line
       <> bulletedList (map (fromString . show) warnings)
-  case NE.nonEmpty errors of
+  case nonEmpty errors of
     Nothing -> pure ()
     Just ne -> prettyThrowM $ CheckException ne
 

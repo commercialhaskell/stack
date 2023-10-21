@@ -15,8 +15,6 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Foldable as F
 import qualified Data.IntMap as IntMap
 import           Data.List.Extra ( groupSortOn )
-import           Data.List.NonEmpty ( nonEmpty )
-import qualified Data.List.NonEmpty as NonEmpty
 import           Data.List.NonEmpty.Extra ( minimumBy1 )
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -37,6 +35,8 @@ import           Path.IO
                    )
 import qualified RIO.FilePath as FP
 import           RIO.List ( (\\), intercalate, isSuffixOf, isPrefixOf )
+import           RIO.NonEmpty ( nonEmpty )
+import qualified RIO.NonEmpty as NE
 import           Stack.BuildPlan
                    ( BuildPlanCheck (..), checkSnapBuildPlan, deNeededBy
                    , removeSrcPkgDefaultFlags, selectBestSnapshot
@@ -138,7 +138,7 @@ instance Pretty InitPrettyException where
     <> flow "None of the following snapshots provides a compiler matching \
             \your package(s):"
     <> line
-    <> bulletedList (map (fromString . show) (NonEmpty.toList names))
+    <> bulletedList (map (fromString . show) (NE.toList names))
     <> blankLine
     <> resolveOptions
   pretty (ResolverMismatch resolver errDesc) =
@@ -624,7 +624,7 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
 getRecommendedSnapshots :: Snapshots -> NonEmpty SnapName
 getRecommendedSnapshots snapshots =
   -- in order - Latest LTS, Latest Nightly, all LTS most recent first
-  case NonEmpty.nonEmpty supportedLtss of
+  case nonEmpty supportedLtss of
     Just (mostRecent :| older) -> mostRecent :| (nightly : older)
     Nothing -> nightly :| []
  where
@@ -704,7 +704,7 @@ cabalPackagesCheck cabaldirs = do
   when (nameMismatchPkgs /= []) $
     prettyThrowIO $ PackageNameInvalid nameMismatchPkgs
   let dupGroups = mapMaybe nonEmpty . groupSortOn (gpdPackageName . snd)
-      dupAll    = concatMap NonEmpty.toList $ dupGroups packages
+      dupAll    = concatMap NE.toList $ dupGroups packages
       -- Among duplicates prefer to include the ones in upper level dirs
       pathlen     = length . FP.splitPath . toFilePath . fst
       getmin      = minimumBy1 (compare `on` pathlen)
@@ -717,7 +717,7 @@ cabalPackagesCheck cabaldirs = do
          flow "The following packages have duplicate package names:"
       <> line
       <> foldMap
-           ( \dup ->    bulletedList (map fromString (NonEmpty.toList dup))
+           ( \dup ->    bulletedList (map fromString (NE.toList dup))
                      <> line
            )
            dups

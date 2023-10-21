@@ -19,7 +19,6 @@ module Stack.BuildPlan
 
 import qualified Data.Foldable as F
 import           Data.List (intercalate)
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -34,6 +33,7 @@ import           Distribution.Text ( display )
 import           Distribution.Types.UnqualComponentName
                    ( unUnqualComponentName )
 import qualified Distribution.Version as C
+import qualified RIO.NonEmpty as NE
 import           Stack.Constants ( wiredInPackages )
 import           Stack.Package
                    ( PackageConfig (..), packageDependencies
@@ -221,7 +221,7 @@ selectPackageBuildPlan ::
     -> GenericPackageDescription
     -> (Map PackageName (Map FlagName Bool), DepErrors)
 selectPackageBuildPlan platform compiler pool gpd =
-    (selectPlan . limitSearchSpace . NonEmpty.map makePlan) flagCombinations
+    (selectPlan . limitSearchSpace . NE.map makePlan) flagCombinations
   where
     selectPlan :: NonEmpty (a, DepErrors) -> (a, DepErrors)
     selectPlan = F.foldr1 fewerErrors
@@ -410,11 +410,11 @@ selectBestSnapshot pkgDirs snaps = do
     prettyInfo $
            fillSep
              [ flow "Selecting the best among"
-             , fromString $ show (NonEmpty.length snaps)
+             , fromString $ show (NE.length snaps)
              , "snapshots..."
              ]
         <> line
-    F.foldr1 go (NonEmpty.map (getResult <=< snapshotLocation) snaps)
+    F.foldr1 go (NE.map (getResult <=< snapshotLocation) snaps)
     where
         go mold mnew = do
             old@(_snap, _loc, bpc) <- mold

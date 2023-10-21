@@ -18,7 +18,6 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.List as L
 import           Data.List.Extra ( (!?) )
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -29,6 +28,7 @@ import           Path ((</>), parent, parseRelFile )
 import           Path.Extra ( forgivingResolveFile', toFilePathNoTrailingSep )
 import           Path.IO
                    ( XdgDirectory (..), doesFileExist, ensureDir, getXdgDir )
+import           RIO.NonEmpty ( nonEmpty )
 import           RIO.Process
                    ( HasProcessContext, exec, proc, readProcess_
                    , withWorkingDir
@@ -462,7 +462,7 @@ buildDepsAndInitialSteps GhciOpts{..} localTargets = do
   let targets = localTargets ++ map T.pack ghciAdditionalPackages
   -- If necessary, do the build, for local packagee targets, only do
   -- 'initialBuildSteps'.
-  case NE.nonEmpty targets of
+  case nonEmpty targets of
     -- only new local targets could appear here
     Just nonEmptyTargets | not ghciNoBuild -> do
       eres <- buildLocalTargets nonEmptyTargets

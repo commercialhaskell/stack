@@ -22,7 +22,6 @@ import           Data.Attoparsec.Text as P
                    , takeWhile
                    )
 import qualified Data.Map.Merge.Strict as Map
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as OA
@@ -31,6 +30,8 @@ import qualified Options.Applicative.Types as OA
 import           Pantry ( loadSnapshot )
 import           Path ( (</>), parent )
 import qualified RIO.Map as Map
+import           RIO.NonEmpty ( nonEmpty )
+import qualified RIO.NonEmpty as NE
 import           RIO.Process ( envVarsL )
 import           Stack.Config
                    ( makeConcreteResolver, getProjectConfig
@@ -131,7 +132,7 @@ cfgCmdSet cmd = do
   --     key3: value
   --
   writeLines yamlLines spaces cmdKeys value =
-    case NE.nonEmpty $ NE.tail cmdKeys of
+    case nonEmpty $ NE.tail cmdKeys of
       Nothing -> yamlLines <> [spaces <> NE.head cmdKeys <> ": " <> value]
       Just ks -> writeLines
                    (yamlLines <> [spaces <> NE.head cmdKeys <> ":"])
@@ -143,7 +144,7 @@ cfgCmdSet cmd = do
     Yaml.Object obj ->
       case KeyMap.lookup (Key.fromText (NE.head cmdKeys)) obj of
         Nothing -> Nothing
-        Just v' -> case NE.nonEmpty $ NE.tail cmdKeys of
+        Just v' -> case nonEmpty $ NE.tail cmdKeys of
           Nothing -> Just v'
           Just ks -> inConfig v' ks
     _ -> Nothing

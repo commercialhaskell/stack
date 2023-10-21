@@ -16,13 +16,14 @@ module Stack.Build
 import           Data.Attoparsec.Args ( EscapingMode (Escaping), parseArgs )
 import           Data.List ( (\\) )
 import           Data.List.Extra ( groupSort )
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
 import           Distribution.Types.Dependency ( Dependency (..), depLibraries )
 import           Distribution.Version ( mkVersion )
+import           RIO.NonEmpty ( nonEmpty )
+import qualified RIO.NonEmpty as NE
 import           Stack.Build.ConstructPlan ( constructPlan )
 import           Stack.Build.Execute ( executePlan, preFetch, printPlan )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
@@ -291,7 +292,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
       , exe <- Set.toList (packageExes pkg)
       ]
   collect :: Ord k => [(k, v)] -> Map k (NonEmpty v)
-  collect = Map.mapMaybe NE.nonEmpty . Map.fromDistinctAscList . groupSort
+  collect = Map.mapMaybe nonEmpty . Map.fromDistinctAscList . groupSort
 
 warnAboutSplitObjs :: HasTerm env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts =

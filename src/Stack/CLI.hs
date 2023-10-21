@@ -17,8 +17,8 @@ import           Options.Applicative.Builder.Extra
                    ( boolFlags, extraHelpOption, textOption )
 import           Options.Applicative.Complicated
                    ( addCommand, addSubCommands, complicatedOptions )
-import qualified RIO.NonEmpty as NE
 import           RIO.NonEmpty ( (<|) )
+import qualified RIO.NonEmpty as NE
 import qualified RIO.Process ( exec )
 import           RIO.Process ( withProcessContextNoLogging )
 import           Stack.Build ( buildCmd )

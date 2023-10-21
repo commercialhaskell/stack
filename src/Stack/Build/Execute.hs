@@ -43,8 +43,6 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed ( createSource )
 import qualified Data.Conduit.Text as CT
 import qualified Data.List as L
-import           Data.List.NonEmpty ( nonEmpty )
-import qualified Data.List.NonEmpty as NonEmpty
 import           Data.List.Split ( chunksOf )
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Map.Strict as Map
@@ -81,6 +79,8 @@ import           Path.IO
                    , ignoringAbsence, removeDirRecur, removeFile, renameDir
                    , renameFile
                    )
+import           RIO.NonEmpty ( nonEmpty )
+import qualified RIO.NonEmpty as NE
 import           RIO.Process
                    ( HasProcessContext, byteStringInput, eceExitCode
                    , findExecutable, getStderr, getStdout, inherit
@@ -922,7 +922,7 @@ unregisterPackages cv localDB ids = do
       let batchSize = case platform of
             Platform _ Windows -> 100
             _ -> 500
-      let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NonEmpty.toList
+      let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NE.toList
       for_ (chunksOfNE batchSize ids) $ \batch -> do
         for_ batch $ \(_, (ident, reason)) -> logReason ident reason
         pkg <- getGhcPkgExe
