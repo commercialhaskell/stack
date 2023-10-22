@@ -503,12 +503,9 @@ getSDistFileList lp deps =
           contents <- liftIO (S.readFile outFile)
           pure (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
  where
-  package = lpPackage lp
   ac = ActionContext Set.empty [] ConcurrencyAllowed
   task = Task
-    { taskProvides =
-        PackageIdentifier (packageName package) (packageVersion package)
-    , taskType = TTLocalMutable lp
+    { taskType = TTLocalMutable lp
     , taskConfigOpts = TaskConfigOpts
         { tcoMissing = Set.empty
         , tcoOpts = \_ -> ConfigureOpts [] []

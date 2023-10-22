@@ -35,7 +35,7 @@ import           Stack.Types.Build
                    ( CachePkgSrc (..), ConfigCache (..), Plan (..), Task (..)
                    , TaskConfigOpts (..), TaskType (..)
                    , installLocationIsMutable, taskIsTarget, taskLocation
-                   , taskTargetIsMutable, toCachePkgSrc
+                   , taskProvides, taskTargetIsMutable, toCachePkgSrc
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -525,10 +525,7 @@ addFinal lp package isAllInOne buildHaddocks = do
     Right (missing, present, _minLoc) -> do
       ctx <- ask
       pure $ Right Task
-        { taskProvides = PackageIdentifier
-            (packageName package)
-            (packageVersion package)
-        , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+        { taskConfigOpts = TaskConfigOpts missing $ \missing' ->
             let allDeps = Map.union present missing'
             in  configureOpts
                   (view envConfigL ctx)
@@ -833,10 +830,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
     pure $ case mRightVersionInstalled of
       Just installed -> ADRFound loc installed
       Nothing -> ADRToInstall Task
-        { taskProvides = PackageIdentifier
-            (packageName package)
-            (packageVersion package)
-        , taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+        { taskConfigOpts = TaskConfigOpts missing $ \missing' ->
             let allDeps = Map.union present missing'
             in  configureOpts
                   (view envConfigL ctx)

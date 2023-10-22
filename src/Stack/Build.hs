@@ -35,7 +35,9 @@ import           Stack.Prelude hiding ( loadPackage )
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.Types.Build
-                   ( Plan (..), Task (..), TaskType (..), taskLocation )
+                   ( Plan (..), Task (..), TaskType (..), taskLocation
+                   , taskProvides
+                   )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig ( HasBuildConfig, stackYamlL )
