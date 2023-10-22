@@ -11,6 +11,7 @@ module Stack.Types.Build
   , Task (..)
   , taskIsTarget
   , taskLocation
+  , taskProvides
   , taskTargetIsMutable
   , LocalPackage (..)
   , Plan (..)
@@ -53,7 +54,7 @@ import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), InstallLocation (..), Installed (..)
                    , LocalPackage (..), Package (..), PackageSource (..)
-                   , psVersion
+                   , packageIdentifier, psVersion
                    )
 
 -- | Package dependency oracle.
@@ -122,9 +123,7 @@ toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 -- | A task to perform when building
 data Task = Task
-  { taskProvides        :: !PackageIdentifier -- FIXME turn this into a function on taskType?
-    -- ^ the package/version to be built
-  , taskType            :: !TaskType
+  { taskType            :: !TaskType
     -- ^ the task type, telling us how to build this
   , taskConfigOpts      :: !TaskConfigOpts
   , taskBuildHaddock    :: !Bool
@@ -171,6 +170,12 @@ data TaskType
   | TTRemotePackage IsMutable Package PackageLocationImmutable
   deriving Show
 
+-- | A function to yield the package name and version of a given 'TaskType'
+-- value.
+taskTypePackageIdentifier :: TaskType -> PackageIdentifier
+taskTypePackageIdentifier (TTLocalMutable lp) = packageIdentifier $ lpPackage lp
+taskTypePackageIdentifier (TTRemotePackage _ p _) = packageIdentifier p
+
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
   case taskType t of
@@ -183,6 +188,11 @@ taskLocation task =
     TTLocalMutable _ -> Local
     TTRemotePackage Mutable _ _ -> Local
     TTRemotePackage Immutable _ _ -> Snap
+
+-- | A funtion to yield the package name and version to be built by the given
+-- task.
+taskProvides :: Task -> PackageIdentifier
+taskProvides = taskTypePackageIdentifier . taskType
 
 taskTargetIsMutable :: Task -> IsMutable
 taskTargetIsMutable task =

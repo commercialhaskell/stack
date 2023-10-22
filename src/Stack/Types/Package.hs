@@ -31,7 +31,6 @@ module Stack.Types.Package
   , lpFilesForComponents
   , memoizeRefWith
   , packageDefinedFlags
-  , packageIdent
   , packageIdentifier
   , psVersion
   , runMemoizedWith
@@ -197,12 +196,8 @@ data Package = Package
   }
   deriving (Show, Typeable)
 
-packageIdent :: Package -> PackageIdentifier
-packageIdent p = PackageIdentifier (packageName p) (packageVersion p)
-
 packageIdentifier :: Package -> PackageIdentifier
-packageIdentifier pkg =
-  PackageIdentifier (packageName pkg) (packageVersion pkg)
+packageIdentifier p = PackageIdentifier (packageName p) (packageVersion p)
 
 packageDefinedFlags :: Package -> Set FlagName
 packageDefinedFlags = M.keysSet . packageDefaultFlags

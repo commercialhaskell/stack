@@ -132,6 +132,7 @@ import           Stack.Types.Build
                    ( ConfigCache (..), Plan (..), PrecompiledCache (..)
                    , Task (..), TaskConfigOpts (..), TaskType (..)
                    , configCacheComponents, taskIsTarget, taskLocation
+                   , taskProvides
                    )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
@@ -174,7 +175,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
                    ( InstallLocation (..), Installed (..), InstalledMap
                    , LocalPackage (..), Package (..), PackageLibraries (..)
-                   , installedPackageIdentifier, packageIdent, packageIdentifier
+                   , installedPackageIdentifier, packageIdentifier
                    , runMemoizedWith
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
@@ -948,7 +949,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
     Nothing -> []
     Just task@Task {..} ->
       [ Action
-          { actionId = ActionId taskProvides ATBuild
+          { actionId = ActionId (taskProvides task) ATBuild
           , actionDeps =
               Set.map (`ActionId` ATBuild) (tcoMissing taskConfigOpts)
           , actionDo =
@@ -961,7 +962,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
     Just task@Task {..} ->
       (if taskAllInOne then id else (:)
           Action
-              { actionId = ActionId taskProvides ATBuildFinal
+              { actionId = ActionId pkgId ATBuildFinal
               , actionDeps = addBuild
                   (Set.map (`ActionId` ATBuild) (tcoMissing taskConfigOpts))
               , actionDo =
@@ -971,7 +972,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
       -- These are the "final" actions - running tests and benchmarks.
       (if Set.null tests then id else (:)
           Action
-              { actionId = ActionId taskProvides ATRunTests
+              { actionId = ActionId pkgId ATRunTests
               , actionDeps = finalDeps
               , actionDo = \ac -> withLock mtestLock $ runInBase $
                   singleTest topts (Set.toList tests) ac ee task installedMap
@@ -983,7 +984,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
               }) $
       (if Set.null benches then id else (:)
           Action
-              { actionId = ActionId taskProvides ATRunBenchmarks
+              { actionId = ActionId pkgId ATRunBenchmarks
               , actionDeps = finalDeps
               , actionDo = \ac -> runInBase $
                   singleBench
@@ -999,17 +1000,18 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
               })
       []
      where
+      pkgId = taskProvides task
       comps = taskComponents task
       tests = testComponents comps
       benches = benchComponents comps
       finalDeps =
         if taskAllInOne
           then addBuild mempty
-          else Set.singleton (ActionId taskProvides ATBuildFinal)
+          else Set.singleton (ActionId pkgId ATBuildFinal)
       addBuild =
         case mbuild of
           Nothing -> id
-          Just _ -> Set.insert $ ActionId taskProvides ATBuild
+          Just _ -> Set.insert $ ActionId pkgId ATBuild
   withLock Nothing f = f
   withLock (Just lock) f = withMVar lock $ \() -> f
   bopts = eeBuildOpts ee
@@ -1292,6 +1294,7 @@ withSingleContext
         withCabal package pkgDir outputType $ \cabal ->
           inner0 package cabalfp pkgDir cabal announce outputType
  where
+  pkgId = taskProvides task
   announce = announceTask ee task
   prettyAnnounce = prettyAnnounceTask ee task
 
@@ -1310,7 +1313,7 @@ withSingleContext
   console =
        (  wanted
        && all
-            (\(ActionId ident _) -> ident == taskProvides)
+            (\(ActionId ident _) -> ident == pkgId)
             (Set.toList acRemaining)
        && eeTotalWanted == 1
        )
@@ -1323,28 +1326,29 @@ withSingleContext
         withLockedDistDir prettyAnnounce root $
           inner (lpPackage lp) (lpCabalFile lp) root
       TTRemotePackage _ package pkgloc -> do
-          suffix <- parseRelDir $ packageIdentifierString $ packageIdent package
-          let dir = eeTempDir </> suffix
-          unpackPackageLocation dir pkgloc
+        suffix <-
+          parseRelDir $ packageIdentifierString $ packageIdentifier package
+        let dir = eeTempDir </> suffix
+        unpackPackageLocation dir pkgloc
 
-          -- See: https://github.com/commercialhaskell/stack/issues/157
-          distDir <- distRelativeDir
-          let oldDist = dir </> relDirDist
-              newDist = dir </> distDir
-          exists <- doesDirExist oldDist
-          when exists $ do
-            -- Previously used takeDirectory, but that got confused
-            -- by trailing slashes, see:
-            -- https://github.com/commercialhaskell/stack/issues/216
-            --
-            -- Instead, use Path which is a bit more resilient
-            ensureDir $ parent newDist
-            renameDir oldDist newDist
+        -- See: https://github.com/commercialhaskell/stack/issues/157
+        distDir <- distRelativeDir
+        let oldDist = dir </> relDirDist
+            newDist = dir </> distDir
+        exists <- doesDirExist oldDist
+        when exists $ do
+          -- Previously used takeDirectory, but that got confused
+          -- by trailing slashes, see:
+          -- https://github.com/commercialhaskell/stack/issues/216
+          --
+          -- Instead, use Path which is a bit more resilient
+          ensureDir $ parent newDist
+          renameDir oldDist newDist
 
-          let name = pkgName taskProvides
-          cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"
-          let cabalfp = dir </> cabalfpRel
-          inner package cabalfp dir
+        let name = pkgName pkgId
+        cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"
+        let cabalfp = dir </> cabalfpRel
+        inner package cabalfp dir
 
   withOutputType pkgDir package inner
     -- Not in interleaved mode. When building a single wanted package, dump
@@ -1546,7 +1550,7 @@ withSingleContext
                                stripTHLoading makeAbsolute pkgDir compilerVer
                           .| CL.consume
               prettyThrowM $ CabalExitedUnsuccessfully
-                (eceExitCode ece) taskProvides exeName fullArgs mlogFile bss
+                (eceExitCode ece) pkgId exeName fullArgs mlogFile bss
            where
             runAndOutput :: ActualCompiler -> RIO env ()
             runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $
@@ -1677,9 +1681,10 @@ singleBuild
       Just installed -> do
         writeFlagCache installed cache
         liftIO $ atomically $
-          modifyTVar eeGhcPkgIds $ Map.insert taskProvides installed
+          modifyTVar eeGhcPkgIds $ Map.insert pkgId installed
  where
-  PackageIdentifier pname pversion = taskProvides
+  pkgId = taskProvides task
+  PackageIdentifier pname pversion = pkgId
   doHaddock mcurator package =
        taskBuildHaddock
     && not isFinalBuild
@@ -1781,7 +1786,7 @@ singleBuild
         PackageIdentifier (encodeCompatPackageName n) v
       allToUnregister :: [Either PackageIdentifier GhcPkgId]
       allToUnregister = mcons
-        (Left taskProvides <$ mlib)
+        (Left pkgId <$ mlib)
         (map (Left . toPackageId . toMungedPackageId) subLibNames)
       allToRegister = mcons mlib sublibs
 
@@ -1807,21 +1812,21 @@ singleBuild
       let dst = bindir </> filename exe
       createLink (toFilePath exe) (toFilePath dst) `catchIO` \_ -> copyFile exe dst
     case (mlib, exes) of
-      (Nothing, _:_) -> markExeInstalled (taskLocation task) taskProvides
+      (Nothing, _:_) -> markExeInstalled (taskLocation task) pkgId
       _ -> pure ()
 
     -- Find the package in the database
     let pkgDbs = [bcoSnapDB eeBaseConfigOpts]
 
     case mlib of
-      Nothing -> pure $ Just $ Executable taskProvides
+      Nothing -> pure $ Just $ Executable pkgId
       Just _ -> do
         mpkgid <- loadInstalledPkg pkgDbs eeSnapshotDumpPkgs pname
 
         pure $ Just $
           case mpkgid of
-            Nothing -> assert False $ Executable taskProvides
-            Just pkgid -> Library taskProvides pkgid Nothing
+            Nothing -> assert False $ Executable pkgId
+            Just pkgid -> Library pkgId pkgid Nothing
    where
     bindir = bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
@@ -1855,7 +1860,7 @@ singleBuild
         let installedMapHasThisPkg :: Bool
             installedMapHasThisPkg =
               case Map.lookup (packageName package) installedMap of
-                Just (_, Library ident _ _) -> ident == taskProvides
+                Just (_, Library ident _ _) -> ident == pkgId
                 Just (_, Executable _) -> True
                 _ -> False
 
@@ -1898,7 +1903,7 @@ singleBuild
     let cabal = cabal0 CloseOnException
     wc <- view $ actualCompilerVersionL.whichCompilerL
 
-    markExeNotInstalled (taskLocation task) taskProvides
+    markExeNotInstalled (taskLocation task) pkgId
     case taskType of
       TTLocalMutable lp -> do
         when enableTests $ setTestStatus pkgDir TSUnknown
@@ -2085,7 +2090,7 @@ singleBuild
           Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
           Just pkgid -> pure (Library ident pkgid Nothing, sublibsPkgIds)
       NoLibraries -> do
-        markExeInstalled (taskLocation task) taskProvides -- TODO unify somehow
+        markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
                                                           -- with writeFlagCache?
         pure (Executable ident, []) -- don't pure sublibs in this case
 
@@ -2106,7 +2111,7 @@ singleBuild
       TTRemotePackage{} -> do
         let remaining =
               filter
-                (\(ActionId x _) -> x == taskProvides)
+                (\(ActionId x _) -> x == pkgId)
                 (Set.toList acRemaining)
         when (null remaining) $ removeDirRecur pkgDir
       TTLocalMutable{} -> pure ()
