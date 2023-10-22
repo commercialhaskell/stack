@@ -163,11 +163,13 @@ instance Show TaskConfigOpts where
     , show $ f Map.empty
     ]
 
--- | The type of a task, either building local code or something from the
--- package index (upstream)
+-- | Type representing different types of task, depending on what is to be
+-- built.
 data TaskType
   = TTLocalMutable LocalPackage
+    -- ^ Building local source code.
   | TTRemotePackage IsMutable Package PackageLocationImmutable
+    -- ^ Building something from the package index (upstream).
   deriving Show
 
 -- | A function to yield the package name and version of a given 'TaskType'

@@ -362,10 +362,12 @@ lpFilesForComponents components lp = runMemoizedWith $ do
   componentFiles <- lpComponentFiles lp
   pure $ mconcat (M.elems (M.restrictKeys componentFiles components))
 
--- | A location to install a package into, either snapshot or local
+-- | Type represeting databases to install a package into.
 data InstallLocation
   = Snap
+    -- ^ The write-only database, formerly known as the snapshot database.
   | Local
+    -- ^ The mutable database, formerly known as the local database.
   deriving (Eq, Show)
 
 instance Semigroup InstallLocation where
@@ -432,11 +434,17 @@ dotCabalGetPath dcp =
     DotCabalFilePath fp -> fp
     DotCabalCFilePath fp -> fp
 
+-- | Type synonym representing dictionaries of package names, and a pair of in
+-- which database the package is installed (write-only or mutable) and what is
+-- installed (library or executable).
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
+-- | Type representing information about what is installed.
 data Installed
   = Library PackageIdentifier GhcPkgId (Maybe (Either SPDX.License License))
+    -- ^ A library.
   | Executable PackageIdentifier
+    -- ^ An executable.
   deriving (Eq, Show)
 
 installedPackageIdentifier :: Installed -> PackageIdentifier
