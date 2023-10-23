@@ -837,7 +837,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted' name =
     then Just []
     else case M.lookup name parentsMap of
       Nothing -> Nothing
-      Just (_, parents) -> Just $ findShortest 256 paths0
+      Just parents -> Just $ findShortest 256 paths0
        where
         paths0 = M.fromList $
           map (\(ident, _) -> (pkgName ident, startDepsPath ident)) parents
@@ -869,7 +869,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted' name =
   extendPath (n, dp) =
     case M.lookup n parentsMap of
       Nothing -> []
-      Just (_, parents) ->
+      Just parents ->
         map (\(pkgId, _) -> (pkgName pkgId, extendDepsPath pkgId dp)) parents
 
 startDepsPath :: PackageIdentifier -> DepsPath

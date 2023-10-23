@@ -907,7 +907,7 @@ addPackageDeps package = do
             Just (lappVer, cabalHash)
     case eres of
       Left e -> do
-        addParent depname range Nothing
+        addParent depname range
         let bd = case e of
               UnknownPackage name -> assert (name == depname) NotInBuildPlan
               DependencyCycleDetected names -> BDDependencyCycleDetected names
@@ -921,7 +921,7 @@ addPackageDeps package = do
       Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
         pure $ Left (depname, (range, Nothing, HasNoLibrary))
       Right adr -> do
-        addParent depname range Nothing
+        addParent depname range
         inRange <- if adrVersion adr `withinRange` range
           then pure True
           else do
@@ -1038,10 +1038,9 @@ addPackageDeps package = do
   adrVersion (ADRFound _ installed) = installedVersion installed
   -- Update the parents map, for later use in plan construction errors
   -- - see 'getShortestDepsPath'.
-  addParent depname range mversion =
-    tell mempty { wParents = MonoidMap $ Map.singleton depname val }
+  addParent depname range = tell mempty { wParents = MonoidMap parentMap }
    where
-    val = (First mversion, [(packageIdentifier package, range)])
+    parentMap = Map.singleton depname [(packageIdentifier package, range)]
 
   adrHasLibrary :: AddDepRes -> Bool
   adrHasLibrary (ADRToInstall task) = taskHasLibrary task
