@@ -9,4 +9,4 @@ import           Stack.Prelude
 import           Stack.Types.Version ( VersionRange )
 
 type ParentMap =
-  MonoidMap PackageName (First Version, [(PackageIdentifier, VersionRange)])
+  MonoidMap PackageName [(PackageIdentifier, VersionRange)]
