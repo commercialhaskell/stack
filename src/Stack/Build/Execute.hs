@@ -661,33 +661,43 @@ executePlan :: HasEnvConfig env
             -> Map PackageName Target
             -> Plan
             -> RIO env ()
-executePlan boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages installedMap targets plan = do
-  logDebug "Executing the build plan"
-  bopts <- view buildOptsL
-  withExecuteEnv
-    bopts
+executePlan
     boptsCli
     baseConfigOpts
     locals
     globalPackages
     snapshotPackages
     localPackages
-    mlargestPackageName
-    (executePlan' installedMap targets plan)
+    installedMap
+    targets
+    plan
+  = do
+    logDebug "Executing the build plan"
+    bopts <- view buildOptsL
+    withExecuteEnv
+      bopts
+      boptsCli
+      baseConfigOpts
+      locals
+      globalPackages
+      snapshotPackages
+      localPackages
+      mlargestPackageName
+      (executePlan' installedMap targets plan)
 
-  copyExecutables (planInstallExes plan)
+    copyExecutables (planInstallExes plan)
 
-  config <- view configL
-  menv' <- liftIO $ configProcessContextSettings config EnvSettings
-             { esIncludeLocals = True
-             , esIncludeGhcPackagePath = True
-             , esStackExe = True
-             , esLocaleUtf8 = False
-             , esKeepGhcRts = False
-             }
-  withProcessContext menv' $
-    forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
-    proc cmd args runProcess_
+    config <- view configL
+    menv' <- liftIO $ configProcessContextSettings config EnvSettings
+               { esIncludeLocals = True
+               , esIncludeGhcPackagePath = True
+               , esStackExe = True
+               , esLocaleUtf8 = False
+               , esKeepGhcRts = False
+               }
+    withProcessContext menv' $
+      forM_ (boptsCLIExec boptsCli) $ \(cmd, args) ->
+      proc cmd args runProcess_
  where
   mlargestPackageName =
     Set.lookupMax $
@@ -2101,7 +2111,9 @@ singleBuild
           loc
           (configCacheOpts cache)
           (configCacheHaddock cache)
-          mpkgid sublibsPkgIds (packageExes package)
+          mpkgid
+          sublibsPkgIds
+          (packageExes package)
       _ -> pure ()
 
     case taskType of

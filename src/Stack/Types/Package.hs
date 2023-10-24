@@ -280,7 +280,6 @@ instance Show PackageSource where
       , "<CommonPackage>"
       ]
 
-
 psVersion :: PackageSource -> Version
 psVersion (PSFilePath lp) = packageVersion $ lpPackage lp
 psVersion (PSRemote _ v _ _) = v
