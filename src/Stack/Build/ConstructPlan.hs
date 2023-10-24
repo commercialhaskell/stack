@@ -8,8 +8,6 @@ module Stack.Build.ConstructPlan
   ( constructPlan
   ) where
 
-import           Control.Monad.RWS.Strict
-                   ( RWST, get, modify, modify', pass, put, runRWST, tell )
 import           Control.Monad.Trans.Maybe ( MaybeT (..) )
 import qualified Data.List as L
 import qualified Data.Map.Merge.Strict as Map
@@ -23,7 +21,9 @@ import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Path ( parent )
 import qualified RIO.NonEmpty as NE
 import           RIO.Process ( HasProcessContext (..), findExecutable )
-import           RIO.State ( State, execState )
+import           RIO.State
+                   ( State, StateT (..), execState, get, modify, modify', put )
+import           RIO.Writer ( WriterT (..), pass, tell )
 import           Stack.Build.Cache ( tryGetFlagCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
@@ -138,12 +138,14 @@ instance Monoid W where
   mempty = memptydefault
   mappend = (<>)
 
-type M = RWST -- TODO replace with more efficient WS stack on top of (RIO Ctx).
-  Ctx
-  W
-  (Map PackageName (Either ConstructPlanException AddDepRes))
-  -- ^ Library map
-  IO
+type M =
+  WriterT
+    W
+    ( StateT
+        (Map PackageName (Either ConstructPlanException AddDepRes))
+        -- ^ Library map
+        (RIO Ctx)
+    )
 
 data Ctx = Ctx
   { baseConfigOpts :: !BaseConfigOpts
@@ -275,8 +277,8 @@ constructPlan
     let inner = mapM_ onTarget $ Map.keys (smtTargets $ smTargets sourceMap)
     pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
     let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
-    ((), m, W efinals installExes dirtyReason warnings parents) <-
-      liftIO $ runRWST inner ctx Map.empty
+    (((), W efinals installExes dirtyReason warnings parents), m) <-
+      liftIO $ runRIO ctx (runStateT (runWriterT inner) Map.empty)
     mapM_ prettyWarn (warnings [])
     let toEither (_, Left e)  = Left e
         toEither (k, Right v) = Right (k, v)
