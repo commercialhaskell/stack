@@ -134,7 +134,7 @@ buildCacheFile dir component = do
   let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
   cacheFileName <- parseRelFile $ case component of
     CLib -> "lib"
-    CInternalLib name -> nonLibComponent "internal-lib" name
+    CSubLib name -> nonLibComponent "sub-lib" name
     CExe name -> nonLibComponent "exe" name
     CTest name -> nonLibComponent "test" name
     CBench name -> nonLibComponent "bench" name
@@ -375,23 +375,23 @@ writePrecompiledCache ::
   -> ConfigureOpts
   -> Bool -- ^ build haddocks
   -> Installed -- ^ library
-  -> [GhcPkgId] -- ^ sublibraries, in the GhcPkgId format
+  -> [GhcPkgId] -- ^ sub-libraries, in the GhcPkgId format
   -> Set Text -- ^ executables
   -> RIO env ()
-writePrecompiledCache baseConfigOpts loc copts buildHaddocks mghcPkgId sublibs exes = do
+writePrecompiledCache baseConfigOpts loc copts buildHaddocks mghcPkgId subLibs exes = do
   key <- getPrecompiledCacheKey loc copts buildHaddocks
   ec <- view envConfigL
   let stackRootRelative = makeRelative (view stackRootL ec)
   mlibpath <- case mghcPkgId of
     Executable _ -> pure Nothing
     Library _ ipid _ -> Just <$> pathFromPkgId stackRootRelative ipid
-  sublibpaths <- mapM (pathFromPkgId stackRootRelative) sublibs
+  subLibPaths <- mapM (pathFromPkgId stackRootRelative) subLibs
   exes' <- forM (Set.toList exes) $ \exe -> do
     name <- parseRelFile $ T.unpack exe
     stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
   let precompiled = PrecompiledCache
         { pcLibrary = mlibpath
-        , pcSubLibs = sublibpaths
+        , pcSubLibs = subLibPaths
         , pcExes = exes'
         }
   savePrecompiledCache key precompiled

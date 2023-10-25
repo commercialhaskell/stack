@@ -1727,7 +1727,7 @@ singleBuild
    where
     result = T.intercalate " + " $ concat
       [ ["lib" | taskAllInOne && hasLib]
-      , ["internal-lib" | taskAllInOne && hasSubLib]
+      , ["sub-lib" | taskAllInOne && hasSubLib]
       , ["exe" | taskAllInOne && hasExe]
       , ["test" | enableTests]
       , ["bench" | enableBenchmarks]
@@ -1739,10 +1739,10 @@ singleBuild
               case packageLibraries package of
                 NoLibraries -> False
                 HasLibraries _ -> True
-            hasSubLibrary = not . Set.null $ packageInternalLibraries package
+            hasSubLibraries = not . Set.null $ packageSubLibraries package
             hasExecutables =
               not . Set.null $ exesToBuild executableBuildStatuses lp
-        in  (hasLibrary, hasSubLibrary, hasExecutables)
+        in  (hasLibrary, hasSubLibraries, hasExecutables)
       -- This isn't true, but we don't want to have this info for upstream deps.
       _ -> (False, False, False)
 
@@ -1776,21 +1776,21 @@ singleBuild
             pure $ if b then Just pc else Nothing
       _ -> pure Nothing
 
-  copyPreCompiled (PrecompiledCache mlib sublibs exes) = do
+  copyPreCompiled (PrecompiledCache mlib subLibs exes) = do
     announceTask ee task "using precompiled package"
 
-    -- We need to copy .conf files for the main library and all sublibraries
+    -- We need to copy .conf files for the main library and all sub-libraries
     -- which exist in the cache, from their old snapshot to the new one.
     -- However, we must unregister any such library in the new snapshot, in case
     -- it was built with different flags.
     let
       subLibNames = Set.toList $ case taskType of
-        TTLocalMutable lp -> packageInternalLibraries $ lpPackage lp
-        TTRemotePackage _ p _ -> packageInternalLibraries p
+        TTLocalMutable lp -> packageSubLibraries $ lpPackage lp
+        TTRemotePackage _ p _ -> packageSubLibraries p
       toMungedPackageId :: Text -> MungedPackageId
-      toMungedPackageId sublib =
-        let sublibName = LSubLibName $ mkUnqualComponentName $ T.unpack sublib
-        in  MungedPackageId (MungedPackageName pname sublibName) pversion
+      toMungedPackageId subLib =
+        let subLibName = LSubLibName $ mkUnqualComponentName $ T.unpack subLib
+        in  MungedPackageId (MungedPackageName pname subLibName) pversion
       toPackageId :: MungedPackageId -> PackageIdentifier
       toPackageId (MungedPackageId n v) =
         PackageIdentifier (encodeCompatPackageName n) v
@@ -1798,7 +1798,7 @@ singleBuild
       allToUnregister = mcons
         (Left pkgId <$ mlib)
         (map (Left . toPackageId . toMungedPackageId) subLibNames)
-      allToRegister = mcons mlib sublibs
+      allToRegister = mcons mlib subLibs
 
     unless (null allToRegister) $
       withMVar eeInstallLock $ \() -> do
@@ -2030,11 +2030,11 @@ singleBuild
             NoLibraries -> False
             HasLibraries _ -> True
         packageHasComponentSet f = not $ Set.null $ f package
-        hasInternalLibrary = packageHasComponentSet packageInternalLibraries
+        hasSubLibraries = packageHasComponentSet packageSubLibraries
         hasExecutables = packageHasComponentSet packageExes
         shouldCopy =
              not isFinalBuild
-          && (hasLibrary || hasInternalLibrary || hasExecutables)
+          && (hasLibrary || hasSubLibraries || hasExecutables)
     when shouldCopy $ withMVar eeInstallLock $ \() -> do
       announce "copy/register"
       eres <- try $ cabal KeepTHLoading ["copy"]
@@ -2044,7 +2044,7 @@ singleBuild
                      (packageBuildType package == C.Simple)
                      (displayException err)
         _ -> pure ()
-      when (hasLibrary || hasInternalLibrary) $ cabal KeepTHLoading ["register"]
+      when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
     -- copy ddump-* files
     case T.unpack <$> boptsDdumpDir eeBuildOpts of
@@ -2078,19 +2078,19 @@ singleBuild
               ( bcoLocalDB eeBaseConfigOpts
               , eeLocalDumpPkgs )
     let ident = PackageIdentifier (packageName package) (packageVersion package)
-    -- only pure the sublibs to cache them if we also cache the main lib (that
-    -- is, if it exists)
-    (mpkgid, sublibsPkgIds) <- case packageLibraries package of
+    -- only pure the sub-libraries to cache them if we also cache the main
+    -- library (that is, if it exists)
+    (mpkgid, subLibsPkgIds) <- case packageLibraries package of
       HasLibraries _ -> do
-        sublibsPkgIds <- fmap catMaybes $
-          forM (Set.toList $ packageInternalLibraries package) $ \sublib -> do
-            let sublibName = MungedPackageName
+        subLibsPkgIds <- fmap catMaybes $
+          forM (Set.toList $ packageSubLibraries package) $ \subLib -> do
+            let subLibName = MungedPackageName
                   (packageName package)
-                  (LSubLibName $ mkUnqualComponentName $ T.unpack sublib)
+                  (LSubLibName $ mkUnqualComponentName $ T.unpack subLib)
             loadInstalledPkg
               [installedPkgDb]
               installedDumpPkgsTVar
-              (encodeCompatPackageName sublibName)
+              (encodeCompatPackageName subLibName)
 
         mpkgid <- loadInstalledPkg
                     [installedPkgDb]
@@ -2098,11 +2098,11 @@ singleBuild
                     (packageName package)
         case mpkgid of
           Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
-          Just pkgid -> pure (Library ident pkgid Nothing, sublibsPkgIds)
+          Just pkgid -> pure (Library ident pkgid Nothing, subLibsPkgIds)
       NoLibraries -> do
         markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
-                                                          -- with writeFlagCache?
-        pure (Executable ident, []) -- don't pure sublibs in this case
+                                                   -- with writeFlagCache?
+        pure (Executable ident, []) -- don't pure sub-libraries in this case
 
     case taskType of
       TTRemotePackage Immutable _ loc ->
@@ -2112,7 +2112,7 @@ singleBuild
           (configCacheOpts cache)
           (configCacheHaddock cache)
           mpkgid
-          sublibsPkgIds
+          subLibsPkgIds
           (packageExes package)
       _ -> pure ()
 
@@ -2675,7 +2675,7 @@ extraBuildOptions wc bopts = do
     else
       pure [optsFlag, baseOpts]
 
--- Library, internal and foreign libraries and executable build components.
+-- Library, sub-library, foreign library and executable build components.
 primaryComponentOptions ::
      Map Text ExecutableBuildStatus
   -> LocalPackage
@@ -2693,7 +2693,7 @@ primaryComponentOptions executableBuildStatuses lp =
      )
   ++ map
        (T.unpack . T.append "lib:")
-       (Set.toList $ packageInternalLibraries package)
+       (Set.toList $ packageSubLibraries package)
   ++ map
        (T.unpack . T.append "exe:")
        (Set.toList $ exesToBuild executableBuildStatuses lp)

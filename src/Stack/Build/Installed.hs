@@ -181,7 +181,7 @@ isAllowed :: InstallMap
 isAllowed installMap mloc dp = case Map.lookup name installMap of
   Nothing ->
     -- If the sourceMap has nothing to say about this package,
-    -- check if it represents a sublibrary first
+    -- check if it represents a sub-library first
     -- See: https://github.com/commercialhaskell/stack/issues/3899
     case dpParentLibIdent dp of
       Just (PackageIdentifier parentLibName version') ->

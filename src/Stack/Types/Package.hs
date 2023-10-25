@@ -132,12 +132,11 @@ instance Exception PackageException where
   displayException ComponentNotParsedBug = bugReport "[S-4623]"
     "Component names should always parse as directory names."
 
--- | Libraries in a package. Since Cabal 2.0, internal libraries are a
--- thing.
+-- | Libraries in a package. Since Cabal 2.0, sub-libraries are a thing.
 data PackageLibraries
   = NoLibraries
   | HasLibraries !(Set Text)
-    -- ^ the foreign library names, sub libraries get built automatically
+    -- ^ the foreign library names, sub-libraries get built automatically
     -- without explicit component name passing
  deriving (Show, Typeable)
 
@@ -175,8 +174,8 @@ data Package = Package
     -- ^ Defaults for unspecified flags.
   , packageLibraries :: !PackageLibraries
     -- ^ does the package have a buildable library stanza?
-  , packageInternalLibraries :: !(Set Text)
-    -- ^ names of internal libraries
+  , packageSubLibraries :: !(Set Text)
+    -- ^ Names of sub-libraries
   , packageTests :: !(Map Text TestSuiteInterface)
     -- ^ names and interfaces of test suites
   , packageBenchmarks :: !(Set Text)

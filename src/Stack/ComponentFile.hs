@@ -332,7 +332,7 @@ componentOutputDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir
 componentOutputDir namedComponent distDir =
   case namedComponent of
     CLib -> buildDir distDir
-    CInternalLib name -> makeTmp name
+    CSubLib name -> makeTmp name
     CExe name -> makeTmp name
     CTest name -> makeTmp name
     CBench name -> makeTmp name
@@ -551,7 +551,7 @@ componentBuildDir cabalVer component distDir
   | otherwise =
       case component of
         CLib -> buildDir distDir
-        CInternalLib name -> buildDir distDir </> componentNameToDir name
+        CSubLib name -> buildDir distDir </> componentNameToDir name
         CExe name -> buildDir distDir </> componentNameToDir name
         CTest name -> buildDir distDir </> componentNameToDir name
         CBench name -> buildDir distDir </> componentNameToDir name

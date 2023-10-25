@@ -303,12 +303,12 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     prettyThrowIO $ CabalFilePathsInconsistentBug cabalfp cabalfp'
   installMap <- toInstallMap sourceMap
   (installedMap, _, _, _) <- getInstalled installMap
-  let internalPackages = Set.fromList $
+  let subLibPackages = Set.fromList $
           gpdPackageName gpd
         : map
             (Cabal.unqualComponentNameToPackageName . fst)
             (Cabal.condSubLibraries gpd)
-      gpd' = gtraverseT (addBounds internalPackages installMap installedMap) gpd
+      gpd' = gtraverseT (addBounds subLibPackages installMap installedMap) gpd
       gpd'' =
         case mrev of
           Nothing -> gpd'
@@ -402,8 +402,8 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
     -> InstalledMap
     -> Dependency
     -> Dependency
-  addBounds internalPackages installMap installedMap dep =
-    if name `Set.member` internalPackages
+  addBounds subLibPackages installMap installedMap dep =
+    if name `Set.member` subLibPackages
       then dep
       else case foundVersion of
         Nothing -> dep

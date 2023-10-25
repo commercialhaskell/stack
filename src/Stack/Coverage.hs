@@ -185,12 +185,12 @@ generateHpcReport pkgDir package tests = do
         case packageLibraries package of
           NoLibraries -> False
           HasLibraries _ -> True
-      internalLibs = packageInternalLibraries package
+      subLibs = packageSubLibraries package
   eincludeName <-
     -- Pre-7.8 uses plain PKG-version in tix files.
     if ghcVersion < mkVersion [7, 10] then pure $ Right $ Just [pkgId]
     -- We don't expect to find a package key if there is no library.
-    else if not hasLibrary && Set.null internalLibs then pure $ Right Nothing
+    else if not hasLibrary && Set.null subLibs then pure $ Right Nothing
     -- Look in the inplace DB for the package key.
     -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
     else do
@@ -201,7 +201,7 @@ generateHpcReport pkgDir package tests = do
         findPackageFieldForBuiltPackage
           pkgDir
           (packageIdentifier package)
-          internalLibs
+          subLibs
           hpcNameField
       case eincludeName of
         Left err -> do
@@ -593,7 +593,7 @@ findPackageFieldForBuiltPackage ::
      HasEnvConfig env
   => Path Abs Dir -> PackageIdentifier -> Set.Set Text -> Text
   -> RIO env (Either Text [Text])
-findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
+findPackageFieldForBuiltPackage pkgDir pkgId subLibs field = do
   distDir <- distDirFromDir pkgDir
   let inplaceDir = distDir </> relDirPackageConfInplace
       pkgIdStr = packageIdentifierString pkgId
@@ -613,12 +613,13 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
   logDebug $ displayShow files
   -- From all the files obtained from the scanning process above, we need to
   -- identify which are .conf files and then ensure that there is at most one
-  -- .conf file for each library and internal library (some might be missing if
-  -- that component has not been built yet). We should error if there are more
-  -- than one .conf file for a component or if there are no .conf files at all
-  -- in the searched location.
+  -- .conf file for each library and sub-library (some might be missing if that
+  -- component has not been built yet). We should error if there are more than
+  -- one .conf file for a component or if there are no .conf files at all in the
+  -- searched location.
   let toFilename = T.pack . toFilePath . filename
-      -- strip known prefix and suffix from the found files to determine only the conf files
+      -- strip known prefix and suffix from the found files to determine only
+      -- the .conf files
       stripKnown =
         T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-"))
       stripped =
@@ -629,7 +630,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
         in  if T.null z then "" else T.tail z
       matchedComponents = map (\(n, f) -> (stripHash n, [f])) stripped
       byComponents =
-        Map.restrictKeys (Map.fromListWith (++) matchedComponents) $ Set.insert "" internalLibs
+        Map.restrictKeys (Map.fromListWith (++) matchedComponents) $ Set.insert "" subLibs
   logDebug $ displayShow byComponents
   if Map.null $ Map.filter (\fs -> length fs > 1) byComponents
     then case concat $ Map.elems byComponents of
