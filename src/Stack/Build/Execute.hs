@@ -2044,7 +2044,7 @@ singleBuild
                      (packageBuildType package == C.Simple)
                      (displayException err)
         _ -> pure ()
-      when hasLibrary $ cabal KeepTHLoading ["register"]
+      when (hasLibrary || hasInternalLibrary) $ cabal KeepTHLoading ["register"]
 
     -- copy ddump-* files
     case T.unpack <$> boptsDdumpDir eeBuildOpts of
