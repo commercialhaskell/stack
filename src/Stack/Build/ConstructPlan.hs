@@ -642,7 +642,6 @@ addFinal lp package isAllInOne buildHaddocks = do
         , taskType = TTLocalMutable lp
         , taskAllInOne = isAllInOne
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
-        , taskAnyMissing = not $ Set.null missing
         , taskBuildTypeConfig = packageBuildTypeConfig package
         }
   tell mempty { wFinals = Map.singleton (packageName package) res }
@@ -961,7 +960,6 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
                 TTRemotePackage mutable package pkgLoc
         , taskAllInOne = isAllInOne
         , taskCachePkgSrc = toCachePkgSrc ps
-        , taskAnyMissing = not $ Set.null missing
         , taskBuildTypeConfig = packageBuildTypeConfig package
         }
 

@@ -63,16 +63,12 @@ import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.SourceMap ( mkProjectPackage )
-import           Stack.Types.Build
-                   ( CachePkgSrc (..), Task (..), TaskConfigOpts (..)
-                   , TaskType (..)
-                   )
+import           Stack.Types.Build ( TaskType (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
 import           Stack.Types.BuildOpts
                    ( BuildOpts (..), defaultBuildOpts, defaultBuildOptsCLI )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
-import           Stack.Types.ConfigureOpts ( ConfigureOpts (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
@@ -493,7 +489,7 @@ getSDistFileList lp deps =
       [] [] [] Nothing -- provide empty list of globals. This is a hack around
                        -- custom Setup.hs files
       $ \ee ->
-      withSingleContext ac ee task deps (Just "sdist") $
+      withSingleContext ac ee taskType deps (Just "sdist") $
         \_package cabalfp _pkgDir cabal _announce _outputType -> do
           let outFile = toFilePath tmpdir FP.</> "source-files-list"
           cabal
@@ -504,19 +500,7 @@ getSDistFileList lp deps =
           pure (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
  where
   ac = ActionContext Set.empty [] ConcurrencyAllowed
-  task = Task
-    { taskType = TTLocalMutable lp
-    , taskConfigOpts = TaskConfigOpts
-        { tcoMissing = Set.empty
-        , tcoOpts = \_ -> ConfigureOpts [] []
-        }
-    , taskBuildHaddock = False
-    , taskPresent = Map.empty
-    , taskAllInOne = True
-    , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent $ lpCabalFile lp))
-    , taskAnyMissing = True
-    , taskBuildTypeConfig = False
-    }
+  taskType = TTLocalMutable lp
 
 normalizeTarballPaths ::
      (HasRunner env, HasTerm env)
