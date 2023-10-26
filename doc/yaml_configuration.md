@@ -301,6 +301,21 @@ custom-preprocessor-extensions:
 
 TODO: Add a simple example of how to use custom preprocessors.
 
+### extra-package-dbs
+
+[:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
+
+Default: `[]`
+
+A list of relative or absolute paths to package databases. These databases will
+be added on top of GHC's global package database before the addition of other
+package databases.
+
+!!! warning
+
+    Use of this feature may result in builds that are not reproducible, as Stack
+    has no control over the contents of the extra package databases.
+
 ## Non-project-specific configuration
 
 Non-project configuration options can be included in a project-level
