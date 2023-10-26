@@ -131,8 +131,9 @@ import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build
                    ( ConfigCache (..), Plan (..), PrecompiledCache (..)
                    , Task (..), TaskConfigOpts (..), TaskType (..)
-                   , configCacheComponents, taskIsTarget, taskLocation
-                   , taskProvides
+                   , configCacheComponents, taskAnyMissing, taskIsTarget
+                   , taskLocation, taskProvides, taskTypeLocation
+                   , taskTypePackageIdentifier
                    )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
@@ -1108,12 +1109,20 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
           (getFileStatus (toFilePath setupConfigfp))
   newSetupConfigMod <- getNewSetupConfigMod
   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
-  -- See https://github.com/commercialhaskell/stack/issues/3554
-  taskAnyMissingHack <-
+  -- See https://github.com/commercialhaskell/stack/issues/3554. This can be
+  -- dropped when Stack drops support for GHC < 8.4.
+  taskAnyMissingHackEnabled <-
     view $ actualCompilerVersionL.to getGhcVersion.to (< mkVersion [8, 4])
   needConfig <-
     if   boptsReconfigure eeBuildOpts
-      || (taskAnyMissing task && taskAnyMissingHack)
+          -- The reason 'taskAnyMissing' is necessary is a bug in Cabal. See:
+          -- <https://github.com/haskell/cabal/issues/4728#issuecomment-337937673>.
+          -- The problem is that Cabal may end up generating the same package ID
+          -- for a dependency, even if the ABI has changed. As a result, without
+          -- check, Stack would think that a reconfigure is unnecessary, when in
+          -- fact we _do_ need to reconfigure. The details here suck. We really
+          -- need proper hashes for package identifiers.
+       || (taskAnyMissingHackEnabled && taskAnyMissing task)
       then pure True
       else do
         -- We can ignore the components portion of the config
@@ -1198,20 +1207,24 @@ packageNamePrefix ee name' =
 announceTask ::
      HasLogFunc env
   => ExecuteEnv
-  -> Task
+  -> TaskType
   -> Utf8Builder
   -> RIO env ()
-announceTask ee task action = logInfo $
-  fromString (packageNamePrefix ee (pkgName (taskProvides task))) <> action
+announceTask ee taskType action = logInfo $
+     fromString
+       (packageNamePrefix ee (pkgName (taskTypePackageIdentifier taskType)))
+  <> action
 
 prettyAnnounceTask ::
      HasTerm env
   => ExecuteEnv
-  -> Task
+  -> TaskType
   -> StyleDoc
   -> RIO env ()
-prettyAnnounceTask ee task action = prettyInfo $
-  fromString (packageNamePrefix ee (pkgName (taskProvides task))) <> action
+prettyAnnounceTask ee taskType action = prettyInfo $
+     fromString
+       (packageNamePrefix ee (pkgName (taskTypePackageIdentifier taskType)))
+  <> action
 
 -- | Ensure we're the only action using the directory.  See
 -- <https://github.com/commercialhaskell/stack/issues/2730>
@@ -1275,7 +1288,7 @@ withSingleContext ::
      forall env a. HasEnvConfig env
   => ActionContext
   -> ExecuteEnv
-  -> Task
+  -> TaskType
   -> Map PackageIdentifier GhcPkgId
      -- ^ All dependencies' package ids to provide to Setup.hs.
   -> Maybe String
@@ -1295,7 +1308,7 @@ withSingleContext ::
 withSingleContext
     ActionContext {..}
     ee@ExecuteEnv {..}
-    task@Task {..}
+    taskType
     allDeps
     msuffix
     inner0
@@ -1304,9 +1317,9 @@ withSingleContext
         withCabal package pkgDir outputType $ \cabal ->
           inner0 package cabalfp pkgDir cabal announce outputType
  where
-  pkgId = taskProvides task
-  announce = announceTask ee task
-  prettyAnnounce = prettyAnnounceTask ee task
+  pkgId = taskTypePackageIdentifier taskType
+  announce = announceTask ee taskType
+  prettyAnnounce = prettyAnnounceTask ee taskType
 
   wanted =
     case taskType of
@@ -1397,7 +1410,7 @@ withSingleContext
     unless (configAllowDifferentUser config) $
       checkOwnership (pkgDir </> configWorkDir config)
     let envSettings = EnvSettings
-          { esIncludeLocals = taskLocation task == Local
+          { esIncludeLocals = taskTypeLocation taskType == Local
           , esIncludeGhcPackagePath = False
           , esStackExe = False
           , esLocaleUtf8 = True
@@ -1777,7 +1790,7 @@ singleBuild
       _ -> pure Nothing
 
   copyPreCompiled (PrecompiledCache mlib subLibs exes) = do
-    announceTask ee task "using precompiled package"
+    announceTask ee taskType "using precompiled package"
 
     -- We need to copy .conf files for the main library and all sub-libraries
     -- which exist in the cache, from their old snapshot to the new one.
@@ -1841,7 +1854,7 @@ singleBuild
     bindir = bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
   realConfigAndBuild cache mcurator allDepsMap =
-    withSingleContext ac ee task allDepsMap Nothing $
+    withSingleContext ac ee taskType allDepsMap Nothing $
       \package cabalfp pkgDir cabal0 announce _outputType -> do
         let cabal = cabal0 CloseOnException
         executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
@@ -2228,7 +2241,7 @@ singleTest topts testsToRun ac ee task installedMap = do
   mcurator <- view $ buildConfigL.to bcCurator
   let pname = pkgName $ taskProvides task
       expectFailure = expectTestFailure pname mcurator
-  withSingleContext ac ee task allDepsMap (Just "test") $
+  withSingleContext ac ee (taskType task) allDepsMap (Just "test") $
     \package _cabalfp pkgDir _cabal announce outputType -> do
       config <- view configL
       let needHpc = toCoverage topts
@@ -2507,7 +2520,7 @@ singleBench :: HasEnvConfig env
             -> RIO env ()
 singleBench beopts benchesToRun ac ee task installedMap = do
   (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
-  withSingleContext ac ee task allDepsMap (Just "bench") $
+  withSingleContext ac ee (taskType task) allDepsMap (Just "bench") $
     \_package _cabalfp _pkgDir cabal announce _outputType -> do
       let args = map T.unpack benchesToRun <> maybe []
                        ((:[]) . ("--benchmark-options=" <>))
