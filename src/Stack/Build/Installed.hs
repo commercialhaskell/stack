@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- Determine which packages are already installed
 module Stack.Build.Installed
@@ -30,6 +31,8 @@ import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Package
                    ( InstallLocation (..), InstallMap, Installed (..)
                    , InstalledMap, InstalledPackageLocation (..)
+                   , PackageDatabase (..), PackageDbVariety (..)
+                   , toPackageDbVariety
                    )
 import           Stack.Types.SourceMap
                    ( DepPackage (..), ProjectPackage (..), SourceMap (..) )
@@ -66,15 +69,15 @@ getInstalled {-opts-} installMap = do
 
   let loadDatabase' = loadDatabase {-opts mcache-} installMap
 
-  (installedLibs0, globalDumpPkgs) <- loadDatabase' Nothing []
+  (installedLibs0, globalDumpPkgs) <- loadDatabase' GlobalPkgDb []
   (installedLibs1, _extraInstalled) <-
     foldM (\lhs' pkgdb ->
-      loadDatabase' (Just (ExtraGlobal, pkgdb)) (fst lhs')
+      loadDatabase' (UserPkgDb ExtraPkgDb pkgdb) (fst lhs')
       ) (installedLibs0, globalDumpPkgs) extraDBPaths
   (installedLibs2, snapshotDumpPkgs) <-
-    loadDatabase' (Just (InstalledTo Snap, snapDBPath)) installedLibs1
+    loadDatabase' (UserPkgDb (InstalledTo Snap) snapDBPath) installedLibs1
   (installedLibs3, localDumpPkgs) <-
-    loadDatabase' (Just (InstalledTo Local, localDBPath)) installedLibs2
+    loadDatabase' (UserPkgDb (InstalledTo Local) localDBPath) installedLibs2
   let installedLibs = Map.fromList $ map lhPair installedLibs3
 
   -- Add in the executables that are installed, making sure to only trust a
@@ -114,71 +117,83 @@ getInstalled {-opts-} installMap = do
 --
 -- The goal is to ascertain that the dependencies for a package are present,
 -- that it has profiling if necessary, and that it matches the version and
--- location needed by the SourceMap
+-- location needed by the SourceMap.
 loadDatabase ::
-     HasEnvConfig env
-  => InstallMap -- ^ to determine which installed things we should include
-  -> Maybe (InstalledPackageLocation, Path Abs Dir)
-     -- ^ package database, Nothing for global
-  -> [LoadHelper] -- ^ from parent databases
+     forall env. HasEnvConfig env
+  => InstallMap
+     -- ^ to determine which installed things we should include
+  -> PackageDatabase
+     -- ^ package database.
+  -> [LoadHelper]
+     -- ^ from parent databases
   -> RIO env ([LoadHelper], [DumpPackage])
-loadDatabase installMap mdb lhs0 = do
+loadDatabase installMap db lhs0 = do
   pkgexe <- getGhcPkgExe
-  (lhs1', dps) <- ghcPkgDump pkgexe (fmap snd (maybeToList mdb)) $
-                    conduitDumpPackage .| sink
-  lhs1 <- mapMaybeM (processLoadResult mdb) lhs1'
+  (lhs1', dps) <- ghcPkgDump pkgexe pkgDb $ conduitDumpPackage .| sink
+  lhs1 <- mapMaybeM processLoadResult lhs1'
   let lhs = pruneDeps id lhId lhDeps const (lhs0 ++ lhs1)
   pure (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, dps)
  where
-  mloc = fmap fst mdb
-  sinkDP =  CL.map (isAllowed installMap mloc &&& toLoadHelper mloc)
+  pkgDb = case db of
+    GlobalPkgDb -> []
+    UserPkgDb _ fp -> [fp]
+
+  sinkDP =  CL.map (isAllowed installMap db' &&& toLoadHelper db')
          .| CL.consume
+   where
+    db' = toPackageDbVariety db
   sink =   getZipSink $ (,)
        <$> ZipSink sinkDP
        <*> ZipSink CL.consume
 
-processLoadResult :: HasLogFunc env
-                  => Maybe (InstalledPackageLocation, Path Abs Dir)
-                  -> (Allowed, LoadHelper)
-                  -> RIO env (Maybe LoadHelper)
-processLoadResult _ (Allowed, lh) = pure (Just lh)
-processLoadResult mdb (reason, lh) = do
-  logDebug $
-       "Ignoring package "
-    <> fromString (packageNameString (fst (lhPair lh)))
-    <> maybe
-         mempty
-         ( \db ->    ", from "
-                  <> displayShow db
-                  <> ","
-         )
-         mdb
-    <> " due to"
-    <> case reason of
-         UnknownPkg -> " it being unknown to the resolver / extra-deps."
-         WrongLocation mloc loc -> " wrong location: " <> displayShow (mloc, loc)
-         WrongVersion actual wanted ->
-              " wanting version "
-          <> fromString (versionString wanted)
-          <> " instead of "
-          <> fromString (versionString actual)
-  pure Nothing
+  processLoadResult :: (Allowed, LoadHelper) -> RIO env (Maybe LoadHelper)
+  processLoadResult (Allowed, lh) = pure (Just lh)
+  processLoadResult (reason, lh) = do
+    logDebug $
+         "Ignoring package "
+      <> fromString (packageNameString (fst (lhPair lh)))
+      <> case db of
+           GlobalPkgDb -> mempty
+           UserPkgDb loc fp -> ", from " <> displayShow (loc, fp) <> ","
+      <> " due to"
+      <> case reason of
+           UnknownPkg -> " it being unknown to the resolver / extra-deps."
+           WrongLocation db' loc ->
+             " wrong location: " <> displayShow (db', loc)
+           WrongVersion actual wanted ->
+                " wanting version "
+            <> fromString (versionString wanted)
+            <> " instead of "
+            <> fromString (versionString actual)
+    pure Nothing
 
+-- | Type representing results of 'isAllowed'.
 data Allowed
   = Allowed
+    -- ^ The installed package can be included in the set of relevant installed
+    -- packages.
   | UnknownPkg
-  | WrongLocation (Maybe InstalledPackageLocation) InstallLocation
+    -- ^ The installed package cannot be included in the set of relevant
+    -- installed packages because the package is unknown.
+  | WrongLocation PackageDbVariety InstallLocation
+    -- ^ The installed package cannot be included in the set of relevant
+    -- installed packages because the package is in the wrong package database.
   | WrongVersion Version Version
+    -- ^ The installed package cannot be included in the set of relevant
+    -- installed packages because the package has the wrong version.
   deriving (Eq, Show)
 
--- | Check if a can be included in the set of installed packages or not, based
--- on the package selections made by the user. This does not perform any
--- dirtiness or flag change checks.
-isAllowed :: InstallMap
-          -> Maybe InstalledPackageLocation
-          -> DumpPackage
-          -> Allowed
-isAllowed installMap mloc dp = case Map.lookup name installMap of
+-- | Check if an installed package can be included in the set of relevant
+-- installed packages or not, based on the package selections made by the user.
+-- This does not perform any dirtiness or flag change checks.
+isAllowed ::
+     InstallMap
+  -> PackageDbVariety
+     -- ^ The package database providing the installed package.
+  -> DumpPackage
+     -- ^ The installed package to check.
+  -> Allowed
+isAllowed installMap pkgDb dp = case Map.lookup name installMap of
   Nothing ->
     -- If the sourceMap has nothing to say about this package,
     -- check if it represents a sub-library first
@@ -195,34 +210,50 @@ isAllowed installMap mloc dp = case Map.lookup name installMap of
  where
   PackageIdentifier name version = dpPackageIdent dp
   -- Ensure that the installed location matches where the sourceMap says it
-  -- should be installed
-  checkLocation Snap = True -- snapshot deps could become mutable after getting
-                            -- any mutable dependency
-  checkLocation Local =
-    mloc == Just (InstalledTo Local) || mloc == Just ExtraGlobal -- 'locally' installed snapshot packages can come from extra dbs
-  -- Check if a package is allowed if it is found in the sourceMap
+  -- should be installed.
+  checkLocation Snap =
+     -- snapshot deps could become mutable after getting any mutable dependency.
+    True
+  checkLocation Local = case pkgDb of
+    GlobalDb -> False
+    -- 'locally' installed snapshot packages can come from 'extra' package
+    -- databases.
+    ExtraDb -> True
+    WriteOnlyDb -> False
+    MutableDb -> True
+  -- Check if an installed package is allowed if it is found in the sourceMap.
   checkFound (installLoc, installVer)
-    | not (checkLocation installLoc) = WrongLocation mloc installLoc
+    | not (checkLocation installLoc) = WrongLocation pkgDb installLoc
     | version /= installVer = WrongVersion version installVer
     | otherwise = Allowed
-  -- check if a package is allowed if it is not found in the sourceMap
-  checkNotFound = case mloc of
-    -- The sourceMap has nothing to say about this global package, so we can use it
-    Nothing -> Allowed
-    Just ExtraGlobal -> Allowed
+  -- Check if an installed package is allowed if it is not found in the
+  -- sourceMap.
+  checkNotFound = case pkgDb of
+    -- The sourceMap has nothing to say about this global package, so we can use
+    -- it.
+    GlobalDb -> Allowed
+    ExtraDb -> Allowed
     -- For non-global packages, don't include unknown packages.
     -- See: https://github.com/commercialhaskell/stack/issues/292
-    Just _ -> UnknownPkg
+    WriteOnlyDb -> UnknownPkg
+    MutableDb -> UnknownPkg
 
+-- | Type representing certain information about an installed package.
 data LoadHelper = LoadHelper
-  { lhId   :: !GhcPkgId
+  { lhId :: !GhcPkgId
+    -- ^ The package's id.
   , lhDeps :: ![GhcPkgId]
+    -- ^ Unless the package's name is that of a 'wired-in' package, a list of
+    -- the ids of the installed packages that are the package's dependencies.
   , lhPair :: !(PackageName, (InstallLocation, Installed))
+    -- ^ A pair of (a) the package's name and (b) a pair of the relevant
+    -- database (write-only or mutable) and information about the library
+    -- installed.
   }
   deriving Show
 
-toLoadHelper :: Maybe InstalledPackageLocation -> DumpPackage -> LoadHelper
-toLoadHelper mloc dp = LoadHelper
+toLoadHelper :: PackageDbVariety -> DumpPackage -> LoadHelper
+toLoadHelper pkgDb dp = LoadHelper
   { lhId = gid
   , lhDeps =
       -- We always want to consider the wired in packages as having all of their
@@ -233,13 +264,17 @@ toLoadHelper mloc dp = LoadHelper
       if name `Set.member` wiredInPackages
         then []
         else dpDepends dp
-  , lhPair = (name, (toPackageLocation mloc, Library ident gid (Right <$> dpLicense dp)))
+  , lhPair =
+      ( name
+      , (toInstallLocation pkgDb, Library ident gid (Right <$> dpLicense dp))
+      )
   }
  where
   gid = dpGhcPkgId dp
   ident@(PackageIdentifier name _) = dpPackageIdent dp
 
-toPackageLocation :: Maybe InstalledPackageLocation -> InstallLocation
-toPackageLocation Nothing = Snap
-toPackageLocation (Just ExtraGlobal) = Snap
-toPackageLocation (Just (InstalledTo loc)) = loc
+  toInstallLocation :: PackageDbVariety -> InstallLocation
+  toInstallLocation GlobalDb = Snap
+  toInstallLocation ExtraDb = Snap
+  toInstallLocation WriteOnlyDb = Snap
+  toInstallLocation MutableDb = Local

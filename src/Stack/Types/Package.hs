@@ -16,6 +16,8 @@ module Stack.Types.Package
   , MemoizedWith (..)
   , Package (..)
   , PackageConfig (..)
+  , PackageDatabase (..)
+  , PackageDbVariety (..)
   , PackageException (..)
   , PackageLibraries (..)
   , PackageSource (..)
@@ -34,6 +36,7 @@ module Stack.Types.Package
   , packageIdentifier
   , psVersion
   , runMemoizedWith
+  , toPackageDbVariety
   ) where
 
 import           Data.Aeson
@@ -201,6 +204,9 @@ packageIdentifier p = PackageIdentifier (packageName p) (packageVersion p)
 packageDefinedFlags :: Package -> Set FlagName
 packageDefinedFlags = M.keysSet . packageDefaultFlags
 
+-- | Type synonym representing dictionaries of package names for a project's
+-- packages and dependencies, and pairs of their relevant database (write-only
+-- or mutable) and package versions.
 type InstallMap = Map PackageName (InstallLocation, Version)
 
 -- | Files that the package depends on, relative to package directory.
@@ -361,12 +367,14 @@ lpFilesForComponents components lp = runMemoizedWith $ do
   componentFiles <- lpComponentFiles lp
   pure $ mconcat (M.elems (M.restrictKeys componentFiles components))
 
--- | Type represeting databases to install a package into.
+-- | Type representing user package databases that packages can be installed
+-- into.
 data InstallLocation
   = Snap
-    -- ^ The write-only database, formerly known as the snapshot database.
+    -- ^ The write-only package database, formerly known as the snapshot
+    -- database.
   | Local
-    -- ^ The mutable database, formerly known as the local database.
+    -- ^ The mutable package database, formerly known as the local database.
   deriving (Eq, Show)
 
 instance Semigroup InstallLocation where
@@ -378,9 +386,43 @@ instance Monoid InstallLocation where
   mempty = Snap
   mappend = (<>)
 
+-- | Type representing user (non-global) package databases that can provide
+-- installed packages.
 data InstalledPackageLocation
-  = InstalledTo InstallLocation | ExtraGlobal
+  = InstalledTo InstallLocation
+    -- ^ A package database that a package can be installed into.
+  | ExtraPkgDb
+    -- ^ An \'extra\' package database, specified by @extra-package-dbs@.
   deriving (Eq, Show)
+
+-- | Type representing package databases that can provide installed packages.
+data PackageDatabase
+  = GlobalPkgDb
+    -- ^ GHC's global package database.
+  | UserPkgDb InstalledPackageLocation (Path Abs Dir)
+    -- ^ A user package database.
+  deriving (Eq, Show)
+
+-- | Type representing varieties of package databases that can provide
+-- installed packages.
+data PackageDbVariety
+  = GlobalDb
+    -- ^ GHC's global package database.
+  | ExtraDb
+    -- ^ An \'extra\' package database, specified by @extra-package-dbs@.
+  | WriteOnlyDb
+    -- ^ The write-only package database, for immutable packages.
+  | MutableDb
+    -- ^ The mutable package database.
+  deriving (Eq, Show)
+
+-- | A function to yield the variety of package database for a given
+-- package database that can provide installed packages.
+toPackageDbVariety :: PackageDatabase -> PackageDbVariety
+toPackageDbVariety GlobalPkgDb = GlobalDb
+toPackageDbVariety (UserPkgDb ExtraPkgDb _) = ExtraDb
+toPackageDbVariety (UserPkgDb (InstalledTo Snap) _) = WriteOnlyDb
+toPackageDbVariety (UserPkgDb (InstalledTo Local) _) = MutableDb
 
 newtype FileCacheInfo = FileCacheInfo
   { fciHash :: SHA256
@@ -434,14 +476,15 @@ dotCabalGetPath dcp =
     DotCabalCFilePath fp -> fp
 
 -- | Type synonym representing dictionaries of package names, and a pair of in
--- which database the package is installed (write-only or mutable) and what is
--- installed (library or executable).
+-- which package database the package is installed (write-only or mutable) and
+-- information about what is installed.
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
 -- | Type representing information about what is installed.
 data Installed
   = Library PackageIdentifier GhcPkgId (Maybe (Either SPDX.License License))
-    -- ^ A library.
+    -- ^ A library, including its installed package id and, optionally, its
+    -- license.
   | Executable PackageIdentifier
     -- ^ An executable.
   deriving (Eq, Show)
