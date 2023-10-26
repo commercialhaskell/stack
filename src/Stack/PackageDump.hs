@@ -206,8 +206,8 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
               _ -> Nothing
       depends <- mapMaybeM parseDepend $ concatMap T.words $ parseM "depends"
 
-      -- Handle sublibs by recording the name of the parent library
-      -- If name of parent library is missing, this is not a sublib.
+      -- Handle sub-libraries by recording the name of the parent library
+      -- If name of parent library is missing, this is not a sub-library.
       let mkParentLib n = PackageIdentifier n version
           parentLib = mkParentLib <$> (parseS "package-name" >>=
                                        parsePackageNameThrowing . T.unpack)

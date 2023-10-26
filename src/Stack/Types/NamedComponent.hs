@@ -9,9 +9,9 @@ module Stack.Types.NamedComponent
   , exeComponents
   , testComponents
   , benchComponents
-  , internalLibComponents
+  , subLibComponents
   , isCLib
-  , isCInternalLib
+  , isCSubLib
   , isCExe
   , isCTest
   , isCBench
@@ -24,7 +24,7 @@ import           Stack.Prelude
 -- | A single, fully resolved component of a package
 data NamedComponent
   = CLib
-  | CInternalLib !Text
+  | CSubLib !Text
   | CExe !Text
   | CTest !Text
   | CBench !Text
@@ -32,7 +32,7 @@ data NamedComponent
 
 renderComponent :: NamedComponent -> Text
 renderComponent CLib = "lib"
-renderComponent (CInternalLib x) = "internal-lib:" <> x
+renderComponent (CSubLib x) = "sub-lib:" <> x
 renderComponent (CExe x) = "exe:" <> x
 renderComponent (CTest x) = "test:" <> x
 renderComponent (CBench x) = "bench:" <> x
@@ -62,19 +62,19 @@ benchComponents = Set.fromList . mapMaybe mBenchName . Set.toList
   mBenchName (CBench name) = Just name
   mBenchName _ = Nothing
 
-internalLibComponents :: Set NamedComponent -> Set Text
-internalLibComponents = Set.fromList . mapMaybe mInternalName . Set.toList
+subLibComponents :: Set NamedComponent -> Set Text
+subLibComponents = Set.fromList . mapMaybe mSubLibName . Set.toList
  where
-  mInternalName (CInternalLib name) = Just name
-  mInternalName _ = Nothing
+  mSubLibName (CSubLib name) = Just name
+  mSubLibName _ = Nothing
 
 isCLib :: NamedComponent -> Bool
 isCLib CLib{} = True
 isCLib _ = False
 
-isCInternalLib :: NamedComponent -> Bool
-isCInternalLib CInternalLib{} = True
-isCInternalLib _ = False
+isCSubLib :: NamedComponent -> Bool
+isCSubLib CSubLib{} = True
+isCSubLib _ = False
 
 isCExe :: NamedComponent -> Bool
 isCExe CExe{} = True

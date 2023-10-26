@@ -218,13 +218,13 @@ data Plan = Plan
   }
   deriving Show
 
--- | Information on a compiled package: the library conf file (if relevant),
--- the sublibraries (if present) and all of the executable paths.
+-- | Information on a compiled package: the library .conf file (if relevant),
+-- the sub-libraries (if present) and all of the executable paths.
 data PrecompiledCache base = PrecompiledCache
   { pcLibrary :: !(Maybe (Path base File))
     -- ^ .conf file inside the package database
   , pcSubLibs :: ![Path base File]
-    -- ^ .conf file inside the package database, for each of the sublibraries
+    -- ^ .conf file inside the package database, for each of the sub-libraries
   , pcExes    :: ![Path base File]
     -- ^ Full paths to executables
   }

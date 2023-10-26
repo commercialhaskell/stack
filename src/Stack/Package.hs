@@ -71,7 +71,7 @@ import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), internalLibComponents )
+                   ( NamedComponent (..), subLibComponents )
 import           Stack.Types.Package
                    ( BuildInfoOpts (..), ExeName (..), GetPackageOpts (..)
                    , InstallMap, Installed (..), InstalledMap, Package (..)
@@ -132,7 +132,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
         case mlib of
           Nothing -> NoLibraries
           Just _ -> HasLibraries foreignLibNames
-  , packageInternalLibraries = subLibNames
+  , packageSubLibraries = subLibNames
   , packageTests = M.fromList
       [ (T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
       | t <- testSuites pkgNoMod
@@ -154,17 +154,17 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageOpts = GetPackageOpts $
       \installMap installedMap omitPkgs addPkgs cabalfp -> do
         (componentsModules,componentFiles, _, _) <- getPackageFiles pkgFiles cabalfp
-        let internals =
-              S.toList $ internalLibComponents $ M.keysSet componentsModules
-        excludedInternals <- mapM (parsePackageNameThrowing . T.unpack) internals
-        mungedInternals <- mapM
+        let subLibs =
+              S.toList $ subLibComponents $ M.keysSet componentsModules
+        excludedSubLibs <- mapM (parsePackageNameThrowing . T.unpack) subLibs
+        mungedSubLibs <- mapM
           (parsePackageNameThrowing . T.unpack . toInternalPackageMungedName)
-          internals
+          subLibs
         componentsOpts <- generatePkgDescOpts
           installMap
           installedMap
-          (excludedInternals ++ omitPkgs)
-          (mungedInternals ++ addPkgs)
+          (excludedSubLibs ++ omitPkgs)
+          (mungedSubLibs ++ addPkgs)
           cabalfp
           pkg
           componentFiles
@@ -284,11 +284,11 @@ generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg compone
                 (pure . generate CLib . libBuildInfo)
                 (library pkg)
             , mapMaybe
-                (\sublib -> do
+                (\subLib -> do
                   let maybeLib =
-                        CInternalLib . T.pack . Cabal.unUnqualComponentName <$>
-                          (libraryNameString . libName) sublib
-                  flip generate  (libBuildInfo sublib) <$> maybeLib
+                        CSubLib . T.pack . Cabal.unUnqualComponentName <$>
+                          (libraryNameString . libName) subLib
+                  flip generate  (libBuildInfo subLib) <$> maybeLib
                  )
                 (subLibraries pkg)
             , fmap

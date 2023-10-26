@@ -1161,10 +1161,10 @@ addPackageDeps package = do
       TTLocalMutable lp -> packageHasLibrary $ lpPackage lp
       TTRemotePackage _ p _ -> packageHasLibrary p
 
-  -- make sure we consider internal libraries as libraries too
+  -- make sure we consider sub-libraries as libraries too
   packageHasLibrary :: Package -> Bool
   packageHasLibrary p =
-    not (Set.null (packageInternalLibraries p)) ||
+    not (Set.null (packageSubLibraries p)) ||
     case packageLibraries p of
       HasLibraries _ -> True
       NoLibraries -> False

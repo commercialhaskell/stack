@@ -49,7 +49,7 @@ import           Stack.Types.EnvConfig
                    )
 import           Stack.Types.FileDigestCache ( readFileDigest )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), isCInternalLib )
+                   ( NamedComponent (..), isCSubLib )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), LocalPackage (..), Package (..)
                    , PackageConfig (..), PackageLibraries (..)
@@ -280,7 +280,7 @@ splitComponents =
  where
   go a b c [] = (Set.fromList $ a [], Set.fromList $ b [], Set.fromList $ c [])
   go a b c (CLib:xs) = go a b c xs
-  go a b c (CInternalLib x:xs) = go (a . (x:)) b c xs
+  go a b c (CSubLib x:xs) = go (a . (x:)) b c xs
   go a b c (CExe x:xs) = go (a . (x:)) b c xs
   go a b c (CTest x:xs) = go a (b . (x:)) c xs
   go a b c (CBench x:xs) = go a b (c . (x:)) xs
@@ -348,7 +348,7 @@ loadLocalPackage pp = do
                   HasLibraries _ -> True
           in     hasLibrary
               || not (Set.null nonLibComponents)
-              || not (Set.null $ packageInternalLibraries pkg)
+              || not (Set.null $ packageSubLibraries pkg)
 
       filterSkippedComponents =
         Set.filter (not . (`elem` boptsSkipComponents bopts))
@@ -510,7 +510,7 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
   (components',compFiles,otherFiles,warnings) <-
     getPackageFiles (packageFiles pkg) cabalFP
   let necessaryComponents =
-        Set.insert CLib $ Set.filter isCInternalLib (M.keysSet components')
+        Set.insert CLib $ Set.filter isCSubLib (M.keysSet components')
       components = necessaryComponents `Set.union` nonLibComponents
       componentsFiles = M.map
         (\files ->

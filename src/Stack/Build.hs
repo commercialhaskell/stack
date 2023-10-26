@@ -372,8 +372,8 @@ checkComponentsBuildable lps =
     , c <- Set.toList (lpUnbuildable lp)
     ]
 
--- | Find if any sublibrary dependency (other than internal libraries) exists in
--- each project package.
+-- | Find if any sub-library dependency (other than internal libraries) exists
+-- in each project package.
 checkSubLibraryDependencies :: HasTerm env => [ProjectPackage] -> RIO env ()
 checkSubLibraryDependencies projectPackages =
   forM_ projectPackages $ \projectPackage -> do

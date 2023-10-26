@@ -791,7 +791,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
   renderComp c =
     case c of
       CLib -> "lib"
-      CInternalLib name -> "internal-lib:" <> fromString (T.unpack name)
+      CSubLib name -> "sub-lib:" <> fromString (T.unpack name)
       CExe name -> "exe:" <> fromString (T.unpack name)
       CTest name -> "test:" <> fromString ( T.unpack name)
       CBench name -> "bench:" <> fromString (T.unpack name)
@@ -939,9 +939,9 @@ wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
   (case packageLibraries pkg of
     NoLibraries -> []
-    HasLibraries names -> CLib : map CInternalLib (S.toList names)) ++
+    HasLibraries names -> CLib : map CSubLib (S.toList names)) ++
   map CExe (S.toList (packageExes pkg)) <>
-  map CInternalLib (S.toList $ packageInternalLibraries pkg) <>
+  map CSubLib (S.toList $ packageSubLibraries pkg) <>
   (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
   (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty

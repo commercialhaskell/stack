@@ -260,7 +260,7 @@ resolveRawTarget sma allLocs (ri, rt) =
   -- 'ComponentName'
   isCompNamed :: ComponentName -> NamedComponent -> Bool
   isCompNamed _ CLib = False
-  isCompNamed t1 (CInternalLib t2) = t1 == t2
+  isCompNamed t1 (CSubLib t2) = t1 == t2
   isCompNamed t1 (CExe t2) = t1 == t2
   isCompNamed t1 (CTest t2) = t1 == t2
   isCompNamed t1 (CBench t2) = t1 == t2
