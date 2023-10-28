@@ -4,10 +4,7 @@
 
 -- Determine which packages are already installed
 module Stack.Build.Installed
-  ( InstalledMap
-  , Installed (..)
-  , getInstalled
-  , InstallMap
+  ( getInstalled
   , toInstallMap
   ) where
 
