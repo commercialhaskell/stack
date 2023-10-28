@@ -55,35 +55,48 @@ instance Exception PackageDumpException where
     , "."
     ]
 
--- | Call ghc-pkg dump with appropriate flags and stream to the given @Sink@,
--- for a single database
+-- | Call @ghc-pkg dump@ with appropriate flags and stream to the given sink,
+-- using either the global package database or the given package databases.
 ghcPkgDump ::
      (HasProcessContext env, HasTerm env)
   => GhcPkgExe
-  -> [Path Abs Dir] -- ^ if empty, use global
+  -> [Path Abs Dir]
+     -- ^ A list of package databases. If empty, use the global package
+     -- database.
   -> ConduitM Text Void (RIO env) a
+     -- ^ Sink.
   -> RIO env a
 ghcPkgDump pkgexe = ghcPkgCmdArgs pkgexe ["dump"]
 
--- | Call ghc-pkg describe with appropriate flags and stream to the given
--- @Sink@, for a single database
+-- | Call @ghc-pkg describe@ with appropriate flags and stream to the given
+-- sink, using either the global package database or the given package
+-- databases.
 ghcPkgDescribe ::
      (HasCompiler env, HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> PackageName
-  -> [Path Abs Dir] -- ^ if empty, use global
+  -> [Path Abs Dir]
+     -- ^ A list of package databases. If empty, use the global package
+     -- database.
   -> ConduitM Text Void (RIO env) a
+     -- ^ Sink.
   -> RIO env a
 ghcPkgDescribe pkgexe pkgName' = ghcPkgCmdArgs
-  pkgexe ["describe", "--simple-output", packageNameString pkgName']
+  pkgexe
+  ["describe", "--simple-output", packageNameString pkgName']
 
--- | Call ghc-pkg and stream to the given @Sink@, for a single database
+-- | Call @ghc-pkg@ and stream to the given sink, using the either the global
+-- package database or the given package databases.
 ghcPkgCmdArgs ::
      (HasProcessContext env, HasTerm env)
   => GhcPkgExe
   -> [String]
-  -> [Path Abs Dir] -- ^ if empty, use global
+     -- ^ A list of commands.
+  -> [Path Abs Dir]
+     -- ^ A list of package databases. If empty, use the global package
+     -- database.
   -> ConduitM Text Void (RIO env) a
+     -- ^ Sink.
   -> RIO env a
 ghcPkgCmdArgs pkgexe@(GhcPkgExe pkgPath) cmd mpkgDbs sink = do
   case reverse mpkgDbs of
@@ -95,8 +108,11 @@ ghcPkgCmdArgs pkgexe@(GhcPkgExe pkgPath) cmd mpkgDbs sink = do
   args = concat
     [ case mpkgDbs of
           [] -> ["--global", "--no-user-package-db"]
-          _ -> ["--user", "--no-user-package-db"] ++
-              concatMap (\pkgDb -> ["--package-db", toFilePathNoTrailingSep pkgDb]) mpkgDbs
+          _ ->   "--user"
+               : "--no-user-package-db"
+               : concatMap
+                   (\pkgDb -> ["--package-db", toFilePathNoTrailingSep pkgDb])
+                   mpkgDbs
     , cmd
     , ["--expand-pkgroot"]
     ]
