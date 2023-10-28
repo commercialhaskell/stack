@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Module exporting the 'NamedComponent' type and related functions.
 module Stack.Types.NamedComponent
   ( NamedComponent (..)
   , renderComponent
@@ -15,19 +16,25 @@ module Stack.Types.NamedComponent
   , isCExe
   , isCTest
   , isCBench
+  , splitComponents
   ) where
 
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Stack.Prelude
 
--- | A single, fully resolved component of a package
+-- | Type representing components of a fully-resolved Cabal package.
 data NamedComponent
   = CLib
+    -- The \'main\' unnamed library component.
   | CSubLib !Text
+    -- A named \'subsidiary\' or \'ancillary\` library component (sub-library).
   | CExe !Text
+    -- A named executable component.
   | CTest !Text
+    -- A named test-suite component.
   | CBench !Text
+    -- A named benchmark component.
   deriving (Eq, Ord, Show)
 
 renderComponent :: NamedComponent -> Text
@@ -87,3 +94,28 @@ isCTest _ = False
 isCBench :: NamedComponent -> Bool
 isCBench CBench{} = True
 isCBench _ = False
+
+-- | A function to split the given list of components into sets of the names of
+-- the named components by the type of component (sub-libraries, executables,
+-- test-suites, benchmarks), ignoring any 'main' unnamed library component.
+splitComponents ::
+     [NamedComponent]
+  -> ( Set Text
+       -- ^ Sub-libraries.
+     , Set Text
+       -- ^ Executables.
+     , Set Text
+       -- ^ Test-suites.
+     , Set Text
+       -- ^ Benchmarks.
+     )
+splitComponents =
+  go id id id id
+ where
+  run c = Set.fromList $ c []
+  go s e t b [] = (run s, run e, run t, run b)
+  go s e t b (CLib:xs) = go s e t b xs
+  go s e t b (CSubLib x:xs) = go (s . (x:)) e t b xs
+  go s e t b (CExe x:xs) = go s (e . (x:)) t b xs
+  go s e t b (CTest x:xs) = go s e (t . (x:)) b xs
+  go s e t b (CBench x:xs) = go s e t (b . (x:)) xs

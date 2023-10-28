@@ -49,7 +49,7 @@ import           Stack.Types.EnvConfig
                    )
 import           Stack.Types.FileDigestCache ( readFileDigest )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), isCSubLib )
+                   ( NamedComponent (..), isCSubLib, splitComponents )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), LocalPackage (..), Package (..)
                    , PackageConfig (..), PackageLibraries (..)
@@ -273,18 +273,6 @@ generalGhcOptions bconfig boptsCli isTarget isLocal = concat
       AGOLocals -> isLocal
       AGOEverything -> True
 
-splitComponents :: [NamedComponent]
-                -> (Set Text, Set Text, Set Text)
-splitComponents =
-  go id id id
- where
-  go a b c [] = (Set.fromList $ a [], Set.fromList $ b [], Set.fromList $ c [])
-  go a b c (CLib:xs) = go a b c xs
-  go a b c (CSubLib x:xs) = go (a . (x:)) b c xs
-  go a b c (CExe x:xs) = go (a . (x:)) b c xs
-  go a b c (CTest x:xs) = go a (b . (x:)) c xs
-  go a b c (CBench x:xs) = go a b (c . (x:)) xs
-
 loadCommonPackage ::
      forall env. (HasBuildConfig env, HasSourceMap env)
   => CommonPackage
@@ -318,7 +306,11 @@ loadLocalPackage pp = do
       mtarget = M.lookup name (smtTargets $ smTargets sm)
       (exeCandidates, testCandidates, benchCandidates) =
         case mtarget of
-          Just (TargetComps comps) -> splitComponents $ Set.toList comps
+          Just (TargetComps comps) ->
+            -- Currently, a named library component (a sub-library) cannot be
+            -- specified as a build target.
+            let (_s, e, t, b) = splitComponents $ Set.toList comps
+            in  (e, t, b)
           Just (TargetAll _packageType) ->
             ( packageExes pkg
             , if    boptsTests bopts
