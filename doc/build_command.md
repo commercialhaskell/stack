@@ -225,8 +225,12 @@ sets this flag.
 
 ### `--haddock-arguments` option
 
-`stack haddock --haddock-arguments <haddock_arguments>` passes the specified
+`stack haddock --haddock-arguments <haddock_argument(s)>` passes the specified
 arguments to the Haddock tool.
+
+Specified arguments are separated by spaces. Arguments can be unquoted (if they
+do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
+include 'escaped' characters, escaped with an initial `\` character.
 
 ### `--[no-]haddock-deps` flag
 
@@ -393,10 +397,33 @@ project packages or from local dependencies). See also the `--file-watch` flag.
 
 ## Controlling what happens after building
 
+### `--benchmark-arguments`, `--ba` option
+
+`stack build --bench --benchmark-arguments=<argument(s)>` will pass the
+specified argument, or arguments, to each benchmark when it is run.
+
+Specified arguments are separated by spaces. Arguments can be unquoted (if they
+do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
+include 'escaped' characters, escaped with an initial `\` character.
+
 ### `--exec` option
 
-`stack build --exec "<command> [<arguments>]"` will run the specified command
+`stack build --exec "<command> [<argument(s)>]"` will run the specified command
 after a successful build.
+
+Specified arguments are separated by spaces. Arguments can be unquoted (if they
+do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
+include 'escaped' characters, escaped with an initial `\` character.
+
+### `--test-arguments`, `--ta` option
+
+`stack build --test --test-arguments=<argument(s)>` will pass the specified
+argument, or arguments, to each test when it is run. This option can be
+specified multiple times.
+
+Specified arguments are separated by spaces. Arguments can be unquoted (if they
+do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
+include 'escaped' characters, escaped with an initial `\` character.
 
 ## Flags affecting GHC's behaviour
 
