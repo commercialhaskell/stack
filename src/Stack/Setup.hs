@@ -1009,9 +1009,9 @@ warnUnsupportedCompiler ghcVersion = do
           , style Url "https://github.com/commercialhaskell/stack/issues/648" <> "."
           ]
         pure True
-    | ghcVersion >= mkVersion [9, 7] && notifyIfGhcUntested -> do
+    | ghcVersion >= mkVersion [9, 9] && notifyIfGhcUntested -> do
         prettyWarnL
-          [ flow "Stack has not been tested with GHC versions 9.8 and above, \
+          [ flow "Stack has not been tested with GHC versions 9.10 and above, \
                  \and using"
           , fromString (versionString ghcVersion) <> ","
           , flow "this may fail."
