@@ -24,6 +24,7 @@ Behavior changes:
 
 Other enhancements:
 
+* Consider GHC 9.8 to be a tested compiler and remove warnings.
 * Add flag `--no-init` to Stack's `new` command to skip the initialisation of
   the newly-created project for use with Stack.
 * The HTML file paths produced at the end of `stack haddock` are printed on
@@ -87,6 +88,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Consider GHC 9.6 to be a tested compiler and remove warnings.
+* Consider Cabal 3.10 to be a tested library and remove warnings.
 * Bump to Hpack 0.36.0.
 * Depend on `pantry-0.9.2`, for support for long filenames and directory names
   in archives created by `git archive`.
@@ -287,6 +290,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Consider GHC 9.2 and 9.4 to be tested compilers and remove warnings.
+* Consider Cabal 3.6 and 3.8 to be a tested libraries and remove warnings.
 * Bump to Hpack 0.35.0.
 * On Windows, the installer now sets `DisplayVersion` in the registry, enabling
   tools like `winget` to properly read the version number.
@@ -345,7 +350,6 @@ Behavior changes:
 Other enhancements:
 
 * `stack setup` supports installing GHC for macOS aarch64 (M1)
-
 * `stack upload` supports authentication with a Hackage API key (via
   `HACKAGE_KEY` environment variable).
 
@@ -405,7 +409,6 @@ Behavior changes:
   packages. It also sets now proper working directory when invoked with
   one package. See
   [#5421](https://github.com/commercialhaskell/stack/issues/5421)
-
 * `custom-setup` dependencies are now properly initialized for `stack dist`.
   This makes `explicit-setup-deps` no longer required and that option was
   removed. See
@@ -413,25 +416,20 @@ Behavior changes:
 
 Other enhancements:
 
+* Consider GHC 9.0 to be a tested compiler and remove warnings.
+* Consider Cabal 3.6 to be a tested library and remove warnings.
 * Nix integration now passes `ghcVersion` (in addition to existing `ghc`) to
   `shell-file` as an identifier that can be looked up in a compiler attribute
   set.
-
 * Nix integration now allows Nix integration if the user is ready in nix-shell.
   This gets rid of "In Nix shell but reExecL is False" error.
-
 * `stack list` is a new command to list package versions in a snapshot.
   See [#5431](https://github.com/commercialhaskell/stack/pull/5431)
-
-* Consider GHC 9.0 a tested compiler and remove warnings.
-
 * `custom-preprocessor-extensions` is a new configuration option for allowing
   Stack to be aware of any custom preprocessors you have added to `Setup.hs`.
   See [#3491](https://github.com/commercialhaskell/stack/issues/3491)
-
 * Added `--candidate` flag to `upload` command to upload a package candidate
   rather than publishing the package.
-
 * Error output using `--no-interleaved-output` no longer prepends indenting
   whitespace. This allows emacs compilation-mode and vim quickfix to locate
   and track errors. See
@@ -442,14 +440,11 @@ Bug fixes:
 * `stack new` now supports branches other than `master` as default for GitHub
   repositories. See
   [#5422](https://github.com/commercialhaskell/stack/issues/5422)
-
 * Ignore all errors from `hi-file-parser`. See
   [#5445](https://github.com/commercialhaskell/stack/issues/5445) and
   [#5486](https://github.com/commercialhaskell/stack/issues/5486).
-
 * Support basic auth in package-indices. See
   [#5509](https://github.com/commercialhaskell/stack/issues/5509).
-
 * Add support for parsing `.hi`. files from GHC 8.10 and 9.0. See
   [hi-file-parser#2](https://github.com/commercialhaskell/hi-file-parser/pull/2).
 
@@ -471,7 +466,6 @@ Major changes:
   override the default location of snapshot configuration files. This option
   affects how snapshot synonyms (LTS/Nightly) are expanded to URLs by the
   `pantry` library.
-
 * `docker-network` configuration key added to override docker `--net` arg
 
 Behavior changes:
