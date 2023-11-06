@@ -1,5 +1,0 @@
-resolver: lts-20.23
-
-allow-newer: true
-allow-newer-deps:
-- foo

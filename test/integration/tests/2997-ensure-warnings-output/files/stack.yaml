@@ -1,5 +1,0 @@
-resolver: ghc-9.2.7
-packages:
-- foo
-- bar
-dump-logs: warning

@@ -1,0 +1,4 @@
+resolver: lts-21.16
+name: snapshot-modify-lts
+drop-packages:
+- zlib

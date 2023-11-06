@@ -1,4 +1,0 @@
-resolver: ghc-9.2.7
-extra-deps:
-- stm-2.4.4.1
-- mtl-2.2.1

@@ -24,6 +24,7 @@ import qualified Distribution.Text as C
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.TestSuiteInterface ( TestSuiteInterface )
 import qualified Distribution.Version as C
+import           RIO.NonEmpty ( nonEmpty )
 import           RIO.Process ( showProcessArgDebug )
 import           Stack.Constants
                    ( defaultUserConfigPath, wiredInPackages )
@@ -81,6 +82,7 @@ data BuildException
   | TemplateHaskellNotFoundBug
   | HaddockIndexNotFound
   | ShowBuildErrorBug
+  | CallStackEmptyBug
   deriving (Show, Typeable)
 
 instance Exception BuildException where
@@ -251,12 +253,15 @@ instance Exception BuildException where
     ++ "No local or snapshot doc index found to open."
   displayException ShowBuildErrorBug = bugReport "[S-5452]"
     "Unexpected case in showBuildError."
+  displayException CallStackEmptyBug = bugReport "[S-2696]"
+    "addDep: call stack is empty."
 
 data BuildPrettyException
   = ConstructPlanFailed
       [ConstructPlanException]
       (Path Abs File)
       (Path Abs Dir)
+      Bool -- Is the project the implicit global project?
       ParentMap
       (Set PackageName)
       (Map PackageName [PackageName])
@@ -283,13 +288,13 @@ data BuildPrettyException
   deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
-  pretty ( ConstructPlanFailed errs stackYaml stackRoot parents wanted prunedGlobalDeps ) =
+  pretty ( ConstructPlanFailed errs stackYaml stackRoot isImplicitGlobal parents wanted prunedGlobalDeps ) =
     "[S-4804]"
     <> line
     <> flow "Stack failed to construct a build plan."
     <> blankLine
     <> pprintExceptions
-           errs stackYaml stackRoot parents wanted prunedGlobalDeps
+         errs stackYaml stackRoot isImplicitGlobal parents wanted prunedGlobalDeps
   pretty (ExecutionFailure es) =
     "[S-7282]"
     <> line
@@ -426,46 +431,84 @@ pprintExceptions ::
      [ConstructPlanException]
   -> Path Abs File
   -> Path Abs Dir
+  -> Bool
   -> ParentMap
   -> Set PackageName
   -> Map PackageName [PackageName]
   -> StyleDoc
-pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDeps =
-  mconcat $
-    [ flow "While constructing the build plan, Stack encountered the \
-           \following errors:"
-    , blankLine
-    , mconcat (L.intersperse blankLine (mapMaybe pprintException exceptions'))
-    ] ++ if L.null recommendations
-           then []
-           else
-             [ blankLine
-             , flow "Some different approaches to resolving this:"
-             , blankLine
-             ] ++ recommendations
-
+pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wanted' prunedGlobalDeps =
+     fillSep
+       [ flow
+           (  "While constructing the build plan, Stack encountered the \
+              \following errors"
+           <> if hasConfigurationRefs then "." else ":"
+           )
+       , if hasConfigurationRefs
+           then flow
+             "The 'Stack configuration' refers to the set of package versions \
+             \specified by the snapshot (after any dropped packages, or pruned \
+             \GHC boot packages; if a boot package is replaced, Stack prunes \
+             \all other such packages that depend on it) and any extra-deps:"
+           else mempty
+       ]
+  <> blankLine
+  <> mconcat (L.intersperse blankLine (mapMaybe pprintException exceptions'))
+  <> if L.null recommendations
+       then mempty
+       else
+            blankLine
+         <> flow "Some different approaches to resolving some or all of this:"
+         <> blankLine
+         <> indent 2 (spacedBulletedList recommendations)
  where
   exceptions' = {- should we dedupe these somehow? nubOrd -} exceptions
 
   recommendations =
-    if not onlyHasDependencyMismatches
-      then []
-      else
-        [ "  *" <+> align (fillSep
-            [ "Set"
-            , style Shell (flow "allow-newer: true")
-            , "in"
-            , pretty (defaultUserConfigPath stackRoot)
-            , flow "to ignore all version constraints and build anyway."
-            ])
-        , blankLine
-        ]
-    ++ addExtraDepsRecommendations
+       [ allowNewerMsg True False | onlyHasDependencyMismatches ]
+    <> [ fillSep
+           $ allowNewerMsg False onlyHasDependencyMismatches
+           : flow "add these package names under"
+           : style Shell "allow-newer-deps" <> ":"
+           : mkNarrativeList (Just Shell) False
+               (map (fromString . packageNameString) (Set.elems pkgsWithMismatches) :: [StyleDoc])
+       | not $ Set.null pkgsWithMismatches
+       ]
+    <> addExtraDepsRecommendations
+   where
+    allowNewerMsg isAll isRepetitive = fillSep
+      $ flow "To ignore"
+      : (if isAll then "all" else "certain")
+      : flow "version constraints and build anyway,"
+      : if isRepetitive
+          then ["also"]
+          else
+            [ fillSep
+                $  [ "in"
+                   , pretty (defaultUserConfigPath stackRoot)
+                   , flow
+                       (  "(global configuration)"
+                       <> if isImplicitGlobal then "," else mempty
+                       )
+                   ]
+                <> ( if isImplicitGlobal
+                       then []
+                       else
+                         [ "or"
+                         , pretty stackYaml
+                         , flow "(project-level configuration),"
+                         ]
+                   )
+                <> [ "set"
+                   ,    style Shell (flow "allow-newer: true")
+                     <> if isAll then "." else mempty
+                   ]
+                <> [ "and" | not isAll ]
+            ]
 
   addExtraDepsRecommendations
     | Map.null extras = []
     | (Just _) <- Map.lookup (mkPackageName "base") extras =
-        [ "  *" <+> align (fillSep
+        [ fillSep
             [ flow "Build requires unattainable version of the"
             , style Current "base"
             , flow "package. Since"
@@ -473,35 +516,21 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
             , flow "is a part of GHC, you most likely need to use a \
                    \different GHC version with the matching"
             , style Current "base"<> "."
-            ])
-         , line
+            ]
         ]
     | otherwise =
-       [ "  *" <+> align (fillSep
-         [ style Recommendation (flow "Recommended action:")
-         , flow "try adding the following to your"
-         , style Shell "extra-deps"
-         , "in"
-         , pretty stackYaml <> ":"
-         ])
-       , blankLine
-       , vsep (map pprintExtra (Map.toList extras))
-       , line
-       ]
+        [   fillSep
+              [ style Recommendation (flow "Recommended action:")
+              , flow "try adding the following to your"
+              , style Shell "extra-deps"
+              , "in"
+              , pretty stackYaml
+              , "(project-level configuration):"
+              ]
+          <> blankLine
+          <> vsep (map pprintExtra (Map.toList extras))
+        ]
 
-  extras = Map.unions $ map getExtras exceptions'
-  getExtras DependencyCycleDetected{} = Map.empty
-  getExtras UnknownPackage{} = Map.empty
-  getExtras (DependencyPlanFailures _ m) =
-    Map.unions $ map go $ Map.toList m
-   where
-    -- TODO: Likely a good idea to distinguish these to the user.  In
-    -- particular, for DependencyMismatch
-    go (name, (_range, Just (version,cabalHash), NotInBuildPlan)) =
-      Map.singleton name (version,cabalHash)
-    go (name, (_range, Just (version,cabalHash), DependencyMismatch{})) =
-      Map.singleton name (version, cabalHash)
-    go _ = Map.empty
   pprintExtra (name, (version, BlobKey cabalHash cabalSize)) =
     let cfInfo = CFIHash cabalHash (Just cabalSize)
         packageIdRev = PackageIdentifierRevision name version cfInfo
@@ -515,16 +544,38 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
         (Map.toList pDeps)
   toNotInBuildPlan _ = []
 
-  -- This checks if 'allow-newer: true' could resolve all issues.
-  onlyHasDependencyMismatches = all go exceptions'
+  (onlyHasDependencyMismatches, hasConfigurationRefs, extras, pkgsWithMismatches) =
+    filterExceptions
+
+  filterExceptions ::
+    ( Bool
+      -- ^ All the errors are DependencyMismatch. This checks if
+      -- 'allow-newer: true' could resolve all reported issues.
+    , Bool
+      -- ^ One or more messages refer to 'the Stack configuration'. This
+      -- triggers a message to explain what that phrase means.
+    , Map PackageName (Version, BlobKey)
+      -- ^ Recommended extras. TO DO: Likely a good idea to distinguish these to
+      -- the user. In particular, those recommended for DependencyMismatch.
+    , Set.Set PackageName
+      -- ^ Set of names of packages with one or more DependencyMismatch errors.
+    )
+  filterExceptions = L.foldl' go acc0 exceptions'
    where
-    go DependencyCycleDetected{} = False
-    go UnknownPackage{} = False
-    go (DependencyPlanFailures _ m) =
-      all (\(_, _, depErr) -> isMismatch depErr) (M.elems m)
-    isMismatch DependencyMismatch{} = True
-    isMismatch Couldn'tResolveItsDependencies{} = True
-    isMismatch _ = False
+    acc0 = (True, False, Map.empty, Set.empty)
+    go acc (DependencyPlanFailures pkg m) = Map.foldrWithKey go' acc m
+     where
+      pkgName = packageName pkg
+      go' name (_, Just extra, NotInBuildPlan) (_, _, m', s) =
+        (False, True, Map.insert name extra m', s)
+      go' _ (_, _, NotInBuildPlan) (_, _, m', s) = (False, True, m', s)
+      go' name (_, Just extra, DependencyMismatch _) (p1, _, m', s) =
+        (p1, True, Map.insert name extra m', Set.insert pkgName s)
+      go' _ (_, _, DependencyMismatch _) (p1, _, m', s) =
+        (p1, True, m', Set.insert pkgName s)
+      go' _ (_, _, Couldn'tResolveItsDependencies _) acc' = acc'
+      go' _ _ (_, p2, m', s) = (False, p2, m', s)
+    go (_, p2, m, s) _ = (False, p2, m, s)
 
   pprintException (DependencyCycleDetected pNames) = Just $
        flow "Dependency cycle detected in packages:"
@@ -537,28 +588,31 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
     case mapMaybe pprintDep (Map.toList pDeps) of
       [] -> Nothing
       depErrors -> Just $
-        flow "In the dependencies for" <+> pkgIdent <>
-        pprintFlags (packageFlags pkg) <> ":" <> line <>
-        indent 4 (vsep depErrors) <>
-        case getShortestDepsPath parentMap wanted' (packageName pkg) of
-          Nothing ->
-               line
-            <> flow "needed for unknown reason - stack invariant violated."
-          Just [] ->
-               line
-            <> fillSep
-                 [ flow "needed since"
-                 , pkgName'
-                 , flow "is a build target."
-                 ]
-          Just (target:path) ->
-               line
-            <> flow "needed due to" <+> encloseSep "" "" " -> " pathElems
-           where
-            pathElems =
-              [style Target . fromString . packageIdentifierString $ target] ++
-              map (fromString . packageIdentifierString) path ++
-              [pkgIdent]
+           fillSep
+             [ flow "In the dependencies for"
+             , pkgIdent <> pprintFlags (packageFlags pkg) <> ":"
+             ]
+        <> line
+        <> indent 2 (bulletedList depErrors)
+        <> case getShortestDepsPath parentMap wanted' (packageName pkg) of
+             Nothing ->
+                  line
+               <> flow "needed for unknown reason - Stack invariant violated."
+             Just [] ->
+                  line
+               <> fillSep
+                    [ flow "needed since"
+                    , pkgName'
+                    , flow "is a build target."
+                    ]
+             Just (target:path) ->
+                  line
+               <> flow "needed due to" <+> encloseSep "" "" " -> " pathElems
+              where
+               pathElems =
+                    [style Target . fromString . packageIdentifierString $ target]
+                 <> map (fromString . packageIdentifierString) path
+                 <> [pkgIdent]
        where
         pkgName' =
           style Current . fromString . packageNameString $ packageName pkg
@@ -579,9 +633,9 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
         in  Just $ fillSep
               [ flow "Can't use GHC boot package"
               , style Current . fromString . packageNameString $ name
-              , flow "when it has an overridden dependency (issue #4510);"
-              , flow "you need to add the following as explicit dependencies \
-                     \to the project:"
+              , flow "when it depends on a replaced boot package. You need to \
+                     \add the following as explicit dependencies to the \
+                     \project:"
               , line
               , encloseSep "" "" ", " prunedDeps
               ]
@@ -598,79 +652,79 @@ pprintExceptions exceptions stackYaml stackRoot parentMap wanted' prunedGlobalDe
 
   pprintDep (name, (range, mlatestApplicable, badDep)) = case badDep of
     NotInBuildPlan
-      | name `elem` fold prunedGlobalDeps -> Just $
-          style Error (fromString $ packageNameString name) <+>
-          align
-            (  ( if range == C.anyVersion
-                   then flow "needed"
-                   else flow "must match" <+> goodRange
-               )
-            <> ","
-            <> softline
-            <> fillSep
-                 [ flow "but this GHC boot package has been pruned (issue \
-                        \#4510); you need to add the package explicitly to \
-                        \extra-deps"
-                 ,latestApplicable Nothing
-                 ]
-            )
-      | otherwise -> Just $
-          style Error (fromString $ packageNameString name) <+>
-          align
-            (  ( if range == C.anyVersion
-                   then flow "needed"
-                   else flow "must match" <+> goodRange
-               )
-            <> ","
-            <> softline
-            <> fillSep
-                 [ flow "but the Stack configuration has no specified version"
-                 , latestApplicable Nothing
-                 ]
-            )
+      | name `elem` fold prunedGlobalDeps -> butMsg $ fillSep
+          [ flow "this GHC boot package has been pruned from the Stack \
+                 \configuration. You need to add the package explicitly to"
+          , style Shell "extra-deps" <> "."
+          ]
+      | otherwise -> butMsg $ inconsistentMsg Nothing
     -- TODO: For local packages, suggest editing constraints
-    DependencyMismatch version -> Just $
-      style
-         Error
-         (fromString . packageIdentifierString $ PackageIdentifier name version)
-      <+>
-      align
-        ( fillSep
-            [ flow "from Stack configuration does not match"
-            , goodRange
-            , latestApplicable (Just version)
-            ]
-        )
+    DependencyMismatch version -> butMsg $ inconsistentMsg $ Just version
     -- I think the main useful info is these explain why missing packages are
     -- needed. Instead lets give the user the shortest path from a target to the
     -- package.
     Couldn'tResolveItsDependencies _version -> Nothing
-    HasNoLibrary -> Just $
-      style Error (fromString $ packageNameString name) <+>
-      align (flow "is a library dependency, but the package provides no library")
-    BDDependencyCycleDetected names -> Just $
-      style Error (fromString $ packageNameString name) <+>
-      align
-        ( flow $ "dependency cycle detected: "
+    HasNoLibrary -> Just $ fillSep
+      [ errorName
+      , flow "is a library dependency, but the package provides no library."
+      ]
+    BDDependencyCycleDetected names -> Just $ fillSep
+      [ errorName
+      , flow $ "dependency cycle detected: "
              ++ L.intercalate ", " (map packageNameString names)
-        )
+      ]
    where
+    errorName = style Error . fromString . packageNameString $ name
     goodRange = style Good (fromString (C.display range))
+    rangeMsg = if range == C.anyVersion
+      then "needed,"
+      else fillSep
+        [ flow "must match"
+        , goodRange <> ","
+        ]
+    butMsg msg = Just $ fillSep
+      [ errorName
+      , rangeMsg
+      , "but"
+      , msg
+      , latestApplicable Nothing
+      ]
+    inconsistentMsg mVersion = fillSep
+      [ style Error $ maybe
+          ( flow "no version" )
+          ( fromString . packageIdentifierString . PackageIdentifier name )
+          mVersion
+      , flow "is in the Stack configuration"
+      ]
     latestApplicable mversion =
       case mlatestApplicable of
         Nothing
-          | isNothing mversion ->
-              flow "(no package with that name found, perhaps there is a typo \
-                   \in a package's build-depends or an omission from the \
-                   \stack.yaml packages list?)"
+          | isNothing mversion -> fillSep
+              [ flow "(no matching package and version found. Perhaps there is \
+                     \an error in the specification of a package's"
+              , style Shell "dependencies"
+              , "or"
+              , style Shell "build-tools"
+              , flow "(Hpack) or"
+              , style Shell "build-depends" <> ","
+              , style Shell "build-tools"
+              , "or"
+              , style Shell "build-tool-depends"
+              , flow "(Cabal file)"
+              , flow "or an omission from the"
+              , style Shell "packages"
+              , flow "list in"
+              , pretty stackYaml
+              , flow "(project-level configuration).)"
+              ]
           | otherwise -> ""
         Just (laVer, _)
           | Just laVer == mversion ->
-              flow "(latest matching version is specified)"
+              flow "(latest matching version is specified)."
           | otherwise ->
               fillSep
                 [ flow "(latest matching version is"
-                , style Good (fromString $ versionString laVer) <> ")"
+                , style Good (fromString $ versionString laVer) <> ")."
                 ]
 
 data ConstructPlanException
@@ -783,7 +837,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted' name =
     then Just []
     else case M.lookup name parentsMap of
       Nothing -> Nothing
-      Just (_, parents) -> Just $ findShortest 256 paths0
+      Just parents -> Just $ findShortest 256 paths0
        where
         paths0 = M.fromList $
           map (\(ident, _) -> (pkgName ident, startDepsPath ident)) parents
@@ -799,10 +853,12 @@ getShortestDepsPath (MonoidMap parentsMap) wanted' name =
     ]
   findShortest _ paths | M.null paths = []
   findShortest fuel paths =
-    case targets of
-      [] -> findShortest (fuel - 1) $ M.fromListWith chooseBest $
+    case nonEmpty targets of
+      Nothing -> findShortest (fuel - 1) $ M.fromListWith chooseBest $
               concatMap extendPath recurses
-      _ -> let (DepsPath _ _ path) = L.minimum (map snd targets) in path
+      Just targets' ->
+        let (DepsPath _ _ path) = minimum (snd <$> targets')
+        in  path
    where
     (targets, recurses) =
       L.partition (\(n, _) -> n `Set.member` wanted') (M.toList paths)
@@ -813,7 +869,7 @@ getShortestDepsPath (MonoidMap parentsMap) wanted' name =
   extendPath (n, dp) =
     case M.lookup n parentsMap of
       Nothing -> []
-      Just (_, parents) ->
+      Just parents ->
         map (\(pkgId, _) -> (pkgName pkgId, extendDepsPath pkgId dp)) parents
 
 startDepsPath :: PackageIdentifier -> DepsPath

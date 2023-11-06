@@ -1,0 +1,6 @@
+resolver: lts-21.16
+
+packages: []
+
+extra-deps:
+- ./one-deps

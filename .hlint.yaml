@@ -67,12 +67,14 @@
     - OverloadedStrings
     - QuasiQuotes
     - RecordWildCards
+    - ScopedTypeVariables
     - TypeFamilies
     - UndecidableInstances
     - ViewPatterns
   # Stack's code generally avoids the use of C preprocessor (CPP) directives.
   - name: CPP
     within:
+    - GHC.Utils.GhcPkg.Main.Compat
     - Stack.BuildInfo
     - Stack.Constants
   # The following list provides an inventory of the small number of modules
@@ -90,6 +92,14 @@
     name:
     - CPP
     - PackageImports
+  # GHC.Utils.GhcPkg.Main.Compat's code largely comes from the GHC repository.
+  - within: GHC.Utils.GhcPkg.Main.Compat
+    name:
+    - FlexibleInstances
+    - KindSignatures
+    - MultiParamTypeClasses
+    - ScopedTypeVariables
+    - TupleSections
 
 # Not considered useful hints
 - ignore:

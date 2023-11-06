@@ -1,0 +1,5 @@
+resolver: lts-21.16
+
+packages:
+- ./local-mmorph
+- ./uses-mmorph

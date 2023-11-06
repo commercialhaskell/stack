@@ -65,8 +65,9 @@ import           Network.HTTP.StackClient
                    )
 import           Network.HTTP.Simple ( getResponseHeader )
 import           Path
-                   ( (</>), addExtension, dirname, filename, parent, parseAbsDir
-                   , parseAbsFile, parseRelDir, parseRelFile, toFilePath
+                   ( (</>), addExtension, filename, parent, parseAbsDir
+                   , parseAbsFile, parseRelDir, parseRelFile, takeDrive
+                   , toFilePath
                    )
 import           Path.CheckInstall ( warnInstallSearchPathIssues )
 import           Path.Extended ( fileExtension )
@@ -83,10 +84,9 @@ import           RIO.Process
                    ( EnvVars, HasProcessContext (..), ProcessContext
                    , augmentPath, augmentPathMap, doesExecutableExist, envVarsL
                    , exeSearchPathL, getStdout, mkProcessContext, modifyEnvVars
-                   , proc, readProcess_, readProcessStdout, readProcessStdout_
-                   , runProcess, runProcess_, setStdout, waitExitCode
-                   , withModifyEnvVars, withProcessWait, withWorkingDir
-                   , workingDirL
+                   , proc, readProcess_, readProcessStdout, runProcess
+                   , runProcess_, setStdout, waitExitCode, withModifyEnvVars
+                   , withProcessWait, withWorkingDir, workingDirL
                    )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( hashSourceMapData, loadSourceMap )
@@ -95,9 +95,10 @@ import           Stack.Config.ConfigureScript ( ensureConfigureScript )
 import           Stack.Constants
                    ( cabalPackageName, ghcBootScript,ghcConfigureMacOS
                    , ghcConfigurePosix, ghcConfigureWindows, hadrianScriptsPosix
-                   , hadrianScriptsWindows, osIsMacOS, osIsWindows, relDirBin
-                   , relDirUsr, relFile7zdll, relFile7zexe, relFileConfigure
-                   , relFileHadrianStackDotYaml, relFileLibgmpSo10
+                   , hadrianScriptsWindows, libDirs, osIsMacOS, osIsWindows
+                   , relDirBin, relDirUsr, relFile7zdll, relFile7zexe
+                   , relFileConfigure, relFileHadrianStackDotYaml
+                   , relFileLibcMuslx86_64So1, relFileLibgmpSo10
                    , relFileLibgmpSo3, relFileLibncurseswSo6, relFileLibtinfoSo5
                    , relFileLibtinfoSo6, relFileMainHs, relFileStack
                    , relFileStackDotExe, relFileStackDotTmp
@@ -146,6 +147,7 @@ import           Stack.Types.EnvConfig
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..), minimalEnvSettings )
 import           Stack.Types.ExtraDirs ( ExtraDirs (..) )
+import           Stack.Types.FileDigestCache ( newFileDigestCache )
 import           Stack.Types.GHCDownloadInfo ( GHCDownloadInfo (..) )
 import           Stack.Types.GHCVariant
                    ( GHCVariant (..), HasGHCVariant (..), ghcVariantName
@@ -666,9 +668,12 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     sourceMapHash <- hashSourceMapData boptsCLI sourceMap
     pure (sourceMap, sourceMapHash)
 
+  fileDigestCache <- newFileDigestCache
+
   let envConfig0 = EnvConfig
         { envConfigBuildConfig = bc
         , envConfigBuildOptsCLI = boptsCLI
+        , envConfigFileDigestCache = fileDigestCache
         , envConfigSourceMap = sourceMap
         , envConfigSourceMapHash = sourceMapHash
         , envConfigCompilerPaths = compilerPaths
@@ -780,6 +785,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             }
         }
     , envConfigBuildOptsCLI = boptsCLI
+    , envConfigFileDigestCache = fileDigestCache
     , envConfigSourceMap = sourceMap
     , envConfigSourceMapHash = sourceMapHash
     , envConfigCompilerPaths = compilerPaths
@@ -985,8 +991,12 @@ ensureCompilerAndMsys sopts = do
   pure (cp, paths)
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
-warnUnsupportedCompiler :: HasTerm env => Version -> RIO env Bool
-warnUnsupportedCompiler ghcVersion =
+warnUnsupportedCompiler ::
+     (HasConfig env, HasTerm env)
+  => Version
+  -> RIO env Bool
+warnUnsupportedCompiler ghcVersion = do
+  notifyIfGhcUntested <- view $ configL.to configNotifyIfGhcUntested
   if
     | ghcVersion < mkVersion [7, 8] -> do
         prettyWarnL
@@ -999,10 +1009,10 @@ warnUnsupportedCompiler ghcVersion =
           , style Url "https://github.com/commercialhaskell/stack/issues/648" <> "."
           ]
         pure True
-    | ghcVersion >= mkVersion [9, 7] -> do
+    | ghcVersion >= mkVersion [9, 9] && notifyIfGhcUntested -> do
         prettyWarnL
-          [ flow "Stack has not been tested with GHC versions 9.8 and above, and \
-                 \using"
+          [ flow "Stack has not been tested with GHC versions 9.10 and above, \
+                 \and using"
           , fromString (versionString ghcVersion) <> ","
           , flow "this may fail."
           ]
@@ -1013,7 +1023,7 @@ warnUnsupportedCompiler ghcVersion =
 
 -- | See <https://github.com/commercialhaskell/stack/issues/4246>
 warnUnsupportedCompilerCabal ::
-     HasTerm env
+     (HasConfig env, HasTerm env)
   => CompilerPaths
   -> Bool -- ^ already warned about GHC?
   -> RIO env ()
@@ -1021,22 +1031,22 @@ warnUnsupportedCompilerCabal cp didWarn = do
   unless didWarn $
     void $ warnUnsupportedCompiler $ getGhcVersion $ cpCompilerVersion cp
   let cabalVersion = cpCabalVersion cp
-
+  notifyIfCabalUntested <- view $ configL.to configNotifyIfCabalUntested
   if
-    | cabalVersion < mkVersion [1, 19, 2] -> do
+    | cabalVersion < mkVersion [1, 24, 0] -> do
         prettyWarnL
-          [ flow "Stack no longer supports Cabal versions below 1.19.2, but \
+          [ flow "Stack no longer supports Cabal versions below 1.24.0.0, but \
                  \version"
           , fromString (versionString cabalVersion)
           , flow "was found. This invocation will most likely fail. To fix \
                  \this, either use an older version of Stack or a newer \
-                 \resolver. Acceptable resolvers: lts-3.0/nightly-2015-05-05 \
+                 \resolver. Acceptable resolvers: lts-7.0/nightly-2016-05-26 \
                  \or later."
           ]
-    | cabalVersion >= mkVersion [3, 11] ->
+    | cabalVersion >= mkVersion [3, 11] && notifyIfCabalUntested ->
         prettyWarnL
-          [ flow "Stack has not been tested with Cabal versions 3.12 and above, \
-                 \but version"
+          [ flow "Stack has not been tested with Cabal versions 3.12 and \
+                 \above, but version"
           , fromString (versionString cabalVersion)
           , flow "was found, this may fail."
           ]
@@ -1662,36 +1672,41 @@ getGhcBuilds = do
               | osIsWindows =
                   -- Cannot parse /usr/lib on Windows
                   pure False
-              | otherwise = do
+              | otherwise = hasMatches lib usrLibDirs
               -- This is a workaround for the fact that libtinfo.so.x doesn't
               -- appear in the 'ldconfig -p' output on Arch or Slackware even
               -- when it exists. There doesn't seem to be an easy way to get the
               -- true list of directories to scan for shared libs, but this
               -- works for our particular cases.
-                  matches <- filterM (doesFileExist .(</> lib)) usrLibDirs
-                  case matches of
-                    [] ->
-                         logDebug
-                           (  "Did not find shared library "
-                           <> libD
-                           )
-                      >> pure False
-                    (path:_) ->
-                         logDebug
-                           (  "Found shared library "
-                           <> libD
-                           <> " in "
-                           <> fromString (Path.toFilePath path)
-                           )
-                      >> pure True
              where
+              libD = fromString (toFilePath lib)
               libT = T.pack (toFilePath lib)
+            hasMatches lib dirs = do
+              matches <- filterM (doesFileExist .(</> lib)) dirs
+              case matches of
+                [] ->
+                     logDebug
+                       (  "Did not find shared library "
+                       <> libD
+                       )
+                  >> pure False
+                (path:_) ->
+                     logDebug
+                       (  "Found shared library "
+                       <> libD
+                       <> " in "
+                       <> fromString (Path.toFilePath path)
+                       )
+                  >> pure True
+             where
               libD = fromString (toFilePath lib)
             getLibc6Version = do
               elddOut <-
-                proc "ldd" ["--version"] $ tryAny . readProcessStdout_
+                -- On Alpine Linux, 'ldd --version' will send output to stderr,
+                -- which we wish to smother.
+                proc "ldd" ["--version"] $ tryAny . readProcess_
               pure $ case elddOut of
-                Right lddOut ->
+                Right (lddOut, _) ->
                   let lddOut' =
                         decodeUtf8Lenient (LBS.toStrict lddOut)
                   in  case P.parse lddVersion lddOut' of
@@ -1713,6 +1728,7 @@ getGhcBuilds = do
               lddMinorVersion <- P.decimal
               P.skip (not . isDigit)
               pure $ mkVersion [ lddMajorVersion, lddMinorVersion ]
+        hasMusl <- hasMatches relFileLibcMuslx86_64So1 libDirs
         mLibc6Version <- getLibc6Version
         case mLibc6Version of
           Just libc6Version -> logDebug $
@@ -1727,17 +1743,21 @@ getGhcBuilds = do
         hasncurses6 <- checkLib relFileLibncurseswSo6
         hasgmp5 <- checkLib relFileLibgmpSo10
         hasgmp4 <- checkLib relFileLibgmpSo3
-        let libComponents = concat
-              [ if hastinfo6 && hasgmp5
-                  then
-                    if hasLibc6_2_32
-                      then [["tinfo6"]]
-                      else [["tinfo6-libc6-pre232"]]
-                  else [[]]
-              , [[] | hastinfo5 && hasgmp5]
-              , [["ncurses6"] | hasncurses6 && hasgmp5 ]
-              , [["gmp4"] | hasgmp4 ]
-              ]
+        let libComponents = if hasMusl
+              then
+                [ ["musl"] ]
+              else
+                concat
+                  [ if hastinfo6 && hasgmp5
+                      then
+                        if hasLibc6_2_32
+                          then [["tinfo6"]]
+                          else [["tinfo6-libc6-pre232"]]
+                      else [[]]
+                  , [ [] | hastinfo5 && hasgmp5 ]
+                  , [ ["ncurses6"] | hasncurses6 && hasgmp5 ]
+                  , [ ["gmp4"] | hasgmp4 ]
+                  ]
         useBuilds $ map
           (\c -> case c of
             [] -> CompilerBuildStandard
@@ -1890,6 +1910,8 @@ downloadAndInstallTool programsDir downloadInfo tool installer = do
   liftIO $ ignoringAbsence (removeDirRecur tempDir)
   pure tool
 
+-- Exceptions thrown by this function are caught by
+-- 'downloadAndInstallPossibleCompilers'.
 downloadAndInstallCompiler ::
      (HasBuildConfig env, HasGHCVariant env)
   => CompilerBuild
@@ -1904,7 +1926,7 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
     Just bindistURL -> do
       case ghcVariant of
         GHCCustom _ -> pure ()
-        _ -> prettyThrowM RequireCustomGHCVariant
+        _ -> throwM RequireCustomGHCVariant
       pure
         ( version
         , GHCDownloadInfo mempty mempty DownloadInfo
@@ -1917,7 +1939,7 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
     _ -> do
       ghcKey <- getGhcKey ghcBuild
       case Map.lookup ghcKey $ siGHCs si of
-        Nothing -> prettyThrowM $ UnknownOSKey ghcKey
+        Nothing -> throwM $ UnknownOSKey ghcKey
         Just pairs_ ->
           getWantedCompilerInfo ghcKey versionCheck wanted ACGhc pairs_
   config <- view configL
@@ -1949,8 +1971,10 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
 downloadAndInstallCompiler _ _ WCGhcjs{} _ _ = throwIO GhcjsNotSupported
 
 downloadAndInstallCompiler _ _ WCGhcGit{} _ _ =
-  prettyThrowIO DownloadAndInstallCompilerError
+  throwIO DownloadAndInstallCompilerError
 
+-- Exceptions thrown by this function are caught by
+-- 'downloadAndInstallPossibleCompilers'.
 getWantedCompilerInfo ::
      (Ord k, MonadThrow m)
   => Text
@@ -1962,7 +1986,7 @@ getWantedCompilerInfo ::
 getWantedCompilerInfo key versionCheck wanted toCV pairs_ =
   case mpair of
     Just pair -> pure pair
-    Nothing -> prettyThrowM $
+    Nothing -> throwM $
       UnknownCompilerVersion
         (Set.singleton key)
         wanted
@@ -2322,17 +2346,26 @@ withUnpackedTarball7z name si archiveFile archiveType destDir = do
       Nothing -> prettyThrowIO $ TarballFileInvalid name archiveFile
       Just x -> parseRelFile $ T.unpack x
   run7z <- setup7z si
-  -- Truncate the name of the temporary directory, to reduce risk of Windows'
-  -- default file path length of 260 characters being exceeded.
-  let tmpName = take 15 (toFilePathNoTrailingSep (dirname destDir)) ++ "-tmp"
+  -- We use a short name for the temporary directory to reduce the risk of a
+  -- filepath length of more than 260 characters, which can be problematic for
+  -- 7-Zip even if Long Filepaths are enabled on Windows.
+  let tmpName = "stack-tmp"
+      destDrive = takeDrive destDir
   ensureDir (parent destDir)
   withRunInIO $ \run ->
-    withTempDir (parent destDir) tmpName $ \tmpDir ->
+  -- We use a temporary directory in the same drive as that of 'destDir' to
+  -- reduce the risk of a filepath length of more than 260 characters, which can
+  -- be problematic for 7-Zip even if Long Filepaths are enabled on Windows. We
+  -- do not use the system temporary directory as it may be on a different
+  -- drive.
+    withTempDir destDrive tmpName $ \tmpDir ->
       run $ do
         liftIO $ ignoringAbsence (removeDirRecur destDir)
         run7z tmpDir archiveFile
         run7z tmpDir (tmpDir </> tarFile)
         absSrcDir <- expectSingleUnpackedDir archiveFile tmpDir
+        -- On Windows, 'renameDir' does not work across drives. However, we have
+        -- ensured that 'tmpDir' has the same drive as 'destDir'.
         renameDir absSrcDir destDir
 
 expectSingleUnpackedDir ::
@@ -2340,8 +2373,8 @@ expectSingleUnpackedDir ::
   => Path Abs File
   -> Path Abs Dir
   -> m (Path Abs Dir)
-expectSingleUnpackedDir archiveFile destDir = do
-  contents <- listDir destDir
+expectSingleUnpackedDir archiveFile unpackDir = do
+  contents <- listDir unpackDir
   case contents of
     ([dir], _ ) -> pure dir
     _ -> prettyThrowIO $ UnknownArchiveStructure archiveFile
@@ -2767,11 +2800,14 @@ preferredPlatforms = do
       I386 -> pure "i386"
       X86_64 -> pure "x86_64"
       Arm -> pure "arm"
+      AArch64 -> pure "aarch64"
       _ -> prettyThrowM $ BinaryUpgradeOnArchUnsupported arch'
   let hasgmp4 = False -- FIXME import relevant code from Stack.Setup?
                       -- checkLib $(mkRelFile "libgmp.so.3")
       suffixes
+          -- 'gmp4' ceased to be relevant after Stack 1.9.3 (December 2018).
         | hasgmp4 = ["-static", "-gmp4", ""]
+          -- 'static' will cease to be relevant after Stack 2.11.1 (May 2023).
         | otherwise = ["-static", ""]
   pure $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
 

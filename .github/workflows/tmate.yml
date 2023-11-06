@@ -1,0 +1,30 @@
+# See https://github.com/commercialhaskell/stack/issues/6252#issuecomment-1732106343
+# See https://github.com/mxschmitt/action-tmate
+
+name: tmate
+on:
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: 'Run with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Sign assets
+      shell: bash
+      env:
+        RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+      run: |
+        echo "$RELEASE_SIGNING_KEY"|gpg --import
+    # Enable tmate debugging of manually-triggered workflows if the input
+    # option was provided
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+      with:
+        limit-access-to-actor: true

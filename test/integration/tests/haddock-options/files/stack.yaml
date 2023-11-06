@@ -1,9 +1,0 @@
-flags: {}
-packages:
-- '.'
-extra-deps: []
-resolver: lts-20.23
-build:
-  haddock-arguments:
-    haddock-args:
-    - --optghc=-DFOO

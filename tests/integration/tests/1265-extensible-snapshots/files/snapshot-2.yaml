@@ -1,0 +1,10 @@
+resolver: ghc-9.4.7
+name: test-snapshot-2
+packages:
+- stm-2.5.1.0
+- async-2.2.4
+- hashable-1.4.2.0
+- zlib-0.6.3.0@sha256:9adce39e4ca0b7a87d45df0a243134816c57059a08e28cff5469c98ae1f54dfc,5367
+# FIXME: test these here
+flags: {}
+ghc-options: {}

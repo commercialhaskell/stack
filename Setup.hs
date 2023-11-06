@@ -1,15 +1,11 @@
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-
 module Main
   ( main
   ) where
 
-import           Data.List ( nub, sortBy )
-import           Data.Ord ( comparing )
+import           Data.List ( nub, sortOn )
 import           Distribution.InstalledPackageInfo
                    ( sourcePackageId, installedUnitId )
-import           Distribution.Package
-                   ( PackageId, UnitId, packageVersion, packageName )
+import           Distribution.Package ( UnitId, packageVersion, packageName )
 import           Distribution.PackageDescription
                    ( PackageDescription (), Executable (..) )
 import           Distribution.Pretty ( prettyShow )
@@ -23,10 +19,10 @@ import           Distribution.Simple.LocalBuildInfo
 import           Distribution.Simple.PackageIndex
                    ( allPackages, dependencyClosure )
 import           Distribution.Simple.Setup
-                   ( BuildFlags (buildVerbosity), fromFlag )
+                   ( BuildFlags (..), ReplFlags (..), fromFlag )
 import           Distribution.Simple.Utils
                    ( rewriteFileEx, createDirectoryIfMissingVerbose )
-import           Distribution.Types.PackageName ( PackageName, unPackageName )
+import           Distribution.Types.PackageName ( unPackageName )
 import           Distribution.Types.UnqualComponentName
                    ( unUnqualComponentName )
 import           Distribution.Verbosity ( Verbosity, normal )
@@ -35,8 +31,14 @@ import           System.FilePath ( (</>) )
 main :: IO ()
 main = defaultMainWithHooks simpleUserHooks
   { buildHook = \pkg lbi hooks flags -> do
-     generateBuildModule (fromFlag (buildVerbosity flags)) pkg lbi
-     buildHook simpleUserHooks pkg lbi hooks flags
+      generateBuildModule (fromFlag (buildVerbosity flags)) pkg lbi
+      buildHook simpleUserHooks pkg lbi hooks flags
+    -- The 'cabal repl' hook corresponds to the 'cabal build' hook and is added
+    -- because, with a Cabal-based cradle, Haskell Language Server makes use of
+    -- 'cabal repl'.
+  , replHook = \pkg lbi hooks flags args -> do
+      generateBuildModule (fromFlag (replVerbosity flags)) pkg lbi
+      replHook simpleUserHooks pkg lbi hooks flags args
   }
 
 generateBuildModule :: Verbosity -> PackageDescription -> LocalBuildInfo -> IO ()
@@ -51,11 +53,11 @@ generateBuildModule verbosity pkg lbi = do
         , "  ) where"
         , ""
         , "deps :: [String]"
-        , "deps = " ++ (show $ formatdeps (transDeps libcfg clbi))
+        , "deps = " ++ show (formatdeps (transDeps libcfg clbi))
         ]
   where
     exeName' = unUnqualComponentName . exeName
-    formatdeps = map formatone . sortBy (comparing unPackageName')
+    formatdeps = map formatone . sortOn unPackageName'
     formatone p = unPackageName' p ++ "-" ++ prettyShow (packageVersion p)
     unPackageName' = unPackageName . packageName
     transDeps xs ys =

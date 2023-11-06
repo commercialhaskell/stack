@@ -1,0 +1,10 @@
+resolver: lts-21.16
+packages:
+- package-with-th
+- package-with-working-th
+- package-with-failing-test
+- subdirs/dependent-on-failing-packages
+- subdirs/failing-in-subdir
+extra-deps: []
+flags: {}
+extra-package-dbs: []

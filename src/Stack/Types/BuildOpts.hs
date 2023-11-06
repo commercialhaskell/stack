@@ -67,8 +67,10 @@ data BuildOpts = BuildOpts
     -- ^ Build haddocks for all symbols and packages, like
     -- @cabal haddock --internal@
   , boptsHaddockHyperlinkSource :: !Bool
-    -- ^ Build hyperlinked source if possible. Fallback to @hscolour@. Disable
-    -- for no sources.
+    -- ^ Build hyperlinked source. Disable for no sources.
+  , boptsHaddockForHackage :: !Bool
+    -- ^ Build with flags to generate Haddock documentation suitable to upload
+    -- to Hackage.
   , boptsInstallExes :: !Bool
     -- ^ Install executables to user path after building?
   , boptsInstallCompilerTool :: !Bool
@@ -122,6 +124,7 @@ defaultBuildOpts = BuildOpts
   , boptsHaddockInternal = defaultFirstFalse buildMonoidHaddockInternal
   , boptsHaddockHyperlinkSource =
       defaultFirstTrue buildMonoidHaddockHyperlinkSource
+  , boptsHaddockForHackage = defaultFirstFalse buildMonoidHaddockForHackage
   , boptsInstallExes = defaultFirstFalse buildMonoidInstallExes
   , boptsInstallCompilerTool = defaultFirstFalse buildMonoidInstallCompilerTool
   , boptsPreFetch = defaultFirstFalse buildMonoidPreFetch
@@ -236,6 +239,7 @@ data BuildOptsMonoid = BuildOptsMonoid
   , buildMonoidHaddockDeps :: !(First Bool)
   , buildMonoidHaddockInternal :: !FirstFalse
   , buildMonoidHaddockHyperlinkSource :: !FirstTrue
+  , buildMonoidHaddockForHackage :: !FirstFalse
   , buildMonoidInstallExes :: !FirstFalse
   , buildMonoidInstallCompilerTool :: !FirstFalse
   , buildMonoidPreFetch :: !FirstFalse
@@ -275,6 +279,8 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
       FirstFalse <$> o ..:? buildMonoidHaddockInternalArgName
     buildMonoidHaddockHyperlinkSource <-
       FirstTrue <$> o ..:? buildMonoidHaddockHyperlinkSourceArgName
+    buildMonoidHaddockForHackage <-
+      FirstFalse <$> o ..:? buildMonoidHaddockForHackageArgName
     buildMonoidInstallExes <-
       FirstFalse <$> o ..:? buildMonoidInstallExesArgName
     buildMonoidInstallCompilerTool <-
@@ -335,6 +341,9 @@ buildMonoidHaddockInternalArgName = "haddock-internal"
 
 buildMonoidHaddockHyperlinkSourceArgName :: Text
 buildMonoidHaddockHyperlinkSourceArgName = "haddock-hyperlink-source"
+
+buildMonoidHaddockForHackageArgName :: Text
+buildMonoidHaddockForHackageArgName = "haddock-for-hackage"
 
 buildMonoidInstallExesArgName :: Text
 buildMonoidInstallExesArgName = "copy-bins"

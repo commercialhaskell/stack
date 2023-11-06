@@ -1,0 +1,5 @@
+resolver: ghc-9.4.7
+ghc-options:
+  "*": -DFOO
+  ghc-options: -DBAR
+rebuild-ghc-options: true

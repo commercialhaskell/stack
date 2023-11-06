@@ -71,7 +71,7 @@ nav:
     - upgrade command: upgrade_command.md
     - upload command: upload_command.md
   - Specific topics:
-    - Stack root location: stack_root.md
+    - Stack root: stack_root.md
     - Snapshot and package location: pantry.md
     - Snapshot specification: custom_snapshot.md
     - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
@@ -93,6 +93,7 @@ nav:
 - Stack's code (advanced):
   - Contributors:
     - Contributor's guide: CONTRIBUTING.md
+    - Dev Containers: dev_containers.md
   - Maintainers:
     - Releases: maintainers/releases.md
     - Maintainer team process: maintainers/team_process.md
@@ -108,6 +109,7 @@ nav:
 markdown_extensions:
 - admonition
 - attr_list
+- footnotes
 - pymdownx.details
 - pymdownx.emoji:
     emoji_index: !!python/name:materialx.emoji.twemoji

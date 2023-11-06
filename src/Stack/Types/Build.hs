@@ -9,9 +9,13 @@ module Stack.Types.Build
   , Installed (..)
   , psVersion
   , Task (..)
+  , taskAnyMissing
   , taskIsTarget
   , taskLocation
+  , taskProvides
   , taskTargetIsMutable
+  , taskTypeLocation
+  , taskTypePackageIdentifier
   , LocalPackage (..)
   , Plan (..)
   , TestOpts (..)
@@ -42,6 +46,7 @@ import           Database.Persist.Sql
                    , PersistValue (PersistText), SqlType (SqlString)
                    )
 import           Path ( parent )
+import qualified RIO.Set as Set
 import           Stack.Prelude
 import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), BuildSubset (..)
@@ -53,7 +58,7 @@ import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), InstallLocation (..), Installed (..)
                    , LocalPackage (..), Package (..), PackageSource (..)
-                   , psVersion
+                   , packageIdentifier, psVersion
                    )
 
 -- | Package dependency oracle.
@@ -120,28 +125,21 @@ toCachePkgSrc (PSFilePath lp) =
   CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
 toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
--- | A task to perform when building
+-- | A type representing tasks to perform when building.
 data Task = Task
-  { taskProvides        :: !PackageIdentifier -- FIXME turn this into a function on taskType?
-    -- ^ the package/version to be built
-  , taskType            :: !TaskType
-    -- ^ the task type, telling us how to build this
+  { taskType            :: !TaskType
+    -- ^ The task type, telling us how to build this
   , taskConfigOpts      :: !TaskConfigOpts
+    -- ^ A set of the package identifiers of dependencies for which 'GhcPkgId'
+    -- are missing and a function which yields configure options, given a
+    -- dictionary of those identifiers and their 'GhcPkgId'.
   , taskBuildHaddock    :: !Bool
   , taskPresent         :: !(Map PackageIdentifier GhcPkgId)
-    -- ^ GhcPkgIds of already-installed dependencies
+    -- ^ A dictionary of the package identifiers of already-installed
+    -- dependencies, and their 'GhcPkgId'.
   , taskAllInOne        :: !Bool
     -- ^ indicates that the package can be built in one step
   , taskCachePkgSrc     :: !CachePkgSrc
-  , taskAnyMissing      :: !Bool
-    -- ^ Were any of the dependencies missing? The reason this is necessary is...
-    -- hairy. And as you may expect, a bug in Cabal. See:
-    -- <https://github.com/haskell/cabal/issues/4728#issuecomment-337937673>.
-    -- The problem is that Cabal may end up generating the same package ID for a
-    -- dependency, even if the ABI has changed. As a result, without this field,
-    -- Stack would think that a reconfigure is unnecessary, when in fact we _do_
-    -- need to reconfigure. The details here suck. We really need proper hashes
-    -- for package identifiers.
   , taskBuildTypeConfig :: !Bool
     -- ^ Is the build type of this package Configure. Check out
     -- ensureConfigureScript in Stack.Build.Execute for the motivation
@@ -164,12 +162,25 @@ instance Show TaskConfigOpts where
     , show $ f Map.empty
     ]
 
--- | The type of a task, either building local code or something from the
--- package index (upstream)
+-- | Type representing different types of task, depending on what is to be
+-- built.
 data TaskType
   = TTLocalMutable LocalPackage
+    -- ^ Building local source code.
   | TTRemotePackage IsMutable Package PackageLocationImmutable
+    -- ^ Building something from the package index (upstream).
   deriving Show
+
+-- | Were any of the dependencies missing?
+
+taskAnyMissing :: Task -> Bool
+taskAnyMissing task = not $ Set.null $ tcoMissing $ taskConfigOpts task
+
+-- | A function to yield the package name and version of a given 'TaskType'
+-- value.
+taskTypePackageIdentifier :: TaskType -> PackageIdentifier
+taskTypePackageIdentifier (TTLocalMutable lp) = packageIdentifier $ lpPackage lp
+taskTypePackageIdentifier (TTRemotePackage _ p _) = packageIdentifier p
 
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
@@ -177,12 +188,22 @@ taskIsTarget t =
     TTLocalMutable lp -> lpWanted lp
     _ -> False
 
+-- | A function to yield the relevant database (write-only or mutable) of a
+-- given 'TaskType' value.
+taskTypeLocation :: TaskType -> InstallLocation
+taskTypeLocation (TTLocalMutable _) = Local
+taskTypeLocation (TTRemotePackage Mutable _ _) = Local
+taskTypeLocation (TTRemotePackage Immutable _ _) = Snap
+
+-- | A function to yield the relevant database (write-only or mutable) of the
+-- given task.
 taskLocation :: Task -> InstallLocation
-taskLocation task =
-  case taskType task of
-    TTLocalMutable _ -> Local
-    TTRemotePackage Mutable _ _ -> Local
-    TTRemotePackage Immutable _ _ -> Snap
+taskLocation = taskTypeLocation . taskType
+
+-- | A function to yield the package name and version to be built by the given
+-- task.
+taskProvides :: Task -> PackageIdentifier
+taskProvides = taskTypePackageIdentifier . taskType
 
 taskTargetIsMutable :: Task -> IsMutable
 taskTargetIsMutable task =
@@ -206,13 +227,13 @@ data Plan = Plan
   }
   deriving Show
 
--- | Information on a compiled package: the library conf file (if relevant),
--- the sublibraries (if present) and all of the executable paths.
+-- | Information on a compiled package: the library .conf file (if relevant),
+-- the sub-libraries (if present) and all of the executable paths.
 data PrecompiledCache base = PrecompiledCache
   { pcLibrary :: !(Maybe (Path base File))
     -- ^ .conf file inside the package database
   , pcSubLibs :: ![Path base File]
-    -- ^ .conf file inside the package database, for each of the sublibraries
+    -- ^ .conf file inside the package database, for each of the sub-libraries
   , pcExes    :: ![Path base File]
     -- ^ Full paths to executables
   }

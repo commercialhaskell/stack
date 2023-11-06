@@ -60,7 +60,9 @@ import           Data.Char ( isSpace )
 import           Conduit ( decodeUtf8C, withSourceFile )
 import           Data.Conduit.Attoparsec ( ParseError (..), Position (..), sinkParserEither )
 import           Data.List ( intercalate )
+import           Data.List.NonEmpty ( singleton )
 import           Data.Text ( pack )
+import           RIO.NonEmpty ( nonEmpty )
 import           Stack.Constants ( stackProgName )
 import           Stack.Prelude
 import           System.FilePath ( takeExtension )
@@ -108,7 +110,7 @@ interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpret
 
 -- | Extract Stack arguments from a correctly placed and correctly formatted
 -- comment when it is being used as an interpreter
-getInterpreterArgs :: String -> IO [String]
+getInterpreterArgs :: String -> IO (NonEmpty String)
 getInterpreterArgs file = do
   eArgStr <- withSourceFile file parseFile
   case eArgStr of
@@ -134,14 +136,16 @@ getInterpreterArgs file = do
     mapM_ stackWarn (lines err)
     stackWarn "Missing or unusable Stack options specification"
     stackWarn "Using runghc without any additional Stack options"
-    pure ["runghc"]
+    pure $ singleton "runghc"
 
   parseArgStr str =
     case P.parseOnly (argsParser Escaping) (pack str) of
       Left err -> handleFailure ("Error parsing command specified in the "
                       ++ "Stack options comment: " ++ err)
-      Right [] -> handleFailure "Empty argument list in Stack options comment"
-      Right args -> pure args
+      Right args -> maybe
+        (handleFailure "Empty argument list in Stack options comment")
+        pure
+        (nonEmpty args)
 
   decodeError e =
     case e of

@@ -285,19 +285,21 @@ compatibility with a range of versions of GHC that a library package (such as
 Stack aims to depend on well-known packages. The specific versions on which it
 depends at any time are specified by `package.yaml` and `stack.yaml`. It does
 not aim to be compatible with more than one version of the `Cabal` package at
-any time. At the time of writing (May 2023) the package versions are primarily
-ones in Stackage snapshot LTS Haskell 20.23 (for GHC 9.2.7), together with
-extra-dep `Cabal-3.8.1.0`.
+any time. At the time of writing (August 2023) the package versions are
+primarily ones in Stackage snapshot LTS Haskell 21.8 (for GHC 9.4.5), together
+with extra-deps to depend on the latest versions of `ansi-terminal`, `crypton`
+(instead of `cryptonite`), `hpack`, `pantry` and `tar-conduit`.
 
 A Stack executable makes use of Cabal (the library) through a small 'Setup'
 executable that it compiles from Haskell source code. The executable compiles
 that code with a dependency on the version of Cabal that ships with the
 specified GHC compiler. Each release of Stack will aim to support all versions
 of GHC and the Cabal package in Stackage snapshots published within seven years
-of the release. For example, snapshot LTS Haskell 7.0, published on
-14 September 2016, was the first LTS Haskell snapshot to provide GHC 8.0.1 which
-comes with `Cabal-1.24.0.0`. Until, at least, 13 September 2023, Stack releases
-would aim to support the immediate predecessor, GHC 7.10.3 and `Cabal-1.22.5.0`.
+of the release. For example, snapshot LTS Haskell 8.0, published on
+12 February 2017, was the first LTS Haskell snapshot to provide GHC 8.0.2 which
+comes with `base-4.9.1.0` and `Cabal-1.24.2.0`. Until, at least,
+13 February 2024, Stack releases would aim to support the immediate
+predecessor, GHC 8.0.1 and `base-4.9.0.0`, `Cabal-1.24.0.0` and Haddock 2.17.2.
 
 When a version of the Stack executable actually ceases to support a version of
 GHC and `Cabal`, that should be recorded in Stack's
@@ -392,13 +394,14 @@ That said, the following may help:
 
 ## Testing
 
-The Stack code has both unit tests and integration tests. Integration tests can
-be found in the
-[test/integration](https://github.com/commercialhaskell/stack/tree/master/test/integration)
-folder and unit tests, in the
-[src/test](https://github.com/commercialhaskell/stack/tree/master/src/test)
-folder. Tests are written using the [Hspec](https://hspec.github.io/) framework.
-In order to run the full test suite, you can simply command:
+The Stack code has both unit tests and integration tests.
+
+### Working with Unit Tests
+
+Unit tests can be found in the
+[tests/unit](https://github.com/commercialhaskell/stack/tree/master/tests/unit)
+directory. Tests are written using the [Hspec](https://hspec.github.io/)
+framework. In order to run the full test suite, you can simply command:
 
 ~~~text
 stack test
@@ -410,18 +413,17 @@ need to specify which test suite (unit test or integration) and pass arguments
 to specify which module you'd specifically like to run to get quick feedback. A
 description of this follows below.
 
-### Working with Unit Tests
 
 If you would like to run the unit tests on their own, you can command:
 
 ~~~text
-stack test stack:stack-test
+stack test stack:stack-unit-test
 ~~~
 
 Running an individual module works with a command like this:
 
 ~~~text
-stack test stack:stack-test --ta "-m <PATTERN>"
+stack test stack:stack-unit-test --ta "-m <PATTERN>"
 ~~~
 
 Where `<PATTERN>` is the name of the module without `Spec.hs`.
@@ -429,7 +431,7 @@ Where `<PATTERN>` is the name of the module without `Spec.hs`.
 You may also load tests into GHCi and run them with these command:
 
 ~~~text
-stack ghci stack:stack-test --only-main
+stack ghci stack:stack-unit-test --only-main
 # GHCi starting up output ...
 > :main -m "<PATTERN>"
 ~~~
@@ -437,6 +439,10 @@ stack ghci stack:stack-test --only-main
 Where again, `<PATTERN>` is the name of the module without `Spec.hs`.
 
 ### Working with Integration Tests
+
+Integration tests can be found in the
+[tests/integration](https://github.com/commercialhaskell/stack/tree/master/tests/integration)
+folder.
 
 Running the integration tests is a little involved, you'll need to command:
 
@@ -484,6 +490,7 @@ The current active workflows are:
 ### Linting - `lint.yml`
 
 This workflow will run if:
+
 * there is a pull request
 * commits are pushed to these branches: `master`, `stable` and `rc/**`
 
@@ -493,6 +500,7 @@ yamllint and Hlint.
 ### Test suite - `unit-tests.yml`
 
 This workflow will run if:
+
 * there is a pull request
 * commits are pushed to these branches: `master`, `stable` and `rc/**`.
 * requested
@@ -515,6 +523,7 @@ of the Stack root.
 ### Integration-based - `integration-tests.yml`
 
 This workflow will run if:
+
 * there is a pull request
 * commits are pushed to these branches: `master`, `stable` and `rc/**`
 * any tag is created
@@ -556,11 +565,156 @@ variable contains the private key for the GPG key with ID 0x575159689BEFB442.
 That key is imported into GPG and then used by GPG to create a detached signature
 for each file.
 
-### Inactive - `stan.yml`
+### Stan tool - `stan.yml`
 
-Stan is a Haskell static analysis tool. As of 29 August 2022, it does not
-support GHC >= 9.0.1 and Stack is built with GHC >= 9.2.4. Consequently, this
-workflow does not run. Its intent is to apply Stan to Stack.
+[Stan](https://hackage.haskell.org/package/stan) is a Haskell static analysis
+tool. As of `stan-0.1.0.1`, it supports GHC >= 9.6.3 and Stack is built with
+GHC 9.4.7. The tool is configured by the contents of the `.stan.toml` file.
+
+This workflow will run if:
+
+* there is a pull request
+* requested
+
+## Haskell Language Server
+
+You may be using [Visual Studio Code](https://code.visualstudio.com/) (VS Code)
+with its
+[Haskell extension](https://marketplace.visualstudio.com/items?itemName=haskell.haskell),
+which is powered by the
+[Haskell Language Server](https://github.com/haskell/haskell-language-server)
+(HLS).
+
+Stack can be built with Stack (which is recommended) or with Cabal (the tool).
+
+=== "Stack"
+
+    If you use Stack to build Stack, command `stack ghci` in the root directory
+    of the Stack project should work as expected, if you have first commanded
+    `stack build` once. `stack build` causes Cabal (the library) to create the
+    automatically generated module `Stack_build`.
+
+    If `ghc` is not on your PATH, then Haskell Language Server may report the
+    following error about `Stack.Constants.ghcShowOptionsOutput`:
+    ~~~text
+    • Exception when trying to run compile-time code:
+        ghc: readCreateProcess: does not exist (No such file or directory)
+      Code: (TH.runIO (readProcess "ghc" ["--show-options"] "")
+               >>= TH.lift . lines)
+    • In the untyped splice:
+        $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift
+            . lines)
+    ~~~
+
+    `ghc` should be on the PATH if you run VS Code itself in the Stack
+    environment:
+    ~~~text
+    stack exec -- code .
+    ~~~
+
+    The following [cradle (`hie.yaml`)](https://github.com/haskell/hie-bios)
+    should suffice to configure Haskell Language Server (HLS) explicitly for
+    `./Setup.hs` and each of the buildable components in Stack's Cabal file:
+    ~~~yaml
+    cradle:
+      multi:
+      - path: "./Setup.hs"
+        config:
+          cradle:
+            direct:
+              arguments: []
+      - path: "./"
+        config:
+          cradle:
+            stack:
+            - path: "./src"
+              component: "stack:lib"
+            - path: "./app"
+              component: "stack:exe:stack"
+            - path: "./tests/integration"
+              component: "stack:exe:stack-integration-test"
+            - path: "./tests/unit"
+              component: "stack:test:stack-unit-test"
+    ~~~
+
+=== "Cabal (the tool)"
+
+    If you use Cabal (the tool) to build Stack, command `cabal repl` in the root
+    directory of the Stack project should work as expected, if you have GHC and
+    (on Windows) MSYS2 on the PATH. Stack's custom `./Setup.hs` causes
+    `cabal repl` to cause Cabal (the library) to create the automatically
+    generated module `Stack_build`.
+
+    If `ghc` is not on your PATH, then Haskell Language Server may report the
+    following error about `Stack.Constants.ghcShowOptionsOutput`:
+    ~~~text
+    • Exception when trying to run compile-time code:
+        ghc: readCreateProcess: does not exist (No such file or directory)
+      Code: (TH.runIO (readProcess "ghc" ["--show-options"] "")
+               >>= TH.lift . lines)
+    • In the untyped splice:
+        $(TH.runIO (readProcess "ghc" ["--show-options"] "") >>= TH.lift
+            . lines)
+    ~~~
+
+    `ghc` and (on Windows) MSYS2 should be on the PATH if you run commands
+    (including `cabal`) in the Stack environment:
+    ~~~text
+    stack exec --no-ghc-package-path -- cabal repl
+    ~~~
+
+    or
+    ~~~text
+    stack exec --no-ghc-package-path -- code .
+    ~~~
+
+    Use of GHC's environment variable `GHC_PACKAGE_PATH` is not compatible with
+    Cabal (the tool). That is why the `--no-ghc-package-path` flag must be
+    specified with `stack exec` when relying on Cabal (the tool).
+
+    The following [cradle (`hie.yaml`)](https://github.com/haskell/hie-bios)
+    should suffice to configure Haskell Language Server (HLS) explicitly for
+    `./Setup.hs` and each of the buildable components in Stack's Cabal file:
+    ~~~yaml
+    cradle:
+      multi:
+      - path: "./Setup.hs"
+        config:
+          cradle:
+            direct:
+              arguments: []
+      - path: "./"
+        config:
+          cradle:
+            cabal:
+            - path: "./src"
+              component: "lib:stack"
+            - path: "./app"
+              component: "exe:stack"
+            - path: "./tests/integration"
+              component: "exe:stack-integration-test"
+            - path: "./tests/unit"
+              component: "test:stack-unit-test"
+    ~~~
+
+A cradle is not committed to Stack's repository because it imposes a choice of
+build tool.
+
+## Dev Containers
+
+A [Development Container](https://containers.dev) (or Dev Container for short)
+allows you to use a container as a full‑featured development environment.
+
+You can run Dev Containers locally/remotely (with VS Code), or create a
+[Codespace](https://github.com/features/codespaces) for a branch in a
+repository to develop online.
+
+Stack's default Dev Container is intended for use with its default
+project‑level configuration (`stack.yaml`). But there are also Dev Containers
+for the experimental project‑level configurations.
+
+For further information, see the documentation for
+[Dev Containers](dev_containers.md).
 
 ## Slack channel
 
@@ -568,3 +722,9 @@ If you're making deep changes and real-time communication with the Stack team
 would be helpful, we have a `#stack-collaborators` Slack channel in the
 Haskell Foundation workspace. To join the workspace, follow this
 [link](https://haskell-foundation.slack.com/join/shared_invite/zt-z45o9x38-8L55P27r12YO0YeEufcO2w#/shared-invite/email).
+
+## Matrix room
+
+There is also a
+[Haskell Stack room](https://matrix.to/#/#haskell-stack:matrix.org)
+at address `#haskell-stack:matrix.org` on [Matrix](https://matrix.org/).

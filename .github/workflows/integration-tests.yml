@@ -16,12 +16,12 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 16 June 2023, ubuntu-latest, windows-latest and macos-latest come
-# with Stack 2.11.1 and GHC 9.6.2. windows-latest comes with NSIS 3.08, for
-# which the default value of the 'Unicode' installer attribute is 'true'.
-# However, that is not the 'large strings' build of NSIS and creates installers
-# that corrupt the PATH environment variable if the default string length of
-# 1024 characters is exceeded.
+# As of 21 August 2023, ubuntu-latest, windows-latest and macos-latest come
+# with Stack 2.11.1 (2.9.3 on macos-latest) and GHC 9.6.2. windows-latest comes
+# with NSIS 3.08, for which the default value of the 'Unicode' installer
+# attribute is 'true'. However, that is not the 'large strings' build of NSIS
+# and creates installers that corrupt the PATH environment variable if the
+# default string length of 1024 characters is exceeded.
 
 jobs:
   integration-tests:
@@ -33,7 +33,7 @@ jobs:
         include:
         - os: ubuntu-latest
           release-args: "--alpine"
-          cache-bust: ""
+          cache-bust: "2023-10-11"
         - os: windows-latest
           release-args: ""
           cache-bust: "13"
@@ -81,7 +81,7 @@ jobs:
           nix-channel --add https://nixos.org/channels/nixos-23.05 nixpkgs
           # Download the Nix expressions for all subscribed channels...
           #
-          # As at 2023-06-05, nixos-23.05 provides GHC 9.2.7.
+          # As at 2023-08-21, nixos-23.05 provides GHC 9.2.8.
           nix-channel --update
           # The NIX_PATH environment variable sets a list of directories used to
           # look up the location of Nix expressions using paths enclosed in
@@ -126,8 +126,15 @@ jobs:
             rm -Rf $(stack path --stack-root)/hooks
         fi
 
+        # Report the file system disk space usage before checks, for
+        # information.
+        df -h
+
         # Do this in the same step as installing deps to get relevant env var modifications
         stack etc/scripts/release.hs check ${{ matrix.release-args }}
+
+        # Report the file system disk space usage after checks, for information.
+        df -h
 
         set +ex
 
@@ -177,20 +184,36 @@ jobs:
       shell: bash
       run: |
         echo '::notice title=ARM64 skipped::To build ARM64, a self-hosted runner needs to be configured and the SELF_HOSTED_RUNNERS secret must contain arm64'
-
     - name: Clone project
       if: needs.configuration.outputs.test-arm64 == 'true'
       uses: actions/checkout@v3
+    - name: Install deps
+      shell: bash
+      run: |
+        set -ex
 
+        # The release.hs script depends on digest, and digest requires
+        # pkg-config. TO DO: Perhaps the self-hosted runner's software should
+        # include pkg-config.
+        sudo apt-get update
+        sudo apt-get install -y pkg-config
+
+        # As of 19 August 2023, the self-hosted runner comes with Stack 2.11.1,
+        # but it is not on the PATH. Logging the version for information.
+        /usr/local/bin/stack --version
+
+        set +ex
     - name: Build bindist
       if: needs.configuration.outputs.test-arm64 == 'true'
       shell: bash
       run: |
-        set -ex
-        docker build . -f etc/dockerfiles/arm64.Dockerfile -t stack --build-arg USERID=$(id -u) --build-arg GROUPID=$(id -g)
-        rm -rf _release
-        mkdir -p _release
-        docker run --rm -v $(pwd):/src -w /src stack bash -c "/home/stack/release build"
+        # Stack's project-level configuration (stack.yaml) specifies the
+        # multi-architecture (including Linux/Aarch64) Docker image published by
+        # Oliver Benz (@benz0li, on GitHub). That image comes with Stack 2.11.1.
+        # (Note that the online documentation for '--docker-stack-exe image'
+        # specifies that the host Stack and image Stack must have the same
+        # version number.)
+        /usr/local/bin/stack etc/scripts/release.hs build --alpine --build-args --docker-stack-exe=image
 
     - name: Upload bindist
       if: needs.configuration.outputs.test-arm64 == 'true'

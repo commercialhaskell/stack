@@ -1,0 +1,9 @@
+resolver: ghc-9.4.7
+
+packages: []
+
+extra-deps:
+- foo
+
+ghc-options:
+  $locals: -bob

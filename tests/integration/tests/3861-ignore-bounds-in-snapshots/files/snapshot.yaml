@@ -1,0 +1,8 @@
+resolver: ghc-9.4.7
+packages:
+- ./bad-bounds.tar
+
+# Include a flag to get a different snapshot hash
+flags:
+  bad-bounds:
+    unimportant: false

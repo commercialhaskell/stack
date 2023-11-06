@@ -1,0 +1,10 @@
+compiler: ghc-9.4.7
+name: my-snapshot
+
+packages:
+- base-4.10.0.0
+- dinamo-0.1.0.0
+
+flags:
+  dinamo:
+    debug: true

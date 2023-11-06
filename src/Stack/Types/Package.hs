@@ -16,6 +16,8 @@ module Stack.Types.Package
   , MemoizedWith (..)
   , Package (..)
   , PackageConfig (..)
+  , PackageDatabase (..)
+  , PackageDbVariety (..)
   , PackageException (..)
   , PackageLibraries (..)
   , PackageSource (..)
@@ -31,10 +33,10 @@ module Stack.Types.Package
   , lpFilesForComponents
   , memoizeRefWith
   , packageDefinedFlags
-  , packageIdent
   , packageIdentifier
   , psVersion
   , runMemoizedWith
+  , toPackageDbVariety
   ) where
 
 import           Data.Aeson
@@ -133,12 +135,11 @@ instance Exception PackageException where
   displayException ComponentNotParsedBug = bugReport "[S-4623]"
     "Component names should always parse as directory names."
 
--- | Libraries in a package. Since Cabal 2.0, internal libraries are a
--- thing.
+-- | Libraries in a package. Since Cabal 2.0, sub-libraries are a thing.
 data PackageLibraries
   = NoLibraries
   | HasLibraries !(Set Text)
-    -- ^ the foreign library names, sub libraries get built automatically
+    -- ^ the foreign library names, sub-libraries get built automatically
     -- without explicit component name passing
  deriving (Show, Typeable)
 
@@ -176,8 +177,8 @@ data Package = Package
     -- ^ Defaults for unspecified flags.
   , packageLibraries :: !PackageLibraries
     -- ^ does the package have a buildable library stanza?
-  , packageInternalLibraries :: !(Set Text)
-    -- ^ names of internal libraries
+  , packageSubLibraries :: !(Set Text)
+    -- ^ Names of sub-libraries
   , packageTests :: !(Map Text TestSuiteInterface)
     -- ^ names and interfaces of test suites
   , packageBenchmarks :: !(Set Text)
@@ -197,16 +198,15 @@ data Package = Package
   }
   deriving (Show, Typeable)
 
-packageIdent :: Package -> PackageIdentifier
-packageIdent p = PackageIdentifier (packageName p) (packageVersion p)
-
 packageIdentifier :: Package -> PackageIdentifier
-packageIdentifier pkg =
-  PackageIdentifier (packageName pkg) (packageVersion pkg)
+packageIdentifier p = PackageIdentifier (packageName p) (packageVersion p)
 
 packageDefinedFlags :: Package -> Set FlagName
 packageDefinedFlags = M.keysSet . packageDefaultFlags
 
+-- | Type synonym representing dictionaries of package names for a project's
+-- packages and dependencies, and pairs of their relevant database (write-only
+-- or mutable) and package versions.
 type InstallMap = Map PackageName (InstallLocation, Version)
 
 -- | Files that the package depends on, relative to package directory.
@@ -285,16 +285,15 @@ instance Show PackageSource where
       , "<CommonPackage>"
       ]
 
-
 psVersion :: PackageSource -> Version
 psVersion (PSFilePath lp) = packageVersion $ lpPackage lp
 psVersion (PSRemote _ v _ _) = v
 
--- | Information on a locally available package of source code
+-- | Information on a locally available package of source code.
 data LocalPackage = LocalPackage
   { lpPackage       :: !Package
-     -- ^ The @Package@ info itself, after resolution with package flags,
-     -- with tests and benchmarks disabled
+     -- ^ The @Package@ info itself, after resolution with package flags, with
+     -- tests and benchmarks disabled
   , lpComponents    :: !(Set NamedComponent)
     -- ^ Components to build, not including the library component.
   , lpUnbuildable   :: !(Set NamedComponent)
@@ -304,11 +303,12 @@ data LocalPackage = LocalPackage
                              -- terminology, it's unclear
     -- ^ Whether this package is wanted as a target.
   , lpTestBench     :: !(Maybe Package)
-    -- ^ This stores the 'Package' with tests and benchmarks enabled, if
-    -- either is asked for by the user.
+    -- ^ This stores the 'Package' with tests and benchmarks enabled, if either
+    -- is asked for by the user.
   , lpCabalFile     :: !(Path Abs File)
     -- ^ The Cabal file
   , lpBuildHaddocks :: !Bool
+    -- ^ Is Haddock documentation being built for this package?
   , lpForceDirty    :: !Bool
   , lpDirtyFiles    :: !(MemoizedWith EnvConfig (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
@@ -367,10 +367,14 @@ lpFilesForComponents components lp = runMemoizedWith $ do
   componentFiles <- lpComponentFiles lp
   pure $ mconcat (M.elems (M.restrictKeys componentFiles components))
 
--- | A location to install a package into, either snapshot or local
+-- | Type representing user package databases that packages can be installed
+-- into.
 data InstallLocation
   = Snap
+    -- ^ The write-only package database, formerly known as the snapshot
+    -- database.
   | Local
+    -- ^ The mutable package database, formerly known as the local database.
   deriving (Eq, Show)
 
 instance Semigroup InstallLocation where
@@ -382,9 +386,43 @@ instance Monoid InstallLocation where
   mempty = Snap
   mappend = (<>)
 
+-- | Type representing user (non-global) package databases that can provide
+-- installed packages.
 data InstalledPackageLocation
-  = InstalledTo InstallLocation | ExtraGlobal
+  = InstalledTo InstallLocation
+    -- ^ A package database that a package can be installed into.
+  | ExtraPkgDb
+    -- ^ An \'extra\' package database, specified by @extra-package-dbs@.
   deriving (Eq, Show)
+
+-- | Type representing package databases that can provide installed packages.
+data PackageDatabase
+  = GlobalPkgDb
+    -- ^ GHC's global package database.
+  | UserPkgDb InstalledPackageLocation (Path Abs Dir)
+    -- ^ A user package database.
+  deriving (Eq, Show)
+
+-- | Type representing varieties of package databases that can provide
+-- installed packages.
+data PackageDbVariety
+  = GlobalDb
+    -- ^ GHC's global package database.
+  | ExtraDb
+    -- ^ An \'extra\' package database, specified by @extra-package-dbs@.
+  | WriteOnlyDb
+    -- ^ The write-only package database, for immutable packages.
+  | MutableDb
+    -- ^ The mutable package database.
+  deriving (Eq, Show)
+
+-- | A function to yield the variety of package database for a given
+-- package database that can provide installed packages.
+toPackageDbVariety :: PackageDatabase -> PackageDbVariety
+toPackageDbVariety GlobalPkgDb = GlobalDb
+toPackageDbVariety (UserPkgDb ExtraPkgDb _) = ExtraDb
+toPackageDbVariety (UserPkgDb (InstalledTo Snap) _) = WriteOnlyDb
+toPackageDbVariety (UserPkgDb (InstalledTo Local) _) = MutableDb
 
 newtype FileCacheInfo = FileCacheInfo
   { fciHash :: SHA256
@@ -437,11 +475,18 @@ dotCabalGetPath dcp =
     DotCabalFilePath fp -> fp
     DotCabalCFilePath fp -> fp
 
+-- | Type synonym representing dictionaries of package names, and a pair of in
+-- which package database the package is installed (write-only or mutable) and
+-- information about what is installed.
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
+-- | Type representing information about what is installed.
 data Installed
   = Library PackageIdentifier GhcPkgId (Maybe (Either SPDX.License License))
+    -- ^ A library, including its installed package id and, optionally, its
+    -- license.
   | Executable PackageIdentifier
+    -- ^ An executable.
   deriving (Eq, Show)
 
 installedPackageIdentifier :: Installed -> PackageIdentifier

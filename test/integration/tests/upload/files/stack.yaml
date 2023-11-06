@@ -1,6 +1,0 @@
-resolver: lts-20.23
-
-packages:
-- .
-
-hackage-base-url: http://localhost:12415/

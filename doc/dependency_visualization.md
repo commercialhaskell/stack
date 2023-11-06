@@ -1,1 +1,0 @@
-./dot_command.md

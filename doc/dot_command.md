@@ -15,7 +15,7 @@ graphs and the `dot` executable for drawing directed graphs. Graphviz is
 available to [download](https://www.graphviz.org/download/) for Linux, Windows,
 macOS and FreeBSD.
 
-`stack dot` produces output, to the standard output channel, in the DOT language
+`stack dot` produces output, to the standard output stream, in the DOT language
 to represent the relationships between your packages and their dependencies.
 
 By default:
@@ -27,7 +27,7 @@ By default:
 * there is no limit to the depth of the resolution of dependencies. Pass the
   `--depth <depth>` option to limit the depth;
 * all relevant packages are included in the output. Pass the
-  `--prude <packages>` option to exclude the specified packages, where
+  `--prune <packages>` option to exclude the specified packages, where
   `<packages>` is a list of package names separated by commas;
 * all packages in the project are included in the output. However, the target
   for the command can be specified as an argument. It uses the same format

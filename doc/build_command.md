@@ -12,11 +12,11 @@ stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
             [--[no-]library-stripping] [--[no-]executable-stripping]
             [--[no-]haddock] [--haddock-arguments HADDOCK_ARGS]
             [--[no-]open] [--[no-]haddock-deps] [--[no-]haddock-internal]
-            [--[no-]haddock-hyperlink-source] [--[no-]copy-bins]
-            [--[no-]copy-compiler-tool] [--[no-]prefetch] [--[no-]keep-going]
-            [--[no-]keep-tmp-files] [--[no-]force-dirty] [--[no-]test]
-            [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS] [--coverage]
-            [--no-run-tests] [--test-suite-timeout ARG]
+            [--[no-]haddock-hyperlink-source] [--[no-]haddock-for-hackage]
+            [--[no-]copy-bins] [--[no-]copy-compiler-tool] [--[no-]prefetch]
+            [--[no-]keep-going] [--[no-]keep-tmp-files] [--[no-]force-dirty]
+            [--[no-]test] [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS]
+            [--coverage] [--no-run-tests] [--test-suite-timeout ARG]
             [--[no-]tests-allow-stdin] [--[no-]bench]
             [--ba|--benchmark-arguments BENCH_ARGS] [--no-run-benchmarks]
             [--[no-]reconfigure] [--cabal-verbosity VERBOSITY |
@@ -198,7 +198,7 @@ The same Cabal flag name can be set (or unset) for multiple packages (at the
 command line only) with:
 
 ~~~text
-stack build --flag *:[-]<flag)name>
+stack build --flag *:[-]<flag_name>
 ~~~
 
 !!! note
@@ -225,8 +225,12 @@ sets this flag.
 
 ### `--haddock-arguments` option
 
-`stack haddock --haddock-arguments <haddock_arguments>` passes the specified
+`stack haddock --haddock-arguments <haddock_argument(s)>` passes the specified
 arguments to the Haddock tool.
+
+Specified arguments are separated by spaces. Arguments can be unquoted (if they
+do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
+include 'escaped' characters, escaped with an initial `\` character.
 
 ### `--[no-]haddock-deps` flag
 
@@ -234,17 +238,74 @@ Default: Enabled (if building Haddock documnentation)
 
 Unset the flag to disable building Haddock documentation for dependencies.
 
+### `--[no-]haddock-for-haddock` flag
+
+:octicons-beaker-24: Experimental
+
+:octicons-tag-24: UNRELEASED
+
+Default: Disabled
+
+Set the flag to build with flags to generate Haddock documentation suitable for
+upload to Hackage. This requires Haddock documentation for dependencies to have
+been built previously (command `stack haddock`).
+
+For each local package:
+
+* the generated Haddock documentation files are in directory
+  `doc\html\<package_version>-docs\`, relative to Stack's dist work directory
+  (see [`stack path --dist-dir`](path_command.md)); and
+* an archive of the `<package_version>-docs` directory and its contents is in
+  Stack's dist work directory.
+
+If the flag is set:
+
+* the [`--[no-]haddock-hyperlink-source`](#-no-haddock-hyperlink-source-flag)
+  flag is ignored and `--haddock-hyperlink-source` is implied;
+* the [`--[no-]haddock-deps`](#-no-haddock-deps-flag) flag is ignored and
+  `--no-haddock-deps` is implied;
+* the [`--[no-]haddock-internal`](#-no-haddock-hyperlink-internal-flag) flag is
+  ignored and `--no-haddock-internal` is implied;
+* the [`--[no-]open`](#-no-open-flag) flag is ignored and `--no-open` is
+  implied; and
+* the [`--[no-]force-dirty`](#-no-force-dirty-flag) flag is ignored and
+  `--force-dirty` is implied.
+
+!!! info
+
+    Stack does not distinguish the building of Haddock documentation for Hackage
+    from the building of Haddock documentation generally. If the former has
+    occurred, use the `--force-dirty` flag.
+
+!!! note
+
+    If set, Haddock will warn that `-source-*` options are ignored when
+    `--hyperlinked-source` is enabled. That is due to a known bug in Cabal
+    (the libiary).
+
+!!! note
+
+    If set, Cabal (the library) will report that documentation has been created
+    in `index.html` and `<package_name>.txt` files. Those files do not exist.
+    That false report is due to a known bug in Cabal (the library).
+
 ### `--[no-]haddock-hyperlink-source` flag
 
 Default: Enabled
 
 Unset the flag to disable building building hyperlinked source for Haddock.
 
+If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+this flag is ignored.
+
 ### `--[no-]haddock-internal` flag
 
 Default: Disabled
 
 Set the flag to enable building Haddock documentation for internal modules.
+
+If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+this flag is ignored.
 
 ### `--[no-]keep-going` flag
 
@@ -336,10 +397,33 @@ project packages or from local dependencies). See also the `--file-watch` flag.
 
 ## Controlling what happens after building
 
+### `--benchmark-arguments`, `--ba` option
+
+`stack build --bench --benchmark-arguments=<argument(s)>` will pass the
+specified argument, or arguments, to each benchmark when it is run.
+
+Specified arguments are separated by spaces. Arguments can be unquoted (if they
+do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
+include 'escaped' characters, escaped with an initial `\` character.
+
 ### `--exec` option
 
-`stack build --exec "<command> [<arguments>]"` will run the specified command
+`stack build --exec "<command> [<argument(s)>]"` will run the specified command
 after a successful build.
+
+Specified arguments are separated by spaces. Arguments can be unquoted (if they
+do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
+include 'escaped' characters, escaped with an initial `\` character.
+
+### `--test-arguments`, `--ta` option
+
+`stack build --test --test-arguments=<argument(s)>` will pass the specified
+argument, or arguments, to each test when it is run. This option can be
+specified multiple times.
+
+Specified arguments are separated by spaces. Arguments can be unquoted (if they
+do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
+include 'escaped' characters, escaped with an initial `\` character.
 
 ## Flags affecting GHC's behaviour
 
@@ -555,17 +639,20 @@ package is targetted in a multi-package project (for example, using
 `stack build <package_name>`).
 
 * **One target package:** The build output for the target package is sent to the
-  console as it happens.
+  standard error stream of the console as it happens.
 
 * **More than one target package:** The build output from GHC (as opposed to
   from Stack) for each target package is sent to a log file for that package,
-  unless an error occurs. At the end of the build, the location of the directory
-  containing the log files is reported. To also output the contents of the log
-  files to the console at the end of the build, use Stack's `dump-logs` option.
-  For further information about that option, see the
+  unless an error occurs that prevents that. If color in output is in use, there
+  will be two files, one with extension `.log` without color codes and one with
+  extension `.log-color` with color codes. At the end of the build, the location
+  of the directory containing the log files is reported. To also output the
+  contents of the log files to the standard error output stream of the console
+  at the end of the build, use Stack's `dump-logs` option. For further
+  information about that option, see the
   [YAML configuration](yaml_configuration.md#dump-logs) documentation. The
-  default `dump-logs` mode is to output the contents of the log files that are
-  warnings.
+  default `dump-logs` mode is to output the contents of any log files that
+  include GHC warnings.
 
 ### `--[no]-open` flag
 
@@ -584,7 +671,7 @@ This can be useful with `stack build --dry-run`.
 
 ### `--progress-bar` option
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.13.1](https://github.com/commercialhaskell/stack/releases/tag/v2.13.1)
 
 Default: `capped`
 
@@ -605,10 +692,10 @@ Default: Enabled
 Cabal defines a test suite interface
 ['exitcode-stdio-1.0'](https://hackage.haskell.org/package/Cabal-syntax-3.8.1.0/docs/Distribution-Types-TestSuiteInterface.html#v:TestSuiteExeV1.0)
 where the test suite takes the form of an executable and the executable takes
-nothing on the standard input channel (`stdin`). Pass this flag to override that
-specification and allow the executable to receive input on that channel. If you
+nothing on the standard input stream (`stdin`). Pass this flag to override that
+specification and allow the executable to receive input on that stream. If you
 pass `--no-tests-allow-stdin` and the executable seeks input on the standard
-input channel, an exception will be thown.
+input stream, an exception will be thown.
 
 ## Examples
 

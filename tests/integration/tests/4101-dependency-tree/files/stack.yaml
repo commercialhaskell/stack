@@ -1,0 +1,7 @@
+resolver: lts-21.16
+packages:
+- .
+- subproject
+extra-deps:
+- github: snoyberg/filelock
+  commit: 4f080496d8bf153fbe26e64d1f52cf73c7db25f6

@@ -1,9 +1,0 @@
-resolver: ghc-9.2.7
-
-packages: []
-
-extra-deps:
-- foo
-
-ghc-options:
-  $locals: -bob

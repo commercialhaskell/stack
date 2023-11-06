@@ -4,7 +4,6 @@
 -- | Extra Path utilities.
 module Path.Extra
   ( toFilePathNoTrailingSep
-  , dropRoot
   , parseCollapsedAbsDir
   , parseCollapsedAbsFile
   , concatAndCollapseAbsDir
@@ -21,10 +20,9 @@ module Path.Extra
 
 import           Data.Time ( UTCTime )
 import           Path
-                   ( Abs, Dir, File, PathException (..), Rel, parseAbsDir
+                   ( Abs, Dir, File, Path, PathException (..), parseAbsDir
                    , parseAbsFile, toFilePath
                    )
-import           Path.Internal ( Path (Path) )
 import           Path.IO
                    ( doesDirExist, doesFileExist, getCurrentDir
                    , getModificationTime
@@ -88,11 +86,6 @@ collapseFilePath = FP.joinPath . reverse . foldl' go [] . FP.splitDirectories
   go rs x = x:rs
   checkPathSeparator [x] = FP.isPathSeparator x
   checkPathSeparator _ = False
-
--- | Drop the root (either @\/@ on POSIX or @C:\\@, @D:\\@, etc. on
--- Windows).
-dropRoot :: Path Abs t -> Path Rel t
-dropRoot (Path l) = Path (FP.dropDrive l)
 
 -- | If given file in 'Maybe' does not exist, ensure we have 'Nothing'. This
 -- is to be used in conjunction with 'forgivingAbsence' and

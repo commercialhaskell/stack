@@ -13,7 +13,9 @@ Stack's YAML configuration options break down into
 configured at the project-level or globally.
 
 The **project-level** configuration file (`stack.yaml`) contains
-project-specific options and may contain non-project-specific options.
+project-specific options and may contain non-project-specific options. However,
+non-project-specific options in the project-level configuration file in the
+`global-project` directory (see below) are ignored by Stack.
 
 Stack obtains project-level configuration from one of the following (in order of
 preference):
@@ -96,10 +98,10 @@ installation, and various settings like build flags. It is called a resolver
 since a snapshot states how dependencies are resolved. There are currently
 four resolver types:
 
-* LTS Haskell snapshots, e.g. `resolver: lts-20.23`
-* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-05-05`
+* LTS Haskell snapshots, e.g. `resolver: lts-21.16`
+* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-09-24`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
-  like `resolver: ghc-9.6.1`
+  like `resolver: ghc-9.6.2`
 * Custom snapshot, via a URL or relative file path. For further information, see
   the [Pantry](pantry.md) documentation.
 
@@ -299,10 +301,27 @@ custom-preprocessor-extensions:
 
 TODO: Add a simple example of how to use custom preprocessors.
 
+### extra-package-dbs
+
+[:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
+
+Default: `[]`
+
+A list of relative or absolute paths to package databases. These databases will
+be added on top of GHC's global package database before the addition of other
+package databases.
+
+!!! warning
+
+    Use of this feature may result in builds that are not reproducible, as Stack
+    has no control over the contents of the extra package databases.
+
 ## Non-project-specific configuration
 
-Non-project configuration options are valid in a project-level configuration
-file (`stack.yaml`) or in global configuration files (`config.yaml`). The
+Non-project configuration options can be included in a project-level
+configuration file (`stack.yaml`) or in global configuration files
+(`config.yaml`). However, non-project-specific options in the project-level
+configuration file in the `global-project` directory are ignored by Stack. The
 options below are listed in alphabetic order.
 
 ### allow-different-user
@@ -430,38 +449,61 @@ build:
   # incorrectly formatted.  This could also affect scripts which use Stack.
   haddock: false
   haddock-arguments:
-    haddock-args: [] # Additional arguments passed to haddock, --haddock-arguments
+
+    # Additional arguments passed to haddock. The corresponding command line
+    # option is --haddock-arguments. Example of use:
+    #
     # haddock-args:
     # - "--css=/home/user/my-css"
-  open-haddocks: false # --open
-  haddock-deps: false # if unspecified, defaults to true if haddock is set
+    haddock-args: []
+
+  # The corresponding command line flag is --[no-]open.
+  open-haddocks: false
+
+  # If Stack is configured to build Haddock documentation, defaults to true.
+  haddock-deps: false
+
+  # If specified, implies haddock-internal: false and
+  # haddock-hyperlink-source: true. Since Stack UNRELEASED.
+  haddock-for-hackage: false
+
+  # The configuration is ignored, if haddock-for-hackage: true.
   haddock-internal: false
+
+  # The configuration is ignored, if haddock-for-hackage: true.
+  haddock-hyperlink-source: true
 
   # These are inadvisable to use in your global configuration, as they make the
   # Stack build command line behave quite differently.
   test: false
   test-arguments:
     rerun-tests: true   # Rerun successful tests
-    additional-args: [] # --test-arguments
+
+    # The corresponding command line option is --test-arguments. Example of use:
+    #
     # additional-args:
     # - "--fail-fast"
+    additional-args: []
     coverage: false
     no-run-tests: false
   bench: false
   benchmark-opts:
-    benchmark-arguments: ""
+
+    # Example of use:
+    #
     # benchmark-arguments: "--csv bench.csv"
+    benchmark-arguments: ""
     no-run-benchmarks: false
   force-dirty: false
   reconfigure: false
   cabal-verbose: false
   split-objs: false
 
-  # Since 1.8. Starting with 2.0, the default is true
+  # Since Stack 1.8. Starting with Stack 2.0, the default is true
   interleaved-output: true
-  # Since UNRELEASED. Available options are none, count-only, capped and full.
+  # Since Stack 2.13.1. Available options are none, count-only, capped and full.
   progress-bar: capped
-  # Since 1.10.
+  # Since Stack 1.10.
   ddump-dir: ""
 ~~~
 
@@ -476,7 +518,7 @@ of the same name. For further information, see the
 
 ### casa
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.13.1](https://github.com/commercialhaskell/stack/releases/tag/v2.13.1)
 
 Default:
 
@@ -528,12 +570,12 @@ Command line equivalent (takes precedence): `--compiler` option
 
 Overrides the compiler version in the resolver. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
-resolvers like `ghc-9.6.1`. This can be used to override the
+resolvers like `ghc-9.6.2`. This can be used to override the
 compiler for a Stackage snapshot, like this:
 
 ~~~yaml
-resolver: lts-20.23
-compiler: ghc-9.6.1
+resolver: lts-21.16
+compiler: ghc-9.6.2
 compiler-check: match-exact
 ~~~
 
@@ -787,21 +829,31 @@ Command line equivalent (takes precedence): `--[no-]dump-logs` flag
 
 In the case of *non-interleaved* output and *more than one* target package,
 Stack sends the build output from GHC for each target package to a log file,
-unless an error occurs. For further information, see the
-[`stack build --[no-]interleaved-output` flag](build_command.md#the-stack-build---no-interleaved-output-flag)
+unless an error occurs that prevents that. For further information, see the
+[`stack build --[no-]interleaved-output` flag](build_command.md#-no-interleaved-output-flag)
 documentation.
 
 The value of the `dump-logs` key controls what, if any, log file content is sent
-('dumped') to the console at the end of the build. Possible values are:
+('dumped') to the standard error stream of the console at the end of the build.
+Possible values are:
 
 ~~~yaml
-dump-logs: none      # don't dump the content of any log files
-dump-logs: warning   # dump the content of log files that are warnings
-dump-logs: all       # dump all of the content of log files
+dump-logs: none    # don't dump the content of any log files
+dump-logs: warning # dump the content of any log files that include GHC warnings
+dump-logs: all     # dump the content of all log files
 ~~~
 
 At the command line, `--no-dump-logs` is equivalent to `dump-logs: none` and
 `--dump-logs` is equivalent to `dump-logs: all`.
+
+If GHC reports an error during the build and a log file is created, that build
+output will be included in the log file. Stack will also report errors during
+building to the standard error stream. That stream can be piped to a file. For
+example, for a file named `stderr.log`:
+
+~~~text
+stack --no-dump-logs --color always build --no-interleaved-output 2> stderr.log
+~~~
 
 ### extra-include-dirs
 
@@ -1102,13 +1154,13 @@ Default:
 
 ~~~yaml
 nix:
-  add-gc-roots: false
-  enable: false
-  nix-shell-options: []
-  packages: []
-  path: []
+  enable: false # Except on NixOS, where `enable: true`
   pure: true
+  packages: []
   shell-file:
+  nix-shell-options: []
+  path: []
+  add-gc-roots: false
 ~~~
 
 Command line equivalents: `--nix-*` flags and options (see `stack --nix-help`
@@ -1116,6 +1168,33 @@ for details).
 
 For further information, see the
 [Nix integration](nix_integration.md#configuration) documentation.
+
+### notify-if-cabal-untested
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+If Stack has not been tested with the version of Cabal (the library) that has
+been found, should Stack notify the user of that?
+
+### notify-if-ghc-untested
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+If Stack has not been tested with the version of GHC that is being used, should
+Stack notify the user of that?
+
+### notify-if-nix-on-path
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+If Stack's integration with the Nix package manager is not enabled, should Stack
+notify the user if a `nix` executable is on the PATH?
 
 ### package-index
 
@@ -1229,13 +1308,14 @@ bounds.
 #### Basic use
 
 Values are `none` (unchanged), `upper` (add upper bounds), `lower` (add
-lower bounds), and both (and upper and lower bounds). The algorithm it follows
-is:
+lower bounds), and both (and upper and lower bounds). The algorithm Stack
+follows is:
 
-* If an upper or lower bound already exists on a dependency, it's left alone
-* When adding a lower bound, we look at the current version specified by
-  `stack.yaml`, and set it as the lower bound (e.g., `foo >= 1.2.3`)
-* When adding an upper bound, we require less than the next major version
+* If an upper or lower bound (other than `>= 0` - 'any version') already exists
+  on a dependency, it is left alone
+* When adding a lower bound, Stack looks at the current version specified by
+  `stack.yaml`, and sets it as the lower bound (e.g., `foo >= 1.2.3`)
+* When adding an upper bound, Stack sets it as less than the next major version
   (e.g., `foo < 1.3`)
 
 ~~~yaml
@@ -1263,12 +1343,10 @@ issues for Stackage maintenance.
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
+Default: `true`
+
 When Stack notices that a new version of Stack is available, should it notify
 the user?
-
-~~~yaml
-recommend-stack-upgrade: true
-~~~
 
 ### rebuild-ghc-options
 
@@ -1276,16 +1354,15 @@ recommend-stack-upgrade: true
 
 Default: `false`
 
-Should we rebuild a package when its GHC options change? Before Stack 0.1.6,
-this was a non-configurable `true`. However, in most cases, the flag is used to
-affect optimization levels and warning behavior, for which GHC itself doesn't
-actually recompile the modules anyway. Therefore, the new behavior is to not
-recompile on an options change, but this behavior can be changed back with the
-following:
+Should Stack rebuild a package when its GHC options change?
 
-~~~yaml
-rebuild-ghc-options: true
-~~~
+The default value reflects that, in most cases, GHC options are used to affect
+optimization levels and warning behavior, for which GHC does not recompile the
+modules.
+
+!!! note
+
+    Before Stack 0.1.6.0, Stack rebuilt a package when its GHC options changed.
 
 ### require-stack-version
 
@@ -1351,7 +1428,7 @@ setup-info:
 
 'Platforms' are pairs of an operating system and a machine architecture (for
 example, 32-bit i386 or 64-bit x86-64) (represented by the
-`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.11.1)
+`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.13.1)
 supports the following pairs in the format of the `setup-info` key:
 
 |Operating system|I386 arch|X86_64 arch|Other machine architectures                                 |

@@ -9,7 +9,11 @@
   - name:
     - NoImplicitPrelude
     - CPP
+    - OverloadedLists
     - OverloadedStrings
+    - QuasiQuotes
+    - RecordWildCards
+    - Safe
     - ScopedTypeVariables
     - TemplateHaskell
     - ViewPatterns

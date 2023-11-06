@@ -16,9 +16,8 @@ import           Control.Monad.State.Strict ( State, execState, get, modify )
 import           Data.ByteString.Builder ( byteString )
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
-import           Data.Foldable ( foldl )
 import qualified Data.List as L
-import qualified Data.List.NonEmpty as NE
+import           Data.List.Extra ( (!?) )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -29,6 +28,7 @@ import           Path ((</>), parent, parseRelFile )
 import           Path.Extra ( forgivingResolveFile', toFilePathNoTrailingSep )
 import           Path.IO
                    ( XdgDirectory (..), doesFileExist, ensureDir, getXdgDir )
+import           RIO.NonEmpty ( nonEmpty )
 import           RIO.Process
                    ( HasProcessContext, exec, proc, readProcess_
                    , withWorkingDir
@@ -91,9 +91,9 @@ import           System.Permissions ( setScriptPerms )
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Ghci" module.
 data GhciException
-  = InvalidPackageOption String
+  = InvalidPackageOption !String
   | LoadingDuplicateModules
-  | MissingFileTarget String
+  | MissingFileTarget !String
   | Can'tSpecifyFilesAndTargets
   | Can'tSpecifyFilesAndMainIs
   deriving (Show, Typeable)
@@ -121,8 +121,9 @@ instance Exception GhciException where
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Ghci" module.
-newtype GhciPrettyException
-  = GhciTargetParseException [StyleDoc]
+data GhciPrettyException
+  = GhciTargetParseException ![StyleDoc]
+  | CandidatesIndexOutOfRangeBug
   deriving (Show, Typeable)
 
 instance Pretty GhciPrettyException where
@@ -135,6 +136,8 @@ instance Pretty GhciPrettyException where
          , style Shell "--ghci-options"
          , "option."
          ]
+  pretty CandidatesIndexOutOfRangeBug = bugPrettyReport "[S-1939]" $
+    flow "figureOutMainFile: index out of range."
 
 instance Exception GhciPrettyException
 
@@ -384,11 +387,11 @@ findFileTargets locals fileTargets = do
         pure $ Right (fp, x)
   let (extraFiles, associatedFiles) = partitionEithers results
       targetMap =
-          foldl unionTargets M.empty $
+          foldl' unionTargets M.empty $
           map (\(_, (name, comp)) -> M.singleton name (TargetComps (S.singleton comp)))
               associatedFiles
       infoMap =
-          foldl (M.unionWith (<>)) M.empty $
+          foldl' (M.unionWith (<>)) M.empty $
           map (\(fp, (name, _)) -> M.singleton name [fp])
               associatedFiles
   pure (targetMap, infoMap, extraFiles)
@@ -459,7 +462,7 @@ buildDepsAndInitialSteps GhciOpts{..} localTargets = do
   let targets = localTargets ++ map T.pack ghciAdditionalPackages
   -- If necessary, do the build, for local packagee targets, only do
   -- 'initialBuildSteps'.
-  case NE.nonEmpty targets of
+  case nonEmpty targets of
     -- only new local targets could appear here
     Just nonEmptyTargets | not ghciNoBuild -> do
       eres <- buildLocalTargets nonEmptyTargets
@@ -775,7 +778,10 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
         putStrLn ""
         pure Nothing
       Just op -> do
-        let (_,_,fp) = candidates L.!! op
+        (_, _, fp) <- maybe
+              (prettyThrowIO CandidatesIndexOutOfRangeBug)
+              pure
+              (candidates !? op)
         putStrLn
           ("Loading main module from candidate " <>
           show (op + 1) <> ", --main-is " <>
@@ -785,7 +791,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
   renderComp c =
     case c of
       CLib -> "lib"
-      CInternalLib name -> "internal-lib:" <> fromString (T.unpack name)
+      CSubLib name -> "sub-lib:" <> fromString (T.unpack name)
       CExe name -> "exe:" <> fromString (T.unpack name)
       CTest name -> "test:" <> fromString ( T.unpack name)
       CBench name -> "bench:" <> fromString (T.unpack name)
@@ -933,9 +939,9 @@ wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
   (case packageLibraries pkg of
     NoLibraries -> []
-    HasLibraries names -> CLib : map CInternalLib (S.toList names)) ++
+    HasLibraries names -> CLib : map CSubLib (S.toList names)) ++
   map CExe (S.toList (packageExes pkg)) <>
-  map CInternalLib (S.toList $ packageInternalLibraries pkg) <>
+  map CSubLib (S.toList $ packageSubLibraries pkg) <>
   (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else []) <>
   (if boptsBenchmarks bopts then map CBench (S.toList (packageBenchmarks pkg)) else [])
 wantedPackageComponents _ _ _ = S.empty

@@ -14,7 +14,6 @@ module Stack.Build.Source
   , hashSourceMapData
   ) where
 
-import           Conduit ( ZipSink (..), withSourceFile )
 import           Data.ByteString.Builder ( toLazyByteString )
 import qualified Data.List as L
 import qualified Data.Map as Map
@@ -48,8 +47,9 @@ import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..)
                    , actualCompilerVersionL
                    )
+import           Stack.Types.FileDigestCache ( readFileDigest )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), isCInternalLib )
+                   ( NamedComponent (..), isCSubLib, splitComponents )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), LocalPackage (..), Package (..)
                    , PackageConfig (..), PackageLibraries (..)
@@ -273,18 +273,6 @@ generalGhcOptions bconfig boptsCli isTarget isLocal = concat
       AGOLocals -> isLocal
       AGOEverything -> True
 
-splitComponents :: [NamedComponent]
-                -> (Set Text, Set Text, Set Text)
-splitComponents =
-  go id id id
- where
-  go a b c [] = (Set.fromList $ a [], Set.fromList $ b [], Set.fromList $ c [])
-  go a b c (CLib:xs) = go a b c xs
-  go a b c (CInternalLib x:xs) = go (a . (x:)) b c xs
-  go a b c (CExe x:xs) = go (a . (x:)) b c xs
-  go a b c (CTest x:xs) = go a (b . (x:)) c xs
-  go a b c (CBench x:xs) = go a b (c . (x:)) xs
-
 loadCommonPackage ::
      forall env. (HasBuildConfig env, HasSourceMap env)
   => CommonPackage
@@ -318,7 +306,11 @@ loadLocalPackage pp = do
       mtarget = M.lookup name (smtTargets $ smTargets sm)
       (exeCandidates, testCandidates, benchCandidates) =
         case mtarget of
-          Just (TargetComps comps) -> splitComponents $ Set.toList comps
+          Just (TargetComps comps) ->
+            -- Currently, a named library component (a sub-library) cannot be
+            -- specified as a build target.
+            let (_s, e, t, b) = splitComponents $ Set.toList comps
+            in  (e, t, b)
           Just (TargetAll _packageType) ->
             ( packageExes pkg
             , if    boptsTests bopts
@@ -348,7 +340,7 @@ loadLocalPackage pp = do
                   HasLibraries _ -> True
           in     hasLibrary
               || not (Set.null nonLibComponents)
-              || not (Set.null $ packageInternalLibraries pkg)
+              || not (Set.null $ packageSubLibraries pkg)
 
       filterSkippedComponents =
         Set.filter (not . (`elem` boptsSkipComponents bopts))
@@ -436,26 +428,27 @@ loadLocalPackage pp = do
 
 -- | Compare the current filesystem state to the cached information, and
 -- determine (1) if the files are dirty, and (2) the new cache values.
-checkBuildCache :: forall m. (MonadIO m)
-                => Map FilePath FileCacheInfo -- ^ old cache
-                -> [Path Abs File] -- ^ files in package
-                -> m (Set FilePath, Map FilePath FileCacheInfo)
+checkBuildCache ::
+     HasEnvConfig env
+  => Map FilePath FileCacheInfo -- ^ old cache
+  -> [Path Abs File] -- ^ files in package
+  -> RIO env (Set FilePath, Map FilePath FileCacheInfo)
 checkBuildCache oldCache files = do
-  fileTimes <- fmap Map.fromList $ forM files $ \fp -> do
-    mdigest <- liftIO (getFileDigestMaybe (toFilePath fp))
+  fileDigests <- fmap Map.fromList $ forM files $ \fp -> do
+    mdigest <- getFileDigestMaybe (toFilePath fp)
     pure (toFilePath fp, mdigest)
   fmap (mconcat . Map.elems) $ sequence $
     Map.merge
       (Map.mapMissing (\fp mdigest -> go fp mdigest Nothing))
       (Map.mapMissing (\fp fci -> go fp Nothing (Just fci)))
       (Map.zipWithMatched (\fp mdigest fci -> go fp mdigest (Just fci)))
-      fileTimes
+      fileDigests
       oldCache
  where
   go :: FilePath
      -> Maybe SHA256
      -> Maybe FileCacheInfo
-     -> m (Set FilePath, Map FilePath FileCacheInfo)
+     -> RIO env (Set FilePath, Map FilePath FileCacheInfo)
   -- Filter out the cabal_macros file to avoid spurious recompilations
   go fp _ _ | takeFileName fp == "cabal_macros.h" = pure (Set.empty, Map.empty)
   -- Common case where it's in the cache and on the filesystem.
@@ -509,7 +502,7 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
   (components',compFiles,otherFiles,warnings) <-
     getPackageFiles (packageFiles pkg) cabalFP
   let necessaryComponents =
-        Set.insert CLib $ Set.filter isCInternalLib (M.keysSet components')
+        Set.insert CLib $ Set.filter isCSubLib (M.keysSet components')
       components = necessaryComponents `Set.union` nonLibComponents
       componentsFiles = M.map
         (\files ->
@@ -519,17 +512,12 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
   pure (componentsFiles, warnings)
 
 -- | Get file digest, if it exists
-getFileDigestMaybe :: MonadIO m => FilePath -> m (Maybe SHA256)
-getFileDigestMaybe fp =
-  liftIO $
-    catch
-      (fmap Just . withSourceFile fp $ getDigest)
-      (\e ->
-            if isDoesNotExistError e
-                then pure Nothing
-                else throwM e)
- where
-  getDigest src = runConduit $ src .| getZipSink (ZipSink SHA256.sinkHash)
+getFileDigestMaybe :: HasEnvConfig env => FilePath -> RIO env (Maybe SHA256)
+getFileDigestMaybe fp = do
+  cache <- view $ envConfigL.to envConfigFileDigestCache
+  catch
+    (Just <$> readFileDigest cache fp)
+    (\e -> if isDoesNotExistError e then pure Nothing else throwM e)
 
 -- | Get 'PackageConfig' for package given its name.
 getPackageConfig ::

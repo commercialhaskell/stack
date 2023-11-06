@@ -38,7 +38,8 @@ import           Stack.Prelude
 import           Stack.Types.Compiler ( ActualCompiler )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 
--- | Common settings for both dependency and project package.
+-- | Settings common to dependency packages ('Stack.Types.SourceMap.DepPackage')
+-- and project packages ('Stack.Types.SourceMap.ProjectPackage').
 data CommonPackage = CommonPackage
   { cpGPD :: !(IO GenericPackageDescription)
   , cpName :: !PackageName
@@ -48,6 +49,7 @@ data CommonPackage = CommonPackage
     -- also lets us know if we're doing profiling
   , cpCabalConfigOpts :: ![Text]
   , cpHaddocks :: !Bool
+    -- ^ Should Haddock documentation be built for this package?
   }
 
 -- | Flag showing if package comes from a snapshot needed to ignore dependency
@@ -72,7 +74,7 @@ data DepPackage = DepPackage
 -- | A view of a project package needed for resolving components
 data ProjectPackage = ProjectPackage
   { ppCommon :: !CommonPackage
-  , ppCabalFP    :: !(Path Abs File)
+  , ppCabalFP :: !(Path Abs File)
   , ppResolvedDir :: !(ResolvedPath Dir)
   }
 

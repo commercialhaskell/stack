@@ -1,10 +1,25 @@
-# Stack is built with GHC 9.2.7. GHC 9.2.7 for Linux/AArch64 says it was made on
+# This Dockerfile was previously used to build dynamically-linked Stack for
+# Linux/Aarch64. It was used with the following step in the GitHub Actions CI:
+#
+#   run: |
+#     set -ex
+#     docker build . -f etc/dockerfiles/arm64.Dockerfile -t stack --build-arg USERID=$(id -u) --build-arg GROUPID=$(id -g)
+#     rm -rf _release
+#     mkdir -p _release
+#     docker run --rm -v $(pwd):/src -w /src stack bash -c "/home/stack/release build"
+#
+# However, after Stack 2.11.1, it was replaced with a step that makes use of
+# https://gitlab.com/benz0li/ghc-musl.
+#
+# ------------------------------------------------------------------------------
+#
+# Stack is built with GHC 9.2.8. GHC 9.2.8 for Linux/AArch64 says it was made on
 # a Debian 10 system and requires GMP 6.1. Debian 10 is codename 'buster' and
 # includes libc6 (2.28-10+deb10u1).
 FROM debian:buster
 
 # pkg-config added to `apt-get install` list because it is required by package
-# digest-0.0.1.4.
+# digest-0.0.1.7.
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y \
     curl build-essential curl libffi-dev libffi6 libgmp-dev libgmp10 \
     libncurses-dev libncurses5 libtinfo5 libnuma-dev xz-utils g++ gcc \
@@ -22,7 +37,7 @@ RUN cd /tmp && \
 
 # Stack's *.tar archive contains a directory that contains the 'stack'
 # executable, hence the use of tar's '--strip-components 1' option.
-RUN curl -L https://github.com/commercialhaskell/stack/releases/download/v2.9.3/stack-2.9.3-linux-aarch64.tar.gz --output /tmp/stack.tar.gz && \
+RUN curl -L https://github.com/commercialhaskell/stack/releases/download/v2.11.1/stack-2.11.1-linux-aarch64.tar.gz --output /tmp/stack.tar.gz && \
     tar xfv /tmp/stack.tar.gz -C /usr/local/bin --strip-components 1 && \
     rm /tmp/stack.tar.gz
 
@@ -54,5 +69,5 @@ RUN stack build shake
 
 COPY etc/scripts/release.hs /src
 
-RUN stack script --resolver lts-20.23 --extra-dep Cabal-3.6.3.0 --compile /src/release.hs -- --version
+RUN stack script --resolver lts-20.26 --compile /src/release.hs -- --version
 RUN cp /src/release /home/stack

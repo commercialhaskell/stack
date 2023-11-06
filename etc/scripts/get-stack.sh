@@ -69,11 +69,14 @@ post_install_separator() {
   info ""
 }
 
-# determines the CPU's instruction set
+# determines the CPU's instruction set architecture (ISA)
 get_isa() {
   if uname -m | grep -Eq 'armv[78]l?' ; then
     echo arm
   elif uname -m | grep -q aarch64 ; then
+    echo aarch64
+  # uname -m returns arm64 on macOS/AArch64
+  elif uname -m | grep -q arm64 ; then
     echo aarch64
   elif uname -m | grep -q x86 ; then
     echo x86
@@ -226,7 +229,7 @@ do_debian_install() {
 # and install the necessary dependencies explicitly.
 do_fedora_install() {
   install_dependencies() {
-    dnf_install_pkgs perl make automake gcc gmp-devel libffi zlib-devel xz tar git gnupg
+    dnf_install_pkgs perl make automake gcc gcc-c++ gmp-devel libffi zlib-devel xz tar git gnupg
   }
 
   if is_x86_64 ; then
@@ -247,7 +250,7 @@ do_fedora_install() {
 # and install the necessary dependencies explicitly.
 do_centos_install() {
   install_dependencies() {
-    yum_install_pkgs perl make automake gcc gmp-devel libffi zlib xz tar git gnupg
+    yum_install_pkgs perl make automake gcc gcc-c++ gmp-devel libffi zlib xz tar git gnupg
   }
 
   if is_x86_64 ; then
@@ -289,16 +292,22 @@ do_windows_install() {
 }
 
 # Attempts to install on macOS.
-# If 'brew' exists, installs using Homebrew.  Otherwise, installs
-# the generic bindist.
 do_osx_install() {
-  info "Using generic bindist..."
-  info ""
-  install_64bit_osx_binary
-  info "NOTE: You may need to run 'xcode-select --install' and/or"
-  info "      'open /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg'"
-  info "      to set up the Xcode command-line tools, which Stack uses."
-  info ""
+  if is_x86_64 ; then
+    install_x86_64_osx_binary
+    info "NOTE: You may need to run 'xcode-select --install' and/or"
+    info "      'open /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg'"
+    info "      to set up the Xcode command-line tools, which Stack uses."
+    info ""
+  elif is_aarch64 ; then
+    install_aarch64_osx_binary
+    info "NOTE: You may need to run 'xcode-select --install' and/or"
+    info "      'open /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg'"
+    info "      to set up the Xcode command-line tools, which Stack uses."
+    info ""
+  else
+    die "Sorry, currently only 64-bit (x86_64 or aarch64) macOS binary is available."
+  fi
 }
 
 # # Attempts to install on FreeBSD.  Installs dependencies with
@@ -581,7 +590,11 @@ install_aarch64_linux_binary() {
   install_from_bindist "linux-aarch64.tar.gz"
 }
 
-install_64bit_osx_binary() {
+install_aarch64_osx_binary() {
+  install_from_bindist "osx-aarch64.tar.gz"
+}
+
+install_x86_64_osx_binary() {
   install_from_bindist "osx-x86_64.tar.gz"
 }
 

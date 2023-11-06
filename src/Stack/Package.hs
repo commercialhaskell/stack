@@ -65,13 +65,13 @@ import           Stack.ComponentFile
                    )
 import           Stack.Types.BuildConfig
                    ( HasBuildConfig (..), getProjectWorkDir )
-import           Stack.Types.Compiler ( ActualCompiler (..), getGhcVersion )
+import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), internalLibComponents )
+                   ( NamedComponent (..), subLibComponents )
 import           Stack.Types.Package
                    ( BuildInfoOpts (..), ExeName (..), GetPackageOpts (..)
                    , InstallMap, Installed (..), InstalledMap, Package (..)
@@ -132,7 +132,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
         case mlib of
           Nothing -> NoLibraries
           Just _ -> HasLibraries foreignLibNames
-  , packageInternalLibraries = subLibNames
+  , packageSubLibraries = subLibNames
   , packageTests = M.fromList
       [ (T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
       | t <- testSuites pkgNoMod
@@ -154,17 +154,17 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageOpts = GetPackageOpts $
       \installMap installedMap omitPkgs addPkgs cabalfp -> do
         (componentsModules,componentFiles, _, _) <- getPackageFiles pkgFiles cabalfp
-        let internals =
-              S.toList $ internalLibComponents $ M.keysSet componentsModules
-        excludedInternals <- mapM (parsePackageNameThrowing . T.unpack) internals
-        mungedInternals <- mapM
+        let subLibs =
+              S.toList $ subLibComponents $ M.keysSet componentsModules
+        excludedSubLibs <- mapM (parsePackageNameThrowing . T.unpack) subLibs
+        mungedSubLibs <- mapM
           (parsePackageNameThrowing . T.unpack . toInternalPackageMungedName)
-          internals
+          subLibs
         componentsOpts <- generatePkgDescOpts
           installMap
           installedMap
-          (excludedInternals ++ omitPkgs)
-          (mungedInternals ++ addPkgs)
+          (excludedSubLibs ++ omitPkgs)
+          (mungedSubLibs ++ addPkgs)
           cabalfp
           pkg
           componentFiles
@@ -209,7 +209,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   (unknownTools, knownTools) = packageDescTools pkg
 
   deps = M.filterWithKey (const . not . isMe) (M.unionsWith (<>)
-    [ asLibrary <$> packageDependencies packageConfig pkg
+    [ asLibrary <$> packageDependencies pkg
     -- We include all custom-setup deps - if present - in the package deps
     -- themselves. Stack always works with the invariant that there will be a
     -- single installed package relating to a package name, and this applies at
@@ -284,11 +284,11 @@ generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg compone
                 (pure . generate CLib . libBuildInfo)
                 (library pkg)
             , mapMaybe
-                (\sublib -> do
+                (\subLib -> do
                   let maybeLib =
-                        CInternalLib . T.pack . Cabal.unUnqualComponentName <$>
-                          (libraryNameString . libName) sublib
-                  flip generate  (libBuildInfo sublib) <$> maybeLib
+                        CSubLib . T.pack . Cabal.unUnqualComponentName <$>
+                          (libraryNameString . libName) subLib
+                  flip generate  (libBuildInfo subLib) <$> maybeLib
                  )
                 (subLibraries pkg)
             , fmap
@@ -461,44 +461,14 @@ makeObjectFilePathFromC cabalDir namedComponent distDir cFilePath = do
   pure (componentOutputDir namedComponent distDir </> relOFilePath)
 
 -- | Get all dependencies of the package (buildable targets only).
---
--- Note that for Cabal versions 1.22 and earlier, there is a bug where Cabal
--- requires dependencies for non-buildable components to be present. We're going
--- to use GHC version as a proxy for Cabal library version in this case for
--- simplicity, so we'll check for GHC being 7.10 or earlier. This obviously
--- makes our function a lot more fun to write...
 packageDependencies ::
-     PackageConfig
-  -> PackageDescription
+     PackageDescription
   -> Map PackageName VersionRange
-packageDependencies pkgConfig pkg' =
+packageDependencies pkg =
   M.fromListWith intersectVersionRanges $
-  map (depPkgName &&& depVerRange) $
-  concatMap targetBuildDepends (allBuildInfo' pkg) ++
-  maybe [] setupDepends (setupBuildInfo pkg)
- where
-  pkg
-    | getGhcVersion (packageConfigCompilerVersion pkgConfig) >= mkVersion [8, 0] = pkg'
-    -- Set all components to buildable. Only need to worry  library, exe, test,
-    -- and bench, since others didn't exist in older Cabal versions
-    | otherwise = pkg'
-      { library =
-          (\c -> c { libBuildInfo = go (libBuildInfo c) }) <$> library pkg'
-      , executables =
-          (\c -> c { buildInfo = go (buildInfo c) }) <$> executables pkg'
-      , testSuites =
-          if packageConfigEnableTests pkgConfig
-            then (\c -> c { testBuildInfo = go (testBuildInfo c) }) <$>
-                   testSuites pkg'
-            else testSuites pkg'
-      , benchmarks =
-          if packageConfigEnableBenchmarks pkgConfig
-            then (\c -> c { benchmarkBuildInfo = go (benchmarkBuildInfo c) }) <$>
-                   benchmarks pkg'
-            else benchmarks pkg'
-      }
-
-  go bi = bi { buildable = True }
+    map (depPkgName &&& depVerRange) $
+         concatMap targetBuildDepends (allBuildInfo' pkg)
+      <> maybe [] setupDepends (setupBuildInfo pkg)
 
 -- | Get all dependencies of the package (buildable targets only).
 --

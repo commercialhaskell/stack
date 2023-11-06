@@ -12,6 +12,7 @@ module Stack.Constants
   , haskellDefaultPreprocessorExts
   , stackProgName
   , stackProgName'
+  , nixProgName
   , stackDotYaml
   , stackWorkEnvVar
   , stackRootEnvVar
@@ -70,6 +71,7 @@ module Stack.Constants
   , relDirLoadedSnapshotCache
   , bindirSuffix
   , docDirSuffix
+  , htmlDirSuffix
   , relDirHpc
   , relDirLib
   , relDirShare
@@ -106,6 +108,7 @@ module Stack.Constants
   , relDirDotStackProgName
   , relDirUnderHome
   , relDirSrc
+  , relFileLibcMuslx86_64So1
   , relFileLibtinfoSo5
   , relFileLibtinfoSo6
   , relFileLibncurseswSo6
@@ -131,10 +134,12 @@ module Stack.Constants
   , relFileHadrianStackDotYaml
   , hadrianScriptsWindows
   , hadrianScriptsPosix
+  , libDirs
   , usrLibDirs
   , testGhcEnvRelFile
   , relFileBuildLock
   , stackDeveloperModeDefault
+  , isStackUploadDisabled
   , globalFooter
   , gitHubBasicAuthType
   , gitHubTokenEnvVar
@@ -151,7 +156,7 @@ import           Hpack.Config ( packageConfig )
 import qualified Language.Haskell.TH.Syntax as TH ( runIO, lift )
 import           Path ( (</>), mkRelDir, mkRelFile, parseAbsFile )
 import           Stack.Constants.StackProgName ( stackProgName )
-import           Stack.Constants.UsrLibDirs ( usrLibDirs )
+import           Stack.Constants.UsrLibDirs ( libDirs, usrLibDirs )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           System.Permissions ( osIsMacOS, osIsWindows )
@@ -170,6 +175,10 @@ instance Exception ConstantsException where
 -- | Name of the Stack program.
 stackProgName' :: Text
 stackProgName' = T.pack stackProgName
+
+-- | Name of the Nix package manager command
+nixProgName :: String
+nixProgName = "nix"
 
 -- | Extensions used for Haskell modules. Excludes preprocessor ones.
 haskellFileExts :: [Text]
@@ -242,7 +251,7 @@ wiredInPackages = case mparsed of
     [ "ghc-prim"
       -- A magic package
     , "integer-gmp"
-      -- No longer magic > 1.0.3.0. With GHC 9.2.7 at least, there seems to be
+      -- No longer magic > 1.0.3.0. With GHC 9.4.7 at least, there seems to be
       -- no problem in using it.
     , "integer-simple"
       -- A magic package
@@ -254,16 +263,16 @@ wiredInPackages = case mparsed of
       -- A magic package
     , "dph-seq"
       -- Deprecated in favour of dph-prim-seq, which does not appear to be
-      -- magic. With GHC 9.2.7 at least, there seems to be no problem in using
+      -- magic. With GHC 9.4.7 at least, there seems to be no problem in using
       -- it.
     , "dph-par"
       --  Deprecated in favour of dph-prim-par, which does not appear to be
-      -- magic. With GHC 9.2.7 at least, there seems to be no problem in using
+      -- magic. With GHC 9.4.7 at least, there seems to be no problem in using
       -- it.
     , "ghc"
       -- A magic package
     , "interactive"
-      -- Could not identify information about this package name. With GHC 9.2.7
+      -- Could not identify information about this package name. With GHC 9.4.7
       -- at least, there seems to be no problem in using it.
     , "ghc-bignum"
       -- A magic package
@@ -445,6 +454,10 @@ bindirSuffix = relDirBin
 docDirSuffix :: Path Rel Dir
 docDirSuffix = $(mkRelDir "doc")
 
+-- | Suffix applied to a path to get the @html@ directory.
+htmlDirSuffix :: Path Rel Dir
+htmlDirSuffix = $(mkRelDir "html")
+
 relDirHpc :: Path Rel Dir
 relDirHpc = $(mkRelDir "hpc")
 
@@ -555,6 +568,9 @@ relDirUnderHome = $(mkRelDir "_home")
 relDirSrc :: Path Rel Dir
 relDirSrc = $(mkRelDir "src")
 
+relFileLibcMuslx86_64So1 :: Path Rel File
+relFileLibcMuslx86_64So1 = $(mkRelFile "libc.musl-x86_64.so.1")
+
 relFileLibtinfoSo5 :: Path Rel File
 relFileLibtinfoSo5 = $(mkRelFile "libtinfo.so.5")
 
@@ -660,6 +676,10 @@ relFileBuildLock = $(mkRelFile "build-lock")
 -- | What should the default be for stack-developer-mode
 stackDeveloperModeDefault :: Bool
 stackDeveloperModeDefault = STACK_DEVELOPER_MODE_DEFAULT
+
+-- | What should the default be for stack-developer-mode
+isStackUploadDisabled :: Bool
+isStackUploadDisabled = STACK_DISABLE_STACK_UPLOAD
 
 -- | The footer to the help for Stack's subcommands
 globalFooter :: String

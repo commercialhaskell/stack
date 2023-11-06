@@ -3,20 +3,82 @@
 # The `stack upload` command
 
 ~~~text
-stack upload [DIR] [--pvp-bounds PVP-BOUNDS] [--ignore-check]
-             [--[no-]test-tarball] [--tar-dir ARG] [--candidate]
+stack upload [ITEM] [-d|--documentation] [--pvp-bounds PVP-BOUNDS]
+             [--ignore-check] [--[no-]test-tarball] [--tar-dir ARG]
+             [--candidate] [--setup-info-yaml URL]
+             [--snapshot-location-base URL]
 ~~~
 
-Hackage accepts packages for uploading in a standard form, a compressed archive
-('tarball') in the format produced by Cabal's `sdist` action.
+By default:
 
-`stack upload` generates a file for your package, in the format accepted by
-Hackage for uploads, and uploads the package to Hackage. For example, if the
-current working directory is the root directory of your project:
+* the command uploads one or more packages. Pass the flag `--documentation`
+  (`-d` for short) to upload documentation for one or more packages; and
+
+* the upload is a package to be published or documentation for a published
+  package. Pass the flag `--candidate` to upload a
+  [package candidate](http://hackage.haskell.org/upload#candidates) or
+  documentation for a package candidate.
+
+At least one `ITEM` must be specified. For example, if the current working
+directory is a package directory:
 
 ~~~text
 stack upload .
 ~~~
+
+## Upload one or more packages
+
+Hackage accepts packages for uploading in a standard form, a compressed archive
+('tarball') in the format produced by Cabal's `sdist` action.
+
+If `ITEM` is a relative path to an sdist tarball, `stack upload` uploads the
+package to Hackage.
+
+If `ITEM` is a relative path to a package directory, `stack upload` generates a
+file for your package, in the format accepted by Hackage for uploads, and
+uploads the package to Hackage.
+
+By default:
+
+* the command will check each package for common mistakes. Pass the flag
+  `--ignore-check` to disable such checks;
+
+* Stack will not test the resulting package archive. Pass the flag
+  `--test-tarball` to cause Stack to test each resulting package archive, by
+  attempting to build it.
+
+The `--pvp-bounds <pvp_bounds_mode>` option determines whether and, if so, how
+PVP version bounds should be added to the Cabal file of the package. The
+available modes for basic use are: `none`, `lower`, `upper`, and `both`. The
+available modes for use with Cabal file revisions are `lower-revision`,
+`upper-revision` and `both-revision`.
+
+For futher information, see the
+[YAML configuration](yaml_configuration.md#pvp-bounds) documentation.
+
+The `--tar-dir <path_to_directory>` option determines whether the package
+archive should be copied to the specified directory.
+
+## Upload documentation for a package
+
+:octicons-beaker-24: Experimental
+
+:octicons-tag-24: UNRELEASED
+
+Hackage accepts documentation for a package for uploading in a standard form and
+in a compressed archive ('tarball') in the `.tar.gz` format.
+
+For further information about how to create such an archive file, see the
+documentation for the
+[`stack haddock --haddock-for-hackage`](build_command.md#-no-haddock-for-haddock-flag)
+command.
+
+If `ITEM` is a relative path to a package directory,
+`stack upload <package_directory> --documentation` uploads an existing archive
+file of documentation for the specified package to Hackage.
+
+If the `--documentation` flag is passed then flags specific to package upload
+are ignored.
 
 ## The `HACKAGE_USERNAME` and `HACKAGE_PASSWORD` environment variables
 
@@ -67,36 +129,3 @@ example:
      $Env:HACKAGE_KEY=<api_authentification_token>
      stack upload .
      ~~~
-
-## `--candidate` flag
-
-Pass the flag to upload a
-[package candidate](http://hackage.haskell.org/upload#candidates).
-
-## `--ignore-check` flag
-
-Pass the flag to disable checks of the package for common mistakes. By default,
-the command will check the package for common mistakes.
-
-## `--pvp-bounds` option
-
-The `--pvp-bounds <pvp_bounds_mode>` option determines whether and, if so, how
-PVP version bounds should be added to the Cabal file of the package. The
-available modes for basic use are: `none`, `lower`, `upper`, and `both`. The
-available modes for use with Cabal file revisions are `lower-revision`,
-`upper-revision` and `both-revision`.
-
-For futher information, see the
-[YAML configuration](yaml_configuration.md#pvp-bounds) documentation.
-
-## `--tar-dir` option
-
-The `--tar-dir <path_to_directory>` option determines whether the package
-archive should be copied to the specified directory.
-
-## `--[no-]test-tarball` flag
-
-Default: Disabled
-
-Set the flag to cause Stack to test the resulting package archive, by attempting
-to build it.

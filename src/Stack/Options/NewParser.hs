@@ -6,7 +6,8 @@ module Stack.Options.NewParser
 
 import qualified Data.Map.Strict as M
 import           Options.Applicative
-                   ( Parser, help, long, metavar, short, switch )
+                   ( Parser, help, idm, long, metavar, short, switch )
+import           Options.Applicative.Builder.Extra ( boolFlags )
 import           Stack.Init ( InitOpts )
 import           Stack.New ( NewOpts (..) )
 import           Stack.Options.InitParser ( initOptsParser )
@@ -28,6 +29,10 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
           (  long "bare"
           <> help "Do not create a subdirectory for the project."
           )
+    <*> boolFlags True
+          "init"
+          "the initialisation of the project for use with Stack."
+          idm
     <*> optional (templateNameArgument
           (  metavar "TEMPLATE_NAME"
           <> help "Name of a template - can take the form\

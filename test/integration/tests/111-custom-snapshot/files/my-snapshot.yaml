@@ -1,4 +1,0 @@
-compiler: ghc-9.2.7
-name: my-snapshot
-packages:
-- mtl-2.2.1

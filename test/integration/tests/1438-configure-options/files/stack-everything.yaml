@@ -1,8 +1,0 @@
-resolver: ghc-9.2.7
-
-extra-deps:
-- acme-dont-1.1@rev:0
-
-configure-options:
-  $everything:
-  - this is an invalid option

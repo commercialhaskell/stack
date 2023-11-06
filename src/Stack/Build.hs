@@ -16,13 +16,14 @@ module Stack.Build
 import           Data.Attoparsec.Args ( EscapingMode (Escaping), parseArgs )
 import           Data.List ( (\\) )
 import           Data.List.Extra ( groupSort )
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Distribution.PackageDescription as C
 import           Distribution.Types.Dependency ( Dependency (..), depLibraries )
 import           Distribution.Version ( mkVersion )
+import           RIO.NonEmpty ( nonEmpty )
+import qualified RIO.NonEmpty as NE
 import           Stack.Build.ConstructPlan ( constructPlan )
 import           Stack.Build.Execute ( executePlan, preFetch, printPlan )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
@@ -34,7 +35,9 @@ import           Stack.Prelude hiding ( loadPackage )
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Setup ( withNewLocalBuildTargets )
 import           Stack.Types.Build
-                   ( Plan (..), Task (..), TaskType (..), taskLocation )
+                   ( Plan (..), Task (..), TaskType (..), taskLocation
+                   , taskProvides
+                   )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig ( HasBuildConfig, stackYamlL )
@@ -77,13 +80,13 @@ instance Pretty CabalVersionPrettyException where
     "[S-5973]"
     <> line
     <> fillSep
-         [ flow "Stack does not support Cabal versions before 1.22, but \
+         [ flow "Stack does not support Cabal versions before 1.24, but \
                 \version"
          , fromString $ versionString cabalVer
          , flow "was found. To fix this, consider updating the snapshot to"
-         , style Shell "lts-3.0"
+         , style Shell "lts-7.0"
          , flow "or later or to"
-         , style Shell "nightly-2015-05-05"
+         , style Shell "nightly-2016-05-26"
          , flow "or later."
          ]
 
@@ -162,7 +165,13 @@ build msetLocalFiles = do
         getInstalled installMap
 
     baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- constructPlan baseConfigOpts localDumpPkgs loadPackage sourceMap installedMap (boptsCLIInitialBuildSteps boptsCli)
+    plan <- constructPlan
+              baseConfigOpts
+              localDumpPkgs
+              loadPackage
+              sourceMap
+              installedMap
+              (boptsCLIInitialBuildSteps boptsCli)
 
     allowLocals <- view $ configL.to configAllowLocals
     unless allowLocals $ case justLocals plan of
@@ -206,7 +215,7 @@ justLocals =
 checkCabalVersion :: HasEnvConfig env => RIO env ()
 checkCabalVersion = do
   cabalVer <- view cabalVersionL
-  when (cabalVer < mkVersion [1, 22]) $
+  when (cabalVer < mkVersion [1, 24]) $
     prettyThrowM $ CabalVersionNotSupported cabalVer
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
@@ -258,14 +267,14 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   warnings :: Map Text ([PackageName],[PackageName])
   warnings =
     Map.mapMaybe
-      (\(pkgsToBuild,localPkgs) ->
-        case (pkgsToBuild,NE.toList localPkgs \\ NE.toList pkgsToBuild) of
-          (_ :| [],[]) ->
+      (\(pkgsToBuild, localPkgs) ->
+        case (pkgsToBuild, NE.toList localPkgs \\ NE.toList pkgsToBuild) of
+          (_ :| [], []) ->
             -- We want to build the executable of single local package
             -- and there are no other local packages with an executable of
             -- the same name. Nothing to warn about, ignore.
             Nothing
-          (_,otherLocals) ->
+          (_, otherLocals) ->
             -- We could be here for two reasons (or their combination):
             -- 1) We are building two or more executables with the same
             --    name that will end up overwriting each other.
@@ -273,25 +282,25 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
             --    there are other local packages with an executable of the
             --    same name that might get overwritten.
             -- Both cases warrant a warning.
-            Just (NE.toList pkgsToBuild,otherLocals))
+            Just (NE.toList pkgsToBuild, otherLocals))
       (Map.intersectionWith (,) exesToBuild localExes)
   exesToBuild :: Map Text (NonEmpty PackageName)
   exesToBuild =
     collect
-      [ (exe,pkgName')
-      | (pkgName',task) <- Map.toList (planTasks plan)
+      [ (exe, pkgName')
+      | (pkgName', task) <- Map.toList (planTasks plan)
       , TTLocalMutable lp <- [taskType task]
       , exe <- (Set.toList . exeComponents . lpComponents) lp
       ]
   localExes :: Map Text (NonEmpty PackageName)
   localExes =
     collect
-      [ (exe,packageName pkg)
+      [ (exe, packageName pkg)
       | pkg <- map lpPackage locals
       , exe <- Set.toList (packageExes pkg)
       ]
-  collect :: Ord k => [(k,v)] -> Map k (NonEmpty v)
-  collect = Map.map NE.fromList . Map.fromDistinctAscList . groupSort
+  collect :: Ord k => [(k, v)] -> Map k (NonEmpty v)
+  collect = Map.mapMaybe nonEmpty . Map.fromDistinctAscList . groupSort
 
 warnAboutSplitObjs :: HasTerm env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts | boptsSplitObjs bopts =
@@ -363,8 +372,8 @@ checkComponentsBuildable lps =
     , c <- Set.toList (lpUnbuildable lp)
     ]
 
--- | Find if any sublibrary dependency (other than internal libraries) exists in
--- each project package.
+-- | Find if any sub-library dependency (other than internal libraries) exists
+-- in each project package.
 checkSubLibraryDependencies :: HasTerm env => [ProjectPackage] -> RIO env ()
 checkSubLibraryDependencies projectPackages =
   forM_ projectPackages $ \projectPackage -> do

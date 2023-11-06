@@ -24,8 +24,8 @@ stack ide packages [--stdout] [--cabal-files]
 
 By default:
 
-* its output is sent to the standard error channel. Pass the flag `--stdout` to
-  change to the standard output channel; and
+* its output is sent to the standard error stream. Pass the flag `--stdout` to
+  change to the standard output stream; and
 * the output is the package name (without its version). Pass the flag
   `--cabal-files` to change to the full path to the package's Cabal file.
 
@@ -39,8 +39,8 @@ stack ide targets [--exes] [--tests] [--benchmarks] [--stdout]
 or more of the flags `--exes`, `--tests` and `--benchmarks` to list only targets
 of those component types.
 
-By default, its output is sent to the standard error channel. Pass the flag
-`--stdout` to change to the standard output channel.
+By default, its output is sent to the standard error stream. Pass the flag
+`--stdout` to change to the standard output stream.
 
 For example, for the Stack project itself, command:
 
@@ -55,7 +55,7 @@ and the output from the second command is:
 stack:lib
 stack:exe:stack
 stack:exe:stack-integration-test
-stack:test:stack-test
+stack:test:stack-unit-test
 ~~~
 
 or command:

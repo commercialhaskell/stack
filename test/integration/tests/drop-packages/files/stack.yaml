@@ -1,3 +1,0 @@
-resolver: lts-20.23
-drop-packages:
-- unliftio-core

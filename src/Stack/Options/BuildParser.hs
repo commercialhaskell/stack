@@ -158,7 +158,7 @@ progsOptionsParser =
     , "alex"
     , "c2hs"
     , "cpphs"
---  , "doctest -- Not present in Cabal-1.22.5.0.
+    , "doctest"
     , "greencard"
     , "happy"
     , "hsc2hs"

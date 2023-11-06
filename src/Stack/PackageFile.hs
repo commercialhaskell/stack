@@ -77,7 +77,7 @@ packageDescModulesAndFiles pkg = do
     fmap
       foldTuples
       ( mapM
-          (asModuleAndFileMap internalLibComponent libraryFiles)
+          (asModuleAndFileMap subLibComponent libraryFiles)
           (subLibraries pkg)
       )
   (executableMods, exeDotCabalFiles, exeWarnings) <-
@@ -112,8 +112,8 @@ packageDescModulesAndFiles pkg = do
   pure (modules, files, dfiles, warnings)
  where
   libComponent = const CLib
-  internalLibComponent =
-    CInternalLib . T.pack . maybe
+  subLibComponent =
+    CSubLib . T.pack . maybe
       "" Cabal.unUnqualComponentName . libraryNameString . libName
   exeComponent = CExe . T.pack . Cabal.unUnqualComponentName . exeName
   testComponent = CTest . T.pack . Cabal.unUnqualComponentName . testName

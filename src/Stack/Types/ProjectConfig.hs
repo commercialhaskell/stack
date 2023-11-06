@@ -2,6 +2,7 @@
 
 module Stack.Types.ProjectConfig
   ( ProjectConfig (..)
+  , isPCGlobalProject
   ) where
 
 import           Stack.Prelude
@@ -17,3 +18,9 @@ data ProjectConfig a
     -- the implicit global.
   | PCNoProject ![PackageIdentifierRevision]
     -- ^ Use a no project run. This comes from 'SYLNoProject'.
+
+-- | Yields 'True' only if the project configuration information is for the
+-- implicit global project.
+isPCGlobalProject :: ProjectConfig a -> Bool
+isPCGlobalProject PCGlobalProject = True
+isPCGlobalProject _ = False

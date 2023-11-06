@@ -401,7 +401,7 @@ configFromConfigMonoid
         Nothing -> liftIO getNumProcessors
         Just i -> pure i
     let configConcurrentTests = fromFirst True configMonoidConcurrentTests
-    let configTemplateParams = configMonoidTemplateParameters
+        configTemplateParams = configMonoidTemplateParameters
         configScmInit = getFirst configMonoidScmInit
         configCabalConfigOpts = coerce configMonoidCabalConfigOpts
         configGhcOptionsByName = coerce configMonoidGhcOptionsByName
@@ -423,6 +423,9 @@ configFromConfigMonoid
           fromFirst "https://hackage.haskell.org/" configMonoidHackageBaseUrl
         configHideSourcePaths = fromFirstTrue configMonoidHideSourcePaths
         configRecommendUpgrade = fromFirstTrue configMonoidRecommendUpgrade
+        configNotifyIfNixOnPath = fromFirstTrue configMonoidNotifyIfNixOnPath
+        configNotifyIfGhcUntested = fromFirstTrue configMonoidNotifyIfGhcUntested
+        configNotifyIfCabalUntested = fromFirstTrue configMonoidNotifyIfCabalUntested
         configNoRunCompile = fromFirstFalse configMonoidNoRunCompile
     configAllowDifferentUser <-
       case getFirst configMonoidAllowDifferentUser of
@@ -567,8 +570,7 @@ getDefaultLocalProgramsBase configStackRoot configPlatform override =
           Nothing ->
             throwM $ ParseAbsolutePathException "LOCALAPPDATA" t
           Just lad ->
-            pure $ lad </> relDirUpperPrograms </>
-                   relDirStackProgName
+            pure $ lad </> relDirUpperPrograms </> relDirStackProgName
         Nothing -> pure defaultBase
     _ -> pure defaultBase
  where
@@ -984,7 +986,8 @@ getExtraConfigs userConfigPath = do
 -- 'ParseConfigFileException' when there's a decoding error.
 loadConfigYaml ::
      HasLogFunc env
-  => (Value -> Yaml.Parser (WithJSONWarnings a)) -> Path Abs File -> RIO env a
+  => (Value -> Yaml.Parser (WithJSONWarnings a))
+  -> Path Abs File -> RIO env a
 loadConfigYaml parser path = do
   eres <- loadYaml parser path
   case eres of

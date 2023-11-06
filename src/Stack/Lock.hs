@@ -14,10 +14,10 @@ import           Data.Aeson.WarningParser
                    , jsonSubWarningsT, logJSONWarnings, withObjectWarnings
                    )
 import           Data.ByteString.Builder ( byteString )
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
+import qualified RIO.NonEmpty as NE
 import           Path ( parent )
 import           Path.Extended ( addExtension )
 import           Path.IO ( doesFileExist )

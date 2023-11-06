@@ -52,6 +52,7 @@ import           Stack.Types.CompilerBuild ( compilerBuildSuffix )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( HasConfig (..), stackRootL )
+import           Stack.Types.FileDigestCache ( FileDigestCache )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..), ghcVariantSuffix )
 import           Stack.Types.Platform
                    ( HasPlatform (..), platformVariantSuffix )
@@ -63,6 +64,7 @@ import           Stack.Types.SourceMap
 data EnvConfig = EnvConfig
   { envConfigBuildConfig :: !BuildConfig
   , envConfigBuildOptsCLI :: !BuildOptsCLI
+  , envConfigFileDigestCache :: !FileDigestCache
   , envConfigSourceMap :: !SourceMap
   , envConfigSourceMapHash :: !SourceMapHash
   , envConfigCompilerPaths :: !CompilerPaths

@@ -3,11 +3,11 @@
 
 -- | Types and functions related to Stack's @new@ command.
 module Stack.New
-    ( NewOpts (..)
-    , TemplateName
-    , newCmd
-    , new
-    ) where
+  ( NewOpts (..)
+  , TemplateName
+  , newCmd
+  , new
+  ) where
 
 import           Control.Monad.Trans.Writer.Strict ( execWriterT )
 import           Data.Aeson as A
@@ -215,13 +215,15 @@ instance Exception NewPrettyException
 -- than those applicable also to the @stack init@ command).
 data NewOpts = NewOpts
   { newOptsProjectName  :: PackageName
-  -- ^ Name of the project to create.
+    -- ^ Name of the project to create.
   , newOptsCreateBare   :: Bool
-  -- ^ Whether to create the project without a directory.
+    -- ^ Whether to create the project without a directory.
+  , newOptsInit         :: Bool
+    -- ^ Whether to initialise the project for use with Stack.
   , newOptsTemplate     :: Maybe TemplateName
-  -- ^ Name of the template to use.
+    -- ^ Name of the template to use.
   , newOptsNonceParams  :: Map Text Text
-  -- ^ Nonce parameters specified just for this invocation.
+    -- ^ Nonce parameters specified just for this invocation.
   }
 
 -- | Function underlying the @stack new@ command. Create a project directory
@@ -231,7 +233,7 @@ newCmd (newOpts, initOpts) =
   withGlobalProject $ withConfig YesReexec $ do
     dir <- new newOpts (forceOverwrite initOpts)
     exists <- doesFileExist $ dir </> stackDotYaml
-    when (forceOverwrite initOpts || not exists) $ do
+    when (newOptsInit newOpts && (forceOverwrite initOpts || not exists)) $ do
       go <- view globalOptsL
       initProject dir initOpts (globalResolver go)
 
@@ -518,7 +520,7 @@ applyTemplate project template nonceParams dir templateText = do
       template
       (flow "the template does not contain any files.")
 
-  let isPkgSpec f = ".cabal" `L.isSuffixOf` f || f == "package.yaml"
+  let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
   unless (any isPkgSpec . M.keys $ files) $
     prettyThrowM $ TemplateInvalid
       template

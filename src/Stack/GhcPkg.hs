@@ -8,6 +8,7 @@ module Stack.GhcPkg
   ( createDatabase
   , findGhcPkgField
   , getGlobalDB
+  , ghcPkg
   , ghcPkgPathEnvVar
   , mkGhcPackagePath
   , unregisterGhcPkgIds
@@ -18,6 +19,7 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.List as L
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import           GHC.Utils.GhcPkg.Main.Compat ( ghcPkgUnregisterForce )
 import           Path ( (</>), parent )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
@@ -26,7 +28,10 @@ import           RIO.Process ( HasProcessContext, proc, readProcess_ )
 import           Stack.Constants ( relFilePackageCache )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( WhichCompiler (..) )
-import           Stack.Types.CompilerPaths ( GhcPkgExe (..) )
+import           Stack.Types.CompilerPaths
+                   ( CompilerPaths (..), GhcPkgExe (..), HasCompiler
+                   , compilerPathsL
+                   )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           System.FilePath ( searchPathSeparator )
 
@@ -137,22 +142,53 @@ findGhcPkgField pkgexe pkgDbs name field = do
 -- | unregister list of package ghcids, batching available from GHC 8.2.1,
 -- see https://github.com/commercialhaskell/stack/issues/2662#issuecomment-460342402
 -- using GHC package id where available (from GHC 7.9)
+--
+-- The version of the ghc-pkg executable supplied with GHCs published before
+-- 28 August 2023 does not efficiently bulk unregister. Until an 'efficient'
+-- ghc-pkg is available, this function no longer uses:
+--
+-- >   eres <- ghcPkg pkgexe [pkgDb] args
+-- > where
+-- >    args = "unregister" : "--user" : "--force" :
+-- >      map packageIdentifierString idents ++
+-- >      if null gids then [] else "--ipid" : map ghcPkgIdString gids
+--
+-- but uses:
+--
+-- >   globalDb <- view $ compilerPathsL.to cpGlobalDB
+-- >   eres <- tryAny $ liftIO $
+-- >     ghcPkgUnregisterUserForce globalDb pkgDb hasIpid pkgarg_strs
+--
 unregisterGhcPkgIds ::
-     (HasProcessContext env, HasTerm env)
-  => GhcPkgExe
+     (HasCompiler env, HasProcessContext env, HasTerm env)
+  => Bool
+     -- ^ Report pretty exceptions as warnings?
+  -> GhcPkgExe
   -> Path Abs Dir -- ^ package database
   -> NonEmpty (Either PackageIdentifier GhcPkgId)
   -> RIO env ()
-unregisterGhcPkgIds pkgexe pkgDb epgids = do
-  eres <- ghcPkg pkgexe [pkgDb] args
+unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
+  globalDb <- view $ compilerPathsL.to cpGlobalDB
+  eres <- try $ do
+    ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs
+    -- ghcPkgUnregisterForce does not perform an effective
+    -- 'ghc-pkg recache', as that depends on a specific version of the Cabal
+    -- package.
+    ghcPkg pkgexe [pkgDb] ["recache"]
   case eres of
-    Left e -> prettyWarn $ string $ displayException e
+    Left (PrettyException e) -> when isWarn $
+      prettyWarn $
+        "[S-8729]"
+        <> line
+        <> flow "While unregistering packages, Stack encountered the following \
+                \error:"
+        <> blankLine
+        <> pretty e
     Right _ -> pure ()
  where
   (idents, gids) = partitionEithers $ toList epgids
-  args = "unregister" : "--user" : "--force" :
-    map packageIdentifierString idents ++
-    if null gids then [] else "--ipid" : map ghcPkgIdString gids
+  hasIpid = not (null gids)
+  pkgarg_strs = map packageIdentifierString idents <> map ghcPkgIdString gids
 
 -- | Get the value for GHC_PACKAGE_PATH
 mkGhcPackagePath :: Bool -> Path Abs Dir -> Path Abs Dir -> [Path Abs Dir] -> Path Abs Dir -> Text

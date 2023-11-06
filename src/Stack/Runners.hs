@@ -18,7 +18,11 @@ module Stack.Runners
   , ShouldReexec (..)
   ) where
 
-import           RIO.Process ( mkDefaultProcessContext )
+import qualified Data.ByteString.Lazy.Char8 as L8
+import           RIO.Process
+                   ( findExecutable, mkDefaultProcessContext, proc
+                   , readProcess
+                   )
 import           RIO.Time ( addUTCTime, getCurrentTime )
 import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Config
@@ -26,7 +30,9 @@ import           Stack.Config
                    , withNewLogFunc
                    )
 import           Stack.Constants
-                   ( defaultTerminalWidth, maxTerminalWidth, minTerminalWidth )
+                   ( defaultTerminalWidth, maxTerminalWidth, minTerminalWidth
+                   , nixProgName
+                   )
 import           Stack.DefaultColorWhen ( defaultColorWhen )
 import qualified Stack.Docker as Docker
 import qualified Stack.Nix as Nix
@@ -140,6 +146,49 @@ withConfig shouldReexec inner =
 reexec :: RIO Config a -> RIO Config a
 reexec inner = do
   nixEnable' <- asks $ nixEnable . configNix
+  notifyIfNixOnPath <- asks configNotifyIfNixOnPath
+  when (not nixEnable' && notifyIfNixOnPath) $ do
+    eNix <- findExecutable nixProgName
+    case eNix of
+      Left _ -> pure ()
+      Right nix -> proc nix ["--version"] $ \pc -> do
+        let nixProgName' = style Shell (fromString nixProgName)
+            muteMsg = fillSep
+              [ flow "To mute this message in future, set"
+              , style Shell (flow "notify-if-nix-on-path: false")
+              , flow "in Stack's configuration."
+              ]
+            reportErr errMsg = prettyWarn $
+                 fillSep
+                   [ nixProgName'
+                   , flow "is on the PATH"
+                   , parens (fillSep ["at", style File (fromString nix)])
+                   , flow "but Stack encountered the following error with"
+                   , nixProgName'
+                   , style Shell "--version" <> ":"
+                   ]
+              <> blankLine
+              <> errMsg
+              <> blankLine
+              <> muteMsg
+              <> line
+        res <- tryAny (readProcess pc)
+        case res of
+          Left e -> reportErr (ppException e)
+          Right (ec, out, err) -> case ec of
+            ExitFailure _ -> reportErr $ string (L8.unpack err)
+            ExitSuccess -> do
+              let trimFinalNewline str = case reverse str of
+                    '\n' : rest -> reverse rest
+                    _ -> str
+              prettyWarn $ fillSep
+                   [ fromString (trimFinalNewline $ L8.unpack out)
+                   , flow "is on the PATH"
+                   , parens (fillSep ["at", style File (fromString nix)])
+                   , flow "but Stack's Nix integration is disabled."
+                   , muteMsg
+                   ]
+                <> line
   dockerEnable' <- asks $ dockerEnable . configDocker
   case (nixEnable', dockerEnable') of
     (True, True) -> throwIO DockerAndNixInvalid
@@ -180,14 +229,18 @@ withRunnerGlobal go inner = do
                                     <$> getTerminalWidth)
                                    pure (globalTermWidth go)
   menv <- mkDefaultProcessContext
+  -- MVar used to ensure the Docker entrypoint is performed exactly once.
+  dockerEntrypointMVar <- newMVar False
   let update = globalStylesUpdate go
-  withNewLogFunc go useColor update $ \logFunc -> runRIO Runner
-    { runnerGlobalOpts = go
-    , runnerUseColor = useColor
-    , runnerLogFunc = logFunc
-    , runnerTermWidth = termWidth
-    , runnerProcessContext = menv
-    } inner
+  withNewLogFunc go useColor update $ \logFunc -> do
+    runRIO Runner
+      { runnerGlobalOpts = go
+      , runnerUseColor = useColor
+      , runnerLogFunc = logFunc
+      , runnerTermWidth = termWidth
+      , runnerProcessContext = menv
+      , runnerDockerEntrypointMVar = dockerEntrypointMVar
+      } inner
  where
   clipWidth w
     | w < minTerminalWidth = minTerminalWidth

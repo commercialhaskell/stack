@@ -14,8 +14,7 @@ module Stack.Coverage
   , generateHpcMarkupIndex
   ) where
 
-import qualified Data.ByteString.Char8 as S8
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as L8
 import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -32,6 +31,7 @@ import           Path.IO
                    , ignoringAbsence, listDir, removeDirRecur, removeFile
                    , resolveDir', resolveFile'
                    )
+import           RIO.ByteString.Lazy ( putStrLn )
 import           RIO.Process ( ProcessException, proc, readProcess_ )
 import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Constants
@@ -45,7 +45,6 @@ import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
-import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.BuildOpts ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
@@ -186,12 +185,12 @@ generateHpcReport pkgDir package tests = do
         case packageLibraries package of
           NoLibraries -> False
           HasLibraries _ -> True
-      internalLibs = packageInternalLibraries package
+      subLibs = packageSubLibraries package
   eincludeName <-
     -- Pre-7.8 uses plain PKG-version in tix files.
     if ghcVersion < mkVersion [7, 10] then pure $ Right $ Just [pkgId]
     -- We don't expect to find a package key if there is no library.
-    else if not hasLibrary && Set.null internalLibs then pure $ Right Nothing
+    else if not hasLibrary && Set.null subLibs then pure $ Right Nothing
     -- Look in the inplace DB for the package key.
     -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
     else do
@@ -202,7 +201,7 @@ generateHpcReport pkgDir package tests = do
         findPackageFieldForBuiltPackage
           pkgDir
           (packageIdentifier package)
-          internalLibs
+          subLibs
           hpcNameField
       case eincludeName of
         Left err -> do
@@ -213,9 +212,9 @@ generateHpcReport pkgDir package tests = do
     tixSrc <- tixFilePath (packageName package) (T.unpack testName)
     let report = fillSep
           [ flow "coverage report for"
-          , fromString pkgName' <> "'s"
+          , style Current (fromString pkgName') <> "'s"
           , "test-suite"
-          , fromString $ "\"" <> T.unpack testName <> "\""
+          , style PkgComponent (fromString $ T.unpack testName)
           ]
         reportHtml =
              "coverage report for"
@@ -290,14 +289,15 @@ generateHpcReportInternal tixSrc reportDir report reportHtml extraMarkupArgs ext
         [ "Generating"
         , report <> "."
         ]
-      outputLines <- map (S8.filter (/= '\r')) . S8.lines . BL.toStrict . fst <$>
+      -- Strip @\r@ characters because Windows.
+      outputLines <- map (L8.filter (/= '\r')) . L8.lines . fst <$>
         proc "hpc"
         ( "report"
         : toFilePath tixSrc
         : (args ++ extraReportArgs)
         )
         readProcess_
-      if all ("(0/0)" `S8.isSuffixOf`) outputLines
+      if all ("(0/0)" `L8.isSuffixOf`) outputLines
         then do
           let msgHtml =
                    "Error: [S-6829]\n\
@@ -328,9 +328,16 @@ generateHpcReportInternal tixSrc reportDir report reportHtml extraMarkupArgs ext
           pure Nothing
         else do
           let reportPath = reportDir </> relFileHpcIndexHtml
-          -- Print output, stripping @\r@ characters because Windows.
-          forM_ outputLines (logInfo . displayBytesUtf8)
-          -- Generate the markup.
+          -- Print the summary report to the standard output stream.
+          putUtf8Builder =<< displayWithColor
+            (  fillSep
+                 [ "Summary"
+                 , report <> ":"
+                 ]
+            <> line
+            )
+          forM_ outputLines putStrLn
+          -- Generate the HTML markup.
           void $ proc "hpc"
             ( "markup"
             : toFilePath tixSrc
@@ -393,8 +400,8 @@ generateHpcReportForTargets opts tixFiles targetNames = do
       dest <- resolveDir' destDir
       ensureDir dest
       pure dest
-  let report = flow "combined report"
-      reportHtml = "combined report"
+  let report = flow "combined coverage report"
+      reportHtml = "combined coverage report"
   mreportPath <- generateUnionReport report reportHtml reportDir tixPaths
   forM_ mreportPath $ \reportPath ->
     if hroptsOpenBrowser opts
@@ -430,8 +437,8 @@ generateHpcUnifiedReport = do
       , flow "so not generating a unified coverage report."
       ]
     else do
-      let report = flow "unified report"
-          reportHtml = "unified report"
+      let report = flow "unified coverage report"
+          reportHtml = "unified coverage report"
       mreportPath <- generateUnionReport report reportHtml reportDir tixFiles
       forM_ mreportPath (displayReportPath "The" report . pretty)
 
@@ -586,64 +593,62 @@ findPackageFieldForBuiltPackage ::
      HasEnvConfig env
   => Path Abs Dir -> PackageIdentifier -> Set.Set Text -> Text
   -> RIO env (Either Text [Text])
-findPackageFieldForBuiltPackage pkgDir pkgId internalLibs field = do
+findPackageFieldForBuiltPackage pkgDir pkgId subLibs field = do
   distDir <- distDirFromDir pkgDir
   let inplaceDir = distDir </> relDirPackageConfInplace
       pkgIdStr = packageIdentifierString pkgId
-      notFoundErr = pure $ Left $ "Failed to find package key for " <> T.pack pkgIdStr
+      notFoundErr = pure $
+        Left $ "Failed to find package key for " <> T.pack pkgIdStr
       extractField path = do
         contents <- readFileUtf8 (toFilePath path)
         case asum (map (T.stripPrefix (field <> ": ")) (T.lines contents)) of
           Just result -> pure $ Right $ T.strip result
           Nothing -> notFoundErr
-  cabalVer <- view cabalVersionL
-  if cabalVer < mkVersion [1, 24]
-    then do
-      -- here we don't need to handle internal libs
-      path <- (inplaceDir </>) <$> parseRelFile (pkgIdStr ++ "-inplace.conf")
-      logDebug $
-           "Parsing config in Cabal < 1.24 location: "
-        <> fromString (toFilePath path)
-      exists <- doesFileExist path
-      if exists then fmap (:[]) <$> extractField path else notFoundErr
-    else do
-      -- With Cabal-1.24, it's in a different location.
-      logDebug $ "Scanning " <> fromString (toFilePath inplaceDir) <> " for files matching " <> fromString pkgIdStr
-      (_, files) <- handleIO (const $ pure ([], [])) $ listDir inplaceDir
-      logDebug $ displayShow files
-      -- From all the files obtained from the scanning process above, we
-      -- need to identify which are .conf files and then ensure that
-      -- there is at most one .conf file for each library and internal
-      -- library (some might be missing if that component has not been
-      -- built yet). We should error if there are more than one .conf
-      -- file for a component or if there are no .conf files at all in
-      -- the searched location.
-      let toFilename = T.pack . toFilePath . filename
-          -- strip known prefix and suffix from the found files to determine only the conf files
-          stripKnown =  T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-"))
-          stripped = mapMaybe (\file -> fmap (,file) . stripKnown . toFilename $ file) files
-          -- which component could have generated each of these conf files
-          stripHash n = let z = T.dropWhile (/= '-') n in if T.null z then "" else T.tail z
-          matchedComponents = map (\(n, f) -> (stripHash n, [f])) stripped
-          byComponents = Map.restrictKeys (Map.fromListWith (++) matchedComponents) $ Set.insert "" internalLibs
-      logDebug $ displayShow byComponents
-      if Map.null $ Map.filter (\fs -> length fs > 1) byComponents
-      then case concat $ Map.elems byComponents of
-        [] -> notFoundErr
-        -- for each of these files, we need to extract the requested field
-        paths -> do
-          (errors, keys) <-  partitionEithers <$> traverse extractField paths
-          case errors of
-            (a:_) -> pure $ Left a -- the first error only, since they're repeated anyway
-            [] -> pure $ Right keys
-      else
-        pure
-          $ Left
-          $    "Multiple files matching "
-            <> T.pack (pkgIdStr ++ "-*.conf")
-            <> " found in "
-            <> T.pack (toFilePath inplaceDir)
-            <> ". Maybe try 'stack clean' on this package?"
+  logDebug $
+       "Scanning "
+    <> fromString (toFilePath inplaceDir)
+    <> " for files matching "
+    <> fromString pkgIdStr
+  (_, files) <- handleIO (const $ pure ([], [])) $ listDir inplaceDir
+  logDebug $ displayShow files
+  -- From all the files obtained from the scanning process above, we need to
+  -- identify which are .conf files and then ensure that there is at most one
+  -- .conf file for each library and sub-library (some might be missing if that
+  -- component has not been built yet). We should error if there are more than
+  -- one .conf file for a component or if there are no .conf files at all in the
+  -- searched location.
+  let toFilename = T.pack . toFilePath . filename
+      -- strip known prefix and suffix from the found files to determine only
+      -- the .conf files
+      stripKnown =
+        T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-"))
+      stripped =
+        mapMaybe (\file -> fmap (,file) . stripKnown . toFilename $ file) files
+      -- which component could have generated each of these conf files
+      stripHash n =
+        let z = T.dropWhile (/= '-') n
+        in  if T.null z then "" else T.tail z
+      matchedComponents = map (\(n, f) -> (stripHash n, [f])) stripped
+      byComponents =
+        Map.restrictKeys (Map.fromListWith (++) matchedComponents) $ Set.insert "" subLibs
+  logDebug $ displayShow byComponents
+  if Map.null $ Map.filter (\fs -> length fs > 1) byComponents
+    then case concat $ Map.elems byComponents of
+      [] -> notFoundErr
+      -- for each of these files, we need to extract the requested field
+      paths -> do
+        (errors, keys) <-  partitionEithers <$> traverse extractField paths
+        case errors of
+          (a:_) -> pure $ Left a -- the first error only, since they're repeated anyway
+          [] -> pure $ Right keys
+    else
+      pure
+        $ Left
+        $    "Multiple files matching "
+          <> T.pack (pkgIdStr ++ "-*.conf")
+          <> " found in "
+          <> T.pack (toFilePath inplaceDir)
+          <> ". Maybe try 'stack clean' on this package?"
 
 displayReportPath ::
      HasTerm env

@@ -1,6 +1,0 @@
-resolver: lts-20.23
-packages:
-- .
-
-ghc-options:
-  "$locals": -j8 +RTS -s -A128M

@@ -1,0 +1,4 @@
+build:
+  test-arguments:
+    no-run-tests: true
+resolver: ghc-9.4.7

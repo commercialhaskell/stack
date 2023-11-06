@@ -1,0 +1,4 @@
+resolver: lts-21.16
+packages:
+- .
+- ../package-c

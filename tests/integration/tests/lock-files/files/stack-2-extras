@@ -1,0 +1,4 @@
+resolver: lts-21.16
+extra-deps:
+- acme-cuteboy-0.1.0.0
+- acme-dont-1.1

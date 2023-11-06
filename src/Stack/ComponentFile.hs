@@ -332,7 +332,7 @@ componentOutputDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir
 componentOutputDir namedComponent distDir =
   case namedComponent of
     CLib -> buildDir distDir
-    CInternalLib name -> makeTmp name
+    CSubLib name -> makeTmp name
     CExe name -> makeTmp name
     CTest name -> makeTmp name
     CBench name -> makeTmp name
@@ -390,26 +390,25 @@ findCandidate dirs name = do
                     -> IO [Path Abs File]
   makeDirCandidates haskellPreprocessorExts dir =
     case name of
-        DotCabalMain fp -> resolveCandidate dir fp
-        DotCabalFile fp -> resolveCandidate dir fp
-        DotCabalCFile fp -> resolveCandidate dir fp
-        DotCabalModule mn -> do
-          let perExt ext =
-                resolveCandidate
-                  dir (Cabal.toFilePath mn ++ "." ++ T.unpack ext)
-          withHaskellExts <- mapM perExt haskellFileExts
-          withPPExts <- mapM perExt haskellPreprocessorExts
-          pure $
-            case (concat withHaskellExts, concat withPPExts) of
-              -- If we have exactly 1 Haskell extension and exactly
-              -- 1 preprocessor extension, assume the former file is
-              -- generated from the latter
-              --
-              -- See https://github.com/commercialhaskell/stack/issues/4076
-              ([_], [y]) -> [y]
-
-              -- Otherwise, return everything
-              (xs, ys) -> xs ++ ys
+      DotCabalMain fp -> resolveCandidate dir fp
+      DotCabalFile fp -> resolveCandidate dir fp
+      DotCabalCFile fp -> resolveCandidate dir fp
+      DotCabalModule mn -> do
+        let perExt ext =
+              resolveCandidate
+                dir (Cabal.toFilePath mn ++ "." ++ T.unpack ext)
+        withHaskellExts <- mapM perExt haskellFileExts
+        withPPExts <- mapM perExt haskellPreprocessorExts
+        pure $
+          case (concat withHaskellExts, concat withPPExts) of
+            -- If we have exactly 1 Haskell extension and exactly
+            -- 1 preprocessor extension, assume the former file is
+            -- generated from the latter
+            --
+            -- See https://github.com/commercialhaskell/stack/issues/4076
+            ([_], [y]) -> [y]
+            -- Otherwise, return everything
+            (xs, ys) -> xs ++ ys
   resolveCandidate dir = fmap maybeToList . resolveDirFile dir
 
 -- | Log that we couldn't find a candidate, but there are
@@ -552,16 +551,17 @@ componentBuildDir cabalVer component distDir
   | otherwise =
       case component of
         CLib -> buildDir distDir
-        CInternalLib name -> buildDir distDir </> componentNameToDir name
+        CSubLib name -> buildDir distDir </> componentNameToDir name
         CExe name -> buildDir distDir </> componentNameToDir name
         CTest name -> buildDir distDir </> componentNameToDir name
         CBench name -> buildDir distDir </> componentNameToDir name
 
 -- Internal helper to define resolveFileOrWarn and resolveDirOrWarn
-resolveOrWarn :: Text
-              -> (Path Abs Dir -> String -> RIO GetPackageFileContext (Maybe a))
-              -> FilePath.FilePath
-              -> RIO GetPackageFileContext (Maybe a)
+resolveOrWarn ::
+     Text
+  -> (Path Abs Dir -> String -> RIO GetPackageFileContext (Maybe a))
+  -> FilePath.FilePath
+  -> RIO GetPackageFileContext (Maybe a)
 resolveOrWarn subject resolver path = do
   cwd <- liftIO getCurrentDir
   file <- asks ctxFile

@@ -5,18 +5,12 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2023-07-24.
+`master` branch of the Stack repository. Last updated: 2023-10-21.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
     -   `ExitCode`
     -   `throwIO`
-
-*   `Stack.StackException`
-
-    ~~~haskell
-    [S-2186] = InvalidReExecVersion String String
-    ~~~
 
 *   `Stack.main`: catches exceptions from action `run`:
 
@@ -32,6 +26,18 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-2816] = InconsistentDependenciesBug
+        ~~~
+
+    -   `GHC.GHC.Utils.GhcPkg.Main.Compat`
+
+        ~~~haskell
+        [S-6512] = CannotParse String String String
+        [S-3384] | CannotOpenDBForModification FilePath IOException
+        [S-1430] | SingleFileDBUnsupported FilePath
+        [S-5996] | ParsePackageInfoExceptions String
+        [S-3189] | CannotFindPackage PackageArg (Maybe FilePath)
+        [S-9323] | CannotParseRelFileBug String
+        [S-7651] | CannotParseDirectoryWithDBug String
         ~~~
 
     -   `Options.Applicative.Builder.Extra.OptionsApplicativeExtraException`
@@ -59,6 +65,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2045] | SnapshotNotFound SnapName
         [S-8559] | NeitherCompilerOrResolverSpecified Text
         [S-5743] | DuplicatePackagesBug
+        ~~~
+
+    -   `Stack.CLI.CliPrettyException`
+
+        ~~~haskell
+        [S-4639] = NoArgumentsBug
         ~~~
 
     -   `Stack.Clean.CleanException`
@@ -120,7 +132,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-8251] = PackageIdNotFoundBug String
         [S-2483] | ExecutableToRunNotFound
+        [S-8600] | NoPackageIdReportedBug
         ~~~
+
+    -   `Stack.GhcPkg`
+
+        `[S-6716]` used in `unregisterGhcPkgIds`
 
     -   `Stack.Ghci.GhciException`
 
@@ -136,6 +153,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-6948] = GhciTargetParseException [StyleDoc]
+        [S-1939] | CandidatesIndexOutOfRangeBug
         ~~~
 
     -   `Stack.Hoogle.HoogleException`
@@ -168,10 +186,10 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2422] | ResolverPartial RawSnapshotLocation String
         ~~~
 
-    -   `Stack.List.ListException`
+    -   `Stack.List.ListPrettyException`
 
         ~~~haskell
-        [S-4926] = CouldNotParsePackageSelectors [String]
+        [S-4926] = CouldNotParsePackageSelectors [StyleDoc]
         ~~~
 
     -   `Stack.Lock.LockPrettyException`
@@ -306,6 +324,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-4230] | ExistingMSYS2NotDeleted (Path Abs Dir) IOException
         ~~~
 
+    -   `Stack.StackException`
+
+        ~~~haskell
+        [S-2186] = InvalidReExecVersion String String
+        ~~~
+
     -   `Stack.Storage.User.StorageUserException`
 
         ~~~haskell
@@ -345,6 +369,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3121] | TemplateHaskellNotFoundBug
         [S-6901] | HaddockIndexNotFound
         [S-5452] | ShowBuildErrorBug
+        [S-2696] | CallStackEmptyBug
         ~~~
 
     -   `Stack.Types.Build.BuildPrettyException`
@@ -483,6 +508,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-2256] = AuthenticationFailure
         [S-6108] | ArchiveUploadFailure Int [String] String
+        [S-2837] | DocsTarballInvalid [(String, Path Abs File)]
+        [S-3179] | ItemsInvalid [FilePath]
+        [S-3030] | NoItemSpecified String
+        [S-5908] | PackageDirectoryInvalid [FilePath]
+        [S-7274] | PackageIdNotSpecifiedForDocsUploadBug
+        [S-5860] | PackageIdSpecifiedForPackageUploadBug
+        [S-5955] | TarGzFileNameInvalidBug String
         ~~~
 
     -   `System.Process.Pager.PagerException`

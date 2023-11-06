@@ -1,0 +1,5 @@
+resolver: ghc-9.4.7
+name: hackage-revisions-are-annoying
+packages:
+- async-2.1.1.1
+- stm-2.1.2.2

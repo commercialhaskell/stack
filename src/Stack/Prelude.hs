@@ -23,6 +23,8 @@ module Stack.Prelude
   , bugReport
   , bugPrettyReport
   , blankLine
+  , putUtf8Builder
+  , putBuilder
   , ppException
   , prettyThrowIO
   , prettyThrowM
@@ -46,6 +48,7 @@ module Stack.Prelude
   , bulletedList
   , debugBracket
   , defaultStyles
+  , displayWithColor
   , encloseSep
   , fill
   , fillSep
@@ -78,6 +81,7 @@ module Stack.Prelude
   , sep
   , softbreak
   , softline
+  , spacedBulletedList
   , string
   , style
   , vsep
@@ -102,18 +106,22 @@ import           RIO as X
 import           RIO.File as X hiding ( writeBinaryFileAtomic )
 import           RIO.PrettyPrint
                    ( HasStylesUpdate (..), HasTerm (..), Pretty (..), Style (..)
-                   , StyleDoc, (<+>), align, bulletedList, debugBracket
-                   , displayWithColor, encloseSep, fill, fillSep, flow, hang
-                   , hcat, hsep, indent, line, logLevelToStyle, mkNarrativeList
-                   , parens, prettyDebug, prettyDebugL, prettyError
-                   , prettyErrorL, prettyInfo, prettyInfoL, prettyInfoS
-                   , prettyNote, prettyNoteL, prettyNoteS, prettyWarn
-                   , prettyWarnL, prettyWarnNoIndent, prettyWarnS, punctuate
-                   , sep, softbreak, softline, string, style, stylesUpdateL
-                   , useColorL, vsep
+                   , StyleDoc, (<+>), align, blankLine, bulletedList
+                   , debugBracket, displayWithColor, encloseSep, fill, fillSep
+                   , flow, hang, hcat, hsep, indent, line, logLevelToStyle
+                   , mkNarrativeList, parens, prettyDebug, prettyDebugL
+                   , prettyError, prettyErrorL, prettyGeneric, prettyInfo
+                   , prettyInfoL, prettyInfoS, prettyNote, prettyNoteL
+                   , prettyNoteS, prettyWarn, prettyWarnL, prettyWarnNoIndent
+                   , prettyWarnS, punctuate, sep, softbreak, softline
+                   , spacedBulletedList, string, style, stylesUpdateL, useColorL
+                   , vsep
                    )
 import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
-import           RIO.PrettyPrint.PrettyException ( PrettyException (..) )
+import           RIO.PrettyPrint.PrettyException
+                   ( PrettyException (..), ppException, prettyThrowIO
+                   , prettyThrowM
+                   )
 import           RIO.PrettyPrint.StylesUpdate
                    ( StylesUpdate (..), parseStylesUpdateFromString )
 import           RIO.PrettyPrint.Types ( StyleSpec )
@@ -343,32 +351,14 @@ bugDeclaration = "The impossible happened!"
 bugRequest :: String
 bugRequest =  "Please report this bug at Stack's repository."
 
--- | A \'pretty\' blank line.
-blankLine :: StyleDoc
-blankLine = line <> line
-
--- | Provide the prettiest available information about an exception.
-ppException :: SomeException -> StyleDoc
-ppException e = case fromException e of
-  Just (PrettyException e') -> pretty e'
-  Nothing -> (string . displayException) e
-
--- | Synchronously throw the given exception as a 'PrettyException'.
-prettyThrowIO :: (Exception e, MonadIO m, Pretty e) => e -> m a
-prettyThrowIO = throwIO . PrettyException
-
--- | Throw the given exception as a 'PrettyException', when the action is run in
--- the monad @m@.
-prettyThrowM :: (Exception e, MonadThrow m, Pretty e) => e -> m a
-prettyThrowM = throwM . PrettyException
-
 -- | Maybe cons.
 mcons :: Maybe a -> [a] -> [a]
 mcons ma as = maybe as (:as) ma
 
-prettyGeneric ::
-     (HasTerm env, HasCallStack, Pretty b, MonadReader env m, MonadIO m)
-  => LogLevel
-  -> b
-  -> m ()
-prettyGeneric level = logGeneric "" level . display <=< displayWithColor
+-- | Write a 'Utf8Builder' to the standard output stream.
+putUtf8Builder :: MonadIO m => Utf8Builder -> m ()
+putUtf8Builder = putBuilder . getUtf8Builder
+
+-- | Write a 'Builder' to the standard output stream.
+putBuilder :: MonadIO m => Builder -> m ()
+putBuilder = hPutBuilder stdout

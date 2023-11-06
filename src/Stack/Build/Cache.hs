@@ -134,7 +134,7 @@ buildCacheFile dir component = do
   let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
   cacheFileName <- parseRelFile $ case component of
     CLib -> "lib"
-    CInternalLib name -> nonLibComponent "internal-lib" name
+    CSubLib name -> nonLibComponent "sub-lib" name
     CExe name -> nonLibComponent "exe" name
     CTest name -> nonLibComponent "test" name
     CBench name -> nonLibComponent "bench" name
@@ -341,13 +341,13 @@ getTestStatus dir = do
 --
 -- We only pay attention to non-directory options. We don't want to avoid a
 -- cache hit just because it was installed in a different directory.
-getPrecompiledCacheKey :: HasEnvConfig env
-                    => PackageLocationImmutable
-                    -> ConfigureOpts
-                    -> Bool -- ^ build haddocks
-                    -> Set GhcPkgId -- ^ dependencies
-                    -> RIO env PrecompiledCacheKey
-getPrecompiledCacheKey loc copts buildHaddocks installedPackageIDs = do
+getPrecompiledCacheKey ::
+     HasEnvConfig env
+  => PackageLocationImmutable
+  -> ConfigureOpts
+  -> Bool -- ^ build haddocks
+  -> RIO env PrecompiledCacheKey
+getPrecompiledCacheKey loc copts buildHaddocks = do
   compiler <- view actualCompilerVersionL
   cabalVersion <- view cabalVersionL
 
@@ -359,63 +359,61 @@ getPrecompiledCacheKey loc copts buildHaddocks installedPackageIDs = do
   platformGhcDir <- platformGhcRelDir
 
   -- In Cabal versions 1.22 and later, the configure options contain the
-  -- installed package IDs, which is what we need for a unique hash.
-  -- Unfortunately, earlier Cabals don't have the information, so we must
-  -- supplement it with the installed package IDs directly.
-  -- See issue: https://github.com/commercialhaskell/stack/issues/1103
-  let input = (coNoDirs copts, installedPackageIDs)
+  -- installed package IDs, which is what we need for a unique hash. See also
+  -- issue: https://github.com/commercialhaskell/stack/issues/1103
+  let input = coNoDirs copts
       optionsHash = Mem.convert $ hashWith SHA256 $ encodeUtf8 $ tshow input
 
-  pure $ precompiledCacheKey platformGhcDir compiler cabalVersion packageKey optionsHash buildHaddocks
+  pure $ precompiledCacheKey
+    platformGhcDir compiler cabalVersion packageKey optionsHash buildHaddocks
 
 -- | Write out information about a newly built package
-writePrecompiledCache :: HasEnvConfig env
-                      => BaseConfigOpts
-                      -> PackageLocationImmutable
-                      -> ConfigureOpts
-                      -> Bool -- ^ build haddocks
-                      -> Set GhcPkgId -- ^ dependencies
-                      -> Installed -- ^ library
-                      -> [GhcPkgId] -- ^ sublibraries, in the GhcPkgId format
-                      -> Set Text -- ^ executables
-                      -> RIO env ()
-writePrecompiledCache baseConfigOpts loc copts buildHaddocks depIDs mghcPkgId sublibs exes = do
-  key <- getPrecompiledCacheKey loc copts buildHaddocks depIDs
+writePrecompiledCache ::
+     HasEnvConfig env
+  => BaseConfigOpts
+  -> PackageLocationImmutable
+  -> ConfigureOpts
+  -> Bool -- ^ build haddocks
+  -> Installed -- ^ library
+  -> [GhcPkgId] -- ^ sub-libraries, in the GhcPkgId format
+  -> Set Text -- ^ executables
+  -> RIO env ()
+writePrecompiledCache baseConfigOpts loc copts buildHaddocks mghcPkgId subLibs exes = do
+  key <- getPrecompiledCacheKey loc copts buildHaddocks
   ec <- view envConfigL
   let stackRootRelative = makeRelative (view stackRootL ec)
   mlibpath <- case mghcPkgId of
     Executable _ -> pure Nothing
     Library _ ipid _ -> Just <$> pathFromPkgId stackRootRelative ipid
-  sublibpaths <- mapM (pathFromPkgId stackRootRelative) sublibs
+  subLibPaths <- mapM (pathFromPkgId stackRootRelative) subLibs
   exes' <- forM (Set.toList exes) $ \exe -> do
     name <- parseRelFile $ T.unpack exe
     stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
   let precompiled = PrecompiledCache
         { pcLibrary = mlibpath
-        , pcSubLibs = sublibpaths
+        , pcSubLibs = subLibPaths
         , pcExes = exes'
         }
   savePrecompiledCache key precompiled
   -- reuse precompiled cache with haddocks also in case when haddocks are not
   -- required
   when buildHaddocks $ do
-    key' <- getPrecompiledCacheKey loc copts False depIDs
+    key' <- getPrecompiledCacheKey loc copts False
     savePrecompiledCache key' precompiled
  where
   pathFromPkgId stackRootRelative ipid = do
     ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
     stackRootRelative $ bcoSnapDB baseConfigOpts </> ipid'
 
--- | Check the cache for a precompiled package matching the given
--- configuration.
-readPrecompiledCache :: forall env. HasEnvConfig env
-                     => PackageLocationImmutable -- ^ target package
-                     -> ConfigureOpts
-                     -> Bool -- ^ build haddocks
-                     -> Set GhcPkgId -- ^ dependencies
-                     -> RIO env (Maybe (PrecompiledCache Abs))
-readPrecompiledCache loc copts buildHaddocks depIDs = do
-  key <- getPrecompiledCacheKey loc copts buildHaddocks depIDs
+-- | Check the cache for a precompiled package matching the given configuration.
+readPrecompiledCache ::
+     forall env. HasEnvConfig env
+  => PackageLocationImmutable -- ^ target package
+  -> ConfigureOpts
+  -> Bool -- ^ build haddocks
+  -> RIO env (Maybe (PrecompiledCache Abs))
+readPrecompiledCache loc copts buildHaddocks = do
+  key <- getPrecompiledCacheKey loc copts buildHaddocks
   mcache <- loadPrecompiledCache key
   maybe (pure Nothing) (fmap Just . mkAbs) mcache
  where

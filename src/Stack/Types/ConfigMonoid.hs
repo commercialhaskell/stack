@@ -168,6 +168,12 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See 'configHideSourcePaths'
   , configMonoidRecommendUpgrade   :: !FirstTrue
     -- ^ See 'configRecommendUpgrade'
+  , configMonoidNotifyIfNixOnPath  :: !FirstTrue
+    -- ^ See 'configNotifyIfNixOnPath'
+  , configMonoidNotifyIfGhcUntested  :: !FirstTrue
+    -- ^ See 'configNotifyIfGhcUntested'
+  , configMonoidNotifyIfCabalUntested  :: !FirstTrue
+    -- ^ See 'configNotifyIfCabalUntested'
   , configMonoidCasaOpts :: !CasaOptsMonoid
     -- ^ Casa configuration options.
   , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
@@ -338,6 +344,12 @@ parseConfigMonoidObject rootDir obj = do
     FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
   configMonoidRecommendUpgrade <-
     FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
+  configMonoidNotifyIfNixOnPath <-
+    FirstTrue <$> obj ..:? configMonoidNotifyIfNixOnPathName
+  configMonoidNotifyIfGhcUntested <-
+    FirstTrue <$> obj ..:? configMonoidNotifyIfGhcUntestedName
+  configMonoidNotifyIfCabalUntested <-
+    FirstTrue <$> obj ..:? configMonoidNotifyIfCabalUntestedName
   configMonoidCasaOpts <-
     jsonSubWarnings (obj ..:? configMonoidCasaOptsName ..!= mempty)
   configMonoidCasaRepoPrefix <-
@@ -514,6 +526,15 @@ configMonoidHideSourcePathsName = "hide-source-paths"
 
 configMonoidRecommendUpgradeName :: Text
 configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
+
+configMonoidNotifyIfNixOnPathName :: Text
+configMonoidNotifyIfNixOnPathName = "notify-if-nix-on-path"
+
+configMonoidNotifyIfGhcUntestedName :: Text
+configMonoidNotifyIfGhcUntestedName = "notify-if-ghc-untested"
+
+configMonoidNotifyIfCabalUntestedName :: Text
+configMonoidNotifyIfCabalUntestedName = "notify-if-cabal-untested"
 
 configMonoidCasaOptsName :: Text
 configMonoidCasaOptsName = "casa"

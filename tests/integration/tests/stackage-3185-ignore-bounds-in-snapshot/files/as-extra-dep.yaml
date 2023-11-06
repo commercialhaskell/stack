@@ -1,0 +1,4 @@
+resolver: ghc-9.4.7
+extra-deps:
+- async-2.1.1.1
+- stm-2.1.2.2

@@ -1,11 +1,11 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.35.2.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
 name:           stack
-version:        2.12.0
+version:        2.14.0
 synopsis:       The Haskell Tool Stack
 description:    Please see the documentation at <https://docs.haskellstack.org>
                 for usage information.
@@ -40,10 +40,9 @@ extra-source-files:
     doc/clean_command.md
     doc/config_command.md
     doc/CONTRIBUTING.md
-    doc/coverage.md
     doc/custom_snapshot.md
     doc/debugging.md
-    doc/dependency_visualization.md
+    doc/dev_containers.md
     doc/developing_on_windows.md
     doc/docker_command.md
     doc/docker_integration.md
@@ -96,12 +95,12 @@ extra-source-files:
     doc/upload_command.md
     doc/yaml_configuration.md
     src/setup-shim/StackSetupShim.hs
-    test/package-dump/ghc-7.10.txt
-    test/package-dump/ghc-7.8.4-osx.txt
-    test/package-dump/ghc-7.8.txt
-    test/package-dump/ghc-head.txt
-    src/test/Stack/Untar/test1.tar.gz
-    src/test/Stack/Untar/test2.tar.gz
+    tests/unit/package-dump/ghc-7.10.txt
+    tests/unit/package-dump/ghc-7.8.4-osx.txt
+    tests/unit/package-dump/ghc-7.8.txt
+    tests/unit/package-dump/ghc-head.txt
+    tests/unit/Stack/Untar/test1.tar.gz
+    tests/unit/Stack/Untar/test2.tar.gz
     cabal.project
     cabal.config
 
@@ -122,6 +121,11 @@ flag developer-mode
 
 flag disable-git-info
   description: Disable inclusion of current Git information in the Stack executable when it is built.
+  manual: True
+  default: False
+
+flag disable-stack-upload
+  description: For use only during development and debugging. Disable 'stack upload' so that it does not make HTTP requests. Stack will output information about the HTTP request(s) that it would have made if the command was enabled.
   manual: True
   default: False
 
@@ -321,7 +325,9 @@ library
       Build_stack
       Paths_stack
   other-modules:
+      GHC.Utils.GhcPkg.Main.Compat
       Stack.Config.ConfigureScript
+      Stack.Types.FileDigestCache
   autogen-modules:
       Build_stack
       Paths_stack
@@ -339,12 +345,12 @@ library
     , base >=4.14.3.0 && <5
     , base64-bytestring
     , bytestring
-    , casa-client
+    , casa-client >=0.0.2
     , companion
     , conduit
     , conduit-extra
     , containers
-    , cryptonite
+    , crypton
     , directory
     , echo
     , exceptions
@@ -354,13 +360,14 @@ library
     , filepath
     , fsnotify >=0.4.1
     , generic-deriving
-    , hi-file-parser >=0.1.4.0
-    , hpack
+    , ghc-boot
+    , hi-file-parser >=0.1.6.0
+    , hpack >=0.36.0
     , hpc
     , http-client
-    , http-client-tls
+    , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download
+    , http-download >=0.2.1.0
     , http-types
     , memory
     , microlens
@@ -369,8 +376,8 @@ library
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.8.3
-    , path
+    , pantry >=0.9.2
+    , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.15
     , persistent-sqlite
@@ -379,7 +386,7 @@ library
     , project-template
     , random
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.4.0
+    , rio-prettyprint >=0.1.7.0
     , split
     , stm
     , tar
@@ -409,6 +416,10 @@ library
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+  if flag(disable-stack-upload)
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=True
+  else
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
   if os(windows)
     other-modules:
         Stack.Constants.UsrLibDirs
@@ -456,12 +467,12 @@ executable stack
     , base >=4.14.3.0 && <5
     , base64-bytestring
     , bytestring
-    , casa-client
+    , casa-client >=0.0.2
     , companion
     , conduit
     , conduit-extra
     , containers
-    , cryptonite
+    , crypton
     , directory
     , echo
     , exceptions
@@ -471,13 +482,14 @@ executable stack
     , filepath
     , fsnotify >=0.4.1
     , generic-deriving
-    , hi-file-parser >=0.1.4.0
-    , hpack
+    , ghc-boot
+    , hi-file-parser >=0.1.6.0
+    , hpack >=0.36.0
     , hpc
     , http-client
-    , http-client-tls
+    , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download
+    , http-download >=0.2.1.0
     , http-types
     , memory
     , microlens
@@ -486,8 +498,8 @@ executable stack
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.8.3
-    , path
+    , pantry >=0.9.2
+    , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.15
     , persistent-sqlite
@@ -496,7 +508,7 @@ executable stack
     , project-template
     , random
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.4.0
+    , rio-prettyprint >=0.1.7.0
     , split
     , stack
     , stm
@@ -527,6 +539,10 @@ executable stack
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+  if flag(disable-stack-upload)
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=True
+  else
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
   if flag(static)
     ld-options: -static -pthread
 
@@ -538,8 +554,8 @@ executable stack-integration-test
   autogen-modules:
       Paths_stack
   hs-source-dirs:
-      test/integration
-      test/integration/lib
+      tests/integration
+      tests/integration/lib
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       Cabal >=3.8.1.0
@@ -552,12 +568,12 @@ executable stack-integration-test
     , base >=4.14.3.0 && <5
     , base64-bytestring
     , bytestring
-    , casa-client
+    , casa-client >=0.0.2
     , companion
     , conduit
     , conduit-extra
     , containers
-    , cryptonite
+    , crypton
     , directory
     , echo
     , exceptions
@@ -567,14 +583,15 @@ executable stack-integration-test
     , filepath
     , fsnotify >=0.4.1
     , generic-deriving
-    , hi-file-parser >=0.1.4.0
-    , hpack
+    , ghc-boot
+    , hi-file-parser >=0.1.6.0
+    , hpack >=0.36.0
     , hpc
     , hspec
     , http-client
-    , http-client-tls
+    , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download
+    , http-download >=0.2.1.0
     , http-types
     , memory
     , microlens
@@ -584,8 +601,8 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative >=0.18.1.0
     , optparse-generic
-    , pantry >=0.8.3
-    , path
+    , pantry >=0.9.2
+    , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.15
     , persistent-sqlite
@@ -594,7 +611,7 @@ executable stack-integration-test
     , project-template
     , random
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.4.0
+    , rio-prettyprint >=0.1.7.0
     , split
     , stm
     , tar
@@ -624,12 +641,16 @@ executable stack-integration-test
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+  if flag(disable-stack-upload)
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=True
+  else
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
   if !(flag(integration-tests))
     buildable: False
   if flag(static)
     ld-options: -static -pthread
 
-test-suite stack-test
+test-suite stack-unit-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
@@ -650,7 +671,7 @@ test-suite stack-test
   autogen-modules:
       Paths_stack
   hs-source-dirs:
-      src/test
+      tests/unit
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded
   build-depends:
       Cabal >=3.8.1.0
@@ -664,12 +685,12 @@ test-suite stack-test
     , base >=4.14.3.0 && <5
     , base64-bytestring
     , bytestring
-    , casa-client
+    , casa-client >=0.0.2
     , companion
     , conduit
     , conduit-extra
     , containers
-    , cryptonite
+    , crypton
     , directory
     , echo
     , exceptions
@@ -679,14 +700,15 @@ test-suite stack-test
     , filepath
     , fsnotify >=0.4.1
     , generic-deriving
-    , hi-file-parser >=0.1.4.0
-    , hpack
+    , ghc-boot
+    , hi-file-parser >=0.1.6.0
+    , hpack >=0.36.0
     , hpc
     , hspec
     , http-client
-    , http-client-tls
+    , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download
+    , http-download >=0.2.1.0
     , http-types
     , memory
     , microlens
@@ -695,8 +717,8 @@ test-suite stack-test
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.8.3
-    , path
+    , pantry >=0.9.2
+    , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.15
     , persistent-sqlite
@@ -706,7 +728,7 @@ test-suite stack-test
     , random
     , raw-strings-qq
     , rio >=0.1.22.0
-    , rio-prettyprint >=0.1.4.0
+    , rio-prettyprint >=0.1.7.0
     , split
     , stack
     , stm
@@ -737,15 +759,19 @@ test-suite stack-test
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=True
   else
     cpp-options: -DSTACK_DEVELOPER_MODE_DEFAULT=False
+  if flag(disable-stack-upload)
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=True
+  else
+    cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
   if os(windows)
     other-modules:
         Stack.Ghci.FakePaths
     hs-source-dirs:
-        src/test/windows/
+        tests/unit/windows/
   else
     other-modules:
         Stack.Ghci.FakePaths
     hs-source-dirs:
-        src/test/unix/
+        tests/unit/unix/
   build-tool-depends:
       hspec-discover:hspec-discover

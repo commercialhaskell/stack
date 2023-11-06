@@ -1,0 +1,39 @@
+name: Apply stan
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Apply stan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Clone project
+      uses: actions/checkout@v3
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.stack
+        key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
+
+    - name: Install stan
+      run: |
+        git clone https://github.com/kowainik/stan.git
+        cd stan
+        stack --local-bin-path ../.bin install
+        cd ..
+
+    - name: Generate .hie for analysis
+      run: stack build stack:lib
+
+    - name: Run stan
+      run: .bin/stan report --cabal-file-path=stack.cabal
+
+    - name: Upload HTML report
+      uses: actions/upload-artifact@v3
+      with:
+        name: Stan_report
+        path: stan.html

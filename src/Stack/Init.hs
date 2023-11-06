@@ -15,7 +15,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.Foldable as F
 import qualified Data.IntMap as IntMap
 import           Data.List.Extra ( groupSortOn )
-import qualified Data.List.NonEmpty as NonEmpty
+import           Data.List.NonEmpty.Extra ( minimumBy1 )
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -35,7 +35,8 @@ import           Path.IO
                    )
 import qualified RIO.FilePath as FP
 import           RIO.List ( (\\), intercalate, isSuffixOf, isPrefixOf )
-import           RIO.List.Partial ( minimumBy )
+import           RIO.NonEmpty ( nonEmpty )
+import qualified RIO.NonEmpty as NE
 import           Stack.BuildPlan
                    ( BuildPlanCheck (..), checkSnapBuildPlan, deNeededBy
                    , removeSrcPkgDefaultFlags, selectBestSnapshot
@@ -137,7 +138,7 @@ instance Pretty InitPrettyException where
     <> flow "None of the following snapshots provides a compiler matching \
             \your package(s):"
     <> line
-    <> bulletedList (map (fromString . show) (NonEmpty.toList names))
+    <> bulletedList (map (fromString . show) (NE.toList names))
     <> blankLine
     <> resolveOptions
   pretty (ResolverMismatch resolver errDesc) =
@@ -421,8 +422,8 @@ renderStackYaml p ignoredPackages dupPackages =
     , "A snapshot resolver dictates the compiler version and the set of packages"
     , "to be used for project dependencies. For example:"
     , ""
-    , "resolver: lts-20.23"
-    , "resolver: nightly-2023-05-26"
+    , "resolver: lts-21.16"
+    , "resolver: nightly-2023-09-24"
     , "resolver: ghc-9.6.2"
     , ""
     , "The location of a snapshot can be provided as a file or url. Stack assumes"
@@ -623,7 +624,7 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
 getRecommendedSnapshots :: Snapshots -> NonEmpty SnapName
 getRecommendedSnapshots snapshots =
   -- in order - Latest LTS, Latest Nightly, all LTS most recent first
-  case NonEmpty.nonEmpty supportedLtss of
+  case nonEmpty supportedLtss of
     Just (mostRecent :| older) -> mostRecent :| (nightly : older)
     Nothing -> nightly :| []
  where
@@ -702,22 +703,21 @@ cabalPackagesCheck cabaldirs = do
   let (nameMismatchPkgs, packages) = partitionEithers ePackages
   when (nameMismatchPkgs /= []) $
     prettyThrowIO $ PackageNameInvalid nameMismatchPkgs
-  let dupGroups = filter ((> 1) . length)
-                          . groupSortOn (gpdPackageName . snd)
-      dupAll    = concat $ dupGroups packages
+  let dupGroups = mapMaybe nonEmpty . groupSortOn (gpdPackageName . snd)
+      dupAll    = concatMap NE.toList $ dupGroups packages
       -- Among duplicates prefer to include the ones in upper level dirs
       pathlen     = length . FP.splitPath . toFilePath . fst
-      getmin      = minimumBy (compare `on` pathlen)
+      getmin      = minimumBy1 (compare `on` pathlen)
       dupSelected = map getmin (dupGroups packages)
       dupIgnored  = dupAll \\ dupSelected
       unique      = packages \\ dupIgnored
   when (dupIgnored /= []) $ do
-    dups <- mapM (mapM (prettyPath. fst)) (dupGroups packages)
+    dups <- mapM (mapM (prettyPath . fst)) (dupGroups packages)
     prettyWarn $
          flow "The following packages have duplicate package names:"
       <> line
       <> foldMap
-           ( \dup ->    bulletedList (map fromString dup)
+           ( \dup ->    bulletedList (map fromString (NE.toList dup))
                      <> line
            )
            dups

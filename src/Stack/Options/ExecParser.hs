@@ -74,7 +74,8 @@ execOptsExtraParser = ExecOptsExtra
   eoRtsOptionsParser :: Parser [String]
   eoRtsOptionsParser = concat <$> many (argsOption
     ( long "rts-options"
-    <> help "Explicit RTS options to pass to application."
+    <> help "Explicit RTS options to pass to application (can be specified \
+            \multiple times)."
     <> metavar "RTSFLAG"
     ))
 
