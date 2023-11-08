@@ -21,18 +21,13 @@ import           Data.List.Extra ( (!?) )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Distribution.PackageDescription as C
 import           Path ((</>), parent, parseRelFile )
 import           Path.Extra ( forgivingResolveFile', toFilePathNoTrailingSep )
 import           Path.IO
                    ( XdgDirectory (..), doesFileExist, ensureDir, getXdgDir )
 import           RIO.NonEmpty ( nonEmpty )
-import           RIO.Process
-                   ( HasProcessContext, exec, proc, readProcess_
-                   , withWorkingDir
-                   )
+import           RIO.Process ( exec, withWorkingDir )
 import           Stack.Build ( buildLocalTargets )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source
@@ -44,7 +39,7 @@ import           Stack.Constants
                    )
 import           Stack.Constants.Config ( ghciDirL, objectInterfaceDirL )
 import           Stack.Ghci.Script
-                   ( GhciScript, ModuleName, cmdAdd, cmdCdGhc, cmdModule
+                   ( GhciScript, ModuleName, cmdAdd, cmdModule
                    , scriptToLazyByteString
                    )
 import           Stack.Package
@@ -561,21 +556,6 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
         case pkgs of
           [pkg] -> withWorkingDir (toFilePath $ ghciPkgDir pkg)
           _ -> id
-      -- TODO: Consider optimizing this check. Perhaps if no "with-ghc" is
-      -- specified, assume that it is not using intero.
-      checkIsIntero =
-        -- Optimization dependent on the behavior of renderScript - it doesn't
-        -- matter if it's intero or ghci when loading multiple packages.
-        case pkgs of
-          [_] -> do
-            menv <-
-              liftIO $ configProcessContextSettings config defaultEnvSettings
-            output <- withProcessContext menv $
-              runGrabFirstLine
-                (fromMaybe compilerExeName ghciGhcCommand)
-                ["--version"]
-            pure $ "Intero" `L.isPrefixOf` output
-          _ -> pure False
   -- Since usage of 'exec' does not pure, we cannot do any cleanup on ghci exit.
   -- So, instead leave the generated files. To make this more efficient and
   -- avoid gratuitous generation of garbage, the file names are determined by
@@ -591,11 +571,10 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
     then execGhci macrosOptions
     else do
       checkForDuplicateModules pkgs
-      isIntero <- checkIsIntero
       scriptOptions <-
         writeGhciScript
           tmpDirectory
-          (renderScript isIntero pkgs mainFile ghciOnlyMain extraFiles)
+          (renderScript pkgs mainFile ghciOnlyMain extraFiles)
       execGhci (macrosOptions ++ scriptOptions)
 
 writeMacrosFile ::
@@ -645,31 +624,24 @@ writeHashedFile outputDirectory relFile contents = do
   pure outFile
 
 renderScript ::
-     Bool
-  -> [GhciPkgInfo]
+     [GhciPkgInfo]
   -> Maybe (Path Abs File)
   -> Bool
   -> [Path Abs File]
   -> GhciScript
-renderScript isIntero pkgs mainFile onlyMain extraFiles = do
-  let cdPhase = case (isIntero, pkgs) of
-        -- If only loading one package, set the cwd properly. Otherwise don't
-        -- try. See https://github.com/commercialhaskell/stack/issues/3309
-        (True, [pkg]) -> cmdCdGhc (ghciPkgDir pkg)
-        _ -> mempty
-      addPhase = cmdAdd $ S.fromList (map Left allModules ++ addMain)
-      addMain = case mainFile of
-        Just path -> [Right path]
-        _ -> []
+renderScript pkgs mainFile onlyMain extraFiles = do
+  let addPhase = cmdAdd $ S.fromList (map Left allModules ++ addMain)
+      addMain = maybe [] (L.singleton . Right) mainFile
       modulePhase = cmdModule $ S.fromList allModules
       allModules = nubOrd $ concatMap (M.keys . ghciPkgModules) pkgs
   case getFileTargets pkgs <> extraFiles of
     [] ->
       if onlyMain
         then
-             cdPhase
-          <> if isJust mainFile then cmdAdd (S.fromList addMain) else mempty
-        else cdPhase <> addPhase <> modulePhase
+          if isJust mainFile
+            then cmdAdd (S.fromList addMain)
+            else mempty
+        else addPhase <> modulePhase
     fileTargets -> cmdAdd (S.fromList (map Right fileTargets))
 
 -- Hacky check if module / main phase should be omitted. This should be
@@ -1227,21 +1199,3 @@ hasLocalComp p t = case t of
   TargetComps s -> any p (S.toList s)
   TargetAll PTProject -> True
   _ -> False
-
--- | Run a command and grab the first line of stdout, dropping
--- stderr's contexts completely.
-runGrabFirstLine ::
-     (HasProcessContext env, HasLogFunc env)
-  => String
-  -> [String]
-  -> RIO env String
-runGrabFirstLine cmd0 args =
-  proc cmd0 args $ \pc -> do
-    (out, _err) <- readProcess_ pc
-    pure
-      $ TL.unpack
-      $ TL.filter (/= '\r')
-      $ TL.concat
-      $ take 1
-      $ TL.lines
-      $ TLE.decodeUtf8With lenientDecode out

@@ -5,7 +5,6 @@ module Stack.Ghci.Script
   ( GhciScript
   , ModuleName
   , cmdAdd
-  , cmdCdGhc
   , cmdModule
   , scriptToLazyByteString
   , scriptToBuilder
@@ -30,15 +29,11 @@ instance Monoid GhciScript where
 
 data GhciCommand
   = AddCmd (Set (Either ModuleName (Path Abs File)))
-  | CdGhcCmd (Path Abs Dir)
   | ModuleCmd (Set ModuleName)
   deriving Show
 
 cmdAdd :: Set (Either ModuleName (Path Abs File)) -> GhciScript
 cmdAdd = GhciScript . (:[]) . AddCmd
-
-cmdCdGhc :: Path Abs Dir -> GhciScript
-cmdCdGhc = GhciScript . (:[]) . CdGhcCmd
 
 cmdModule :: Set ModuleName -> GhciScript
 cmdModule = GhciScript . (:[]) . ModuleCmd
@@ -78,9 +73,6 @@ commandToBuilder (AddCmd modules)
                  (S.toAscList modules)
          )
     <> "\n"
-
-commandToBuilder (CdGhcCmd path) =
-  ":cd-ghc " <> fromString (quoteFileName (toFilePath path)) <> "\n"
 
 commandToBuilder (ModuleCmd modules)
   | S.null modules = ":module +\n"

@@ -25,11 +25,10 @@ spec = do
 
       describe "script" $ do
         it "should separate commands with a newline" $ do
-          let dir = $(mkAbsDir $ defaultDrive FP.</> "src" FP.</> "package-a")
-              script = cmdCdGhc dir
-                    <> cmdAdd [Left (fromString "Lib.A")]
+          let script =    cmdAdd [Left (fromString "Lib.A")]
+                       <> cmdAdd [Left (fromString "Lib.B")]
           scriptToLazyByteString script `shouldBe`
-            ":cd-ghc " <> pathToLazyByteString dir <> "\n:add Lib.A\n"
+            ":add Lib.A\n:add Lib.B\n"
 
       describe ":add" $ do
         it "should not render empty add commands" $ do
@@ -46,13 +45,6 @@ spec = do
               script = cmdAdd (S.fromList [Right file])
           scriptToLazyByteString script `shouldBe`
             ":add " <> pathToLazyByteString file <> "\n"
-
-      describe ":cd-ghc" $ do
-        it "should render a full absolute path" $ do
-          let dir = $(mkAbsDir $ defaultDrive FP.</> "Users" FP.</> "someone" FP.</> "src" FP.</> "project" FP.</> "package-a")
-              script = cmdCdGhc dir
-          scriptToLazyByteString script `shouldBe`
-            ":cd-ghc " <> pathToLazyByteString dir <> "\n"
 
       describe ":module" $ do
         it "should render empty module as ':module +'" $ do
