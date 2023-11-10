@@ -19,7 +19,6 @@ module Stack.Types.Package
   , PackageDatabase (..)
   , PackageDbVariety (..)
   , PackageException (..)
-  , PackageLibraries (..)
   , PackageSource (..)
   , dotCabalCFilePath
   , dotCabalGetPath
@@ -137,14 +136,6 @@ instance Exception PackageException where
   displayException (ComponentNotParsedBug name)= bugReport "[S-4623]"
     ("Component names should always parse as directory names."
     <> " The component name without a directory is '" <> name <> "'")
-
--- | Libraries in a package. Since Cabal 2.0, sub-libraries are a thing.
-data PackageLibraries
-  = NoLibraries
-  | HasLibraries !(Set Text)
-    -- ^ the foreign library names, sub-libraries get built automatically
-    -- without explicit component name passing
- deriving (Show, Typeable)
 
 -- | Name of an executable.
 newtype ExeName
