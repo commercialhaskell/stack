@@ -834,6 +834,6 @@ packageSubLibrariesNameSet :: Package -> Set Text
 packageSubLibrariesNameSet pkg = getBuildableSetText (packageSubLibraries pkg)
 packageExes :: Package -> Set Text
 packageExes pkg = getBuildableSetText (packageExecutables pkg)
--- packageTests ::
+
 packageBenchmarks :: Package -> Set Text
 packageBenchmarks pkg = getBuildableSetText (packageBenchmarkSuites pkg)

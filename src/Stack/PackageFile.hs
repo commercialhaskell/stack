@@ -33,7 +33,7 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.PackageFile
                    ( GetPackageFileContext (..)
-                   , StackPackageFile (StackPackageFile), PackageComponentFile (PackageComponentFile, dfiles)
+                   , StackPackageFile (StackPackageFile), PackageComponentFile (PackageComponentFile, packageExtraFile)
                    )
 import qualified System.FilePath as FilePath
 import           System.IO.Error ( isUserError )
@@ -55,9 +55,9 @@ packageDescModulesAndFiles ::
        GetPackageFileContext
        PackageComponentFile
 packageDescModulesAndFiles pkg = do
-  dfiles <- resolveGlobFilesFromStackPackageFile
+  packageExtraFile <- resolveGlobFilesFromStackPackageFile
               (packageCabalSpec pkg) (packageFile pkg)
-  let initialValue = mempty{dfiles=dfiles}
+  let initialValue = mempty{packageExtraFile=packageExtraFile}
   let accumulator f comp st = (insertComponentFile <$> st) <*> f comp
   let gatherCompFileCollection createCompFileFn getCompFn res = foldr' (accumulator createCompFileFn) res (getCompFn pkg)
   gatherCompFileCollection stackLibraryFiles packageLibrary
@@ -143,7 +143,7 @@ getPackageFile pkg cabalfp =
       let hpackPath = pkgDir </> relFileHpackPackageConfig
       hpackExists <- doesFileExist hpackPath
       pure $ if hpackExists then S.singleton hpackPath else S.empty
-    pure packageComponentFile{dfiles = moreBuildFiles <> dfiles packageComponentFile}
+    pure packageComponentFile{packageExtraFile = moreBuildFiles <> packageExtraFile packageComponentFile}
 
 stackPackageFileFromCabal :: PackageDescription -> StackPackageFile
 stackPackageFileFromCabal cabalPkg =
@@ -151,10 +151,10 @@ stackPackageFileFromCabal cabalPkg =
 
 insertComponentFile :: PackageComponentFile -> (NamedComponent, ComponentFile) -> PackageComponentFile
 insertComponentFile packageCompFile (name, compFile) =
-  PackageComponentFile nCompFile nDotCollec dfiles nWarnings
+  PackageComponentFile nCompFile nDotCollec packageExtraFile nWarnings
   where
-    (ComponentFile modFile dotCabalFile warningsCollec) = compFile
-    (PackageComponentFile modules files dfiles warnings) = packageCompFile
-    nCompFile = M.insert name modFile modules
-    nDotCollec = M.insert name dotCabalFile files
+    (ComponentFile moduleFileMap dotCabalFileList warningsCollec) = compFile
+    (PackageComponentFile modules files packageExtraFile warnings) = packageCompFile
+    nCompFile = M.insert name moduleFileMap modules
+    nDotCollec = M.insert name dotCabalFileList files
     nWarnings = warningsCollec ++ warnings
