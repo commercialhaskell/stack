@@ -8,7 +8,8 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Avoid restricted extensions" #-}
 
 -- | All utility functions for Components (library, internal library, foreign library, executable, tests, benchmarks) in stack.
 -- In particular, this module gathers all the Cabal-to-Stack component translations, which previlously occured in the "Stack.Package" module.
@@ -85,9 +86,9 @@ stackBuildInfoFromCabal buildInfoV = gatherComponentToolsAndDepsFromCabal
   StackBuildInfo {
     sbiBuildable = buildInfoV.buildable,
     sbiOtherModules = buildInfoV.otherModules,
-    sbiJsSources = buildInfoV.jsSources,
+    jsSources = buildInfoV.jsSources,
     hsSourceDirs = buildInfoV.hsSourceDirs,
-    cSource = buildInfoV.cSources,
+    cSources = buildInfoV.cSources,
     sbiDependency = mempty,
     sbiUnknownTools = mempty
     }

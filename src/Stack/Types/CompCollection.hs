@@ -3,6 +3,8 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Avoid restricted extensions" #-}
 
 -- | A package has collections of "Stack.Types.Component".
 -- In Cabal, the components are grouped as a list in a @PackageDescription@, this is stack's counterpart
@@ -119,6 +121,6 @@ hasBuildableComponent = not . null . getBuildableSet
 collectionLookup :: Text -> CompCollection component -> Maybe component
 collectionLookup needle haystack = HM.lookup (StackUnqualCompName needle) (asNameMap $ buildableOnes haystack)
 collectionKeyValueList :: CompCollection component -> [(Text, component)]
-collectionKeyValueList haystack = (\(StackUnqualCompName k, v) -> (k, v)) <$> HM.toList (asNameMap $ buildableOnes haystack)
+collectionKeyValueList haystack = (\(StackUnqualCompName k, !v) -> (k, v)) <$> HM.toList (asNameMap $ buildableOnes haystack)
 collectionMember :: Text -> CompCollection component -> Bool
 collectionMember needle haystack = isJust $ collectionLookup needle haystack

@@ -60,8 +60,8 @@ import           Stack.Types.EnvConfig ( EnvConfig, HasEnvConfig (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.PackageFile
-                   ( GetPackageFiles (..), DotCabalDescriptor (..)
-                   , DotCabalPath (..)
+                   ( DotCabalDescriptor (..)
+                   , DotCabalPath (..), StackPackageFile
                    )
 import           Stack.Types.SourceMap ( CommonPackage, FromSnapshot )
 import           Stack.Types.Version ( VersionRange )
@@ -79,7 +79,7 @@ data PackageException
   | MismatchedCabalIdentifier !PackageIdentifierRevision !PackageIdentifier
   | CabalFileNameParseFail FilePath
   | CabalFileNameInvalidPackageName FilePath
-  | ComponentNotParsedBug
+  | ComponentNotParsedBug String
   deriving (Show, Typeable)
 
 instance Exception PackageException where
@@ -134,8 +134,9 @@ instance Exception PackageException where
       \extension, the following is invalid: "
     , fp
     ]
-  displayException ComponentNotParsedBug = bugReport "[S-4623]"
-    "Component names should always parse as directory names."
+  displayException (ComponentNotParsedBug name)= bugReport "[S-4623]"
+    ("Component names should always parse as directory names."
+    <> " The component name without a directory is '" <> name <> "'")
 
 -- | Libraries in a package. Since Cabal 2.0, sub-libraries are a thing.
 data PackageLibraries
@@ -158,7 +159,7 @@ data Package = Package
     -- ^ Version of the package
   , packageLicense :: !(Either SPDX.License License)
     -- ^ The license the package was released under.
-  , packageFiles :: !GetPackageFiles
+  -- , packageFiles :: !GetPackageFiles
     -- ^ Get all files of the package.
   , packageDeps :: !(Map PackageName DepValue)
     -- ^ Packages that the package depends on, both as libraries and build tools.
@@ -174,12 +175,12 @@ data Package = Package
     -- ^ Flags used on package.
   , packageDefaultFlags :: !(Map FlagName Bool)
     -- ^ Defaults for unspecified flags.
-  , packageLibrary :: Maybe StackLibrary
-  , packageSubLibraries :: CompCollection StackLibrary
-  , packageForeignLibraries :: CompCollection StackForeignLibrary
-  , packageTestSuites :: CompCollection StackTest
-  , packageBenchmarkSuites :: CompCollection StackBenchmark
-  , packageExecutables :: CompCollection StackExecutable
+  , packageLibrary :: !(Maybe StackLibrary)
+  , packageSubLibraries :: !(CompCollection StackLibrary)
+  , packageForeignLibraries :: !(CompCollection StackForeignLibrary)
+  , packageTestSuites :: !(CompCollection StackTest)
+  , packageBenchmarkSuites :: !(CompCollection StackBenchmark)
+  , packageExecutables :: !(CompCollection StackExecutable)
     -- ^ does the package have a buildable library stanza?
   , packageOpts :: !GetPackageOpts
     -- ^ Args to pass to GHC.
@@ -189,6 +190,9 @@ data Package = Package
     -- ^ If present: custom-setup dependencies
   , packageCabalSpec :: !CabalSpecVersion
     -- ^ Cabal spec range
+  , packageFile :: StackPackageFile
+    -- ^ The cabal sourced files related to the package at the package level
+    -- The components may have file information in their own types
   }
   deriving (Show, Typeable)
 
@@ -207,7 +211,8 @@ type InstallMap = Map PackageName (InstallLocation, Version)
 -- Argument is the location of the Cabal file
 newtype GetPackageOpts = GetPackageOpts
   { getPackageOpts :: forall env. HasEnvConfig env
-                   => InstallMap
+                   => Package
+                   -> InstallMap
                    -> InstalledMap
                    -> [PackageName]
                    -> [PackageName]
