@@ -55,7 +55,8 @@ import           Stack.Types.Package
                    , PackageConfig (..)
                    , dotCabalGetPath, memoizeRefWith, runMemoizedWith
                    )
-import           Stack.Types.PackageFile ( PackageWarning, getPackageFiles )
+import           Stack.Types.PackageFile ( PackageWarning, PackageComponentFile (PackageComponentFile) )
+import           Stack.PackageFile ( getPackageFile )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
@@ -497,8 +498,8 @@ getPackageFilesForTargets ::
   -> Set NamedComponent
   -> RIO env (Map NamedComponent (Set (Path Abs File)), [PackageWarning])
 getPackageFilesForTargets pkg cabalFP nonLibComponents = do
-  (components',compFiles,otherFiles,warnings) <-
-    getPackageFiles (packageFiles pkg) cabalFP
+  PackageComponentFile components' compFiles otherFiles warnings <-
+    getPackageFile pkg cabalFP
   let necessaryComponents =
         Set.insert CLib $ Set.filter isCSubLib (M.keysSet components')
       components = necessaryComponents `Set.union` nonLibComponents

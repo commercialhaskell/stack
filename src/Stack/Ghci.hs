@@ -78,7 +78,7 @@ import           Stack.Types.Package
                    , dotCabalCFilePath, dotCabalGetPath
                    , dotCabalMainPath, getPackageOpts
                    )
-import           Stack.Types.PackageFile ( getPackageFiles )
+import           Stack.PackageFile ( getPackageFile )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner, Runner )
 import           Stack.Types.SourceMap
@@ -89,6 +89,7 @@ import           Stack.Types.SourceMap
 import           System.IO ( putStrLn )
 import           System.Permissions ( setScriptPerms )
 import           Stack.Types.CompCollection ( getBuildableListText )
+import Stack.Types.PackageFile (PackageComponentFile(PackageComponentFile))
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Ghci" module.
@@ -347,7 +348,7 @@ findFileTargets ::
   -> RIO env (Map PackageName Target, Map PackageName [Path Abs File], [Path Abs File])
 findFileTargets locals fileTargets = do
   filePackages <- forM locals $ \lp -> do
-    (_,compFiles,_,_) <- getPackageFiles (packageFiles (lpPackage lp)) (lpCabalFile lp)
+    PackageComponentFile _ compFiles _ _ <- getPackageFile (lpPackage lp) (lpCabalFile lp)
     pure (lp, M.map (map dotCabalGetPath) compFiles)
   let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
       foundFileTargetComponents =
@@ -931,7 +932,7 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
       cabalfp = ghciDescCabalFp pkgDesc
       target = ghciDescTarget pkgDesc
       name = packageName pkg
-  (mods,files,opts) <- getPackageOpts (packageOpts pkg) installMap installedMap locals addPkgs cabalfp
+  (mods,files,opts) <- getPackageOpts (packageOpts pkg) pkg installMap installedMap locals addPkgs cabalfp
   let filteredOpts = filterWanted opts
       filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
       allWanted = wantedPackageComponents bopts target pkg

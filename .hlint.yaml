@@ -65,6 +65,11 @@
     - MultiWayIf
     - OverloadedLists
     - OverloadedStrings
+    - ConstraintKinds
+    - FlexibleContexts
+    - DisambiguateRecordFields
+    - OverloadedRecordDot
+    - PartialTypeSignatures
     - QuasiQuotes
     - RecordWildCards
     - ScopedTypeVariables

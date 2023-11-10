@@ -119,6 +119,6 @@ hasBuildableComponent = not . null . getBuildableSet
 collectionLookup :: Text -> CompCollection component -> Maybe component
 collectionLookup needle haystack = HM.lookup (StackUnqualCompName needle) (asNameMap $ buildableOnes haystack)
 collectionKeyValueList :: CompCollection component -> [(Text, component)]
-collectionKeyValueList haystack = (\(StackUnqualCompName k, v) -> (k, v)) <$> HM.toList (asNameMap $ buildableOnes haystack)
+collectionKeyValueList haystack = (\(StackUnqualCompName k, !v) -> (k, v)) <$> HM.toList (asNameMap $ buildableOnes haystack)
 collectionMember :: Text -> CompCollection component -> Bool
 collectionMember needle haystack = isJust $ collectionLookup needle haystack

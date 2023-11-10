@@ -88,8 +88,8 @@ import           Stack.Types.Version
                    ( VersionRange, intersectVersionRanges, withinRange )
 import           System.FilePath ( replaceExtension )
 import           Stack.Types.Dependency ( DepValue (..), DepType (..) )
-import           Stack.Types.PackageFile ( DotCabalPath , GetPackageFiles (..) )
-import           Stack.PackageFile ( getPackageFile )
+import           Stack.Types.PackageFile ( DotCabalPath, PackageComponentFile (PackageComponentFile) )
+import           Stack.PackageFile ( getPackageFile, stackPackageFileFromCabal )
 
 import           Stack.Types.CompCollection ( foldAndMakeCollection, CompCollection, getBuildableSetText )
 import           Stack.Component
@@ -127,7 +127,6 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageVersion = pkgVersion pkgId
   , packageLicense = licenseRaw pkg
   , packageDeps = deps
-  , packageFiles = pkgFiles
   , packageGhcOptions = packageConfigGhcOptions packageConfig
   , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig
   , packageFlags = packageConfigFlags packageConfig
@@ -143,9 +142,10 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageSubLibDeps = subLibDeps
   -- This is an action used to collect info needed for "stack ghci".
   -- This info isn't usually needed, so computation of it is deferred.
+  -- TODO : move into a function
   , packageOpts = GetPackageOpts $
-      \installMap installedMap omitPkgs addPkgs cabalfp -> do
-        (componentsModules,componentFiles, _, _) <- getPackageFiles pkgFiles cabalfp
+      \stackPackage installMap installedMap omitPkgs addPkgs cabalfp -> do
+        PackageComponentFile !componentsModules componentFiles _ _ <- getPackageFile stackPackage cabalfp
         let subLibs =
               S.toList $ subLibComponents $ M.keysSet componentsModules
         excludedSubLibs <- mapM (parsePackageNameThrowing . T.unpack) subLibs
@@ -164,6 +164,7 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageBuildType = buildType pkg
   , packageSetupDeps = msetupDeps
   , packageCabalSpec = specVersion pkg
+  , packageFile = stackPackageFileFromCabal pkg
   }
  where
   extraLibNames = S.union subLibNames foreignLibNames
@@ -190,7 +191,6 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   -- Gets all of the modules, files, build files, and data files that constitute
   -- the package. This is primarily used for dirtiness checking during build, as
   -- well as use by "stack ghci"
-  pkgFiles = GetPackageFiles $ getPackageFile pkg
   pkgId = package pkg
   name = pkgName pkgId
 
