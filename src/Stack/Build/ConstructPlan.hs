@@ -29,10 +29,8 @@ import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
 import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
-                   ( applyForceCustomBuild
-                   , hasMainBuildableLibrary
-                   , packageUnknownTools
-                   , packageExes
+                   ( applyForceCustomBuild, hasMainBuildableLibrary
+                   , packageExes, packageUnknownTools
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
@@ -50,6 +48,7 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
 import           Stack.Types.BuildOpts
                    ( BuildOpts (..), BuildOptsCLI (..), BuildSubset (..) )
+import           Stack.Types.CompCollection ( collectionMember )
 import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
@@ -72,8 +71,8 @@ import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
                    ( ExeName (..), InstallLocation (..), Installed (..)
                    , InstalledMap, LocalPackage (..), Package (..)
-                   , PackageSource (..), installedVersion
-                   , packageIdentifier, psVersion, runMemoizedWith
+                   , PackageSource (..), installedVersion, packageIdentifier
+                   , psVersion, runMemoizedWith
                    )
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Platform ( HasPlatform (..) )
@@ -86,7 +85,6 @@ import           Stack.Types.SourceMap
 import           Stack.Types.Version
                    ( latestApplicableVersion, versionRangeText, withinRange )
 import           System.Environment ( lookupEnv )
-import           Stack.Types.CompCollection ( collectionMember )
 
 -- | Type representing information about packages, namely information about
 -- whether or not a package is already installed and, unless the package is not
@@ -1168,8 +1166,7 @@ addPackageDeps package = do
   -- make sure we consider sub-libraries as libraries too
   packageHasLibrary :: Package -> Bool
   packageHasLibrary p =
-    not (null (packageSubLibraries p)) ||
-    hasMainBuildableLibrary p
+    hasMainBuildableLibrary p || not (null (packageSubLibraries p))
 
 checkDirtiness ::
      PackageSource
@@ -1338,8 +1335,8 @@ checkAndWarnForUnknownTools p = do
   -- Check whether the tool is on the PATH or a package executable before
   -- warning about it.
   warnings <-
-    fmap catMaybes $ forM unknownTools $ \name@toolName ->
-      runMaybeT $ notOnPath toolName *> notPackageExe toolName *> warn name
+    fmap catMaybes $ forM unknownTools $ \toolName ->
+      runMaybeT $ notOnPath toolName *> notPackageExe toolName *> warn toolName
   tell mempty { wWarnings = (map toolWarningText warnings ++) }
   pure ()
  where
@@ -1353,7 +1350,8 @@ checkAndWarnForUnknownTools p = do
     skipIf $ isRight eFound
   -- From Cabal 1.12, build-tools can specify another executable in the same
   -- package.
-  notPackageExe toolName = MaybeT $ skipIf $ collectionMember toolName (packageExecutables p)
+  notPackageExe toolName =
+    MaybeT $ skipIf $ collectionMember toolName (packageExecutables p)
   warn name = MaybeT . pure . Just $ ToolWarning (ExeName name) (packageName p)
   skipIf p' = pure $ if p' then Nothing else Just ()
 
