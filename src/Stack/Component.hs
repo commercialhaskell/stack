@@ -191,10 +191,10 @@ gatherComponentToolsAndDepsFromCabal legacyBuildTools buildTools targetDeps =
 -- for them.
 processDependencies :: ( Monad m
                        , HasField "buildInfo" component StackBuildInfo )
-  => (PackageName -> DepValue -> m [resT] -> m [resT])
+  => (PackageName -> DepValue -> m (t resT) -> m (t resT))
   -> component
-  -> m [resT]
-  -> m [resT]
+  -> m (t resT)
+  -> m (t resT)
 processDependencies iteratorFn component resAction = Map.foldrWithKey' iteratorFn resAction componentDeps
   where
     componentDeps = buildInfo.sbiDependency

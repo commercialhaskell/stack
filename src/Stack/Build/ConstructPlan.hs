@@ -31,7 +31,7 @@ import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
                    ( applyForceCustomBuild, buildableExes
                    , hasBuildableMainLibrary, packageUnknownTools
-                   , processPackageDependencies
+                   , processPackageDependenciesToList
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
@@ -1002,7 +1002,7 @@ addPackageDeps ::
 addPackageDeps package = do
   ctx <- ask
   checkAndWarnForUnknownTools package
-  deps <- processPackageDependencies package $ \depname (DepValue range depType) -> do
+  deps <- processPackageDependenciesToList package $ \depname (DepValue range depType) -> do
     eres <- getCachedDepOrAddDep depname
     let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
         getLatestApplicableVersionAndRev = do

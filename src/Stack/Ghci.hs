@@ -52,6 +52,7 @@ import           Stack.Package
                    , buildableForeignLibs, hasBuildableMainLibrary
                    , getPackageOpts, packageFromPackageDescription
                    , readDotBuildinfo, resolvePackageDescription
+                   , listOfPackageDeps
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
@@ -1201,7 +1202,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
   getDeps :: PackageName -> [PackageName]
   getDeps name =
     case M.lookup name localMap of
-      Just lp -> M.keys (packageDeps (lpPackage lp)) -- FIXME just Local?
+      Just lp -> listOfPackageDeps (lpPackage lp) -- FIXME just Local?
       _ -> []
   go ::
        PackageName
@@ -1212,7 +1213,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
       (Just (Just _), _) -> pure True
       (Just Nothing, _) | not loadAllDeps -> pure False
       (_, Just lp) -> do
-        let deps = M.keys (packageDeps (lpPackage lp))
+        let deps = listOfPackageDeps (lpPackage lp)
         shouldLoad <- or <$> mapM go deps
         if shouldLoad
           then do

@@ -23,7 +23,7 @@ module Stack.Types.CompCollection
   , collectionLookup
   , collectionKeyValueList
   , collectionMember
-  , foldComponentToList
+  , foldComponentToAnotherCollection
   )
 where
 import qualified Data.HashMap.Strict as HM
@@ -159,9 +159,9 @@ collectionKeyValueList haystack =
 collectionMember :: Text -> CompCollection component -> Bool
 collectionMember needle haystack = isJust $ collectionLookup needle haystack
 
-foldComponentToList :: (Monad m)
+foldComponentToAnotherCollection :: (Monad m)
   => CompCollection component
-  -> (component -> m [b] -> m [b])
-  -> m [b]
-  -> m [b]
-foldComponentToList collection fn initialValue = HM.foldr' fn initialValue (asNameMap $ buildableOnes collection)
+  -> (component -> m (t b) -> m (t b))
+  -> m (t b)
+  -> m (t b)
+foldComponentToAnotherCollection collection fn initialValue = HM.foldr' fn initialValue (asNameMap $ buildableOnes collection)

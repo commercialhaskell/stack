@@ -155,11 +155,6 @@ data Package = Package
     -- ^ Version of the package
   , packageLicense :: !(Either SPDX.License License)
     -- ^ The license the package was released under.
-  , packageDeps :: !(Map PackageName DepValue)
-    -- ^ Packages that the package depends on, both as libraries and build
-    -- tools.
-  , packageAllDeps :: !(Set PackageName)
-    -- ^ Original dependencies (not sieved).
   , packageSubLibDeps :: !(Map MungedPackageName DepValue)
     -- ^ Original sub-library dependencies (not sieved).
   , packageGhcOptions :: ![Text]

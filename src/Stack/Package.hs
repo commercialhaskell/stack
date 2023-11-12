@@ -26,7 +26,9 @@ module Stack.Package
   , buildableTestSuites
   , buildableBenchmarks
   , getPackageOpts
-  , processPackageDependencies
+  , processPackageDependenciesToList
+  , listOfPackageDeps
+  , setOfPackageDeps
   ) where
 
 import           Data.Foldable ( Foldable (..) )
@@ -47,8 +49,7 @@ import           Distribution.PackageDescription
                    , GenericPackageDescription (..), HookedBuildInfo
                    , Library (..), PackageDescription (..), PackageFlag (..)
                    , SetupBuildInfo (..), TestSuite (..), allLibraries
-                   , buildType, depPkgName, depVerRange, libraryNameString
-                   , maybeToLibraryName
+                   , buildType, depPkgName, depVerRange, maybeToLibraryName
                    )
 import           Distribution.Pretty ( prettyShow )
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
@@ -86,7 +87,7 @@ import           Stack.Types.BuildConfig
                    ( HasBuildConfig (..), getProjectWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, foldAndMakeCollection
-                   , getBuildableSetText, foldComponentToList
+                   , getBuildableSetText, foldComponentToAnotherCollection
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
@@ -141,7 +142,6 @@ packageFromPackageDescription
       { packageName = name
       , packageVersion = pkgVersion pkgId
       , packageLicense = licenseRaw pkg
-      , packageDeps = deps
       , packageGhcOptions = packageConfigGhcOptions packageConfig
       , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig
       , packageFlags = packageConfigFlags packageConfig
@@ -158,7 +158,6 @@ packageFromPackageDescription
           foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkgNoMod
       , packageExecutables =
           foldAndMakeCollection stackExecutableFromCabal $ executables pkg
-      , packageAllDeps = M.keysSet deps
       , packageSubLibDeps = subLibDeps
       , packageBuildType = buildType pkg
       , packageSetupDeps = msetupDeps
@@ -168,40 +167,11 @@ packageFromPackageDescription
       , packageBenchmarkEnabled = packageConfigEnableBenchmarks packageConfig
       }
  where
-  extraLibNames = S.union subLibNames foreignLibNames
-
-  subLibNames
-    = S.fromList
-    $ map (T.pack . Cabal.unUnqualComponentName)
-    $ mapMaybe (libraryNameString . libName) -- this is a design bug in the
-                                             -- Cabal API: this should
-                                             -- statically be known to exist
-    $ filter (buildable . libBuildInfo)
-    $ subLibraries pkg
-
-  foreignLibNames
-    = S.fromList
-    $ map (T.pack . Cabal.unUnqualComponentName . foreignLibName)
-    $ filter (buildable . foreignLibBuildInfo)
-    $ foreignLibs pkg
-
   -- Gets all of the modules, files, build files, and data files that constitute
   -- the package. This is primarily used for dirtiness checking during build, as
   -- well as use by "stack ghci"
   pkgId = package pkg
   name = pkgName pkgId
-
-  (_unknownTools, knownTools) = packageDescTools pkg
-
-  deps = M.filterWithKey (const . not . isMe) (M.unionsWith (<>)
-    [ asLibrary <$> packageDependencies pkg
-    -- We include all custom-setup deps - if present - in the package deps
-    -- themselves. Stack always works with the invariant that there will be a
-    -- single installed package relating to a package name, and this applies at
-    -- the setup dependency level as well.
-    , asLibrary <$> fromMaybe M.empty msetupDeps
-    , knownTools
-    ])
 
   msetupDeps = fmap
     (M.fromList . map (depPkgName &&& depVerRange) . setupDepends)
@@ -219,11 +189,6 @@ packageFromPackageDescription
     { dvVersionRange = range
     , dvType = AsLibrary
     }
-
-  -- Is the package dependency mentioned here me: either the package name
-  -- itself, or the name of one of the sub libraries
-  isMe name' =  name' == name
-             || fromString (packageNameString name') `S.member` extraLibNames
 
 toInternalPackageMungedName :: Package -> Text -> Text
 toInternalPackageMungedName pkg =
@@ -799,9 +764,6 @@ applyForceCustomBuild cabalVersion package
   | forceCustomBuild =
       package
         { packageBuildType = Custom
-        , packageDeps =
-            M.insertWith (<>) "Cabal" (DepValue cabalVersionRange AsLibrary) $
-              packageDeps package
         , packageSetupDeps = Just $ M.fromList
             [ ("Cabal", cabalVersionRange)
             , ("base", anyVersion)
@@ -866,12 +828,13 @@ buildableBenchmarks :: Package -> Set Text
 buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)
 
 -- | This is a fonction to iterate in a monad over all
--- package component's dependencies, and yield a list of results.
-processPackageDependencies :: (Monad m)
+-- package component's dependencies, and yield a collection of results (used with list and set).
+processPackageDependencies :: (Monad m, Monoid (targetedCollection resT))
   => Package
+  -> (resT -> targetedCollection resT -> targetedCollection resT)
   -> (PackageName -> DepValue -> m resT)
-  -> m [resT]
-processPackageDependencies pkg fn = do
+  -> m (targetedCollection resT)
+processPackageDependencies pkg combineResults fn = do
   let asPackageNameSet accessor = S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
   let (!subLibNames, !foreignLibNames) = (asPackageNameSet packageSubLibraries, asPackageNameSet packageForeignLibraries)
   let shouldIgnoreDep (packageNameV :: PackageName)
@@ -884,8 +847,8 @@ processPackageDependencies pkg fn = do
         | otherwise = do
           resList <- resListInMonad
           newResElement <- fn packageName depValue
-          pure $ newResElement : resList 
-  let compProcessor target = foldComponentToList (target pkg) (processDependencies innerIterator)
+          pure $ combineResults newResElement resList
+  let compProcessor target = foldComponentToAnotherCollection (target pkg) (processDependencies innerIterator)
   let asLibrary range = DepValue
         { dvVersionRange = range
         , dvType = AsLibrary
@@ -899,9 +862,22 @@ processPackageDependencies pkg fn = do
         . compProcessor packageExecutables
         . (if packageBenchmarkEnabled pkg then compProcessor packageBenchmarks else id)
         . (if packageTestEnabled pkg then compProcessor packageTestSuites else id)
-        . packageSetupDepsProcessor 
-              
+        . packageSetupDepsProcessor
+
   let initialValue = case packageLibrary pkg of
-        Nothing -> pure []
-        Just comp -> processDependencies innerIterator comp (pure [])
+        Nothing -> pure mempty
+        Just comp -> processDependencies innerIterator comp (pure mempty)
   processAllComp initialValue
+
+-- | Iterate/fold on all the package dependencies, components, setup deps and all.
+processPackageDependenciesToList :: Monad m => Package -> (PackageName -> DepValue -> m resT) -> m [resT]
+processPackageDependenciesToList pkg = processPackageDependencies pkg (:)
+
+-- | List all package's dependencies in a "free" context through the identity monad.
+listOfPackageDeps :: Package -> [PackageName]
+listOfPackageDeps pkg = do
+  runIdentity $ processPackageDependenciesToList pkg (\pn _ -> pure pn)
+-- | The set of package's dependencies.
+setOfPackageDeps :: Package -> Set PackageName
+setOfPackageDeps pkg = do
+  runIdentity $ processPackageDependencies pkg S.insert (\pn _ -> pure pn)
