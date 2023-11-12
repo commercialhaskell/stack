@@ -48,7 +48,7 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( PackageDescriptionPair (..), buildableExes
+                   ( buildableExes
                    , buildableForeignLibs, hasBuildableMainLibrary
                    , getPackageOpts, packageFromPackageDescription
                    , readDotBuildinfo, resolvePackageDescription
@@ -887,12 +887,7 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
         packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
         maybe
           pdp
-          ( \bi ->
-            let PackageDescriptionPair x y = pdp
-            in  PackageDescriptionPair
-                  (C.updatePackageDescription bi x)
-                  (C.updatePackageDescription bi y)
-          )
+          (`C.updatePackageDescription` pdp)
           mbuildinfo
   pure GhciPkgDesc
     { ghciDescPkg = pkg

@@ -10,7 +10,6 @@ module Stack.Package
   , resolvePackage
   , packageFromPackageDescription
   , Package (..)
-  , PackageDescriptionPair (..)
   , PackageConfig (..)
   , buildLogPath
   , PackageException (..)
@@ -31,8 +30,7 @@ module Stack.Package
   , setOfPackageDeps
   ) where
 
-import           Data.Foldable ( Foldable (..) )
-import           Data.List ( unzip )
+import           Data.Foldable ( Foldable(foldr') )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -56,8 +54,6 @@ import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
 import           Distribution.System ( OS (..), Arch, Platform (..) )
 import           Distribution.Text ( display )
 import qualified Distribution.Types.CondTree as Cabal
-import qualified Distribution.Types.ExeDependency as Cabal
-import qualified Distribution.Types.LegacyExeDependency as Cabal
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Distribution.Utils.Path ( getSymbolicPath )
 import           Distribution.Verbosity ( silent )
@@ -100,7 +96,7 @@ import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), subLibComponents )
 import           Stack.Types.Package
-                   ( BioInput (..), BuildInfoOpts (..), ExeName (..)
+                   ( BuildInfoOpts (..), BioInput(..)
                    , InstallMap, Installed (..), InstalledMap, Package (..)
                    , PackageConfig (..), PackageException (..)
                    , dotCabalCFilePath, packageIdentifier
@@ -132,12 +128,12 @@ resolvePackage packageConfig gpkg =
 packageFromPackageDescription ::
      PackageConfig
   -> [PackageFlag]
-  -> PackageDescriptionPair
+  -> PackageDescription
   -> Package
 packageFromPackageDescription
     packageConfig
     pkgFlags
-    (PackageDescriptionPair pkgNoMod pkg)
+    pkg
   = Package
       { packageName = name
       , packageVersion = pkgVersion pkgId
@@ -153,9 +149,9 @@ packageFromPackageDescription
       , packageForeignLibraries =
           foldAndMakeCollection stackForeignLibraryFromCabal $ foreignLibs pkg
       , packageTestSuites =
-          foldAndMakeCollection stackTestFromCabal $ testSuites pkgNoMod
+          foldAndMakeCollection stackTestFromCabal $ testSuites pkg
       , packageBenchmarks =
-          foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkgNoMod
+          foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkg
       , packageExecutables =
           foldAndMakeCollection stackExecutableFromCabal $ executables pkg
       , packageSubLibDeps = subLibDeps
@@ -439,73 +435,6 @@ packageDependencies pkg =
          concatMap targetBuildDepends (allBuildInfo' pkg)
       <> maybe [] setupDepends (setupBuildInfo pkg)
 
--- | Get all dependencies of the package (buildable targets only).
---
--- This uses both the new 'buildToolDepends' and old 'buildTools' information.
-packageDescTools ::
-     PackageDescription
-  -> (Set ExeName, Map PackageName DepValue)
-packageDescTools pd =
-  (S.fromList $ concat unknowns, M.fromListWith (<>) $ concat knowns)
- where
-  (unknowns, knowns) = unzip $ map perBI $ allBuildInfo' pd
-
-  perBI :: BuildInfo -> ([ExeName], [(PackageName, DepValue)])
-  perBI bi =
-    (unknownTools, tools)
-   where
-    (unknownTools, knownTools) = partitionEithers $ map go1 (buildTools bi)
-
-    tools = mapMaybe go2 (knownTools ++ buildToolDepends bi)
-
-    -- This is similar to desugarBuildTool from Cabal, however it
-    -- uses our own hard-coded map which drops tools shipped with
-    -- GHC (like hsc2hs), and includes some tools from Stackage.
-    go1 :: Cabal.LegacyExeDependency -> Either ExeName Cabal.ExeDependency
-    go1 (Cabal.LegacyExeDependency name range) =
-      case M.lookup name hardCodedMap of
-        Just pkgName ->
-          Right $
-            Cabal.ExeDependency pkgName (Cabal.mkUnqualComponentName name) range
-        Nothing -> Left $ ExeName $ T.pack name
-
-    go2 :: Cabal.ExeDependency -> Maybe (PackageName, DepValue)
-    go2 (Cabal.ExeDependency pkg _name range)
-      | pkg `S.member` preInstalledPackages = Nothing
-      | otherwise = Just
-          ( pkg
-          , DepValue
-              { dvVersionRange = range
-              , dvType = AsBuildTool
-              }
-          )
-
--- | A hard-coded map for tool dependencies
-hardCodedMap :: Map String PackageName
-hardCodedMap = M.fromList
-  [ ("alex", Distribution.Package.mkPackageName "alex")
-  , ("happy", Distribution.Package.mkPackageName "happy")
-  , ("cpphs", Distribution.Package.mkPackageName "cpphs")
-  , ("greencard", Distribution.Package.mkPackageName "greencard")
-  , ("c2hs", Distribution.Package.mkPackageName "c2hs")
-  , ("hscolour", Distribution.Package.mkPackageName "hscolour")
-  , ("hspec-discover", Distribution.Package.mkPackageName "hspec-discover")
-  , ("hsx2hs", Distribution.Package.mkPackageName "hsx2hs")
-  , ("gtk2hsC2hs", Distribution.Package.mkPackageName "gtk2hs-buildtools")
-  , ("gtk2hsHookGenerator", Distribution.Package.mkPackageName "gtk2hs-buildtools")
-  , ("gtk2hsTypeGen", Distribution.Package.mkPackageName "gtk2hs-buildtools")
-  ]
-
--- | Executable-only packages which come pre-installed with GHC and do not need
--- to be built. Without this exception, we would either end up unnecessarily
--- rebuilding these packages, or failing because the packages do not appear in
--- the Stackage snapshot.
-preInstalledPackages :: Set PackageName
-preInstalledPackages = S.fromList
-  [ mkPackageName "hsc2hs"
-  , mkPackageName "haddock"
-  ]
-
 -- | Variant of 'allBuildInfo' from Cabal that, like versions before Cabal 2.2
 -- only includes buildable components.
 allBuildInfo' :: PackageDescription -> [BuildInfo]
@@ -525,42 +454,21 @@ allBuildInfo' pkg_descr = [ bi | lib <- allLibraries pkg_descr
                                , let bi = benchmarkBuildInfo tst
                                , buildable bi ]
 
--- | A pair of package descriptions: one which modified the buildable values of
--- test suites and benchmarks depending on whether they are enabled, and one
--- which does not.
---
--- Fields are intentionally lazy, we may only need one or the other value.
---
--- Michael S Snoyman 2017-08-29: The very presence of this data type is terribly
--- ugly, it represents the fact that the Cabal 2.0 upgrade did _not_ go well.
--- Specifically, we used to have a field to indicate whether a component was
--- enabled in addition to buildable, but that's gone now, and this is an ugly
--- proxy. We should at some point clean up the mess of Package, LocalPackage,
--- etc, and probably pull in the definition of PackageDescription from Cabal
--- with our additionally needed metadata. But this is a good enough hack for the
--- moment. Odds are, you're reading this in the year 2024 and thinking "wtf?"
-data PackageDescriptionPair = PackageDescriptionPair
-  { pdpOrigBuildable :: PackageDescription
-  , pdpModifiedBuildable :: PackageDescription
-  }
-
 -- | Evaluates the conditions of a 'GenericPackageDescription', yielding
 -- a resolved 'PackageDescription'.
 resolvePackageDescription ::
      PackageConfig
   -> GenericPackageDescription
-  -> PackageDescriptionPair
+  -> PackageDescription
 resolvePackageDescription
   packageConfig
   ( GenericPackageDescription
       desc _ defaultFlags mlib subLibs foreignLibs' exes tests benches
   )
   =
-  PackageDescriptionPair
-    { pdpOrigBuildable = go False
-    , pdpModifiedBuildable = go True
-    }
+  go False
  where
+ -- TODO: remove modBuildable
   go modBuildable = desc
     { library = fmap (resolveConditions rc updateLibDeps) mlib
     , subLibraries = map
