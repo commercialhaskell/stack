@@ -4,9 +4,9 @@
 
 module Stack.Types.Package
   ( BuildInfoOpts (..)
+  , BioInput (..)
   , ExeName (..)
   , FileCacheInfo (..)
-  , GetPackageOpts (..)
   , InstallLocation (..)
   , InstallMap
   , Installed (..)
@@ -65,7 +65,7 @@ import           Stack.Types.PackageFile
 import           Stack.Types.SourceMap ( CommonPackage, FromSnapshot )
 import           Stack.Types.Version ( VersionRange )
 import           Stack.Types.CompCollection ( CompCollection )
-import           Stack.Types.Component ( StackLibrary, StackForeignLibrary, StackTest, StackBenchmark, StackExecutable )
+import           Stack.Types.Component ( StackLibrary, StackForeignLibrary, StackTest, StackBenchmark, StackExecutable, StackBuildInfo )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -173,8 +173,6 @@ data Package = Package
   , packageBenchmarkSuites :: !(CompCollection StackBenchmark)
   , packageExecutables :: !(CompCollection StackExecutable)
     -- ^ does the package have a buildable library stanza?
-  , packageOpts :: !GetPackageOpts
-    -- ^ Args to pass to GHC.
   , packageBuildType :: !BuildType
     -- ^ Package build-type.
   , packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
@@ -198,25 +196,6 @@ packageDefinedFlags = M.keysSet . packageDefaultFlags
 -- or mutable) and package versions.
 type InstallMap = Map PackageName (InstallLocation, Version)
 
--- | Files that the package depends on, relative to package directory.
--- Argument is the location of the Cabal file
-newtype GetPackageOpts = GetPackageOpts
-  { getPackageOpts :: forall env. HasEnvConfig env
-                   => Package
-                   -> InstallMap
-                   -> InstalledMap
-                   -> [PackageName]
-                   -> [PackageName]
-                   -> Path Abs File
-                   -> RIO env
-                        ( Map NamedComponent (Map ModuleName (Path Abs File))
-                        , Map NamedComponent [DotCabalPath]
-                        , Map NamedComponent BuildInfoOpts
-                        )
-  }
-
-instance Show GetPackageOpts where
-  show _ = "<GetPackageOpts>"
 
 -- | GHC options based on cabal information and ghc-options.
 data BuildInfoOpts = BuildInfoOpts
@@ -488,3 +467,20 @@ installedVersion :: Installed -> Version
 installedVersion i =
   let PackageIdentifier _ version = installedPackageIdentifier i
   in  version
+
+
+-- | Input to 'generateBuildInfoOpts'
+data BioInput = BioInput
+  { biInstallMap :: !InstallMap
+  , biInstalledMap :: !InstalledMap
+  , biCabalDir :: !(Path Abs Dir)
+  , biDistDir :: !(Path Abs Dir)
+  , biOmitPackages :: ![PackageName]
+  , biAddPackages :: ![PackageName]
+  , biBuildInfo :: !StackBuildInfo
+  , biDotCabalPaths :: ![DotCabalPath]
+  , biConfigLibDirs :: ![FilePath]
+  , biConfigIncludeDirs :: ![FilePath]
+  , biComponentName :: !NamedComponent
+  , biCabalVersion :: !Version
+  }

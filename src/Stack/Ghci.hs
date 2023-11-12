@@ -50,7 +50,7 @@ import           Stack.Ghci.Script
 import           Stack.Package
                    ( PackageDescriptionPair (..), packageFromPackageDescription
                    , readDotBuildinfo, resolvePackageDescription, hasMainBuildableLibrary
-                   , packageExes
+                   , packageExes, getPackageOpts
                    )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
@@ -76,7 +76,7 @@ import           Stack.Types.Package
                    ( BuildInfoOpts (..), InstallMap, InstalledMap
                    , LocalPackage (..), Package (..), PackageConfig (..)
                    , dotCabalCFilePath, dotCabalGetPath
-                   , dotCabalMainPath, getPackageOpts
+                   , dotCabalMainPath
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Types.Platform ( HasPlatform (..) )
@@ -89,7 +89,7 @@ import           Stack.Types.SourceMap
 import           System.IO ( putStrLn )
 import           System.Permissions ( setScriptPerms )
 import           Stack.Types.CompCollection ( getBuildableListText )
-import Stack.Types.PackageFile (PackageComponentFile(PackageComponentFile))
+import           Stack.Types.PackageFile (PackageComponentFile(PackageComponentFile))
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Ghci" module.
@@ -917,7 +917,7 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
       cabalfp = ghciDescCabalFp pkgDesc
       target = ghciDescTarget pkgDesc
       name = packageName pkg
-  (mods,files,opts) <- getPackageOpts (packageOpts pkg) pkg installMap installedMap locals addPkgs cabalfp
+  (mods,files,opts) <- getPackageOpts pkg installMap installedMap locals addPkgs cabalfp
   let filteredOpts = filterWanted opts
       filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
       allWanted = wantedPackageComponents bopts target pkg
