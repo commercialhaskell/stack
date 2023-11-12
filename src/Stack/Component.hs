@@ -20,6 +20,8 @@ module Stack.Component
   , stackForeignLibraryFromCabal
   , stackBenchmarkFromCabal
   , stackTestFromCabal
+  , foldOnNameAndBuildInfo
+  , stackUnqualToQual
   )
   where
 import           Stack.Prelude
@@ -37,9 +39,22 @@ import qualified Distribution.PackageDescription as Cabal
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Distribution.Package (mkPackageName)
+import           GHC.Records (HasField)
+import           Data.Foldable (foldr')
+import Stack.Types.NamedComponent (NamedComponent)
 
 fromCabalName :: UnqualComponentName -> StackUnqualCompName
 fromCabalName unqualName = StackUnqualCompName $ pack . Cabal.unUnqualComponentName $ unqualName
+
+stackUnqualToQual :: (Text -> NamedComponent) -> StackUnqualCompName -> NamedComponent
+stackUnqualToQual c (StackUnqualCompName n) = c n
+
+foldOnNameAndBuildInfo :: (HasField "buildInfo" a StackBuildInfo
+    , HasField "name" a StackUnqualCompName, Foldable c) =>
+    c a -> (StackUnqualCompName -> StackBuildInfo -> t -> t) -> t -> t
+foldOnNameAndBuildInfo initialCollection accumulator input = foldr' iterator input initialCollection
+    where
+        iterator comp = accumulator comp.name comp.buildInfo
 
 stackLibraryFromCabal :: Library -> StackLibrary
 stackLibraryFromCabal cabalLib = StackLibrary {
@@ -88,7 +103,16 @@ stackBuildInfoFromCabal buildInfoV = gatherComponentToolsAndDepsFromCabal
     hsSourceDirs = buildInfoV.hsSourceDirs,
     cSources = buildInfoV.cSources,
     sbiDependency = mempty,
-    sbiUnknownTools = mempty
+    sbiUnknownTools = mempty,
+    cppOptions = buildInfoV.cppOptions,
+    targetBuildDepends = buildInfoV.targetBuildDepends,
+    options = buildInfoV.options,
+    allLanguages = Cabal.allLanguages buildInfoV,
+    usedExtensions = Cabal.usedExtensions buildInfoV,
+    includeDirs = buildInfoV.includeDirs,
+    extraLibs = buildInfoV.extraLibs,
+    extraLibDirs = buildInfoV.extraLibDirs,
+    frameworks = buildInfoV.frameworks
     }
 
 -- | Iterate on all three dependency list given, and transform and sort them between sbiUnknownTools

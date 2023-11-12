@@ -7,6 +7,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Avoid restricted extensions" #-}
 
 -- | All component related types (library, internal library, foreign library, executable, tests, benchmarks) in stack.
 -- The chosen design replicates many of cabal existing things but in simplified
@@ -27,11 +29,13 @@ module Stack.Types.Component
 where
 
 import Distribution.ModuleName (ModuleName)
-import Distribution.PackageDescription (BenchmarkInterface, TestSuiteInterface)
+import Distribution.PackageDescription (BenchmarkInterface, TestSuiteInterface, Dependency)
 import Distribution.Utils.Path (PackageDir, SourceDir, SymbolicPath)
 import GHC.Records (HasField)
 import Stack.Prelude
 import Stack.Types.Dependency (DepValue)
+import Distribution.Compiler (PerCompilerFlavor)
+import Distribution.Simple (Language, Extension)
 
 type HasName component = HasField "name" component StackUnqualCompName
 
@@ -131,9 +135,27 @@ data StackBuildInfo = StackBuildInfo
     sbiOtherModules :: [ModuleName],
     -- | Only used in file gathering. See usage in "Stack.ComponentFile" module.
     jsSources :: [FilePath],
-    -- | Only used in file gathering. See usage in "Stack.ComponentFile" module.
+    -- | Only used in file & opts gathering. See usage in "Stack.ComponentFile" module for fle gathering.
     hsSourceDirs :: [SymbolicPath PackageDir SourceDir],
     -- | Only used in file gathering. See usage in "Stack.ComponentFile" module.
-    cSources :: [FilePath]
+    cSources :: [FilePath],
+    -- | Only used in opts gathering. See usage in "Stack.Package" module.
+    cppOptions :: [String],
+    -- | Only used in opts gathering.
+    targetBuildDepends :: [Dependency],
+    -- | Only used in opts gathering.
+    options :: PerCompilerFlavor [String],
+    -- | Only used in opts gathering.
+    allLanguages :: [Language],
+    -- | Only used in opts gathering.
+    usedExtensions :: [Extension],
+    -- | Only used in opts gathering.
+    includeDirs :: [FilePath],
+    -- | Only used in opts gathering.
+    extraLibs :: [String],
+    -- | Only used in opts gathering.
+    extraLibDirs :: [String],
+    -- | Only used in opts gathering.
+    frameworks :: [String]
   }
   deriving (Show)
