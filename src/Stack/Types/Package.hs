@@ -1,10 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Types.Package
-  ( BuildInfoOpts (..)
-  , BioInput (..)
+  ( BioInput (..)
+  , BuildInfoOpts (..)
   , ExeName (..)
   , FileCacheInfo (..)
   , InstallLocation (..)
@@ -48,24 +48,26 @@ import           Distribution.Parsec ( PError (..), PWarning (..), showPos )
 import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License ( License )
 import           Distribution.ModuleName ( ModuleName )
-import           Distribution.PackageDescription
-                   ( BuildType )
+import           Distribution.PackageDescription ( BuildType )
 import           Distribution.System ( Platform (..) )
 import qualified RIO.Text as T
 import           Stack.Prelude
+import           Stack.Types.CompCollection ( CompCollection )
 import           Stack.Types.Compiler ( ActualCompiler )
+import           Stack.Types.Component
+                   ( StackBenchmark, StackBuildInfo, StackExecutable
+                   , StackForeignLibrary, StackLibrary, StackTest
+                   )
 import           Stack.Types.Dependency ( DepValue )
 import           Stack.Types.EnvConfig ( EnvConfig, HasEnvConfig (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.PackageFile
-                   ( DotCabalDescriptor (..)
-                   , DotCabalPath (..), StackPackageFile
+                   ( DotCabalDescriptor (..), DotCabalPath (..)
+                   , StackPackageFile
                    )
 import           Stack.Types.SourceMap ( CommonPackage, FromSnapshot )
 import           Stack.Types.Version ( VersionRange )
-import           Stack.Types.CompCollection ( CompCollection )
-import           Stack.Types.Component ( StackLibrary, StackForeignLibrary, StackTest, StackBenchmark, StackExecutable, StackBuildInfo )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -133,9 +135,12 @@ instance Exception PackageException where
       \extension, the following is invalid: "
     , fp
     ]
-  displayException (ComponentNotParsedBug name)= bugReport "[S-4623]"
-    ("Component names should always parse as directory names."
-    <> " The component name without a directory is '" <> name <> "'")
+  displayException (ComponentNotParsedBug name) = bugReport "[S-4623]"
+    (  "Component names should always parse as directory names. The component \
+       \name without a directory is '"
+    <> name
+    <> "'."
+    )
 
 -- | Name of an executable.
 newtype ExeName
@@ -150,10 +155,9 @@ data Package = Package
     -- ^ Version of the package
   , packageLicense :: !(Either SPDX.License License)
     -- ^ The license the package was released under.
-  -- , packageFiles :: !GetPackageFiles
-    -- ^ Get all files of the package.
   , packageDeps :: !(Map PackageName DepValue)
-    -- ^ Packages that the package depends on, both as libraries and build tools.
+    -- ^ Packages that the package depends on, both as libraries and build
+    -- tools.
   , packageAllDeps :: !(Set PackageName)
     -- ^ Original dependencies (not sieved).
   , packageSubLibDeps :: !(Map MungedPackageName DepValue)
@@ -195,7 +199,6 @@ packageDefinedFlags = M.keysSet . packageDefaultFlags
 -- packages and dependencies, and pairs of their relevant database (write-only
 -- or mutable) and package versions.
 type InstallMap = Map PackageName (InstallLocation, Version)
-
 
 -- | GHC options based on cabal information and ghc-options.
 data BuildInfoOpts = BuildInfoOpts
@@ -468,8 +471,7 @@ installedVersion i =
   let PackageIdentifier _ version = installedPackageIdentifier i
   in  version
 
-
--- | Input to 'generateBuildInfoOpts'
+-- | Type representing inputs to 'Stack.Package.generateBuildInfoOpts'.
 data BioInput = BioInput
   { biInstallMap :: !InstallMap
   , biInstalledMap :: !InstalledMap

@@ -21,8 +21,8 @@ module Stack.Component
   , stackTestFromCabal
   , foldOnNameAndBuildInfo
   , stackUnqualToQual
-  )
-  where
+  ) where
+
 import           Stack.Prelude
 import           Stack.Types.Component
 import           Stack.Types.Dependency ( cabalExeToStackDep, cabalToStackDep )
