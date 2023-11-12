@@ -57,18 +57,18 @@
   # the GHC2021 set. Other extensions can be added, if need be.
   - name:
     - NoImplicitPrelude
+    - ConstraintKinds
     - DataKinds
     - DefaultSignatures
     - DerivingStrategies
+    - DisambiguateRecordFields
+    - FlexibleContexts
     - GADTs
     - LambdaCase
     - MultiWayIf
     - OverloadedLists
-    - OverloadedStrings
-    - ConstraintKinds
-    - FlexibleContexts
-    - DisambiguateRecordFields
     - OverloadedRecordDot
+    - OverloadedStrings
     - PartialTypeSignatures
     - QuasiQuotes
     - RecordWildCards
