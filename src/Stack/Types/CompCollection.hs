@@ -23,8 +23,9 @@ module Stack.Types.CompCollection
   , collectionLookup
   , collectionKeyValueList
   , collectionMember
-  ) where
-
+  , foldComponentToList
+  )
+where
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Set as Set
 import           Data.Foldable ( Foldable (..) )
@@ -157,3 +158,10 @@ collectionKeyValueList haystack =
 
 collectionMember :: Text -> CompCollection component -> Bool
 collectionMember needle haystack = isJust $ collectionLookup needle haystack
+
+foldComponentToList :: (Monad m)
+  => CompCollection component
+  -> (component -> m [b] -> m [b])
+  -> m [b]
+  -> m [b]
+foldComponentToList collection fn initialValue = HM.foldr' fn initialValue (asNameMap $ buildableOnes collection)

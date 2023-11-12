@@ -191,6 +191,16 @@ data Package = Package
   , packageFile :: StackPackageFile
     -- ^ The cabal sourced files related to the package at the package level
     -- The components may have file information in their own types
+  , packageTestEnabled :: Bool
+    -- ^ This is a requirement because when tests are not enabled,
+    -- stack's package dependencies should ignore test dependencies.
+    -- Directly set from packageConfigEnableTests. A previous workaround used the
+    -- buildable boolean in cabal's buildInfo.
+  , packageBenchmarkEnabled :: Bool
+    -- ^ This is a requirement because when benchmark are not enabled,
+    -- stack's package dependencies should ignore benchmark dependencies.
+    -- Directly set from packageConfigEnableBenchmarks. A previous workaround used the
+    -- buildable boolean in cabal's buildInfo.
   }
   deriving (Show, Typeable)
 

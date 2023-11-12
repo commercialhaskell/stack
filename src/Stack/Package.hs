@@ -26,6 +26,7 @@ module Stack.Package
   , buildableTestSuites
   , buildableBenchmarks
   , getPackageOpts
+  , processPackageDependencies
   ) where
 
 import           Data.Foldable ( Foldable (..) )
@@ -71,7 +72,7 @@ import           Stack.Component
                    ( foldOnNameAndBuildInfo, isComponentBuildable
                    , stackBenchmarkFromCabal, stackExecutableFromCabal
                    , stackForeignLibraryFromCabal, stackLibraryFromCabal
-                   , stackTestFromCabal, stackUnqualToQual
+                   , stackTestFromCabal, stackUnqualToQual, processDependencies
                    )
 import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
@@ -85,7 +86,7 @@ import           Stack.Types.BuildConfig
                    ( HasBuildConfig (..), getProjectWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, foldAndMakeCollection
-                   , getBuildableSetText
+                   , getBuildableSetText, foldComponentToList
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
@@ -163,6 +164,8 @@ packageFromPackageDescription
       , packageSetupDeps = msetupDeps
       , packageCabalSpec = specVersion pkg
       , packageFile = stackPackageFileFromCabal pkg
+      , packageTestEnabled = packageConfigEnableTests packageConfig
+      , packageBenchmarkEnabled = packageConfigEnableBenchmarks packageConfig
       }
  where
   extraLibNames = S.union subLibNames foreignLibNames
@@ -861,3 +864,44 @@ buildableTestSuites pkg = getBuildableSetText (packageTestSuites pkg)
 
 buildableBenchmarks :: Package -> Set Text
 buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)
+
+-- | This is a fonction to iterate in a monad over all
+-- package component's dependencies, and yield a list of results.
+processPackageDependencies :: (Monad m)
+  => Package
+  -> (PackageName -> DepValue -> m resT)
+  -> m [resT]
+processPackageDependencies pkg fn = do
+  let asPackageNameSet accessor = S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
+  let (!subLibNames, !foreignLibNames) = (asPackageNameSet packageSubLibraries, asPackageNameSet packageForeignLibraries)
+  let shouldIgnoreDep (packageNameV :: PackageName)
+          | packageNameV == packageName pkg = True
+          | packageNameV `S.member` subLibNames = True
+          | packageNameV `S.member` foreignLibNames = True
+          | otherwise = False
+  let innerIterator packageName depValue resListInMonad
+        | shouldIgnoreDep packageName = resListInMonad
+        | otherwise = do
+          resList <- resListInMonad
+          newResElement <- fn packageName depValue
+          pure $ newResElement : resList 
+  let compProcessor target = foldComponentToList (target pkg) (processDependencies innerIterator)
+  let asLibrary range = DepValue
+        { dvVersionRange = range
+        , dvType = AsLibrary
+        }
+  let packageSetupDepsProcessor resAction = case packageSetupDeps pkg of
+        Nothing -> resAction
+        Just v -> M.foldrWithKey' (\pn vr -> innerIterator pn (asLibrary vr)) resAction v
+  let processAllComp
+        = compProcessor packageSubLibraries
+        . compProcessor packageForeignLibraries
+        . compProcessor packageExecutables
+        . (if packageBenchmarkEnabled pkg then compProcessor packageBenchmarks else id)
+        . (if packageTestEnabled pkg then compProcessor packageTestSuites else id)
+        . packageSetupDepsProcessor 
+              
+  let initialValue = case packageLibrary pkg of
+        Nothing -> pure []
+        Just comp -> processDependencies innerIterator comp (pure [])
+  processAllComp initialValue
