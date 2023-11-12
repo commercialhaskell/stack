@@ -24,7 +24,11 @@ import qualified Distribution.PackageDescription as C
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
-import           Stack.Package ( hasMainBuildableLibrary, resolvePackage, packageExes, packageBenchmarks )
+import           Stack.Package
+                   ( hasMainBuildableLibrary, packageBenchmarks, packageExes
+                   , resolvePackage
+                   )
+import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
 import           Stack.SourceMap
                    ( DumpedGlobalPackage, checkFlagsUsedThrowing
@@ -40,6 +44,7 @@ import           Stack.Types.BuildOpts
                    , TestOpts (..), boptsCLIAllProgOptions
                    )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
+import           Stack.Types.CompCollection ( getBuildableSetText )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
 import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.Curator ( Curator (..) )
@@ -52,11 +57,11 @@ import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCSubLib, splitComponents )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), LocalPackage (..), Package (..)
-                   , PackageConfig (..)
-                   , dotCabalGetPath, memoizeRefWith, runMemoizedWith
+                   , PackageConfig (..), dotCabalGetPath, memoizeRefWith
+                   , runMemoizedWith
                    )
-import           Stack.Types.PackageFile ( PackageWarning, PackageComponentFile (PackageComponentFile) )
-import           Stack.PackageFile ( getPackageFile )
+import           Stack.Types.PackageFile
+                   ( PackageComponentFile (..), PackageWarning )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
@@ -66,7 +71,6 @@ import           Stack.Types.SourceMap
 import           Stack.Types.UnusedFlags ( FlagSource (..) )
 import           System.FilePath ( takeFileName )
 import           System.IO.Error ( isDoesNotExistError )
-import           Stack.Types.CompCollection ( getBuildableSetText )
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env => RIO env [LocalPackage]
@@ -336,10 +340,9 @@ loadLocalPackage pp = do
         -- individual executables or library") is resolved, 'hasLibrary' is only
         -- relevant if the library is part of the target spec.
         Just _ ->
-          let hasLibrary = hasMainBuildableLibrary pkg
-          in     hasLibrary
-              || not (Set.null nonLibComponents)
-              || not (null $ packageSubLibraries pkg)
+             hasMainBuildableLibrary pkg
+          || not (Set.null nonLibComponents)
+          || not (null $ packageSubLibraries pkg)
 
       filterSkippedComponents =
         Set.filter (not . (`elem` boptsSkipComponents bopts))
