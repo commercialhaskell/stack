@@ -223,6 +223,9 @@ Set the flag to build Haddock documentation. This may cause a lot of packages to
 get re-built, so that the documentation links work. The `stack haddock` synonym
 sets this flag.
 
+Stack applies Haddock's `--gen-contents` and `--gen-index` flags to generate a
+single HTML contents and index for multiple sets of Haddock documentation.
+
 ### `--haddock-arguments` option
 
 `stack haddock --haddock-arguments <haddock_argument(s)>` passes the specified
@@ -231,6 +234,11 @@ arguments to the Haddock tool.
 Specified arguments are separated by spaces. Arguments can be unquoted (if they
 do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
 include 'escaped' characters, escaped with an initial `\` character.
+
+!!! note
+
+    Haddock's `--latex` flag is incompatible with the Haddock flags used by
+    Stack to generate a single HTML contents and index.
 
 ### `--[no-]haddock-deps` flag
 
