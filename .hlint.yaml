@@ -69,7 +69,6 @@
     - OverloadedLists
     - OverloadedRecordDot
     - OverloadedStrings
-    - PartialTypeSignatures
     - QuasiQuotes
     - RecordWildCards
     - ScopedTypeVariables

@@ -7,7 +7,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE PartialTypeSignatures #-}
 
 -- | All utility functions for Components (library, internal library, foreign library, executable, tests, benchmarks) in stack.
 -- In particular, this module gathers all the Cabal-to-Stack component translations, which previlously occured in the "Stack.Package" module.
