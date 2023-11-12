@@ -47,6 +47,7 @@ stan.html
 
 # VS Code Counter (Visual Studio Code Extension)-related
 .VSCodeCounter
+.vscode
 
 # Unexplained
 *~
