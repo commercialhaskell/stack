@@ -24,7 +24,7 @@ import qualified Distribution.PackageDescription as C
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
-import           Stack.Package ( resolvePackage )
+import           Stack.Package ( hasMainBuildableLibrary, resolvePackage, packageExes, packageBenchmarks )
 import           Stack.Prelude
 import           Stack.SourceMap
                    ( DumpedGlobalPackage, checkFlagsUsedThrowing
@@ -52,10 +52,11 @@ import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCSubLib, splitComponents )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), LocalPackage (..), Package (..)
-                   , PackageConfig (..), PackageLibraries (..)
+                   , PackageConfig (..)
                    , dotCabalGetPath, memoizeRefWith, runMemoizedWith
                    )
-import           Stack.Types.PackageFile ( PackageWarning, getPackageFiles )
+import           Stack.Types.PackageFile ( PackageWarning, PackageComponentFile (PackageComponentFile) )
+import           Stack.PackageFile ( getPackageFile )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
@@ -65,6 +66,7 @@ import           Stack.Types.SourceMap
 import           Stack.Types.UnusedFlags ( FlagSource (..) )
 import           System.FilePath ( takeFileName )
 import           System.IO.Error ( isDoesNotExistError )
+import           Stack.Types.CompCollection ( getBuildableSetText )
 
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env => RIO env [LocalPackage]
@@ -315,7 +317,7 @@ loadLocalPackage pp = do
             ( packageExes pkg
             , if    boptsTests bopts
                  && maybe True (Set.notMember name . curatorSkipTest) mcurator
-                then Map.keysSet (packageTests pkg)
+                then getBuildableSetText (packageTestSuites pkg)
                 else Set.empty
             , if    boptsBenchmarks bopts
                  && maybe
@@ -334,13 +336,10 @@ loadLocalPackage pp = do
         -- individual executables or library") is resolved, 'hasLibrary' is only
         -- relevant if the library is part of the target spec.
         Just _ ->
-          let hasLibrary =
-                case packageLibraries pkg of
-                  NoLibraries -> False
-                  HasLibraries _ -> True
+          let hasLibrary = hasMainBuildableLibrary pkg
           in     hasLibrary
               || not (Set.null nonLibComponents)
-              || not (Set.null $ packageSubLibraries pkg)
+              || not (null $ packageSubLibraries pkg)
 
       filterSkippedComponents =
         Set.filter (not . (`elem` boptsSkipComponents bopts))
@@ -422,7 +421,7 @@ loadLocalPackage pp = do
       -- must not be buildable.
     , lpUnbuildable = toComponents
         (exes `Set.difference` packageExes pkg)
-        (tests `Set.difference` Map.keysSet (packageTests pkg))
+        (tests `Set.difference` getBuildableSetText (packageTestSuites pkg))
         (benches `Set.difference` packageBenchmarks pkg)
     }
 
@@ -499,8 +498,8 @@ getPackageFilesForTargets ::
   -> Set NamedComponent
   -> RIO env (Map NamedComponent (Set (Path Abs File)), [PackageWarning])
 getPackageFilesForTargets pkg cabalFP nonLibComponents = do
-  (components',compFiles,otherFiles,warnings) <-
-    getPackageFiles (packageFiles pkg) cabalFP
+  PackageComponentFile components' compFiles otherFiles warnings <-
+    getPackageFile pkg cabalFP
   let necessaryComponents =
         Set.insert CLib $ Set.filter isCSubLib (M.keysSet components')
       components = necessaryComponents `Set.union` nonLibComponents

@@ -4,9 +4,9 @@
 
 module Stack.Types.Package
   ( BuildInfoOpts (..)
+  , BioInput (..)
   , ExeName (..)
   , FileCacheInfo (..)
-  , GetPackageOpts (..)
   , InstallLocation (..)
   , InstallMap
   , Installed (..)
@@ -19,7 +19,6 @@ module Stack.Types.Package
   , PackageDatabase (..)
   , PackageDbVariety (..)
   , PackageException (..)
-  , PackageLibraries (..)
   , PackageSource (..)
   , dotCabalCFilePath
   , dotCabalGetPath
@@ -50,7 +49,7 @@ import qualified Distribution.SPDX.License as SPDX
 import           Distribution.License ( License )
 import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription
-                   ( TestSuiteInterface, BuildType )
+                   ( BuildType )
 import           Distribution.System ( Platform (..) )
 import qualified RIO.Text as T
 import           Stack.Prelude
@@ -60,11 +59,13 @@ import           Stack.Types.EnvConfig ( EnvConfig, HasEnvConfig (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.PackageFile
-                   ( GetPackageFiles (..), DotCabalDescriptor (..)
-                   , DotCabalPath (..)
+                   ( DotCabalDescriptor (..)
+                   , DotCabalPath (..), StackPackageFile
                    )
 import           Stack.Types.SourceMap ( CommonPackage, FromSnapshot )
 import           Stack.Types.Version ( VersionRange )
+import           Stack.Types.CompCollection ( CompCollection )
+import           Stack.Types.Component ( StackLibrary, StackForeignLibrary, StackTest, StackBenchmark, StackExecutable, StackBuildInfo )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -77,7 +78,7 @@ data PackageException
   | MismatchedCabalIdentifier !PackageIdentifierRevision !PackageIdentifier
   | CabalFileNameParseFail FilePath
   | CabalFileNameInvalidPackageName FilePath
-  | ComponentNotParsedBug
+  | ComponentNotParsedBug String
   deriving (Show, Typeable)
 
 instance Exception PackageException where
@@ -132,16 +133,9 @@ instance Exception PackageException where
       \extension, the following is invalid: "
     , fp
     ]
-  displayException ComponentNotParsedBug = bugReport "[S-4623]"
-    "Component names should always parse as directory names."
-
--- | Libraries in a package. Since Cabal 2.0, sub-libraries are a thing.
-data PackageLibraries
-  = NoLibraries
-  | HasLibraries !(Set Text)
-    -- ^ the foreign library names, sub-libraries get built automatically
-    -- without explicit component name passing
- deriving (Show, Typeable)
+  displayException (ComponentNotParsedBug name)= bugReport "[S-4623]"
+    ("Component names should always parse as directory names."
+    <> " The component name without a directory is '" <> name <> "'")
 
 -- | Name of an executable.
 newtype ExeName
@@ -156,13 +150,10 @@ data Package = Package
     -- ^ Version of the package
   , packageLicense :: !(Either SPDX.License License)
     -- ^ The license the package was released under.
-  , packageFiles :: !GetPackageFiles
+  -- , packageFiles :: !GetPackageFiles
     -- ^ Get all files of the package.
   , packageDeps :: !(Map PackageName DepValue)
     -- ^ Packages that the package depends on, both as libraries and build tools.
-  , packageUnknownTools :: !(Set ExeName)
-    -- ^ Build tools specified in the legacy manner (build-tools:) that failed
-    -- the hard-coded lookup.
   , packageAllDeps :: !(Set PackageName)
     -- ^ Original dependencies (not sieved).
   , packageSubLibDeps :: !(Map MungedPackageName DepValue)
@@ -175,26 +166,22 @@ data Package = Package
     -- ^ Flags used on package.
   , packageDefaultFlags :: !(Map FlagName Bool)
     -- ^ Defaults for unspecified flags.
-  , packageLibraries :: !PackageLibraries
+  , packageLibrary :: !(Maybe StackLibrary)
+  , packageSubLibraries :: !(CompCollection StackLibrary)
+  , packageForeignLibraries :: !(CompCollection StackForeignLibrary)
+  , packageTestSuites :: !(CompCollection StackTest)
+  , packageBenchmarkSuites :: !(CompCollection StackBenchmark)
+  , packageExecutables :: !(CompCollection StackExecutable)
     -- ^ does the package have a buildable library stanza?
-  , packageSubLibraries :: !(Set Text)
-    -- ^ Names of sub-libraries
-  , packageTests :: !(Map Text TestSuiteInterface)
-    -- ^ names and interfaces of test suites
-  , packageBenchmarks :: !(Set Text)
-    -- ^ names of benchmarks
-  , packageExes :: !(Set Text)
-    -- ^ names of executables
-  , packageOpts :: !GetPackageOpts
-    -- ^ Args to pass to GHC.
-  , packageHasExposedModules :: !Bool
-    -- ^ Does the package have exposed modules?
   , packageBuildType :: !BuildType
     -- ^ Package build-type.
   , packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
     -- ^ If present: custom-setup dependencies
   , packageCabalSpec :: !CabalSpecVersion
     -- ^ Cabal spec range
+  , packageFile :: StackPackageFile
+    -- ^ The cabal sourced files related to the package at the package level
+    -- The components may have file information in their own types
   }
   deriving (Show, Typeable)
 
@@ -209,24 +196,6 @@ packageDefinedFlags = M.keysSet . packageDefaultFlags
 -- or mutable) and package versions.
 type InstallMap = Map PackageName (InstallLocation, Version)
 
--- | Files that the package depends on, relative to package directory.
--- Argument is the location of the Cabal file
-newtype GetPackageOpts = GetPackageOpts
-  { getPackageOpts :: forall env. HasEnvConfig env
-                   => InstallMap
-                   -> InstalledMap
-                   -> [PackageName]
-                   -> [PackageName]
-                   -> Path Abs File
-                   -> RIO env
-                        ( Map NamedComponent (Map ModuleName (Path Abs File))
-                        , Map NamedComponent [DotCabalPath]
-                        , Map NamedComponent BuildInfoOpts
-                        )
-  }
-
-instance Show GetPackageOpts where
-  show _ = "<GetPackageOpts>"
 
 -- | GHC options based on cabal information and ghc-options.
 data BuildInfoOpts = BuildInfoOpts
@@ -498,3 +467,20 @@ installedVersion :: Installed -> Version
 installedVersion i =
   let PackageIdentifier _ version = installedPackageIdentifier i
   in  version
+
+
+-- | Input to 'generateBuildInfoOpts'
+data BioInput = BioInput
+  { biInstallMap :: !InstallMap
+  , biInstalledMap :: !InstalledMap
+  , biCabalDir :: !(Path Abs Dir)
+  , biDistDir :: !(Path Abs Dir)
+  , biOmitPackages :: ![PackageName]
+  , biAddPackages :: ![PackageName]
+  , biBuildInfo :: !StackBuildInfo
+  , biDotCabalPaths :: ![DotCabalPath]
+  , biConfigLibDirs :: ![FilePath]
+  , biConfigIncludeDirs :: ![FilePath]
+  , biComponentName :: !NamedComponent
+  , biCabalVersion :: !Version
+  }

@@ -11,13 +11,19 @@ module Stack.Package
   , packageFromPackageDescription
   , Package (..)
   , PackageDescriptionPair (..)
-  , GetPackageOpts (..)
   , PackageConfig (..)
   , buildLogPath
   , PackageException (..)
   , resolvePackageDescription
   , packageDependencies
   , applyForceCustomBuild
+  , hasMainBuildableLibrary
+  , mainLibraryHasExposedModules
+  , packageUnknownTools
+  , packageSubLibrariesNameSet
+  , packageExes
+  , packageBenchmarks
+  , getPackageOpts
   ) where
 
 import           Data.List ( unzip )
@@ -35,9 +41,9 @@ import           Distribution.PackageDescription
                    , Dependency (..), Executable (..), ForeignLib (..)
                    , GenericPackageDescription (..), HookedBuildInfo
                    , Library (..), PackageDescription (..), PackageFlag (..)
-                   , SetupBuildInfo (..), TestSuite (..), allLanguages
+                   , SetupBuildInfo (..), TestSuite (..)
                    , allLibraries, buildType, depPkgName, depVerRange
-                   , libraryNameString, maybeToLibraryName, usedExtensions
+                   , libraryNameString, maybeToLibraryName
                    )
 import           Distribution.Pretty ( prettyShow )
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
@@ -73,17 +79,25 @@ import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), subLibComponents )
 import           Stack.Types.Package
-                   ( BuildInfoOpts (..), ExeName (..), GetPackageOpts (..)
+                   ( BuildInfoOpts (..), ExeName (..)
                    , InstallMap, Installed (..), InstalledMap, Package (..)
                    , PackageConfig (..), PackageException (..)
-                   , PackageLibraries (..), dotCabalCFilePath, packageIdentifier
+                   , dotCabalCFilePath, packageIdentifier, BioInput (..)
                    )
 import           Stack.Types.Version
                    ( VersionRange, intersectVersionRanges, withinRange )
 import           System.FilePath ( replaceExtension )
 import           Stack.Types.Dependency ( DepValue (..), DepType (..) )
-import           Stack.Types.PackageFile ( DotCabalPath , GetPackageFiles (..) )
-import           Stack.PackageFile ( getPackageFile )
+import           Stack.Types.PackageFile ( DotCabalPath, PackageComponentFile (PackageComponentFile) )
+import           Stack.PackageFile ( getPackageFile, stackPackageFileFromCabal )
+
+import           Stack.Types.CompCollection ( foldAndMakeCollection, CompCollection, getBuildableSetText )
+import           Stack.Component
+import qualified Stack.Types.Component as Component
+import           GHC.Records (getField)
+import           Stack.Types.Component ( HasBuildInfo )
+import           Data.Foldable ( Foldable(foldr') )
+import           Distribution.ModuleName (ModuleName)
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
@@ -114,68 +128,23 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   , packageVersion = pkgVersion pkgId
   , packageLicense = licenseRaw pkg
   , packageDeps = deps
-  , packageFiles = pkgFiles
-  , packageUnknownTools = unknownTools
   , packageGhcOptions = packageConfigGhcOptions packageConfig
   , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig
   , packageFlags = packageConfigFlags packageConfig
   , packageDefaultFlags = M.fromList
       [(flagName flag, flagDefault flag) | flag <- pkgFlags]
+  , packageLibrary = stackLibraryFromCabal <$> library pkg
+  , packageSubLibraries = foldAndMakeCollection stackLibraryFromCabal $ subLibraries pkg
+  , packageForeignLibraries = foldAndMakeCollection stackForeignLibraryFromCabal $ foreignLibs pkg
+  , packageTestSuites = foldAndMakeCollection stackTestFromCabal $ testSuites pkgNoMod
+  , packageBenchmarkSuites = foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkgNoMod
+  , packageExecutables = foldAndMakeCollection stackExecutableFromCabal $ executables pkg
   , packageAllDeps = M.keysSet deps
   , packageSubLibDeps = subLibDeps
-  , packageLibraries =
-      let mlib = do
-            lib <- library pkg
-            guard $ buildable $ libBuildInfo lib
-            Just lib
-       in
-        case mlib of
-          Nothing -> NoLibraries
-          Just _ -> HasLibraries foreignLibNames
-  , packageSubLibraries = subLibNames
-  , packageTests = M.fromList
-      [ (T.pack (Cabal.unUnqualComponentName $ testName t), testInterface t)
-      | t <- testSuites pkgNoMod
-      , buildable (testBuildInfo t)
-      ]
-  , packageBenchmarks = S.fromList
-      [ T.pack (Cabal.unUnqualComponentName $ benchmarkName b)
-      | b <- benchmarks pkgNoMod
-      , buildable (benchmarkBuildInfo b)
-      ]
-      -- Same comment about buildable applies here too.
-  , packageExes = S.fromList
-      [ T.pack (Cabal.unUnqualComponentName $ exeName biBuildInfo)
-      | biBuildInfo <- executables pkg
-      , buildable (buildInfo biBuildInfo)
-      ]
-  -- This is an action used to collect info needed for "stack ghci".
-  -- This info isn't usually needed, so computation of it is deferred.
-  , packageOpts = GetPackageOpts $
-      \installMap installedMap omitPkgs addPkgs cabalfp -> do
-        (componentsModules,componentFiles, _, _) <- getPackageFiles pkgFiles cabalfp
-        let subLibs =
-              S.toList $ subLibComponents $ M.keysSet componentsModules
-        excludedSubLibs <- mapM (parsePackageNameThrowing . T.unpack) subLibs
-        mungedSubLibs <- mapM
-          (parsePackageNameThrowing . T.unpack . toInternalPackageMungedName)
-          subLibs
-        componentsOpts <- generatePkgDescOpts
-          installMap
-          installedMap
-          (excludedSubLibs ++ omitPkgs)
-          (mungedSubLibs ++ addPkgs)
-          cabalfp
-          pkg
-          componentFiles
-        pure (componentsModules, componentFiles, componentsOpts)
-  , packageHasExposedModules = maybe
-      False
-      (not . null . exposedModules)
-      (library pkg)
   , packageBuildType = buildType pkg
   , packageSetupDeps = msetupDeps
   , packageCabalSpec = specVersion pkg
+  , packageFile = stackPackageFileFromCabal pkg
   }
  where
   extraLibNames = S.union subLibNames foreignLibNames
@@ -195,18 +164,13 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
     $ filter (buildable . foreignLibBuildInfo)
     $ foreignLibs pkg
 
-  toInternalPackageMungedName
-    = T.pack . prettyShow . MungedPackageName (pkgName pkgId)
-    . maybeToLibraryName . Just . Cabal.mkUnqualComponentName . T.unpack
-
   -- Gets all of the modules, files, build files, and data files that constitute
   -- the package. This is primarily used for dirtiness checking during build, as
   -- well as use by "stack ghci"
-  pkgFiles = GetPackageFiles $ getPackageFile pkg
   pkgId = package pkg
   name = pkgName pkgId
 
-  (unknownTools, knownTools) = packageDescTools pkg
+  (_unknownTools, knownTools) = packageDescTools pkg
 
   deps = M.filterWithKey (const . not . isMe) (M.unionsWith (<>)
     [ asLibrary <$> packageDependencies pkg
@@ -240,6 +204,40 @@ packageFromPackageDescription packageConfig pkgFlags (PackageDescriptionPair pkg
   isMe name' =  name' == name
              || fromString (packageNameString name') `S.member` extraLibNames
 
+toInternalPackageMungedName :: Package -> Text -> Text
+toInternalPackageMungedName pkg
+  = T.pack . prettyShow . MungedPackageName (packageName pkg)
+  . maybeToLibraryName . Just . Cabal.mkUnqualComponentName . T.unpack
+
+-- | This is an action used to collect info needed for "stack ghci".
+-- This info isn't usually needed, so computation of it is deferred.
+getPackageOpts :: (MonadUnliftIO m, MonadThrow m, HasEnvConfig env, MonadReader env m)
+  => Package
+  -> InstallMap
+  -> InstalledMap
+  -> [PackageName]
+  -> [PackageName]
+  -> Path Abs File
+  -> m ( Map NamedComponent (Map ModuleName (Path Abs File))
+       , Map NamedComponent [DotCabalPath]
+       , Map NamedComponent BuildInfoOpts)
+getPackageOpts stackPackage installMap installedMap omitPkgs addPkgs cabalfp = do
+        PackageComponentFile !componentsModules componentFiles _ _ <- getPackageFile stackPackage cabalfp
+        let subLibs =
+              S.toList $ subLibComponents $ M.keysSet componentsModules
+        excludedSubLibs <- mapM (parsePackageNameThrowing . T.unpack) subLibs
+        mungedSubLibs <- mapM
+          (parsePackageNameThrowing . T.unpack . toInternalPackageMungedName stackPackage)
+          subLibs
+        componentsOpts <- generatePkgDescOpts
+          installMap
+          installedMap
+          (excludedSubLibs ++ omitPkgs)
+          (mungedSubLibs ++ addPkgs)
+          cabalfp
+          stackPackage
+          componentFiles
+        pure (componentsModules, componentFiles, componentsOpts)
 -- | Generate GHC options for the package's components, and a list of options
 -- which apply generally to the package, not one specific component.
 generatePkgDescOpts ::
@@ -251,16 +249,14 @@ generatePkgDescOpts ::
   -> [PackageName]
      -- ^ Packages to add to the "-package" flags
   -> Path Abs File
-  -> PackageDescription
+  -> Package
   -> Map NamedComponent [DotCabalPath]
   -> m (Map NamedComponent BuildInfoOpts)
 generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
   config <- view configL
   cabalVer <- view cabalVersionL
   distDir <- distDirFromDir cabalDir
-  let generate namedComponent binfo =
-        ( namedComponent
-        , generateBuildInfoOpts BioInput
+  let generate namedComponent binfo = generateBuildInfoOpts BioInput
             { biInstallMap = installMap
             , biInstalledMap = installedMap
             , biCabalDir = cabalDir
@@ -275,73 +271,25 @@ generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg compone
             , biComponentName = namedComponent
             , biCabalVersion = cabalVer
             }
-        )
-  pure
-    ( M.fromList
-        ( concat
-            [ maybe
-                []
-                (pure . generate CLib . libBuildInfo)
-                (library pkg)
-            , mapMaybe
-                (\subLib -> do
-                  let maybeLib =
-                        CSubLib . T.pack . Cabal.unUnqualComponentName <$>
-                          (libraryNameString . libName) subLib
-                  flip generate  (libBuildInfo subLib) <$> maybeLib
-                 )
-                (subLibraries pkg)
-            , fmap
-                (\exe ->
-                  generate
-                    (CExe (T.pack (Cabal.unUnqualComponentName (exeName exe))))
-                    (buildInfo exe)
-                )
-                (executables pkg)
-            , fmap
-                (\bench ->
-                  generate
-                    (CBench
-                      (T.pack (Cabal.unUnqualComponentName (benchmarkName bench)))
-                    )
-                    (benchmarkBuildInfo bench)
-                )
-                (benchmarks pkg)
-            , fmap
-                (\test ->
-                  generate
-                    (CTest (T.pack (Cabal.unUnqualComponentName (testName test))))
-                    (testBuildInfo test)
-                )
-                (testSuites pkg)
-            ]
-        )
-    )
+  let insertInMap name compVal = M.insert name (generate name compVal)
+  let translatedInsertInMap constructor name = insertInMap (stackUnqualToQual constructor name)
+  let makeBuildInfoOpts selector constructor = foldOnNameAndBuildInfo (selector pkg) (translatedInsertInMap constructor)
+  let aggregateAllBuildInfoOpts = 
+        makeBuildInfoOpts packageLibrary (const CLib)
+        . makeBuildInfoOpts packageSubLibraries CSubLib
+        . makeBuildInfoOpts packageExecutables CExe
+        . makeBuildInfoOpts packageBenchmarkSuites CBench
+        . makeBuildInfoOpts packageTestSuites CTest
+  pure $ aggregateAllBuildInfoOpts mempty
  where
   cabalDir = parent cabalfp
-
--- | Input to 'generateBuildInfoOpts'
-data BioInput = BioInput
-  { biInstallMap :: !InstallMap
-  , biInstalledMap :: !InstalledMap
-  , biCabalDir :: !(Path Abs Dir)
-  , biDistDir :: !(Path Abs Dir)
-  , biOmitPackages :: ![PackageName]
-  , biAddPackages :: ![PackageName]
-  , biBuildInfo :: !BuildInfo
-  , biDotCabalPaths :: ![DotCabalPath]
-  , biConfigLibDirs :: ![FilePath]
-  , biConfigIncludeDirs :: ![FilePath]
-  , biComponentName :: !NamedComponent
-  , biCabalVersion :: !Version
-  }
 
 -- | Generate GHC options for the target. Since Cabal also figures out these
 -- options, currently this is only used for invoking GHCI (via stack ghci).
 generateBuildInfoOpts :: BioInput -> BuildInfoOpts
 generateBuildInfoOpts BioInput {..} =
   BuildInfoOpts
-    { bioOpts = ghcOpts ++ fmap ("-optP" <>) (cppOptions biBuildInfo)
+    { bioOpts = ghcOpts ++ fmap ("-optP" <>) (Component.cppOptions biBuildInfo)
     -- NOTE for future changes: Due to this use of nubOrd (and other uses
     -- downstream), these generated options must not rely on multiple
     -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
@@ -376,22 +324,22 @@ generateBuildInfoOpts BioInput {..} =
   pkgs =
     biAddPackages ++
     [ name
-    | Dependency name _ _ <- targetBuildDepends biBuildInfo
+    | Dependency name _ _ <- Component.targetBuildDepends biBuildInfo
       -- TODO: cabal 3 introduced multiple public libraries in a single dependency
     , name `notElem` biOmitPackages
     ]
-  PerCompilerFlavor ghcOpts _ = options biBuildInfo
+  PerCompilerFlavor ghcOpts _ = Component.options biBuildInfo
   extOpts =
-       map (("-X" ++) . display) (allLanguages biBuildInfo)
-    <> map (("-X" ++) . display) (usedExtensions biBuildInfo)
+       map (("-X" ++) . display) (Component.allLanguages biBuildInfo)
+    <> map (("-X" ++) . display) (Component.usedExtensions biBuildInfo)
   srcOpts =
     map (("-i" <>) . toFilePathNoTrailingSep)
       (concat
         [ [ componentBuildDir biCabalVersion biComponentName biDistDir ]
         , [ biCabalDir
-          | null (hsSourceDirs biBuildInfo)
+          | null (Component.hsSourceDirs biBuildInfo)
           ]
-        , mapMaybe (toIncludeDir . getSymbolicPath) (hsSourceDirs biBuildInfo)
+        , mapMaybe (toIncludeDir . getSymbolicPath) (Component.hsSourceDirs biBuildInfo)
         , [ componentAutogen ]
         , maybeToList (packageAutogenDir biCabalVersion biDistDir)
         , [ componentOutputDir biComponentName biDistDir ]
@@ -404,22 +352,22 @@ generateBuildInfoOpts BioInput {..} =
     map ("-I" <>) (biConfigIncludeDirs <> pkgIncludeOpts)
   pkgIncludeOpts =
     [ toFilePathNoTrailingSep absDir
-    | dir <- includeDirs biBuildInfo
+    | dir <- Component.includeDirs biBuildInfo
     , absDir <- handleDir dir
     ]
   libOpts =
-    map ("-l" <>) (extraLibs biBuildInfo) <>
+    map ("-l" <>) (Component.extraLibs biBuildInfo) <>
     map ("-L" <>) (biConfigLibDirs <> pkgLibDirs)
   pkgLibDirs =
     [ toFilePathNoTrailingSep absDir
-    | dir <- extraLibDirs biBuildInfo
+    | dir <- Component.extraLibDirs biBuildInfo
     , absDir <- handleDir dir
     ]
   handleDir dir = case (parseAbsDir dir, parseRelDir dir) of
     (Just ab, _       ) -> [ab]
     (_      , Just rel) -> [biCabalDir </> rel]
     (Nothing, Nothing ) -> []
-  fworks = map ("-framework=" <>) (frameworks biBuildInfo)
+  fworks = map ("-framework=" <>) (Component.frameworks biBuildInfo)
 
 -- | Make the .o path from the .c file path for a component. Example:
 --
@@ -802,3 +750,50 @@ applyForceCustomBuild cabalVersion package
   forceCustomBuild =
        packageBuildType package == Simple
     && not (cabalVersion `withinRange` cabalVersionRange)
+
+-- | Check if the main library is buildable.
+-- 
+-- Replace legacy logic with cabal shaped types.
+-- Previous logic beeing @Package@ field named packageLibraries, equal to either NoLibrary or v foreignLibNames.
+-- True here means HasLibraries _ in previous usage.
+-- 
+hasMainBuildableLibrary :: Package -> Bool
+hasMainBuildableLibrary package = maybe False isComponentBuildable $ packageLibrary package
+
+-- | Check if the main library has any exposed modules.
+-- 
+-- Replace legacy packageHasExposedModule. This should become irrelevant at some point
+-- since there's nothing inherently wrong or different with packages exposing only modules in
+-- internal libraries (for instance). 
+-- 
+mainLibraryHasExposedModules :: Package -> Bool
+mainLibraryHasExposedModules package = maybe False (not . null . Component.exposedModules) $ packageLibrary package
+
+-- | Aggregate all unknown tools from all exe.
+-- Replaces packageUnknownTools field from Package datatype.
+-- Mostly meant for build tools specified in the legacy manner (build-tools:) that failed
+-- the hard-coded lookup.
+-- See sbiUnknownTools for more info.
+packageUnknownTools :: Package -> Set Text
+packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
+  where
+    lib setT = case packageLibrary pkg of
+      Just libV -> addUnknownTools libV setT
+      Nothing -> setT
+    bench = gatherUnknownTools $ packageBenchmarkSuites pkg
+    tests = gatherUnknownTools $ packageTestSuites pkg
+    flib = gatherUnknownTools $ packageForeignLibraries pkg
+    sublib = gatherUnknownTools $ packageSubLibraries pkg
+    exe = gatherUnknownTools $ packageExecutables pkg
+    addUnknownTools :: HasBuildInfo x => x -> Set Text -> Set Text
+    addUnknownTools = (<>) . Component.sbiUnknownTools . getField @"buildInfo"
+    gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
+    gatherUnknownTools = foldr' addUnknownTools mempty
+
+packageSubLibrariesNameSet :: Package -> Set Text
+packageSubLibrariesNameSet pkg = getBuildableSetText (packageSubLibraries pkg)
+packageExes :: Package -> Set Text
+packageExes pkg = getBuildableSetText (packageExecutables pkg)
+
+packageBenchmarks :: Package -> Set Text
+packageBenchmarks pkg = getBuildableSetText (packageBenchmarkSuites pkg)
