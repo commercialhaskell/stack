@@ -60,10 +60,14 @@
     - ConstraintKinds
     - DataKinds
     - DefaultSignatures
+    - DeriveDataTypeable
+    - DeriveGeneric
     - DerivingStrategies
     - DisambiguateRecordFields
+    - DuplicateRecordFields
     - FlexibleContexts
     - GADTs
+    - GeneralizedNewtypeDeriving
     - LambdaCase
     - MultiWayIf
     - OverloadedLists
