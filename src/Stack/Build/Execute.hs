@@ -64,6 +64,7 @@ import           Distribution.Types.UnqualComponentName
                    ( mkUnqualComponentName )
 import           Distribution.Verbosity ( showForCabal )
 import           Distribution.Version ( mkVersion )
+import           GHC.Records ( getField )
 import           Path
                    ( PathException, (</>), addExtension, filename
                    , isProperPrefixOf, parent, parseRelDir, parseRelFile
@@ -124,7 +125,11 @@ import           Stack.Coverage
                    , generateHpcUnifiedReport, updateTixFile
                    )
 import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
-import           Stack.Package ( buildLogPath, hasMainBuildableLibrary, mainLibraryHasExposedModules, packageSubLibrariesNameSet, packageExes )
+import           Stack.Package
+                   ( buildLogPath, hasMainBuildableLibrary
+                   , mainLibraryHasExposedModules, packageExes
+                   , packageSubLibrariesNameSet
+                   )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
@@ -144,6 +149,10 @@ import           Stack.Types.BuildOpts
                    , CabalVerbosity (..), HaddockOpts (..)
                    , ProgressBarFormat (..), TestOpts (..)
                    )
+import           Stack.Types.CompCollection
+                   ( collectionKeyValueList, collectionLookup
+                   , getBuildableListText
+                   )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
                    , compilerVersionString, getGhcVersion, whichCompilerL
@@ -152,6 +161,7 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..)
                    , cabalVersionL, cpWhich, getCompilerPath, getGhcPkgExe
                    )
+import qualified Stack.Types.Component as Component
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), buildOptsL, stackRootL )
 import           Stack.Types.ConfigureOpts
@@ -175,9 +185,8 @@ import           Stack.Types.NamedComponent
                    )
 import           Stack.Types.Package
                    ( InstallLocation (..), Installed (..), InstalledMap
-                   , LocalPackage (..), Package (..)
-                   , installedPackageIdentifier, packageIdentifier
-                   , runMemoizedWith
+                   , LocalPackage (..), Package (..), installedPackageIdentifier
+                   , packageIdentifier, runMemoizedWith
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
@@ -195,13 +204,6 @@ import           System.IO.Error ( isDoesNotExistError )
 import           System.PosixCompat.Files
                    ( createLink, getFileStatus, modificationTime )
 import           System.Random ( randomIO )
-import           Stack.Types.CompCollection
-                  ( getBuildableListText
-                  , collectionKeyValueList
-                  , collectionLookup
-                  )
-import qualified Stack.Types.Component as Component
-import           GHC.Records ( getField )
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus
@@ -2093,8 +2095,8 @@ singleBuild
     let ident = PackageIdentifier (packageName package) (packageVersion package)
     -- only pure the sub-libraries to cache them if we also cache the main
     -- library (that is, if it exists)
-    (mpkgid, subLibsPkgIds) <- if hasMainBuildableLibrary package then
-      do
+    (mpkgid, subLibsPkgIds) <- if hasMainBuildableLibrary package
+      then do
         subLibsPkgIds <- fmap catMaybes $
           forM (getBuildableListText $ packageSubLibraries package) $ \subLib -> do
             let subLibName = MungedPackageName
@@ -2114,7 +2116,7 @@ singleBuild
           Just pkgid -> pure (Library ident pkgid Nothing, subLibsPkgIds)
       else do
         markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
-                                                          -- with writeFlagCache?
+                                                   -- with writeFlagCache?
         pure (Executable ident, []) -- don't pure sublibs in this case
 
     case taskType of
@@ -2276,7 +2278,9 @@ singleTest topts testsToRun ac ee task installedMap = do
 
         let suitesToRun
               = [ testSuitePair
-                | testSuitePair <- (fmap . fmap) (getField @"interface") <$> collectionKeyValueList $ packageTestSuites package
+                | testSuitePair <-
+                    (fmap . fmap) (getField @"interface") <$>
+                      collectionKeyValueList $ packageTestSuites package
                 , let testName = fst testSuitePair
                 , testName `elem` testsToRun
                 ]
@@ -2485,9 +2489,11 @@ singleTest topts testsToRun ac ee task installedMap = do
         when needHpc $ do
           let testsToRun' = map f testsToRun
               f tName =
-                  case getField @"interface" <$> collectionLookup tName (packageTestSuites package) of
-                    Just C.TestSuiteLibV09{} -> tName <> "Stub"
-                    _ -> tName
+                case getField @"interface" <$> mComponent of
+                  Just C.TestSuiteLibV09{} -> tName <> "Stub"
+                  _ -> tName
+               where
+                mComponent = collectionLookup tName (packageTestSuites package)
           generateHpcReport pkgDir package testsToRun'
 
         bs <- liftIO $
@@ -2694,19 +2700,22 @@ primaryComponentOptions ::
   -> LocalPackage
   -> [String]
 primaryComponentOptions executableBuildStatuses lp =
-    -- TODO: get this information from target parsing instead,
-    -- which will allow users to turn off library building if
-    -- desired
-  (if hasMainBuildableLibrary package then map T.unpack
-        $ T.append "lib:" (T.pack (packageNameString (packageName package)))
-        : map (T.append "flib:") (getBuildableListText (packageForeignLibraries package))
-    else [])
+  -- TODO: get this information from target parsing instead, which will allow
+  -- users to turn off library building if desired
+     ( if hasMainBuildableLibrary package
+         then map T.unpack
+           $ T.append "lib:" (T.pack (packageNameString (packageName package)))
+           : map
+               (T.append "flib:")
+               (getBuildableListText (packageForeignLibraries package))
+         else []
+     )
   ++ map
-      (T.unpack . T.append "lib:")
-      (getBuildableListText $ packageSubLibraries package)
+       (T.unpack . T.append "lib:")
+       (getBuildableListText $ packageSubLibraries package)
   ++ map
-      (T.unpack . T.append "exe:")
-      (Set.toList $ exesToBuild executableBuildStatuses lp)
+       (T.unpack . T.append "exe:")
+       (Set.toList $ exesToBuild executableBuildStatuses lp)
  where
   package = lpPackage lp
 
