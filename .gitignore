@@ -45,9 +45,11 @@ stan.html
 # macOS-related
 .DS_Store
 
+# VS Code workspace settings
+.vscode
+
 # VS Code Counter (Visual Studio Code Extension)-related
 .VSCodeCounter
-.vscode
 
 # Unexplained
 *~
