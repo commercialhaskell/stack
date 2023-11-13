@@ -7,39 +7,35 @@ module Stack.PackageFile
   , stackPackageFileFromCabal
   ) where
 
+import           Data.Foldable ( Foldable (..) )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import           Distribution.CabalSpecVersion ( CabalSpecVersion )
-import           Distribution.PackageDescription
-                  ( PackageDescription(dataFiles, extraSrcFiles, dataDir),
-                  BuildType(Custom) )
+import qualified Distribution.PackageDescription as Cabal
 import           Distribution.Simple.Glob ( matchDirFileGlob )
 import           Path ( parent, (</>) )
 import           Path.Extra ( forgivingResolveFile, rejectMissingFile )
 import           Path.IO ( doesFileExist )
 import           Stack.ComponentFile
-                   ( resolveOrWarn, ComponentFile (ComponentFile)
-                   , stackLibraryFiles, stackExecutableFiles, stackBenchmarkFiles
+                   ( ComponentFile (..), resolveOrWarn, stackBenchmarkFiles
+                   , stackExecutableFiles, stackLibraryFiles
                    )
 import           Stack.Constants
                    ( relFileHpackPackageConfig, relFileSetupHs, relFileSetupLhs
                    )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Prelude
+import           Stack.Types.BuildConfig ( HasBuildConfig (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.EnvConfig
-                   ( HasEnvConfig (..) )
+import           Stack.Types.EnvConfig ( HasEnvConfig (..) )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
+import           Stack.Types.Package ( Package(..) )
 import           Stack.Types.PackageFile
-                   ( GetPackageFileContext (..)
-                   , StackPackageFile (StackPackageFile), PackageComponentFile (PackageComponentFile, packageExtraFile)
+                   ( GetPackageFileContext (..), PackageComponentFile (..)
+                   , StackPackageFile (..)
                    )
 import qualified System.FilePath as FilePath
 import           System.IO.Error ( isUserError )
-import           Stack.Types.BuildConfig
-                   ( HasBuildConfig(buildConfigL) )
-import           Stack.Types.Package (Package(..))
-import           Data.Foldable (Foldable(..))
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
@@ -60,20 +56,24 @@ packageDescModulesAndFiles pkg = do
               (packageCabalSpec pkg) (packageFile pkg)
   let initialValue = mempty{packageExtraFile=packageExtraFile}
   let accumulator f comp st = (insertComponentFile <$> st) <*> f comp
-  let gatherCompFileCollection createCompFileFn getCompFn res = foldr' (accumulator createCompFileFn) res (getCompFn pkg)
+  let gatherCompFileCollection createCompFileFn getCompFn res =
+        foldr' (accumulator createCompFileFn) res (getCompFn pkg)
   gatherCompFileCollection stackLibraryFiles packageLibrary
-          . gatherCompFileCollection stackLibraryFiles packageSubLibraries
-          . gatherCompFileCollection stackExecutableFiles packageExecutables
-          . gatherCompFileCollection stackBenchmarkFiles packageBenchmarkSuites $ pure initialValue
+    . gatherCompFileCollection stackLibraryFiles packageSubLibraries
+    . gatherCompFileCollection stackExecutableFiles packageExecutables
+    . gatherCompFileCollection stackBenchmarkFiles packageBenchmarkSuites
+    $ pure initialValue
 
-
-resolveGlobFilesFromStackPackageFile :: CabalSpecVersion -> StackPackageFile -> RIO GetPackageFileContext (Set (Path Abs File))
-resolveGlobFilesFromStackPackageFile csvV (StackPackageFile extraSrcFilesV dataDirV dataFilesV) =
-  resolveGlobFiles
-                csvV
-                ( extraSrcFilesV
-                  ++ map (dataDirV FilePath.</>) dataFilesV
-                )
+resolveGlobFilesFromStackPackageFile ::
+     CabalSpecVersion
+  -> StackPackageFile
+  -> RIO GetPackageFileContext (Set (Path Abs File))
+resolveGlobFilesFromStackPackageFile
+    csvV
+    (StackPackageFile extraSrcFilesV dataDirV dataFilesV)
+  = resolveGlobFiles
+      csvV
+      (extraSrcFilesV ++ map (dataDirV FilePath.</>) dataFilesV)
 
 -- | Resolve globbing of files (e.g. data files) to absolute paths.
 resolveGlobFiles ::
@@ -81,8 +81,7 @@ resolveGlobFiles ::
   -> [String]
   -> RIO GetPackageFileContext (Set (Path Abs File))
 resolveGlobFiles cabalFileVersion =
-  fmap (S.fromList . catMaybes . concat) .
-  mapM resolve
+  fmap (S.fromList . catMaybes . concat) . mapM resolve
  where
   resolve name =
     if '*' `elem` name
@@ -127,35 +126,45 @@ getPackageFile pkg cabalfp =
         (GetPackageFileContext cabalfp distDir bc cabalVer)
         (packageDescModulesAndFiles pkg)
     setupFiles <-
-      if packageBuildType pkg == Custom
-      then do
-        let setupHsPath = pkgDir </> relFileSetupHs
-            setupLhsPath = pkgDir </> relFileSetupLhs
-        setupHsExists <- doesFileExist setupHsPath
-        if setupHsExists
-          then pure (S.singleton setupHsPath)
-          else do
-            setupLhsExists <- doesFileExist setupLhsPath
-            if setupLhsExists
-              then pure (S.singleton setupLhsPath)
-              else pure S.empty
-      else pure S.empty
+      if packageBuildType pkg == Cabal.Custom
+        then do
+          let setupHsPath = pkgDir </> relFileSetupHs
+              setupLhsPath = pkgDir </> relFileSetupLhs
+          setupHsExists <- doesFileExist setupHsPath
+          if setupHsExists
+            then pure (S.singleton setupHsPath)
+            else do
+              setupLhsExists <- doesFileExist setupLhsPath
+              if setupLhsExists
+                then pure (S.singleton setupLhsPath)
+                else pure S.empty
+        else pure S.empty
     moreBuildFiles <- fmap (S.insert cabalfp . S.union setupFiles) $ do
       let hpackPath = pkgDir </> relFileHpackPackageConfig
       hpackExists <- doesFileExist hpackPath
       pure $ if hpackExists then S.singleton hpackPath else S.empty
-    pure packageComponentFile{packageExtraFile = moreBuildFiles <> packageExtraFile packageComponentFile}
+    pure packageComponentFile
+      { packageExtraFile =
+          moreBuildFiles <> packageExtraFile packageComponentFile
+      }
 
-stackPackageFileFromCabal :: PackageDescription -> StackPackageFile
+stackPackageFileFromCabal :: Cabal.PackageDescription -> StackPackageFile
 stackPackageFileFromCabal cabalPkg =
-  StackPackageFile (extraSrcFiles cabalPkg) (dataDir cabalPkg) (dataFiles cabalPkg)
+  StackPackageFile
+    (Cabal.extraSrcFiles cabalPkg)
+    (Cabal.dataDir cabalPkg)
+    (Cabal.dataFiles cabalPkg)
 
-insertComponentFile :: PackageComponentFile -> (NamedComponent, ComponentFile) -> PackageComponentFile
+insertComponentFile ::
+     PackageComponentFile
+  -> (NamedComponent, ComponentFile)
+  -> PackageComponentFile
 insertComponentFile packageCompFile (name, compFile) =
   PackageComponentFile nCompFile nDotCollec packageExtraFile nWarnings
-  where
-    (ComponentFile moduleFileMap dotCabalFileList warningsCollec) = compFile
-    (PackageComponentFile modules files packageExtraFile warnings) = packageCompFile
-    nCompFile = M.insert name moduleFileMap modules
-    nDotCollec = M.insert name dotCabalFileList files
-    nWarnings = warningsCollec ++ warnings
+ where
+  (ComponentFile moduleFileMap dotCabalFileList warningsCollec) = compFile
+  (PackageComponentFile modules files packageExtraFile warnings) =
+    packageCompFile
+  nCompFile = M.insert name moduleFileMap modules
+  nDotCollec = M.insert name dotCabalFileList files
+  nWarnings = warningsCollec ++ warnings
