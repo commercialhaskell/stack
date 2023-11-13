@@ -71,14 +71,14 @@ import           Stack.Component
                    , stackForeignLibraryFromCabal, stackLibraryFromCabal
                    , stackTestFromCabal, stackUnqualToQual
                    )
-import           Stack.Constants (relFileCabalMacrosH, relDirLogs)
-import           Stack.Constants.Config ( distDirFromDir )
-import           Stack.PackageFile ( getPackageFile, stackPackageFileFromCabal )
-import           Stack.Prelude hiding ( Display (..) )
 import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
                    , componentOutputDir, packageAutogenDir
                    )
+import           Stack.Constants (relFileCabalMacrosH, relDirLogs)
+import           Stack.Constants.Config ( distDirFromDir )
+import           Stack.PackageFile ( getPackageFile, stackPackageFileFromCabal )
+import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.BuildConfig
                    ( HasBuildConfig (..), getProjectWorkDir )
 import           Stack.Types.CompCollection
@@ -221,8 +221,8 @@ packageFromPackageDescription
              || fromString (packageNameString name') `S.member` extraLibNames
 
 toInternalPackageMungedName :: Package -> Text -> Text
-toInternalPackageMungedName pkg
-  = T.pack
+toInternalPackageMungedName pkg =
+    T.pack
   . prettyShow
   . MungedPackageName (packageName pkg)
   . maybeToLibraryName
@@ -287,37 +287,47 @@ generatePkgDescOpts ::
   -> Package
   -> Map NamedComponent [DotCabalPath]
   -> m (Map NamedComponent BuildInfoOpts)
-generatePkgDescOpts installMap installedMap omitPkgs addPkgs cabalfp pkg componentPaths = do
-  config <- view configL
-  cabalVer <- view cabalVersionL
-  distDir <- distDirFromDir cabalDir
-  let generate namedComponent binfo = generateBuildInfoOpts BioInput
-        { biInstallMap = installMap
-        , biInstalledMap = installedMap
-        , biCabalDir = cabalDir
-        , biDistDir = distDir
-        , biOmitPackages = omitPkgs
-        , biAddPackages = addPkgs
-        , biBuildInfo = binfo
-        , biDotCabalPaths =
-            fromMaybe [] (M.lookup namedComponent componentPaths)
-        , biConfigLibDirs = configExtraLibDirs config
-        , biConfigIncludeDirs = configExtraIncludeDirs config
-        , biComponentName = namedComponent
-        , biCabalVersion = cabalVer
-        }
-  let insertInMap name compVal = M.insert name (generate name compVal)
-  let translatedInsertInMap constructor name =
-        insertInMap (stackUnqualToQual constructor name)
-  let makeBuildInfoOpts selector constructor =
-        foldOnNameAndBuildInfo (selector pkg) (translatedInsertInMap constructor)
-  let aggregateAllBuildInfoOpts =
-          makeBuildInfoOpts packageLibrary (const CLib)
-        . makeBuildInfoOpts packageSubLibraries CSubLib
-        . makeBuildInfoOpts packageExecutables CExe
-        . makeBuildInfoOpts packageBenchmarkSuites CBench
-        . makeBuildInfoOpts packageTestSuites CTest
-  pure $ aggregateAllBuildInfoOpts mempty
+generatePkgDescOpts
+    installMap
+    installedMap
+    omitPkgs
+    addPkgs
+    cabalfp
+    pkg
+    componentPaths
+  = do
+      config <- view configL
+      cabalVer <- view cabalVersionL
+      distDir <- distDirFromDir cabalDir
+      let generate namedComponent binfo = generateBuildInfoOpts BioInput
+            { biInstallMap = installMap
+            , biInstalledMap = installedMap
+            , biCabalDir = cabalDir
+            , biDistDir = distDir
+            , biOmitPackages = omitPkgs
+            , biAddPackages = addPkgs
+            , biBuildInfo = binfo
+            , biDotCabalPaths =
+                fromMaybe [] (M.lookup namedComponent componentPaths)
+            , biConfigLibDirs = configExtraLibDirs config
+            , biConfigIncludeDirs = configExtraIncludeDirs config
+            , biComponentName = namedComponent
+            , biCabalVersion = cabalVer
+            }
+      let insertInMap name compVal = M.insert name (generate name compVal)
+      let translatedInsertInMap constructor name =
+            insertInMap (stackUnqualToQual constructor name)
+      let makeBuildInfoOpts selector constructor =
+            foldOnNameAndBuildInfo
+              (selector pkg)
+              (translatedInsertInMap constructor)
+      let aggregateAllBuildInfoOpts =
+              makeBuildInfoOpts packageLibrary (const CLib)
+            . makeBuildInfoOpts packageSubLibraries CSubLib
+            . makeBuildInfoOpts packageExecutables CExe
+            . makeBuildInfoOpts packageBenchmarkSuites CBench
+            . makeBuildInfoOpts packageTestSuites CTest
+      pure $ aggregateAllBuildInfoOpts mempty
  where
   cabalDir = parent cabalfp
 
@@ -584,19 +594,28 @@ resolvePackageDescription
   go modBuildable = desc
     { library = fmap (resolveConditions rc updateLibDeps) mlib
     , subLibraries = map
-        (\(n, v) -> (resolveConditions rc updateLibDeps v){libName=LSubLibName n})
+        ( \(n, v) ->
+            (resolveConditions rc updateLibDeps v){libName = LSubLibName n}
+        )
         subLibs
     , foreignLibs = map
-        (\(n, v) -> (resolveConditions rc updateForeignLibDeps v){foreignLibName=n})
+        ( \(n, v) ->
+            (resolveConditions rc updateForeignLibDeps v){foreignLibName = n}
+        )
         foreignLibs'
     , executables = map
-        (\(n, v) -> (resolveConditions rc updateExeDeps v){exeName=n})
+        ( \(n, v) -> (resolveConditions rc updateExeDeps v){exeName = n} )
         exes
     , testSuites = map
-        (\(n, v) -> (resolveConditions rc (updateTestDeps modBuildable) v){testName=n})
+        ( \(n, v) ->
+            (resolveConditions rc (updateTestDeps modBuildable) v){testName = n}
+        )
         tests
     , benchmarks = map
-        (\(n, v) -> (resolveConditions rc (updateBenchmarkDeps modBuildable) v){benchmarkName=n})
+        ( \(n, v) ->
+            (resolveConditions rc (updateBenchmarkDeps modBuildable) v)
+              {benchmarkName = n}
+        )
         benches
     }
 
