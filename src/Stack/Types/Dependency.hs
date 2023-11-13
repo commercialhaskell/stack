@@ -7,10 +7,10 @@ module Stack.Types.Dependency
   , cabalExeToStackDep
   ) where
 
+import qualified Distribution.PackageDescription as Cabal
 import           Distribution.Types.VersionRange ( VersionRange )
 import           Stack.Prelude
 import           Stack.Types.Version ( intersectVersionRanges )
-import qualified Distribution.PackageDescription as Cabal
 
 -- | The value for a map from dependency name. This contains both the version
 -- range and the type of dependency, and provides a semigroup instance.
@@ -36,6 +36,8 @@ instance Semigroup DepType where
   AsBuildTool <> x = x
 
 cabalToStackDep :: Cabal.Dependency -> DepValue
-cabalToStackDep (Cabal.Dependency _ verRange _libNameSet) = DepValue{dvVersionRange = verRange, dvType=AsLibrary}
+cabalToStackDep (Cabal.Dependency _ verRange _libNameSet) =
+  DepValue{dvVersionRange = verRange, dvType = AsLibrary}
 cabalExeToStackDep :: Cabal.ExeDependency -> DepValue
-cabalExeToStackDep (Cabal.ExeDependency _ _name verRange) = DepValue{dvVersionRange = verRange, dvType=AsBuildTool}
+cabalExeToStackDep (Cabal.ExeDependency _ _name verRange) =
+  DepValue{dvVersionRange = verRange, dvType = AsBuildTool}
