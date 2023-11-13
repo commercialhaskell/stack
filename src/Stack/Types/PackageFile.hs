@@ -102,24 +102,26 @@ data PackageWarning
     -- ^ Modules not found in file system, which are listed in Cabal file
   -}
 
--- | This is the information from cabal we need at the package level
--- to track files. 
-data StackPackageFile = StackPackageFile {
-  -- specVersion :: CabalSpecVersion, --already in package info
-  extraSrcFiles :: [FilePath],
-  dataDir :: FilePath,
-  dataFiles :: [FilePath]
-} deriving (Show, Typeable)
+-- | This is the information from Cabal we need at the package level to track
+-- files.
+data StackPackageFile = StackPackageFile
+  { extraSrcFiles :: [FilePath]
+  , dataDir :: FilePath
+  , dataFiles :: [FilePath]
+  }
+  deriving (Show, Typeable)
 
 -- | Files that the package depends on, relative to package directory.
-data PackageComponentFile = PackageComponentFile {
-  modulePathMap :: Map NamedComponent (Map ModuleName (Path Abs File)),
-  cabalFileMap :: !(Map NamedComponent [DotCabalPath]),
-  packageExtraFile :: Set (Path Abs File),
-  warnings :: [PackageWarning]
-}
+data PackageComponentFile = PackageComponentFile
+  { modulePathMap :: Map NamedComponent (Map ModuleName (Path Abs File))
+  , cabalFileMap :: !(Map NamedComponent [DotCabalPath])
+  , packageExtraFile :: Set (Path Abs File)
+  , warnings :: [PackageWarning]
+  }
+
 instance Semigroup PackageComponentFile where
   PackageComponentFile x1 x2 x3 x4 <> PackageComponentFile y1 y2 y3 y4 =
     PackageComponentFile (x1 <> y1) (x2 <> y2) (x3 <> y3) (x4 <> y4)
+
 instance Monoid PackageComponentFile where
   mempty = PackageComponentFile mempty mempty mempty mempty
