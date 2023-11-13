@@ -134,13 +134,13 @@ getBuildableSet = asNameSet . buildableOnes
 getBuildableSetText :: CompCollection component -> Set Text
 getBuildableSetText = Set.mapMonotonic unqualCompToText . getBuildableSet
 
-getBuildableListText :: CompCollection component -> [] Text
+getBuildableListText :: CompCollection component -> [Text]
 getBuildableListText = getBuildableListAs unqualCompToText
 
 getBuildableListAs ::
      (StackUnqualCompName -> something)
   -> CompCollection component
-  -> [] something
+  -> [something]
 getBuildableListAs fn = Set.foldr' (\v l -> fn v:l) [] . getBuildableSet
 
 hasBuildableComponent :: CompCollection component -> Bool
