@@ -171,12 +171,17 @@ data Package = Package
   , packageDefaultFlags :: !(Map FlagName Bool)
     -- ^ Defaults for unspecified flags.
   , packageLibrary :: !(Maybe StackLibrary)
+    -- ^ Does the package have a buildable main library stanza?
   , packageSubLibraries :: !(CompCollection StackLibrary)
+    -- ^ The sub-libraries of the package.
   , packageForeignLibraries :: !(CompCollection StackForeignLibrary)
+    -- ^ The foreign libraries of the package.
   , packageTestSuites :: !(CompCollection StackTest)
+    -- ^ The test suites of the package.
   , packageBenchmarkSuites :: !(CompCollection StackBenchmark)
+    -- ^ The benchmarks of the package.
   , packageExecutables :: !(CompCollection StackExecutable)
-    -- ^ does the package have a buildable library stanza?
+    -- ^ The executables of the package.
   , packageBuildType :: !BuildType
     -- ^ Package build-type.
   , packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
