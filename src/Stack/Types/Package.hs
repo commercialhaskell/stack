@@ -178,7 +178,7 @@ data Package = Package
     -- ^ The foreign libraries of the package.
   , packageTestSuites :: !(CompCollection StackTest)
     -- ^ The test suites of the package.
-  , packageBenchmarkSuites :: !(CompCollection StackBenchmark)
+  , packageBenchmarks :: !(CompCollection StackBenchmark)
     -- ^ The benchmarks of the package.
   , packageExecutables :: !(CompCollection StackExecutable)
     -- ^ The executables of the package.

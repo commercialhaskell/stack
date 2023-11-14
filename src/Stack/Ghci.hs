@@ -972,7 +972,7 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
   buildableForeignLibs = getBuildableListText $ packageForeignLibraries pkg
   buildableSubLibs = getBuildableListText $ packageSubLibraries pkg
   buildableTestSuites = getBuildableListText $ packageTestSuites pkg
-  buildableBenchmarks = getBuildableListText $ packageBenchmarkSuites pkg
+  buildableBenchmarks = getBuildableListText $ packageBenchmarks pkg
 wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: HasTerm env => [GhciPkgInfo] -> RIO env ()

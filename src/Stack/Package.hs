@@ -22,7 +22,7 @@ module Stack.Package
   , packageUnknownTools
   , packageSubLibrariesNameSet
   , packageExes
-  , packageBenchmarks
+  , buildableBenchmarks
   , getPackageOpts
   ) where
 
@@ -151,7 +151,7 @@ packageFromPackageDescription
           foldAndMakeCollection stackForeignLibraryFromCabal $ foreignLibs pkg
       , packageTestSuites =
           foldAndMakeCollection stackTestFromCabal $ testSuites pkgNoMod
-      , packageBenchmarkSuites =
+      , packageBenchmarks =
           foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkgNoMod
       , packageExecutables =
           foldAndMakeCollection stackExecutableFromCabal $ executables pkg
@@ -325,7 +325,7 @@ generatePkgDescOpts
               makeBuildInfoOpts packageLibrary (const CLib)
             . makeBuildInfoOpts packageSubLibraries CSubLib
             . makeBuildInfoOpts packageExecutables CExe
-            . makeBuildInfoOpts packageBenchmarkSuites CBench
+            . makeBuildInfoOpts packageBenchmarks CBench
             . makeBuildInfoOpts packageTestSuites CTest
       pure $ aggregateAllBuildInfoOpts mempty
  where
@@ -835,7 +835,7 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
   lib setT = case packageLibrary pkg of
     Just libV -> addUnknownTools libV setT
     Nothing -> setT
-  bench = gatherUnknownTools $ packageBenchmarkSuites pkg
+  bench = gatherUnknownTools $ packageBenchmarks pkg
   tests = gatherUnknownTools $ packageTestSuites pkg
   flib = gatherUnknownTools $ packageForeignLibraries pkg
   sublib = gatherUnknownTools $ packageSubLibraries pkg
@@ -851,5 +851,5 @@ packageSubLibrariesNameSet pkg = getBuildableSetText (packageSubLibraries pkg)
 packageExes :: Package -> Set Text
 packageExes pkg = getBuildableSetText (packageExecutables pkg)
 
-packageBenchmarks :: Package -> Set Text
-packageBenchmarks pkg = getBuildableSetText (packageBenchmarkSuites pkg)
+buildableBenchmarks :: Package -> Set Text
+buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)

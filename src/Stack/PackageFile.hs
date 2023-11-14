@@ -61,7 +61,7 @@ packageDescModulesAndFiles pkg = do
   gatherCompFileCollection stackLibraryFiles packageLibrary
     . gatherCompFileCollection stackLibraryFiles packageSubLibraries
     . gatherCompFileCollection stackExecutableFiles packageExecutables
-    . gatherCompFileCollection stackBenchmarkFiles packageBenchmarkSuites
+    . gatherCompFileCollection stackBenchmarkFiles packageBenchmarks
     $ pure initialValue
 
 resolveGlobFilesFromStackPackageFile ::

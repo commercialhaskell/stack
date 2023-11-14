@@ -25,7 +25,7 @@ import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Package
-                   ( hasBuildableMainLibrary, packageBenchmarks, packageExes
+                   ( buildableBenchmarks, hasBuildableMainLibrary, packageExes
                    , resolvePackage
                    )
 import           Stack.PackageFile ( getPackageFile )
@@ -328,7 +328,7 @@ loadLocalPackage pp = do
                       True
                       (Set.notMember name . curatorSkipBenchmark)
                       mcurator
-                then packageBenchmarks pkg
+                then buildableBenchmarks pkg
                 else Set.empty
             )
           Nothing -> mempty
@@ -425,7 +425,7 @@ loadLocalPackage pp = do
     , lpUnbuildable = toComponents
         (exes `Set.difference` packageExes pkg)
         (tests `Set.difference` getBuildableSetText (packageTestSuites pkg))
-        (benches `Set.difference` packageBenchmarks pkg)
+        (benches `Set.difference` buildableBenchmarks pkg)
     }
 
 -- | Compare the current filesystem state to the cached information, and
