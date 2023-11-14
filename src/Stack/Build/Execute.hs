@@ -126,7 +126,7 @@ import           Stack.Coverage
                    )
 import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
 import           Stack.Package
-                   ( buildLogPath, hasMainBuildableLibrary
+                   ( buildLogPath, hasBuildableMainLibrary
                    , mainLibraryHasExposedModules, packageExes
                    , packageSubLibrariesNameSet
                    )
@@ -1757,7 +1757,7 @@ singleBuild
     (hasLib, hasSubLib, hasExe) = case taskType of
       TTLocalMutable lp ->
         let package = lpPackage lp
-            hasLibrary = hasMainBuildableLibrary package
+            hasLibrary = hasBuildableMainLibrary package
             hasSubLibraries = not . null $ packageSubLibraries package
             hasExecutables =
               not . Set.null $ exesToBuild executableBuildStatuses lp
@@ -2044,7 +2044,7 @@ singleBuild
 
         cabal0 keep KeepTHLoading $ "haddock" : args
 
-    let hasLibrary = hasMainBuildableLibrary package
+    let hasLibrary = hasBuildableMainLibrary package
         hasSubLibraries = not $ null $ packageSubLibraries package
         hasExecutables = not $ null $ packageExecutables package
         shouldCopy =
@@ -2095,7 +2095,7 @@ singleBuild
     let ident = PackageIdentifier (packageName package) (packageVersion package)
     -- only pure the sub-libraries to cache them if we also cache the main
     -- library (that is, if it exists)
-    (mpkgid, subLibsPkgIds) <- if hasMainBuildableLibrary package
+    (mpkgid, subLibsPkgIds) <- if hasBuildableMainLibrary package
       then do
         subLibsPkgIds <- fmap catMaybes $
           forM (getBuildableListText $ packageSubLibraries package) $ \subLib -> do
@@ -2702,7 +2702,7 @@ primaryComponentOptions ::
 primaryComponentOptions executableBuildStatuses lp =
   -- TODO: get this information from target parsing instead, which will allow
   -- users to turn off library building if desired
-     ( if hasMainBuildableLibrary package
+     ( if hasBuildableMainLibrary package
          then map T.unpack
            $ T.append "lib:" (T.pack (packageNameString (packageName package)))
            : map

@@ -29,7 +29,7 @@ import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
 import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
-                   ( applyForceCustomBuild, hasMainBuildableLibrary
+                   ( applyForceCustomBuild, hasBuildableMainLibrary
                    , packageExes, packageUnknownTools
                    )
 import           Stack.Prelude hiding ( loadPackage )
@@ -1166,7 +1166,7 @@ addPackageDeps package = do
   -- make sure we consider sub-libraries as libraries too
   packageHasLibrary :: Package -> Bool
   packageHasLibrary p =
-    hasMainBuildableLibrary p || not (null (packageSubLibraries p))
+    hasBuildableMainLibrary p || not (null (packageSubLibraries p))
 
 checkDirtiness ::
      PackageSource

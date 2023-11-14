@@ -17,7 +17,7 @@ module Stack.Package
   , resolvePackageDescription
   , packageDependencies
   , applyForceCustomBuild
-  , hasMainBuildableLibrary
+  , hasBuildableMainLibrary
   , mainLibraryHasExposedModules
   , packageUnknownTools
   , packageSubLibrariesNameSet
@@ -812,8 +812,8 @@ applyForceCustomBuild cabalVersion package
     && not (cabalVersion `withinRange` cabalVersionRange)
 
 -- | Check if the package has a main library that is buildable.
-hasMainBuildableLibrary :: Package -> Bool
-hasMainBuildableLibrary package =
+hasBuildableMainLibrary :: Package -> Bool
+hasBuildableMainLibrary package =
   maybe False isComponentBuildable $ packageLibrary package
 
 -- | Check if the main library has any exposed modules.

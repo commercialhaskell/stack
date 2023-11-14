@@ -48,7 +48,7 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( PackageDescriptionPair (..), hasMainBuildableLibrary
+                   ( PackageDescriptionPair (..), hasBuildableMainLibrary
                    , getPackageOpts, packageExes, packageFromPackageDescription
                    , readDotBuildinfo, resolvePackageDescription
                    )
@@ -960,7 +960,7 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
 wantedPackageComponents :: BuildOpts -> Target -> Package -> Set NamedComponent
 wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
-     ( if hasMainBuildableLibrary pkg
+     ( if hasBuildableMainLibrary pkg
          then CLib : map CSubLib buildableForeignLibs
          else []
      )

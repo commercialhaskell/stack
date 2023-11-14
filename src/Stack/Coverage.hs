@@ -40,7 +40,7 @@ import           Stack.Constants
                    , relFileHpcIndexHtml, relFileIndexHtml
                    )
 import           Stack.Constants.Config ( distDirFromDir, hpcRelativeDir )
-import           Stack.Package ( hasMainBuildableLibrary )
+import           Stack.Package ( hasBuildableMainLibrary )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
@@ -182,7 +182,7 @@ generateHpcReport pkgDir package tests = do
   let pkgId = packageIdentifierString (packageIdentifier package)
       pkgName' = packageNameString $ packageName package
       ghcVersion = getGhcVersion compilerVersion
-      hasLibrary = hasMainBuildableLibrary package
+      hasLibrary = hasBuildableMainLibrary package
       subLibs = packageSubLibraries package
   eincludeName <-
     -- Pre-7.8 uses plain PKG-version in tix files.

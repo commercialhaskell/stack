@@ -25,7 +25,7 @@ import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Package
-                   ( hasMainBuildableLibrary, packageBenchmarks, packageExes
+                   ( hasBuildableMainLibrary, packageBenchmarks, packageExes
                    , resolvePackage
                    )
 import           Stack.PackageFile ( getPackageFile )
@@ -340,7 +340,7 @@ loadLocalPackage pp = do
         -- individual executables or library") is resolved, 'hasLibrary' is only
         -- relevant if the library is part of the target spec.
         Just _ ->
-             hasMainBuildableLibrary pkg
+             hasBuildableMainLibrary pkg
           || not (Set.null nonLibComponents)
           || not (null $ packageSubLibraries pkg)
 
