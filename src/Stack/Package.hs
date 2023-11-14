@@ -22,6 +22,7 @@ module Stack.Package
   , packageUnknownTools
   , buildableSubLibs
   , buildableExes
+  , buildableTestSuites
   , buildableBenchmarks
   , getPackageOpts
   ) where
@@ -850,6 +851,9 @@ buildableSubLibs pkg = getBuildableSetText (packageSubLibraries pkg)
 
 buildableExes :: Package -> Set Text
 buildableExes pkg = getBuildableSetText (packageExecutables pkg)
+
+buildableTestSuites :: Package -> Set Text
+buildableTestSuites pkg = getBuildableSetText (packageTestSuites pkg)
 
 buildableBenchmarks :: Package -> Set Text
 buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)

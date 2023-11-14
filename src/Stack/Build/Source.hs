@@ -25,8 +25,8 @@ import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Package
-                   ( buildableBenchmarks, buildableExes, hasBuildableMainLibrary
-                   , resolvePackage
+                   ( buildableBenchmarks, buildableExes, buildableTestSuites
+                   , hasBuildableMainLibrary, resolvePackage
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
@@ -44,7 +44,6 @@ import           Stack.Types.BuildOpts
                    , TestOpts (..), boptsCLIAllProgOptions
                    )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
-import           Stack.Types.CompCollection ( getBuildableSetText )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
 import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.Curator ( Curator (..) )
@@ -321,7 +320,7 @@ loadLocalPackage pp = do
             ( buildableExes pkg
             , if    boptsTests bopts
                  && maybe True (Set.notMember name . curatorSkipTest) mcurator
-                then getBuildableSetText (packageTestSuites pkg)
+                then buildableTestSuites pkg
                 else Set.empty
             , if    boptsBenchmarks bopts
                  && maybe
@@ -424,7 +423,7 @@ loadLocalPackage pp = do
       -- must not be buildable.
     , lpUnbuildable = toComponents
         (exes `Set.difference` buildableExes pkg)
-        (tests `Set.difference` getBuildableSetText (packageTestSuites pkg))
+        (tests `Set.difference` buildableTestSuites pkg)
         (benches `Set.difference` buildableBenchmarks pkg)
     }
 
