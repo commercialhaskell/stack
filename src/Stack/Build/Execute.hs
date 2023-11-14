@@ -126,8 +126,8 @@ import           Stack.Coverage
                    )
 import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
 import           Stack.Package
-                   ( buildLogPath, buildableExes, hasBuildableMainLibrary
-                   , mainLibraryHasExposedModules, packageSubLibrariesNameSet
+                   ( buildLogPath, buildableExes, buildableSubLibs
+                   , hasBuildableMainLibrary, mainLibraryHasExposedModules
                    )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
@@ -1802,7 +1802,7 @@ singleBuild
     -- However, we must unregister any such library in the new snapshot, in case
     -- it was built with different flags.
     let
-      subLibNames = Set.toList $ packageSubLibrariesNameSet $ case taskType of
+      subLibNames = Set.toList $ buildableSubLibs $ case taskType of
         TTLocalMutable lp -> lpPackage lp
         TTRemotePackage _ p _ -> p
       toMungedPackageId :: Text -> MungedPackageId

@@ -20,7 +20,7 @@ module Stack.Package
   , hasBuildableMainLibrary
   , mainLibraryHasExposedModules
   , packageUnknownTools
-  , packageSubLibrariesNameSet
+  , buildableSubLibs
   , buildableExes
   , buildableBenchmarks
   , getPackageOpts
@@ -845,8 +845,8 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
   gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
   gatherUnknownTools = foldr' addUnknownTools mempty
 
-packageSubLibrariesNameSet :: Package -> Set Text
-packageSubLibrariesNameSet pkg = getBuildableSetText (packageSubLibraries pkg)
+buildableSubLibs :: Package -> Set Text
+buildableSubLibs pkg = getBuildableSetText (packageSubLibraries pkg)
 
 buildableExes :: Package -> Set Text
 buildableExes pkg = getBuildableSetText (packageExecutables pkg)
