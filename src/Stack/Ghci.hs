@@ -49,9 +49,9 @@ import           Stack.Ghci.Script
                    )
 import           Stack.Package
                    ( PackageDescriptionPair (..), buildableExes
-                   , hasBuildableMainLibrary, getPackageOpts
-                   , packageFromPackageDescription, readDotBuildinfo
-                   , resolvePackageDescription
+                   , buildableForeignLibs, hasBuildableMainLibrary
+                   , getPackageOpts, packageFromPackageDescription
+                   , readDotBuildinfo, resolvePackageDescription
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
@@ -962,16 +962,17 @@ wantedPackageComponents :: BuildOpts -> Target -> Package -> Set NamedComponent
 wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
      ( if hasBuildableMainLibrary pkg
-         then CLib : map CSubLib buildableForeignLibs
+         then CLib : map CSubLib buildableForeignLibs'
          else []
      )
-  <> map CExe (S.toList (buildableExes pkg))
+  <> map CExe buildableExes'
   <> map CSubLib buildableSubLibs
   <> (if boptsTests bopts then map CTest buildableTestSuites else [])
   <> (if boptsBenchmarks bopts then map CBench buildableBenchmarks else [])
  where
-  buildableForeignLibs = getBuildableListText $ packageForeignLibraries pkg
+  buildableForeignLibs' = S.toList $ buildableForeignLibs pkg
   buildableSubLibs = getBuildableListText $ packageSubLibraries pkg
+  buildableExes' = S.toList $ buildableExes pkg
   buildableTestSuites = getBuildableListText $ packageTestSuites pkg
   buildableBenchmarks = getBuildableListText $ packageBenchmarks pkg
 wantedPackageComponents _ _ _ = S.empty

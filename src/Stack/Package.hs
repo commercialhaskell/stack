@@ -20,6 +20,7 @@ module Stack.Package
   , hasBuildableMainLibrary
   , mainLibraryHasExposedModules
   , packageUnknownTools
+  , buildableForeignLibs
   , buildableSubLibs
   , buildableExes
   , buildableTestSuites
@@ -845,6 +846,9 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
   addUnknownTools = (<>) . Component.sbiUnknownTools . getField @"buildInfo"
   gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
   gatherUnknownTools = foldr' addUnknownTools mempty
+
+buildableForeignLibs :: Package -> Set Text
+buildableForeignLibs pkg = getBuildableSetText (packageForeignLibraries pkg)
 
 buildableSubLibs :: Package -> Set Text
 buildableSubLibs pkg = getBuildableSetText (packageSubLibraries pkg)
