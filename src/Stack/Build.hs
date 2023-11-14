@@ -30,7 +30,7 @@ import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source ( localDependencies, projectLocalPackages )
 import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.FileWatch ( fileWatch, fileWatchPoll )
-import           Stack.Package ( packageExes, resolvePackage )
+import           Stack.Package ( buildableExes, resolvePackage )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Setup ( withNewLocalBuildTargets )
@@ -297,7 +297,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
     collect
       [ (exe, packageName pkg)
       | pkg <- map lpPackage locals
-      , exe <- Set.toList (packageExes pkg)
+      , exe <- Set.toList (buildableExes pkg)
       ]
   collect :: Ord k => [(k, v)] -> Map k (NonEmpty v)
   collect = Map.mapMaybe nonEmpty . Map.fromDistinctAscList . groupSort

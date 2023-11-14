@@ -126,9 +126,8 @@ import           Stack.Coverage
                    )
 import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
 import           Stack.Package
-                   ( buildLogPath, hasBuildableMainLibrary
-                   , mainLibraryHasExposedModules, packageExes
-                   , packageSubLibrariesNameSet
+                   ( buildLogPath, buildableExes, hasBuildableMainLibrary
+                   , mainLibraryHasExposedModules, packageSubLibrariesNameSet
                    )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
@@ -2128,7 +2127,7 @@ singleBuild
           (configCacheHaddock cache)
           mpkgid
           subLibsPkgIds
-          (packageExes package)
+          (buildableExes package)
       _ -> pure ()
 
     case taskType of
@@ -2176,7 +2175,7 @@ getExecutableBuildStatuses package pkgDir = do
   platform <- view platformL
   fmap
     Map.fromList
-    (mapM (checkExeStatus platform distDir) (Set.toList (packageExes package)))
+    (mapM (checkExeStatus platform distDir) (Set.toList (buildableExes package)))
 
 -- | Check whether the given executable is defined in the given dist directory.
 checkExeStatus ::
@@ -2735,7 +2734,7 @@ exesToBuild :: Map Text ExecutableBuildStatus -> LocalPackage -> Set Text
 exesToBuild executableBuildStatuses lp =
   if cabalIsSatisfied executableBuildStatuses && lpWanted lp
     then exeComponents (lpComponents lp)
-    else packageExes (lpPackage lp)
+    else buildableExes (lpPackage lp)
 
 -- | Do the current executables satisfy Cabal's bugged out requirements?
 cabalIsSatisfied :: Map k ExecutableBuildStatus -> Bool

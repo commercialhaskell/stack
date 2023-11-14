@@ -29,8 +29,8 @@ import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
 import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
-                   ( applyForceCustomBuild, hasBuildableMainLibrary
-                   , packageExes, packageUnknownTools
+                   ( applyForceCustomBuild, buildableExes
+                   , hasBuildableMainLibrary, packageUnknownTools
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
@@ -803,7 +803,7 @@ tellExecutablesPackage loc p = do
 
   tell mempty
     { wInstall = Map.fromList $
-        map (, loc) $ Set.toList $ filterComps myComps $ packageExes p
+        map (, loc) $ Set.toList $ filterComps myComps $ buildableExes p
     }
  where
   filterComps myComps x

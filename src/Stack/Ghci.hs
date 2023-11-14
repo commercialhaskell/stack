@@ -48,9 +48,10 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( PackageDescriptionPair (..), hasBuildableMainLibrary
-                   , getPackageOpts, packageExes, packageFromPackageDescription
-                   , readDotBuildinfo, resolvePackageDescription
+                   ( PackageDescriptionPair (..), buildableExes
+                   , hasBuildableMainLibrary, getPackageOpts
+                   , packageFromPackageDescription, readDotBuildinfo
+                   , resolvePackageDescription
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
@@ -964,7 +965,7 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
          then CLib : map CSubLib buildableForeignLibs
          else []
      )
-  <> map CExe (S.toList (packageExes pkg))
+  <> map CExe (S.toList (buildableExes pkg))
   <> map CSubLib buildableSubLibs
   <> (if boptsTests bopts then map CTest buildableTestSuites else [])
   <> (if boptsBenchmarks bopts then map CBench buildableBenchmarks else [])

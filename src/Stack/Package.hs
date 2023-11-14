@@ -21,7 +21,7 @@ module Stack.Package
   , mainLibraryHasExposedModules
   , packageUnknownTools
   , packageSubLibrariesNameSet
-  , packageExes
+  , buildableExes
   , buildableBenchmarks
   , getPackageOpts
   ) where
@@ -848,8 +848,8 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
 packageSubLibrariesNameSet :: Package -> Set Text
 packageSubLibrariesNameSet pkg = getBuildableSetText (packageSubLibraries pkg)
 
-packageExes :: Package -> Set Text
-packageExes pkg = getBuildableSetText (packageExecutables pkg)
+buildableExes :: Package -> Set Text
+buildableExes pkg = getBuildableSetText (packageExecutables pkg)
 
 buildableBenchmarks :: Package -> Set Text
 buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)

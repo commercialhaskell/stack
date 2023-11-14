@@ -25,7 +25,7 @@ import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Package
-                   ( buildableBenchmarks, hasBuildableMainLibrary, packageExes
+                   ( buildableBenchmarks, buildableExes, hasBuildableMainLibrary
                    , resolvePackage
                    )
 import           Stack.PackageFile ( getPackageFile )
@@ -318,7 +318,7 @@ loadLocalPackage pp = do
             let (_s, e, t, b) = splitComponents $ Set.toList comps
             in  (e, t, b)
           Just (TargetAll _packageType) ->
-            ( packageExes pkg
+            ( buildableExes pkg
             , if    boptsTests bopts
                  && maybe True (Set.notMember name . curatorSkipTest) mcurator
                 then getBuildableSetText (packageTestSuites pkg)
@@ -423,7 +423,7 @@ loadLocalPackage pp = do
       -- through component parsing, but the components aren't present, then they
       -- must not be buildable.
     , lpUnbuildable = toComponents
-        (exes `Set.difference` packageExes pkg)
+        (exes `Set.difference` buildableExes pkg)
         (tests `Set.difference` getBuildableSetText (packageTestSuites pkg))
         (benches `Set.difference` buildableBenchmarks pkg)
     }
