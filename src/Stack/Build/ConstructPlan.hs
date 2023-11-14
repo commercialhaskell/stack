@@ -28,7 +28,10 @@ import           Stack.Build.Cache ( tryGetFlagCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
 import           Stack.Constants ( compilerOptionsCabalFlag )
-import           Stack.Package ( applyForceCustomBuild )
+import           Stack.Package
+                   ( applyForceCustomBuild, buildableExes
+                   , hasBuildableMainLibrary, packageUnknownTools
+                   )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
 import           Stack.Types.Build
@@ -45,6 +48,7 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
 import           Stack.Types.BuildOpts
                    ( BuildOpts (..), BuildOptsCLI (..), BuildSubset (..) )
+import           Stack.Types.CompCollection ( collectionMember )
 import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
@@ -67,8 +71,8 @@ import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
                    ( ExeName (..), InstallLocation (..), Installed (..)
                    , InstalledMap, LocalPackage (..), Package (..)
-                   , PackageLibraries (..), PackageSource (..), installedVersion
-                   , packageIdentifier, psVersion, runMemoizedWith
+                   , PackageSource (..), installedVersion, packageIdentifier
+                   , psVersion, runMemoizedWith
                    )
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Platform ( HasPlatform (..) )
@@ -799,7 +803,7 @@ tellExecutablesPackage loc p = do
 
   tell mempty
     { wInstall = Map.fromList $
-        map (, loc) $ Set.toList $ filterComps myComps $ packageExes p
+        map (, loc) $ Set.toList $ filterComps myComps $ buildableExes p
     }
  where
   filterComps myComps x
@@ -1162,10 +1166,7 @@ addPackageDeps package = do
   -- make sure we consider sub-libraries as libraries too
   packageHasLibrary :: Package -> Bool
   packageHasLibrary p =
-    not (Set.null (packageSubLibraries p)) ||
-    case packageLibraries p of
-      HasLibraries _ -> True
-      NoLibraries -> False
+    hasBuildableMainLibrary p || not (null (packageSubLibraries p))
 
 checkDirtiness ::
      PackageSource
@@ -1334,8 +1335,8 @@ checkAndWarnForUnknownTools p = do
   -- Check whether the tool is on the PATH or a package executable before
   -- warning about it.
   warnings <-
-    fmap catMaybes $ forM unknownTools $ \name@(ExeName toolName) ->
-      runMaybeT $ notOnPath toolName *> notPackageExe toolName *> warn name
+    fmap catMaybes $ forM unknownTools $ \toolName ->
+      runMaybeT $ notOnPath toolName *> notPackageExe toolName *> warn toolName
   tell mempty { wWarnings = (map toolWarningText warnings ++) }
   pure ()
  where
@@ -1349,8 +1350,9 @@ checkAndWarnForUnknownTools p = do
     skipIf $ isRight eFound
   -- From Cabal 1.12, build-tools can specify another executable in the same
   -- package.
-  notPackageExe toolName = MaybeT $ skipIf $ toolName `Set.member` packageExes p
-  warn name = MaybeT . pure . Just $ ToolWarning name (packageName p)
+  notPackageExe toolName =
+    MaybeT $ skipIf $ collectionMember toolName (packageExecutables p)
+  warn name = MaybeT . pure . Just $ ToolWarning (ExeName name) (packageName p)
   skipIf p' = pure $ if p' then Nothing else Just ()
 
 -- | Warn about tools in the snapshot definition. States the tool name

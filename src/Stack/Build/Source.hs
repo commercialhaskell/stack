@@ -24,7 +24,11 @@ import qualified Distribution.PackageDescription as C
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
-import           Stack.Package ( resolvePackage )
+import           Stack.Package
+                   ( buildableBenchmarks, buildableExes, buildableTestSuites
+                   , hasBuildableMainLibrary, resolvePackage
+                   )
+import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
 import           Stack.SourceMap
                    ( DumpedGlobalPackage, checkFlagsUsedThrowing
@@ -52,10 +56,11 @@ import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCSubLib, splitComponents )
 import           Stack.Types.Package
                    ( FileCacheInfo (..), LocalPackage (..), Package (..)
-                   , PackageConfig (..), PackageLibraries (..)
-                   , dotCabalGetPath, memoizeRefWith, runMemoizedWith
+                   , PackageConfig (..), dotCabalGetPath, memoizeRefWith
+                   , runMemoizedWith
                    )
-import           Stack.Types.PackageFile ( PackageWarning, getPackageFiles )
+import           Stack.Types.PackageFile
+                   ( PackageComponentFile (..), PackageWarning )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
@@ -312,17 +317,17 @@ loadLocalPackage pp = do
             let (_s, e, t, b) = splitComponents $ Set.toList comps
             in  (e, t, b)
           Just (TargetAll _packageType) ->
-            ( packageExes pkg
+            ( buildableExes pkg
             , if    boptsTests bopts
                  && maybe True (Set.notMember name . curatorSkipTest) mcurator
-                then Map.keysSet (packageTests pkg)
+                then buildableTestSuites pkg
                 else Set.empty
             , if    boptsBenchmarks bopts
                  && maybe
                       True
                       (Set.notMember name . curatorSkipBenchmark)
                       mcurator
-                then packageBenchmarks pkg
+                then buildableBenchmarks pkg
                 else Set.empty
             )
           Nothing -> mempty
@@ -334,13 +339,9 @@ loadLocalPackage pp = do
         -- individual executables or library") is resolved, 'hasLibrary' is only
         -- relevant if the library is part of the target spec.
         Just _ ->
-          let hasLibrary =
-                case packageLibraries pkg of
-                  NoLibraries -> False
-                  HasLibraries _ -> True
-          in     hasLibrary
-              || not (Set.null nonLibComponents)
-              || not (Set.null $ packageSubLibraries pkg)
+             hasBuildableMainLibrary pkg
+          || not (Set.null nonLibComponents)
+          || not (null $ packageSubLibraries pkg)
 
       filterSkippedComponents =
         Set.filter (not . (`elem` boptsSkipComponents bopts))
@@ -421,9 +422,9 @@ loadLocalPackage pp = do
       -- through component parsing, but the components aren't present, then they
       -- must not be buildable.
     , lpUnbuildable = toComponents
-        (exes `Set.difference` packageExes pkg)
-        (tests `Set.difference` Map.keysSet (packageTests pkg))
-        (benches `Set.difference` packageBenchmarks pkg)
+        (exes `Set.difference` buildableExes pkg)
+        (tests `Set.difference` buildableTestSuites pkg)
+        (benches `Set.difference` buildableBenchmarks pkg)
     }
 
 -- | Compare the current filesystem state to the cached information, and
@@ -499,8 +500,8 @@ getPackageFilesForTargets ::
   -> Set NamedComponent
   -> RIO env (Map NamedComponent (Set (Path Abs File)), [PackageWarning])
 getPackageFilesForTargets pkg cabalFP nonLibComponents = do
-  (components',compFiles,otherFiles,warnings) <-
-    getPackageFiles (packageFiles pkg) cabalFP
+  PackageComponentFile components' compFiles otherFiles warnings <-
+    getPackageFile pkg cabalFP
   let necessaryComponents =
         Set.insert CLib $ Set.filter isCSubLib (M.keysSet components')
       components = necessaryComponents `Set.union` nonLibComponents

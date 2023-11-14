@@ -326,7 +326,10 @@ library
       Paths_stack
   other-modules:
       GHC.Utils.GhcPkg.Main.Compat
+      Stack.Component
       Stack.Config.ConfigureScript
+      Stack.Types.CompCollection
+      Stack.Types.Component
       Stack.Types.FileDigestCache
   autogen-modules:
       Build_stack

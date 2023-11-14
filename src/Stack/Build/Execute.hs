@@ -64,6 +64,7 @@ import           Distribution.Types.UnqualComponentName
                    ( mkUnqualComponentName )
 import           Distribution.Verbosity ( showForCabal )
 import           Distribution.Version ( mkVersion )
+import           GHC.Records ( getField )
 import           Path
                    ( PathException, (</>), addExtension, filename
                    , isProperPrefixOf, parent, parseRelDir, parseRelFile
@@ -124,7 +125,10 @@ import           Stack.Coverage
                    , generateHpcUnifiedReport, updateTixFile
                    )
 import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
-import           Stack.Package ( buildLogPath )
+import           Stack.Package
+                   ( buildLogPath, buildableExes, buildableSubLibs
+                   , hasBuildableMainLibrary, mainLibraryHasExposedModules
+                   )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
@@ -144,6 +148,10 @@ import           Stack.Types.BuildOpts
                    , CabalVerbosity (..), HaddockOpts (..)
                    , ProgressBarFormat (..), TestOpts (..)
                    )
+import           Stack.Types.CompCollection
+                   ( collectionKeyValueList, collectionLookup
+                   , getBuildableListText
+                   )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
                    , compilerVersionString, getGhcVersion, whichCompilerL
@@ -152,6 +160,7 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..)
                    , cabalVersionL, cpWhich, getCompilerPath, getGhcPkgExe
                    )
+import qualified Stack.Types.Component as Component
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), buildOptsL, stackRootL )
 import           Stack.Types.ConfigureOpts
@@ -175,9 +184,8 @@ import           Stack.Types.NamedComponent
                    )
 import           Stack.Types.Package
                    ( InstallLocation (..), Installed (..), InstalledMap
-                   , LocalPackage (..), Package (..), PackageLibraries (..)
-                   , installedPackageIdentifier, packageIdentifier
-                   , runMemoizedWith
+                   , LocalPackage (..), Package (..), installedPackageIdentifier
+                   , packageIdentifier, runMemoizedWith
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
@@ -1713,7 +1721,7 @@ singleBuild
     && not isFinalBuild
        -- Works around haddock failing on bytestring-builder since it has no
        -- modules when bytestring is new enough.
-    && packageHasExposedModules package
+    && mainLibraryHasExposedModules package
        -- Special help for the curator tool to avoid haddocks that are known
        -- to fail
     && maybe True (Set.notMember pname . curatorSkipHaddock) mcurator
@@ -1748,11 +1756,8 @@ singleBuild
     (hasLib, hasSubLib, hasExe) = case taskType of
       TTLocalMutable lp ->
         let package = lpPackage lp
-            hasLibrary =
-              case packageLibraries package of
-                NoLibraries -> False
-                HasLibraries _ -> True
-            hasSubLibraries = not . Set.null $ packageSubLibraries package
+            hasLibrary = hasBuildableMainLibrary package
+            hasSubLibraries = not . null $ packageSubLibraries package
             hasExecutables =
               not . Set.null $ exesToBuild executableBuildStatuses lp
         in  (hasLibrary, hasSubLibraries, hasExecutables)
@@ -1797,9 +1802,9 @@ singleBuild
     -- However, we must unregister any such library in the new snapshot, in case
     -- it was built with different flags.
     let
-      subLibNames = Set.toList $ case taskType of
-        TTLocalMutable lp -> packageSubLibraries $ lpPackage lp
-        TTRemotePackage _ p _ -> packageSubLibraries p
+      subLibNames = Set.toList $ buildableSubLibs $ case taskType of
+        TTLocalMutable lp -> lpPackage lp
+        TTRemotePackage _ p _ -> p
       toMungedPackageId :: Text -> MungedPackageId
       toMungedPackageId subLib =
         let subLibName = LSubLibName $ mkUnqualComponentName $ T.unpack subLib
@@ -2038,13 +2043,9 @@ singleBuild
 
         cabal0 keep KeepTHLoading $ "haddock" : args
 
-    let hasLibrary =
-          case packageLibraries package of
-            NoLibraries -> False
-            HasLibraries _ -> True
-        packageHasComponentSet f = not $ Set.null $ f package
-        hasSubLibraries = packageHasComponentSet packageSubLibraries
-        hasExecutables = packageHasComponentSet packageExes
+    let hasLibrary = hasBuildableMainLibrary package
+        hasSubLibraries = not $ null $ packageSubLibraries package
+        hasExecutables = not $ null $ packageExecutables package
         shouldCopy =
              not isFinalBuild
           && (hasLibrary || hasSubLibraries || hasExecutables)
@@ -2093,10 +2094,10 @@ singleBuild
     let ident = PackageIdentifier (packageName package) (packageVersion package)
     -- only pure the sub-libraries to cache them if we also cache the main
     -- library (that is, if it exists)
-    (mpkgid, subLibsPkgIds) <- case packageLibraries package of
-      HasLibraries _ -> do
+    (mpkgid, subLibsPkgIds) <- if hasBuildableMainLibrary package
+      then do
         subLibsPkgIds <- fmap catMaybes $
-          forM (Set.toList $ packageSubLibraries package) $ \subLib -> do
+          forM (getBuildableListText $ packageSubLibraries package) $ \subLib -> do
             let subLibName = MungedPackageName
                   (packageName package)
                   (LSubLibName $ mkUnqualComponentName $ T.unpack subLib)
@@ -2112,10 +2113,10 @@ singleBuild
         case mpkgid of
           Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
           Just pkgid -> pure (Library ident pkgid Nothing, subLibsPkgIds)
-      NoLibraries -> do
+      else do
         markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
                                                    -- with writeFlagCache?
-        pure (Executable ident, []) -- don't pure sub-libraries in this case
+        pure (Executable ident, []) -- don't pure sublibs in this case
 
     case taskType of
       TTRemotePackage Immutable _ loc ->
@@ -2126,7 +2127,7 @@ singleBuild
           (configCacheHaddock cache)
           mpkgid
           subLibsPkgIds
-          (packageExes package)
+          (buildableExes package)
       _ -> pure ()
 
     case taskType of
@@ -2174,7 +2175,7 @@ getExecutableBuildStatuses package pkgDir = do
   platform <- view platformL
   fmap
     Map.fromList
-    (mapM (checkExeStatus platform distDir) (Set.toList (packageExes package)))
+    (mapM (checkExeStatus platform distDir) (Set.toList (buildableExes package)))
 
 -- | Check whether the given executable is defined in the given dist directory.
 checkExeStatus ::
@@ -2276,7 +2277,9 @@ singleTest topts testsToRun ac ee task installedMap = do
 
         let suitesToRun
               = [ testSuitePair
-                | testSuitePair <- Map.toList $ packageTests package
+                | testSuitePair <-
+                    (fmap . fmap) (getField @"interface") <$>
+                      collectionKeyValueList $ packageTestSuites package
                 , let testName = fst testSuitePair
                 , testName `elem` testsToRun
                 ]
@@ -2485,9 +2488,11 @@ singleTest topts testsToRun ac ee task installedMap = do
         when needHpc $ do
           let testsToRun' = map f testsToRun
               f tName =
-                  case Map.lookup tName (packageTests package) of
-                    Just C.TestSuiteLibV09{} -> tName <> "Stub"
-                    _ -> tName
+                case getField @"interface" <$> mComponent of
+                  Just C.TestSuiteLibV09{} -> tName <> "Stub"
+                  _ -> tName
+               where
+                mComponent = collectionLookup tName (packageTestSuites package)
           generateHpcReport pkgDir package testsToRun'
 
         bs <- liftIO $
@@ -2696,17 +2701,17 @@ primaryComponentOptions ::
 primaryComponentOptions executableBuildStatuses lp =
   -- TODO: get this information from target parsing instead, which will allow
   -- users to turn off library building if desired
-     ( case packageLibraries package of
-         NoLibraries -> []
-         HasLibraries names -> map
-           T.unpack
-           ( T.append "lib:" (T.pack (packageNameString (packageName package)))
-           : map (T.append "flib:") (Set.toList names)
-           )
+     ( if hasBuildableMainLibrary package
+         then map T.unpack
+           $ T.append "lib:" (T.pack (packageNameString (packageName package)))
+           : map
+               (T.append "flib:")
+               (getBuildableListText (packageForeignLibraries package))
+         else []
      )
   ++ map
        (T.unpack . T.append "lib:")
-       (Set.toList $ packageSubLibraries package)
+       (getBuildableListText $ packageSubLibraries package)
   ++ map
        (T.unpack . T.append "exe:")
        (Set.toList $ exesToBuild executableBuildStatuses lp)
@@ -2729,7 +2734,7 @@ exesToBuild :: Map Text ExecutableBuildStatus -> LocalPackage -> Set Text
 exesToBuild executableBuildStatuses lp =
   if cabalIsSatisfied executableBuildStatuses && lpWanted lp
     then exeComponents (lpComponents lp)
-    else packageExes (lpPackage lp)
+    else buildableExes (lpPackage lp)
 
 -- | Do the current executables satisfy Cabal's bugged out requirements?
 cabalIsSatisfied :: Map k ExecutableBuildStatus -> Bool

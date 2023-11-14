@@ -40,19 +40,20 @@ import           Stack.Constants
                    , relFileHpcIndexHtml, relFileIndexHtml
                    )
 import           Stack.Constants.Config ( distDirFromDir, hpcRelativeDir )
+import           Stack.Package ( hasBuildableMainLibrary )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
+import           Stack.Types.CompCollection ( getBuildableSetText )
 import           Stack.Types.BuildOpts ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , hpcReportDir
                    )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
-import           Stack.Types.Package
-                   ( Package (..), PackageLibraries (..), packageIdentifier )
+import           Stack.Types.Package ( Package (..), packageIdentifier )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap
                    ( PackageType (..), SMTargets (..), SMWanted (..)
@@ -181,16 +182,13 @@ generateHpcReport pkgDir package tests = do
   let pkgId = packageIdentifierString (packageIdentifier package)
       pkgName' = packageNameString $ packageName package
       ghcVersion = getGhcVersion compilerVersion
-      hasLibrary =
-        case packageLibraries package of
-          NoLibraries -> False
-          HasLibraries _ -> True
+      hasLibrary = hasBuildableMainLibrary package
       subLibs = packageSubLibraries package
   eincludeName <-
     -- Pre-7.8 uses plain PKG-version in tix files.
     if ghcVersion < mkVersion [7, 10] then pure $ Right $ Just [pkgId]
     -- We don't expect to find a package key if there is no library.
-    else if not hasLibrary && Set.null subLibs then pure $ Right Nothing
+    else if not hasLibrary && null subLibs then pure $ Right Nothing
     -- Look in the inplace DB for the package key.
     -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
     else do
@@ -201,7 +199,7 @@ generateHpcReport pkgDir package tests = do
         findPackageFieldForBuiltPackage
           pkgDir
           (packageIdentifier package)
-          subLibs
+          (getBuildableSetText subLibs)
           hpcNameField
       case eincludeName of
         Left err -> do
@@ -248,104 +246,113 @@ generateHpcReportInternal ::
   -> [String]
   -> [String]
   -> RIO env (Maybe (Path Abs File))
-generateHpcReportInternal tixSrc reportDir report reportHtml extraMarkupArgs extraReportArgs = do
-  -- If a .tix file exists, move it to the HPC output directory and generate a
-  -- report for it.
-  tixFileExists <- doesFileExist tixSrc
-  if not tixFileExists
-    then do
-      prettyError $
-        "[S-4634]"
-        <> line
-        <> flow "Didn't find"
-        <> style File ".tix"
-        <> "for"
-        <> report
-        <> flow "- expected to find it at"
-        <> pretty tixSrc <> "."
-      pure Nothing
-    else (`catch` \(err :: ProcessException) -> do
-           logError $ displayShow err
-           generateHpcErrorReport reportDir $ display $ sanitize $
-               displayException err
-           pure Nothing) $
-       (`onException`
-           prettyError
-             ( "[S-8215]"
-               <> line
-               <> flow "Error occurred while producing"
-               <> report <> "."
-             )) $ do
-      -- Directories for .mix files.
-      hpcRelDir <- hpcRelativeDir
-      -- Compute arguments used for both "hpc markup" and "hpc report".
-      pkgDirs <- view $ buildConfigL.to (map ppRoot . Map.elems . smwProject . bcSMWanted)
-      let args =
-            -- Use index files from all packages (allows cross-package coverage results).
-            concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++
-            -- Look for index files in the correct dir (relative to each pkgdir).
-            ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
-      prettyInfoL
-        [ "Generating"
-        , report <> "."
-        ]
-      -- Strip @\r@ characters because Windows.
-      outputLines <- map (L8.filter (/= '\r')) . L8.lines . fst <$>
-        proc "hpc"
-        ( "report"
-        : toFilePath tixSrc
-        : (args ++ extraReportArgs)
-        )
-        readProcess_
-      if all ("(0/0)" `L8.isSuffixOf`) outputLines
+generateHpcReportInternal
+    tixSrc
+    reportDir
+    report
+    reportHtml
+    extraMarkupArgs
+    extraReportArgs
+  = do
+      -- If a .tix file exists, move it to the HPC output directory and generate
+      -- a report for it.
+      tixFileExists <- doesFileExist tixSrc
+      if not tixFileExists
         then do
-          let msgHtml =
-                   "Error: [S-6829]\n\
-                   \The "
-                <> display reportHtml
-                <> " did not consider any code. One possible cause of this is \
-                   \if your test-suite builds the library code (see Stack \
-                   \<a href='https://github.com/commercialhaskell/stack/issues/1008'>\
-                   \issue #1008\
-                   \</a>\
-                   \). It may also indicate a bug in Stack or the hpc program. \
-                   \Please report this issue if you think your coverage report \
-                   \should have meaningful results."
           prettyError $
-            "[S-6829]"
+            "[S-4634]"
             <> line
-            <> fillSep
-                 [ "The"
-                 , report
-                 , flow "did not consider any code. One possible cause of this \
-                        \is if your test-suite builds the library code (see \
-                        \Stack issue #1008). It may also indicate a bug in \
-                        \Stack or the hpc program. Please report this issue if \
-                        \you think your coverage report should have meaningful \
-                        \results."
-                 ]
-          generateHpcErrorReport reportDir msgHtml
+            <> flow "Didn't find"
+            <> style File ".tix"
+            <> "for"
+            <> report
+            <> flow "- expected to find it at"
+            <> pretty tixSrc <> "."
           pure Nothing
-        else do
-          let reportPath = reportDir </> relFileHpcIndexHtml
-          -- Print the summary report to the standard output stream.
-          putUtf8Builder =<< displayWithColor
-            (  fillSep
-                 [ "Summary"
-                 , report <> ":"
-                 ]
-            <> line
-            )
-          forM_ outputLines putStrLn
-          -- Generate the HTML markup.
-          void $ proc "hpc"
-            ( "markup"
+        else (`catch` \(err :: ProcessException) -> do
+               logError $ displayShow err
+               generateHpcErrorReport reportDir $ display $ sanitize $
+                   displayException err
+               pure Nothing) $
+           (`onException`
+               prettyError
+                 ( "[S-8215]"
+                   <> line
+                   <> flow "Error occurred while producing"
+                   <> report <> "."
+                 )) $ do
+          -- Directories for .mix files.
+          hpcRelDir <- hpcRelativeDir
+          -- Compute arguments used for both "hpc markup" and "hpc report".
+          pkgDirs <- view $ buildConfigL.to
+            (map ppRoot . Map.elems . smwProject . bcSMWanted)
+          let args =
+                -- Use index files from all packages (allows cross-package
+                -- coverage results).
+                concatMap (\x -> ["--srcdir", toFilePathNoTrailingSep x]) pkgDirs ++
+                -- Look for index files in the correct dir (relative to each pkgdir).
+                ["--hpcdir", toFilePathNoTrailingSep hpcRelDir, "--reset-hpcdirs"]
+          prettyInfoL
+            [ "Generating"
+            , report <> "."
+            ]
+          -- Strip @\r@ characters because Windows.
+          outputLines <- map (L8.filter (/= '\r')) . L8.lines . fst <$>
+            proc "hpc"
+            ( "report"
             : toFilePath tixSrc
-            : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)
-            : (args ++ extraMarkupArgs)
+            : (args ++ extraReportArgs)
             )
             readProcess_
-          pure (Just reportPath)
+          if all ("(0/0)" `L8.isSuffixOf`) outputLines
+            then do
+              let msgHtml =
+                       "Error: [S-6829]\n\
+                       \The "
+                    <> display reportHtml
+                    <> " did not consider any code. One possible cause of this is \
+                       \if your test-suite builds the library code (see Stack \
+                       \<a href='https://github.com/commercialhaskell/stack/issues/1008'>\
+                       \issue #1008\
+                       \</a>\
+                       \). It may also indicate a bug in Stack or the hpc program. \
+                       \Please report this issue if you think your coverage report \
+                       \should have meaningful results."
+              prettyError $
+                "[S-6829]"
+                <> line
+                <> fillSep
+                     [ "The"
+                     , report
+                     , flow "did not consider any code. One possible cause of this \
+                            \is if your test-suite builds the library code (see \
+                            \Stack issue #1008). It may also indicate a bug in \
+                            \Stack or the hpc program. Please report this issue if \
+                            \you think your coverage report should have meaningful \
+                            \results."
+                     ]
+              generateHpcErrorReport reportDir msgHtml
+              pure Nothing
+            else do
+              let reportPath = reportDir </> relFileHpcIndexHtml
+              -- Print the summary report to the standard output stream.
+              putUtf8Builder =<< displayWithColor
+                (  fillSep
+                     [ "Summary"
+                     , report <> ":"
+                     ]
+                <> line
+                )
+              forM_ outputLines putStrLn
+              -- Generate the HTML markup.
+              void $ proc "hpc"
+                ( "markup"
+                : toFilePath tixSrc
+                : ("--destdir=" ++ toFilePathNoTrailingSep reportDir)
+                : (args ++ extraMarkupArgs)
+                )
+                readProcess_
+              pure (Just reportPath)
 
 generateHpcReportForTargets :: HasEnvConfig env
                             => HpcReportOpts -> [Text] -> [Text] -> RIO env ()
@@ -415,11 +422,12 @@ generateHpcUnifiedReport = do
   outputDir <- hpcReportDir
   ensureDir outputDir
   (dirs, _) <- listDir outputDir
-  tixFiles0 <- fmap (concat . concat) $ forM (filter (("combined" /=) . dirnameString) dirs) $ \dir -> do
-    (dirs', _) <- listDir dir
-    forM dirs' $ \dir' -> do
-      (_, files) <- listDir dir'
-      pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
+  tixFiles0 <-
+    fmap (concat . concat) $ forM (filter (("combined" /=) . dirnameString) dirs) $ \dir -> do
+      (dirs', _) <- listDir dir
+      forM dirs' $ \dir' -> do
+        (_, files) <- listDir dir'
+        pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
   extraTixFiles <- findExtraTixFiles
   let tixFiles = tixFiles0  ++ extraTixFiles
       reportDir = outputDir </> relDirCombined </> relDirAll
@@ -463,7 +471,8 @@ generateUnionReport report reportHtml reportDir tixFiles = do
          ]
     <> line
     <> bulletedList (map fromString errs :: [StyleDoc])
-  tixDest <- (reportDir </>) <$> parseRelFile (dirnameString reportDir ++ ".tix")
+  tixDest <-
+    (reportDir </>) <$> parseRelFile (dirnameString reportDir ++ ".tix")
   ensureDir (parent tixDest)
   liftIO $ writeTix (toFilePath tixDest) tix
   generateHpcReportInternal tixDest reportDir report reportHtml [] []
@@ -488,10 +497,11 @@ readTixOrLog path = do
            ]
   pure mtix
 
--- | Module names which contain '/' have a package name, and so they weren't built into the
--- executable.
+-- | Module names which contain '/' have a package name, and so they weren't
+-- built into the executable.
 removeExeModules :: Tix -> Tix
-removeExeModules (Tix ms) = Tix (filter (\(TixModule name _ _ _) -> '/' `elem` name) ms)
+removeExeModules (Tix ms) =
+  Tix (filter (\(TixModule name _ _ _) -> '/' `elem` name) ms)
 
 unionTixes :: [Tix] -> ([String], Tix)
 unionTixes tixes = (Map.keys errs, Tix (Map.elems outputs))
@@ -500,7 +510,8 @@ unionTixes tixes = (Map.keys errs, Tix (Map.elems outputs))
   toMap (Tix ms) = Map.fromList (map (\x@(TixModule k _ _ _) -> (k, Right x)) ms)
   merge (Right (TixModule k hash1 len1 tix1))
       (Right (TixModule _ hash2 len2 tix2))
-    | hash1 == hash2 && len1 == len2 = Right (TixModule k hash1 len1 (zipWith (+) tix1 tix2))
+    | hash1 == hash2 && len1 == len2 =
+        Right (TixModule k hash1 len1 (zipWith (+) tix1 tix2))
   merge _ _ = Left ()
 
 generateHpcMarkupIndex :: HasEnvConfig env => RIO env ()

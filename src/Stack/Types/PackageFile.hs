@@ -9,8 +9,9 @@ module Stack.Types.PackageFile
   ( GetPackageFileContext (..)
   , DotCabalPath (..)
   , DotCabalDescriptor (..)
-  , GetPackageFiles (..)
   , PackageWarning (..)
+  , StackPackageFile (..)
+  , PackageComponentFile (..)
   ) where
 
 import           Distribution.ModuleName ( ModuleName )
@@ -19,7 +20,6 @@ import           Stack.Prelude
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Config ( HasConfig (..) )
-import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.Platform ( HasPlatform (..) )
@@ -91,21 +91,6 @@ data DotCabalDescriptor
   | DotCabalCFile !FilePath
   deriving (Eq, Ord, Show)
 
--- | Files that the package depends on, relative to package directory.
--- Argument is the location of the Cabal file
-newtype GetPackageFiles = GetPackageFiles
-  { getPackageFiles :: forall env. HasEnvConfig env
-                    => Path Abs File
-                    -> RIO env
-                         ( Map NamedComponent (Map ModuleName (Path Abs File))
-                         , Map NamedComponent [DotCabalPath]
-                         , Set (Path Abs File)
-                         , [PackageWarning]
-                         )
-  }
-instance Show GetPackageFiles where
-  show _ = "<GetPackageFiles>"
-
 -- | Warning generated when reading a package
 data PackageWarning
   = UnlistedModulesWarning NamedComponent [ModuleName]
@@ -116,3 +101,27 @@ data PackageWarning
   | MissingModulesWarning (Path Abs File) (Maybe String) [ModuleName]
     -- ^ Modules not found in file system, which are listed in Cabal file
   -}
+
+-- | This is the information from Cabal we need at the package level to track
+-- files.
+data StackPackageFile = StackPackageFile
+  { extraSrcFiles :: [FilePath]
+  , dataDir :: FilePath
+  , dataFiles :: [FilePath]
+  }
+  deriving (Show, Typeable)
+
+-- | Files that the package depends on, relative to package directory.
+data PackageComponentFile = PackageComponentFile
+  { modulePathMap :: Map NamedComponent (Map ModuleName (Path Abs File))
+  , cabalFileMap :: !(Map NamedComponent [DotCabalPath])
+  , packageExtraFile :: Set (Path Abs File)
+  , warnings :: [PackageWarning]
+  }
+
+instance Semigroup PackageComponentFile where
+  PackageComponentFile x1 x2 x3 x4 <> PackageComponentFile y1 y2 y3 y4 =
+    PackageComponentFile (x1 <> y1) (x2 <> y2) (x3 <> y3) (x4 <> y4)
+
+instance Monoid PackageComponentFile where
+  mempty = PackageComponentFile mempty mempty mempty mempty

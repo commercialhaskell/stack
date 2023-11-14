@@ -48,9 +48,12 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( PackageDescriptionPair (..), packageFromPackageDescription
+                   ( PackageDescriptionPair (..), buildableExes
+                   , buildableForeignLibs, hasBuildableMainLibrary
+                   , getPackageOpts, packageFromPackageDescription
                    , readDotBuildinfo, resolvePackageDescription
                    )
+import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Build.Exception
@@ -61,6 +64,7 @@ import           Stack.Types.BuildOpts
                    ( ApplyCLIFlag, BenchmarkOpts (..), BuildOpts (..)
                    , BuildOptsCLI (..), TestOpts (..), defaultBuildOptsCLI
                    )
+import           Stack.Types.CompCollection ( getBuildableListText )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
@@ -74,10 +78,9 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
                    ( BuildInfoOpts (..), InstallMap, InstalledMap
                    , LocalPackage (..), Package (..), PackageConfig (..)
-                   , PackageLibraries (..), dotCabalCFilePath, dotCabalGetPath
-                   , dotCabalMainPath, getPackageOpts
+                   , dotCabalCFilePath, dotCabalGetPath, dotCabalMainPath
                    )
-import           Stack.Types.PackageFile ( getPackageFiles )
+import           Stack.Types.PackageFile ( PackageComponentFile (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner, Runner )
 import           Stack.Types.SourceMap
@@ -345,7 +348,7 @@ findFileTargets ::
   -> RIO env (Map PackageName Target, Map PackageName [Path Abs File], [Path Abs File])
 findFileTargets locals fileTargets = do
   filePackages <- forM locals $ \lp -> do
-    (_,compFiles,_,_) <- getPackageFiles (packageFiles (lpPackage lp)) (lpCabalFile lp)
+    PackageComponentFile _ compFiles _ _ <- getPackageFile (lpPackage lp) (lpCabalFile lp)
     pure (lp, M.map (map dotCabalGetPath) compFiles)
   let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
       foundFileTargetComponents =
@@ -929,7 +932,8 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
       cabalfp = ghciDescCabalFp pkgDesc
       target = ghciDescTarget pkgDesc
       name = packageName pkg
-  (mods,files,opts) <- getPackageOpts (packageOpts pkg) installMap installedMap locals addPkgs cabalfp
+  (mods, files, opts) <-
+    getPackageOpts pkg installMap installedMap locals addPkgs cabalfp
   let filteredOpts = filterWanted opts
       filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
       allWanted = wantedPackageComponents bopts target pkg
@@ -957,17 +961,20 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
 wantedPackageComponents :: BuildOpts -> Target -> Package -> Set NamedComponent
 wantedPackageComponents _ (TargetComps cs) _ = cs
 wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
-     ( case packageLibraries pkg of
-         NoLibraries -> []
-         HasLibraries names -> CLib : map CSubLib (S.toList names)
-     )
-  <> map CExe (S.toList (packageExes pkg))
-  <> map CSubLib (S.toList $ packageSubLibraries pkg)
-  <> (if boptsTests bopts then map CTest (M.keys (packageTests pkg)) else [])
-  <> ( if boptsBenchmarks bopts
-         then map CBench (S.toList (packageBenchmarks pkg))
+     ( if hasBuildableMainLibrary pkg
+         then CLib : map CSubLib buildableForeignLibs'
          else []
      )
+  <> map CExe buildableExes'
+  <> map CSubLib buildableSubLibs
+  <> (if boptsTests bopts then map CTest buildableTestSuites else [])
+  <> (if boptsBenchmarks bopts then map CBench buildableBenchmarks else [])
+ where
+  buildableForeignLibs' = S.toList $ buildableForeignLibs pkg
+  buildableSubLibs = getBuildableListText $ packageSubLibraries pkg
+  buildableExes' = S.toList $ buildableExes pkg
+  buildableTestSuites = getBuildableListText $ packageTestSuites pkg
+  buildableBenchmarks = getBuildableListText $ packageBenchmarks pkg
 wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: HasTerm env => [GhciPkgInfo] -> RIO env ()
