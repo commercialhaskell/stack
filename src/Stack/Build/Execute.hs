@@ -165,6 +165,7 @@ import           Stack.Types.Config
                    ( Config (..), HasConfig (..), buildOptsL, stackRootL )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
+import           Stack.Types.Dependency (DepValue(dvVersionRange))
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
@@ -989,6 +990,9 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
               , actionConcurrency = ConcurrencyAllowed
               }) $
       -- These are the "final" actions - running tests and benchmarks.
+      -- These are the "final" actions - running tests and benchmarks.
+      
+      -- These are the "final" actions - running tests and benchmarks.
       (if Set.null tests then id else (:)
           Action
               { actionId = ActionId pkgId ATRunTests
@@ -1488,10 +1492,10 @@ withSingleContext
                            \errors."
                     ]
                 matchedDeps <-
-                  forM (Map.toList customSetupDeps) $ \(name, range) -> do
+                  forM (Map.toList customSetupDeps) $ \(name, depValue) -> do
                     let matches (PackageIdentifier name' version) =
                           name == name' &&
-                          version `withinRange` range
+                          version `withinRange` dvVersionRange depValue
                     case filter (matches . fst) (Map.toList allDeps) of
                       x:xs -> do
                         unless (null xs) $
@@ -1646,6 +1650,15 @@ withSingleContext
                 ] ++
 
                 -- Apply GHC options
+
+                -- Apply GHC options
+
+                -- Apply GHC options
+
+                -- Apply GHC options
+                -- https://github.com/commercialhaskell/stack/issues/4526
+                -- https://github.com/commercialhaskell/stack/issues/4526
+                -- https://github.com/commercialhaskell/stack/issues/4526
                 -- https://github.com/commercialhaskell/stack/issues/4526
                 map
                   T.unpack

@@ -67,7 +67,6 @@ import           Stack.Types.PackageFile
                    , StackPackageFile
                    )
 import           Stack.Types.SourceMap ( CommonPackage, FromSnapshot )
-import           Stack.Types.Version ( VersionRange )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -179,7 +178,7 @@ data Package = Package
     -- ^ The executables of the package.
   , packageBuildType :: !BuildType
     -- ^ Package build-type.
-  , packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
+  , packageSetupDeps :: !(Maybe (Map PackageName DepValue))
     -- ^ If present: custom-setup dependencies
   , packageCabalSpec :: !CabalSpecVersion
     -- ^ Cabal spec range

@@ -90,7 +90,7 @@ import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Component ( HasBuildInfo )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
-import           Stack.Types.Dependency ( DepType (..), DepValue (..) )
+import           Stack.Types.Dependency ( DepValue (..), cabalSetupDepsToStackDep, libraryDepFromVersionRange )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent
@@ -156,7 +156,7 @@ packageFromPackageDescription
           foldAndMakeCollection stackExecutableFromCabal $ executables pkg
       , packageSubLibDeps = subLibDeps
       , packageBuildType = buildType pkg
-      , packageSetupDeps = msetupDeps
+      , packageSetupDeps = fmap cabalSetupDepsToStackDep (setupBuildInfo pkg)
       , packageCabalSpec = specVersion pkg
       , packageFile = stackPackageFileFromCabal pkg
       , packageTestEnabled = packageConfigEnableTests packageConfig
@@ -169,22 +169,13 @@ packageFromPackageDescription
   pkgId = package pkg
   name = pkgName pkgId
 
-  msetupDeps = fmap
-    (M.fromList . map (depPkgName &&& depVerRange) . setupDepends)
-    (setupBuildInfo pkg)
-
   subLibDeps = M.fromList $ concatMap
     (\(Dependency n vr libs) -> mapMaybe (getSubLibName n vr) (NES.toList libs))
     (concatMap targetBuildDepends (allBuildInfo' pkg))
 
   getSubLibName pn vr lib@(LSubLibName _) =
-    Just (MungedPackageName pn lib, asLibrary vr)
+    Just (MungedPackageName pn lib, libraryDepFromVersionRange vr)
   getSubLibName _ _ _ = Nothing
-
-  asLibrary range = DepValue
-    { dvVersionRange = range
-    , dvType = AsLibrary
-    }
 
 toInternalPackageMungedName :: Package -> Text -> Text
 toInternalPackageMungedName pkg =
@@ -673,8 +664,8 @@ applyForceCustomBuild cabalVersion package
       package
         { packageBuildType = Custom
         , packageSetupDeps = Just $ M.fromList
-            [ ("Cabal", cabalVersionRange)
-            , ("base", anyVersion)
+            [ ("Cabal", libraryDepFromVersionRange cabalVersionRange)
+            , ("base", libraryDepFromVersionRange anyVersion)
             ]
         }
   | otherwise = package
@@ -757,13 +748,9 @@ processPackageDependencies pkg combineResults fn = do
           newResElement <- fn packageName depValue
           pure $ combineResults newResElement resList
   let compProcessor target = foldComponentToAnotherCollection (target pkg) (processDependencies innerIterator)
-  let asLibrary range = DepValue
-        { dvVersionRange = range
-        , dvType = AsLibrary
-        }
   let packageSetupDepsProcessor resAction = case packageSetupDeps pkg of
         Nothing -> resAction
-        Just v -> M.foldrWithKey' (\pn vr -> innerIterator pn (asLibrary vr)) resAction v
+        Just v -> M.foldrWithKey' innerIterator resAction v
   let processAllComp
         = compProcessor packageSubLibraries
         . compProcessor packageForeignLibraries
