@@ -48,10 +48,11 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( PackageDescriptionPair (..), buildableExes
+                   ( buildableExes
                    , buildableForeignLibs, hasBuildableMainLibrary
                    , getPackageOpts, packageFromPackageDescription
                    , readDotBuildinfo, resolvePackageDescription
+                   , listOfPackageDeps
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
@@ -886,12 +887,7 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
         packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
         maybe
           pdp
-          ( \bi ->
-            let PackageDescriptionPair x y = pdp
-            in  PackageDescriptionPair
-                  (C.updatePackageDescription bi x)
-                  (C.updatePackageDescription bi y)
-          )
+          (`C.updatePackageDescription` pdp)
           mbuildinfo
   pure GhciPkgDesc
     { ghciDescPkg = pkg
@@ -1201,7 +1197,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
   getDeps :: PackageName -> [PackageName]
   getDeps name =
     case M.lookup name localMap of
-      Just lp -> M.keys (packageDeps (lpPackage lp)) -- FIXME just Local?
+      Just lp -> listOfPackageDeps (lpPackage lp) -- FIXME just Local?
       _ -> []
   go ::
        PackageName
@@ -1212,7 +1208,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
       (Just (Just _), _) -> pure True
       (Just Nothing, _) | not loadAllDeps -> pure False
       (_, Just lp) -> do
-        let deps = M.keys (packageDeps (lpPackage lp))
+        let deps = listOfPackageDeps (lpPackage lp)
         shouldLoad <- or <$> mapM go deps
         if shouldLoad
           then do

@@ -31,6 +31,7 @@ import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
                    ( applyForceCustomBuild, buildableExes
                    , hasBuildableMainLibrary, packageUnknownTools
+                   , processPackageDependenciesToList
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
@@ -57,7 +58,7 @@ import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..), configureOpts )
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency
-                   ( DepValue (DepValue), DepType (AsLibrary) )
+                   ( DepValue (DepValue), isDepTypeLibrary )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
@@ -1001,8 +1002,7 @@ addPackageDeps ::
 addPackageDeps package = do
   ctx <- ask
   checkAndWarnForUnknownTools package
-  let deps' = Map.toList $ packageDeps package
-  deps <- forM deps' $ \(depname, DepValue range depType) -> do
+  deps <- processPackageDependenciesToList package $ \depname (DepValue range depType) -> do
     eres <- getCachedDepOrAddDep depname
     let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
         getLatestApplicableVersionAndRev = do
@@ -1028,7 +1028,7 @@ addPackageDeps package = do
                 Couldn'tResolveItsDependencies (packageVersion package)
         mlatestApplicable <- getLatestApplicableVersionAndRev
         pure $ Left (depname, (range, mlatestApplicable, bd))
-      Right adr | depType == AsLibrary && not (adrHasLibrary adr) ->
+      Right adr | isDepTypeLibrary depType && not (adrHasLibrary adr) ->
         pure $ Left (depname, (range, Nothing, HasNoLibrary))
       Right adr -> do
         addParent depname range

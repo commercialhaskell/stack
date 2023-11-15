@@ -57,9 +57,9 @@
 #  ✦ Category:      #AntiPattern
 #  ✦ File:          src\Stack\Build\Execute.hs
 #
-#  1097 ┃
-#  1098 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
-#  1099 ┃                     ^^^^^^^
+#  1122 ┃
+#  1123 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
+#  1124 ┃                     ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
@@ -67,9 +67,9 @@
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\Execute.hs
-# 2614 ┃
-# 2615 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-# 2616 ┃   ^^^^^^^
+# 2673 ┃
+# 2674 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+# 2675 ┃   ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]

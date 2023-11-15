@@ -23,6 +23,7 @@ module Stack.Component
   , stackTestFromCabal
   , foldOnNameAndBuildInfo
   , stackUnqualToQual
+  , processDependencies
   ) where
 
 import           Data.Foldable ( foldr' )
@@ -44,7 +45,7 @@ import           Stack.Types.Component
                    , StackExecutable (..), StackForeignLibrary (..)
                    , StackLibrary (..), StackTest (..), StackUnqualCompName (..)
                    )
-import           Stack.Types.Dependency ( cabalExeToStackDep, cabalToStackDep )
+import           Stack.Types.Dependency ( cabalExeToStackDep, cabalToStackDep, DepValue )
 import           Stack.Types.NamedComponent ( NamedComponent )
 
 fromCabalName :: UnqualComponentName -> StackUnqualCompName
@@ -185,8 +186,22 @@ gatherComponentToolsAndDepsFromCabal legacyBuildTools buildTools targetDeps =
         Map.insert pName (cabalToStackDep dep) $ sbiDependency sbi
     }
 
--- | A hard-coded map for tool dependencies. If a dependency is within this map
--- it's considered "known" (the exe will be found at the execution stage).
+
+-- | This is meant to process package's dependencies without recreating intermediate data reprensentation
+-- for them.
+processDependencies :: ( Monad m
+                       , HasField "buildInfo" component StackBuildInfo )
+  => (PackageName -> DepValue -> m (t resT) -> m (t resT))
+  -> component
+  -> m (t resT)
+  -> m (t resT)
+processDependencies iteratorFn component resAction = Map.foldrWithKey' iteratorFn resAction componentDeps
+  where
+    componentDeps = buildInfo.sbiDependency
+    buildInfo = component.buildInfo
+
+-- | A hard-coded map for tool dependencies.
+-- If a dependency is within this map it's considered "known" (the exe will be found at the execution stage).
 -- [It also exists in Cabal](https://hackage.haskell.org/package/Cabal/docs/src/Distribution.Simple.BuildToolDepends.html#local-6989586621679259154)
 isKnownLegacyExe :: String -> Maybe PackageName
 isKnownLegacyExe input = case input of
