@@ -32,6 +32,7 @@ import           Distribution.Utils.Path ( PackageDir, SourceDir, SymbolicPath )
 import           GHC.Records ( HasField )
 import           Stack.Prelude
 import           Stack.Types.Dependency ( DepValue )
+import           Stack.Types.ComponentUtils ( StackUnqualCompName(..) )
 
 -- | A type representing (unnamed) main library or sub-library components of a
 -- package.
@@ -97,19 +98,6 @@ data StackBenchmark = StackBenchmark
 
 -- | Type representing the name of an executable.
 newtype ExeName = ExeName Text
-  deriving (Data, Eq, Hashable, IsString, Generic, NFData, Ord, Show, Typeable)
-
--- | Type representing the name of an \'unqualified\' component (that is, the
--- component can be any sort - a (unnamed) main library or sub-library,
--- an executable, etc. ).
---
--- The corresponding The Cabal-syntax type is
--- 'Distribution.Types.UnqualComponentName.UnqualComponentName'.
-
--- Ideally, we would use the Cabal-syntax type and not 'Text', to avoid
--- unnecessary work, but there is no 'Hashable' instance for
--- 'Distribution.Types.UnqualComponentName.UnqualComponentName' yet.
-newtype StackUnqualCompName = StackUnqualCompName {unqualCompToText :: Text}
   deriving (Data, Eq, Hashable, IsString, Generic, NFData, Ord, Show, Typeable)
 
 -- | Type representing information needed to build. The file gathering-related

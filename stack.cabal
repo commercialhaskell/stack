@@ -330,6 +330,7 @@ library
   other-modules:
       GHC.Utils.GhcPkg.Main.Compat
       Stack.Config.ConfigureScript
+      Stack.Types.ComponentUtils
       Stack.Types.FileDigestCache
   autogen-modules:
       Build_stack

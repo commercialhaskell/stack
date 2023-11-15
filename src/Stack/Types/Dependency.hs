@@ -12,9 +12,12 @@ module Stack.Types.Dependency
 
 import           Data.Foldable ( foldr' )
 import qualified Data.Map as Map
+import qualified Distribution.Compat.NonEmptySet as NES
 import qualified Distribution.PackageDescription as Cabal
 import           Distribution.Types.VersionRange ( VersionRange )
 import           Stack.Prelude
+import           Stack.Types.ComponentUtils ( StackUnqualCompName(..), fromCabalName )
+import qualified Data.Set as Set
 
 -- | The value for a map from dependency name. This contains both the version
 -- range and the type of dependency.
@@ -28,18 +31,31 @@ data DepValue = DepValue
 -- former, we need to ensure that a library actually exists. See
 -- <https://github.com/commercialhaskell/stack/issues/2195>
 data DepType
-  = AsLibrary
+  = AsLibrary !DepLibrary
   | AsBuildTool
   deriving (Eq, Show)
+data DepLibrary = DepLibrary
+  { dlMain :: !Bool
+  , dlSublib :: Set StackUnqualCompName
+  }
+  deriving (Eq, Show)
+
+defaultDepLibrary :: DepLibrary
+defaultDepLibrary = DepLibrary True mempty
 
 isDepTypeLibrary :: DepType -> Bool
-isDepTypeLibrary AsLibrary = True
+isDepTypeLibrary AsLibrary{} = True
 isDepTypeLibrary AsBuildTool = False
 
 cabalToStackDep :: Cabal.Dependency -> DepValue
-cabalToStackDep (Cabal.Dependency _ verRange _libNameSet) =
-  DepValue{dvVersionRange = verRange, dvType = AsLibrary}
-
+cabalToStackDep (Cabal.Dependency _ verRange libNameSet) =
+  DepValue{dvVersionRange = verRange, dvType = AsLibrary depLibrary}
+  where
+    depLibrary = DepLibrary finalHasMain filteredItems
+    (finalHasMain, filteredItems) = foldr' iterator (False, mempty) libNameSet
+    iterator LMainLibName (_, newLibNameSet) = (True, newLibNameSet)
+    iterator (LSubLibName libName) (hasMain, newLibNameSet) = (hasMain, Set.insert (fromCabalName libName) newLibNameSet)
+  
 cabalExeToStackDep :: Cabal.ExeDependency -> DepValue
 cabalExeToStackDep (Cabal.ExeDependency _ _name verRange) =
   DepValue{dvVersionRange = verRange, dvType = AsBuildTool}
@@ -54,5 +70,5 @@ cabalSetupDepsToStackDep setupInfo =
 libraryDepFromVersionRange :: VersionRange -> DepValue
 libraryDepFromVersionRange range = DepValue
   { dvVersionRange = range
-  , dvType = AsLibrary
+  , dvType = AsLibrary defaultDepLibrary
   }
