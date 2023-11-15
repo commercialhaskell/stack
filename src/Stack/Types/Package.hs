@@ -183,18 +183,16 @@ data Package = Package
   , packageCabalSpec :: !CabalSpecVersion
     -- ^ Cabal spec range
   , packageFile :: StackPackageFile
-    -- ^ The cabal sourced files related to the package at the package level
+    -- ^ The Cabal sourced files related to the package at the package level
     -- The components may have file information in their own types
   , packageTestEnabled :: Bool
-    -- ^ This is a requirement because when tests are not enabled,
-    -- stack's package dependencies should ignore test dependencies.
-    -- Directly set from packageConfigEnableTests. A previous workaround used the
-    -- buildable boolean in cabal's buildInfo.
+    -- ^ This is a requirement because when tests are not enabled, Stack's
+    -- package dependencies should ignore test dependencies. Directly set from
+    -- 'packageConfigEnableTests'.
   , packageBenchmarkEnabled :: Bool
-    -- ^ This is a requirement because when benchmark are not enabled,
-    -- stack's package dependencies should ignore benchmark dependencies.
-    -- Directly set from packageConfigEnableBenchmarks. A previous workaround used the
-    -- buildable boolean in cabal's buildInfo.
+    -- ^ This is a requirement because when benchmark are not enabled, Stack's
+    -- package dependencies should ignore benchmark dependencies. Directly set
+    -- from 'packageConfigEnableBenchmarks'.
   }
   deriving (Show, Typeable)
 

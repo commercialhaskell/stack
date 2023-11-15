@@ -55,10 +55,7 @@ import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source ( projectLocalPackages )
 import           Stack.Constants ( stackProgName, stackProgName' )
 import           Stack.Constants.Config ( distDirFromDir )
-import           Stack.Package
-                   ( resolvePackage
-                   , resolvePackageDescription
-                   )
+import           Stack.Package ( resolvePackage, resolvePackageDescription )
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )

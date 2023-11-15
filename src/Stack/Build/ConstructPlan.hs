@@ -31,7 +31,7 @@ import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
                    ( applyForceCustomBuild, buildableExes
                    , hasBuildableMainLibrary, packageUnknownTools
-                   , processPackageDependenciesToList
+                   , processPackageDepsToList
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
@@ -57,8 +57,7 @@ import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..), configureOpts )
 import           Stack.Types.Curator ( Curator (..) )
-import           Stack.Types.Dependency
-                   ( DepValue (DepValue), isDepTypeLibrary )
+import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
@@ -1002,24 +1001,25 @@ addPackageDeps ::
 addPackageDeps package = do
   ctx <- ask
   checkAndWarnForUnknownTools package
-  deps <- processPackageDependenciesToList package $ \depname (DepValue range depType) -> do
-    eres <- getCachedDepOrAddDep depname
+  deps <- processPackageDepsToList package $ \name value -> do
+    eres <- getCachedDepOrAddDep name
     let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
         getLatestApplicableVersionAndRev = do
           vsAndRevs <-
             runRIO ctx $
               getHackagePackageVersions
-                YesRequireHackageIndex UsePreferredVersions depname
+                YesRequireHackageIndex UsePreferredVersions name
           pure $ do
             lappVer <- latestApplicableVersion range $ Map.keysSet vsAndRevs
             revs <- Map.lookup lappVer vsAndRevs
             (cabalHash, _) <- Map.maxView revs
             Just (lappVer, cabalHash)
+        range = dvVersionRange value
     case eres of
       Left e -> do
-        addParent depname range
+        addParent name range
         let bd = case e of
-              UnknownPackage name -> assert (name == depname) NotInBuildPlan
+              UnknownPackage name' -> assert (name' == name) NotInBuildPlan
               DependencyCycleDetected names -> BDDependencyCycleDetected names
               -- ultimately we won't show any information on this to the user,
               -- we'll allow the dependency failures alone to display to avoid
@@ -1027,11 +1027,12 @@ addPackageDeps package = do
               DependencyPlanFailures _ _  ->
                 Couldn'tResolveItsDependencies (packageVersion package)
         mlatestApplicable <- getLatestApplicableVersionAndRev
-        pure $ Left (depname, (range, mlatestApplicable, bd))
-      Right adr | isDepTypeLibrary depType && not (adrHasLibrary adr) ->
-        pure $ Left (depname, (range, Nothing, HasNoLibrary))
+        pure $ Left (name, (range, mlatestApplicable, bd))
+      Right adr
+        | isDepTypeLibrary (dvType value) && not (adrHasLibrary adr) ->
+            pure $ Left (name, (range, Nothing, HasNoLibrary))
       Right adr -> do
-        addParent depname range
+        addParent name range
         inRange <- if adrVersion adr `withinRange` range
           then pure True
           else do
@@ -1039,14 +1040,21 @@ addPackageDeps package = do
                  where
                   msg =
                        fillSep
-                         [ if isIgnoring then "Ignoring" else flow "Not ignoring"
-                         , style Current (fromString . packageNameString $ packageName package) <> "'s"
+                         [ if isIgnoring
+                             then "Ignoring"
+                             else flow "Not ignoring"
+                         ,    style
+                                Current
+                                ( fromString . packageNameString $
+                                    packageName package
+                                )
+                           <> "'s"
                          , flow "bounds on"
-                         , style Current (fromString $ packageNameString depname)
+                         , style Current (fromString $ packageNameString name)
                          , parens (fromString . T.unpack $ versionRangeText range)
                          , flow "and using"
                          , style Current (fromString . packageIdentifierString $
-                             PackageIdentifier depname (adrVersion adr)) <> "."
+                             PackageIdentifier name (adrVersion adr)) <> "."
                          ]
                     <> line
                     <> fillSep
@@ -1058,7 +1066,7 @@ addPackageDeps package = do
             let inSnapshotCheck = do
                   -- We ignore dependency information for packages in a snapshot
                   x <- inSnapshot (packageName package) (packageVersion package)
-                  y <- inSnapshot depname (adrVersion adr)
+                  y <- inSnapshot name (adrVersion adr)
                   if x && y
                     then do
                       warn_ True
@@ -1131,7 +1139,7 @@ addPackageDeps package = do
           else do
             mlatestApplicable <- getLatestApplicableVersionAndRev
             pure $ Left
-              ( depname
+              ( name
               , ( range
                 , mlatestApplicable
                 , DependencyMismatch $ adrVersion adr

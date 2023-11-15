@@ -25,12 +25,12 @@ module Stack.Package
   , buildableTestSuites
   , buildableBenchmarks
   , getPackageOpts
-  , processPackageDependenciesToList
+  , processPackageDepsToList
   , listOfPackageDeps
   , setOfPackageDeps
   ) where
 
-import           Data.Foldable ( Foldable(foldr') )
+import           Data.Foldable ( Foldable (..) )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -67,9 +67,10 @@ import           Path
 import           Path.Extra ( concatAndCollapseAbsDir, toFilePathNoTrailingSep )
 import           Stack.Component
                    ( foldOnNameAndBuildInfo, isComponentBuildable
-                   , stackBenchmarkFromCabal, stackExecutableFromCabal
-                   , stackForeignLibraryFromCabal, stackLibraryFromCabal
-                   , stackTestFromCabal, stackUnqualToQual, processDependencies
+                   , processDependencies, stackBenchmarkFromCabal
+                   , stackExecutableFromCabal, stackForeignLibraryFromCabal
+                   , stackLibraryFromCabal, stackTestFromCabal
+                   , stackUnqualToQual
                    )
 import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
@@ -83,21 +84,24 @@ import           Stack.Types.BuildConfig
                    ( HasBuildConfig (..), getProjectWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, foldAndMakeCollection
-                   , getBuildableSetText, foldComponentToAnotherCollection
+                   , foldComponentToAnotherCollection, getBuildableSetText
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Component ( HasBuildInfo )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
-import           Stack.Types.Dependency ( DepValue (..), cabalSetupDepsToStackDep, libraryDepFromVersionRange )
+import           Stack.Types.Dependency
+                   ( DepValue (..), cabalSetupDepsToStackDep
+                   , libraryDepFromVersionRange
+                   )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), subLibComponents )
 import           Stack.Types.Package
-                   ( BuildInfoOpts (..), BioInput(..)
-                   , InstallMap, Installed (..), InstalledMap, Package (..)
+                   ( BioInput(..), BuildInfoOpts (..), InstallMap
+                   , Installed (..), InstalledMap, Package (..)
                    , PackageConfig (..), PackageException (..)
                    , dotCabalCFilePath, packageIdentifier
                    )
@@ -726,16 +730,21 @@ buildableTestSuites pkg = getBuildableSetText (packageTestSuites pkg)
 buildableBenchmarks :: Package -> Set Text
 buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)
 
--- | This is a fonction to iterate in a monad over all
--- package component's dependencies, and yield a collection of results (used with list and set).
-processPackageDependencies :: (Monad m, Monoid (targetedCollection resT))
+-- | This is a function to iterate in a monad over all of a package component's
+-- dependencies, and yield a collection of results (used with list and set).
+processPackageDeps ::
+     (Monad m, Monoid (targetedCollection resT))
   => Package
   -> (resT -> targetedCollection resT -> targetedCollection resT)
   -> (PackageName -> DepValue -> m resT)
   -> m (targetedCollection resT)
-processPackageDependencies pkg combineResults fn = do
-  let asPackageNameSet accessor = S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
-  let (!subLibNames, !foreignLibNames) = (asPackageNameSet packageSubLibraries, asPackageNameSet packageForeignLibraries)
+processPackageDeps pkg combineResults fn = do
+  let asPackageNameSet accessor =
+        S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
+  let (!subLibNames, !foreignLibNames) =
+        ( asPackageNameSet packageSubLibraries
+        , asPackageNameSet packageForeignLibraries
+        )
   let shouldIgnoreDep (packageNameV :: PackageName)
           | packageNameV == packageName pkg = True
           | packageNameV `S.member` subLibNames = True
@@ -744,35 +753,49 @@ processPackageDependencies pkg combineResults fn = do
   let innerIterator packageName depValue resListInMonad
         | shouldIgnoreDep packageName = resListInMonad
         | otherwise = do
-          resList <- resListInMonad
-          newResElement <- fn packageName depValue
-          pure $ combineResults newResElement resList
-  let compProcessor target = foldComponentToAnotherCollection (target pkg) (processDependencies innerIterator)
+            resList <- resListInMonad
+            newResElement <- fn packageName depValue
+            pure $ combineResults newResElement resList
+  let compProcessor target =
+        foldComponentToAnotherCollection
+          (target pkg)
+          (processDependencies innerIterator)
   let packageSetupDepsProcessor resAction = case packageSetupDeps pkg of
         Nothing -> resAction
         Just v -> M.foldrWithKey' innerIterator resAction v
-  let processAllComp
-        = compProcessor packageSubLibraries
+  let processAllComp =
+          compProcessor packageSubLibraries
         . compProcessor packageForeignLibraries
         . compProcessor packageExecutables
-        . (if packageBenchmarkEnabled pkg then compProcessor packageBenchmarks else id)
-        . (if packageTestEnabled pkg then compProcessor packageTestSuites else id)
+        . ( if packageBenchmarkEnabled pkg
+              then compProcessor packageBenchmarks
+              else id
+          )
+        . ( if packageTestEnabled pkg
+              then compProcessor packageTestSuites
+              else id
+          )
         . packageSetupDepsProcessor
-
   let initialValue = case packageLibrary pkg of
         Nothing -> pure mempty
         Just comp -> processDependencies innerIterator comp (pure mempty)
   processAllComp initialValue
 
--- | Iterate/fold on all the package dependencies, components, setup deps and all.
-processPackageDependenciesToList :: Monad m => Package -> (PackageName -> DepValue -> m resT) -> m [resT]
-processPackageDependenciesToList pkg = processPackageDependencies pkg (:)
+-- | Iterate/fold on all the package dependencies, components, setup deps and
+-- all.
+processPackageDepsToList ::
+     Monad m
+  => Package
+  -> (PackageName -> DepValue -> m resT)
+  -> m [resT]
+processPackageDepsToList pkg = processPackageDeps pkg (:)
 
--- | List all package's dependencies in a "free" context through the identity monad.
+-- | List all package's dependencies in a "free" context through the identity
+-- monad.
 listOfPackageDeps :: Package -> [PackageName]
-listOfPackageDeps pkg = do
-  runIdentity $ processPackageDependenciesToList pkg (\pn _ -> pure pn)
+listOfPackageDeps pkg =
+  runIdentity $ processPackageDepsToList pkg (\pn _ -> pure pn)
 -- | The set of package's dependencies.
 setOfPackageDeps :: Package -> Set PackageName
-setOfPackageDeps pkg = do
-  runIdentity $ processPackageDependencies pkg S.insert (\pn _ -> pure pn)
+setOfPackageDeps pkg =
+  runIdentity $ processPackageDeps pkg S.insert (\pn _ -> pure pn)

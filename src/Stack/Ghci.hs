@@ -48,11 +48,10 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( buildableExes
-                   , buildableForeignLibs, hasBuildableMainLibrary
-                   , getPackageOpts, packageFromPackageDescription
-                   , readDotBuildinfo, resolvePackageDescription
-                   , listOfPackageDeps
+                   ( buildableExes, buildableForeignLibs, getPackageOpts
+                   , hasBuildableMainLibrary, listOfPackageDeps
+                   , packageFromPackageDescription, readDotBuildinfo
+                   , resolvePackageDescription
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
@@ -883,12 +882,8 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
         | otherwise = Nothing
   mbuildinfo <- forM mbuildinfofp readDotBuildinfo
   let pdp = resolvePackageDescription config gpkgdesc
-      pkg =
-        packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
-        maybe
-          pdp
-          (`C.updatePackageDescription` pdp)
-          mbuildinfo
+      pkg = packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
+        maybe pdp (`C.updatePackageDescription` pdp) mbuildinfo
   pure GhciPkgDesc
     { ghciDescPkg = pkg
     , ghciDescCabalFp = cabalfp

@@ -489,8 +489,8 @@ projectPackageDependencies dotOpts locals =
       locals
  where
   deps pkg packageDepsSet = if dotIncludeExternal dotOpts
-               then Set.delete (packageName pkg) packageDepsSet
-               else Set.intersection localNames packageDepsSet
+    then Set.delete (packageName pkg) packageDepsSet
+    else Set.intersection localNames packageDepsSet
   localNames = Set.fromList $ map (packageName . lpPackage) locals
   lpPayload pkg loc =
     DotPayload (Just $ packageVersion pkg)

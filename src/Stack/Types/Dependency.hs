@@ -10,10 +10,10 @@ module Stack.Types.Dependency
   , isDepTypeLibrary
   ) where
 
+import           Data.Foldable ( foldr' )
+import qualified Data.Map as Map
 import qualified Distribution.PackageDescription as Cabal
 import           Distribution.Types.VersionRange ( VersionRange )
-import           Data.Foldable (foldr')
-import qualified Data.Map as Map
 import           Stack.Prelude
 
 -- | The value for a map from dependency name. This contains both the version
@@ -39,13 +39,17 @@ isDepTypeLibrary AsBuildTool = False
 cabalToStackDep :: Cabal.Dependency -> DepValue
 cabalToStackDep (Cabal.Dependency _ verRange _libNameSet) =
   DepValue{dvVersionRange = verRange, dvType = AsLibrary}
+
 cabalExeToStackDep :: Cabal.ExeDependency -> DepValue
 cabalExeToStackDep (Cabal.ExeDependency _ _name verRange) =
   DepValue{dvVersionRange = verRange, dvType = AsBuildTool}
+
 cabalSetupDepsToStackDep :: Cabal.SetupBuildInfo -> Map PackageName DepValue
-cabalSetupDepsToStackDep setupInfo = foldr' inserter mempty (Cabal.setupDepends setupInfo)
-  where
-    inserter d@(Cabal.Dependency packageName _ _) = Map.insert packageName (cabalToStackDep d)
+cabalSetupDepsToStackDep setupInfo =
+  foldr' inserter mempty (Cabal.setupDepends setupInfo)
+ where
+  inserter d@(Cabal.Dependency packageName _ _) =
+    Map.insert packageName (cabalToStackDep d)
 
 libraryDepFromVersionRange :: VersionRange -> DepValue
 libraryDepFromVersionRange range = DepValue

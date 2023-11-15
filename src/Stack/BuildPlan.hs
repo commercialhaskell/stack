@@ -174,8 +174,8 @@ gpdPackageDeps gpd ac platform flags =
        $ map (C.mkPackageName . unUnqualComponentName . fst)
        $ C.condSubLibraries gpd
 
-  -- Since tests and benchmarks are both enabled, doesn't matter
-  -- if we choose modified or unmodified
+  -- Since tests and benchmarks are both enabled, doesn't matter if we choose
+  -- modified or unmodified
   pkgDesc = resolvePackageDescription pkgConfig gpd
   pkgConfig = PackageConfig
     { packageConfigEnableTests = True

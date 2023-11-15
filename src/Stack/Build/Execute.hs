@@ -980,47 +980,49 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
   afinal = case mfinal of
     Nothing -> []
     Just task@Task {..} ->
-      (if taskAllInOne then id else (:)
-          Action
-              { actionId = ActionId pkgId ATBuildFinal
-              , actionDeps = addBuild
-                  (Set.map (`ActionId` ATBuild) (tcoMissing taskConfigOpts))
-              , actionDo =
-                  \ac -> runInBase $ singleBuild ac ee task installedMap True
-              , actionConcurrency = ConcurrencyAllowed
-              }) $
+      ( if taskAllInOne
+          then id
+          else (:) Action
+            { actionId = ActionId pkgId ATBuildFinal
+            , actionDeps = addBuild
+                (Set.map (`ActionId` ATBuild) (tcoMissing taskConfigOpts))
+            , actionDo =
+                \ac -> runInBase $ singleBuild ac ee task installedMap True
+            , actionConcurrency = ConcurrencyAllowed
+            }
+      ) $
       -- These are the "final" actions - running tests and benchmarks.
-      -- These are the "final" actions - running tests and benchmarks.
-      
-      -- These are the "final" actions - running tests and benchmarks.
-      (if Set.null tests then id else (:)
-          Action
-              { actionId = ActionId pkgId ATRunTests
-              , actionDeps = finalDeps
-              , actionDo = \ac -> withLock mtestLock $ runInBase $
-                  singleTest topts (Set.toList tests) ac ee task installedMap
-              -- Always allow tests tasks to run concurrently with
-              -- other tasks, particularly build tasks. Note that
-              -- 'mtestLock' can optionally make it so that only
-              -- one test is run at a time.
-              , actionConcurrency = ConcurrencyAllowed
-              }) $
-      (if Set.null benches then id else (:)
-          Action
-              { actionId = ActionId pkgId ATRunBenchmarks
-              , actionDeps = finalDeps
-              , actionDo = \ac -> runInBase $
-                  singleBench
-                    beopts
-                    (Set.toList benches)
-                    ac
-                    ee
-                    task
-                    installedMap
-                -- Never run benchmarks concurrently with any other task, see
-                -- #3663
-              , actionConcurrency = ConcurrencyDisallowed
-              })
+      ( if Set.null tests
+          then id
+          else (:) Action
+            { actionId = ActionId pkgId ATRunTests
+            , actionDeps = finalDeps
+            , actionDo = \ac -> withLock mtestLock $ runInBase $
+                singleTest topts (Set.toList tests) ac ee task installedMap
+              -- Always allow tests tasks to run concurrently with other tasks,
+              -- particularly build tasks. Note that 'mtestLock' can optionally
+              -- make it so that only one test is run at a time.
+            , actionConcurrency = ConcurrencyAllowed
+            }
+      ) $
+      ( if Set.null benches
+          then id
+          else (:) Action
+            { actionId = ActionId pkgId ATRunBenchmarks
+            , actionDeps = finalDeps
+            , actionDo = \ac -> runInBase $
+                singleBench
+                  beopts
+                  (Set.toList benches)
+                  ac
+                  ee
+                  task
+                  installedMap
+              -- Never run benchmarks concurrently with any other task, see
+              -- #3663
+            , actionConcurrency = ConcurrencyDisallowed
+            }
+      )
       []
      where
       pkgId = taskProvides task
@@ -1494,8 +1496,8 @@ withSingleContext
                 matchedDeps <-
                   forM (Map.toList customSetupDeps) $ \(name, depValue) -> do
                     let matches (PackageIdentifier name' version) =
-                          name == name' &&
-                          version `withinRange` dvVersionRange depValue
+                             name == name'
+                          && version `withinRange` dvVersionRange depValue
                     case filter (matches . fst) (Map.toList allDeps) of
                       x:xs -> do
                         unless (null xs) $
@@ -1650,15 +1652,6 @@ withSingleContext
                 ] ++
 
                 -- Apply GHC options
-
-                -- Apply GHC options
-
-                -- Apply GHC options
-
-                -- Apply GHC options
-                -- https://github.com/commercialhaskell/stack/issues/4526
-                -- https://github.com/commercialhaskell/stack/issues/4526
-                -- https://github.com/commercialhaskell/stack/issues/4526
                 -- https://github.com/commercialhaskell/stack/issues/4526
                 map
                   T.unpack

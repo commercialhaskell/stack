@@ -52,7 +52,7 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-fki0nd-1119:21"
+  id = "OBS-STAN-0203-fki0nd-1125:21"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 #  ✦ Category:      #AntiPattern
 #  ✦ File:          src\Stack\Build\Execute.hs
@@ -63,7 +63,7 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-fki0nd-2661:3"
+  id = "OBS-STAN-0203-fki0nd-2667:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\Execute.hs
