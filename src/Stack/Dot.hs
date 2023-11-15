@@ -36,7 +36,7 @@ import           Stack.Build.Source
                    ( loadCommonPackage, loadLocalPackage, loadSourceMap )
 import           Stack.Build.Target( NeedTargets (..), parseTargets )
 import           Stack.Constants ( wiredInPackages )
-import           Stack.Package ( Package (..) )
+import           Stack.Package ( Package (..), setOfPackageDeps )
 import           Stack.Prelude hiding ( Display (..), pkgName, loadPackage )
 import qualified Stack.Prelude ( pkgName )
 import           Stack.Runners
@@ -189,7 +189,7 @@ createDependencyGraph dotOpts = do
             pure ( Set.empty
                  , DotPayload (Just version) (Just $ Right BSD3) Nothing )
         | otherwise =
-            fmap (packageAllDeps &&& makePayload loc)
+            fmap (setOfPackageDeps &&& makePayload loc)
                  (loadPackage loc flags ghcOptions cabalConfigOpts)
   resolveDependencies (dotDependencyDepth dotOpts) graph depLoader
  where
@@ -433,7 +433,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
    where
     loadDeps pp = do
       pkg <- loadCommonPackage (ppCommon pp)
-      pure (packageAllDeps pkg, payloadFromLocal pkg Nothing)
+      pure (setOfPackageDeps pkg, payloadFromLocal pkg Nothing)
 
   dependencyDeps =
     loadDeps <$> Map.lookup pkgName (smDeps sourceMap)
@@ -441,7 +441,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
     loadDeps DepPackage{dpLocation=PLMutable dir} = do
       pp <- mkProjectPackage YesPrintWarnings dir False
       pkg <- loadCommonPackage (ppCommon pp)
-      pure (packageAllDeps pkg, payloadFromLocal pkg (Just $ PLMutable dir))
+      pure (setOfPackageDeps pkg, payloadFromLocal pkg (Just $ PLMutable dir))
 
     loadDeps dp@DepPackage{dpLocation=PLImmutable loc} = do
       let common = dpCommon dp
@@ -483,13 +483,14 @@ projectPackageDependencies ::
 projectPackageDependencies dotOpts locals =
   map (\lp -> let pkg = localPackageToPackage lp
                   pkgDir = parent $ lpCabalFile lp
+                  packageDepsSet = setOfPackageDeps pkg
                   loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
-              in  (packageName pkg, (deps pkg, lpPayload pkg loc)))
+              in  (packageName pkg, (deps pkg packageDepsSet, lpPayload pkg loc)))
       locals
  where
-  deps pkg = if dotIncludeExternal dotOpts
-               then Set.delete (packageName pkg) (packageAllDeps pkg)
-               else Set.intersection localNames (packageAllDeps pkg)
+  deps pkg packageDepsSet = if dotIncludeExternal dotOpts
+    then Set.delete (packageName pkg) packageDepsSet
+    else Set.intersection localNames packageDepsSet
   localNames = Set.fromList $ map (packageName . lpPackage) locals
   lpPayload pkg loc =
     DotPayload (Just $ packageVersion pkg)

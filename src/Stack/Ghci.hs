@@ -48,10 +48,10 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( PackageDescriptionPair (..), buildableExes
-                   , buildableForeignLibs, hasBuildableMainLibrary
-                   , getPackageOpts, packageFromPackageDescription
-                   , readDotBuildinfo, resolvePackageDescription
+                   ( buildableExes, buildableForeignLibs, getPackageOpts
+                   , hasBuildableMainLibrary, listOfPackageDeps
+                   , packageFromPackageDescription, readDotBuildinfo
+                   , resolvePackageDescription
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
@@ -882,17 +882,8 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
         | otherwise = Nothing
   mbuildinfo <- forM mbuildinfofp readDotBuildinfo
   let pdp = resolvePackageDescription config gpkgdesc
-      pkg =
-        packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
-        maybe
-          pdp
-          ( \bi ->
-            let PackageDescriptionPair x y = pdp
-            in  PackageDescriptionPair
-                  (C.updatePackageDescription bi x)
-                  (C.updatePackageDescription bi y)
-          )
-          mbuildinfo
+      pkg = packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
+        maybe pdp (`C.updatePackageDescription` pdp) mbuildinfo
   pure GhciPkgDesc
     { ghciDescPkg = pkg
     , ghciDescCabalFp = cabalfp
@@ -1201,7 +1192,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
   getDeps :: PackageName -> [PackageName]
   getDeps name =
     case M.lookup name localMap of
-      Just lp -> M.keys (packageDeps (lpPackage lp)) -- FIXME just Local?
+      Just lp -> listOfPackageDeps (lpPackage lp) -- FIXME just Local?
       _ -> []
   go ::
        PackageName
@@ -1212,7 +1203,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
       (Just (Just _), _) -> pure True
       (Just Nothing, _) | not loadAllDeps -> pure False
       (_, Just lp) -> do
-        let deps = M.keys (packageDeps (lpPackage lp))
+        let deps = listOfPackageDeps (lpPackage lp)
         shouldLoad <- or <$> mapM go deps
         if shouldLoad
           then do

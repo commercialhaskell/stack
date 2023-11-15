@@ -36,7 +36,7 @@ import qualified RIO.NonEmpty as NE
 import           Stack.Constants ( wiredInPackages )
 import           Stack.Package
                    ( PackageConfig (..), packageDependencies
-                   , pdpModifiedBuildable, resolvePackageDescription
+                   , resolvePackageDescription
                    )
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.SourceMap
@@ -174,9 +174,9 @@ gpdPackageDeps gpd ac platform flags =
        $ map (C.mkPackageName . unUnqualComponentName . fst)
        $ C.condSubLibraries gpd
 
-  -- Since tests and benchmarks are both enabled, doesn't matter
-  -- if we choose modified or unmodified
-  pkgDesc = pdpModifiedBuildable $ resolvePackageDescription pkgConfig gpd
+  -- Since tests and benchmarks are both enabled, doesn't matter if we choose
+  -- modified or unmodified
+  pkgDesc = resolvePackageDescription pkgConfig gpd
   pkgConfig = PackageConfig
     { packageConfigEnableTests = True
     , packageConfigEnableBenchmarks = True

@@ -67,7 +67,6 @@ import           Stack.Types.PackageFile
                    , StackPackageFile
                    )
 import           Stack.Types.SourceMap ( CommonPackage, FromSnapshot )
-import           Stack.Types.Version ( VersionRange )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.
@@ -155,11 +154,6 @@ data Package = Package
     -- ^ Version of the package
   , packageLicense :: !(Either SPDX.License License)
     -- ^ The license the package was released under.
-  , packageDeps :: !(Map PackageName DepValue)
-    -- ^ Packages that the package depends on, both as libraries and build
-    -- tools.
-  , packageAllDeps :: !(Set PackageName)
-    -- ^ Original dependencies (not sieved).
   , packageSubLibDeps :: !(Map MungedPackageName DepValue)
     -- ^ Original sub-library dependencies (not sieved).
   , packageGhcOptions :: ![Text]
@@ -184,13 +178,21 @@ data Package = Package
     -- ^ The executables of the package.
   , packageBuildType :: !BuildType
     -- ^ Package build-type.
-  , packageSetupDeps :: !(Maybe (Map PackageName VersionRange))
+  , packageSetupDeps :: !(Maybe (Map PackageName DepValue))
     -- ^ If present: custom-setup dependencies
   , packageCabalSpec :: !CabalSpecVersion
     -- ^ Cabal spec range
   , packageFile :: StackPackageFile
-    -- ^ The cabal sourced files related to the package at the package level
+    -- ^ The Cabal sourced files related to the package at the package level
     -- The components may have file information in their own types
+  , packageTestEnabled :: Bool
+    -- ^ This is a requirement because when tests are not enabled, Stack's
+    -- package dependencies should ignore test dependencies. Directly set from
+    -- 'packageConfigEnableTests'.
+  , packageBenchmarkEnabled :: Bool
+    -- ^ This is a requirement because when benchmark are not enabled, Stack's
+    -- package dependencies should ignore benchmark dependencies. Directly set
+    -- from 'packageConfigEnableBenchmarks'.
   }
   deriving (Show, Typeable)
 

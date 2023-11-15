@@ -55,10 +55,7 @@ import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source ( projectLocalPackages )
 import           Stack.Constants ( stackProgName, stackProgName' )
 import           Stack.Constants.Config ( distDirFromDir )
-import           Stack.Package
-                   ( PackageDescriptionPair (..), resolvePackage
-                   , resolvePackageDescription
-                   )
+import           Stack.Package ( resolvePackage, resolvePackageDescription )
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
@@ -565,7 +562,7 @@ checkPackageInExtractedTarball pkgDir = do
   (gpdio, name, _cabalfp) <- loadCabalFilePath (Just stackProgName') pkgDir
   gpd <- liftIO $ gpdio YesPrintWarnings
   config <- getDefaultPackageConfig
-  let PackageDescriptionPair pkgDesc _ = resolvePackageDescription config gpd
+  let pkgDesc = resolvePackageDescription config gpd
   prettyInfoL
     [ flow "Checking package"
     , style Current (fromString $ packageNameString name)

@@ -10,7 +10,6 @@ module Stack.Package
   , resolvePackage
   , packageFromPackageDescription
   , Package (..)
-  , PackageDescriptionPair (..)
   , PackageConfig (..)
   , buildLogPath
   , PackageException (..)
@@ -26,10 +25,12 @@ module Stack.Package
   , buildableTestSuites
   , buildableBenchmarks
   , getPackageOpts
+  , processPackageDepsToList
+  , listOfPackageDeps
+  , setOfPackageDeps
   ) where
 
 import           Data.Foldable ( Foldable (..) )
-import           Data.List ( unzip )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -46,16 +47,13 @@ import           Distribution.PackageDescription
                    , GenericPackageDescription (..), HookedBuildInfo
                    , Library (..), PackageDescription (..), PackageFlag (..)
                    , SetupBuildInfo (..), TestSuite (..), allLibraries
-                   , buildType, depPkgName, depVerRange, libraryNameString
-                   , maybeToLibraryName
+                   , buildType, depPkgName, depVerRange, maybeToLibraryName
                    )
 import           Distribution.Pretty ( prettyShow )
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
 import           Distribution.System ( OS (..), Arch, Platform (..) )
 import           Distribution.Text ( display )
 import qualified Distribution.Types.CondTree as Cabal
-import qualified Distribution.Types.ExeDependency as Cabal
-import qualified Distribution.Types.LegacyExeDependency as Cabal
 import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Distribution.Utils.Path ( getSymbolicPath )
 import           Distribution.Verbosity ( silent )
@@ -69,9 +67,10 @@ import           Path
 import           Path.Extra ( concatAndCollapseAbsDir, toFilePathNoTrailingSep )
 import           Stack.Component
                    ( foldOnNameAndBuildInfo, isComponentBuildable
-                   , stackBenchmarkFromCabal, stackExecutableFromCabal
-                   , stackForeignLibraryFromCabal, stackLibraryFromCabal
-                   , stackTestFromCabal, stackUnqualToQual
+                   , processDependencies, stackBenchmarkFromCabal
+                   , stackExecutableFromCabal, stackForeignLibraryFromCabal
+                   , stackLibraryFromCabal, stackTestFromCabal
+                   , stackUnqualToQual
                    )
 import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
@@ -85,21 +84,24 @@ import           Stack.Types.BuildConfig
                    ( HasBuildConfig (..), getProjectWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, foldAndMakeCollection
-                   , getBuildableSetText
+                   , foldComponentToAnotherCollection, getBuildableSetText
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Component ( HasBuildInfo )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
-import           Stack.Types.Dependency ( DepType (..), DepValue (..) )
+import           Stack.Types.Dependency
+                   ( DepValue (..), cabalSetupDepsToStackDep
+                   , libraryDepFromVersionRange
+                   )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), subLibComponents )
 import           Stack.Types.Package
-                   ( BioInput (..), BuildInfoOpts (..), ExeName (..)
-                   , InstallMap, Installed (..), InstalledMap, Package (..)
+                   ( BioInput(..), BuildInfoOpts (..), InstallMap
+                   , Installed (..), InstalledMap, Package (..)
                    , PackageConfig (..), PackageException (..)
                    , dotCabalCFilePath, packageIdentifier
                    )
@@ -130,17 +132,16 @@ resolvePackage packageConfig gpkg =
 packageFromPackageDescription ::
      PackageConfig
   -> [PackageFlag]
-  -> PackageDescriptionPair
+  -> PackageDescription
   -> Package
 packageFromPackageDescription
     packageConfig
     pkgFlags
-    (PackageDescriptionPair pkgNoMod pkg)
+    pkg
   = Package
       { packageName = name
       , packageVersion = pkgVersion pkgId
       , packageLicense = licenseRaw pkg
-      , packageDeps = deps
       , packageGhcOptions = packageConfigGhcOptions packageConfig
       , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig
       , packageFlags = packageConfigFlags packageConfig
@@ -152,75 +153,33 @@ packageFromPackageDescription
       , packageForeignLibraries =
           foldAndMakeCollection stackForeignLibraryFromCabal $ foreignLibs pkg
       , packageTestSuites =
-          foldAndMakeCollection stackTestFromCabal $ testSuites pkgNoMod
+          foldAndMakeCollection stackTestFromCabal $ testSuites pkg
       , packageBenchmarks =
-          foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkgNoMod
+          foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkg
       , packageExecutables =
           foldAndMakeCollection stackExecutableFromCabal $ executables pkg
-      , packageAllDeps = M.keysSet deps
       , packageSubLibDeps = subLibDeps
       , packageBuildType = buildType pkg
-      , packageSetupDeps = msetupDeps
+      , packageSetupDeps = fmap cabalSetupDepsToStackDep (setupBuildInfo pkg)
       , packageCabalSpec = specVersion pkg
       , packageFile = stackPackageFileFromCabal pkg
+      , packageTestEnabled = packageConfigEnableTests packageConfig
+      , packageBenchmarkEnabled = packageConfigEnableBenchmarks packageConfig
       }
  where
-  extraLibNames = S.union subLibNames foreignLibNames
-
-  subLibNames
-    = S.fromList
-    $ map (T.pack . Cabal.unUnqualComponentName)
-    $ mapMaybe (libraryNameString . libName) -- this is a design bug in the
-                                             -- Cabal API: this should
-                                             -- statically be known to exist
-    $ filter (buildable . libBuildInfo)
-    $ subLibraries pkg
-
-  foreignLibNames
-    = S.fromList
-    $ map (T.pack . Cabal.unUnqualComponentName . foreignLibName)
-    $ filter (buildable . foreignLibBuildInfo)
-    $ foreignLibs pkg
-
   -- Gets all of the modules, files, build files, and data files that constitute
   -- the package. This is primarily used for dirtiness checking during build, as
   -- well as use by "stack ghci"
   pkgId = package pkg
   name = pkgName pkgId
 
-  (_unknownTools, knownTools) = packageDescTools pkg
-
-  deps = M.filterWithKey (const . not . isMe) (M.unionsWith (<>)
-    [ asLibrary <$> packageDependencies pkg
-    -- We include all custom-setup deps - if present - in the package deps
-    -- themselves. Stack always works with the invariant that there will be a
-    -- single installed package relating to a package name, and this applies at
-    -- the setup dependency level as well.
-    , asLibrary <$> fromMaybe M.empty msetupDeps
-    , knownTools
-    ])
-
-  msetupDeps = fmap
-    (M.fromList . map (depPkgName &&& depVerRange) . setupDepends)
-    (setupBuildInfo pkg)
-
   subLibDeps = M.fromList $ concatMap
     (\(Dependency n vr libs) -> mapMaybe (getSubLibName n vr) (NES.toList libs))
     (concatMap targetBuildDepends (allBuildInfo' pkg))
 
   getSubLibName pn vr lib@(LSubLibName _) =
-    Just (MungedPackageName pn lib, asLibrary vr)
+    Just (MungedPackageName pn lib, libraryDepFromVersionRange vr)
   getSubLibName _ _ _ = Nothing
-
-  asLibrary range = DepValue
-    { dvVersionRange = range
-    , dvType = AsLibrary
-    }
-
-  -- Is the package dependency mentioned here me: either the package name
-  -- itself, or the name of one of the sub libraries
-  isMe name' =  name' == name
-             || fromString (packageNameString name') `S.member` extraLibNames
 
 toInternalPackageMungedName :: Package -> Text -> Text
 toInternalPackageMungedName pkg =
@@ -471,73 +430,6 @@ packageDependencies pkg =
          concatMap targetBuildDepends (allBuildInfo' pkg)
       <> maybe [] setupDepends (setupBuildInfo pkg)
 
--- | Get all dependencies of the package (buildable targets only).
---
--- This uses both the new 'buildToolDepends' and old 'buildTools' information.
-packageDescTools ::
-     PackageDescription
-  -> (Set ExeName, Map PackageName DepValue)
-packageDescTools pd =
-  (S.fromList $ concat unknowns, M.fromListWith (<>) $ concat knowns)
- where
-  (unknowns, knowns) = unzip $ map perBI $ allBuildInfo' pd
-
-  perBI :: BuildInfo -> ([ExeName], [(PackageName, DepValue)])
-  perBI bi =
-    (unknownTools, tools)
-   where
-    (unknownTools, knownTools) = partitionEithers $ map go1 (buildTools bi)
-
-    tools = mapMaybe go2 (knownTools ++ buildToolDepends bi)
-
-    -- This is similar to desugarBuildTool from Cabal, however it
-    -- uses our own hard-coded map which drops tools shipped with
-    -- GHC (like hsc2hs), and includes some tools from Stackage.
-    go1 :: Cabal.LegacyExeDependency -> Either ExeName Cabal.ExeDependency
-    go1 (Cabal.LegacyExeDependency name range) =
-      case M.lookup name hardCodedMap of
-        Just pkgName ->
-          Right $
-            Cabal.ExeDependency pkgName (Cabal.mkUnqualComponentName name) range
-        Nothing -> Left $ ExeName $ T.pack name
-
-    go2 :: Cabal.ExeDependency -> Maybe (PackageName, DepValue)
-    go2 (Cabal.ExeDependency pkg _name range)
-      | pkg `S.member` preInstalledPackages = Nothing
-      | otherwise = Just
-          ( pkg
-          , DepValue
-              { dvVersionRange = range
-              , dvType = AsBuildTool
-              }
-          )
-
--- | A hard-coded map for tool dependencies
-hardCodedMap :: Map String PackageName
-hardCodedMap = M.fromList
-  [ ("alex", Distribution.Package.mkPackageName "alex")
-  , ("happy", Distribution.Package.mkPackageName "happy")
-  , ("cpphs", Distribution.Package.mkPackageName "cpphs")
-  , ("greencard", Distribution.Package.mkPackageName "greencard")
-  , ("c2hs", Distribution.Package.mkPackageName "c2hs")
-  , ("hscolour", Distribution.Package.mkPackageName "hscolour")
-  , ("hspec-discover", Distribution.Package.mkPackageName "hspec-discover")
-  , ("hsx2hs", Distribution.Package.mkPackageName "hsx2hs")
-  , ("gtk2hsC2hs", Distribution.Package.mkPackageName "gtk2hs-buildtools")
-  , ("gtk2hsHookGenerator", Distribution.Package.mkPackageName "gtk2hs-buildtools")
-  , ("gtk2hsTypeGen", Distribution.Package.mkPackageName "gtk2hs-buildtools")
-  ]
-
--- | Executable-only packages which come pre-installed with GHC and do not need
--- to be built. Without this exception, we would either end up unnecessarily
--- rebuilding these packages, or failing because the packages do not appear in
--- the Stackage snapshot.
-preInstalledPackages :: Set PackageName
-preInstalledPackages = S.fromList
-  [ mkPackageName "hsc2hs"
-  , mkPackageName "haddock"
-  ]
-
 -- | Variant of 'allBuildInfo' from Cabal that, like versions before Cabal 2.2
 -- only includes buildable components.
 allBuildInfo' :: PackageDescription -> [BuildInfo]
@@ -557,42 +449,21 @@ allBuildInfo' pkg_descr = [ bi | lib <- allLibraries pkg_descr
                                , let bi = benchmarkBuildInfo tst
                                , buildable bi ]
 
--- | A pair of package descriptions: one which modified the buildable values of
--- test suites and benchmarks depending on whether they are enabled, and one
--- which does not.
---
--- Fields are intentionally lazy, we may only need one or the other value.
---
--- Michael S Snoyman 2017-08-29: The very presence of this data type is terribly
--- ugly, it represents the fact that the Cabal 2.0 upgrade did _not_ go well.
--- Specifically, we used to have a field to indicate whether a component was
--- enabled in addition to buildable, but that's gone now, and this is an ugly
--- proxy. We should at some point clean up the mess of Package, LocalPackage,
--- etc, and probably pull in the definition of PackageDescription from Cabal
--- with our additionally needed metadata. But this is a good enough hack for the
--- moment. Odds are, you're reading this in the year 2024 and thinking "wtf?"
-data PackageDescriptionPair = PackageDescriptionPair
-  { pdpOrigBuildable :: PackageDescription
-  , pdpModifiedBuildable :: PackageDescription
-  }
-
 -- | Evaluates the conditions of a 'GenericPackageDescription', yielding
 -- a resolved 'PackageDescription'.
 resolvePackageDescription ::
      PackageConfig
   -> GenericPackageDescription
-  -> PackageDescriptionPair
+  -> PackageDescription
 resolvePackageDescription
   packageConfig
   ( GenericPackageDescription
       desc _ defaultFlags mlib subLibs foreignLibs' exes tests benches
   )
   =
-  PackageDescriptionPair
-    { pdpOrigBuildable = go False
-    , pdpModifiedBuildable = go True
-    }
+  go False
  where
+ -- TODO: remove modBuildable
   go modBuildable = desc
     { library = fmap (resolveConditions rc updateLibDeps) mlib
     , subLibraries = map
@@ -796,12 +667,9 @@ applyForceCustomBuild cabalVersion package
   | forceCustomBuild =
       package
         { packageBuildType = Custom
-        , packageDeps =
-            M.insertWith (<>) "Cabal" (DepValue cabalVersionRange AsLibrary) $
-              packageDeps package
         , packageSetupDeps = Just $ M.fromList
-            [ ("Cabal", cabalVersionRange)
-            , ("base", anyVersion)
+            [ ("Cabal", libraryDepFromVersionRange cabalVersionRange)
+            , ("base", libraryDepFromVersionRange anyVersion)
             ]
         }
   | otherwise = package
@@ -861,3 +729,73 @@ buildableTestSuites pkg = getBuildableSetText (packageTestSuites pkg)
 
 buildableBenchmarks :: Package -> Set Text
 buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)
+
+-- | This is a function to iterate in a monad over all of a package component's
+-- dependencies, and yield a collection of results (used with list and set).
+processPackageDeps ::
+     (Monad m, Monoid (targetedCollection resT))
+  => Package
+  -> (resT -> targetedCollection resT -> targetedCollection resT)
+  -> (PackageName -> DepValue -> m resT)
+  -> m (targetedCollection resT)
+processPackageDeps pkg combineResults fn = do
+  let asPackageNameSet accessor =
+        S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
+  let (!subLibNames, !foreignLibNames) =
+        ( asPackageNameSet packageSubLibraries
+        , asPackageNameSet packageForeignLibraries
+        )
+  let shouldIgnoreDep (packageNameV :: PackageName)
+          | packageNameV == packageName pkg = True
+          | packageNameV `S.member` subLibNames = True
+          | packageNameV `S.member` foreignLibNames = True
+          | otherwise = False
+  let innerIterator packageName depValue resListInMonad
+        | shouldIgnoreDep packageName = resListInMonad
+        | otherwise = do
+            resList <- resListInMonad
+            newResElement <- fn packageName depValue
+            pure $ combineResults newResElement resList
+  let compProcessor target =
+        foldComponentToAnotherCollection
+          (target pkg)
+          (processDependencies innerIterator)
+  let packageSetupDepsProcessor resAction = case packageSetupDeps pkg of
+        Nothing -> resAction
+        Just v -> M.foldrWithKey' innerIterator resAction v
+  let processAllComp =
+          compProcessor packageSubLibraries
+        . compProcessor packageForeignLibraries
+        . compProcessor packageExecutables
+        . ( if packageBenchmarkEnabled pkg
+              then compProcessor packageBenchmarks
+              else id
+          )
+        . ( if packageTestEnabled pkg
+              then compProcessor packageTestSuites
+              else id
+          )
+        . packageSetupDepsProcessor
+  let initialValue = case packageLibrary pkg of
+        Nothing -> pure mempty
+        Just comp -> processDependencies innerIterator comp (pure mempty)
+  processAllComp initialValue
+
+-- | Iterate/fold on all the package dependencies, components, setup deps and
+-- all.
+processPackageDepsToList ::
+     Monad m
+  => Package
+  -> (PackageName -> DepValue -> m resT)
+  -> m [resT]
+processPackageDepsToList pkg = processPackageDeps pkg (:)
+
+-- | List all package's dependencies in a "free" context through the identity
+-- monad.
+listOfPackageDeps :: Package -> [PackageName]
+listOfPackageDeps pkg =
+  runIdentity $ processPackageDepsToList pkg (\pn _ -> pure pn)
+-- | The set of package's dependencies.
+setOfPackageDeps :: Package -> Set PackageName
+setOfPackageDeps pkg =
+  runIdentity $ processPackageDeps pkg S.insert (\pn _ -> pure pn)
