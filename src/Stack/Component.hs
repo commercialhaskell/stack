@@ -142,15 +142,15 @@ stackBuildInfoFromCabal buildInfoV = gatherComponentToolsAndDepsFromCabal
 gatherComponentToolsAndDepsFromCabal
   :: [Cabal.LegacyExeDependency]
      -- ^ Legacy build tools dependency from
-     -- [buildTools](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-BuildInfo.html#t:buildTools).
+     -- 'Distribution.Types.BuildInfo.buildTools'.
   -> [Cabal.ExeDependency]
-     -- ^ Build tools dependency
-     -- [buildToolDepends](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-BuildInfo.html#t:buildToolDepends)
+     -- ^ Build tools dependency from
+     -- `Distribution.Types.BuildInfo.buildToolDepends'.
   -> [Cabal.Dependency]
-     -- ^ The Cabal defined
-     -- [targetBuildDepends](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-BuildInfo.html#t:targetBuildDepends),
-     -- these are the simplest dependencies for a component extracted from the
-     -- Cabal file such as:
+     -- ^ Cabal-syntax defines
+     -- 'Distribution.Types.BuildInfo.targetBuildDepends'. These are the
+     -- simplest dependencies for a component extracted from the Cabal file such
+     -- as:
      -- @
      --  build-depends:
      --      foo ^>= 1.2.3.4,
@@ -164,10 +164,10 @@ gatherComponentToolsAndDepsFromCabal legacyBuildTools buildTools targetDeps =
   gatherUnknownTools sbi = foldl' processLegacyExeDepency sbi legacyBuildTools
   gatherToolsDependency sbi = foldl' processExeDependency sbi buildTools
   gatherTargetDependency sbi = foldl' processDependency sbi targetDeps
-  -- This is similar to
-  -- [desugarBuildTool](https://hackage.haskell.org/package/Cabal/docs/src/Distribution.Simple.BuildToolDepends.html#desugarBuildTool)
-  -- from Cabal, however it uses our own hard-coded map which drops tools
-  -- shipped with GHC (like hsc2hs), and includes some tools from Stackage.
+  -- This is similar to Cabal's
+  -- 'Distribution.Simple.BuildToolDepends.desugarBuildTool', however it uses
+  -- our own hard-coded map which drops tools shipped with GHC (like hsc2hs),
+  -- and includes some tools from Stackage.
   processLegacyExeDepency sbi (Cabal.LegacyExeDependency exeName range) =
     case isKnownLegacyExe exeName of
       Just pName ->
@@ -202,8 +202,9 @@ processDependencies iteratorFn component resAction =
   buildInfo = component.buildInfo
 
 -- | A hard-coded map for tool dependencies. If a dependency is within this map
--- it's considered "known" (the exe will be found at the execution stage).
--- [It also exists in Cabal](https://hackage.haskell.org/package/Cabal/docs/src/Distribution.Simple.BuildToolDepends.html#local-6989586621679259154)
+-- it's considered "known" (the exe will be found at the execution stage). The
+-- corresponding Cabal function is
+-- 'Distribution.Simple.BuildToolDepends.desugarBuildTool'.
 isKnownLegacyExe :: String -> Maybe PackageName
 isKnownLegacyExe input = case input of
   "alex" -> justPck "alex"

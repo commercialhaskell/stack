@@ -183,6 +183,7 @@ library:
   - Stack.BuildInfo
   - Stack.CLI
   - Stack.Clean
+  - Stack.Component
   - Stack.ComponentFile
   - Stack.Config
   - Stack.Config.Build
@@ -271,9 +272,11 @@ library:
   - Stack.Types.Cache
   - Stack.Types.Casa
   - Stack.Types.ColorWhen
+  - Stack.Types.CompCollection
   - Stack.Types.CompilerBuild
   - Stack.Types.CompilerPaths
   - Stack.Types.Compiler
+  - Stack.Types.Component
   - Stack.Types.Config
   - Stack.Types.Config.Exception
   - Stack.Types.ConfigMonoid
