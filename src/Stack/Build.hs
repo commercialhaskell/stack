@@ -19,8 +19,8 @@ import           Data.List.Extra ( groupSort )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import qualified Distribution.PackageDescription as C
-import           Distribution.Types.Dependency ( Dependency (..), depLibraries )
+-- import qualified Distribution.PackageDescription as C
+-- import           Distribution.Types.Dependency ( Dependency (..), depLibraries )
 import           Distribution.Version ( mkVersion )
 import           RIO.NonEmpty ( nonEmpty )
 import qualified RIO.NonEmpty as NE
