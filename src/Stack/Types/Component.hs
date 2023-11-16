@@ -40,18 +40,16 @@ type HasName component = HasField "name" component StackUnqualCompName
 
 type HasBuildInfo component = HasField "buildInfo" component StackBuildInfo
 
--- | A main or sub library. We do not keep the
--- [Cabal ADT name distinction](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-LibraryName.html#t:LibraryName)
--- because in Cabal 3.0 it's
--- [likely](https://github.com/haskell/cabal/issues/8567) that the main/sub
--- distinction doesn't make sense anymore. Besides, the missing name from main
--- lib can simply be encoded as an empty string for backward compatibility
--- without loosing info. Through this simplification we get a clean name
--- interface for all components (they all have a potentially mempty name of the
--- same type).
+-- | A main or sub library. We do not keep the Cabal-syntax ADT name distinction
+-- ('Distribution.Types.LibraryName.LibraryName') because in Cabal 3.0 it's
+-- [likely](https://github.com/haskell/cabal/issues/8567) that the
+-- main/sub-library distinction doesn't make sense anymore. Besides, the missing
+-- name from the main library can simply be encoded as an empty string for
+-- backward compatibility without losing information. Through this
+-- simplification we get a clean name interface for all components (they all
+-- have a potentially @mempty@ name of the same type).
 --
--- The Cabal equivalent is
--- [Library](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-Library.html).
+-- The Cabal-syntax equivalent is 'Distribution.Types.Library.Library'.
 data StackLibrary = StackLibrary
   { name :: StackUnqualCompName
   , buildInfo :: !StackBuildInfo
@@ -60,10 +58,10 @@ data StackLibrary = StackLibrary
   }
   deriving (Show, Typeable)
 
--- Stack foreign libraries.
+-- | Stack foreign libraries.
 --
--- The Cabal equivalent is
--- [ForeignLib](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-Foreign-Libraries.html).
+-- The Cabal-syntax equivalent is
+-- 'Distribution.Types.Foreign.Libraries.ForeignLib'.
 data StackForeignLibrary = StackForeignLibrary
   { name :: StackUnqualCompName
   , buildInfo :: !StackBuildInfo
@@ -72,8 +70,7 @@ data StackForeignLibrary = StackForeignLibrary
 
 -- Stack executable.
 --
--- The Cabal equivalent is
--- [Executable](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-Executable.html).
+-- The Cabal-syntax equivalent is 'Distribution.Types.Executable.Executable'.
 data StackExecutable = StackExecutable
   { name :: StackUnqualCompName
   , buildInfo :: !StackBuildInfo
@@ -81,10 +78,9 @@ data StackExecutable = StackExecutable
   }
   deriving (Show, Typeable)
 
--- Stack test.
+-- Stack test suite.
 --
--- The Cabal equivalent is
--- [TestSuite](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-TestSuite.html).
+-- The Cabal-syntax equivalent is 'Distribution.Types.TestSuite.TestSuite'.
 data StackTest = StackTest
   { name :: StackUnqualCompName
   , buildInfo :: !StackBuildInfo
@@ -94,8 +90,7 @@ data StackTest = StackTest
 
 -- Stack benchmark.
 --
--- The Cabal equivalent is
--- [Benchmark](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-Benchmark.html).
+-- The Cabal-syntax equivalent is 'Distribution.Types.Benchmark.Benchmark'.
 data StackBenchmark = StackBenchmark
   { name :: StackUnqualCompName
   , buildInfo :: StackBuildInfo
@@ -109,24 +104,24 @@ newtype ExeName = ExeName Text
   deriving (Data, Eq, Hashable, IsString, Generic, NFData, Ord, Show, Typeable)
 
 -- | The name of an unqualified component (that is, it can be an executable, a
--- library, anything). The Cabal equivalent is
--- [UnqualComponentName](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-UnqualComponentName.html#t:UnqualComponentName).
--- Ideally, we'd want to use the Cabal type behind this newtype and not Text to
--- avoid unnecessary work, but for now this is too much refactoring (also there
--- is no Hashable instance for UnqualComponentName yet).
+-- library, anything). The Cabal-syntax equivalent is
+-- 'Distribution.Types.UnqualComponentName.UnqualComponentName'. Ideally, we'd
+-- want to use the Cabal-syntax type behind this newtype and not 'Text' to
+-- avoid unnecessary work, but there is no 'Hashable' instance for
+-- 'Distribution.Types.UnqualComponentName.UnqualComponentName' yet.
 newtype StackUnqualCompName = StackUnqualCompName Text
   deriving (Data, Eq, Hashable, IsString, Generic, NFData, Ord, Show, Typeable)
 
 unqualCompToText :: StackUnqualCompName -> Text
 unqualCompToText (StackUnqualCompName v) = v
 
--- | This is the Stack equivalent of Cabal's
--- [BuildInfo](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-BuildInfo.html).
--- We don't use the Cabal version because Cabal provides a list of dependencies
--- (and we need a Map), and we only need a tiny subset of all the Cabal-provided
--- info. It's also the decomposition of @Package@ based information in prior
--- versions of Stack, to enable component based builds and backpack. The file
--- gathering related fields are lazy because not always needed.
+-- | This type corresponds to Cabal-syntax's
+-- 'Distribution.Types.BuildInfo.BuildInfo'. We don't use the Cabal-syntax
+-- type because Cabal provides a list of dependencies, and Stack needs a Map and
+-- only a small subset of all the information in Cabal-syntax type. It's also
+-- the decomposition of @Package@ based information in prior versions of Stack,
+-- to enable component based builds and backpack. The file gathering related
+-- fields are lazy because not always needed.
 data StackBuildInfo = StackBuildInfo
   { sbiBuildable :: !Bool
     -- ^ From BuildInfo in Cabal.

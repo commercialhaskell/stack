@@ -5,13 +5,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | A package has collections of the types exported by "Stack.Types.Component".
--- In Cabal, the components are grouped as a list in a @PackageDescription@;
--- this is Stack's counterpart. See for instance the
--- [foreign libraries field](https://hackage.haskell.org/package/Cabal-syntax/docs/Distribution-Types-PackageDescription.html#t:GenericPackageDescription)
--- in Cabal. Cabal removes all the unbuildable components very early (at the
--- cost of slightly worse error messages) and it historically used a list for
--- components. For , as well as set listed for backward compatbility at least,
--- hence this structure.
+-- In Cabal-syntax, the components are grouped as a list in a
+-- 'Distribution.Types.PackageDescription.PackageDescription'; this is Stack's
+-- counterpart. See for instance Cabal-syntax's
+-- 'Distribution.Types.PackageDescription.foreignLibs' field. Cabal removes all
+-- the unbuildable components very early (at the cost of slightly worse error
+-- messages) and it historically used a list for components.
 module Stack.Types.CompCollection
   ( CompCollection
   , getBuildableSet
