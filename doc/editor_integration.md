@@ -7,12 +7,6 @@
 For further information, see the [Stack and Visual Code](Stack_and_VS_Code.md)
 documentation.
 
-## The `intero` project
-
-For editor integration, Stack has a related project called
-[intero](https://github.com/commercialhaskell/intero). It is particularly well
-supported by Emacs, but some other editors have integration for it as well.
-
 ## Shell auto-completion
 
 Love tab-completion of commands? You're not alone. If you're on bash, just run

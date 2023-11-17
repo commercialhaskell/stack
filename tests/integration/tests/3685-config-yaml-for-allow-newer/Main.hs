@@ -10,6 +10,7 @@ main :: IO ()
 main = do
   removeFileIgnore "stack.yaml"
   stack ["init", defaultResolverArg]
+  -- intero-0.1.23 chosen because it depends on ghc >=7.8 && <8.2.2.
   stackErrStderr ["install", "intero-0.1.23"] (expectMessage planRecommendation)
 
 expectMessage :: String -> String -> IO ()

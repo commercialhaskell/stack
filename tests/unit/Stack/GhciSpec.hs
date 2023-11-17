@@ -2,7 +2,7 @@
 -- {-# LANGUAGE QuasiQuotes #-}
 -- {-# LANGUAGE TemplateHaskell #-}
 
--- | Test suite for GHCi like applications including both GHCi and Intero.
+-- | Test suite for GHCi-like applications including GHCi.
 module Stack.GhciSpec
   ( spec
   ) where

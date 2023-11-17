@@ -1249,7 +1249,7 @@ the output of the command:
 --compiler-exe           Compiler binary (e.g. ghc)
 --compiler-bin           Directory containing the compiler binary (e.g. ghc)
 --compiler-tools-bin     Directory containing binaries specific to a
-                         particular compiler (e.g. intero)
+                         particular compiler
 --local-bin              Directory where Stack installs executables (e.g.
                          ~/.local/bin (Unix-like OSs) or %APPDATA%\local\bin
                          (Windows))

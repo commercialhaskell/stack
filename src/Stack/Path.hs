@@ -197,7 +197,7 @@ paths =
   , ( "Directory containing the compiler binary (e.g. ghc)"
     , "compiler-bin"
     , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . parent . piCompiler )
-  , ( "Directory containing binaries specific to a particular compiler (e.g. intero)"
+  , ( "Directory containing binaries specific to a particular compiler"
     , "compiler-tools-bin"
     , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . piToolsDir )
   , ( "Directory where Stack installs executables (e.g. ~/.local/bin (Unix-like OSs) or %APPDATA%\\local\\bin (Windows))"
