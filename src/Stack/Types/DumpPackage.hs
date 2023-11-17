@@ -2,11 +2,14 @@
 
 module Stack.Types.DumpPackage
   ( DumpPackage (..)
+  , SublibDump (..)
+  , dpParentLibIdent
   ) where
 
 import qualified Distribution.License as C
 import           Distribution.ModuleName ( ModuleName )
 import           Stack.Prelude
+import           Stack.Types.Component (StackUnqualCompName)
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 
 -- | Type representing dump information for a single package, as output by the
@@ -18,9 +21,8 @@ data DumpPackage = DumpPackage
     -- ^ The @name@ and @version@ fields. The @name@ field is the munged package
     -- name. If the package is not for a sub library, its munged name is its
     -- name.
-  , dpParentLibIdent :: !(Maybe PackageIdentifier)
-    -- ^ The @package-name@ and @version@ fields, if @package-name@ is present.
-    -- That field is present if the package is for a sub library.
+  , dpSublib :: !(Maybe SublibDump)
+    -- ^ The sub library information if it's a sub-library.
   , dpLicense :: !(Maybe C.License)
   , dpLibDirs :: ![FilePath]
     -- ^ The @library-dirs@ field.
@@ -35,3 +37,19 @@ data DumpPackage = DumpPackage
   , dpIsExposed :: !Bool
   }
   deriving (Eq, Read, Show)
+
+-- |
+-- ghc-pkg has a notion of sublibraries when using ghc-kg dump.
+-- We can only know it's different through the fields it shows.
+data SublibDump = SublibDump
+  { sdPackageName :: PackageName
+  -- ^ "package-name" field from ghc-pkg
+  , sdLibraryName :: StackUnqualCompName
+  -- ^ "lib-name" field from ghc-pkg
+  }
+  deriving (Eq, Read, Show)
+
+dpParentLibIdent :: DumpPackage -> Maybe PackageIdentifier
+dpParentLibIdent dp = case (dpSublib dp, dpPackageIdent dp) of
+  (Nothing, _) -> Nothing
+  (Just SublibDump{sdPackageName=libParentPackageName}, PackageIdentifier _ v) -> Just $ PackageIdentifier libParentPackageName v

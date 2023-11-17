@@ -24,6 +24,7 @@ module Stack.Component
   , foldOnNameAndBuildInfo
   , stackUnqualToQual
   , processDependencies
+  , fromCabalName
   ) where
 
 import           Data.Foldable ( foldr' )

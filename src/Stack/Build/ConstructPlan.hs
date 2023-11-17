@@ -59,7 +59,7 @@ import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..), configureOpts )
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
-import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.DumpPackage ( DumpPackage (..), dpParentLibIdent )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
 import           Stack.Types.EnvSettings
