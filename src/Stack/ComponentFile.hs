@@ -53,8 +53,9 @@ import           Stack.Constants
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.Component
                    ( StackBenchmark (..), StackBuildInfo (..)
-                   , StackExecutable (..), StackLibrary (..), StackTest (..)
-                   , sbiOtherModules, unqualCompToText
+                   , StackExecutable (..), StackLibrary (..)
+                   , StackTestSuite (..), StackUnqualCompName (..)
+                   , sbiOtherModules
                    )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), prettyStackDevL )
@@ -90,7 +91,7 @@ stackBenchmarkFiles bench =
 
 -- | Get all files referenced by the test.
 stackTestFiles ::
-     StackTest
+     StackTestSuite
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackTestFiles test =
   resolveComponentFiles (CTest $ unqualCompToText test.name) build names

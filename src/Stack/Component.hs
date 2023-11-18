@@ -43,7 +43,8 @@ import           Stack.Prelude
 import           Stack.Types.Component
                    ( HasBuildInfo, StackBenchmark (..), StackBuildInfo (..)
                    , StackExecutable (..), StackForeignLibrary (..)
-                   , StackLibrary (..), StackTest (..), StackUnqualCompName (..)
+                   , StackLibrary (..), StackTestSuite (..)
+                   , StackUnqualCompName (..)
                    )
 import           Stack.Types.Dependency
                    ( DepValue, cabalExeToStackDep, cabalToStackDep )
@@ -102,8 +103,8 @@ stackBenchmarkFromCabal cabalBenchmark = StackBenchmark
   , buildInfo = stackBuildInfoFromCabal cabalBenchmark.benchmarkBuildInfo
   }
 
-stackTestFromCabal :: TestSuite -> StackTest
-stackTestFromCabal cabalTest = StackTest
+stackTestFromCabal :: TestSuite -> StackTestSuite
+stackTestFromCabal cabalTest = StackTestSuite
   { name = fromCabalName cabalTest.testName
   , interface = cabalTest.testInterface
   , buildInfo = stackBuildInfoFromCabal cabalTest.testBuildInfo

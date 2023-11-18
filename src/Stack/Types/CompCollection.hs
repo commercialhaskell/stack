@@ -36,7 +36,7 @@ import           Data.Foldable ( Foldable (..) )
 import           Stack.Prelude
 import           Stack.Types.Component
                    ( HasBuildInfo, HasName, StackBuildInfo (..)
-                   , StackUnqualCompName (..), unqualCompToText
+                   , StackUnqualCompName (..)
                    )
 
 -- | A type representing collections of components, distinguishing buildable

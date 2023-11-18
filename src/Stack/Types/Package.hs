@@ -56,7 +56,7 @@ import           Stack.Types.CompCollection ( CompCollection )
 import           Stack.Types.Compiler ( ActualCompiler )
 import           Stack.Types.Component
                    ( StackBenchmark, StackBuildInfo, StackExecutable
-                   , StackForeignLibrary, StackLibrary, StackTest
+                   , StackForeignLibrary, StackLibrary, StackTestSuite
                    )
 import           Stack.Types.Dependency ( DepValue )
 import           Stack.Types.EnvConfig ( EnvConfig, HasEnvConfig (..) )
@@ -170,7 +170,7 @@ data Package = Package
     -- ^ The sub-libraries of the package.
   , packageForeignLibraries :: !(CompCollection StackForeignLibrary)
     -- ^ The foreign libraries of the package.
-  , packageTestSuites :: !(CompCollection StackTest)
+  , packageTestSuites :: !(CompCollection StackTestSuite)
     -- ^ The test suites of the package.
   , packageBenchmarks :: !(CompCollection StackBenchmark)
     -- ^ The benchmarks of the package.
