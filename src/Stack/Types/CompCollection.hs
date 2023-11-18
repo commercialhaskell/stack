@@ -4,13 +4,18 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | A package has collections of the types exported by "Stack.Types.Component".
--- In Cabal-syntax, the components are grouped as a list in a
--- 'Distribution.Types.PackageDescription.PackageDescription'; this is Stack's
--- counterpart. See for instance Cabal-syntax's
--- 'Distribution.Types.PackageDescription.foreignLibs' field. Cabal removes all
--- the unbuildable components very early (at the cost of slightly worse error
--- messages) and it historically used a list for components.
+-- | A module providing the type 'CompCollection' and associated helper
+-- functions.
+--
+-- The corresponding Cabal approach uses lists. See, for example, the
+-- 'Distribution.Types.PackageDescription.sublibraries',
+-- 'Distribution.Types.PackageDescription.foreignLibs',
+-- 'Distribution.Types.PackageDescription.executables',
+-- 'Distribution.Types.PackageDescription.testSuites', and
+-- 'Distribution.Types.PackageDescription.benchmarks' fields.
+--
+-- Cabal removes all the unbuildable components very early (at the cost of
+-- slightly worse error messages).
 module Stack.Types.CompCollection
   ( CompCollection
   , getBuildableSet
@@ -34,14 +39,14 @@ import           Stack.Types.Component
                    , StackUnqualCompName (..), unqualCompToText
                    )
 
--- | This is a collection discriminating buildable components and non-buildable
--- ones.
+-- | A type representing collections of components, distinguishing buildable
+-- components and non-buildable components.
 data CompCollection component = CompCollection
   { buildableOnes :: {-# UNPACK #-} !(InnerCollection component)
   , unbuildableOnes :: Set StackUnqualCompName
-    -- ^ Note that the field is lazy beacause it should only serve when users
-    -- explicitely require unbuildable components to be built (and this field
-    -- ensure intelligible error messages).
+    -- ^ The field is lazy beacause it should only serve when users explicitely
+    -- require unbuildable components to be built. The field allows for
+    -- intelligible error messages.
   }
   deriving (Show)
 
@@ -57,15 +62,20 @@ instance Monoid (CompCollection component) where
     , unbuildableOnes = mempty
     }
 
--- | This is a naive collection which trades memory consumption for speed, the
--- name set is strictly redundant but it takes O(n) to compute it from the map's
--- keys, hence the redundancy. The assumption is 'asNameSet' is always equal to
--- @keySet . asNameMap@, but faster because cached. But this assumption is not
--- checked anywhere, it's simply built into the 'addComponent' function, which
--- should always be used rather than record's fields for inserting new elements.
+instance Foldable CompCollection where
+  foldMap fn collection = foldMap fn (asNameMap $ buildableOnes collection)
+  foldr' fn c collection = HM.foldr' fn c (asNameMap $ buildableOnes collection)
+  null = HM.null . asNameMap . buildableOnes
+
+-- | A type representing a collection of components, including a cache of
+-- the components' names.
 data InnerCollection component = InnerCollection
   { asNameMap :: !(HashMap StackUnqualCompName component)
   , asNameSet :: !(Set StackUnqualCompName)
+    -- ^ Strictly, this field is redundant. It is provided as a cache for speed.
+    -- It is assumed, but not checked, that 'asNameSet' is always equal to
+    -- @keySet . asNameMap@. It takes O(n) to compute it from 'asNameMap'.
+    -- 'addComponent' should be used to add new members to the collection.
   }
   deriving (Show)
 
@@ -81,23 +91,14 @@ instance Monoid (InnerCollection component) where
     , asNameSet = mempty
     }
 
-instance Foldable CompCollection where
-  foldMap fn collection = foldMap fn (asNameMap $ buildableOnes collection)
-  foldr' fn c collection = HM.foldr' fn c (asNameMap $ buildableOnes collection)
-  null = HM.null . asNameMap . buildableOnes
-
--- |
---
--- >>> :set -XOverloadedStrings
--- >>> import Stack.Types.Component (StackUnqualCompName(StackUnqualCompName))
--- >>> data TestComp = TestComp { name :: StackUnqualCompName } deriving (Show)
--- >>> let ok = TestComp (StackUnqualCompName "some-comp-name")
--- >>> addComponent ok mempty
--- InnerCollection {asNameMap = fromList [(StackUnqualCompName "some-comp-name",TestComp {name = StackUnqualCompName "some-comp-name"})], asNameSet = fromList [StackUnqualCompName "some-comp-name"]}
+-- | A function to add a component to a collection of components. Ensures that
+-- both 'asNameMap' and 'asNameSet' are updated consistently.
 addComponent ::
      HasName component
   => component
+     -- ^ Component to add.
   -> InnerCollection component
+     -- ^ Existing collection of components.
   -> InnerCollection component
 addComponent componentV collection =
   let nameV = componentV.name
@@ -106,12 +107,15 @@ addComponent componentV collection =
         , asNameSet=Set.insert nameV (asNameSet collection)
         }
 
--- | Iterates on a collection of @compA@ and map each element to @compB@ while
--- building the corresponding @CompCollection@ out of it.
+-- | For the given function and foldable data structure of components of type
+-- @compA@, iterates on the elements of that structure and maps each element to
+-- a component of type @compB@ while building a 'CompCollection'.
 foldAndMakeCollection ::
      (HasBuildInfo compB, HasName compB, Foldable sourceCollection)
   => (compA -> compB)
+     -- ^ Function to apply to each element in the data struture.
   -> sourceCollection compA
+     -- ^ Given foldable data structure of components of type @compA@.
   -> CompCollection compB
 foldAndMakeCollection mapFn = foldl' compIterator mempty
  where
@@ -127,42 +131,76 @@ foldAndMakeCollection mapFn = foldl' compIterator mempty
             Set.insert component.name (unbuildableOnes existingCollection)
         }
 
--- | Get the name set of buildable components from this collection.
+-- | Get the names of the buildable components in the given collection, as a
+-- 'Set' of 'StackUnqualCompName'.
 getBuildableSet :: CompCollection component -> Set StackUnqualCompName
 getBuildableSet = asNameSet . buildableOnes
 
+-- | Get the names of the buildable components in the given collection, as a
+-- 'Set' of 'Text'.
 getBuildableSetText :: CompCollection component -> Set Text
 getBuildableSetText = Set.mapMonotonic unqualCompToText . getBuildableSet
 
+-- | Get the names of the buildable components in the given collection, as a
+-- list of 'Text.
 getBuildableListText :: CompCollection component -> [Text]
 getBuildableListText = getBuildableListAs unqualCompToText
 
+-- | Apply the given function to the names of the buildable components in the
+-- given collection, yielding a list.
 getBuildableListAs ::
      (StackUnqualCompName -> something)
+     -- ^ Function to apply to buildable components.
   -> CompCollection component
+     -- ^ Collection of components.
   -> [something]
 getBuildableListAs fn = Set.foldr' (\v l -> fn v:l) [] . getBuildableSet
 
+-- | Yields 'True' if, and only if, the given collection includes at least one
+-- buildable component.
 hasBuildableComponent :: CompCollection component -> Bool
 hasBuildableComponent = not . null . getBuildableSet
 
-collectionLookup :: Text -> CompCollection component -> Maybe component
+-- | For the given name of a buildable component and the given collection of
+-- components, yields 'Just' @component@ if the collection includes a buildable
+-- component of that name, and 'Nothing' otherwise.
+collectionLookup ::
+     Text
+     -- ^ Name of the buildable component.
+  -> CompCollection component
+     -- ^ Collection of components.
+  -> Maybe component
 collectionLookup needle haystack =
   HM.lookup (StackUnqualCompName needle) (asNameMap $ buildableOnes haystack)
 
+-- | For a given collection of components, yields a list of pairs for buildable
+-- components of the name of the component and the component.
 collectionKeyValueList :: CompCollection component -> [(Text, component)]
 collectionKeyValueList haystack =
       (\(StackUnqualCompName k, !v) -> (k, v))
   <$> HM.toList (asNameMap $ buildableOnes haystack)
 
-collectionMember :: Text -> CompCollection component -> Bool
+-- | Yields 'True' if, and only if, the given collection of components includes
+-- a buildable component with the given name.
+collectionMember ::
+     Text
+     -- ^ Name of the buildable component.
+  -> CompCollection component
+     -- ^ Collection of components.
+  -> Bool
 collectionMember needle haystack = isJust $ collectionLookup needle haystack
 
+-- | Reduce the buildable components of the given collection of components by
+-- applying the given binary operator to all buildable components, using the
+-- given starting value (typically the right-identity of the operator).
 foldComponentToAnotherCollection ::
      (Monad m)
   => CompCollection component
+     -- ^ Collection of components.
   -> (component -> m (t b) -> m (t b))
+     -- ^ Binary operator.
   -> m (t b)
+     -- ^ Starting value.
   -> m (t b)
 foldComponentToAnotherCollection collection fn initialValue =
   HM.foldr' fn initialValue (asNameMap $ buildableOnes collection)
