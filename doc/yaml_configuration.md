@@ -316,6 +316,40 @@ package databases.
     Use of this feature may result in builds that are not reproducible, as Stack
     has no control over the contents of the extra package databases.
 
+### curator
+
+:octicons-beaker-24: Experimental
+
+[:octicons-tag-24: 2.1.0.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.0.1)
+
+Default: `{}`
+
+Configuration intended for use only by the
+[`curator` tool](https://github.com/commercialhaskell/curator), which uses Stack
+to build packages. For given package names (which need not exist in the
+project), Stack can be configured to ignore (skip) silently building test
+suites, building benchmarks and/or creating Haddock documentation or to expect
+that building test suites, building benchmarks and/or creating Haddock
+documentation will fail.
+
+For example:
+
+~~~yaml
+curator:
+  skip-test:
+  - my-package1
+  expect-test-failure:
+  - my-package2
+  skip-bench:
+  - my-package3
+  expect-benchmark-failure:
+  - my-package4
+  skip-haddock:
+  - my-package5
+  expect-haddock-failure:
+  - my-package6
+~~~
+
 ## Non-project-specific configuration
 
 Non-project configuration options can be included in a project-level
