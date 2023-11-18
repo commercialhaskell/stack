@@ -1,6 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Module exporting the 'Curator' type, used to represent Stack's
+-- project-specific @curator@ option, which supports the needs of the
+-- [@curator@ tool](https://github.com/commercialhaskell/curator).
 module Stack.Types.Curator
   ( Curator (..)
   ) where
@@ -11,16 +14,22 @@ import           Data.Aeson.WarningParser
 import qualified Data.Set as Set
 import           Stack.Prelude
 
--- | Extra configuration intended exclusively for usage by the curator tool. In
--- other words, this is /not/ part of the documented and exposed Stack API.
--- SUBJECT TO CHANGE.
+-- | Type representing configuration options which support the needs of the
+-- [@curator@ tool](https://github.com/commercialhaskell/curator).
 data Curator = Curator
   { curatorSkipTest :: !(Set PackageName)
+    -- ^ Packages for which Stack should ignore test suites.
   , curatorExpectTestFailure :: !(Set PackageName)
+    -- ^ Packages for which Stack should expect building test suites to fail.
   , curatorSkipBenchmark :: !(Set PackageName)
+    -- ^ Packages for which Stack should ignore benchmarks.
   , curatorExpectBenchmarkFailure :: !(Set PackageName)
+    -- ^ Packages for which Stack should expect building benchmarks to fail.
   , curatorSkipHaddock :: !(Set PackageName)
+    -- ^ Packages for which Stack should ignore creating Haddock documentation.
   , curatorExpectHaddockFailure :: !(Set PackageName)
+    -- ^ Packages for which Stack should expect creating Haddock documentation
+    -- to fail.
   }
   deriving Show
 
@@ -32,7 +41,7 @@ instance ToJSON Curator where
     , "expect-benchmark-failure" .=
         Set.map CabalString (curatorExpectTestFailure c)
     , "skip-haddock" .= Set.map CabalString (curatorSkipHaddock c)
-    , "expect-test-failure" .=
+    , "expect-haddock-failure" .=
         Set.map CabalString (curatorExpectHaddockFailure c)
     ]
 
@@ -41,6 +50,10 @@ instance FromJSON (WithJSONWarnings Curator) where
     <$> fmap (Set.map unCabalString) (o ..:? "skip-test" ..!= mempty)
     <*> fmap (Set.map unCabalString) (o ..:? "expect-test-failure" ..!= mempty)
     <*> fmap (Set.map unCabalString) (o ..:? "skip-bench" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "expect-benchmark-failure" ..!= mempty)
+    <*> fmap
+          (Set.map unCabalString)
+          (o ..:? "expect-benchmark-failure" ..!= mempty)
     <*> fmap (Set.map unCabalString) (o ..:? "skip-haddock" ..!= mempty)
-    <*> fmap (Set.map unCabalString) (o ..:? "expect-haddock-failure" ..!= mempty)
+    <*> fmap
+          (Set.map unCabalString)
+          (o ..:? "expect-haddock-failure" ..!= mempty)

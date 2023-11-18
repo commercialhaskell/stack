@@ -48,6 +48,7 @@ Other enhancements:
   be muted if unwanted.
 
 Bug fixes:
+* Fix the `Curator` instance of `ToJSON`, as regards `expect-haddock-failure`.
 
 ## v2.13.1 - 2023-09-29
 
