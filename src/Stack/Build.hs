@@ -67,7 +67,7 @@ import           Stack.Types.Package
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap
-                   ( CommonPackage (..), ProjectPackage (..), SMTargets (..)
+                   ( SMTargets (..)
                    , SourceMap (..), Target (..) )
 import           System.Terminal ( fixCodePage )
 
