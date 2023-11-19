@@ -17,6 +17,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Types.BuildType ( BuildType (Configure) )
 import           Distribution.Types.PackageName ( mkPackageName )
+import           Distribution.Types.VersionRange ( VersionRange )
 import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Path ( parent )
 import qualified RIO.NonEmpty as NE
@@ -183,6 +184,22 @@ data AddDepRes
 toTask :: AddDepRes -> Maybe Task
 toTask (ADRToInstall task) = Just task
 toTask (ADRFound _ _) = Nothing
+
+adrVersion :: AddDepRes -> Version
+adrVersion (ADRToInstall task) = pkgVersion $ taskProvides task
+adrVersion (ADRFound _ installed) = installedVersion installed
+
+adrHasLibrary :: AddDepRes -> Bool
+adrHasLibrary (ADRToInstall task) = case taskType task of
+  TTLocalMutable lp -> packageHasLibrary $ lpPackage lp
+  TTRemotePackage _ p _ -> packageHasLibrary p
+ where
+  -- make sure we consider sub-libraries as libraries too
+  packageHasLibrary :: Package -> Bool
+  packageHasLibrary p =
+    hasBuildableMainLibrary p || not (null (packageSubLibraries p))
+adrHasLibrary (ADRFound _ Library{}) = True
+adrHasLibrary (ADRFound _ Executable{}) = False
 
 -- | Type representing values used as the environment to be read from during the
 -- construction of a build plan (the \'context\').
@@ -999,182 +1016,197 @@ addPackageDeps ::
            )
        )
 addPackageDeps package = do
-  ctx <- ask
   checkAndWarnForUnknownTools package
-  deps <- processPackageDepsToList package $ \name value -> do
-    eres <- getCachedDepOrAddDep name
-    let getLatestApplicableVersionAndRev :: M (Maybe (Version, BlobKey))
-        getLatestApplicableVersionAndRev = do
-          vsAndRevs <-
-            runRIO ctx $
-              getHackagePackageVersions
-                YesRequireHackageIndex UsePreferredVersions name
-          pure $ do
-            lappVer <- latestApplicableVersion range $ Map.keysSet vsAndRevs
-            revs <- Map.lookup lappVer vsAndRevs
-            (cabalHash, _) <- Map.maxView revs
-            Just (lappVer, cabalHash)
-        range = dvVersionRange value
-    case eres of
-      Left e -> do
-        addParent name range
-        let bd = case e of
-              UnknownPackage name' -> assert (name' == name) NotInBuildPlan
-              DependencyCycleDetected names -> BDDependencyCycleDetected names
-              -- ultimately we won't show any information on this to the user,
-              -- we'll allow the dependency failures alone to display to avoid
-              -- spamming the user too much
-              DependencyPlanFailures _ _  ->
-                Couldn'tResolveItsDependencies (packageVersion package)
-        mlatestApplicable <- getLatestApplicableVersionAndRev
-        pure $ Left (name, (range, mlatestApplicable, bd))
-      Right adr
-        | isDepTypeLibrary (dvType value) && not (adrHasLibrary adr) ->
-            pure $ Left (name, (range, Nothing, HasNoLibrary))
-      Right adr -> do
-        addParent name range
-        inRange <- if adrVersion adr `withinRange` range
-          then pure True
-          else do
-            let warn_ isIgnoring reason = tell mempty { wWarnings = (msg:) }
-                 where
-                  msg =
-                       fillSep
-                         [ if isIgnoring
-                             then "Ignoring"
-                             else flow "Not ignoring"
-                         ,    style
-                                Current
-                                ( fromString . packageNameString $
-                                    packageName package
-                                )
-                           <> "'s"
-                         , flow "bounds on"
-                         , style Current (fromString $ packageNameString name)
-                         , parens (fromString . T.unpack $ versionRangeText range)
-                         , flow "and using"
-                         , style Current (fromString . packageIdentifierString $
-                             PackageIdentifier name (adrVersion adr)) <> "."
-                         ]
-                    <> line
-                    <> fillSep
-                         [ "Reason:"
-                         , reason <> "."
-                         ]
-            allowNewer <- view $ configL.to configAllowNewer
-            allowNewerDeps <- view $ configL.to configAllowNewerDeps
-            let inSnapshotCheck = do
-                  -- We ignore dependency information for packages in a snapshot
-                  x <- inSnapshot (packageName package) (packageVersion package)
-                  y <- inSnapshot name (adrVersion adr)
-                  if x && y
-                    then do
-                      warn_ True
-                        ( flow "trusting snapshot over Cabal file dependency \
-                               \information"
-                        )
-                      pure True
-                    else pure False
-            if allowNewer
-              then case allowNewerDeps of
-                Nothing -> do
-                  warn_ True $
-                    fillSep
-                      [ style Shell "allow-newer"
-                      , "enabled"
-                      ]
-                  pure True
-                Just boundsIgnoredDeps -> do
-                  let pkgName = packageName package
-                      pkgName' = fromString $ packageNameString pkgName
-                      isBoundsIgnoreDep = pkgName `elem` boundsIgnoredDeps
-                      reason = if isBoundsIgnoreDep
-                        then fillSep
-                          [ style Current pkgName'
-                          , flow "is an"
-                          , style Shell "allow-newer-dep"
-                          , flow "and"
-                          , style Shell "allow-newer"
-                          , "enabled"
-                          ]
-                        else fillSep
-                          [ style Current pkgName'
-                          , flow "is not an"
-                          , style Shell "allow-newer-dep"
-                          , flow "although"
-                          , style Shell "allow-newer"
-                          , "enabled"
-                          ]
-                  warn_ isBoundsIgnoreDep reason
-                  pure isBoundsIgnoreDep
-              else do
-                when (isJust allowNewerDeps) $
-                  warn_ False $
-                    fillSep
-                      [ "although"
-                      , style Shell "allow-newer-deps"
-                      , flow "are specified,"
-                      , style Shell "allow-newer"
-                      , "is"
-                      , style Shell "false"
-                      ]
-                inSnapshotCheck
-        if inRange
-          then case adr of
-            ADRToInstall task -> pure $ Right
-              ( Set.singleton $ taskProvides task
-              , Map.empty
-              , taskTargetIsMutable task
-              )
-            ADRFound loc (Executable _) -> pure $ Right
-              ( Set.empty
-              , Map.empty
-              , installLocationIsMutable loc
-              )
-            ADRFound loc (Library ident gid _) -> pure $ Right
-              ( Set.empty
-              , Map.singleton ident gid
-              , installLocationIsMutable loc
-              )
-          else do
-            mlatestApplicable <- getLatestApplicableVersionAndRev
-            pure $ Left
-              ( name
-              , ( range
-                , mlatestApplicable
-                , DependencyMismatch $ adrVersion adr
-                )
-              )
-  case partitionEithers deps of
+  let pkgId = packageIdentifier package
+  deps <- processPackageDepsToList package (processDep pkgId)
+  pure $ case partitionEithers deps of
     -- Note that the Monoid for 'IsMutable' means that if any is 'Mutable',
     -- the result is 'Mutable'. Otherwise the result is 'Immutable'.
-    ([], pairs) -> pure $ Right $ mconcat pairs
+    ([], pairs) -> Right $ mconcat pairs
     (errs, _) ->
-      pure $ Left $ DependencyPlanFailures package (Map.fromList errs)
+      Left $ DependencyPlanFailures package (Map.fromList errs)
+
+-- | Given a dependency, yields either information for an error message or a
+-- triple indicating: (1) if the dependency is to be installed, its package
+-- identifier; (2) if the dependency is installed and a library, its package
+-- identifier and 'GhcPkgId'; and (3) if the dependency is, or will be when
+-- installed, mutable or immutable.
+processDep ::
+     PackageIdentifier
+     -- ^ The package which has the dependency being processed.
+  -> PackageName
+     -- ^ The name of the dependency.
+  -> DepValue
+     -- ^ The version range and dependency type of the dependency.
+  -> M ( Either
+           ( PackageName
+           , (VersionRange, Maybe (Version, BlobKey), BadDependency)
+           )
+           (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable)
+       )
+processDep pkgId name value = do
+  mLatestApplicable <- getLatestApplicableVersionAndRev name range
+  eRes <- getCachedDepOrAddDep name
+  case eRes of
+    Left e -> do
+      addParent
+      let bd = case e of
+            UnknownPackage name' -> assert (name' == name) NotInBuildPlan
+            DependencyCycleDetected names -> BDDependencyCycleDetected names
+            -- ultimately we won't show any information on this to the user,
+            -- we'll allow the dependency failures alone to display to avoid
+            -- spamming the user too much
+            DependencyPlanFailures _ _  ->
+              Couldn'tResolveItsDependencies version
+      pure $ Left (name, (range, mLatestApplicable, bd))
+    Right adr
+      | isDepTypeLibrary (dvType value) && not (adrHasLibrary adr) ->
+          pure $ Left (name, (range, Nothing, HasNoLibrary))
+    Right adr -> do
+      addParent
+      inRange <- adrInRange pkgId name range adr
+      pure $ if inRange
+        then Right $ processAdr adr
+        else Left
+          ( name
+          , ( range
+            , mLatestApplicable
+            , DependencyMismatch $ adrVersion adr
+            )
+          )
  where
-  adrVersion (ADRToInstall task) = pkgVersion $ taskProvides task
-  adrVersion (ADRFound _ installed) = installedVersion installed
+  range = dvVersionRange value
+  version = pkgVersion pkgId
   -- Update the parents map, for later use in plan construction errors
   -- - see 'getShortestDepsPath'.
-  addParent depname range = tell mempty { wParents = MonoidMap parentMap }
+  addParent =
+    let parentMap = Map.singleton name [(pkgId, range)]
+    in  tell mempty { wParents = MonoidMap parentMap }
+
+getLatestApplicableVersionAndRev ::
+     PackageName
+  -> VersionRange
+  -> M (Maybe (Version, BlobKey))
+getLatestApplicableVersionAndRev name range = do
+  ctx <- ask
+  vsAndRevs <- runRIO ctx $
+    getHackagePackageVersions YesRequireHackageIndex UsePreferredVersions name
+  pure $ do
+    lappVer <- latestApplicableVersion range $ Map.keysSet vsAndRevs
+    revs <- Map.lookup lappVer vsAndRevs
+    (cabalHash, _) <- Map.maxView revs
+    Just (lappVer, cabalHash)
+
+-- | Function to determine whether the result of 'addDep' is within range, given
+-- the version range of the dependency and taking into account Stack's
+-- @allow-newer@ configuration.
+adrInRange ::
+     PackageIdentifier
+     -- ^ The package which has the dependency.
+  -> PackageName
+     -- ^ The name of the dependency.
+  -> VersionRange
+     -- ^ The version range of the dependency.
+  -> AddDepRes
+     -- ^ The result of 'addDep'.
+  -> M Bool
+adrInRange pkgId name range adr = if adrVersion adr `withinRange` range
+  then pure True
+  else do
+    allowNewer <- view $ configL.to configAllowNewer
+    allowNewerDeps <- view $ configL.to configAllowNewerDeps
+    if allowNewer
+      then case allowNewerDeps of
+        Nothing -> do
+          warn_ True $
+            fillSep
+              [ style Shell "allow-newer"
+              , "enabled"
+              ]
+          pure True
+        Just boundsIgnoredDeps -> do
+          let pkgName' = fromString $ packageNameString pkgName
+              isBoundsIgnoreDep = pkgName `elem` boundsIgnoredDeps
+              reason = if isBoundsIgnoreDep
+                then fillSep
+                  [ style Current pkgName'
+                  , flow "is an"
+                  , style Shell "allow-newer-dep"
+                  , flow "and"
+                  , style Shell "allow-newer"
+                  , "enabled"
+                  ]
+                else fillSep
+                  [ style Current pkgName'
+                  , flow "is not an"
+                  , style Shell "allow-newer-dep"
+                  , flow "although"
+                  , style Shell "allow-newer"
+                  , "enabled"
+                  ]
+          warn_ isBoundsIgnoreDep reason
+          pure isBoundsIgnoreDep
+      else do
+        when (isJust allowNewerDeps) $
+          warn_ False $
+            fillSep
+              [ "although"
+              , style Shell "allow-newer-deps"
+              , flow "are specified,"
+              , style Shell "allow-newer"
+              , "is"
+              , style Shell "false"
+              ]
+        -- We ignore dependency information for packages in a snapshot
+        pkgInSnapshot <- inSnapshot pkgName version
+        adrInSnapshot <- inSnapshot name (adrVersion adr)
+        if pkgInSnapshot && adrInSnapshot
+          then do
+            warn_ True
+              ( flow "trusting snapshot over Cabal file dependency \
+                     \information"
+              )
+            pure True
+          else pure False
+ where
+  PackageIdentifier pkgName version = pkgId
+  warn_ isIgnoring reason = tell mempty { wWarnings = (msg:) }
    where
-    parentMap = Map.singleton depname [(packageIdentifier package, range)]
+    msg = fillSep
+            [ if isIgnoring
+                then "Ignoring"
+                else flow "Not ignoring"
+            ,    style
+                   Current
+                   (fromString $ packageNameString pkgName)
+              <> "'s"
+            , flow "bounds on"
+            , style Current (fromString $ packageNameString name)
+            , parens (fromString . T.unpack $ versionRangeText range)
+            , flow "and using"
+            , style Current (fromString . packageIdentifierString $
+                PackageIdentifier name (adrVersion adr)) <> "."
+            ]
+       <> line
+       <> fillSep
+            [ "Reason:"
+            , reason <> "."
+            ]
 
-  adrHasLibrary :: AddDepRes -> Bool
-  adrHasLibrary (ADRToInstall task) = taskHasLibrary task
-  adrHasLibrary (ADRFound _ Library{}) = True
-  adrHasLibrary (ADRFound _ Executable{}) = False
-
-  taskHasLibrary :: Task -> Bool
-  taskHasLibrary task =
-    case taskType task of
-      TTLocalMutable lp -> packageHasLibrary $ lpPackage lp
-      TTRemotePackage _ p _ -> packageHasLibrary p
-
-  -- make sure we consider sub-libraries as libraries too
-  packageHasLibrary :: Package -> Bool
-  packageHasLibrary p =
-    hasBuildableMainLibrary p || not (null (packageSubLibraries p))
+-- | Given a result of 'addDep', yields a triple indicating: (1) if the
+-- dependency is to be installed, its package identifier; (2) if the dependency
+-- is installed and a library, its package identifier and 'GhcPkgId'; and (3) if
+-- the dependency is, or will be when installed, mutable or immutable.
+processAdr ::
+     AddDepRes
+  -> (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable)
+processAdr adr = case adr of
+  ADRToInstall task ->
+    (Set.singleton $ taskProvides task, Map.empty, taskTargetIsMutable task)
+  ADRFound loc (Executable _) ->
+    (Set.empty, Map.empty, installLocationIsMutable loc)
+  ADRFound loc (Library ident gid _) ->
+    (Set.empty, Map.singleton ident gid, installLocationIsMutable loc)
 
 checkDirtiness ::
      PackageSource
