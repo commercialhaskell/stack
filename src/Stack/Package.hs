@@ -795,6 +795,7 @@ processPackageDepsToList pkg = processPackageDeps pkg (:)
 listOfPackageDeps :: Package -> [PackageName]
 listOfPackageDeps pkg =
   runIdentity $ processPackageDepsToList pkg (\pn _ -> pure pn)
+
 -- | The set of package's dependencies.
 setOfPackageDeps :: Package -> Set PackageName
 setOfPackageDeps pkg =
