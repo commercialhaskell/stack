@@ -460,11 +460,7 @@ resolvePackageDescription
   ( GenericPackageDescription
       desc _ defaultFlags mlib subLibs foreignLibs' exes tests benches
   )
-  =
-  go False
- where
- -- TODO: remove modBuildable
-  go modBuildable = desc
+  = desc
     { library = fmap (resolveConditions rc updateLibDeps) mlib
     , subLibraries = map
         ( \(n, v) ->
@@ -481,19 +477,18 @@ resolvePackageDescription
         exes
     , testSuites = map
         ( \(n, v) ->
-            (resolveConditions rc (updateTestDeps modBuildable) v){testName = n}
+            (resolveConditions rc updateTestDeps v){testName = n}
         )
         tests
     , benchmarks = map
         ( \(n, v) ->
-            (resolveConditions rc (updateBenchmarkDeps modBuildable) v)
+            (resolveConditions rc updateBenchmarkDeps v)
               {benchmarkName = n}
         )
         benches
     }
-
+ where
   flags = M.union (packageConfigFlags packageConfig) (flagMap defaultFlags)
-
   rc = mkResolveConditions
          (packageConfigCompilerVersion packageConfig)
          (packageConfigPlatform packageConfig)
@@ -507,38 +502,10 @@ resolvePackageDescription
     }
   updateExeDeps exe deps = exe
     { buildInfo = (buildInfo exe) {targetBuildDepends = deps} }
-
-  -- Note that, prior to moving to Cabal 2.0, we would set testEnabled or
-  -- benchmarkEnabled here. These fields no longer exist, so we modify buildable
-  -- instead here. The only wrinkle in the Cabal 2.0 story is
-  -- https://github.com/haskell/cabal/issues/1725, where older versions of Cabal
-  -- (which may be used for actually building code) don't properly exclude
-  -- build-depends for non-buildable components. Testing indicates that
-  -- everything is working fine, and that this comment can be completely
-  -- ignored. I'm leaving the comment anyway in case something breaks and you,
-  -- poor reader, are investigating.
-  updateTestDeps modBuildable test deps =
-    let bi = testBuildInfo test
-        bi' = bi
-          { targetBuildDepends = deps
-          , buildable =
-                 buildable bi
-              && (  not modBuildable
-                 || packageConfigEnableTests packageConfig
-                 )
-          }
-    in  test { testBuildInfo = bi' }
-  updateBenchmarkDeps modBuildable benchmark deps =
-    let bi = benchmarkBuildInfo benchmark
-        bi' = bi
-          { targetBuildDepends = deps
-          , buildable =
-                 buildable bi
-              && (  not modBuildable
-                 || packageConfigEnableBenchmarks packageConfig
-                 )
-          }
-    in  benchmark { benchmarkBuildInfo = bi' }
+  updateTestDeps test deps = test
+    { testBuildInfo = (testBuildInfo test) {targetBuildDepends = deps} }
+  updateBenchmarkDeps bench deps = bench
+    { benchmarkBuildInfo = (benchmarkBuildInfo bench) {targetBuildDepends = deps} }
 
 -- | Make a map from a list of flag specifications.
 --
