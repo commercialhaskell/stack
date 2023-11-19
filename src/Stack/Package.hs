@@ -456,44 +456,42 @@ resolvePackageDescription ::
   -> GenericPackageDescription
   -> PackageDescription
 resolvePackageDescription
-  packageConfig
-  ( GenericPackageDescription
-      desc _ defaultFlags mlib subLibs foreignLibs' exes tests benches
-  )
+    packageConfig
+    ( GenericPackageDescription
+        desc _ defaultFlags mlib subLibs foreignLibs' exes tests benches
+    )
   = desc
-    { library = fmap (resolveConditions rc updateLibDeps) mlib
-    , subLibraries = map
-        ( \(n, v) ->
-            (resolveConditions rc updateLibDeps v){libName = LSubLibName n}
-        )
-        subLibs
-    , foreignLibs = map
-        ( \(n, v) ->
-            (resolveConditions rc updateForeignLibDeps v){foreignLibName = n}
-        )
-        foreignLibs'
-    , executables = map
-        ( \(n, v) -> (resolveConditions rc updateExeDeps v){exeName = n} )
-        exes
-    , testSuites = map
-        ( \(n, v) ->
-            (resolveConditions rc updateTestDeps v){testName = n}
-        )
-        tests
-    , benchmarks = map
-        ( \(n, v) ->
-            (resolveConditions rc updateBenchmarkDeps v)
-              {benchmarkName = n}
-        )
-        benches
-    }
+      { library = fmap (resolveConditions rc updateLibDeps) mlib
+      , subLibraries = map
+          ( \(n, v) ->
+              (resolveConditions rc updateLibDeps v){libName = LSubLibName n}
+          )
+          subLibs
+      , foreignLibs = map
+          ( \(n, v) ->
+              (resolveConditions rc updateForeignLibDeps v){foreignLibName = n}
+          )
+          foreignLibs'
+      , executables = map
+          ( \(n, v) -> (resolveConditions rc updateExeDeps v){exeName = n} )
+          exes
+      , testSuites = map
+          ( \(n, v) ->
+              (resolveConditions rc updateTestDeps v){testName = n}
+          )
+          tests
+      , benchmarks = map
+          ( \(n, v) ->
+              (resolveConditions rc updateBenchmarkDeps v){benchmarkName = n}
+          )
+          benches
+      }
  where
   flags = M.union (packageConfigFlags packageConfig) (flagMap defaultFlags)
   rc = mkResolveConditions
          (packageConfigCompilerVersion packageConfig)
          (packageConfigPlatform packageConfig)
          flags
-
   updateLibDeps lib deps = lib
     { libBuildInfo = (libBuildInfo lib) {targetBuildDepends = deps} }
   updateForeignLibDeps lib deps = lib
@@ -505,7 +503,9 @@ resolvePackageDescription
   updateTestDeps test deps = test
     { testBuildInfo = (testBuildInfo test) {targetBuildDepends = deps} }
   updateBenchmarkDeps bench deps = bench
-    { benchmarkBuildInfo = (benchmarkBuildInfo bench) {targetBuildDepends = deps} }
+    { benchmarkBuildInfo =
+        (benchmarkBuildInfo bench) {targetBuildDepends = deps}
+    }
 
 -- | Make a map from a list of flag specifications.
 --
