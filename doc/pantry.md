@@ -165,11 +165,11 @@ repository's submodules. For example:
 ~~~yaml
 extra-deps:
 - git: git@github.com:commercialhaskell/stack.git
-  commit: "6a86ee32e5b869a877151f74064572225e1a0398"
+  commit: '6a86ee32e5b869a877151f74064572225e1a0398'
 - git: git@github.com:snoyberg/http-client.git
-  commit: "a5f4f3"
+  commit: 'a5f4f3'
 - hg: https://example.com/hg/repo
-  commit: "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+  commit: 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
 ~~~
 
 !!! note
@@ -209,7 +209,7 @@ support this, you may also specify `subdirs` for repositories. For example:
 ~~~yaml
 extra-deps:
 - git: git@github.com:yesodweb/wai
-  commit: "2f8a8e1b771829f4a8a77c0111352ce45a14c30f"
+  commit: '2f8a8e1b771829f4a8a77c0111352ce45a14c30f'
   subdirs:
   - auto-update
   - wai
@@ -278,7 +278,7 @@ history. For example:
 ~~~yaml
 extra-deps:
 - github: snoyberg/http-client
-  commit: "a5f4f30f01366738f913968163d856366d7e0342"
+  commit: 'a5f4f30f01366738f913968163d856366d7e0342'
 ~~~
 
 !!! note

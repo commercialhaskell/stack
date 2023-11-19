@@ -183,11 +183,11 @@ extra-deps:
   - my-package
 # A Git repository at a specific commit:
 - git: https://github.com/example-user/my-repo.git
-  commit: "08c9b4cdf977d5bcd1baba046a007940c1940758"
+  commit: '08c9b4cdf977d5bcd1baba046a007940c1940758'
 # An archive of files at a point in the history of a GitHub repository
 # (identified by a specific commit):
 - github: example-user/my-repo
-  commit: "08c9b4cdf977d5bcd1baba046a007940c1940758"
+  commit: '08c9b4cdf977d5bcd1baba046a007940c1940758'
   subdirs:
   - my-package
 ~~~
@@ -747,7 +747,7 @@ exactly the same commit id you used to build GHC as follows:
 ~~~
 extra-deps:
 - git: https://gitlab.haskell.org/ghc/ghc.git
-  commit: "5be7ad7861c8d39f60b7101fd8d8e816ff50353a"
+  commit: '5be7ad7861c8d39f60b7101fd8d8e816ff50353a'
   subdirs:
     - libraries/Cabal/Cabal
     - libraries/...
