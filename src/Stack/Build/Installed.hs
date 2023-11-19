@@ -19,7 +19,7 @@ import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.SourceMap ( getPLIVersion, loadVersion )
 import           Stack.Types.CompilerPaths ( getGhcPkgExe )
-import           Stack.Types.DumpPackage ( DumpPackage (..), dpParentLibIdent )
+import           Stack.Types.DumpPackage ( DumpPackage (..), dpParentLibIdent, SublibDump )
 import           Stack.Types.EnvConfig
                     ( HasEnvConfig, packageDatabaseDeps, packageDatabaseExtra
                     , packageDatabaseLocal
@@ -239,6 +239,7 @@ isAllowed installMap pkgDb dp = case Map.lookup name installMap of
 data LoadHelper = LoadHelper
   { lhId :: !GhcPkgId
     -- ^ The package's id.
+  , lhSublibrary :: !(Maybe SublibDump)
   , lhDeps :: ![GhcPkgId]
     -- ^ Unless the package's name is that of a 'wired-in' package, a list of
     -- the ids of the installed packages that are the package's dependencies.
@@ -261,6 +262,7 @@ toLoadHelper pkgDb dp = LoadHelper
       if name `Set.member` wiredInPackages
         then []
         else dpDepends dp
+  , lhSublibrary = dpSublib dp     
   , lhPair =
       ( name
       , (toInstallLocation pkgDb, Library ident gid (Right <$> dpLicense dp))
