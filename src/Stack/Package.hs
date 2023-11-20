@@ -103,7 +103,7 @@ import           Stack.Types.Package
                    ( BioInput(..), BuildInfoOpts (..), InstallMap
                    , Installed (..), InstalledMap, Package (..)
                    , PackageConfig (..), PackageException (..)
-                   , dotCabalCFilePath, packageIdentifier
+                   , dotCabalCFilePath, packageIdentifier, InstalledLibraryInfo (iliId)
                    )
 import           Stack.Types.PackageFile
                    ( DotCabalPath, PackageComponentFile (..) )
@@ -321,8 +321,8 @@ generateBuildInfoOpts BioInput {..} =
   deps =
     concat
       [ case M.lookup name biInstalledMap of
-          Just (_, Stack.Types.Package.Library _ident ipid _) ->
-            ["-package-id=" <> ghcPkgIdString ipid]
+          Just (_, Stack.Types.Package.Library _ident installedInfo) ->
+            ["-package-id=" <> ghcPkgIdString (iliId installedInfo)]
           _ -> ["-package=" <> packageNameString name <>
             maybe "" -- This empty case applies to e.g. base.
               ((("-" <>) . versionString) . installVersion)

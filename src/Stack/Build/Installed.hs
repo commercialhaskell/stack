@@ -29,7 +29,7 @@ import           Stack.Types.Package
                    ( InstallLocation (..), InstallMap, Installed (..)
                    , InstalledMap, InstalledPackageLocation (..)
                    , PackageDatabase (..), PackageDbVariety (..)
-                   , toPackageDbVariety
+                   , toPackageDbVariety, InstalledLibraryInfo (InstalledLibraryInfo)
                    )
 import           Stack.Types.SourceMap
                    ( DepPackage (..), ProjectPackage (..), SourceMap (..) )
@@ -265,10 +265,11 @@ toLoadHelper pkgDb dp = LoadHelper
   , lhSublibrary = dpSublib dp     
   , lhPair =
       ( name
-      , (toInstallLocation pkgDb, Library ident gid (Right <$> dpLicense dp))
+      , (toInstallLocation pkgDb, Library ident installedLibInfo)
       )
   }
  where
+  installedLibInfo = InstalledLibraryInfo gid (Right <$> dpLicense dp) mempty
   gid = dpGhcPkgId dp
   ident@(PackageIdentifier name _) = dpPackageIdent dp
 

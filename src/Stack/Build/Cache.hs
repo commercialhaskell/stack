@@ -75,6 +75,7 @@ import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
                    ( modificationTime, getFileStatus, setFileTimes )
+import           Stack.Types.Package (installedGhcPkgId, InstalledLibraryInfo (iliId))
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (HasEnvConfig env)
@@ -262,9 +263,10 @@ flagCacheKey :: (HasEnvConfig env) => Installed -> RIO env ConfigCacheKey
 flagCacheKey installed = do
   installationRoot <- installationRootLocal
   case installed of
-    Library _ gid _ ->
+    Library _ installedInfo -> do
+      let gid = iliId installedInfo
       pure $
-      configCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
+        configCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
     Executable ident ->
       pure $
         configCacheKey
@@ -382,9 +384,7 @@ writePrecompiledCache baseConfigOpts loc copts buildHaddocks mghcPkgId subLibs e
   key <- getPrecompiledCacheKey loc copts buildHaddocks
   ec <- view envConfigL
   let stackRootRelative = makeRelative (view stackRootL ec)
-  mlibpath <- case mghcPkgId of
-    Executable _ -> pure Nothing
-    Library _ ipid _ -> Just <$> pathFromPkgId stackRootRelative ipid
+  mlibpath <- traverse (pathFromPkgId stackRootRelative) (installedGhcPkgId mghcPkgId)
   subLibPaths <- mapM (pathFromPkgId stackRootRelative) subLibs
   exes' <- forM (Set.toList exes) $ \exe -> do
     name <- parseRelFile $ T.unpack exe

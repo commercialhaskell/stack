@@ -73,7 +73,7 @@ import           Stack.Types.Package
                    ( ExeName (..), InstallLocation (..), Installed (..)
                    , InstalledMap, LocalPackage (..), Package (..)
                    , PackageSource (..), installedVersion, packageIdentifier
-                   , psVersion, runMemoizedWith
+                   , psVersion, runMemoizedWith, InstalledLibraryInfo (iliId)
                    )
 import           Stack.Types.ProjectConfig ( isPCGlobalProject )
 import           Stack.Types.Runner ( HasRunner (..), globalOptsL )
@@ -985,8 +985,8 @@ processAdr adr = case adr of
     (Set.singleton $ taskProvides task, Map.empty, taskTargetIsMutable task)
   ADRFound loc (Executable _) ->
     (Set.empty, Map.empty, installLocationIsMutable loc)
-  ADRFound loc (Library ident gid _) ->
-    (Set.empty, Map.singleton ident gid, installLocationIsMutable loc)
+  ADRFound loc (Library ident installedInfo) ->
+    (Set.empty, Map.singleton ident (iliId installedInfo), installLocationIsMutable loc)
 
 checkDirtiness ::
      PackageSource
@@ -1196,7 +1196,7 @@ inSnapshot name version = do
       PIBoth (PSRemote _ srcVersion FromSnapshot _) _ ->
         pure $ srcVersion == version
       -- OnlyInstalled occurs for global database
-      PIOnlyInstalled loc (Library pid _gid _lic) ->
+      PIOnlyInstalled loc (Library pid _) ->
         assert (loc == Snap) $
         assert (pkgVersion pid == version) $
         Just True

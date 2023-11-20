@@ -10,6 +10,7 @@ module Stack.Types.Package
   , InstallLocation (..)
   , InstallMap
   , Installed (..)
+  , InstalledLibraryInfo (..)
   , InstalledPackageLocation (..)
   , InstalledMap
   , LocalPackage (..)
@@ -26,6 +27,8 @@ module Stack.Types.Package
   , dotCabalMainPath
   , dotCabalModule
   , dotCabalModulePath
+  , installedGhcPkgId
+  , installedLibraryInfoFromGhcPkgId
   , installedPackageIdentifier
   , installedVersion
   , lpFiles
@@ -56,7 +59,7 @@ import           Stack.Types.CompCollection ( CompCollection )
 import           Stack.Types.Compiler ( ActualCompiler )
 import           Stack.Types.Component
                    ( StackBenchmark, StackBuildInfo, StackExecutable
-                   , StackForeignLibrary, StackLibrary, StackTestSuite
+                   , StackForeignLibrary, StackLibrary, StackTestSuite, StackUnqualCompName
                    )
 import           Stack.Types.Dependency ( DepValue )
 import           Stack.Types.EnvConfig ( EnvConfig, HasEnvConfig (..) )
@@ -459,9 +462,19 @@ dotCabalGetPath dcp =
 -- information about what is installed.
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
+data InstalledLibraryInfo = InstalledLibraryInfo
+  { iliId :: GhcPkgId
+  , iliLicense :: Maybe (Either SPDX.License License)
+  , iliSublib :: Map StackUnqualCompName GhcPkgId
+  }
+  deriving (Eq, Show)
+
+installedLibraryInfoFromGhcPkgId :: GhcPkgId -> InstalledLibraryInfo
+installedLibraryInfoFromGhcPkgId ghcPkgId = InstalledLibraryInfo ghcPkgId Nothing mempty
+
 -- | Type representing information about what is installed.
 data Installed
-  = Library PackageIdentifier GhcPkgId (Maybe (Either SPDX.License License))
+  = Library PackageIdentifier InstalledLibraryInfo 
     -- ^ A library, including its installed package id and, optionally, its
     -- license.
   | Executable PackageIdentifier
@@ -469,8 +482,12 @@ data Installed
   deriving (Eq, Show)
 
 installedPackageIdentifier :: Installed -> PackageIdentifier
-installedPackageIdentifier (Library pid _ _) = pid
+installedPackageIdentifier (Library pid _) = pid
 installedPackageIdentifier (Executable pid) = pid
+
+installedGhcPkgId :: Installed -> Maybe GhcPkgId
+installedGhcPkgId (Library _ libInfo) = Just $ iliId libInfo
+installedGhcPkgId (Executable _) = Nothing
 
 -- | Get the installed Version.
 installedVersion :: Installed -> Version

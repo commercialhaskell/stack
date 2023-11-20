@@ -185,8 +185,9 @@ import           Stack.Types.NamedComponent
                    )
 import           Stack.Types.Package
                    ( InstallLocation (..), Installed (..), InstalledMap
-                   , LocalPackage (..), Package (..), installedPackageIdentifier
-                   , packageIdentifier, runMemoizedWith
+                   , LocalPackage (..), Package (..), InstalledLibraryInfo (..)
+                   , installedPackageIdentifier, packageIdentifier, runMemoizedWith
+                   , installedLibraryInfoFromGhcPkgId
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
@@ -1077,8 +1078,8 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
                   -> installedToGhcPkgId ident installed
           Just installed -> installedToGhcPkgId ident installed
           _ -> throwM $ PackageIdMissingBug ident
-      installedToGhcPkgId ident (Library ident' x _) =
-        assert (ident == ident') $ Just (ident, x)
+      installedToGhcPkgId ident (Library ident' libInfo) =
+        assert (ident == ident') $ Just (ident, iliId libInfo)
       installedToGhcPkgId _ (Executable _) = Nothing
       missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
       TaskConfigOpts missing mkOpts = taskConfigOpts
@@ -1859,7 +1860,7 @@ singleBuild
         pure $ Just $
           case mpkgid of
             Nothing -> assert False $ Executable pkgId
-            Just pkgid -> Library pkgId pkgid Nothing
+            Just pkgid -> Library pkgId (installedLibraryInfoFromGhcPkgId pkgid)
    where
     bindir = bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
@@ -1893,7 +1894,7 @@ singleBuild
         let installedMapHasThisPkg :: Bool
             installedMapHasThisPkg =
               case Map.lookup (packageName package) installedMap of
-                Just (_, Library ident _ _) -> ident == pkgId
+                Just (_, Library ident _) -> ident == pkgId
                 Just (_, Executable _) -> True
                 _ -> False
 
@@ -2119,7 +2120,7 @@ singleBuild
                     (packageName package)
         case mpkgid of
           Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
-          Just pkgid -> pure (Library ident pkgid Nothing, subLibsPkgIds)
+          Just pkgid -> pure (Library ident (installedLibraryInfoFromGhcPkgId pkgid), subLibsPkgIds) -- TODO: sublib should be in Library here
       else do
         markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
                                                    -- with writeFlagCache?
@@ -2318,7 +2319,7 @@ singleTest topts testsToRun ac ee task installedMap = do
               idMap <- liftIO $ readTVarIO (eeGhcPkgIds ee)
               pure $ Map.lookup (taskProvides task) idMap
           let pkgGhcIdList = case installed of
-                               Just (Library _ ghcPkgId _) -> [ghcPkgId]
+                               Just (Library _ libInfo) -> [iliId libInfo]
                                _ -> []
           -- doctest relies on template-haskell in QuickCheck-based tests
           thGhcId <-
