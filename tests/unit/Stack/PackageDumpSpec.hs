@@ -95,7 +95,7 @@ spec = do
             haskell2010 { dpExposedModules = mempty } `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = packageIdent
-                , dpParentLibIdent = Nothing
+                , dpSublib = Nothing
                 , dpLicense = Just BSD3
                 , dpLibDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
                 , dpDepends = depends
@@ -137,7 +137,7 @@ spec = do
             haskell2010 { dpExposedModules = mempty } `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = pkgIdent
-                , dpParentLibIdent = Nothing
+                , dpSublib = Nothing
                 , dpLicense = Just BSD3
                 , dpLibDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
                 , dpHaddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
@@ -172,7 +172,7 @@ spec = do
             hmatrix `shouldBe` DumpPackage
                 { dpGhcPkgId = ghcPkgId
                 , dpPackageIdent = pkgId
-                , dpParentLibIdent = Nothing
+                , dpSublib = Nothing
                 , dpLicense = Just BSD3
                 , dpLibDirs =
                       [ "/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/lib/x86_64-osx-ghc-7.8.4/hmatrix-0.16.1.5"
@@ -208,7 +208,7 @@ spec = do
           ghcBoot `shouldBe` DumpPackage
             { dpGhcPkgId = ghcPkgId
             , dpPackageIdent = pkgId
-            , dpParentLibIdent = Nothing
+            , dpSublib = Nothing
             , dpLicense = Just BSD3
             , dpLibDirs =
                   ["/opt/ghc/head/lib/ghc-7.11.20151213/ghc-boot-0.0.0.0"]
