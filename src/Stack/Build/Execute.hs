@@ -1985,9 +1985,12 @@ singleBuild
                       \undefined reference errors from the linker, along with \
                       \other problems."
 
+    actualCompiler <- view actualCompilerVersionL
     () <- announce
       (  "build"
       <> display (annSuffix executableBuildStatuses)
+      <> " with "
+      <> display actualCompiler
       )
     config <- view configL
     extraOpts <- extraBuildOptions wc eeBuildOpts
@@ -2017,7 +2020,6 @@ singleBuild
         else "haddock"
 
       -- For GHC 8.4 and later, provide the --quickjump option.
-      actualCompiler <- view actualCompilerVersionL
       let quickjump =
             case actualCompiler of
               ACGhc ghcVer
