@@ -138,8 +138,6 @@ build msetLocalFiles = do
     depsLocals <- localDependencies
     let allLocals = locals <> depsLocals
 
-    -- checkSubLibraryDependencies (Map.elems $ smProject sourceMap)
-
     boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
@@ -371,34 +369,3 @@ checkComponentsBuildable lps =
     | lp <- lps
     , c <- Set.toList (lpUnbuildable lp)
     ]
-
--- | Find if any sub-library dependency (other than internal libraries) exists
--- in each project package.
--- checkSubLibraryDependencies :: HasTerm env => [ProjectPackage] -> RIO env ()
--- checkSubLibraryDependencies projectPackages =
---   forM_ projectPackages $ \projectPackage -> do
---     C.GenericPackageDescription pkgDesc _ _ lib subLibs foreignLibs exes tests benches <-
---       liftIO $ cpGPD . ppCommon $ projectPackage
-
---     let pName = pkgName . C.package $ pkgDesc
---         dependencies = concatMap getDeps subLibs <>
---                        concatMap getDeps foreignLibs <>
---                        concatMap getDeps exes <>
---                        concatMap getDeps tests <>
---                        concatMap getDeps benches <>
---                        maybe [] C.condTreeConstraints lib
---         notInternal (Dependency pName' _ _) = pName' /= pName
---         publicDependencies = filter notInternal dependencies
---         publicLibraries = concatMap (toList . depLibraries) publicDependencies
-
---     when (subLibDepExist publicLibraries) $
---       prettyWarnS
---         "Sublibrary dependency is not supported, this will almost certainly \
---         \fail."
---  where
---   getDeps (_, C.CondNode _ dep _) = dep
---   subLibDepExist = any
---     ( \case
---         C.LSubLibName _ -> True
---         C.LMainLibName  -> False
---     )
