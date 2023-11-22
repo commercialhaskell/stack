@@ -47,14 +47,12 @@ import           Distribution.PackageDescription
                    , GenericPackageDescription (..), HookedBuildInfo
                    , Library (..), PackageDescription (..), PackageFlag (..)
                    , SetupBuildInfo (..), TestSuite (..), allLibraries
-                   , buildType, depPkgName, depVerRange, maybeToLibraryName
+                   , buildType, depPkgName, depVerRange
                    )
-import           Distribution.Pretty ( prettyShow )
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
 import           Distribution.System ( OS (..), Arch, Platform (..) )
 import           Distribution.Text ( display )
 import qualified Distribution.Types.CondTree as Cabal
-import qualified Distribution.Types.UnqualComponentName as Cabal
 import           Distribution.Utils.Path ( getSymbolicPath )
 import           Distribution.Verbosity ( silent )
 import           Distribution.Version
@@ -96,14 +94,13 @@ import           Stack.Types.Dependency
                    , libraryDepFromVersionRange
                    )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
-import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), subLibComponents )
 import           Stack.Types.Package
                    ( BioInput(..), BuildInfoOpts (..), InstallMap
                    , Installed (..), InstalledMap, Package (..)
                    , PackageConfig (..), PackageException (..)
-                   , dotCabalCFilePath, packageIdentifier, InstalledLibraryInfo (iliId)
+                   , dotCabalCFilePath, packageIdentifier, installedToPackageIdOpt
                    )
 import           Stack.Types.PackageFile
                    ( DotCabalPath, PackageComponentFile (..) )
@@ -181,16 +178,6 @@ packageFromPackageDescription
     Just (MungedPackageName pn lib, libraryDepFromVersionRange vr)
   getSubLibName _ _ _ = Nothing
 
-toInternalPackageMungedName :: Package -> Text -> Text
-toInternalPackageMungedName pkg =
-    T.pack
-  . prettyShow
-  . MungedPackageName (packageName pkg)
-  . maybeToLibraryName
-  . Just
-  . Cabal.mkUnqualComponentName
-  . T.unpack
-
 -- | This is an action used to collect info needed for "stack ghci". This info
 -- isn't usually needed, so computation of it is deferred.
 getPackageOpts ::
@@ -218,17 +205,11 @@ getPackageOpts
       let subLibs =
             S.toList $ subLibComponents $ M.keysSet componentsModules
       excludedSubLibs <- mapM (parsePackageNameThrowing . T.unpack) subLibs
-      mungedSubLibs <- mapM
-        ( parsePackageNameThrowing
-        . T.unpack
-        . toInternalPackageMungedName stackPackage
-        )
-        subLibs
       componentsOpts <- generatePkgDescOpts
         installMap
         installedMap
         (excludedSubLibs ++ omitPkgs)
-        (mungedSubLibs ++ addPkgs)
+        addPkgs
         cabalfp
         stackPackage
         componentFiles
@@ -322,7 +303,7 @@ generateBuildInfoOpts BioInput {..} =
     concat
       [ case M.lookup name biInstalledMap of
           Just (_, Stack.Types.Package.Library _ident installedInfo) ->
-            ["-package-id=" <> ghcPkgIdString (iliId installedInfo)]
+            installedToPackageIdOpt installedInfo
           _ -> ["-package=" <> packageNameString name <>
             maybe "" -- This empty case applies to e.g. base.
               ((("-" <>) . versionString) . installVersion)

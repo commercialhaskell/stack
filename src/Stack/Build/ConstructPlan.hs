@@ -73,7 +73,7 @@ import           Stack.Types.Package
                    ( ExeName (..), InstallLocation (..), Installed (..)
                    , InstalledMap, LocalPackage (..), Package (..)
                    , PackageSource (..), installedVersion, packageIdentifier
-                   , psVersion, runMemoizedWith, InstalledLibraryInfo (iliId)
+                   , psVersion, runMemoizedWith, installedMapGhcPkgId
                    )
 import           Stack.Types.ProjectConfig ( isPCGlobalProject )
 import           Stack.Types.Runner ( HasRunner (..), globalOptsL )
@@ -986,7 +986,7 @@ processAdr adr = case adr of
   ADRFound loc (Executable _) ->
     (Set.empty, Map.empty, installLocationIsMutable loc)
   ADRFound loc (Library ident installedInfo) ->
-    (Set.empty, Map.singleton ident (iliId installedInfo), installLocationIsMutable loc)
+    (Set.empty, installedMapGhcPkgId ident installedInfo, installLocationIsMutable loc)
 
 checkDirtiness ::
      PackageSource

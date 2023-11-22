@@ -150,7 +150,7 @@ import           Stack.Types.BuildOpts
                    )
 import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
-                   , getBuildableListText
+                   , getBuildableListText, getBuildableListAs
                    )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
@@ -187,7 +187,7 @@ import           Stack.Types.Package
                    ( InstallLocation (..), Installed (..), InstalledMap
                    , LocalPackage (..), Package (..), InstalledLibraryInfo (..)
                    , installedPackageIdentifier, packageIdentifier, runMemoizedWith
-                   , installedLibraryInfoFromGhcPkgId
+                   , installedMapGhcPkgId, toCabalMungedPackageName, simpleInstalledLib
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
@@ -1075,14 +1075,15 @@ getConfigCache ExecuteEnv {..} task@Task {..} installedMap enableTest enableBenc
               -- an initialBuildSteps target.
               | boptsCLIInitialBuildSteps eeBuildOptsCLI && taskIsTarget task,
                 Just (_, installed) <- Map.lookup (pkgName ident) installedMap
-                  -> installedToGhcPkgId ident installed
-          Just installed -> installedToGhcPkgId ident installed
+                  -> pure $ installedToGhcPkgId ident installed
+          Just installed -> pure $ installedToGhcPkgId ident installed
           _ -> throwM $ PackageIdMissingBug ident
       installedToGhcPkgId ident (Library ident' libInfo) =
-        assert (ident == ident') $ Just (ident, iliId libInfo)
-      installedToGhcPkgId _ (Executable _) = Nothing
-      missing' = Map.fromList $ mapMaybe getMissing $ Set.toList missing
+        assert (ident == ident') (installedMapGhcPkgId ident libInfo)
+      installedToGhcPkgId _ (Executable _) = mempty
       TaskConfigOpts missing mkOpts = taskConfigOpts
+  missingMapList <- traverse getMissing $ toList missing
+  let missing' = Map.unions missingMapList
       opts = mkOpts missing'
       allDeps = Set.fromList $ Map.elems missing' ++ Map.elems taskPresent
       cache = ConfigCache
@@ -1860,7 +1861,7 @@ singleBuild
         pure $ Just $
           case mpkgid of
             Nothing -> assert False $ Executable pkgId
-            Just pkgid -> Library pkgId (installedLibraryInfoFromGhcPkgId pkgid)
+            Just pkgid -> simpleInstalledLib pkgId pkgid mempty
    where
     bindir = bcoSnapInstallRoot eeBaseConfigOpts </> bindirSuffix
 
@@ -2104,23 +2105,23 @@ singleBuild
     -- library (that is, if it exists)
     (mpkgid, subLibsPkgIds) <- if hasBuildableMainLibrary package
       then do
-        subLibsPkgIds <- fmap catMaybes $
-          forM (getBuildableListText $ packageSubLibraries package) $ \subLib -> do
-            let subLibName = MungedPackageName
-                  (packageName package)
-                  (LSubLibName $ mkUnqualComponentName $ T.unpack subLib)
-            loadInstalledPkg
+        subLibsPkgIds' <- fmap catMaybes $
+          forM (getBuildableListAs id $ packageSubLibraries package) $ \subLib -> do
+            let subLibName = toCabalMungedPackageName (packageName package) subLib
+            maybeGhcpkgId <- loadInstalledPkg
               [installedPkgDb]
               installedDumpPkgsTVar
               (encodeCompatPackageName subLibName)
-
+            pure $ (subLib, ) <$> maybeGhcpkgId
+        let subLibsPkgIds = snd <$> subLibsPkgIds'
         mpkgid <- loadInstalledPkg
                     [installedPkgDb]
                     installedDumpPkgsTVar
                     (packageName package)
+        let makeInstalledLib pkgid = simpleInstalledLib ident pkgid (Map.fromList subLibsPkgIds')
         case mpkgid of
           Nothing -> throwM $ Couldn'tFindPkgId $ packageName package
-          Just pkgid -> pure (Library ident (installedLibraryInfoFromGhcPkgId pkgid), subLibsPkgIds) -- TODO: sublib should be in Library here
+          Just pkgid -> pure (makeInstalledLib pkgid, subLibsPkgIds)
       else do
         markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
                                                    -- with writeFlagCache?

@@ -14,11 +14,12 @@
 module Stack.Types.ComponentUtils
   ( StackUnqualCompName (..)
   , fromCabalName
+  , toCabalName
   ) where
 
-import           Distribution.PackageDescription (UnqualComponentName, unUnqualComponentName)
+import           Distribution.PackageDescription (UnqualComponentName, unUnqualComponentName, mkUnqualComponentName)
 import           Stack.Prelude
-import RIO.Text (pack)
+import RIO.Text (pack, unpack)
 
 -- | Type representing the name of an \'unqualified\' component (that is, the
 -- component can be any sort - a (unnamed) main library or sub-library,
@@ -36,3 +37,7 @@ newtype StackUnqualCompName = StackUnqualCompName {unqualCompToText :: Text}
 fromCabalName :: UnqualComponentName -> StackUnqualCompName
 fromCabalName unqualName =
   StackUnqualCompName $ pack . unUnqualComponentName $ unqualName
+
+toCabalName :: StackUnqualCompName -> UnqualComponentName
+toCabalName (StackUnqualCompName unqualName) =
+  mkUnqualComponentName (unpack unqualName)

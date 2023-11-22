@@ -19,7 +19,7 @@ import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.SourceMap ( getPLIVersion, loadVersion )
 import           Stack.Types.CompilerPaths ( getGhcPkgExe )
-import           Stack.Types.DumpPackage ( DumpPackage (..), dpParentLibIdent, SublibDump (sdLibraryName), sdPackageName )
+import           Stack.Types.DumpPackage ( DumpPackage (..), dpParentLibIdent, SublibDump (..), sdPackageName )
 import           Stack.Types.EnvConfig
                     ( HasEnvConfig, packageDatabaseDeps, packageDatabaseExtra
                     , packageDatabaseLocal

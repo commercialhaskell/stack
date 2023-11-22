@@ -8,11 +8,11 @@ module Stack.Types.Dependency
   , cabalSetupDepsToStackDep
   , libraryDepFromVersionRange
   , isDepTypeLibrary
+  , getDepSublib
   ) where
 
 import           Data.Foldable ( foldr' )
 import qualified Data.Map as Map
-import qualified Distribution.Compat.NonEmptySet as NES
 import qualified Distribution.PackageDescription as Cabal
 import           Distribution.Types.VersionRange ( VersionRange )
 import           Stack.Prelude
@@ -39,6 +39,11 @@ data DepLibrary = DepLibrary
   , dlSublib :: Set StackUnqualCompName
   }
   deriving (Eq, Show)
+
+getDepSublib :: DepValue -> Maybe (Set StackUnqualCompName)
+getDepSublib val = case dvType val of
+  AsLibrary libVal -> Just $ dlSublib libVal
+  _ -> Nothing
 
 defaultDepLibrary :: DepLibrary
 defaultDepLibrary = DepLibrary True mempty
