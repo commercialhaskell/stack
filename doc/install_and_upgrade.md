@@ -130,8 +130,8 @@ GitHub repository.
 
     === "Arch Linux"
 
-        The Arch community package repository provides an official
-        [package](https://www.archlinux.org/packages/community/x86_64/stack/).
+        The Arch extra package repository provides an official
+        [package](https://www.archlinux.org/packages/extra/x86_64/stack/).
         You can install it with the command:
 
         ~~~text
