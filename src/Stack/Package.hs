@@ -35,7 +35,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import           Distribution.CabalSpecVersion ( cabalSpecToVersionDigits )
-import qualified Distribution.Compat.NonEmptySet as NES
 import           Distribution.Compiler
                    ( CompilerFlavor (..), PerCompilerFlavor (..) )
 import           Distribution.ModuleName ( ModuleName )
@@ -155,7 +154,6 @@ packageFromPackageDescription
           foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkg
       , packageExecutables =
           foldAndMakeCollection stackExecutableFromCabal $ executables pkg
-      , packageSubLibDeps = subLibDeps
       , packageBuildType = buildType pkg
       , packageSetupDeps = fmap cabalSetupDepsToStackDep (setupBuildInfo pkg)
       , packageCabalSpec = specVersion pkg
@@ -169,14 +167,6 @@ packageFromPackageDescription
   -- well as use by "stack ghci"
   pkgId = package pkg
   name = pkgName pkgId
-
-  subLibDeps = M.fromList $ concatMap
-    (\(Dependency n vr libs) -> mapMaybe (getSubLibName n vr) (NES.toList libs))
-    (concatMap targetBuildDepends (allBuildInfo' pkg))
-
-  getSubLibName pn vr lib@(LSubLibName _) =
-    Just (MungedPackageName pn lib, libraryDepFromVersionRange vr)
-  getSubLibName _ _ _ = Nothing
 
 -- | This is an action used to collect info needed for "stack ghci". This info
 -- isn't usually needed, so computation of it is deferred.

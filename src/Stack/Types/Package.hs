@@ -163,8 +163,6 @@ data Package = Package
     -- ^ Version of the package
   , packageLicense :: !(Either SPDX.License License)
     -- ^ The license the package was released under.
-  , packageSubLibDeps :: !(Map MungedPackageName DepValue)
-    -- ^ Original sub-library dependencies (not sieved).
   , packageGhcOptions :: ![Text]
     -- ^ Ghc options used on package.
   , packageCabalConfigOpts :: ![Text]
