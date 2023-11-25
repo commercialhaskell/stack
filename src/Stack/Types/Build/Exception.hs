@@ -594,25 +594,27 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
              ]
         <> line
         <> indent 2 (bulletedList depErrors)
-        <> case getShortestDepsPath parentMap wanted' (packageName pkg) of
-             Nothing ->
-                  line
-               <> flow "needed for unknown reason - Stack invariant violated."
-             Just [] ->
-                  line
-               <> fillSep
-                    [ flow "needed since"
-                    , pkgName'
-                    , flow "is a build target."
-                    ]
-             Just (target:path) ->
-                  line
-               <> flow "needed due to" <+> encloseSep "" "" " -> " pathElems
-              where
-               pathElems =
-                    [style Target . fromString . packageIdentifierString $ target]
-                 <> map (fromString . packageIdentifierString) path
-                 <> [pkgIdent]
+        <> line
+        <> fillSep
+             ( flow "The above is/are needed"
+             : case getShortestDepsPath parentMap wanted' (packageName pkg) of
+                 Nothing ->
+                   [flow "for unknown reason - Stack invariant violated."]
+                 Just [] ->
+                   [ "since"
+                   , pkgName'
+                   , flow "is a build target."
+                   ]
+                 Just (target:path) ->
+                   [ flow "due to"
+                   , encloseSep "" "" " -> " pathElems
+                   ]
+                  where
+                   pathElems =
+                        [style Target . fromString . packageIdentifierString $ target]
+                     <> map (fromString . packageIdentifierString) path
+                     <> [pkgIdent]
+             )
        where
         pkgName' =
           style Current . fromString . packageNameString $ packageName pkg
