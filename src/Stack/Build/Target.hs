@@ -302,7 +302,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                          PkgComponent
                          (fromString $ T.unpack $ renderComponent nc)
                      , flow "of package"
-                     , style PkgComponent (fromString $ packageNameString pn)
+                     , style PkgComponent (fromPackageName pn)
                      ]
                  )
                  matches
@@ -313,7 +313,7 @@ resolveRawTarget sma allLocs (ri, rt) =
       Nothing -> pure $ Left $
         fillSep
           [ flow "Unknown local package:"
-          , style Target (fromString $ packageNameString name) <> "."
+          , style Target (fromPackageName name) <> "."
           ]
       Just pp -> do
         comps <- ppComponents pp
@@ -331,7 +331,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                   [ "Component"
                   , style Target (fromString $ T.unpack $ renderComponent comp)
                   , flow "does not exist in package"
-                  , style Target (fromString $ packageNameString name) <> "."
+                  , style Target (fromPackageName name) <> "."
                   ]
           UnresolvedComponent comp ->
             case filter (isCompNamed comp) $ Set.toList comps of
@@ -340,7 +340,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                   [ "Component"
                   , style Target (fromString $ T.unpack comp)
                   , flow "does not exist in package"
-                  , style Target (fromString $ packageNameString name) <> "."
+                  , style Target (fromPackageName name) <> "."
                   ]
               [x] -> Right ResolveResult
                 { rrName = name
@@ -354,7 +354,7 @@ resolveRawTarget sma allLocs (ri, rt) =
                   [ flow "Ambiguous component name"
                   , style Target (fromString $ T.unpack comp)
                   , flow "for package"
-                  , style Target (fromString $ packageNameString name)
+                  , style Target (fromPackageName name)
                   , flow "matches components:"
                   , fillSep $
                       mkNarrativeList (Just PkgComponent) False
@@ -387,7 +387,7 @@ resolveRawTarget sma allLocs (ri, rt) =
   go (RTPackageIdentifier ident@(PackageIdentifier name version))
     | Map.member name locals = pure $ Left $
         fillSep
-          [ style Target (fromString $ packageNameString name)
+          [ style Target (fromPackageName name)
           , flow "target has a specific version number, but it is a local \
                  \package. To avoid confusion, we will not install the \
                  \specified version or build the local one. To build the \
@@ -413,7 +413,7 @@ resolveRawTarget sma allLocs (ri, rt) =
             fillSep
               [ flow "Package with identifier was targeted on the command \
                      \line:"
-              , style Target (fromString $ packageIdentifierString ident) <> ","
+              , style Target (fromPackageId ident) <> ","
               , flow "but it was specified from a non-index location:"
               , flow $ T.unpack $ textDisplay loc' <> "."
               , flow "Recommendation: add the correctly desired version to \
@@ -509,7 +509,7 @@ combineResolveResults results = do
                     catMaybes mcomps
               | otherwise -> Left $ fillSep
                   [ flow "The package"
-                  , style Target $ fromString $ packageNameString name
+                  , style Target $ fromPackageName name
                   , flow "was specified in multiple, incompatible ways:"
                   , fillSep $
                       mkNarrativeList (Just Target) False

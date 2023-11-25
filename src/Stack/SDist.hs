@@ -565,7 +565,7 @@ checkPackageInExtractedTarball pkgDir = do
   let pkgDesc = resolvePackageDescription config gpd
   prettyInfoL
     [ flow "Checking package"
-    , style Current (fromString $ packageNameString name)
+    , style Current (fromPackageName name)
     , flow "for common mistakes."
     ]
   let pkgChecks =

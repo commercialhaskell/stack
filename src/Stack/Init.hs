@@ -558,8 +558,7 @@ getWorkingResolverPlan initOpts pkgDirs0 snapCandidate snapLoc = do
                 prettyWarn
                   (  flow "Ignoring the following packages:"
                   <> line
-                  <> bulletedList
-                       (map (fromString . packageNameString) ignored)
+                  <> bulletedList (map fromPackageName ignored)
                   )
               else
                 prettyWarnL

@@ -755,10 +755,10 @@ addDep name packageInfo = do
                   cs
                 prettyWarnL
                   $ flow "No latest package revision found for"
-                  : style Current (fromString $ packageNameString name) <> ","
+                  : style Current (fromPackageName name) <> ","
                   : flow "dependency callstack:"
                   : mkNarrativeList Nothing False
-                      (map (fromString . packageNameString) cs' :: [StyleDoc])
+                      (map fromPackageName cs' :: [StyleDoc])
                 pure Nothing
               Just (_rev, cfKey, treeKey) ->
                 pure $ Just $
@@ -1125,7 +1125,7 @@ adrInRange pkgId name range adr = if adrVersion adr `withinRange` range
               ]
           pure True
         Just boundsIgnoredDeps -> do
-          let pkgName' = fromString $ packageNameString pkgName
+          let pkgName' = fromPackageName pkgName
               isBoundsIgnoreDep = pkgName `elem` boundsIgnoredDeps
               reason = if isBoundsIgnoreDep
                 then fillSep
@@ -1176,16 +1176,14 @@ adrInRange pkgId name range adr = if adrVersion adr `withinRange` range
             [ if isIgnoring
                 then "Ignoring"
                 else flow "Not ignoring"
-            ,    style
-                   Current
-                   (fromString $ packageNameString pkgName)
-              <> "'s"
+            , style Current (fromPackageName pkgName) <> "'s"
             , flow "bounds on"
-            , style Current (fromString $ packageNameString name)
+            , style Current (fromPackageName name)
             , parens (fromString . T.unpack $ versionRangeText range)
             , flow "and using"
-            , style Current (fromString . packageIdentifierString $
-                PackageIdentifier name (adrVersion adr)) <> "."
+            , style
+                Current
+                (fromPackageId $ PackageIdentifier name (adrVersion adr)) <> "."
             ]
        <> line
        <> fillSep
@@ -1406,7 +1404,7 @@ toolWarningText (ToolWarning (ExeName toolName) pkgName') = fillSep
   [ flow "No packages found in snapshot which provide a"
   , style PkgComponent (fromString $ show toolName)
   , flow "executable, which is a build-tool dependency of"
-  , style Current (fromString $ packageNameString pkgName')
+  , style Current (fromPackageName pkgName')
   ]
 
 -- | Is the given package/version combo defined in the snapshot or in the global
