@@ -52,6 +52,8 @@ module Stack.Prelude
   , encloseSep
   , fill
   , fillSep
+  , fromPackageId
+  , fromPackageName
   , flow
   , hang
   , hcat
@@ -362,3 +364,11 @@ putUtf8Builder = putBuilder . getUtf8Builder
 -- | Write a 'Builder' to the standard output stream.
 putBuilder :: MonadIO m => Builder -> m ()
 putBuilder = hPutBuilder stdout
+
+-- | Convert a package identifier to a value of a string-like type.
+fromPackageId :: IsString a => PackageIdentifier -> a
+fromPackageId = fromString . packageIdentifierString
+
+-- | Convert a package name to a value of a string-like type.
+fromPackageName :: IsString a => PackageName -> a
+fromPackageName = fromString . packageNameString

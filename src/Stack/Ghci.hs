@@ -421,7 +421,7 @@ getAllLocalTargets GhciOpts{..} targets0 mainIsTargets localMap = do
     then pure directlyWanted
     else do
       let extraList' =
-            map (fromString . packageNameString . fst) extraLoadDeps :: [StyleDoc]
+            map (fromPackageName . fst) extraLoadDeps :: [StyleDoc]
           extraList = mkNarrativeList (Just Current) False extraList'
       if ghciLoadLocalDeps
         then prettyInfo $
@@ -539,7 +539,7 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
   prettyInfoL
     ( flow "Configuring GHCi with the following packages:"
     : mkNarrativeList (Just Current) False
-        (map (fromString . packageNameString . ghciPkgName) pkgs :: [StyleDoc])
+        (map (fromPackageName . ghciPkgName) pkgs :: [StyleDoc])
     )
   compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
   let execGhci extras = do
@@ -733,7 +733,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
   renderCandidate c@(pkgName, namedComponent, mainIs) =
     let candidateIndex =
           fromString . show . (+1) . fromMaybe 0 . L.elemIndex c
-        pkgNameText = fromString $ packageNameString pkgName
+        pkgNameText = fromPackageName pkgName
     in  hang 4
           $  fill 4 ( candidateIndex candidates <> ".")
           <> fillSep
@@ -1102,7 +1102,7 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
     prettyWarnL
       [ flow "Some targets"
       , parens $ fillSep $ punctuate "," $ map
-          (style Good . fromString . packageNameString)
+          (style Good . fromPackageName)
           nonLocalTargets
       , flow "are not local packages, and so cannot be directly loaded. In \
              \future versions of Stack, this might be supported - see"

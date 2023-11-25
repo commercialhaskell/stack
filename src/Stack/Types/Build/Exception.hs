@@ -346,7 +346,7 @@ instance Pretty BuildPrettyException where
     go :: UnusedFlags -> StyleDoc
     go (UFNoPackage src name) = fillSep
       [ "Package"
-      , style Error (fromString $ packageNameString name)
+      , style Error (fromPackageName name)
       , flow "not found"
       , showFlagSrc src
       ]
@@ -376,7 +376,7 @@ instance Pretty BuildPrettyException where
       name = packageNameString pname
     go (UFSnapshot name) = fillSep
       [ flow "Attempted to set flag on snapshot package"
-      , style Current (fromString $ packageNameString name) <> ","
+      , style Current (fromPackageName name) <> ","
       , flow "please add the package to"
       , style Shell "extra-deps" <> "."
       ]
@@ -470,7 +470,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
            : flow "add these package names under"
            : style Shell "allow-newer-deps" <> ":"
            : mkNarrativeList (Just Shell) False
-               (map (fromString . packageNameString) (Set.elems pkgsWithMismatches) :: [StyleDoc])
+               (map fromPackageName (Set.elems pkgsWithMismatches) :: [StyleDoc])
        | not $ Set.null pkgsWithMismatches
        ]
     <> addExtraDepsRecommendations
@@ -581,9 +581,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
        flow "Dependency cycle detected in packages:"
     <> line
     <> indent 4
-         ( encloseSep "[" "]" ","
-             (map (style Error . fromString . packageNameString) pNames)
-         )
+         (encloseSep "[" "]" "," (map (style Error . fromPackageName) pNames))
   pprintException (DependencyPlanFailures pkg pDeps) =
     case mapMaybe pprintDep (Map.toList pDeps) of
       [] -> Nothing
@@ -611,30 +609,26 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
                    ]
                   where
                    pathElems =
-                        [style Target . fromString . packageIdentifierString $ target]
-                     <> map (fromString . packageIdentifierString) path
+                        [style Target . fromPackageId $ target]
+                     <> map fromPackageId path
                      <> [pkgIdent]
              )
        where
-        pkgName' =
-          style Current . fromString . packageNameString $ packageName pkg
-        pkgIdent =
-          style
-            Current
-            (fromString . packageIdentifierString $ packageIdentifier pkg)
+        pkgName' = style Current . fromPackageName $ packageName pkg
+        pkgIdent = style Current (fromPackageId $ packageIdentifier pkg)
   -- Skip these when they are redundant with 'NotInBuildPlan' info.
   pprintException (UnknownPackage name)
     | name `Set.member` allNotInBuildPlan = Nothing
     | name `Set.member` wiredInPackages = Just $ fillSep
         [ flow "Can't build a package with same name as a wired-in-package:"
-        , style Current . fromString . packageNameString $ name
+        , style Current . fromPackageName $ name
         ]
     | Just pruned <- Map.lookup name prunedGlobalDeps =
         let prunedDeps =
-              map (style Current . fromString . packageNameString) pruned
+              map (style Current . fromPackageName) pruned
         in  Just $ fillSep
               [ flow "Can't use GHC boot package"
-              , style Current . fromString . packageNameString $ name
+              , style Current . fromPackageName $ name
               , flow "when it depends on a replaced boot package. You need to \
                      \add the following as explicit dependencies to the \
                      \project:"
@@ -643,7 +637,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
               ]
     | otherwise = Just $ fillSep
         [ flow "Unknown package:"
-        , style Current . fromString . packageNameString $ name
+        , style Current . fromPackageName $ name
         ]
 
   pprintFlags flags
@@ -676,7 +670,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
              ++ L.intercalate ", " (map packageNameString names)
       ]
    where
-    errorName = style Error . fromString . packageNameString $ name
+    errorName = style Error . fromPackageName $ name
     goodRange = style Good (fromString (C.display range))
     rangeMsg = if range == C.anyVersion
       then "needed,"
@@ -694,7 +688,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
     inconsistentMsg mVersion = fillSep
       [ style Error $ maybe
           ( flow "no version" )
-          ( fromString . packageIdentifierString . PackageIdentifier name )
+          ( fromPackageId . PackageIdentifier name )
           mVersion
       , flow "is in the Stack configuration"
       ]

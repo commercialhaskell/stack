@@ -182,11 +182,10 @@ instance Pretty NewPrettyException where
     <> fillSep
          ( flow "The names blocked by Stack are:"
          : mkNarrativeList Nothing False
-             (map toStyleDoc (L.sort $ S.toList wiredInPackages))
+             (map fromPackageName sortedWiredInPackages :: [StyleDoc])
          )
    where
-    toStyleDoc :: PackageName -> StyleDoc
-    toStyleDoc = fromString . packageNameString
+    sortedWiredInPackages = L.sort $ S.toList wiredInPackages
   pretty (AttemptedOverwrites name fps) =
     "[S-3113]"
     <> line

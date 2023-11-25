@@ -78,7 +78,7 @@ instance Pretty CoveragePrettyException where
     <> fillSep
          [ flow "Can't specify anything except test-suites as hpc report \
                 \targets"
-         , parens (style Target . fromString . packageNameString $ name)
+         , parens (style Target . fromPackageName $ name)
          , flow "is used with a non test-suite target."
          ]
   pretty NoTargetsOrTixSpecified =
@@ -91,7 +91,7 @@ instance Pretty CoveragePrettyException where
     <> line
     <> fillSep
          [ flow "Expected a local package, but"
-         , style Target . fromString . packageNameString $ name
+         , style Target . fromPackageName $ name
          , flow "is either an extra-dep or in the snapshot."
          ]
 

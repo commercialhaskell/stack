@@ -222,7 +222,7 @@ instance Pretty ConfigPrettyException where
     go (name, dirs) =
          blankLine
       <> fillSep
-           [ style Error (fromString $ packageNameString name)
+           [ style Error (fromPackageName name)
            , flow "used in:"
            ]
       <> line

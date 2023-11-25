@@ -132,14 +132,14 @@ unpackPackages mSnapshot dest input = do
         candidates <- getHackageTypoCorrections name
         pure $ Left $ fillSep
           [ flow "Could not find package"
-          , style Current (fromString $ packageNameString name)
+          , style Current (fromPackageName name)
           , flow "on Hackage."
           , if null candidates
               then mempty
               else fillSep $
                   flow "Perhaps you meant one of:"
                 : mkNarrativeList (Just Good) False
-                    (map (fromString . packageNameString) candidates :: [StyleDoc])
+                    (map fromPackageName candidates :: [StyleDoc])
           ]
       Just loc -> pure $ Right (loc, packageLocationIdent loc)
 
@@ -152,7 +152,7 @@ unpackPackages mSnapshot dest input = do
       Nothing ->
         pure $ Left $ fillSep
           [ flow "Package does not appear in snapshot:"
-          , style Current (fromString $ packageNameString name) <> "."
+          , style Current (fromPackageName name) <> "."
           ]
       Just sp -> do
         loc <- cplComplete <$> completePackageLocation (rspLocation sp)

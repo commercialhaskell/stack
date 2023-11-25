@@ -317,7 +317,7 @@ displayTask task = fillSep $
   <> [ fillSep $
            "after:"
          : mkNarrativeList Nothing False
-             (map (fromString . packageIdentifierString) (Set.toList missing) :: [StyleDoc])
+             (map fromPackageId (Set.toList missing) :: [StyleDoc])
      | not $ Set.null missing
      ]
  where
@@ -848,8 +848,7 @@ executePlan' installedMap0 targets plan ee@ExecuteEnv {..} = do
                     nowBuilding []    = ""
                     nowBuilding names = mconcat $
                         ": "
-                      : L.intersperse ", "
-                          (map (fromString . packageNameString) names)
+                      : L.intersperse ", " (map fromPackageName names)
                     progressFormat = boptsProgressBar eeBuildOpts
                     progressLine prev' total' =
                          "Progress "
@@ -1471,7 +1470,7 @@ withSingleContext
               (TTLocalMutable lp, C.Custom) | lpWanted lp ->
                 prettyWarnL
                   [ flow "Package"
-                  , fromString $ packageNameString $ packageName package
+                  , fromPackageName $ packageName package
                   , flow "uses a custom Cabal build, but does not use a \
                          \custom-setup stanza"
                   ]
@@ -1488,7 +1487,7 @@ withSingleContext
               Just customSetupDeps -> do
                 unless (Map.member (mkPackageName "Cabal") customSetupDeps) $
                   prettyWarnL
-                    [ fromString $ packageNameString $ packageName package
+                    [ fromPackageName $ packageName package
                     , flow "has a setup-depends field, but it does not mention \
                            \a Cabal dependency. This is likely to cause build \
                            \errors."
@@ -1504,13 +1503,13 @@ withSingleContext
                           prettyWarnL
                             [ flow "Found multiple installed packages for \
                                    \custom-setup dep:"
-                            , style Current (fromString $ packageNameString name) <> "."
+                            , style Current (fromPackageName name) <> "."
                             ]
                         pure ("-package-id=" ++ ghcPkgIdString (snd x), Just (fst x))
                       [] -> do
                         prettyWarnL
                           [ flow "Could not find custom-setup dep:"
-                          , style Current (fromString $ packageNameString name) <> "."
+                          , style Current (fromPackageName name) <> "."
                           ]
                         pure ("-package=" ++ packageNameString name, Nothing)
                 let depsArgs = map fst matchedDeps
@@ -1739,7 +1738,7 @@ singleBuild
         eres <- tryAny $ action KeepOpen
         case eres of
           Right () -> prettyWarnL
-            [ style Current (fromString $ packageNameString pname) <> ":"
+            [ style Current (fromPackageName pname) <> ":"
             , flow "unexpected Haddock success."
             ]
           Left _ -> pure ()
@@ -1874,7 +1873,7 @@ singleBuild
              ) $
           prettyInfoL
             [ flow "Building all executables for"
-            , style Current (fromString $ packageNameString $ packageName package)
+            , style Current (fromPackageName $ packageName package)
             , flow "once. After a successful build of all of them, only \
                    \specified executables will be rebuilt."
             ]
@@ -2782,7 +2781,7 @@ fulfillCuratorBuildExpectations pname mcurator enableTests _ defValue action
       case eres of
         Right res -> do
           prettyWarnL
-            [ style Current (fromString $ packageNameString pname) <> ":"
+            [ style Current (fromPackageName pname) <> ":"
             , flow "unexpected test build success."
             ]
           pure res
@@ -2793,7 +2792,7 @@ fulfillCuratorBuildExpectations pname mcurator _ enableBench defValue action
       case eres of
         Right res -> do
           prettyWarnL
-            [ style Current (fromString $ packageNameString pname) <> ":"
+            [ style Current (fromPackageName pname) <> ":"
             , flow "unexpected benchmark build success."
             ]
           pure res
