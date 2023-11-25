@@ -46,6 +46,8 @@ Other enhancements:
   found. In YAML configuration files, the `notify-if-ghc-untested` and
   `notify-if-cabal-untested` keys are introduced, to allow the notification to
   be muted if unwanted.
+* The compiler version is included in Stack's build message (e.g.
+  `stack> build (lib + exe + test) with ghc-9.4.7`).
 
 Bug fixes:
 * Fix the `Curator` instance of `ToJSON`, as regards `expect-haddock-failure`.

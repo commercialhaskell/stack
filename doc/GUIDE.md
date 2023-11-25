@@ -981,7 +981,7 @@ stack build :helloworld-test
 Building all executables for `helloworld' once. After a successful build of all of them, only specified executables will be rebuilt.
 helloworld> configure (lib + exe + test)
 Configuring helloworld-0.1.0.0...
-helloworld> build (lib + exe + test)
+helloworld> build (lib + exe + test) with ghc-x.y.z
 Preprocessing library for helloworld-0.1.0.0..
 Building library for helloworld-0.1.0.0..
 [1 of 2] Compiling Lib
@@ -1024,7 +1024,7 @@ and command again:
 ~~~text
 stack build :helloworld-test
 helloworld-0.1.0.0: unregistering (local file changes: test\Spec.hs)
-helloworld> build (lib + test)
+helloworld> build (lib + test) with ghc-x.y.z
 Preprocessing library for helloworld-0.1.0.0..
 Building library for helloworld-0.1.0.0..
 Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
