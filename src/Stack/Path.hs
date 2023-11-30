@@ -15,6 +15,7 @@ import qualified Data.Text.IO as T
 import           Path ( (</>), parent )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           RIO.Process ( HasProcessContext (..), exeSearchPathL )
+import           Stack.Config ( determineStackRootAndOwnership )
 import           Stack.Constants
                    ( docDirSuffix, stackGlobalConfigOptionName
                    , stackRootOptionName
@@ -41,14 +42,22 @@ import           Stack.Types.EnvConfig
                    , packageDatabaseExtra, packageDatabaseLocal
                    )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
-import           Stack.Types.GlobalOpts ( globalOptsBuildOptsMonoidL )
+import           Stack.Types.GlobalOpts
+                   ( GlobalOpts (..), globalOptsBuildOptsMonoidL )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import qualified System.FilePath as FP
 
--- | Print out useful path information in a human-readable format (and
--- support others later).
+-- | Print out useful path information in a human-readable format (and support
+-- others later).
 path :: [Text] -> RIO Runner ()
+-- Distinguish a request for only the Stack root, as such a request does not
+-- require 'withDefaultEnvConfig'.
+path [key] | key == stackRootOptionName' = do
+  clArgs <- view $ globalOptsL.to globalConfigMonoid
+  liftIO $ do
+    (_, stackRoot, _) <- determineStackRootAndOwnership clArgs
+    T.putStrLn $ T.pack $ toFilePathNoTrailingSep stackRoot
 path keys = do
   let -- filter the chosen paths in flags (keys), or show all of them if no
       -- specific paths chosen.
@@ -172,7 +181,7 @@ data UseHaddocks a
 paths :: [(String, Text, UseHaddocks (PathInfo -> Text))]
 paths =
   [ ( "Global Stack root directory"
-    , T.pack stackRootOptionName
+    , stackRootOptionName'
     , WithoutHaddocks $ view (stackRootL.to toFilePathNoTrailingSep.to T.pack))
   , ( "Global Stack configuration file"
     , T.pack stackGlobalConfigOptionName
@@ -258,3 +267,7 @@ paths =
     , "local-hpc-root"
     , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . piHpcDir )
   ]
+
+-- | 'Text' equivalent of 'stackRootOptionName'.
+stackRootOptionName' :: Text
+stackRootOptionName' = T.pack stackRootOptionName

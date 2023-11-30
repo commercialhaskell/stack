@@ -22,6 +22,8 @@ Behavior changes:
   manager is available. In YAML configuration files, the `notify-if-nix-on-path`
   key is introduced, to allow the notification to be muted if unwanted.
 * Drop support for Intero (end of life in November 2019).
+* `stack path --stack-root` no longer sets up Stack's environment and does not
+  load Stack's configuration.
 
 Other enhancements:
 

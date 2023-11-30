@@ -29,6 +29,7 @@ module Stack.Config
   , getProjectConfig
   , withBuildConfig
   , withNewLogFunc
+  , determineStackRootAndOwnership
   ) where
 
 import           Control.Monad.Extra ( firstJustM )
