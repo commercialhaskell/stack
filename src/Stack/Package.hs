@@ -99,7 +99,8 @@ import           Stack.Types.Package
                    ( BioInput(..), BuildInfoOpts (..), InstallMap
                    , Installed (..), InstalledMap, Package (..)
                    , PackageConfig (..), PackageException (..)
-                   , dotCabalCFilePath, packageIdentifier, installedToPackageIdOpt
+                   , dotCabalCFilePath, installedToPackageIdOpt
+                   , packageIdentifier
                    )
 import           Stack.Types.PackageFile
                    ( DotCabalPath, PackageComponentFile (..) )

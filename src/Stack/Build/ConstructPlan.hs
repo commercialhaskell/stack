@@ -27,8 +27,8 @@ import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
 import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
-                   ( applyForceCustomBuild, buildableExes
-                   , packageUnknownTools, processPackageDepsToList
+                   ( applyForceCustomBuild, buildableExes, packageUnknownTools
+                   , processPackageDepsToList
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
@@ -37,6 +37,11 @@ import           Stack.Types.Build
                    , TaskConfigOpts (..), TaskType (..)
                    , installLocationIsMutable, taskIsTarget, taskLocation
                    , taskProvides, taskTargetIsMutable, toCachePkgSrc
+                   )
+import           Stack.Types.Build.ConstructPlan
+                   ( AddDepRes (..), CombinedMap, Ctx (..), M, NotOnlyLocal (..)
+                   , PackageInfo (..), ToolWarning(..), UnregisterState (..)
+                   , W (..), adrHasLibrary, adrVersion, toTask
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -53,16 +58,10 @@ import           Stack.Types.CompilerPaths
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..), configureOpts )
-import Stack.Types.Build.ConstructPlan
-    ( UnregisterState(..), NotOnlyLocal(NotOnlyLocal), ToolWarning(..),
-      Ctx(..), M, CombinedMap, AddDepRes(..),
-      W(..), PackageInfo(..), toTask, adrVersion, adrHasLibrary
-    )
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
 import           Stack.Types.DumpPackage ( DumpPackage (..), dpParentLibIdent )
-import           Stack.Types.EnvConfig
-                   ( EnvConfig (..), HasEnvConfig (..) )
+import           Stack.Types.EnvConfig ( EnvConfig (..), HasEnvConfig (..) )
 import           Stack.Types.EnvSettings
                    ( EnvSettings (..), minimalEnvSettings )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
@@ -72,8 +71,8 @@ import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
                    ( ExeName (..), InstallLocation (..), Installed (..)
                    , InstalledMap, LocalPackage (..), Package (..)
-                   , PackageSource (..), installedVersion, packageIdentifier
-                   , psVersion, runMemoizedWith, installedMapGhcPkgId
+                   , PackageSource (..), installedMapGhcPkgId, installedVersion
+                   , packageIdentifier, psVersion, runMemoizedWith
                    )
 import           Stack.Types.ProjectConfig ( isPCGlobalProject )
 import           Stack.Types.Runner ( HasRunner (..), globalOptsL )
@@ -82,7 +81,9 @@ import           Stack.Types.SourceMap
                    , GlobalPackage (..), SMTargets (..), SourceMap (..)
                    )
 import           Stack.Types.Version
-                   ( latestApplicableVersion, versionRangeText, withinRange, VersionRange )
+                   ( VersionRange, latestApplicableVersion, versionRangeText
+                   , withinRange
+                   )
 import           System.Environment ( lookupEnv )
 
 -- | Computes a build plan. This means figuring out which build 'Task's to take,
@@ -986,7 +987,10 @@ processAdr adr = case adr of
   ADRFound loc (Executable _) ->
     (Set.empty, Map.empty, installLocationIsMutable loc)
   ADRFound loc (Library ident installedInfo) ->
-    (Set.empty, installedMapGhcPkgId ident installedInfo, installLocationIsMutable loc)
+    ( Set.empty
+    , installedMapGhcPkgId ident installedInfo
+    , installLocationIsMutable loc
+    )
 
 checkDirtiness ::
      PackageSource

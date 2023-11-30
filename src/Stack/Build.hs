@@ -62,7 +62,8 @@ import           Stack.Types.GlobalOpts ( globalOptsBuildOptsMonoidL )
 import           Stack.Types.NamedComponent ( exeComponents )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..)
-                   , PackageConfig (..), lpFiles, lpFilesForComponents )
+                   , PackageConfig (..), lpFiles, lpFilesForComponents
+                   )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap

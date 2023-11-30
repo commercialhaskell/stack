@@ -17,9 +17,12 @@ module Stack.Types.ComponentUtils
   , toCabalName
   ) where
 
-import           Distribution.PackageDescription (UnqualComponentName, unUnqualComponentName, mkUnqualComponentName)
+import           Distribution.PackageDescription
+                   ( UnqualComponentName, mkUnqualComponentName
+                   , unUnqualComponentName
+                   )
+import           RIO.Text (pack, unpack)
 import           Stack.Prelude
-import RIO.Text (pack, unpack)
 
 -- | Type representing the name of an \'unqualified\' component (that is, the
 -- component can be any sort - a (unnamed) main library or sub-library,
@@ -31,8 +34,10 @@ import RIO.Text (pack, unpack)
 -- Ideally, we would use the Cabal-syntax type and not 'Text', to avoid
 -- unnecessary work, but there is no 'Hashable' instance for
 -- 'Distribution.Types.UnqualComponentName.UnqualComponentName' yet.
-newtype StackUnqualCompName = StackUnqualCompName {unqualCompToText :: Text}
-  deriving (Data, Eq, Hashable, IsString, Generic, NFData, Ord, Show, Typeable, Read)
+newtype StackUnqualCompName = StackUnqualCompName
+  { unqualCompToText :: Text
+  }
+  deriving (Data, Eq, Generic, Hashable, IsString, NFData, Ord, Read, Show, Typeable)
 
 fromCabalName :: UnqualComponentName -> StackUnqualCompName
 fromCabalName unqualName =

@@ -150,7 +150,7 @@ import           Stack.Types.BuildOpts
                    )
 import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
-                   , getBuildableListText, getBuildableListAs
+                   , getBuildableListAs, getBuildableListText
                    )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
@@ -184,10 +184,12 @@ import           Stack.Types.NamedComponent
                    , isCTest, renderComponent, testComponents
                    )
 import           Stack.Types.Package
-                   ( InstallLocation (..), Installed (..), InstalledMap
-                   , LocalPackage (..), Package (..), InstalledLibraryInfo (..)
-                   , installedPackageIdentifier, packageIdentifier, runMemoizedWith
-                   , installedMapGhcPkgId, toCabalMungedPackageName, simpleInstalledLib
+                   ( InstallLocation (..), Installed (..)
+                   , InstalledLibraryInfo (..), InstalledMap, LocalPackage (..)
+                   , Package (..), installedMapGhcPkgId
+                   , installedPackageIdentifier, packageIdentifier
+                   , runMemoizedWith, simpleInstalledLib
+                   , toCabalMungedPackageName
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )

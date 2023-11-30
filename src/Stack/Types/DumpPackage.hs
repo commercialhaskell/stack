@@ -9,7 +9,7 @@ module Stack.Types.DumpPackage
 import qualified Distribution.License as C
 import           Distribution.ModuleName ( ModuleName )
 import           Stack.Prelude
-import           Stack.Types.Component (StackUnqualCompName)
+import           Stack.Types.Component ( StackUnqualCompName )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 
 -- | Type representing dump information for a single package, as output by the
@@ -38,18 +38,20 @@ data DumpPackage = DumpPackage
   }
   deriving (Eq, Read, Show)
 
--- |
--- ghc-pkg has a notion of sublibraries when using ghc-kg dump.
--- We can only know it's different through the fields it shows.
+-- | ghc-pkg has a notion of sublibraries when using ghc-pkg dump. We can only
+-- know it's different through the fields it shows.
 data SublibDump = SublibDump
   { sdPackageName :: PackageName
-  -- ^ "package-name" field from ghc-pkg
+    -- ^ "package-name" field from ghc-pkg
   , sdLibraryName :: StackUnqualCompName
-  -- ^ "lib-name" field from ghc-pkg
+    -- ^ "lib-name" field from ghc-pkg
   }
   deriving (Eq, Read, Show)
 
 dpParentLibIdent :: DumpPackage -> Maybe PackageIdentifier
 dpParentLibIdent dp = case (dpSublib dp, dpPackageIdent dp) of
   (Nothing, _) -> Nothing
-  (Just SublibDump{sdPackageName=libParentPackageName}, PackageIdentifier _ v) -> Just $ PackageIdentifier libParentPackageName v
+  (Just sublibDump, PackageIdentifier _ v) ->
+    Just $ PackageIdentifier libParentPackageName v
+   where
+    SublibDump { sdPackageName = libParentPackageName } = sublibDump

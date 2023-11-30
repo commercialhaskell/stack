@@ -13,11 +13,12 @@ module Stack.Types.Dependency
 
 import           Data.Foldable ( foldr' )
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Distribution.PackageDescription as Cabal
 import           Distribution.Types.VersionRange ( VersionRange )
 import           Stack.Prelude
-import           Stack.Types.ComponentUtils ( StackUnqualCompName(..), fromCabalName )
-import qualified Data.Set as Set
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName (..), fromCabalName )
 
 -- | The value for a map from dependency name. This contains both the version
 -- range and the type of dependency.
@@ -34,6 +35,7 @@ data DepType
   = AsLibrary !DepLibrary
   | AsBuildTool
   deriving (Eq, Show)
+
 data DepLibrary = DepLibrary
   { dlMain :: !Bool
   , dlSublib :: Set StackUnqualCompName
@@ -55,12 +57,13 @@ isDepTypeLibrary AsBuildTool = False
 cabalToStackDep :: Cabal.Dependency -> DepValue
 cabalToStackDep (Cabal.Dependency _ verRange libNameSet) =
   DepValue{dvVersionRange = verRange, dvType = AsLibrary depLibrary}
-  where
-    depLibrary = DepLibrary finalHasMain filteredItems
-    (finalHasMain, filteredItems) = foldr' iterator (False, mempty) libNameSet
-    iterator LMainLibName (_, newLibNameSet) = (True, newLibNameSet)
-    iterator (LSubLibName libName) (hasMain, newLibNameSet) = (hasMain, Set.insert (fromCabalName libName) newLibNameSet)
-  
+ where
+  depLibrary = DepLibrary finalHasMain filteredItems
+  (finalHasMain, filteredItems) = foldr' iterator (False, mempty) libNameSet
+  iterator LMainLibName (_, newLibNameSet) = (True, newLibNameSet)
+  iterator (LSubLibName libName) (hasMain, newLibNameSet) =
+    (hasMain, Set.insert (fromCabalName libName) newLibNameSet)
+
 cabalExeToStackDep :: Cabal.ExeDependency -> DepValue
 cabalExeToStackDep (Cabal.ExeDependency _ _name verRange) =
   DepValue{dvVersionRange = verRange, dvType = AsBuildTool}

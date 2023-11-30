@@ -1,14 +1,14 @@
-{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Stack.Types.Build.ConstructPlan
-  ( NotOnlyLocal(..)
-  , ToolWarning(..)
-  , UnregisterState(..)
-  , AddDepRes(..)
-  , W(..)
-  , Ctx(..)
+  ( NotOnlyLocal (..)
+  , ToolWarning (..)
+  , UnregisterState (..)
+  , AddDepRes (..)
+  , W (..)
+  , Ctx (..)
   , M
-  , PackageInfo(..)
+  , PackageInfo (..)
   , CombinedMap
   , toTask
   , adrVersion
@@ -17,27 +17,27 @@ module Stack.Types.Build.ConstructPlan
 
 import qualified Data.List as L
 import qualified Data.Text as T
-import           Stack.Prelude hiding ( loadPackage )
-import           Stack.Types.DumpPackage ( DumpPackage )
-import           Stack.Types.GhcPkgId (GhcPkgId)
-import           Stack.Types.Package
-import           Stack.Types.EnvConfig
-import           Stack.Types.CompilerPaths
-import           Stack.Types.BuildConfig
-import           RIO.Process (HasProcessContext (processContextL))
-import           Stack.Types.Config (HasConfig (configL))
-import           Stack.Types.Runner
-import           Stack.Types.GHCVariant
-import           Stack.Types.Platform
-import           Stack.Types.Curator
-import           Stack.Types.ConfigureOpts
-import           Stack.Types.Build.Exception (ConstructPlanException)
+import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
+import           RIO.Process ( HasProcessContext (..) )
 import           RIO.State
-import           Stack.Types.Build
-import           Stack.Types.ParentMap
 import           RIO.Writer ( WriterT (..) )
-import           Generics.Deriving.Monoid (memptydefault, mappenddefault)
-import           Stack.Package (hasBuildableMainLibrary)
+import           Stack.Package ( hasBuildableMainLibrary )
+import           Stack.Prelude hiding ( loadPackage )
+import           Stack.Types.Build
+import           Stack.Types.Build.Exception ( ConstructPlanException )
+import           Stack.Types.BuildConfig
+import           Stack.Types.CompilerPaths
+import           Stack.Types.Config ( HasConfig (..) )
+import           Stack.Types.ConfigureOpts
+import           Stack.Types.Curator
+import           Stack.Types.DumpPackage ( DumpPackage )
+import           Stack.Types.EnvConfig
+import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           Stack.Types.GHCVariant
+import           Stack.Types.Package
+import           Stack.Types.ParentMap
+import           Stack.Types.Platform
+import           Stack.Types.Runner
 
 
 -- | Type representing information about packages, namely information about
@@ -212,7 +212,6 @@ data UnregisterState = UnregisterState
   , usKeep :: ![DumpPackage]
   , usAnyAdded :: !Bool
   }
-
 
 data NotOnlyLocal
   = NotOnlyLocal [PackageName] [Text]

@@ -31,8 +31,8 @@ import           Distribution.Simple ( Extension, Language )
 import           Distribution.Utils.Path ( PackageDir, SourceDir, SymbolicPath )
 import           GHC.Records ( HasField )
 import           Stack.Prelude
+import           Stack.Types.ComponentUtils ( StackUnqualCompName (..) )
 import           Stack.Types.Dependency ( DepValue )
-import           Stack.Types.ComponentUtils ( StackUnqualCompName(..) )
 
 -- | A type representing (unnamed) main library or sub-library components of a
 -- package.

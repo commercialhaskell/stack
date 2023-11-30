@@ -70,9 +70,9 @@ import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Package
-                   ( InstallMap, Installed (..), InstalledLibraryInfo (..), InstalledMap,
-                     LocalPackage (..), Package (..), PackageConfig (..), installedVersion
-                   , packageIdentifier
+                   ( InstallMap, Installed (..), InstalledLibraryInfo (..)
+                   , InstalledMap, LocalPackage (..), Package (..)
+                   , PackageConfig (..), installedVersion, packageIdentifier
                    )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )

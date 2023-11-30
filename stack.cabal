@@ -259,6 +259,7 @@ library
       Stack.Types.ApplyGhcOptions
       Stack.Types.ApplyProgOptions
       Stack.Types.Build
+      Stack.Types.Build.ConstructPlan
       Stack.Types.Build.Exception
       Stack.Types.BuildConfig
       Stack.Types.BuildOpts
@@ -271,6 +272,7 @@ library
       Stack.Types.CompilerPaths
       Stack.Types.Compiler
       Stack.Types.Component
+      Stack.Types.ComponentUtils
       Stack.Types.Config
       Stack.Types.Config.Exception
       Stack.Types.ConfigMonoid
@@ -330,8 +332,6 @@ library
   other-modules:
       GHC.Utils.GhcPkg.Main.Compat
       Stack.Config.ConfigureScript
-      Stack.Types.Build.ConstructPlan
-      Stack.Types.ComponentUtils
       Stack.Types.FileDigestCache
   autogen-modules:
       Build_stack
