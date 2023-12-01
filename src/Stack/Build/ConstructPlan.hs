@@ -39,9 +39,9 @@ import           Stack.Types.Build
                    , taskProvides, taskTargetIsMutable, toCachePkgSrc
                    )
 import           Stack.Types.Build.ConstructPlan
-                   ( AddDepRes (..), CombinedMap, Ctx (..), M, NotOnlyLocal (..)
-                   , PackageInfo (..), ToolWarning(..), UnregisterState (..)
-                   , W (..), adrHasLibrary, adrVersion, toTask
+                   ( AddDepRes (..), CombinedMap, Ctx (..), M, PackageInfo (..)
+                   , ToolWarning(..), UnregisterState (..), W (..)
+                   , adrHasLibrary, adrVersion, toTask
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -268,7 +268,7 @@ constructPlan
     let snapTasks = Map.keys $ Map.filter (\t -> taskLocation t == Snap) tasks
         snapExes = Map.keys $ Map.filter (== Snap) installExes
     unless (null snapTasks && null snapExes) $
-      throwIO $ NotOnlyLocal snapTasks snapExes
+      prettyThrowIO $ NotOnlyLocal snapTasks snapExes
     pure plan
 
   prunedGlobalDeps :: Map PackageName [PackageName]

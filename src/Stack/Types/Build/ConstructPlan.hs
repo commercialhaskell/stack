@@ -1,8 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module Stack.Types.Build.ConstructPlan
-  ( NotOnlyLocal (..)
-  , ToolWarning (..)
+  ( ToolWarning (..)
   , UnregisterState (..)
   , AddDepRes (..)
   , W (..)
@@ -15,8 +14,6 @@ module Stack.Types.Build.ConstructPlan
   , adrHasLibrary
   ) where
 
-import qualified Data.List as L
-import qualified Data.Text as T
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           RIO.Process ( HasProcessContext (..) )
 import           RIO.State ( StateT )
@@ -218,26 +215,6 @@ data UnregisterState = UnregisterState
   , usKeep :: ![DumpPackage]
   , usAnyAdded :: !Bool
   }
-
-data NotOnlyLocal
-  = NotOnlyLocal [PackageName] [Text]
-  deriving (Show, Typeable)
-
-instance Exception NotOnlyLocal where
-  displayException (NotOnlyLocal packages exes) = concat
-    [ "Error: [S-1727]\n"
-    , "Specified only-locals, but I need to build snapshot contents:\n"
-    , if null packages then "" else concat
-        [ "Packages: "
-        , L.intercalate ", " (map packageNameString packages)
-        , "\n"
-        ]
-    , if null exes then "" else concat
-        [ "Executables: "
-        , L.intercalate ", " (map T.unpack exes)
-        , "\n"
-        ]
-    ]
 
 -- | Warn about tools in the snapshot definition. States the tool name
 -- expected and the package name using it.
