@@ -8,9 +8,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
--- | A module providing the types that represent different sorts of components
--- of a package (library and sub-library, foreign library, executable, test
--- suite and benchmark).
+-- | A module providing a type representing the name of an \'unqualified\'
+-- component and related helper functions.
 module Stack.Types.ComponentUtils
   ( StackUnqualCompName (..)
   , fromCabalName

@@ -1,17 +1,19 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+-- | A module providing types and related helper functions used in module
+-- "Stack.Build.ConstructPlan".
 module Stack.Types.Build.ConstructPlan
-  ( ToolWarning (..)
-  , UnregisterState (..)
-  , AddDepRes (..)
-  , W (..)
-  , Ctx (..)
-  , M
-  , PackageInfo (..)
+  ( PackageInfo (..)
   , CombinedMap
+  , M
+  , W (..)
+  , AddDepRes (..)
   , toTask
   , adrVersion
   , adrHasLibrary
+  , Ctx (..)
+  , UnregisterState (..)
+  , ToolWarning (..)
   ) where
 
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
