@@ -72,6 +72,8 @@ import           Stack.Types.EnvConfig
                    )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
+import           Stack.Types.Package
+                   (InstalledLibraryInfo (..), installedGhcPkgId )
 import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
                    ( modificationTime, getFileStatus, setFileTimes )
@@ -262,14 +264,11 @@ flagCacheKey :: (HasEnvConfig env) => Installed -> RIO env ConfigCacheKey
 flagCacheKey installed = do
   installationRoot <- installationRootLocal
   case installed of
-    Library _ gid _ ->
-      pure $
-      configCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
-    Executable ident ->
-      pure $
-        configCacheKey
-          installationRoot
-          (ConfigCacheTypeFlagExecutable ident)
+    Library _ installedInfo -> do
+      let gid = iliId installedInfo
+      pure $ configCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
+    Executable ident -> pure $
+      configCacheKey installationRoot (ConfigCacheTypeFlagExecutable ident)
 
 -- | Loads the flag cache for the given installed extra-deps
 tryGetFlagCache :: HasEnvConfig env
@@ -378,28 +377,36 @@ writePrecompiledCache ::
   -> [GhcPkgId] -- ^ sub-libraries, in the GhcPkgId format
   -> Set Text -- ^ executables
   -> RIO env ()
-writePrecompiledCache baseConfigOpts loc copts buildHaddocks mghcPkgId subLibs exes = do
-  key <- getPrecompiledCacheKey loc copts buildHaddocks
-  ec <- view envConfigL
-  let stackRootRelative = makeRelative (view stackRootL ec)
-  mlibpath <- case mghcPkgId of
-    Executable _ -> pure Nothing
-    Library _ ipid _ -> Just <$> pathFromPkgId stackRootRelative ipid
-  subLibPaths <- mapM (pathFromPkgId stackRootRelative) subLibs
-  exes' <- forM (Set.toList exes) $ \exe -> do
-    name <- parseRelFile $ T.unpack exe
-    stackRootRelative $ bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
-  let precompiled = PrecompiledCache
-        { pcLibrary = mlibpath
-        , pcSubLibs = subLibPaths
-        , pcExes = exes'
-        }
-  savePrecompiledCache key precompiled
-  -- reuse precompiled cache with haddocks also in case when haddocks are not
-  -- required
-  when buildHaddocks $ do
-    key' <- getPrecompiledCacheKey loc copts False
-    savePrecompiledCache key' precompiled
+writePrecompiledCache
+    baseConfigOpts
+    loc
+    copts
+    buildHaddocks
+    mghcPkgId
+    subLibs
+    exes
+  = do
+      key <- getPrecompiledCacheKey loc copts buildHaddocks
+      ec <- view envConfigL
+      let stackRootRelative = makeRelative (view stackRootL ec)
+      mlibpath <-
+        traverse (pathFromPkgId stackRootRelative) (installedGhcPkgId mghcPkgId)
+      subLibPaths <- mapM (pathFromPkgId stackRootRelative) subLibs
+      exes' <- forM (Set.toList exes) $ \exe -> do
+        name <- parseRelFile $ T.unpack exe
+        stackRootRelative $
+          bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
+      let precompiled = PrecompiledCache
+            { pcLibrary = mlibpath
+            , pcSubLibs = subLibPaths
+            , pcExes = exes'
+            }
+      savePrecompiledCache key precompiled
+      -- reuse precompiled cache with haddocks also in case when haddocks are
+      -- not required
+      when buildHaddocks $ do
+        key' <- getPrecompiledCacheKey loc copts False
+        savePrecompiledCache key' precompiled
  where
   pathFromPkgId stackRootRelative ipid = do
     ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"

@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | Build the project.
@@ -19,8 +18,8 @@ import           Data.List.Extra ( groupSort )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import qualified Distribution.PackageDescription as C
-import           Distribution.Types.Dependency ( Dependency (..), depLibraries )
+-- import qualified Distribution.PackageDescription as C
+-- import           Distribution.Types.Dependency ( Dependency (..), depLibraries )
 import           Distribution.Version ( mkVersion )
 import           RIO.NonEmpty ( nonEmpty )
 import qualified RIO.NonEmpty as NE
@@ -63,11 +62,12 @@ import           Stack.Types.GlobalOpts ( globalOptsBuildOptsMonoidL )
 import           Stack.Types.NamedComponent ( exeComponents )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..)
-                   , PackageConfig (..), lpFiles, lpFilesForComponents )
+                   , PackageConfig (..), lpFiles, lpFilesForComponents
+                   )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap
-                   ( CommonPackage (..), ProjectPackage (..), SMTargets (..)
+                   ( SMTargets (..)
                    , SourceMap (..), Target (..) )
 import           System.Terminal ( fixCodePage )
 
@@ -137,8 +137,6 @@ build msetLocalFiles = do
     locals <- projectLocalPackages
     depsLocals <- localDependencies
     let allLocals = locals <> depsLocals
-
-    checkSubLibraryDependencies (Map.elems $ smProject sourceMap)
 
     boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
     -- Set local files, necessary for file watching
@@ -371,34 +369,3 @@ checkComponentsBuildable lps =
     | lp <- lps
     , c <- Set.toList (lpUnbuildable lp)
     ]
-
--- | Find if any sub-library dependency (other than internal libraries) exists
--- in each project package.
-checkSubLibraryDependencies :: HasTerm env => [ProjectPackage] -> RIO env ()
-checkSubLibraryDependencies projectPackages =
-  forM_ projectPackages $ \projectPackage -> do
-    C.GenericPackageDescription pkgDesc _ _ lib subLibs foreignLibs exes tests benches <-
-      liftIO $ cpGPD . ppCommon $ projectPackage
-
-    let pName = pkgName . C.package $ pkgDesc
-        dependencies = concatMap getDeps subLibs <>
-                       concatMap getDeps foreignLibs <>
-                       concatMap getDeps exes <>
-                       concatMap getDeps tests <>
-                       concatMap getDeps benches <>
-                       maybe [] C.condTreeConstraints lib
-        notInternal (Dependency pName' _ _) = pName' /= pName
-        publicDependencies = filter notInternal dependencies
-        publicLibraries = concatMap (toList . depLibraries) publicDependencies
-
-    when (subLibDepExist publicLibraries) $
-      prettyWarnS
-        "Sublibrary dependency is not supported, this will almost certainly \
-        \fail."
- where
-  getDeps (_, C.CondNode _ dep _) = dep
-  subLibDepExist = any
-    ( \case
-        C.LSubLibName _ -> True
-        C.LMainLibName  -> False
-    )

@@ -10,6 +10,7 @@ module Stack.Build.Installed
 
 import           Data.Conduit ( ZipSink (..), getZipSink )
 import qualified Data.Conduit.List as CL
+import           Data.Foldable ( Foldable (..) )
 import qualified Data.Set as Set
 import qualified Data.Map.Strict as Map
 import           Stack.Build.Cache ( getInstalledExes )
@@ -19,7 +20,10 @@ import           Stack.PackageDump
 import           Stack.Prelude
 import           Stack.SourceMap ( getPLIVersion, loadVersion )
 import           Stack.Types.CompilerPaths ( getGhcPkgExe )
-import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.DumpPackage
+                   ( DumpPackage (..), SublibDump (..), dpParentLibIdent
+                   , sdPackageName
+                   )
 import           Stack.Types.EnvConfig
                     ( HasEnvConfig, packageDatabaseDeps, packageDatabaseExtra
                     , packageDatabaseLocal
@@ -27,9 +31,9 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Package
                    ( InstallLocation (..), InstallMap, Installed (..)
-                   , InstalledMap, InstalledPackageLocation (..)
-                   , PackageDatabase (..), PackageDbVariety (..)
-                   , toPackageDbVariety
+                   , InstalledLibraryInfo (..), InstalledMap
+                   , InstalledPackageLocation (..), PackageDatabase (..)
+                   , PackageDbVariety (..), toPackageDbVariety
                    )
 import           Stack.Types.SourceMap
                    ( DepPackage (..), ProjectPackage (..), SourceMap (..) )
@@ -75,7 +79,8 @@ getInstalled {-opts-} installMap = do
     loadDatabase' (UserPkgDb (InstalledTo Snap) snapDBPath) installedLibs1
   (installedLibs3, localDumpPkgs) <-
     loadDatabase' (UserPkgDb (InstalledTo Local) localDBPath) installedLibs2
-  let installedLibs = Map.fromList $ map lhPair installedLibs3
+  let installedLibs =
+        foldr' gatherAndTransformSubLoadHelper mempty installedLibs3
 
   -- Add in the executables that are installed, making sure to only trust a
   -- listed installation under the right circumstances (see below)
@@ -239,6 +244,7 @@ isAllowed installMap pkgDb dp = case Map.lookup name installMap of
 data LoadHelper = LoadHelper
   { lhId :: !GhcPkgId
     -- ^ The package's id.
+  , lhSublibrary :: !(Maybe SublibDump)
   , lhDeps :: ![GhcPkgId]
     -- ^ Unless the package's name is that of a 'wired-in' package, a list of
     -- the ids of the installed packages that are the package's dependencies.
@@ -261,12 +267,14 @@ toLoadHelper pkgDb dp = LoadHelper
       if name `Set.member` wiredInPackages
         then []
         else dpDepends dp
+  , lhSublibrary = dpSublib dp
   , lhPair =
       ( name
-      , (toInstallLocation pkgDb, Library ident gid (Right <$> dpLicense dp))
+      , (toInstallLocation pkgDb, Library ident installedLibInfo)
       )
   }
  where
+  installedLibInfo = InstalledLibraryInfo gid (Right <$> dpLicense dp) mempty
   gid = dpGhcPkgId dp
   ident@(PackageIdentifier name _) = dpPackageIdent dp
 
@@ -275,3 +283,40 @@ toLoadHelper pkgDb dp = LoadHelper
   toInstallLocation ExtraDb = Snap
   toInstallLocation WriteOnlyDb = Snap
   toInstallLocation MutableDb = Local
+
+-- | This is where sublibraries and main libraries are assembled into a single
+-- entity Installed package, where all ghcPkgId live.
+gatherAndTransformSubLoadHelper ::
+     LoadHelper
+  -> Map PackageName (InstallLocation, Installed)
+  -> Map PackageName (InstallLocation, Installed)
+gatherAndTransformSubLoadHelper lh =
+  Map.insertWith onPreviousLoadHelper key value
+ where
+  -- Here we assume that both have the same location which already was a prior
+  -- assumption in Stack.
+  onPreviousLoadHelper
+      (pLoc, Library pn incomingLibInfo)
+      (_, Library _ existingLibInfo)
+    = ( pLoc
+      , Library pn existingLibInfo
+          { iliSublib = Map.union
+              (iliSublib incomingLibInfo)
+              (iliSublib existingLibInfo)
+          , iliId = if isJust $ lhSublibrary lh
+                      then iliId existingLibInfo
+                      else iliId incomingLibInfo
+          }
+      )
+  onPreviousLoadHelper newVal _oldVal = newVal
+  (key, value) = case lhSublibrary lh of
+    Nothing -> (rawPackageName, rawValue)
+    Just sd -> (sdPackageName sd, updateAsSublib sd <$> rawValue)
+  (rawPackageName, rawValue) = lhPair lh
+  updateAsSublib
+      sd
+      (Library (PackageIdentifier _sublibMungedPackageName version) libInfo)
+    = Library
+        (PackageIdentifier key version)
+        libInfo {iliSublib = Map.singleton (sdLibraryName sd) (iliId libInfo)}
+  updateAsSublib _ v = v

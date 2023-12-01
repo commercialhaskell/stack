@@ -21,13 +21,17 @@ import qualified Data.Conduit.Text as CT
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Distribution.Text as C
+import           Distribution.Types.MungedPackageName
+                   ( decodeCompatPackageName )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           RIO.Process ( HasProcessContext )
 import qualified RIO.Text as T
+import           Stack.Component ( fromCabalName )
 import           Stack.GhcPkg ( createDatabase )
 import           Stack.Prelude
 import           Stack.Types.CompilerPaths ( GhcPkgExe (..), HasCompiler (..) )
-import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.Component ( StackUnqualCompName(..) )
+import           Stack.Types.DumpPackage ( DumpPackage (..), SublibDump (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId )
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -224,10 +228,16 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
 
       -- Handle sub-libraries by recording the name of the parent library
       -- If name of parent library is missing, this is not a sub-library.
-      let mkParentLib n = PackageIdentifier n version
-          parentLib = mkParentLib <$> (parseS "package-name" >>=
-                                       parsePackageNameThrowing . T.unpack)
-
+      let maybePackageName :: Maybe PackageName =
+            parseS "package-name" >>= parsePackageNameThrowing . T.unpack
+      let maybeLibName = parseS "lib-name"
+      let getLibNameFromLegacyName = case decodeCompatPackageName name of
+            MungedPackageName _parentPackageName (LSubLibName libName) ->
+              fromCabalName libName
+            MungedPackageName _parentPackageName _ -> ""
+      let libName =
+            maybe getLibNameFromLegacyName StackUnqualCompName maybeLibName
+      let subLibDump = flip SublibDump libName <$> maybePackageName
       let parseQuoted key =
             case mapM (P.parseOnly (argsParser NoEscaping)) val of
               Left{} -> throwM (Couldn'tParseField key val)
@@ -241,7 +251,7 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
       pure $ Just DumpPackage
         { dpGhcPkgId = ghcPkgId
         , dpPackageIdent = PackageIdentifier name version
-        , dpParentLibIdent = parentLib
+        , dpSublib = subLibDump
         , dpLicense = license
         , dpLibDirs = libDirPaths
         , dpLibraries = T.words $ T.unwords libraries

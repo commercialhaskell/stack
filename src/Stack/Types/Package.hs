@@ -10,6 +10,7 @@ module Stack.Types.Package
   , InstallLocation (..)
   , InstallMap
   , Installed (..)
+  , InstalledLibraryInfo (..)
   , InstalledPackageLocation (..)
   , InstalledMap
   , LocalPackage (..)
@@ -26,7 +27,11 @@ module Stack.Types.Package
   , dotCabalMainPath
   , dotCabalModule
   , dotCabalModulePath
+  , installedGhcPkgId
+  , installedLibraryInfoFromGhcPkgId
+  , installedMapGhcPkgId
   , installedPackageIdentifier
+  , installedToPackageIdOpt
   , installedVersion
   , lpFiles
   , lpFilesForComponents
@@ -35,6 +40,8 @@ module Stack.Types.Package
   , packageIdentifier
   , psVersion
   , runMemoizedWith
+  , simpleInstalledLib
+  , toCabalMungedPackageName
   , toPackageDbVariety
   ) where
 
@@ -50,6 +57,8 @@ import           Distribution.License ( License )
 import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription ( BuildType )
 import           Distribution.System ( Platform (..) )
+import           Distribution.Types.MungedPackageName
+                   ( encodeCompatPackageName )
 import qualified RIO.Text as T
 import           Stack.Prelude
 import           Stack.Types.CompCollection ( CompCollection )
@@ -57,10 +66,12 @@ import           Stack.Types.Compiler ( ActualCompiler )
 import           Stack.Types.Component
                    ( StackBenchmark, StackBuildInfo, StackExecutable
                    , StackForeignLibrary, StackLibrary, StackTestSuite
+                   , StackUnqualCompName
                    )
+import           Stack.Types.ComponentUtils (toCabalName)
 import           Stack.Types.Dependency ( DepValue )
 import           Stack.Types.EnvConfig ( EnvConfig, HasEnvConfig (..) )
-import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.PackageFile
                    ( DotCabalDescriptor (..), DotCabalPath (..)
@@ -154,8 +165,6 @@ data Package = Package
     -- ^ Version of the package
   , packageLicense :: !(Either SPDX.License License)
     -- ^ The license the package was released under.
-  , packageSubLibDeps :: !(Map MungedPackageName DepValue)
-    -- ^ Original sub-library dependencies (not sieved).
   , packageGhcOptions :: ![Text]
     -- ^ Ghc options used on package.
   , packageCabalConfigOpts :: ![Text]
@@ -459,9 +468,35 @@ dotCabalGetPath dcp =
 -- information about what is installed.
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
+data InstalledLibraryInfo = InstalledLibraryInfo
+  { iliId :: GhcPkgId
+  , iliLicense :: Maybe (Either SPDX.License License)
+  , iliSublib :: Map StackUnqualCompName GhcPkgId
+  }
+  deriving (Eq, Show)
+
+installedLibraryInfoFromGhcPkgId :: GhcPkgId -> InstalledLibraryInfo
+installedLibraryInfoFromGhcPkgId ghcPkgId =
+  InstalledLibraryInfo ghcPkgId Nothing mempty
+
+simpleInstalledLib ::
+     PackageIdentifier
+  -> GhcPkgId
+  -> Map StackUnqualCompName GhcPkgId
+  -> Installed
+simpleInstalledLib pkgIdentifier ghcPkgId =
+  Library pkgIdentifier . InstalledLibraryInfo ghcPkgId Nothing
+
+installedToPackageIdOpt :: InstalledLibraryInfo -> [String]
+installedToPackageIdOpt libInfo =
+  M.foldr' (iterator (++)) (pure $ toStr (iliId libInfo)) (iliSublib libInfo)
+ where
+  toStr ghcPkgId = "-package-id=" <> ghcPkgIdString ghcPkgId
+  iterator op ghcPkgId acc = pure (toStr ghcPkgId) `op` acc
+
 -- | Type representing information about what is installed.
 data Installed
-  = Library PackageIdentifier GhcPkgId (Maybe (Either SPDX.License License))
+  = Library PackageIdentifier InstalledLibraryInfo
     -- ^ A library, including its installed package id and, optionally, its
     -- license.
   | Executable PackageIdentifier
@@ -469,14 +504,47 @@ data Installed
   deriving (Eq, Show)
 
 installedPackageIdentifier :: Installed -> PackageIdentifier
-installedPackageIdentifier (Library pid _ _) = pid
+installedPackageIdentifier (Library pid _) = pid
 installedPackageIdentifier (Executable pid) = pid
+
+installedGhcPkgId :: Installed -> Maybe GhcPkgId
+installedGhcPkgId (Library _ libInfo) = Just $ iliId libInfo
+installedGhcPkgId (Executable _) = Nothing
 
 -- | Get the installed Version.
 installedVersion :: Installed -> Version
 installedVersion i =
   let PackageIdentifier _ version = installedPackageIdentifier i
   in  version
+
+-- | Gathers all the GhcPkgId provided by a library into a map
+installedMapGhcPkgId ::
+     PackageIdentifier
+  -> InstalledLibraryInfo
+  -> Map PackageIdentifier GhcPkgId
+installedMapGhcPkgId pkgId@(PackageIdentifier pkgName version) installedLib =
+  finalMap
+ where
+  finalMap = M.insert pkgId (iliId installedLib) baseMap
+  baseMap =
+    M.mapKeysMonotonic (toCabalMungedPackageIdentifier pkgName version) $
+      iliSublib installedLib
+
+-- | Creates a 'MungedPackageName' identifier.
+toCabalMungedPackageIdentifier ::
+     PackageName
+  -> Version
+  -> StackUnqualCompName
+  -> PackageIdentifier
+toCabalMungedPackageIdentifier pkgName version = flip PackageIdentifier version
+  . encodeCompatPackageName . toCabalMungedPackageName pkgName
+
+toCabalMungedPackageName ::
+     PackageName
+  -> StackUnqualCompName
+  -> MungedPackageName
+toCabalMungedPackageName pkgName =
+  MungedPackageName pkgName . LSubLibName . toCabalName
 
 -- | Type representing inputs to 'Stack.Package.generateBuildInfoOpts'.
 data BioInput = BioInput

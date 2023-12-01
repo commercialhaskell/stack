@@ -375,14 +375,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Stack.Types.Build.BuildPrettyException`
 
         ~~~haskell
-        [S-4804] | ConstructPlanFailed [ConstructPlanException] (Path Abs File) (Path Abs Dir) ParentMap (Set PackageName) (Map PackageName [PackageName])
+        [S-4804] = ConstructPlanFailed [ConstructPlanException] (Path Abs File) (Path Abs Dir) ParentMap (Set PackageName) (Map PackageName [PackageName])
         [S-7282] | ExecutionFailure [SomeException]
         [S-7011] | CabalExitedUnsuccessfully ExitCode PackageIdentifier (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
         [S-6374] | SetupHsBuildFailure ExitCode (Maybe PackageIdentifier) (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
         [S-8506] | TargetParseException [StyleDoc]
         [S-7086] | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
         [S-8664] | InvalidFlagSpecification (Set UnusedFlags)
-        [S-8100] = GHCProfOptionInvalid
+        [S-8100] | GHCProfOptionInvalid
+        [S-1727] | NotOnlyLocal [PackageName] [Text]
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`

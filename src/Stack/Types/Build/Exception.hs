@@ -285,6 +285,7 @@ data BuildPrettyException
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   | InvalidFlagSpecification (Set UnusedFlags)
   | GHCProfOptionInvalid
+  | NotOnlyLocal [PackageName] [Text]
   deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
@@ -393,6 +394,29 @@ instance Pretty BuildPrettyException where
          , flow "flags. See:"
          , style Url "https://github.com/commercialhaskell/stack/issues/1015" <> "."
          ]
+  pretty (NotOnlyLocal packages exes) =
+    "[S-1727]"
+    <> line
+    <> flow "Specified only-locals, but Stack needs to build snapshot contents:"
+    <> line
+    <> if null packages
+         then mempty
+         else
+              fillSep
+                ( "Packages:"
+                : mkNarrativeList Nothing False
+                    (map fromPackageName packages :: [StyleDoc])
+                )
+           <> line
+    <> if null exes
+         then mempty
+         else
+              fillSep
+                ( "Executables:"
+                : mkNarrativeList Nothing False
+                    (map (fromString . T.unpack) exes :: [StyleDoc])
+                )
+           <> line
 
 instance Exception BuildPrettyException
 

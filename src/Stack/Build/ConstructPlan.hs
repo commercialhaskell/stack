@@ -9,7 +9,6 @@ module Stack.Build.ConstructPlan
   ) where
 
 import           Control.Monad.Trans.Maybe ( MaybeT (..) )
-import qualified Data.List as L
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Map.Strict as Map
 import           Data.Monoid.Map ( MonoidMap(..) )
@@ -17,11 +16,9 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Types.BuildType ( BuildType (Configure) )
 import           Distribution.Types.PackageName ( mkPackageName )
-import           Distribution.Types.VersionRange ( VersionRange )
-import           Generics.Deriving.Monoid ( memptydefault, mappenddefault )
 import           Path ( parent )
 import qualified RIO.NonEmpty as NE
-import           RIO.Process ( HasProcessContext (..), findExecutable )
+import           RIO.Process ( findExecutable )
 import           RIO.State
                    ( State, StateT (..), execState, get, modify, modify', put )
 import           RIO.Writer ( WriterT (..), pass, tell )
@@ -30,8 +27,7 @@ import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
 import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
-                   ( applyForceCustomBuild, buildableExes
-                   , hasBuildableMainLibrary, packageUnknownTools
+                   ( applyForceCustomBuild, buildableExes, packageUnknownTools
                    , processPackageDepsToList
                    )
 import           Stack.Prelude hiding ( loadPackage )
@@ -41,6 +37,11 @@ import           Stack.Types.Build
                    , TaskConfigOpts (..), TaskType (..)
                    , installLocationIsMutable, taskIsTarget, taskLocation
                    , taskProvides, taskTargetIsMutable, toCachePkgSrc
+                   )
+import           Stack.Types.Build.ConstructPlan
+                   ( AddDepRes (..), CombinedMap, Ctx (..), M, PackageInfo (..)
+                   , ToolWarning(..), UnregisterState (..), W (..)
+                   , adrHasLibrary, adrVersion, toTask
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -59,12 +60,10 @@ import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..), configureOpts )
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
-import           Stack.Types.DumpPackage ( DumpPackage (..) )
-import           Stack.Types.EnvConfig
-                   ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
+import           Stack.Types.DumpPackage ( DumpPackage (..), dpParentLibIdent )
+import           Stack.Types.EnvConfig ( EnvConfig (..), HasEnvConfig (..) )
 import           Stack.Types.EnvSettings
                    ( EnvSettings (..), minimalEnvSettings )
-import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.IsMutable ( IsMutable (..) )
@@ -72,11 +71,9 @@ import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
                    ( ExeName (..), InstallLocation (..), Installed (..)
                    , InstalledMap, LocalPackage (..), Package (..)
-                   , PackageSource (..), installedVersion, packageIdentifier
-                   , psVersion, runMemoizedWith
+                   , PackageSource (..), installedMapGhcPkgId, installedVersion
+                   , packageIdentifier, psVersion, runMemoizedWith
                    )
-import           Stack.Types.ParentMap ( ParentMap )
-import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.ProjectConfig ( isPCGlobalProject )
 import           Stack.Types.Runner ( HasRunner (..), globalOptsL )
 import           Stack.Types.SourceMap
@@ -84,196 +81,10 @@ import           Stack.Types.SourceMap
                    , GlobalPackage (..), SMTargets (..), SourceMap (..)
                    )
 import           Stack.Types.Version
-                   ( latestApplicableVersion, versionRangeText, withinRange )
+                   ( VersionRange, latestApplicableVersion, versionRangeText
+                   , withinRange
+                   )
 import           System.Environment ( lookupEnv )
-
--- | Type representing information about packages, namely information about
--- whether or not a package is already installed and, unless the package is not
--- to be built (global packages), where its source code is located.
-data PackageInfo
-  = PIOnlyInstalled InstallLocation Installed
-    -- ^ This indicates that the package is already installed, and that we
-    -- shouldn't build it from source. This is only the case for global
-    -- packages.
-  | PIOnlySource PackageSource
-    -- ^ This indicates that the package isn't installed, and we know where to
-    -- find its source.
-  | PIBoth PackageSource Installed
-    -- ^ This indicates that the package is installed and we know where to find
-    -- its source. We may want to reinstall from source.
-  deriving Show
-
--- | A function to yield a 'PackageInfo' value from: (1) a 'PackageSource'
--- value; and (2) a pair of an 'InstallLocation' value and an 'Installed' value.
--- Checks that the version of the 'PackageSource' value and the version of the
--- `Installed` value are the same.
-combineSourceInstalled :: PackageSource
-                       -> (InstallLocation, Installed)
-                       -> PackageInfo
-combineSourceInstalled ps (location, installed) =
-  assert (psVersion ps == installedVersion installed) $
-    case location of
-      -- Always trust something in the snapshot
-      Snap -> PIOnlyInstalled location installed
-      Local -> PIBoth ps installed
-
--- | A type synonym representing dictionaries of package names, and combined
--- information about the package in respect of whether or not it is already
--- installed and, unless the package is not to be built (global packages), where
--- its source code is located.
-type CombinedMap = Map PackageName PackageInfo
-
--- | A function to yield a 'CombinedMap' value from: (1) a dictionary of package
--- names, and where the source code of the named package is located; and (2) an
--- 'InstalledMap' value.
-combineMap :: Map PackageName PackageSource -> InstalledMap -> CombinedMap
-combineMap = Map.merge
-  (Map.mapMissing (\_ s -> PIOnlySource s))
-  (Map.mapMissing (\_ i -> uncurry PIOnlyInstalled i))
-  (Map.zipWithMatched (\_ s i -> combineSourceInstalled s i))
-
--- | Type synonym representing values used during the construction of a build
--- plan. The type is an instance of 'Monad', hence its name.
-type M =
-  WriterT
-    W
-    -- ^ The output to be collected
-    ( StateT
-        (Map PackageName (Either ConstructPlanException AddDepRes))
-        -- ^ Library map
-        (RIO Ctx)
-    )
-
--- | Type representing values used as the output to be collected during the
--- construction of a build plan.
-data W = W
-  { wFinals :: !(Map PackageName (Either ConstructPlanException Task))
-    -- ^ A dictionary of package names, and either a final task to perform when
-    -- building the package or an exception.
-  , wInstall :: !(Map Text InstallLocation)
-    -- ^ A dictionary of executables to be installed, and location where the
-    -- executable's binary is placed.
-  , wDirty :: !(Map PackageName Text)
-    -- ^ A dictionary of local packages, and the reason why the local package is
-    -- considered dirty.
-  , wWarnings :: !([StyleDoc] -> [StyleDoc])
-    -- ^ Warnings.
-  , wParents :: !ParentMap
-    -- ^ A dictionary of package names, and a list of pairs of the identifier
-    -- of a package depending on the package and the version range specified for
-    -- the dependency by that package. Used in the reporting of failure to
-    -- construct a build plan.
-  }
-  deriving Generic
-
-instance Semigroup W where
-  (<>) = mappenddefault
-
-instance Monoid W where
-  mempty = memptydefault
-  mappend = (<>)
-
--- | Type representing results of 'addDep'.
-data AddDepRes
-  = ADRToInstall Task
-    -- ^ A task must be performed to provide the package name.
-  | ADRFound InstallLocation Installed
-    -- ^ An existing installation provides the package name.
-  deriving Show
-
-toTask :: AddDepRes -> Maybe Task
-toTask (ADRToInstall task) = Just task
-toTask (ADRFound _ _) = Nothing
-
-adrVersion :: AddDepRes -> Version
-adrVersion (ADRToInstall task) = pkgVersion $ taskProvides task
-adrVersion (ADRFound _ installed) = installedVersion installed
-
-adrHasLibrary :: AddDepRes -> Bool
-adrHasLibrary (ADRToInstall task) = case taskType task of
-  TTLocalMutable lp -> packageHasLibrary $ lpPackage lp
-  TTRemotePackage _ p _ -> packageHasLibrary p
- where
-  -- make sure we consider sub-libraries as libraries too
-  packageHasLibrary :: Package -> Bool
-  packageHasLibrary p =
-    hasBuildableMainLibrary p || not (null (packageSubLibraries p))
-adrHasLibrary (ADRFound _ Library{}) = True
-adrHasLibrary (ADRFound _ Executable{}) = False
-
--- | Type representing values used as the environment to be read from during the
--- construction of a build plan (the \'context\').
-data Ctx = Ctx
-  { baseConfigOpts :: !BaseConfigOpts
-    -- ^ Basic information used to determine configure options
-  , loadPackage    :: !(  PackageLocationImmutable
-                       -> Map FlagName Bool
-                       -> [Text]
-                          -- ^ GHC options.
-                       -> [Text]
-                          -- ^ Cabal configure options.
-                       -> M Package
-                       )
-  , combinedMap    :: !CombinedMap
-    -- ^ A dictionary of package names, and combined information about the
-    -- package in respect of whether or not it is already installed and, unless
-    -- the package is not to be built (global packages), where its source code
-    -- is located.
-  , ctxEnvConfig   :: !EnvConfig
-    -- ^ Configuration after the environment has been setup.
-  , callStack      :: ![PackageName]
-  , wanted         :: !(Set PackageName)
-  , localNames     :: !(Set PackageName)
-  , mcurator       :: !(Maybe Curator)
-  , pathEnvVar     :: !Text
-  }
-
-instance HasPlatform Ctx where
-  platformL = configL.platformL
-  {-# INLINE platformL #-}
-  platformVariantL = configL.platformVariantL
-  {-# INLINE platformVariantL #-}
-
-instance HasGHCVariant Ctx where
-  ghcVariantL = configL.ghcVariantL
-  {-# INLINE ghcVariantL #-}
-
-instance HasLogFunc Ctx where
-  logFuncL = configL.logFuncL
-
-instance HasRunner Ctx where
-  runnerL = configL.runnerL
-
-instance HasStylesUpdate Ctx where
-  stylesUpdateL = runnerL.stylesUpdateL
-
-instance HasTerm Ctx where
-  useColorL = runnerL.useColorL
-  termWidthL = runnerL.termWidthL
-
-instance HasConfig Ctx where
-  configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
-  {-# INLINE configL #-}
-
-instance HasPantryConfig Ctx where
-  pantryConfigL = configL.pantryConfigL
-
-instance HasProcessContext Ctx where
-  processContextL = configL.processContextL
-
-instance HasBuildConfig Ctx where
-  buildConfigL = envConfigL.lens
-    envConfigBuildConfig
-    (\x y -> x { envConfigBuildConfig = y })
-
-instance HasSourceMap Ctx where
-  sourceMapL = envConfigL.sourceMapL
-
-instance HasCompiler Ctx where
-  compilerPathsL = envConfigL.compilerPathsL
-
-instance HasEnvConfig Ctx where
-  envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
 
 -- | Computes a build plan. This means figuring out which build 'Task's to take,
 -- and the interdependencies among the build 'Task's. In particular:
@@ -457,7 +268,7 @@ constructPlan
     let snapTasks = Map.keys $ Map.filter (\t -> taskLocation t == Snap) tasks
         snapExes = Map.keys $ Map.filter (== Snap) installExes
     unless (null snapTasks && null snapExes) $
-      throwIO $ NotOnlyLocal snapTasks snapExes
+      prettyThrowIO $ NotOnlyLocal snapTasks snapExes
     pure plan
 
   prunedGlobalDeps :: Map PackageName [PackageName]
@@ -492,34 +303,6 @@ constructPlan
           lp <- loadLocalPackage' pp
           pure $ PSFilePath lp
     pure $ pPackages <> deps
-
-data NotOnlyLocal
-  = NotOnlyLocal [PackageName] [Text]
-  deriving (Show, Typeable)
-
-instance Exception NotOnlyLocal where
-  displayException (NotOnlyLocal packages exes) = concat
-    [ "Error: [S-1727]\n"
-    , "Specified only-locals, but I need to build snapshot contents:\n"
-    , if null packages then "" else concat
-        [ "Packages: "
-        , L.intercalate ", " (map packageNameString packages)
-        , "\n"
-        ]
-    , if null exes then "" else concat
-        [ "Executables: "
-        , L.intercalate ", " (map T.unpack exes)
-        , "\n"
-        ]
-    ]
-
--- | State to be maintained during the calculation of local packages
--- to unregister.
-data UnregisterState = UnregisterState
-  { usToUnregister :: !(Map GhcPkgId (PackageIdentifier, Text))
-  , usKeep :: ![DumpPackage]
-  , usAnyAdded :: !Bool
-  }
 
 -- | Determine which packages to unregister based on the given tasks and
 -- already registered local packages.
@@ -1203,8 +986,11 @@ processAdr adr = case adr of
     (Set.singleton $ taskProvides task, Map.empty, taskTargetIsMutable task)
   ADRFound loc (Executable _) ->
     (Set.empty, Map.empty, installLocationIsMutable loc)
-  ADRFound loc (Library ident gid _) ->
-    (Set.empty, Map.singleton ident gid, installLocationIsMutable loc)
+  ADRFound loc (Library ident installedInfo) ->
+    ( Set.empty
+    , installedMapGhcPkgId ident installedInfo
+    , installLocationIsMutable loc
+    )
 
 checkDirtiness ::
      PackageSource
@@ -1393,12 +1179,6 @@ checkAndWarnForUnknownTools p = do
   warn name = MaybeT . pure . Just $ ToolWarning (ExeName name) (packageName p)
   skipIf p' = pure $ if p' then Nothing else Just ()
 
--- | Warn about tools in the snapshot definition. States the tool name
--- expected and the package name using it.
-data ToolWarning
-  = ToolWarning ExeName PackageName
-  deriving Show
-
 toolWarningText :: ToolWarning -> StyleDoc
 toolWarningText (ToolWarning (ExeName toolName) pkgName') = fillSep
   [ flow "No packages found in snapshot which provide a"
@@ -1420,7 +1200,7 @@ inSnapshot name version = do
       PIBoth (PSRemote _ srcVersion FromSnapshot _) _ ->
         pure $ srcVersion == version
       -- OnlyInstalled occurs for global database
-      PIOnlyInstalled loc (Library pid _gid _lic) ->
+      PIOnlyInstalled loc (Library pid _) ->
         assert (loc == Snap) $
         assert (pkgVersion pid == version) $
         Just True
@@ -1437,3 +1217,26 @@ logDebugPlanS ::
 logDebugPlanS s msg = do
   debugPlan <- view $ globalOptsL.to globalPlanInLog
   when debugPlan $ logDebugS s msg
+
+-- | A function to yield a 'PackageInfo' value from: (1) a 'PackageSource'
+-- value; and (2) a pair of an 'InstallLocation' value and an 'Installed' value.
+-- Checks that the version of the 'PackageSource' value and the version of the
+-- `Installed` value are the same.
+combineSourceInstalled :: PackageSource
+                       -> (InstallLocation, Installed)
+                       -> PackageInfo
+combineSourceInstalled ps (location, installed) =
+  assert (psVersion ps == installedVersion installed) $
+    case location of
+      -- Always trust something in the snapshot
+      Snap -> PIOnlyInstalled location installed
+      Local -> PIBoth ps installed
+
+-- | A function to yield a 'CombinedMap' value from: (1) a dictionary of package
+-- names, and where the source code of the named package is located; and (2) an
+-- 'InstalledMap' value.
+combineMap :: Map PackageName PackageSource -> InstalledMap -> CombinedMap
+combineMap = Map.merge
+  (Map.mapMissing (\_ s -> PIOnlySource s))
+  (Map.mapMissing (\_ i -> uncurry PIOnlyInstalled i))
+  (Map.zipWithMatched (\_ s i -> combineSourceInstalled s i))

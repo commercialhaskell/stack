@@ -24,6 +24,7 @@ module Stack.Component
   , foldOnNameAndBuildInfo
   , stackUnqualToQual
   , processDependencies
+  , fromCabalName
   ) where
 
 import           Data.Foldable ( foldr' )
@@ -35,7 +36,6 @@ import           Distribution.PackageDescription
                    , TestSuite (..)
                    )
 import           Distribution.Types.BuildInfo ( BuildInfo )
-import           Distribution.Types.UnqualComponentName ( UnqualComponentName )
 import           Distribution.Package ( mkPackageName )
 import qualified Distribution.PackageDescription as Cabal
 import           GHC.Records ( HasField )
@@ -46,13 +46,10 @@ import           Stack.Types.Component
                    , StackLibrary (..), StackTestSuite (..)
                    , StackUnqualCompName (..)
                    )
+import           Stack.Types.ComponentUtils ( fromCabalName )
 import           Stack.Types.Dependency
                    ( DepValue, cabalExeToStackDep, cabalToStackDep )
 import           Stack.Types.NamedComponent ( NamedComponent )
-
-fromCabalName :: UnqualComponentName -> StackUnqualCompName
-fromCabalName unqualName =
-  StackUnqualCompName $ pack . Cabal.unUnqualComponentName $ unqualName
 
 stackUnqualToQual ::
      (Text -> NamedComponent)

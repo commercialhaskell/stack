@@ -4,6 +4,8 @@
 
 Release notes:
 
+* After an upgrade from an earlier version of Stack, on first use only,
+  Stack 2.14.0 may warn that it had trouble loading the CompilerPaths cache.
 * The hash used as a key for Stack's pre-compiled package cache has changed,
   following the dropping of support for Cabal versions older than `1.24.0.0`.
 
@@ -28,6 +30,8 @@ Behavior changes:
 Other enhancements:
 
 * Consider GHC 9.8 to be a tested compiler and remove warnings.
+* Stack can build packages with dependencies on public sub-libraries of other
+  packages.
 * Add flag `--no-init` to Stack's `new` command to skip the initialisation of
   the newly-created project for use with Stack.
 * The HTML file paths produced at the end of `stack haddock` are printed on
