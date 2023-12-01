@@ -1,4 +1,4 @@
-resolver: lts-21.16
+resolver: lts-21.22
 
 packages:
 - ./local-mmorph

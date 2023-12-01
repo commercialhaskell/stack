@@ -569,7 +569,7 @@ for each file.
 
 [Stan](https://hackage.haskell.org/package/stan) is a Haskell static analysis
 tool. As of `stan-0.1.0.1`, it supports GHC >= 9.6.3 and Stack is built with
-GHC 9.4.7. The tool is configured by the contents of the `.stan.toml` file.
+GHC 9.4.8. The tool is configured by the contents of the `.stan.toml` file.
 
 This workflow will run if:
 
