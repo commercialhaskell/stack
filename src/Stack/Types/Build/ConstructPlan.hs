@@ -19,26 +19,32 @@ import qualified Data.List as L
 import qualified Data.Text as T
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           RIO.Process ( HasProcessContext (..) )
-import           RIO.State
+import           RIO.State ( StateT )
 import           RIO.Writer ( WriterT (..) )
 import           Stack.Package ( hasBuildableMainLibrary )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.Types.Build
+                    ( Task (..), TaskType (..), taskProvides )
 import           Stack.Types.Build.Exception ( ConstructPlanException )
 import           Stack.Types.BuildConfig
-import           Stack.Types.CompilerPaths
+                   ( BuildConfig (..), HasBuildConfig(..) )
+import           Stack.Types.CompilerPaths ( HasCompiler (..) )
 import           Stack.Types.Config ( HasConfig (..) )
-import           Stack.Types.ConfigureOpts
-import           Stack.Types.Curator
+import           Stack.Types.ConfigureOpts ( BaseConfigOpts )
+import           Stack.Types.Curator ( Curator )
 import           Stack.Types.DumpPackage ( DumpPackage )
 import           Stack.Types.EnvConfig
+                   ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
-import           Stack.Types.GHCVariant
+import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.Package
-import           Stack.Types.ParentMap
-import           Stack.Types.Platform
-import           Stack.Types.Runner
-
+                   ( ExeName (..), InstallLocation, Installed (..)
+                   , LocalPackage (..), Package (..), PackageSource (..)
+                   , installedVersion
+                   )
+import           Stack.Types.ParentMap ( ParentMap )
+import           Stack.Types.Platform ( HasPlatform (..) )
+import           Stack.Types.Runner ( HasRunner (..) )
 
 -- | Type representing information about packages, namely information about
 -- whether or not a package is already installed and, unless the package is not
