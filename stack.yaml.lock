@@ -110,12 +110,12 @@ packages:
   original:
     hackage: optparse-generic-1.5.1@sha256:c65a7d3429feedf870f5a9f7f0d2aaf75609888b52449f85f22871b5f5a7e95f,2204
 - completed:
-    hackage: pantry-0.9.2@sha256:e1c5444d1b4003435d860853abd21e91e5fc337f2b2e2c8c992a2bac04712dc0,7650
+    hackage: pantry-0.9.3@sha256:ad7109ed18a3e8a61e7cd3c490fe7566384de974df1e50771b6f458ad13467a5,7810
     pantry-tree:
-      sha256: 8f14d90ab352a42847bcffa6cf814e45543b8aa4a56c71b3c74eba6beec3b831
+      sha256: 9ef35da9d202839cb1c05b439b4c616fc4e09482290acff2027ab34117ea3ce9
       size: 2665
   original:
-    hackage: pantry-0.9.2@sha256:e1c5444d1b4003435d860853abd21e91e5fc337f2b2e2c8c992a2bac04712dc0,7650
+    hackage: pantry-0.9.3@sha256:ad7109ed18a3e8a61e7cd3c490fe7566384de974df1e50771b6f458ad13467a5,7810
 - completed:
     hackage: static-bytes-0.1.0@sha256:35dbf30f617baa0151682c97687042516be07872a39984f9fe31f78125b962bf,1627
     pantry-tree:
