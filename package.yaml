@@ -162,6 +162,7 @@ library:
   - Data.Attoparsec.Combinators
   - Data.Attoparsec.Interpreter
   - Data.Monoid.Map
+  - GHC.Utils.GhcPkg.Main.Compat
   - Network.HTTP.StackClient
   - Options.Applicative.Args
   - Options.Applicative.Builder.Extra
@@ -187,6 +188,7 @@ library:
   - Stack.ComponentFile
   - Stack.Config
   - Stack.Config.Build
+  - Stack.Config.ConfigureScript
   - Stack.Config.Docker
   - Stack.Config.Nix
   - Stack.ConfigCmd
@@ -195,6 +197,7 @@ library:
   - Stack.Constants.StackProgName
   - Stack.Coverage
   - Stack.DefaultColorWhen
+  - Stack.DependencyGraph
   - Stack.Docker
   - Stack.DockerCmd
   - Stack.Dot
@@ -285,14 +288,17 @@ library:
   - Stack.Types.ConfigureOpts
   - Stack.Types.Curator
   - Stack.Types.Dependency
+  - Stack.Types.DependencyTree
   - Stack.Types.Docker
   - Stack.Types.DockerEntrypoint
+  - Stack.Types.DotOpts
   - Stack.Types.DownloadInfo
   - Stack.Types.DumpLogs
   - Stack.Types.DumpPackage
   - Stack.Types.EnvConfig
   - Stack.Types.EnvSettings
   - Stack.Types.ExtraDirs
+  - Stack.Types.FileDigestCache
   - Stack.Types.GHCDownloadInfo
   - Stack.Types.GHCVariant
   - Stack.Types.GhcOptionKey

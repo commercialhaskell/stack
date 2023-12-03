@@ -1,37 +1,24 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Function to parse command line arguments for Stack's @dot@ command and
+-- certain command line arguments for Stack's @ls dependencies@ command.
 module Stack.Options.DotParser
   ( dotOptsParser
-  , formatSubCommand
-  , licenseParser
-  , listDepsConstraintsParser
-  , listDepsFormatOptsParser
-  , listDepsJsonParser
-  , listDepsOptsParser
-  , listDepsTextParser
-  , listDepsTreeParser
-  , separatorParser
-  , toListDepsOptsParser
   ) where
 
 import           Data.Char ( isSpace )
 import           Data.List.Split ( splitOn )
 import qualified Data.Set as Set
-import qualified Data.Text as T
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Options.Applicative
-                   ( CommandFields, Mod, Parser, auto, command, help, idm, info
-                   , long, metavar, option, progDesc, showDefault, strOption
-                   , subparser, switch, value
+                   ( Parser, auto, help, idm, long, metavar, option, strOption
+                   , switch
                    )
-import           Options.Applicative.Builder.Extra ( boolFlags, textOption )
-import           Stack.Dot
-                   ( DotOpts (..), ListDepsFormat (..), ListDepsFormatOpts (..)
-                   , ListDepsOpts (..)
-                   )
+import           Options.Applicative.Builder.Extra ( boolFlags )
 import           Stack.Options.BuildParser ( flagsParser, targetsParser )
 import           Stack.Prelude
+import           Stack.Types.DotOpts ( DotOpts (..) )
 
 -- | Parser for arguments to `stack dot`
 dotOptsParser :: Bool -> Parser DotOpts
@@ -87,75 +74,3 @@ dotOptsParser externalDefault = DotOpts
     <> help "Do not require an install GHC; instead, use a hints file for \
             \global packages."
     )
-
-separatorParser :: Parser Text
-separatorParser = fmap
-  escapeSep
-  ( textOption
-      (  long "separator"
-      <> metavar "SEP"
-      <> help "Separator between package name and package version."
-      <> value " "
-      <> showDefault
-      )
-  )
- where
-  escapeSep s = T.replace "\\t" "\t" (T.replace "\\n" "\n" s)
-
-licenseParser :: Parser Bool
-licenseParser = boolFlags False
-  "license"
-  "printing of dependency licenses instead of versions."
-  idm
-
-listDepsFormatOptsParser :: Parser ListDepsFormatOpts
-listDepsFormatOptsParser = ListDepsFormatOpts
-  <$> separatorParser
-  <*> licenseParser
-
-listDepsTreeParser :: Parser ListDepsFormat
-listDepsTreeParser =  ListDepsTree <$> listDepsFormatOptsParser
-
-listDepsTextParser :: Parser ListDepsFormat
-listDepsTextParser = ListDepsText <$> listDepsFormatOptsParser
-
-listDepsJsonParser :: Parser ListDepsFormat
-listDepsJsonParser = pure ListDepsJSON
-
-listDepsConstraintsParser :: Parser ListDepsFormat
-listDepsConstraintsParser = pure ListDepsConstraints
-
-toListDepsOptsParser :: Parser ListDepsFormat -> Parser ListDepsOpts
-toListDepsOptsParser formatParser = ListDepsOpts
-  <$> formatParser
-  <*> dotOptsParser True
-
-formatSubCommand ::
-     String
-  -> String
-  -> Parser ListDepsFormat
-  -> Mod CommandFields ListDepsOpts
-formatSubCommand cmd desc formatParser =
-  command cmd (info (toListDepsOptsParser formatParser) (progDesc desc))
-
--- | Parser for arguments to `stack ls dependencies`.
-listDepsOptsParser :: Parser ListDepsOpts
-listDepsOptsParser = subparser
-      (  formatSubCommand
-           "text"
-           "Print dependencies as text (default)."
-           listDepsTextParser
-      <> formatSubCommand
-           "cabal"
-           "Print dependencies as exact Cabal constraints."
-           listDepsConstraintsParser
-      <> formatSubCommand
-           "tree"
-           "Print dependencies as tree."
-           listDepsTreeParser
-      <> formatSubCommand
-           "json"
-           "Print dependencies as JSON."
-           listDepsJsonParser
-      )
-  <|> toListDepsOptsParser listDepsTextParser
