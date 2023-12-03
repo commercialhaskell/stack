@@ -15,8 +15,9 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Distribution.License ( License (BSD3) )
 import qualified RIO.Text as T
-import           Stack.Dot ( DotPayload (..), pruneGraph, resolveDependencies )
+import           Stack.DependencyGraph ( pruneGraph, resolveDependencies )
 import           Stack.Prelude hiding ( pkgName )
+import           Stack.Types.DependencyTree ( DotPayload (..) )
 import           Test.Hspec ( Spec, describe, it, shouldBe )
 import           Test.Hspec.QuickCheck ( prop )
 import           Test.QuickCheck ( Gen, choose, forAll )

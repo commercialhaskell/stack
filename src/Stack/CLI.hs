@@ -30,7 +30,7 @@ import           Stack.Coverage ( hpcReportCmd )
 import           Stack.Docker
                    ( dockerCmdName, dockerHelpOptName, dockerPullCmdName )
 import           Stack.DockerCmd ( dockerPullCmd, dockerResetCmd )
-import qualified Stack.Dot ( dot )
+import           Stack.Dot ( dotCmd )
 import           Stack.Exec ( SpecialExecCmd (..), execCmd )
 import           Stack.Eval ( evalCmd )
 import           Stack.Ghci ( ghciCmd )
@@ -251,7 +251,7 @@ commandLineHandler currentDir progName isInterpreter =
   dot = addCommand'
     "dot"
     "Visualize your project's dependency graph using Graphviz dot."
-    Stack.Dot.dot
+    dotCmd
     (dotOptsParser False) -- Default for --external is False.
 
   eval = addCommand'

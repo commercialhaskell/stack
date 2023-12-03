@@ -7,17 +7,25 @@ module Stack.Ls
   ( LsCmdOpts (..)
   , LsCmds (..)
   , SnapshotOpts (..)
+  , LsView (..)
+  , ListDepsOpts (..)
+  , ListDepsFormat (..)
+  , ListDepsFormatOpts (..)
   , ListStylesOpts (..)
   , ListToolsOpts (..)
-  , LsView (..)
   , lsCmd
   ) where
 
-import           Data.Aeson ( FromJSON, Value (..), (.:) )
+import           Data.Aeson ( FromJSON, Value (..), (.:), encode )
 import           Data.Array.IArray ( (//), elems )
+import qualified Data.ByteString.Lazy.Char8 as LBC8
 import           Distribution.Package ( mkPackageName )
 import qualified Data.Aeson.Types as A
+import qualified Data.Foldable as F
 import qualified Data.List as L
+import qualified Data.Map as Map
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import           Data.Text ( isPrefixOf )
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -29,13 +37,18 @@ import           Network.HTTP.StackClient
 import           Path ( parent )
 import           RIO.List ( sort )
 import           Stack.Constants ( osIsWindows )
-import           Stack.Dot ( ListDepsOpts, listDependencies )
+import           Stack.DependencyGraph ( createPrunedDependencyGraph )
 import           Stack.Prelude hiding ( Nightly, Snapshot )
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Setup.Installed
                    ( Tool (..), filterTools, listInstalled, toolString )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.DependencyTree
+                   ( DependencyTree (..), DotPayload (..), licenseText
+                   , versionText
+                   )
+import           Stack.Types.DotOpts ( DotOpts (..) )
 import           Stack.Types.EnvConfig ( installationRootDeps )
 import           Stack.Types.Runner ( HasRunner, Runner, terminalL )
 import           System.Console.ANSI.Codes
@@ -56,6 +69,26 @@ instance Exception LsException where
     ++ "Failure to parse values as a snapshot: "
     ++ show val
 
+-- | Type representing command line options for the @stack ls@ command.
+newtype LsCmdOpts
+  = LsCmdOpts { lsView :: LsCmds }
+
+-- | Type representing subcommands for the @stack ls@ command.
+data LsCmds
+  = LsSnapshot SnapshotOpts
+  | LsDependencies ListDepsOpts
+  | LsStyles ListStylesOpts
+  | LsTools ListToolsOpts
+
+-- | Type representing command line options for the @stack ls snapshots@
+-- command.
+data SnapshotOpts = SnapshotOpts
+  { soptViewType :: LsView
+  , soptLtsSnapView :: Bool
+  , soptNightlySnapView :: Bool
+  }
+  deriving (Eq, Ord, Show)
+
 -- | Type representing subcommands for the @stack ls snapshots@ command.
 data LsView
   = Local
@@ -70,14 +103,25 @@ data SnapshotType
     -- ^ Stackage Nightly
   deriving (Eq, Ord, Show)
 
--- | Type representing command line options for the @stack ls snapshots@
--- command.
-data SnapshotOpts = SnapshotOpts
-  { soptViewType :: LsView
-  , soptLtsSnapView :: Bool
-  , soptNightlySnapView :: Bool
+data ListDepsOpts = ListDepsOpts
+  { listDepsFormat :: !ListDepsFormat
+    -- ^ Format of printing dependencies
+  , listDepsDotOpts :: !DotOpts
+    -- ^ The normal dot options.
   }
-  deriving (Eq, Ord, Show)
+
+data ListDepsFormat
+  = ListDepsText ListDepsFormatOpts
+  | ListDepsTree ListDepsFormatOpts
+  | ListDepsJSON
+  | ListDepsConstraints
+
+data ListDepsFormatOpts = ListDepsFormatOpts
+  { listDepsSep :: !Text
+    -- ^ Separator between the package name and details.
+  , listDepsLicense :: !Bool
+    -- ^ Print dependency licenses instead of versions.
+  }
 
 -- | Type representing command line options for the @stack ls stack-colors@ and
 -- @stack ls stack-colours@ commands.
@@ -92,17 +136,6 @@ data ListStylesOpts = ListStylesOpts
 newtype ListToolsOpts
   = ListToolsOpts { toptFilter  :: String }
 
--- | Type representing subcommands for the @stack ls@ command.
-data LsCmds
-  = LsSnapshot SnapshotOpts
-  | LsDependencies ListDepsOpts
-  | LsStyles ListStylesOpts
-  | LsTools ListToolsOpts
-
--- | Type representing command line options for the @stack ls@ command.
-newtype LsCmdOpts
-  = LsCmdOpts { lsView :: LsCmds }
-
 data Snapshot = Snapshot
   { snapId :: Text
   , snapTitle :: Text
@@ -110,15 +143,15 @@ data Snapshot = Snapshot
   }
   deriving (Eq, Ord, Show)
 
+instance FromJSON Snapshot where
+  parseJSON o@(Array _) = parseSnapshot o
+  parseJSON _ = mempty
+
 data SnapshotData = SnapshotData
   { _snapTotalCounts :: Integer
   , snaps :: [[Snapshot]]
   }
   deriving (Eq, Ord, Show)
-
-instance FromJSON Snapshot where
-  parseJSON o@(Array _) = parseSnapshot o
-  parseJSON _ = mempty
 
 instance FromJSON SnapshotData where
   parseJSON (Object s) =
@@ -286,3 +319,99 @@ listToolsCmd opts = do
  where
   filtered pkgName installed = Tool <$>
       filterTools (mkPackageName pkgName) (const True) installed
+
+listDependencies :: ListDepsOpts -> RIO Runner ()
+listDependencies opts = do
+  let dotOpts = listDepsDotOpts opts
+  (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
+  liftIO $ case listDepsFormat opts of
+    ListDepsTree treeOpts ->
+      T.putStrLn "Packages"
+      >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
+    ListDepsJSON -> printJSON pkgs resultGraph
+    ListDepsText textOpts ->
+      void $ Map.traverseWithKey (go "" textOpts) (snd <$> resultGraph)
+    ListDepsConstraints -> do
+      let constraintOpts = ListDepsFormatOpts " ==" False
+      T.putStrLn "constraints:"
+      void $ Map.traverseWithKey (go "  , " constraintOpts)
+                                 (snd <$> resultGraph)
+ where
+  go prefix lineOpts name payload =
+    T.putStrLn $ prefix <> listDepsLine lineOpts name payload
+
+treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
+treeRoots opts projectPackages' =
+  let targets = dotTargets $ listDepsDotOpts opts
+  in  if null targets
+        then projectPackages'
+        else Set.fromList $ map (mkPackageName . T.unpack) targets
+
+printTree ::
+     ListDepsFormatOpts
+  -> DotOpts
+  -> Int
+  -> [Int]
+  -> Set PackageName
+  -> Map PackageName (Set PackageName, DotPayload)
+  -> IO ()
+printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
+  F.sequence_ $ Seq.mapWithIndex go (toSeq packages)
+ where
+  toSeq = Seq.fromList . Set.toList
+  go index name =
+    let newDepsCounts = remainingDepsCounts ++ [Set.size packages - index - 1]
+    in  case Map.lookup name dependencyMap of
+          Just (deps, payload) -> do
+            printTreeNode opts dotOpts depth newDepsCounts deps payload name
+            if Just depth == dotDependencyDepth dotOpts
+              then pure ()
+              else printTree opts dotOpts (depth + 1) newDepsCounts deps
+                     dependencyMap
+          -- TODO: Define this behaviour, maybe pure an error?
+          Nothing -> pure ()
+
+printTreeNode ::
+     ListDepsFormatOpts
+  -> DotOpts
+  -> Int
+  -> [Int]
+  -> Set PackageName
+  -> DotPayload
+  -> PackageName
+  -> IO ()
+printTreeNode opts dotOpts depth remainingDepsCounts deps payload name =
+  let remainingDepth = fromMaybe 999 (dotDependencyDepth dotOpts) - depth
+      hasDeps = not $ null deps
+  in  T.putStrLn $
+        treeNodePrefix "" remainingDepsCounts hasDeps remainingDepth <> " " <>
+        listDepsLine opts name payload
+
+treeNodePrefix :: Text -> [Int] -> Bool -> Int -> Text
+treeNodePrefix t [] _ _      = t
+treeNodePrefix t [0] True  0 = t <> "└──"
+treeNodePrefix t [_] True  0 = t <> "├──"
+treeNodePrefix t [0] True  _ = t <> "└─┬"
+treeNodePrefix t [_] True  _ = t <> "├─┬"
+treeNodePrefix t [0] False _ = t <> "└──"
+treeNodePrefix t [_] False _ = t <> "├──"
+treeNodePrefix t (0:ns) d remainingDepth = treeNodePrefix (t <> "  ") ns d remainingDepth
+treeNodePrefix t (_:ns) d remainingDepth = treeNodePrefix (t <> "│ ") ns d remainingDepth
+
+listDepsLine :: ListDepsFormatOpts -> PackageName -> DotPayload -> Text
+listDepsLine opts name payload =
+  T.pack (packageNameString name) <> listDepsSep opts <>
+  payloadText opts payload
+
+payloadText :: ListDepsFormatOpts -> DotPayload -> Text
+payloadText opts payload =
+  if listDepsLicense opts
+    then licenseText payload
+    else versionText payload
+
+printJSON ::
+     Set PackageName
+  -> Map PackageName (Set PackageName, DotPayload)
+  -> IO ()
+printJSON pkgs dependencyMap =
+  LBC8.putStrLn $ encode $ DependencyTree pkgs dependencyMap

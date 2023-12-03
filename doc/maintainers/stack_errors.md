@@ -114,7 +114,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-9975] | NotLocalPackage PackageName
         ~~~
 
-    -   `Stack.Dot.DotException`
+    -   `Stack.DependencyGraph.DependencyGraphException`
 
         ~~~haskell
         [S-7071] = DependencyNotFoundBug GhcPkgId
