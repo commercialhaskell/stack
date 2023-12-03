@@ -71,9 +71,9 @@ import           Stack.Types.EnvConfig
                    , platformGhcRelDir
                    )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
-import           Stack.Types.NamedComponent ( NamedComponent (..) )
-import           Stack.Types.Package
+import           Stack.Types.Installed
                    (InstalledLibraryInfo (..), installedGhcPkgId )
+import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
                    ( modificationTime, getFileStatus, setFileTimes )

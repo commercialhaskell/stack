@@ -335,6 +335,8 @@ library
       System.Terminal
       Build_stack
       Paths_stack
+  other-modules:
+      Stack.Types.Installed
   autogen-modules:
       Build_stack
       Paths_stack

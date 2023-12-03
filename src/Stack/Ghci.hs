@@ -68,12 +68,13 @@ import           Stack.Types.EnvConfig
                    , shaPathForBytes
                    )
 import           Stack.Types.EnvSettings ( defaultEnvSettings )
+import           Stack.Types.Installed ( InstallMap, InstalledMap)
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCLib, renderPkgComponent )
 import           Stack.Types.Package
-                   ( BuildInfoOpts (..), InstallMap, InstalledMap
-                   , LocalPackage (..), Package (..), PackageConfig (..)
-                   , dotCabalCFilePath, dotCabalGetPath, dotCabalMainPath
+                   ( BuildInfoOpts (..), LocalPackage (..), Package (..)
+                   , PackageConfig (..), dotCabalCFilePath, dotCabalGetPath
+                   , dotCabalMainPath
                    )
 import           Stack.Types.PackageFile ( PackageComponentFile (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )

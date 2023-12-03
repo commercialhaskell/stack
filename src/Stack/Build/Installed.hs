@@ -29,12 +29,10 @@ import           Stack.Types.EnvConfig
                     , packageDatabaseLocal
                     )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
-import           Stack.Types.Package
-                   ( InstallLocation (..), InstallMap, Installed (..)
-                   , InstalledLibraryInfo (..), InstalledMap
-                   , InstalledPackageLocation (..), PackageDatabase (..)
-                   , PackageDbVariety (..), toPackageDbVariety
-                   )
+import           Stack.Types.Installed
+                   ( InstallLocation (..), Installed (..), InstalledLibraryInfo (..)
+                   , InstallMap, InstalledMap, InstalledPackageLocation (..)
+                   , PackageDatabase (..), PackageDbVariety (..), toPackageDbVariety )
 import           Stack.Types.SourceMap
                    ( DepPackage (..), ProjectPackage (..), SourceMap (..) )
 

@@ -66,12 +66,14 @@ import           Stack.Types.EnvSettings
                    ( EnvSettings (..), minimalEnvSettings )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import           Stack.Types.Installed
+                   ( InstallLocation (..), Installed (..), InstalledMap
+                   , installedVersion )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package
-                   ( ExeName (..), InstallLocation (..), Installed (..)
-                   , InstalledMap, LocalPackage (..), Package (..)
-                   , PackageSource (..), installedMapGhcPkgId, installedVersion
+                   ( ExeName (..), LocalPackage (..), Package (..)
+                   , PackageSource (..), installedMapGhcPkgId
                    , packageIdentifier, psVersion, runMemoizedWith
                    )
 import           Stack.Types.ProjectConfig ( isPCGlobalProject )
