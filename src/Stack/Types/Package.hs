@@ -65,18 +65,19 @@ import           Stack.Types.ComponentUtils (toCabalName)
 import           Stack.Types.Dependency ( DepValue )
 import           Stack.Types.EnvConfig ( EnvConfig, HasEnvConfig (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           Stack.Types.Installed
+                   ( InstallLocation (..), InstallMap, Installed (..)
+                   , InstalledLibraryInfo (..), InstalledMap
+                   , InstalledPackageLocation (..), PackageDatabase (..)
+                   , PackageDbVariety(..), simpleInstalledLib
+                   , toPackageDbVariety
+                   )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.PackageFile
                    ( DotCabalDescriptor (..), DotCabalPath (..)
                    , StackPackageFile
                    )
 import           Stack.Types.SourceMap ( CommonPackage, FromSnapshot )
-import Stack.Types.Installed
-                   ( Installed(..), InstalledLibraryInfo(..), InstalledMap
-                   , InstallMap, PackageDbVariety(..), PackageDatabase(..)
-                   , InstalledPackageLocation(..), InstallLocation(..)
-                   , toPackageDbVariety, simpleInstalledLib
-                   )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Package" module.

@@ -74,8 +74,8 @@ import           Stack.Types.Installed
                    , InstalledLibraryInfo (..), installedVersion
                    )
 import           Stack.Types.Package
-                   ( LocalPackage (..), Package (..)
-                   , PackageConfig (..), packageIdentifier
+                   ( LocalPackage (..), Package (..), PackageConfig (..)
+                   , packageIdentifier
                    )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )

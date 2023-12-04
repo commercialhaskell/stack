@@ -68,7 +68,7 @@ import           Stack.Types.EnvConfig
                    , shaPathForBytes
                    )
 import           Stack.Types.EnvSettings ( defaultEnvSettings )
-import           Stack.Types.Installed ( InstallMap, InstalledMap)
+import           Stack.Types.Installed ( InstallMap, InstalledMap )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCLib, renderPkgComponent )
 import           Stack.Types.Package

@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | This module contains all the types related to the idea of installing a package
--- in the pkg-db or an executable on the file system.
+-- | This module contains all the types related to the idea of installing a
+-- package in the pkg-db or an executable on the file system.
 module Stack.Types.Installed
   ( InstallLocation (..)
   , InstalledPackageLocation (..)
@@ -20,12 +20,12 @@ module Stack.Types.Installed
   , installedVersion
   ) where
 
-import qualified Distribution.SPDX.License as SPDX
-import           Distribution.License (License)
-import           Stack.Prelude
-import           Stack.Types.ComponentUtils (StackUnqualCompName)
-import           Stack.Types.GhcPkgId (GhcPkgId, ghcPkgIdString)
 import qualified Data.Map as M
+import qualified Distribution.SPDX.License as SPDX
+import           Distribution.License ( License )
+import           Stack.Prelude
+import           Stack.Types.ComponentUtils ( StackUnqualCompName )
+import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 
 -- | Type representing user package databases that packages can be installed
 -- into.

@@ -68,7 +68,8 @@ import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Installed
                    ( InstallLocation (..), Installed (..), InstalledMap
-                   , installedVersion )
+                   , installedVersion
+                   )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
 import           Stack.Types.Package

@@ -180,16 +180,16 @@ import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString, unGhcPkgId )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Installed
                    ( InstallLocation (..), Installed (..), InstalledMap
-                   , InstalledLibraryInfo (..), installedPackageIdentifier )
+                   , InstalledLibraryInfo (..), installedPackageIdentifier
+                   )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent
                    ( NamedComponent, benchComponents, exeComponents, isCBench
                    , isCTest, renderComponent, testComponents
                    )
 import           Stack.Types.Package
-                   ( LocalPackage (..), Package (..)
-                   , installedMapGhcPkgId, packageIdentifier
-                   , runMemoizedWith, simpleInstalledLib
+                   ( LocalPackage (..), Package (..), installedMapGhcPkgId
+                   , packageIdentifier, runMemoizedWith, simpleInstalledLib
                    , toCabalMungedPackageName
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )

@@ -93,10 +93,10 @@ import           Stack.Types.Dependency
                    , libraryDepFromVersionRange
                    )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
-
 import           Stack.Types.Installed
-                   ( Installed (..), InstallMap, InstalledMap
-                   , installedToPackageIdOpt )
+                   ( InstallMap, Installed (..), InstalledMap
+                   , installedToPackageIdOpt
+                   )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), subLibComponents )
 import           Stack.Types.Package

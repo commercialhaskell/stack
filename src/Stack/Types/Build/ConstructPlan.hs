@@ -37,8 +37,7 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.Installed
-                   ( InstallLocation, Installed (..)
-                   , installedVersion)
+                   ( InstallLocation, Installed (..), installedVersion )
 import           Stack.Types.Package
                    ( ExeName (..), LocalPackage (..), Package (..)
                    , PackageSource (..)
