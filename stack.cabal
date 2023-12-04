@@ -300,6 +300,7 @@ library
       Stack.Types.GhcPkgId
       Stack.Types.GlobalOpts
       Stack.Types.GlobalOptsMonoid
+      Stack.Types.Installed
       Stack.Types.IsMutable
       Stack.Types.LockFileBehavior
       Stack.Types.NamedComponent
@@ -335,8 +336,6 @@ library
       System.Terminal
       Build_stack
       Paths_stack
-  other-modules:
-      Stack.Types.Installed
   autogen-modules:
       Build_stack
       Paths_stack
