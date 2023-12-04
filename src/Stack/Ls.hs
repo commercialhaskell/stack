@@ -11,6 +11,7 @@ module Stack.Ls
   , ListDepsOpts (..)
   , ListDepsFormat (..)
   , ListDepsFormatOpts (..)
+  , ListDepsTextFilter (..)
   , ListStylesOpts (..)
   , ListToolsOpts (..)
   , lsCmd
@@ -111,7 +112,7 @@ data ListDepsOpts = ListDepsOpts
   }
 
 data ListDepsFormat
-  = ListDepsText ListDepsFormatOpts
+  = ListDepsText ListDepsFormatOpts [ListDepsTextFilter]
   | ListDepsTree ListDepsFormatOpts
   | ListDepsJSON
   | ListDepsConstraints
@@ -122,6 +123,13 @@ data ListDepsFormatOpts = ListDepsFormatOpts
   , listDepsLicense :: !Bool
     -- ^ Print dependency licenses instead of versions.
   }
+
+-- | Type representing items to filter the results of @stack ls dependencies@.
+data ListDepsTextFilter
+  = FilterPackage PackageName
+    -- ^ Item is a package name.
+  | FilterLocals
+    -- ^ Item represents all local packages.
 
 -- | Type representing command line options for the @stack ls stack-colors@ and
 -- @stack ls stack-colours@ commands.
@@ -329,8 +337,20 @@ listDependencies opts = do
       T.putStrLn "Packages"
       >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
     ListDepsJSON -> printJSON pkgs resultGraph
-    ListDepsText textOpts ->
-      void $ Map.traverseWithKey (go "" textOpts) (snd <$> resultGraph)
+    ListDepsText textOpts listDepsTextFilters -> do
+      let resultGraph' = Map.filterWithKey p resultGraph
+          p k _ =
+            Set.notMember k (exclude (Set.toList pkgs) listDepsTextFilters)
+      void $ Map.traverseWithKey (go "" textOpts) (snd <$> resultGraph')
+     where
+      exclude :: [PackageName] -> [ListDepsTextFilter] -> Set PackageName
+      exclude locals = Set.fromList . exclude' locals
+
+      exclude' :: [PackageName] -> [ListDepsTextFilter] -> [PackageName]
+      exclude' _ [] = []
+      exclude' locals (f:fs) = case f of
+        FilterPackage pkgName -> pkgName : exclude' locals fs
+        FilterLocals -> locals <> exclude' locals fs
     ListDepsConstraints -> do
       let constraintOpts = ListDepsFormatOpts " ==" False
       T.putStrLn "constraints:"

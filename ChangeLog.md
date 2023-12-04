@@ -71,6 +71,9 @@ Other enhancements:
 * Stack will notify the user if a specified architecture value is unknown to
   Cabal (the library). In YAML configuration files, the `notify-if-arch-unknown`
   key is introduced, to allow the notification to be muted if unwanted.
+* Add option `--filter <item>` to Stack's `ls dependencies text` command to
+  filter out an item from the results, if present. The item can be `$locals` for
+  all local packages.
 
 Bug fixes:
 
