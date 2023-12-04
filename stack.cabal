@@ -300,6 +300,7 @@ library
       Stack.Types.GhcPkgId
       Stack.Types.GlobalOpts
       Stack.Types.GlobalOptsMonoid
+      Stack.Types.Installed
       Stack.Types.IsMutable
       Stack.Types.LockFileBehavior
       Stack.Types.NamedComponent

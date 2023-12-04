@@ -36,10 +36,11 @@ import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
+import           Stack.Types.Installed
+                   ( InstallLocation, Installed (..), installedVersion )
 import           Stack.Types.Package
-                   ( ExeName (..), InstallLocation, Installed (..)
-                   , LocalPackage (..), Package (..), PackageSource (..)
-                   , installedVersion
+                   ( ExeName (..), LocalPackage (..), Package (..)
+                   , PackageSource (..)
                    )
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Platform ( HasPlatform (..) )
