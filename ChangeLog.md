@@ -26,6 +26,10 @@ Behavior changes:
 * Drop support for Intero (end of life in November 2019).
 * `stack path --stack-root` no longer sets up Stack's environment and does not
   load Stack's configuration.
+* Stack no longer locks on configuration, so packages (remote and local) can
+  be configured in parallel. This increases the effective concurrency of builds
+  that before would use fewer threads. Reconsider your `--jobs` setting
+  accordingly. See [#84](https://github.com/commercialhaskell/stack/issues/84).
 
 Other enhancements:
 
