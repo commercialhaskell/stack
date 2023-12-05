@@ -328,8 +328,7 @@ displayTask task = fillSep $
   missing = tcoMissing $ taskConfigOpts task
 
 data ExecuteEnv = ExecuteEnv
-  { eeConfigureLock  :: !(MVar ())
-  , eeInstallLock    :: !(MVar ())
+  { eeInstallLock    :: !(MVar ())
   , eeBuildOpts      :: !BuildOpts
   , eeBuildOptsCLI   :: !BuildOptsCLI
   , eeBaseConfigOpts :: !BaseConfigOpts
@@ -473,7 +472,6 @@ withExecuteEnv ::
   -> RIO env a
 withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages mlargestPackageName inner =
   createTempDirFunction stackProgName $ \tmpdir -> do
-    configLock <- liftIO $ newMVar ()
     installLock <- liftIO $ newMVar ()
     idMap <- liftIO $ newTVarIO Map.empty
     config <- view configL
@@ -532,7 +530,6 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
         -- appears to be a Cabal library bug. Original issue:
         -- https://github.com/commercialhaskell/stack/issues/84. Ideally
         -- we'd be able to remove this.
-      , eeConfigureLock = configLock
       , eeInstallLock = installLock
       , eeBaseConfigOpts = baseConfigOpts
       , eeGhcPkgIds = idMap
@@ -1174,7 +1171,7 @@ ensureConfig newConfigCache pkgDir ExecuteEnv {..} announce cabal cabalfp task =
     -- https://github.com/commercialhaskell/stack/issues/3534
     ensureConfigureScript pkgDir
 
-  when needConfig $ withMVar eeConfigureLock $ \_ -> do
+  when needConfig $ do
     deleteCaches pkgDir
     announce
     cp <- view compilerPathsL
