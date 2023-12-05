@@ -54,25 +54,25 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-fki0nd-1129:21"
+  id = "OBS-STAN-0203-fki0nd-1126:21"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\Execute.hs
 #
-#  1128 ┃
-#  1129 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
-#  1130 ┃                     ^^^^^^^
+#  1125 ┃
+#  1126 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
+#  1137 ┃                     ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-fki0nd-2673:3"
+  id = "OBS-STAN-0203-fki0nd-2670:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\Execute.hs
 #
-#  2672 ┃
-#  2673 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  2674 ┃   ^^^^^^^
+#  2669 ┃
+#  2670 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+#  2671 ┃   ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
