@@ -4,10 +4,6 @@
 
 Release notes:
 
-* Removed the configure lock so configuring of packages (remote and local) can
-  be done in parallel. For some builds this can result in significant speed ups.
-  Note that this also increase the effective concurrency of builds that before would
-  not use many threads. Reconsider your `--jobs` setting accordingly.
 * After an upgrade from an earlier version of Stack, on first use only,
   Stack 2.14.0 may warn that it had trouble loading the CompilerPaths cache.
 * The hash used as a key for Stack's pre-compiled package cache has changed,
@@ -30,6 +26,10 @@ Behavior changes:
 * Drop support for Intero (end of life in November 2019).
 * `stack path --stack-root` no longer sets up Stack's environment and does not
   load Stack's configuration.
+* Stack no longer locks on configuration, so packages (remote and local) can
+  be configured in parallel. This increases the effective concurrency of builds
+  that before would use fewer threads. Reconsider your `--jobs` setting
+  accordingly. See [#84](https://github.com/commercialhaskell/stack/issues/84).
 
 Other enhancements:
 
