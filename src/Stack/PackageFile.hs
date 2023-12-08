@@ -19,6 +19,7 @@ import           Path.IO ( doesFileExist )
 import           Stack.ComponentFile
                    ( ComponentFile (..), resolveOrWarn, stackBenchmarkFiles
                    , stackExecutableFiles, stackLibraryFiles
+                   , stackTestSuiteFiles
                    )
 import           Stack.Constants
                    ( relFileHpackPackageConfig, relFileSetupHs, relFileSetupLhs
@@ -61,6 +62,7 @@ packageDescModulesAndFiles pkg = do
   gatherCompFileCollection stackLibraryFiles packageLibrary
     . gatherCompFileCollection stackLibraryFiles packageSubLibraries
     . gatherCompFileCollection stackExecutableFiles packageExecutables
+    . gatherCompFileCollection stackTestSuiteFiles packageTestSuites
     . gatherCompFileCollection stackBenchmarkFiles packageBenchmarks
     $ pure initialValue
 

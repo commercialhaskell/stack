@@ -16,7 +16,7 @@ module Stack.ComponentFile
   , ComponentFile (..)
   , stackLibraryFiles
   , stackExecutableFiles
-  , stackTestFiles
+  , stackTestSuiteFiles
   , stackBenchmarkFiles
   ) where
 
@@ -90,10 +90,10 @@ stackBenchmarkFiles bench =
   build = bench.buildInfo
 
 -- | Get all files referenced by the test.
-stackTestFiles ::
+stackTestSuiteFiles ::
      StackTestSuite
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
-stackTestFiles test =
+stackTestSuiteFiles test =
   resolveComponentFiles (CTest $ unqualCompToText test.name) build names
  where
   names = bnames <> exposed
