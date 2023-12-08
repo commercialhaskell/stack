@@ -60,7 +60,7 @@ dependencies:
 - base >= 4.14.3.0 && < 5
 - Cabal >= 3.8.1.0
 - aeson >= 2.0.3.0
-- aeson-warning-parser
+- aeson-warning-parser >= 0.1.1
 - ansi-terminal >= 1.0
 - array
 - async
@@ -98,7 +98,7 @@ dependencies:
 - neat-interpolation
 - open-browser
 - optparse-applicative >= 0.18.1.0
-- pantry >= 0.9.3
+- pantry >= 0.9.3.1
 - path >= 0.9.5
 - path-io
 # In order for Cabal (the tool) to build Stack, it needs to be told of the

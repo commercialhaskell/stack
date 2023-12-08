@@ -61,6 +61,8 @@ Other enhancements:
 
 Bug fixes:
 * Fix the `Curator` instance of `ToJSON`, as regards `expect-haddock-failure`.
+* Better error message if a `resolver:` or `snapshot:` value is, in error, a
+  YAML number.
 
 ## v2.13.1 - 2023-09-29
 
