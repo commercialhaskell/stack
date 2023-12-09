@@ -18,6 +18,25 @@ By default:
 * the project is initialised for use with Stack. Pass the `--no-init` flag to
   skip such initialisation.
 
+A package name acceptable to Cabal comprises an alphanumeric 'word'; or two or
+more such words, with the words separated by a dash character (`-`). A word
+cannot be comprised only of the characters `0` to `9`. An alphanumerical
+character is one in one of the Unicode categories Lu (Letter, uppercase),
+Ll (Letter, lowercase), Lt (Letter, titlecase), Lm (Letter, modifier),
+Lo (Letter, other), Nd (Number, decimal digit), Nl (Number, letter), and
+No (Number, other).
+
+!!! note
+
+    In the case of Hackage and acceptable package names, an alphanumerical
+    character is limited to one of `A` to `Z`, `a` to `z`, and `0` to `9`.
+
+!!! note
+
+    The name of a project is not constrained to be an acceptable package name. A
+    single-package project can be renamed to differ from the name of its
+    package.
+
 The `--param <key>:<value>` option specifies a key-value pair to populate a key
 in a template. The option can be specified multiple times.
 
