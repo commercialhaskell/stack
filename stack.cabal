@@ -151,6 +151,7 @@ flag supported-build
 
 library
   exposed-modules:
+      Codec.Archive.Tar.Utf8
       Control.Concurrent.Execute
       Data.Attoparsec.Args
       Data.Attoparsec.Combinators
