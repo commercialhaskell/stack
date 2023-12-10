@@ -63,6 +63,7 @@ Bug fixes:
 * Fix the `Curator` instance of `ToJSON`, as regards `expect-haddock-failure`.
 * Better error message if a `resolver:` or `snapshot:` value is, in error, a
   YAML number.
+* Stack accepts all package names that are, in fact, acceptable to Cabal.
 
 ## v2.13.1 - 2023-09-29
 

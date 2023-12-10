@@ -22,9 +22,15 @@ packageNameArgument =
     case parsePackageName s of
       Just x -> Right x
       Nothing -> Left $ unlines
-        [ "Expected valid package name, but got: " ++ s
-        , "Package names consist of one or more alphanumeric words separated \
-          \by hyphens."
-        , "To avoid ambiguity with version numbers, each of these words must \
-          \contain at least one letter."
+        [ "Expected a package name acceptable to Cabal, but got: " ++ s ++ "\n"
+        , "An acceptable package name comprises an alphanumeric 'word'; or \
+          \two or more"
+        , "such words, with the words separated by a hyphen/minus character ('-'). A \
+          \word"
+        , "cannot be comprised only of the characters '0' to '9'. \n"
+        , "An alphanumeric character is one in one of the Unicode Letter \
+          \categories"
+        , "(Lu (uppercase), Ll (lowercase), Lt (titlecase), Lm (modifier), or \
+          \Lo (other))"
+        , "or Number categories (Nd (decimal), Nl (letter), or No (other))."
         ]
