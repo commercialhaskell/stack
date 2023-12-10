@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -- | A ghc-pkg id.
 
@@ -12,13 +12,14 @@ module Stack.Types.GhcPkgId
 
 import           Data.Aeson.Types ( FromJSON (..), ToJSON (..), withText )
 import           Data.Attoparsec.Text
-                   ( Parser, choice, digit, endOfInput, letter, many1, parseOnly
+                   ( Parser, (<?>), choice, endOfInput, many1, parseOnly
                    , satisfy
                    )
+import           Data.Char ( isAlphaNum )
 import qualified Data.Text as T
 import           Database.Persist.Sql ( PersistField, PersistFieldSql )
-import           Prelude ( Read (..) )
 import           Stack.Prelude
+import           Text.Read ( Read (..) )
 
 -- | A parse fail.
 newtype GhcPkgIdParseFail
@@ -70,7 +71,12 @@ ghcPkgIdParser :: Parser GhcPkgId
 ghcPkgIdParser =
   let elements = "_.-" :: String
   in  GhcPkgId . T.pack <$>
-        many1 (choice [digit, letter, satisfy (`elem` elements)])
+        many1 (choice [alphaNum, satisfy (`elem` elements)])
+
+-- | Parse an alphanumerical character, as recognised by `isAlphaNum`.
+alphaNum :: Parser Char
+alphaNum = satisfy isAlphaNum <?> "alphanumeric"
+{-# INLINE alphaNum #-}
 
 -- | Get a string representation of GHC package id.
 ghcPkgIdString :: GhcPkgId -> String
