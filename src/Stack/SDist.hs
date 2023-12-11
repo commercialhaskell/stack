@@ -12,7 +12,7 @@ module Stack.SDist
   , readLocalPackage
   ) where
 
-import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Archive.Tar.Utf8 as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Conduit ( runConduitRes, sourceLazy, sinkFileCautious )

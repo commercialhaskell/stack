@@ -64,6 +64,8 @@ Bug fixes:
 * Better error message if a `resolver:` or `snapshot:` value is, in error, a
   YAML number.
 * Stack accepts all package names that are, in fact, acceptable to Cabal.
+* Stack's `sdist` command can check packages with names that include non-ASCII
+  characters.
 
 ## v2.13.1 - 2023-09-29
 
