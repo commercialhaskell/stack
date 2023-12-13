@@ -497,7 +497,7 @@ commandLineHandler currentDir progName isInterpreter =
 
   unpack = addCommand'
     "unpack"
-    "Unpack one or more packages locally."
+    "Unpack one or more packages, or one or more package candidates, locally."
     unpackCmd
     unpackOptsParser
 

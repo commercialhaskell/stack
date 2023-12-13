@@ -145,6 +145,7 @@ module Stack.Constants
   , gitHubBasicAuthType
   , gitHubTokenEnvVar
   , altGitHubTokenEnvVar
+  , hackageBaseUrl
   ) where
 
 import           Data.ByteString.Builder ( byteString )
@@ -703,3 +704,6 @@ gitHubTokenEnvVar = "GH_TOKEN"
 -- \'Basic\' authentication.
 altGitHubTokenEnvVar :: String
 altGitHubTokenEnvVar = "GITHUB_TOKEN"
+
+hackageBaseUrl :: Text
+hackageBaseUrl = "https://hackage.haskell.org/"

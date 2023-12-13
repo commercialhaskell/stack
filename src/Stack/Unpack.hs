@@ -9,6 +9,7 @@ module Stack.Unpack
   , unpackPackages
   ) where
 
+import           Data.List.Extra ( notNull )
 import           Path ( SomeBase (..), (</>), parseRelDir )
 import           Path.IO ( doesDirExist, getCurrentDir )
 import           Pantry ( loadSnapshot )
@@ -20,6 +21,7 @@ import           Stack.Config ( makeConcreteResolver )
 import           Stack.Constants ( relDirRoot )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
+import           Stack.Types.Config ( Config (..), HasConfig, configL )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 
@@ -28,6 +30,8 @@ import           Stack.Types.Runner ( Runner, globalOptsL )
 data UnpackPrettyException
   = UnpackDirectoryAlreadyExists (Set (Path Abs Dir))
   | CouldNotParsePackageSelectors [StyleDoc]
+  | PackageCandidatesRequireVersions [PackageName]
+  | PackageLocationInvalid PackageIdentifierRevision
   deriving (Show, Typeable)
 
 instance Pretty UnpackPrettyException where
@@ -45,6 +49,21 @@ instance Pretty UnpackPrettyException where
             \identifiers:"
     <> line
     <> bulletedList errs
+  pretty (PackageCandidatesRequireVersions names) =
+    "[S-6114]"
+    <> line
+    <> flow "Package candidates to unpack cannot be identified by name only. \
+            \The following do not specify a version:"
+    <> line
+    <> bulletedList (map fromPackageName names)
+  pretty (PackageLocationInvalid pir) =
+    "[S-5170]"
+    <> line
+    <> fillSep
+         [ flow "While trying to unpack from"
+         , fromString (T.unpack $ textDisplay pir) <> ","
+         , flow "Stack encountered an error."
+         ]
 
 instance Exception UnpackPrettyException
 
@@ -56,43 +75,81 @@ type UnpackTarget = Either PackageName PackageIdentifierRevision
 -- | Type representing options for the @stack unpack@ command.
 data UnpackOpts = UnpackOpts
   { upoptsTargets :: [UnpackTarget]
-    -- ^ The packages to be unpacked.
-  , upOptsDest :: Maybe (SomeBase Dir)
-    -- ^ The optional directory into which a package will be unpacked into a
+    -- ^ The packages or package candidates to be unpacked.
+  , upoptsAreCandidates :: Bool
+    -- ^ Whether the targets are Hackage package candidates.
+  , upoptsDest :: Maybe (SomeBase Dir)
+    -- ^ The optional directory into which a target will be unpacked into a
     -- subdirectory.
   }
 
--- | Function underlying the @stack unpack@ command. Unpack packages to the
--- filesystem.
+-- | Function underlying the @stack unpack@ command. Unpack packages or package
+-- candidates to the filesystem.
 unpackCmd ::
      UnpackOpts
   -> RIO Runner ()
-unpackCmd (UnpackOpts names Nothing) =
-  unpackCmd (UnpackOpts names (Just $ Rel relDirRoot))
-unpackCmd (UnpackOpts names (Just dstPath)) = withConfig NoReexec $ do
-  mresolver <- view $ globalOptsL.to globalResolver
-  mSnapshot <- forM mresolver $ \resolver -> do
-    concrete <- makeConcreteResolver resolver
-    loc <- completeSnapshotLocation concrete
-    loadSnapshot loc
-  dstPath' <- case dstPath of
-    Abs path -> pure path
-    Rel path -> do
-      wd <- getCurrentDir
-      pure $ wd </> path
-  unpackPackages mSnapshot dstPath' names
+unpackCmd (UnpackOpts targets areCandidates Nothing) =
+  unpackCmd (UnpackOpts targets areCandidates (Just $ Rel relDirRoot))
+unpackCmd (UnpackOpts targets areCandidates (Just dstPath)) =
+  withConfig NoReexec $ do
+    mresolver <- view $ globalOptsL.to globalResolver
+    mSnapshot <- forM mresolver $ \resolver -> do
+      concrete <- makeConcreteResolver resolver
+      loc <- completeSnapshotLocation concrete
+      loadSnapshot loc
+    dstPath' <- case dstPath of
+      Abs path -> pure path
+      Rel path -> do
+        wd <- getCurrentDir
+        pure $ wd </> path
+    unpackPackages mSnapshot dstPath' targets areCandidates
 
 -- | Intended to work for the command line command.
 unpackPackages ::
-     forall env. (HasPantryConfig env, HasProcessContext env, HasTerm env)
+     forall env.
+       (HasConfig env, HasPantryConfig env, HasProcessContext env, HasTerm env)
   => Maybe RawSnapshot -- ^ When looking up by name, take from this build plan.
   -> Path Abs Dir -- ^ Destination.
   -> [UnpackTarget]
+  -> Bool
+     -- ^ Whether the targets are package candidates.
   -> RIO env ()
-unpackPackages mSnapshot dest input = do
-  let (names, pirs) = partitionEithers input
+unpackPackages mSnapshot dest targets areCandidates = do
+  let (names, pirs) = partitionEithers targets
+      pisWithRevisions = any hasRevision pirs
+      hasRevision (PackageIdentifierRevision _ _ CFILatest) = False
+      hasRevision _ = True
+  when (areCandidates && notNull names) $
+    prettyThrowIO $ PackageCandidatesRequireVersions names
+  when (areCandidates && pisWithRevisions) $
+    prettyWarn $
+         flow "Package revisions are not meaningful for package candidates and \
+              \will be ignored."
+      <> line
   locs1 <- forM pirs $ \pir -> do
-    loc <- fmap cplComplete $ completePackageLocation $ RPLIHackage pir Nothing
+    hackageBaseUrl <- view $ configL.to configHackageBaseUrl
+    let rpli = if areCandidates
+          then
+            let -- Ignoring revisions for package candidates.
+                PackageIdentifierRevision candidateName candidateVersion _ = pir
+                candidatePkgId =
+                  PackageIdentifier candidateName candidateVersion
+                candidatePkgIdText =
+                  T.pack $ packageIdentifierString candidatePkgId
+                candidateUrl =
+                     hackageBaseUrl
+                  <> "package/"
+                  <> candidatePkgIdText
+                  <> "/candidate/"
+                  <> candidatePkgIdText
+                  <> ".tar.gz"
+                candidateLoc = ALUrl candidateUrl
+                candidateArchive = RawArchive candidateLoc Nothing Nothing ""
+                candidateMetadata = RawPackageMetadata Nothing Nothing Nothing
+            in RPLIArchive candidateArchive candidateMetadata
+          else RPLIHackage pir Nothing
+    loc <- cplComplete <$> completePackageLocation rpli
+      `catch` \(_ :: SomeException) -> prettyThrowIO $ PackageLocationInvalid pir
     pure (loc, packageLocationIdent loc)
   (errs, locs2) <- partitionEithers <$> traverse toLoc names
   unless (null errs) $ prettyThrowM $ CouldNotParsePackageSelectors errs
@@ -117,8 +174,8 @@ unpackPackages mSnapshot dest input = do
       , pretty dest' <> "."
       ]
  where
-  toLoc | Just snapshot <- mSnapshot = toLocSnapshot snapshot
-        | otherwise = toLocNoSnapshot
+  toLoc name | Just snapshot <- mSnapshot = toLocSnapshot snapshot name
+             | otherwise = toLocNoSnapshot name
 
   toLocNoSnapshot ::
        PackageName
@@ -135,7 +192,7 @@ unpackPackages mSnapshot dest input = do
           updated <- updateHackageIndex
             $ Just
             $    "Could not find package "
-              <> fromString (packageNameString name)
+              <> fromPackageName name
               <> ", updating"
           case updated of
             UpdateOccurred ->
