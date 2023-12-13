@@ -244,6 +244,7 @@ library:
   - Stack.Options.ScriptParser
   - Stack.Options.SetupParser
   - Stack.Options.TestParser
+  - Stack.Options.UnpackParser
   - Stack.Options.UpgradeParser
   - Stack.Options.UploadParser
   - Stack.Options.Utils

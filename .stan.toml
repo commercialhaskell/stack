@@ -81,31 +81,31 @@
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Init.hs
 #
-#  378 ┃
-#  379 ┃   commentHelp = BC.pack .  intercalate "\n" . map commentLine
-#  380 ┃                 ^^^^^^^
+#  379 ┃
+#  380 ┃   commentHelp = BC.pack .  intercalate "\n" . map commentLine
+#  381 ┃                 ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
   id = "OBS-STAN-0203-hTeu0Y-397:26"
-#  ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
-#  ✦ Category:      #AntiPattern
-#  ✦ File:          src\Stack\Init.hs
+# ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
+# ✦ Category:      #AntiPattern
+# ✦ File:          src\Stack\Init.hs
 #
-#   395 ┃
-#   396 ┃         <> B.byteString (BC.pack $ concat
-#   397 ┃                          ^^^^^^^
+#  396 ┃
+#  397 ┃         <> B.byteString (BC.pack $ concat
+#  398 ┃                          ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
   id = "OBS-STAN-0203-axv1UG-346:32"
-#  ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
-#  ✦ Category:      #AntiPattern
-#  ✦ File:          src\Stack\Docker.hs
+# ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
+# ✦ Category:      #AntiPattern
+# ✦ File:          src\Stack\Docker.hs
 #
-#   346 ┃
-#   347 ┃     hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
-#   348 ┃                                ^^^^^^^
+#  345 ┃
+#  346 ┃     hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
+#  347 ┃                                ^^^^^^^
 
 # Data types with non-strict fields
 # Defining lazy fields in data types can lead to unexpected space leaks
@@ -159,16 +159,16 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-5rtOmw-477:33"
+  id = "OBS-STAN-0212-5rtOmw-481:33"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
-#  ✦ Category:      #Unsafe #AntiPattern
-#  ✦ File:          src\Stack\Constants.hs
+# ✦ Category:      #Unsafe #AntiPattern
+# ✦ File:          src\Stack\Constants.hs
 #
-#   476 ┃
-#   477 ┃ setupGhciShimCode = byteString $(do
-#   478 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
-#   479 ┃     embedFile path)
-#   480 ┃
+#  480 ┃
+#  481 ┃ setupGhciShimCode = byteString $(do
+#  482 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
+#  483 ┃     embedFile path)
+#  484 ┃
 
 # Anti-pattern: Pattern matching on '_'
 # Pattern matching on '_' for sum types can create maintainability issues

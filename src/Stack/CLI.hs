@@ -14,7 +14,7 @@ import           Options.Applicative
                    , overFailure, renderFailure, strArgument, switch )
 import           Options.Applicative.Help ( errorHelp, stringChunk, vcatChunks )
 import           Options.Applicative.Builder.Extra
-                   ( boolFlags, extraHelpOption, textOption )
+                   ( boolFlags, extraHelpOption )
 import           Options.Applicative.Complicated
                    ( addCommand, addSubCommands, complicatedOptions )
 import           RIO.NonEmpty ( (<|) )
@@ -59,6 +59,7 @@ import           Stack.Options.PathParser ( pathParser )
 import           Stack.Options.SDistParser ( sdistOptsParser )
 import           Stack.Options.ScriptParser ( scriptOptsParser )
 import           Stack.Options.SetupParser ( setupOptsParser )
+import           Stack.Options.UnpackParser ( unpackOptsParser )
 import           Stack.Options.UpgradeParser ( upgradeOptsParser )
 import           Stack.Options.UploadParser ( uploadOptsParser )
 import           Stack.Options.Utils ( GlobalOptsContext (..) )
@@ -498,14 +499,7 @@ commandLineHandler currentDir progName isInterpreter =
     "unpack"
     "Unpack one or more packages locally."
     unpackCmd
-    ( (,)
-        <$> some (strArgument $ metavar "PACKAGE")
-        <*> optional (textOption
-              (  long "to"
-              <> help "Optional path to unpack the package into (will \
-                      \unpack into subdirectory)."
-              ))
-    )
+    unpackOptsParser
 
   update = addCommand'
     "update"

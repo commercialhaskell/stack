@@ -3,18 +3,21 @@
 
 -- | Functions related to Stack's @unpack@ command.
 module Stack.Unpack
-  ( unpackCmd
+  ( UnpackOpts (..)
+  , UnpackTarget
+  , unpackCmd
   , unpackPackages
   ) where
 
-import           Path ( (</>), parseRelDir )
-import           Path.IO ( doesDirExist, resolveDir' )
+import           Path ( SomeBase (..), (</>), parseRelDir )
+import           Path.IO ( doesDirExist, getCurrentDir )
 import           Pantry ( loadSnapshot )
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
 import qualified RIO.Set as Set
 import qualified RIO.Text as T
 import           Stack.Config ( makeConcreteResolver )
+import           Stack.Constants ( relDirRoot )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
@@ -45,21 +48,38 @@ instance Pretty UnpackPrettyException where
 
 instance Exception UnpackPrettyException
 
+-- | Type synonymn representing packages to be unpacked by the @stack unpack@
+-- command, identified either by name only or by an identifier (including
+-- Hackage revision).
+type UnpackTarget = Either PackageName PackageIdentifierRevision
+
+-- | Type representing options for the @stack unpack@ command.
+data UnpackOpts = UnpackOpts
+  { upoptsTargets :: [UnpackTarget]
+    -- ^ The packages to be unpacked.
+  , upOptsDest :: Maybe (SomeBase Dir)
+    -- ^ The optional directory into which a package will be unpacked into a
+    -- subdirectory.
+  }
+
 -- | Function underlying the @stack unpack@ command. Unpack packages to the
 -- filesystem.
 unpackCmd ::
-     ([String], Maybe Text)
-     -- ^ A pair of a list of names or identifiers and an optional destination
-     -- path.
+     UnpackOpts
   -> RIO Runner ()
-unpackCmd (names, Nothing) = unpackCmd (names, Just ".")
-unpackCmd (names, Just dstPath) = withConfig NoReexec $ do
+unpackCmd (UnpackOpts names Nothing) =
+  unpackCmd (UnpackOpts names (Just $ Rel relDirRoot))
+unpackCmd (UnpackOpts names (Just dstPath)) = withConfig NoReexec $ do
   mresolver <- view $ globalOptsL.to globalResolver
   mSnapshot <- forM mresolver $ \resolver -> do
     concrete <- makeConcreteResolver resolver
     loc <- completeSnapshotLocation concrete
     loadSnapshot loc
-  dstPath' <- resolveDir' $ T.unpack dstPath
+  dstPath' <- case dstPath of
+    Abs path -> pure path
+    Rel path -> do
+      wd <- getCurrentDir
+      pure $ wd </> path
   unpackPackages mSnapshot dstPath' names
 
 -- | Intended to work for the command line command.
@@ -67,18 +87,15 @@ unpackPackages ::
      forall env. (HasPantryConfig env, HasProcessContext env, HasTerm env)
   => Maybe RawSnapshot -- ^ When looking up by name, take from this build plan.
   -> Path Abs Dir -- ^ Destination.
-  -> [String] -- ^ Names or identifiers.
+  -> [UnpackTarget]
   -> RIO env ()
 unpackPackages mSnapshot dest input = do
-  let (errs1, (names, pirs1)) =
-        fmap partitionEithers $ partitionEithers $ map parse input
-  locs1 <- forM pirs1 $ \pir -> do
+  let (names, pirs) = partitionEithers input
+  locs1 <- forM pirs $ \pir -> do
     loc <- fmap cplComplete $ completePackageLocation $ RPLIHackage pir Nothing
     pure (loc, packageLocationIdent loc)
-  (errs2, locs2) <- partitionEithers <$> traverse toLoc names
-  case errs1 ++ errs2 of
-    [] -> pure ()
-    errs -> prettyThrowM $ CouldNotParsePackageSelectors errs
+  (errs, locs2) <- partitionEithers <$> traverse toLoc names
+  unless (null errs) $ prettyThrowM $ CouldNotParsePackageSelectors errs
   locs <- Map.fromList <$> mapM
     (\(pir, ident) -> do
         suffix <- parseRelDir $ packageIdentifierString ident
@@ -157,15 +174,3 @@ unpackPackages mSnapshot dest input = do
       Just sp -> do
         loc <- cplComplete <$> completePackageLocation (rspLocation sp)
         pure $ Right (loc, packageLocationIdent loc)
-
-  -- Possible future enhancement: parse names as name + version range
-  parse s =
-    case parsePackageName s of
-      Just x -> Right $ Left x
-      Nothing ->
-        case parsePackageIdentifierRevision (T.pack s) of
-          Right x -> Right $ Right x
-          Left _ -> Left $ fillSep
-            [ flow "Could not parse as package name or identifier:"
-            , style Current (fromString s) <> "."
-            ]

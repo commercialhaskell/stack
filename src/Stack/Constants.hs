@@ -52,6 +52,7 @@ module Stack.Constants
   , relDirGhciScript
   , relDirPantry
   , relDirPrograms
+  , relDirRoot
   , relDirUpperPrograms
   , relDirStackProgName
   , relDirStackWork
@@ -394,6 +395,9 @@ relDirPantry = $(mkRelDir "pantry")
 
 relDirPrograms :: Path Rel Dir
 relDirPrograms = $(mkRelDir "programs")
+
+relDirRoot :: Path Rel Dir
+relDirRoot = $(mkRelDir ".")
 
 relDirUpperPrograms :: Path Rel Dir
 relDirUpperPrograms = $(mkRelDir "Programs")

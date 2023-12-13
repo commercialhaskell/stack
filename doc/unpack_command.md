@@ -3,7 +3,7 @@
 # The `stack unpack` command
 
 ~~~text
-stack unpack PACKAGE [--to ARG]
+stack unpack PACKAGE [--to DIR]
 ~~~
 
 `stack unpack` downloads an archive file for one or more specified packages from
