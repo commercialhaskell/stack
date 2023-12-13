@@ -248,6 +248,12 @@ referring to remote archive files, either tarballs or ZIP files.
 
 !!! note
 
+    An example of a remote archive file is a Hackage package candidate, usually
+    located at (for example)
+    https://hackage.haskell.org/package/my-package-1.0.0/candidate/my-package-1.0.0.tar.gz.
+
+!!! warning
+
     Stack assumes that these archive files never change after downloading to
     avoid needing to make an HTTP request on each build.
 
