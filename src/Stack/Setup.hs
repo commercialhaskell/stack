@@ -1043,6 +1043,15 @@ warnUnsupportedCompilerCabal cp didWarn = do
                  \resolver. Acceptable resolvers: lts-7.0/nightly-2016-05-26 \
                  \or later."
           ]
+    | cabalVersion < mkVersion [2, 2, 0] -> do
+        prettyWarnL
+          [ flow "Stack's support of Cabal versions below 2.2.0.0 is \
+                 \deprecated and may be removed from the next version of \
+                 \ Stack. Cabal version"
+          , fromString (versionString cabalVersion)
+          , flow "was found. Consider using a resolver that is \
+                 \lts-12.0 or later or nightly-2018-03-13 or later."
+          ]
     | cabalVersion >= mkVersion [3, 11] && notifyIfCabalUntested ->
         prettyWarnL
           [ flow "Stack has not been tested with Cabal versions 3.12 and \

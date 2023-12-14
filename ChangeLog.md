@@ -30,6 +30,11 @@ Behavior changes:
   be configured in parallel. This increases the effective concurrency of builds
   that before would use fewer threads. Reconsider your `--jobs` setting
   accordingly. See [#84](https://github.com/commercialhaskell/stack/issues/84).
+* Stack warns that its support for Cabal versions before `2.2.0.0` is deprecated
+  and may be removed in the next version of Stack. Removal would mean that
+  projects using snapshots earlier than `lts-12.0` or `nightly-2018-03-18`
+  (GHC 8.4.1) might no longer build. See
+  [#6377](https://github.com/commercialhaskell/stack/issues/6377).
 
 Other enhancements:
 
