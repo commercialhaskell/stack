@@ -81,7 +81,7 @@ import           Stack.Config.Nix ( nixOptsFromMonoid )
 import           Stack.Constants
                    ( defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated
                    , defaultUserConfigPath, defaultUserConfigPathDeprecated
-                   , implicitGlobalProjectDir
+                   , hackageBaseUrl, implicitGlobalProjectDir
                    , implicitGlobalProjectDirDeprecated, inContainerEnvVar
                    , inNixShellEnvVar, osIsWindows, pantryRootEnvVar
                    , platformVariantEnvVar, relDirBin, relDirStackWork
@@ -421,7 +421,7 @@ configFromConfigMonoid
         configDumpLogs = fromFirst DumpWarningLogs configMonoidDumpLogs
         configSaveHackageCreds = fromFirst True configMonoidSaveHackageCreds
         configHackageBaseUrl =
-          fromFirst "https://hackage.haskell.org/" configMonoidHackageBaseUrl
+          fromFirst hackageBaseUrl configMonoidHackageBaseUrl
         configHideSourcePaths = fromFirstTrue configMonoidHideSourcePaths
         configRecommendUpgrade = fromFirstTrue configMonoidRecommendUpgrade
         configNotifyIfNixOnPath = fromFirstTrue configMonoidNotifyIfNixOnPath

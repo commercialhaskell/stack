@@ -58,8 +58,11 @@ Other enhancements:
   be muted if unwanted.
 * The compiler version is included in Stack's build message (e.g.
   `stack> build (lib + exe + test) with ghc-9.4.8`).
+* Add flag `--candidate` to Stack's `unpack` command, to allow package
+  candidates to be unpacked locally.
 
 Bug fixes:
+
 * Fix the `Curator` instance of `ToJSON`, as regards `expect-haddock-failure`.
 * Better error message if a `resolver:` or `snapshot:` value is, in error, a
   YAML number.
