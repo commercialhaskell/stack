@@ -8,10 +8,11 @@ stack unpack TARGET [--candidate] [--to DIR]
 
 `stack unpack` downloads an archive file for one or more specified target
 packages from the package index (e.g. Hackage), or one or more specified target
-package candidates, and unpacks each archive.
+package candidates, and unpacks each archive into a subdirectory named after the
+package version.
 
 In the case of packages from the package index, a target can be a package
-name. In that case, the download is for the most recent version.
+name only. In that case, the download is for the most recent version.
 
 Otherwise, a target should specify a package name and version (for example,
 `acme-missiles-0.3`). In the case of package versions from the package index,
@@ -29,6 +30,7 @@ By default:
         after the package version and located at endpoint
         `package\<package_version>\candidate\`. This is true of Hackage.
 
-*   the target is unpacked into a directory named after the package version.
-    Pass the option `--to <directory>` to specify the destination directory. The
-    directory can be an absolute one or relative to the current directory.
+*   the target is unpacked into a subdirectory of the current directory. Pass
+    the option `--to <directory>` to specify an alternative destination
+    directory to the current directory. The destination directory can be an
+    absolute one or relative to the current directory.
