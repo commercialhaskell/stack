@@ -407,6 +407,15 @@ Pass Stack's `--fast` flag to add `-O0` to the flags and options passed to GHC.
 The effect of `--fast` can be overriden with Stack's
 [`--ghc-options`](#-ghc-options-option) command line options.
 
+!!! note
+
+    With one exception, GHC's `-O` flag is always passed to GHC first (being
+    Cabal's default behaviour). The exception is if Cabal's
+    `--disable-optimization` flag or `--enable-optimization[=n]`, `-O[n]`
+    options are used during the configure step of the Cabal build process; see
+    Stack's [`configure-options`](#yaml_configuration.md#configure-options) YAML
+    configuration option.
+
 ### `--ghc-options` option
 
 `stack build --ghc-options <ghc_options>` passes the specified command line
