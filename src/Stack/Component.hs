@@ -23,7 +23,7 @@ module Stack.Component
   , stackTestFromCabal
   , foldOnNameAndBuildInfo
   , stackUnqualToQual
-  , processDependencies
+  , componentDependencyMap
   , fromCabalName
   ) where
 
@@ -185,19 +185,8 @@ gatherComponentToolsAndDepsFromCabal legacyBuildTools buildTools targetDeps =
         Map.insert pName (cabalToStackDep dep) $ sbiDependency sbi
     }
 
--- | This processes package's dependencies without recreating intermediate data
--- reprensentation for them.
-processDependencies ::
-     (HasField "buildInfo" component StackBuildInfo, Monad m)
-  => (PackageName -> DepValue -> m a -> m a)
-  -> component
-  -> m a
-  -> m a
-processDependencies iteratorFn component resAction =
-  Map.foldrWithKey' iteratorFn resAction componentDeps
- where
-  componentDeps = buildInfo.sbiDependency
-  buildInfo = component.buildInfo
+componentDependencyMap :: (HasField "buildInfo" r1 r2, HasField "sbiDependency" r2 a) => r1 -> a
+componentDependencyMap component = component.buildInfo.sbiDependency
 
 -- | A hard-coded map for tool dependencies. If a dependency is within this map
 -- it's considered "known" (the exe will be found at the execution stage). The

@@ -65,10 +65,10 @@ import           Path
 import           Path.Extra ( concatAndCollapseAbsDir, toFilePathNoTrailingSep )
 import           Stack.Component
                    ( foldOnNameAndBuildInfo, isComponentBuildable
-                   , processDependencies, stackBenchmarkFromCabal
+                   , stackBenchmarkFromCabal
                    , stackExecutableFromCabal, stackForeignLibraryFromCabal
                    , stackLibraryFromCabal, stackTestFromCabal
-                   , stackUnqualToQual
+                   , stackUnqualToQual, componentDependencyMap
                    )
 import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
@@ -704,8 +704,24 @@ processPackageComponent pkg componentFn = do
         . processMainLib
   processAllComp
 
--- | This is a function to iterate in a monad over all of a package component's
+-- | This is a function to iterate in a monad over all of a package's
 -- dependencies, and yield a collection of results (used with list and set).
+processPackageMapDeps ::
+     (Monad m)
+  => Package
+  -> (Map PackageName DepValue -> m a -> m a)
+  -> m a
+  -> m a
+processPackageMapDeps pkg fn = do
+  let packageSetupDepsProcessor resAction = case packageSetupDeps pkg of
+        Nothing -> resAction
+        Just v -> fn v resAction
+  let processAllComp = processPackageComponent pkg (fn . componentDependencyMap)
+        . packageSetupDepsProcessor
+  processAllComp
+
+-- | This is a function to iterate in a monad over all of a package component's
+-- dependencies, and yield a collection of results.
 processPackageDeps ::
      (Monad m, Monoid (targetedCollection resT))
   => Package
@@ -731,12 +747,7 @@ processPackageDeps pkg combineResults fn = do
             resList <- resListInMonad
             newResElement <- fn packageName depValue
             pure $ combineResults newResElement resList
-  let packageSetupDepsProcessor resAction = case packageSetupDeps pkg of
-        Nothing -> resAction
-        Just v -> M.foldrWithKey' innerIterator resAction v
-  let processAllComp = processPackageComponent pkg (processDependencies innerIterator)
-        . packageSetupDepsProcessor
-  processAllComp
+  processPackageMapDeps pkg (flip (M.foldrWithKey' innerIterator)) 
 
 -- | Iterate/fold on all the package dependencies, components, setup deps and
 -- all.
