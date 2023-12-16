@@ -451,8 +451,18 @@ dependencies.
 
 ### `--fast` flag
 
-Pass the flag to build your project with the GHC option `-O0`. `-O0` disables
-GHC's optimisations (which is GHC's default).
+GHC has many flags that specify individual optimisations of the compiler. GHC
+also uses its `-O*` flags to specify convenient 'packages' of GHC optimisation
+flags. GHC's flags are evaluated from left to right and later flags can override
+the effect of earlier ones.
+
+If no GHC `-O*` type flag is specified, GHC takes that to mean "Please
+compile quickly; I'm not over-bothered about compiled-code quality." GHC's `-O0`
+flag reverts to the same settings as if no `-O*` flags had been specified.
+
+Pass Stack's `--fast` flag to add `-O0` to the flags and options passed to GHC.
+The effect of `--fast` can be overriden with Stack's
+[`--ghc-options`](#-ghc-options-option) command line options.
 
 ### `--ghc-options` option
 
@@ -461,10 +471,10 @@ options to GHC, depending on Stack's
 [`apply-ghc-options`](yaml_configuration.md#apply-ghc-options) YAML
 configuration option. This option can be specified multiple times.
 
-GHC's command line options are _order-dependent_ and evaluated from left to
-right. Later options can override earlier options. Stack applies the options
-specified at the command line last. Any existing GHC command line options of a
-package are applied after those specified at the command line.
+GHC's command line options are evaluated from left to right. Later options can
+override the effect of earlier ones. Stack applies the options specified at the
+command line last. Any existing GHC command line options of a package are
+applied after those specified at the command line.
 
 ### `--[no-]library-profiling` flag
 
