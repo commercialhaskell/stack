@@ -17,7 +17,7 @@ available in snapshots to ensure reproducibility.
     snapshot specification.
 
 ~~~yaml
-resolver: lts-21.22 # Inherits GHC version and package set
+resolver: lts-22.0 # Inherits GHC version and package set
 compiler: ghc-9.6.2 # Overwrites GHC version in the resolver, optional
 
 # Additional packages, follows extra-deps syntax
@@ -61,35 +61,35 @@ custom snapshot, due to Stack sharing snapshot packages whenever possible.
 
 ### Overriding the compiler
 
-The following snapshot specification will be identical to `lts-21.22`, but
-instead use `ghc-9.4.5` instead of `ghc-9.4.8`:
+The following snapshot specification will be identical to `lts-22.0`, but
+instead use `ghc-9.6.2` instead of `ghc-9.6.3`:
 
 ~~~yaml
-resolver: lts-21.22
-compiler: ghc-9.4.5
+resolver: lts-22.0
+compiler: ghc-9.6.2
 ~~~
 
 ### Dropping packages
 
-The following snapshot specification will be identical to `lts-21.22`, but
+The following snapshot specification will be identical to `lts-22.0`, but
 without the `text` package in our snapshot. Removing this package will cause all
 the packages that depend on `text` to be unbuildable, but they will still be
 present in the snapshot.
 
 ~~~yaml
-resolver: lts-21.22
+resolver: lts-22.0
 drop-packages:
 - text
 ~~~
 
 ### Hiding packages
 
-The following snapshot specification will be identical to `lts-21.22`, but the
+The following snapshot specification will be identical to `lts-22.0`, but the
 `text` package will be hidden when registering. This will affect, for example,
 the import parser in the script command.
 
 ~~~yaml
-resolver: lts-21.22
+resolver: lts-22.0
 hidden:
 - text
 ~~~
@@ -99,11 +99,11 @@ hidden:
 In order to specify GHC options for a package, you use the same syntax as the
 [ghc-options](yaml_configuration.md#ghc-options) key for build configuration.
 
-The following snapshot specification will be identical to `lts-21.22`, but
+The following snapshot specification will be identical to `lts-22.0`, but
 provides `-O1` as a ghc-option for `text`:
 
 ~~~yaml
-resolver: lts-21.22
+resolver: lts-22.0
 packages:
 - text-2.0.2
 ghc-options:
@@ -122,11 +122,11 @@ packages in the `packages` list, rather than all packages in the snapshot.
 
 In order to specify Cabal flags for a package, you use the same syntax as the
 [flags](yaml_configuration.md#flags) key for build configuration. The
-following snapshot specification will be identical to `lts-21.22`, but
+following snapshot specification will be identical to `lts-22.0`, but
 it enables the `developer` Cabal flag:
 
 ~~~yaml
-resolver: lts-21.22
+resolver: lts-22.0
 packages:
 - text-2.0.2
 flags:
