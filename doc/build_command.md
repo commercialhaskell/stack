@@ -405,7 +405,7 @@ flag reverts to the same settings as if no `-O*` flags had been specified.
 
 Pass Stack's `--fast` flag to add `-O0` to the flags and options passed to GHC.
 The effect of `--fast` can be overriden with Stack's
-[`--ghc-options`](#ghc-options-option) command line options.
+[`--ghc-options`](#-ghc-options-option) command line options.
 
 ### `--ghc-options` option
 
