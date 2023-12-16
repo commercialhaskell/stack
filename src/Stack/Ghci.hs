@@ -70,7 +70,7 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.EnvSettings ( defaultEnvSettings )
 import           Stack.Types.Installed ( InstallMap, InstalledMap )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), isCLib, renderPkgComponent )
+                   ( NamedComponent (..), isCLib, renderPkgComponent, renderComponentTo )
 import           Stack.Types.Package
                    ( BuildInfoOpts (..), LocalPackage (..), Package (..)
                    , PackageConfig (..), dotCabalCFilePath, dotCabalGetPath
@@ -747,7 +747,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
                    PkgComponent
                    (  pkgNameText
                    <> ":"
-                   <> renderComp namedComponent
+                   <> renderComponentTo namedComponent
                    )
                  <> ","
                , "with"
@@ -778,21 +778,14 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
           toFilePath fp)
         putStrLn ""
         pure $ Just fp
-  renderComp c =
-    case c of
-      CLib -> "lib"
-      CSubLib name -> "sub-lib:" <> fromString (T.unpack name)
-      CExe name -> "exe:" <> fromString (T.unpack name)
-      CTest name -> "test:" <> fromString ( T.unpack name)
-      CBench name -> "bench:" <> fromString (T.unpack name)
   sampleTargetArg (pkg, comp, _) =
        fromString (packageNameString pkg)
     <> ":"
-    <> renderComp comp
+    <> renderComponentTo comp
   sampleMainIsArg (pkg, comp, _) =
     fillSep
       [ "--main-is"
-      , fromString (packageNameString pkg) <> ":" <> renderComp comp
+      , fromString (packageNameString pkg) <> ":" <> renderComponentTo comp
       ]
 
 loadGhciPkgDescs ::

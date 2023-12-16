@@ -170,7 +170,7 @@ instance HasField "qualifiedName" StackLibrary NamedComponent where
     where
       rawName = unqualCompToText v.name
 instance HasField "qualifiedName" StackForeignLibrary NamedComponent where
-  getField = CSubLib . unqualCompToText . (.name) -- TODO: make proper FLib constructor
+  getField = CFlib . unqualCompToText . (.name)
 instance HasField "qualifiedName" StackExecutable NamedComponent where
   getField = CExe . unqualCompToText . (.name)
 instance HasField "qualifiedName" StackTestSuite NamedComponent where

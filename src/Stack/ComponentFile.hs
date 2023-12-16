@@ -341,6 +341,7 @@ componentOutputDir namedComponent distDir =
     CExe name -> makeTmp name
     CTest name -> makeTmp name
     CBench name -> makeTmp name
+    CFlib name -> makeTmp name
  where
   makeTmp name =
     buildDir distDir </> componentNameToDir (name <> "/" <> name <> "-tmp")
@@ -563,6 +564,7 @@ componentBuildDir cabalVer component distDir
         CLib -> buildDir distDir
         CSubLib name -> buildDir distDir </> componentNameToDir name
         CExe name -> buildDir distDir </> componentNameToDir name
+        CFlib name -> buildDir distDir </> componentNameToDir name
         CTest name -> buildDir distDir </> componentNameToDir name
         CBench name -> buildDir distDir </> componentNameToDir name
 

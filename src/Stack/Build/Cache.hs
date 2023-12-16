@@ -138,6 +138,7 @@ buildCacheFile dir component = do
     CLib -> "lib"
     CSubLib name -> nonLibComponent "sub-lib" name
     CExe name -> nonLibComponent "exe" name
+    CFlib name -> nonLibComponent "flib" name
     CTest name -> nonLibComponent "test" name
     CBench name -> nonLibComponent "bench" name
   pure $ cachesDir </> smDirName </> cacheFileName

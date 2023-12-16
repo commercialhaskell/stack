@@ -5,6 +5,7 @@
 module Stack.Types.NamedComponent
   ( NamedComponent (..)
   , renderComponent
+  , renderComponentTo
   , renderPkgComponents
   , renderPkgComponent
   , exeComponents
@@ -31,16 +32,24 @@ data NamedComponent
     -- A named \'subsidiary\' or \'ancillary\` library component (sub-library).
   | CExe !Text
     -- A named executable component.
+  | CFlib !Text
+    -- A foreign library.
   | CTest !Text
     -- A named test-suite component.
   | CBench !Text
     -- A named benchmark component.
   deriving (Eq, Ord, Show)
 
+-- | Render a component to anything with an "IsString" instance.
+-- For Text prefer renderComponent.
+renderComponentTo :: IsString a => NamedComponent -> a
+renderComponentTo = fromString . T.unpack . renderComponent
+
 renderComponent :: NamedComponent -> Text
 renderComponent CLib = "lib"
 renderComponent (CSubLib x) = "sub-lib:" <> x
 renderComponent (CExe x) = "exe:" <> x
+renderComponent (CFlib x) = "flib:" <> x
 renderComponent (CTest x) = "test:" <> x
 renderComponent (CBench x) = "bench:" <> x
 
@@ -119,3 +128,4 @@ splitComponents =
   go s e t b (CExe x:xs) = go s (e . (x:)) t b xs
   go s e t b (CTest x:xs) = go s e (t . (x:)) b xs
   go s e t b (CBench x:xs) = go s e t (b . (x:)) xs
+  go s e t b x = go s e t b x
