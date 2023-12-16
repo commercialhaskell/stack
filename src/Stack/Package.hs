@@ -1,7 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Dealing with Cabal.
 
@@ -85,7 +86,7 @@ import           Stack.Types.CompCollection
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.Component ( HasBuildInfo )
+import           Stack.Types.Component ( HasBuildInfo, HasComponentInfo )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.Dependency
@@ -671,6 +672,38 @@ buildableTestSuites pkg = getBuildableSetText (packageTestSuites pkg)
 buildableBenchmarks :: Package -> Set Text
 buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)
 
+-- | Apply a generic processing function in a Monad over all of the Package's components.
+processPackageComponent ::
+     forall m a.
+     (Monad m)
+  => Package
+  -> (forall component. HasComponentInfo component => component -> m a -> m a)
+   -- ^ Processing function with all the component's info.
+  -> m a
+   -- ^ Initial value.
+  -> m a
+processPackageComponent pkg componentFn = do
+  let componentKindProcessor :: forall component. HasComponentInfo component => (Package -> CompCollection component) -> m a -> m a
+      componentKindProcessor target =
+        foldComponentToAnotherCollection
+          (target pkg)
+          componentFn
+  let processMainLib = maybe id componentFn (packageLibrary pkg)
+  let processAllComp =
+        ( if packageBenchmarkEnabled pkg
+              then componentKindProcessor packageBenchmarks
+              else id
+          )
+        . ( if packageTestEnabled pkg
+              then componentKindProcessor packageTestSuites
+              else id
+          )
+        . componentKindProcessor packageForeignLibraries
+        . componentKindProcessor packageExecutables
+        . componentKindProcessor packageSubLibraries
+        . processMainLib
+  processAllComp
+
 -- | This is a function to iterate in a monad over all of a package component's
 -- dependencies, and yield a collection of results (used with list and set).
 processPackageDeps ::
@@ -678,6 +711,7 @@ processPackageDeps ::
   => Package
   -> (resT -> targetedCollection resT -> targetedCollection resT)
   -> (PackageName -> DepValue -> m resT)
+  -> m (targetedCollection resT)
   -> m (targetedCollection resT)
 processPackageDeps pkg combineResults fn = do
   let asPackageNameSet accessor =
@@ -697,30 +731,12 @@ processPackageDeps pkg combineResults fn = do
             resList <- resListInMonad
             newResElement <- fn packageName depValue
             pure $ combineResults newResElement resList
-  let compProcessor target =
-        foldComponentToAnotherCollection
-          (target pkg)
-          (processDependencies innerIterator)
   let packageSetupDepsProcessor resAction = case packageSetupDeps pkg of
         Nothing -> resAction
         Just v -> M.foldrWithKey' innerIterator resAction v
-  let processAllComp =
-          compProcessor packageSubLibraries
-        . compProcessor packageForeignLibraries
-        . compProcessor packageExecutables
-        . ( if packageBenchmarkEnabled pkg
-              then compProcessor packageBenchmarks
-              else id
-          )
-        . ( if packageTestEnabled pkg
-              then compProcessor packageTestSuites
-              else id
-          )
+  let processAllComp = processPackageComponent pkg (processDependencies innerIterator)
         . packageSetupDepsProcessor
-  let initialValue = case packageLibrary pkg of
-        Nothing -> pure mempty
-        Just comp -> processDependencies innerIterator comp (pure mempty)
-  processAllComp initialValue
+  processAllComp
 
 -- | Iterate/fold on all the package dependencies, components, setup deps and
 -- all.
@@ -729,7 +745,7 @@ processPackageDepsToList ::
   => Package
   -> (PackageName -> DepValue -> m resT)
   -> m [resT]
-processPackageDepsToList pkg = processPackageDeps pkg (:)
+processPackageDepsToList pkg fn = processPackageDeps pkg (:) fn (pure [])
 
 -- | List all package's dependencies in a "free" context through the identity
 -- monad.
@@ -740,4 +756,4 @@ listOfPackageDeps pkg =
 -- | The set of package's dependencies.
 setOfPackageDeps :: Package -> Set PackageName
 setOfPackageDeps pkg =
-  runIdentity $ processPackageDeps pkg S.insert (\pn _ -> pure pn)
+  runIdentity $ processPackageDeps pkg S.insert (\pn _ -> pure pn) (pure mempty)
