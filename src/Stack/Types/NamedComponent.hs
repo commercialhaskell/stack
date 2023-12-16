@@ -17,6 +17,7 @@ module Stack.Types.NamedComponent
   , isCExe
   , isCTest
   , isCBench
+  , isPotentialDependency
   , splitComponents
   ) where
 
@@ -103,6 +104,9 @@ isCTest _ = False
 isCBench :: NamedComponent -> Bool
 isCBench CBench{} = True
 isCBench _ = False
+
+isPotentialDependency :: NamedComponent -> Bool
+isPotentialDependency v = isCLib v || isCSubLib v || isCExe v
 
 -- | A function to split the given list of components into sets of the names of
 -- the named components by the type of component (sub-libraries, executables,

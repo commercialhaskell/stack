@@ -48,7 +48,7 @@ import           Stack.Types.Component
                    )
 import           Stack.Types.ComponentUtils ( fromCabalName )
 import           Stack.Types.Dependency
-                   ( DepValue, cabalExeToStackDep, cabalToStackDep )
+                   ( cabalExeToStackDep, cabalToStackDep )
 import           Stack.Types.NamedComponent ( NamedComponent )
 
 stackUnqualToQual ::

@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- | Dealing with Cabal.
 
@@ -29,11 +30,13 @@ module Stack.Package
   , processPackageDepsToList
   , listOfPackageDeps
   , setOfPackageDeps
+  , topSortPackageComponent
   ) where
 
 import           Data.Foldable ( Foldable (..) )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import           Data.STRef ( STRef, modifySTRef', readSTRef, newSTRef )
 import qualified Data.Text as T
 import           Distribution.CabalSpecVersion ( cabalSpecToVersionDigits )
 import           Distribution.Compiler
@@ -82,16 +85,16 @@ import           Stack.Types.BuildConfig
                    ( HasBuildConfig (..), getProjectWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, foldAndMakeCollection
-                   , foldComponentToAnotherCollection, getBuildableSetText
+                   , foldComponentToAnotherCollection, getBuildableSetText, collectionLookup
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.Component ( HasBuildInfo, HasComponentInfo )
+import           Stack.Types.Component ( HasBuildInfo, HasComponentInfo, StackUnqualCompName (unqualCompToText) )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.Dependency
                    ( DepValue (..), cabalSetupDepsToStackDep
-                   , libraryDepFromVersionRange
+                   , libraryDepFromVersionRange, DepType (..), DepLibrary (..)
                    )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.Installed
@@ -99,7 +102,7 @@ import           Stack.Types.Installed
                    , installedToPackageIdOpt
                    )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), subLibComponents )
+                   ( NamedComponent (..), subLibComponents, isPotentialDependency )
 import           Stack.Types.Package
                    ( BioInput(..), BuildInfoOpts (..), Package (..)
                    , PackageConfig (..), PackageException (..)
@@ -107,9 +110,11 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.PackageFile
                    ( DotCabalPath, PackageComponentFile (..) )
+import           Stack.Types.SourceMap (Target(..))
 import           Stack.Types.Version
                    ( VersionRange, intersectVersionRanges, withinRange )
 import           System.FilePath ( replaceExtension )
+import           RIO.Seq ((|>))
 
 -- | Read @<package>.buildinfo@ ancillary files produced by some Setup.hs hooks.
 -- The file includes Cabal file syntax to be merged into the package description
@@ -768,3 +773,68 @@ listOfPackageDeps pkg =
 setOfPackageDeps :: Package -> Set PackageName
 setOfPackageDeps pkg =
   runIdentity $ processPackageDeps pkg S.insert (\pn _ -> pure pn) (pure mempty)
+
+-- | This implements a topological sort on all targeted components for the build
+-- and their dependencies. It's only targeting internal dependencies, so it's doing
+-- a topological sort on a subset of a package's components.
+-- 
+-- Note that in Cabal they use the Data.Graph struct to pursue the same goal. But dong this here
+-- would require a large number intermediate data structure.
+-- This is needed because we need to get the right GhcPkgId of the relevant internal dependencies
+-- of a component before building it as a component.
+topSortPackageComponent ::
+     Package
+  -> Target
+  -> Bool
+   -- ^ Include directTarget or not. False here means we won't 
+   -- include the actual targets in the result, only their deps.
+   -- Using it with False here only in GHCi
+  -> Seq NamedComponent
+topSortPackageComponent package target includeDirectTarget = runST $ do
+  alreadyProcessedRef <- newSTRef (mempty :: Set NamedComponent)
+  let processInitialComponents c = case target of
+        TargetAll{} -> processComponent includeDirectTarget alreadyProcessedRef c
+        TargetComps targetSet -> if S.member c.qualifiedName targetSet
+          then processComponent includeDirectTarget alreadyProcessedRef c
+          else id
+  processPackageComponent package processInitialComponents (pure mempty)
+  where
+    processComponent :: forall s component. HasComponentInfo component
+      => Bool
+       -- ^ Finally add this component in the seq
+      -> STRef s (Set NamedComponent)
+      -> component
+      -> ST s (Seq NamedComponent)
+      -> ST s (Seq NamedComponent)
+    processComponent finallyAddComponent alreadyProcessedRef component res = do
+      let depMap = componentDependencyMap component
+      let internalDep = M.lookup (packageName package) depMap
+      let processSubDep = processOneDep alreadyProcessedRef internalDep res
+      let qualName = component.qualifiedName
+      let processSubDepSaveName
+            | finallyAddComponent = (|> qualName) <$> processSubDep
+            | otherwise = processSubDep
+      -- This is an optimization, the only components we are likely to process
+      -- multiple times are the ones we can find in dependencies, 
+      -- otherwise we only fold on a single version of each component
+      -- by design.
+      if isPotentialDependency qualName then do
+        alreadyProcessed <- readSTRef alreadyProcessedRef
+        if S.member qualName alreadyProcessed then res
+        else modifySTRef' alreadyProcessedRef (S.insert qualName) >> processSubDepSaveName
+      else processSubDepSaveName
+    lookupLibName isMain name = if isMain
+          then packageLibrary package
+          else collectionLookup name $ packageSubLibraries package
+    processOneDep alreadyProcessed mDependency res = case dvType <$> mDependency of
+          Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
+            let processMainLibDep = case (mainLibDep, lookupLibName True mempty) of
+                  (True, Just mainLib) ->
+                    processComponent True alreadyProcessed mainLib
+                  _ -> id
+            let processSingleSubLib name = case lookupLibName False (unqualCompToText name) of
+                  Just lib -> processComponent True alreadyProcessed lib
+                  Nothing -> id
+            let processSubLibDep r = foldr' processSingleSubLib r subLibDeps
+            processSubLibDep (processMainLibDep res)
+          _ -> res
