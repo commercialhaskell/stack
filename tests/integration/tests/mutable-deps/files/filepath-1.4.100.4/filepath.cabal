@@ -50,17 +50,9 @@ description:
   Code examples for the new API can be found <https://github.com/hasufell/filepath-examples here>.
 
 extra-source-files:
-  Generate.hs
-  Makefile
   System/FilePath/Internal.hs
   System/OsPath/Common.hs
   System/OsString/Common.hs
-  tests/bytestring-tests/Properties/Common.hs
-
-extra-doc-files:
-  changelog.md
-  HACKING.md
-  README.md
 
 flag cpphs
   description: Use cpphs (fixes haddock source links)

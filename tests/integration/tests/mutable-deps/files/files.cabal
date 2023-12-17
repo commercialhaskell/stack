@@ -1,15 +1,23 @@
+cabal-version: 3.8
+
 name: files
 version: 1.0.0
 build-type: Simple
-cabal-version: >= 1.10
 
 library
-  hs-source-dirs: src
-  exposed-modules:  Files
-  build-depends:    base
-                  , filemanip
+  hs-source-dirs:
+      src
+  exposed-modules:
+      Files
+  build-depends:
+      base
+    , filemanip
 
 executable test-exe
-  hs-source-dirs: app
-  main-is: Main.hs
-  build-depends: base, files
+  hs-source-dirs:
+      app
+  main-is:
+      Main.hs
+  build-depends:
+      base
+    , files
