@@ -2,6 +2,14 @@ import Control.Monad (forM_, unless, when)
 import Data.List (isInfixOf, stripPrefix)
 import StackTest
 
+-- The package 'files' depends directly on filemanip, which depends directly on
+-- packages directory, filepath and unix-compat. Package directory also depends
+-- directly on filepath. Package unix-compat depends directly on directory,
+-- filepath, time, unix and Win32.
+-- The stack.yaml file, however, identifies filepath-1.4.100.4 as a local
+-- package. Consequently, filepath is a mutable package and the packages
+-- that depend on it should also be treated as mutable packages.
+
 main :: IO ()
 main = unless isWindows $ do -- dependency issues on Windows
     let isBuild package line =
