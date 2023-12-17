@@ -2,6 +2,31 @@
 
 _Note: below all `FilePath` values are unquoted, so `\\` really means two backslashes._
 
+## 1.4.100.4 *Jul 2023*
+
+* Fix isInfixOf and breakSubString in Word16, wrt [#195](https://github.com/haskell/filepath/issues/195)
+
+## 1.4.100.3 *Feb 2023*
+
+* Fix a regression in `splitFileName` wrt [#189](https://github.com/haskell/filepath/pull/189)
+
+## 1.4.100.2 *Feb 2023*
+
+* Speed up `splitFileName`, `splitExtension`, `readDriveLetter` and various other helpers (up to 20x faster) by @Bodigrim
+
+## 1.4.100.1 *Feb 2023*
+
+* Fix regression in `System.FilePath.Windows.normalise` wrt [#187](https://github.com/haskell/filepath/issues/187)
+* Fix tests on GHC 9.4.4
+* Avoid head and tail
+
+## 1.4.100.0 *July 2022*
+
+Implementation of the [Abstract FilePath Proposal](https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/abstract-file-path)
+in user-space as a separate type.
+
+Introduction to the new API is explained [in this blog post](https://hasufell.github.io/posts/2022-06-29-fixing-haskell-filepaths.html).
+
 ## 1.4.2.2 *Dec 2021*
 
 This release is purely a documentation release, fixing the broken haddock links.

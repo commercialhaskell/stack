@@ -16,12 +16,12 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 21 August 2023, ubuntu-latest, windows-latest and macos-latest come
-# with Stack 2.11.1 (2.9.3 on macos-latest) and GHC 9.6.2. windows-latest comes
-# with NSIS 3.08, for which the default value of the 'Unicode' installer
-# attribute is 'true'. However, that is not the 'large strings' build of NSIS
-# and creates installers that corrupt the PATH environment variable if the
-# default string length of 1024 characters is exceeded.
+# As of 16 December 2023, ubuntu-latest, windows-latest and macos-latest come
+# with Stack 2.13.1 and GHC 9.8.1. windows-latest comes with NSIS 3.08, for
+# which the default value of the 'Unicode' installer attribute is 'true'.
+# However, that is not the 'large strings' build of NSIS and creates installers
+# that corrupt the PATH environment variable if the default string length of
+# 1024 characters is exceeded.
 
 jobs:
   integration-tests:

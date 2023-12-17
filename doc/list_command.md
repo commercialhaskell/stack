@@ -29,11 +29,11 @@ For example:
 
 ~~~text
 stack list base unix Win32 acme-missiles pantry
-base-4.18.0.0
-unix-2.8.1.1
+base-4.19.0.0
+unix-2.8.5.0
 Win32-2.13.4.0
 acme-missiles-0.3
-pantry-0.9.2
+pantry-0.9.3.1
 
 stack list paltry
 Could not find package paltry, updating
@@ -44,20 +44,20 @@ Error: [S-4926]
          pantry, pretty, pasty, xattr, alloy, para, pappy, alure, polar and
          factory.
 
-stack --resolver lts-21.22 list base unix Win32 acme-missiles pantry
+stack --resolver lts-22.0 list base unix Win32 acme-missiles pantry
 Error: [S-4926]
        * Package does not appear in snapshot: base.
        * Package does not appear in snapshot: unix.
        * Package does not appear in snapshot: Win32.
        * Package does not appear in snapshot: acme-missiles.
 
-stack --resolver lts-21.22 list pantry
-pantry-0.8.3
+stack --resolver lts-22.0 list pantry
+pantry-0.9.3.1
 
-stack --resolver lts-21.22 list
+stack --resolver lts-22.0 list
 AC-Angle-1.0
 ALUT-2.4.0.3
 ...
-zot-0.0.3
 zstd-0.1.3.0
+zxcvbn-hs-0.3.6
 ~~~

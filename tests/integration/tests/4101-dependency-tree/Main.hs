@@ -12,7 +12,7 @@ main =
   stackCheckStdout ["ls", "dependencies", "tree"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "├─┬ files 0.1.0.0"
-                           , "│ ├─┬ base 4.17.2.1"
+                           , "│ ├─┬ base 4.18.1.0"
                            ]
     unless (expected `isPrefixOf` stdOut) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]
@@ -20,12 +20,12 @@ main =
   stackCheckStdout ["ls", "dependencies", "tree", "--depth=1"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "├─┬ files 0.1.0.0"
-                           , "│ ├── base 4.17.2.1"
+                           , "│ ├── base 4.18.1.0"
                            , "│ ├── filelock 0.1.1.2"
-                           , "│ ├── mtl 2.2.2"
+                           , "│ ├── mtl 2.3.1"
                            , "│ └── subproject 0.1.0.0"
                            , "└─┬ subproject 0.1.0.0"
-                           , "  └── base 4.17.2.1"
+                           , "  └── base 4.18.1.0"
                            ]
     when (stdOut /= expected) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]
@@ -33,11 +33,11 @@ main =
   stackCheckStdout ["ls", "dependencies", "tree", "subproject"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "└─┬ subproject 0.1.0.0"
-                           , "  └─┬ base 4.17.2.1"
+                           , "  └─┬ base 4.18.1.0"
                            , "    ├─┬ ghc-bignum 1.3"
-                           , "    │ └─┬ ghc-prim 0.9.1"
+                           , "    │ └─┬ ghc-prim 0.10.0"
                            , "    │   └── rts 1.0.2"
-                           , "    ├─┬ ghc-prim 0.9.1"
+                           , "    ├─┬ ghc-prim 0.10.0"
                            , "    │ └── rts 1.0.2"
                            , "    └── rts 1.0.2"
                            ]
@@ -46,6 +46,6 @@ main =
 
   stackCheckStdout ["ls", "dependencies", "json"] $ \stdOut -> do
     currdir <- getCurrentDirectory
-    let expected = "[{\"dependencies\":[\"base\",\"bytestring\",\"time\"]"
+    let expected = "[{\"dependencies\":[\"base\",\"bytestring\",\"filepath\",\"time\"]"
     unless (expected `isPrefixOf` stdOut) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]

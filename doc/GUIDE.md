@@ -255,8 +255,8 @@ packages:
 
 The value of the `resolver` key tells Stack *how* to build your package: which
 GHC version to use, versions of package dependencies, and so on. Our value here
-says to use [LTS Haskell 21.22](https://www.stackage.org/lts-21.22), which
-implies GHC 9.4.8 (which is why `stack build` installs that version of GHC if it
+says to use [LTS Haskell 22.0](https://www.stackage.org/lts-22.0), which
+implies GHC 9.6.3 (which is why `stack build` installs that version of GHC if it
 is not already available to Stack). There are a number of values you can use for
 `resolver`, which we'll cover later.
 
@@ -503,7 +503,7 @@ also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite
 a bit of information about it at
 [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-21.22`, as is currently the
+* The appropriate resolver value (`resolver: lts-22.0`, as is currently the
   latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
@@ -522,7 +522,7 @@ towards by default as well).
 
 ## Resolvers and changing your compiler version
 
-Let's explore package sets a bit further. Instead of `lts-21.22`, let's change
+Let's explore package sets a bit further. Instead of `lts-22.0`, let's change
 our `stack.yaml` file to use the
 [latest nightly](https://www.stackage.org/nightly). Right now, this is currently
 2023-09-24 - please see the resolver from the link above to get the latest.
@@ -1340,7 +1340,7 @@ yields output like:
 
 ~~~text
 Run from outside a project, using implicit global project config
-Using latest snapshot resolver: lts-21.22
+Using latest snapshot resolver: lts-22.0
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
 Note: You can change the snapshot via the resolver field there.
 I installed the stm package via --package stm

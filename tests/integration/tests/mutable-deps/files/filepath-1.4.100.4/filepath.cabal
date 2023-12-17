@@ -1,0 +1,116 @@
+cabal-version:      2.2
+name:               filepath
+version:            1.4.100.4
+
+-- NOTE: Don't forget to update ./changelog.md
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Neil Mitchell <ndmitchell@gmail.com>
+maintainer:         Julian Ospald <hasufell@posteo.de>
+copyright:          Neil Mitchell 2005-2020, Julain Ospald 2021-2022
+bug-reports:        https://github.com/haskell/filepath/issues
+homepage:
+  https://github.com/haskell/filepath/blob/master/README.md
+
+category:           System
+build-type:         Simple
+synopsis:           Library for manipulating FilePaths in a cross platform way.
+tested-with:
+  GHC ==8.0.2
+   || ==8.2.2
+   || ==8.4.4
+   || ==8.6.5
+   || ==8.8.4
+   || ==8.10.7
+   || ==9.0.2
+   || ==9.2.3
+
+description:
+  This package provides functionality for manipulating @FilePath@ values, and is shipped with <https://www.haskell.org/ghc/ GHC>. It provides two variants for filepaths:
+  .
+  1. legacy filepaths: @type FilePath = String@
+  .
+  2. operating system abstracted filepaths (@OsPath@): internally unpinned @ShortByteString@ (platform-dependent encoding)
+  .
+  It is recommended to use @OsPath@ when possible, because it is more correct.
+  .
+  For each variant there are three main modules:
+  .
+  * "System.FilePath.Posix" / "System.OsPath.Posix" manipulates POSIX\/Linux style @FilePath@ values (with @\/@ as the path separator).
+  .
+  * "System.FilePath.Windows" / "System.OsPath.Windows" manipulates Windows style @FilePath@ values (with either @\\@ or @\/@ as the path separator, and deals with drives).
+  .
+  * "System.FilePath" / "System.OsPath" for dealing with current platform-specific filepaths
+  .
+  "System.OsString" is like "System.OsPath", but more general purpose. Refer to the documentation of
+  those modules for more information.
+  .
+  An introduction into the new API can be found in this
+  <https://hasufell.github.io/posts/2022-06-29-fixing-haskell-filepaths.html blog post>.
+  Code examples for the new API can be found <https://github.com/hasufell/filepath-examples here>.
+
+extra-source-files:
+  Generate.hs
+  Makefile
+  System/FilePath/Internal.hs
+  System/OsPath/Common.hs
+  System/OsString/Common.hs
+  tests/bytestring-tests/Properties/Common.hs
+
+extra-doc-files:
+  changelog.md
+  HACKING.md
+  README.md
+
+flag cpphs
+  description: Use cpphs (fixes haddock source links)
+  default:     False
+  manual:      True
+
+source-repository head
+  type:     git
+  location: https://github.com/haskell/filepath
+
+library
+  exposed-modules:
+    System.FilePath
+    System.FilePath.Posix
+    System.FilePath.Windows
+    System.OsPath
+    System.OsPath.Data.ByteString.Short
+    System.OsPath.Data.ByteString.Short.Internal
+    System.OsPath.Data.ByteString.Short.Word16
+    System.OsPath.Encoding
+    System.OsPath.Encoding.Internal
+    System.OsPath.Internal
+    System.OsPath.Posix
+    System.OsPath.Posix.Internal
+    System.OsPath.Types
+    System.OsPath.Windows
+    System.OsPath.Windows.Internal
+    System.OsString
+    System.OsString.Internal
+    System.OsString.Internal.Types
+    System.OsString.Posix
+    System.OsString.Windows
+
+  other-extensions:
+    CPP
+    PatternGuards
+
+  if impl(ghc >=7.2)
+    other-extensions: Safe
+
+  default-language: Haskell2010
+  build-depends:
+    , base              >=4.9      && <4.20
+    , bytestring        >=0.11.3.0
+    , deepseq
+    , exceptions
+    , template-haskell
+
+  ghc-options:      -Wall
+
+  if flag(cpphs)
+    ghc-options:        -pgmPcpphs -optP--cpp
+    build-tool-depends: cpphs:cpphs -any
