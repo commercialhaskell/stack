@@ -47,8 +47,7 @@ import           Stack.Types.Component
                    , StackUnqualCompName (..)
                    )
 import           Stack.Types.ComponentUtils ( fromCabalName )
-import           Stack.Types.Dependency
-                   ( cabalExeToStackDep, cabalToStackDep )
+import           Stack.Types.Dependency ( cabalExeToStackDep, cabalToStackDep )
 import           Stack.Types.NamedComponent ( NamedComponent )
 
 stackUnqualToQual ::
@@ -185,7 +184,10 @@ gatherComponentToolsAndDepsFromCabal legacyBuildTools buildTools targetDeps =
         Map.insert pName (cabalToStackDep dep) $ sbiDependency sbi
     }
 
-componentDependencyMap :: (HasField "buildInfo" r1 r2, HasField "sbiDependency" r2 a) => r1 -> a
+componentDependencyMap ::
+     (HasField "buildInfo" r1 r2, HasField "sbiDependency" r2 a)
+  => r1
+  -> a
 componentDependencyMap component = component.buildInfo.sbiDependency
 
 -- | A hard-coded map for tool dependencies. If a dependency is within this map

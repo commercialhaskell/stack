@@ -6,8 +6,8 @@
 {-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE OverloadedRecordDot        #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 -- | A module providing the types that represent different sorts of components
 -- of a package (library and sub-library, foreign library, executable, test
@@ -31,7 +31,7 @@ import           Distribution.PackageDescription
                    ( BenchmarkInterface, Dependency, TestSuiteInterface )
 import           Distribution.Simple ( Extension, Language )
 import           Distribution.Utils.Path ( PackageDir, SourceDir, SymbolicPath )
-import           GHC.Records ( HasField(..) )
+import           GHC.Records ( HasField (..) )
 import           Stack.Prelude
 import           Stack.Types.ComponentUtils ( StackUnqualCompName (..) )
 import           Stack.Types.Dependency ( DepValue )
@@ -169,12 +169,16 @@ instance HasField "qualifiedName" StackLibrary NamedComponent where
     | otherwise = CSubLib rawName
     where
       rawName = unqualCompToText v.name
+
 instance HasField "qualifiedName" StackForeignLibrary NamedComponent where
   getField = CFlib . unqualCompToText . (.name)
+
 instance HasField "qualifiedName" StackExecutable NamedComponent where
   getField = CExe . unqualCompToText . (.name)
+
 instance HasField "qualifiedName" StackTestSuite NamedComponent where
   getField = CTest . unqualCompToText . (.name)
+
 instance HasField "qualifiedName" StackBenchmark NamedComponent where
   getField = CTest . unqualCompToText . (.name)
 
@@ -182,6 +186,7 @@ instance HasField "qualifiedName" StackBenchmark NamedComponent where
 -- computed from the type, the NamedComponent constructor and the name.
 type HasQualiName component = HasField "qualifiedName" component NamedComponent
 
--- | Type synonym for a 'HasField' constraint for all the common component fields
--- i.e. @name@ and @buildInfo@ and qualifiedName now.
-type HasComponentInfo component = (HasName component, HasBuildInfo component, HasQualiName component)
+-- | Type synonym for a 'HasField' constraint for all the common component
+-- fields i.e. @name@, @buildInfo@ and @qualifiedName@.
+type HasComponentInfo component =
+  (HasName component, HasBuildInfo component, HasQualiName component)

@@ -613,7 +613,7 @@ applyTemplate project template nonceParams dir templateText = do
     <> style Shell
          ( fillSep
              [ flow "stack new"
-             , fromString (packageNameString project)
+             , fromPackageName project
              , fromString $ T.unpack (templateName template)
              , hsep $
                  map

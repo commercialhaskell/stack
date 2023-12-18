@@ -153,7 +153,7 @@ loadDatabase installMap db lhs0 = do
   processLoadResult (reason, lh) = do
     logDebug $
          "Ignoring package "
-      <> fromString (packageNameString (fst (lhPair lh)))
+      <> fromPackageName (fst (lhPair lh))
       <> case db of
            GlobalPkgDb -> mempty
            UserPkgDb loc fp -> ", from " <> displayShow (loc, fp) <> ","

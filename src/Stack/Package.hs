@@ -67,11 +67,11 @@ import           Path
                    )
 import           Path.Extra ( concatAndCollapseAbsDir, toFilePathNoTrailingSep )
 import           Stack.Component
-                   ( foldOnNameAndBuildInfo, isComponentBuildable
-                   , stackBenchmarkFromCabal
+                   ( componentDependencyMap, foldOnNameAndBuildInfo
+                   , isComponentBuildable, stackBenchmarkFromCabal
                    , stackExecutableFromCabal, stackForeignLibraryFromCabal
                    , stackLibraryFromCabal, stackTestFromCabal
-                   , stackUnqualToQual, componentDependencyMap
+                   , stackUnqualToQual
                    )
 import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
@@ -677,28 +677,32 @@ buildableTestSuites pkg = getBuildableSetText (packageTestSuites pkg)
 buildableBenchmarks :: Package -> Set Text
 buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)
 
--- | Apply a generic processing function in a Monad over all of the Package's components.
+-- | Apply a generic processing function in a Monad over all of the Package's
+-- components.
 processPackageComponent ::
-     forall m a.
-     (Monad m)
+     forall m a. (Monad m)
   => Package
   -> (forall component. HasComponentInfo component => component -> m a -> m a)
-   -- ^ Processing function with all the component's info.
+     -- ^ Processing function with all the component's info.
   -> m a
-   -- ^ Initial value.
+     -- ^ Initial value.
   -> m a
 processPackageComponent pkg componentFn = do
-  let componentKindProcessor :: forall component. HasComponentInfo component => (Package -> CompCollection component) -> m a -> m a
+  let componentKindProcessor ::
+           forall component. HasComponentInfo component
+        => (Package -> CompCollection component)
+        -> m a
+        -> m a
       componentKindProcessor target =
         foldComponentToAnotherCollection
           (target pkg)
           componentFn
-  let processMainLib = maybe id componentFn (packageLibrary pkg)
-  let processAllComp =
+      processMainLib = maybe id componentFn (packageLibrary pkg)
+      processAllComp =
         ( if packageBenchmarkEnabled pkg
-              then componentKindProcessor packageBenchmarks
-              else id
-          )
+            then componentKindProcessor packageBenchmarks
+            else id
+        )
         . ( if packageTestEnabled pkg
               then componentKindProcessor packageTestSuites
               else id
@@ -721,7 +725,7 @@ processPackageMapDeps pkg fn = do
   let packageSetupDepsProcessor resAction = case packageSetupDeps pkg of
         Nothing -> resAction
         Just v -> fn v resAction
-  let processAllComp = processPackageComponent pkg (fn . componentDependencyMap)
+      processAllComp = processPackageComponent pkg (fn . componentDependencyMap)
         . packageSetupDepsProcessor
   processAllComp
 
@@ -737,22 +741,22 @@ processPackageDeps ::
 processPackageDeps pkg combineResults fn = do
   let asPackageNameSet accessor =
         S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
-  let (!subLibNames, !foreignLibNames) =
+      (!subLibNames, !foreignLibNames) =
         ( asPackageNameSet packageSubLibraries
         , asPackageNameSet packageForeignLibraries
         )
-  let shouldIgnoreDep (packageNameV :: PackageName)
-          | packageNameV == packageName pkg = True
-          | packageNameV `S.member` subLibNames = True
-          | packageNameV `S.member` foreignLibNames = True
-          | otherwise = False
-  let innerIterator packageName depValue resListInMonad
+      shouldIgnoreDep (packageNameV :: PackageName)
+        | packageNameV == packageName pkg = True
+        | packageNameV `S.member` subLibNames = True
+        | packageNameV `S.member` foreignLibNames = True
+        | otherwise = False
+      innerIterator packageName depValue resListInMonad
         | shouldIgnoreDep packageName = resListInMonad
         | otherwise = do
             resList <- resListInMonad
             newResElement <- fn packageName depValue
             pure $ combineResults newResElement resList
-  processPackageMapDeps pkg (flip (M.foldrWithKey' innerIterator)) 
+  processPackageMapDeps pkg (flip (M.foldrWithKey' innerIterator))
 
 -- | Iterate/fold on all the package dependencies, components, setup deps and
 -- all.
@@ -777,7 +781,7 @@ setOfPackageDeps pkg =
 -- | This implements a topological sort on all targeted components for the build
 -- and their dependencies. It's only targeting internal dependencies, so it's doing
 -- a topological sort on a subset of a package's components.
--- 
+--
 -- Note that in Cabal they use the Data.Graph struct to pursue the same goal. But dong this here
 -- would require a large number intermediate data structure.
 -- This is needed because we need to get the right GhcPkgId of the relevant internal dependencies
@@ -786,7 +790,7 @@ topSortPackageComponent ::
      Package
   -> Target
   -> Bool
-   -- ^ Include directTarget or not. False here means we won't 
+   -- ^ Include directTarget or not. False here means we won't
    -- include the actual targets in the result, only their deps.
    -- Using it with False here only in GHCi
   -> Seq NamedComponent
@@ -808,33 +812,38 @@ topSortPackageComponent package target includeDirectTarget = runST $ do
       -> ST s (Seq NamedComponent)
     processComponent finallyAddComponent alreadyProcessedRef component res = do
       let depMap = componentDependencyMap component
-      let internalDep = M.lookup (packageName package) depMap
-      let processSubDep = processOneDep alreadyProcessedRef internalDep res
-      let qualName = component.qualifiedName
-      let processSubDepSaveName
+          internalDep = M.lookup (packageName package) depMap
+          processSubDep = processOneDep alreadyProcessedRef internalDep res
+          qualName = component.qualifiedName
+          processSubDepSaveName
             | finallyAddComponent = (|> qualName) <$> processSubDep
             | otherwise = processSubDep
       -- This is an optimization, the only components we are likely to process
-      -- multiple times are the ones we can find in dependencies, 
-      -- otherwise we only fold on a single version of each component
-      -- by design.
-      if isPotentialDependency qualName then do
-        alreadyProcessed <- readSTRef alreadyProcessedRef
-        if S.member qualName alreadyProcessed then res
-        else modifySTRef' alreadyProcessedRef (S.insert qualName) >> processSubDepSaveName
-      else processSubDepSaveName
+      -- multiple times are the ones we can find in dependencies, otherwise we
+      -- only fold on a single version of each component by design.
+      if isPotentialDependency qualName
+        then do
+          alreadyProcessed <- readSTRef alreadyProcessedRef
+          if S.member qualName alreadyProcessed
+            then res
+            else modifySTRef' alreadyProcessedRef (S.insert qualName)
+                   >> processSubDepSaveName
+        else processSubDepSaveName
     lookupLibName isMain name = if isMain
-          then packageLibrary package
-          else collectionLookup name $ packageSubLibraries package
-    processOneDep alreadyProcessed mDependency res = case dvType <$> mDependency of
-          Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
-            let processMainLibDep = case (mainLibDep, lookupLibName True mempty) of
+      then packageLibrary package
+      else collectionLookup name $ packageSubLibraries package
+    processOneDep alreadyProcessed mDependency res =
+      case dvType <$> mDependency of
+        Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
+          let processMainLibDep =
+                case (mainLibDep, lookupLibName True mempty) of
                   (True, Just mainLib) ->
                     processComponent True alreadyProcessed mainLib
                   _ -> id
-            let processSingleSubLib name = case lookupLibName False (unqualCompToText name) of
+              processSingleSubLib name =
+                case lookupLibName False (unqualCompToText name) of
                   Just lib -> processComponent True alreadyProcessed lib
                   Nothing -> id
-            let processSubLibDep r = foldr' processSingleSubLib r subLibDeps
-            processSubLibDep (processMainLibDep res)
-          _ -> res
+              processSubLibDep r = foldr' processSingleSubLib r subLibDeps
+          processSubLibDep (processMainLibDep res)
+        _ -> res

@@ -137,8 +137,8 @@ buildCacheFile dir component = do
   cacheFileName <- parseRelFile $ case component of
     CLib -> "lib"
     CSubLib name -> nonLibComponent "sub-lib" name
-    CExe name -> nonLibComponent "exe" name
     CFlib name -> nonLibComponent "flib" name
+    CExe name -> nonLibComponent "exe" name
     CTest name -> nonLibComponent "test" name
     CBench name -> nonLibComponent "bench" name
   pure $ cachesDir </> smDirName </> cacheFileName

@@ -472,7 +472,7 @@ getCachedDepOrAddDep name = do
     Just res -> do
       logDebugPlanS "getCachedDepOrAddDep" $
            "Using cached result for "
-        <> fromString (packageNameString name)
+        <> fromPackageName name
         <> ": "
         <> fromString (show res)
       pure res
@@ -490,7 +490,7 @@ checkCallStackAndAddDep name = do
     then do
       logDebugPlanS "checkCallStackAndAddDep" $
            "Detected cycle "
-        <> fromString (packageNameString name)
+        <> fromPackageName name
         <> ": "
         <> fromString (show $ map packageNameString (callStack ctx))
       pure $ Left $ DependencyCycleDetected $ name : callStack ctx
@@ -500,7 +500,7 @@ checkCallStackAndAddDep name = do
       Nothing -> do
         logDebugPlanS "checkCallStackAndAddDep" $
              "No package info for "
-          <> fromString (packageNameString name)
+          <> fromPackageName name
           <> "."
         pure $ Left $ UnknownPackage name
       Just packageInfo ->
@@ -520,7 +520,7 @@ addDep ::
 addDep name packageInfo = do
   logDebugPlanS "addDep" $
        "Package info for "
-    <> fromString (packageNameString name)
+    <> fromPackageName name
     <> ": "
     <> fromString (show packageInfo)
   case packageInfo of
@@ -625,7 +625,7 @@ installPackage name ps minstalled = do
     PSRemote pkgLoc _version _fromSnapshot cp -> do
       logDebugPlanS "installPackage" $
            "Doing all-in-one build for upstream package "
-        <> fromString (packageNameString name)
+        <> fromPackageName name
         <> "."
       package <- loadPackage
         ctx pkgLoc (cpFlags cp) (cpGhcOptions cp) (cpCabalConfigOpts cp)
@@ -635,7 +635,7 @@ installPackage name ps minstalled = do
         Nothing -> do
           logDebugPlanS "installPackage" $
                "No test or bench component for "
-            <> fromString (packageNameString name)
+            <> fromPackageName name
             <> " so doing an all-in-one build."
           resolveDepsAndInstall
             True (lpBuildHaddocks lp) ps (lpPackage lp) minstalled
@@ -653,7 +653,7 @@ installPackage name ps minstalled = do
             Right deps -> do
               logDebugPlanS "installPackage" $
                    "For "
-                <> fromString (packageNameString name)
+                <> fromPackageName name
                 <> ", successfully added package deps."
               -- in curator builds we can't do all-in-one build as
               -- test/benchmark failure could prevent library from being
