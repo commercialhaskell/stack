@@ -111,6 +111,8 @@ isPotentialDependency v = isCLib v || isCSubLib v || isCExe v
 -- | A function to split the given list of components into sets of the names of
 -- the named components by the type of component (sub-libraries, executables,
 -- test-suites, benchmarks), ignoring any 'main' unnamed library component.
+-- This function should be used very sparingly, more often than not, you can 
+-- keep/parse the components split from the start.
 splitComponents ::
      [NamedComponent]
   -> ( Set Text
@@ -132,4 +134,4 @@ splitComponents =
   go s e t b (CExe x:xs) = go s (e . (x:)) t b xs
   go s e t b (CTest x:xs) = go s e (t . (x:)) b xs
   go s e t b (CBench x:xs) = go s e t (b . (x:)) xs
-  go s e t b x = go s e t b x
+  go s e t b (CFlib _:xs) = go s e t b xs -- ignore foreign lirbaries here, for now
