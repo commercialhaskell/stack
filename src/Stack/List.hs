@@ -73,7 +73,7 @@ listPackages mSnapshot input = do
           updated <-
             updateHackageIndex $ Just $
                  "Could not find package "
-              <> fromString (packageNameString name)
+              <> fromPackageName name
               <> ", updating"
           case updated of
             UpdateOccurred ->

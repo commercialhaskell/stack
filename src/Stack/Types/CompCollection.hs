@@ -197,10 +197,10 @@ foldComponentToAnotherCollection ::
      (Monad m)
   => CompCollection component
      -- ^ Collection of components.
-  -> (component -> m (t b) -> m (t b))
+  -> (component -> m a -> m a)
      -- ^ Binary operator.
-  -> m (t b)
+  -> m a
      -- ^ Starting value.
-  -> m (t b)
+  -> m a
 foldComponentToAnotherCollection collection fn initialValue =
   HM.foldr' fn initialValue (asNameMap $ buildableOnes collection)

@@ -46,7 +46,7 @@ import           Stack.Package
                    ( buildableExes, buildableForeignLibs, getPackageOpts
                    , hasBuildableMainLibrary, listOfPackageDeps
                    , packageFromPackageDescription, readDotBuildinfo
-                   , resolvePackageDescription
+                   , resolvePackageDescription, topSortPackageComponent
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
@@ -70,7 +70,9 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.EnvSettings ( defaultEnvSettings )
 import           Stack.Types.Installed ( InstallMap, InstalledMap )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), isCLib, renderPkgComponent )
+                   ( NamedComponent (..), isCLib, isCSubLib, renderComponentTo
+                   , renderPkgComponent
+                   )
 import           Stack.Types.Package
                    ( BuildInfoOpts (..), LocalPackage (..), Package (..)
                    , PackageConfig (..), dotCabalCFilePath, dotCabalGetPath
@@ -182,11 +184,12 @@ data GhciPkgDesc = GhciPkgDesc
   , ghciDescTarget :: !Target
   }
 
--- Mapping from a module name to a map with all of the paths that use
--- that name. Each of those paths is associated with a set of components
--- that contain it. Purpose of this complex structure is for use in
+-- Mapping from a module name to a map with all of the paths that use that name.
+-- Each of those paths is associated with a set of components that contain it.
+-- The purpose of this complex structure is for use in
 -- 'checkForDuplicateModules'.
-type ModuleMap = Map ModuleName (Map (Path Abs File) (Set (PackageName, NamedComponent)))
+type ModuleMap =
+  Map ModuleName (Map (Path Abs File) (Set (PackageName, NamedComponent)))
 
 unionModuleMaps :: [ModuleMap] -> ModuleMap
 unionModuleMaps = M.unionsWith (M.unionWith S.union)
@@ -251,6 +254,11 @@ ghci opts@GhciOpts{..} = do
   localTargets <- getAllLocalTargets opts inputTargets mainIsTargets localMap
   -- Get a list of all the non-local target packages.
   nonLocalTargets <- getAllNonLocalTargets inputTargets
+  let getInternalDependencies target localPackage =
+        topSortPackageComponent (lpPackage localPackage) target False
+      internalDependencies =
+        M.intersectionWith getInternalDependencies inputTargets localMap
+      relevantDependencies = M.filter (any isCSubLib) internalDependencies
   -- Check if additional package arguments are sensible.
   addPkgs <- checkAdditionalPackages ghciAdditionalPackages
   -- Load package descriptions.
@@ -286,6 +294,7 @@ ghci opts@GhciOpts{..} = do
     pkgs
     (maybe [] snd mfileTargets)
     (nonLocalTargets ++ addPkgs)
+    relevantDependencies
 
 preprocessTargets ::
      HasEnvConfig env
@@ -489,94 +498,111 @@ runGhci ::
   -> [GhciPkgInfo]
   -> [Path Abs File]
   -> [PackageName]
+  -> Map PackageName (Seq NamedComponent)
   -> RIO env ()
-runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
-  config <- view configL
-  let pkgopts = hidePkgOpts ++ genOpts ++ ghcOpts
-      shouldHidePackages =
-        fromMaybe (not (null pkgs && null exposePackages)) ghciHidePackages
-      hidePkgOpts =
-        if shouldHidePackages
-          then
-            ["-hide-all-packages"] ++
-            -- This is necessary, because current versions of ghci
-            -- will entirely fail to start if base isn't visible. This
-            -- is because it tries to use the interpreter to set
-            -- buffering options on standard IO.
-            (if null targets then ["-package", "base"] else []) ++
-            concatMap (\n -> ["-package", packageNameString n]) exposePackages
-          else []
-      oneWordOpts bio
-        | shouldHidePackages = bioOneWordOpts bio ++ bioPackageFlags bio
-        | otherwise = bioOneWordOpts bio
-      genOpts = nubOrd (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
-      (omittedOpts, ghcOpts) = L.partition badForGhci $
-           concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs
-        ++ map
-             T.unpack
-             (  fold (configGhcOptionsByCat config)
-                -- ^ include everything, locals, and targets
-             ++ concatMap (getUserOptions . ghciPkgName) pkgs
-             )
-      getUserOptions pkg =
-        M.findWithDefault [] pkg (configGhcOptionsByName config)
-      badForGhci x =
-           L.isPrefixOf "-O" x
-        || elem x (words "-debug -threaded -ticky -static -Werror")
-  unless (null omittedOpts) $
-    prettyWarn $
-         fillSep
-           ( flow "The following GHC options are incompatible with GHCi and \
-                  \have not been passed to it:"
-           : mkNarrativeList (Just Current) False
-               (map fromString (nubOrd omittedOpts) :: [StyleDoc])
-           )
-      <> line
-  oiDir <- view objectInterfaceDirL
-  let odir =
-        [ "-odir=" <> toFilePathNoTrailingSep oiDir
-        , "-hidir=" <> toFilePathNoTrailingSep oiDir
-        ]
-  prettyInfoL
-    ( flow "Configuring GHCi with the following packages:"
-    : mkNarrativeList (Just Current) False
-        (map (fromPackageName . ghciPkgName) pkgs :: [StyleDoc])
-    )
-  compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
-  let execGhci extras = do
-        menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
-        withPackageWorkingDir $ withProcessContext menv $ exec
-          (fromMaybe compilerExeName ghciGhcCommand)
-          ( ("--interactive" : ) $
-            -- This initial "-i" resets the include directories to not include
-            -- CWD. If there aren't any packages, CWD is included.
-            (if null pkgs then id else ("-i" : )) $
-            odir <> pkgopts <> extras <> ghciGhcOptions <> ghciArgs
-          )
-      withPackageWorkingDir =
-        case pkgs of
-          [pkg] -> withWorkingDir (toFilePath $ ghciPkgDir pkg)
-          _ -> id
-  -- Since usage of 'exec' does not pure, we cannot do any cleanup on ghci exit.
-  -- So, instead leave the generated files. To make this more efficient and
-  -- avoid gratuitous generation of garbage, the file names are determined by
-  -- hashing. This also has the nice side effect of making it possible to copy
-  -- the ghci invocation out of the log and have it still work.
-  tmpDirectory <- getXdgDir XdgCache $
-    Just (relDirStackProgName </> relDirGhciScript)
-  ghciDir <- view ghciDirL
-  ensureDir ghciDir
-  ensureDir tmpDirectory
-  macrosOptions <- writeMacrosFile ghciDir pkgs
-  if ghciNoLoadModules
-    then execGhci macrosOptions
-    else do
-      checkForDuplicateModules pkgs
-      scriptOptions <-
-        writeGhciScript
-          tmpDirectory
-          (renderScript pkgs mainFile ghciOnlyMain extraFiles)
-      execGhci (macrosOptions ++ scriptOptions)
+runGhci
+    GhciOpts{..}
+    targets
+    mainFile
+    pkgs
+    extraFiles
+    exposePackages
+    exposeInternalDep
+  = do
+      config <- view configL
+      let subDepsPackageUnhide pName deps =
+            if null deps then [] else ["-package", fromPackageName pName]
+          pkgopts = hidePkgOpts ++ genOpts ++ ghcOpts
+          shouldHidePackages =
+            fromMaybe (not (null pkgs && null exposePackages)) ghciHidePackages
+          hidePkgOpts =
+            if shouldHidePackages
+              then
+                   ["-hide-all-packages"]
+                -- This is necessary, because current versions of ghci will
+                -- entirely fail to start if base isn't visible. This is because
+                -- it tries to use the interpreter to set buffering options on
+                -- standard IO.
+                ++ (if null targets then ["-package", "base"] else [])
+                ++ concatMap
+                     (\n -> ["-package", packageNameString n])
+                     exposePackages
+                ++ M.foldMapWithKey subDepsPackageUnhide exposeInternalDep
+              else []
+          oneWordOpts bio
+            | shouldHidePackages = bioOneWordOpts bio ++ bioPackageFlags bio
+            | otherwise = bioOneWordOpts bio
+          genOpts = nubOrd
+            (concatMap (concatMap (oneWordOpts . snd) . ghciPkgOpts) pkgs)
+          (omittedOpts, ghcOpts) = L.partition badForGhci $
+               concatMap (concatMap (bioOpts . snd) . ghciPkgOpts) pkgs
+            ++ map
+                 T.unpack
+                 (  fold (configGhcOptionsByCat config)
+                    -- ^ include everything, locals, and targets
+                 ++ concatMap (getUserOptions . ghciPkgName) pkgs
+                 )
+          getUserOptions pkg =
+            M.findWithDefault [] pkg (configGhcOptionsByName config)
+          badForGhci x =
+               L.isPrefixOf "-O" x
+            || elem x (words "-debug -threaded -ticky -static -Werror")
+      unless (null omittedOpts) $
+        prettyWarn $
+             fillSep
+               ( flow "The following GHC options are incompatible with GHCi \
+                      \and have not been passed to it:"
+               : mkNarrativeList (Just Current) False
+                   (map fromString (nubOrd omittedOpts) :: [StyleDoc])
+               )
+          <> line
+      oiDir <- view objectInterfaceDirL
+      let odir =
+            [ "-odir=" <> toFilePathNoTrailingSep oiDir
+            , "-hidir=" <> toFilePathNoTrailingSep oiDir
+            ]
+      prettyInfoL
+        ( flow "Configuring GHCi with the following packages:"
+        : mkNarrativeList (Just Current) False
+            (map (fromPackageName . ghciPkgName) pkgs :: [StyleDoc])
+        )
+      compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
+      let execGhci extras = do
+            menv <-
+              liftIO $ configProcessContextSettings config defaultEnvSettings
+            withPackageWorkingDir $ withProcessContext menv $ exec
+              (fromMaybe compilerExeName ghciGhcCommand)
+              ( ("--interactive" : ) $
+                -- This initial "-i" resets the include directories to not
+                -- include CWD. If there aren't any packages, CWD is included.
+                (if null pkgs then id else ("-i" : )) $
+                odir <> pkgopts <> extras <> ghciGhcOptions <> ghciArgs
+              )
+          withPackageWorkingDir =
+            case pkgs of
+              [pkg] -> withWorkingDir (toFilePath $ ghciPkgDir pkg)
+              _ -> id
+      -- Since usage of 'exec' does not pure, we cannot do any cleanup on ghci
+      -- exit. So, instead leave the generated files. To make this more
+      -- efficient and avoid gratuitous generation of garbage, the file names
+      -- are determined by hashing. This also has the nice side effect of making
+      -- it possible to copy the ghci invocation out of the log and have it
+      -- still work.
+      tmpDirectory <- getXdgDir XdgCache $
+        Just (relDirStackProgName </> relDirGhciScript)
+      ghciDir <- view ghciDirL
+      ensureDir ghciDir
+      ensureDir tmpDirectory
+      macrosOptions <- writeMacrosFile ghciDir pkgs
+      if ghciNoLoadModules
+        then execGhci macrosOptions
+        else do
+          checkForDuplicateModules pkgs
+          scriptOptions <-
+            writeGhciScript
+              tmpDirectory
+              (renderScript pkgs mainFile ghciOnlyMain extraFiles)
+          execGhci (macrosOptions ++ scriptOptions)
 
 writeMacrosFile ::
      HasTerm env
@@ -747,7 +773,7 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
                    PkgComponent
                    (  pkgNameText
                    <> ":"
-                   <> renderComp namedComponent
+                   <> renderComponentTo namedComponent
                    )
                  <> ","
                , "with"
@@ -778,21 +804,14 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
           toFilePath fp)
         putStrLn ""
         pure $ Just fp
-  renderComp c =
-    case c of
-      CLib -> "lib"
-      CSubLib name -> "sub-lib:" <> fromString (T.unpack name)
-      CExe name -> "exe:" <> fromString (T.unpack name)
-      CTest name -> "test:" <> fromString ( T.unpack name)
-      CBench name -> "bench:" <> fromString (T.unpack name)
   sampleTargetArg (pkg, comp, _) =
-       fromString (packageNameString pkg)
+       fromPackageName pkg
     <> ":"
-    <> renderComp comp
+    <> renderComponentTo comp
   sampleMainIsArg (pkg, comp, _) =
     fillSep
       [ "--main-is"
-      , fromString (packageNameString pkg) <> ":" <> renderComp comp
+      , fromPackageName pkg <> ":" <> renderComponentTo comp
       ]
 
 loadGhciPkgDescs ::

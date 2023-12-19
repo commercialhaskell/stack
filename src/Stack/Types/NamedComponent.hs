@@ -5,6 +5,7 @@
 module Stack.Types.NamedComponent
   ( NamedComponent (..)
   , renderComponent
+  , renderComponentTo
   , renderPkgComponents
   , renderPkgComponent
   , exeComponents
@@ -16,6 +17,7 @@ module Stack.Types.NamedComponent
   , isCExe
   , isCTest
   , isCBench
+  , isPotentialDependency
   , splitComponents
   ) where
 
@@ -29,6 +31,8 @@ data NamedComponent
     -- The \'main\' unnamed library component.
   | CSubLib !Text
     -- A named \'subsidiary\' or \'ancillary\` library component (sub-library).
+  | CFlib !Text
+    -- A foreign library.
   | CExe !Text
     -- A named executable component.
   | CTest !Text
@@ -37,9 +41,15 @@ data NamedComponent
     -- A named benchmark component.
   deriving (Eq, Ord, Show)
 
+-- | Render a component to anything with an "IsString" instance. For 'Text'
+-- prefer 'renderComponent'.
+renderComponentTo :: IsString a => NamedComponent -> a
+renderComponentTo = fromString . T.unpack . renderComponent
+
 renderComponent :: NamedComponent -> Text
 renderComponent CLib = "lib"
 renderComponent (CSubLib x) = "sub-lib:" <> x
+renderComponent (CFlib x) = "flib:" <> x
 renderComponent (CExe x) = "exe:" <> x
 renderComponent (CTest x) = "test:" <> x
 renderComponent (CBench x) = "bench:" <> x
@@ -49,7 +59,7 @@ renderPkgComponents = T.intercalate " " . map renderPkgComponent
 
 renderPkgComponent :: (PackageName, NamedComponent) -> Text
 renderPkgComponent (pkg, comp) =
-  fromString (packageNameString pkg) <> ":" <> renderComponent comp
+  fromPackageName pkg <> ":" <> renderComponent comp
 
 exeComponents :: Set NamedComponent -> Set Text
 exeComponents = Set.fromList . mapMaybe mExeName . Set.toList
@@ -95,9 +105,14 @@ isCBench :: NamedComponent -> Bool
 isCBench CBench{} = True
 isCBench _ = False
 
+isPotentialDependency :: NamedComponent -> Bool
+isPotentialDependency v = isCLib v || isCSubLib v || isCExe v
+
 -- | A function to split the given list of components into sets of the names of
 -- the named components by the type of component (sub-libraries, executables,
--- test-suites, benchmarks), ignoring any 'main' unnamed library component.
+-- test-suites, benchmarks), ignoring any 'main' unnamed library component or
+-- foreign library component. This function should be used very sparingly; more
+-- often than not, you can keep/parse the components split from the start.
 splitComponents ::
      [NamedComponent]
   -> ( Set Text
@@ -114,8 +129,10 @@ splitComponents =
  where
   run c = Set.fromList $ c []
   go s e t b [] = (run s, run e, run t, run b)
-  go s e t b (CLib:xs) = go s e t b xs
-  go s e t b (CSubLib x:xs) = go (s . (x:)) e t b xs
-  go s e t b (CExe x:xs) = go s (e . (x:)) t b xs
-  go s e t b (CTest x:xs) = go s e (t . (x:)) b xs
-  go s e t b (CBench x:xs) = go s e t (b . (x:)) xs
+  go s e t b (CLib : xs) = go s e t b xs
+  go s e t b (CSubLib x : xs) = go (s . (x:)) e t b xs
+  -- Ignore foreign libraries, for now.
+  go s e t b (CFlib _ : xs) = go s e t b xs
+  go s e t b (CExe x : xs) = go s (e . (x:)) t b xs
+  go s e t b (CTest x : xs) = go s e (t . (x:)) b xs
+  go s e t b (CBench x : xs) = go s e t (b . (x:)) xs

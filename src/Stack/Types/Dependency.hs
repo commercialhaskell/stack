@@ -3,6 +3,7 @@
 module Stack.Types.Dependency
   ( DepValue (..)
   , DepType (..)
+  , DepLibrary (..)
   , cabalToStackDep
   , cabalExeToStackDep
   , cabalSetupDepsToStackDep

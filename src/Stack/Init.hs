@@ -105,7 +105,7 @@ instance Pretty InitPrettyException where
                  , "as"
                  , style
                      File
-                     (fromString (packageNameString name) <> ".cabal")
+                     (fromPackageName name <> ".cabal")
                  ]
              )
              rels

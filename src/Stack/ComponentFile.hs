@@ -338,6 +338,7 @@ componentOutputDir namedComponent distDir =
   case namedComponent of
     CLib -> buildDir distDir
     CSubLib name -> makeTmp name
+    CFlib name -> makeTmp name
     CExe name -> makeTmp name
     CTest name -> makeTmp name
     CBench name -> makeTmp name
@@ -562,6 +563,7 @@ componentBuildDir cabalVer component distDir
       case component of
         CLib -> buildDir distDir
         CSubLib name -> buildDir distDir </> componentNameToDir name
+        CFlib name -> buildDir distDir </> componentNameToDir name
         CExe name -> buildDir distDir </> componentNameToDir name
         CTest name -> buildDir distDir </> componentNameToDir name
         CBench name -> buildDir distDir </> componentNameToDir name
