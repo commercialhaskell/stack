@@ -46,7 +46,7 @@ import           Stack.Package
                    ( buildableExes, buildableForeignLibs, getPackageOpts
                    , hasBuildableMainLibrary, listOfPackageDeps
                    , packageFromPackageDescription, readDotBuildinfo
-                   , resolvePackageDescription
+                   , resolvePackageDescription, topSortPackageComponent
                    )
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
@@ -70,7 +70,7 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.EnvSettings ( defaultEnvSettings )
 import           Stack.Types.Installed ( InstallMap, InstalledMap )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), isCLib, renderPkgComponent, renderComponentTo )
+                   ( NamedComponent (..), isCLib, renderPkgComponent, renderComponentTo, isCSubLib )
 import           Stack.Types.Package
                    ( BuildInfoOpts (..), LocalPackage (..), Package (..)
                    , PackageConfig (..), dotCabalCFilePath, dotCabalGetPath
@@ -251,6 +251,9 @@ ghci opts@GhciOpts{..} = do
   localTargets <- getAllLocalTargets opts inputTargets mainIsTargets localMap
   -- Get a list of all the non-local target packages.
   nonLocalTargets <- getAllNonLocalTargets inputTargets
+  let getInternalDependencies target localPackage = topSortPackageComponent (lpPackage localPackage) target False
+  let internalDependencies = M.intersectionWith getInternalDependencies inputTargets localMap
+  let relevantDependencies = M.filter (any isCSubLib) internalDependencies
   -- Check if additional package arguments are sensible.
   addPkgs <- checkAdditionalPackages ghciAdditionalPackages
   -- Load package descriptions.
@@ -286,6 +289,7 @@ ghci opts@GhciOpts{..} = do
     pkgs
     (maybe [] snd mfileTargets)
     (nonLocalTargets ++ addPkgs)
+    relevantDependencies
 
 preprocessTargets ::
      HasEnvConfig env
@@ -489,9 +493,11 @@ runGhci ::
   -> [GhciPkgInfo]
   -> [Path Abs File]
   -> [PackageName]
+  -> Map PackageName (Seq NamedComponent)
   -> RIO env ()
-runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
+runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages exposeInternalDep = do
   config <- view configL
+  let subDepsPackageUnhide pName deps = if null deps then [] else ["-package", fromPackageName pName]
   let pkgopts = hidePkgOpts ++ genOpts ++ ghcOpts
       shouldHidePackages =
         fromMaybe (not (null pkgs && null exposePackages)) ghciHidePackages
@@ -504,7 +510,8 @@ runGhci GhciOpts{..} targets mainFile pkgs extraFiles exposePackages = do
             -- is because it tries to use the interpreter to set
             -- buffering options on standard IO.
             (if null targets then ["-package", "base"] else []) ++
-            concatMap (\n -> ["-package", packageNameString n]) exposePackages
+            concatMap (\n -> ["-package", packageNameString n]) exposePackages ++
+            M.foldMapWithKey subDepsPackageUnhide exposeInternalDep
           else []
       oneWordOpts bio
         | shouldHidePackages = bioOneWordOpts bio ++ bioPackageFlags bio
