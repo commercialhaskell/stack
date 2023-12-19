@@ -52,6 +52,7 @@ module Stack.Prelude
   , encloseSep
   , fill
   , fillSep
+  , foldr'
   , fromPackageId
   , fromPackageName
   , flow
@@ -96,6 +97,7 @@ import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed
                    ( byteStringInput, createSource, withLoggedProcess_ )
+import           Data.Foldable ( Foldable(foldr') )
 import qualified Data.Text.IO as T
 import           Distribution.Types.LibraryName ( LibraryName (..) )
 import           Distribution.Types.MungedPackageId ( MungedPackageId (..) )

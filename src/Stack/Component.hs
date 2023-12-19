@@ -27,7 +27,6 @@ module Stack.Component
   , fromCabalName
   ) where
 
-import           Data.Foldable ( foldr' )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Text ( pack )

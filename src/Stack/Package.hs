@@ -33,7 +33,6 @@ module Stack.Package
   , topSortPackageComponent
   ) where
 
-import           Data.Foldable ( Foldable (..) )
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import           Data.STRef ( STRef, modifySTRef', readSTRef, newSTRef )

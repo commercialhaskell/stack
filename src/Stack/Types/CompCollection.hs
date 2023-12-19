@@ -32,7 +32,6 @@ module Stack.Types.CompCollection
 
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Set as Set
-import           Data.Foldable ( Foldable (..) )
 import           Stack.Prelude
 import           Stack.Types.Component
                    ( HasBuildInfo, HasName, StackBuildInfo (..)
