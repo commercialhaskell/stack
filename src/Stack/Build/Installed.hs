@@ -10,7 +10,6 @@ module Stack.Build.Installed
 
 import           Data.Conduit ( ZipSink (..), getZipSink )
 import qualified Data.Conduit.List as CL
-import           Data.Foldable ( Foldable (..) )
 import qualified Data.Set as Set
 import qualified Data.Map.Strict as Map
 import           Stack.Build.Cache ( getInstalledExes )
