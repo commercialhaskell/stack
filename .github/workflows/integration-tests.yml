@@ -196,6 +196,8 @@ jobs:
         # pkg-config. TO DO: Perhaps the self-hosted runner's software should
         # include pkg-config.
         sudo apt-get update
+        # Hopefully temporary fix to correct reported error in logs:
+        sudo dpkg --configure -a
         sudo apt-get install -y pkg-config
 
         # As of 19 August 2023, the self-hosted runner comes with Stack 2.11.1,
