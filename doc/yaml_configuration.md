@@ -807,9 +807,18 @@ configure-options:
   - /some/path
   $locals:
   - --happy-option=--ghc
+  $targets:
+  # Only works on platforms where GHC supports linking against shared Haskell
+  # libraries:
+  - --enable-executable-dynamic
   my-package:
   - --another-flag
 ~~~
+
+On platforms where GHC supports linking against shared Haskell libraries (that
+currently excludes Windows), Cabal's `--enable-executable-dynamic` flag (which
+implies `--enable-shared`, unless `--disable-shared` is specified) links
+dependent Haskell libraries into executables dynamically.
 
 ### connection-count
 
