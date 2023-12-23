@@ -168,7 +168,11 @@ part of Stack's [user's guide](GUIDE.md#the-stack-build-command) for information
 about how these dependencies get specified.
 
 In addition to specifying targets, you can also control what gets built, or
-retained, with the following flags:
+retained, with the flags and options listed below. You can also affect what gets
+built by specifying Cabal (the library) options for the configure step
+of the Cabal build process (for further information, see the documentation for
+the [configure-options](yaml_configuration.md#configure-options) configuration
+option).
 
 ### `--bench` flag
 
