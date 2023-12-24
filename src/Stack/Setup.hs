@@ -117,7 +117,7 @@ import           Stack.Setup.Installed
 import           Stack.SourceMap
                    ( actualFromGhc, globalsFromDump, pruneGlobals )
 import           Stack.Storage.User ( loadCompilerPaths, saveCompilerPaths )
-import           Stack.Types.Build.Exception ( BuildException (..) )
+import           Stack.Types.Build.Exception ( BuildPrettyException (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL
                    , wantedCompilerVersionL
@@ -316,9 +316,9 @@ instance Pretty SetupPrettyException where
     <> fillSep
          [ flow "Stack does not know how to install GHC for the combination of \
                 \operating system"
-         , fromString $ show os
+         , style Shell (pretty os)
          , "and architecture"
-         , fromString $ show arch <> "."
+         , style Shell (pretty arch) <> "."
          , flow "Please install manually."
          ]
   pretty (MissingDependencies tools) =
@@ -549,14 +549,14 @@ instance Pretty SetupPrettyException where
     <> line
     <> fillSep
          [ flow "Binary upgrade not yet supported on OS:"
-         , fromString (show os) <> "."
+         , pretty os <> "."
          ]
   pretty (BinaryUpgradeOnArchUnsupported arch) =
     "[S-3249]"
     <> line
     <> fillSep
          [ flow "Binary upgrade not yet supported on architecture:"
-         , fromString (show arch) <> "."
+         , pretty arch <> "."
          ]
   pretty (ExistingMSYS2NotDeleted destDir e) =
     "[S-4230]"
@@ -605,7 +605,7 @@ data SetupOpts = SetupOpts
     -- ^ Don't check for a compatible GHC version/architecture
   , soptsSkipMsys :: !Bool
     -- ^ Do not use a custom msys installation on Windows
-  , soptsResolveMissingGHC :: !(Maybe Text)
+  , soptsResolveMissingGHC :: !(Maybe StyleDoc)
     -- ^ Message shown to user for how to resolve the missing GHC
   , soptsGHCBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
@@ -617,7 +617,8 @@ data SetupOpts = SetupOpts
 setupEnv ::
      NeedTargets
   -> BuildOptsCLI
-  -> Maybe Text -- ^ Message to give user when necessary GHC is not available
+  -> Maybe StyleDoc
+     -- ^ Message to give user when necessary GHC is not available.
   -> RIO BuildConfig EnvConfig
 setupEnv needTargets boptsCLI mResolveMissingGHC = do
   config <- view configL
@@ -1143,17 +1144,28 @@ installGhcBindist sopts getSetupInfo' installed = do
             (soptsCompilerCheck sopts)
             (soptsGHCBindistURL sopts)
       | otherwise -> do
-          let suggestion = fromMaybe
-                (mconcat
-                  [ "To install the correct GHC into "
-                  , T.pack (toFilePath (configLocalPrograms config))
-                  , ", try running 'stack setup' or use the '--install-ghc' flag."
-                  , " To use your system GHC installation, run \
-                    \'stack config set system-ghc --global true', \
-                    \or use the '--system-ghc' flag."
-                  ])
-                (soptsResolveMissingGHC sopts)
-          throwM $ CompilerVersionMismatch
+          let suggestion =
+                fromMaybe defaultSuggestion (soptsResolveMissingGHC sopts)
+              defaultSuggestion = fillSep
+                [ flow "To install the correct version of GHC into the \
+                       \subdirectory for the specified platform in Stack's \
+                       \directory for local tools"
+                , parens (pretty $ configLocalPrograms config) <> ","
+                , flow "try running"
+                , style Shell (flow "stack setup")
+                , flow "or use the"
+                , style Shell "--install-ghc"
+                , flow "flag. To use your system GHC installation, run"
+                ,    style
+                       Shell
+                       (flow "stack config set system-ghc --global true")
+                  <> ","
+                , flow "or use the"
+                , style Shell "--system-ghc"
+                , "flag."
+                ]
+
+          prettyThrowM $ CompilerVersionMismatch
             Nothing -- FIXME ((\(x, y, _) -> (x, y)) <$> msystem)
             (soptsWantedCompiler sopts, expectedArch)
             ghcVariant
@@ -2065,7 +2077,10 @@ getGhcKey ghcBuild = do
     <> T.pack (ghcVariantSuffix ghcVariant)
     <> T.pack (compilerBuildSuffix ghcBuild)
 
-getOSKey :: (MonadThrow m) => Platform -> m Text
+getOSKey ::
+     (MonadThrow m)
+  => Platform
+  -> m Text
 getOSKey platform =
   case platform of
     Platform I386                  Cabal.Linux   -> pure "linux32"

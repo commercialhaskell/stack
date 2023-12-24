@@ -45,14 +45,6 @@ import           Stack.Types.Version ( VersionCheck (..), VersionRange )
 -- names beginning @Stack.Build@.
 data BuildException
   = Couldn'tFindPkgId PackageName
-  | CompilerVersionMismatch
-      (Maybe (ActualCompiler, Arch)) -- found
-      (WantedCompiler, Arch) -- expected
-      GHCVariant -- expected
-      CompilerBuild -- expected
-      VersionCheck
-      (Maybe (Path Abs File)) -- Path to the stack.yaml file
-      Text -- recommended resolution
   | Couldn'tParseTargets [Text]
   | UnknownTargets
       (Set PackageName) -- no known version
@@ -92,34 +84,6 @@ instance Exception BuildException where
     ,", the package id couldn't be found (via ghc-pkg describe "
     , packageNameString name
     , ")."
-    ]
-  displayException (CompilerVersionMismatch mactual (expected, eArch) ghcVariant ghcBuild check mstack resolution) = concat
-    [ "Error: [S-6362]\n"
-    , case mactual of
-        Nothing -> "No compiler found, expected "
-        Just (actual, arch) -> concat
-          [ "Compiler version mismatched, found "
-          , compilerVersionString actual
-          , " ("
-          , C.display arch
-          , ")"
-          , ", but expected "
-          ]
-    , case check of
-        MatchMinor -> "minor version match with "
-        MatchExact -> "exact version "
-        NewerMinor -> "minor version match or newer with "
-    , T.unpack $ utf8BuilderToText $ display expected
-    , " ("
-    , C.display eArch
-    , ghcVariantSuffix ghcVariant
-    , compilerBuildSuffix ghcBuild
-    , ") (based on "
-    , case mstack of
-        Nothing -> "command line arguments"
-        Just stack -> "resolver setting in " ++ toFilePath stack
-    , ").\n"
-    , T.unpack resolution
     ]
   displayException (Couldn'tParseTargets targets) = unlines
     $ "Error: [S-3127]"
@@ -286,6 +250,14 @@ data BuildPrettyException
   | InvalidFlagSpecification (Set UnusedFlags)
   | GHCProfOptionInvalid
   | NotOnlyLocal [PackageName] [Text]
+  | CompilerVersionMismatch
+      (Maybe (ActualCompiler, Arch)) -- found
+      (WantedCompiler, Arch) -- expected
+      GHCVariant -- expected
+      CompilerBuild -- expected
+      VersionCheck
+      (Maybe (Path Abs File)) -- Path to the stack.yaml file
+      StyleDoc -- recommended resolution
   deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
@@ -417,6 +389,43 @@ instance Pretty BuildPrettyException where
                     (map (fromString . T.unpack) exes :: [StyleDoc])
                 )
            <> line
+  pretty (CompilerVersionMismatch mactual (expected, eArch) ghcVariant ghcBuild check mstack resolution) =
+    "[S-6362]"
+    <> line
+    <> fillSep
+         [ case mactual of
+             Nothing -> flow "No compiler found, expected"
+             Just (actual, arch) -> fillSep
+               [ flow "Compiler version mismatched, found"
+               , fromString $ compilerVersionString actual
+               , parens (pretty arch) <> ","
+               , flow "but expected"
+               ]
+         , case check of
+             MatchMinor -> flow "minor version match with"
+             MatchExact -> flow "exact version"
+             NewerMinor -> flow "minor version match or newer with"
+         , fromString $ T.unpack $ utf8BuilderToText $ display expected
+         , parens $ mconcat
+             [ pretty eArch
+             , fromString $ ghcVariantSuffix ghcVariant
+             , fromString $ compilerBuildSuffix ghcBuild
+             ]
+         ,    parens
+                ( fillSep
+                    [ flow "based on"
+                    , case mstack of
+                        Nothing -> flow "command line arguments"
+                        Just stack -> fillSep
+                          [ flow "resolver setting in"
+                          , pretty stack
+                          ]
+                    ]
+                )
+          <> "."
+         ]
+    <> blankLine
+    <> resolution
 
 instance Exception BuildPrettyException
 
