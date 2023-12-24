@@ -462,14 +462,30 @@ otherwise), and `targets` (all local packages that are targets).
 
 Default: The machine architecture on which Stack is running.
 
-Command line equivalent (takes precedence): `--arch` option
+Command line equivalent (takes precedence):
+[`--arch`](global_flags.md#-arch-option) option
 
 Stack identifies different GHC executables by platform (operating system and
 machine architecture), (optional) GHC variant and (optional) GHC build.
 See [`setup-info`](#setup-info).
 
-`arch` sets the machine architecture. Values are those recognized by Cabal,
-including `x86_64`, `i386` and `aarch64`.
+`arch` sets the machine architecture. Values can be those recognized by Cabal
+(the library) (which are case-insensitive and include `i386`, `x86_64`, and
+`aarch64` / `arm64`), or other values (which are case-sensitive and treated as
+an unknown 'other' architecture of the specified name).
+
+!!! note
+
+    The machine architecture on which Stack is running is as classified by
+    Cabal (the library). Cabal does not distinguish between certain
+    architectures. Examples are `ppc64`/`powerpc64`/`powerpc64le` (classified as
+    `ppc64`) and `arm`/`armel`/`armeb` (classified as `arm`).
+
+!!! note
+
+    As Cabal (the library) does not distinguish between machine architectures
+    `powerpc64` and `powerpc64le`, the latter can be specified in Stack's
+    configuration as an 'other' architecture, such as `arch: ppc64le`.
 
 ### build
 
