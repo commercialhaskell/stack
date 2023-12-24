@@ -18,6 +18,13 @@ packages:
       size: 1675
   original:
     hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
+- completed:
+    hackage: rio-prettyprint-0.1.8.0@sha256:28a034bfa2842043d4603800e47943027677746cca0b3b8088aee10168870105,1428
+    pantry-tree:
+      sha256: 69850784d99d1c44e85f934433abafad729f87fdc40d375c590c8d4a1cb2886d
+      size: 779
+  original:
+    hackage: rio-prettyprint-0.1.8.0@sha256:28a034bfa2842043d4603800e47943027677746cca0b3b8088aee10168870105,1428
 snapshots:
 - completed:
     sha256: e176944bc843f740e05242fa7a66ca1f440c127e425254f7f1257f9b19add23f
