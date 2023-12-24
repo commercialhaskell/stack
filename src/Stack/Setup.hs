@@ -158,7 +158,8 @@ import           Stack.Types.Platform
                    , platformOnlyRelDir )
 import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
-import           Stack.Types.SourceMap ( SMActual (..), SourceMap (..) )
+import           Stack.Types.SourceMap
+                   ( SMActual (..), SMWanted (..), SourceMap (..) )
 import           Stack.Types.Version
                    ( VersionCheck, stackMinorVersion, stackVersion )
 import           Stack.Types.VersionedDownloadInfo
@@ -198,7 +199,7 @@ data SetupPrettyException
   | InvalidGhcAt !(Path Abs File) !SomeException
   | ExecutableNotFound ![Path Abs File]
   | SandboxedCompilerNotFound ![String] ![Path Abs Dir]
-  | UnsupportedSetupCombo !OS !Arch
+  | UnsupportedSetupCombo !OS !Arch !StyleDoc !StyleDoc !(Path Abs Dir)
   | MissingDependencies ![String]
   | UnknownCompilerVersion
       !(Set.Set Text)
@@ -310,16 +311,33 @@ instance Pretty SetupPrettyException where
                 \tools, see the output of"
          , style Shell (flow "stack uninstall") <> "."
          ]
-  pretty (UnsupportedSetupCombo os arch) =
+  pretty (UnsupportedSetupCombo os arch tool toolDirAdvice programsDir) =
     "[S-1852]"
     <> line
     <> fillSep
-         [ flow "Stack does not know how to install GHC for the combination of \
-                \operating system"
+         [ flow "Stack does not know how to install"
+         , tool
+         , flow "for the combination of operating system"
          , style Shell (pretty os)
          , "and architecture"
          , style Shell (pretty arch) <> "."
          , flow "Please install manually."
+         ]
+    <> blankLine
+    <> fillSep
+         [ flow "To install manually the version of"
+         , tool <> ","
+         , flow "its root directory should be named"
+         , toolDirAdvice
+         , flow "and the directory should be accompanied by a file with the \
+                \same name and extension"
+         , style File ".installed"
+         , flow "(which marks the"
+         , tool
+         , flow "version as installed). Both items should be located in the \
+                \subdirectory for the specified platform in Stack's directory \
+                \for local tools"
+         , parens (pretty programsDir) <> "."
          ]
   pretty (MissingDependencies tools) =
     "[S-2126]"
@@ -1081,7 +1099,11 @@ ensureMsys sopts getSetupInfo' = do
         Nothing
           | soptsInstallIfMissing sopts -> do
               si <- runMemoized getSetupInfo'
-              osKey <- getOSKey platform
+              let msysDir = fillSep
+                    [ style Dir "msys2-yyyymmdd"
+                    , flow "(where yyyymmdd is the date-based version)"
+                    ]
+              osKey <- getOSKey "MSYS2" msysDir
               config <- view configL
               VersionedDownloadInfo version info <-
                 case Map.lookup osKey $ siMsys2 si of
@@ -1094,7 +1116,7 @@ ensureMsys sopts getSetupInfo' = do
                          tool
                          (installMsys2Windows si)
           | otherwise -> do
-              prettyWarnS "Continuing despite missing tool: msys2"
+              prettyWarnS "Continuing despite missing tool: MSYS2."
               pure Nothing
     _ -> pure Nothing
 
@@ -2065,23 +2087,38 @@ downloadAndInstallPossibleCompilers possibleCompilers si wanted versionCheck mbi
       Right r -> pure (r, b)
 
 getGhcKey ::
-     (MonadReader env m, HasPlatform env, HasGHCVariant env, MonadThrow m)
+     (HasBuildConfig env, HasGHCVariant env)
   => CompilerBuild
-  -> m Text
+  -> RIO env Text
 getGhcKey ghcBuild = do
   ghcVariant <- view ghcVariantL
-  platform <- view platformL
-  osKey <- getOSKey platform
-  pure $
-       osKey
-    <> T.pack (ghcVariantSuffix ghcVariant)
-    <> T.pack (compilerBuildSuffix ghcBuild)
+  wantedComiler <- view $ buildConfigL.to (smwCompiler . bcSMWanted)
+  ghcVersion <- case wantedComiler of
+        WCGhc version -> pure version
+        WCGhcjs _ _ ->  throwIO GhcjsNotSupported
+        WCGhcGit _ _ -> throwIO DownloadAndInstallCompilerError
+  let variantSuffix = ghcVariantSuffix ghcVariant
+      buildSuffix = compilerBuildSuffix ghcBuild
+      ghcDir = style Dir $ mconcat
+        [ "ghc"
+        , fromString variantSuffix
+        , fromString buildSuffix
+        , "-"
+        , fromString $ versionString ghcVersion
+        ]
+  osKey <- getOSKey "GHC" ghcDir
+  pure $ osKey <> T.pack variantSuffix <> T.pack buildSuffix
 
 getOSKey ::
-     (MonadThrow m)
-  => Platform
-  -> m Text
-getOSKey platform =
+     (HasConfig env, HasPlatform env)
+  => StyleDoc
+     -- ^ Description of the tool that is being set up.
+  -> StyleDoc
+     -- ^ Description of the root directory of the tool.
+  -> RIO env Text
+getOSKey tool toolDir = do
+  programsDir <- view $ configL.to configLocalPrograms
+  platform <- view platformL
   case platform of
     Platform I386                  Cabal.Linux   -> pure "linux32"
     Platform X86_64                Cabal.Linux   -> pure "linux64"
@@ -2098,7 +2135,8 @@ getOSKey platform =
     Platform Sparc                 Cabal.Linux   -> pure "linux-sparc"
     Platform AArch64               Cabal.OSX     -> pure "macosx-aarch64"
     Platform AArch64               Cabal.FreeBSD -> pure "freebsd-aarch64"
-    Platform arch os -> prettyThrowM $ UnsupportedSetupCombo os arch
+    Platform arch os ->
+      prettyThrowM $ UnsupportedSetupCombo os arch tool toolDir programsDir
 
 downloadOrUseLocal ::
      (HasTerm env, HasBuildConfig env)
