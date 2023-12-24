@@ -174,6 +174,8 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See 'configNotifyIfGhcUntested'
   , configMonoidNotifyIfCabalUntested  :: !FirstTrue
     -- ^ See 'configNotifyIfCabalUntested'
+  , configMonoidNotifyIfArchUnknown  :: !FirstTrue
+    -- ^ See 'configNotifyIfArchUnknown'
   , configMonoidCasaOpts :: !CasaOptsMonoid
     -- ^ Casa configuration options.
   , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
@@ -350,6 +352,8 @@ parseConfigMonoidObject rootDir obj = do
     FirstTrue <$> obj ..:? configMonoidNotifyIfGhcUntestedName
   configMonoidNotifyIfCabalUntested <-
     FirstTrue <$> obj ..:? configMonoidNotifyIfCabalUntestedName
+  configMonoidNotifyIfArchUnknown <-
+    FirstTrue <$> obj ..:? configMonoidNotifyIfArchUnknownName
   configMonoidCasaOpts <-
     jsonSubWarnings (obj ..:? configMonoidCasaOptsName ..!= mempty)
   configMonoidCasaRepoPrefix <-
@@ -535,6 +539,9 @@ configMonoidNotifyIfGhcUntestedName = "notify-if-ghc-untested"
 
 configMonoidNotifyIfCabalUntestedName :: Text
 configMonoidNotifyIfCabalUntestedName = "notify-if-cabal-untested"
+
+configMonoidNotifyIfArchUnknownName :: Text
+configMonoidNotifyIfArchUnknownName = "notify-if-arch-unknown"
 
 configMonoidCasaOptsName :: Text
 configMonoidCasaOptsName = "casa"

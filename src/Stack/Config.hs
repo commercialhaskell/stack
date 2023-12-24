@@ -48,7 +48,7 @@ import           Data.Monoid.Map ( MonoidMap (..) )
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import           Distribution.System
-                   ( Arch (OtherArch), OS (..), Platform (..), buildPlatform )
+                   ( Arch (..), OS (..), Platform (..), buildPlatform )
 import qualified Distribution.Text ( simpleParse )
 import           Distribution.Version ( simplifyVersionRange )
 import           GHC.Conc ( getNumProcessors )
@@ -322,14 +322,6 @@ configFromConfigMonoid
         configRequireStackVersion = simplifyVersionRange
           (getIntersectingVersionRange configMonoidRequireStackVersion)
         configCompilerCheck = fromFirst MatchMinor configMonoidCompilerCheck
-    case arch of
-      OtherArch "aarch64" -> pure ()
-      OtherArch unk ->
-        prettyWarnL
-          [ flow "Unknown value for architecture setting:"
-          , style Shell (fromString unk) <> "."
-          ]
-      _ -> pure ()
     configPlatformVariant <- liftIO $
       maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
     let configBuild = buildOptsFromMonoid configMonoidBuildOpts
@@ -427,6 +419,7 @@ configFromConfigMonoid
         configNotifyIfNixOnPath = fromFirstTrue configMonoidNotifyIfNixOnPath
         configNotifyIfGhcUntested = fromFirstTrue configMonoidNotifyIfGhcUntested
         configNotifyIfCabalUntested = fromFirstTrue configMonoidNotifyIfCabalUntested
+        configNotifyIfArchUnknown = fromFirstTrue configMonoidNotifyIfArchUnknown
         configNoRunCompile = fromFirstFalse configMonoidNoRunCompile
     configAllowDifferentUser <-
       case getFirst configMonoidAllowDifferentUser of
@@ -618,6 +611,18 @@ loadConfig inner = do
           (mconcat $ configArgs : addConfigMonoid extraConfigs)
 
   withConfig $ \config -> do
+    let Platform arch _ = configPlatform config
+    case arch of
+      OtherArch unknownArch
+        | configNotifyIfArchUnknown config ->
+            prettyWarnL
+              [ flow "Unknown value for architecture setting:"
+              , style Shell (fromString unknownArch) <> "."
+              , flow "To mute this message in future, set"
+              , style Shell (flow "notify-if-arch-unknown: false")
+              , flow "in Stack's configuration."
+              ]
+      _ -> pure ()
     unless (stackVersion `withinRange` configRequireStackVersion config)
       (throwM (BadStackVersionException (configRequireStackVersion config)))
     unless (configAllowDifferentUser config) $ do

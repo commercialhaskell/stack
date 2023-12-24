@@ -65,6 +65,9 @@ Other enhancements:
   `stack> build (lib + exe + test) with ghc-9.6.3`).
 * Add flag `--candidate` to Stack's `unpack` command, to allow package
   candidates to be unpacked locally.
+* Stack will notify the user if a specified architecture value is unknown to
+  Cabal (the library). In YAML configuration files, the `notify-if-arch-unknown`
+  key is introduced, to allow the notification to be muted if unwanted.
 
 Bug fixes:
 

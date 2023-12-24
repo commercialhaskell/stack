@@ -100,7 +100,7 @@ configOptsParser currentDir hide0 =
   <*> optionalFirst (strOption
         (  long "arch"
         <> metavar "ARCH"
-        <> help "System architecture, e.g. i386, x86_64."
+        <> help "System architecture, e.g. i386, x86_64, aarch64."
         <> hide
         ))
   <*> optionalFirst (ghcVariantParser (hide0 /= OuterGlobalOpts))
