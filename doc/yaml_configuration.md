@@ -474,6 +474,9 @@ See [`setup-info`](#setup-info).
 `aarch64` / `arm64`), or other values (which are case-sensitive and treated as
 an unknown 'other' architecture of the specified name).
 
+Stack will warn the user if the specified machine architecture is an unknown
+'other' architecture.
+
 !!! note
 
     The machine architecture on which Stack is running is as classified by
