@@ -186,6 +186,9 @@ data Config = Config
     -- ^ Notify if Stack has not been tested with the GHC version?
   , configNotifyIfCabalUntested :: !Bool
     -- ^ Notify if Stack has not been tested with the Cabal version?
+  , configNotifyIfArchUnknown :: !Bool
+    -- ^ Notify if the specified machine architecture is unknown to Cabal (the
+    -- library)?
   , configNoRunCompile   :: !Bool
     -- ^ Use --no-run and --compile options when using `stack script`
   , configStackDeveloperMode  :: !Bool

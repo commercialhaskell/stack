@@ -474,8 +474,9 @@ See [`setup-info`](#setup-info).
 `aarch64` / `arm64`), or other values (which are case-sensitive and treated as
 an unknown 'other' architecture of the specified name).
 
-Stack will warn the user if the specified machine architecture is an unknown
-'other' architecture.
+By default, Stack will warn the user if the specified machine architecture is an
+unknown 'other' architecture. The warning can be muted; see
+[`notify-if-arch-unknown`](#notify-if-arch-unknown)
 
 !!! note
 
@@ -1236,6 +1237,15 @@ for details).
 
 For further information, see the
 [Nix integration](nix_integration.md#configuration) documentation.
+
+### notify-if-arch-unknown
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+If the specified machine architecture value is unknown to Cabal (the library),
+should Stack notify the user of that?
 
 ### notify-if-cabal-untested
 
