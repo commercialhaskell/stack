@@ -102,6 +102,7 @@ nav:
     - Upgrading MSYS2: maintainers/msys.md
     - Upgrading 7-Zip: maintainers/7zip.md
     - HaskellStack.org: maintainers/haskellstack.org.md
+    - Self-hosted runners: maintainers/self-hosted_runners.md
 - Signing key: SIGNING_KEY.md
 - Glossary: glossary.md
 - Version history: ChangeLog.md
