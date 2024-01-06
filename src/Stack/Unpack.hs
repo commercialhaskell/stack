@@ -60,8 +60,8 @@ instance Pretty UnpackPrettyException where
     "[S-5170]"
     <> line
     <> fillSep
-         [ flow "While trying to unpack from"
-         , fromString (T.unpack $ textDisplay pir) <> ","
+         [ flow "While trying to unpack"
+         , style Target (fromString $ T.unpack $ textDisplay pir) <> ","
          , flow "Stack encountered an error."
          ]
 
@@ -175,33 +175,19 @@ unpackPackages mSnapshot dest targets areCandidates = do
       ]
  where
   toLoc name | Just snapshot <- mSnapshot = toLocSnapshot snapshot name
-             | otherwise = toLocNoSnapshot name
+             | otherwise = do
+                 void $ updateHackageIndex $ Just "Updating the package index."
+                 toLocNoSnapshot name
 
   toLocNoSnapshot ::
        PackageName
     -> RIO env (Either StyleDoc (PackageLocationImmutable, PackageIdentifier))
   toLocNoSnapshot name = do
-    mloc1 <- getLatestHackageLocation
+    mLoc <- getLatestHackageLocation
       YesRequireHackageIndex
       name
       UsePreferredVersions
-    mloc <-
-      case mloc1 of
-        Just _ -> pure mloc1
-        Nothing -> do
-          updated <- updateHackageIndex
-            $ Just
-            $    "Could not find package "
-              <> fromPackageName name
-              <> ", updating"
-          case updated of
-            UpdateOccurred ->
-              getLatestHackageLocation
-                YesRequireHackageIndex
-                name
-                UsePreferredVersions
-            NoUpdateOccurred -> pure Nothing
-    case mloc of
+    case mLoc of
       Nothing -> do
         candidates <- getHackageTypoCorrections name
         pure $ Left $ fillSep
