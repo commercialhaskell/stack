@@ -1,0 +1,27 @@
+# This is an experimental project-level configuration, to see if Stack can be
+# built with GHC 9.8.1.
+
+# GHC 9.8.1
+resolver: nightly-2024-01-06
+
+extra-deps:
+# nightly-2023-01-06 specifies pantry-0.9.3.1@rev:0.
+- pantry-0.9.3.1@sha256:79e9be1b28a9829cb9630ca97ac5732b0843ee8d60ce26b347ecd57740305c2b,7859
+# nightly-2023-01-06 specifies tar-conduit-0.4.0
+- tar-conduit-0.4.1@sha256:112d28118eb71901ea9e224e1b174c648b378256729669c2739b8b803d25b43a,3126
+
+docker:
+  enable: false
+  repo: glcr.b-data.ch/ghc/ghc-musl:9.8.1
+
+nix:
+  # --nix on the command-line to enable.
+  packages:
+  - zlib
+  - unzip
+
+flags:
+  hackage-security:
+    cabal-syntax: true
+  stack:
+    developer-mode: true
