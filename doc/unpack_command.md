@@ -15,7 +15,8 @@ In the case of packages from the package index, a target can be a package
 name only. In that case, by default:
 
 *   if Stack's `--resolver` option is not specified, the download is for the
-    most recent version of the package in the package index; and
+    most recent version of the package in the package index. Stack will first
+    seek to update the index; and
 
 *   if Stack's `--resolver` option is specified, the download is for the version
     of the package included directly in the specified snapshot.

@@ -35,6 +35,9 @@ Behavior changes:
   projects using snapshots earlier than `lts-12.0` or `nightly-2018-03-18`
   (GHC 8.4.1) might no longer build. See
   [#6377](https://github.com/commercialhaskell/stack/issues/6377).
+* If Stack's `--resolver` option is not specified, Stack's `unpack` command with
+  a package name will seek to update the package index before seeking to
+  download the most recent version of the package in the index.
 
 Other enhancements:
 
