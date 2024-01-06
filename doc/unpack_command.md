@@ -12,7 +12,21 @@ package candidates, and unpacks each archive into a subdirectory named after the
 package version.
 
 In the case of packages from the package index, a target can be a package
-name only. In that case, the download is for the most recent version.
+name only. In that case, by default:
+
+*   if Stack's `--resolver` option is not specified, the download is for the
+    most recent version of the package in the package index; and
+
+*   if Stack's `--resolver` option is specified, the download is for the version
+    of the package included directly in the specified snapshot.
+
+!!! note
+
+    Stackage snapshots do not include directly most GHC boot packages (packages
+    that come with GHC and are included in GHC's global package database) but
+    some snapshots may include directly some boot packages. In particular, some
+    snapshots include directly `Win32` (which is a boot package on Windows)
+    while others do not.
 
 Otherwise, a target should specify a package name and version (for example,
 `acme-missiles-0.3`). In the case of package versions from the package index,
