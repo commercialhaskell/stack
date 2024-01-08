@@ -5,7 +5,7 @@
 Stack is configured by the content of YAML files. Some Stack operations can also
 be customised by the use of scripts.
 
-!!! note
+!!! info
 
     A Haskell package is an organised collection of Haskell code and related
     files. It is described by a Cabal file or a `package.yaml` file (which can
@@ -451,7 +451,7 @@ or otherwise), `locals` (all local packages, targets or otherwise), and
 
     The use of `everything` can break invariants about your snapshot database.
 
-!!! note
+!!! info
 
     Before Stack 0.1.6.0, the default value was `targets`.
 
@@ -1024,7 +1024,7 @@ flag). However, setting options via `$everything` on all flags will not do so
 for reasoning). This can lead to unpredictable behavior by affecting your
 snapshot packages.
 
-!!! note
+!!! info
 
     Before Stack 1.6.1, the key `*` (then deprecated) had the same function as
     the key `$everything`.
@@ -1302,13 +1302,13 @@ package-indices:
     ignore-expiry: true
 ~~~
 
-!!! note
+!!! info
 
     Before Stack 2.1.3, the default for `ignore-expiry` was `false`. For more
     information, see
     [issue #4928](https://github.com/commercialhaskell/stack/issues/4928).
 
-!!! note
+!!! info
 
     Before Stack 2.1.1, Stack had a different approach to `package-indices`. For
     more information, see
@@ -1393,7 +1393,7 @@ The default value reflects that, in most cases, GHC options are used to affect
 optimization levels and warning behavior, for which GHC does not recompile the
 modules.
 
-!!! note
+!!! info
 
     Before Stack 0.1.6.0, Stack rebuilt a package when its GHC options changed.
 
