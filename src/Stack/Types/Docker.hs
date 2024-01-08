@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE RecordWildCards    #-}
 
 -- | Docker types.
 
@@ -327,38 +326,55 @@ data DockerOptsMonoid = DockerOptsMonoid
 
 -- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
-  parseJSON = withObjectWarnings "DockerOptsMonoid"
-    ( \o -> do
-       let dockerMonoidDefaultEnable = Any True
-       dockerMonoidEnable <- First <$> o ..:? dockerEnableArgName
-       dockerMonoidRepoOrImage <- First <$>
-         (   (Just . DockerMonoidImage <$> o ..: dockerImageArgName)
-         <|> (Just . DockerMonoidRepo <$> o ..: dockerRepoArgName)
-         <|> pure Nothing
-         )
-       dockerMonoidRegistryLogin <- First <$> o ..:? dockerRegistryLoginArgName
-       dockerMonoidRegistryUsername <-
-         First <$> o ..:? dockerRegistryUsernameArgName
-       dockerMonoidRegistryPassword <-
-         First <$> o ..:? dockerRegistryPasswordArgName
-       dockerMonoidAutoPull <- FirstTrue <$> o ..:? dockerAutoPullArgName
-       dockerMonoidDetach <- FirstFalse <$> o ..:? dockerDetachArgName
-       dockerMonoidPersist <- FirstFalse <$> o ..:? dockerPersistArgName
-       dockerMonoidContainerName <- First <$> o ..:? dockerContainerNameArgName
-       dockerMonoidNetwork <- First <$> o ..:? dockerNetworkArgName
-       dockerMonoidRunArgs <- o ..:? dockerRunArgsArgName ..!= []
-       dockerMonoidMount <- o ..:? dockerMountArgName ..!= []
-       dockerMonoidMountMode <- First <$> o ..:? dockerMountModeArgName
-       dockerMonoidEnv <- o ..:? dockerEnvArgName ..!= []
-       dockerMonoidStackExe <- First <$> o ..:? dockerStackExeArgName
-       dockerMonoidSetUser <- First <$> o ..:? dockerSetUserArgName
-       dockerMonoidRequireDockerVersion <-
-         IntersectingVersionRange . unVersionRangeJSON <$>
-           ( o ..:? dockerRequireDockerVersionArgName
-             ..!= VersionRangeJSON anyVersion
-           )
-       pure DockerOptsMonoid {..}
-    )
+  parseJSON = withObjectWarnings "DockerOptsMonoid" $ \o -> do
+    let dockerMonoidDefaultEnable = Any True
+    dockerMonoidEnable <- First <$> o ..:? dockerEnableArgName
+    dockerMonoidRepoOrImage <- First <$>
+      (   (Just . DockerMonoidImage <$> o ..: dockerImageArgName)
+      <|> (Just . DockerMonoidRepo <$> o ..: dockerRepoArgName)
+      <|> pure Nothing
+      )
+    dockerMonoidRegistryLogin <- First <$> o ..:? dockerRegistryLoginArgName
+    dockerMonoidRegistryUsername <-
+      First <$> o ..:? dockerRegistryUsernameArgName
+    dockerMonoidRegistryPassword <-
+      First <$> o ..:? dockerRegistryPasswordArgName
+    dockerMonoidAutoPull <- FirstTrue <$> o ..:? dockerAutoPullArgName
+    dockerMonoidDetach <- FirstFalse <$> o ..:? dockerDetachArgName
+    dockerMonoidPersist <- FirstFalse <$> o ..:? dockerPersistArgName
+    dockerMonoidContainerName <- First <$> o ..:? dockerContainerNameArgName
+    dockerMonoidNetwork <- First <$> o ..:? dockerNetworkArgName
+    dockerMonoidRunArgs <- o ..:? dockerRunArgsArgName ..!= []
+    dockerMonoidMount <- o ..:? dockerMountArgName ..!= []
+    dockerMonoidMountMode <- First <$> o ..:? dockerMountModeArgName
+    dockerMonoidEnv <- o ..:? dockerEnvArgName ..!= []
+    dockerMonoidStackExe <- First <$> o ..:? dockerStackExeArgName
+    dockerMonoidSetUser <- First <$> o ..:? dockerSetUserArgName
+    dockerMonoidRequireDockerVersion <-
+      IntersectingVersionRange . unVersionRangeJSON <$>
+        ( o ..:? dockerRequireDockerVersionArgName
+          ..!= VersionRangeJSON anyVersion
+        )
+    pure $ DockerOptsMonoid
+      { dockerMonoidDefaultEnable
+      , dockerMonoidEnable
+      , dockerMonoidRepoOrImage
+      , dockerMonoidRegistryLogin
+      , dockerMonoidRegistryUsername
+      , dockerMonoidRegistryPassword
+      , dockerMonoidAutoPull
+      , dockerMonoidDetach
+      , dockerMonoidPersist
+      , dockerMonoidContainerName
+      , dockerMonoidNetwork
+      , dockerMonoidRunArgs
+      , dockerMonoidMount
+      , dockerMonoidMountMode
+      , dockerMonoidEnv
+      , dockerMonoidStackExe
+      , dockerMonoidSetUser
+      , dockerMonoidRequireDockerVersion
+      }
 
 -- | Left-biased combine Docker options
 instance Semigroup DockerOptsMonoid where

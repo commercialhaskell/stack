@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 
 -- | Configuration options for building.
 module Stack.Types.BuildOpts
@@ -310,7 +309,39 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     buildMonoidProgressBar <-
       First <$> o ..:? buildMonoidProgressBarName
     buildMonoidDdumpDir <- o ..:? buildMonoidDdumpDirName ..!= mempty
-    pure BuildOptsMonoid{..}
+    pure $ BuildOptsMonoid
+      { buildMonoidTrace
+      , buildMonoidProfile
+      , buildMonoidNoStrip
+      , buildMonoidLibProfile
+      , buildMonoidExeProfile
+      , buildMonoidLibStrip
+      , buildMonoidExeStrip
+      , buildMonoidHaddock
+      , buildMonoidHaddockOpts
+      , buildMonoidOpenHaddocks
+      , buildMonoidHaddockDeps
+      , buildMonoidHaddockInternal
+      , buildMonoidHaddockHyperlinkSource
+      , buildMonoidHaddockForHackage
+      , buildMonoidInstallExes
+      , buildMonoidInstallCompilerTool
+      , buildMonoidPreFetch
+      , buildMonoidKeepGoing
+      , buildMonoidKeepTmpFiles
+      , buildMonoidForceDirty
+      , buildMonoidTests
+      , buildMonoidTestOpts
+      , buildMonoidBenchmarks
+      , buildMonoidBenchmarkOpts
+      , buildMonoidReconfigure
+      , buildMonoidCabalVerbose
+      , buildMonoidSplitObjs
+      , buildMonoidSkipComponents
+      , buildMonoidInterleavedOutput
+      , buildMonoidProgressBar
+      , buildMonoidDdumpDir
+      }
 
 buildMonoidLibProfileArgName :: Text
 buildMonoidLibProfileArgName = "library-profiling"
@@ -458,7 +489,14 @@ instance FromJSON (WithJSONWarnings TestOptsMonoid) where
     toMonoidMaximumTimeSeconds <-
       First <$> o ..:? toMonoidMaximumTimeSecondsArgName
     toMonoidAllowStdin <- FirstTrue <$> o ..:? toMonoidTestsAllowStdinName
-    pure TestOptsMonoid{..}
+    pure $ TestOptsMonoid
+      { toMonoidRerunTests
+      , toMonoidAdditionalArgs
+      , toMonoidCoverage
+      , toMonoidDisableRun
+      , toMonoidMaximumTimeSeconds
+      , toMonoidAllowStdin
+      }
 
 toMonoidRerunTestsArgName :: Text
 toMonoidRerunTestsArgName = "rerun-tests"
@@ -502,7 +540,7 @@ defaultHaddockOpts = HaddockOpts {hoAdditionalArgs = []}
 instance FromJSON (WithJSONWarnings HaddockOptsMonoid) where
   parseJSON = withObjectWarnings "HaddockOptsMonoid" $ \o -> do
     hoMonoidAdditionalArgs <- o ..:? hoMonoidAdditionalArgsName ..!= []
-    pure HaddockOptsMonoid{..}
+    pure $ HaddockOptsMonoid { hoMonoidAdditionalArgs }
 
 instance Semigroup HaddockOptsMonoid where
   (<>) = mappenddefault
@@ -539,7 +577,10 @@ instance FromJSON (WithJSONWarnings BenchmarkOptsMonoid) where
   parseJSON = withObjectWarnings "BenchmarkOptsMonoid" $ \o -> do
     beoMonoidAdditionalArgs <- First <$> o ..:? beoMonoidAdditionalArgsArgName
     beoMonoidDisableRun <- First <$> o ..:? beoMonoidDisableRunArgName
-    pure BenchmarkOptsMonoid{..}
+    pure $ BenchmarkOptsMonoid
+      { beoMonoidAdditionalArgs
+      , beoMonoidDisableRun
+      }
 
 beoMonoidAdditionalArgsArgName :: Text
 beoMonoidAdditionalArgsArgName = "benchmark-arguments"

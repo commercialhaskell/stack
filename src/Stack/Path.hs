@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 
 -- | Types and functions related to Stack's @path@ command.
 module Stack.Path
@@ -111,7 +110,20 @@ fillPathInfo = do
   piDistDir <- distRelativeDir
   piHpcDir <- hpcReportDir
   piCompiler <- getCompilerPath
-  pure PathInfo {..}
+  pure $ PathInfo
+    { piBuildConfig
+    , piSnapDb
+    , piLocalDb
+    , piGlobalDb
+    , piSnapRoot
+    , piLocalRoot
+    , piToolsDir
+    , piHoogleRoot
+    , piDistDir
+    , piHpcDir
+    , piExtraDbs
+    , piCompiler
+    }
 
 -- | Type representing information passed to all the path printers.
 data PathInfo = PathInfo

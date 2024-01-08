@@ -1,5 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- Concurrent execution with dependencies. Types currently hard-coded for needs
 -- of stack, but could be generalized easily.
@@ -85,7 +85,7 @@ data ExecuteState = ExecuteState
   , esKeepGoing  :: Bool
   }
 
-runActions :: 
+runActions ::
      Int -- ^ threads
   -> Bool -- ^ keep going after one task has failed
   -> [Action]
@@ -117,33 +117,33 @@ sortActions = sortBy (compareConcurrency `on` actionConcurrency)
   compareConcurrency _ _ = EQ
 
 runActions' :: ExecuteState -> IO ()
-runActions' ExecuteState {..} = loop
+runActions' es = loop
  where
   loop :: IO ()
   loop = join $ atomically $ breakOnErrs $ withActions processActions
 
   breakOnErrs :: STM (IO ()) -> STM (IO ())
   breakOnErrs inner = do
-    errs <- readTVar esExceptions
-    if null errs || esKeepGoing
+    errs <- readTVar es.esExceptions
+    if null errs || es.esKeepGoing
       then inner
       else doNothing
 
   withActions :: ([Action] -> STM (IO ())) -> STM (IO ())
   withActions inner = do
-    actions <- readTVar esActions
+    actions <- readTVar es.esActions
     if null actions
       then doNothing
       else inner actions
 
   processActions :: [Action] -> STM (IO ())
   processActions actions = do
-    inAction <- readTVar esInAction
+    inAction <- readTVar es.esInAction
     case break (Set.null . actionDeps) actions of
       (_, []) -> do
         check (Set.null inAction)
-        unless esKeepGoing $
-          modifyTVar esExceptions (toException InconsistentDependenciesBug:)
+        unless es.esKeepGoing $
+          modifyTVar es.esExceptions (toException InconsistentDependenciesBug:)
         doNothing
       (xs, action:ys) -> processAction inAction (xs ++ ys) action
 
@@ -160,30 +160,30 @@ runActions' ExecuteState {..} = loop
           , acDownstream = downstreamActions action' otherActions
           , acConcurrency = concurrency
           }
-    writeTVar esActions otherActions
-    modifyTVar esInAction (Set.insert action')
+    writeTVar es.esActions otherActions
+    modifyTVar es.esInAction (Set.insert action')
     pure $ do
       mask $ \restore -> do
         eres <- try $ restore $ actionDo action actionContext
         atomically $ do
-          modifyTVar esInAction (Set.delete action')
-          modifyTVar esCompleted (+1)
+          modifyTVar es.esInAction (Set.delete action')
+          modifyTVar es.esCompleted (+1)
           case eres of
-            Left err -> modifyTVar esExceptions (err:)
-            Right () -> modifyTVar esActions $ map (dropDep action')
+            Left err -> modifyTVar es.esExceptions (err:)
+            Right () -> modifyTVar es.esActions $ map (dropDep action')
       loop
 
   -- | Filter a list of actions to include only those that depend on the given
   -- action.
   downstreamActions :: ActionId -> [Action] -> [Action]
   downstreamActions aid = filter (\a -> aid `Set.member` actionDeps a)
-  
+
   -- | Given two actions (the first specified by its id) yield an action
   -- equivalent to the second but excluding any dependency on the first action.
   dropDep :: ActionId -> Action -> Action
   dropDep action' action =
     action { actionDeps = Set.delete action' $ actionDeps action }
-  
+
   -- | @IO ()@ lifted into 'STM'.
   doNothing :: STM (IO ())
   doNothing = pure $ pure ()

@@ -54,25 +54,25 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-fki0nd-1126:21"
+  id = "OBS-STAN-0203-fki0nd-1134:21"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\Execute.hs
 #
-#  1125 ┃
-#  1126 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
-#  1137 ┃                     ^^^^^^^
+#  1133 ┃
+#  1134 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
+#  1135 ┃                     ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-fki0nd-2670:3"
+  id = "OBS-STAN-0203-fki0nd-2680:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\Execute.hs
 #
-#  2669 ┃
-#  2670 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  2671 ┃   ^^^^^^^
+#  2679 ┃
+#  2680 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+#  2681 ┃   ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
@@ -98,14 +98,14 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-axv1UG-346:32"
+  id = "OBS-STAN-0203-axv1UG-353:32"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Docker.hs
 #
-#  345 ┃
-#  346 ┃     hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
-#  347 ┃                                ^^^^^^^
+#  352 ┃
+#  353 ┃     hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
+#  354 ┃                                ^^^^^^^
 
 # Data types with non-strict fields
 # Defining lazy fields in data types can lead to unexpected space leaks

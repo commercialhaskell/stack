@@ -1,7 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- Types and functions related to Stack's @script@ command.
 module Stack.Script
@@ -136,7 +136,7 @@ scriptCmd opts = do
   -- Note that in this functions we use logError instead of logWarn because,
   -- when using the interpreter mode, only error messages are shown. See:
   -- https://github.com/commercialhaskell/stack/issues/3007
-  view (globalOptsL.to globalStackYaml) >>= \case
+  view (globalOptsL . to globalStackYaml) >>= \case
     SYLOverride fp -> logError $
          "Ignoring override stack.yaml file for script command: "
       <> fromString (toFilePath fp)
@@ -148,7 +148,7 @@ scriptCmd opts = do
   let scriptFile = filename file
 
   isNoRunCompile <- fromFirstFalse . configMonoidNoRunCompile <$>
-                           view (globalOptsL.to globalConfigMonoid)
+                           view (globalOptsL . to globalConfigMonoid)
 
   let scriptDir = parent file
       modifyGO go = go
@@ -243,7 +243,7 @@ scriptCmd opts = do
           -- to check which packages are installed already. If all needed
           -- packages are available, we can skip the (rather expensive) build
           -- call below.
-          GhcPkgExe pkg <- view $ compilerPathsL.to cpPkg
+          GhcPkgExe pkg <- view $ compilerPathsL . to cpPkg
           -- https://github.com/haskell/process/issues/251
           bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
               ["list", "--simple-output"] CL.sinkNull CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
@@ -282,7 +282,7 @@ scriptCmd opts = do
               ]
         case shouldCompile of
           SEInterpret -> do
-            interpret <- view $ compilerPathsL.to cpInterpreter
+            interpret <- view $ compilerPathsL . to cpInterpreter
             exec (toFilePath interpret)
                 (ghcArgs ++ toFilePath file : soArgs opts)
           _ -> do
@@ -292,7 +292,8 @@ scriptCmd opts = do
             -- exception, the standard output we did capture will be reported
             -- to the user.
             liftIO $ Dir.createDirectoryIfMissing True (fromAbsDir (parent exe))
-            compilerExeName <- view $ compilerPathsL.to cpCompiler.to toFilePath
+            compilerExeName <-
+              view $ compilerPathsL . to cpCompiler . to toFilePath
             withWorkingDir (fromAbsDir (parent file)) $ proc
               compilerExeName
               (ghcArgs ++ [toFilePath file])
@@ -369,9 +370,9 @@ dumpedPackageModules ::
 dumpedPackageModules pkgs dumpPkgs =
   let pnames = Map.keysSet pkgs `Set.difference` blacklist
   in  Map.fromList
-        [ (pn, dpExposedModules)
-        | DumpPackage {..} <- dumpPkgs
-        , let PackageIdentifier pn _ = dpPackageIdent
+        [ (pn, dp.dpExposedModules)
+        | dp <- dumpPkgs
+        , let PackageIdentifier pn _ = dp.dpPackageIdent
         , pn `Set.member` pnames
         ]
 

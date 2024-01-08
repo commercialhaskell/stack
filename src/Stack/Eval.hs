@@ -1,5 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- | Types and functions related to Stack's @eval@ command.
 module Stack.Eval
@@ -24,10 +24,10 @@ data EvalOpts = EvalOpts
 -- | Function underlying the @stack eval@ command. Evaluate some Haskell code
 -- inline.
 evalCmd :: EvalOpts -> RIO Runner ()
-evalCmd EvalOpts {..} = execCmd execOpts
+evalCmd eval = execCmd execOpts
  where
-  execOpts =
-    ExecOpts { eoCmd = ExecGhc
-             , eoArgs = ["-e", evalArg]
-             , eoExtra = evalExtra
-             }
+  execOpts = ExecOpts
+    { eoCmd = ExecGhc
+    , eoArgs = ["-e", eval.evalArg]
+    , eoExtra = eval.evalExtra
+    }

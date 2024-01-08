@@ -1,13 +1,13 @@
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE QuasiQuotes                #-}
-{-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE NoImplicitPrelude    #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE DerivingStrategies   #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE OverloadedRecordDot  #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE QuasiQuotes          #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
 -- | Work with SQLite database used for caches across a single project.
@@ -113,8 +113,8 @@ readConfigCache ::
      (HasBuildConfig env, HasLogFunc env)
   => Entity ConfigCacheParent
   -> ReaderT SqlBackend (RIO env) ConfigCache
-readConfigCache (Entity parentId ConfigCacheParent {..}) = do
-  let configCachePkgSrc = configCacheParentPkgSrc
+readConfigCache (Entity parentId configCacheParent) = do
+  let configCachePkgSrc = configCacheParent.configCacheParentPkgSrc
   coDirs <-
     map (configCacheDirOptionValue . entityVal) <$>
     selectList
@@ -125,16 +125,26 @@ readConfigCache (Entity parentId ConfigCacheParent {..}) = do
     selectList
       [ConfigCacheNoDirOptionParent ==. parentId]
       [Asc ConfigCacheNoDirOptionIndex]
-  let configCacheOpts = ConfigureOpts {..}
+  let configCacheOpts = ConfigureOpts
+        { coDirs
+        , coNoDirs
+        }
   configCacheDeps <-
     Set.fromList . map (configCacheDepValue . entityVal) <$>
     selectList [ConfigCacheDepParent ==. parentId] []
   configCacheComponents <-
     Set.fromList . map (configCacheComponentValue . entityVal) <$>
     selectList [ConfigCacheComponentParent ==. parentId] []
-  let configCachePathEnvVar = configCacheParentPathEnvVar
-  let configCacheHaddock = configCacheParentHaddock
-  pure ConfigCache {..}
+  let configCachePathEnvVar = configCacheParent.configCacheParentPathEnvVar
+  let configCacheHaddock = configCacheParent.configCacheParentHaddock
+  pure $ ConfigCache
+    { configCacheOpts
+    , configCacheDeps
+    , configCacheComponents
+    , configCacheHaddock
+    , configCachePkgSrc
+    , configCachePathEnvVar
+    }
 
 -- | Load 'ConfigCache' from the database.
 loadConfigCache ::
@@ -146,8 +156,8 @@ loadConfigCache key =
     mparent <- getBy key
     case mparent of
       Nothing -> pure Nothing
-      Just parentEntity@(Entity _ ConfigCacheParent {..})
-        | configCacheParentActive ->
+      Just parentEntity@(Entity _ configCacheParent)
+        |  configCacheParent.configCacheParentActive ->
             Just <$> readConfigCache parentEntity
         | otherwise -> pure Nothing
 

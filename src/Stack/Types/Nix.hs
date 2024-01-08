@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 
 -- | Nix types.
 module Stack.Types.Nix
@@ -63,17 +62,23 @@ data NixOptsMonoid = NixOptsMonoid
 
 -- | Decode uninterpreted nix options from JSON/YAML.
 instance FromJSON (WithJSONWarnings NixOptsMonoid) where
-  parseJSON = withObjectWarnings "NixOptsMonoid"
-    ( \o -> do
-        nixMonoidEnable        <- First <$> o ..:? nixEnableArgName
-        nixMonoidPureShell     <- First <$> o ..:? nixPureShellArgName
-        nixMonoidPackages      <- First <$> o ..:? nixPackagesArgName
-        nixMonoidInitFile      <- First <$> o ..:? nixInitFileArgName
-        nixMonoidShellOptions  <- First <$> o ..:? nixShellOptsArgName
-        nixMonoidPath          <- First <$> o ..:? nixPathArgName
-        nixMonoidAddGCRoots    <- FirstFalse <$> o ..:? nixAddGCRootsArgName
-        pure NixOptsMonoid{..}
-    )
+  parseJSON = withObjectWarnings "NixOptsMonoid" $ \o -> do
+    nixMonoidEnable        <- First <$> o ..:? nixEnableArgName
+    nixMonoidPureShell     <- First <$> o ..:? nixPureShellArgName
+    nixMonoidPackages      <- First <$> o ..:? nixPackagesArgName
+    nixMonoidInitFile      <- First <$> o ..:? nixInitFileArgName
+    nixMonoidShellOptions  <- First <$> o ..:? nixShellOptsArgName
+    nixMonoidPath          <- First <$> o ..:? nixPathArgName
+    nixMonoidAddGCRoots    <- FirstFalse <$> o ..:? nixAddGCRootsArgName
+    pure $ NixOptsMonoid
+      { nixMonoidEnable
+      , nixMonoidPureShell
+      , nixMonoidPackages
+      , nixMonoidInitFile
+      , nixMonoidShellOptions
+      , nixMonoidPath
+      , nixMonoidAddGCRoots
+      }
 
 -- | Left-biased combine Nix options
 instance Semigroup NixOptsMonoid where

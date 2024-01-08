@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Nix configuration
 module Stack.Config.Nix
@@ -46,20 +46,21 @@ nixOptsFromMonoid ::
   => NixOptsMonoid
   -> OS
   -> RIO env NixOpts
-nixOptsFromMonoid NixOptsMonoid{..} os = do
+nixOptsFromMonoid nixMonoid os = do
   let defaultPure = case os of
         OSX -> False
         _ -> True
-      nixPureShell = fromFirst defaultPure nixMonoidPureShell
-      nixPackages = fromFirst [] nixMonoidPackages
-      nixInitFile = getFirst nixMonoidInitFile
-      nixShellOptions = fromFirst [] nixMonoidShellOptions
-                        ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoidPath)
-      nixAddGCRoots   = fromFirstFalse nixMonoidAddGCRoots
+      nixPureShell = fromFirst defaultPure nixMonoid.nixMonoidPureShell
+      nixPackages = fromFirst [] nixMonoid.nixMonoidPackages
+      nixInitFile = getFirst nixMonoid.nixMonoidInitFile
+      nixShellOptions =
+           fromFirst [] nixMonoid.nixMonoidShellOptions
+        ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoid.nixMonoidPath)
+      nixAddGCRoots   = fromFirstFalse nixMonoid.nixMonoidAddGCRoots
 
   -- Enable Nix-mode by default on NixOS, unless Docker-mode was specified
   osIsNixOS <- isNixOS
-  let nixEnable0 = fromFirst osIsNixOS nixMonoidEnable
+  let nixEnable0 = fromFirst osIsNixOS nixMonoid.nixMonoidEnable
 
   nixEnable <-
     if nixEnable0 && osIsWindows
@@ -71,7 +72,14 @@ nixOptsFromMonoid NixOptsMonoid{..} os = do
 
   when (not (null nixPackages) && isJust nixInitFile) $
     throwIO NixCannotUseShellFileAndPackagesException
-  pure NixOpts{..}
+  pure $ NixOpts
+    { nixEnable
+    , nixPureShell
+    , nixPackages
+    , nixInitFile
+    , nixShellOptions
+    , nixAddGCRoots
+    }
  where
   prefixAll p (x:xs) = p : x : prefixAll p xs
   prefixAll _ _      = []

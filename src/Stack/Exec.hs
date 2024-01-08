@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Types and function related to Stack's @exec@, @ghc@, @run@, @runghc@ and
 -- @runhaskell@ commands.
@@ -102,28 +102,28 @@ data ExecOpts = ExecOpts
 -- | The function underlying Stack's @exec@, @ghc@, @run@, @runghc@ and
 -- @runhaskell@ commands. Execute a command.
 execCmd :: ExecOpts -> RIO Runner ()
-execCmd ExecOpts {..} =
+execCmd opts =
   withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
     unless (null targets) $ build Nothing
 
     config <- view configL
-    menv <- liftIO $ configProcessContextSettings config eoEnvSettings
+    menv <- liftIO $ configProcessContextSettings config eo.eoEnvSettings
     withProcessContext menv $ do
       -- Add RTS options to arguments
-      let argsWithRts args = if null eoRtsOptions
+      let argsWithRts args = if null eo.eoRtsOptions
                   then args :: [String]
-                  else args ++ ["+RTS"] ++ eoRtsOptions ++ ["-RTS"]
-      (cmd, args) <- case (eoCmd, argsWithRts eoArgs) of
+                  else args ++ ["+RTS"] ++ eo.eoRtsOptions ++ ["-RTS"]
+      (cmd, args) <- case (opts.eoCmd, argsWithRts opts.eoArgs) of
         (ExecCmd cmd, args) -> pure (cmd, args)
         (ExecRun, args) -> getRunCmd args
-        (ExecGhc, args) -> getGhcCmd eoPackages args
-        (ExecRunGhc, args) -> getRunGhcCmd eoPackages args
+        (ExecGhc, args) -> getGhcCmd eo.eoPackages args
+        (ExecRunGhc, args) -> getRunGhcCmd eo.eoPackages args
 
-      runWithPath eoCwd $ exec cmd args
+      runWithPath eo.eoCwd $ exec cmd args
  where
-  ExecOptsExtra {..} = eoExtra
+  eo = opts.eoExtra
 
-  targets = concatMap words eoPackages
+  targets = concatMap words eo.eoPackages
   boptsCLI = defaultBuildOptsCLI
              { boptsCLITargets = map T.pack targets
              }
@@ -144,16 +144,16 @@ execCmd ExecOpts {..} =
     map ("-package-id=" ++) <$> mapM getPkgId pkgs
 
   getRunCmd args = do
-    packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+    packages <- view $ buildConfigL . to (smwProject . bcSMWanted)
     pkgComponents <- for (Map.elems packages) ppComponents
     let executables = concatMap (filter isCExe . Set.toList) pkgComponents
     let (exe, args') = case args of
-                       []   -> (firstExe, args)
-                       x:xs -> case L.find (\y -> y == CExe (T.pack x)) executables of
-                               Nothing -> (firstExe, args)
-                               argExe -> (argExe, xs)
-                       where
-                          firstExe = listToMaybe executables
+          [] -> (firstExe, args)
+          x:xs -> case L.find (\y -> y == CExe (T.pack x)) executables of
+            Nothing -> (firstExe, args)
+            argExe -> (argExe, xs)
+         where
+          firstExe = listToMaybe executables
     case exe of
       Just (CExe exe') -> do
         withNewLocalBuildTargets [T.cons ':' exe'] $ build Nothing
@@ -162,12 +162,12 @@ execCmd ExecOpts {..} =
 
   getGhcCmd pkgs args = do
     pkgopts <- getPkgOpts pkgs
-    compiler <- view $ compilerPathsL.to cpCompiler
+    compiler <- view $ compilerPathsL . to cpCompiler
     pure (toFilePath compiler, pkgopts ++ args)
 
   getRunGhcCmd pkgs args = do
     pkgopts <- getPkgOpts pkgs
-    interpret <- view $ compilerPathsL.to cpInterpreter
+    interpret <- view $ compilerPathsL . to cpInterpreter
     pure (toFilePath interpret, pkgopts ++ args)
 
   runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()

@@ -352,7 +352,7 @@ library
     , array
     , async
     , attoparsec
-    , base >=4.14.3.0 && <5
+    , base >=4.16.0.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client >=0.0.2
@@ -474,7 +474,7 @@ executable stack
     , array
     , async
     , attoparsec
-    , base >=4.14.3.0 && <5
+    , base >=4.16.0.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client >=0.0.2
@@ -575,7 +575,7 @@ executable stack-integration-test
     , array
     , async
     , attoparsec
-    , base >=4.14.3.0 && <5
+    , base >=4.16.0.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client >=0.0.2
@@ -692,7 +692,7 @@ test-suite stack-unit-test
     , array
     , async
     , attoparsec
-    , base >=4.14.3.0 && <5
+    , base >=4.16.0.0 && <5
     , base64-bytestring
     , bytestring
     , casa-client >=0.0.2

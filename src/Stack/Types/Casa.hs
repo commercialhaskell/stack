@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE RecordWildCards    #-}
 
 -- | Casa configuration types.
 
@@ -26,14 +25,16 @@ data CasaOptsMonoid = CasaOptsMonoid
 
 -- | Decode uninterpreted Casa configuration options from JSON/YAML.
 instance FromJSON (WithJSONWarnings CasaOptsMonoid) where
-  parseJSON = withObjectWarnings "CasaOptsMonoid"
-    ( \o -> do
-        casaMonoidEnable <- FirstTrue <$> o ..:? casaEnableName
-        casaMonoidRepoPrefix <- First <$> o ..:? casaRepoPrefixName
-        casaMonoidMaxKeysPerRequest <-
-          First <$> o ..:? casaMaxKeysPerRequestName
-        pure CasaOptsMonoid {..}
-    )
+  parseJSON = withObjectWarnings "CasaOptsMonoid" $ \o -> do
+    casaMonoidEnable <- FirstTrue <$> o ..:? casaEnableName
+    casaMonoidRepoPrefix <- First <$> o ..:? casaRepoPrefixName
+    casaMonoidMaxKeysPerRequest <-
+      First <$> o ..:? casaMaxKeysPerRequestName
+    pure $ CasaOptsMonoid
+      { casaMonoidEnable
+      , casaMonoidRepoPrefix
+      , casaMonoidMaxKeysPerRequest
+      }
 
 -- | Left-biased combine Casa configuration options
 instance Semigroup CasaOptsMonoid where

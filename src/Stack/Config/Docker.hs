@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Docker configuration
 module Stack.Config.Docker
@@ -68,9 +68,9 @@ dockerOptsFromMonoid ::
   -> Maybe AbstractResolver
   -> DockerOptsMonoid
   -> m DockerOpts
-dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
+dockerOptsFromMonoid mproject maresolver dockerMonoid = do
   let dockerImage =
-        case getFirst dockerMonoidRepoOrImage of
+        case getFirst dockerMonoid.dockerMonoidRepoOrImage of
           Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
           Just (DockerMonoidImage image) -> pure image
           Just (DockerMonoidRepo repo) ->
@@ -79,27 +79,51 @@ dockerOptsFromMonoid mproject maresolver DockerOptsMonoid{..} = do
               -- Repo already specified a tag or digest, so don't append default
               Just _ -> pure repo
   let dockerEnable =
-        fromFirst (getAny dockerMonoidDefaultEnable) dockerMonoidEnable
+        fromFirst
+          (getAny dockerMonoid.dockerMonoidDefaultEnable)
+          dockerMonoid.dockerMonoidEnable
       dockerRegistryLogin =
         fromFirst
-          (isJust (emptyToNothing (getFirst dockerMonoidRegistryUsername)))
-          dockerMonoidRegistryLogin
-      dockerRegistryUsername = emptyToNothing (getFirst dockerMonoidRegistryUsername)
-      dockerRegistryPassword = emptyToNothing (getFirst dockerMonoidRegistryPassword)
-      dockerAutoPull = fromFirstTrue dockerMonoidAutoPull
-      dockerDetach = fromFirstFalse dockerMonoidDetach
-      dockerPersist = fromFirstFalse dockerMonoidPersist
-      dockerContainerName = emptyToNothing (getFirst dockerMonoidContainerName)
-      dockerNetwork = emptyToNothing (getFirst dockerMonoidNetwork)
-      dockerRunArgs = dockerMonoidRunArgs
-      dockerMount = dockerMonoidMount
-      dockerMountMode = emptyToNothing (getFirst dockerMonoidMountMode)
-      dockerEnv = dockerMonoidEnv
-      dockerSetUser = getFirst dockerMonoidSetUser
+          (isJust (emptyToNothing (getFirst dockerMonoid.dockerMonoidRegistryUsername)))
+          dockerMonoid.dockerMonoidRegistryLogin
+      dockerRegistryUsername =
+        emptyToNothing (getFirst dockerMonoid.dockerMonoidRegistryUsername)
+      dockerRegistryPassword =
+        emptyToNothing (getFirst dockerMonoid.dockerMonoidRegistryPassword)
+      dockerAutoPull = fromFirstTrue dockerMonoid.dockerMonoidAutoPull
+      dockerDetach = fromFirstFalse dockerMonoid.dockerMonoidDetach
+      dockerPersist = fromFirstFalse dockerMonoid.dockerMonoidPersist
+      dockerContainerName =
+        emptyToNothing (getFirst dockerMonoid.dockerMonoidContainerName)
+      dockerNetwork = emptyToNothing (getFirst dockerMonoid.dockerMonoidNetwork)
+      dockerRunArgs = dockerMonoid.dockerMonoidRunArgs
+      dockerMount = dockerMonoid.dockerMonoidMount
+      dockerMountMode =
+        emptyToNothing (getFirst dockerMonoid.dockerMonoidMountMode)
+      dockerEnv = dockerMonoid.dockerMonoidEnv
+      dockerSetUser = getFirst dockerMonoid.dockerMonoidSetUser
       dockerRequireDockerVersion =
-        simplifyVersionRange (getIntersectingVersionRange dockerMonoidRequireDockerVersion)
-      dockerStackExe = getFirst dockerMonoidStackExe
-  pure DockerOpts{..}
+        simplifyVersionRange (getIntersectingVersionRange dockerMonoid.dockerMonoidRequireDockerVersion)
+      dockerStackExe = getFirst dockerMonoid.dockerMonoidStackExe
+  pure $ DockerOpts
+    { dockerEnable
+    , dockerImage
+    , dockerRegistryLogin
+    , dockerRegistryUsername
+    , dockerRegistryPassword
+    , dockerAutoPull
+    , dockerDetach
+    , dockerPersist
+    , dockerContainerName
+    , dockerNetwork
+    , dockerRunArgs
+    , dockerMount
+    , dockerMountMode
+    , dockerEnv
+    , dockerStackExe
+    , dockerSetUser
+    , dockerRequireDockerVersion
+    }
  where
   emptyToNothing Nothing = Nothing
   emptyToNothing (Just s)

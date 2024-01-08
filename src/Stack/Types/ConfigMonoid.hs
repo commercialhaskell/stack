@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 
 module Stack.Types.ConfigMonoid
   ( ConfigMonoid (..)
@@ -366,7 +365,71 @@ parseConfigMonoidObject rootDir obj = do
   configMonoidStackDeveloperMode <-
     First <$> obj ..:? configMonoidStackDeveloperModeName
 
-  pure ConfigMonoid {..}
+  pure $ ConfigMonoid
+    { configMonoidStackRoot
+    , configMonoidWorkDir
+    , configMonoidBuildOpts
+    , configMonoidDockerOpts
+    , configMonoidNixOpts
+    , configMonoidConnectionCount
+    , configMonoidHideTHLoading
+    , configMonoidPrefixTimestamps
+    , configMonoidLatestSnapshot
+    , configMonoidPackageIndex
+    , configMonoidPackageIndices
+    , configMonoidSystemGHC
+    , configMonoidInstallGHC
+    , configMonoidSkipGHCCheck
+    , configMonoidSkipMsys
+    , configMonoidCompilerCheck
+    , configMonoidCompilerRepository
+    , configMonoidRequireStackVersion
+    , configMonoidArch
+    , configMonoidGHCVariant
+    , configMonoidGHCBuild
+    , configMonoidJobs
+    , configMonoidExtraIncludeDirs
+    , configMonoidExtraLibDirs
+    , configMonoidCustomPreprocessorExts
+    , configMonoidOverrideGccPath
+    , configMonoidOverrideHpack
+    , configMonoidConcurrentTests
+    , configMonoidLocalBinPath
+    , configMonoidTemplateParameters
+    , configMonoidScmInit
+    , configMonoidGhcOptionsByName
+    , configMonoidGhcOptionsByCat
+    , configMonoidCabalConfigOpts
+    , configMonoidExtraPath
+    , configMonoidSetupInfoLocations
+    , configMonoidSetupInfoInline
+    , configMonoidLocalProgramsBase
+    , configMonoidPvpBounds
+    , configMonoidModifyCodePage
+    , configMonoidRebuildGhcOptions
+    , configMonoidApplyGhcOptions
+    , configMonoidApplyProgOptions
+    , configMonoidAllowNewer
+    , configMonoidAllowNewerDeps
+    , configMonoidDefaultTemplate
+    , configMonoidAllowDifferentUser
+    , configMonoidDumpLogs
+    , configMonoidSaveHackageCreds
+    , configMonoidHackageBaseUrl
+    , configMonoidColorWhen
+    , configMonoidStyles
+    , configMonoidHideSourcePaths
+    , configMonoidRecommendUpgrade
+    , configMonoidNotifyIfNixOnPath
+    , configMonoidNotifyIfGhcUntested
+    , configMonoidNotifyIfCabalUntested
+    , configMonoidNotifyIfArchUnknown
+    , configMonoidCasaOpts
+    , configMonoidCasaRepoPrefix
+    , configMonoidSnapshotLocation
+    , configMonoidNoRunCompile
+    , configMonoidStackDeveloperMode
+    }
 
 configMonoidWorkDirName :: Text
 configMonoidWorkDirName = "work-dir"

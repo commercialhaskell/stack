@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecordWildCards     #-}
 
 -- | Types and functions related to Stack's @ls@ command.
 module Stack.Ls
@@ -171,11 +171,11 @@ parseSnapshot :: Value -> A.Parser Snapshot
 parseSnapshot = A.withArray "array of snapshot" (pure . toSnapshot . V.toList)
 
 displayTime :: Snapshot -> [Text]
-displayTime Snapshot {..} = [snapTime]
+displayTime snap = [snap.snapTime]
 
 displaySnap :: Snapshot -> [Text]
-displaySnap Snapshot {..} =
-  ["Resolver name: " <> snapId, "\n" <> snapTitle <> "\n\n"]
+displaySnap snap =
+  ["Resolver name: " <> snap.snapId, "\n" <> snap.snapTitle <> "\n\n"]
 
 displaySingleSnap :: [Snapshot] -> Text
 displaySingleSnap snapshots =
@@ -228,8 +228,8 @@ handleLocal lsOpts = do
   snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
   let snapData = L.sort snapData'
   case lsView lsOpts of
-    LsSnapshot SnapshotOpts {..} ->
-      case (soptLtsSnapView, soptNightlySnapView) of
+    LsSnapshot sopt ->
+      case (sopt.soptLtsSnapView, sopt.soptNightlySnapView) of
         (True, False) ->
           liftIO $
           displayLocalSnapshot isStdoutTerminal $
@@ -251,8 +251,8 @@ handleRemote lsOpts = do
   result <- httpJSON req'
   let snapData = getResponseBody result
   case lsView lsOpts of
-    LsSnapshot SnapshotOpts {..} ->
-      case (soptLtsSnapView, soptNightlySnapView) of
+    LsSnapshot sopt ->
+      case (sopt.soptLtsSnapView, sopt.soptNightlySnapView) of
         (True, False) ->
           liftIO $
           displaySnapshotData isStdoutTerminal $
@@ -271,8 +271,8 @@ handleRemote lsOpts = do
 lsCmd :: LsCmdOpts -> RIO Runner ()
 lsCmd lsOpts =
   case lsView lsOpts of
-    LsSnapshot SnapshotOpts {..} ->
-      case soptViewType of
+    LsSnapshot sopt ->
+      case sopt.soptViewType of
         Local -> handleLocal lsOpts
         Remote -> handleRemote lsOpts
     LsDependencies depOpts -> listDependencies depOpts
@@ -309,7 +309,7 @@ listStylesCmd opts = do
 -- | List Stack's installed tools, sorted (see instance of 'Ord' for 'Tool').
 listToolsCmd :: ListToolsOpts -> RIO Config ()
 listToolsCmd opts = do
-  localPrograms <- view $ configL.to configLocalPrograms
+  localPrograms <- view $ configL . to configLocalPrograms
   installed <- sort <$> listInstalled localPrograms
   let wanted = case toptFilter opts of
         [] -> installed
