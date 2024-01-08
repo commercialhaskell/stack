@@ -69,9 +69,11 @@ Cabal file (named `<package_name>.cabal`), see the
 Project-specific configuration options are valid only in a project-level
 configuration file (`stack.yaml`).
 
-> Note: We define **project** to mean a directory that contains a `stack.yaml`
-> file, which specifies how to build a set of packages. We define **package** to
-> be a package with a Cabal file or an Hpack `package.yaml` file.
+!!! note
+
+    We define **project** to mean a directory that contains a `stack.yaml`
+    file, which specifies how to build a set of packages. We define **package** to
+    be a package with a Cabal file or an Hpack `package.yaml` file.
 
 In your project-specific options, you specify both **which local packages** to
 build and **which dependencies to use** when building these packages. Unlike the
@@ -256,18 +258,22 @@ be included in our package. This can be used for a few different purposes, e.g.:
 
 * Ensure that packages you don't want used in your project cannot be used in a
   `package.yaml` file (e.g., for license reasons)
-* Prevent overriding of a global package like `Cabal`. For more information, see
-  Stackage issue
-  [#4425](https://github.com/commercialhaskell/stackage/issues/4425)
 * When using a custom GHC build, avoid incompatible packages (see this
   [comment](https://github.com/commercialhaskell/stack/pull/4655#issuecomment-477954429)).
 
 ~~~yaml
 drop-packages:
-- Cabal
 - buggy-package
 - package-with-unacceptable-license
 ~~~
+
+!!! info
+
+    In older snapshots, it used to be handy to drop Cabal for reasons listed in
+    Stackage issue
+    [#4425](https://github.com/commercialhaskell/stackage/issues/4425). However,
+    since around February 2020 (LTS-14.27 and nightly-2020-02-08), Cabal is not
+    directly included in snapshots, so dropping Cabal no longer has any effect.
 
 ### user-message
 
