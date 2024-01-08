@@ -11,9 +11,9 @@
 -- directly. As GHC 9.6.3 boot packages Cabal and Cabal-syntax expose modules
 -- with the same names, the language extension PackageImports is required.
 
-{-# LANGUAGE PackageImports  #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE PackageImports      #-}
+{-# LANGUAGE PatternSynonyms     #-}
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as TarEntry
@@ -77,7 +77,22 @@ main = shakeArgsWith
         gProjectRoot = "" -- Set to real value below.
         gBuildArgs = ["--flag", "stack:-developer-mode"]
         gCertificateName = Nothing
-        global0 = foldl (flip id) Global{..} flags
+        global0 = foldl
+          (flip id)
+          Global
+            { gStackPackageDescription
+            , gAllowDirty
+            , gGitRevCount
+            , gGitSha
+            , gProjectRoot
+            , gHomeDir
+            , gArch
+            , gBinarySuffix
+            , gTestHaddocks
+            , gBuildArgs
+            , gCertificateName
+            }
+          flags
 
     -- Need to get paths after options since the '--arch' argument can effect
     -- them.
@@ -136,7 +151,7 @@ options =
 
 -- | Shake rules.
 rules :: Global -> [String] -> Rules ()
-rules global@Global{..} args = do
+rules global args = do
   case args of
     [] -> error "No wanted target(s) specified."
     _ -> want args
@@ -157,7 +172,7 @@ rules global@Global{..} args = do
   releaseCheckDir </> binaryExeFileName %> \out -> do
     need [releaseBinDir </> binaryName </> stackExeFileName]
     Stdout dirty <- cmd "git status --porcelain"
-    when (not gAllowDirty && not (null (trim dirty))) $
+    when (not global.gAllowDirty && not (null (trim dirty))) $
       error $ concat
         [ "Working tree is dirty.  Use --"
         , allowDirtyOptName
@@ -165,18 +180,24 @@ rules global@Global{..} args = do
         , show dirty
         ]
     () <- cmd
-      [gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName]
+      [ global.gProjectRoot </> releaseBinDir </> binaryName </>
+          stackExeFileName
+      ]
       (stackArgs global)
       ["build"]
-      gBuildArgs
+      global.gBuildArgs
       integrationTestFlagArgs
       ["--pedantic", "--no-haddock-deps", "--test"]
-      ["--haddock" | gTestHaddocks]
+      ["--haddock" | global.gTestHaddocks]
       ["stack"]
     () <- cmd
-      [gProjectRoot </> releaseBinDir </> binaryName </> stackExeFileName]
+      [ global.gProjectRoot </> releaseBinDir </> binaryName </>
+          stackExeFileName
+      ]
       ["exec"]
-      [gProjectRoot </> releaseBinDir </> binaryName </> "stack-integration-test"]
+      [ global.gProjectRoot </> releaseBinDir </> binaryName </>
+          "stack-integration-test"
+      ]
     copyFileChanged (releaseBinDir </> binaryName </> stackExeFileName) out
 
   releaseDir </> binaryPkgZipFileName %> \out -> do
@@ -214,7 +235,7 @@ rules global@Global{..} args = do
     need [releaseBinDir </> binaryName </> stackExeFileName]
     (Stdout versionOut) <-
       cmd (releaseBinDir </> binaryName </> stackExeFileName) "--version"
-    when (not gAllowDirty && "dirty" `isInfixOf` lower versionOut) $
+    when (not global.gAllowDirty && "dirty" `isInfixOf` lower versionOut) $
       error
         (  "Refusing continue because 'stack --version' reports dirty.  Use --"
         ++ allowDirtyOptName
@@ -225,7 +246,7 @@ rules global@Global{..} args = do
         -- Windows doesn't have or need a 'strip' command, so skip it.
         -- Instead, we sign the executable
         liftIO $ copyFile (releaseBinDir </> binaryName </> stackExeFileName) out
-        case gCertificateName of
+        case global.gCertificateName of
           Nothing -> pure ()
           Just certName ->
             actionOnException
@@ -235,9 +256,9 @@ rules global@Global{..} args = do
                   [ "sign"
                   , "/v"
                   , "/d"
-                  , fromShortText $ synopsis gStackPackageDescription
+                  , fromShortText $ synopsis global.gStackPackageDescription
                   , "/du"
-                  , fromShortText $ homepage gStackPackageDescription
+                  , fromShortText $ homepage global.gStackPackageDescription
                   , "/n"
                   , certName
                   , "/t"
@@ -278,7 +299,7 @@ rules global@Global{..} args = do
           (stackArgs global)
           ["--local-bin-path=" ++ takeDirectory out]
           "install"
-          gBuildArgs
+          global.gBuildArgs
           integrationTestFlagArgs
           "--pedantic"
           "stack"
@@ -338,8 +359,8 @@ rules global@Global{..} args = do
     , "-"
     , display platformOS
     , "-"
-    , display gArch
-    , if null gBinarySuffix then "" else "-" ++ gBinarySuffix
+    , display global.gArch
+    , if null global.gBinarySuffix then "" else "-" ++ global.gBinarySuffix
     ]
   stackExeFileName = stackProgName <.> exe
 
@@ -431,9 +452,9 @@ certificateNameOptName = "certificate-name"
 
 -- | Arguments to pass to all 'stack' invocations.
 stackArgs :: Global -> [String]
-stackArgs Global{..} = [ "--arch=" ++ display gArch
-                       , "--interleaved-output"
-                       ]
+stackArgs global = [ "--arch=" ++ display global.gArch
+                   , "--interleaved-output"
+                   ]
 
 -- | Name of the 'stack' program.
 stackProgName :: FilePath
