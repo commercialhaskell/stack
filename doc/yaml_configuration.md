@@ -5,6 +5,18 @@
 Stack is configured by the content of YAML files. Some Stack operations can also
 be customised by the use of scripts.
 
+!!! info
+
+    A Haskell package is an organised collection of Haskell code and related
+    files. It is described by a Cabal file or a `package.yaml` file (which can
+    be used to generate a Cabal file). The package description is itself part of
+    the package. Its file is located in the root directory of a local package.
+
+    A Stack project is a local directory that contains a Stack project-level
+    configuration file (`stack.yaml`). A project may relate to more than one
+    local package. A single-package project's directory will usually also be the
+    package's root directory.
+
 ## YAML configuration
 
 Stack's YAML configuration options break down into
@@ -68,10 +80,6 @@ Cabal file (named `<package_name>.cabal`), see the
 
 Project-specific configuration options are valid only in a project-level
 configuration file (`stack.yaml`).
-
-> Note: We define **project** to mean a directory that contains a `stack.yaml`
-> file, which specifies how to build a set of packages. We define **package** to
-> be a package with a Cabal file or an Hpack `package.yaml` file.
 
 In your project-specific options, you specify both **which local packages** to
 build and **which dependencies to use** when building these packages. Unlike the
@@ -256,18 +264,25 @@ be included in our package. This can be used for a few different purposes, e.g.:
 
 * Ensure that packages you don't want used in your project cannot be used in a
   `package.yaml` file (e.g., for license reasons)
-* Prevent overriding of a global package like `Cabal`. For more information, see
-  Stackage issue
-  [#4425](https://github.com/commercialhaskell/stackage/issues/4425)
 * When using a custom GHC build, avoid incompatible packages (see this
   [comment](https://github.com/commercialhaskell/stack/pull/4655#issuecomment-477954429)).
 
 ~~~yaml
 drop-packages:
-- Cabal
 - buggy-package
 - package-with-unacceptable-license
 ~~~
+
+!!! info
+
+    Stackage snapshots LTS Haskell 14.27 (GHC 8.6.5) and earlier, and Nightly
+    2022-02-08 (GHC 8.8.2) and earlier, included directly the `Cabal` package.
+    Later snapshots do not include directly that package (which is a GHC boot
+    package).
+
+    For the older Stackage snapshots, it could be handy to drop the
+    snapshot-specified `Cabal` package, to avoid building that version of the
+    package. For the later snapshots, there is no package version to drop.
 
 ### user-message
 
@@ -436,7 +451,7 @@ or otherwise), `locals` (all local packages, targets or otherwise), and
 
     The use of `everything` can break invariants about your snapshot database.
 
-!!! note
+!!! info
 
     Before Stack 0.1.6.0, the default value was `targets`.
 
@@ -1033,7 +1048,7 @@ flag). However, setting options via `$everything` on all flags will not do so
 for reasoning). This can lead to unpredictable behavior by affecting your
 snapshot packages.
 
-!!! note
+!!! info
 
     Before Stack 1.6.1, the key `*` (then deprecated) had the same function as
     the key `$everything`.
@@ -1347,13 +1362,13 @@ package-indices:
     ignore-expiry: true
 ~~~
 
-!!! note
+!!! info
 
     Before Stack 2.1.3, the default for `ignore-expiry` was `false`. For more
     information, see
     [issue #4928](https://github.com/commercialhaskell/stack/issues/4928).
 
-!!! note
+!!! info
 
     Before Stack 2.1.1, Stack had a different approach to `package-indices`. For
     more information, see
@@ -1438,7 +1453,7 @@ The default value reflects that, in most cases, GHC options are used to affect
 optimization levels and warning behavior, for which GHC does not recompile the
 modules.
 
-!!! note
+!!! info
 
     Before Stack 0.1.6.0, Stack rebuilt a package when its GHC options changed.
 
