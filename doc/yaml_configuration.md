@@ -5,6 +5,18 @@
 Stack is configured by the content of YAML files. Some Stack operations can also
 be customised by the use of scripts.
 
+!!! note
+
+    A Haskell package is an organised collection of Haskell code and related
+    files. It is described by a Cabal file or a `package.yaml` file (which can
+    be used to generate a Cabal file). The package description is itself part of
+    the package. Its file is located in the root directory of a local package.
+
+    A Stack project is a local directory that contains a Stack project-level
+    configuration file (`stack.yaml`). A project may relate to more than one
+    local package. A single-package project's directory will usually also be the
+    package's root directory.
+
 ## YAML configuration
 
 Stack's YAML configuration options break down into
@@ -68,12 +80,6 @@ Cabal file (named `<package_name>.cabal`), see the
 
 Project-specific configuration options are valid only in a project-level
 configuration file (`stack.yaml`).
-
-!!! note
-
-    We define **project** to mean a directory that contains a `stack.yaml`
-    file, which specifies how to build a set of packages. We define **package** to
-    be a package with a Cabal file or an Hpack `package.yaml` file.
 
 In your project-specific options, you specify both **which local packages** to
 build and **which dependencies to use** when building these packages. Unlike the
@@ -269,11 +275,14 @@ drop-packages:
 
 !!! info
 
-    In older snapshots, it used to be handy to drop Cabal for reasons listed in
-    Stackage issue
-    [#4425](https://github.com/commercialhaskell/stackage/issues/4425). However,
-    since around February 2020 (LTS-14.27 and nightly-2020-02-08), Cabal is not
-    directly included in snapshots, so dropping Cabal no longer has any effect.
+    Stackage snapshots LTS Haskell 14.27 (GHC 8.6.5) and earlier, and Nightly
+    2022-02-08 (GHC 8.8.2) and earlier, included directly the `Cabal` package.
+    Later snapshots do not include directly that package (which is a GHC boot
+    package).
+
+    For the older Stackage snapshots, it could be handy to drop the
+    snapshot-specified `Cabal` package, to avoid building that version of the
+    package. For the later snapshots, there is no package version to drop.
 
 ### user-message
 

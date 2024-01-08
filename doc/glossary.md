@@ -36,9 +36,11 @@ The following terms are used in Stack's documentation.
 |Make               |A [build automation tool](https://www.gnu.org/software/make/).|
 |MSYS2              |The [MSYS2](https://www.msys2.org/) software distribution and building platform for Windows.|
 |Nix                |A purely functional [package manager](https://nixos.org/), available for Linux and macOS.|
+|package            |A Haskell package is an organised collection of Haskell code and related files. It is described by a Cabal file or a `package.yaml` file, which is itself part of the package.|
 |`package.yaml`     |A file that describes a package in the Hpack format.      |
 |Pantry             |A library for content-addressable Haskell package management, provided by the [`pantry` package](https://hackage.haskell.org/package/pantry). A dependency of Stack.|
 |PATH               |The `PATH` environment variable, specifying a list of directories searched for executable files.|
+|project            |A Stack project is a local directory that contains a project-level configuration file (`stack.yaml`). A project may relate to more than one local package.|
 |PVP                |The Haskell [Package Versioning Policy](https://pvp.haskell.org/), which tells developers of libraries how to set their version numbers.|
 |REPL               |An interactive (run-eval-print loop) programming environment.|
 |resolver           |A synonym for snapshot.                                   |
