@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecordWildCards     #-}
 
 -- | Run commands in Docker containers
 module Stack.Docker
@@ -106,14 +106,21 @@ getCmdArgs docker imageInfo isRemoteDocker = do
               duUmask <- Files.setFileCreationMask 0o022
               -- Only way to get old umask seems to be to change it, so set it back afterward
               _ <- Files.setFileCreationMask duUmask
-              pure (Just DockerUser{..})
+              pure $ Just DockerUser
+                { duUid
+                , duGid
+                , duGroups
+                , duUmask
+                }
             else pure Nothing
     args <-
         fmap
-            (["--" ++ reExecArgName ++ "=" ++ showStackVersion
-             ,"--" ++ dockerEntrypointArgName
-             ,show DockerEntrypoint{..}] ++)
-            (liftIO getArgs)
+          (  [ "--" ++ reExecArgName ++ "=" ++ showStackVersion
+             , "--" ++ dockerEntrypointArgName
+             , show DockerEntrypoint {deUser}
+             ] ++
+          )
+          (liftIO getArgs)
     case dockerStackExe (configDocker config) of
         Just DockerStackExeHost
           | configPlatform config == dockerContainerPlatform -> do
@@ -194,7 +201,7 @@ runContainerAndExit = do
   config <- view configL
   let docker = configDocker config
   checkDockerVersion docker
-  (env,isStdinTerminal,isStderrTerminal,homeDir) <- liftIO $
+  (env, isStdinTerminal, isStderrTerminal, homeDir) <- liftIO $
     (,,,)
     <$> getEnvironment
     <*> hIsTerminalDeviceOrMinTTY stdin
@@ -216,7 +223,7 @@ runContainerAndExit = do
         "Using boot2docker is NOT supported, and not likely to perform well."
     )
   maybeImageInfo <- inspect image
-  imageInfo@Inspect{..} <- case maybeImageInfo of
+  imageInfo <- case maybeImageInfo of
     Just ii -> pure ii
     Nothing
       | dockerAutoPull docker -> do
@@ -228,8 +235,8 @@ runContainerAndExit = do
       | otherwise -> throwM (NotPulledException image)
   projectRoot <- getProjectRoot
   sandboxDir <- projectDockerSandboxDir projectRoot
-  let ImageConfig {..} = iiConfig
-      imageEnvVars = map (break (== '=')) icEnv
+  let ic = imageInfo.iiConfig
+      imageEnvVars = map (break (== '=')) ic.icEnv
       platformVariant = show $ hashRepoName image
       stackRoot = view stackRootL config
       sandboxHomeDir = sandboxDir </> homeDirName
@@ -316,8 +323,8 @@ runContainerAndExit = do
            -- Disable the deprecated entrypoint in FP Complete-generated images
         , [ "--entrypoint=/usr/bin/env"
           |  isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars)
-          && (  icEntrypoint == ["/usr/local/sbin/docker-entrypoint"]
-             || icEntrypoint == ["/root/entrypoint.sh"]
+          && (  ic.icEntrypoint == ["/usr/local/sbin/docker-entrypoint"]
+             || ic.icEntrypoint == ["/root/entrypoint.sh"]
              )
           ]
         , concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
@@ -480,7 +487,7 @@ entrypoint ::
   => Config
   -> DockerEntrypoint
   -> RIO env ()
-entrypoint config@Config{} DockerEntrypoint{..} = do
+entrypoint config@Config{} de = do
   entrypointMVar <- view dockerEntrypointMVarL
   modifyMVar_ entrypointMVar $ \alreadyRan -> do
     -- Only run the entrypoint once
@@ -491,7 +498,7 @@ entrypoint config@Config{} DockerEntrypoint{..} = do
       estackUserEntry0 <- liftIO $ tryJust (guard . isDoesNotExistError) $
         User.getUserEntryForName stackUserName
       -- Switch UID/GID if needed, and update user's home directory
-      case deUser of
+      case de.deUser of
         Nothing -> pure ()
         Just (DockerUser 0 _ _ _) -> pure ()
         Just du -> withProcessContext envOverride $
@@ -516,44 +523,49 @@ entrypoint config@Config{} DockerEntrypoint{..} = do
                 copyFile srcBuildPlan destBuildPlan
     pure True
  where
-  updateOrCreateStackUser estackUserEntry homeDir DockerUser{..} = do
+  updateOrCreateStackUser estackUserEntry homeDir du = do
     case estackUserEntry of
       Left _ -> do
         -- If no 'stack' user in image, create one with correct UID/GID and home
         -- directory
         readProcessNull "groupadd"
-          ["-o"
-          ,"--gid",show duGid
-          ,stackUserName]
+          [ "-o"
+          , "--gid",show du.duGid
+          , stackUserName
+          ]
         readProcessNull "useradd"
-          ["-oN"
-          ,"--uid",show duUid
-          ,"--gid",show duGid
-          ,"--home",toFilePathNoTrailingSep homeDir
-          ,stackUserName]
+          [ "-oN"
+          , "--uid", show du.duUid
+          , "--gid", show du.duGid
+          , "--home", toFilePathNoTrailingSep homeDir
+          , stackUserName
+          ]
       Right _ -> do
         -- If there is already a 'stack' user in the image, adjust its UID/GID
         -- and home directory
         readProcessNull "usermod"
-          ["-o"
-          ,"--uid",show duUid
-          ,"--home",toFilePathNoTrailingSep homeDir
-          ,stackUserName]
+          [ "-o"
+          , "--uid", show du.duUid
+          , "--home", toFilePathNoTrailingSep homeDir
+          , stackUserName
+          ]
         readProcessNull "groupmod"
-          ["-o"
-          ,"--gid",show duGid
-          ,stackUserName]
-    forM_ duGroups $ \gid ->
+          [ "-o"
+          , "--gid", show du.duGid
+          , stackUserName
+          ]
+    forM_ du.duGroups $ \gid ->
       readProcessNull "groupadd"
-        ["-o"
-        ,"--gid",show gid
-        ,"group" ++ show gid]
+        [ "-o"
+        , "--gid", show gid
+        , "group" ++ show gid
+        ]
     -- 'setuid' to the wanted UID and GID
     liftIO $ do
-      User.setGroupID duGid
-      handleSetGroups duGroups
-      User.setUserID duUid
-      _ <- Files.setFileCreationMask duUmask
+      User.setGroupID du.duGid
+      handleSetGroups du.duGroups
+      User.setUserID du.duUid
+      _ <- Files.setFileCreationMask du.duUmask
       pure ()
   stackUserName = "stack" :: String
 
@@ -605,7 +617,7 @@ decodeUtf8 bs = T.unpack (T.decodeUtf8 bs)
 -- | Fail with friendly error if project root not set.
 getProjectRoot :: HasConfig env => RIO env (Path Abs Dir)
 getProjectRoot = do
-  mroot <- view $ configL.to configProjectRoot
+  mroot <- view $ configL . to configProjectRoot
   maybe (throwIO CannotDetermineProjectRootException) pure mroot
 
 -- | Environment variable that contained the old sandbox ID.

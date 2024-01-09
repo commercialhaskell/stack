@@ -1,9 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Dealing with Cabal.
 
@@ -274,9 +273,11 @@ generatePkgDescOpts
 -- | Generate GHC options for the target. Since Cabal also figures out these
 -- options, currently this is only used for invoking GHCI (via stack ghci).
 generateBuildInfoOpts :: BioInput -> BuildInfoOpts
-generateBuildInfoOpts BioInput {..} =
+generateBuildInfoOpts bi =
   BuildInfoOpts
-    { bioOpts = ghcOpts ++ fmap ("-optP" <>) (Component.cppOptions biBuildInfo)
+    { bioOpts =
+           ghcOpts
+        ++ fmap ("-optP" <>) (Component.cppOptions bi.biBuildInfo)
     -- NOTE for future changes: Due to this use of nubOrd (and other uses
     -- downstream), these generated options must not rely on multiple
     -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
@@ -290,75 +291,76 @@ generateBuildInfoOpts BioInput {..} =
     , bioCabalMacros = componentAutogen </> relFileCabalMacrosH
     }
  where
-  cObjectFiles =
-    mapMaybe (fmap toFilePath .
-              makeObjectFilePathFromC biCabalDir biComponentName biDistDir)
-             cfiles
-  cfiles = mapMaybe dotCabalCFilePath biDotCabalPaths
+  cObjectFiles = mapMaybe
+    ( fmap toFilePath
+    . makeObjectFilePathFromC bi.biCabalDir bi.biComponentName bi.biDistDir
+    )
+    cfiles
+  cfiles = mapMaybe dotCabalCFilePath bi.biDotCabalPaths
   installVersion = snd
   -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
   deps =
     concat
-      [ case M.lookup name biInstalledMap of
+      [ case M.lookup name bi.biInstalledMap of
           Just (_, Stack.Types.Installed.Library _ident installedInfo) ->
             installedToPackageIdOpt installedInfo
           _ -> ["-package=" <> packageNameString name <>
             maybe "" -- This empty case applies to e.g. base.
               ((("-" <>) . versionString) . installVersion)
-              (M.lookup name biInstallMap)]
+              (M.lookup name bi.biInstallMap)]
       | name <- pkgs
       ]
   pkgs =
-    biAddPackages ++
+    bi.biAddPackages ++
     [ name
-    | Dependency name _ _ <- Component.targetBuildDepends biBuildInfo
+    | Dependency name _ _ <- Component.targetBuildDepends bi.biBuildInfo
       -- TODO: Cabal 3.0 introduced multiple public libraries in a single
       -- dependency
-    , name `notElem` biOmitPackages
+    , name `notElem` bi.biOmitPackages
     ]
-  PerCompilerFlavor ghcOpts _ = Component.options biBuildInfo
+  PerCompilerFlavor ghcOpts _ = Component.options bi.biBuildInfo
   extOpts =
-       map (("-X" ++) . display) (Component.allLanguages biBuildInfo)
-    <> map (("-X" ++) . display) (Component.usedExtensions biBuildInfo)
+       map (("-X" ++) . display) (Component.allLanguages bi.biBuildInfo)
+    <> map (("-X" ++) . display) (Component.usedExtensions bi.biBuildInfo)
   srcOpts =
     map (("-i" <>) . toFilePathNoTrailingSep)
       (concat
-        [ [ componentBuildDir biCabalVersion biComponentName biDistDir ]
-        , [ biCabalDir
-          | null (Component.hsSourceDirs biBuildInfo)
+        [ [ componentBuildDir bi.biCabalVersion bi.biComponentName bi.biDistDir ]
+        , [ bi.biCabalDir
+          | null (Component.hsSourceDirs bi.biBuildInfo)
           ]
         , mapMaybe
             (toIncludeDir . getSymbolicPath)
-            (Component.hsSourceDirs biBuildInfo)
+            (Component.hsSourceDirs bi.biBuildInfo)
         , [ componentAutogen ]
-        , maybeToList (packageAutogenDir biCabalVersion biDistDir)
-        , [ componentOutputDir biComponentName biDistDir ]
+        , maybeToList (packageAutogenDir bi.biCabalVersion bi.biDistDir)
+        , [ componentOutputDir bi.biComponentName bi.biDistDir ]
         ]) ++
-    [ "-stubdir=" ++ toFilePathNoTrailingSep (buildDir biDistDir) ]
+    [ "-stubdir=" ++ toFilePathNoTrailingSep (buildDir bi.biDistDir) ]
   componentAutogen =
-    componentAutogenDir biCabalVersion biComponentName biDistDir
-  toIncludeDir "." = Just biCabalDir
-  toIncludeDir relDir = concatAndCollapseAbsDir biCabalDir relDir
+    componentAutogenDir bi.biCabalVersion bi.biComponentName bi.biDistDir
+  toIncludeDir "." = Just bi.biCabalDir
+  toIncludeDir relDir = concatAndCollapseAbsDir bi.biCabalDir relDir
   includeOpts =
-    map ("-I" <>) (biConfigIncludeDirs <> pkgIncludeOpts)
+    map ("-I" <>) (bi.biConfigIncludeDirs <> pkgIncludeOpts)
   pkgIncludeOpts =
     [ toFilePathNoTrailingSep absDir
-    | dir <- Component.includeDirs biBuildInfo
+    | dir <- Component.includeDirs bi.biBuildInfo
     , absDir <- handleDir dir
     ]
   libOpts =
-    map ("-l" <>) (Component.extraLibs biBuildInfo) <>
-    map ("-L" <>) (biConfigLibDirs <> pkgLibDirs)
+    map ("-l" <>) (Component.extraLibs bi.biBuildInfo) <>
+    map ("-L" <>) (bi.biConfigLibDirs <> pkgLibDirs)
   pkgLibDirs =
     [ toFilePathNoTrailingSep absDir
-    | dir <- Component.extraLibDirs biBuildInfo
+    | dir <- Component.extraLibDirs bi.biBuildInfo
     , absDir <- handleDir dir
     ]
   handleDir dir = case (parseAbsDir dir, parseRelDir dir) of
     (Just ab, _       ) -> [ab]
-    (_      , Just rel) -> [biCabalDir </> rel]
+    (_      , Just rel) -> [bi.biCabalDir </> rel]
     (Nothing, Nothing ) -> []
-  fworks = map ("-framework=" <>) (Component.frameworks biBuildInfo)
+  fworks = map ("-framework=" <>) (Component.frameworks bi.biBuildInfo)
 
 -- | Make the .o path from the .c file path for a component. Example:
 --

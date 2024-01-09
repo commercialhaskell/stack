@@ -1,5 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- | Functions to parse Stack's \'global\' command line arguments.
 module Stack.Options.GlobalParser
@@ -116,37 +116,40 @@ globalOptsFromMonoid ::
   => Bool
   -> GlobalOptsMonoid
   -> m GlobalOpts
-globalOptsFromMonoid defaultTerminal GlobalOptsMonoid{..} = do
-  resolver <- for (getFirst globalMonoidResolver) $ \ur -> do
+globalOptsFromMonoid defaultTerminal globalMonoid = do
+  resolver <- for (getFirst globalMonoid.globalMonoidResolver) $ \ur -> do
     root <-
-      case globalMonoidResolverRoot of
+      case globalMonoid.globalMonoidResolverRoot of
         First Nothing -> getCurrentDir
         First (Just dir) -> resolveDir' dir
     resolvePaths (Just root) ur
   stackYaml <-
-    case getFirst globalMonoidStackYaml of
+    case getFirst globalMonoid.globalMonoidStackYaml of
       Nothing -> pure SYLDefault
       Just fp -> SYLOverride <$> resolveFile' fp
   pure GlobalOpts
-    { globalReExecVersion = getFirst globalMonoidReExecVersion
-    , globalDockerEntrypoint = getFirst globalMonoidDockerEntrypoint
-    , globalLogLevel = fromFirst defaultLogLevel globalMonoidLogLevel
-    , globalTimeInLog = fromFirstTrue globalMonoidTimeInLog
-    , globalRSLInLog = fromFirstFalse globalMonoidRSLInLog
-    , globalPlanInLog = fromFirstFalse globalMonoidPlanInLog
-    , globalConfigMonoid = globalMonoidConfigMonoid
+    { globalReExecVersion = getFirst globalMonoid.globalMonoidReExecVersion
+    , globalDockerEntrypoint =
+        getFirst globalMonoid.globalMonoidDockerEntrypoint
+    , globalLogLevel =
+        fromFirst defaultLogLevel globalMonoid.globalMonoidLogLevel
+    , globalTimeInLog = fromFirstTrue globalMonoid.globalMonoidTimeInLog
+    , globalRSLInLog = fromFirstFalse globalMonoid.globalMonoidRSLInLog
+    , globalPlanInLog = fromFirstFalse globalMonoid.globalMonoidPlanInLog
+    , globalConfigMonoid = globalMonoid.globalMonoidConfigMonoid
     , globalResolver = resolver
-    , globalCompiler = getFirst globalMonoidCompiler
-    , globalTerminal = fromFirst defaultTerminal globalMonoidTerminal
-    , globalStylesUpdate = globalMonoidStyles
-    , globalTermWidth = getFirst globalMonoidTermWidth
+    , globalCompiler = getFirst globalMonoid.globalMonoidCompiler
+    , globalTerminal =
+        fromFirst defaultTerminal globalMonoid.globalMonoidTerminal
+    , globalStylesUpdate = globalMonoid.globalMonoidStyles
+    , globalTermWidth = getFirst globalMonoid.globalMonoidTermWidth
     , globalStackYaml = stackYaml
     , globalLockFileBehavior =
         let defLFB =
-              case getFirst globalMonoidResolver of
+              case getFirst globalMonoid.globalMonoidResolver of
                 Nothing -> LFBReadWrite
                 _ -> LFBReadOnly
-        in  fromFirst defLFB globalMonoidLockFileBehavior
+        in  fromFirst defLFB globalMonoid.globalMonoidLockFileBehavior
     }
 
 -- | Default logging level should be something useful but not crazy.

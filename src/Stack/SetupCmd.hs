@@ -1,7 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Types and functions related to Stack's @setup@ command.
 module Stack.SetupCmd
@@ -33,17 +33,17 @@ data SetupCmdOpts = SetupCmdOpts
 
 -- | Function underlying the @stack setup@ command.
 setupCmd :: SetupCmdOpts -> RIO Runner ()
-setupCmd sco@SetupCmdOpts{..} = withConfig YesReexec $ do
-  installGHC <- view $ configL.to configInstallGHC
+setupCmd sco = withConfig YesReexec $ do
+  installGHC <- view $ configL . to configInstallGHC
   if installGHC
     then
        withBuildConfig $ do
        (wantedCompiler, compilerCheck, mstack) <-
-         case scoCompilerVersion of
+         case sco.scoCompilerVersion of
            Just v -> pure (v, MatchMinor, Nothing)
            Nothing -> (,,)
              <$> view wantedCompilerVersionL
-             <*> view (configL.to configCompilerCheck)
+             <*> view (configL . to configCompilerCheck)
              <*> (Just <$> view stackYamlL)
        setup sco wantedCompiler compilerCheck mstack
     else
@@ -62,20 +62,20 @@ setup ::
   -> VersionCheck
   -> Maybe (Path Abs File)
   -> RIO env ()
-setup SetupCmdOpts{..} wantedCompiler compilerCheck mstack = do
-  Config{..} <- view configL
+setup sco wantedCompiler compilerCheck mstack = do
+  config <- view configL
   sandboxedGhc <- cpSandboxed . fst <$> ensureCompilerAndMsys SetupOpts
     { soptsInstallIfMissing = True
-    , soptsUseSystem = configSystemGHC && not scoForceReinstall
+    , soptsUseSystem = config.configSystemGHC && not sco.scoForceReinstall
     , soptsWantedCompiler = wantedCompiler
     , soptsCompilerCheck = compilerCheck
     , soptsStackYaml = mstack
-    , soptsForceReinstall = scoForceReinstall
+    , soptsForceReinstall = sco.scoForceReinstall
     , soptsSanityCheck = True
     , soptsSkipGhcCheck = False
-    , soptsSkipMsys = configSkipMsys
+    , soptsSkipMsys = config.configSkipMsys
     , soptsResolveMissingGHC = Nothing
-    , soptsGHCBindistURL = scoGHCBindistURL
+    , soptsGHCBindistURL = sco.scoGHCBindistURL
     }
   let compiler = case wantedCompiler of
         WCGhc _ -> "GHC"

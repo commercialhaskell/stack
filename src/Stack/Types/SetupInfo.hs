@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE ViewPatterns      #-}
 
 
@@ -37,7 +36,13 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
       jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
     (fmap unCabalStringMap -> siStack) <-
       jsonSubWarningsTT (o ..:? "stack" ..!= mempty)
-    pure SetupInfo {..}
+    pure $ SetupInfo
+      { siSevenzExe
+      , siSevenzDll
+      , siMsys2
+      , siGHCs
+      , siStack
+      }
 
 -- | For the @siGHCs@ field maps are deeply merged. For all fields the values
 -- from the first @SetupInfo@ win.

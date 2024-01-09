@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- Load information on package sources
 module Stack.Build.Source
@@ -74,13 +74,13 @@ import           System.IO.Error ( isDoesNotExistError )
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env => RIO env [LocalPackage]
 projectLocalPackages = do
-  sm <- view $ envConfigL.to envConfigSourceMap
+  sm <- view $ envConfigL . to envConfigSourceMap
   for (toList $ smProject sm) loadLocalPackage
 
 -- | loads all local dependencies - project packages and local extra-deps
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
 localDependencies = do
-  bopts <- view $ configL.to configBuild
+  bopts <- view $ configL . to configBuild
   sourceMap <- view $ envConfigL . to envConfigSourceMap
   forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
     case dpLocation dp of
@@ -188,18 +188,18 @@ hashSourceMapData boptsCli sm = do
   pure $ SourceMapHash (SHA256.hashLazyBytes hashedContent)
 
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env Builder
-depPackageHashableContent DepPackage {..} =
-  case dpLocation of
+depPackageHashableContent dp =
+  case dp.dpLocation of
     PLMutable _ -> pure ""
     PLImmutable pli -> do
       let flagToBs (f, enabled) =
             if enabled
               then ""
               else "-" <> fromString (C.unFlagName f)
-          flags = map flagToBs $ Map.toList (cpFlags dpCommon)
-          ghcOptions = map display (cpGhcOptions dpCommon)
-          cabalConfigOpts = map display (cpCabalConfigOpts dpCommon)
-          haddocks = if cpHaddocks dpCommon then "haddocks" else ""
+          flags = map flagToBs $ Map.toList (cpFlags dp.dpCommon)
+          ghcOptions = map display (cpGhcOptions dp.dpCommon)
+          cabalConfigOpts = map display (cpCabalConfigOpts dp.dpCommon)
+          haddocks = if cpHaddocks dp.dpCommon then "haddocks" else ""
           hash = immutableLocSha pli
       pure
         $  hash
@@ -301,7 +301,7 @@ loadLocalPackage pp = do
   sm <- view sourceMapL
   let common = ppCommon pp
   bopts <- view buildOptsL
-  mcurator <- view $ buildConfigL.to bcCurator
+  mcurator <- view $ buildConfigL . to bcCurator
   config <- getPackageConfig
               (cpFlags common)
               (cpGhcOptions common)
@@ -515,7 +515,7 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
 -- | Get file digest, if it exists
 getFileDigestMaybe :: HasEnvConfig env => FilePath -> RIO env (Maybe SHA256)
 getFileDigestMaybe fp = do
-  cache <- view $ envConfigL.to envConfigFileDigestCache
+  cache <- view $ envConfigL . to envConfigFileDigestCache
   catch
     (Just <$> readFileDigest cache fp)
     (\e -> if isDoesNotExistError e then pure Nothing else throwM e)

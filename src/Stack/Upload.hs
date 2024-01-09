@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE NoImplicitPrelude    #-}
+{-# LANGUAGE  OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings    #-}
 
 -- | Types and functions related to Stack's @upload@ command.
 module Stack.Upload
@@ -184,13 +184,13 @@ uploadCmd (UploadOpts [] uoDocumentation _ _ _ _ _) = do
         then "documentation for the current package,"
         else "the current package,"
   prettyThrowIO $ NoItemSpecified subject
-uploadCmd (UploadOpts {..}) = withConfig YesReexec $ withDefaultEnvConfig $ do
+uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
   config <- view configL
   let hackageUrl = T.unpack $ configHackageBaseUrl config
-  if uoDocumentation
+  if uo.uoDocumentation
     then do
       (dirs, invalid) <-
-        liftIO $ partitionM doesDirectoryExist uoItemsToWorkWith
+        liftIO $ partitionM doesDirectoryExist uo.uoItemsToWorkWith
       unless (null invalid) $
         prettyThrowIO $ PackageDirectoryInvalid invalid
       (failed, items) <- partitionEithers <$> forM dirs checkDocsTarball
@@ -205,18 +205,19 @@ uploadCmd (UploadOpts {..}) = withConfig YesReexec $ withDefaultEnvConfig $ do
           DocArchive
           (Just pkgIdName)
           (toFilePath tarGzFile)
-          uoUploadVariant
+          uo.uoUploadVariant
     else do
-      (files, nonFiles) <- liftIO $ partitionM doesFileExist uoItemsToWorkWith
+      (files, nonFiles) <-
+        liftIO $ partitionM doesFileExist uo.uoItemsToWorkWith
       (dirs, invalid) <- liftIO $ partitionM doesDirectoryExist nonFiles
       unless (null invalid) $ do
         prettyThrowIO $ ItemsInvalid invalid
       let sdistOpts = SDistOpts
-            uoItemsToWorkWith
-            uoPvpBounds
-            uoCheck
-            uoBuildPackage
-            uoTarPath
+            uo.uoItemsToWorkWith
+            uo.uoPvpBounds
+            uo.uoCheck
+            uo.uoBuildPackage
+            uo.uoTarPath
       getCreds <- memoizeRef $ loadAuth config
       mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
       forM_ files $ \file -> do
@@ -228,10 +229,11 @@ uploadCmd (UploadOpts {..}) = withConfig YesReexec $ withDefaultEnvConfig $ do
           SDist
           Nothing
           (toFilePath tarFile)
-          uoUploadVariant
+          uo.uoUploadVariant
       forM_ dirs $ \dir -> do
         pkgDir <- resolveDir' dir
-        (tarName, tarBytes, mcabalRevision) <- getSDistTarball uoPvpBounds pkgDir
+        (tarName, tarBytes, mcabalRevision) <-
+          getSDistTarball uo.uoPvpBounds pkgDir
         checkSDistTarball' sdistOpts tarName tarBytes
         creds <- runMemoized getCreds
         uploadBytes
@@ -240,7 +242,7 @@ uploadCmd (UploadOpts {..}) = withConfig YesReexec $ withDefaultEnvConfig $ do
           SDist
           Nothing
           tarName
-          uoUploadVariant
+          uo.uoUploadVariant
           tarBytes
         forM_ mcabalRevision $ uncurry $ uploadRevision hackageUrl creds
    where

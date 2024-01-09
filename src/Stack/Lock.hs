@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Lock
   ( lockCachedWanted
@@ -91,10 +91,10 @@ data Locked = Locked
   deriving (Eq, Show)
 
 instance ToJSON Locked where
-  toJSON Locked {..} =
+  toJSON lck =
     object
-      [ "snapshots" .= lckSnapshotLocations
-      , "packages" .= lckPkgImmutableLocations
+      [ "snapshots" .= lck.lckSnapshotLocations
+      , "packages" .= lck.lckPkgImmutableLocations
       ]
 
 instance FromJSON (WithJSONWarnings (Unresolved Locked)) where

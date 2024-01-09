@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.SourceMap
   ( mkProjectPackage
@@ -116,18 +116,18 @@ snapToDepPackage ::
   -> PackageName
   -> SnapshotPackage
   -> RIO env DepPackage
-snapToDepPackage buildHaddocks name SnapshotPackage{..} = do
+snapToDepPackage buildHaddocks name sp = do
   run <- askRunInIO
   pure DepPackage
-    { dpLocation = PLImmutable spLocation
-    , dpHidden = spHidden
+    { dpLocation = PLImmutable sp.spLocation
+    , dpHidden = sp.spHidden
     , dpFromSnapshot = FromSnapshot
     , dpCommon =
         CommonPackage
-          { cpGPD = run $ loadCabalFileImmutable spLocation
+          { cpGPD = run $ loadCabalFileImmutable sp.spLocation
           , cpName = name
-          , cpFlags = spFlags
-          , cpGhcOptions = spGhcOptions
+          , cpFlags = sp.spFlags
+          , cpGhcOptions = sp.spGhcOptions
           , cpCabalConfigOpts = [] -- No spCabalConfigOpts, not present in snapshots
           , cpHaddocks = buildHaddocks
           }
@@ -177,7 +177,7 @@ actualFromGhc ::
   -> ActualCompiler
   -> RIO env (SMActual DumpedGlobalPackage)
 actualFromGhc smw ac = do
-  globals <- view $ compilerPathsL.to cpGlobalDump
+  globals <- view $ compilerPathsL . to cpGlobalDump
   pure
     SMActual
       { smaCompiler = ac
@@ -265,7 +265,7 @@ pruneGlobals globals deps =
       Map.map ReplacedGlobalPackage prunedGlobals
 
 getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder
-getCompilerInfo = view $ compilerPathsL.to (byteString . cpGhcInfo)
+getCompilerInfo = view $ compilerPathsL . to (byteString . cpGhcInfo)
 
 immutableLocSha :: PackageLocationImmutable -> Builder
 immutableLocSha = byteString . treeKeyToBs . locationTreeKey
@@ -287,8 +287,10 @@ loadProjectSnapshotCandidate ::
   -> RIO env (SnapshotCandidate env)
 loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
   debugRSL <- view rslInLogL
-  (snapshot, _, _) <- loadAndCompleteSnapshotRaw' debugRSL loc Map.empty Map.empty
-  deps <- Map.traverseWithKey (snapToDepPackage False) (snapshotPackages snapshot)
+  (snapshot, _, _) <-
+    loadAndCompleteSnapshotRaw' debugRSL loc Map.empty Map.empty
+  deps <-
+    Map.traverseWithKey (snapToDepPackage False) (snapshotPackages snapshot)
   let wc = snapshotCompiler snapshot
   globals <- Map.map GlobalPackageVersion <$> globalsFromHints wc
   pure $ \projectPackages -> do

@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- | Extra functions for optparse-applicative.
 
@@ -325,7 +325,7 @@ dirCompleter =
   pathCompleterWith defaultPathCompleterOpts { pcoFileFilter = const False }
 
 pathCompleterWith :: PathCompleterOpts -> Completer
-pathCompleterWith PathCompleterOpts {..} = mkCompleter $ \inputRaw -> do
+pathCompleterWith pco = mkCompleter $ \inputRaw -> do
   -- Unescape input, to handle single and double quotes. Note that the
   -- results do not need to be re-escaped, due to some fiddly bash
   -- magic.
@@ -333,15 +333,15 @@ pathCompleterWith PathCompleterOpts {..} = mkCompleter $ \inputRaw -> do
   let (inputSearchDir0, searchPrefix) = splitFileName input
       inputSearchDir = if inputSearchDir0 == "./" then "" else inputSearchDir0
   msearchDir <-
-    case (isRelative inputSearchDir, pcoAbsolute, pcoRelative) of
+    case (isRelative inputSearchDir, pco.pcoAbsolute, pco.pcoRelative) of
       (True, _, True) -> do
-        rootDir <- maybe getCurrentDirectory pure pcoRootDir
+        rootDir <- maybe getCurrentDirectory pure pco.pcoRootDir
         pure $ Just (rootDir </> inputSearchDir)
       (False, True, _) -> pure $ Just inputSearchDir
       _ -> pure Nothing
   case msearchDir of
     Nothing
-      | input == "" && pcoAbsolute -> pure ["/"]
+      | input == "" && pco.pcoAbsolute -> pure ["/"]
       | otherwise -> pure []
     Just searchDir -> do
       entries <-
@@ -354,7 +354,7 @@ pathCompleterWith PathCompleterOpts {..} = mkCompleter $ \inputRaw -> do
             if searchPrefix `isPrefixOf` entry
               then do
                 let path = searchDir </> entry
-                case (pcoFileFilter path, pcoDirFilter path) of
+                case (pco.pcoFileFilter path, pco.pcoDirFilter path) of
                   (True, True) -> pure $ Just (inputSearchDir </> entry)
                   (fileAllowed, dirAllowed) -> do
                     isDir <- doesDirectoryExist path

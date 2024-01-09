@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.ConfigSpec
   ( sampleConfig
@@ -149,12 +149,12 @@ spec = beforeAll setup $ do
           loadProject' yamlAbs inner
 
     it "parses snapshot using 'resolver'" $ inTempDir $ do
-      loadProject resolverConfig $ \Project{..} ->
-        projectResolver `shouldBe` RSLSynonym (LTS 19 22)
+      loadProject resolverConfig $ \project ->
+        project.projectResolver `shouldBe` RSLSynonym (LTS 19 22)
 
     it "parses snapshot using 'snapshot'" $ inTempDir $ do
-      loadProject snapshotConfig $ \Project{..} ->
-        projectResolver `shouldBe` RSLSynonym (LTS 19 22)
+      loadProject snapshotConfig $ \project ->
+        project.projectResolver `shouldBe` RSLSynonym (LTS 19 22)
 
     it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
       loadProject resolverSnapshotConfig (const (pure ()))
@@ -190,30 +190,32 @@ spec = beforeAll setup $ do
     it "parses build config options" $ inTempDir $ do
      writeFile (toFilePath stackDotYaml) buildOptsConfig
      loadConfig' $ \config -> liftIO $ do
-      let BuildOpts{..} = configBuild  config
-      boptsLibProfile `shouldBe` True
-      boptsExeProfile `shouldBe` True
-      boptsHaddock `shouldBe` True
-      boptsHaddockDeps `shouldBe` Just True
-      boptsInstallExes `shouldBe` True
-      boptsPreFetch `shouldBe` True
-      boptsKeepGoing `shouldBe` Just True
-      boptsKeepTmpFiles `shouldBe` True
-      boptsForceDirty `shouldBe` True
-      boptsTests `shouldBe` True
-      boptsTestOpts `shouldBe` TestOpts { toRerunTests = True
-                                        , toAdditionalArgs = ["-fprof"]
-                                        , toCoverage = True
-                                        , toDisableRun = True
-                                        , toMaximumTimeSeconds = Nothing
-                                        , toAllowStdin = True
-                                        }
-      boptsBenchmarks `shouldBe` True
-      boptsBenchmarkOpts `shouldBe` BenchmarkOpts { beoAdditionalArgs = Just "-O2"
-                                                  , beoDisableRun = True
-                                                  }
-      boptsReconfigure `shouldBe` True
-      boptsCabalVerbose `shouldBe` CabalVerbosity verbose
+      let bopts = configBuild  config
+      bopts.boptsLibProfile `shouldBe` True
+      bopts.boptsExeProfile `shouldBe` True
+      bopts.boptsHaddock `shouldBe` True
+      bopts.boptsHaddockDeps `shouldBe` Just True
+      bopts.boptsInstallExes `shouldBe` True
+      bopts.boptsPreFetch `shouldBe` True
+      bopts.boptsKeepGoing `shouldBe` Just True
+      bopts.boptsKeepTmpFiles `shouldBe` True
+      bopts.boptsForceDirty `shouldBe` True
+      bopts.boptsTests `shouldBe` True
+      bopts.boptsTestOpts `shouldBe` TestOpts
+        { toRerunTests = True
+        , toAdditionalArgs = ["-fprof"]
+        , toCoverage = True
+        , toDisableRun = True
+        , toMaximumTimeSeconds = Nothing
+        , toAllowStdin = True
+        }
+      bopts.boptsBenchmarks `shouldBe` True
+      bopts.boptsBenchmarkOpts `shouldBe` BenchmarkOpts
+         { beoAdditionalArgs = Just "-O2"
+         , beoDisableRun = True
+         }
+      bopts.boptsReconfigure `shouldBe` True
+      bopts.boptsCabalVerbose `shouldBe` CabalVerbosity verbose
 
     it "finds the config file in a parent directory" $ inTempDir $ do
       writeFile "package.yaml" "name: foo"
@@ -231,29 +233,34 @@ spec = beforeAll setup $ do
         let stackYamlFp = toFilePath (dir </> stackDotYaml)
         writeFile stackYamlFp sampleConfig
         writeFile (toFilePath dir ++ "/package.yaml") "name: foo"
-        withEnvVar "STACK_YAML" stackYamlFp $ loadConfig' $ \config -> liftIO $ do
-          BuildConfig{..} <- runRIO config $ withBuildConfig ask
-          bcStackYaml `shouldBe` dir </> stackDotYaml
-          parent bcStackYaml `shouldBe` dir
+        withEnvVar "STACK_YAML" stackYamlFp $
+          loadConfig' $ \config -> liftIO $ do
+            bc <- runRIO config $ withBuildConfig ask
+            bc.bcStackYaml `shouldBe` dir </> stackDotYaml
+            parent bc.bcStackYaml `shouldBe` dir
 
     it "STACK_YAML can be relative" $ inTempDir $ do
         parentDir <- getCurrentDirectory >>= parseAbsDir
         let childRel = either impureThrow id (parseRelDir "child")
-            yamlRel = childRel </> either impureThrow id (parseRelFile "some-other-name.config")
+            yamlRel =
+              childRel </> either impureThrow id (parseRelFile "some-other-name.config")
             yamlAbs = parentDir </> yamlRel
-            packageYaml = childRel </> either impureThrow id (parseRelFile "package.yaml")
+            packageYaml =
+              childRel </> either impureThrow id (parseRelFile "package.yaml")
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
         writeFile (toFilePath yamlAbs) "resolver: ghc-9.0"
         writeFile (toFilePath packageYaml) "name: foo"
-        withEnvVar "STACK_YAML" (toFilePath yamlRel) $ loadConfig' $ \config -> liftIO $ do
-            BuildConfig{..} <- runRIO config $ withBuildConfig ask
-            bcStackYaml `shouldBe` yamlAbs
+        withEnvVar "STACK_YAML" (toFilePath yamlRel) $
+          loadConfig' $ \config -> liftIO $ do
+            bc <- runRIO config $ withBuildConfig ask
+            bc.bcStackYaml `shouldBe` yamlAbs
 
   describe "defaultConfigYaml" $
     it "is parseable" $ \_ -> do
-        curDir <- getCurrentDir
-        let parsed :: Either String (Either String (WithJSONWarnings ConfigMonoid))
-            parsed = parseEither (parseConfigMonoid curDir) <$> left show (decodeEither' defaultConfigYaml)
-        case parsed of
-            Right (Right _) -> pure () :: IO ()
-            _ -> fail "Failed to parse default config yaml"
+      curDir <- getCurrentDir
+      let parsed :: Either String (Either String (WithJSONWarnings ConfigMonoid))
+          parsed = parseEither
+            (parseConfigMonoid curDir) <$> left show (decodeEither' defaultConfigYaml)
+      case parsed of
+        Right (Right _) -> pure () :: IO ()
+        _ -> fail "Failed to parse default config yaml"
