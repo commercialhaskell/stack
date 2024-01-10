@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.GlobalOpts
   ( GlobalOpts (..)
@@ -42,9 +43,9 @@ data GlobalOpts = GlobalOpts
 globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL =
   lens
-    globalConfigMonoid
+    (.globalConfigMonoid)
     (\x y -> x { globalConfigMonoid = y })
   .
   lens
-    configMonoidBuildOpts
+    (.configMonoidBuildOpts)
     (\x y -> x { configMonoidBuildOpts = y })

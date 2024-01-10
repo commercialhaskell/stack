@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | A module which exports all package-level file-gathering logic.
@@ -53,16 +54,16 @@ packageDescModulesAndFiles ::
        PackageComponentFile
 packageDescModulesAndFiles pkg = do
   packageExtraFile <- resolveGlobFilesFromStackPackageFile
-              (packageCabalSpec pkg) (packageFile pkg)
+              pkg.packageCabalSpec pkg.packageFile
   let initialValue = mempty{packageExtraFile=packageExtraFile}
   let accumulator f comp st = (insertComponentFile <$> st) <*> f comp
   let gatherCompFileCollection createCompFileFn getCompFn res =
         foldr' (accumulator createCompFileFn) res (getCompFn pkg)
-  gatherCompFileCollection stackLibraryFiles packageLibrary
-    . gatherCompFileCollection stackLibraryFiles packageSubLibraries
-    . gatherCompFileCollection stackExecutableFiles packageExecutables
-    . gatherCompFileCollection stackTestSuiteFiles packageTestSuites
-    . gatherCompFileCollection stackBenchmarkFiles packageBenchmarks
+  gatherCompFileCollection stackLibraryFiles (.packageLibrary)
+    . gatherCompFileCollection stackLibraryFiles (.packageSubLibraries)
+    . gatherCompFileCollection stackExecutableFiles (.packageExecutables)
+    . gatherCompFileCollection stackTestSuiteFiles (.packageTestSuites)
+    . gatherCompFileCollection stackBenchmarkFiles (.packageBenchmarks)
     $ pure initialValue
 
 resolveGlobFilesFromStackPackageFile ::
@@ -89,7 +90,7 @@ resolveGlobFiles cabalFileVersion =
       then explode name
       else fmap pure (resolveFileOrWarn name)
   explode name = do
-    dir <- asks (parent . ctxFile)
+    dir <- asks (parent . (.ctxFile))
     names <- matchDirFileGlob' (toFilePath dir) name
     mapM resolveFileOrWarn names
   matchDirFileGlob' dir glob =
@@ -127,7 +128,7 @@ getPackageFile pkg cabalfp =
         (GetPackageFileContext cabalfp distDir bc cabalVer)
         (packageDescModulesAndFiles pkg)
     setupFiles <-
-      if packageBuildType pkg == Cabal.Custom
+      if pkg.packageBuildType == Cabal.Custom
         then do
           let setupHsPath = pkgDir </> relFileSetupHs
               setupLhsPath = pkgDir </> relFileSetupLhs
@@ -146,7 +147,7 @@ getPackageFile pkg cabalfp =
       pure $ if hpackExists then S.singleton hpackPath else S.empty
     pure packageComponentFile
       { packageExtraFile =
-          moreBuildFiles <> packageExtraFile packageComponentFile
+          moreBuildFiles <> packageComponentFile.packageExtraFile
       }
 
 stackPackageFileFromCabal :: Cabal.PackageDescription -> StackPackageFile

@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Generate HPC (Haskell Program Coverage) reports
 module Stack.Coverage
@@ -110,9 +111,9 @@ data HpcReportOpts = HpcReportOpts
 hpcReportCmd :: HpcReportOpts -> RIO Runner ()
 hpcReportCmd hropts = do
   let (tixFiles, targetNames) =
-        L.partition (".tix" `T.isSuffixOf`) (hroptsInputs hropts)
+        L.partition (".tix" `T.isSuffixOf`) hropts.hroptsInputs
       boptsCLI = defaultBuildOptsCLI
-        { boptsCLITargets = if hroptsAll hropts then [] else targetNames }
+        { boptsCLITargets = if hropts.hroptsAll then [] else targetNames }
   withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
     generateHpcReportForTargets hropts tixFiles targetNames
 
@@ -179,11 +180,11 @@ generateHpcReport pkgDir package tests = do
   compilerVersion <- view actualCompilerVersionL
   -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
   -- https://github.com/commercialhaskell/stack/issues/785
-  let pkgId = packageIdentifierString (packageIdentifier package)
-      pkgName' = packageNameString $ packageName package
+  let pkgId = packageIdentifierString $ packageIdentifier package
+      pkgName' = packageNameString package.packageName
       ghcVersion = getGhcVersion compilerVersion
       hasLibrary = hasBuildableMainLibrary package
-      subLibs = packageSubLibraries package
+      subLibs = package.packageSubLibraries
   eincludeName <-
     -- Pre-7.8 uses plain PKG-version in tix files.
     if ghcVersion < mkVersion [7, 10] then pure $ Right $ Just [pkgId]
@@ -207,7 +208,7 @@ generateHpcReport pkgDir package tests = do
           pure $ Left err
         Right includeNames -> pure $ Right $ Just $ map T.unpack includeNames
   forM_ tests $ \testName -> do
-    tixSrc <- tixFilePath (packageName package) (T.unpack testName)
+    tixSrc <- tixFilePath package.packageName (T.unpack testName)
     let report = fillSep
           [ flow "coverage report for"
           , style Current (fromString pkgName') <> "'s"
@@ -284,8 +285,8 @@ generateHpcReportInternal
           -- Directories for .mix files.
           hpcRelDir <- hpcRelativeDir
           -- Compute arguments used for both "hpc markup" and "hpc report".
-          pkgDirs <- view $ buildConfigL.to
-            (map ppRoot . Map.elems . smwProject . bcSMWanted)
+          pkgDirs <- view $ buildConfigL . to
+            (map ppRoot . Map.elems . (.bcSMWanted.smwProject))
           let args =
                 -- Use index files from all packages (allows cross-package
                 -- coverage results).
@@ -360,10 +361,10 @@ generateHpcReportForTargets opts tixFiles targetNames = do
   targetTixFiles <-
     -- When there aren't any package component arguments, and --all
     -- isn't passed, default to not considering any targets.
-    if not (hroptsAll opts) && null targetNames
+    if not opts.hroptsAll && null targetNames
     then pure []
     else do
-      when (hroptsAll opts && not (null targetNames)) $
+      when (opts.hroptsAll && not (null targetNames)) $
         prettyWarnL
           $ "Since"
           : style Shell "--all"
@@ -371,7 +372,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
           : mkNarrativeList (Just Target) False
               (map (fromString . T.unpack) targetNames :: [StyleDoc])
       targets <-
-        view $ envConfigL.to envConfigSourceMap.to smTargets.to smtTargets
+        view $ envConfigL . to (.envConfigSourceMap.smTargets.smtTargets)
       fmap concat $ forM (Map.toList targets) $ \(name, target) ->
         case target of
           TargetAll PTDependency -> prettyThrowIO $ NotLocalPackage name
@@ -401,7 +402,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
     mapM (resolveFile' . T.unpack) tixFiles
   when (null tixPaths) $ prettyThrowIO NoTargetsOrTixSpecified
   outputDir <- hpcReportDir
-  reportDir <- case hroptsDestDir opts of
+  reportDir <- case opts.hroptsDestDir of
     Nothing -> pure (outputDir </> relDirCombined </> relDirCustom)
     Just destDir -> do
       dest <- resolveDir' destDir
@@ -411,7 +412,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
       reportHtml = "combined coverage report"
   mreportPath <- generateUnionReport report reportHtml reportDir tixPaths
   forM_ mreportPath $ \reportPath ->
-    if hroptsOpenBrowser opts
+    if opts.hroptsOpenBrowser
       then do
         prettyInfo $ "Opening" <+> pretty reportPath <+> "in the browser."
         void $ liftIO $ openBrowser (toFilePath reportPath)

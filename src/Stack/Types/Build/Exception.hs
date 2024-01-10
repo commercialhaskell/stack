@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Types.Build.Exception
   ( BuildException (..)
@@ -598,7 +599,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
     acc0 = (True, False, Map.empty, Set.empty)
     go acc (DependencyPlanFailures pkg m) = Map.foldrWithKey go' acc m
      where
-      pkgName = packageName pkg
+      pkgName = pkg.packageName
       go' name (_, Just extra, NotInBuildPlan) (_, _, m', s) =
         (False, True, Map.insert name extra m', s)
       go' _ (_, _, NotInBuildPlan) (_, _, m', s) = (False, True, m', s)
@@ -621,14 +622,14 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
       depErrors -> Just $
            fillSep
              [ flow "In the dependencies for"
-             , pkgIdent <> pprintFlags (packageFlags pkg) <> ":"
+             , pkgIdent <> pprintFlags pkg.packageFlags <> ":"
              ]
         <> line
         <> indent 2 (bulletedList depErrors)
         <> line
         <> fillSep
              ( flow "The above is/are needed"
-             : case getShortestDepsPath parentMap wanted' (packageName pkg) of
+             : case getShortestDepsPath parentMap wanted' pkg.packageName of
                  Nothing ->
                    [flow "for unknown reason - Stack invariant violated."]
                  Just [] ->
@@ -647,7 +648,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
                      <> [pkgIdent]
              )
        where
-        pkgName' = style Current . fromPackageName $ packageName pkg
+        pkgName' = style Current (fromPackageName pkg.packageName)
         pkgIdent = style Current (fromPackageId $ packageIdentifier pkg)
   -- Skip these when they are redundant with 'NotInBuildPlan' info.
   pprintException (UnknownPackage name)
@@ -910,8 +911,8 @@ startDepsPath ident = DepsPath
 
 extendDepsPath :: PackageIdentifier -> DepsPath -> DepsPath
 extendDepsPath ident dp = DepsPath
-  { dpLength = dpLength dp + 1
-  , dpNameLength = dpNameLength dp + length (packageNameString (pkgName ident))
+  { dpLength = dp.dpLength + 1
+  , dpNameLength = dp.dpNameLength + length (packageNameString (pkgName ident))
   , dpPath = [ident]
   }
 

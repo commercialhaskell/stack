@@ -74,16 +74,16 @@ import           System.IO.Error ( isDoesNotExistError )
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env => RIO env [LocalPackage]
 projectLocalPackages = do
-  sm <- view $ envConfigL . to envConfigSourceMap
-  for (toList $ smProject sm) loadLocalPackage
+  sm <- view $ envConfigL . to (.envConfigSourceMap)
+  for (toList sm.smProject) loadLocalPackage
 
 -- | loads all local dependencies - project packages and local extra-deps
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
 localDependencies = do
-  bopts <- view $ configL . to configBuild
-  sourceMap <- view $ envConfigL . to envConfigSourceMap
-  forMaybeM (Map.elems $ smDeps sourceMap) $ \dp ->
-    case dpLocation dp of
+  bopts <- view $ configL . to (.configBuild)
+  sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
+  forMaybeM (Map.elems sourceMap.smDeps) $ \dp ->
+    case dp.dpLocation of
       PLMutable dir -> do
         pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
         Just <$> loadLocalPackage pp
@@ -98,42 +98,42 @@ loadSourceMap :: HasBuildConfig env
               -> RIO env SourceMap
 loadSourceMap smt boptsCli sma = do
   bconfig <- view buildConfigL
-  let compiler = smaCompiler sma
-      project = M.map applyOptsFlagsPP $ smaProject sma
-      bopts = configBuild (bcConfig bconfig)
+  let compiler = sma.smaCompiler
+      project = M.map applyOptsFlagsPP sma.smaProject
+      bopts = bconfig.bcConfig.configBuild
       applyOptsFlagsPP p@ProjectPackage{ppCommon = c} =
-        p{ppCommon = applyOptsFlags (M.member (cpName c) (smtTargets smt)) True c}
-      deps0 = smtDeps smt <> smaDeps sma
+        p{ppCommon = applyOptsFlags (M.member c.cpName smt.smtTargets) True c}
+      deps0 = smt.smtDeps <> sma.smaDeps
       deps = M.map applyOptsFlagsDep deps0
       applyOptsFlagsDep d@DepPackage{dpCommon = c} =
-        d{dpCommon = applyOptsFlags (M.member (cpName c) (smtDeps smt)) False c}
+        d{dpCommon = applyOptsFlags (M.member c.cpName smt.smtDeps) False c}
       applyOptsFlags isTarget isProjectPackage common =
-        let name = cpName common
+        let name = common.cpName
             flags = getLocalFlags boptsCli name
             ghcOptions =
               generalGhcOptions bconfig boptsCli isTarget isProjectPackage
             cabalConfigOpts =
-              generalCabalConfigOpts bconfig boptsCli (cpName common) isTarget isProjectPackage
+              generalCabalConfigOpts bconfig boptsCli common.cpName isTarget isProjectPackage
         in  common
               { cpFlags =
                   if M.null flags
-                    then cpFlags common
+                    then common.cpFlags
                     else flags
               , cpGhcOptions =
-                  ghcOptions ++ cpGhcOptions common
+                  ghcOptions ++ common.cpGhcOptions
               , cpCabalConfigOpts =
-                  cabalConfigOpts ++ cpCabalConfigOpts common
+                  cabalConfigOpts ++ common.cpCabalConfigOpts
               , cpHaddocks =
                   if isTarget
-                    then boptsHaddock bopts
+                    then bopts.boptsHaddock
                     else shouldHaddockDeps bopts
               }
       packageCliFlags = Map.fromList $
         mapMaybe maybeProjectFlags $
-        Map.toList (boptsCLIFlags boptsCli)
+        Map.toList boptsCli.boptsCLIFlags
       maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
       maybeProjectFlags _ = Nothing
-      globals = pruneGlobals (smaGlobal sma) (Map.keysSet deps)
+      globals = pruneGlobals sma.smaGlobal (Map.keysSet deps)
   logDebug "Checking flags"
   checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
   logDebug "SourceMap constructed"
@@ -173,7 +173,7 @@ hashSourceMapData ::
 hashSourceMapData boptsCli sm = do
   compilerPath <- getUtf8Builder . fromString . toFilePath <$> getCompilerPath
   compilerInfo <- getCompilerInfo
-  immDeps <- forM (Map.elems (smDeps sm)) depPackageHashableContent
+  immDeps <- forM (Map.elems sm.smDeps) depPackageHashableContent
   bc <- view buildConfigL
   let -- extra bytestring specifying GHC options supposed to be applied to GHC
       -- boot packages so we'll have different hashes when bare resolver
@@ -196,10 +196,10 @@ depPackageHashableContent dp =
             if enabled
               then ""
               else "-" <> fromString (C.unFlagName f)
-          flags = map flagToBs $ Map.toList (cpFlags dp.dpCommon)
-          ghcOptions = map display (cpGhcOptions dp.dpCommon)
-          cabalConfigOpts = map display (cpCabalConfigOpts dp.dpCommon)
-          haddocks = if cpHaddocks dp.dpCommon then "haddocks" else ""
+          flags = map flagToBs $ Map.toList dp.dpCommon.cpFlags
+          ghcOptions = map display dp.dpCommon.cpGhcOptions
+          cabalConfigOpts = map display dp.dpCommon.cpCabalConfigOpts
+          haddocks = if dp.dpCommon.cpHaddocks then "haddocks" else ""
           hash = immutableLocSha pli
       pure
         $  hash
@@ -218,7 +218,7 @@ getLocalFlags boptsCli name = Map.unions
   , Map.findWithDefault Map.empty ACFAllProjectPackages cliFlags
   ]
  where
-  cliFlags = boptsCLIFlags boptsCli
+  cliFlags = boptsCli.boptsCLIFlags
 
 -- | Get the options to pass to @./Setup.hs configure@
 generalCabalConfigOpts ::
@@ -229,14 +229,14 @@ generalCabalConfigOpts ::
   -> Bool
   -> [Text]
 generalCabalConfigOpts bconfig boptsCli name isTarget isLocal = concat
-  [ Map.findWithDefault [] CCKEverything (configCabalConfigOpts config)
+  [ Map.findWithDefault [] CCKEverything config.configCabalConfigOpts
   , if isLocal
-      then Map.findWithDefault [] CCKLocals (configCabalConfigOpts config)
+      then Map.findWithDefault [] CCKLocals config.configCabalConfigOpts
       else []
   , if isTarget
-      then Map.findWithDefault [] CCKTargets (configCabalConfigOpts config)
+      then Map.findWithDefault [] CCKTargets config.configCabalConfigOpts
       else []
-  , Map.findWithDefault [] (CCKPackage name) (configCabalConfigOpts config)
+  , Map.findWithDefault [] (CCKPackage name) config.configCabalConfigOpts
   , if includeExtraOptions
       then boptsCLIAllProgOptions boptsCli
       else []
@@ -244,7 +244,7 @@ generalCabalConfigOpts bconfig boptsCli name isTarget isLocal = concat
  where
   config = view configL bconfig
   includeExtraOptions =
-    case configApplyProgOptions config of
+    case config.configApplyProgOptions of
       APOTargets -> isTarget
       APOLocals -> isLocal
       APOEverything -> True
@@ -253,27 +253,27 @@ generalCabalConfigOpts bconfig boptsCli name isTarget isLocal = concat
 -- configuration and commandline.
 generalGhcOptions :: BuildConfig -> BuildOptsCLI -> Bool -> Bool -> [Text]
 generalGhcOptions bconfig boptsCli isTarget isLocal = concat
-  [ Map.findWithDefault [] AGOEverything (configGhcOptionsByCat config)
+  [ Map.findWithDefault [] AGOEverything config.configGhcOptionsByCat
   , if isLocal
-      then Map.findWithDefault [] AGOLocals (configGhcOptionsByCat config)
+      then Map.findWithDefault [] AGOLocals config.configGhcOptionsByCat
       else []
   , if isTarget
-      then Map.findWithDefault [] AGOTargets (configGhcOptionsByCat config)
+      then Map.findWithDefault [] AGOTargets config.configGhcOptionsByCat
       else []
-  , concat [["-fhpc"] | isLocal && toCoverage (boptsTestOpts bopts)]
-  , if boptsLibProfile bopts || boptsExeProfile bopts
+  , concat [["-fhpc"] | isLocal && bopts.boptsTestOpts.toCoverage]
+  , if bopts.boptsLibProfile || bopts.boptsExeProfile
       then ["-fprof-auto", "-fprof-cafs"]
       else []
-  , [ "-g" | not $ boptsLibStrip bopts || boptsExeStrip bopts ]
+  , [ "-g" | not $ bopts.boptsLibStrip || bopts.boptsExeStrip ]
   , if includeExtraOptions
-      then boptsCLIGhcOptions boptsCli
+      then boptsCli.boptsCLIGhcOptions
       else []
   ]
  where
-  bopts = configBuild config
+  bopts =  config.configBuild
   config = view configL bconfig
   includeExtraOptions =
-    case configApplyGhcOptions config of
+    case config.configApplyGhcOptions of
       AGOTargets -> isTarget
       AGOLocals -> isLocal
       AGOEverything -> True
@@ -285,10 +285,10 @@ loadCommonPackage ::
 loadCommonPackage common = do
   config <-
     getPackageConfig
-      (cpFlags common)
-      (cpGhcOptions common)
-      (cpCabalConfigOpts common)
-  gpkg <- liftIO $ cpGPD common
+      common.cpFlags
+      common.cpGhcOptions
+      common.cpCabalConfigOpts
+  gpkg <- liftIO common.cpGPD
   pure $ resolvePackage config gpkg
 
 -- | Upgrade the initial project package info to a full-blown @LocalPackage@
@@ -299,16 +299,16 @@ loadLocalPackage ::
   -> RIO env LocalPackage
 loadLocalPackage pp = do
   sm <- view sourceMapL
-  let common = ppCommon pp
+  let common = pp.ppCommon
   bopts <- view buildOptsL
-  mcurator <- view $ buildConfigL . to bcCurator
+  mcurator <- view $ buildConfigL . to (.bcCurator)
   config <- getPackageConfig
-              (cpFlags common)
-              (cpGhcOptions common)
-              (cpCabalConfigOpts common)
+              common.cpFlags
+              common.cpGhcOptions
+              common.cpCabalConfigOpts
   gpkg <- ppGPD pp
-  let name = cpName common
-      mtarget = M.lookup name (smtTargets $ smTargets sm)
+  let name = common.cpName
+      mtarget = M.lookup name sm.smTargets.smtTargets
       (exeCandidates, testCandidates, benchCandidates) =
         case mtarget of
           Just (TargetComps comps) ->
@@ -318,14 +318,14 @@ loadLocalPackage pp = do
             in  (e, t, b)
           Just (TargetAll _packageType) ->
             ( buildableExes pkg
-            , if    boptsTests bopts
-                 && maybe True (Set.notMember name . curatorSkipTest) mcurator
+            , if    bopts.boptsTests
+                 && maybe True (Set.notMember name . (.curatorSkipTest)) mcurator
                 then buildableTestSuites pkg
                 else Set.empty
-            , if    boptsBenchmarks bopts
+            , if    bopts.boptsBenchmarks
                  && maybe
                       True
-                      (Set.notMember name . curatorSkipBenchmark)
+                      (Set.notMember name . (.curatorSkipBenchmark))
                       mcurator
                 then buildableBenchmarks pkg
                 else Set.empty
@@ -341,10 +341,10 @@ loadLocalPackage pp = do
         Just _ ->
              hasBuildableMainLibrary pkg
           || not (Set.null nonLibComponents)
-          || not (null $ packageSubLibraries pkg)
+          || not (null pkg.packageSubLibraries)
 
       filterSkippedComponents =
-        Set.filter (not . (`elem` boptsSkipComponents bopts))
+        Set.filter (not . (`elem` bopts.boptsSkipComponents))
 
       (exes, tests, benches) = ( filterSkippedComponents exeCandidates
                                , filterSkippedComponents testCandidates
@@ -380,7 +380,7 @@ loadLocalPackage pp = do
         | otherwise = Just (resolvePackage btconfig gpkg)
 
   componentFiles <- memoizeRefWith $
-    fst <$> getPackageFilesForTargets pkg (ppCabalFP pp) nonLibComponents
+    fst <$> getPackageFilesForTargets pkg pp.ppCabalFP nonLibComponents
 
   checkCacheResults <- memoizeRefWith $ do
     componentFiles' <- runMemoizedWith componentFiles
@@ -408,11 +408,11 @@ loadLocalPackage pp = do
     { lpPackage = pkg
     , lpTestBench = btpkg
     , lpComponentFiles = componentFiles
-    , lpBuildHaddocks = cpHaddocks (ppCommon pp)
-    , lpForceDirty = boptsForceDirty bopts
+    , lpBuildHaddocks = pp.ppCommon.cpHaddocks
+    , lpForceDirty = bopts.boptsForceDirty
     , lpDirtyFiles = dirtyFiles
     , lpNewBuildCaches = newBuildCaches
-    , lpCabalFile = ppCabalFP pp
+    , lpCabalFile = pp.ppCabalFP
     , lpWanted = isWanted
     , lpComponents = nonLibComponents
       -- TODO: refactor this so that it's easier to be sure that these
@@ -454,7 +454,7 @@ checkBuildCache oldCache files = do
   go fp _ _ | takeFileName fp == "cabal_macros.h" = pure (Set.empty, Map.empty)
   -- Common case where it's in the cache and on the filesystem.
   go fp (Just digest') (Just fci)
-      | fciHash fci == digest' = pure (Set.empty, Map.singleton fp fci)
+      | fci.fciHash == digest' = pure (Set.empty, Map.singleton fp fci)
       | otherwise =
           pure (Set.singleton fp, Map.singleton fp $ FileCacheInfo digest')
   -- Missing file. Add it to dirty files, but no FileCacheInfo.
@@ -515,7 +515,7 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
 -- | Get file digest, if it exists
 getFileDigestMaybe :: HasEnvConfig env => FilePath -> RIO env (Maybe SHA256)
 getFileDigestMaybe fp = do
-  cache <- view $ envConfigL . to envConfigFileDigestCache
+  cache <- view $ envConfigL . to (.envConfigFileDigestCache)
   catch
     (Just <$> readFileDigest cache fp)
     (\e -> if isDoesNotExistError e then pure Nothing else throwM e)

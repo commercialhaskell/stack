@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -40,15 +41,15 @@ import           Stack.Types.SourceMap
 toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do
   projectInstalls <-
-    for (smProject sourceMap) $ \pp -> do
-      version <- loadVersion (ppCommon pp)
+    for sourceMap.smProject $ \pp -> do
+      version <- loadVersion pp.ppCommon
       pure (Local, version)
   depInstalls <-
-    for (smDeps sourceMap) $ \dp ->
-      case dpLocation dp of
+    for sourceMap.smDeps $ \dp ->
+      case dp.dpLocation of
         PLImmutable pli -> pure (Snap, getPLIVersion pli)
         PLMutable _ -> do
-          version <- loadVersion (dpCommon dp)
+          version <- loadVersion dp.dpCommon
           pure (Local, version)
   pure $ projectInstalls <> depInstalls
 
@@ -132,7 +133,7 @@ loadDatabase installMap db lhs0 = do
   pkgexe <- getGhcPkgExe
   (lhs1', dps) <- ghcPkgDump pkgexe pkgDb $ conduitDumpPackage .| sink
   lhs1 <- mapMaybeM processLoadResult lhs1'
-  let lhs = pruneDeps id lhId lhDeps const (lhs0 ++ lhs1)
+  let lhs = pruneDeps id (.lhId) (.lhDeps) const (lhs0 ++ lhs1)
   pure (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, dps)
  where
   pkgDb = case db of
@@ -152,7 +153,7 @@ loadDatabase installMap db lhs0 = do
   processLoadResult (reason, lh) = do
     logDebug $
          "Ignoring package "
-      <> fromPackageName (fst (lhPair lh))
+      <> fromPackageName (fst lh.lhPair)
       <> case db of
            GlobalPkgDb -> mempty
            UserPkgDb loc fp -> ", from " <> displayShow (loc, fp) <> ","
@@ -209,7 +210,7 @@ isAllowed installMap pkgDb dp = case Map.lookup name installMap of
       Nothing -> checkNotFound
   Just pii -> checkFound pii
  where
-  PackageIdentifier name version = dpPackageIdent dp
+  PackageIdentifier name version = dp.dpPackageIdent
   -- Ensure that the installed location matches where the sourceMap says it
   -- should be installed.
   checkLocation Snap =
@@ -265,17 +266,17 @@ toLoadHelper pkgDb dp = LoadHelper
       -- therefore not match the snapshot.
       if name `Set.member` wiredInPackages
         then []
-        else dpDepends dp
-  , lhSublibrary = dpSublib dp
+        else dp.dpDepends
+  , lhSublibrary = dp.dpSublib
   , lhPair =
       ( name
       , (toInstallLocation pkgDb, Library ident installedLibInfo)
       )
   }
  where
-  installedLibInfo = InstalledLibraryInfo gid (Right <$> dpLicense dp) mempty
-  gid = dpGhcPkgId dp
-  ident@(PackageIdentifier name _) = dpPackageIdent dp
+  installedLibInfo = InstalledLibraryInfo gid (Right <$> dp.dpLicense) mempty
+  gid = dp.dpGhcPkgId
+  ident@(PackageIdentifier name _) = dp.dpPackageIdent
 
   toInstallLocation :: PackageDbVariety -> InstallLocation
   toInstallLocation GlobalDb = Snap
@@ -300,22 +301,22 @@ gatherAndTransformSubLoadHelper lh =
     = ( pLoc
       , Library pn existingLibInfo
           { iliSublib = Map.union
-              (iliSublib incomingLibInfo)
-              (iliSublib existingLibInfo)
-          , iliId = if isJust $ lhSublibrary lh
-                      then iliId existingLibInfo
-                      else iliId incomingLibInfo
+              incomingLibInfo.iliSublib
+              existingLibInfo.iliSublib
+          , iliId = if isJust lh.lhSublibrary
+                      then existingLibInfo.iliId
+                      else incomingLibInfo.iliId
           }
       )
   onPreviousLoadHelper newVal _oldVal = newVal
-  (key, value) = case lhSublibrary lh of
+  (key, value) = case lh.lhSublibrary of
     Nothing -> (rawPackageName, rawValue)
-    Just sd -> (sdPackageName sd, updateAsSublib sd <$> rawValue)
-  (rawPackageName, rawValue) = lhPair lh
+    Just sd -> (sd.sdPackageName, updateAsSublib sd <$> rawValue)
+  (rawPackageName, rawValue) = lh.lhPair
   updateAsSublib
       sd
       (Library (PackageIdentifier _sublibMungedPackageName version) libInfo)
     = Library
         (PackageIdentifier key version)
-        libInfo {iliSublib = Map.singleton (sdLibraryName sd) (iliId libInfo)}
+        libInfo {iliSublib = Map.singleton sd.sdLibraryName libInfo.iliId}
   updateAsSublib _ v = v

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | A wrapper around hoogle.
@@ -153,10 +154,10 @@ hoogleCmd (args, setup, rebuild, startServer) =
   requiringHoogle :: Muted -> RIO EnvConfig x -> RIO EnvConfig x
   requiringHoogle muted f = do
     hoogleTarget <- do
-      sourceMap <- view $ sourceMapL . to smDeps
+      sourceMap <- view $ sourceMapL . to (.smDeps)
       case Map.lookup hooglePackageName sourceMap of
         Just hoogleDep ->
-          case dpLocation hoogleDep of
+          case hoogleDep.dpLocation of
             PLImmutable pli ->
               T.pack . packageIdentifierString <$>
                   restrictMinHoogleVersion muted (packageLocationIdent pli)
@@ -215,7 +216,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
   runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
   runHoogle hooglePath hoogleArgs = do
     config <- view configL
-    menv <- liftIO $ configProcessContextSettings config envSettings
+    menv <- liftIO $ config.configProcessContextSettings envSettings
     dbpath <- hoogleDatabasePath
     let databaseArg = ["--database=" ++ toFilePath dbpath]
     withProcessContext menv $ proc
@@ -230,7 +231,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
   ensureHoogleInPath :: RIO EnvConfig (Path Abs File)
   ensureHoogleInPath = do
     config <- view configL
-    menv <- liftIO $ configProcessContextSettings config envSettings
+    menv <- liftIO $ config.configProcessContextSettings envSettings
     mHooglePath' <- eitherToMaybe <$> runRIO menv (findExecutable "hoogle")
     let mHooglePath'' =
           eitherToMaybe <$> requiringHoogle NotMuted (findExecutable "hoogle")

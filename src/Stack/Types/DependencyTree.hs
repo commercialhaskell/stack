@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Types.DependencyTree
   ( DependencyTree (..)
@@ -47,7 +48,7 @@ dependencyToJSON pkg (deps, payload) =
                             , "dependencies" .= Set.map packageNameString deps
                             ]
       loc = catMaybes
-              [("location" .=) . pkgLocToJSON <$> payloadLocation payload]
+              [("location" .=) . pkgLocToJSON <$> payload.payloadLocation]
   in  object $ fieldsAlwaysPresent ++ loc
 
 pkgLocToJSON :: PackageLocation -> Value
@@ -82,8 +83,8 @@ pkgLocToJSON (PLImmutable (PLIRepo repo _)) = object
 licenseText :: DotPayload -> Text
 licenseText payload =
   maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id)
-                    (payloadLicense payload)
+                    payload.payloadLicense
 
 versionText :: DotPayload -> Text
 versionText payload =
-  maybe "<unknown>" (Text.pack . display) (payloadVersion payload)
+  maybe "<unknown>" (Text.pack . display) payload.payloadVersion

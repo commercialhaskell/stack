@@ -98,7 +98,7 @@ withProjectStorage ::
   => ReaderT SqlBackend (RIO env) a
   -> RIO env a
 withProjectStorage inner = do
-  storage <- view (buildConfigL . to bcProjectStorage . to unProjectStorage)
+  storage <- view (buildConfigL . to (.bcProjectStorage.unProjectStorage))
   withStorage_ storage inner
 
 -- | Key used to retrieve configuration or flag cache
@@ -116,12 +116,12 @@ readConfigCache ::
 readConfigCache (Entity parentId configCacheParent) = do
   let configCachePkgSrc = configCacheParent.configCacheParentPkgSrc
   coDirs <-
-    map (configCacheDirOptionValue . entityVal) <$>
+    map ((.configCacheDirOptionValue) . entityVal) <$>
     selectList
       [ConfigCacheDirOptionParent ==. parentId]
       [Asc ConfigCacheDirOptionIndex]
   coNoDirs <-
-    map (configCacheNoDirOptionValue . entityVal) <$>
+    map ((.configCacheNoDirOptionValue) . entityVal) <$>
     selectList
       [ConfigCacheNoDirOptionParent ==. parentId]
       [Asc ConfigCacheNoDirOptionIndex]
@@ -130,10 +130,10 @@ readConfigCache (Entity parentId configCacheParent) = do
         , coNoDirs
         }
   configCacheDeps <-
-    Set.fromList . map (configCacheDepValue . entityVal) <$>
+    Set.fromList . map ((.configCacheDepValue) . entityVal) <$>
     selectList [ConfigCacheDepParent ==. parentId] []
   configCacheComponents <-
-    Set.fromList . map (configCacheComponentValue . entityVal) <$>
+    Set.fromList . map ((.configCacheComponentValue) . entityVal) <$>
     selectList [ConfigCacheComponentParent ==. parentId] []
   let configCachePathEnvVar = configCacheParent.configCacheParentPathEnvVar
   let configCacheHaddock = configCacheParent.configCacheParentHaddock
@@ -178,18 +178,18 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
             ConfigCacheParent
               { configCacheParentDirectory = dir
               , configCacheParentType = type_
-              , configCacheParentPkgSrc = configCachePkgSrc new
+              , configCacheParentPkgSrc = new.configCachePkgSrc
               , configCacheParentActive = True
-              , configCacheParentPathEnvVar = configCachePathEnvVar new
-              , configCacheParentHaddock = configCacheHaddock new
+              , configCacheParentPathEnvVar = new.configCachePathEnvVar
+              , configCacheParentHaddock = new.configCacheHaddock
               }
         Just parentEntity@(Entity parentId _) -> do
           old <- readConfigCache parentEntity
           update
             parentId
-            [ ConfigCacheParentPkgSrc =. configCachePkgSrc new
+            [ ConfigCacheParentPkgSrc =. new.configCachePkgSrc
             , ConfigCacheParentActive =. True
-            , ConfigCacheParentPathEnvVar =. configCachePathEnvVar new
+            , ConfigCacheParentPathEnvVar =. new.configCachePathEnvVar
             ]
           pure (parentId, Just old)
     updateList
@@ -197,29 +197,29 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
       ConfigCacheDirOptionParent
       parentId
       ConfigCacheDirOptionIndex
-      (maybe [] (coDirs . configCacheOpts) mold)
-      (coDirs $ configCacheOpts new)
+      (maybe [] (.configCacheOpts.coDirs) mold)
+      new.configCacheOpts.coDirs
     updateList
       ConfigCacheNoDirOption
       ConfigCacheNoDirOptionParent
       parentId
       ConfigCacheNoDirOptionIndex
-      (maybe [] (coNoDirs . configCacheOpts) mold)
-      (coNoDirs $ configCacheOpts new)
+      (maybe [] (.configCacheOpts.coNoDirs) mold)
+      new.configCacheOpts.coNoDirs
     updateSet
       ConfigCacheDep
       ConfigCacheDepParent
       parentId
       ConfigCacheDepValue
-      (maybe Set.empty configCacheDeps mold)
-      (configCacheDeps new)
+      (maybe Set.empty (.configCacheDeps) mold)
+      new.configCacheDeps
     updateSet
       ConfigCacheComponent
       ConfigCacheComponentParent
       parentId
       ConfigCacheComponentValue
-      (maybe Set.empty configCacheComponents mold)
-      (configCacheComponents new)
+      (maybe Set.empty (.configCacheComponents) mold)
+      new.configCacheComponents
 
 -- | Mark 'ConfigCache' as inactive in the database.
 -- We use a flag instead of deleting the records since, in most cases, the same

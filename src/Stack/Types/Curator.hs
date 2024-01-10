@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Module exporting the 'Curator' type, used to represent Stack's
 -- project-specific @curator@ option, which supports the needs of the
@@ -35,14 +36,14 @@ data Curator = Curator
 
 instance ToJSON Curator where
   toJSON c = object
-    [ "skip-test" .= Set.map CabalString (curatorSkipTest c)
-    , "expect-test-failure" .= Set.map CabalString (curatorExpectTestFailure c)
-    , "skip-bench" .= Set.map CabalString (curatorSkipBenchmark c)
+    [ "skip-test" .= Set.map CabalString c.curatorSkipTest
+    , "expect-test-failure" .= Set.map CabalString c.curatorExpectTestFailure
+    , "skip-bench" .= Set.map CabalString c.curatorSkipBenchmark
     , "expect-benchmark-failure" .=
-        Set.map CabalString (curatorExpectTestFailure c)
-    , "skip-haddock" .= Set.map CabalString (curatorSkipHaddock c)
+        Set.map CabalString c.curatorExpectTestFailure
+    , "skip-haddock" .= Set.map CabalString c.curatorSkipHaddock
     , "expect-haddock-failure" .=
-        Set.map CabalString (curatorExpectHaddockFailure c)
+        Set.map CabalString c.curatorExpectHaddockFailure
     ]
 
 instance FromJSON (WithJSONWarnings Curator) where

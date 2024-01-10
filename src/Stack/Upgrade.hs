@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Types and functions related to Stack's @upgrade@ command.
 module Stack.Upgrade
@@ -117,7 +118,7 @@ data UpgradeOpts = UpgradeOpts
 upgradeCmd :: UpgradeOpts -> RIO Runner ()
 upgradeCmd upgradeOpts = do
   go <- view globalOptsL
-  case globalResolver go of
+  case go.globalResolver of
     Just _ -> prettyThrowIO ResolverOptionInvalid
     Nothing -> withGlobalProject $ upgrade maybeGitHash upgradeOpts
 
@@ -197,7 +198,7 @@ binaryUpgrade (BinaryOpts mplatform force' onlyLocalBin mver morg mrepo) =
     when toUpgrade $ do
       config <- view configL
       downloadStackExe
-        platforms0 archiveInfo (configLocalBin config) (not onlyLocalBin) $
+        platforms0 archiveInfo config.configLocalBin (not onlyLocalBin) $
           \tmpFile -> do
             -- Sanity check!
             ec <- rawSystem (toFilePath tmpFile) ["--version"]
@@ -293,5 +294,5 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
       local (over globalOptsL (modifyGO dir))
         $ withConfig NoReexec
         $ withEnvConfig AllowNoTargets boptsCLI
-        $ local (set (buildOptsL.buildOptsInstallExesL) True)
+        $ local (set (buildOptsL . buildOptsInstallExesL) True)
         $ build Nothing

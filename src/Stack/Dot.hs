@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Functions related to Stack's @dot@ command.
 module Stack.Dot
@@ -41,7 +42,7 @@ printGraph dotOpts locals graph = do
   liftIO $ Text.putStrLn "}"
  where
   filteredLocals =
-    Set.filter (\local' -> local' `Set.notMember` dotPrune dotOpts) locals
+    Set.filter (\local' -> local' `Set.notMember` dotOpts.dotPrune) locals
 
 -- | Print the local nodes with a different style depending on options
 printLocalNodes ::
@@ -53,7 +54,7 @@ printLocalNodes dotOpts locals =
   liftIO $ Text.putStrLn (Text.intercalate "\n" lpNodes)
  where
   applyStyle :: Text -> Text
-  applyStyle n = if dotIncludeExternal dotOpts
+  applyStyle n = if dotOpts.dotIncludeExternal
                    then n <> " [style=dashed];"
                    else n <> " [style=solid];"
   lpNodes :: [Text]

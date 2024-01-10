@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- | The facility for retrieving all files from the main Stack
 -- 'Stack.Types.Package' type. This was moved into its own module to allow
@@ -33,40 +34,40 @@ data GetPackageFileContext = GetPackageFileContext
   }
 
 instance HasPlatform GetPackageFileContext where
-  platformL = configL.platformL
+  platformL = configL . platformL
   {-# INLINE platformL #-}
-  platformVariantL = configL.platformVariantL
+  platformVariantL = configL . platformVariantL
   {-# INLINE platformVariantL #-}
 
 instance HasGHCVariant GetPackageFileContext where
-  ghcVariantL = configL.ghcVariantL
+  ghcVariantL = configL . ghcVariantL
   {-# INLINE ghcVariantL #-}
 
 instance HasLogFunc GetPackageFileContext where
-  logFuncL = configL.logFuncL
+  logFuncL = configL . logFuncL
 
 instance HasRunner GetPackageFileContext where
-  runnerL = configL.runnerL
+  runnerL = configL . runnerL
 
 instance HasStylesUpdate GetPackageFileContext where
-  stylesUpdateL = runnerL.stylesUpdateL
+  stylesUpdateL = runnerL . stylesUpdateL
 
 instance HasTerm GetPackageFileContext where
-  useColorL = runnerL.useColorL
-  termWidthL = runnerL.termWidthL
+  useColorL = runnerL . useColorL
+  termWidthL = runnerL . termWidthL
 
 instance HasConfig GetPackageFileContext where
-  configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
+  configL = buildConfigL . lens (.bcConfig) (\x y -> x { bcConfig = y })
   {-# INLINE configL #-}
 
 instance HasBuildConfig GetPackageFileContext where
-  buildConfigL = lens ctxBuildConfig (\x y -> x { ctxBuildConfig = y })
+  buildConfigL = lens (.ctxBuildConfig) (\x y -> x { ctxBuildConfig = y })
 
 instance HasPantryConfig GetPackageFileContext where
-  pantryConfigL = configL.pantryConfigL
+  pantryConfigL = configL . pantryConfigL
 
 instance HasProcessContext GetPackageFileContext where
-  processContextL = configL.processContextL
+  processContextL = configL . processContextL
 
 -- | A path resolved from the Cabal file, which is either main-is or
 -- an exposed/internal/referenced module.

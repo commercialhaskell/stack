@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude    #-}
-{-# LANGUAGE  OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Types and functions related to Stack's @upload@ command.
 module Stack.Upload
@@ -186,7 +186,7 @@ uploadCmd (UploadOpts [] uoDocumentation _ _ _ _ _) = do
   prettyThrowIO $ NoItemSpecified subject
 uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
   config <- view configL
-  let hackageUrl = T.unpack $ configHackageBaseUrl config
+  let hackageUrl = T.unpack config.configHackageBaseUrl
   if uo.uoDocumentation
     then do
       (dirs, invalid) <-
@@ -254,7 +254,7 @@ uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
       pkgDir <- resolveDir' dir
       distDir <- distDirFromDir pkgDir
       lp <- readLocalPackage pkgDir
-      let pkgId = packageIdentifier (lpPackage lp)
+      let pkgId = packageIdentifier lp.lpPackage
           pkgIdName = packageIdentifierString pkgId
           name = pkgIdName <> "-docs"
       tarGzFileName <- maybe
@@ -334,7 +334,7 @@ loadUserAndPassword config = do
       -- didn't do this
       writeFilePrivate fp $ lazyByteString lbs
 
-      unless (configSaveHackageCreds config) $ do
+      unless config.configSaveHackageCreds $ do
         prettyWarnL
           [ flow "You've set"
           , style Shell "save-hackage-creds"
@@ -355,7 +355,7 @@ loadUserAndPassword config = do
           , hcCredsFile = fp
           }
 
-    when (configSaveHackageCreds config) $ do
+    when config.configSaveHackageCreds $ do
       shouldSave <- promptBool $ T.pack $
         "Save Hackage credentials to file at " ++ fp ++ " [y/n]? "
       prettyNoteL
@@ -428,8 +428,8 @@ applyCreds creds req0 = do
       pure (Left $ toException ExitSuccess )
     else
       liftIO $ applyDigestAuth
-        (encodeUtf8 $ hcUsername creds)
-        (encodeUtf8 $ hcPassword creds)
+        (encodeUtf8 creds.hcUsername)
+        (encodeUtf8 creds.hcPassword)
         req0
         manager
   case ereq of
@@ -517,7 +517,7 @@ uploadBytes baseUrl auth contentForm mPkgIdName tarName uploadVariant bytes = do
           HACreds creds ->
             handleIO
               (const $ pure ())
-              (liftIO $ removeFile (hcCredsFile creds))
+              (liftIO $ removeFile creds.hcCredsFile)
           _ -> pure ()
         prettyThrowIO AuthenticationFailure
       403 -> do

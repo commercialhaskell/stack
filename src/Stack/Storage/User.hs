@@ -167,7 +167,7 @@ withUserStorage ::
   => ReaderT SqlBackend (RIO env) a
   -> RIO env a
 withUserStorage inner = do
-  storage <- view (configL . to configUserStorage . to unUserStorage)
+  storage <- view (configL . to (.configUserStorage.unUserStorage))
   withStorage_ storage inner
 
 -- | Key used to retrieve the precompiled cache
@@ -200,10 +200,10 @@ readPrecompiledCache key = do
     pcLibrary <-
       mapM parseRelFile precompiledCacheParent.precompiledCacheParentLibrary
     pcSubLibs <-
-      mapM (parseRelFile . precompiledCacheSubLibValue . entityVal) =<<
+      mapM (parseRelFile . (.precompiledCacheSubLibValue) . entityVal) =<<
       selectList [PrecompiledCacheSubLibParent ==. parentId] []
     pcExes <-
-      mapM (parseRelFile . precompiledCacheExeValue . entityVal) =<<
+      mapM (parseRelFile . (.precompiledCacheExeValue) . entityVal) =<<
       selectList [PrecompiledCacheExeParent ==. parentId] []
     pure
       ( parentId
@@ -239,7 +239,7 @@ savePrecompiledCache
       )
   new
   = withUserStorage $ do
-      let precompiledCacheParentLibrary = fmap toFilePath (pcLibrary new)
+      let precompiledCacheParentLibrary = fmap toFilePath new.pcLibrary
       mIdOld <- readPrecompiledCache key
       (parentId, mold) <-
         case mIdOld of
@@ -264,15 +264,15 @@ savePrecompiledCache
         PrecompiledCacheSubLibParent
         parentId
         PrecompiledCacheSubLibValue
-        (maybe Set.empty (toFilePathSet . pcSubLibs) mold)
-        (toFilePathSet $ pcSubLibs new)
+        (maybe Set.empty (toFilePathSet . (.pcSubLibs)) mold)
+        (toFilePathSet new.pcSubLibs)
       updateSet
         PrecompiledCacheExe
         PrecompiledCacheExeParent
         parentId
         PrecompiledCacheExeValue
-        (maybe Set.empty (toFilePathSet . pcExes) mold)
-        (toFilePathSet $ pcExes new)
+        (maybe Set.empty (toFilePathSet . (.pcExes)) mold)
+        (toFilePathSet new.pcExes)
  where
   toFilePathSet = Set.fromList . map toFilePath
 
@@ -284,7 +284,7 @@ loadDockerImageExeCache ::
   -> UTCTime
   -> RIO env (Maybe Bool)
 loadDockerImageExeCache imageId exePath exeTimestamp = withUserStorage $
-  fmap (dockerImageExeCacheCompatible . entityVal) <$>
+  fmap ((.dockerImageExeCacheCompatible) . entityVal) <$>
   getBy (DockerImageExeCacheUnique imageId (toFilePath exePath) exeTimestamp)
 
 -- | Sets the record of whether an executable is compatible with a Docker image

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | Types and functions related to Stack's @ide@ command.
@@ -72,12 +73,12 @@ listPackages ::
   -> ListPackagesCmd
   -> RIO env ()
 listPackages stream flag = do
-  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  packages <- view $ buildConfigL . to (.bcSMWanted.smwProject)
   let strs = case flag of
         ListPackageNames ->
           map packageNameString (Map.keys packages)
         ListPackageCabalFiles ->
-          map (toFilePath . ppCabalFP) (Map.elems packages)
+          map (toFilePath . (.ppCabalFP)) (Map.elems packages)
   mapM_ (outputFunc stream) strs
 
 -- | List the targets in the current project.
@@ -87,7 +88,7 @@ listTargets ::
   -> (NamedComponent -> Bool)
   -> RIO env ()
 listTargets stream isCompType = do
-  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  packages <- view $ buildConfigL . to (.bcSMWanted.smwProject)
   pairs <- concat <$> Map.traverseWithKey toNameAndComponent packages
   outputFunc stream $ T.unpack $ T.intercalate "\n" $
     map renderPkgComponent pairs

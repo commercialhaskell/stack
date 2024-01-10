@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -135,7 +136,7 @@ snapToDepPackage buildHaddocks name sp = do
 
 loadVersion :: MonadIO m => CommonPackage -> m Version
 loadVersion common = do
-  gpd <- liftIO $ cpGPD common
+  gpd <- liftIO common.cpGPD
   pure (pkgVersion $ PD.package $ PD.packageDescription gpd)
 
 getPLIVersion :: PackageLocationImmutable -> Version
@@ -149,9 +150,9 @@ globalsFromDump ::
   -> RIO env (Map PackageName DumpedGlobalPackage)
 globalsFromDump pkgexe = do
   let pkgConduit =    conduitDumpPackage
-                   .| CL.foldMap (\dp -> Map.singleton (dpGhcPkgId dp) dp)
+                   .| CL.foldMap (\dp -> Map.singleton dp.dpGhcPkgId dp)
       toGlobals ds =
-        Map.fromList $ map (pkgName . dpPackageIdent &&& id) $ Map.elems ds
+        Map.fromList $ map (pkgName . (.dpPackageIdent) &&& id) $ Map.elems ds
   toGlobals <$> ghcPkgDump pkgexe [] pkgConduit
 
 globalsFromHints ::
@@ -177,12 +178,12 @@ actualFromGhc ::
   -> ActualCompiler
   -> RIO env (SMActual DumpedGlobalPackage)
 actualFromGhc smw ac = do
-  globals <- view $ compilerPathsL . to cpGlobalDump
+  globals <- view $ compilerPathsL . to (.cpGlobalDump)
   pure
     SMActual
       { smaCompiler = ac
-      , smaProject = smwProject smw
-      , smaDeps = smwDeps smw
+      , smaProject = smw.smwProject
+      , smaDeps = smw.smwDeps
       , smaGlobal = globals
       }
 
@@ -196,8 +197,8 @@ actualFromHints smw ac = do
   pure
     SMActual
       { smaCompiler = ac
-      , smaProject = smwProject smw
-      , smaDeps = smwDeps smw
+      , smaProject = smw.smwProject
+      , smaDeps = smw.smwDeps
       , smaGlobal = Map.map GlobalPackageVersion globals
       }
 
@@ -235,15 +236,15 @@ getUnusedPackageFlags ::
   -> Map PackageName DepPackage
   -> m (Maybe UnusedFlags)
 getUnusedPackageFlags (name, userFlags) source prj deps =
-  let maybeCommon =     fmap ppCommon (Map.lookup name prj)
-                    <|> fmap dpCommon (Map.lookup name deps)
+  let maybeCommon =     fmap (.ppCommon) (Map.lookup name prj)
+                    <|> fmap (.dpCommon) (Map.lookup name deps)
   in  case maybeCommon of
         -- Package is not available as project or dependency
         Nothing ->
           pure $ Just $ UFNoPackage source name
         -- Package exists, let's check if the flags are defined
         Just common -> do
-          gpd <- liftIO $ cpGPD common
+          gpd <- liftIO common.cpGPD
           let pname = pkgName $ PD.package $ PD.packageDescription gpd
               pkgFlags = Set.fromList $ map PD.flagName $ PD.genPackageFlags gpd
               unused = Map.keysSet $ Map.withoutKeys userFlags pkgFlags
@@ -259,13 +260,13 @@ pruneGlobals ::
   -> Map PackageName GlobalPackage
 pruneGlobals globals deps =
   let (prunedGlobals, keptGlobals) =
-        partitionReplacedDependencies globals (pkgName . dpPackageIdent)
-          dpGhcPkgId dpDepends deps
-  in  Map.map (GlobalPackage . pkgVersion . dpPackageIdent) keptGlobals <>
+        partitionReplacedDependencies globals (pkgName . (.dpPackageIdent))
+          (.dpGhcPkgId) (.dpDepends) deps
+  in  Map.map (GlobalPackage . pkgVersion . (.dpPackageIdent)) keptGlobals <>
       Map.map ReplacedGlobalPackage prunedGlobals
 
 getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder
-getCompilerInfo = view $ compilerPathsL . to (byteString . cpGhcInfo)
+getCompilerInfo = view $ compilerPathsL . to (byteString . (.cpGhcInfo))
 
 immutableLocSha :: PackageLocationImmutable -> Builder
 immutableLocSha = byteString . treeKeyToBs . locationTreeKey
@@ -296,7 +297,7 @@ loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
   pure $ \projectPackages -> do
     prjPkgs <- fmap Map.fromList . for projectPackages $ \resolved -> do
       pp <- mkProjectPackage printWarnings resolved buildHaddocks
-      pure (cpName $ ppCommon pp, pp)
+      pure (pp.ppCommon.cpName, pp)
     compiler <- either throwIO pure $ wantedToActual $ snapshotCompiler snapshot
     pure
       SMActual

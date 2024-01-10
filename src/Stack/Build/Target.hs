@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ViewPatterns        #-}
 
@@ -106,7 +107,7 @@ getRawInput ::
   -> Map PackageName ProjectPackage
   -> ([Text], [RawInput])
 getRawInput boptscli locals =
-  let textTargets' = boptsCLITargets boptscli
+  let textTargets' = boptscli.boptsCLITargets
       textTargets =
         -- Handle the no targets case, which means we pass in the names of all
         -- project packages
@@ -253,9 +254,9 @@ resolveRawTarget ::
 resolveRawTarget sma allLocs (ri, rt) =
   go rt
  where
-  locals = smaProject sma
-  deps = smaDeps sma
-  globals = smaGlobal sma
+  locals = sma.smaProject
+  deps = sma.smaDeps
+  globals = sma.smaGlobal
   -- Helper function: check if a 'NamedComponent' matches the given
   -- 'ComponentName'
   isCompNamed :: ComponentName -> NamedComponent -> Bool
@@ -487,23 +488,23 @@ combineResolveResults ::
        )
 combineResolveResults results = do
   addedDeps <- fmap Map.unions $ forM results $ \result ->
-    case rrAddedDep result of
+    case result.rrAddedDep of
       Nothing -> pure Map.empty
-      Just pl -> pure $ Map.singleton (rrName result) pl
+      Just pl -> pure $ Map.singleton result.rrName pl
 
   let m0 = Map.unionsWith (++) $
-        map (\rr -> Map.singleton (rrName rr) [rr]) results
+        map (\rr -> Map.singleton rr.rrName [rr]) results
       (errs, ms) = partitionEithers $ flip map (Map.toList m0) $
         \(name, rrs) ->
-          let mcomps = map rrComponent rrs in
+          let mcomps = map (.rrComponent) rrs in
           -- Confirm that there is either exactly 1 with no component, or that
           -- all rrs are components
           case rrs of
             [] -> assert False $
               Left $
                 flow "Somehow got no rrComponent values, that can't happen."
-            [rr] | isNothing (rrComponent rr) ->
-              Right $ Map.singleton name $ TargetAll $ rrPackageType rr
+            [rr] | isNothing rr.rrComponent ->
+              Right $ Map.singleton name $ TargetAll rr.rrPackageType
             _
               | all isJust mcomps ->
                   Right $ Map.singleton name $ TargetComps $ Set.fromList $
@@ -519,7 +520,7 @@ combineResolveResults results = do
   pure (errs, Map.unions ms, addedDeps)
  where
   rrToStyleDoc :: ResolveResult -> StyleDoc
-  rrToStyleDoc = fromString . T.unpack . unRawInput . rrRaw
+  rrToStyleDoc = fromString . T.unpack . (.rrRaw.unRawInput)
 
 --------------------------------------------------------------------------------
 -- OK, let's do it!
@@ -536,13 +537,13 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   logDebug "Parsing the targets"
   bconfig <- view buildConfigL
   workingDir <- getCurrentDir
-  locals <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  locals <- view $ buildConfigL . to (.bcSMWanted.smwProject)
   let (textTargets', rawInput) = getRawInput boptscli locals
 
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir locals
 
-  let depLocs = Map.map dpLocation $ smaDeps smActual
+  let depLocs = Map.map (.dpLocation) smActual.smaDeps
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
     resolveRawTarget smActual depLocs
@@ -581,7 +582,7 @@ parseTargets needTargets haddockDeps boptscli smActual = do
     }
  where
   bcImplicitGlobal bconfig =
-    case configProject $ bcConfig bconfig of
+    case bconfig.bcConfig.configProject of
       PCProject _ -> False
       PCGlobalProject -> True
       PCNoProject _ -> False

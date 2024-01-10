@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Types and functions related to Stack's @query@ command.
 module Stack.Query
@@ -107,8 +108,8 @@ queryBuildInfo selectors0 =
 rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
   locals <- projectLocalPackages
-  wantedCompiler <- view $ wantedCompilerVersionL.to (utf8BuilderToText . display)
-  actualCompiler <- view $ actualCompilerVersionL.to compilerVersionText
+  wantedCompiler <- view $ wantedCompilerVersionL . to (utf8BuilderToText . display)
+  actualCompiler <- view $ actualCompilerVersionL . to compilerVersionText
   pure $ object
     [ "locals" .= Object (KeyMap.fromList $ map localToPair locals)
     , "compiler" .= object
@@ -118,10 +119,10 @@ rawBuildInfo = do
     ]
  where
   localToPair lp =
-    (Key.fromText $ T.pack $ packageNameString $ packageName p, value)
+    (Key.fromText $ T.pack $ packageNameString p.packageName, value)
    where
-    p = lpPackage lp
+    p = lp.lpPackage
     value = object
-      [ "version" .= CabalString (packageVersion p)
-      , "path" .= toFilePath (parent $ lpCabalFile lp)
+      [ "version" .= CabalString p.packageVersion
+      , "path" .= toFilePath (parent lp.lpCabalFile)
       ]

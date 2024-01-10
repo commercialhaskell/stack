@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Configuration options for building.
 module Stack.Types.BuildOpts
@@ -112,36 +113,42 @@ data BuildOpts = BuildOpts
 
 defaultBuildOpts :: BuildOpts
 defaultBuildOpts = BuildOpts
-  { boptsLibProfile = defaultFirstFalse buildMonoidLibProfile
-  , boptsExeProfile = defaultFirstFalse buildMonoidExeProfile
-  , boptsLibStrip = defaultFirstTrue buildMonoidLibStrip
-  , boptsExeStrip = defaultFirstTrue buildMonoidExeStrip
+  { boptsLibProfile = defaultFirstFalse buildMonoid.buildMonoidLibProfile
+  , boptsExeProfile = defaultFirstFalse buildMonoid.buildMonoidExeProfile
+  , boptsLibStrip = defaultFirstTrue buildMonoid.buildMonoidLibStrip
+  , boptsExeStrip = defaultFirstTrue buildMonoid.buildMonoidExeStrip
   , boptsHaddock = False
   , boptsHaddockOpts = defaultHaddockOpts
-  , boptsOpenHaddocks = defaultFirstFalse buildMonoidOpenHaddocks
+  , boptsOpenHaddocks = defaultFirstFalse buildMonoid.buildMonoidOpenHaddocks
   , boptsHaddockDeps = Nothing
-  , boptsHaddockInternal = defaultFirstFalse buildMonoidHaddockInternal
+  , boptsHaddockInternal =
+      defaultFirstFalse buildMonoid.buildMonoidHaddockInternal
   , boptsHaddockHyperlinkSource =
-      defaultFirstTrue buildMonoidHaddockHyperlinkSource
-  , boptsHaddockForHackage = defaultFirstFalse buildMonoidHaddockForHackage
-  , boptsInstallExes = defaultFirstFalse buildMonoidInstallExes
-  , boptsInstallCompilerTool = defaultFirstFalse buildMonoidInstallCompilerTool
-  , boptsPreFetch = defaultFirstFalse buildMonoidPreFetch
+      defaultFirstTrue buildMonoid.buildMonoidHaddockHyperlinkSource
+  , boptsHaddockForHackage =
+      defaultFirstFalse buildMonoid.buildMonoidHaddockForHackage
+  , boptsInstallExes = defaultFirstFalse buildMonoid.buildMonoidInstallExes
+  , boptsInstallCompilerTool =
+      defaultFirstFalse buildMonoid.buildMonoidInstallCompilerTool
+  , boptsPreFetch = defaultFirstFalse buildMonoid.buildMonoidPreFetch
   , boptsKeepGoing = Nothing
-  , boptsKeepTmpFiles = defaultFirstFalse buildMonoidKeepTmpFiles
-  , boptsForceDirty = defaultFirstFalse buildMonoidForceDirty
-  , boptsTests = defaultFirstFalse buildMonoidTests
+  , boptsKeepTmpFiles = defaultFirstFalse buildMonoid.buildMonoidKeepTmpFiles
+  , boptsForceDirty = defaultFirstFalse buildMonoid.buildMonoidForceDirty
+  , boptsTests = defaultFirstFalse buildMonoid.buildMonoidTests
   , boptsTestOpts = defaultTestOpts
-  , boptsBenchmarks = defaultFirstFalse buildMonoidBenchmarks
+  , boptsBenchmarks = defaultFirstFalse buildMonoid.buildMonoidBenchmarks
   , boptsBenchmarkOpts = defaultBenchmarkOpts
-  , boptsReconfigure = defaultFirstFalse buildMonoidReconfigure
+  , boptsReconfigure = defaultFirstFalse buildMonoid.buildMonoidReconfigure
   , boptsCabalVerbose = CabalVerbosity normal
-  , boptsSplitObjs = defaultFirstFalse buildMonoidSplitObjs
+  , boptsSplitObjs = defaultFirstFalse buildMonoid.buildMonoidSplitObjs
   , boptsSkipComponents = []
-  , boptsInterleavedOutput = defaultFirstTrue buildMonoidInterleavedOutput
+  , boptsInterleavedOutput =
+      defaultFirstTrue buildMonoid.buildMonoidInterleavedOutput
   , boptsProgressBar = CappedBar
   , boptsDdumpDir = Nothing
   }
+ where
+  buildMonoid = undefined :: BuildOptsMonoid
 
 defaultBuildOptsCLI ::BuildOptsCLI
 defaultBuildOptsCLI = BuildOptsCLI
@@ -173,7 +180,7 @@ boptsCLIFlagsByName =
   Map.fromList .
   mapMaybe go .
   Map.toList .
-  boptsCLIFlags
+  (.boptsCLIFlags)
  where
   go (ACFAllProjectPackages, _) = Nothing
   go (ACFByName name, flags) = Just (name, flags)
@@ -198,7 +205,7 @@ data BuildOptsCLI = BuildOptsCLI
 -- | Generate a list of --PROG-option="<argument>" arguments for all PROGs.
 boptsCLIAllProgOptions :: BuildOptsCLI -> [Text]
 boptsCLIAllProgOptions boptsCLI =
-  concatMap progOptionArgs (boptsCLIProgsOptions boptsCLI)
+  concatMap progOptionArgs boptsCLI.boptsCLIProgsOptions
  where
   -- Generate a list of --PROG-option="<argument>" arguments for a PROG.
   progOptionArgs :: (Text, [Text]) -> [Text]
@@ -462,13 +469,15 @@ data TestOpts = TestOpts
 
 defaultTestOpts :: TestOpts
 defaultTestOpts = TestOpts
-  { toRerunTests = defaultFirstTrue toMonoidRerunTests
+  { toRerunTests = defaultFirstTrue toMonoid.toMonoidRerunTests
   , toAdditionalArgs = []
-  , toCoverage = defaultFirstFalse toMonoidCoverage
-  , toDisableRun = defaultFirstFalse toMonoidDisableRun
+  , toCoverage = defaultFirstFalse toMonoid.toMonoidCoverage
+  , toDisableRun = defaultFirstFalse toMonoid.toMonoidDisableRun
   , toMaximumTimeSeconds = Nothing
-  , toAllowStdin = defaultFirstTrue toMonoidAllowStdin
+  , toAllowStdin = defaultFirstTrue toMonoid.toMonoidAllowStdin
   }
+ where
+  toMonoid = undefined :: TestOptsMonoid
 
 data TestOptsMonoid = TestOptsMonoid
   { toMonoidRerunTests :: !FirstTrue
@@ -606,7 +615,7 @@ newtype CabalVerbosity
   deriving (Eq, Show)
 
 toFirstCabalVerbosity :: FirstFalse -> First CabalVerbosity
-toFirstCabalVerbosity vf = First $ getFirstFalse vf <&> \p ->
+toFirstCabalVerbosity vf = First $ vf.getFirstFalse <&> \p ->
   if p then verboseLevel else normalLevel
  where
   verboseLevel = CabalVerbosity verbose
@@ -624,32 +633,32 @@ instance Parsec CabalVerbosity where
 
 buildOptsMonoidHaddockL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidHaddockL =
-  lens (getFirstFalse . buildMonoidHaddock)
+  lens (.buildMonoidHaddock.getFirstFalse)
     (\buildMonoid t -> buildMonoid {buildMonoidHaddock = FirstFalse t})
 
 buildOptsMonoidTestsL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidTestsL =
-  lens (getFirstFalse . buildMonoidTests)
+  lens (.buildMonoidTests.getFirstFalse)
     (\buildMonoid t -> buildMonoid {buildMonoidTests = FirstFalse t})
 
 buildOptsMonoidBenchmarksL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidBenchmarksL =
-  lens (getFirstFalse . buildMonoidBenchmarks)
+  lens (.buildMonoidBenchmarks.getFirstFalse)
     (\buildMonoid t -> buildMonoid {buildMonoidBenchmarks = FirstFalse t})
 
 buildOptsMonoidInstallExesL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidInstallExesL =
-  lens (getFirstFalse . buildMonoidInstallExes)
+  lens (.buildMonoidInstallExes.getFirstFalse)
     (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = FirstFalse t})
 
 buildOptsInstallExesL :: Lens' BuildOpts Bool
 buildOptsInstallExesL =
-  lens boptsInstallExes
+  lens (.boptsInstallExes)
     (\bopts t -> bopts {boptsInstallExes = t})
 
 buildOptsHaddockL :: Lens' BuildOpts Bool
 buildOptsHaddockL =
-  lens boptsHaddock
+  lens (.boptsHaddock)
     (\bopts t -> bopts {boptsHaddock = t})
 
 -- Type representing formats of Stack's progress bar when building.

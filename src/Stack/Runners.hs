@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Utilities for running stack commands.
 --
@@ -127,7 +128,7 @@ withConfig shouldReexec inner =
     -- If we have been relaunched in a Docker container, perform in-container
     -- initialization (switch UID, etc.).  We do this after first loading the
     -- configuration since it must happen ASAP but needs a configuration.
-    view (globalOptsL.to globalDockerEntrypoint) >>=
+    view (globalOptsL . to (.globalDockerEntrypoint)) >>=
       traverse_ (Docker.entrypoint config)
     runRIO config $ do
       -- Catching all exceptions here, since we don't want this
@@ -145,8 +146,8 @@ withConfig shouldReexec inner =
 -- action.
 reexec :: RIO Config a -> RIO Config a
 reexec inner = do
-  nixEnable' <- asks $ nixEnable . configNix
-  notifyIfNixOnPath <- asks configNotifyIfNixOnPath
+  nixEnable' <- asks $ (.configNix.nixEnable)
+  notifyIfNixOnPath <- asks (.configNotifyIfNixOnPath)
   when (not nixEnable' && notifyIfNixOnPath) $ do
     eNix <- findExecutable nixProgName
     case eNix of
@@ -189,7 +190,7 @@ reexec inner = do
                    , muteMsg
                    ]
                 <> line
-  dockerEnable' <- asks $ dockerEnable . configDocker
+  dockerEnable' <- asks (.configDocker.dockerEnable)
   case (nixEnable', dockerEnable') of
     (True, True) -> throwIO DockerAndNixInvalid
     (False, False) -> inner
@@ -220,18 +221,18 @@ withRunnerGlobal :: GlobalOpts -> RIO Runner a -> IO a
 withRunnerGlobal go inner = do
   colorWhen <-
     maybe defaultColorWhen pure $
-    getFirst $ configMonoidColorWhen $ globalConfigMonoid go
+    getFirst go.globalConfigMonoid.configMonoidColorWhen
   useColor <- case colorWhen of
     ColorNever -> pure False
     ColorAlways -> pure True
     ColorAuto -> hSupportsANSI stderr
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
                                     <$> getTerminalWidth)
-                                   pure (globalTermWidth go)
+                                   pure go.globalTermWidth
   menv <- mkDefaultProcessContext
   -- MVar used to ensure the Docker entrypoint is performed exactly once.
   dockerEntrypointMVar <- newMVar False
-  let update = globalStylesUpdate go
+  let update = go.globalStylesUpdate
   withNewLogFunc go useColor update $ \logFunc -> do
     runRIO Runner
       { runnerGlobalOpts = go
@@ -251,7 +252,7 @@ withRunnerGlobal go inner = do
 shouldUpgradeCheck :: RIO Config ()
 shouldUpgradeCheck = do
   config <- ask
-  when (configRecommendUpgrade config) $ do
+  when config.configRecommendUpgrade $ do
     now <- getCurrentTime
     let yesterday = addUTCTime (-24 * 60 * 60) now
     checks <- upgradeChecksSince yesterday
@@ -279,7 +280,7 @@ shouldUpgradeCheck = do
                  [ flow "Tired of seeing this? Add"
                  , style Shell (flow "recommend-stack-upgrade: false")
                  , "to"
-                 , pretty (configUserConfigPath config) <> "."
+                 , pretty config.configUserConfigPath <> "."
                  ]
             <> blankLine
         _ -> pure ()

@@ -38,7 +38,7 @@ instance Exception ConfigDockerException where
           (_, Just aresolver) ->
             T.unpack $ utf8BuilderToText $ display aresolver
           (Just project, Nothing) ->
-            T.unpack $ utf8BuilderToText $ display $ projectResolver project
+            T.unpack $ utf8BuilderToText $ display project.projectResolver
       , "\nUse an LTS resolver, or set the '"
       , T.unpack dockerImageArgName
       , "' explicitly, in your configuration file."]
@@ -56,7 +56,7 @@ addDefaultTag base mproject maresolver = do
     Just (ARResolver (RSLSynonym lts@(LTS _ _))) -> pure lts
     Just _aresolver -> exc
     Nothing ->
-      case projectResolver <$> mproject of
+      case (.projectResolver) <$> mproject of
         Just (RSLSynonym lts@(LTS _ _)) -> pure lts
         _ -> exc
   pure $ base ++ ":" ++ show lts
@@ -103,7 +103,8 @@ dockerOptsFromMonoid mproject maresolver dockerMonoid = do
       dockerEnv = dockerMonoid.dockerMonoidEnv
       dockerSetUser = getFirst dockerMonoid.dockerMonoidSetUser
       dockerRequireDockerVersion =
-        simplifyVersionRange (getIntersectingVersionRange dockerMonoid.dockerMonoidRequireDockerVersion)
+        simplifyVersionRange
+          dockerMonoid.dockerMonoidRequireDockerVersion.getIntersectingVersionRange
       dockerStackExe = getFirst dockerMonoid.dockerMonoidStackExe
   pure $ DockerOpts
     { dockerEnable

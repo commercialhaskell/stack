@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE DataKinds          #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Run commands in a nix-shell
 module Stack.Nix
@@ -57,7 +58,7 @@ runShellAndExit = do
 
     mshellFile <- case configProjectRoot config of
       Just projectRoot ->
-        traverse (resolveFile projectRoot) $ nixInitFile (configNix config)
+        traverse (resolveFile projectRoot) config.configNix.nixInitFile
       Nothing -> pure Nothing
 
     -- This will never result in double loading the build config, since:
@@ -70,11 +71,11 @@ runShellAndExit = do
 
     ghc <- either throwIO pure $ nixCompiler compilerVersion
     ghcVersion <- either throwIO pure $ nixCompilerVersion compilerVersion
-    let pkgsInConfig = nixPackages (configNix config)
+    let pkgsInConfig = config.configNix.nixPackages
         pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
         pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
-        pureShell = nixPureShell (configNix config)
-        addGCRoots = nixAddGCRoots (configNix config)
+        pureShell = config.configNix.nixPureShell
+        addGCRoots = config.configNix.nixAddGCRoots
         nixopts = case mshellFile of
           Just fp ->
             [ toFilePath fp
@@ -121,12 +122,12 @@ runShellAndExit = do
               then [ "--indirect"
                    , "--add-root"
                    , toFilePath
-                             (configWorkDir config)
+                             config.configWorkDir
                        F.</> "nix-gc-symlinks"
                        F.</> "gc-root"
                    ]
               else []
-          , map T.unpack (nixShellOptions (configNix config))
+          , map T.unpack config.configNix.nixShellOptions
           , nixopts
           , ["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args')]
             -- Using --run instead of --command so we cannot end up in the

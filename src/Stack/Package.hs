@@ -58,7 +58,6 @@ import           Distribution.Utils.Path ( getSymbolicPath )
 import           Distribution.Verbosity ( silent )
 import           Distribution.Version
                    ( anyVersion, mkVersion, orLaterVersion )
-import           GHC.Records ( getField )
 import           Path
                    ( (</>), parent, parseAbsDir, parseRelDir, parseRelFile
                    , stripProperPrefix
@@ -145,9 +144,9 @@ packageFromPackageDescription
       { packageName = name
       , packageVersion = pkgVersion pkgId
       , packageLicense = licenseRaw pkg
-      , packageGhcOptions = packageConfigGhcOptions packageConfig
-      , packageCabalConfigOpts = packageConfigCabalConfigOpts packageConfig
-      , packageFlags = packageConfigFlags packageConfig
+      , packageGhcOptions =  packageConfig.packageConfigGhcOptions
+      , packageCabalConfigOpts =  packageConfig.packageConfigCabalConfigOpts
+      , packageFlags = packageConfig.packageConfigFlags
       , packageDefaultFlags = M.fromList
           [(flagName flag, flagDefault flag) | flag <- pkgFlags]
       , packageLibrary = stackLibraryFromCabal <$> library pkg
@@ -165,8 +164,8 @@ packageFromPackageDescription
       , packageSetupDeps = fmap cabalSetupDepsToStackDep (setupBuildInfo pkg)
       , packageCabalSpec = specVersion pkg
       , packageFile = stackPackageFileFromCabal pkg
-      , packageTestEnabled = packageConfigEnableTests packageConfig
-      , packageBenchmarkEnabled = packageConfigEnableBenchmarks packageConfig
+      , packageTestEnabled =  packageConfig.packageConfigEnableTests
+      , packageBenchmarkEnabled = packageConfig.packageConfigEnableBenchmarks
       }
  where
   -- Gets all of the modules, files, build files, and data files that constitute
@@ -248,8 +247,8 @@ generatePkgDescOpts
             , biBuildInfo = binfo
             , biDotCabalPaths =
                 fromMaybe [] (M.lookup namedComponent componentPaths)
-            , biConfigLibDirs = configExtraLibDirs config
-            , biConfigIncludeDirs = configExtraIncludeDirs config
+            , biConfigLibDirs =  config.configExtraLibDirs
+            , biConfigIncludeDirs =  config.configExtraIncludeDirs
             , biComponentName = namedComponent
             , biCabalVersion = cabalVer
             }
@@ -261,11 +260,11 @@ generatePkgDescOpts
               (selector pkg)
               (translatedInsertInMap constructor)
       let aggregateAllBuildInfoOpts =
-              makeBuildInfoOpts packageLibrary (const CLib)
-            . makeBuildInfoOpts packageSubLibraries CSubLib
-            . makeBuildInfoOpts packageExecutables CExe
-            . makeBuildInfoOpts packageBenchmarks CBench
-            . makeBuildInfoOpts packageTestSuites CTest
+              makeBuildInfoOpts (.packageLibrary) (const CLib)
+            . makeBuildInfoOpts (.packageSubLibraries) CSubLib
+            . makeBuildInfoOpts (.packageExecutables) CExe
+            . makeBuildInfoOpts (.packageBenchmarks) CBench
+            . makeBuildInfoOpts (.packageTestSuites) CTest
       pure $ aggregateAllBuildInfoOpts mempty
  where
   cabalDir = parent cabalfp
@@ -277,7 +276,7 @@ generateBuildInfoOpts bi =
   BuildInfoOpts
     { bioOpts =
            ghcOpts
-        ++ fmap ("-optP" <>) (Component.cppOptions bi.biBuildInfo)
+        ++ fmap ("-optP" <>) bi.biBuildInfo.cppOptions
     -- NOTE for future changes: Due to this use of nubOrd (and other uses
     -- downstream), these generated options must not rely on multiple
     -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
@@ -313,25 +312,25 @@ generateBuildInfoOpts bi =
   pkgs =
     bi.biAddPackages ++
     [ name
-    | Dependency name _ _ <- Component.targetBuildDepends bi.biBuildInfo
+    | Dependency name _ _ <- bi.biBuildInfo.targetBuildDepends
       -- TODO: Cabal 3.0 introduced multiple public libraries in a single
       -- dependency
     , name `notElem` bi.biOmitPackages
     ]
-  PerCompilerFlavor ghcOpts _ = Component.options bi.biBuildInfo
+  PerCompilerFlavor ghcOpts _ = bi.biBuildInfo.options
   extOpts =
-       map (("-X" ++) . display) (Component.allLanguages bi.biBuildInfo)
-    <> map (("-X" ++) . display) (Component.usedExtensions bi.biBuildInfo)
+       map (("-X" ++) . display) bi.biBuildInfo.allLanguages
+    <> map (("-X" ++) . display) bi.biBuildInfo.usedExtensions
   srcOpts =
     map (("-i" <>) . toFilePathNoTrailingSep)
       (concat
         [ [ componentBuildDir bi.biCabalVersion bi.biComponentName bi.biDistDir ]
         , [ bi.biCabalDir
-          | null (Component.hsSourceDirs bi.biBuildInfo)
+          | null bi.biBuildInfo.hsSourceDirs
           ]
         , mapMaybe
             (toIncludeDir . getSymbolicPath)
-            (Component.hsSourceDirs bi.biBuildInfo)
+            bi.biBuildInfo.hsSourceDirs
         , [ componentAutogen ]
         , maybeToList (packageAutogenDir bi.biCabalVersion bi.biDistDir)
         , [ componentOutputDir bi.biComponentName bi.biDistDir ]
@@ -345,22 +344,22 @@ generateBuildInfoOpts bi =
     map ("-I" <>) (bi.biConfigIncludeDirs <> pkgIncludeOpts)
   pkgIncludeOpts =
     [ toFilePathNoTrailingSep absDir
-    | dir <- Component.includeDirs bi.biBuildInfo
+    | dir <- bi.biBuildInfo.includeDirs
     , absDir <- handleDir dir
     ]
   libOpts =
-    map ("-l" <>) (Component.extraLibs bi.biBuildInfo) <>
+    map ("-l" <>) bi.biBuildInfo.extraLibs <>
     map ("-L" <>) (bi.biConfigLibDirs <> pkgLibDirs)
   pkgLibDirs =
     [ toFilePathNoTrailingSep absDir
-    | dir <- Component.extraLibDirs bi.biBuildInfo
+    | dir <- bi.biBuildInfo.extraLibDirs
     , absDir <- handleDir dir
     ]
   handleDir dir = case (parseAbsDir dir, parseRelDir dir) of
     (Just ab, _       ) -> [ab]
     (_      , Just rel) -> [bi.biCabalDir </> rel]
     (Nothing, Nothing ) -> []
-  fworks = map ("-framework=" <>) (Component.frameworks bi.biBuildInfo)
+  fworks = map ("-framework=" <>) bi.biBuildInfo.frameworks
 
 -- | Make the .o path from the .c file path for a component. Example:
 --
@@ -468,10 +467,10 @@ resolvePackageDescription
           benches
       }
  where
-  flags = M.union (packageConfigFlags packageConfig) (flagMap defaultFlags)
+  flags = M.union packageConfig.packageConfigFlags (flagMap defaultFlags)
   rc = mkResolveConditions
-         (packageConfigCompilerVersion packageConfig)
-         (packageConfigPlatform packageConfig)
+         packageConfig.packageConfigCompilerVersion
+         packageConfig.packageConfigPlatform
          flags
   updateLibDeps lib deps = lib
     { libBuildInfo = (libBuildInfo lib) {targetBuildDepends = deps} }
@@ -542,13 +541,13 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
         CAnd cx cy -> condSatisfied cx && condSatisfied cy
     varSatisfied v =
       case v of
-        OS os -> os == rcOS rc
-        Arch arch -> arch == rcArch rc
-        PackageFlag flag -> fromMaybe False $ M.lookup flag (rcFlags rc)
+        OS os -> os == rc.rcOS
+        Arch arch -> arch == rc.rcArch
+        PackageFlag flag -> fromMaybe False $ M.lookup flag rc.rcFlags
         -- NOTE:  ^^^^^ This should never happen, as all flags which are used
         -- must be declared. Defaulting to False.
         Impl flavor range ->
-          case (flavor, rcCompilerVersion rc) of
+          case (flavor, rc.rcCompilerVersion) of
             (GHC, ACGhc vghc) -> vghc `withinRange` range
             _ -> False
 
@@ -623,16 +622,15 @@ applyForceCustomBuild cabalVersion package
   | otherwise = package
  where
   cabalVersionRange =
-    orLaterVersion $ mkVersion $ cabalSpecToVersionDigits $
-      packageCabalSpec package
-  forceCustomBuild =
-       packageBuildType package == Simple
+    orLaterVersion $ mkVersion $ cabalSpecToVersionDigits
+      package.packageCabalSpec
+  forceCustomBuild = package.packageBuildType == Simple
     && not (cabalVersion `withinRange` cabalVersionRange)
 
 -- | Check if the package has a main library that is buildable.
 hasBuildableMainLibrary :: Package -> Bool
 hasBuildableMainLibrary package =
-  maybe False isComponentBuildable $ packageLibrary package
+  maybe False isComponentBuildable package.packageLibrary
 
 -- | Check if the main library has any exposed modules.
 --
@@ -641,7 +639,7 @@ hasBuildableMainLibrary package =
 -- (for instance).
 mainLibraryHasExposedModules :: Package -> Bool
 mainLibraryHasExposedModules package =
-  maybe False (not . null . Component.exposedModules) $ packageLibrary package
+  maybe False (not . null . (.exposedModules)) package.packageLibrary
 
 -- | Aggregate all unknown tools from all components. Mostly meant for
 -- build tools specified in the legacy manner (build-tools:) that failed the
@@ -650,33 +648,33 @@ mainLibraryHasExposedModules package =
 packageUnknownTools :: Package -> Set Text
 packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
  where
-  lib setT = case packageLibrary pkg of
+  lib setT = case pkg.packageLibrary of
     Just libV -> addUnknownTools libV setT
     Nothing -> setT
-  bench = gatherUnknownTools $ packageBenchmarks pkg
-  tests = gatherUnknownTools $ packageTestSuites pkg
-  flib = gatherUnknownTools $ packageForeignLibraries pkg
-  sublib = gatherUnknownTools $ packageSubLibraries pkg
-  exe = gatherUnknownTools $ packageExecutables pkg
+  bench = gatherUnknownTools pkg.packageBenchmarks
+  tests = gatherUnknownTools pkg.packageTestSuites
+  flib = gatherUnknownTools pkg.packageForeignLibraries
+  sublib = gatherUnknownTools pkg.packageSubLibraries
+  exe = gatherUnknownTools pkg.packageExecutables
   addUnknownTools :: HasBuildInfo x => x -> Set Text -> Set Text
-  addUnknownTools = (<>) . Component.sbiUnknownTools . getField @"buildInfo"
+  addUnknownTools = (<>) . (.buildInfo.sbiUnknownTools)
   gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
   gatherUnknownTools = foldr' addUnknownTools mempty
 
 buildableForeignLibs :: Package -> Set Text
-buildableForeignLibs pkg = getBuildableSetText (packageForeignLibraries pkg)
+buildableForeignLibs pkg = getBuildableSetText pkg.packageForeignLibraries
 
 buildableSubLibs :: Package -> Set Text
-buildableSubLibs pkg = getBuildableSetText (packageSubLibraries pkg)
+buildableSubLibs pkg = getBuildableSetText pkg.packageSubLibraries
 
 buildableExes :: Package -> Set Text
-buildableExes pkg = getBuildableSetText (packageExecutables pkg)
+buildableExes pkg = getBuildableSetText pkg.packageExecutables
 
 buildableTestSuites :: Package -> Set Text
-buildableTestSuites pkg = getBuildableSetText (packageTestSuites pkg)
+buildableTestSuites pkg = getBuildableSetText pkg.packageTestSuites
 
 buildableBenchmarks :: Package -> Set Text
-buildableBenchmarks pkg = getBuildableSetText (packageBenchmarks pkg)
+buildableBenchmarks pkg = getBuildableSetText pkg.packageBenchmarks
 
 -- | Apply a generic processing function in a Monad over all of the Package's
 -- components.
@@ -698,19 +696,19 @@ processPackageComponent pkg componentFn = do
         foldComponentToAnotherCollection
           (target pkg)
           componentFn
-      processMainLib = maybe id componentFn (packageLibrary pkg)
+      processMainLib = maybe id componentFn pkg.packageLibrary
       processAllComp =
-        ( if packageBenchmarkEnabled pkg
-            then componentKindProcessor packageBenchmarks
+        ( if pkg.packageBenchmarkEnabled
+            then componentKindProcessor (.packageBenchmarks)
             else id
         )
-        . ( if packageTestEnabled pkg
-              then componentKindProcessor packageTestSuites
+        . ( if pkg.packageTestEnabled
+              then componentKindProcessor (.packageTestSuites)
               else id
           )
-        . componentKindProcessor packageForeignLibraries
-        . componentKindProcessor packageExecutables
-        . componentKindProcessor packageSubLibraries
+        . componentKindProcessor (.packageForeignLibraries)
+        . componentKindProcessor (.packageExecutables)
+        . componentKindProcessor (.packageSubLibraries)
         . processMainLib
   processAllComp
 
@@ -723,7 +721,7 @@ processPackageMapDeps ::
   -> m a
   -> m a
 processPackageMapDeps pkg fn = do
-  let packageSetupDepsProcessor resAction = case packageSetupDeps pkg of
+  let packageSetupDepsProcessor resAction = case pkg.packageSetupDeps of
         Nothing -> resAction
         Just v -> fn v resAction
       processAllComp = processPackageComponent pkg (fn . componentDependencyMap)
@@ -743,11 +741,11 @@ processPackageDeps pkg combineResults fn = do
   let asPackageNameSet accessor =
         S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
       (!subLibNames, !foreignLibNames) =
-        ( asPackageNameSet packageSubLibraries
-        , asPackageNameSet packageForeignLibraries
+        ( asPackageNameSet (.packageSubLibraries)
+        , asPackageNameSet (.packageForeignLibraries)
         )
       shouldIgnoreDep (packageNameV :: PackageName)
-        | packageNameV == packageName pkg = True
+        | packageNameV == pkg.packageName = True
         | packageNameV `S.member` subLibNames = True
         | packageNameV `S.member` foreignLibNames = True
         | otherwise = False
@@ -813,7 +811,7 @@ topSortPackageComponent package target includeDirectTarget = runST $ do
       -> ST s (Seq NamedComponent)
     processComponent finallyAddComponent alreadyProcessedRef component res = do
       let depMap = componentDependencyMap component
-          internalDep = M.lookup (packageName package) depMap
+          internalDep = M.lookup package.packageName depMap
           processSubDep = processOneDep alreadyProcessedRef internalDep res
           qualName = component.qualifiedName
           processSubDepSaveName
@@ -831,10 +829,10 @@ topSortPackageComponent package target includeDirectTarget = runST $ do
                    >> processSubDepSaveName
         else processSubDepSaveName
     lookupLibName isMain name = if isMain
-      then packageLibrary package
-      else collectionLookup name $ packageSubLibraries package
+      then package.packageLibrary
+      else collectionLookup name package.packageSubLibraries
     processOneDep alreadyProcessed mDependency res =
-      case dvType <$> mDependency of
+      case (.dvType) <$> mDependency of
         Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
           let processMainLibDep =
                 case (mainLibDep, lookupLibName True mempty) of
@@ -842,7 +840,7 @@ topSortPackageComponent package target includeDirectTarget = runST $ do
                     processComponent True alreadyProcessed mainLib
                   _ -> id
               processSingleSubLib name =
-                case lookupLibName False (unqualCompToText name) of
+                case lookupLibName False name.unqualCompToText of
                   Just lib -> processComponent True alreadyProcessed lib
                   Nothing -> id
               processSubLibDep r = foldr' processSingleSubLib r subLibDeps

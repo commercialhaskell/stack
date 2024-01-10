@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | Resolving a build plan for a set of packages in a given Stackage snapshot.
@@ -354,7 +355,7 @@ compareBuildPlanCheck
     -- Note: order of comparison flipped, since it's better to have fewer errors.
     compare (Map.size e2) (Map.size e1)
 compareBuildPlanCheck (BuildPlanCheckFail _ e1 _) (BuildPlanCheckFail _ e2 _) =
-  let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap deNeededBy e))
+  let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap (.deNeededBy) e))
   in  compare (numUserPkgs e2) (numUserPkgs e1)
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckOk{}      = EQ
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckPartial{} = GT
@@ -379,16 +380,16 @@ checkSnapBuildPlan ::
 checkSnapBuildPlan pkgDirs flags snapCandidate = do
   platform <- view platformL
   sma <- snapCandidate pkgDirs
-  gpds <- liftIO $ forM (Map.elems $ smaProject sma) (cpGPD . ppCommon)
+  gpds <- liftIO $ forM (Map.elems sma.smaProject) (.ppCommon.cpGPD)
 
-  let compiler = smaCompiler sma
+  let compiler = sma.smaCompiler
       globalVersion (GlobalPackageVersion v) = v
       depVersion dep
-        | PLImmutable loc <- dpLocation dep = Just $ packageLocationVersion loc
+        | PLImmutable loc <- dep.dpLocation = Just $ packageLocationVersion loc
         | otherwise = Nothing
       snapPkgs = Map.union
-        (Map.mapMaybe depVersion $ smaDeps sma)
-        (Map.map globalVersion $ smaGlobal sma)
+        (Map.mapMaybe depVersion sma.smaDeps)
+        (Map.map globalVersion sma.smaGlobal)
       (f, errs) = checkBundleBuildPlan platform compiler snapPkgs flags gpds
       cerrs = compilerErrors compiler errs
 
@@ -501,7 +502,7 @@ showCompilerErrors flags errs compiler =
   T.concat
     [ compilerVersionText compiler
     , " cannot be used for these packages:\n"
-    , showMapPackages $ Map.unions (Map.elems (fmap deNeededBy errs))
+    , showMapPackages $ Map.unions (Map.elems (fmap (.deNeededBy) errs))
     , showDepErrors flags errs -- TODO only in debug mode
     ]
 
@@ -539,5 +540,5 @@ showDepErrors flags errs =
     ]
 
   flagVals = T.concat (map showFlags userPkgs)
-  userPkgs = Map.keys $ Map.unions (Map.elems (fmap deNeededBy errs))
+  userPkgs = Map.keys $ Map.unions (Map.elems (fmap (.deNeededBy) errs))
   showFlags pkg = maybe "" (showPackageFlags pkg) (Map.lookup pkg flags)

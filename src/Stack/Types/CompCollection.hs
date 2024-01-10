@@ -51,8 +51,8 @@ data CompCollection component = CompCollection
 
 instance Semigroup (CompCollection component) where
   a <> b = CompCollection
-    { buildableOnes = buildableOnes a <> buildableOnes b
-    , unbuildableOnes = unbuildableOnes a <> unbuildableOnes b
+    { buildableOnes = a.buildableOnes <> b.buildableOnes
+    , unbuildableOnes = a.unbuildableOnes <> b.unbuildableOnes
     }
 
 instance Monoid (CompCollection component) where
@@ -62,9 +62,9 @@ instance Monoid (CompCollection component) where
     }
 
 instance Foldable CompCollection where
-  foldMap fn collection = foldMap fn (asNameMap $ buildableOnes collection)
-  foldr' fn c collection = HM.foldr' fn c (asNameMap $ buildableOnes collection)
-  null = HM.null . asNameMap . buildableOnes
+  foldMap fn collection = foldMap fn collection.buildableOnes.asNameMap
+  foldr' fn c collection = HM.foldr' fn c collection.buildableOnes.asNameMap
+  null = HM.null . (.buildableOnes.asNameMap)
 
 -- | A type representing a collection of components, including a cache of
 -- the components' names.
@@ -80,8 +80,8 @@ data InnerCollection component = InnerCollection
 
 instance Semigroup (InnerCollection component) where
   a <> b = InnerCollection
-    { asNameMap = asNameMap a <> asNameMap b
-    , asNameSet = asNameSet a <> asNameSet b
+    { asNameMap = a.asNameMap <> b.asNameMap
+    , asNameSet = a.asNameSet <> b.asNameSet
     }
 
 instance Monoid (InnerCollection component) where
@@ -102,8 +102,8 @@ addComponent ::
 addComponent componentV collection =
   let nameV = componentV.name
   in  collection
-        { asNameMap=HM.insert nameV componentV (asNameMap collection)
-        , asNameSet=Set.insert nameV (asNameSet collection)
+        { asNameMap=HM.insert nameV componentV collection.asNameMap
+        , asNameSet=Set.insert nameV collection.asNameSet
         }
 
 -- | For the given function and foldable data structure of components of type
@@ -123,27 +123,27 @@ foldAndMakeCollection mapFn = foldl' compIterator mempty
   compCreator existingCollection component
     | component.buildInfo.sbiBuildable = existingCollection
         { buildableOnes =
-            addComponent component (buildableOnes existingCollection)
+            addComponent component existingCollection.buildableOnes
         }
     | otherwise = existingCollection
         { unbuildableOnes =
-            Set.insert component.name (unbuildableOnes existingCollection)
+            Set.insert component.name existingCollection.unbuildableOnes
         }
 
 -- | Get the names of the buildable components in the given collection, as a
 -- 'Set' of 'StackUnqualCompName'.
 getBuildableSet :: CompCollection component -> Set StackUnqualCompName
-getBuildableSet = asNameSet . buildableOnes
+getBuildableSet = (.buildableOnes.asNameSet)
 
 -- | Get the names of the buildable components in the given collection, as a
 -- 'Set' of 'Text'.
 getBuildableSetText :: CompCollection component -> Set Text
-getBuildableSetText = Set.mapMonotonic unqualCompToText . getBuildableSet
+getBuildableSetText = Set.mapMonotonic (.unqualCompToText) . getBuildableSet
 
 -- | Get the names of the buildable components in the given collection, as a
 -- list of 'Text.
 getBuildableListText :: CompCollection component -> [Text]
-getBuildableListText = getBuildableListAs unqualCompToText
+getBuildableListText = getBuildableListAs (.unqualCompToText)
 
 -- | Apply the given function to the names of the buildable components in the
 -- given collection, yielding a list.
@@ -170,14 +170,14 @@ collectionLookup ::
      -- ^ Collection of components.
   -> Maybe component
 collectionLookup needle haystack =
-  HM.lookup (StackUnqualCompName needle) (asNameMap $ buildableOnes haystack)
+  HM.lookup (StackUnqualCompName needle) haystack.buildableOnes.asNameMap
 
 -- | For a given collection of components, yields a list of pairs for buildable
 -- components of the name of the component and the component.
 collectionKeyValueList :: CompCollection component -> [(Text, component)]
 collectionKeyValueList haystack =
       (\(StackUnqualCompName k, !v) -> (k, v))
-  <$> HM.toList (asNameMap $ buildableOnes haystack)
+  <$> HM.toList haystack.buildableOnes.asNameMap
 
 -- | Yields 'True' if, and only if, the given collection of components includes
 -- a buildable component with the given name.
@@ -202,4 +202,4 @@ foldComponentToAnotherCollection ::
      -- ^ Starting value.
   -> m a
 foldComponentToAnotherCollection collection fn initialValue =
-  HM.foldr' fn initialValue (asNameMap $ buildableOnes collection)
+  HM.foldr' fn initialValue collection.buildableOnes.asNameMap

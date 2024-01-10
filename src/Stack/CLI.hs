@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.CLI
   ( commandLineHandler
@@ -456,7 +457,7 @@ commandLineHandler currentDir progName isInterpreter =
     ( \so gom ->
         gom
           { globalMonoidResolverRoot =
-              First $ Just $ takeDirectory $ soFile so
+              First $ Just $ takeDirectory so.soFile
           }
     )
     (globalOpts OtherCmdGlobalOpts)

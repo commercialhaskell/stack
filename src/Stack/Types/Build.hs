@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Build-specific types.
 
@@ -122,7 +123,7 @@ instance PersistFieldSql CachePkgSrc where
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
 toCachePkgSrc (PSFilePath lp) =
-  CacheSrcLocal (toFilePath (parent (lpCabalFile lp)))
+  CacheSrcLocal (toFilePath (parent lp.lpCabalFile))
 toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 -- | A type representing tasks to perform when building.
@@ -174,18 +175,18 @@ data TaskType
 -- | Were any of the dependencies missing?
 
 taskAnyMissing :: Task -> Bool
-taskAnyMissing task = not $ Set.null $ tcoMissing $ taskConfigOpts task
+taskAnyMissing task = not $ Set.null task.taskConfigOpts.tcoMissing
 
 -- | A function to yield the package name and version of a given 'TaskType'
 -- value.
 taskTypePackageIdentifier :: TaskType -> PackageIdentifier
-taskTypePackageIdentifier (TTLocalMutable lp) = packageIdentifier $ lpPackage lp
+taskTypePackageIdentifier (TTLocalMutable lp) = packageIdentifier lp.lpPackage
 taskTypePackageIdentifier (TTRemotePackage _ p _) = packageIdentifier p
 
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
-  case taskType t of
-    TTLocalMutable lp -> lpWanted lp
+  case t.taskType of
+    TTLocalMutable lp -> lp.lpWanted
     _ -> False
 
 -- | A function to yield the relevant database (write-only or mutable) of a
@@ -198,16 +199,16 @@ taskTypeLocation (TTRemotePackage Immutable _ _) = Snap
 -- | A function to yield the relevant database (write-only or mutable) of the
 -- given task.
 taskLocation :: Task -> InstallLocation
-taskLocation = taskTypeLocation . taskType
+taskLocation = taskTypeLocation . (.taskType)
 
 -- | A function to yield the package name and version to be built by the given
 -- task.
 taskProvides :: Task -> PackageIdentifier
-taskProvides = taskTypePackageIdentifier . taskType
+taskProvides = taskTypePackageIdentifier . (.taskType)
 
 taskTargetIsMutable :: Task -> IsMutable
 taskTargetIsMutable task =
-  case taskType task of
+  case task.taskType of
     TTLocalMutable _ -> Mutable
     TTRemotePackage mutable _ _ -> mutable
 

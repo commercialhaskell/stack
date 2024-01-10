@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.Dependency
   ( DepValue (..)
@@ -43,8 +44,8 @@ data DepLibrary = DepLibrary
   deriving (Eq, Show)
 
 getDepSublib :: DepValue -> Maybe (Set StackUnqualCompName)
-getDepSublib val = case dvType val of
-  AsLibrary libVal -> Just $ dlSublib libVal
+getDepSublib val = case val.dvType of
+  AsLibrary libVal -> Just libVal.dlSublib
   _ -> Nothing
 
 defaultDepLibrary :: DepLibrary

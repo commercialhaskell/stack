@@ -98,7 +98,7 @@ getCmdArgs ::
 getCmdArgs docker imageInfo isRemoteDocker = do
     config <- view configL
     deUser <-
-        if fromMaybe (not isRemoteDocker) (dockerSetUser docker)
+        if fromMaybe (not isRemoteDocker) docker.dockerSetUser
             then liftIO $ do
               duUid <- User.getEffectiveUserID
               duGid <- User.getEffectiveGroupID
@@ -121,9 +121,9 @@ getCmdArgs docker imageInfo isRemoteDocker = do
              ] ++
           )
           (liftIO getArgs)
-    case dockerStackExe (configDocker config) of
+    case config.configDocker.dockerStackExe of
         Just DockerStackExeHost
-          | configPlatform config == dockerContainerPlatform -> do
+          | config.configPlatform == dockerContainerPlatform -> do
               exePath <- resolveFile' =<< liftIO getExecutablePath
               cmdArgs args exePath
           | otherwise -> throwIO UnsupportedStackExeHostPlatformException
@@ -133,13 +133,13 @@ getCmdArgs docker imageInfo isRemoteDocker = do
         Just (DockerStackExePath path) -> cmdArgs args path
         Just DockerStackExeDownload -> exeDownload args
         Nothing
-          | configPlatform config == dockerContainerPlatform -> do
-              (exePath,exeTimestamp,misCompatible) <-
+          | config.configPlatform == dockerContainerPlatform -> do
+              (exePath, exeTimestamp, misCompatible) <-
                   do exePath <- resolveFile' =<< liftIO getExecutablePath
                      exeTimestamp <- getModificationTime exePath
                      isKnown <-
                          loadDockerImageExeCache
-                             (iiId imageInfo)
+                             imageInfo.iiId
                              exePath
                              exeTimestamp
                      pure (exePath, exeTimestamp, isKnown)
@@ -154,7 +154,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
                               [ "run"
                               , "-v"
                               , toFilePath exePath ++ ":" ++ "/tmp/stack"
-                              , T.unpack (iiId imageInfo)
+                              , T.unpack imageInfo.iiId
                               , "/tmp/stack"
                               , "--version"]
                               sinkNull
@@ -164,7 +164,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
                                   Left ExitCodeException{} -> False
                                   Right _ -> True
                       saveDockerImageExeCache
-                          (iiId imageInfo)
+                          imageInfo.iiId
                           exePath
                           exeTimestamp
                           compatible
@@ -199,7 +199,7 @@ preventInContainer inner =
 runContainerAndExit :: HasConfig env => RIO env void
 runContainerAndExit = do
   config <- view configL
-  let docker = configDocker config
+  let docker = config.configDocker
   checkDockerVersion docker
   (env, isStdinTerminal, isStderrTerminal, homeDir) <- liftIO $
     (,,,)
@@ -216,7 +216,7 @@ runContainerAndExit = do
       muserEnv = lookup "USER" env
       isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
   mstackYaml <- for (lookup "STACK_YAML" env) RIO.Directory.makeAbsolute
-  image <- either throwIO pure (dockerImage docker)
+  image <- either throwIO pure docker.dockerImage
   when
     ( isRemoteDocker && maybe False (isInfixOf "boot2docker") dockerCertPath )
     ( prettyWarnS
@@ -226,7 +226,7 @@ runContainerAndExit = do
   imageInfo <- case maybeImageInfo of
     Just ii -> pure ii
     Nothing
-      | dockerAutoPull docker -> do
+      | docker.dockerAutoPull -> do
           pullImage docker image
           mii2 <- inspect image
           case mii2 of
@@ -240,11 +240,11 @@ runContainerAndExit = do
       platformVariant = show $ hashRepoName image
       stackRoot = view stackRootL config
       sandboxHomeDir = sandboxDir </> homeDirName
-      isTerm = not (dockerDetach docker) &&
+      isTerm = not docker.dockerDetach &&
                isStdinTerminal &&
                isStdoutTerminal &&
                isStderrTerminal
-      keepStdinOpen = not (dockerDetach docker) &&
+      keepStdinOpen = not docker.dockerDetach &&
                       -- Workaround for https://github.com/docker/docker/issues/12319
                       -- This is fixed in Docker 1.9.1, but will leave the workaround
                       -- in place for now, for users who haven't upgraded yet.
@@ -277,7 +277,7 @@ runContainerAndExit = do
       (Files.createSymbolicLink
         (toFilePathNoTrailingSep sshDir)
         (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir))))
-  let mountSuffix = maybe "" (":" ++) (dockerMountMode docker)
+  let mountSuffix = maybe "" (":" ++) docker.dockerMountMode
   containerID <- withWorkingDir (toFilePath projectRoot) $
     trim . decodeUtf8 <$> readDockerProcess
       ( concat
@@ -302,7 +302,7 @@ runContainerAndExit = do
               toFilePathNoTrailingSep sandboxHomeDir ++ mountSuffix
           , "-w", toFilePathNoTrailingSep pwd
           ]
-        , case dockerNetwork docker of
+        , case docker.dockerNetwork of
             Nothing -> ["--net=host"]
             Just name -> ["--net=" ++ name]
         , case muserEnv of
@@ -328,14 +328,14 @@ runContainerAndExit = do
              )
           ]
         , concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
-        , concatMap (mountArg mountSuffix) (extraMount ++ dockerMount docker)
-        , concatMap (\nv -> ["-e", nv]) (dockerEnv docker)
-        , case dockerContainerName docker of
+        , concatMap (mountArg mountSuffix) (extraMount ++ docker.dockerMount)
+        , concatMap (\nv -> ["-e", nv]) docker.dockerEnv
+        , case docker.dockerContainerName of
             Just name -> ["--name=" ++ name]
             Nothing -> []
         , ["-t" | isTerm]
         , ["-i" | keepStdinOpen]
-        , dockerRunArgs docker
+        , docker.dockerRunArgs
         , [image]
         , [cmnd]
         , args
@@ -386,7 +386,7 @@ inspects images = do
       -- containing invalid UTF-8
       case eitherDecode (LBS.pack (filter isAscii (decodeUtf8 inspectOut))) of
         Left msg -> throwIO (InvalidInspectOutputException msg)
-        Right results -> pure (Map.fromList (map (\r -> (iiId r,r)) results))
+        Right results -> pure (Map.fromList (map (\r -> (r.iiId, r)) results))
     Left ece
       | any (`LBS.isPrefixOf` eceStderr ece) missingImagePrefixes ->
           pure Map.empty
@@ -398,9 +398,9 @@ inspects images = do
 pull :: HasConfig env => RIO env ()
 pull = do
   config <- view configL
-  let docker = configDocker config
+  let docker = config.configDocker
   checkDockerVersion docker
-  either throwIO (pullImage docker) (dockerImage docker)
+  either throwIO (pullImage docker) docker.dockerImage
 
 -- | Pull Docker image from registry.
 pullImage :: (HasProcessContext env, HasTerm env)
@@ -412,14 +412,14 @@ pullImage docker image = do
     [ flow "Pulling image from registry:"
     , style Current (fromString image) <> "."
     ]
-  when (dockerRegistryLogin docker) $ do
+  when docker.dockerRegistryLogin $ do
     prettyInfoS "You may need to log in."
     proc
       "docker"
       ( concat
           [ ["login"]
-          , maybe [] (\n -> ["--username=" ++ n]) (dockerRegistryUsername docker)
-          , maybe [] (\p -> ["--password=" ++ p]) (dockerRegistryPassword docker)
+          , maybe [] (\n -> ["--username=" ++ n]) docker.dockerRegistryUsername
+          , maybe [] (\p -> ["--password=" ++ p]) docker.dockerRegistryPassword
           , [takeWhile (/= '/') image]
           ]
       )
@@ -454,8 +454,8 @@ checkDockerVersion docker = do
             throwIO (DockerTooOldException minimumDockerVersion v')
           | v' `elem` prohibitedDockerVersions ->
             throwIO (DockerVersionProhibitedException prohibitedDockerVersions v')
-          | not (v' `withinRange` dockerRequireDockerVersion docker) ->
-            throwIO (BadDockerVersionException (dockerRequireDockerVersion docker) v')
+          | not (v' `withinRange` docker.dockerRequireDockerVersion) ->
+            throwIO (BadDockerVersionException docker.dockerRequireDockerVersion v')
           | otherwise ->
             pure ()
         _ -> throwIO InvalidVersionOutputException

@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Types.ConfigMonoid
   ( ConfigMonoid (..)
@@ -241,7 +242,7 @@ parseConfigMonoidObject rootDir obj = do
     FirstFalse <$> obj ..:? configMonoidSkipGHCCheckName
   configMonoidSkipMsys <- FirstFalse <$> obj ..:? configMonoidSkipMsysName
   configMonoidRequireStackVersion <-
-    IntersectingVersionRange . unVersionRangeJSON <$>
+    IntersectingVersionRange . (.unVersionRangeJSON) <$>
       ( obj ..:? configMonoidRequireStackVersionName
           ..!= VersionRangeJSON anyVersion
       )
@@ -275,8 +276,8 @@ parseConfigMonoidObject rootDir obj = do
   configMonoidCompilerRepository <-
     First <$> (obj ..:? configMonoidCompilerRepositoryName)
 
-  options <-
-    Map.map unGhcOptions <$> obj ..:? configMonoidGhcOptionsName ..!= mempty
+  options <- Map.map (.unGhcOptions) <$>
+    obj ..:? configMonoidGhcOptionsName ..!= (mempty :: Map GhcOptionKey GhcOptions)
 
   optionsEverything <-
     case (Map.lookup GOKOldEverything options, Map.lookup GOKEverything options) of

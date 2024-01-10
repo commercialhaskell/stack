@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE OverloadedLists     #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | Make changes to project or global configuration.
@@ -89,7 +90,7 @@ cfgCmdSet cmd = do
   configFilePath <-
     case configCmdSetScope cmd of
       CommandScopeProject -> do
-        mstackYamlOption <- view $ globalOptsL.to globalStackYaml
+        mstackYamlOption <- view $ globalOptsL . to (.globalStackYaml)
         mstackYaml <- getProjectConfig mstackYamlOption
         case mstackYaml of
           PCProject stackYaml -> pure stackYaml
@@ -97,7 +98,7 @@ cfgCmdSet cmd = do
             fmap (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
           PCNoProject _extraDeps -> throwIO NoProjectConfigAvailable
           -- maybe modify the ~/.stack/config.yaml file instead?
-      CommandScopeGlobal -> pure (configUserConfigPath conf)
+      CommandScopeGlobal -> pure conf.configUserConfigPath
   rawConfig <- liftIO (readFileUtf8 (toFilePath configFilePath))
   config <- either throwM pure (Yaml.decodeEither' $ encodeUtf8 rawConfig)
   newValue <- cfgCmdSetValue (parent configFilePath) cmd
@@ -347,7 +348,7 @@ data EnvVarAction = EVASet !Text | EVAUnset
 cfgCmdEnv :: EnvSettings -> RIO EnvConfig ()
 cfgCmdEnv es = do
   origEnv <- liftIO $ Map.fromList . map (first fromString) <$> getEnvironment
-  mkPC <- view $ configL.to configProcessContextSettings
+  mkPC <- view $ configL . to (.configProcessContextSettings)
   pc <- liftIO $ mkPC es
   let newEnv = pc ^. envVarsL
       actions = Map.merge

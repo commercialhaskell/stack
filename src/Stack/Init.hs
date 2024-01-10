@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 -- | Types and functions related to Stack's @init@ command.
 module Stack.Init
@@ -204,7 +205,7 @@ initCmd initOpts = do
   pwd <- getCurrentDir
   go <- view globalOptsL
   withGlobalProject $
-    withConfig YesReexec (initProject pwd initOpts (globalResolver go))
+    withConfig YesReexec (initProject pwd initOpts go.globalResolver)
 
 -- | Generate a @stack.yaml@ file.
 initProject ::
@@ -217,10 +218,10 @@ initProject currDir initOpts mresolver = do
   let dest = currDir </> stackDotYaml
   reldest <- toFilePath <$> makeRelativeToCurrentDir dest
   exists <- doesFileExist dest
-  when (not (forceOverwrite initOpts) && exists) $
+  when (not initOpts.forceOverwrite && exists) $
     prettyThrowIO $ ConfigFileAlreadyExists reldest
-  dirs <- mapM (resolveDir' . T.unpack) (searchDirs initOpts)
-  let find  = findCabalDirs (includeSubDirs initOpts)
+  dirs <- mapM (resolveDir' . T.unpack) initOpts.searchDirs
+  let find  = findCabalDirs initOpts.includeSubDirs
       dirs' = if null dirs then [currDir] else dirs
   prettyInfo $
        fillSep
@@ -512,7 +513,7 @@ getDefaultResolver initOpts mresolver pkgDirs = do
     snaps <- fmap getRecommendedSnapshots getSnapshots'
     (c, l, r) <- selectBestSnapshot (Map.elems pkgDirs) snaps
     case r of
-      BuildPlanCheckFail {} | not (omitPackages initOpts)
+      BuildPlanCheckFail {} | not initOpts.omitPackages
               -> prettyThrowM $ NoMatchingSnapshot snaps
       _ -> pure (c, l)
 
@@ -589,7 +590,7 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
   case result of
     BuildPlanCheckOk f -> pure $ Right (f, Map.empty)
     BuildPlanCheckPartial _f e -> do -- FIXME:qrilka unused f
-      if omitPackages initOpts
+      if initOpts.omitPackages
         then do
           warnPartial result
           prettyWarnS "Omitting packages with unsatisfied dependencies"
@@ -597,7 +598,7 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
         else
           prettyThrowM $ ResolverPartial snapshotLoc (show result)
     BuildPlanCheckFail _ e _
-      | omitPackages initOpts -> do
+      | initOpts.omitPackages -> do
           prettyWarn $
                fillSep
                  [ "Resolver compiler mismatch:"
@@ -618,7 +619,7 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
       <> line
       <> indent 4 (string $ show res)
 
-  failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap deNeededBy e))
+  failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap (.deNeededBy) e))
 
 getRecommendedSnapshots :: Snapshots -> NonEmpty SnapName
 getRecommendedSnapshots snapshots =
@@ -627,9 +628,9 @@ getRecommendedSnapshots snapshots =
     Just (mostRecent :| older) -> mostRecent :| (nightly : older)
     Nothing -> nightly :| []
  where
-  ltss = map (uncurry LTS) (IntMap.toDescList $ snapshotsLts snapshots)
+  ltss = map (uncurry LTS) (IntMap.toDescList snapshots.snapshotsLts )
   supportedLtss = filter (>= minSupportedLts) ltss
-  nightly = Nightly (snapshotsNightly snapshots)
+  nightly = Nightly snapshots.snapshotsNightly
 
 -- |Yields the minimum LTS supported by Stack.
 minSupportedLts :: SnapName

@@ -109,7 +109,7 @@ testOptsFromMonoid toMonoid madditional = defaultTestOpts
   , toDisableRun = fromFirstFalse toMonoid.toMonoidDisableRun
   , toMaximumTimeSeconds =
       fromFirst
-        (toMaximumTimeSeconds defaultTestOpts)
+        defaultTestOpts.toMaximumTimeSeconds
         toMonoid.toMonoidMaximumTimeSeconds
   , toAllowStdin = fromFirstTrue toMonoid.toMonoidAllowStdin
   }
@@ -124,6 +124,6 @@ benchmarkOptsFromMonoid beoMonoid madditional =
         fmap (\args -> unwords args <> " ") madditional <>
         getFirst beoMonoid.beoMonoidAdditionalArgs
     , beoDisableRun = fromFirst
-        (beoDisableRun defaultBenchmarkOpts)
+        defaultBenchmarkOpts.beoDisableRun
         beoMonoid.beoMonoidDisableRun
     }

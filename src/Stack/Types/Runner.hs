@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.Runner
   ( Runner (..)
@@ -32,25 +33,27 @@ data Runner = Runner
   }
 
 instance HasLogFunc Runner where
-  logFuncL = lens runnerLogFunc (\x y -> x { runnerLogFunc = y })
+  logFuncL = lens (.runnerLogFunc) (\x y -> x { runnerLogFunc = y })
 
 instance HasProcessContext Runner where
   processContextL =
-    lens runnerProcessContext (\x y -> x { runnerProcessContext = y })
+    lens (.runnerProcessContext) (\x y -> x { runnerProcessContext = y })
 
 instance HasRunner Runner where
   runnerL = id
 
 instance HasStylesUpdate Runner where
-  stylesUpdateL = globalOptsL.
-                  lens globalStylesUpdate (\x y -> x { globalStylesUpdate = y })
+  stylesUpdateL = globalOptsL . lens
+    (.globalStylesUpdate)
+    (\x y -> x { globalStylesUpdate = y })
 instance HasTerm Runner where
-  useColorL = lens runnerUseColor (\x y -> x { runnerUseColor = y })
-  termWidthL = lens runnerTermWidth (\x y -> x { runnerTermWidth = y })
+  useColorL = lens (.runnerUseColor) (\x y -> x { runnerUseColor = y })
+  termWidthL = lens (.runnerTermWidth) (\x y -> x { runnerTermWidth = y })
 
 instance HasDockerEntrypointMVar Runner where
-  dockerEntrypointMVarL =
-    lens runnerDockerEntrypointMVar (\x y -> x { runnerDockerEntrypointMVar = y })
+  dockerEntrypointMVarL = lens
+    (.runnerDockerEntrypointMVar)
+    (\x y -> x { runnerDockerEntrypointMVar = y })
 
 -- | Class for environment values which have a 'Runner'.
 class (HasProcessContext env, HasLogFunc env) => HasRunner env where
@@ -62,21 +65,25 @@ class HasRunner env => HasDockerEntrypointMVar env where
 
 stackYamlLocL :: HasRunner env => Lens' env StackYamlLoc
 stackYamlLocL =
-  globalOptsL.lens globalStackYaml (\x y -> x { globalStackYaml = y })
+  globalOptsL . lens (.globalStackYaml) (\x y -> x { globalStackYaml = y })
 
 lockFileBehaviorL :: HasRunner env => SimpleGetter env LockFileBehavior
-lockFileBehaviorL = globalOptsL.to globalLockFileBehavior
+lockFileBehaviorL = globalOptsL . to (.globalLockFileBehavior)
 
 globalOptsL :: HasRunner env => Lens' env GlobalOpts
-globalOptsL = runnerL.lens runnerGlobalOpts (\x y -> x { runnerGlobalOpts = y })
+globalOptsL = runnerL . lens
+  (.runnerGlobalOpts)
+  (\x y -> x { runnerGlobalOpts = y })
 
 -- | See 'globalTerminal'
 terminalL :: HasRunner env => Lens' env Bool
-terminalL = globalOptsL.lens globalTerminal (\x y -> x { globalTerminal = y })
+terminalL = globalOptsL . lens
+  (.globalTerminal)
+  (\x y -> x { globalTerminal = y })
 
 -- | See 'globalReExecVersion'
 reExecL :: HasRunner env => SimpleGetter env Bool
-reExecL = globalOptsL.to (isJust . globalReExecVersion)
+reExecL = globalOptsL . to (isJust . (.globalReExecVersion))
 
 rslInLogL :: HasRunner env => SimpleGetter env Bool
-rslInLogL = globalOptsL.to globalRSLInLog
+rslInLogL = globalOptsL . to (.globalRSLInLog)

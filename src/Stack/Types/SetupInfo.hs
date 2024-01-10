@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 
 module Stack.Types.SetupInfo
@@ -49,19 +50,20 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
 instance Semigroup SetupInfo where
   l <> r =
     SetupInfo
-    { siSevenzExe = siSevenzExe l <|> siSevenzExe r
-    , siSevenzDll = siSevenzDll l <|> siSevenzDll r
-    , siMsys2 = siMsys2 l <> siMsys2 r
-    , siGHCs = Map.unionWith (<>) (siGHCs l) (siGHCs r)
-    , siStack = Map.unionWith (<>) (siStack l) (siStack r) }
+      { siSevenzExe = l.siSevenzExe <|> r.siSevenzExe
+      , siSevenzDll = l.siSevenzDll <|> r.siSevenzDll
+      , siMsys2 = l.siMsys2 <> r.siMsys2
+      , siGHCs = Map.unionWith (<>) l.siGHCs r.siGHCs
+      , siStack = Map.unionWith (<>) l.siStack r.siStack
+      }
 
 instance Monoid SetupInfo where
   mempty =
     SetupInfo
-    { siSevenzExe = Nothing
-    , siSevenzDll = Nothing
-    , siMsys2 = Map.empty
-    , siGHCs = Map.empty
-    , siStack = Map.empty
-    }
+      { siSevenzExe = Nothing
+      , siSevenzDll = Nothing
+      , siMsys2 = Map.empty
+      , siGHCs = Map.empty
+      , siStack = Map.empty
+      }
   mappend = (<>)

@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- | A sourcemap maps a package name to how it should be built, including source
 -- code, flags, options, etc. This module contains various stages of source map
@@ -169,11 +170,11 @@ smRelDir :: (MonadThrow m) => SourceMapHash -> m (Path Rel Dir)
 smRelDir (SourceMapHash smh) = parseRelDir $ T.unpack $ SHA256.toHexText smh
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
-ppGPD = liftIO . cpGPD . ppCommon
+ppGPD = liftIO . (.ppCommon.cpGPD)
 
 -- | Root directory for the given 'ProjectPackage'
 ppRoot :: ProjectPackage -> Path Abs Dir
-ppRoot = parent . ppCabalFP
+ppRoot = parent . (.ppCabalFP)
 
 -- | All components available in the given 'ProjectPackage'
 ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
