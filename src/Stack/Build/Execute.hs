@@ -1113,13 +1113,13 @@ getConfigCache ee task installedMap enableTest enableBench = do
 ensureConfig :: HasEnvConfig env
              => ConfigCache -- ^ newConfigCache
              -> Path Abs Dir -- ^ package directory
-             -> ExecuteEnv
+             -> BuildOpts
              -> RIO env () -- ^ announce
              -> (ExcludeTHLoading -> [String] -> RIO env ()) -- ^ cabal
              -> Path Abs File -- ^ Cabal file
              -> Task
              -> RIO env Bool
-ensureConfig newConfigCache pkgDir ee announce cabal cabalfp task = do
+ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalfp task = do
   newCabalMod <-
     liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
   setupConfigfp <- setupConfigFromDir pkgDir
@@ -1135,7 +1135,7 @@ ensureConfig newConfigCache pkgDir ee announce cabal cabalfp task = do
   taskAnyMissingHackEnabled <-
     view $ actualCompilerVersionL . to getGhcVersion . to (< mkVersion [8, 4])
   needConfig <-
-    if    ee.eeBuildOpts.boptsReconfigure
+    if buildOpts.boptsReconfigure
           -- The reason 'taskAnyMissing' is necessary is a bug in Cabal. See:
           -- <https://github.com/haskell/cabal/issues/4728#issuecomment-337937673>.
           -- The problem is that Cabal may end up generating the same package ID
@@ -1889,7 +1889,7 @@ singleBuild
           ensureConfig
             cache
             pkgDir
-            ee
+            ee.eeBuildOpts
             ( announce
                 (  "configure"
                 <> display (annSuffix executableBuildStatuses)
