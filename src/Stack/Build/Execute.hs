@@ -134,6 +134,7 @@ import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build
                    ( ConfigCache (..), Plan (..), PrecompiledCache (..)
                    , Task (..), TaskConfigOpts (..), TaskType (..)
+                   , ExcludeTHLoading (..), ConvertPathsToAbsolute (..), KeepOutputOpen (..)
                    , configCacheComponents, taskAnyMissing, taskIsTarget
                    , taskLocation, taskProvides, taskTypeLocation
                    , taskTypePackageIdentifier
@@ -2558,21 +2559,6 @@ singleBench beopts benchesToRun ac ee task installedMap = do
       when toRun $ do
         announce "benchmarks"
         cabal CloseOnException KeepTHLoading ("bench" : args)
-
-data ExcludeTHLoading
-  = ExcludeTHLoading
-  | KeepTHLoading
-
-data ConvertPathsToAbsolute
-  = ConvertPathsToAbsolute
-  | KeepPathsAsIs
-
--- | special marker for expected failures in curator builds, using those we need
--- to keep log handle open as build continues further even after a failure
-data KeepOutputOpen
-  = KeepOpen
-  | CloseOnException
-  deriving Eq
 
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
 mungeBuildOutput ::

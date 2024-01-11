@@ -338,6 +338,8 @@ library
       System.Terminal
       Build_stack
       Paths_stack
+  other-modules:
+      Stack.Build.ExecuteComponent
   autogen-modules:
       Build_stack
       Paths_stack
