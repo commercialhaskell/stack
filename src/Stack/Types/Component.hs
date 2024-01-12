@@ -6,6 +6,7 @@
 {-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoFieldSelectors           #-}
 {-# LANGUAGE OverloadedRecordDot        #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 

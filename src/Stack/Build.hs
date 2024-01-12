@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Build the project.
 
@@ -355,13 +356,13 @@ loadPackage loc flags ghcOptions cabalConfigOpts = do
   compiler <- view actualCompilerVersionL
   platform <- view platformL
   let pkgConfig = PackageConfig
-        { packageConfigEnableTests = False
-        , packageConfigEnableBenchmarks = False
-        , packageConfigFlags = flags
-        , packageConfigGhcOptions = ghcOptions
-        , packageConfigCabalConfigOpts = cabalConfigOpts
-        , packageConfigCompilerVersion = compiler
-        , packageConfigPlatform = platform
+        { enableTests = False
+        , enableBenchmarks = False
+        , flags = flags
+        , ghcOptions = ghcOptions
+        , cabalConfigOpts = cabalConfigOpts
+        , compilerVersion = compiler
+        , platform = platform
         }
   resolvePackage pkgConfig <$> loadCabalFileImmutable loc
 

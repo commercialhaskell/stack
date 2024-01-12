@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- Load information on package sources
 module Stack.Build.Source
@@ -360,8 +361,8 @@ loadLocalPackage pp = do
         ]
 
       btconfig = config
-        { packageConfigEnableTests = not $ Set.null tests
-        , packageConfigEnableBenchmarks = not $ Set.null benches
+        { enableTests = not $ Set.null tests
+        , enableBenchmarks = not $ Set.null benches
         }
 
       -- We resolve the package in 2 different configurations:
@@ -531,11 +532,11 @@ getPackageConfig flags ghcOptions cabalConfigOpts = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL
   pure PackageConfig
-    { packageConfigEnableTests = False
-    , packageConfigEnableBenchmarks = False
-    , packageConfigFlags = flags
-    , packageConfigGhcOptions = ghcOptions
-    , packageConfigCabalConfigOpts = cabalConfigOpts
-    , packageConfigCompilerVersion = compilerVersion
-    , packageConfigPlatform = platform
+    { enableTests = False
+    , enableBenchmarks = False
+    , flags = flags
+    , ghcOptions = ghcOptions
+    , cabalConfigOpts = cabalConfigOpts
+    , compilerVersion = compilerVersion
+    , platform = platform
     }

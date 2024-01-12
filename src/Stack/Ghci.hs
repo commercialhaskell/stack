@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Types and functions related to Stack's @ghci@ and @repl@ commands.
 module Stack.Ghci
@@ -856,14 +857,14 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
       sourceMapFlags =
         maybe mempty (.ppCommon.cpFlags) $ M.lookup name sm.smProject
       config = PackageConfig
-        { packageConfigEnableTests = True
-        , packageConfigEnableBenchmarks = True
-        , packageConfigFlags =
+        { enableTests = True
+        , enableBenchmarks = True
+        , flags =
             getLocalFlags buildOptsCLI name `M.union` sourceMapFlags
-        , packageConfigGhcOptions = sourceMapGhcOptions
-        , packageConfigCabalConfigOpts = sourceMapCabalConfigOpts
-        , packageConfigCompilerVersion = compilerVersion
-        , packageConfigPlatform = view platformL econfig
+        , ghcOptions = sourceMapGhcOptions
+        , cabalConfigOpts = sourceMapCabalConfigOpts
+        , compilerVersion = compilerVersion
+        , platform = view platformL econfig
         }
   -- TODO we've already parsed this information, otherwise we
   -- wouldn't have figured out the cabalfp already. In the future:

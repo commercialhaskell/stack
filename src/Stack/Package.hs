@@ -51,6 +51,8 @@ import           Distribution.PackageDescription
                    , SetupBuildInfo (..), TestSuite (..), allLibraries
                    , buildType, depPkgName, depVerRange
                    )
+import           Distribution.PackageDescription as Executable
+                   ( Executable (..) )
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
 import           Distribution.System ( OS (..), Arch, Platform (..) )
 import           Distribution.Text ( display )
@@ -145,9 +147,9 @@ packageFromPackageDescription
       { name = name
       , version = pkgVersion pkgId
       , license = licenseRaw pkg
-      , ghcOptions =  packageConfig.packageConfigGhcOptions
-      , cabalConfigOpts =  packageConfig.packageConfigCabalConfigOpts
-      , flags = packageConfig.packageConfigFlags
+      , ghcOptions =  packageConfig.ghcOptions
+      , cabalConfigOpts =  packageConfig.cabalConfigOpts
+      , flags = packageConfig.flags
       , defaultFlags = M.fromList
           [(flagName flag, flagDefault flag) | flag <- pkgFlags]
       , library = stackLibraryFromCabal <$> library pkg
@@ -165,8 +167,8 @@ packageFromPackageDescription
       , setupDeps = fmap cabalSetupDepsToStackDep (setupBuildInfo pkg)
       , cabalSpec = specVersion pkg
       , file = stackPackageFileFromCabal pkg
-      , testEnabled =  packageConfig.packageConfigEnableTests
-      , benchmarkEnabled = packageConfig.packageConfigEnableBenchmarks
+      , testEnabled =  packageConfig.enableTests
+      , benchmarkEnabled = packageConfig.enableBenchmarks
       }
  where
   -- Gets all of the modules, files, build files, and data files that constitute
@@ -239,19 +241,19 @@ generatePkgDescOpts
       cabalVer <- view cabalVersionL
       distDir <- distDirFromDir cabalDir
       let generate namedComponent binfo = generateBuildInfoOpts BioInput
-            { biInstallMap = installMap
-            , biInstalledMap = installedMap
-            , biCabalDir = cabalDir
-            , biDistDir = distDir
-            , biOmitPackages = omitPkgs
-            , biAddPackages = addPkgs
-            , biBuildInfo = binfo
-            , biDotCabalPaths =
+            { installMap = installMap
+            , installedMap = installedMap
+            , cabalDir = cabalDir
+            , distDir = distDir
+            , omitPackages = omitPkgs
+            , addPackages = addPkgs
+            , buildInfo = binfo
+            , dotCabalPaths =
                 fromMaybe [] (M.lookup namedComponent componentPaths)
-            , biConfigLibDirs =  config.configExtraLibDirs
-            , biConfigIncludeDirs =  config.configExtraIncludeDirs
-            , biComponentName = namedComponent
-            , biCabalVersion = cabalVer
+            , configLibDirs =  config.configExtraLibDirs
+            , configIncludeDirs =  config.configExtraIncludeDirs
+            , componentName = namedComponent
+            , cabalVersion = cabalVer
             }
       let insertInMap name compVal = M.insert name (generate name compVal)
       let translatedInsertInMap constructor name =
@@ -277,7 +279,7 @@ generateBuildInfoOpts bi =
   BuildInfoOpts
     { bioOpts =
            ghcOpts
-        ++ fmap ("-optP" <>) bi.biBuildInfo.cppOptions
+        ++ fmap ("-optP" <>) bi.buildInfo.cppOptions
     -- NOTE for future changes: Due to this use of nubOrd (and other uses
     -- downstream), these generated options must not rely on multiple
     -- argument sequences.  For example, ["--main-is", "Foo.hs", "--main-
@@ -293,74 +295,74 @@ generateBuildInfoOpts bi =
  where
   cObjectFiles = mapMaybe
     ( fmap toFilePath
-    . makeObjectFilePathFromC bi.biCabalDir bi.biComponentName bi.biDistDir
+    . makeObjectFilePathFromC bi.cabalDir bi.componentName bi.distDir
     )
     cfiles
-  cfiles = mapMaybe dotCabalCFilePath bi.biDotCabalPaths
+  cfiles = mapMaybe dotCabalCFilePath bi.dotCabalPaths
   installVersion = snd
   -- Generates: -package=base -package=base16-bytestring-0.1.1.6 ...
   deps =
     concat
-      [ case M.lookup name bi.biInstalledMap of
+      [ case M.lookup name bi.installedMap of
           Just (_, Stack.Types.Installed.Library _ident installedInfo) ->
             installedToPackageIdOpt installedInfo
           _ -> ["-package=" <> packageNameString name <>
             maybe "" -- This empty case applies to e.g. base.
               ((("-" <>) . versionString) . installVersion)
-              (M.lookup name bi.biInstallMap)]
+              (M.lookup name bi.installMap)]
       | name <- pkgs
       ]
   pkgs =
-    bi.biAddPackages ++
+    bi.addPackages ++
     [ name
-    | Dependency name _ _ <- bi.biBuildInfo.targetBuildDepends
+    | Dependency name _ _ <- bi.buildInfo.targetBuildDepends
       -- TODO: Cabal 3.0 introduced multiple public libraries in a single
       -- dependency
-    , name `notElem` bi.biOmitPackages
+    , name `notElem` bi.omitPackages
     ]
-  PerCompilerFlavor ghcOpts _ = bi.biBuildInfo.options
+  PerCompilerFlavor ghcOpts _ = bi.buildInfo.options
   extOpts =
-       map (("-X" ++) . display) bi.biBuildInfo.allLanguages
-    <> map (("-X" ++) . display) bi.biBuildInfo.usedExtensions
+       map (("-X" ++) . display) bi.buildInfo.allLanguages
+    <> map (("-X" ++) . display) bi.buildInfo.usedExtensions
   srcOpts =
     map (("-i" <>) . toFilePathNoTrailingSep)
       (concat
-        [ [ componentBuildDir bi.biCabalVersion bi.biComponentName bi.biDistDir ]
-        , [ bi.biCabalDir
-          | null bi.biBuildInfo.hsSourceDirs
+        [ [ componentBuildDir bi.cabalVersion bi.componentName bi.distDir ]
+        , [ bi.cabalDir
+          | null bi.buildInfo.hsSourceDirs
           ]
         , mapMaybe
             (toIncludeDir . getSymbolicPath)
-            bi.biBuildInfo.hsSourceDirs
+            bi.buildInfo.hsSourceDirs
         , [ componentAutogen ]
-        , maybeToList (packageAutogenDir bi.biCabalVersion bi.biDistDir)
-        , [ componentOutputDir bi.biComponentName bi.biDistDir ]
+        , maybeToList (packageAutogenDir bi.cabalVersion bi.distDir)
+        , [ componentOutputDir bi.componentName bi.distDir ]
         ]) ++
-    [ "-stubdir=" ++ toFilePathNoTrailingSep (buildDir bi.biDistDir) ]
+    [ "-stubdir=" ++ toFilePathNoTrailingSep (buildDir bi.distDir) ]
   componentAutogen =
-    componentAutogenDir bi.biCabalVersion bi.biComponentName bi.biDistDir
-  toIncludeDir "." = Just bi.biCabalDir
-  toIncludeDir relDir = concatAndCollapseAbsDir bi.biCabalDir relDir
+    componentAutogenDir bi.cabalVersion bi.componentName bi.distDir
+  toIncludeDir "." = Just bi.cabalDir
+  toIncludeDir relDir = concatAndCollapseAbsDir bi.cabalDir relDir
   includeOpts =
-    map ("-I" <>) (bi.biConfigIncludeDirs <> pkgIncludeOpts)
+    map ("-I" <>) (bi.configIncludeDirs <> pkgIncludeOpts)
   pkgIncludeOpts =
     [ toFilePathNoTrailingSep absDir
-    | dir <- bi.biBuildInfo.includeDirs
+    | dir <- bi.buildInfo.includeDirs
     , absDir <- handleDir dir
     ]
   libOpts =
-    map ("-l" <>) bi.biBuildInfo.extraLibs <>
-    map ("-L" <>) (bi.biConfigLibDirs <> pkgLibDirs)
+    map ("-l" <>) bi.buildInfo.extraLibs <>
+    map ("-L" <>) (bi.configLibDirs <> pkgLibDirs)
   pkgLibDirs =
     [ toFilePathNoTrailingSep absDir
-    | dir <- bi.biBuildInfo.extraLibDirs
+    | dir <- bi.buildInfo.extraLibDirs
     , absDir <- handleDir dir
     ]
   handleDir dir = case (parseAbsDir dir, parseRelDir dir) of
     (Just ab, _       ) -> [ab]
-    (_      , Just rel) -> [bi.biCabalDir </> rel]
+    (_      , Just rel) -> [bi.cabalDir </> rel]
     (Nothing, Nothing ) -> []
-  fworks = map ("-framework=" <>) bi.biBuildInfo.frameworks
+  fworks = map ("-framework=" <>) bi.buildInfo.frameworks
 
 -- | Make the .o path from the .c file path for a component. Example:
 --
@@ -468,10 +470,10 @@ resolvePackageDescription
           benches
       }
  where
-  flags = M.union packageConfig.packageConfigFlags (flagMap defaultFlags)
+  flags = M.union packageConfig.flags (flagMap defaultFlags)
   rc = mkResolveConditions
-         packageConfig.packageConfigCompilerVersion
-         packageConfig.packageConfigPlatform
+         packageConfig.compilerVersion
+         packageConfig.platform
          flags
   updateLibDeps lib deps = lib
     { libBuildInfo = (libBuildInfo lib) {targetBuildDepends = deps} }
@@ -480,7 +482,7 @@ resolvePackageDescription
         (foreignLibBuildInfo lib) {targetBuildDepends = deps}
     }
   updateExeDeps exe deps = exe
-    { buildInfo = (buildInfo exe) {targetBuildDepends = deps} }
+    { Executable.buildInfo = (buildInfo exe) {targetBuildDepends = deps} }
   updateTestDeps test deps = test
     { testBuildInfo = (testBuildInfo test) {targetBuildDepends = deps} }
   updateBenchmarkDeps bench deps = bench

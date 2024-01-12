@@ -1,8 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE NoFieldSelectors    #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Stack.Types.Package
   ( BioInput (..)
@@ -227,19 +228,19 @@ data BuildInfoOpts = BuildInfoOpts
 
 -- | Package build configuration
 data PackageConfig = PackageConfig
-  { packageConfigEnableTests :: !Bool
+  { enableTests :: !Bool
     -- ^ Are tests enabled?
-  , packageConfigEnableBenchmarks :: !Bool
+  , enableBenchmarks :: !Bool
     -- ^ Are benchmarks enabled?
-  , packageConfigFlags :: !(Map FlagName Bool)
+  , flags :: !(Map FlagName Bool)
     -- ^ Configured flags.
-  , packageConfigGhcOptions :: ![Text]
+  , ghcOptions :: ![Text]
     -- ^ Configured ghc options.
-  , packageConfigCabalConfigOpts :: ![Text]
+  , cabalConfigOpts :: ![Text]
     -- ^ ./Setup.hs configure options
-  , packageConfigCompilerVersion :: ActualCompiler
+  , compilerVersion :: ActualCompiler
     -- ^ GHC version
-  , packageConfigPlatform :: !Platform
+  , platform :: !Platform
     -- ^ host platform
   }
  deriving (Show, Typeable)
@@ -435,16 +436,16 @@ toCabalMungedPackageName pkgName =
 
 -- | Type representing inputs to 'Stack.Package.generateBuildInfoOpts'.
 data BioInput = BioInput
-  { biInstallMap :: !InstallMap
-  , biInstalledMap :: !InstalledMap
-  , biCabalDir :: !(Path Abs Dir)
-  , biDistDir :: !(Path Abs Dir)
-  , biOmitPackages :: ![PackageName]
-  , biAddPackages :: ![PackageName]
-  , biBuildInfo :: !StackBuildInfo
-  , biDotCabalPaths :: ![DotCabalPath]
-  , biConfigLibDirs :: ![FilePath]
-  , biConfigIncludeDirs :: ![FilePath]
-  , biComponentName :: !NamedComponent
-  , biCabalVersion :: !Version
+  { installMap :: !InstallMap
+  , installedMap :: !InstalledMap
+  , cabalDir :: !(Path Abs Dir)
+  , distDir :: !(Path Abs Dir)
+  , omitPackages :: ![PackageName]
+  , addPackages :: ![PackageName]
+  , buildInfo :: !StackBuildInfo
+  , dotCabalPaths :: ![DotCabalPath]
+  , configLibDirs :: ![FilePath]
+  , configIncludeDirs :: ![FilePath]
+  , componentName :: !NamedComponent
+  , cabalVersion :: !Version
   }

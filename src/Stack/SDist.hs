@@ -1,7 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 -- Types and functions related to Stack's @sdist@ command.
 module Stack.SDist
@@ -690,11 +691,11 @@ getDefaultPackageConfig = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL
   pure PackageConfig
-    { packageConfigEnableTests = False
-    , packageConfigEnableBenchmarks = False
-    , packageConfigFlags = mempty
-    , packageConfigGhcOptions = []
-    , packageConfigCabalConfigOpts = []
-    , packageConfigCompilerVersion = compilerVersion
-    , packageConfigPlatform = platform
+    { enableTests = False
+    , enableBenchmarks = False
+    , flags = mempty
+    , ghcOptions = []
+    , cabalConfigOpts = []
+    , compilerVersion = compilerVersion
+    , platform = platform
     }
