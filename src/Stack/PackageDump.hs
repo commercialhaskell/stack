@@ -170,14 +170,14 @@ sinkMatching :: Monad m
              -> ConduitM DumpPackage o m (Map PackageName DumpPackage)
 sinkMatching allowed =
     Map.fromList
-  . map (pkgName . (.dpPackageIdent) &&& id)
+  . map (pkgName . (.packageIdent) &&& id)
   . Map.elems
   . pruneDeps
       id
-      (.dpGhcPkgId)
-      (.dpDepends)
+      (.ghcPkgId)
+      (.depends)
       const -- Could consider a better comparison in the future
-  <$> (CL.filter (isAllowed . (.dpPackageIdent)) .| CL.consume)
+  <$> (CL.filter (isAllowed . (.packageIdent)) .| CL.consume)
  where
   isAllowed (PackageIdentifier name version) =
     case Map.lookup name allowed of
@@ -250,26 +250,26 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
       haddockHtml <- parseQuoted "haddock-html"
 
       pure $ Just DumpPackage
-        { dpGhcPkgId = ghcPkgId
-        , dpPackageIdent = PackageIdentifier name version
-        , dpSublib = subLibDump
-        , dpLicense = license
-        , dpLibDirs = libDirPaths
-        , dpLibraries = T.words $ T.unwords libraries
-        , dpHasExposedModules = not (null libraries || null exposedModules)
+        { ghcPkgId = ghcPkgId
+        , packageIdent = PackageIdentifier name version
+        , sublib = subLibDump
+        , license = license
+        , libDirs = libDirPaths
+        , libraries = T.words $ T.unwords libraries
+        , hasExposedModules = not (null libraries || null exposedModules)
 
         -- Strip trailing commas from ghc package exposed-modules (looks buggy to me...).
         -- Then try to parse the module names.
-        , dpExposedModules =
+        , exposedModules =
               Set.fromList
             $ mapMaybe (C.simpleParse . T.unpack . T.dropSuffix ",")
             $ T.words
             $ T.unwords exposedModules
 
-        , dpDepends = depends
-        , dpHaddockInterfaces = haddockInterfaces
-        , dpHaddockHtml = listToMaybe haddockHtml
-        , dpIsExposed = exposed == ["True"]
+        , depends = depends
+        , haddockInterfaces = haddockInterfaces
+        , haddockHtml = listToMaybe haddockHtml
+        , isExposed = exposed == ["True"]
         }
 
 stripPrefixText :: Text -> Text -> Maybe Text

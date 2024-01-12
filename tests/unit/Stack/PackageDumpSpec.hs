@@ -92,19 +92,19 @@ spec = do
                 , "base-4.7.0.2-bfd89587617e381ae01b8dd7b6c7f1c1"
                 , "ghc-prim-0.3.1.0-a24f9c14c632d75b683d0f93283aea37"
                 ]
-            haskell2010 { dpExposedModules = mempty } `shouldBe` DumpPackage
-                { dpGhcPkgId = ghcPkgId
-                , dpPackageIdent = packageIdent
-                , dpSublib = Nothing
-                , dpLicense = Just BSD3
-                , dpLibDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
-                , dpDepends = depends
-                , dpLibraries = ["HShaskell2010-1.1.2.0"]
-                , dpHasExposedModules = True
-                , dpHaddockInterfaces = ["/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0/haskell2010.haddock"]
-                , dpHaddockHtml = Just "/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0"
-                , dpIsExposed = False
-                , dpExposedModules = mempty
+            haskell2010 { exposedModules = mempty } `shouldBe` DumpPackage
+                { ghcPkgId = ghcPkgId
+                , packageIdent = packageIdent
+                , sublib = Nothing
+                , license = Just BSD3
+                , libDirs = ["/opt/ghc/7.8.4/lib/ghc-7.8.4/haskell2010-1.1.2.0"]
+                , depends = depends
+                , libraries = ["HShaskell2010-1.1.2.0"]
+                , hasExposedModules = True
+                , haddockInterfaces = ["/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0/haskell2010.haddock"]
+                , haddockHtml = Just "/opt/ghc/7.8.4/share/doc/ghc/html/libraries/haskell2010-1.1.2.0"
+                , isExposed = False
+                , exposedModules = mempty
                 }
 
         it "ghc 7.10" $ do
@@ -134,19 +134,19 @@ spec = do
                 , "transformers-0.4.2.0-c1a7bb855a176fe475d7b665301cd48f"
                 , "unix-2.7.1.0-e5915eb989e568b732bc7286b0d0817f"
                 ]
-            haskell2010 { dpExposedModules = mempty } `shouldBe` DumpPackage
-                { dpGhcPkgId = ghcPkgId
-                , dpPackageIdent = pkgIdent
-                , dpSublib = Nothing
-                , dpLicense = Just BSD3
-                , dpLibDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
-                , dpHaddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
-                , dpHaddockHtml = Just "/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1"
-                , dpDepends = depends
-                , dpLibraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
-                , dpHasExposedModules = True
-                , dpIsExposed = False
-                , dpExposedModules = mempty
+            haskell2010 { exposedModules = mempty } `shouldBe` DumpPackage
+                { ghcPkgId = ghcPkgId
+                , packageIdent = pkgIdent
+                , sublib = Nothing
+                , license = Just BSD3
+                , libDirs = ["/opt/ghc/7.10.1/lib/ghc-7.10.1/ghc_EMlWrQ42XY0BNVbSrKixqY"]
+                , haddockInterfaces = ["/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1/ghc.haddock"]
+                , haddockHtml = Just "/opt/ghc/7.10.1/share/doc/ghc/html/libraries/ghc-7.10.1"
+                , depends = depends
+                , libraries = ["HSghc-7.10.1-EMlWrQ42XY0BNVbSrKixqY"]
+                , hasExposedModules = True
+                , isExposed = False
+                , exposedModules = mempty
                 }
         it "ghc 7.8.4 (osx)" $ do
             hmatrix:_ <-
@@ -170,22 +170,22 @@ spec = do
                 , "storable-complex-0.2.2-e962c368d58acc1f5b41d41edc93da72"
                 , "vector-0.10.12.3-f4222db607fd5fdd7545d3e82419b307"]
             hmatrix `shouldBe` DumpPackage
-                { dpGhcPkgId = ghcPkgId
-                , dpPackageIdent = pkgId
-                , dpSublib = Nothing
-                , dpLicense = Just BSD3
-                , dpLibDirs =
+                { ghcPkgId = ghcPkgId
+                , packageIdent = pkgId
+                , sublib = Nothing
+                , license = Just BSD3
+                , libDirs =
                       [ "/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/lib/x86_64-osx-ghc-7.8.4/hmatrix-0.16.1.5"
                       , "/opt/local/lib/"
                       , "/usr/local/lib/"
                       ,  "C:/Program Files/Example/"]
-                , dpHaddockInterfaces = ["/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html/hmatrix.haddock"]
-                , dpHaddockHtml = Just "/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html"
-                , dpDepends = depends
-                , dpLibraries = ["HShmatrix-0.16.1.5"]
-                , dpHasExposedModules = True
-                , dpIsExposed = True
-                , dpExposedModules = Set.fromList ["Data.Packed","Data.Packed.Vector","Data.Packed.Matrix","Data.Packed.Foreign","Data.Packed.ST","Data.Packed.Development","Numeric.LinearAlgebra","Numeric.LinearAlgebra.LAPACK","Numeric.LinearAlgebra.Algorithms","Numeric.Container","Numeric.LinearAlgebra.Util","Numeric.LinearAlgebra.Devel","Numeric.LinearAlgebra.Data","Numeric.LinearAlgebra.HMatrix","Numeric.LinearAlgebra.Static"]
+                , haddockInterfaces = ["/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html/hmatrix.haddock"]
+                , haddockHtml = Just "/Users/alexbiehl/.stack/snapshots/x86_64-osx/lts-2.13/7.8.4/doc/html"
+                , depends = depends
+                , libraries = ["HShmatrix-0.16.1.5"]
+                , hasExposedModules = True
+                , isExposed = True
+                , exposedModules = Set.fromList ["Data.Packed","Data.Packed.Vector","Data.Packed.Matrix","Data.Packed.Foreign","Data.Packed.ST","Data.Packed.Development","Numeric.LinearAlgebra","Numeric.LinearAlgebra.LAPACK","Numeric.LinearAlgebra.Algorithms","Numeric.Container","Numeric.LinearAlgebra.Util","Numeric.LinearAlgebra.Devel","Numeric.LinearAlgebra.Data","Numeric.LinearAlgebra.HMatrix","Numeric.LinearAlgebra.Static"]
                 }
         it "ghc HEAD" $ do
           ghcBoot:_ <-
@@ -206,19 +206,19 @@ spec = do
             , "filepath-1.4.1.0"
             ]
           ghcBoot `shouldBe` DumpPackage
-            { dpGhcPkgId = ghcPkgId
-            , dpPackageIdent = pkgId
-            , dpSublib = Nothing
-            , dpLicense = Just BSD3
-            , dpLibDirs =
+            { ghcPkgId = ghcPkgId
+            , packageIdent = pkgId
+            , sublib = Nothing
+            , license = Just BSD3
+            , libDirs =
                   ["/opt/ghc/head/lib/ghc-7.11.20151213/ghc-boot-0.0.0.0"]
-            , dpHaddockInterfaces = ["/opt/ghc/head/share/doc/ghc/html/libraries/ghc-boot-0.0.0.0/ghc-boot.haddock"]
-            , dpHaddockHtml = Just "/opt/ghc/head/share/doc/ghc/html/libraries/ghc-boot-0.0.0.0"
-            , dpDepends = depends
-            , dpLibraries = ["HSghc-boot-0.0.0.0"]
-            , dpHasExposedModules = True
-            , dpIsExposed = True
-            , dpExposedModules = Set.fromList ["GHC.Lexeme", "GHC.PackageDb"]
+            , haddockInterfaces = ["/opt/ghc/head/share/doc/ghc/html/libraries/ghc-boot-0.0.0.0/ghc-boot.haddock"]
+            , haddockHtml = Just "/opt/ghc/head/share/doc/ghc/html/libraries/ghc-boot-0.0.0.0"
+            , depends = depends
+            , libraries = ["HSghc-boot-0.0.0.0"]
+            , hasExposedModules = True
+            , isExposed = True
+            , exposedModules = Set.fromList ["GHC.Lexeme", "GHC.PackageDb"]
             }
 
 

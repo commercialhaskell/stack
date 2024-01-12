@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.DumpPackage
@@ -16,26 +17,26 @@ import           Stack.Types.GhcPkgId ( GhcPkgId )
 -- | Type representing dump information for a single package, as output by the
 -- @ghc-pkg describe@ command.
 data DumpPackage = DumpPackage
-  { dpGhcPkgId :: !GhcPkgId
+  { ghcPkgId :: !GhcPkgId
     -- ^ The @id@ field.
-  , dpPackageIdent :: !PackageIdentifier
+  , packageIdent :: !PackageIdentifier
     -- ^ The @name@ and @version@ fields. The @name@ field is the munged package
     -- name. If the package is not for a sub library, its munged name is its
     -- name.
-  , dpSublib :: !(Maybe SublibDump)
+  , sublib :: !(Maybe SublibDump)
     -- ^ The sub library information if it's a sub-library.
-  , dpLicense :: !(Maybe C.License)
-  , dpLibDirs :: ![FilePath]
+  , license :: !(Maybe C.License)
+  , libDirs :: ![FilePath]
     -- ^ The @library-dirs@ field.
-  , dpLibraries :: ![Text]
+  , libraries :: ![Text]
     -- ^ The @hs-libraries@ field.
-  , dpHasExposedModules :: !Bool
-  , dpExposedModules :: !(Set ModuleName)
-  , dpDepends :: ![GhcPkgId]
+  , hasExposedModules :: !Bool
+  , exposedModules :: !(Set ModuleName)
+  , depends :: ![GhcPkgId]
     -- ^ The @depends@ field (packages on which this package depends).
-  , dpHaddockInterfaces :: ![FilePath]
-  , dpHaddockHtml :: !(Maybe FilePath)
-  , dpIsExposed :: !Bool
+  , haddockInterfaces :: ![FilePath]
+  , haddockHtml :: !(Maybe FilePath)
+  , isExposed :: !Bool
   }
   deriving (Eq, Read, Show)
 
@@ -50,7 +51,7 @@ data SublibDump = SublibDump
   deriving (Eq, Read, Show)
 
 dpParentLibIdent :: DumpPackage -> Maybe PackageIdentifier
-dpParentLibIdent dp = case (dp.dpSublib, dp.dpPackageIdent) of
+dpParentLibIdent dp = case (dp.sublib, dp.packageIdent) of
   (Nothing, _) -> Nothing
   (Just sublibDump, PackageIdentifier _ v) ->
     Just $ PackageIdentifier libParentPackageName v

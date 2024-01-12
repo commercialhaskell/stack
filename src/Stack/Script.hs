@@ -355,7 +355,7 @@ mapSnapshotPackageModules = do
       notHiddenDeps = notHidden sourceMap.smDeps
       installedDeps = dumpedPackageModules notHiddenDeps snapshotDumpPkgs
       dumpPkgs =
-        Set.fromList $ map (pkgName . (.dpPackageIdent)) snapshotDumpPkgs
+        Set.fromList $ map (pkgName . (.packageIdent)) snapshotDumpPkgs
       notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
   otherDeps <- for notInstalledDeps $ \dep -> do
     gpd <- liftIO dep.dpCommon.cpGPD
@@ -371,9 +371,9 @@ dumpedPackageModules ::
 dumpedPackageModules pkgs dumpPkgs =
   let pnames = Map.keysSet pkgs `Set.difference` blacklist
   in  Map.fromList
-        [ (pn, dp.dpExposedModules)
+        [ (pn, dp.exposedModules)
         | dp <- dumpPkgs
-        , let PackageIdentifier pn _ = dp.dpPackageIdent
+        , let PackageIdentifier pn _ = dp.packageIdent
         , pn `Set.member` pnames
         ]
 

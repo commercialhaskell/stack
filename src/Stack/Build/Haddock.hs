@@ -129,7 +129,7 @@ generateLocalHaddockIndex bco localDumpPkgs locals = do
         mapMaybe
           ( \LocalPackage{lpPackage = Package{packageName, packageVersion}} ->
               F.find
-                ( \dp -> dp.dpPackageIdent ==
+                ( \dp -> dp.packageIdent ==
                          PackageIdentifier packageName packageVersion
                 )
                 localDumpPkgs
@@ -170,8 +170,8 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
   getGhcPkgId :: LocalPackage -> Maybe GhcPkgId
   getGhcPkgId LocalPackage{lpPackage = Package{packageName, packageVersion}} =
     let pkgId = PackageIdentifier packageName packageVersion
-        mdpPkg = F.find (\dp -> dp.dpPackageIdent == pkgId) localDumpPkgs
-    in  fmap (.dpGhcPkgId) mdpPkg
+        mdpPkg = F.find (\dp -> dp.packageIdent == pkgId) localDumpPkgs
+    in  fmap (.ghcPkgId) mdpPkg
   findTransitiveDepends :: [GhcPkgId] -> [GhcPkgId]
   findTransitiveDepends = (`go` HS.empty) . HS.fromList
    where
@@ -181,7 +181,7 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
         (ghcPkgId:_) ->
           let deps = case lookupDumpPackage ghcPkgId allDumpPkgs of
                        Nothing -> HS.empty
-                       Just pkgDP -> HS.fromList pkgDP.dpDepends
+                       Just pkgDP -> HS.fromList pkgDP.depends
               deps' = deps `HS.difference` checked
               todo' = HS.delete ghcPkgId (deps' `HS.union` todo)
               checked' = HS.insert ghcPkgId checked
@@ -259,18 +259,18 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
   toInterfaceOpt ::
        DumpPackage
     -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
-  toInterfaceOpt DumpPackage {dpHaddockInterfaces, dpPackageIdent, dpHaddockHtml} =
-    case dpHaddockInterfaces of
+  toInterfaceOpt DumpPackage {haddockInterfaces, packageIdent, haddockHtml} =
+    case haddockInterfaces of
       [] -> pure Nothing
       srcInterfaceFP:_ -> do
         srcInterfaceAbsFile <- parseCollapsedAbsFile srcInterfaceFP
-        let (PackageIdentifier name _) = dpPackageIdent
+        let (PackageIdentifier name _) = packageIdent
             destInterfaceRelFP =
               docRelFP FP.</>
-              packageIdentifierString dpPackageIdent FP.</>
+              packageIdentifierString packageIdent FP.</>
               (packageNameString name FP.<.> "haddock")
             docPathRelFP =
-              fmap ((docRelFP FP.</>) . FP.takeFileName) dpHaddockHtml
+              fmap ((docRelFP FP.</>) . FP.takeFileName) haddockHtml
             interfaces = intercalate "," $ mcons docPathRelFP [srcInterfaceFP]
 
         destInterfaceAbsFile <-

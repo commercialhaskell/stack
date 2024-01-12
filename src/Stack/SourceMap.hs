@@ -150,9 +150,9 @@ globalsFromDump ::
   -> RIO env (Map PackageName DumpedGlobalPackage)
 globalsFromDump pkgexe = do
   let pkgConduit =    conduitDumpPackage
-                   .| CL.foldMap (\dp -> Map.singleton dp.dpGhcPkgId dp)
+                   .| CL.foldMap (\dp -> Map.singleton dp.ghcPkgId dp)
       toGlobals ds =
-        Map.fromList $ map (pkgName . (.dpPackageIdent) &&& id) $ Map.elems ds
+        Map.fromList $ map (pkgName . (.packageIdent) &&& id) $ Map.elems ds
   toGlobals <$> ghcPkgDump pkgexe [] pkgConduit
 
 globalsFromHints ::
@@ -260,9 +260,9 @@ pruneGlobals ::
   -> Map PackageName GlobalPackage
 pruneGlobals globals deps =
   let (prunedGlobals, keptGlobals) =
-        partitionReplacedDependencies globals (pkgName . (.dpPackageIdent))
-          (.dpGhcPkgId) (.dpDepends) deps
-  in  Map.map (GlobalPackage . pkgVersion . (.dpPackageIdent)) keptGlobals <>
+        partitionReplacedDependencies globals (pkgName . (.packageIdent))
+          (.ghcPkgId) (.depends) deps
+  in  Map.map (GlobalPackage . pkgVersion . (.packageIdent)) keptGlobals <>
       Map.map ReplacedGlobalPackage prunedGlobals
 
 getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder

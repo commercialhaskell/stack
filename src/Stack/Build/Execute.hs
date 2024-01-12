@@ -549,7 +549,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
       , eePathEnvVar = pathEnvVar
       } `finally` dumpLogs logFilesTChan totalWanted
  where
-  toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dp.dpGhcPkgId, dp))
+  toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dp.ghcPkgId, dp))
 
   createTempDirFunction
     | bopts.boptsKeepTmpFiles = withKeepSystemTempDir
@@ -2172,8 +2172,8 @@ singleBuild
     case dps of
       [] -> pure Nothing
       [dp] -> do
-        liftIO $ atomically $ modifyTVar' tvar (Map.insert dp.dpGhcPkgId dp)
-        pure $ Just dp.dpGhcPkgId
+        liftIO $ atomically $ modifyTVar' tvar (Map.insert dp.ghcPkgId dp)
+        pure $ Just dp.ghcPkgId
       _ -> throwM $ MultipleResultsBug name dps
 
 -- | Get the build status of all the package executables. Do so by
@@ -2332,7 +2332,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                                _ -> []
           -- doctest relies on template-haskell in QuickCheck-based tests
           thGhcId <-
-            case L.find ((== "template-haskell") . pkgName . (.dpPackageIdent) . snd)
+            case L.find ((== "template-haskell") . pkgName . (.packageIdent) . snd)
                    (Map.toList ee.eeGlobalDumpPkgs) of
               Just (ghcId, _) -> pure ghcId
               Nothing -> throwIO TemplateHaskellNotFoundBug

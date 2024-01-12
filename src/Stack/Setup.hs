@@ -1498,7 +1498,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler =
     cabalPkgVer <-
       case Map.lookup cabalPackageName globalDump of
         Nothing -> prettyThrowIO $ CabalNotFound compiler
-        Just dp -> pure $ pkgVersion dp.dpPackageIdent
+        Just dp -> pure $ pkgVersion dp.packageIdent
 
     pure CompilerPaths
       { cpBuild = compilerBuild

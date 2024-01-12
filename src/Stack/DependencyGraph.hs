@@ -121,18 +121,18 @@ withDotConfig opts inner =
           }
         toDump :: PackageName -> Version -> DumpPackage
         toDump name version = DumpPackage
-          { dpGhcPkgId = fakeGhcPkgId
-          , dpPackageIdent = PackageIdentifier name version
-          , dpSublib = Nothing
-          , dpLicense = Nothing
-          , dpLibDirs = []
-          , dpLibraries = []
-          , dpHasExposedModules = True
-          , dpExposedModules = mempty
-          , dpDepends = []
-          , dpHaddockInterfaces = []
-          , dpHaddockHtml = Nothing
-          , dpIsExposed = True
+          { ghcPkgId = fakeGhcPkgId
+          , packageIdent = PackageIdentifier name version
+          , sublib = Nothing
+          , license = Nothing
+          , libDirs = []
+          , libraries = []
+          , hasExposedModules = True
+          , exposedModules = mempty
+          , depends = []
+          , haddockInterfaces = []
+          , haddockHtml = Nothing
+          , isExposed = True
           }
         actualPkgs =
           Map.keysSet smActual.smaDeps <> Map.keysSet smActual.smaProject
@@ -189,9 +189,9 @@ createDependencyGraph dotOpts = do
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $
-        map (\dp -> (Stack.Prelude.pkgName dp.dpPackageIdent, dp)) globalDump
+        map (\dp -> (Stack.Prelude.pkgName dp.packageIdent, dp)) globalDump
       globalIdMap =
-        Map.fromList $ map ((.dpGhcPkgId) &&& (.dpPackageIdent)) globalDump
+        Map.fromList $ map ((.ghcPkgId) &&& (.packageIdent)) globalDump
   let depLoader =
         createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps
       loadPackageDeps name version loc flags ghcOptions cabalConfigOpts
@@ -283,7 +283,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
    where
     getDepsFromDump dump = (Set.fromList deps, payloadFromDump dump)
      where
-      deps = map ghcIdToPackageName dump.dpDepends
+      deps = map ghcIdToPackageName dump.depends
       ghcIdToPackageName depId =
         maybe (impureThrow $ DependencyNotFoundBug depId)
               Stack.Prelude.pkgName
@@ -293,8 +293,8 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
     DotPayload (Just pkg.packageVersion) (Just pkg.packageLicense)
 
   payloadFromDump dp =
-    DotPayload (Just $ pkgVersion dp.dpPackageIdent)
-               (Right <$> dp.dpLicense)
+    DotPayload (Just $ pkgVersion dp.packageIdent)
+               (Right <$> dp.license)
                Nothing
 
 -- | Resolve the dependency graph up to (Just depth) or until fixpoint is reached
