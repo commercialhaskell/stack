@@ -171,16 +171,16 @@ gatherComponentToolsAndDepsFromCabal legacyBuildTools buildTools targetDeps =
           sbi
           (Cabal.ExeDependency pName (Cabal.mkUnqualComponentName exeName) range)
       Nothing -> sbi
-        {sbiUnknownTools = Set.insert (pack exeName) $ sbiUnknownTools sbi}
+        {sbiUnknownTools = Set.insert (pack exeName) sbi.sbiUnknownTools}
   processExeDependency sbi exeDep@(Cabal.ExeDependency pName _ _)
     | isPreInstalledPackages pName = sbi
     | otherwise = sbi
         { sbiDependency =
-            Map.insert pName (cabalExeToStackDep exeDep) $ sbiDependency sbi
+            Map.insert pName (cabalExeToStackDep exeDep) sbi.sbiDependency
         }
   processDependency sbi dep@(Cabal.Dependency pName _ _) = sbi
     { sbiDependency =
-        Map.insert pName (cabalToStackDep dep) $ sbiDependency sbi
+        Map.insert pName (cabalToStackDep dep) sbi.sbiDependency
     }
 
 componentDependencyMap ::

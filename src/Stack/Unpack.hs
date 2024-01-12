@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | Functions related to Stack's @unpack@ command.
@@ -92,7 +93,7 @@ unpackCmd (UnpackOpts targets areCandidates Nothing) =
   unpackCmd (UnpackOpts targets areCandidates (Just $ Rel relDirRoot))
 unpackCmd (UnpackOpts targets areCandidates (Just dstPath)) =
   withConfig NoReexec $ do
-    mresolver <- view $ globalOptsL.to globalResolver
+    mresolver <- view $ globalOptsL . to (.globalResolver)
     mSnapshot <- forM mresolver $ \resolver -> do
       concrete <- makeConcreteResolver resolver
       loc <- completeSnapshotLocation concrete
@@ -127,7 +128,7 @@ unpackPackages mSnapshot dest targets areCandidates = do
               \will be ignored."
       <> line
   locs1 <- forM pirs $ \pir -> do
-    hackageBaseUrl <- view $ configL.to configHackageBaseUrl
+    hackageBaseUrl <- view $ configL . to (.configHackageBaseUrl)
     let rpli = if areCandidates
           then
             let -- Ignoring revisions for package candidates.

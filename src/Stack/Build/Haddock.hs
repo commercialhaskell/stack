@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Generate haddocks
 module Stack.Build.Haddock
@@ -63,7 +64,7 @@ openHaddocksInBrowser ::
   -- ^ Build targets as determined by 'Stack.Build.Source.loadSourceMap'
   -> RIO env ()
 openHaddocksInBrowser bco pkgLocations buildTargets = do
-  let cliTargets = (boptsCLITargets . bcoBuildOptsCLI) bco
+  let cliTargets = bco.bcoBuildOptsCLI.boptsCLITargets
       getDocIndex = do
         let localDocs = haddockIndexFile (localDepsDocDir bco)
         localExists <- doesFileExist localDocs
@@ -109,13 +110,12 @@ shouldHaddockPackage ::
   -> Bool
 shouldHaddockPackage bopts wanted name =
   if Set.member name wanted
-    then boptsHaddock bopts
+    then bopts.boptsHaddock
     else shouldHaddockDeps bopts
 
 -- | Determine whether to build haddocks for dependencies.
 shouldHaddockDeps :: BuildOpts -> Bool
-shouldHaddockDeps bopts =
-  fromMaybe (boptsHaddock bopts) (boptsHaddockDeps bopts)
+shouldHaddockDeps bopts = fromMaybe bopts.boptsHaddock bopts.boptsHaddockDeps
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex ::
@@ -129,7 +129,7 @@ generateLocalHaddockIndex bco localDumpPkgs locals = do
         mapMaybe
           ( \LocalPackage{lpPackage = Package{packageName, packageVersion}} ->
               F.find
-                ( \dp -> dpPackageIdent dp ==
+                ( \dp -> dp.dpPackageIdent ==
                          PackageIdentifier packageName packageVersion
                 )
                 localDumpPkgs
@@ -170,8 +170,8 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
   getGhcPkgId :: LocalPackage -> Maybe GhcPkgId
   getGhcPkgId LocalPackage{lpPackage = Package{packageName, packageVersion}} =
     let pkgId = PackageIdentifier packageName packageVersion
-        mdpPkg = F.find (\dp -> dpPackageIdent dp == pkgId) localDumpPkgs
-    in  fmap dpGhcPkgId mdpPkg
+        mdpPkg = F.find (\dp -> dp.dpPackageIdent == pkgId) localDumpPkgs
+    in  fmap (.dpGhcPkgId) mdpPkg
   findTransitiveDepends :: [GhcPkgId] -> [GhcPkgId]
   findTransitiveDepends = (`go` HS.empty) . HS.fromList
    where
@@ -181,7 +181,7 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
         (ghcPkgId:_) ->
           let deps = case lookupDumpPackage ghcPkgId allDumpPkgs of
                        Nothing -> HS.empty
-                       Just pkgDP -> HS.fromList (dpDepends pkgDP)
+                       Just pkgDP -> HS.fromList pkgDP.dpDepends
               deps' = deps `HS.difference` checked
               todo' = HS.delete ghcPkgId (deps' `HS.union` todo)
               checked' = HS.insert ghcPkgId checked
@@ -236,13 +236,13 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
           <> line
           <> pretty destIndexFile
         liftIO (mapM_ copyPkgDocs interfaceOpts)
-        haddockExeName <- view $ compilerPathsL.to (toFilePath . cpHaddock)
+        haddockExeName <- view $ compilerPathsL . to (toFilePath . (.cpHaddock))
         withWorkingDir (toFilePath destDir) $ readProcessNull
           haddockExeName
           ( map
               (("--optghc=-package-db=" ++ ) . toFilePathNoTrailingSep)
-                 [bcoSnapDB bco, bcoLocalDB bco]
-              ++ hoAdditionalArgs (boptsHaddockOpts (bcoBuildOpts bco))
+                 [bco.bcoSnapDB, bco.bcoLocalDB]
+              ++ bco.bcoBuildOpts.boptsHaddockOpts.hoAdditionalArgs
               ++ ["--gen-contents", "--gen-index"]
               ++ [x | (xs, _, _, _) <- interfaceOpts, x <- xs]
           )
@@ -322,7 +322,7 @@ haddockIndexFile destDir = destDir </> relFileIndexHtml
 
 -- | Path of local packages documentation directory.
 localDocDir :: BaseConfigOpts -> Path Abs Dir
-localDocDir bco = bcoLocalInstallRoot bco </> docDirSuffix
+localDocDir bco = bco.bcoLocalInstallRoot </> docDirSuffix
 
 -- | Path of documentation directory for the dependencies of local packages
 localDepsDocDir :: BaseConfigOpts -> Path Abs Dir
@@ -330,7 +330,7 @@ localDepsDocDir bco = localDocDir bco </> relDirAll
 
 -- | Path of snapshot packages documentation directory.
 snapDocDir :: BaseConfigOpts -> Path Abs Dir
-snapDocDir bco = bcoSnapInstallRoot bco </> docDirSuffix
+snapDocDir bco = bco.bcoSnapInstallRoot </> docDirSuffix
 
 generateLocalHaddockForHackageArchives ::
      (HasEnvConfig env, HasTerm env)
@@ -339,9 +339,9 @@ generateLocalHaddockForHackageArchives ::
 generateLocalHaddockForHackageArchives =
   mapM_
     ( \lp ->
-        let pkg = lpPackage lp
-            pkgId = PackageIdentifier (packageName pkg) (packageVersion pkg)
-            pkgDir = parent (lpCabalFile lp)
+        let pkg = lp.lpPackage
+            pkgId = PackageIdentifier pkg.packageName pkg.packageVersion
+            pkgDir = parent lp.lpCabalFile
         in generateLocalHaddockForHackageArchive pkgDir pkgId
     )
 

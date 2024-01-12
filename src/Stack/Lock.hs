@@ -59,7 +59,7 @@ data LockedLocation a b = LockedLocation
 
 instance (ToJSON a, ToJSON b) => ToJSON (LockedLocation a b) where
   toJSON ll =
-      object [ "original" .= llOriginal ll, "completed" .= llCompleted ll ]
+      object [ "original" .= ll.llOriginal, "completed" .= ll.llCompleted ]
 
 instance ( FromJSON (WithJSONWarnings (Unresolved a))
          , FromJSON (WithJSONWarnings (Unresolved b))
@@ -101,7 +101,8 @@ instance FromJSON (WithJSONWarnings (Unresolved Locked)) where
   parseJSON = withObjectWarnings "Locked" $ \o -> do
     snapshots <- jsonSubWarningsT $ o ..: "snapshots"
     packages <- jsonSubWarningsT $ o ..: "packages"
-    let unwrap ll = ll { llOriginal = unSingleRPLI (llOriginal ll) }
+    let unwrap :: LockedLocation SingleRPLI b -> LockedLocation RawPackageLocationImmutable b
+        unwrap ll = ll { llOriginal = ll.llOriginal.unSingleRPLI }
     pure $ Locked <$> sequenceA snapshots <*> (map unwrap <$> sequenceA packages)
 
 loadYamlThrow ::
@@ -150,9 +151,9 @@ lockCachedWanted stackFile resolver fillWanted = do
       logDebug "Not reading lock file"
       pure $ Locked [] []
   let toMap :: Ord a => [LockedLocation a b] -> Map a b
-      toMap =  Map.fromList . map (llOriginal &&& llCompleted)
-      slocCache = toMap $ lckSnapshotLocations locked
-      pkgLocCache = toMap $ lckPkgImmutableLocations locked
+      toMap =  Map.fromList . map ((.llOriginal) &&& (.llCompleted))
+      slocCache = toMap locked.lckSnapshotLocations
+      pkgLocCache = toMap locked.lckPkgImmutableLocations
   debugRSL <- view rslInLogL
   (snap, slocCompleted, pliCompleted) <-
     loadAndCompleteSnapshotRaw' debugRSL resolver slocCache pkgLocCache

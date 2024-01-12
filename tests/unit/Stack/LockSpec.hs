@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes         #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.LockSpec
@@ -58,7 +59,7 @@ snapshots:
     compiler: ghc-8.6.5
 packages: []
 |]
-        pkgImm <- lckPkgImmutableLocations <$> decodeLocked lockFile
+        pkgImm <- (.lckPkgImmutableLocations) <$> decodeLocked lockFile
         pkgImm `shouldBe` []
     it "parses lock file (empty with LTS resolver)" $ do
         let lockFile :: ByteString
@@ -76,7 +77,7 @@ snapshots:
     compiler: ghc-8.6.5
 packages: []
 |]
-        pkgImm <- lckPkgImmutableLocations <$> decodeLocked lockFile
+        pkgImm <- (.lckPkgImmutableLocations) <$> decodeLocked lockFile
         pkgImm `shouldBe` []
     it "parses lock file (LTS, wai + warp)" $ do
         let lockFile :: ByteString
@@ -120,7 +121,7 @@ packages:
       sha256: f808e075811b002563d24c393ce115be826bb66a317d38da22c513ee42b7443a
     commit: d11d63f1a6a92db8c637a8d33e7953ce6194a3e0
 |]
-        pkgImm <- lckPkgImmutableLocations <$> decodeLocked lockFile
+        pkgImm <- (.lckPkgImmutableLocations) <$> decodeLocked lockFile
         let waiSubdirRepo subdir =
               Repo { repoType = RepoGit
                    , repoUrl = "https://github.com/yesodweb/wai.git"

@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | Main Stack tool entry point.
@@ -77,9 +78,9 @@ main = do
       throwIO exitCode
     Right (globalMonoid, run) -> do
       global <- globalOptsFromMonoid isTerminal globalMonoid
-      when (globalLogLevel global == LevelDebug) $
+      when (global.globalLogLevel == LevelDebug) $
         hPutStrLn stderr versionString'
-      case globalReExecVersion global of
+      case global.globalReExecVersion of
         Just expectVersion -> do
           expectVersion' <- parseVersionThrowing expectVersion
           unless (checkVersion MatchMinor expectVersion' stackVersion) $

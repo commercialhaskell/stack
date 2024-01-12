@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- | This module contains all the types related to the idea of installing a
 -- package in the pkg-db or an executable on the file system.
@@ -124,7 +125,7 @@ simpleInstalledLib pkgIdentifier ghcPkgId =
 
 installedToPackageIdOpt :: InstalledLibraryInfo -> [String]
 installedToPackageIdOpt libInfo =
-  M.foldr' (iterator (++)) (pure $ toStr (iliId libInfo)) (iliSublib libInfo)
+  M.foldr' (iterator (++)) (pure $ toStr libInfo.iliId) libInfo.iliSublib
  where
   toStr ghcPkgId = "-package-id=" <> ghcPkgIdString ghcPkgId
   iterator op ghcPkgId acc = pure (toStr ghcPkgId) `op` acc
@@ -134,7 +135,7 @@ installedPackageIdentifier (Library pid _) = pid
 installedPackageIdentifier (Executable pid) = pid
 
 installedGhcPkgId :: Installed -> Maybe GhcPkgId
-installedGhcPkgId (Library _ libInfo) = Just $ iliId libInfo
+installedGhcPkgId (Library _ libInfo) = Just libInfo.iliId
 installedGhcPkgId (Executable _) = Nothing
 
 -- | Get the installed Version.

@@ -1,8 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Stack.Setup.Installed
   ( getCompilerVersion
@@ -135,8 +136,8 @@ getCompilerVersion wc exe =
 extraDirs :: HasConfig env => Tool -> RIO env ExtraDirs
 extraDirs tool = do
   config <- view configL
-  dir <- installDir (configLocalPrograms config) tool
-  case (configPlatform config, toolNameString tool) of
+  dir <- installDir config.configLocalPrograms tool
+  case (config.configPlatform, toolNameString tool) of
     (Platform _ Cabal.Windows, isGHC -> True) -> pure mempty
       { edBins =
           [ dir </> relDirBin

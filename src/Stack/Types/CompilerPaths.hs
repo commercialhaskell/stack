@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.CompilerPaths
   ( CompilerPaths (..)
@@ -61,20 +62,20 @@ newtype GhcPkgExe
   deriving Show
 
 cabalVersionL :: HasCompiler env => SimpleGetter env Version
-cabalVersionL = compilerPathsL.to cpCabalVersion
+cabalVersionL = compilerPathsL . to (.cpCabalVersion)
 
 compilerVersionL :: HasCompiler env => SimpleGetter env ActualCompiler
-compilerVersionL = compilerPathsL.to cpCompilerVersion
+compilerVersionL = compilerPathsL . to (.cpCompilerVersion)
 
 cpWhich :: (MonadReader env m, HasCompiler env) => m WhichCompiler
-cpWhich = view $ compilerPathsL.to (whichCompiler.cpCompilerVersion)
+cpWhich = view $ compilerPathsL . to (whichCompiler . (.cpCompilerVersion))
 
 -- | Get the path for the given compiler ignoring any local binaries.
 --
 -- https://github.com/commercialhaskell/stack/issues/1052
 getCompilerPath :: HasCompiler env => RIO env (Path Abs File)
-getCompilerPath = view $ compilerPathsL.to cpCompiler
+getCompilerPath = view $ compilerPathsL . to (.cpCompiler)
 
 -- | Get the 'GhcPkgExe' from a 'HasCompiler' environment
 getGhcPkgExe :: HasCompiler env => RIO env GhcPkgExe
-getGhcPkgExe = view $ compilerPathsL.to cpPkg
+getGhcPkgExe = view $ compilerPathsL . to (.cpPkg)

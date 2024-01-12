@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Cache information about previous builds
 module Stack.Build.Cache
@@ -131,7 +132,7 @@ buildCacheFile :: (HasEnvConfig env, MonadReader env m, MonadThrow m)
                -> m (Path Abs File)
 buildCacheFile dir component = do
   cachesDir <- buildCachesDir dir
-  smh <- view $ envConfigL.to envConfigSourceMapHash
+  smh <- view $ envConfigL . to (.envConfigSourceMapHash)
   smDirName <- smRelDir smh
   let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
   cacheFileName <- parseRelFile $ case component of
@@ -151,8 +152,9 @@ tryGetBuildCache :: HasEnvConfig env
 tryGetBuildCache dir component = do
   fp <- buildCacheFile dir component
   ensureDir $ parent fp
-  either (const Nothing) (Just . buildCacheTimes) <$>
-    liftIO (tryAny (Yaml.decodeFileThrow (toFilePath fp)))
+  let decode :: MonadIO m => m BuildCache
+      decode = Yaml.decodeFileThrow (toFilePath fp)
+  either (const Nothing) (Just . (.buildCacheTimes)) <$> liftIO (tryAny decode)
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetConfigCache ::
@@ -266,7 +268,7 @@ flagCacheKey installed = do
   installationRoot <- installationRootLocal
   case installed of
     Library _ installedInfo -> do
-      let gid = iliId installedInfo
+      let gid = installedInfo.iliId
       pure $ configCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
     Executable ident -> pure $
       configCacheKey installationRoot (ConfigCacheTypeFlagExecutable ident)
@@ -361,7 +363,7 @@ getPrecompiledCacheKey loc copts buildHaddocks = do
   -- In Cabal versions 1.22 and later, the configure options contain the
   -- installed package IDs, which is what we need for a unique hash. See also
   -- issue: https://github.com/commercialhaskell/stack/issues/1103
-  let input = coNoDirs copts
+  let input = copts.coNoDirs
       optionsHash = Mem.convert $ hashWith SHA256 $ encodeUtf8 $ tshow input
 
   pure $ precompiledCacheKey
@@ -396,7 +398,7 @@ writePrecompiledCache
       exes' <- forM (Set.toList exes) $ \exe -> do
         name <- parseRelFile $ T.unpack exe
         stackRootRelative $
-          bcoSnapInstallRoot baseConfigOpts </> bindirSuffix </> name
+           baseConfigOpts.bcoSnapInstallRoot </> bindirSuffix </> name
       let precompiled = PrecompiledCache
             { pcLibrary = mlibpath
             , pcSubLibs = subLibPaths
@@ -411,7 +413,7 @@ writePrecompiledCache
  where
   pathFromPkgId stackRootRelative ipid = do
     ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
-    stackRootRelative $ bcoSnapDB baseConfigOpts </> ipid'
+    stackRootRelative $ baseConfigOpts.bcoSnapDB </> ipid'
 
 -- | Check the cache for a precompiled package matching the given configuration.
 readPrecompiledCache ::
@@ -435,7 +437,7 @@ readPrecompiledCache loc copts buildHaddocks = do
     stackRoot <- view stackRootL
     let mkAbs' = (stackRoot </>)
     pure PrecompiledCache
-      { pcLibrary = mkAbs' <$> pcLibrary pc0
-      , pcSubLibs = mkAbs' <$> pcSubLibs pc0
-      , pcExes = mkAbs' <$> pcExes pc0
+      { pcLibrary = mkAbs' <$> pc0.pcLibrary
+      , pcSubLibs = mkAbs' <$> pc0.pcSubLibs
+      , pcExes = mkAbs' <$> pc0.pcExes
       }

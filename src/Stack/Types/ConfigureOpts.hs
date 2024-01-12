@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Types.ConfigureOpts
   ( ConfigureOpts (..)
@@ -67,8 +68,8 @@ configureOptsDirs :: BaseConfigOpts
 configureOptsDirs bco isMutable package = concat
   [ ["--user", "--package-db=clear", "--package-db=global"]
   , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case isMutable of
-      Immutable -> bcoExtraDBs bco ++ [bcoSnapDB bco]
-      Mutable -> bcoExtraDBs bco ++ [bcoSnapDB bco] ++ [bcoLocalDB bco]
+      Immutable -> bco.bcoExtraDBs ++ [bco.bcoSnapDB]
+      Mutable -> bco.bcoExtraDBs ++ [bco.bcoSnapDB] ++ [bco.bcoLocalDB]
   , [ "--libdir=" ++ toFilePathNoTrailingSep (installRoot </> relDirLib)
     , "--bindir=" ++ toFilePathNoTrailingSep (installRoot </> bindirSuffix)
     , "--datadir=" ++ toFilePathNoTrailingSep (installRoot </> relDirShare)
@@ -81,15 +82,15 @@ configureOptsDirs bco isMutable package = concat
  where
   installRoot =
     case isMutable of
-      Immutable -> bcoSnapInstallRoot bco
-      Mutable -> bcoLocalInstallRoot bco
+      Immutable -> bco.bcoSnapInstallRoot
+      Mutable -> bco.bcoLocalInstallRoot
   docDir =
     case pkgVerDir of
       Nothing -> installRoot </> docDirSuffix
       Just dir -> installRoot </> docDirSuffix </> dir
   pkgVerDir = parseRelDir
     (  packageIdentifierString
-        (PackageIdentifier (packageName package) (packageVersion package))
+        (PackageIdentifier package.packageName package.packageVersion)
     ++ [pathSeparator]
     )
 
@@ -104,14 +105,14 @@ configureOptsNoDir ::
 configureOptsNoDir econfig bco deps isLocal package = concat
   [ depOptions
   , [ "--enable-library-profiling"
-    | boptsLibProfile bopts || boptsExeProfile bopts
+    | bopts.boptsLibProfile || bopts.boptsExeProfile
     ]
-  , ["--enable-profiling" | boptsExeProfile bopts && isLocal]
-  , ["--enable-split-objs" | boptsSplitObjs bopts]
+  , ["--enable-profiling" | bopts.boptsExeProfile && isLocal]
+  , ["--enable-split-objs" | bopts.boptsSplitObjs]
   , [ "--disable-library-stripping"
-    | not $ boptsLibStrip bopts || boptsExeStrip bopts
+    | not $ bopts.boptsLibStrip || bopts.boptsExeStrip
     ]
-  , ["--disable-executable-stripping" | not (boptsExeStrip bopts) && isLocal]
+  , ["--disable-executable-stripping" | not bopts.boptsExeStrip && isLocal]
   , map (\(name,enabled) ->
                      "-f" <>
                      (if enabled
@@ -119,14 +120,14 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                         else "-") <>
                      flagNameString name)
                   (Map.toList flags)
-  , map T.unpack $ packageCabalConfigOpts package
-  , processGhcOptions (packageGhcOptions package)
-  , map ("--extra-include-dirs=" ++) (configExtraIncludeDirs config)
-  , map ("--extra-lib-dirs=" ++) (configExtraLibDirs config)
+  , map T.unpack package.packageCabalConfigOpts
+  , processGhcOptions package.packageGhcOptions
+  , map ("--extra-include-dirs=" ++) config.configExtraIncludeDirs
+  , map ("--extra-lib-dirs=" ++) config.configExtraLibDirs
   , maybe
       []
       (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc])
-      (configOverrideGccPath config)
+      config.configOverrideGccPath
   , ["--exact-configuration"]
   , ["--ghc-option=-fhide-source-paths" | hideSourcePaths cv]
   ]
@@ -161,18 +162,18 @@ configureOptsNoDir econfig bco deps isLocal package = concat
         newArgs = concat [preRtsArgs, fullRtsArgs, postRtsArgs]
     in  concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) newArgs
 
-  wc = view (actualCompilerVersionL.to whichCompiler) econfig
-  cv = view (actualCompilerVersionL.to getGhcVersion) econfig
+  wc = view (actualCompilerVersionL . to whichCompiler) econfig
+  cv = view (actualCompilerVersionL . to getGhcVersion) econfig
 
   hideSourcePaths ghcVersion =
-    ghcVersion >= C.mkVersion [8, 2] && configHideSourcePaths config
+    ghcVersion >= C.mkVersion [8, 2] && config.configHideSourcePaths
 
   config = view configL econfig
-  bopts = bcoBuildOpts bco
+  bopts = bco.bcoBuildOpts
 
   -- Unioning atop defaults is needed so that all flags are specified with
   -- --exact-configuration.
-  flags = packageFlags package `Map.union` packageDefaultFlags package
+  flags = package.packageFlags `Map.union` package.packageDefaultFlags
 
   depOptions = map toDepOption $ Map.toList deps
 

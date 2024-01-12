@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Docker types.
 
@@ -351,7 +352,7 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
     dockerMonoidStackExe <- First <$> o ..:? dockerStackExeArgName
     dockerMonoidSetUser <- First <$> o ..:? dockerSetUserArgName
     dockerMonoidRequireDockerVersion <-
-      IntersectingVersionRange . unVersionRangeJSON <$>
+      IntersectingVersionRange . (.unVersionRangeJSON) <$>
         ( o ..:? dockerRequireDockerVersionArgName
           ..!= VersionRangeJSON anyVersion
         )

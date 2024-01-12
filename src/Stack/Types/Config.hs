@@ -1,12 +1,13 @@
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DefaultSignatures     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiWayIf            #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE QuasiQuotes           #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DefaultSignatures   #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
+{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 module Stack.Types.Config
   (
@@ -199,19 +200,19 @@ data Config = Config
 -- | The project root directory, if in a project.
 configProjectRoot :: Config -> Maybe (Path Abs Dir)
 configProjectRoot c =
-  case configProject c of
+  case c.configProject of
     PCProject (_, fp) -> Just $ parent fp
     PCGlobalProject -> Nothing
     PCNoProject _deps -> Nothing
 
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
-askLatestSnapshotUrl = view $ configL.to configLatestSnapshot
+askLatestSnapshotUrl = view $ configL . to (.configLatestSnapshot)
 
 -- | @STACK_ROOT\/hooks\/@
 hooksDir :: HasConfig env => RIO env (Path Abs Dir)
 hooksDir = do
-  sr <- view $ configL.to configStackRoot
+  sr <- view $ configL . to (.configStackRoot)
   pure (sr </> [reldir|hooks|])
 
 -- | @STACK_ROOT\/hooks\/ghc-install.sh@
@@ -239,67 +240,69 @@ class ( HasPlatform env
 -----------------------------------
 
 instance HasPlatform Config where
-  platformL = lens configPlatform (\x y -> x { configPlatform = y })
+  platformL = lens (.configPlatform) (\x y -> x { configPlatform = y })
   platformVariantL =
-    lens configPlatformVariant (\x y -> x { configPlatformVariant = y })
+    lens (.configPlatformVariant) (\x y -> x { configPlatformVariant = y })
 
 instance HasGHCVariant Config where
-  ghcVariantL = to $ fromMaybe GHCStandard . configGHCVariant
+  ghcVariantL = to $ fromMaybe GHCStandard . (.configGHCVariant)
 
 instance HasProcessContext Config where
-  processContextL = runnerL.processContextL
+  processContextL = runnerL . processContextL
 
 instance HasPantryConfig Config where
-  pantryConfigL = lens configPantryConfig (\x y -> x { configPantryConfig = y })
+  pantryConfigL = lens
+    (.configPantryConfig)
+    (\x y -> x { configPantryConfig = y })
 
 instance HasConfig Config where
   configL = id
   {-# INLINE configL #-}
 
 instance HasRunner Config where
-  runnerL = lens configRunner (\x y -> x { configRunner = y })
+  runnerL = lens (.configRunner) (\x y -> x { configRunner = y })
 
 instance HasLogFunc Config where
-  logFuncL = runnerL.logFuncL
+  logFuncL = runnerL . logFuncL
 
 instance HasStylesUpdate Config where
-  stylesUpdateL = runnerL.stylesUpdateL
+  stylesUpdateL = runnerL . stylesUpdateL
 
 instance HasTerm Config where
-  useColorL = runnerL.useColorL
-  termWidthL = runnerL.termWidthL
+  useColorL = runnerL . useColorL
+  termWidthL = runnerL . termWidthL
 
 -----------------------------------
 -- Helper lenses
 -----------------------------------
 
 stackRootL :: HasConfig s => Lens' s (Path Abs Dir)
-stackRootL = configL.lens configStackRoot (\x y -> x { configStackRoot = y })
+stackRootL =
+  configL . lens (.configStackRoot) (\x y -> x { configStackRoot = y })
 
 stackGlobalConfigL :: HasConfig s => Lens' s (Path Abs File)
-stackGlobalConfigL =
-  configL.lens configUserConfigPath (\x y -> x { configUserConfigPath = y })
+stackGlobalConfigL = configL . lens
+  (.configUserConfigPath)
+  (\x y -> x { configUserConfigPath = y })
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
-buildOptsL = configL.lens
-  configBuild
-  (\x y -> x { configBuild = y })
+buildOptsL = configL . lens (.configBuild) (\x y -> x { configBuild = y })
 
 envOverrideSettingsL ::
      HasConfig env
   => Lens' env (EnvSettings -> IO ProcessContext)
-envOverrideSettingsL = configL.lens
-  configProcessContextSettings
+envOverrideSettingsL = configL . lens
+  (.configProcessContextSettings)
   (\x y -> x { configProcessContextSettings = y })
 
 -- | @".stack-work"@
 workDirL :: HasConfig env => Lens' env (Path Rel Dir)
-workDirL = configL.lens configWorkDir (\x y -> x { configWorkDir = y })
+workDirL = configL . lens (.configWorkDir) (\x y -> x { configWorkDir = y })
 
 -- | In dev mode, print as a warning, otherwise as debug
 prettyStackDevL :: HasConfig env => [StyleDoc] -> RIO env ()
 prettyStackDevL docs = do
   config <- view configL
-  if configStackDeveloperMode config
+  if config.configStackDeveloperMode
     then prettyWarnL docs
     else prettyDebugL docs

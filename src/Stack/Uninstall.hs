@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Function related to Stack's @uninstall@ command.
 module Stack.Uninstall
@@ -21,8 +22,8 @@ uninstallCmd :: () -> RIO Runner ()
 uninstallCmd () = withConfig NoReexec $ do
   stackRoot <- view stackRootL
   globalConfig <- view stackGlobalConfigL
-  programsDir <- view $ configL.to configLocalProgramsBase
-  localBinDir <- view $ configL.to configLocalBin
+  programsDir <- view $ configL . to (.configLocalProgramsBase)
+  localBinDir <- view $ configL . to (.configLocalBin)
   let toStyleDoc = style Dir . fromString . toFilePath
       stackRoot' = toStyleDoc stackRoot
       globalConfig' = toStyleDoc globalConfig

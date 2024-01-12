@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Options.Completion
   ( ghcOptsCompleter
@@ -62,7 +63,7 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do
-  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  packages <- view $ buildConfigL . to (.bcSMWanted.smwProject)
   comps <- for packages ppComponents
   pure $
     concatMap
@@ -75,7 +76,7 @@ targetCompleter = buildConfigCompleter $ \input -> do
 flagCompleter :: Completer
 flagCompleter = buildConfigCompleter $ \input -> do
   bconfig <- view buildConfigL
-  gpds <- for (smwProject $ bcSMWanted bconfig) ppGPD
+  gpds <- for bconfig.bcSMWanted.smwProject ppGPD
   let wildcardFlags
         = nubOrd
         $ concatMap (\(name, gpd) ->
@@ -90,8 +91,8 @@ flagCompleter = buildConfigCompleter $ \input -> do
         let flname = C.unFlagName $ C.flagName fl
         in  (if flagEnabled name fl then "-" else "") ++ flname
       prjFlags =
-        case configProject (bcConfig bconfig) of
-          PCProject (p, _) -> projectFlags p
+        case bconfig.bcConfig.configProject of
+          PCProject (p, _) -> p.projectFlags
           PCGlobalProject -> mempty
           PCNoProject _ -> mempty
       flagEnabled name fl =
@@ -106,7 +107,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
 
 projectExeCompleter :: Completer
 projectExeCompleter = buildConfigCompleter $ \input -> do
-  packages <- view $ buildConfigL.to (smwProject . bcSMWanted)
+  packages <- view $ buildConfigL . to (.bcSMWanted.smwProject)
   gpds <- Map.traverseWithKey (const ppGPD) packages
   pure
     $ filter (input `isPrefixOf`)

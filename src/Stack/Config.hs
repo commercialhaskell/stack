@@ -224,19 +224,19 @@ makeConcreteResolver ar = do
         let fp = implicitGlobalDir </> stackDotYaml
         iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
         ProjectAndConfigMonoid project _ <- liftIO iopc
-        pure $ projectResolver project
+        pure project.projectResolver
       ARLatestNightly ->
-        RSLSynonym . Nightly . snapshotsNightly <$> getSnapshots
+        RSLSynonym . Nightly . (.snapshotsNightly) <$> getSnapshots
       ARLatestLTSMajor x -> do
         snapshots <- getSnapshots
-        case IntMap.lookup x $ snapshotsLts snapshots of
+        case IntMap.lookup x snapshots.snapshotsLts of
           Nothing -> throwIO $ NoLTSWithMajorVersion x
           Just y -> pure $ RSLSynonym $ LTS x y
       ARLatestLTS -> do
         snapshots <- getSnapshots
-        if IntMap.null $ snapshotsLts snapshots
+        if IntMap.null snapshots.snapshotsLts
           then throwIO NoLTSFound
-          else let (x, y) = IntMap.findMax $ snapshotsLts snapshots
+          else let (x, y) = IntMap.findMax snapshots.snapshotsLts
                in  pure $ RSLSynonym $ LTS x y
   prettyInfoL
     [ flow "Selected resolver:"
@@ -249,8 +249,8 @@ getLatestResolver :: HasConfig env => RIO env RawSnapshotLocation
 getLatestResolver = do
   snapshots <- getSnapshots
   let mlts = uncurry LTS <$>
-             listToMaybe (reverse (IntMap.toList (snapshotsLts snapshots)))
-  pure $ RSLSynonym $ fromMaybe (Nightly (snapshotsNightly snapshots)) mlts
+             listToMaybe (reverse (IntMap.toList snapshots.snapshotsLts))
+  pure $ RSLSynonym $ fromMaybe (Nightly snapshots.snapshotsNightly) mlts
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid ::
@@ -320,7 +320,7 @@ configFromConfigMonoid
         os = defOS
         configPlatform = Platform arch os
         configRequireStackVersion = simplifyVersionRange
-          (getIntersectingVersionRange configMonoid.configMonoidRequireStackVersion)
+          configMonoid.configMonoidRequireStackVersion.getIntersectingVersionRange
         configCompilerCheck = fromFirst MatchMinor configMonoid.configMonoidCompilerCheck
     configPlatformVariant <- liftIO $
       maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
@@ -329,13 +329,13 @@ configFromConfigMonoid
       dockerOptsFromMonoid (fmap fst mproject) configResolver configMonoid.configMonoidDockerOpts
     configNix <- nixOptsFromMonoid configMonoid.configMonoidNixOpts os
     configSystemGHC <-
-      case (getFirst configMonoid.configMonoidSystemGHC, nixEnable configNix) of
+      case (getFirst configMonoid.configMonoidSystemGHC, configNix.nixEnable) of
         (Just False, True) ->
           throwM NixRequiresSystemGhc
         _ ->
           pure
             (fromFirst
-              (dockerEnable configDocker || nixEnable configNix)
+              (configDocker.dockerEnable || configNix.nixEnable)
               configMonoid.configMonoidSystemGHC)
     when (isJust configGHCVariant && configSystemGHC) $
       throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
@@ -429,7 +429,7 @@ configFromConfigMonoid
     useAnsi <- liftIO $ hSupportsANSI stderr
     let stylesUpdate' = (configRunner' ^. stylesUpdateL) <>
           configMonoid.configMonoidStyles
-        useColor' = runnerUseColor configRunner'
+        useColor' = configRunner'.runnerUseColor
         mUseColor = do
           colorWhen <- getFirst configMonoid.configMonoidColorWhen
           pure $ case colorWhen of
@@ -441,7 +441,7 @@ configFromConfigMonoid
           & processContextL .~ origEnv
           & stylesUpdateL .~ stylesUpdate'
           & useColorL .~ useColor''
-        go = runnerGlobalOpts configRunner'
+        go = configRunner'.runnerGlobalOpts
     pic <-
       case getFirst configMonoid.configMonoidPackageIndex of
         Nothing ->
@@ -479,18 +479,20 @@ configFromConfigMonoid
                         <> "/" <> display day <> ".yaml"
                 mkRSLUrl builder = RSLUrl (utf8BuilderToText builder) Nothing
                 addr' = display $ T.dropWhileEnd (=='/') addr
-    let configStackDeveloperMode =
-          fromFirst stackDeveloperModeDefault configMonoid.configMonoidStackDeveloperMode
-        configCasa = if fromFirstTrue $ casaMonoidEnable configMonoid.configMonoidCasaOpts
-          then
-            let casaRepoPrefix = fromFirst
-                  (fromFirst defaultCasaRepoPrefix configMonoid.configMonoidCasaRepoPrefix)
-                  (casaMonoidRepoPrefix configMonoid.configMonoidCasaOpts)
-                casaMaxKeysPerRequest = fromFirst
-                  defaultCasaMaxPerRequest
-                  (casaMonoidMaxKeysPerRequest configMonoid.configMonoidCasaOpts)
-            in  Just (casaRepoPrefix, casaMaxKeysPerRequest)
-          else Nothing
+    let configStackDeveloperMode = fromFirst
+          stackDeveloperModeDefault
+          configMonoid.configMonoidStackDeveloperMode
+        configCasa =
+          if fromFirstTrue configMonoid.configMonoidCasaOpts.casaMonoidEnable
+            then
+              let casaRepoPrefix = fromFirst
+                    (fromFirst defaultCasaRepoPrefix configMonoid.configMonoidCasaRepoPrefix)
+                    configMonoid.configMonoidCasaOpts.casaMonoidRepoPrefix
+                  casaMaxKeysPerRequest = fromFirst
+                    defaultCasaMaxPerRequest
+                    configMonoid.configMonoidCasaOpts.casaMonoidMaxKeysPerRequest
+              in  Just (casaRepoPrefix, casaMaxKeysPerRequest)
+            else Nothing
     withNewLogFunc go useColor'' stylesUpdate' $ \logFunc -> do
       let configRunner = configRunner'' & logFuncL .~ logFunc
       withLocalLogFunc logFunc $ handleMigrationException $ do
@@ -598,10 +600,10 @@ withNewLogFunc go useColor (StylesUpdate update) inner = do
         $ setLogLevelColors logLevelColors
         $ setLogSecondaryColor secondaryColor
         $ setLogAccentColors (const highlightColor)
-        $ setLogUseTime (globalTimeInLog go)
-        $ setLogMinLevel (globalLogLevel go)
-        $ setLogVerboseFormat (globalLogLevel go <= LevelDebug)
-        $ setLogTerminal (globalTerminal go)
+        $ setLogUseTime go.globalTimeInLog
+        $ setLogMinLevel go.globalLogLevel
+        $ setLogVerboseFormat (go.globalLogLevel <= LevelDebug)
+        $ setLogTerminal go.globalTerminal
           logOptions0
   withLogFunc logOptions inner
  where
@@ -644,10 +646,10 @@ loadConfig ::
   => (Config -> RIO env a)
   -> RIO env a
 loadConfig inner = do
-  mstackYaml <- view $ globalOptsL . to globalStackYaml
+  mstackYaml <- view $ globalOptsL . to (.globalStackYaml)
   mproject <- loadProjectConfig mstackYaml
-  mresolver <- view $ globalOptsL . to globalResolver
-  configArgs <- view $ globalOptsL . to globalConfigMonoid
+  mresolver <- view $ globalOptsL . to (.globalResolver)
+  configArgs <- view $ globalOptsL . to (.globalConfigMonoid)
   (configRoot, stackRoot, userOwnsStackRoot) <-
     determineStackRootAndOwnership configArgs
 
@@ -665,7 +667,7 @@ loadConfig inner = do
         -- default docker to enabled, so make it look like they didn't exist
         map
           ( \c -> c {configMonoidDockerOpts =
-              (configMonoidDockerOpts c) {dockerMonoidDefaultEnable = Any False}}
+              c.configMonoidDockerOpts {dockerMonoidDefaultEnable = Any False}}
           )
           extraConfigs0
 
@@ -678,10 +680,10 @@ loadConfig inner = do
           (mconcat $ configArgs : addConfigMonoid extraConfigs)
 
   withConfig $ \config -> do
-    let Platform arch _ = configPlatform config
+    let Platform arch _ = config.configPlatform
     case arch of
       OtherArch unknownArch
-        | configNotifyIfArchUnknown config ->
+        | config.configNotifyIfArchUnknown ->
             prettyWarnL
               [ flow "Unknown value for architecture setting:"
               , style Shell (fromString unknownArch) <> "."
@@ -690,13 +692,13 @@ loadConfig inner = do
               , flow "in Stack's configuration."
               ]
       _ -> pure ()
-    unless (stackVersion `withinRange` configRequireStackVersion config)
-      (throwM (BadStackVersionException (configRequireStackVersion config)))
-    unless (configAllowDifferentUser config) $ do
+    unless (stackVersion `withinRange` config.configRequireStackVersion)
+      (throwM (BadStackVersionException config.configRequireStackVersion))
+    unless config.configAllowDifferentUser $ do
       unless userOwnsStackRoot $
         throwM (UserDoesn'tOwnDirectory stackRoot)
       forM_ (configProjectRoot config) $ \dir ->
-        checkOwnership (dir </> configWorkDir config)
+        checkOwnership (dir </> config.configWorkDir)
     inner config
 
 -- | Load the build configuration, adds build-specific values to config loaded
@@ -712,20 +714,20 @@ withBuildConfig inner = do
   -- to properly deal with an AbstractResolver, we need a base directory (to
   -- deal with custom snapshot relative paths). We consider the current working
   -- directory to be the correct base. Let's calculate the mresolver first.
-  mresolver <- forM (configResolver config) $ \aresolver -> do
+  mresolver <- forM config.configResolver $ \aresolver -> do
     logDebug ("Using resolver: " <> display aresolver <> " specified on command line")
     makeConcreteResolver aresolver
 
-  (project', stackYamlFP) <- case configProject config of
+  (project', stackYamlFP) <- case config.configProject of
     PCProject (project, fp) -> do
-      forM_ (projectUserMsg project) prettyWarnS
+      forM_ project.projectUserMsg prettyWarnS
       pure (project, fp)
     PCNoProject extraDeps -> do
       p <-
         case mresolver of
           Nothing -> throwIO NoResolverWhenUsingNoProject
           Just _ -> getEmptyProject mresolver extraDeps
-      pure (p, configUserConfigPath config)
+      pure (p, config.configUserConfigPath)
     PCGlobalProject -> do
       logDebug "Run from outside a project, using implicit global project config"
       destDir <- getImplicitGlobalProjectDir config
@@ -740,13 +742,13 @@ withBuildConfig inner = do
           iopc <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
           ProjectAndConfigMonoid project _ <- liftIO iopc
           when (view terminalL config) $
-            case configResolver config of
+            case config.configResolver of
               Nothing ->
                 logDebug $
-                  "Using resolver: " <>
-                  display (projectResolver project) <>
-                  " from implicit global project's config file: " <>
-                  fromString dest'
+                     "Using resolver: "
+                  <> display project.projectResolver
+                  <> " from implicit global project's config file: "
+                  <> fromString dest'
               Just _ -> pure ()
           pure (project, dest)
         else do
@@ -764,7 +766,7 @@ withBuildConfig inner = do
               [ "# This is the implicit global project's config file, which is only used when\n"
               , "# 'stack' is run outside of a real project. Settings here do _not_ act as\n"
               , "# defaults for all projects. To change Stack's default settings, edit\n"
-              , "# '", encodeUtf8 (T.pack $ toFilePath $ configUserConfigPath config), "' instead.\n"
+              , "# '", encodeUtf8 (T.pack $ toFilePath config.configUserConfigPath), "' instead.\n"
               , "#\n"
               , "# For more information about Stack's configuration, see\n"
               , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
@@ -775,14 +777,14 @@ withBuildConfig inner = do
               "used only when 'stack' is run\noutside of a " <>
               "real project.\n"
           pure (p, dest)
-  mcompiler <- view $ globalOptsL . to globalCompiler
+  mcompiler <- view $ globalOptsL . to (.globalCompiler)
   let project = project'
-        { projectCompiler = mcompiler <|> projectCompiler project'
-        , projectResolver = fromMaybe (projectResolver project') mresolver
+        { projectCompiler = mcompiler <|> project'.projectCompiler
+        , projectResolver = fromMaybe project'.projectResolver mresolver
         }
-  extraPackageDBs <- mapM resolveDir' (projectExtraPackageDBs project)
+  extraPackageDBs <- mapM resolveDir' project.projectExtraPackageDBs
 
-  wanted <- lockCachedWanted stackYamlFP (projectResolver project) $
+  wanted <- lockCachedWanted stackYamlFP project.projectResolver $
     fillProjectWanted stackYamlFP config project
 
   -- Unfortunately redoes getProjectWorkDir, since we don't have a BuildConfig
@@ -796,7 +798,7 @@ withBuildConfig inner = do
           , bcSMWanted = wanted
           , bcExtraPackageDBs = extraPackageDBs
           , bcStackYaml = stackYamlFP
-          , bcCurator = projectCurator project
+          , bcCurator = project.projectCurator
           , bcProjectStorage = projectStorage
           }
     runRIO bc inner
@@ -844,13 +846,13 @@ fillProjectWanted ::
   -> Map PackageName (Bool -> RIO env DepPackage)
   -> RIO env (SMWanted, [CompletedPLI])
 fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages = do
-  let bopts = configBuild config
+  let bopts = config.configBuild
 
-  packages0 <- for (projectPackages project) $ \fp@(RelFilePath t) -> do
+  packages0 <- for project.projectPackages $ \fp@(RelFilePath t) -> do
     abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
     let resolved = ResolvedPath fp abs'
-    pp <- mkProjectPackage YesPrintWarnings resolved (boptsHaddock bopts)
-    pure (cpName $ ppCommon pp, pp)
+    pp <- mkProjectPackage YesPrintWarnings resolved bopts.boptsHaddock
+    pure (pp.ppCommon.cpName, pp)
 
   -- prefetch git repos to avoid cloning per subdirectory
   -- see https://github.com/commercialhaskell/stack/issues/5411
@@ -859,11 +861,11 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
             (RPLImmutable (RPLIRepo repo rpm)) -> Just (repo, rpm)
             _ -> Nothing
         )
-        (projectDependencies project)
+        project.projectDependencies
   logDebug ("Prefetching git repos: " <> display (T.pack (show gitRepos)))
   fetchReposRaw gitRepos
 
-  (deps0, mcompleted) <- fmap unzip . forM (projectDependencies project) $ \rpl -> do
+  (deps0, mcompleted) <- fmap unzip . forM project.projectDependencies $ \rpl -> do
     (pl, mCompleted) <- case rpl of
        RPLImmutable rpli -> do
          (compl, mcompl) <-
@@ -880,17 +882,17 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
        RPLMutable p ->
          pure (PLMutable p, Nothing)
     dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
-    pure ((cpName $ dpCommon dp, dp), mCompleted)
+    pure ((dp.dpCommon.cpName, dp), mCompleted)
 
   checkDuplicateNames $
-    map (second (PLMutable . ppResolvedDir)) packages0 ++
-    map (second dpLocation) deps0
+    map (second (PLMutable . (.ppResolvedDir))) packages0 ++
+    map (second (.dpLocation)) deps0
 
   let packages1 = Map.fromList packages0
       snPackages = snapPackages
         `Map.difference` packages1
         `Map.difference` Map.fromList deps0
-        `Map.withoutKeys` projectDropPackages project
+        `Map.withoutKeys` project.projectDropPackages
 
   snDeps <- for snPackages $ \getDep -> getDep (shouldHaddockDeps bopts)
 
@@ -898,19 +900,19 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
 
   let mergeApply m1 m2 f =
         MS.merge MS.preserveMissing MS.dropMissing (MS.zipWithMatched f) m1 m2
-      pFlags = projectFlags project
+      pFlags = project.projectFlags
       packages2 = mergeApply packages1 pFlags $
-        \_ p flags -> p{ppCommon=(ppCommon p){cpFlags=flags}}
+        \_ p flags -> p{ppCommon = p.ppCommon {cpFlags=flags}}
       deps2 = mergeApply deps1 pFlags $
-        \_ d flags -> d{dpCommon=(dpCommon d){cpFlags=flags}}
+        \_ d flags -> d{dpCommon = d.dpCommon {cpFlags=flags}}
 
   checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
 
-  let pkgGhcOptions = configGhcOptionsByName config
+  let pkgGhcOptions = config.configGhcOptionsByName
       deps = mergeApply deps2 pkgGhcOptions $
-        \_ d options -> d{dpCommon=(dpCommon d){cpGhcOptions=options}}
+        \_ d options -> d{dpCommon = d.dpCommon {cpGhcOptions=options}}
       packages = mergeApply packages2 pkgGhcOptions $
-        \_ p options -> p{ppCommon=(ppCommon p){cpGhcOptions=options}}
+        \_ p options -> p{ppCommon = p.ppCommon {cpGhcOptions=options}}
       unusedPkgGhcOptions =
         pkgGhcOptions `Map.restrictKeys` Map.keysSet packages2
           `Map.restrictKeys` Map.keysSet deps2
@@ -919,10 +921,10 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
     throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
 
   let wanted = SMWanted
-        { smwCompiler = fromMaybe snapCompiler (projectCompiler project)
+        { smwCompiler = fromMaybe snapCompiler project.projectCompiler
         , smwProject = packages
         , smwDeps = deps
-        , smwSnapshotLocation = projectResolver project
+        , smwSnapshotLocation = project.projectResolver
         }
 
   pure (wanted, catMaybes mcompleted)
@@ -950,7 +952,7 @@ determineStackRootAndOwnership ::
   -> m (Path Abs Dir, Path Abs Dir, Bool)
 determineStackRootAndOwnership clArgs = liftIO $ do
   (configRoot, stackRoot) <- do
-    case getFirst (configMonoidStackRoot clArgs) of
+    case getFirst clArgs.configMonoidStackRoot of
       Just x -> pure (x, x)
       Nothing -> do
         mstackRoot <- lookupEnv stackRootEnvVar

@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.PackageDump
   ( Line
@@ -169,14 +170,14 @@ sinkMatching :: Monad m
              -> ConduitM DumpPackage o m (Map PackageName DumpPackage)
 sinkMatching allowed =
     Map.fromList
-  . map (pkgName . dpPackageIdent &&& id)
+  . map (pkgName . (.dpPackageIdent) &&& id)
   . Map.elems
   . pruneDeps
       id
-      dpGhcPkgId
-      dpDepends
+      (.dpGhcPkgId)
+      (.dpDepends)
       const -- Could consider a better comparison in the future
-  <$> (CL.filter (isAllowed . dpPackageIdent) .| CL.consume)
+  <$> (CL.filter (isAllowed . (.dpPackageIdent)) .| CL.consume)
  where
   isAllowed (PackageIdentifier name version) =
     case Map.lookup name allowed of

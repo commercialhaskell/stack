@@ -98,16 +98,16 @@ runActions threads keepGoing actions withProgress = do
     <*> newTVarIO Set.empty -- esInAction
     <*> newTVarIO 0 -- esCompleted
     <*> pure keepGoing -- esKeepGoing
-  _ <- async $ withProgress (esCompleted es) (esInAction es)
+  _ <- async $ withProgress es.esCompleted es.esInAction
   if threads <= 1
     then runActions' es
     else replicateConcurrently_ threads $ runActions' es
-  readTVarIO $ esExceptions es
+  readTVarIO es.esExceptions
 
 -- | Sort actions such that those that can't be run concurrently are at
 -- the end.
 sortActions :: [Action] -> [Action]
-sortActions = sortBy (compareConcurrency `on` actionConcurrency)
+sortActions = sortBy (compareConcurrency `on` (.actionConcurrency))
  where
   -- NOTE: Could derive Ord. However, I like to make this explicit so
   -- that changes to the datatype must consider how it's affecting
@@ -139,7 +139,7 @@ runActions' es = loop
   processActions :: [Action] -> STM (IO ())
   processActions actions = do
     inAction <- readTVar es.esInAction
-    case break (Set.null . actionDeps) actions of
+    case break (Set.null . (.actionDeps)) actions of
       (_, []) -> do
         check (Set.null inAction)
         unless es.esKeepGoing $
@@ -149,11 +149,11 @@ runActions' es = loop
 
   processAction :: Set ActionId -> [Action] -> Action -> STM (IO ())
   processAction inAction otherActions action = do
-    let concurrency = actionConcurrency action
+    let concurrency = action.actionConcurrency
     unless (concurrency == ConcurrencyAllowed) $
       check (Set.null inAction)
-    let action' = actionId action
-        otherActions' = Set.fromList $ map actionId otherActions
+    let action' = action.actionId
+        otherActions' = Set.fromList $ map (.actionId) otherActions
         remaining = Set.union otherActions' inAction
         actionContext = ActionContext
           { acRemaining = remaining
@@ -164,7 +164,7 @@ runActions' es = loop
     modifyTVar es.esInAction (Set.insert action')
     pure $ do
       mask $ \restore -> do
-        eres <- try $ restore $ actionDo action actionContext
+        eres <- try $ restore $ action.actionDo actionContext
         atomically $ do
           modifyTVar es.esInAction (Set.delete action')
           modifyTVar es.esCompleted (+1)
@@ -176,13 +176,13 @@ runActions' es = loop
   -- | Filter a list of actions to include only those that depend on the given
   -- action.
   downstreamActions :: ActionId -> [Action] -> [Action]
-  downstreamActions aid = filter (\a -> aid `Set.member` actionDeps a)
+  downstreamActions aid = filter (\a -> aid `Set.member` a.actionDeps)
 
   -- | Given two actions (the first specified by its id) yield an action
   -- equivalent to the second but excluding any dependency on the first action.
   dropDep :: ActionId -> Action -> Action
   dropDep action' action =
-    action { actionDeps = Set.delete action' $ actionDeps action }
+    action { actionDeps = Set.delete action' action.actionDeps }
 
   -- | @IO ()@ lifted into 'STM'.
   doNothing :: STM (IO ())

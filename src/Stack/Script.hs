@@ -136,7 +136,7 @@ scriptCmd opts = do
   -- Note that in this functions we use logError instead of logWarn because,
   -- when using the interpreter mode, only error messages are shown. See:
   -- https://github.com/commercialhaskell/stack/issues/3007
-  view (globalOptsL . to globalStackYaml) >>= \case
+  view (globalOptsL . to (.globalStackYaml)) >>= \case
     SYLOverride fp -> logError $
          "Ignoring override stack.yaml file for script command: "
       <> fromString (toFilePath fp)
@@ -144,25 +144,25 @@ scriptCmd opts = do
     SYLDefault -> pure ()
     SYLNoProject _ -> assert False (pure ())
 
-  file <- resolveFile' $ soFile opts
+  file <- resolveFile' opts.soFile
   let scriptFile = filename file
 
-  isNoRunCompile <- fromFirstFalse . configMonoidNoRunCompile <$>
-                           view (globalOptsL . to globalConfigMonoid)
+  isNoRunCompile <- fromFirstFalse . (.configMonoidNoRunCompile) <$>
+                           view (globalOptsL . to (.globalConfigMonoid))
 
   let scriptDir = parent file
       modifyGO go = go
-        { globalConfigMonoid = (globalConfigMonoid go)
+        { globalConfigMonoid = go.globalConfigMonoid
             { configMonoidInstallGHC = FirstTrue $ Just True
             }
-        , globalStackYaml = SYLNoProject $ soScriptExtraDeps opts
+        , globalStackYaml = SYLNoProject opts.soScriptExtraDeps
         }
       (shouldRun, shouldCompile) = if isNoRunCompile
         then (NoRun, SECompile)
-        else (soShouldRun opts, soCompile opts)
+        else (opts.soShouldRun, opts.soCompile)
 
   root <- withConfig NoReexec $ view stackRootL
-  outputDir <- if soUseRoot opts
+  outputDir <- if opts.soUseRoot
     then do
       scriptFileAsDir <- maybe
         (throwIO $ FailedToParseScriptFileAsDirBug scriptFile)
@@ -191,7 +191,7 @@ scriptCmd opts = do
   case shouldRun of
     YesRun -> pure ()
     NoRun -> do
-      unless (null $ soArgs opts) $ throwIO ArgumentsWithNoRunInvalid
+      unless (null opts.soArgs) $ throwIO ArgumentsWithNoRunInvalid
       case shouldCompile of
         SEInterpret -> throwIO NoRunWithoutCompilationInvalid
         SECompile -> pure ()
@@ -208,7 +208,7 @@ scriptCmd opts = do
  where
   runCompiled shouldRun exe = do
     case shouldRun of
-      YesRun -> exec (fromAbsFile exe) (soArgs opts)
+      YesRun -> exec (fromAbsFile exe) opts.soArgs
       NoRun -> prettyInfoL
         [ flow "Compilation finished, executable available at"
         , style File (fromString (fromAbsFile exe)) <> "."
@@ -226,13 +226,13 @@ scriptCmd opts = do
     withConfig YesReexec $
     withDefaultEnvConfig $ do
       config <- view configL
-      menv <- liftIO $ configProcessContextSettings config defaultEnvSettings
+      menv <- liftIO $ config.configProcessContextSettings defaultEnvSettings
       withProcessContext menv $ do
         colorFlag <- appropriateGhcColorFlag
 
         targetsSet <-
-          case soPackages opts of
-            [] -> getPackagesFromImports (soFile opts) -- Using the import parser
+          case opts.soPackages of
+            [] -> getPackagesFromImports opts.soFile -- Using the import parser
             packages -> do
               let targets = concatMap wordsComma packages
               targets' <- mapM parsePackageNameThrowing targets
@@ -243,7 +243,7 @@ scriptCmd opts = do
           -- to check which packages are installed already. If all needed
           -- packages are available, we can skip the (rather expensive) build
           -- call below.
-          GhcPkgExe pkg <- view $ compilerPathsL . to cpPkg
+          GhcPkgExe pkg <- view $ compilerPathsL . to (.cpPkg)
           -- https://github.com/haskell/process/issues/251
           bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
               ["list", "--simple-output"] CL.sinkNull CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
@@ -272,8 +272,8 @@ scriptCmd opts = do
                   SEInterpret -> []
                   SECompile -> []
                   SEOptimize -> ["-O2"]
-              , soGhcOptions opts
-              , if soUseRoot opts
+              , opts.soGhcOptions
+              , if opts.soUseRoot
                   then
                     [ "-outputdir=" ++ fromAbsDir (parent exe)
                     , "-o", fromAbsFile exe
@@ -282,9 +282,9 @@ scriptCmd opts = do
               ]
         case shouldCompile of
           SEInterpret -> do
-            interpret <- view $ compilerPathsL . to cpInterpreter
+            interpret <- view $ compilerPathsL . to (.cpInterpreter)
             exec (toFilePath interpret)
-                (ghcArgs ++ toFilePath file : soArgs opts)
+                (ghcArgs ++ toFilePath file : opts.soArgs)
           _ -> do
             -- Use readProcessStdout_ so that (1) if GHC does send any output
             -- to stdout, we capture it and stop it from being sent to our
@@ -293,7 +293,7 @@ scriptCmd opts = do
             -- to the user.
             liftIO $ Dir.createDirectoryIfMissing True (fromAbsDir (parent exe))
             compilerExeName <-
-              view $ compilerPathsL . to cpCompiler . to toFilePath
+              view $ compilerPathsL . to (.cpCompiler) . to toFilePath
             withWorkingDir (fromAbsDir (parent file)) $ proc
               compilerExeName
               (ghcArgs ++ [toFilePath file])
@@ -330,12 +330,12 @@ getPackagesFromModuleNames mns = do
 
 hashSnapshot :: RIO EnvConfig SnapshotCacheHash
 hashSnapshot = do
-  sourceMap <- view $ envConfigL . to envConfigSourceMap
+  sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
   compilerInfo <- getCompilerInfo
   let eitherPliHash (pn, dep)
-        | PLImmutable pli <- dpLocation dep = Right $ immutableLocSha pli
+        | PLImmutable pli <- dep.dpLocation = Right $ immutableLocSha pli
         | otherwise = Left pn
-      deps = Map.toList (smDeps sourceMap)
+      deps = Map.toList sourceMap.smDeps
   case partitionEithers (map eitherPliHash deps) of
     ([], pliHashes) -> do
       let hashedContent = mconcat $ compilerInfo : pliHashes
@@ -346,18 +346,19 @@ hashSnapshot = do
 
 mapSnapshotPackageModules :: RIO EnvConfig (Map PackageName (Set ModuleName))
 mapSnapshotPackageModules = do
-  sourceMap <- view $ envConfigL . to envConfigSourceMap
+  sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
   installMap <- toInstallMap sourceMap
   (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
     getInstalled installMap
-  let globals = dumpedPackageModules (smGlobal sourceMap) globalDumpPkgs
-      notHidden = Map.filter (not . dpHidden)
-      notHiddenDeps = notHidden $ smDeps sourceMap
+  let globals = dumpedPackageModules sourceMap.smGlobal globalDumpPkgs
+      notHidden = Map.filter (not . (.dpHidden))
+      notHiddenDeps = notHidden sourceMap.smDeps
       installedDeps = dumpedPackageModules notHiddenDeps snapshotDumpPkgs
-      dumpPkgs = Set.fromList $ map (pkgName . dpPackageIdent) snapshotDumpPkgs
+      dumpPkgs =
+        Set.fromList $ map (pkgName . (.dpPackageIdent)) snapshotDumpPkgs
       notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
   otherDeps <- for notInstalledDeps $ \dep -> do
-    gpd <- liftIO $ cpGPD (dpCommon dep)
+    gpd <- liftIO dep.dpCommon.cpGPD
     Set.fromList <$> allExposedModules gpd
   -- source map construction process should guarantee unique package names in
   -- these maps

@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.DumpPackage
   ( DumpPackage (..)
@@ -49,7 +50,7 @@ data SublibDump = SublibDump
   deriving (Eq, Read, Show)
 
 dpParentLibIdent :: DumpPackage -> Maybe PackageIdentifier
-dpParentLibIdent dp = case (dpSublib dp, dpPackageIdent dp) of
+dpParentLibIdent dp = case (dp.dpSublib, dp.dpPackageIdent) of
   (Nothing, _) -> Nothing
   (Just sublibDump, PackageIdentifier _ v) ->
     Just $ PackageIdentifier libParentPackageName v

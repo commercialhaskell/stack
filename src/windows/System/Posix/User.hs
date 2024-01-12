@@ -1,3 +1,6 @@
+{-# LANGUAGE NoFieldSelectors    #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+
 -- | The module of this name differs as between Windows and non-Windows builds.
 -- This is the Windows version. Non-Windows builds rely on the unix package,
 -- which exposes a module of the same name.
@@ -47,3 +50,6 @@ data UserEntry = UserEntry
     , homeDirectory :: String
     , userShell     :: String
     } deriving (Eq, Read, Show)
+
+homeDirectory :: UserEntry -> String
+homeDirectory ue = ue.homeDirectory

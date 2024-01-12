@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 -- Types and functions related to Stack's @sdist@ command.
 module Stack.SDist
@@ -143,10 +144,10 @@ sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =
   withConfig YesReexec $ withDefaultEnvConfig $ do
     -- If no directories are specified, build all sdist tarballs.
-    dirs' <- if null (sdoptsDirsToWorkWith sdistOpts)
+    dirs' <- if null sdistOpts.sdoptsDirsToWorkWith
       then do
         dirs <- view $
-          buildConfigL.to (map ppRoot . Map.elems . smwProject . bcSMWanted)
+          buildConfigL . to (map ppRoot . Map.elems . (.bcSMWanted.smwProject))
         when (null dirs) $ do
           stackYaml <- view stackYamlL
           prettyErrorL
@@ -159,10 +160,10 @@ sdistCmd sdistOpts =
             ]
           exitFailure
         pure dirs
-      else mapM resolveDir' (sdoptsDirsToWorkWith sdistOpts)
+      else mapM resolveDir' sdistOpts.sdoptsDirsToWorkWith
     forM_ dirs' $ \dir -> do
       (tarName, tarBytes, _mcabalRevision) <-
-        getSDistTarball (sdoptsPvpBounds sdistOpts) dir
+        getSDistTarball sdistOpts.sdoptsPvpBounds dir
       distDir <- distDirFromDir dir
       tarPath <- (distDir </>) <$> parseRelFile tarName
       ensureDir (parent tarPath)
@@ -174,7 +175,7 @@ sdistCmd sdistOpts =
         , pretty tarPath <> "."
         ]
       checkSDistTarball sdistOpts tarPath
-      forM_ (sdoptsTarPath sdistOpts) $ copyTarToTarPath tarPath tarName
+      forM_ sdistOpts.sdoptsTarPath $ copyTarToTarPath tarPath tarName
  where
   copyTarToTarPath tarPath tarName targetDir = liftIO $ do
     let targetTarPath = targetDir FP.</> tarName
@@ -201,11 +202,11 @@ getSDistTarball ::
 getSDistTarball mpvpBounds pkgDir = do
   config <- view configL
   let PvpBounds pvpBounds asRevision =
-        fromMaybe (configPvpBounds config) mpvpBounds
+        fromMaybe config.configPvpBounds mpvpBounds
       tweakCabal = pvpBounds /= PvpBoundsNone
       pkgFp = toFilePath pkgDir
   lp <- readLocalPackage pkgDir
-  forM_ (packageSetupDeps (lpPackage lp)) $ \customSetupDeps ->
+  forM_ lp.lpPackage.packageSetupDeps $ \customSetupDeps ->
     case nonEmpty (map (T.pack . packageNameString) (Map.keys customSetupDeps)) of
       Just nonEmptyDepTargets -> do
         eres <- buildLocalTargets nonEmptyDepTargets
@@ -219,12 +220,12 @@ getSDistTarball mpvpBounds pkgDir = do
             pure ()
       Nothing ->
         prettyWarnS "unexpected empty custom-setup dependencies."
-  sourceMap <- view $ envConfigL.to envConfigSourceMap
+  sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
   installMap <- toInstallMap sourceMap
   (installedMap, _globalDumpPkgs, _snapshotDumpPkgs, _localDumpPkgs) <-
     getInstalled installMap
   let deps = Map.fromList
-        [ (pid, iliId libInfo)
+        [ (pid, libInfo.iliId)
         | (_, Library pid libInfo) <- Map.elems installedMap]
   prettyInfoL
     [ flow "Getting the file list for"
@@ -273,7 +274,7 @@ getSDistTarball mpvpBounds pkgDir = do
       isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
       tarName = pkgIdName FP.<.> "tar.gz"
       pkgIdName = packageIdentifierString pkgId
-      pkgId = packageIdentifier (lpPackage lp)
+      pkgId = packageIdentifier lp.lpPackage
   dirEntries <- mapM packDir (dirsFromFiles files)
   fileEntries <- mapM packFile files
   mcabalFileRevision <- liftIO (readIORef cabalFileRevisionRef)
@@ -549,13 +550,13 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
   pkgDir <- (pkgDir' </>) <$>
     (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
   --               ^ drop ".tar"     ^ drop ".gz"
-  when (sdoptsBuildTarball opts)
+  when opts.sdoptsBuildTarball
     ( buildExtractedTarball ResolvedPath
         { resolvedRelative = RelFilePath "this-is-not-used" -- ugly hack
         , resolvedAbsolute = pkgDir
         }
     )
-  unless (sdoptsIgnoreCheck opts) (checkPackageInExtractedTarball pkgDir)
+  unless opts.sdoptsIgnoreCheck (checkPackageInExtractedTarball pkgDir)
 
 checkPackageInExtractedTarball ::
      HasEnvConfig env
@@ -608,26 +609,26 @@ buildExtractedTarball pkgDir = do
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         pure
-          $  packageName (lpPackage localPackage)
-          == packageName (lpPackage localPackageToBuild)
+          $  localPackage.lpPackage.packageName
+          == localPackageToBuild.lpPackage.packageName
   pathsToKeep <- Map.fromList <$> filterM
-    (fmap not . isPathToRemove . resolvedAbsolute . ppResolvedDir . snd)
-    (Map.toList (smwProject (bcSMWanted (envConfigBuildConfig envConfig))))
+    (fmap not . isPathToRemove . resolvedAbsolute . (.ppResolvedDir) . snd)
+    (Map.toList envConfig.envConfigBuildConfig.bcSMWanted.smwProject)
   pp <- mkProjectPackage YesPrintWarnings pkgDir False
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
               { envConfigSourceMap =
-                  updatePackagesInSourceMap (envConfigSourceMap envConfig)
+                  updatePackagesInSourceMap envConfig.envConfigSourceMap
               , envConfigBuildConfig =
-                  updateBuildConfig (envConfigBuildConfig envConfig)
+                  updateBuildConfig envConfig.envConfigBuildConfig
               }
             updateBuildConfig bc = bc
-              { bcConfig = (bcConfig bc)
+              { bcConfig = bc.bcConfig
                  { configBuild = defaultBuildOpts { boptsTests = True } }
               }
         in  set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =
-        sm {smProject = Map.insert (cpName $ ppCommon pp) pp pathsToKeep}
+        sm {smProject = Map.insert pp.ppCommon.cpName pp pathsToKeep}
   local adjustEnvForBuild $ build Nothing
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to

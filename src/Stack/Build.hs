@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | Build the project.
@@ -95,10 +96,10 @@ instance Exception CabalVersionPrettyException
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> RIO Runner ()
 buildCmd opts = do
-  when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) (boptsCLIGhcOptions opts)) $
+  when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) opts.boptsCLIGhcOptions) $
     prettyThrowIO GHCProfOptionInvalid
   local (over globalOptsL modifyGO) $
-    case boptsCLIFileWatch opts of
+    case opts.boptsCLIFileWatch of
       FileWatchPoll -> fileWatchPoll (inner . Just)
       FileWatch -> fileWatch (inner . Just)
       NoFileWatch -> inner Nothing
@@ -110,14 +111,19 @@ buildCmd opts = do
       Stack.Build.build setLocalFiles
   -- Read the build command from the CLI and enable it to run
   modifyGO =
-    case boptsCLICommand opts of
-      Test -> set (globalOptsBuildOptsMonoidL.buildOptsMonoidTestsL) (Just True)
-      Haddock ->
-        set (globalOptsBuildOptsMonoidL.buildOptsMonoidHaddockL) (Just True)
-      Bench ->
-        set (globalOptsBuildOptsMonoidL.buildOptsMonoidBenchmarksL) (Just True)
-      Install ->
-        set (globalOptsBuildOptsMonoidL.buildOptsMonoidInstallExesL) (Just True)
+    case opts.boptsCLICommand of
+      Test -> set
+        (globalOptsBuildOptsMonoidL . buildOptsMonoidTestsL)
+        (Just True)
+      Haddock -> set
+        (globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL)
+        (Just True)
+      Bench -> set
+        (globalOptsBuildOptsMonoidL . buildOptsMonoidBenchmarksL)
+        (Just True)
+      Install -> set
+        (globalOptsBuildOptsMonoidL . buildOptsMonoidInstallExesL)
+        (Just True)
       Build -> id -- Default case is just Build
 
 -- | Build.
@@ -129,25 +135,25 @@ build :: HasEnvConfig env
       => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> RIO env ()
 build msetLocalFiles = do
-  mcp <- view $ configL.to configModifyCodePage
-  ghcVersion <- view $ actualCompilerVersionL.to getGhcVersion
+  mcp <- view $ configL . to (.configModifyCodePage)
+  ghcVersion <- view $ actualCompilerVersionL . to getGhcVersion
   fixCodePage mcp ghcVersion $ do
     bopts <- view buildOptsL
-    sourceMap <- view $ envConfigL.to envConfigSourceMap
+    sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
     locals <- projectLocalPackages
     depsLocals <- localDependencies
     let allLocals = locals <> depsLocals
 
-    boptsCli <- view $ envConfigL.to envConfigBuildOptsCLI
+    boptsCli <- view $ envConfigL . to (.envConfigBuildOptsCLI)
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
     for_ msetLocalFiles $ \setLocalFiles -> do
       files <-
-        if boptsCLIWatchAll boptsCli
+        if boptsCli.boptsCLIWatchAll
         then sequence [lpFiles lp | lp <- allLocals]
         else forM allLocals $ \lp -> do
-          let pn = packageName (lpPackage lp)
-          case Map.lookup pn (smtTargets $ smTargets sourceMap) of
+          let pn = lp.lpPackage.packageName
+          case Map.lookup pn sourceMap.smTargets.smtTargets of
             Nothing ->
               pure Set.empty
             Just (TargetAll _) ->
@@ -169,9 +175,9 @@ build msetLocalFiles = do
               loadPackage
               sourceMap
               installedMap
-              (boptsCLIInitialBuildSteps boptsCli)
+              boptsCli.boptsCLIInitialBuildSteps
 
-    allowLocals <- view $ configL.to configAllowLocals
+    allowLocals <- view $ configL . to (.configAllowLocals)
     unless allowLocals $ case justLocals plan of
       [] -> pure ()
       localsIdents -> throwM $ LocalPackagesPresent localsIdents
@@ -180,10 +186,10 @@ build msetLocalFiles = do
     warnAboutSplitObjs bopts
     warnIfExecutablesWithSameNameCouldBeOverwritten locals plan
 
-    when (boptsPreFetch bopts) $
+    when bopts.boptsPreFetch $
         preFetch plan
 
-    if boptsCLIDryrun boptsCli
+    if boptsCli.boptsCLIDryrun
       then printPlan plan
       else executePlan
              boptsCli
@@ -193,7 +199,7 @@ build msetLocalFiles = do
              snapshotDumpPkgs
              localDumpPkgs
              installedMap
-             (smtTargets $ smTargets sourceMap)
+             sourceMap.smTargets.smtTargets
              plan
 
 buildLocalTargets ::
@@ -208,7 +214,7 @@ justLocals =
   map taskProvides .
   filter ((== Local) . taskLocation) .
   Map.elems .
-  planTasks
+  (.planTasks)
 
 checkCabalVersion :: HasEnvConfig env => RIO env ()
 checkCabalVersion = do
@@ -286,22 +292,22 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   exesToBuild =
     collect
       [ (exe, pkgName')
-      | (pkgName', task) <- Map.toList (planTasks plan)
-      , TTLocalMutable lp <- [taskType task]
-      , exe <- (Set.toList . exeComponents . lpComponents) lp
+      | (pkgName', task) <- Map.toList plan.planTasks
+      , TTLocalMutable lp <- [task.taskType]
+      , exe <- (Set.toList . exeComponents . (.lpComponents)) lp
       ]
   localExes :: Map Text (NonEmpty PackageName)
   localExes =
     collect
-      [ (exe, packageName pkg)
-      | pkg <- map lpPackage locals
+      [ (exe, pkg.packageName)
+      | pkg <- map (.lpPackage) locals
       , exe <- Set.toList (buildableExes pkg)
       ]
   collect :: Ord k => [(k, v)] -> Map k (NonEmpty v)
   collect = Map.mapMaybe nonEmpty . Map.fromDistinctAscList . groupSort
 
 warnAboutSplitObjs :: HasTerm env => BuildOpts -> RIO env ()
-warnAboutSplitObjs bopts | boptsSplitObjs bopts =
+warnAboutSplitObjs bopts |  bopts.boptsSplitObjs =
   prettyWarnL
     [ flow "Building with"
     , style Shell "--split-objs"
@@ -365,7 +371,7 @@ checkComponentsBuildable lps =
     prettyThrowM $ SomeTargetsNotBuildable unbuildable
  where
   unbuildable =
-    [ (packageName (lpPackage lp), c)
+    [ (lp.lpPackage.packageName, c)
     | lp <- lps
-    , c <- Set.toList (lpUnbuildable lp)
+    , c <- Set.toList lp.lpUnbuildable
     ]

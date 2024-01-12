@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude         #-}
-{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Prelude
   ( withSystemTempDir
@@ -284,10 +285,10 @@ instance Monoid FirstTrue where
 
 -- | Get the 'Bool', defaulting to 'True'
 fromFirstTrue :: FirstTrue -> Bool
-fromFirstTrue = fromMaybe True . getFirstTrue
+fromFirstTrue = fromMaybe True . (.getFirstTrue)
 
 -- | Helper for filling in default values
-defaultFirstTrue :: (a -> FirstTrue) -> Bool
+defaultFirstTrue :: FirstTrue -> Bool
 defaultFirstTrue _ = True
 
 -- | Like @First Bool@, but the default is @False@.
@@ -305,10 +306,10 @@ instance Monoid FirstFalse where
 
 -- | Get the 'Bool', defaulting to 'False'
 fromFirstFalse :: FirstFalse -> Bool
-fromFirstFalse = fromMaybe False . getFirstFalse
+fromFirstFalse = fromMaybe False . (.getFirstFalse)
 
 -- | Helper for filling in default values
-defaultFirstFalse :: (a -> FirstFalse) -> Bool
+defaultFirstFalse :: FirstFalse -> Bool
 defaultFirstFalse _ = False
 
 -- | Write a @Builder@ to a file and atomically rename.

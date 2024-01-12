@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Ghci.Script
   ( GhciScript
@@ -44,7 +45,7 @@ scriptToLazyByteString = toLazyByteString . scriptToBuilder
 scriptToBuilder :: GhciScript -> Builder
 scriptToBuilder backwardScript = mconcat $ fmap commandToBuilder script
  where
-  script = reverse $ unGhciScript backwardScript
+  script = reverse backwardScript.unGhciScript
 
 scriptToFile :: Path Abs File -> GhciScript -> IO ()
 scriptToFile path script =

@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Types.Package
   ( BioInput (..)
@@ -206,10 +207,10 @@ data Package = Package
   deriving (Show, Typeable)
 
 packageIdentifier :: Package -> PackageIdentifier
-packageIdentifier p = PackageIdentifier (packageName p) (packageVersion p)
+packageIdentifier p = PackageIdentifier p.packageName p.packageVersion
 
 packageDefinedFlags :: Package -> Set FlagName
-packageDefinedFlags = M.keysSet . packageDefaultFlags
+packageDefinedFlags = M.keysSet . (.packageDefaultFlags)
 
 -- | GHC options based on cabal information and ghc-options.
 data BuildInfoOpts = BuildInfoOpts
@@ -244,11 +245,11 @@ data PackageConfig = PackageConfig
 
 -- | Compares the package name.
 instance Ord Package where
-  compare = on compare packageName
+  compare = on compare (.packageName)
 
 -- | Compares the package name.
 instance Eq Package where
-  (==) = on (==) packageName
+  (==) = on (==) (.packageName)
 
 -- | Where the package's source is located: local directory or package index
 data PackageSource
@@ -269,7 +270,7 @@ instance Show PackageSource where
       ]
 
 psVersion :: PackageSource -> Version
-psVersion (PSFilePath lp) = packageVersion $ lpPackage lp
+psVersion (PSFilePath lp) = lp.lpPackage.packageVersion
 psVersion (PSRemote _ v _ _) = v
 
 -- | Information on a locally available package of source code.
@@ -340,14 +341,14 @@ instance Show (MemoizedWith env a) where
   show _ = "<<MemoizedWith>>"
 
 lpFiles :: HasEnvConfig env => LocalPackage -> RIO env (Set.Set (Path Abs File))
-lpFiles = runMemoizedWith . fmap (Set.unions . M.elems) . lpComponentFiles
+lpFiles = runMemoizedWith . fmap (Set.unions . M.elems) . (.lpComponentFiles)
 
 lpFilesForComponents :: HasEnvConfig env
                      => Set NamedComponent
                      -> LocalPackage
                      -> RIO env (Set.Set (Path Abs File))
 lpFilesForComponents components lp = runMemoizedWith $ do
-  componentFiles <- lpComponentFiles lp
+  componentFiles <- lp.lpComponentFiles
   pure $ mconcat (M.elems (M.restrictKeys componentFiles components))
 
 newtype FileCacheInfo = FileCacheInfo
@@ -409,10 +410,11 @@ installedMapGhcPkgId ::
 installedMapGhcPkgId pkgId@(PackageIdentifier pkgName version) installedLib =
   finalMap
  where
-  finalMap = M.insert pkgId (iliId installedLib) baseMap
+  finalMap = M.insert pkgId installedLib.iliId baseMap
   baseMap =
-    M.mapKeysMonotonic (toCabalMungedPackageIdentifier pkgName version) $
-      iliSublib installedLib
+    M.mapKeysMonotonic
+      (toCabalMungedPackageIdentifier pkgName version)
+      installedLib.iliSublib
 
 -- | Creates a 'MungedPackageName' identifier.
 toCabalMungedPackageIdentifier ::

@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 -- | A module providing types and related helper functions used in module
 -- "Stack.Build.ConstructPlan".
@@ -126,14 +127,14 @@ adrVersion (ADRToInstall task) = pkgVersion $ taskProvides task
 adrVersion (ADRFound _ installed) = installedVersion installed
 
 adrHasLibrary :: AddDepRes -> Bool
-adrHasLibrary (ADRToInstall task) = case taskType task of
-  TTLocalMutable lp -> packageHasLibrary $ lpPackage lp
+adrHasLibrary (ADRToInstall task) = case task.taskType of
+  TTLocalMutable lp -> packageHasLibrary lp.lpPackage
   TTRemotePackage _ p _ -> packageHasLibrary p
  where
   -- make sure we consider sub-libraries as libraries too
   packageHasLibrary :: Package -> Bool
   packageHasLibrary p =
-    hasBuildableMainLibrary p || not (null (packageSubLibraries p))
+    hasBuildableMainLibrary p || not (null p.packageSubLibraries)
 adrHasLibrary (ADRFound _ Library{}) = True
 adrHasLibrary (ADRFound _ Executable{}) = False
 
@@ -165,51 +166,51 @@ data Ctx = Ctx
   }
 
 instance HasPlatform Ctx where
-  platformL = configL.platformL
+  platformL = configL . platformL
   {-# INLINE platformL #-}
-  platformVariantL = configL.platformVariantL
+  platformVariantL = configL . platformVariantL
   {-# INLINE platformVariantL #-}
 
 instance HasGHCVariant Ctx where
-  ghcVariantL = configL.ghcVariantL
+  ghcVariantL = configL . ghcVariantL
   {-# INLINE ghcVariantL #-}
 
 instance HasLogFunc Ctx where
-  logFuncL = configL.logFuncL
+  logFuncL = configL . logFuncL
 
 instance HasRunner Ctx where
-  runnerL = configL.runnerL
+  runnerL = configL . runnerL
 
 instance HasStylesUpdate Ctx where
-  stylesUpdateL = runnerL.stylesUpdateL
+  stylesUpdateL = runnerL . stylesUpdateL
 
 instance HasTerm Ctx where
-  useColorL = runnerL.useColorL
-  termWidthL = runnerL.termWidthL
+  useColorL = runnerL . useColorL
+  termWidthL = runnerL . termWidthL
 
 instance HasConfig Ctx where
-  configL = buildConfigL.lens bcConfig (\x y -> x { bcConfig = y })
+  configL = buildConfigL . lens (.bcConfig) (\x y -> x { bcConfig = y })
   {-# INLINE configL #-}
 
 instance HasPantryConfig Ctx where
-  pantryConfigL = configL.pantryConfigL
+  pantryConfigL = configL . pantryConfigL
 
 instance HasProcessContext Ctx where
-  processContextL = configL.processContextL
+  processContextL = configL . processContextL
 
 instance HasBuildConfig Ctx where
-  buildConfigL = envConfigL.lens
-    envConfigBuildConfig
+  buildConfigL = envConfigL . lens
+    (.envConfigBuildConfig)
     (\x y -> x { envConfigBuildConfig = y })
 
 instance HasSourceMap Ctx where
-  sourceMapL = envConfigL.sourceMapL
+  sourceMapL = envConfigL . sourceMapL
 
 instance HasCompiler Ctx where
-  compilerPathsL = envConfigL.compilerPathsL
+  compilerPathsL = envConfigL . compilerPathsL
 
 instance HasEnvConfig Ctx where
-  envConfigL = lens ctxEnvConfig (\x y -> x { ctxEnvConfig = y })
+  envConfigL = lens (.ctxEnvConfig) (\x y -> x { ctxEnvConfig = y })
 
 -- | State to be maintained during the calculation of local packages
 -- to unregister.

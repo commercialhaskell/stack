@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude         #-}
-{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Types and functions related to Stack's @new@ command.
 module Stack.New
@@ -230,11 +231,11 @@ data NewOpts = NewOpts
 newCmd :: (NewOpts, InitOpts) -> RIO Runner ()
 newCmd (newOpts, initOpts) =
   withGlobalProject $ withConfig YesReexec $ do
-    dir <- new newOpts (forceOverwrite initOpts)
+    dir <- new newOpts initOpts.forceOverwrite
     exists <- doesFileExist $ dir </> stackDotYaml
-    when (newOptsInit newOpts && (forceOverwrite initOpts || not exists)) $ do
+    when (newOpts.newOptsInit && (initOpts.forceOverwrite || not exists)) $ do
       go <- view globalOptsL
-      initProject dir initOpts (globalResolver go)
+      initProject dir initOpts go.globalResolver
 
 -- | Create a new project with the given options.
 new :: HasConfig env => NewOpts -> Bool -> RIO env (Path Abs Dir)
@@ -247,7 +248,7 @@ new opts forceOverwrite = do
               else do relDir <- parseRelDir (packageNameString project)
                       pure (pwd </> relDir)
   exists <- doesDirExist absDir
-  configTemplate <- view $ configL.to configDefaultTemplate
+  configTemplate <- view $ configL . to (.configDefaultTemplate)
   let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
                                                       , configTemplate
                                                       ]
@@ -259,7 +260,7 @@ new opts forceOverwrite = do
         applyTemplate
           project
           template
-          (newOptsNonceParams opts)
+          opts.newOptsNonceParams
           absDir
           templateText
       when (not forceOverwrite && bare) $
@@ -268,10 +269,10 @@ new opts forceOverwrite = do
       runTemplateInits absDir
       pure absDir
  where
-  cliOptionTemplate = newOptsTemplate opts
-  project = newOptsProjectName opts
+  cliOptionTemplate = opts.newOptsTemplate
+  project = opts.newOptsProjectName
   projectName = packageNameString project
-  bare = newOptsCreateBare opts
+  bare = opts.newOptsCreateBare
   logUsing absDir template templateFrom =
     let loading = case templateFrom of
                     LocalTemp -> flow "Loading local"
@@ -306,7 +307,7 @@ loadTemplate ::
   -> (TemplateFrom -> RIO env ())
   -> RIO env Text
 loadTemplate name logIt = do
-  templateDir <- view $ configL.to templatesDir
+  templateDir <- view $ configL . to templatesDir
   case templatePath name of
     AbsPath absFile ->
       logIt LocalTemp >> loadLocalFile absFile eitherByteStringToText
@@ -320,9 +321,9 @@ loadTemplate name logIt = do
             pure f)
         ( \(e :: PrettyException) -> do
             settings <- fromMaybe (throwM e) (relSettings rawParam)
-            let url = tplDownloadUrl settings
-                mBasicAuth = tplBasicAuth settings
-                extract = tplExtract settings
+            let url = settings.tplDownloadUrl
+                mBasicAuth = settings.tplBasicAuth
+                extract = settings.tplExtract
             downloadTemplate url mBasicAuth extract (templateDir </> relFile)
         )
     RepoPath rtp -> do
@@ -355,10 +356,10 @@ loadTemplate name logIt = do
 
   downloadFromUrl :: TemplateDownloadSettings -> Path Abs Dir -> RIO env Text
   downloadFromUrl settings templateDir = do
-    let url = tplDownloadUrl settings
-        mBasicAuth = tplBasicAuth settings
+    let url =  settings.tplDownloadUrl
+        mBasicAuth = settings.tplBasicAuth
         rel = fromMaybe backupUrlRelPath (parseRelFile url)
-    downloadTemplate url mBasicAuth (tplExtract settings) (templateDir </> rel)
+    downloadTemplate url mBasicAuth settings.tplExtract (templateDir </> rel)
 
   downloadTemplate ::
        String
@@ -503,7 +504,7 @@ applyTemplate project template nonceParams dir templateText = do
         nameParams = M.fromList [ ("name", T.pack $ packageNameString project)
                                 , ("name-as-varid", nameAsVarId)
                                 , ("name-as-module", nameAsModule) ]
-        configParams = configTemplateParams config
+        configParams = config.configTemplateParams
         yearParam = M.singleton "year" currentYear
   files :: Map FilePath LB.ByteString <-
     catch
@@ -568,7 +569,7 @@ applyTemplate project template nonceParams dir templateText = do
     prettyNote $
       missingParameters
         missingKeys
-        (configUserConfigPath config)
+        config.configUserConfigPath
   pure $ M.fromList results
  where
   onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks
@@ -658,7 +659,7 @@ writeTemplateFiles files =
 runTemplateInits :: HasConfig env => Path Abs Dir -> RIO env ()
 runTemplateInits dir = do
   config <- view configL
-  case configScmInit config of
+  case config.configScmInit of
     Nothing -> pure ()
     Just Git -> withWorkingDir (toFilePath dir) $
       catchAny

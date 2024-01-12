@@ -79,7 +79,7 @@ stackBenchmarkFiles ::
      StackBenchmark
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackBenchmarkFiles bench =
-  resolveComponentFiles (CBench $ unqualCompToText bench.name) build names
+  resolveComponentFiles (CBench bench.name.unqualCompToText) build names
  where
   names = bnames <> exposed
   exposed =
@@ -94,7 +94,7 @@ stackTestSuiteFiles ::
      StackTestSuite
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackTestSuiteFiles test =
-  resolveComponentFiles (CTest $ unqualCompToText test.name) build names
+  resolveComponentFiles (CTest test.name.unqualCompToText) build names
  where
   names = bnames <> exposed
   exposed =
@@ -110,7 +110,7 @@ stackExecutableFiles ::
      StackExecutable
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackExecutableFiles exe =
-  resolveComponentFiles (CExe $ unqualCompToText exe.name) build names
+  resolveComponentFiles (CExe exe.name.unqualCompToText) build names
  where
   build = exe.buildInfo
   names =
@@ -124,7 +124,7 @@ stackLibraryFiles ::
 stackLibraryFiles lib =
   resolveComponentFiles componentName build names
  where
-  componentRawName = unqualCompToText lib.name
+  componentRawName = lib.name.unqualCompToText
   componentName
     | componentRawName == mempty = CLib
     | otherwise = CSubLib componentRawName
@@ -144,7 +144,7 @@ resolveComponentFiles ::
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 resolveComponentFiles component build names = do
   dirs <- mapMaybeM (resolveDirOrWarn . getSymbolicPath) build.hsSourceDirs
-  dir <- asks (parent . ctxFile)
+  dir <- asks (parent . (.ctxFile))
   agdirs <- autogenDirs
   (modules,files,warnings) <-
     resolveFilesAndDeps
@@ -155,8 +155,8 @@ resolveComponentFiles component build names = do
   pure (component, ComponentFile modules (files <> cfiles) warnings)
  where
   autogenDirs = do
-    cabalVer <- asks ctxCabalVer
-    distDir <- asks ctxDistDir
+    cabalVer <- asks (.ctxCabalVer)
+    distDir <- asks (.ctxDistDir)
     let compDir = componentAutogenDir cabalVer component distDir
         pkgDir = maybeToList $ packageAutogenDir cabalVer distDir
     filterM doesDirExist $ compDir : pkgDir
@@ -272,8 +272,8 @@ getDependencies knownUsages component dirs dotCabalPath =
     DotCabalCFilePath{} -> pure (S.empty, M.empty)
  where
   readResolvedHi resolvedFile = do
-    dumpHIDir <- componentOutputDir component <$> asks ctxDistDir
-    dir <- asks (parent . ctxFile)
+    dumpHIDir <- componentOutputDir component <$> asks (.ctxDistDir)
+    dir <- asks (parent . (.ctxFile))
     let sourceDir = fromMaybe dir $ find (`isProperPrefixOf` resolvedFile) dirs
         stripSourceDir d = stripProperPrefix d resolvedFile
     case stripSourceDir sourceDir of
@@ -296,7 +296,7 @@ parseHI ::
      -- ^ The path to the *.hi file to be parsed
   -> RIO GetPackageFileContext (Set ModuleName, Map FilePath (Path Abs File))
 parseHI knownUsages hiPath = do
-  dir <- asks (parent . ctxFile)
+  dir <- asks (parent . (.ctxFile))
   result <-
     liftIO $ catchAnyDeep
       (Iface.fromFile hiPath)
@@ -363,8 +363,8 @@ findCandidate ::
   -> DotCabalDescriptor
   -> RIO GetPackageFileContext (Maybe DotCabalPath)
 findCandidate dirs name = do
-  pkg <- asks ctxFile >>= parsePackageNameFromFilePath
-  customPreprocessorExts <- view $ configL . to configCustomPreprocessorExts
+  pkg <- asks (.ctxFile) >>= parsePackageNameFromFilePath
+  customPreprocessorExts <- view $ configL . to (.configCustomPreprocessorExts)
   let haskellPreprocessorExts =
         haskellDefaultPreprocessorExts ++ customPreprocessorExts
   candidates <- liftIO $ makeNameCandidates haskellPreprocessorExts
@@ -460,8 +460,8 @@ buildOtherSources ::
   -> RIO GetPackageFileContext [DotCabalPath]
 buildOtherSources build = do
   cwd <- liftIO getCurrentDir
-  dir <- asks (parent . ctxFile)
-  file <- asks ctxFile
+  dir <- asks (parent . (.ctxFile))
+  file <- asks (.ctxFile)
   let resolveDirFiles files toCabalPath =
         forMaybeM files $ \fp -> do
           result <- resolveDirFile dir fp
@@ -576,8 +576,8 @@ resolveOrWarn ::
   -> RIO GetPackageFileContext (Maybe a)
 resolveOrWarn subject resolver path = do
   cwd <- liftIO getCurrentDir
-  file <- asks ctxFile
-  dir <- asks (parent . ctxFile)
+  file <- asks (.ctxFile)
+  dir <- asks (parent . (.ctxFile))
   result <- resolver dir path
   when (isNothing result) $ warnMissingFile subject cwd path file
   pure result

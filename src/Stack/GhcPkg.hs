@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 -- | Functions for the GHC package database.
 
@@ -168,7 +169,7 @@ unregisterGhcPkgIds ::
   -> NonEmpty (Either PackageIdentifier GhcPkgId)
   -> RIO env ()
 unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
-  globalDb <- view $ compilerPathsL.to cpGlobalDB
+  globalDb <- view $ compilerPathsL . to (.cpGlobalDB)
   eres <- try $ do
     ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs
     -- ghcPkgUnregisterForce does not perform an effective

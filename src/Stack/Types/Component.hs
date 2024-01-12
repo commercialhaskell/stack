@@ -168,19 +168,19 @@ instance HasField "qualifiedName" StackLibrary NamedComponent where
     | rawName == mempty = CLib
     | otherwise = CSubLib rawName
     where
-      rawName = unqualCompToText v.name
+      rawName = v.name.unqualCompToText
 
 instance HasField "qualifiedName" StackForeignLibrary NamedComponent where
-  getField = CFlib . unqualCompToText . (.name)
+  getField = CFlib . (.name.unqualCompToText)
 
 instance HasField "qualifiedName" StackExecutable NamedComponent where
-  getField = CExe . unqualCompToText . (.name)
+  getField = CExe . (.name.unqualCompToText)
 
 instance HasField "qualifiedName" StackTestSuite NamedComponent where
-  getField = CTest . unqualCompToText . (.name)
+  getField = CTest . (.name.unqualCompToText)
 
 instance HasField "qualifiedName" StackBenchmark NamedComponent where
-  getField = CTest . unqualCompToText . (.name)
+  getField = CTest . (.name.unqualCompToText)
 
 -- | Type synonym for a 'HasField' constraint which represent a virtual field,
 -- computed from the type, the NamedComponent constructor and the name.

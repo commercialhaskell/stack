@@ -193,7 +193,7 @@ renderData False content = T.putStr content
 
 displaySnapshotData :: Bool -> SnapshotData -> IO ()
 displaySnapshotData term sdata =
-  case L.reverse $ snaps sdata of
+  case L.reverse sdata.snaps of
     [] -> pure ()
     xs ->
       let snaps = T.concat $ L.map displaySingleSnap xs
@@ -203,12 +203,12 @@ filterSnapshotData :: SnapshotData -> SnapshotType -> SnapshotData
 filterSnapshotData sdata stype =
   sdata { snaps = filterSnapData }
  where
-  snapdata = snaps sdata
+  snapdata = sdata.snaps
   filterSnapData =
     case stype of
-      Lts -> L.map (L.filter (\x -> "lts" `isPrefixOf` snapId x)) snapdata
+      Lts -> L.map (L.filter (\x -> "lts" `isPrefixOf` x.snapId)) snapdata
       Nightly ->
-        L.map (L.filter (\x -> "nightly" `isPrefixOf` snapId x)) snapdata
+        L.map (L.filter (\x -> "nightly" `isPrefixOf` x.snapId)) snapdata
 
 displayLocalSnapshot :: Bool -> [String] -> IO ()
 displayLocalSnapshot term xs = renderData term (localSnaptoText xs)
@@ -227,7 +227,7 @@ handleLocal lsOpts = do
         | otherwise   = parent parentInstRoot
   snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
   let snapData = L.sort snapData'
-  case lsView lsOpts of
+  case lsOpts.lsView of
     LsSnapshot sopt ->
       case (sopt.soptLtsSnapView, sopt.soptNightlySnapView) of
         (True, False) ->
@@ -250,7 +250,7 @@ handleRemote lsOpts = do
   let req' = addRequestHeader hAccept "application/json" req
   result <- httpJSON req'
   let snapData = getResponseBody result
-  case lsView lsOpts of
+  case lsOpts.lsView of
     LsSnapshot sopt ->
       case (sopt.soptLtsSnapView, sopt.soptNightlySnapView) of
         (True, False) ->
@@ -270,7 +270,7 @@ handleRemote lsOpts = do
 
 lsCmd :: LsCmdOpts -> RIO Runner ()
 lsCmd lsOpts =
-  case lsView lsOpts of
+  case lsOpts.lsView of
     LsSnapshot sopt ->
       case sopt.soptViewType of
         Local -> handleLocal lsOpts
@@ -286,9 +286,9 @@ listStylesCmd opts = do
   -- This is the same test as is used in Stack.Types.Runner.withRunner
   let useColor = view useColorL lc
       styles = elems $ defaultStyles // stylesUpdate (view stylesUpdateL lc)
-      isComplex = not (coptBasic opts)
-      showSGR = isComplex && coptSGR opts
-      showExample = isComplex && coptExample opts && useColor
+      isComplex = not opts.coptBasic
+      showSGR = isComplex && opts.coptSGR
+      showExample = isComplex && opts.coptExample && useColor
       styleReports = L.map (styleReport showSGR showExample) styles
   liftIO $
     T.putStrLn $ T.intercalate (if isComplex then "\n" else ":") styleReports
@@ -309,9 +309,9 @@ listStylesCmd opts = do
 -- | List Stack's installed tools, sorted (see instance of 'Ord' for 'Tool').
 listToolsCmd :: ListToolsOpts -> RIO Config ()
 listToolsCmd opts = do
-  localPrograms <- view $ configL . to configLocalPrograms
+  localPrograms <- view $ configL . to (.configLocalPrograms)
   installed <- sort <$> listInstalled localPrograms
-  let wanted = case toptFilter opts of
+  let wanted = case opts.toptFilter of
         [] -> installed
         "ghc-git" -> [t | t@(ToolGhcGit _ _) <- installed]
         pkgName -> filtered pkgName installed
@@ -322,9 +322,9 @@ listToolsCmd opts = do
 
 listDependencies :: ListDepsOpts -> RIO Runner ()
 listDependencies opts = do
-  let dotOpts = listDepsDotOpts opts
+  let dotOpts = opts.listDepsDotOpts
   (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
-  liftIO $ case listDepsFormat opts of
+  liftIO $ case opts.listDepsFormat of
     ListDepsTree treeOpts ->
       T.putStrLn "Packages"
       >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
@@ -342,7 +342,7 @@ listDependencies opts = do
 
 treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
 treeRoots opts projectPackages' =
-  let targets = dotTargets $ listDepsDotOpts opts
+  let targets = opts.listDepsDotOpts.dotTargets
   in  if null targets
         then projectPackages'
         else Set.fromList $ map (mkPackageName . T.unpack) targets
@@ -364,7 +364,7 @@ printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
     in  case Map.lookup name dependencyMap of
           Just (deps, payload) -> do
             printTreeNode opts dotOpts depth newDepsCounts deps payload name
-            if Just depth == dotDependencyDepth dotOpts
+            if Just depth == dotOpts.dotDependencyDepth
               then pure ()
               else printTree opts dotOpts (depth + 1) newDepsCounts deps
                      dependencyMap
@@ -381,7 +381,7 @@ printTreeNode ::
   -> PackageName
   -> IO ()
 printTreeNode opts dotOpts depth remainingDepsCounts deps payload name =
-  let remainingDepth = fromMaybe 999 (dotDependencyDepth dotOpts) - depth
+  let remainingDepth = fromMaybe 999 dotOpts.dotDependencyDepth - depth
       hasDeps = not $ null deps
   in  T.putStrLn $
         treeNodePrefix "" remainingDepsCounts hasDeps remainingDepth <> " " <>
@@ -400,12 +400,12 @@ treeNodePrefix t (_:ns) d remainingDepth = treeNodePrefix (t <> "│ ") ns d rem
 
 listDepsLine :: ListDepsFormatOpts -> PackageName -> DotPayload -> Text
 listDepsLine opts name payload =
-  T.pack (packageNameString name) <> listDepsSep opts <>
+  T.pack (packageNameString name) <> opts.listDepsSep <>
   payloadText opts payload
 
 payloadText :: ListDepsFormatOpts -> DotPayload -> Text
 payloadText opts payload =
-  if listDepsLicense opts
+  if opts.listDepsLicense
     then licenseText payload
     else versionText payload
 

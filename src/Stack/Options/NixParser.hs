@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Options.NixParser
   ( nixOptsParser
@@ -65,7 +66,7 @@ nixOptsParser hide0 = overrideActivation <$>
  where
   hide = hideMods hide0
   overrideActivation m =
-    if fromFirst False (nixMonoidPureShell m)
-      then m { nixMonoidEnable = (First . Just . fromFirst True) (nixMonoidEnable m) }
+    if fromFirst False m.nixMonoidPureShell
+      then m { nixMonoidEnable = (First . Just . fromFirst True) m.nixMonoidEnable }
       else m
   textArgsOption = fmap (map T.pack) . argsOption

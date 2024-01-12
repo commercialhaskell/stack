@@ -107,7 +107,7 @@ execCmd opts =
     unless (null targets) $ build Nothing
 
     config <- view configL
-    menv <- liftIO $ configProcessContextSettings config eo.eoEnvSettings
+    menv <- liftIO $ config.configProcessContextSettings eo.eoEnvSettings
     withProcessContext menv $ do
       -- Add RTS options to arguments
       let argsWithRts args = if null eo.eoRtsOptions
@@ -144,7 +144,7 @@ execCmd opts =
     map ("-package-id=" ++) <$> mapM getPkgId pkgs
 
   getRunCmd args = do
-    packages <- view $ buildConfigL . to (smwProject . bcSMWanted)
+    packages <- view $ buildConfigL . to (.bcSMWanted.smwProject)
     pkgComponents <- for (Map.elems packages) ppComponents
     let executables = concatMap (filter isCExe . Set.toList) pkgComponents
     let (exe, args') = case args of
@@ -162,12 +162,12 @@ execCmd opts =
 
   getGhcCmd pkgs args = do
     pkgopts <- getPkgOpts pkgs
-    compiler <- view $ compilerPathsL . to cpCompiler
+    compiler <- view $ compilerPathsL . to (.cpCompiler)
     pure (toFilePath compiler, pkgopts ++ args)
 
   getRunGhcCmd pkgs args = do
     pkgopts <- getPkgOpts pkgs
-    interpret <- view $ compilerPathsL . to cpInterpreter
+    interpret <- view $ compilerPathsL . to (.cpInterpreter)
     pure (toFilePath interpret, pkgopts ++ args)
 
   runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()
