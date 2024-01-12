@@ -210,7 +210,7 @@ isAllowed installMap pkgDb dp = case Map.lookup name installMap of
       Nothing -> checkNotFound
   Just pii -> checkFound pii
  where
-  PackageIdentifier name version = dp.dpPackageIdent
+  PackageIdentifier name version = dp.packageIdent
   -- Ensure that the installed location matches where the sourceMap says it
   -- should be installed.
   checkLocation Snap =
@@ -266,17 +266,17 @@ toLoadHelper pkgDb dp = LoadHelper
       -- therefore not match the snapshot.
       if name `Set.member` wiredInPackages
         then []
-        else dp.dpDepends
-  , lhSublibrary = dp.dpSublib
+        else dp.depends
+  , lhSublibrary = dp.sublib
   , lhPair =
       ( name
       , (toInstallLocation pkgDb, Library ident installedLibInfo)
       )
   }
  where
-  installedLibInfo = InstalledLibraryInfo gid (Right <$> dp.dpLicense) mempty
-  gid = dp.dpGhcPkgId
-  ident@(PackageIdentifier name _) = dp.dpPackageIdent
+  installedLibInfo = InstalledLibraryInfo gid (Right <$> dp.license) mempty
+  gid = dp.ghcPkgId
+  ident@(PackageIdentifier name _) = dp.packageIdent
 
   toInstallLocation :: PackageDbVariety -> InstallLocation
   toInstallLocation GlobalDb = Snap

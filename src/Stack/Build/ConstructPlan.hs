@@ -365,10 +365,10 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
         , usAnyAdded = True
         }
    where
-    gid = dp.dpGhcPkgId
-    ident = dp.dpPackageIdent
+    gid = dp.ghcPkgId
+    ident = dp.packageIdent
     mParentLibId = dpParentLibIdent dp
-    deps = dp.dpDepends
+    deps = dp.depends
 
   maybeUnregisterReason ::
        Map GhcPkgId (PackageIdentifier, Text)
