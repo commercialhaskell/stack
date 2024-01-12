@@ -4,7 +4,9 @@
 
 set -e
 
-mkdir -p "$HOME/.cabal/bin"
+if dpkg --compare-versions "${CABAL_VERSION%.*.*}" le-nl "3.8"; then
+  mkdir -p "$HOME/.cabal/bin";
+fi
 mkdir -p "$HOME/.local/bin"
 
 # Copy Zsh-related files and folders from the untouched home directory
@@ -27,12 +29,21 @@ else
 fi
 
 # Set PATH so it includes user's private bin if it exists
+if ! grep -q "user's private bin" "$HOME/.bashrc"; then
+  echo -e "\nPATH=\"\${PATH%:\$HOME/.local/bin}\"" >> "$HOME/.bashrc";
+  echo -e "\n# set PATH so it includes user's private bin if it exists\nif [ -d \"\$HOME/bin\" ] && [[ \"\$PATH\" != *\"\$HOME/bin\"* ]] ; then\n    PATH=\"\$HOME/bin:\$PATH\"\nfi" >> "$HOME/.bashrc";
+  echo -e "\n# set PATH so it includes user's private bin if it exists\nif [ -d \"\$HOME/.local/bin\" ] && [[ \"\$PATH\" != *\"\$HOME/.local/bin\"* ]] ; then\n    PATH=\"\$HOME/.local/bin:\$PATH\"\nfi" >> "$HOME/.bashrc";
+fi
 if ! grep -q "user's private bin" "$HOME/.zshrc"; then
+  echo -e "\nPATH=\"\${PATH%:\$HOME/.local/bin}\"" >> "$HOME/.zshrc";
   echo -e "\n# set PATH so it includes user's private bin if it exists\nif [ -d \"\$HOME/bin\" ] && [[ \"\$PATH\" != *\"\$HOME/bin\"* ]] ; then\n    PATH=\"\$HOME/bin:\$PATH\"\nfi" >> "$HOME/.zshrc";
   echo -e "\n# set PATH so it includes user's private bin if it exists\nif [ -d \"\$HOME/.local/bin\" ] && [[ \"\$PATH\" != *\"\$HOME/.local/bin\"* ]] ; then\n    PATH=\"\$HOME/.local/bin:\$PATH\"\nfi" >> "$HOME/.zshrc";
 fi
 
 # Set PATH so it includes cabal's bin if it exists
+if ! grep -q "cabal's bin" "$HOME/.bashrc"; then
+  echo -e "\n# set PATH so it includes cabal's bin if it exists\nif [ -d \"\$HOME/.cabal/bin\" ] && [[ \"\$PATH\" != *\"\$HOME/.cabal/bin\"* ]] ; then\n    PATH=\"\$HOME/.cabal/bin:\$PATH\"\nfi" >> "$HOME/.bashrc";
+fi
 if ! grep -q "cabal's bin" "$HOME/.zshrc"; then
   echo -e "\n# set PATH so it includes cabal's bin if it exists\nif [ -d \"\$HOME/.cabal/bin\" ] && [[ \"\$PATH\" != *\"\$HOME/.cabal/bin\"* ]] ; then\n    PATH=\"\$HOME/.cabal/bin:\$PATH\"\nfi" >> "$HOME/.zshrc";
 fi
