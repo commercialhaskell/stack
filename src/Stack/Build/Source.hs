@@ -341,7 +341,7 @@ loadLocalPackage pp = do
         Just _ ->
              hasBuildableMainLibrary pkg
           || not (Set.null nonLibComponents)
-          || not (null pkg.packageSubLibraries)
+          || not (null pkg.subLibraries)
 
       filterSkippedComponents =
         Set.filter (not . (`elem` bopts.boptsSkipComponents))

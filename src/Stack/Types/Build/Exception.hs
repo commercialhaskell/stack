@@ -599,7 +599,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
     acc0 = (True, False, Map.empty, Set.empty)
     go acc (DependencyPlanFailures pkg m) = Map.foldrWithKey go' acc m
      where
-      pkgName = pkg.packageName
+      pkgName = pkg.name
       go' name (_, Just extra, NotInBuildPlan) (_, _, m', s) =
         (False, True, Map.insert name extra m', s)
       go' _ (_, _, NotInBuildPlan) (_, _, m', s) = (False, True, m', s)
@@ -622,14 +622,14 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
       depErrors -> Just $
            fillSep
              [ flow "In the dependencies for"
-             , pkgIdent <> pprintFlags pkg.packageFlags <> ":"
+             , pkgIdent <> pprintFlags pkg.flags <> ":"
              ]
         <> line
         <> indent 2 (bulletedList depErrors)
         <> line
         <> fillSep
              ( flow "The above is/are needed"
-             : case getShortestDepsPath parentMap wanted' pkg.packageName of
+             : case getShortestDepsPath parentMap wanted' pkg.name of
                  Nothing ->
                    [flow "for unknown reason - Stack invariant violated."]
                  Just [] ->
@@ -648,7 +648,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
                      <> [pkgIdent]
              )
        where
-        pkgName' = style Current (fromPackageName pkg.packageName)
+        pkgName' = style Current (fromPackageName pkg.name)
         pkgIdent = style Current (fromPackageId $ packageIdentifier pkg)
   -- Skip these when they are redundant with 'NotInBuildPlan' info.
   pprintException (UnknownPackage name)

@@ -90,7 +90,7 @@ configureOptsDirs bco isMutable package = concat
       Just dir -> installRoot </> docDirSuffix </> dir
   pkgVerDir = parseRelDir
     (  packageIdentifierString
-        (PackageIdentifier package.packageName package.packageVersion)
+        (PackageIdentifier package.name package.version)
     ++ [pathSeparator]
     )
 
@@ -120,8 +120,8 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                         else "-") <>
                      flagNameString name)
                   (Map.toList flags)
-  , map T.unpack package.packageCabalConfigOpts
-  , processGhcOptions package.packageGhcOptions
+  , map T.unpack package.cabalConfigOpts
+  , processGhcOptions package.ghcOptions
   , map ("--extra-include-dirs=" ++) config.configExtraIncludeDirs
   , map ("--extra-lib-dirs=" ++) config.configExtraLibDirs
   , maybe
@@ -173,7 +173,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
 
   -- Unioning atop defaults is needed so that all flags are specified with
   -- --exact-configuration.
-  flags = package.packageFlags `Map.union` package.packageDefaultFlags
+  flags = package.flags `Map.union` package.defaultFlags
 
   depOptions = map toDepOption $ Map.toList deps
 

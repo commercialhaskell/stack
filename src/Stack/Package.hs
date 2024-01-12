@@ -1,8 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 -- | Dealing with Cabal.
 
@@ -141,31 +142,31 @@ packageFromPackageDescription
     pkgFlags
     pkg
   = Package
-      { packageName = name
-      , packageVersion = pkgVersion pkgId
-      , packageLicense = licenseRaw pkg
-      , packageGhcOptions =  packageConfig.packageConfigGhcOptions
-      , packageCabalConfigOpts =  packageConfig.packageConfigCabalConfigOpts
-      , packageFlags = packageConfig.packageConfigFlags
-      , packageDefaultFlags = M.fromList
+      { name = name
+      , version = pkgVersion pkgId
+      , license = licenseRaw pkg
+      , ghcOptions =  packageConfig.packageConfigGhcOptions
+      , cabalConfigOpts =  packageConfig.packageConfigCabalConfigOpts
+      , flags = packageConfig.packageConfigFlags
+      , defaultFlags = M.fromList
           [(flagName flag, flagDefault flag) | flag <- pkgFlags]
-      , packageLibrary = stackLibraryFromCabal <$> library pkg
-      , packageSubLibraries =
+      , library = stackLibraryFromCabal <$> library pkg
+      , subLibraries =
           foldAndMakeCollection stackLibraryFromCabal $ subLibraries pkg
-      , packageForeignLibraries =
+      , foreignLibraries =
           foldAndMakeCollection stackForeignLibraryFromCabal $ foreignLibs pkg
-      , packageTestSuites =
+      , testSuites =
           foldAndMakeCollection stackTestFromCabal $ testSuites pkg
-      , packageBenchmarks =
+      , benchmarks =
           foldAndMakeCollection stackBenchmarkFromCabal $ benchmarks pkg
-      , packageExecutables =
+      , executables =
           foldAndMakeCollection stackExecutableFromCabal $ executables pkg
-      , packageBuildType = buildType pkg
-      , packageSetupDeps = fmap cabalSetupDepsToStackDep (setupBuildInfo pkg)
-      , packageCabalSpec = specVersion pkg
-      , packageFile = stackPackageFileFromCabal pkg
-      , packageTestEnabled =  packageConfig.packageConfigEnableTests
-      , packageBenchmarkEnabled = packageConfig.packageConfigEnableBenchmarks
+      , buildType = buildType pkg
+      , setupDeps = fmap cabalSetupDepsToStackDep (setupBuildInfo pkg)
+      , cabalSpec = specVersion pkg
+      , file = stackPackageFileFromCabal pkg
+      , testEnabled =  packageConfig.packageConfigEnableTests
+      , benchmarkEnabled = packageConfig.packageConfigEnableBenchmarks
       }
  where
   -- Gets all of the modules, files, build files, and data files that constitute
@@ -260,11 +261,11 @@ generatePkgDescOpts
               (selector pkg)
               (translatedInsertInMap constructor)
       let aggregateAllBuildInfoOpts =
-              makeBuildInfoOpts (.packageLibrary) (const CLib)
-            . makeBuildInfoOpts (.packageSubLibraries) CSubLib
-            . makeBuildInfoOpts (.packageExecutables) CExe
-            . makeBuildInfoOpts (.packageBenchmarks) CBench
-            . makeBuildInfoOpts (.packageTestSuites) CTest
+              makeBuildInfoOpts (.library) (const CLib)
+            . makeBuildInfoOpts (.subLibraries) CSubLib
+            . makeBuildInfoOpts (.executables) CExe
+            . makeBuildInfoOpts (.benchmarks) CBench
+            . makeBuildInfoOpts (.testSuites) CTest
       pure $ aggregateAllBuildInfoOpts mempty
  where
   cabalDir = parent cabalfp
@@ -613,8 +614,8 @@ applyForceCustomBuild ::
 applyForceCustomBuild cabalVersion package
   | forceCustomBuild =
       package
-        { packageBuildType = Custom
-        , packageSetupDeps = Just $ M.fromList
+        { buildType = Custom
+        , setupDeps = Just $ M.fromList
             [ ("Cabal", libraryDepFromVersionRange cabalVersionRange)
             , ("base", libraryDepFromVersionRange anyVersion)
             ]
@@ -623,14 +624,14 @@ applyForceCustomBuild cabalVersion package
  where
   cabalVersionRange =
     orLaterVersion $ mkVersion $ cabalSpecToVersionDigits
-      package.packageCabalSpec
-  forceCustomBuild = package.packageBuildType == Simple
+      package.cabalSpec
+  forceCustomBuild = package.buildType == Simple
     && not (cabalVersion `withinRange` cabalVersionRange)
 
 -- | Check if the package has a main library that is buildable.
 hasBuildableMainLibrary :: Package -> Bool
 hasBuildableMainLibrary package =
-  maybe False isComponentBuildable package.packageLibrary
+  maybe False isComponentBuildable package.library
 
 -- | Check if the main library has any exposed modules.
 --
@@ -639,7 +640,7 @@ hasBuildableMainLibrary package =
 -- (for instance).
 mainLibraryHasExposedModules :: Package -> Bool
 mainLibraryHasExposedModules package =
-  maybe False (not . null . (.exposedModules)) package.packageLibrary
+  maybe False (not . null . (.exposedModules)) package.library
 
 -- | Aggregate all unknown tools from all components. Mostly meant for
 -- build tools specified in the legacy manner (build-tools:) that failed the
@@ -648,33 +649,33 @@ mainLibraryHasExposedModules package =
 packageUnknownTools :: Package -> Set Text
 packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
  where
-  lib setT = case pkg.packageLibrary of
+  lib setT = case pkg.library of
     Just libV -> addUnknownTools libV setT
     Nothing -> setT
-  bench = gatherUnknownTools pkg.packageBenchmarks
-  tests = gatherUnknownTools pkg.packageTestSuites
-  flib = gatherUnknownTools pkg.packageForeignLibraries
-  sublib = gatherUnknownTools pkg.packageSubLibraries
-  exe = gatherUnknownTools pkg.packageExecutables
+  bench = gatherUnknownTools pkg.benchmarks
+  tests = gatherUnknownTools pkg.testSuites
+  flib = gatherUnknownTools pkg.foreignLibraries
+  sublib = gatherUnknownTools pkg.subLibraries
+  exe = gatherUnknownTools pkg.executables
   addUnknownTools :: HasBuildInfo x => x -> Set Text -> Set Text
   addUnknownTools = (<>) . (.buildInfo.sbiUnknownTools)
   gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
   gatherUnknownTools = foldr' addUnknownTools mempty
 
 buildableForeignLibs :: Package -> Set Text
-buildableForeignLibs pkg = getBuildableSetText pkg.packageForeignLibraries
+buildableForeignLibs pkg = getBuildableSetText pkg.foreignLibraries
 
 buildableSubLibs :: Package -> Set Text
-buildableSubLibs pkg = getBuildableSetText pkg.packageSubLibraries
+buildableSubLibs pkg = getBuildableSetText pkg.subLibraries
 
 buildableExes :: Package -> Set Text
-buildableExes pkg = getBuildableSetText pkg.packageExecutables
+buildableExes pkg = getBuildableSetText pkg.executables
 
 buildableTestSuites :: Package -> Set Text
-buildableTestSuites pkg = getBuildableSetText pkg.packageTestSuites
+buildableTestSuites pkg = getBuildableSetText pkg.testSuites
 
 buildableBenchmarks :: Package -> Set Text
-buildableBenchmarks pkg = getBuildableSetText pkg.packageBenchmarks
+buildableBenchmarks pkg = getBuildableSetText pkg.benchmarks
 
 -- | Apply a generic processing function in a Monad over all of the Package's
 -- components.
@@ -696,19 +697,19 @@ processPackageComponent pkg componentFn = do
         foldComponentToAnotherCollection
           (target pkg)
           componentFn
-      processMainLib = maybe id componentFn pkg.packageLibrary
+      processMainLib = maybe id componentFn pkg.library
       processAllComp =
-        ( if pkg.packageBenchmarkEnabled
-            then componentKindProcessor (.packageBenchmarks)
+        ( if pkg.benchmarkEnabled
+            then componentKindProcessor (.benchmarks)
             else id
         )
-        . ( if pkg.packageTestEnabled
-              then componentKindProcessor (.packageTestSuites)
+        . ( if pkg.testEnabled
+              then componentKindProcessor (.testSuites)
               else id
           )
-        . componentKindProcessor (.packageForeignLibraries)
-        . componentKindProcessor (.packageExecutables)
-        . componentKindProcessor (.packageSubLibraries)
+        . componentKindProcessor (.foreignLibraries)
+        . componentKindProcessor (.executables)
+        . componentKindProcessor (.subLibraries)
         . processMainLib
   processAllComp
 
@@ -721,7 +722,7 @@ processPackageMapDeps ::
   -> m a
   -> m a
 processPackageMapDeps pkg fn = do
-  let packageSetupDepsProcessor resAction = case pkg.packageSetupDeps of
+  let packageSetupDepsProcessor resAction = case pkg.setupDeps of
         Nothing -> resAction
         Just v -> fn v resAction
       processAllComp = processPackageComponent pkg (fn . componentDependencyMap)
@@ -741,11 +742,11 @@ processPackageDeps pkg combineResults fn = do
   let asPackageNameSet accessor =
         S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
       (!subLibNames, !foreignLibNames) =
-        ( asPackageNameSet (.packageSubLibraries)
-        , asPackageNameSet (.packageForeignLibraries)
+        ( asPackageNameSet (.subLibraries)
+        , asPackageNameSet (.foreignLibraries)
         )
       shouldIgnoreDep (packageNameV :: PackageName)
-        | packageNameV == pkg.packageName = True
+        | packageNameV == pkg.name = True
         | packageNameV `S.member` subLibNames = True
         | packageNameV `S.member` foreignLibNames = True
         | otherwise = False
@@ -811,7 +812,7 @@ topSortPackageComponent package target includeDirectTarget = runST $ do
       -> ST s (Seq NamedComponent)
     processComponent finallyAddComponent alreadyProcessedRef component res = do
       let depMap = componentDependencyMap component
-          internalDep = M.lookup package.packageName depMap
+          internalDep = M.lookup package.name depMap
           processSubDep = processOneDep alreadyProcessedRef internalDep res
           qualName = component.qualifiedName
           processSubDepSaveName
@@ -829,8 +830,8 @@ topSortPackageComponent package target includeDirectTarget = runST $ do
                    >> processSubDepSaveName
         else processSubDepSaveName
     lookupLibName isMain name = if isMain
-      then package.packageLibrary
-      else collectionLookup name package.packageSubLibraries
+      then package.library
+      else collectionLookup name package.subLibraries
     processOneDep alreadyProcessed mDependency res =
       case (.dvType) <$> mDependency of
         Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do

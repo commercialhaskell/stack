@@ -452,7 +452,7 @@ addFinal lp package isAllInOne buildHaddocks = do
         , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent lp.lpCabalFile))
         , taskBuildTypeConfig = packageBuildTypeConfig package
         }
-  tell mempty { wFinals = Map.singleton package.packageName res }
+  tell mempty { wFinals = Map.singleton package.name res }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the package, if
 -- needed. First checks if the package name is in the library map.
@@ -594,7 +594,7 @@ tellExecutablesPackage loc p = do
   cm <- asks (.combinedMap)
   -- Determine which components are enabled so we know which ones to copy
   let myComps =
-        case Map.lookup p.packageName cm of
+        case Map.lookup p.name cm of
           Nothing -> assert False Set.empty
           Just (PIOnlyInstalled _ _) -> Set.empty
           Just (PIOnlySource ps) -> goSource ps
@@ -728,7 +728,7 @@ installPackageGivenDeps ::
   -> M AddDepRes
 installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
   (missing, present, minMutable) = do
-    let name = package.packageName
+    let name = package.name
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
       (Just installed, True) -> do
@@ -773,7 +773,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
 
 -- | Is the build type of the package Configure
 packageBuildTypeConfig :: Package -> Bool
-packageBuildTypeConfig pkg = pkg.packageBuildType == Configure
+packageBuildTypeConfig pkg = pkg.buildType == Configure
 
 -- Update response in the library map. If it is an error, and there's already an
 -- error about cyclic dependencies, prefer the cyclic error.
@@ -1045,7 +1045,7 @@ checkDirtiness ps installed package present buildHaddocks = do
   case mreason of
     Nothing -> pure False
     Just reason -> do
-      tell mempty { wDirty = Map.singleton package.packageName reason }
+      tell mempty { wDirty = Map.singleton package.name reason }
       pure True
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
@@ -1179,8 +1179,8 @@ checkAndWarnForUnknownTools p = do
   -- From Cabal 1.12, build-tools can specify another executable in the same
   -- package.
   notPackageExe toolName =
-    MaybeT $ skipIf $ collectionMember toolName p.packageExecutables
-  warn name = MaybeT . pure . Just $ ToolWarning (ExeName name) p.packageName
+    MaybeT $ skipIf $ collectionMember toolName p.executables
+  warn name = MaybeT . pure . Just $ ToolWarning (ExeName name) p.name
   skipIf p' = pure $ if p' then Nothing else Just ()
 
 toolWarningText :: ToolWarning -> StyleDoc

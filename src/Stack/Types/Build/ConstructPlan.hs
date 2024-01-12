@@ -134,7 +134,7 @@ adrHasLibrary (ADRToInstall task) = case task.taskType of
   -- make sure we consider sub-libraries as libraries too
   packageHasLibrary :: Package -> Bool
   packageHasLibrary p =
-    hasBuildableMainLibrary p || not (null p.packageSubLibraries)
+    hasBuildableMainLibrary p || not (null p.subLibraries)
 adrHasLibrary (ADRFound _ Library{}) = True
 adrHasLibrary (ADRFound _ Executable{}) = False
 

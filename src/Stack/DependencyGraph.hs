@@ -205,8 +205,8 @@ createDependencyGraph dotOpts = do
                  (loadPackage loc flags ghcOptions cabalConfigOpts)
   resolveDependencies dotOpts.dotDependencyDepth graph depLoader
  where
-  makePayload loc pkg = DotPayload (Just pkg.packageVersion)
-                                   (Just pkg.packageLicense)
+  makePayload loc pkg = DotPayload (Just pkg.version)
+                                   (Just pkg.license)
                                    (Just $ PLImmutable loc)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local
@@ -220,16 +220,16 @@ projectPackageDependencies dotOpts locals =
                   pkgDir = parent lp.lpCabalFile
                   packageDepsSet = setOfPackageDeps pkg
                   loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
-              in  (pkg.packageName, (deps pkg packageDepsSet, lpPayload pkg loc)))
+              in  (pkg.name, (deps pkg packageDepsSet, lpPayload pkg loc)))
       locals
  where
   deps pkg packageDepsSet = if dotOpts.dotIncludeExternal
-    then Set.delete pkg.packageName packageDepsSet
+    then Set.delete pkg.name packageDepsSet
     else Set.intersection localNames packageDepsSet
-  localNames = Set.fromList $ map (.lpPackage.packageName) locals
+  localNames = Set.fromList $ map (.lpPackage.name) locals
   lpPayload pkg loc =
-    DotPayload (Just pkg.packageVersion)
-               (Just pkg.packageLicense)
+    DotPayload (Just pkg.version)
+               (Just pkg.license)
                (Just loc)
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for
@@ -290,7 +290,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
               (Map.lookup depId globalIdMap)
 
   payloadFromLocal pkg =
-    DotPayload (Just pkg.packageVersion) (Just pkg.packageLicense)
+    DotPayload (Just pkg.version) (Just pkg.license)
 
   payloadFromDump dp =
     DotPayload (Just $ pkgVersion dp.packageIdent)

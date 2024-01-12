@@ -152,7 +152,7 @@ build msetLocalFiles = do
         if boptsCli.boptsCLIWatchAll
         then sequence [lpFiles lp | lp <- allLocals]
         else forM allLocals $ \lp -> do
-          let pn = lp.lpPackage.packageName
+          let pn = lp.lpPackage.name
           case Map.lookup pn sourceMap.smTargets.smtTargets of
             Nothing ->
               pure Set.empty
@@ -299,7 +299,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   localExes :: Map Text (NonEmpty PackageName)
   localExes =
     collect
-      [ (exe, pkg.packageName)
+      [ (exe, pkg.name)
       | pkg <- map (.lpPackage) locals
       , exe <- Set.toList (buildableExes pkg)
       ]
@@ -371,7 +371,7 @@ checkComponentsBuildable lps =
     prettyThrowM $ SomeTargetsNotBuildable unbuildable
  where
   unbuildable =
-    [ (lp.lpPackage.packageName, c)
+    [ (lp.lpPackage.name, c)
     | lp <- lps
     , c <- Set.toList lp.lpUnbuildable
     ]

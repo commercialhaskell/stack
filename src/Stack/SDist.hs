@@ -206,7 +206,7 @@ getSDistTarball mpvpBounds pkgDir = do
       tweakCabal = pvpBounds /= PvpBoundsNone
       pkgFp = toFilePath pkgDir
   lp <- readLocalPackage pkgDir
-  forM_ lp.lpPackage.packageSetupDeps $ \customSetupDeps ->
+  forM_ lp.lpPackage.setupDeps $ \customSetupDeps ->
     case nonEmpty (map (T.pack . packageNameString) (Map.keys customSetupDeps)) of
       Just nonEmptyDepTargets -> do
         eres <- buildLocalTargets nonEmptyDepTargets
@@ -609,8 +609,8 @@ buildExtractedTarball pkgDir = do
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         pure
-          $  localPackage.lpPackage.packageName
-          == localPackageToBuild.lpPackage.packageName
+          $  localPackage.lpPackage.name
+          == localPackageToBuild.lpPackage.name
   pathsToKeep <- Map.fromList <$> filterM
     (fmap not . isPathToRemove . resolvedAbsolute . (.ppResolvedDir) . snd)
     (Map.toList envConfig.envConfigBuildConfig.bcSMWanted.smwProject)

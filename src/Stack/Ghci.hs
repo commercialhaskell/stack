@@ -229,7 +229,7 @@ ghci opts = do
   locals <- projectLocalPackages
   depLocals <- localDependencies
   let localMap =
-        M.fromList [(lp.lpPackage.packageName, lp) | lp <- locals ++ depLocals]
+        M.fromList [(lp.lpPackage.name, lp) | lp <- locals ++ depLocals]
       -- FIXME:qrilka this looks wrong to go back to SMActual
       sma = SMActual
         { smaCompiler = sourceMap.smCompiler
@@ -358,7 +358,7 @@ findFileTargets locals fileTargets = do
   let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
       foundFileTargetComponents =
         map (\fp -> (fp, ) $ L.sort $
-                    concatMap (\(lp, files) -> map ((lp.lpPackage.packageName,) . fst)
+                    concatMap (\(lp, files) -> map ((lp.lpPackage.name,) . fst)
                                                    (filter (elem fp . snd) (M.toList files))
                               ) filePackages
             ) fileTargets
@@ -900,7 +900,7 @@ getGhciPkgInfos ::
 getGhciPkgInfos installMap addPkgs mfileTargets localTargets = do
   (installedMap, _, _, _) <- getInstalled installMap
   let localLibs =
-        [ desc.ghciDescPkg.packageName
+        [ desc.ghciDescPkg.name
         | desc <- localTargets
         , hasLocalComp isCLib desc.ghciDescTarget
         ]
@@ -922,7 +922,7 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
   let pkg = pkgDesc.ghciDescPkg
       cabalfp = pkgDesc.ghciDescCabalFp
       target = pkgDesc.ghciDescTarget
-      name = pkg.packageName
+      name = pkg.name
   (mods, files, opts) <-
     getPackageOpts pkg installMap installedMap locals addPkgs cabalfp
   let filteredOpts = filterWanted opts
@@ -935,7 +935,7 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
     , ghciPkgModules = unionModuleMaps $
       map
         ( \(comp, mp) -> M.map
-            (\fp -> M.singleton fp (S.singleton (pkg.packageName, comp)))
+            (\fp -> M.singleton fp (S.singleton (pkg.name, comp)))
             mp
         )
         (M.toList (filterWanted mods))
@@ -962,10 +962,10 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
   <> (if bopts.boptsBenchmarks then map CBench buildableBenchmarks else [])
  where
   buildableForeignLibs' = S.toList $ buildableForeignLibs pkg
-  buildableSubLibs = getBuildableListText pkg.packageSubLibraries
+  buildableSubLibs = getBuildableListText pkg.subLibraries
   buildableExes' = S.toList $ buildableExes pkg
-  buildableTestSuites = getBuildableListText pkg.packageTestSuites
-  buildableBenchmarks = getBuildableListText pkg.packageBenchmarks
+  buildableTestSuites = getBuildableListText pkg.testSuites
+  buildableBenchmarks = getBuildableListText pkg.benchmarks
 wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: HasTerm env => [GhciPkgInfo] -> RIO env ()

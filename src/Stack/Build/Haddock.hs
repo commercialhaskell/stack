@@ -127,10 +127,10 @@ generateLocalHaddockIndex ::
 generateLocalHaddockIndex bco localDumpPkgs locals = do
   let dumpPackages =
         mapMaybe
-          ( \LocalPackage{lpPackage = Package{packageName, packageVersion}} ->
+          ( \LocalPackage {lpPackage = Package {name, version}} ->
               F.find
                 ( \dp -> dp.packageIdent ==
-                         PackageIdentifier packageName packageVersion
+                         PackageIdentifier name version
                 )
                 localDumpPkgs
           )
@@ -168,8 +168,8 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
     depDocDir
  where
   getGhcPkgId :: LocalPackage -> Maybe GhcPkgId
-  getGhcPkgId LocalPackage{lpPackage = Package{packageName, packageVersion}} =
-    let pkgId = PackageIdentifier packageName packageVersion
+  getGhcPkgId LocalPackage {lpPackage = Package {name, version}} =
+    let pkgId = PackageIdentifier name version
         mdpPkg = F.find (\dp -> dp.packageIdent == pkgId) localDumpPkgs
     in  fmap (.ghcPkgId) mdpPkg
   findTransitiveDepends :: [GhcPkgId] -> [GhcPkgId]
@@ -340,7 +340,7 @@ generateLocalHaddockForHackageArchives =
   mapM_
     ( \lp ->
         let pkg = lp.lpPackage
-            pkgId = PackageIdentifier pkg.packageName pkg.packageVersion
+            pkgId = PackageIdentifier pkg.name pkg.version
             pkgDir = parent lp.lpCabalFile
         in generateLocalHaddockForHackageArchive pkgDir pkgId
     )
