@@ -405,23 +405,23 @@ loadLocalPackage pp = do
         M.fromList . map (\(c, (_, cache)) -> (c, cache)) <$> checkCacheResults
 
   pure LocalPackage
-    { lpPackage = pkg
-    , lpTestBench = btpkg
-    , lpComponentFiles = componentFiles
-    , lpBuildHaddocks = pp.ppCommon.cpHaddocks
-    , lpForceDirty = bopts.boptsForceDirty
-    , lpDirtyFiles = dirtyFiles
-    , lpNewBuildCaches = newBuildCaches
-    , lpCabalFile = pp.ppCabalFP
-    , lpWanted = isWanted
-    , lpComponents = nonLibComponents
+    { package = pkg
+    , testBench = btpkg
+    , componentFiles = componentFiles
+    , buildHaddocks = pp.ppCommon.cpHaddocks
+    , forceDirty = bopts.boptsForceDirty
+    , dirtyFiles = dirtyFiles
+    , newBuildCaches = newBuildCaches
+    , cabalFile = pp.ppCabalFP
+    , wanted = isWanted
+    , components = nonLibComponents
       -- TODO: refactor this so that it's easier to be sure that these
       -- components are indeed unbuildable.
       --
       -- The reasoning here is that if the STLocalComps specification made it
       -- through component parsing, but the components aren't present, then they
       -- must not be buildable.
-    , lpUnbuildable = toComponents
+    , unbuildable = toComponents
         (exes `Set.difference` buildableExes pkg)
         (tests `Set.difference` buildableTestSuites pkg)
         (benches `Set.difference` buildableBenchmarks pkg)

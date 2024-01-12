@@ -184,7 +184,7 @@ createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
   locals <- for (toList sourceMap.smProject) loadLocalPackage
   let graph =
-        Map.fromList $ projectPackageDependencies dotOpts (filter (.lpWanted) locals)
+        Map.fromList $ projectPackageDependencies dotOpts (filter (.wanted) locals)
   globalDump <- view $ to (.dcGlobalDump)
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
@@ -217,7 +217,7 @@ projectPackageDependencies ::
   -> [(PackageName, (Set PackageName, DotPayload))]
 projectPackageDependencies dotOpts locals =
   map (\lp -> let pkg = localPackageToPackage lp
-                  pkgDir = parent lp.lpCabalFile
+                  pkgDir = parent lp.cabalFile
                   packageDepsSet = setOfPackageDeps pkg
                   loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
               in  (pkg.name, (deps pkg packageDepsSet, lpPayload pkg loc)))
@@ -226,7 +226,7 @@ projectPackageDependencies dotOpts locals =
   deps pkg packageDepsSet = if dotOpts.dotIncludeExternal
     then Set.delete pkg.name packageDepsSet
     else Set.intersection localNames packageDepsSet
-  localNames = Set.fromList $ map (.lpPackage.name) locals
+  localNames = Set.fromList $ map (.package.name) locals
   lpPayload pkg loc =
     DotPayload (Just pkg.version)
                (Just pkg.license)
@@ -353,7 +353,7 @@ pruneUnreachable dontPrune = fixpoint prune
     reachables = F.fold (fst <$> graph')
 
 localPackageToPackage :: LocalPackage -> Package
-localPackageToPackage lp = fromMaybe lp.lpPackage lp.lpTestBench
+localPackageToPackage lp = fromMaybe lp.package lp.testBench
 
 data DotConfig = DotConfig
   { dcBuildConfig :: !BuildConfig

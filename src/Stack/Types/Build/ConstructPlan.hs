@@ -128,7 +128,7 @@ adrVersion (ADRFound _ installed) = installedVersion installed
 
 adrHasLibrary :: AddDepRes -> Bool
 adrHasLibrary (ADRToInstall task) = case task.taskType of
-  TTLocalMutable lp -> packageHasLibrary lp.lpPackage
+  TTLocalMutable lp -> packageHasLibrary lp.package
   TTRemotePackage _ p _ -> packageHasLibrary p
  where
   -- make sure we consider sub-libraries as libraries too

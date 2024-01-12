@@ -1,8 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -- | Construct a @Plan@ for how to build
 module Stack.Build.ConstructPlan
@@ -291,8 +292,8 @@ constructPlan
     let loadLocalPackage' pp = do
           lp <- loadLocalPackage pp
           let lpPackage' =
-                applyForceCustomBuild globalCabalVersion lp.lpPackage
-          pure lp { lpPackage = lpPackage' }
+                applyForceCustomBuild globalCabalVersion lp.package
+          pure lp { package = lpPackage' }
     pPackages <- for sourceProject $ \pp -> do
       lp <- loadLocalPackage' pp
       pure $ PSFilePath lp
@@ -449,7 +450,7 @@ addFinal lp package isAllInOne buildHaddocks = do
         , taskPresent = present
         , taskType = TTLocalMutable lp
         , taskAllInOne = isAllInOne
-        , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent lp.lpCabalFile))
+        , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFile))
         , taskBuildTypeConfig = packageBuildTypeConfig package
         }
   tell mempty { wFinals = Map.singleton package.name res }
@@ -563,7 +564,7 @@ addDep name packageInfo = do
 -- executables to the collected output.
 tellExecutables :: PackageName -> PackageSource -> M ()
 tellExecutables _name (PSFilePath lp)
-  | lp.lpWanted = tellExecutablesPackage Local lp.lpPackage
+  | lp.wanted = tellExecutablesPackage Local lp.package
   | otherwise = pure ()
 -- Ignores ghcOptions because they don't matter for enumerating executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnapshot cp) =
@@ -601,7 +602,7 @@ tellExecutablesPackage loc p = do
           Just (PIBoth ps _) -> goSource ps
 
       goSource (PSFilePath lp)
-        | lp.lpWanted = exeComponents lp.lpComponents
+        | lp.wanted = exeComponents lp.components
         | otherwise = Set.empty
       goSource PSRemote{} = Set.empty
 
@@ -632,14 +633,14 @@ installPackage name ps minstalled = do
         pkgLoc cp.cpFlags cp.cpGhcOptions cp.cpCabalConfigOpts
       resolveDepsAndInstall True cp.cpHaddocks ps package minstalled
     PSFilePath lp -> do
-      case lp.lpTestBench of
+      case lp.testBench of
         Nothing -> do
           logDebugPlanS "installPackage" $
                "No test or bench component for "
             <> fromPackageName name
             <> " so doing an all-in-one build."
           resolveDepsAndInstall
-            True lp.lpBuildHaddocks ps lp.lpPackage minstalled
+            True lp.buildHaddocks ps lp.package minstalled
         Just tb -> do
           -- Attempt to find a plan which performs an all-in-one build. Ignore
           -- the writer action + reset the state if it fails.
@@ -663,7 +664,7 @@ installPackage name ps minstalled = do
               splitRequired <- expectedTestOrBenchFailures <$> asks (.mcurator)
               let isAllInOne = not splitRequired
               adr <- installPackageGivenDeps
-                isAllInOne lp.lpBuildHaddocks ps tb minstalled deps
+                isAllInOne lp.buildHaddocks ps tb minstalled deps
               let finalAllInOne = case adr of
                     ADRToInstall _ | splitRequired -> False
                     _ -> True
@@ -681,7 +682,7 @@ installPackage name ps minstalled = do
               -- Otherwise, fall back on building the tests / benchmarks in a
               -- separate step.
               res' <- resolveDepsAndInstall
-                False lp.lpBuildHaddocks ps lp.lpPackage minstalled
+                False lp.buildHaddocks ps lp.package minstalled
               when (isRight res') $ do
                 -- Insert it into the map so that it's available for addFinal.
                 updateLibMap name res'
@@ -1020,7 +1021,7 @@ checkDirtiness ps installed package present buildHaddocks = do
         , configCacheComponents =
             case ps of
               PSFilePath lp ->
-                Set.map (encodeUtf8 . renderComponent) lp.lpComponents
+                Set.map (encodeUtf8 . renderComponent) lp.components
               PSRemote{} -> Set.empty
         , configCacheHaddock = buildHaddocks
         , configCachePkgSrc = toCachePkgSrc ps
@@ -1137,14 +1138,14 @@ describeConfigDiff config old new
   pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
-psForceDirty (PSFilePath lp) = lp.lpForceDirty
+psForceDirty (PSFilePath lp) = lp.forceDirty
 psForceDirty PSRemote{} = False
 
 psDirty ::
      (MonadIO m, HasEnvConfig env, MonadReader env m)
   => PackageSource
   -> m (Maybe (Set FilePath))
-psDirty (PSFilePath lp) = runMemoizedWith lp.lpDirtyFiles
+psDirty (PSFilePath lp) = runMemoizedWith lp.dirtyFiles
 psDirty PSRemote {} = pure Nothing -- files never change in a remote package
 
 psLocal :: PackageSource -> Bool

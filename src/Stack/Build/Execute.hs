@@ -310,7 +310,7 @@ displayTask task = fillSep $
        <> ","
      ,    "source="
        <> ( case task.taskType of
-              TTLocalMutable lp -> pretty $ parent lp.lpCabalFile
+              TTLocalMutable lp -> pretty $ parent lp.cabalFile
               TTRemotePackage _ _ pl -> fromString $ T.unpack $ textDisplay pl
           )
        <> if Set.null missing
@@ -520,7 +520,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
     localPackagesTVar <-
       liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
     logFilesTChan <- liftIO $ atomically newTChan
-    let totalWanted = length $ filter (.lpWanted) locals
+    let totalWanted = length $ filter (.wanted) locals
     pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
     inner ExecuteEnv
       { eeBuildOpts = bopts
@@ -901,7 +901,7 @@ executePlan' installedMap0 targets plan ee = do
               localPkgs =
                 Map.fromList
                   [ (p.name, (packageIdentifier p, Local))
-                  | p <- map (.lpPackage) ee.eeLocals
+                  | p <- map (.package) ee.eeLocals
                   ]
               installedPkgs =
                 Map.map (swap . second installedPackageIdentifier) installedMap'
@@ -1100,7 +1100,7 @@ getConfigCache ee task installedMap enableTest enableBench = do
         , configCacheComponents =
             case task.taskType of
               TTLocalMutable lp ->
-                Set.map (encodeUtf8 . renderComponent) lp.lpComponents
+                Set.map (encodeUtf8 . renderComponent) lp.components
               TTRemotePackage{} -> Set.empty
         , configCacheHaddock = task.taskBuildHaddock
         , configCachePkgSrc = task.taskCachePkgSrc
@@ -1344,7 +1344,7 @@ withSingleContext
 
   wanted =
     case taskType of
-      TTLocalMutable lp -> lp.lpWanted
+      TTLocalMutable lp -> lp.wanted
       TTRemotePackage{} -> False
 
   -- Output to the console if this is the last task, and the user asked to build
@@ -1366,9 +1366,9 @@ withSingleContext
   withPackage inner =
     case taskType of
       TTLocalMutable lp -> do
-        let root = parent lp.lpCabalFile
+        let root = parent lp.cabalFile
         withLockedDistDir prettyAnnounce root $
-          inner lp.lpPackage lp.lpCabalFile root
+          inner lp.package lp.cabalFile root
       TTRemotePackage _ package pkgloc -> do
         suffix <-
           parseRelDir $ packageIdentifierString $ packageIdentifier package
@@ -1412,7 +1412,7 @@ withSingleContext
 
         -- We only want to dump logs for local non-dependency packages
         case taskType of
-          TTLocalMutable lp | lp.lpWanted ->
+          TTLocalMutable lp | lp.wanted ->
               liftIO $ atomically $ writeTChan ee.eeLogFiles (pkgDir, logPath)
           _ -> pure ()
 
@@ -1475,7 +1475,7 @@ withSingleContext
           warnCustomNoDeps :: RIO env ()
           warnCustomNoDeps =
             case (taskType, package.buildType) of
-              (TTLocalMutable lp, C.Custom) | lp.lpWanted ->
+              (TTLocalMutable lp, C.Custom) | lp.wanted ->
                 prettyWarnL
                   [ flow "Package"
                   , fromPackageName package.name
@@ -1768,7 +1768,7 @@ singleBuild
       ]
     (hasLib, hasSubLib, hasExe) = case task.taskType of
       TTLocalMutable lp ->
-        let package = lp.lpPackage
+        let package = lp.package
             hasLibrary = hasBuildableMainLibrary package
             hasSubLibraries = not $ null package.subLibraries
             hasExecutables =
@@ -1816,7 +1816,7 @@ singleBuild
     -- it was built with different flags.
     let
       subLibNames = Set.toList $ buildableSubLibs $ case task.taskType of
-        TTLocalMutable lp -> lp.lpPackage
+        TTLocalMutable lp -> lp.package
         TTRemotePackage _ p _ -> p
       toMungedPackageId :: Text -> MungedPackageId
       toMungedPackageId subLib =
@@ -1949,7 +1949,7 @@ singleBuild
     case task.taskType of
       TTLocalMutable lp -> do
         when enableTests $ setTestStatus pkgDir TSUnknown
-        caches <- runMemoizedWith lp.lpNewBuildCaches
+        caches <- runMemoizedWith lp.newBuildCaches
         mapM_
           (uncurry (writeBuildCache pkgDir))
           (Map.toList caches)
@@ -1962,7 +1962,7 @@ singleBuild
             TTLocalMutable lp -> do
                 warnings <- checkForUnlistedFiles task.taskType pkgDir
                 -- TODO: Perhaps only emit these warnings for non extra-dep?
-                pure (Just (lp.lpCabalFile, warnings))
+                pure (Just (lp.cabalFile, warnings))
             _ -> pure Nothing
           -- NOTE: once
           -- https://github.com/commercialhaskell/stack/issues/2649
@@ -2228,12 +2228,12 @@ checkForUnlistedFiles ::
   -> Path Abs Dir
   -> RIO env [PackageWarning]
 checkForUnlistedFiles (TTLocalMutable lp) pkgDir = do
-  caches <- runMemoizedWith lp.lpNewBuildCaches
+  caches <- runMemoizedWith lp.newBuildCaches
   (addBuildCache,warnings) <-
     addUnlistedToBuildCache
-      lp.lpPackage
-      lp.lpCabalFile
-      lp.lpComponents
+      lp.package
+      lp.cabalFile
+      lp.components
       caches
   forM_ (Map.toList addBuildCache) $ \(component, newToCache) -> do
     let cache = Map.findWithDefault Map.empty component caches
@@ -2733,7 +2733,7 @@ primaryComponentOptions executableBuildStatuses lp =
        (T.unpack . T.append "exe:")
        (Set.toList $ exesToBuild executableBuildStatuses lp)
  where
-  package = lp.lpPackage
+  package = lp.package
 
 -- | History of this function:
 --
@@ -2749,9 +2749,9 @@ primaryComponentOptions executableBuildStatuses lp =
 --
 exesToBuild :: Map Text ExecutableBuildStatus -> LocalPackage -> Set Text
 exesToBuild executableBuildStatuses lp =
-  if cabalIsSatisfied executableBuildStatuses && lp.lpWanted
-    then exeComponents lp.lpComponents
-    else buildableExes lp.lpPackage
+  if cabalIsSatisfied executableBuildStatuses && lp.wanted
+    then exeComponents lp.components
+    else buildableExes lp.package
 
 -- | Do the current executables satisfy Cabal's bugged out requirements?
 cabalIsSatisfied :: Map k ExecutableBuildStatus -> Bool
@@ -2762,12 +2762,12 @@ finalComponentOptions :: LocalPackage -> [String]
 finalComponentOptions lp =
   map (T.unpack . renderComponent) $
   Set.toList $
-  Set.filter (\c -> isCTest c || isCBench c) lp.lpComponents
+  Set.filter (\c -> isCTest c || isCBench c) lp.components
 
 taskComponents :: Task -> Set NamedComponent
 taskComponents task =
   case task.taskType of
-    TTLocalMutable lp -> lp.lpComponents -- FIXME probably just want lpWanted
+    TTLocalMutable lp -> lp.components -- FIXME probably just want lpWanted
     TTRemotePackage{} -> Set.empty
 
 expectTestFailure :: PackageName -> Maybe Curator -> Bool

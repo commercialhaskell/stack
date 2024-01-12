@@ -121,8 +121,8 @@ rawBuildInfo = do
   localToPair lp =
     (Key.fromText $ T.pack $ packageNameString p.name, value)
    where
-    p = lp.lpPackage
+    p = lp.package
     value = object
       [ "version" .= CabalString p.version
-      , "path" .= toFilePath (parent lp.lpCabalFile)
+      , "path" .= toFilePath (parent lp.cabalFile)
       ]

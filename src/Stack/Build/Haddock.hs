@@ -127,7 +127,7 @@ generateLocalHaddockIndex ::
 generateLocalHaddockIndex bco localDumpPkgs locals = do
   let dumpPackages =
         mapMaybe
-          ( \LocalPackage {lpPackage = Package {name, version}} ->
+          ( \LocalPackage {package = Package {name, version}} ->
               F.find
                 ( \dp -> dp.packageIdent ==
                          PackageIdentifier name version
@@ -168,7 +168,7 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
     depDocDir
  where
   getGhcPkgId :: LocalPackage -> Maybe GhcPkgId
-  getGhcPkgId LocalPackage {lpPackage = Package {name, version}} =
+  getGhcPkgId LocalPackage {package = Package {name, version}} =
     let pkgId = PackageIdentifier name version
         mdpPkg = F.find (\dp -> dp.packageIdent == pkgId) localDumpPkgs
     in  fmap (.ghcPkgId) mdpPkg
@@ -339,9 +339,9 @@ generateLocalHaddockForHackageArchives ::
 generateLocalHaddockForHackageArchives =
   mapM_
     ( \lp ->
-        let pkg = lp.lpPackage
+        let pkg = lp.package
             pkgId = PackageIdentifier pkg.name pkg.version
-            pkgDir = parent lp.lpCabalFile
+            pkgDir = parent lp.cabalFile
         in generateLocalHaddockForHackageArchive pkgDir pkgId
     )
 

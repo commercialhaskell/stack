@@ -206,7 +206,7 @@ getSDistTarball mpvpBounds pkgDir = do
       tweakCabal = pvpBounds /= PvpBoundsNone
       pkgFp = toFilePath pkgDir
   lp <- readLocalPackage pkgDir
-  forM_ lp.lpPackage.setupDeps $ \customSetupDeps ->
+  forM_ lp.package.setupDeps $ \customSetupDeps ->
     case nonEmpty (map (T.pack . packageNameString) (Map.keys customSetupDeps)) of
       Just nonEmptyDepTargets -> do
         eres <- buildLocalTargets nonEmptyDepTargets
@@ -274,7 +274,7 @@ getSDistTarball mpvpBounds pkgDir = do
       isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
       tarName = pkgIdName FP.<.> "tar.gz"
       pkgIdName = packageIdentifierString pkgId
-      pkgId = packageIdentifier lp.lpPackage
+      pkgId = packageIdentifier lp.package
   dirEntries <- mapM packDir (dirsFromFiles files)
   fileEntries <- mapM packFile files
   mcabalFileRevision <- liftIO (readIORef cabalFileRevisionRef)
@@ -457,20 +457,20 @@ readLocalPackage pkgDir = do
   gpd <- liftIO $ gpdio YesPrintWarnings
   let package = resolvePackage config gpd
   pure LocalPackage
-    { lpPackage = package
-    , lpWanted = False -- HACK: makes it so that sdist output goes to a log
+    { package = package
+    , wanted = False -- HACK: makes it so that sdist output goes to a log
                        -- instead of a file.
-    , lpCabalFile = cabalfp
+    , cabalFile = cabalfp
     -- NOTE: these aren't the 'correct' values, but aren't used in the usage of
     -- this function in this module.
-    , lpTestBench = Nothing
-    , lpBuildHaddocks = False
-    , lpForceDirty = False
-    , lpDirtyFiles = pure Nothing
-    , lpNewBuildCaches = pure Map.empty
-    , lpComponentFiles = pure Map.empty
-    , lpComponents = Set.empty
-    , lpUnbuildable = Set.empty
+    , testBench = Nothing
+    , buildHaddocks = False
+    , forceDirty = False
+    , dirtyFiles = pure Nothing
+    , newBuildCaches = pure Map.empty
+    , componentFiles = pure Map.empty
+    , components = Set.empty
+    , unbuildable = Set.empty
     }
 
 -- | Returns a newline-separate list of paths, and the absolute path to the
@@ -609,8 +609,8 @@ buildExtractedTarball pkgDir = do
   let isPathToRemove path = do
         localPackage <- readLocalPackage path
         pure
-          $  localPackage.lpPackage.name
-          == localPackageToBuild.lpPackage.name
+          $  localPackage.package.name
+          == localPackageToBuild.package.name
   pathsToKeep <- Map.fromList <$> filterM
     (fmap not . isPathToRemove . resolvedAbsolute . (.ppResolvedDir) . snd)
     (Map.toList envConfig.envConfigBuildConfig.bcSMWanted.smwProject)
