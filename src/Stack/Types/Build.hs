@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -131,20 +132,20 @@ toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 -- | A type representing tasks to perform when building.
 data Task = Task
-  { taskType            :: !TaskType
+  { taskType        :: !TaskType
     -- ^ The task type, telling us how to build this
-  , taskConfigOpts      :: !TaskConfigOpts
+  , configOpts      :: !TaskConfigOpts
     -- ^ A set of the package identifiers of dependencies for which 'GhcPkgId'
     -- are missing and a function which yields configure options, given a
     -- dictionary of those identifiers and their 'GhcPkgId'.
-  , taskBuildHaddock    :: !Bool
-  , taskPresent         :: !(Map PackageIdentifier GhcPkgId)
+  , buildHaddock    :: !Bool
+  , present         :: !(Map PackageIdentifier GhcPkgId)
     -- ^ A dictionary of the package identifiers of already-installed
     -- dependencies, and their 'GhcPkgId'.
-  , taskAllInOne        :: !Bool
+  , allInOne        :: !Bool
     -- ^ indicates that the package can be built in one step
-  , taskCachePkgSrc     :: !CachePkgSrc
-  , taskBuildTypeConfig :: !Bool
+  , cachePkgSrc     :: !CachePkgSrc
+  , buildTypeConfig :: !Bool
     -- ^ Is the build type of this package Configure. Check out
     -- ensureConfigureScript in Stack.Build.Execute for the motivation
   }
@@ -178,7 +179,7 @@ data TaskType
 -- | Were any of the dependencies missing?
 
 taskAnyMissing :: Task -> Bool
-taskAnyMissing task = not $ Set.null task.taskConfigOpts.tcoMissing
+taskAnyMissing task = not $ Set.null task.configOpts.tcoMissing
 
 -- | A function to yield the package name and version of a given 'TaskType'
 -- value.

@@ -254,7 +254,7 @@ constructPlan
     providesDep task = pkgName (taskProvides task) `Set.member` deps
     tasks = Map.elems plan.planTasks
     missing =
-      Map.fromList $ map (taskProvides &&&  (.taskConfigOpts.tcoMissing)) tasks
+      Map.fromList $ map (taskProvides &&&  (.configOpts.tcoMissing)) tasks
     missingForDeps = flip execState mempty $
       for_ tasks $ \task ->
         when (providesDep task) $
@@ -437,7 +437,7 @@ addFinal lp package isAllInOne buildHaddocks = do
     Right (missing, present, _minLoc) -> do
       ctx <- ask
       pure $ Right Task
-        { taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+        { configOpts = TaskConfigOpts missing $ \missing' ->
             let allDeps = Map.union present missing'
             in  configureOpts
                   (view envConfigL ctx)
@@ -446,12 +446,12 @@ addFinal lp package isAllInOne buildHaddocks = do
                   True -- local
                   Mutable
                   package
-        , taskBuildHaddock = buildHaddocks
-        , taskPresent = present
+        , buildHaddock = buildHaddocks
+        , present = present
         , taskType = TTLocalMutable lp
-        , taskAllInOne = isAllInOne
-        , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFile))
-        , taskBuildTypeConfig = packageBuildTypeConfig package
+        , allInOne = isAllInOne
+        , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFile))
+        , buildTypeConfig = packageBuildTypeConfig package
         }
   tell mempty { wFinals = Map.singleton package.name res }
 
@@ -750,7 +750,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
     pure $ case mRightVersionInstalled of
       Just installed -> ADRFound loc installed
       Nothing -> ADRToInstall Task
-        { taskConfigOpts = TaskConfigOpts missing $ \missing' ->
+        { configOpts = TaskConfigOpts missing $ \missing' ->
             let allDeps = Map.union present missing'
             in  configureOpts
                   (view envConfigL ctx)
@@ -759,17 +759,17 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
                   (psLocal ps)
                   mutable
                   package
-        , taskBuildHaddock = buildHaddocks
-        , taskPresent = present
+        , buildHaddock = buildHaddocks
+        , present = present
         , taskType =
             case ps of
               PSFilePath lp ->
                 TTLocalMutable lp
               PSRemote pkgLoc _version _fromSnapshot _cp ->
                 TTRemotePackage mutable package pkgLoc
-        , taskAllInOne = isAllInOne
-        , taskCachePkgSrc = toCachePkgSrc ps
-        , taskBuildTypeConfig = packageBuildTypeConfig package
+        , allInOne = isAllInOne
+        , cachePkgSrc = toCachePkgSrc ps
+        , buildTypeConfig = packageBuildTypeConfig package
         }
 
 -- | Is the build type of the package Configure

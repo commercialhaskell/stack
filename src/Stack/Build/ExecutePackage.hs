@@ -188,11 +188,11 @@ getConfigCache ee task installedMap enableTest enableBench = do
       installedToGhcPkgId ident (Library ident' libInfo) =
         assert (ident == ident') (installedMapGhcPkgId ident libInfo)
       installedToGhcPkgId _ (Executable _) = mempty
-      TaskConfigOpts missing mkOpts = task.taskConfigOpts
+      TaskConfigOpts missing mkOpts = task.configOpts
   missingMapList <- traverse getMissing $ toList missing
   let missing' = Map.unions missingMapList
       opts = mkOpts missing'
-      allDeps = Set.fromList $ Map.elems missing' ++ Map.elems task.taskPresent
+      allDeps = Set.fromList $ Map.elems missing' ++ Map.elems task.present
       cache = ConfigCache
         { configCacheOpts = opts
             { coNoDirs = opts.coNoDirs ++ map T.unpack extra
@@ -203,11 +203,11 @@ getConfigCache ee task installedMap enableTest enableBench = do
               TTLocalMutable lp ->
                 Set.map (encodeUtf8 . renderComponent) lp.components
               TTRemotePackage{} -> Set.empty
-        , configCacheHaddock = task.taskBuildHaddock
-        , configCachePkgSrc = task.taskCachePkgSrc
+        , configCacheHaddock = task.buildHaddock
+        , configCachePkgSrc = task.cachePkgSrc
         , configCachePathEnvVar = ee.eePathEnvVar
         }
-      allDepsMap = Map.union missing' task.taskPresent
+      allDepsMap = Map.union missing' task.present
   pure (allDepsMap, cache)
 
 -- | Ensure that the configuration for the package matches what is given
@@ -272,7 +272,7 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalfp task = do
           || mOldProjectRoot /= Just newProjectRoot
   let ConfigureOpts dirs nodirs = newConfigCache.configCacheOpts
 
-  when task.taskBuildTypeConfig $
+  when task.buildTypeConfig $
     -- When build-type is Configure, we need to have a configure script in the
     -- local directory. If it doesn't exist, build it with autoreconf -i. See:
     -- https://github.com/commercialhaskell/stack/issues/3534
@@ -386,7 +386,7 @@ singleBuild
   pkgId = taskProvides task
   PackageIdentifier pname pversion = pkgId
   doHaddock mcurator package =
-       task.taskBuildHaddock
+       task.buildHaddock
     && not isFinalBuild
        -- Works around haddock failing on bytestring-builder since it has no
        -- modules when bytestring is new enough.
@@ -408,7 +408,7 @@ singleBuild
           Left _ -> pure ()
   fulfillHaddockExpectations _ action = action CloseOnException
 
-  buildingFinals = isFinalBuild || task.taskAllInOne
+  buildingFinals = isFinalBuild || task.allInOne
   enableTests = buildingFinals && any isCTest (taskComponents task)
   enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
 
@@ -416,9 +416,9 @@ singleBuild
     if result == "" then "" else " (" <> result <> ")"
    where
     result = T.intercalate " + " $ concat
-      [ ["lib" | task.taskAllInOne && hasLib]
-      , ["sub-lib" | task.taskAllInOne && hasSubLib]
-      , ["exe" | task.taskAllInOne && hasExe]
+      [ ["lib" | task.allInOne && hasLib]
+      , ["sub-lib" | task.allInOne && hasSubLib]
+      , ["exe" | task.allInOne && hasExe]
       , ["test" | enableTests]
       , ["bench" | enableBenchmarks]
       ]
@@ -663,7 +663,7 @@ singleBuild
           | config.hideTHLoading = ExcludeTHLoading
           | otherwise                  = KeepTHLoading
     cabal stripTHLoading (("build" :) $ (++ extraOpts) $
-        case (task.taskType, task.taskAllInOne, isFinalBuild) of
+        case (task.taskType, task.allInOne, isFinalBuild) of
             (_, True, True) -> throwM AllInOneBuildBug
             (TTLocalMutable lp, False, False) ->
               primaryComponentOptions executableBuildStatuses lp
