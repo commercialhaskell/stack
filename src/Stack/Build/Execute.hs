@@ -424,7 +424,7 @@ executePlan' :: HasEnvConfig env
              -> ExecuteEnv
              -> RIO env ()
 executePlan' installedMap0 targets plan ee = do
-  when ee.eeBuildOpts.testOpts.toCoverage deleteHpcReports
+  when ee.buildOpts.testOpts.toCoverage deleteHpcReports
   cv <- view actualCompilerVersionL
   case nonEmpty $ Map.toList plan.planUnregisterLocal of
     Nothing -> pure ()
@@ -432,7 +432,7 @@ executePlan' installedMap0 targets plan ee = do
       localDB <- packageDatabaseLocal
       unregisterPackages cv localDB ids
 
-  liftIO $ atomically $ modifyTVar' ee.eeLocalDumpPkgs $ \initMap ->
+  liftIO $ atomically $ modifyTVar' ee.localDumpPkgs $ \initMap ->
     foldl' (flip Map.delete) initMap $ Map.keys plan.planUnregisterLocal
 
   run <- askRunInIO
@@ -454,7 +454,7 @@ executePlan' installedMap0 targets plan ee = do
   threads <- view $ configL . to (.jobs)
   let keepGoing = fromMaybe
         (not (Map.null plan.planFinals))
-        ee.eeBuildOpts.keepGoing
+        ee.buildOpts.keepGoing
   terminal <- view terminalL
   terminalWidth <- view termWidthL
   errs <- liftIO $ runActions threads keepGoing actions $
@@ -474,7 +474,7 @@ executePlan' installedMap0 targets plan ee = do
                     nowBuilding names = mconcat $
                         ": "
                       : L.intersperse ", " (map fromPackageName names)
-                    progressFormat = ee.eeBuildOpts.progressBar
+                    progressFormat = ee.buildOpts.progressBar
                     progressLine prev' total' =
                          "Progress "
                       <> display prev' <> "/" <> display total'
@@ -494,30 +494,30 @@ executePlan' installedMap0 targets plan ee = do
                   pure done
                 loop done
       when (total > 1) $ loop 0
-  when ee.eeBuildOpts.testOpts.toCoverage $ do
+  when ee.buildOpts.testOpts.toCoverage $ do
     generateHpcUnifiedReport
     generateHpcMarkupIndex
   unless (null errs) $
     prettyThrowM $ ExecutionFailure errs
-  when ee.eeBuildOpts.haddock $ do
-    if ee.eeBuildOpts.haddockForHackage
+  when ee.buildOpts.haddock $ do
+    if ee.buildOpts.haddockForHackage
       then
-        generateLocalHaddockForHackageArchives ee.eeLocals
+        generateLocalHaddockForHackageArchives ee.locals
       else do
-        snapshotDumpPkgs <- liftIO (readTVarIO ee.eeSnapshotDumpPkgs)
-        localDumpPkgs <- liftIO (readTVarIO ee.eeLocalDumpPkgs)
-        generateLocalHaddockIndex ee.eeBaseConfigOpts localDumpPkgs ee.eeLocals
+        snapshotDumpPkgs <- liftIO (readTVarIO ee.snapshotDumpPkgs)
+        localDumpPkgs <- liftIO (readTVarIO ee.localDumpPkgs)
+        generateLocalHaddockIndex ee.baseConfigOpts localDumpPkgs ee.locals
         generateDepsHaddockIndex
-          ee.eeBaseConfigOpts
-          ee.eeGlobalDumpPkgs
+          ee.baseConfigOpts
+          ee.globalDumpPkgs
           snapshotDumpPkgs
           localDumpPkgs
-          ee.eeLocals
+          ee.locals
         generateSnapHaddockIndex
-          ee.eeBaseConfigOpts
-          ee.eeGlobalDumpPkgs
+          ee.baseConfigOpts
+          ee.globalDumpPkgs
           snapshotDumpPkgs
-        when ee.eeBuildOpts.openHaddocks $ do
+        when ee.buildOpts.openHaddocks $ do
           let planPkgs, localPkgs, installedPkgs, availablePkgs
                 :: Map PackageName (PackageIdentifier, InstallLocation)
               planPkgs =
@@ -525,13 +525,13 @@ executePlan' installedMap0 targets plan ee = do
               localPkgs =
                 Map.fromList
                   [ (p.name, (packageIdentifier p, Local))
-                  | p <- map (.package) ee.eeLocals
+                  | p <- map (.package) ee.locals
                   ]
               installedPkgs =
                 Map.map (swap . second installedPackageIdentifier) installedMap'
               availablePkgs = Map.unions [planPkgs, localPkgs, installedPkgs]
           openHaddocksInBrowser
-            ee.eeBaseConfigOpts
+            ee.baseConfigOpts
             availablePkgs
             (Map.keysSet targets)
  where
@@ -669,7 +669,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
           Just _ -> Set.insert $ ActionId pkgId ATBuild
   withLock Nothing f = f
   withLock (Just lock) f = withMVar lock $ \() -> f
-  bopts = ee.eeBuildOpts
+  bopts = ee.buildOpts
   topts = bopts.testOpts
   beopts = bopts.benchmarkOpts
 
@@ -678,7 +678,7 @@ packageNamePrefix :: ExecuteEnv -> PackageName -> String
 packageNamePrefix ee name' =
   let name = packageNameString name'
       paddedName =
-        case ee.eeLargestPackageName of
+        case ee.largestPackageName of
           Nothing -> name
           Just len ->
             assert (len >= length name) $ take len $ name ++ L.repeat ' '
@@ -818,7 +818,7 @@ withSingleContext
        && all
             (\(ActionId ident _) -> ident == pkgId)
             (Set.toList ac.acRemaining)
-       && ee.eeTotalWanted == 1
+       && ee.totalWanted == 1
        )
     || ac.acConcurrency == ConcurrencyDisallowed
 
@@ -831,7 +831,7 @@ withSingleContext
       TTRemotePackage _ package pkgloc -> do
         suffix <-
           parseRelDir $ packageIdentifierString $ packageIdentifier package
-        let dir = ee.eeTempDir </> suffix
+        let dir = ee.tempDir </> suffix
         unpackPackageLocation dir pkgloc
 
         -- See: https://github.com/commercialhaskell/stack/issues/157
@@ -860,7 +860,7 @@ withSingleContext
 
     -- If the user requested interleaved output, dump to the console with a
     -- prefix.
-    | ee.eeBuildOpts.interleavedOutput = inner $
+    | ee.buildOpts.interleavedOutput = inner $
         OTConsole $ Just $ fromString (packageNamePrefix ee package.name)
 
     -- Neither condition applies, dump to a file.
@@ -872,7 +872,7 @@ withSingleContext
         -- We only want to dump logs for local non-dependency packages
         case taskType of
           TTLocalMutable lp | lp.wanted ->
-              liftIO $ atomically $ writeTChan ee.eeLogFiles (pkgDir, logPath)
+              liftIO $ atomically $ writeTChan ee.logFiles (pkgDir, logPath)
           _ -> pure ()
 
         withBinaryFile fp WriteMode $ \h -> inner $ OTLogFile logPath h
@@ -902,7 +902,7 @@ withSingleContext
       -- Avoid broken Setup.hs files causing problems for simple build
       -- types, see:
       -- https://github.com/commercialhaskell/stack/issues/370
-      case (package.buildType, ee.eeSetupExe) of
+      case (package.buildType, ee.setupExe) of
         (C.Simple, Just setupExe) -> pure $ Left setupExe
         _ -> liftIO $ Right <$> getSetupHs pkgDir
     inner $ \keepOutputOpen stripTHLoading args -> do
@@ -914,19 +914,19 @@ withSingleContext
             | otherwise =
                 ["-package=" ++ packageIdentifierString
                                     (PackageIdentifier cabalPackageName
-                                                      ee.eeCabalPkgVer)]
+                                                      ee.cabalPkgVer)]
           packageDBArgs =
             ( "-clear-package-db"
             : "-global-package-db"
             : map
                 (("-package-db=" ++) . toFilePathNoTrailingSep)
-                ee.eeBaseConfigOpts.bcoExtraDBs
+                ee.baseConfigOpts.bcoExtraDBs
             ) ++
             ( (  "-package-db="
-              ++ toFilePathNoTrailingSep ee.eeBaseConfigOpts.bcoSnapDB
+              ++ toFilePathNoTrailingSep ee.baseConfigOpts.bcoSnapDB
               )
             : (  "-package-db="
-              ++ toFilePathNoTrailingSep ee.eeBaseConfigOpts.bcoLocalDB
+              ++ toFilePathNoTrailingSep ee.baseConfigOpts.bcoLocalDB
               )
             : ["-hide-all-packages"]
             )
@@ -1022,9 +1022,9 @@ withSingleContext
                      : "-global-package-db"
                      : map
                          (("-package-db=" ++) . toFilePathNoTrailingSep)
-                         ee.eeBaseConfigOpts.bcoExtraDBs
+                         ee.baseConfigOpts.bcoExtraDBs
                      ++ [    "-package-db="
-                          ++ toFilePathNoTrailingSep ee.eeBaseConfigOpts.bcoSnapDB
+                          ++ toFilePathNoTrailingSep ee.baseConfigOpts.bcoSnapDB
                         ]
                      )
 
@@ -1096,7 +1096,7 @@ withSingleContext
           distDir <- distDirFromDir pkgDir
           let setupDir = distDir </> relDirSetup
               outputFile = setupDir </> relFileSetupLower
-          customBuilt <- liftIO $ readIORef ee.eeCustomBuilt
+          customBuilt <- liftIO $ readIORef ee.customBuilt
           if Set.member package.name customBuilt
             then pure outputFile
             else do
@@ -1110,7 +1110,7 @@ withSingleContext
                 , "-i", "-i."
                 ] ++ packageArgs ++
                 [ toFilePath setuphs
-                , toFilePath ee.eeSetupShimHs
+                , toFilePath ee.setupShimHs
                 , "-main-is"
                 , "StackSetupShim.mainOverride"
                 , "-o", toFilePath outputFile
@@ -1126,17 +1126,17 @@ withSingleContext
                       AGOEverything
                       config.ghcOptionsByCat
                   ++ case config.applyGhcOptions of
-                       AGOEverything -> ee.eeBuildOptsCLI.boptsCLIGhcOptions
+                       AGOEverything -> ee.buildOptsCLI.boptsCLIGhcOptions
                        AGOTargets -> []
                        AGOLocals -> []
                   )
 
-              liftIO $ atomicModifyIORef' ee.eeCustomBuilt $
+              liftIO $ atomicModifyIORef' ee.customBuilt $
                 \oldCustomBuilt ->
                   (Set.insert package.name oldCustomBuilt, ())
               pure outputFile
       let cabalVerboseArg =
-            let CabalVerbosity cv = ee.eeBuildOpts.cabalVerbose
+            let CabalVerbosity cv = ee.buildOpts.cabalVerbose
             in  "--verbose=" <> showForCabal cv
       runExe exeName $ cabalVerboseArg:setupArgs
 
