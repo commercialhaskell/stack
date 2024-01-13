@@ -622,8 +622,7 @@ buildExtractedTarball pkgDir = do
               , buildConfig = updateBuildConfig envConfig.buildConfig
               }
             updateBuildConfig bc = bc
-              { config = bc.config
-                  { build = defaultBuildOpts { boptsTests = True } }
+              { config = bc.config { build = defaultBuildOpts { tests = True } }
               }
         in  set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =

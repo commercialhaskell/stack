@@ -110,12 +110,12 @@ shouldHaddockPackage ::
   -> Bool
 shouldHaddockPackage bopts wanted name =
   if Set.member name wanted
-    then bopts.boptsHaddock
+    then bopts.haddock
     else shouldHaddockDeps bopts
 
 -- | Determine whether to build haddocks for dependencies.
 shouldHaddockDeps :: BuildOpts -> Bool
-shouldHaddockDeps bopts = fromMaybe bopts.boptsHaddock bopts.boptsHaddockDeps
+shouldHaddockDeps bopts = fromMaybe bopts.haddock bopts.haddockDeps
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex ::
@@ -242,7 +242,7 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
           ( map
               (("--optghc=-package-db=" ++ ) . toFilePathNoTrailingSep)
                  [bco.bcoSnapDB, bco.bcoLocalDB]
-              ++ bco.bcoBuildOpts.boptsHaddockOpts.hoAdditionalArgs
+              ++ bco.bcoBuildOpts.haddockOpts.hoAdditionalArgs
               ++ ["--gen-contents", "--gen-index"]
               ++ [x | (xs, _, _, _) <- interfaceOpts, x <- xs]
           )

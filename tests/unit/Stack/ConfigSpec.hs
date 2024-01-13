@@ -191,17 +191,17 @@ spec = beforeAll setup $ do
      writeFile (toFilePath stackDotYaml) buildOptsConfig
      loadConfig' $ \config -> liftIO $ do
       let bopts = config.build
-      bopts.boptsLibProfile `shouldBe` True
-      bopts.boptsExeProfile `shouldBe` True
-      bopts.boptsHaddock `shouldBe` True
-      bopts.boptsHaddockDeps `shouldBe` Just True
-      bopts.boptsInstallExes `shouldBe` True
-      bopts.boptsPreFetch `shouldBe` True
-      bopts.boptsKeepGoing `shouldBe` Just True
-      bopts.boptsKeepTmpFiles `shouldBe` True
-      bopts.boptsForceDirty `shouldBe` True
-      bopts.boptsTests `shouldBe` True
-      bopts.boptsTestOpts `shouldBe` TestOpts
+      bopts.libProfile `shouldBe` True
+      bopts.exeProfile `shouldBe` True
+      bopts.haddock `shouldBe` True
+      bopts.haddockDeps `shouldBe` Just True
+      bopts.installExes `shouldBe` True
+      bopts.preFetch `shouldBe` True
+      bopts.keepGoing `shouldBe` Just True
+      bopts.keepTmpFiles `shouldBe` True
+      bopts.forceDirty `shouldBe` True
+      bopts.tests `shouldBe` True
+      bopts.testOpts `shouldBe` TestOpts
         { toRerunTests = True
         , toAdditionalArgs = ["-fprof"]
         , toCoverage = True
@@ -209,13 +209,13 @@ spec = beforeAll setup $ do
         , toMaximumTimeSeconds = Nothing
         , toAllowStdin = True
         }
-      bopts.boptsBenchmarks `shouldBe` True
-      bopts.boptsBenchmarkOpts `shouldBe` BenchmarkOpts
+      bopts.benchmarks `shouldBe` True
+      bopts.benchmarkOpts `shouldBe` BenchmarkOpts
          { beoAdditionalArgs = Just "-O2"
          , beoDisableRun = True
          }
-      bopts.boptsReconfigure `shouldBe` True
-      bopts.boptsCabalVerbose `shouldBe` CabalVerbosity verbose
+      bopts.reconfigure `shouldBe` True
+      bopts.cabalVerbose `shouldBe` CabalVerbosity verbose
 
     it "finds the config file in a parent directory" $ inTempDir $ do
       writeFile "package.yaml" "name: foo"

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -51,101 +52,101 @@ import           Stack.Prelude
 -- | Build options that is interpreted by the build command. This is built up
 -- from BuildOptsCLI and BuildOptsMonoid
 data BuildOpts = BuildOpts
-  { boptsLibProfile :: !Bool
-  , boptsExeProfile :: !Bool
-  , boptsLibStrip :: !Bool
-  , boptsExeStrip :: !Bool
-  , boptsHaddock :: !Bool
+  { libProfile :: !Bool
+  , exeProfile :: !Bool
+  , libStrip :: !Bool
+  , exeStrip :: !Bool
+  , haddock :: !Bool
     -- ^ Build haddocks?
-  , boptsHaddockOpts :: !HaddockOpts
+  , haddockOpts :: !HaddockOpts
     -- ^ Options to pass to haddock
-  , boptsOpenHaddocks :: !Bool
+  , openHaddocks :: !Bool
     -- ^ Open haddocks in the browser?
-  , boptsHaddockDeps :: !(Maybe Bool)
+  , haddockDeps :: !(Maybe Bool)
     -- ^ Build haddocks for dependencies?
-  , boptsHaddockInternal :: !Bool
+  , haddockInternal :: !Bool
     -- ^ Build haddocks for all symbols and packages, like
     -- @cabal haddock --internal@
-  , boptsHaddockHyperlinkSource :: !Bool
+  , haddockHyperlinkSource :: !Bool
     -- ^ Build hyperlinked source. Disable for no sources.
-  , boptsHaddockForHackage :: !Bool
+  , haddockForHackage :: !Bool
     -- ^ Build with flags to generate Haddock documentation suitable to upload
     -- to Hackage.
-  , boptsInstallExes :: !Bool
+  , installExes :: !Bool
     -- ^ Install executables to user path after building?
-  , boptsInstallCompilerTool :: !Bool
+  , installCompilerTool :: !Bool
     -- ^ Install executables to compiler tools path after building?
-  , boptsPreFetch :: !Bool
+  , preFetch :: !Bool
     -- ^ Fetch all packages immediately
     -- ^ Watch files for changes and automatically rebuild
-  , boptsKeepGoing :: !(Maybe Bool)
+  , keepGoing :: !(Maybe Bool)
     -- ^ Keep building/running after failure
-  , boptsKeepTmpFiles :: !Bool
+  , keepTmpFiles :: !Bool
     -- ^ Keep intermediate files and build directories
-  , boptsForceDirty :: !Bool
+  , forceDirty :: !Bool
     -- ^ Force treating all local packages as having dirty files
-  , boptsTests :: !Bool
+  , tests :: !Bool
     -- ^ Turn on tests for local targets
-  , boptsTestOpts :: !TestOpts
+  , testOpts :: !TestOpts
     -- ^ Additional test arguments
-  , boptsBenchmarks :: !Bool
+  , benchmarks :: !Bool
     -- ^ Turn on benchmarks for local targets
-  , boptsBenchmarkOpts :: !BenchmarkOpts
+  , benchmarkOpts :: !BenchmarkOpts
     -- ^ Additional test arguments
     -- ^ Commands (with arguments) to run after a successful build
     -- ^ Only perform the configure step when building
-  , boptsReconfigure :: !Bool
+  , reconfigure :: !Bool
     -- ^ Perform the configure step even if already configured
-  , boptsCabalVerbose :: !CabalVerbosity
+  , cabalVerbose :: !CabalVerbosity
     -- ^ Ask Cabal to be verbose in its builds
-  , boptsSplitObjs :: !Bool
+  , splitObjs :: !Bool
     -- ^ Whether to enable split-objs.
-  , boptsSkipComponents :: ![Text]
+  , skipComponents :: ![Text]
     -- ^ Which components to skip when building
-  , boptsInterleavedOutput :: !Bool
+  , interleavedOutput :: !Bool
     -- ^ Should we use the interleaved GHC output when building
     -- multiple packages?
-  , boptsProgressBar :: !ProgressBarFormat
+  , progressBar :: !ProgressBarFormat
     -- ^ Format of the progress bar
-  , boptsDdumpDir :: !(Maybe Text)
+  , ddumpDir :: !(Maybe Text)
   }
   deriving Show
 
 defaultBuildOpts :: BuildOpts
 defaultBuildOpts = BuildOpts
-  { boptsLibProfile = defaultFirstFalse buildMonoid.buildMonoidLibProfile
-  , boptsExeProfile = defaultFirstFalse buildMonoid.buildMonoidExeProfile
-  , boptsLibStrip = defaultFirstTrue buildMonoid.buildMonoidLibStrip
-  , boptsExeStrip = defaultFirstTrue buildMonoid.buildMonoidExeStrip
-  , boptsHaddock = False
-  , boptsHaddockOpts = defaultHaddockOpts
-  , boptsOpenHaddocks = defaultFirstFalse buildMonoid.buildMonoidOpenHaddocks
-  , boptsHaddockDeps = Nothing
-  , boptsHaddockInternal =
+  { libProfile = defaultFirstFalse buildMonoid.buildMonoidLibProfile
+  , exeProfile = defaultFirstFalse buildMonoid.buildMonoidExeProfile
+  , libStrip = defaultFirstTrue buildMonoid.buildMonoidLibStrip
+  , exeStrip = defaultFirstTrue buildMonoid.buildMonoidExeStrip
+  , haddock = False
+  , haddockOpts = defaultHaddockOpts
+  , openHaddocks = defaultFirstFalse buildMonoid.buildMonoidOpenHaddocks
+  , haddockDeps = Nothing
+  , haddockInternal =
       defaultFirstFalse buildMonoid.buildMonoidHaddockInternal
-  , boptsHaddockHyperlinkSource =
+  , haddockHyperlinkSource =
       defaultFirstTrue buildMonoid.buildMonoidHaddockHyperlinkSource
-  , boptsHaddockForHackage =
+  , haddockForHackage =
       defaultFirstFalse buildMonoid.buildMonoidHaddockForHackage
-  , boptsInstallExes = defaultFirstFalse buildMonoid.buildMonoidInstallExes
-  , boptsInstallCompilerTool =
+  , installExes = defaultFirstFalse buildMonoid.buildMonoidInstallExes
+  , installCompilerTool =
       defaultFirstFalse buildMonoid.buildMonoidInstallCompilerTool
-  , boptsPreFetch = defaultFirstFalse buildMonoid.buildMonoidPreFetch
-  , boptsKeepGoing = Nothing
-  , boptsKeepTmpFiles = defaultFirstFalse buildMonoid.buildMonoidKeepTmpFiles
-  , boptsForceDirty = defaultFirstFalse buildMonoid.buildMonoidForceDirty
-  , boptsTests = defaultFirstFalse buildMonoid.buildMonoidTests
-  , boptsTestOpts = defaultTestOpts
-  , boptsBenchmarks = defaultFirstFalse buildMonoid.buildMonoidBenchmarks
-  , boptsBenchmarkOpts = defaultBenchmarkOpts
-  , boptsReconfigure = defaultFirstFalse buildMonoid.buildMonoidReconfigure
-  , boptsCabalVerbose = CabalVerbosity normal
-  , boptsSplitObjs = defaultFirstFalse buildMonoid.buildMonoidSplitObjs
-  , boptsSkipComponents = []
-  , boptsInterleavedOutput =
+  , preFetch = defaultFirstFalse buildMonoid.buildMonoidPreFetch
+  , keepGoing = Nothing
+  , keepTmpFiles = defaultFirstFalse buildMonoid.buildMonoidKeepTmpFiles
+  , forceDirty = defaultFirstFalse buildMonoid.buildMonoidForceDirty
+  , tests = defaultFirstFalse buildMonoid.buildMonoidTests
+  , testOpts = defaultTestOpts
+  , benchmarks = defaultFirstFalse buildMonoid.buildMonoidBenchmarks
+  , benchmarkOpts = defaultBenchmarkOpts
+  , reconfigure = defaultFirstFalse buildMonoid.buildMonoidReconfigure
+  , cabalVerbose = CabalVerbosity normal
+  , splitObjs = defaultFirstFalse buildMonoid.buildMonoidSplitObjs
+  , skipComponents = []
+  , interleavedOutput =
       defaultFirstTrue buildMonoid.buildMonoidInterleavedOutput
-  , boptsProgressBar = CappedBar
-  , boptsDdumpDir = Nothing
+  , progressBar = CappedBar
+  , ddumpDir = Nothing
   }
  where
   buildMonoid = undefined :: BuildOptsMonoid
@@ -652,14 +653,12 @@ buildOptsMonoidInstallExesL =
     (\buildMonoid t -> buildMonoid {buildMonoidInstallExes = FirstFalse t})
 
 buildOptsInstallExesL :: Lens' BuildOpts Bool
-buildOptsInstallExesL =
-  lens (.boptsInstallExes)
-    (\bopts t -> bopts {boptsInstallExes = t})
+buildOptsInstallExesL = lens
+  (.installExes)
+  (\bopts t -> bopts {installExes = t})
 
 buildOptsHaddockL :: Lens' BuildOpts Bool
-buildOptsHaddockL =
-  lens (.boptsHaddock)
-    (\bopts t -> bopts {boptsHaddock = t})
+buildOptsHaddockL = lens (.haddock) (\bopts t -> bopts {haddock = t})
 
 -- Type representing formats of Stack's progress bar when building.
 data ProgressBarFormat

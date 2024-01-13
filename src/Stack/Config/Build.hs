@@ -22,58 +22,57 @@ import           Stack.Types.BuildOpts
 -- | Interprets BuildOptsMonoid options.
 buildOptsFromMonoid :: BuildOptsMonoid -> BuildOpts
 buildOptsFromMonoid buildMonoid = BuildOpts
-  { boptsLibProfile = fromFirstFalse
+  { libProfile = fromFirstFalse
       (buildMonoid.buildMonoidLibProfile <>
        FirstFalse (if tracing || profiling then Just True else Nothing))
-  , boptsExeProfile = fromFirstFalse
+  , exeProfile = fromFirstFalse
       (buildMonoid.buildMonoidExeProfile <>
        FirstFalse (if tracing || profiling then Just True else Nothing))
-  , boptsLibStrip = fromFirstTrue
+  , libStrip = fromFirstTrue
       (buildMonoid.buildMonoidLibStrip <>
        FirstTrue (if noStripping then Just False else Nothing))
-  , boptsExeStrip = fromFirstTrue
+  , exeStrip = fromFirstTrue
       (buildMonoid.buildMonoidExeStrip <>
        FirstTrue (if noStripping then Just False else Nothing))
-  , boptsHaddock = fromFirstFalse buildMonoid.buildMonoidHaddock
-  , boptsHaddockOpts = haddockOptsFromMonoid buildMonoid.buildMonoidHaddockOpts
-  , boptsOpenHaddocks =
+  , haddock = fromFirstFalse buildMonoid.buildMonoidHaddock
+  , haddockOpts = haddockOptsFromMonoid buildMonoid.buildMonoidHaddockOpts
+  , openHaddocks =
          not isHaddockFromHackage
       && fromFirstFalse buildMonoid.buildMonoidOpenHaddocks
-  , boptsHaddockDeps = if isHaddockFromHackage
+  , haddockDeps = if isHaddockFromHackage
       then Nothing
       else getFirst buildMonoid.buildMonoidHaddockDeps
-  , boptsHaddockInternal =
+  , haddockInternal =
          not isHaddockFromHackage
       && fromFirstFalse buildMonoid.buildMonoidHaddockInternal
-  , boptsHaddockHyperlinkSource =
+  , haddockHyperlinkSource =
          isHaddockFromHackage
       || fromFirstTrue buildMonoid.buildMonoidHaddockHyperlinkSource
-  , boptsHaddockForHackage = isHaddockFromHackage
-  , boptsInstallExes = fromFirstFalse buildMonoid.buildMonoidInstallExes
-  , boptsInstallCompilerTool =
+  , haddockForHackage = isHaddockFromHackage
+  , installExes = fromFirstFalse buildMonoid.buildMonoidInstallExes
+  , installCompilerTool =
       fromFirstFalse buildMonoid.buildMonoidInstallCompilerTool
-  , boptsPreFetch = fromFirstFalse buildMonoid.buildMonoidPreFetch
-  , boptsKeepGoing = getFirst buildMonoid.buildMonoidKeepGoing
-  , boptsKeepTmpFiles = fromFirstFalse buildMonoid.buildMonoidKeepTmpFiles
-  , boptsForceDirty =
+  , preFetch = fromFirstFalse buildMonoid.buildMonoidPreFetch
+  , keepGoing = getFirst buildMonoid.buildMonoidKeepGoing
+  , keepTmpFiles = fromFirstFalse buildMonoid.buildMonoidKeepTmpFiles
+  , forceDirty =
       isHaddockFromHackage || fromFirstFalse buildMonoid.buildMonoidForceDirty
-  , boptsTests = fromFirstFalse buildMonoid.buildMonoidTests
-  , boptsTestOpts =
+  , tests = fromFirstFalse buildMonoid.buildMonoidTests
+  , testOpts =
       testOptsFromMonoid buildMonoid.buildMonoidTestOpts additionalArgs
-  , boptsBenchmarks = fromFirstFalse buildMonoid.buildMonoidBenchmarks
-  , boptsBenchmarkOpts =
+  , benchmarks = fromFirstFalse buildMonoid.buildMonoidBenchmarks
+  , benchmarkOpts =
       benchmarkOptsFromMonoid
         buildMonoid.buildMonoidBenchmarkOpts
         additionalArgs
-  , boptsReconfigure = fromFirstFalse buildMonoid.buildMonoidReconfigure
-  , boptsCabalVerbose =
+  , reconfigure = fromFirstFalse buildMonoid.buildMonoidReconfigure
+  , cabalVerbose =
       fromFirst (CabalVerbosity normal) buildMonoid.buildMonoidCabalVerbose
-  , boptsSplitObjs = fromFirstFalse buildMonoid.buildMonoidSplitObjs
-  , boptsSkipComponents = buildMonoid.buildMonoidSkipComponents
-  , boptsInterleavedOutput =
-      fromFirstTrue buildMonoid.buildMonoidInterleavedOutput
-  , boptsProgressBar = fromFirst CappedBar buildMonoid.buildMonoidProgressBar
-  , boptsDdumpDir = getFirst buildMonoid.buildMonoidDdumpDir
+  , splitObjs = fromFirstFalse buildMonoid.buildMonoidSplitObjs
+  , skipComponents = buildMonoid.buildMonoidSkipComponents
+  , interleavedOutput = fromFirstTrue buildMonoid.buildMonoidInterleavedOutput
+  , progressBar = fromFirst CappedBar buildMonoid.buildMonoidProgressBar
+  , ddumpDir = getFirst buildMonoid.buildMonoidDdumpDir
   }
  where
   isHaddockFromHackage = fromFirstFalse buildMonoid.buildMonoidHaddockForHackage
