@@ -6,7 +6,7 @@ module Stack.DefaultColorWhen
 
 import           Stack.Prelude ( stdout )
 import           Stack.Types.ColorWhen ( ColorWhen (..) )
-import           System.Console.ANSI ( hSupportsANSI )
+import           System.Console.ANSI ( hNowSupportsANSI )
 import           System.Environment ( lookupEnv )
 
 -- | The default adopts the standard proposed at http://no-color.org/, that
@@ -15,6 +15,6 @@ import           System.Environment ( lookupEnv )
 defaultColorWhen :: IO ColorWhen
 defaultColorWhen = lookupEnv "NO_COLOR" >>= \case
   Just _ -> pure ColorNever
-  _ -> hSupportsANSI stdout >>= \case
+  _ -> hNowSupportsANSI stdout >>= \case
     False -> pure ColorNever
     _ -> pure ColorAuto
