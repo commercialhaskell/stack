@@ -107,7 +107,7 @@ getRawInput ::
   -> Map PackageName ProjectPackage
   -> ([Text], [RawInput])
 getRawInput boptscli locals =
-  let textTargets' = boptscli.boptsCLITargets
+  let textTargets' = boptscli.targets
       textTargets =
         -- Handle the no targets case, which means we pass in the names of all
         -- project packages

@@ -926,7 +926,7 @@ withSingleContext
                       AGOEverything
                       config.ghcOptionsByCat
                   ++ case config.applyGhcOptions of
-                       AGOEverything -> ee.eeBuildOptsCLI.boptsCLIGhcOptions
+                       AGOEverything -> ee.eeBuildOptsCLI.ghcOptions
                        AGOTargets -> []
                        AGOLocals -> []
                   )

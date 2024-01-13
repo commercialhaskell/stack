@@ -330,7 +330,7 @@ executePlan
                , esKeepGhcRts = False
                }
     withProcessContext menv' $
-      forM_ boptsCli.boptsCLIExec $ \(cmd, args) ->
+      forM_ boptsCli.exec $ \(cmd, args) ->
       proc cmd args runProcess_
  where
   mlargestPackageName =
@@ -1126,7 +1126,7 @@ withSingleContext
                       AGOEverything
                       config.ghcOptionsByCat
                   ++ case config.applyGhcOptions of
-                       AGOEverything -> ee.eeBuildOptsCLI.boptsCLIGhcOptions
+                       AGOEverything -> ee.eeBuildOptsCLI.ghcOptions
                        AGOTargets -> []
                        AGOLocals -> []
                   )

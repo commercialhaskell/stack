@@ -180,7 +180,7 @@ getConfigCache ee task installedMap enableTest enableBench = do
           Nothing
               -- Expect to instead find it in installedMap if it's
               -- an initialBuildSteps target.
-              | ee.eeBuildOptsCLI.boptsCLIInitialBuildSteps && taskIsTarget task
+              | ee.eeBuildOptsCLI.initialBuildSteps && taskIsTarget task
               , Just (_, installed) <- Map.lookup (pkgName ident) installedMap
                   -> pure $ installedToGhcPkgId ident installed
           Just installed -> pure $ installedToGhcPkgId ident installed
@@ -561,8 +561,8 @@ singleBuild
                 Just (_, Executable _) -> True
                 _ -> False
 
-        case ( ee.eeBuildOptsCLI.boptsCLIOnlyConfigure
-             , ee.eeBuildOptsCLI.boptsCLIInitialBuildSteps && taskIsTarget task
+        case ( ee.eeBuildOptsCLI.onlyConfigure
+             , ee.eeBuildOptsCLI.initialBuildSteps && taskIsTarget task
              ) of
           -- A full build is done if there are downstream actions,
           -- because their configure step will require that this

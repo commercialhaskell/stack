@@ -124,9 +124,7 @@ execCmd opts =
   eo = opts.eoExtra
 
   targets = concatMap words eo.eoPackages
-  boptsCLI = defaultBuildOptsCLI
-             { boptsCLITargets = map T.pack targets
-             }
+  boptsCLI = defaultBuildOptsCLI { targets = map T.pack targets }
 
   -- return the package-id of the first package in GHC_PACKAGE_PATH
   getPkgId name = do

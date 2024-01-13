@@ -176,9 +176,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
           T.pack . packageIdentifierString <$>
               restrictMinHoogleVersion muted hoogleIdent
     config <- view configL
-    let boptsCLI = defaultBuildOptsCLI
-            { boptsCLITargets =  [hoogleTarget]
-            }
+    let boptsCLI = defaultBuildOptsCLI { targets =  [hoogleTarget] }
     runRIO config $ withEnvConfig NeedTargets boptsCLI f
 
   restrictMinHoogleVersion ::

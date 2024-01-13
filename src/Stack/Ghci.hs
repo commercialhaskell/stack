@@ -201,10 +201,10 @@ ghciCmd :: GhciOpts -> RIO Runner ()
 ghciCmd ghciOpts =
   let boptsCLI = defaultBuildOptsCLI
         -- using only additional packages, targets then get overridden in `ghci`
-        { boptsCLITargets = map T.pack ghciOpts.ghciAdditionalPackages
-        , boptsCLIInitialBuildSteps = True
-        , boptsCLIFlags = ghciOpts.ghciFlags
-        , boptsCLIGhcOptions = map T.pack ghciOpts.ghciGhcOptions
+        { targets = map T.pack ghciOpts.ghciAdditionalPackages
+        , initialBuildSteps = True
+        , flags = ghciOpts.ghciFlags
+        , ghcOptions = map T.pack ghciOpts.ghciGhcOptions
         }
   in  withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
         bopts <- view buildOptsL
@@ -221,8 +221,8 @@ ghciCmd ghciOpts =
 ghci :: HasEnvConfig env => GhciOpts -> RIO env ()
 ghci opts = do
   let buildOptsCLI = defaultBuildOptsCLI
-        { boptsCLITargets = []
-        , boptsCLIFlags = opts.ghciFlags
+        { targets = []
+        , flags = opts.ghciFlags
         }
   sourceMap <- view $ envConfigL . to (.sourceMap)
   installMap <- toInstallMap sourceMap
@@ -320,7 +320,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
     else do
       -- Try parsing targets before checking if both file and
       -- module targets are specified (see issue#3342).
-      let boptsCLI = buildOptsCLI { boptsCLITargets = normalTargetsRaw }
+      let boptsCLI = buildOptsCLI { targets = normalTargetsRaw }
       normalTargets <- parseTargets AllowNoTargets False boptsCLI sma
         `catch` \pex@(PrettyException ex) ->
           case fromException $ toException ex of
@@ -337,7 +337,7 @@ parseMainIsTargets ::
   -> Maybe Text
   -> RIO env (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do
-  let boptsCLI = buildOptsCLI { boptsCLITargets = [target] }
+  let boptsCLI = buildOptsCLI { targets = [target] }
   targets <- parseTargets AllowNoTargets False boptsCLI sma
   pure targets.smtTargets
 

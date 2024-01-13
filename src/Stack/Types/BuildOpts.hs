@@ -153,18 +153,18 @@ defaultBuildOpts = BuildOpts
 
 defaultBuildOptsCLI ::BuildOptsCLI
 defaultBuildOptsCLI = BuildOptsCLI
-  { boptsCLITargets = []
-  , boptsCLIDryrun = False
-  , boptsCLIFlags = Map.empty
-  , boptsCLIGhcOptions = []
-  , boptsCLIProgsOptions = []
-  , boptsCLIBuildSubset = BSAll
-  , boptsCLIFileWatch = NoFileWatch
-  , boptsCLIWatchAll = False
-  , boptsCLIExec = []
-  , boptsCLIOnlyConfigure = False
-  , boptsCLICommand = Build
-  , boptsCLIInitialBuildSteps = False
+  { targets = []
+  , dryrun = False
+  , flags = Map.empty
+  , ghcOptions = []
+  , progsOptions = []
+  , buildSubset = BSAll
+  , fileWatch = NoFileWatch
+  , watchAll = False
+  , exec = []
+  , onlyConfigure = False
+  , command = Build
+  , initialBuildSteps = False
   }
 
 -- | How to apply a CLI flag
@@ -181,32 +181,32 @@ boptsCLIFlagsByName =
   Map.fromList .
   mapMaybe go .
   Map.toList .
-  (.boptsCLIFlags)
+  (.flags)
  where
   go (ACFAllProjectPackages, _) = Nothing
   go (ACFByName name, flags) = Just (name, flags)
 
 -- | Build options that may only be specified from the CLI
 data BuildOptsCLI = BuildOptsCLI
-  { boptsCLITargets :: ![Text]
-  , boptsCLIDryrun :: !Bool
-  , boptsCLIGhcOptions :: ![Text]
-  , boptsCLIProgsOptions :: ![(Text, [Text])]
-  , boptsCLIFlags :: !(Map ApplyCLIFlag (Map FlagName Bool))
-  , boptsCLIBuildSubset :: !BuildSubset
-  , boptsCLIFileWatch :: !FileWatchOpts
-  , boptsCLIWatchAll :: !Bool
-  , boptsCLIExec :: ![(String, [String])]
-  , boptsCLIOnlyConfigure :: !Bool
-  , boptsCLICommand :: !BuildCommand
-  , boptsCLIInitialBuildSteps :: !Bool
+  { targets :: ![Text]
+  , dryrun :: !Bool
+  , ghcOptions :: ![Text]
+  , progsOptions :: ![(Text, [Text])]
+  , flags :: !(Map ApplyCLIFlag (Map FlagName Bool))
+  , buildSubset :: !BuildSubset
+  , fileWatch :: !FileWatchOpts
+  , watchAll :: !Bool
+  , exec :: ![(String, [String])]
+  , onlyConfigure :: !Bool
+  , command :: !BuildCommand
+  , initialBuildSteps :: !Bool
   }
   deriving Show
 
 -- | Generate a list of --PROG-option="<argument>" arguments for all PROGs.
 boptsCLIAllProgOptions :: BuildOptsCLI -> [Text]
 boptsCLIAllProgOptions boptsCLI =
-  concatMap progOptionArgs boptsCLI.boptsCLIProgsOptions
+  concatMap progOptionArgs boptsCLI.progsOptions
  where
   -- Generate a list of --PROG-option="<argument>" arguments for a PROG.
   progOptionArgs :: (Text, [Text]) -> [Text]
