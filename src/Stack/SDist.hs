@@ -221,7 +221,7 @@ getSDistTarball mpvpBounds pkgDir = do
             pure ()
       Nothing ->
         prettyWarnS "unexpected empty custom-setup dependencies."
-  sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
+  sourceMap <- view $ envConfigL . to (.sourceMap)
   installMap <- toInstallMap sourceMap
   (installedMap, _globalDumpPkgs, _snapshotDumpPkgs, _localDumpPkgs) <-
     getInstalled installMap
@@ -614,14 +614,12 @@ buildExtractedTarball pkgDir = do
           == localPackageToBuild.package.name
   pathsToKeep <- Map.fromList <$> filterM
     (fmap not . isPathToRemove . resolvedAbsolute . (.ppResolvedDir) . snd)
-    (Map.toList envConfig.envConfigBuildConfig.smWanted.smwProject)
+    (Map.toList envConfig.buildConfig.smWanted.smwProject)
   pp <- mkProjectPackage YesPrintWarnings pkgDir False
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
-              { envConfigSourceMap =
-                  updatePackagesInSourceMap envConfig.envConfigSourceMap
-              , envConfigBuildConfig =
-                  updateBuildConfig envConfig.envConfigBuildConfig
+              { sourceMap = updatePackagesInSourceMap envConfig.sourceMap
+              , buildConfig = updateBuildConfig envConfig.buildConfig
               }
             updateBuildConfig bc = bc
               { config = bc.config

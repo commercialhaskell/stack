@@ -152,11 +152,11 @@ withDotConfig opts inner =
 
   withReal = withEnvConfig NeedTargets boptsCLI $ do
     envConfig <- ask
-    let sourceMap = envConfig.envConfigSourceMap
+    let sourceMap = envConfig.sourceMap
     installMap <- toInstallMap sourceMap
     (_, globalDump, _, _) <- getInstalled installMap
     let dc = DotConfig
-          { dcBuildConfig = envConfig.envConfigBuildConfig
+          { dcBuildConfig = envConfig.buildConfig
           , dcSourceMap = sourceMap
           , dcGlobalDump = globalDump
           }
