@@ -339,7 +339,6 @@ library
       Build_stack
       Paths_stack
   other-modules:
-      Stack.Build.ExecuteComponent
       Stack.Build.ExecuteEnv
       Stack.Build.ExecutePackage
   autogen-modules:
