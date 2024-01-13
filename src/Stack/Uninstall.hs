@@ -11,9 +11,7 @@ import           Stack.Constants ( osIsWindows )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.Config
-                   ( configL, configLocalBin, configLocalProgramsBase
-                   , stackGlobalConfigL, stackRootL
-                   )
+                   ( Config (..), configL, stackGlobalConfigL, stackRootL )
 import           Stack.Types.Runner ( Runner )
 
 -- | Function underlying the @stack uninstall@ command. Display help for the
@@ -22,8 +20,8 @@ uninstallCmd :: () -> RIO Runner ()
 uninstallCmd () = withConfig NoReexec $ do
   stackRoot <- view stackRootL
   globalConfig <- view stackGlobalConfigL
-  programsDir <- view $ configL . to (.configLocalProgramsBase)
-  localBinDir <- view $ configL . to (.configLocalBin)
+  programsDir <- view $ configL . to (.localProgramsBase)
+  localBinDir <- view $ configL . to (.localBin)
   let toStyleDoc = style Dir . fromString . toFilePath
       stackRoot' = toStyleDoc stackRoot
       globalConfig' = toStyleDoc globalConfig

@@ -121,9 +121,9 @@ getCmdArgs docker imageInfo isRemoteDocker = do
              ] ++
           )
           (liftIO getArgs)
-    case config.configDocker.dockerStackExe of
+    case config.docker.dockerStackExe of
         Just DockerStackExeHost
-          | config.configPlatform == dockerContainerPlatform -> do
+          | config.platform == dockerContainerPlatform -> do
               exePath <- resolveFile' =<< liftIO getExecutablePath
               cmdArgs args exePath
           | otherwise -> throwIO UnsupportedStackExeHostPlatformException
@@ -133,7 +133,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
         Just (DockerStackExePath path) -> cmdArgs args path
         Just DockerStackExeDownload -> exeDownload args
         Nothing
-          | config.configPlatform == dockerContainerPlatform -> do
+          | config.platform == dockerContainerPlatform -> do
               (exePath, exeTimestamp, misCompatible) <-
                   do exePath <- resolveFile' =<< liftIO getExecutablePath
                      exeTimestamp <- getModificationTime exePath
@@ -199,7 +199,7 @@ preventInContainer inner =
 runContainerAndExit :: HasConfig env => RIO env void
 runContainerAndExit = do
   config <- view configL
-  let docker = config.configDocker
+  let docker = config.docker
   checkDockerVersion docker
   (env, isStdinTerminal, isStderrTerminal, homeDir) <- liftIO $
     (,,,)
@@ -398,7 +398,7 @@ inspects images = do
 pull :: HasConfig env => RIO env ()
 pull = do
   config <- view configL
-  let docker = config.configDocker
+  let docker = config.docker
   checkDockerVersion docker
   either throwIO (pullImage docker) docker.dockerImage
 

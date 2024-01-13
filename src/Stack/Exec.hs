@@ -107,7 +107,7 @@ execCmd opts =
     unless (null targets) $ build Nothing
 
     config <- view configL
-    menv <- liftIO $ config.configProcessContextSettings eo.eoEnvSettings
+    menv <- liftIO $ config.processContextSettings eo.eoEnvSettings
     withProcessContext menv $ do
       -- Add RTS options to arguments
       let argsWithRts args = if null eo.eoRtsOptions

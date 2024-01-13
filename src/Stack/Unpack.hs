@@ -128,7 +128,7 @@ unpackPackages mSnapshot dest targets areCandidates = do
               \will be ignored."
       <> line
   locs1 <- forM pirs $ \pir -> do
-    hackageBaseUrl <- view $ configL . to (.configHackageBaseUrl)
+    hackageBaseUrl <- view $ configL . to (.hackageBaseUrl)
     let rpli = if areCandidates
           then
             let -- Ignoring revisions for package candidates.

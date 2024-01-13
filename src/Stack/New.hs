@@ -248,7 +248,7 @@ new opts forceOverwrite = do
               else do relDir <- parseRelDir (packageNameString project)
                       pure (pwd </> relDir)
   exists <- doesDirExist absDir
-  configTemplate <- view $ configL . to (.configDefaultTemplate)
+  configTemplate <- view $ configL . to (.defaultTemplate)
   let template = fromMaybe defaultTemplateName $ asum [ cliOptionTemplate
                                                       , configTemplate
                                                       ]
@@ -504,7 +504,7 @@ applyTemplate project template nonceParams dir templateText = do
         nameParams = M.fromList [ ("name", T.pack $ packageNameString project)
                                 , ("name-as-varid", nameAsVarId)
                                 , ("name-as-module", nameAsModule) ]
-        configParams = config.configTemplateParams
+        configParams = config.templateParams
         yearParam = M.singleton "year" currentYear
   files :: Map FilePath LB.ByteString <-
     catch
@@ -569,7 +569,7 @@ applyTemplate project template nonceParams dir templateText = do
     prettyNote $
       missingParameters
         missingKeys
-        config.configUserConfigPath
+        config.userConfigPath
   pure $ M.fromList results
  where
   onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks
@@ -659,7 +659,7 @@ writeTemplateFiles files =
 runTemplateInits :: HasConfig env => Path Abs Dir -> RIO env ()
 runTemplateInits dir = do
   config <- view configL
-  case config.configScmInit of
+  case config.scmInit of
     Nothing -> pure ()
     Just Git -> withWorkingDir (toFilePath dir) $
       catchAny

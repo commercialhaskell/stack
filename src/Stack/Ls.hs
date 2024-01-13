@@ -309,7 +309,7 @@ listStylesCmd opts = do
 -- | List Stack's installed tools, sorted (see instance of 'Ord' for 'Tool').
 listToolsCmd :: ListToolsOpts -> RIO Config ()
 listToolsCmd opts = do
-  localPrograms <- view $ configL . to (.configLocalPrograms)
+  localPrograms <- view $ configL . to (.localPrograms)
   installed <- sort <$> listInstalled localPrograms
   let wanted = case opts.toptFilter of
         [] -> installed

@@ -215,7 +215,7 @@ paths =
   , ( "Install location for GHC and other core tools (see 'stack ls tools' command)"
     , "programs"
     , WithoutHaddocks $
-        view (configL . to (.configLocalPrograms) . to toFilePathNoTrailingSep . to T.pack))
+        view (configL . to (.localPrograms) . to toFilePathNoTrailingSep . to T.pack))
   , ( "Compiler binary (e.g. ghc)"
     , "compiler-exe"
     , WithoutHaddocks $ T.pack . toFilePath . (.piCompiler) )
@@ -228,15 +228,15 @@ paths =
   , ( "Directory where Stack installs executables (e.g. ~/.local/bin (Unix-like OSs) or %APPDATA%\\local\\bin (Windows))"
     , "local-bin"
     , WithoutHaddocks $
-        view $ configL . to (.configLocalBin) . to toFilePathNoTrailingSep . to T.pack)
+        view $ configL . to (.localBin) . to toFilePathNoTrailingSep . to T.pack)
   , ( "Extra include directories"
     , "extra-include-dirs"
     , WithoutHaddocks $
-        T.intercalate ", " . map T.pack . (.configExtraIncludeDirs) . view configL )
+        T.intercalate ", " . map T.pack . (.extraIncludeDirs) . view configL )
   , ( "Extra library directories"
     , "extra-library-dirs"
     , WithoutHaddocks $
-        T.intercalate ", " . map T.pack . (.configExtraLibDirs) . view configL )
+        T.intercalate ", " . map T.pack . (.extraLibDirs) . view configL )
   , ( "Snapshot package database"
     , "snapshot-pkg-db"
     , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.piSnapDb) )

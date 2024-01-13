@@ -51,8 +51,7 @@ import           Distribution.PackageDescription
                    , SetupBuildInfo (..), TestSuite (..), allLibraries
                    , buildType, depPkgName, depVerRange
                    )
-import           Distribution.PackageDescription as Executable
-                   ( Executable (..) )
+import qualified Distribution.PackageDescription as Executable
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
 import           Distribution.System ( OS (..), Arch, Platform (..) )
 import           Distribution.Text ( display )
@@ -84,17 +83,18 @@ import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.BuildConfig
                    ( HasBuildConfig (..), getProjectWorkDir )
 import           Stack.Types.CompCollection
-                   ( CompCollection, foldAndMakeCollection
-                   , foldComponentToAnotherCollection, getBuildableSetText, collectionLookup
+                   ( CompCollection, collectionLookup, foldAndMakeCollection
+                   , foldComponentToAnotherCollection, getBuildableSetText
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.Component ( HasBuildInfo, HasComponentInfo, StackUnqualCompName (unqualCompToText) )
+import           Stack.Types.Component
+                   ( HasBuildInfo, HasComponentInfo, StackUnqualCompName (..) )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.Dependency
-                   ( DepValue (..), cabalSetupDepsToStackDep
-                   , libraryDepFromVersionRange, DepType (..), DepLibrary (..)
+                   ( DepLibrary (..), DepType (..), DepValue (..)
+                   , cabalSetupDepsToStackDep, libraryDepFromVersionRange
                    )
 import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.Installed
@@ -102,7 +102,9 @@ import           Stack.Types.Installed
                    , installedToPackageIdOpt
                    )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent (..), subLibComponents, isPotentialDependency )
+                   ( NamedComponent (..), isPotentialDependency
+                   , subLibComponents
+                   )
 import           Stack.Types.Package
                    ( BioInput(..), BuildInfoOpts (..), Package (..)
                    , PackageConfig (..), PackageException (..)
@@ -250,8 +252,8 @@ generatePkgDescOpts
             , buildInfo = binfo
             , dotCabalPaths =
                 fromMaybe [] (M.lookup namedComponent componentPaths)
-            , configLibDirs =  config.configExtraLibDirs
-            , configIncludeDirs =  config.configExtraIncludeDirs
+            , configLibDirs =  config.extraLibDirs
+            , configIncludeDirs =  config.extraIncludeDirs
             , componentName = namedComponent
             , cabalVersion = cabalVer
             }

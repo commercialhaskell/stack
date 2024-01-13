@@ -649,15 +649,15 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
   actual <- either throwIO pure $ wantedToActual wanted
   let wc = actual^.whichCompilerL
   let sopts = SetupOpts
-        { soptsInstallIfMissing = config.configInstallGHC
-        , soptsUseSystem = config.configSystemGHC
+        { soptsInstallIfMissing = config.installGHC
+        , soptsUseSystem = config.systemGHC
         , soptsWantedCompiler = wcVersion
-        , soptsCompilerCheck = config.configCompilerCheck
+        , soptsCompilerCheck = config.compilerCheck
         , soptsStackYaml = Just stackYaml
         , soptsForceReinstall = False
         , soptsSanityCheck = False
-        , soptsSkipGhcCheck = config.configSkipGHCCheck
-        , soptsSkipMsys = config.configSkipMsys
+        , soptsSkipGhcCheck = config.skipGHCCheck
+        , soptsSkipMsys = config.skipMsys
         , soptsResolveMissingGHC = mResolveMissingGHC
         , soptsGHCBindistURL = Nothing
         }
@@ -682,7 +682,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                      Map.keysSet smActual.smaProject
         prunedActual = smActual
           { smaGlobal = pruneGlobals smActual.smaGlobal actualPkgs }
-        haddockDeps = shouldHaddockDeps config.configBuild
+        haddockDeps = shouldHaddockDeps config.build
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
     sourceMapHash <- hashSourceMapData boptsCLI sourceMap
@@ -801,7 +801,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         { bcConfig = addIncludeLib ghcBin
                    $ set processContextL envOverride
                      (view configL bc)
-            { configProcessContextSettings = getProcessContext'
+            { processContextSettings = getProcessContext'
             }
         }
     , envConfigBuildOptsCLI = boptsCLI
@@ -972,7 +972,7 @@ withNewLocalBuildTargets ::
   -> RIO env a
 withNewLocalBuildTargets targets f = do
   envConfig <- view envConfigL
-  haddockDeps <- view $ configL . to (.configBuild) . to shouldHaddockDeps
+  haddockDeps <- view $ configL . to (.build) . to shouldHaddockDeps
   let boptsCLI = envConfig.envConfigBuildOptsCLI
   envConfig' <- rebuildEnv envConfig NeedTargets haddockDeps $
                 boptsCLI {boptsCLITargets = targets}
@@ -981,11 +981,11 @@ withNewLocalBuildTargets targets f = do
 -- | Add the include and lib paths to the given Config
 addIncludeLib :: ExtraDirs -> Config -> Config
 addIncludeLib (ExtraDirs _bins includes libs) config = config
-  { configExtraIncludeDirs =
-      config.configExtraIncludeDirs ++
+  { extraIncludeDirs =
+      config.extraIncludeDirs ++
       map toFilePathNoTrailingSep includes
-  , configExtraLibDirs =
-      config.configExtraLibDirs ++
+  , extraLibDirs =
+      config.extraLibDirs ++
       map toFilePathNoTrailingSep libs
   }
 
@@ -1016,7 +1016,7 @@ warnUnsupportedCompiler ::
   => Version
   -> RIO env Bool
 warnUnsupportedCompiler ghcVersion = do
-  notifyIfGhcUntested <- view $ configL . to (.configNotifyIfGhcUntested)
+  notifyIfGhcUntested <- view $ configL . to (.notifyIfGhcUntested)
   if
     | ghcVersion < mkVersion [7, 8] -> do
         prettyWarnL
@@ -1051,7 +1051,7 @@ warnUnsupportedCompilerCabal cp didWarn = do
   unless didWarn $
     void $ warnUnsupportedCompiler $ getGhcVersion cp.cpCompilerVersion
   let cabalVersion = cp.cpCabalVersion
-  notifyIfCabalUntested <- view $ configL . to (.configNotifyIfCabalUntested)
+  notifyIfCabalUntested <- view $ configL . to (.notifyIfCabalUntested)
   if
     | cabalVersion < mkVersion [1, 24, 0] -> do
         prettyWarnL
@@ -1090,7 +1090,7 @@ ensureMsys ::
   -> RIO env (Maybe Tool)
 ensureMsys sopts getSetupInfo' = do
   platform <- view platformL
-  localPrograms <- view $ configL . to (.configLocalPrograms)
+  localPrograms <- view $ configL . to (.localPrograms)
   installed <- listInstalled localPrograms
 
   case platform of
@@ -1112,7 +1112,7 @@ ensureMsys sopts getSetupInfo' = do
                   Nothing -> prettyThrowIO $ MSYS2NotFound osKey
               let tool = Tool (PackageIdentifier (mkPackageName "msys2") version)
               Just <$> downloadAndInstallTool
-                         config.configLocalPrograms
+                         config.localPrograms
                          info
                          tool
                          (installMsys2Windows si)
@@ -1173,7 +1173,7 @@ installGhcBindist sopts getSetupInfo' installed = do
                 [ flow "To install the correct version of GHC into the \
                        \subdirectory for the specified platform in Stack's \
                        \directory for local tools"
-                , parens (pretty config.configLocalPrograms) <> ","
+                , parens (pretty config.localPrograms) <> ","
                 , flow "try running"
                 , style Shell (flow "stack setup")
                 , flow "or use the"
@@ -1330,7 +1330,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
   let wanted = sopts.soptsWantedCompiler
   -- List installed tools
   config <- view configL
-  let localPrograms = config.configLocalPrograms
+  let localPrograms = config.localPrograms
   installed <- listInstalled localPrograms
   logDebug $
        "Installed tools: \n - "
@@ -1342,7 +1342,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
        buildGhcFromSource
          getSetupInfo'
          installed
-         config.configCompilerRepository
+         config.compilerRepository
          commitId
          flavour
      _ -> installGhcBindist sopts getSetupInfo' installed
@@ -1561,7 +1561,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
         -- withRepo is guaranteed to set workingDirL, so let's get it
         mcwd <- traverse parseAbsDir =<< view workingDirL
         cwd <- maybe (throwIO WorkingDirectoryInvalidBug) pure mcwd
-        let threads = config.configJobs
+        let threads = config.jobs
             relFileHadrianStackDotYaml' = toFilePath relFileHadrianStackDotYaml
             ghcBootScriptPath = cwd </> ghcBootScript
             boot = if osIsWindows
@@ -1574,7 +1574,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
               -- If a resolver is specified on the command line, Stack will
               -- apply it. This allows the resolver specified in Hadrian's
               -- stack.yaml file to be overridden.
-              args' = maybe args addResolver config.configResolver
+              args' = maybe args addResolver config.resolver
               addResolver resolver = "--resolver=" <> show resolver : args
             happy = stack ["install", "happy"]
             alex = stack ["install", "alex"]
@@ -1649,7 +1649,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
                    | otherwise   = installGHCPosix ghcdlinfo
             si <- runMemoized getSetupInfo'
             _ <- downloadAndInstallTool
-              config.configLocalPrograms
+              config.localPrograms
               dlinfo
               compilerTool
               (installer si)
@@ -1663,7 +1663,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
 getGhcBuilds :: HasConfig env => RIO env [CompilerBuild]
 getGhcBuilds = do
   config <- view configL
-  case config.configGHCBuild of
+  case config.ghcBuild of
     Just ghcBuild -> pure [ghcBuild]
     Nothing -> determineGhcBuild
  where
@@ -1856,7 +1856,7 @@ ensureDockerStackExe containerPlatform = do
   config <- view configL
   containerPlatformDir <-
     runReaderT platformOnlyRelDir (containerPlatform,PlatformVariantNone)
-  let programsPath = config.configLocalProgramsBase </> containerPlatformDir
+  let programsPath = config.localProgramsBase </> containerPlatformDir
       tool = Tool (PackageIdentifier (mkPackageName "stack") stackVersion)
   stackExeDir <- installDir programsPath tool
   let stackExePath = stackExeDir </> relFileStack
@@ -1905,8 +1905,8 @@ sourceSystemCompilers wanted = do
 getSetupInfo :: HasConfig env => RIO env SetupInfo
 getSetupInfo = do
   config <- view configL
-  let inlineSetupInfo = config.configSetupInfoInline
-      locations' = config.configSetupInfoLocations
+  let inlineSetupInfo = config.setupInfoInline
+      locations' = config.setupInfoLocations
       locations = if null locations' then [defaultSetupInfoYaml] else locations'
 
   resolvedSetupInfos <- mapM loadSetupInfo locations
@@ -1988,7 +1988,7 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
           getWantedCompilerInfo ghcKey versionCheck wanted ACGhc pairs_
   config <- view configL
   let installer =
-        case config.configPlatform of
+        case config.platform of
           Platform _ Cabal.Windows -> installGHCWindows
           _ -> installGHCPosix downloadInfo
   prettyInfo $
@@ -2007,7 +2007,7 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
     ("ghc" ++ ghcVariantSuffix ghcVariant ++ compilerBuildSuffix ghcBuild)
   let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
   downloadAndInstallTool
-    config.configLocalPrograms
+    config.localPrograms
     downloadInfo.gdiDownloadInfo
     tool
     (installer si)
@@ -2118,7 +2118,7 @@ getOSKey ::
      -- ^ Description of the root directory of the tool.
   -> RIO env Text
 getOSKey tool toolDir = do
-  programsDir <- view $ configL . to (.configLocalPrograms)
+  programsDir <- view $ configL . to (.localPrograms)
   platform <- view platformL
   case platform of
     Platform I386                  Cabal.Linux   -> pure "linux32"
@@ -2276,7 +2276,7 @@ installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
 
   dir <- expectSingleUnpackedDir archiveFile tempDir
 
-  mOverrideGccPath <- view $ configL . to (.configOverrideGccPath)
+  mOverrideGccPath <- view $ configL . to (.overrideGccPath)
 
   -- The make application uses the CC environment variable to configure the
   -- program for compiling C programs
@@ -2450,7 +2450,7 @@ setup7z ::
   => SetupInfo
   -> RIO env (Path Abs Dir -> Path Abs File -> m ())
 setup7z si = do
-  dir <- view $ configL . to (.configLocalPrograms)
+  dir <- view $ configL . to (.localPrograms)
   ensureDir dir
   let exeDestination = dir </> relFile7zexe
       dllDestination = dir </> relFile7zdll

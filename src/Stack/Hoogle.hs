@@ -216,7 +216,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
   runHoogle :: Path Abs File -> [String] -> RIO EnvConfig ()
   runHoogle hooglePath hoogleArgs = do
     config <- view configL
-    menv <- liftIO $ config.configProcessContextSettings envSettings
+    menv <- liftIO $ config.processContextSettings envSettings
     dbpath <- hoogleDatabasePath
     let databaseArg = ["--database=" ++ toFilePath dbpath]
     withProcessContext menv $ proc
@@ -231,7 +231,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
   ensureHoogleInPath :: RIO EnvConfig (Path Abs File)
   ensureHoogleInPath = do
     config <- view configL
-    menv <- liftIO $ config.configProcessContextSettings envSettings
+    menv <- liftIO $ config.processContextSettings envSettings
     mHooglePath' <- eitherToMaybe <$> runRIO menv (findExecutable "hoogle")
     let mHooglePath'' =
           eitherToMaybe <$> requiringHoogle NotMuted (findExecutable "hoogle")

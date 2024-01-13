@@ -1,9 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 -- | The general Stack configuration that starts everything off. This should
 -- be smart to fallback if there is no stack.yaml, instead relying on
@@ -81,7 +82,7 @@ import           Stack.Config.Nix ( nixOptsFromMonoid )
 import           Stack.Constants
                    ( defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated
                    , defaultUserConfigPath, defaultUserConfigPathDeprecated
-                   , hackageBaseUrl, implicitGlobalProjectDir
+                   , implicitGlobalProjectDir
                    , implicitGlobalProjectDirDeprecated, inContainerEnvVar
                    , inNixShellEnvVar, osIsWindows, pantryRootEnvVar
                    , platformVariantEnvVar, relDirBin, relDirStackWork
@@ -90,6 +91,7 @@ import           Stack.Constants
                    , stackDeveloperModeDefault, stackDotYaml, stackProgName
                    , stackRootEnvVar, stackWorkEnvVar, stackXdgEnvVar
                    )
+import qualified Stack.Constants as Constants
 import           Stack.Lock ( lockCachedWanted )
 import           Stack.Prelude
 import           Stack.SourceMap
@@ -263,10 +265,10 @@ configFromConfigMonoid ::
   -> (Config -> RIO env a)
   -> RIO env a
 configFromConfigMonoid
-  configStackRoot
-  configUserConfigPath
-  configResolver
-  configProject
+  stackRoot
+  userConfigPath
+  resolver
+  project
   configMonoid
   inner
   = do
@@ -274,12 +276,12 @@ configFromConfigMonoid
     -- is set, use that. If neither, use the default ".stack-work"
     mstackWorkEnv <- liftIO $ lookupEnv stackWorkEnvVar
     let mproject =
-          case configProject of
+          case project of
             PCProject pair -> Just pair
             PCGlobalProject -> Nothing
             PCNoProject _deps -> Nothing
-        configAllowLocals =
-          case configProject of
+        allowLocals =
+          case project of
             PCProject _ -> True
             PCGlobalProject -> True
             PCNoProject _ -> False
@@ -293,64 +295,64 @@ configFromConfigMonoid
                   _ -> throwIO e
               )
       in  maybe (pure relDirStackWork) (liftIO . parseStackWorkEnv) mstackWorkEnv
-    let configWorkDir = fromFirst configWorkDir0 configMonoid.configMonoidWorkDir
-        configLatestSnapshot = fromFirst
+    let workDir = fromFirst configWorkDir0 configMonoid.configMonoidWorkDir
+        latestSnapshot = fromFirst
           "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
           configMonoid.configMonoidLatestSnapshot
         clConnectionCount = fromFirst 8 configMonoid.configMonoidConnectionCount
-        configHideTHLoading = fromFirstTrue configMonoid.configMonoidHideTHLoading
-        configPrefixTimestamps = fromFirst False configMonoid.configMonoidPrefixTimestamps
-        configGHCVariant = getFirst configMonoid.configMonoidGHCVariant
-        configCompilerRepository = fromFirst
+        hideTHLoading = fromFirstTrue configMonoid.configMonoidHideTHLoading
+        prefixTimestamps = fromFirst False configMonoid.configMonoidPrefixTimestamps
+        ghcVariant = getFirst configMonoid.configMonoidGHCVariant
+        compilerRepository = fromFirst
           defaultCompilerRepository
           configMonoid.configMonoidCompilerRepository
-        configGHCBuild = getFirst configMonoid.configMonoidGHCBuild
-        configInstallGHC = fromFirstTrue configMonoid.configMonoidInstallGHC
-        configSkipGHCCheck = fromFirstFalse configMonoid.configMonoidSkipGHCCheck
-        configSkipMsys = fromFirstFalse configMonoid.configMonoidSkipMsys
-        configExtraIncludeDirs = configMonoid.configMonoidExtraIncludeDirs
-        configExtraLibDirs = configMonoid.configMonoidExtraLibDirs
-        configCustomPreprocessorExts = configMonoid.configMonoidCustomPreprocessorExts
-        configOverrideGccPath = getFirst configMonoid.configMonoidOverrideGccPath
+        ghcBuild = getFirst configMonoid.configMonoidGHCBuild
+        installGHC = fromFirstTrue configMonoid.configMonoidInstallGHC
+        skipGHCCheck = fromFirstFalse configMonoid.configMonoidSkipGHCCheck
+        skipMsys = fromFirstFalse configMonoid.configMonoidSkipMsys
+        extraIncludeDirs = configMonoid.configMonoidExtraIncludeDirs
+        extraLibDirs = configMonoid.configMonoidExtraLibDirs
+        customPreprocessorExts = configMonoid.configMonoidCustomPreprocessorExts
+        overrideGccPath = getFirst configMonoid.configMonoidOverrideGccPath
         -- Only place in the codebase where platform is hard-coded. In theory in
         -- the future, allow it to be configured.
         (Platform defArch defOS) = buildPlatform
         arch = fromMaybe defArch
           $ getFirst configMonoid.configMonoidArch >>= Distribution.Text.simpleParse
         os = defOS
-        configPlatform = Platform arch os
-        configRequireStackVersion = simplifyVersionRange
+        platform = Platform arch os
+        requireStackVersion = simplifyVersionRange
           configMonoid.configMonoidRequireStackVersion.getIntersectingVersionRange
-        configCompilerCheck = fromFirst MatchMinor configMonoid.configMonoidCompilerCheck
-    configPlatformVariant <- liftIO $
+        compilerCheck = fromFirst MatchMinor configMonoid.configMonoidCompilerCheck
+    platformVariant <- liftIO $
       maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
-    let configBuild = buildOptsFromMonoid configMonoid.configMonoidBuildOpts
-    configDocker <-
-      dockerOptsFromMonoid (fmap fst mproject) configResolver configMonoid.configMonoidDockerOpts
-    configNix <- nixOptsFromMonoid configMonoid.configMonoidNixOpts os
-    configSystemGHC <-
-      case (getFirst configMonoid.configMonoidSystemGHC, configNix.nixEnable) of
+    let build = buildOptsFromMonoid configMonoid.configMonoidBuildOpts
+    docker <-
+      dockerOptsFromMonoid (fmap fst mproject) resolver configMonoid.configMonoidDockerOpts
+    nix <- nixOptsFromMonoid configMonoid.configMonoidNixOpts os
+    systemGHC <-
+      case (getFirst configMonoid.configMonoidSystemGHC, nix.nixEnable) of
         (Just False, True) ->
           throwM NixRequiresSystemGhc
         _ ->
           pure
             (fromFirst
-              (configDocker.dockerEnable || configNix.nixEnable)
+              (docker.dockerEnable || nix.nixEnable)
               configMonoid.configMonoidSystemGHC)
-    when (isJust configGHCVariant && configSystemGHC) $
+    when (isJust ghcVariant && systemGHC) $
       throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
     rawEnv <- liftIO getEnvironment
     pathsEnv <- either throwM pure
       $ augmentPathMap (map toFilePath configMonoid.configMonoidExtraPath)
                        (Map.fromList (map (T.pack *** T.pack) rawEnv))
     origEnv <- mkProcessContext pathsEnv
-    let configProcessContextSettings _ = pure origEnv
-    configLocalProgramsBase <- case getFirst configMonoid.configMonoidLocalProgramsBase of
-      Nothing -> getDefaultLocalProgramsBase configStackRoot configPlatform origEnv
+    let processContextSettings _ = pure origEnv
+    localProgramsBase <- case getFirst configMonoid.configMonoidLocalProgramsBase of
+      Nothing -> getDefaultLocalProgramsBase stackRoot platform origEnv
       Just path -> pure path
-    let localProgramsFilePath = toFilePath configLocalProgramsBase
+    let localProgramsFilePath = toFilePath localProgramsBase
     when (osIsWindows && ' ' `elem` localProgramsFilePath) $ do
-      ensureDir configLocalProgramsBase
+      ensureDir localProgramsBase
       -- getShortPathName returns the long path name when a short name does not
       -- exist.
       shortLocalProgramsFilePath <-
@@ -370,9 +372,9 @@ configFromConfigMonoid
                , style File (fromString localProgramsFilePath) <> "."
                ]
     platformOnlyDir <-
-      runReaderT platformOnlyRelDir (configPlatform, configPlatformVariant)
-    let configLocalPrograms = configLocalProgramsBase </> platformOnlyDir
-    configLocalBin <-
+      runReaderT platformOnlyRelDir (platform, platformVariant)
+    let localPrograms = localProgramsBase </> platformOnlyDir
+    localBin <-
       case getFirst configMonoid.configMonoidLocalBinPath of
         Nothing -> do
           localDir <- getAppUserDataDir "local"
@@ -389,39 +391,44 @@ configFromConfigMonoid
           -- resolveDirMaybe.
           `catchAny`
           const (throwIO (NoSuchDirectory userPath))
-    configJobs <-
+    jobs <-
       case getFirst configMonoid.configMonoidJobs of
         Nothing -> liftIO getNumProcessors
         Just i -> pure i
-    let configConcurrentTests = fromFirst True configMonoid.configMonoidConcurrentTests
-        configTemplateParams = configMonoid.configMonoidTemplateParameters
-        configScmInit = getFirst configMonoid.configMonoidScmInit
-        configCabalConfigOpts = coerce configMonoid.configMonoidCabalConfigOpts
-        configGhcOptionsByName = coerce configMonoid.configMonoidGhcOptionsByName
-        configGhcOptionsByCat = coerce configMonoid.configMonoidGhcOptionsByCat
-        configSetupInfoLocations = configMonoid.configMonoidSetupInfoLocations
-        configSetupInfoInline = configMonoid.configMonoidSetupInfoInline
-        configPvpBounds =
+    let concurrentTests =
+          fromFirst True configMonoid.configMonoidConcurrentTests
+        templateParams = configMonoid.configMonoidTemplateParameters
+        scmInit = getFirst configMonoid.configMonoidScmInit
+        cabalConfigOpts = coerce configMonoid.configMonoidCabalConfigOpts
+        ghcOptionsByName = coerce configMonoid.configMonoidGhcOptionsByName
+        ghcOptionsByCat = coerce configMonoid.configMonoidGhcOptionsByCat
+        setupInfoLocations = configMonoid.configMonoidSetupInfoLocations
+        setupInfoInline = configMonoid.configMonoidSetupInfoInline
+        pvpBounds =
           fromFirst (PvpBounds PvpBoundsNone False) configMonoid.configMonoidPvpBounds
-        configModifyCodePage = fromFirstTrue configMonoid.configMonoidModifyCodePage
-        configRebuildGhcOptions = fromFirstFalse configMonoid.configMonoidRebuildGhcOptions
-        configApplyGhcOptions = fromFirst AGOLocals configMonoid.configMonoidApplyGhcOptions
-        configApplyProgOptions = fromFirst APOLocals configMonoid.configMonoidApplyProgOptions
-        configAllowNewer = fromFirst False configMonoid.configMonoidAllowNewer
-        configAllowNewerDeps = coerce configMonoid.configMonoidAllowNewerDeps
-        configDefaultTemplate = getFirst configMonoid.configMonoidDefaultTemplate
-        configDumpLogs = fromFirst DumpWarningLogs configMonoid.configMonoidDumpLogs
-        configSaveHackageCreds = fromFirst True configMonoid.configMonoidSaveHackageCreds
-        configHackageBaseUrl =
-          fromFirst hackageBaseUrl configMonoid.configMonoidHackageBaseUrl
-        configHideSourcePaths = fromFirstTrue configMonoid.configMonoidHideSourcePaths
-        configRecommendUpgrade = fromFirstTrue configMonoid.configMonoidRecommendUpgrade
-        configNotifyIfNixOnPath = fromFirstTrue configMonoid.configMonoidNotifyIfNixOnPath
-        configNotifyIfGhcUntested = fromFirstTrue configMonoid.configMonoidNotifyIfGhcUntested
-        configNotifyIfCabalUntested = fromFirstTrue configMonoid.configMonoidNotifyIfCabalUntested
-        configNotifyIfArchUnknown = fromFirstTrue configMonoid.configMonoidNotifyIfArchUnknown
-        configNoRunCompile = fromFirstFalse configMonoid.configMonoidNoRunCompile
-    configAllowDifferentUser <-
+        modifyCodePage = fromFirstTrue configMonoid.configMonoidModifyCodePage
+        rebuildGhcOptions =
+          fromFirstFalse configMonoid.configMonoidRebuildGhcOptions
+        applyGhcOptions =
+          fromFirst AGOLocals configMonoid.configMonoidApplyGhcOptions
+        applyProgOptions =
+          fromFirst APOLocals configMonoid.configMonoidApplyProgOptions
+        allowNewer = fromFirst False configMonoid.configMonoidAllowNewer
+        allowNewerDeps = coerce configMonoid.configMonoidAllowNewerDeps
+        defaultTemplate = getFirst configMonoid.configMonoidDefaultTemplate
+        dumpLogs = fromFirst DumpWarningLogs configMonoid.configMonoidDumpLogs
+        saveHackageCreds =
+          fromFirst True configMonoid.configMonoidSaveHackageCreds
+        hackageBaseUrl =
+          fromFirst Constants.hackageBaseUrl configMonoid.configMonoidHackageBaseUrl
+        hideSourcePaths = fromFirstTrue configMonoid.configMonoidHideSourcePaths
+        recommendUpgrade = fromFirstTrue configMonoid.configMonoidRecommendUpgrade
+        notifyIfNixOnPath = fromFirstTrue configMonoid.configMonoidNotifyIfNixOnPath
+        notifyIfGhcUntested = fromFirstTrue configMonoid.configMonoidNotifyIfGhcUntested
+        notifyIfCabalUntested = fromFirstTrue configMonoid.configMonoidNotifyIfCabalUntested
+        notifyIfArchUnknown = fromFirstTrue configMonoid.configMonoidNotifyIfArchUnknown
+        noRunCompile = fromFirstFalse configMonoid.configMonoidNoRunCompile
+    allowDifferentUser <-
       case getFirst configMonoid.configMonoidAllowDifferentUser of
         Just True -> pure True
         _ -> getInContainer
@@ -459,7 +466,7 @@ configFromConfigMonoid
           case parseAbsDir dir of
             Nothing -> throwIO $ ParseAbsolutePathException pantryRootEnvVar dir
             Just x -> pure x
-        Nothing -> pure $ configStackRoot </> relDirPantry
+        Nothing -> pure $ stackRoot </> relDirPantry
     let snapLoc =
           case getFirst configMonoid.configMonoidSnapshotLocation of
             Nothing -> defaultSnapshotLocation
@@ -479,10 +486,10 @@ configFromConfigMonoid
                         <> "/" <> display day <> ".yaml"
                 mkRSLUrl builder = RSLUrl (utf8BuilderToText builder) Nothing
                 addr' = display $ T.dropWhileEnd (=='/') addr
-    let configStackDeveloperMode = fromFirst
+    let stackDeveloperMode = fromFirst
           stackDeveloperModeDefault
           configMonoid.configMonoidStackDeveloperMode
-        configCasa =
+        casa =
           if fromFirstTrue configMonoid.configMonoidCasaOpts.casaMonoidEnable
             then
               let casaRepoPrefix = fromFirst
@@ -494,9 +501,9 @@ configFromConfigMonoid
               in  Just (casaRepoPrefix, casaMaxKeysPerRequest)
             else Nothing
     withNewLogFunc go useColor'' stylesUpdate' $ \logFunc -> do
-      let configRunner = configRunner'' & logFuncL .~ logFunc
+      let runner = configRunner'' & logFuncL .~ logFunc
       withLocalLogFunc logFunc $ handleMigrationException $ do
-        logDebug $ case configCasa of
+        logDebug $ case casa of
           Nothing -> "Use of Casa server disabled."
           Just (repoPrefix, maxKeys) ->
                "Use of Casa server enabled: ("
@@ -509,75 +516,75 @@ configFromConfigMonoid
           pic
           (maybe HpackBundled HpackCommand $ getFirst configMonoid.configMonoidOverrideHpack)
           clConnectionCount
-          configCasa
+          casa
           snapLoc
-          (\configPantryConfig -> initUserStorage
-            (configStackRoot </> relFileStorage)
-            ( \configUserStorage -> inner Config
-                { configWorkDir
-                , configUserConfigPath
-                , configBuild
-                , configDocker
-                , configNix
-                , configProcessContextSettings
-                , configLocalProgramsBase
-                , configLocalPrograms
-                , configHideTHLoading
-                , configPrefixTimestamps
-                , configPlatform
-                , configPlatformVariant
-                , configGHCVariant
-                , configGHCBuild
-                , configLatestSnapshot
-                , configSystemGHC
-                , configInstallGHC
-                , configSkipGHCCheck
-                , configSkipMsys
-                , configCompilerCheck
-                , configCompilerRepository
-                , configLocalBin
-                , configRequireStackVersion
-                , configJobs
-                , configOverrideGccPath
-                , configExtraIncludeDirs
-                , configExtraLibDirs
-                , configCustomPreprocessorExts
-                , configConcurrentTests
-                , configTemplateParams
-                , configScmInit
-                , configGhcOptionsByName
-                , configGhcOptionsByCat
-                , configCabalConfigOpts
-                , configSetupInfoLocations
-                , configSetupInfoInline
-                , configPvpBounds
-                , configModifyCodePage
-                , configRebuildGhcOptions
-                , configApplyGhcOptions
-                , configApplyProgOptions
-                , configAllowNewer
-                , configAllowNewerDeps
-                , configDefaultTemplate
-                , configAllowDifferentUser
-                , configDumpLogs
-                , configProject
-                , configAllowLocals
-                , configSaveHackageCreds
-                , configHackageBaseUrl
-                , configRunner
-                , configPantryConfig
-                , configStackRoot
-                , configResolver
-                , configUserStorage
-                , configHideSourcePaths
-                , configRecommendUpgrade
-                , configNotifyIfNixOnPath
-                , configNotifyIfGhcUntested
-                , configNotifyIfCabalUntested
-                , configNotifyIfArchUnknown
-                , configNoRunCompile
-                , configStackDeveloperMode
-                , configCasa
+          (\pantryConfig -> initUserStorage
+            (stackRoot </> relFileStorage)
+            ( \userStorage -> inner Config
+                { workDir
+                , userConfigPath
+                , build
+                , docker
+                , nix
+                , processContextSettings
+                , localProgramsBase
+                , localPrograms
+                , hideTHLoading
+                , prefixTimestamps
+                , platform
+                , platformVariant
+                , ghcVariant
+                , ghcBuild
+                , latestSnapshot
+                , systemGHC
+                , installGHC
+                , skipGHCCheck
+                , skipMsys
+                , compilerCheck
+                , compilerRepository
+                , localBin
+                , requireStackVersion
+                , jobs
+                , overrideGccPath
+                , extraIncludeDirs
+                , extraLibDirs
+                , customPreprocessorExts
+                , concurrentTests
+                , templateParams
+                , scmInit
+                , ghcOptionsByName
+                , ghcOptionsByCat
+                , cabalConfigOpts
+                , setupInfoLocations
+                , setupInfoInline
+                , pvpBounds
+                , modifyCodePage
+                , rebuildGhcOptions
+                , applyGhcOptions
+                , applyProgOptions
+                , allowNewer
+                , allowNewerDeps
+                , defaultTemplate
+                , allowDifferentUser
+                , dumpLogs
+                , project
+                , allowLocals
+                , saveHackageCreds
+                , hackageBaseUrl
+                , runner
+                , pantryConfig
+                , stackRoot
+                , resolver
+                , userStorage
+                , hideSourcePaths
+                , recommendUpgrade
+                , notifyIfNixOnPath
+                , notifyIfGhcUntested
+                , notifyIfCabalUntested
+                , notifyIfArchUnknown
+                , noRunCompile
+                , stackDeveloperMode
+                , casa
                 }
             )
           )
@@ -680,10 +687,10 @@ loadConfig inner = do
           (mconcat $ configArgs : addConfigMonoid extraConfigs)
 
   withConfig $ \config -> do
-    let Platform arch _ = config.configPlatform
+    let Platform arch _ = config.platform
     case arch of
       OtherArch unknownArch
-        | config.configNotifyIfArchUnknown ->
+        | config.notifyIfArchUnknown ->
             prettyWarnL
               [ flow "Unknown value for architecture setting:"
               , style Shell (fromString unknownArch) <> "."
@@ -692,13 +699,13 @@ loadConfig inner = do
               , flow "in Stack's configuration."
               ]
       _ -> pure ()
-    unless (stackVersion `withinRange` config.configRequireStackVersion)
-      (throwM (BadStackVersionException config.configRequireStackVersion))
-    unless config.configAllowDifferentUser $ do
+    unless (stackVersion `withinRange` config.requireStackVersion)
+      (throwM (BadStackVersionException config.requireStackVersion))
+    unless config.allowDifferentUser $ do
       unless userOwnsStackRoot $
         throwM (UserDoesn'tOwnDirectory stackRoot)
       forM_ (configProjectRoot config) $ \dir ->
-        checkOwnership (dir </> config.configWorkDir)
+        checkOwnership (dir </> config.workDir)
     inner config
 
 -- | Load the build configuration, adds build-specific values to config loaded
@@ -714,11 +721,11 @@ withBuildConfig inner = do
   -- to properly deal with an AbstractResolver, we need a base directory (to
   -- deal with custom snapshot relative paths). We consider the current working
   -- directory to be the correct base. Let's calculate the mresolver first.
-  mresolver <- forM config.configResolver $ \aresolver -> do
+  mresolver <- forM config.resolver $ \aresolver -> do
     logDebug ("Using resolver: " <> display aresolver <> " specified on command line")
     makeConcreteResolver aresolver
 
-  (project', stackYamlFP) <- case config.configProject of
+  (project', stackYamlFP) <- case config.project of
     PCProject (project, fp) -> do
       forM_ project.projectUserMsg prettyWarnS
       pure (project, fp)
@@ -727,7 +734,7 @@ withBuildConfig inner = do
         case mresolver of
           Nothing -> throwIO NoResolverWhenUsingNoProject
           Just _ -> getEmptyProject mresolver extraDeps
-      pure (p, config.configUserConfigPath)
+      pure (p, config.userConfigPath)
     PCGlobalProject -> do
       logDebug "Run from outside a project, using implicit global project config"
       destDir <- getImplicitGlobalProjectDir config
@@ -742,7 +749,7 @@ withBuildConfig inner = do
           iopc <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
           ProjectAndConfigMonoid project _ <- liftIO iopc
           when (view terminalL config) $
-            case config.configResolver of
+            case config.resolver of
               Nothing ->
                 logDebug $
                      "Using resolver: "
@@ -766,7 +773,7 @@ withBuildConfig inner = do
               [ "# This is the implicit global project's config file, which is only used when\n"
               , "# 'stack' is run outside of a real project. Settings here do _not_ act as\n"
               , "# defaults for all projects. To change Stack's default settings, edit\n"
-              , "# '", encodeUtf8 (T.pack $ toFilePath config.configUserConfigPath), "' instead.\n"
+              , "# '", encodeUtf8 (T.pack $ toFilePath config.userConfigPath), "' instead.\n"
               , "#\n"
               , "# For more information about Stack's configuration, see\n"
               , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
@@ -846,7 +853,7 @@ fillProjectWanted ::
   -> Map PackageName (Bool -> RIO env DepPackage)
   -> RIO env (SMWanted, [CompletedPLI])
 fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages = do
-  let bopts = config.configBuild
+  let bopts = config.build
 
   packages0 <- for project.projectPackages $ \fp@(RelFilePath t) -> do
     abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
@@ -908,7 +915,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
 
   checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
 
-  let pkgGhcOptions = config.configGhcOptionsByName
+  let pkgGhcOptions = config.ghcOptionsByName
       deps = mergeApply deps2 pkgGhcOptions $
         \_ d options -> d{dpCommon = d.dpCommon {cpGhcOptions=options}}
       packages = mergeApply packages2 pkgGhcOptions $
