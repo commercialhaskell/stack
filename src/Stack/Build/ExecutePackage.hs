@@ -176,13 +176,13 @@ getConfigCache ee task installedMap enableTest enableBench = do
             [ "--enable-tests" | enableTest] ++
             [ "--enable-benchmarks" | enableBench]
           TTRemotePackage{} -> []
-  idMap <- liftIO $ readTVarIO ee.eeGhcPkgIds
+  idMap <- liftIO $ readTVarIO ee.ghcPkgIds
   let getMissing ident =
         case Map.lookup ident idMap of
           Nothing
               -- Expect to instead find it in installedMap if it's
               -- an initialBuildSteps target.
-              | ee.eeBuildOptsCLI.boptsCLIInitialBuildSteps && taskIsTarget task
+              | ee.buildOptsCLI.boptsCLIInitialBuildSteps && taskIsTarget task
               , Just (_, installed) <- Map.lookup (pkgName ident) installedMap
                   -> pure $ installedToGhcPkgId ident installed
           Just installed -> pure $ installedToGhcPkgId ident installed
@@ -205,7 +205,7 @@ getConfigCache ee task installedMap enableTest enableBench = do
               TTRemotePackage{} -> Set.empty
         , haddock = task.taskBuildHaddock
         , pkgSrc = task.taskCachePkgSrc
-        , pathEnvVar = ee.eePathEnvVar
+        , pathEnvVar = ee.pathEnvVar
         }
       allDepsMap = Map.union missing' task.taskPresent
   pure (allDepsMap, cache)
@@ -321,7 +321,7 @@ packageNamePrefix :: ExecuteEnv -> PackageName -> String
 packageNamePrefix ee name' =
   let name = packageNameString name'
       paddedName =
-        case ee.eeLargestPackageName of
+        case ee.largestPackageName of
           Nothing -> name
           Just len ->
             assert (len >= length name) $ take len $ name ++ L.repeat ' '
@@ -382,7 +382,7 @@ singleBuild
       Just installed -> do
         writeFlagCache installed cache
         liftIO $ atomically $
-          modifyTVar ee.eeGhcPkgIds $ Map.insert pkgId installed
+          modifyTVar ee.ghcPkgIds $ Map.insert pkgId installed
  where
   pkgId = taskProvides task
   PackageIdentifier pname pversion = pkgId
@@ -397,7 +397,7 @@ singleBuild
     && maybe True (Set.notMember pname . (.curatorSkipHaddock)) mcurator
   expectHaddockFailure =
       maybe False (Set.member pname . (.curatorExpectHaddockFailure))
-  isHaddockForHackage = ee.eeBuildOpts.haddockForHackage
+  isHaddockForHackage = ee.buildOpts.haddockForHackage
   fulfillHaddockExpectations mcurator action
     | expectHaddockFailure mcurator = do
         eres <- tryAny $ action KeepOpen
@@ -447,7 +447,7 @@ singleBuild
           -- within the snapshot.
           Just pc
             | maybe False
-                (ee.eeBaseConfigOpts.bcoSnapInstallRoot `isProperPrefixOf`)
+                (ee.baseConfigOpts.bcoSnapInstallRoot `isProperPrefixOf`)
                 pc.pcLibrary -> pure Nothing
           -- If old precompiled cache files are left around but snapshots are
           -- deleted, it is possible for the precompiled file to refer to the
@@ -489,11 +489,11 @@ singleBuild
       allToRegister = mcons mlib subLibs
 
     unless (null allToRegister) $
-      withMVar ee.eeInstallLock $ \() -> do
+      withMVar ee.installLock $ \() -> do
         -- We want to ignore the global and user package databases. ghc-pkg
         -- allows us to specify --no-user-package-db and --package-db=<db> on
         -- the command line.
-        let pkgDb = ee.eeBaseConfigOpts.bcoSnapDB
+        let pkgDb = ee.baseConfigOpts.bcoSnapDB
         ghcPkgExe <- getGhcPkgExe
         -- First unregister, silently, everything that needs to be unregistered.
         case nonEmpty allToUnregister of
@@ -514,19 +514,19 @@ singleBuild
       _ -> pure ()
 
     -- Find the package in the database
-    let pkgDbs = [ee.eeBaseConfigOpts.bcoSnapDB]
+    let pkgDbs = [ee.baseConfigOpts.bcoSnapDB]
 
     case mlib of
       Nothing -> pure $ Just $ Executable pkgId
       Just _ -> do
-        mpkgid <- loadInstalledPkg pkgDbs ee.eeSnapshotDumpPkgs pname
+        mpkgid <- loadInstalledPkg pkgDbs ee.snapshotDumpPkgs pname
 
         pure $ Just $
           case mpkgid of
             Nothing -> assert False $ Executable pkgId
             Just pkgid -> simpleInstalledLib pkgId pkgid mempty
    where
-    bindir = ee.eeBaseConfigOpts.bcoSnapInstallRoot </> bindirSuffix
+    bindir = ee.baseConfigOpts.bcoSnapInstallRoot </> bindirSuffix
 
   realConfigAndBuild cache mcurator allDepsMap =
     withSingleContext ac ee task.taskType allDepsMap Nothing $
@@ -546,7 +546,7 @@ singleBuild
           ensureConfig
             cache
             pkgDir
-            ee.eeBuildOpts
+            ee.buildOpts
             ( announce
                 (  "configure"
                 <> display (annSuffix executableBuildStatuses)
@@ -562,8 +562,8 @@ singleBuild
                 Just (_, Executable _) -> True
                 _ -> False
 
-        case ( ee.eeBuildOptsCLI.boptsCLIOnlyConfigure
-             , ee.eeBuildOptsCLI.boptsCLIInitialBuildSteps && taskIsTarget task
+        case ( ee.buildOptsCLI.boptsCLIOnlyConfigure
+             , ee.buildOptsCLI.boptsCLIInitialBuildSteps && taskIsTarget task
              ) of
           -- A full build is done if there are downstream actions,
           -- because their configure step will require that this
@@ -659,7 +659,7 @@ singleBuild
       <> display actualCompiler
       )
     config <- view configL
-    extraOpts <- extraBuildOptions wc ee.eeBuildOpts
+    extraOpts <- extraBuildOptions wc ee.buildOpts
     let stripTHLoading
           | config.hideTHLoading = ExcludeTHLoading
           | otherwise                  = KeepTHLoading
@@ -703,13 +703,13 @@ singleBuild
                        , "--html-location=../$pkg-$version/"
                        ]
                      , [ "--haddock-option=--hyperlinked-source"
-                       | ee.eeBuildOpts.haddockHyperlinkSource
+                       | ee.buildOpts.haddockHyperlinkSource
                        ]
-                     , [ "--internal" | ee.eeBuildOpts.haddockInternal  ]
+                     , [ "--internal" | ee.buildOpts.haddockInternal  ]
                      , quickjump
                      ]
               <> [ [ "--haddock-option=" <> opt
-                   | opt <- ee.eeBuildOpts.haddockOpts.hoAdditionalArgs
+                   | opt <- ee.buildOpts.haddockOpts.hoAdditionalArgs
                    ]
                  ]
               )
@@ -722,7 +722,7 @@ singleBuild
         shouldCopy =
              not isFinalBuild
           && (hasLibrary || hasSubLibraries || hasExecutables)
-    when shouldCopy $ withMVar ee.eeInstallLock $ \() -> do
+    when shouldCopy $ withMVar ee.installLock $ \() -> do
       announce "copy/register"
       eres <- try $ cabal KeepTHLoading ["copy"]
       case eres of
@@ -734,7 +734,7 @@ singleBuild
       when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
     -- copy ddump-* files
-    case T.unpack <$> ee.eeBuildOpts.ddumpDir of
+    case T.unpack <$> ee.buildOpts.ddumpDir of
       Just ddumpPath | buildingFinals && not (null ddumpPath) -> do
         distDir <- distRelativeDir
         ddumpDir <- parseRelDir ddumpPath
@@ -759,11 +759,11 @@ singleBuild
     let (installedPkgDb, installedDumpPkgsTVar) =
           case taskLocation task of
             Snap ->
-              ( ee.eeBaseConfigOpts.bcoSnapDB
-              , ee.eeSnapshotDumpPkgs )
+              ( ee.baseConfigOpts.bcoSnapDB
+              , ee.snapshotDumpPkgs )
             Local ->
-              ( ee.eeBaseConfigOpts.bcoLocalDB
-              , ee.eeLocalDumpPkgs )
+              ( ee.baseConfigOpts.bcoLocalDB
+              , ee.localDumpPkgs )
     let ident = PackageIdentifier package.name package.version
     -- only pure the sub-libraries to cache them if we also cache the main
     -- library (that is, if it exists)
@@ -795,7 +795,7 @@ singleBuild
     case task.taskType of
       TTRemotePackage Immutable _ loc ->
         writePrecompiledCache
-          ee.eeBaseConfigOpts
+          ee.baseConfigOpts
           loc
           cache.opts
           cache.haddock
@@ -981,7 +981,7 @@ singleTest topts testsToRun ac ee task installedMap = do
           installed <- case Map.lookup pname installedMap of
             Just (_, installed) -> pure $ Just installed
             Nothing -> do
-              idMap <- liftIO $ readTVarIO ee.eeGhcPkgIds
+              idMap <- liftIO $ readTVarIO ee.ghcPkgIds
               pure $ Map.lookup (taskProvides task) idMap
           let pkgGhcIdList = case installed of
                                Just (Library _ libInfo) -> [libInfo.iliId]
@@ -989,7 +989,7 @@ singleTest topts testsToRun ac ee task installedMap = do
           -- doctest relies on template-haskell in QuickCheck-based tests
           thGhcId <-
             case L.find ((== "template-haskell") . pkgName . (.packageIdent) . snd)
-                   (Map.toList ee.eeGlobalDumpPkgs) of
+                   (Map.toList ee.globalDumpPkgs) of
               Just (ghcId, _) -> pure ghcId
               Nothing -> throwIO TemplateHaskellNotFoundBug
           -- env variable GHC_ENVIRONMENT is set for doctest so module names for
@@ -1000,16 +1000,16 @@ singleTest topts testsToRun ac ee task installedMap = do
           let setEnv f pc = modifyEnvVars pc $ \envVars ->
                 Map.insert "HASKELL_DIST_DIR" (T.pack $ toFilePath buildDir) $
                 Map.insert "GHC_ENVIRONMENT" (T.pack f) envVars
-              fp' = ee.eeTempDir </> testGhcEnvRelFile
+              fp' = ee.tempDir </> testGhcEnvRelFile
           -- Add a random suffix to avoid conflicts between parallel jobs
           -- See https://github.com/commercialhaskell/stack/issues/5024
           randomInt <- liftIO (randomIO :: IO Int)
           let randomSuffix = "." <> show (abs randomInt)
           fp <- toFilePath <$> addExtension randomSuffix fp'
           let snapDBPath =
-                toFilePathNoTrailingSep ee.eeBaseConfigOpts.bcoSnapDB
+                toFilePathNoTrailingSep ee.baseConfigOpts.bcoSnapDB
               localDBPath =
-                toFilePathNoTrailingSep ee.eeBaseConfigOpts.bcoLocalDB
+                toFilePathNoTrailingSep ee.baseConfigOpts.bcoLocalDB
               ghcEnv =
                    "clear-package-db\n"
                 <> "global-package-db\n"
