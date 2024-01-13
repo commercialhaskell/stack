@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Nix types.
@@ -23,16 +24,16 @@ import           Stack.Prelude
 -- | Nix configuration. Parameterize by resolver type to avoid cyclic
 -- dependency.
 data NixOpts = NixOpts
-  { nixEnable :: !Bool
-  , nixPureShell :: !Bool
-  , nixPackages :: ![Text]
+  { enable :: !Bool
+  , pureShell :: !Bool
+  , packages :: ![Text]
     -- ^ The system packages to be installed in the environment before it runs
-  , nixInitFile :: !(Maybe FilePath)
+  , initFile :: !(Maybe FilePath)
     -- ^ The path of a file containing preconfiguration of the environment
     -- (e.g shell.nix)
-  , nixShellOptions :: ![Text]
+  , shellOptions :: ![Text]
     -- ^ Options to be given to the nix-shell command line
-  , nixAddGCRoots :: !Bool
+  , addGCRoots :: !Bool
     -- ^ Should we register gc roots so running nix-collect-garbage doesn't
     -- remove nix dependencies
   }

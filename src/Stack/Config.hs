@@ -122,7 +122,7 @@ import           Stack.Types.Casa ( CasaOptsMonoid (..) )
 import           Stack.Types.Docker ( DockerOptsMonoid (..), dockerEnable )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
-import           Stack.Types.Nix ( nixEnable )
+import           Stack.Types.Nix ( NixOpts (..) )
 import           Stack.Types.Platform
                    ( PlatformVariant (..), platformOnlyRelDir )
 import           Stack.Types.Project ( Project (..) )
@@ -331,13 +331,13 @@ configFromConfigMonoid
       dockerOptsFromMonoid (fmap fst mproject) resolver configMonoid.configMonoidDockerOpts
     nix <- nixOptsFromMonoid configMonoid.configMonoidNixOpts os
     systemGHC <-
-      case (getFirst configMonoid.configMonoidSystemGHC, nix.nixEnable) of
+      case (getFirst configMonoid.configMonoidSystemGHC, nix.enable) of
         (Just False, True) ->
           throwM NixRequiresSystemGhc
         _ ->
           pure
             (fromFirst
-              (docker.dockerEnable || nix.nixEnable)
+              (docker.dockerEnable || nix.enable)
               configMonoid.configMonoidSystemGHC)
     when (isJust ghcVariant && systemGHC) $
       throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
