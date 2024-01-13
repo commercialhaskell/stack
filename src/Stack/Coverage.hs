@@ -181,10 +181,10 @@ generateHpcReport pkgDir package tests = do
   -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
   -- https://github.com/commercialhaskell/stack/issues/785
   let pkgId = packageIdentifierString $ packageIdentifier package
-      pkgName' = packageNameString package.packageName
+      pkgName' = packageNameString package.name
       ghcVersion = getGhcVersion compilerVersion
       hasLibrary = hasBuildableMainLibrary package
-      subLibs = package.packageSubLibraries
+      subLibs = package.subLibraries
   eincludeName <-
     -- Pre-7.8 uses plain PKG-version in tix files.
     if ghcVersion < mkVersion [7, 10] then pure $ Right $ Just [pkgId]
@@ -208,7 +208,7 @@ generateHpcReport pkgDir package tests = do
           pure $ Left err
         Right includeNames -> pure $ Right $ Just $ map T.unpack includeNames
   forM_ tests $ \testName -> do
-    tixSrc <- tixFilePath package.packageName (T.unpack testName)
+    tixSrc <- tixFilePath package.name (T.unpack testName)
     let report = fillSep
           [ flow "coverage report for"
           , style Current (fromString pkgName') <> "'s"

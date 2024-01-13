@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- Load information on package sources
 module Stack.Build.Source
@@ -341,7 +342,7 @@ loadLocalPackage pp = do
         Just _ ->
              hasBuildableMainLibrary pkg
           || not (Set.null nonLibComponents)
-          || not (null pkg.packageSubLibraries)
+          || not (null pkg.subLibraries)
 
       filterSkippedComponents =
         Set.filter (not . (`elem` bopts.boptsSkipComponents))
@@ -360,8 +361,8 @@ loadLocalPackage pp = do
         ]
 
       btconfig = config
-        { packageConfigEnableTests = not $ Set.null tests
-        , packageConfigEnableBenchmarks = not $ Set.null benches
+        { enableTests = not $ Set.null tests
+        , enableBenchmarks = not $ Set.null benches
         }
 
       -- We resolve the package in 2 different configurations:
@@ -405,23 +406,23 @@ loadLocalPackage pp = do
         M.fromList . map (\(c, (_, cache)) -> (c, cache)) <$> checkCacheResults
 
   pure LocalPackage
-    { lpPackage = pkg
-    , lpTestBench = btpkg
-    , lpComponentFiles = componentFiles
-    , lpBuildHaddocks = pp.ppCommon.cpHaddocks
-    , lpForceDirty = bopts.boptsForceDirty
-    , lpDirtyFiles = dirtyFiles
-    , lpNewBuildCaches = newBuildCaches
-    , lpCabalFile = pp.ppCabalFP
-    , lpWanted = isWanted
-    , lpComponents = nonLibComponents
+    { package = pkg
+    , testBench = btpkg
+    , componentFiles = componentFiles
+    , buildHaddocks = pp.ppCommon.cpHaddocks
+    , forceDirty = bopts.boptsForceDirty
+    , dirtyFiles = dirtyFiles
+    , newBuildCaches = newBuildCaches
+    , cabalFile = pp.ppCabalFP
+    , wanted = isWanted
+    , components = nonLibComponents
       -- TODO: refactor this so that it's easier to be sure that these
       -- components are indeed unbuildable.
       --
       -- The reasoning here is that if the STLocalComps specification made it
       -- through component parsing, but the components aren't present, then they
       -- must not be buildable.
-    , lpUnbuildable = toComponents
+    , unbuildable = toComponents
         (exes `Set.difference` buildableExes pkg)
         (tests `Set.difference` buildableTestSuites pkg)
         (benches `Set.difference` buildableBenchmarks pkg)
@@ -531,11 +532,11 @@ getPackageConfig flags ghcOptions cabalConfigOpts = do
   platform <- view platformL
   compilerVersion <- view actualCompilerVersionL
   pure PackageConfig
-    { packageConfigEnableTests = False
-    , packageConfigEnableBenchmarks = False
-    , packageConfigFlags = flags
-    , packageConfigGhcOptions = ghcOptions
-    , packageConfigCabalConfigOpts = cabalConfigOpts
-    , packageConfigCompilerVersion = compilerVersion
-    , packageConfigPlatform = platform
+    { enableTests = False
+    , enableBenchmarks = False
+    , flags = flags
+    , ghcOptions = ghcOptions
+    , cabalConfigOpts = cabalConfigOpts
+    , compilerVersion = compilerVersion
+    , platform = platform
     }

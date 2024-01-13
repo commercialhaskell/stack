@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Module exporting a function to create a pruned dependency graph given a
 -- 'DotOpts' value.
@@ -184,7 +185,7 @@ createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
   locals <- for (toList sourceMap.smProject) loadLocalPackage
   let graph =
-        Map.fromList $ projectPackageDependencies dotOpts (filter (.lpWanted) locals)
+        Map.fromList $ projectPackageDependencies dotOpts (filter (.wanted) locals)
   globalDump <- view $ to (.dcGlobalDump)
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
@@ -205,8 +206,8 @@ createDependencyGraph dotOpts = do
                  (loadPackage loc flags ghcOptions cabalConfigOpts)
   resolveDependencies dotOpts.dotDependencyDepth graph depLoader
  where
-  makePayload loc pkg = DotPayload (Just pkg.packageVersion)
-                                   (Just pkg.packageLicense)
+  makePayload loc pkg = DotPayload (Just pkg.version)
+                                   (Just pkg.license)
                                    (Just $ PLImmutable loc)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local
@@ -217,19 +218,19 @@ projectPackageDependencies ::
   -> [(PackageName, (Set PackageName, DotPayload))]
 projectPackageDependencies dotOpts locals =
   map (\lp -> let pkg = localPackageToPackage lp
-                  pkgDir = parent lp.lpCabalFile
+                  pkgDir = parent lp.cabalFile
                   packageDepsSet = setOfPackageDeps pkg
                   loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
-              in  (pkg.packageName, (deps pkg packageDepsSet, lpPayload pkg loc)))
+              in  (pkg.name, (deps pkg packageDepsSet, lpPayload pkg loc)))
       locals
  where
   deps pkg packageDepsSet = if dotOpts.dotIncludeExternal
-    then Set.delete pkg.packageName packageDepsSet
+    then Set.delete pkg.name packageDepsSet
     else Set.intersection localNames packageDepsSet
-  localNames = Set.fromList $ map (.lpPackage.packageName) locals
+  localNames = Set.fromList $ map (.package.name) locals
   lpPayload pkg loc =
-    DotPayload (Just pkg.packageVersion)
-               (Just pkg.packageLicense)
+    DotPayload (Just pkg.version)
+               (Just pkg.license)
                (Just loc)
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for
@@ -290,7 +291,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
               (Map.lookup depId globalIdMap)
 
   payloadFromLocal pkg =
-    DotPayload (Just pkg.packageVersion) (Just pkg.packageLicense)
+    DotPayload (Just pkg.version) (Just pkg.license)
 
   payloadFromDump dp =
     DotPayload (Just $ pkgVersion dp.packageIdent)
@@ -353,7 +354,7 @@ pruneUnreachable dontPrune = fixpoint prune
     reachables = F.fold (fst <$> graph')
 
 localPackageToPackage :: LocalPackage -> Package
-localPackageToPackage lp = fromMaybe lp.lpPackage lp.lpTestBench
+localPackageToPackage lp = fromMaybe lp.package lp.testBench
 
 data DotConfig = DotConfig
   { dcBuildConfig :: !BuildConfig

@@ -123,7 +123,7 @@ instance PersistFieldSql CachePkgSrc where
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
 toCachePkgSrc (PSFilePath lp) =
-  CacheSrcLocal (toFilePath (parent lp.lpCabalFile))
+  CacheSrcLocal (toFilePath (parent lp.cabalFile))
 toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 -- | A type representing tasks to perform when building.
@@ -180,13 +180,13 @@ taskAnyMissing task = not $ Set.null task.taskConfigOpts.tcoMissing
 -- | A function to yield the package name and version of a given 'TaskType'
 -- value.
 taskTypePackageIdentifier :: TaskType -> PackageIdentifier
-taskTypePackageIdentifier (TTLocalMutable lp) = packageIdentifier lp.lpPackage
+taskTypePackageIdentifier (TTLocalMutable lp) = packageIdentifier lp.package
 taskTypePackageIdentifier (TTRemotePackage _ p _) = packageIdentifier p
 
 taskIsTarget :: Task -> Bool
 taskIsTarget t =
   case t.taskType of
-    TTLocalMutable lp -> lp.lpWanted
+    TTLocalMutable lp -> lp.wanted
     _ -> False
 
 -- | A function to yield the relevant database (write-only or mutable) of a

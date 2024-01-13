@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Build the project.
 
@@ -152,7 +153,7 @@ build msetLocalFiles = do
         if boptsCli.boptsCLIWatchAll
         then sequence [lpFiles lp | lp <- allLocals]
         else forM allLocals $ \lp -> do
-          let pn = lp.lpPackage.packageName
+          let pn = lp.package.name
           case Map.lookup pn sourceMap.smTargets.smtTargets of
             Nothing ->
               pure Set.empty
@@ -294,13 +295,13 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
       [ (exe, pkgName')
       | (pkgName', task) <- Map.toList plan.planTasks
       , TTLocalMutable lp <- [task.taskType]
-      , exe <- (Set.toList . exeComponents . (.lpComponents)) lp
+      , exe <- (Set.toList . exeComponents . (.components)) lp
       ]
   localExes :: Map Text (NonEmpty PackageName)
   localExes =
     collect
-      [ (exe, pkg.packageName)
-      | pkg <- map (.lpPackage) locals
+      [ (exe, pkg.name)
+      | pkg <- map (.package) locals
       , exe <- Set.toList (buildableExes pkg)
       ]
   collect :: Ord k => [(k, v)] -> Map k (NonEmpty v)
@@ -355,13 +356,13 @@ loadPackage loc flags ghcOptions cabalConfigOpts = do
   compiler <- view actualCompilerVersionL
   platform <- view platformL
   let pkgConfig = PackageConfig
-        { packageConfigEnableTests = False
-        , packageConfigEnableBenchmarks = False
-        , packageConfigFlags = flags
-        , packageConfigGhcOptions = ghcOptions
-        , packageConfigCabalConfigOpts = cabalConfigOpts
-        , packageConfigCompilerVersion = compiler
-        , packageConfigPlatform = platform
+        { enableTests = False
+        , enableBenchmarks = False
+        , flags = flags
+        , ghcOptions = ghcOptions
+        , cabalConfigOpts = cabalConfigOpts
+        , compilerVersion = compiler
+        , platform = platform
         }
   resolvePackage pkgConfig <$> loadCabalFileImmutable loc
 
@@ -371,7 +372,7 @@ checkComponentsBuildable lps =
     prettyThrowM $ SomeTargetsNotBuildable unbuildable
  where
   unbuildable =
-    [ (lp.lpPackage.packageName, c)
+    [ (lp.package.name, c)
     | lp <- lps
-    , c <- Set.toList lp.lpUnbuildable
+    , c <- Set.toList lp.unbuildable
     ]

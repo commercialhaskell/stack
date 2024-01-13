@@ -54,16 +54,16 @@ packageDescModulesAndFiles ::
        PackageComponentFile
 packageDescModulesAndFiles pkg = do
   packageExtraFile <- resolveGlobFilesFromStackPackageFile
-              pkg.packageCabalSpec pkg.packageFile
+              pkg.cabalSpec pkg.file
   let initialValue = mempty{packageExtraFile=packageExtraFile}
   let accumulator f comp st = (insertComponentFile <$> st) <*> f comp
   let gatherCompFileCollection createCompFileFn getCompFn res =
         foldr' (accumulator createCompFileFn) res (getCompFn pkg)
-  gatherCompFileCollection stackLibraryFiles (.packageLibrary)
-    . gatherCompFileCollection stackLibraryFiles (.packageSubLibraries)
-    . gatherCompFileCollection stackExecutableFiles (.packageExecutables)
-    . gatherCompFileCollection stackTestSuiteFiles (.packageTestSuites)
-    . gatherCompFileCollection stackBenchmarkFiles (.packageBenchmarks)
+  gatherCompFileCollection stackLibraryFiles (.library)
+    . gatherCompFileCollection stackLibraryFiles (.subLibraries)
+    . gatherCompFileCollection stackExecutableFiles (.executables)
+    . gatherCompFileCollection stackTestSuiteFiles (.testSuites)
+    . gatherCompFileCollection stackBenchmarkFiles (.benchmarks)
     $ pure initialValue
 
 resolveGlobFilesFromStackPackageFile ::
@@ -128,7 +128,7 @@ getPackageFile pkg cabalfp =
         (GetPackageFileContext cabalfp distDir bc cabalVer)
         (packageDescModulesAndFiles pkg)
     setupFiles <-
-      if pkg.packageBuildType == Cabal.Custom
+      if pkg.buildType == Cabal.Custom
         then do
           let setupHsPath = pkgDir </> relFileSetupHs
               setupLhsPath = pkgDir </> relFileSetupLhs

@@ -1,8 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -- | Construct a @Plan@ for how to build
 module Stack.Build.ConstructPlan
@@ -291,8 +292,8 @@ constructPlan
     let loadLocalPackage' pp = do
           lp <- loadLocalPackage pp
           let lpPackage' =
-                applyForceCustomBuild globalCabalVersion lp.lpPackage
-          pure lp { lpPackage = lpPackage' }
+                applyForceCustomBuild globalCabalVersion lp.package
+          pure lp { package = lpPackage' }
     pPackages <- for sourceProject $ \pp -> do
       lp <- loadLocalPackage' pp
       pure $ PSFilePath lp
@@ -449,10 +450,10 @@ addFinal lp package isAllInOne buildHaddocks = do
         , taskPresent = present
         , taskType = TTLocalMutable lp
         , taskAllInOne = isAllInOne
-        , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent lp.lpCabalFile))
+        , taskCachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFile))
         , taskBuildTypeConfig = packageBuildTypeConfig package
         }
-  tell mempty { wFinals = Map.singleton package.packageName res }
+  tell mempty { wFinals = Map.singleton package.name res }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the package, if
 -- needed. First checks if the package name is in the library map.
@@ -563,7 +564,7 @@ addDep name packageInfo = do
 -- executables to the collected output.
 tellExecutables :: PackageName -> PackageSource -> M ()
 tellExecutables _name (PSFilePath lp)
-  | lp.lpWanted = tellExecutablesPackage Local lp.lpPackage
+  | lp.wanted = tellExecutablesPackage Local lp.package
   | otherwise = pure ()
 -- Ignores ghcOptions because they don't matter for enumerating executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnapshot cp) =
@@ -594,14 +595,14 @@ tellExecutablesPackage loc p = do
   cm <- asks (.combinedMap)
   -- Determine which components are enabled so we know which ones to copy
   let myComps =
-        case Map.lookup p.packageName cm of
+        case Map.lookup p.name cm of
           Nothing -> assert False Set.empty
           Just (PIOnlyInstalled _ _) -> Set.empty
           Just (PIOnlySource ps) -> goSource ps
           Just (PIBoth ps _) -> goSource ps
 
       goSource (PSFilePath lp)
-        | lp.lpWanted = exeComponents lp.lpComponents
+        | lp.wanted = exeComponents lp.components
         | otherwise = Set.empty
       goSource PSRemote{} = Set.empty
 
@@ -632,14 +633,14 @@ installPackage name ps minstalled = do
         pkgLoc cp.cpFlags cp.cpGhcOptions cp.cpCabalConfigOpts
       resolveDepsAndInstall True cp.cpHaddocks ps package minstalled
     PSFilePath lp -> do
-      case lp.lpTestBench of
+      case lp.testBench of
         Nothing -> do
           logDebugPlanS "installPackage" $
                "No test or bench component for "
             <> fromPackageName name
             <> " so doing an all-in-one build."
           resolveDepsAndInstall
-            True lp.lpBuildHaddocks ps lp.lpPackage minstalled
+            True lp.buildHaddocks ps lp.package minstalled
         Just tb -> do
           -- Attempt to find a plan which performs an all-in-one build. Ignore
           -- the writer action + reset the state if it fails.
@@ -663,7 +664,7 @@ installPackage name ps minstalled = do
               splitRequired <- expectedTestOrBenchFailures <$> asks (.mcurator)
               let isAllInOne = not splitRequired
               adr <- installPackageGivenDeps
-                isAllInOne lp.lpBuildHaddocks ps tb minstalled deps
+                isAllInOne lp.buildHaddocks ps tb minstalled deps
               let finalAllInOne = case adr of
                     ADRToInstall _ | splitRequired -> False
                     _ -> True
@@ -681,7 +682,7 @@ installPackage name ps minstalled = do
               -- Otherwise, fall back on building the tests / benchmarks in a
               -- separate step.
               res' <- resolveDepsAndInstall
-                False lp.lpBuildHaddocks ps lp.lpPackage minstalled
+                False lp.buildHaddocks ps lp.package minstalled
               when (isRight res') $ do
                 -- Insert it into the map so that it's available for addFinal.
                 updateLibMap name res'
@@ -728,7 +729,7 @@ installPackageGivenDeps ::
   -> M AddDepRes
 installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
   (missing, present, minMutable) = do
-    let name = package.packageName
+    let name = package.name
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
       (Just installed, True) -> do
@@ -773,7 +774,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
 
 -- | Is the build type of the package Configure
 packageBuildTypeConfig :: Package -> Bool
-packageBuildTypeConfig pkg = pkg.packageBuildType == Configure
+packageBuildTypeConfig pkg = pkg.buildType == Configure
 
 -- Update response in the library map. If it is an error, and there's already an
 -- error about cyclic dependencies, prefer the cyclic error.
@@ -1020,7 +1021,7 @@ checkDirtiness ps installed package present buildHaddocks = do
         , configCacheComponents =
             case ps of
               PSFilePath lp ->
-                Set.map (encodeUtf8 . renderComponent) lp.lpComponents
+                Set.map (encodeUtf8 . renderComponent) lp.components
               PSRemote{} -> Set.empty
         , configCacheHaddock = buildHaddocks
         , configCachePkgSrc = toCachePkgSrc ps
@@ -1045,7 +1046,7 @@ checkDirtiness ps installed package present buildHaddocks = do
   case mreason of
     Nothing -> pure False
     Just reason -> do
-      tell mempty { wDirty = Map.singleton package.packageName reason }
+      tell mempty { wDirty = Map.singleton package.name reason }
       pure True
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
@@ -1137,14 +1138,14 @@ describeConfigDiff config old new
   pkgSrcName CacheSrcUpstream = "upstream source"
 
 psForceDirty :: PackageSource -> Bool
-psForceDirty (PSFilePath lp) = lp.lpForceDirty
+psForceDirty (PSFilePath lp) = lp.forceDirty
 psForceDirty PSRemote{} = False
 
 psDirty ::
      (MonadIO m, HasEnvConfig env, MonadReader env m)
   => PackageSource
   -> m (Maybe (Set FilePath))
-psDirty (PSFilePath lp) = runMemoizedWith lp.lpDirtyFiles
+psDirty (PSFilePath lp) = runMemoizedWith lp.dirtyFiles
 psDirty PSRemote {} = pure Nothing -- files never change in a remote package
 
 psLocal :: PackageSource -> Bool
@@ -1179,8 +1180,8 @@ checkAndWarnForUnknownTools p = do
   -- From Cabal 1.12, build-tools can specify another executable in the same
   -- package.
   notPackageExe toolName =
-    MaybeT $ skipIf $ collectionMember toolName p.packageExecutables
-  warn name = MaybeT . pure . Just $ ToolWarning (ExeName name) p.packageName
+    MaybeT $ skipIf $ collectionMember toolName p.executables
+  warn name = MaybeT . pure . Just $ ToolWarning (ExeName name) p.name
   skipIf p' = pure $ if p' then Nothing else Just ()
 
 toolWarningText :: ToolWarning -> StyleDoc

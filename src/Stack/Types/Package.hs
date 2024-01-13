@@ -1,7 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Stack.Types.Package
   ( BioInput (..)
@@ -160,46 +162,46 @@ newtype ExeName
 
 -- | Some package info.
 data Package = Package
-  { packageName :: !PackageName
+  { name :: !PackageName
     -- ^ Name of the package.
-  , packageVersion :: !Version
+  , version :: !Version
     -- ^ Version of the package
-  , packageLicense :: !(Either SPDX.License License)
+  , license :: !(Either SPDX.License License)
     -- ^ The license the package was released under.
-  , packageGhcOptions :: ![Text]
+  , ghcOptions :: ![Text]
     -- ^ Ghc options used on package.
-  , packageCabalConfigOpts :: ![Text]
+  , cabalConfigOpts :: ![Text]
     -- ^ Additional options passed to ./Setup.hs configure
-  , packageFlags :: !(Map FlagName Bool)
+  , flags :: !(Map FlagName Bool)
     -- ^ Flags used on package.
-  , packageDefaultFlags :: !(Map FlagName Bool)
+  , defaultFlags :: !(Map FlagName Bool)
     -- ^ Defaults for unspecified flags.
-  , packageLibrary :: !(Maybe StackLibrary)
+  , library :: !(Maybe StackLibrary)
     -- ^ Does the package have a buildable main library stanza?
-  , packageSubLibraries :: !(CompCollection StackLibrary)
+  , subLibraries :: !(CompCollection StackLibrary)
     -- ^ The sub-libraries of the package.
-  , packageForeignLibraries :: !(CompCollection StackForeignLibrary)
+  , foreignLibraries :: !(CompCollection StackForeignLibrary)
     -- ^ The foreign libraries of the package.
-  , packageTestSuites :: !(CompCollection StackTestSuite)
+  , testSuites :: !(CompCollection StackTestSuite)
     -- ^ The test suites of the package.
-  , packageBenchmarks :: !(CompCollection StackBenchmark)
+  , benchmarks :: !(CompCollection StackBenchmark)
     -- ^ The benchmarks of the package.
-  , packageExecutables :: !(CompCollection StackExecutable)
+  , executables :: !(CompCollection StackExecutable)
     -- ^ The executables of the package.
-  , packageBuildType :: !BuildType
+  , buildType :: !BuildType
     -- ^ Package build-type.
-  , packageSetupDeps :: !(Maybe (Map PackageName DepValue))
+  , setupDeps :: !(Maybe (Map PackageName DepValue))
     -- ^ If present: custom-setup dependencies
-  , packageCabalSpec :: !CabalSpecVersion
+  , cabalSpec :: !CabalSpecVersion
     -- ^ Cabal spec range
-  , packageFile :: StackPackageFile
+  , file :: StackPackageFile
     -- ^ The Cabal sourced files related to the package at the package level
     -- The components may have file information in their own types
-  , packageTestEnabled :: Bool
+  , testEnabled :: Bool
     -- ^ This is a requirement because when tests are not enabled, Stack's
     -- package dependencies should ignore test dependencies. Directly set from
     -- 'packageConfigEnableTests'.
-  , packageBenchmarkEnabled :: Bool
+  , benchmarkEnabled :: Bool
     -- ^ This is a requirement because when benchmark are not enabled, Stack's
     -- package dependencies should ignore benchmark dependencies. Directly set
     -- from 'packageConfigEnableBenchmarks'.
@@ -207,10 +209,10 @@ data Package = Package
   deriving (Show, Typeable)
 
 packageIdentifier :: Package -> PackageIdentifier
-packageIdentifier p = PackageIdentifier p.packageName p.packageVersion
+packageIdentifier p = PackageIdentifier p.name p.version
 
 packageDefinedFlags :: Package -> Set FlagName
-packageDefinedFlags = M.keysSet . (.packageDefaultFlags)
+packageDefinedFlags = M.keysSet . (.defaultFlags)
 
 -- | GHC options based on cabal information and ghc-options.
 data BuildInfoOpts = BuildInfoOpts
@@ -226,30 +228,30 @@ data BuildInfoOpts = BuildInfoOpts
 
 -- | Package build configuration
 data PackageConfig = PackageConfig
-  { packageConfigEnableTests :: !Bool
+  { enableTests :: !Bool
     -- ^ Are tests enabled?
-  , packageConfigEnableBenchmarks :: !Bool
+  , enableBenchmarks :: !Bool
     -- ^ Are benchmarks enabled?
-  , packageConfigFlags :: !(Map FlagName Bool)
+  , flags :: !(Map FlagName Bool)
     -- ^ Configured flags.
-  , packageConfigGhcOptions :: ![Text]
+  , ghcOptions :: ![Text]
     -- ^ Configured ghc options.
-  , packageConfigCabalConfigOpts :: ![Text]
+  , cabalConfigOpts :: ![Text]
     -- ^ ./Setup.hs configure options
-  , packageConfigCompilerVersion :: ActualCompiler
+  , compilerVersion :: ActualCompiler
     -- ^ GHC version
-  , packageConfigPlatform :: !Platform
+  , platform :: !Platform
     -- ^ host platform
   }
  deriving (Show, Typeable)
 
 -- | Compares the package name.
 instance Ord Package where
-  compare = on compare (.packageName)
+  compare = on compare (.name)
 
 -- | Compares the package name.
 instance Eq Package where
-  (==) = on (==) (.packageName)
+  (==) = on (==) (.name)
 
 -- | Where the package's source is located: local directory or package index
 data PackageSource
@@ -270,40 +272,40 @@ instance Show PackageSource where
       ]
 
 psVersion :: PackageSource -> Version
-psVersion (PSFilePath lp) = lp.lpPackage.packageVersion
+psVersion (PSFilePath lp) = lp.package.version
 psVersion (PSRemote _ v _ _) = v
 
 -- | Information on a locally available package of source code.
 data LocalPackage = LocalPackage
-  { lpPackage       :: !Package
+  { package       :: !Package
      -- ^ The @Package@ info itself, after resolution with package flags, with
      -- tests and benchmarks disabled
-  , lpComponents    :: !(Set NamedComponent)
+  , components    :: !(Set NamedComponent)
     -- ^ Components to build, not including the library component.
-  , lpUnbuildable   :: !(Set NamedComponent)
+  , unbuildable   :: !(Set NamedComponent)
     -- ^ Components explicitly requested for build, that are marked
     -- "buildable: false".
-  , lpWanted        :: !Bool -- FIXME Should completely drop this "wanted"
+  , wanted        :: !Bool -- FIXME Should completely drop this "wanted"
                              -- terminology, it's unclear
     -- ^ Whether this package is wanted as a target.
-  , lpTestBench     :: !(Maybe Package)
+  , testBench     :: !(Maybe Package)
     -- ^ This stores the 'Package' with tests and benchmarks enabled, if either
     -- is asked for by the user.
-  , lpCabalFile     :: !(Path Abs File)
+  , cabalFile     :: !(Path Abs File)
     -- ^ The Cabal file
-  , lpBuildHaddocks :: !Bool
+  , buildHaddocks :: !Bool
     -- ^ Is Haddock documentation being built for this package?
-  , lpForceDirty    :: !Bool
-  , lpDirtyFiles    :: !(MemoizedWith EnvConfig (Maybe (Set FilePath)))
+  , forceDirty    :: !Bool
+  , dirtyFiles    :: !(MemoizedWith EnvConfig (Maybe (Set FilePath)))
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-  , lpNewBuildCaches :: !( MemoizedWith
+  , newBuildCaches :: !( MemoizedWith
                              EnvConfig
                              (Map NamedComponent (Map FilePath FileCacheInfo))
                          )
     -- ^ current state of the files
-  , lpComponentFiles :: !( MemoizedWith
+  , componentFiles :: !( MemoizedWith
                              EnvConfig
                              (Map NamedComponent (Set (Path Abs File)))
                          )
@@ -341,14 +343,14 @@ instance Show (MemoizedWith env a) where
   show _ = "<<MemoizedWith>>"
 
 lpFiles :: HasEnvConfig env => LocalPackage -> RIO env (Set.Set (Path Abs File))
-lpFiles = runMemoizedWith . fmap (Set.unions . M.elems) . (.lpComponentFiles)
+lpFiles = runMemoizedWith . fmap (Set.unions . M.elems) . (.componentFiles)
 
 lpFilesForComponents :: HasEnvConfig env
                      => Set NamedComponent
                      -> LocalPackage
                      -> RIO env (Set.Set (Path Abs File))
 lpFilesForComponents components lp = runMemoizedWith $ do
-  componentFiles <- lp.lpComponentFiles
+  componentFiles <- lp.componentFiles
   pure $ mconcat (M.elems (M.restrictKeys componentFiles components))
 
 newtype FileCacheInfo = FileCacheInfo
@@ -434,16 +436,16 @@ toCabalMungedPackageName pkgName =
 
 -- | Type representing inputs to 'Stack.Package.generateBuildInfoOpts'.
 data BioInput = BioInput
-  { biInstallMap :: !InstallMap
-  , biInstalledMap :: !InstalledMap
-  , biCabalDir :: !(Path Abs Dir)
-  , biDistDir :: !(Path Abs Dir)
-  , biOmitPackages :: ![PackageName]
-  , biAddPackages :: ![PackageName]
-  , biBuildInfo :: !StackBuildInfo
-  , biDotCabalPaths :: ![DotCabalPath]
-  , biConfigLibDirs :: ![FilePath]
-  , biConfigIncludeDirs :: ![FilePath]
-  , biComponentName :: !NamedComponent
-  , biCabalVersion :: !Version
+  { installMap :: !InstallMap
+  , installedMap :: !InstalledMap
+  , cabalDir :: !(Path Abs Dir)
+  , distDir :: !(Path Abs Dir)
+  , omitPackages :: ![PackageName]
+  , addPackages :: ![PackageName]
+  , buildInfo :: !StackBuildInfo
+  , dotCabalPaths :: ![DotCabalPath]
+  , configLibDirs :: ![FilePath]
+  , configIncludeDirs :: ![FilePath]
+  , componentName :: !NamedComponent
+  , cabalVersion :: !Version
   }

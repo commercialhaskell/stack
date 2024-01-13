@@ -254,7 +254,7 @@ uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
       pkgDir <- resolveDir' dir
       distDir <- distDirFromDir pkgDir
       lp <- readLocalPackage pkgDir
-      let pkgId = packageIdentifier lp.lpPackage
+      let pkgId = packageIdentifier lp.package
           pkgIdName = packageIdentifierString pkgId
           name = pkgIdName <> "-docs"
       tarGzFileName <- maybe

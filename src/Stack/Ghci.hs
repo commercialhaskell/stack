@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Types and functions related to Stack's @ghci@ and @repl@ commands.
 module Stack.Ghci
@@ -229,7 +230,7 @@ ghci opts = do
   locals <- projectLocalPackages
   depLocals <- localDependencies
   let localMap =
-        M.fromList [(lp.lpPackage.packageName, lp) | lp <- locals ++ depLocals]
+        M.fromList [(lp.package.name, lp) | lp <- locals ++ depLocals]
       -- FIXME:qrilka this looks wrong to go back to SMActual
       sma = SMActual
         { smaCompiler = sourceMap.smCompiler
@@ -255,7 +256,7 @@ ghci opts = do
   -- Get a list of all the non-local target packages.
   nonLocalTargets <- getAllNonLocalTargets inputTargets
   let getInternalDependencies target localPackage =
-        topSortPackageComponent localPackage.lpPackage target False
+        topSortPackageComponent localPackage.package target False
       internalDependencies =
         M.intersectionWith getInternalDependencies inputTargets localMap
       relevantDependencies = M.filter (any isCSubLib) internalDependencies
@@ -353,12 +354,12 @@ findFileTargets ::
   -> RIO env (Map PackageName Target, Map PackageName [Path Abs File], [Path Abs File])
 findFileTargets locals fileTargets = do
   filePackages <- forM locals $ \lp -> do
-    PackageComponentFile _ compFiles _ _ <- getPackageFile lp.lpPackage lp.lpCabalFile
+    PackageComponentFile _ compFiles _ _ <- getPackageFile lp.package lp.cabalFile
     pure (lp, M.map (map dotCabalGetPath) compFiles)
   let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
       foundFileTargetComponents =
         map (\fp -> (fp, ) $ L.sort $
-                    concatMap (\(lp, files) -> map ((lp.lpPackage.packageName,) . fst)
+                    concatMap (\(lp, files) -> map ((lp.package.name,) . fst)
                                                    (filter (elem fp . snd) (M.toList files))
                               ) filePackages
             ) fileTargets
@@ -856,14 +857,14 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
       sourceMapFlags =
         maybe mempty (.ppCommon.cpFlags) $ M.lookup name sm.smProject
       config = PackageConfig
-        { packageConfigEnableTests = True
-        , packageConfigEnableBenchmarks = True
-        , packageConfigFlags =
+        { enableTests = True
+        , enableBenchmarks = True
+        , flags =
             getLocalFlags buildOptsCLI name `M.union` sourceMapFlags
-        , packageConfigGhcOptions = sourceMapGhcOptions
-        , packageConfigCabalConfigOpts = sourceMapCabalConfigOpts
-        , packageConfigCompilerVersion = compilerVersion
-        , packageConfigPlatform = view platformL econfig
+        , ghcOptions = sourceMapGhcOptions
+        , cabalConfigOpts = sourceMapCabalConfigOpts
+        , compilerVersion = compilerVersion
+        , platform = view platformL econfig
         }
   -- TODO we've already parsed this information, otherwise we
   -- wouldn't have figured out the cabalfp already. In the future:
@@ -900,7 +901,7 @@ getGhciPkgInfos ::
 getGhciPkgInfos installMap addPkgs mfileTargets localTargets = do
   (installedMap, _, _, _) <- getInstalled installMap
   let localLibs =
-        [ desc.ghciDescPkg.packageName
+        [ desc.ghciDescPkg.name
         | desc <- localTargets
         , hasLocalComp isCLib desc.ghciDescTarget
         ]
@@ -922,7 +923,7 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
   let pkg = pkgDesc.ghciDescPkg
       cabalfp = pkgDesc.ghciDescCabalFp
       target = pkgDesc.ghciDescTarget
-      name = pkg.packageName
+      name = pkg.name
   (mods, files, opts) <-
     getPackageOpts pkg installMap installedMap locals addPkgs cabalfp
   let filteredOpts = filterWanted opts
@@ -935,7 +936,7 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
     , ghciPkgModules = unionModuleMaps $
       map
         ( \(comp, mp) -> M.map
-            (\fp -> M.singleton fp (S.singleton (pkg.packageName, comp)))
+            (\fp -> M.singleton fp (S.singleton (pkg.name, comp)))
             mp
         )
         (M.toList (filterWanted mods))
@@ -962,10 +963,10 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
   <> (if bopts.boptsBenchmarks then map CBench buildableBenchmarks else [])
  where
   buildableForeignLibs' = S.toList $ buildableForeignLibs pkg
-  buildableSubLibs = getBuildableListText pkg.packageSubLibraries
+  buildableSubLibs = getBuildableListText pkg.subLibraries
   buildableExes' = S.toList $ buildableExes pkg
-  buildableTestSuites = getBuildableListText pkg.packageTestSuites
-  buildableBenchmarks = getBuildableListText pkg.packageBenchmarks
+  buildableTestSuites = getBuildableListText pkg.testSuites
+  buildableBenchmarks = getBuildableListText pkg.benchmarks
 wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: HasTerm env => [GhciPkgInfo] -> RIO env ()
@@ -1192,7 +1193,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
   getDeps :: PackageName -> [PackageName]
   getDeps name =
     case M.lookup name localMap of
-      Just lp -> listOfPackageDeps lp.lpPackage -- FIXME just Local?
+      Just lp -> listOfPackageDeps lp.package -- FIXME just Local?
       _ -> []
   go ::
        PackageName
@@ -1203,11 +1204,11 @@ getExtraLoadDeps loadAllDeps localMap targets =
       (Just (Just _), _) -> pure True
       (Just Nothing, _) | not loadAllDeps -> pure False
       (_, Just lp) -> do
-        let deps = listOfPackageDeps lp.lpPackage
+        let deps = listOfPackageDeps lp.package
         shouldLoad <- or <$> mapM go deps
         if shouldLoad
           then do
-            modify (M.insert name (Just (lp.lpCabalFile, TargetComps (S.singleton CLib))))
+            modify (M.insert name (Just (lp.cabalFile, TargetComps (S.singleton CLib))))
             pure True
           else do
             modify (M.insert name Nothing)

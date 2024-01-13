@@ -179,13 +179,13 @@ gpdPackageDeps gpd ac platform flags =
   -- modified or unmodified
   pkgDesc = resolvePackageDescription pkgConfig gpd
   pkgConfig = PackageConfig
-    { packageConfigEnableTests = True
-    , packageConfigEnableBenchmarks = True
-    , packageConfigFlags = flags
-    , packageConfigGhcOptions = []
-    , packageConfigCabalConfigOpts = []
-    , packageConfigCompilerVersion = ac
-    , packageConfigPlatform = platform
+    { enableTests = True
+    , enableBenchmarks = True
+    , flags = flags
+    , ghcOptions = []
+    , cabalConfigOpts = []
+    , compilerVersion = ac
+    , platform = platform
     }
 
 -- Remove any src package flags having default values
