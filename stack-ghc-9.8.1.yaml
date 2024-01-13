@@ -5,6 +5,8 @@
 resolver: nightly-2024-01-06
 
 extra-deps:
+# nightly-2023-01-06 specifies ansi-terminal-1.0.
+- ansi-terminal-1.0.2@sha256:1f90bb88e670ce63fbf2c9216d50857f2419582f1c6791e542c3eab97ecfd364,2897
 # nightly-2023-01-06 specifies pantry-0.9.3.1@rev:0.
 - pantry-0.9.3.1@sha256:79e9be1b28a9829cb9630ca97ac5732b0843ee8d60ce26b347ecd57740305c2b,7859
 # nightly-2023-01-06 specifies tar-conduit-0.4.0

@@ -61,7 +61,7 @@ dependencies:
 - Cabal >= 3.8.1.0
 - aeson >= 2.0.3.0
 - aeson-warning-parser >= 0.1.1
-- ansi-terminal >= 1.0
+- ansi-terminal >= 1.0.2
 - array
 - async
 - attoparsec

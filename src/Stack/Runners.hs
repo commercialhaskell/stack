@@ -54,7 +54,7 @@ import           Stack.Types.Runner
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
 import           Stack.Types.Version
                    ( minorVersion, stackMinorVersion, stackVersion )
-import           System.Console.ANSI ( hSupportsANSI )
+import           System.Console.ANSI ( hNowSupportsANSI )
 import           System.Terminal ( getTerminalWidth )
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -225,7 +225,7 @@ withRunnerGlobal go inner = do
   useColor <- case colorWhen of
     ColorNever -> pure False
     ColorAlways -> pure True
-    ColorAuto -> hSupportsANSI stderr
+    ColorAuto -> hNowSupportsANSI stderr
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
                                     <$> getTerminalWidth)
                                    pure go.globalTermWidth
