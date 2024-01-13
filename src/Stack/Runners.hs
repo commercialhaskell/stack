@@ -48,7 +48,7 @@ import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.Docker ( dockerEnable )
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
-import           Stack.Types.Nix ( nixEnable )
+import           Stack.Types.Nix ( NixOpts (..) )
 import           Stack.Types.Runner
                    ( Runner (..), globalOptsL, reExecL, stackYamlLocL )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
@@ -146,7 +146,7 @@ withConfig shouldReexec inner =
 -- action.
 reexec :: RIO Config a -> RIO Config a
 reexec inner = do
-  nixEnable' <- asks $ (.nix.nixEnable)
+  nixEnable' <- asks $ (.nix.enable)
   notifyIfNixOnPath <- asks (.notifyIfNixOnPath)
   when (not nixEnable' && notifyIfNixOnPath) $ do
     eNix <- findExecutable nixProgName

@@ -73,42 +73,42 @@ spec = beforeAll setup $ do
   describe "nix disabled in config file" $
     around_ (withStackDotYaml sampleConfigNixDisabled) $ do
       it "sees that the nix shell is not enabled" $ loadConfig' mempty $ \config ->
-         config.nix.nixEnable `shouldBe` False
+         config.nix.enable `shouldBe` False
       describe "--nix given on command line" $
         it "sees that the nix shell is enabled" $
           loadConfig' (parseOpts ["--nix"]) $ \config ->
-          config.nix.nixEnable `shouldBe` trueOnNonWindows
+          config.nix.enable `shouldBe` trueOnNonWindows
       describe "--nix-pure given on command line" $
         it "sees that the nix shell is enabled" $
           loadConfig' (parseOpts ["--nix-pure"]) $ \config ->
-          config.nix.nixEnable `shouldBe` trueOnNonWindows
+          config.nix.enable `shouldBe` trueOnNonWindows
       describe "--no-nix given on command line" $
         it "sees that the nix shell is not enabled" $
           loadConfig' (parseOpts ["--no-nix"]) $ \config ->
-          config.nix.nixEnable `shouldBe` False
+          config.nix.enable `shouldBe` False
       describe "--no-nix-pure given on command line" $
         it "sees that the nix shell is not enabled" $
           loadConfig' (parseOpts ["--no-nix-pure"]) $ \config ->
-          config.nix.nixEnable `shouldBe` False
+          config.nix.enable `shouldBe` False
   describe "nix enabled in config file" $
     around_ (withStackDotYaml sampleConfigNixEnabled) $ do
       it "sees that the nix shell is enabled" $
         loadConfig' mempty $ \config ->
-        config.nix.nixEnable `shouldBe` trueOnNonWindows
+        config.nix.enable `shouldBe` trueOnNonWindows
       describe "--no-nix given on command line" $
         it "sees that the nix shell is not enabled" $
           loadConfig' (parseOpts ["--no-nix"]) $ \config ->
-          config.nix.nixEnable `shouldBe` False
+          config.nix.enable `shouldBe` False
       describe "--nix-pure given on command line" $
         it "sees that the nix shell is enabled" $
           loadConfig' (parseOpts ["--nix-pure"]) $ \config ->
-          config.nix.nixEnable `shouldBe` trueOnNonWindows
+          config.nix.enable `shouldBe` trueOnNonWindows
       describe "--no-nix-pure given on command line" $
         it "sees that the nix shell is enabled" $
           loadConfig' (parseOpts ["--no-nix-pure"]) $ \config ->
-          config.nix.nixEnable `shouldBe` trueOnNonWindows
+          config.nix.enable `shouldBe` trueOnNonWindows
       it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $ loadConfig' mempty $ \config -> do
-        config.nix.nixPackages `shouldBe` ["glpk"]
+        config.nix.packages `shouldBe` ["glpk"]
         v <- parseVersionThrowing "9.0.2"
         ghc <- either throwIO pure $ nixCompiler (WCGhc v)
         ghc `shouldBe` "haskell.compiler.ghc902"

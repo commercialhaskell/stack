@@ -50,19 +50,19 @@ nixOptsFromMonoid nixMonoid os = do
   let defaultPure = case os of
         OSX -> False
         _ -> True
-      nixPureShell = fromFirst defaultPure nixMonoid.nixMonoidPureShell
-      nixPackages = fromFirst [] nixMonoid.nixMonoidPackages
-      nixInitFile = getFirst nixMonoid.nixMonoidInitFile
-      nixShellOptions =
+      pureShell = fromFirst defaultPure nixMonoid.nixMonoidPureShell
+      packages = fromFirst [] nixMonoid.nixMonoidPackages
+      initFile = getFirst nixMonoid.nixMonoidInitFile
+      shellOptions =
            fromFirst [] nixMonoid.nixMonoidShellOptions
         ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoid.nixMonoidPath)
-      nixAddGCRoots   = fromFirstFalse nixMonoid.nixMonoidAddGCRoots
+      addGCRoots   = fromFirstFalse nixMonoid.nixMonoidAddGCRoots
 
   -- Enable Nix-mode by default on NixOS, unless Docker-mode was specified
   osIsNixOS <- isNixOS
   let nixEnable0 = fromFirst osIsNixOS nixMonoid.nixMonoidEnable
 
-  nixEnable <-
+  enable <-
     if nixEnable0 && osIsWindows
       then do
         prettyNoteS
@@ -70,15 +70,15 @@ nixOptsFromMonoid nixMonoid os = do
         pure False
       else pure nixEnable0
 
-  when (not (null nixPackages) && isJust nixInitFile) $
+  when (not (null packages) && isJust initFile) $
     throwIO NixCannotUseShellFileAndPackagesException
   pure $ NixOpts
-    { nixEnable
-    , nixPureShell
-    , nixPackages
-    , nixInitFile
-    , nixShellOptions
-    , nixAddGCRoots
+    { enable
+    , pureShell
+    , packages
+    , initFile
+    , shellOptions
+    , addGCRoots
     }
  where
   prefixAll p (x:xs) = p : x : prefixAll p xs
