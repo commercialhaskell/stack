@@ -81,7 +81,7 @@ projectLocalPackages = do
 -- | loads all local dependencies - project packages and local extra-deps
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
 localDependencies = do
-  bopts <- view $ configL . to (.configBuild)
+  bopts <- view $ configL . to (.build)
   sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
   forMaybeM (Map.elems sourceMap.smDeps) $ \dp ->
     case dp.dpLocation of
@@ -101,7 +101,7 @@ loadSourceMap smt boptsCli sma = do
   bconfig <- view buildConfigL
   let compiler = sma.smaCompiler
       project = M.map applyOptsFlagsPP sma.smaProject
-      bopts = bconfig.bcConfig.configBuild
+      bopts = bconfig.bcConfig.build
       applyOptsFlagsPP p@ProjectPackage{ppCommon = c} =
         p{ppCommon = applyOptsFlags (M.member c.cpName smt.smtTargets) True c}
       deps0 = smt.smtDeps <> sma.smaDeps
@@ -230,14 +230,14 @@ generalCabalConfigOpts ::
   -> Bool
   -> [Text]
 generalCabalConfigOpts bconfig boptsCli name isTarget isLocal = concat
-  [ Map.findWithDefault [] CCKEverything config.configCabalConfigOpts
+  [ Map.findWithDefault [] CCKEverything config.cabalConfigOpts
   , if isLocal
-      then Map.findWithDefault [] CCKLocals config.configCabalConfigOpts
+      then Map.findWithDefault [] CCKLocals config.cabalConfigOpts
       else []
   , if isTarget
-      then Map.findWithDefault [] CCKTargets config.configCabalConfigOpts
+      then Map.findWithDefault [] CCKTargets config.cabalConfigOpts
       else []
-  , Map.findWithDefault [] (CCKPackage name) config.configCabalConfigOpts
+  , Map.findWithDefault [] (CCKPackage name) config.cabalConfigOpts
   , if includeExtraOptions
       then boptsCLIAllProgOptions boptsCli
       else []
@@ -245,7 +245,7 @@ generalCabalConfigOpts bconfig boptsCli name isTarget isLocal = concat
  where
   config = view configL bconfig
   includeExtraOptions =
-    case config.configApplyProgOptions of
+    case config.applyProgOptions of
       APOTargets -> isTarget
       APOLocals -> isLocal
       APOEverything -> True
@@ -254,12 +254,12 @@ generalCabalConfigOpts bconfig boptsCli name isTarget isLocal = concat
 -- configuration and commandline.
 generalGhcOptions :: BuildConfig -> BuildOptsCLI -> Bool -> Bool -> [Text]
 generalGhcOptions bconfig boptsCli isTarget isLocal = concat
-  [ Map.findWithDefault [] AGOEverything config.configGhcOptionsByCat
+  [ Map.findWithDefault [] AGOEverything config.ghcOptionsByCat
   , if isLocal
-      then Map.findWithDefault [] AGOLocals config.configGhcOptionsByCat
+      then Map.findWithDefault [] AGOLocals config.ghcOptionsByCat
       else []
   , if isTarget
-      then Map.findWithDefault [] AGOTargets config.configGhcOptionsByCat
+      then Map.findWithDefault [] AGOTargets config.ghcOptionsByCat
       else []
   , concat [["-fhpc"] | isLocal && bopts.boptsTestOpts.toCoverage]
   , if bopts.boptsLibProfile || bopts.boptsExeProfile
@@ -271,10 +271,10 @@ generalGhcOptions bconfig boptsCli isTarget isLocal = concat
       else []
   ]
  where
-  bopts =  config.configBuild
+  bopts =  config.build
   config = view configL bconfig
   includeExtraOptions =
-    case config.configApplyGhcOptions of
+    case config.applyGhcOptions of
       AGOTargets -> isTarget
       AGOLocals -> isLocal
       AGOEverything -> True

@@ -122,12 +122,12 @@ configureOptsNoDir econfig bco deps isLocal package = concat
                   (Map.toList flags)
   , map T.unpack package.cabalConfigOpts
   , processGhcOptions package.ghcOptions
-  , map ("--extra-include-dirs=" ++) config.configExtraIncludeDirs
-  , map ("--extra-lib-dirs=" ++) config.configExtraLibDirs
+  , map ("--extra-include-dirs=" ++) config.extraIncludeDirs
+  , map ("--extra-lib-dirs=" ++) config.extraLibDirs
   , maybe
       []
       (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc])
-      config.configOverrideGccPath
+      config.overrideGccPath
   , ["--exact-configuration"]
   , ["--ghc-option=-fhide-source-paths" | hideSourcePaths cv]
   ]
@@ -166,7 +166,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
   cv = view (actualCompilerVersionL . to getGhcVersion) econfig
 
   hideSourcePaths ghcVersion =
-    ghcVersion >= C.mkVersion [8, 2] && config.configHideSourcePaths
+    ghcVersion >= C.mkVersion [8, 2] && config.hideSourcePaths
 
   config = view configL econfig
   bopts = bco.bcoBuildOpts

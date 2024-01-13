@@ -34,7 +34,7 @@ data SetupCmdOpts = SetupCmdOpts
 -- | Function underlying the @stack setup@ command.
 setupCmd :: SetupCmdOpts -> RIO Runner ()
 setupCmd sco = withConfig YesReexec $ do
-  installGHC <- view $ configL . to (.configInstallGHC)
+  installGHC <- view $ configL . to (.installGHC)
   if installGHC
     then
        withBuildConfig $ do
@@ -43,7 +43,7 @@ setupCmd sco = withConfig YesReexec $ do
            Just v -> pure (v, MatchMinor, Nothing)
            Nothing -> (,,)
              <$> view wantedCompilerVersionL
-             <*> view (configL . to (.configCompilerCheck))
+             <*> view (configL . to (.compilerCheck))
              <*> (Just <$> view stackYamlL)
        setup sco wantedCompiler compilerCheck mstack
     else
@@ -66,14 +66,14 @@ setup sco wantedCompiler compilerCheck mstack = do
   config <- view configL
   sandboxedGhc <- (.cpSandboxed) . fst <$> ensureCompilerAndMsys SetupOpts
     { soptsInstallIfMissing = True
-    , soptsUseSystem = config.configSystemGHC && not sco.scoForceReinstall
+    , soptsUseSystem = config.systemGHC && not sco.scoForceReinstall
     , soptsWantedCompiler = wantedCompiler
     , soptsCompilerCheck = compilerCheck
     , soptsStackYaml = mstack
     , soptsForceReinstall = sco.scoForceReinstall
     , soptsSanityCheck = True
     , soptsSkipGhcCheck = False
-    , soptsSkipMsys = config.configSkipMsys
+    , soptsSkipMsys = config.skipMsys
     , soptsResolveMissingGHC = Nothing
     , soptsGHCBindistURL = sco.scoGHCBindistURL
     }

@@ -364,7 +364,7 @@ findCandidate ::
   -> RIO GetPackageFileContext (Maybe DotCabalPath)
 findCandidate dirs name = do
   pkg <- asks (.ctxFile) >>= parsePackageNameFromFilePath
-  customPreprocessorExts <- view $ configL . to (.configCustomPreprocessorExts)
+  customPreprocessorExts <- view $ configL . to (.customPreprocessorExts)
   let haskellPreprocessorExts =
         haskellDefaultPreprocessorExts ++ customPreprocessorExts
   candidates <- liftIO $ makeNameCandidates haskellPreprocessorExts

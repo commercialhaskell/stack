@@ -226,7 +226,7 @@ scriptCmd opts = do
     withConfig YesReexec $
     withDefaultEnvConfig $ do
       config <- view configL
-      menv <- liftIO $ config.configProcessContextSettings defaultEnvSettings
+      menv <- liftIO $ config.processContextSettings defaultEnvSettings
       withProcessContext menv $ do
         colorFlag <- appropriateGhcColorFlag
 

@@ -188,7 +188,7 @@ constructPlan
         stackYaml <- view stackYamlL
         stackRoot <- view stackRootL
         isImplicitGlobal <-
-          view $ configL . to (isPCGlobalProject . (.configProject))
+          view $ configL . to (isPCGlobalProject . (.project))
         prettyThrowM $ ConstructPlanFailed
           errs
           stackYaml
@@ -297,7 +297,7 @@ constructPlan
     pPackages <- for sourceProject $ \pp -> do
       lp <- loadLocalPackage' pp
       pure $ PSFilePath lp
-    bopts <- view $ configL . to (.configBuild)
+    bopts <- view $ configL . to (.build)
     deps <- for sourceDeps $ \dp ->
       case dp.dpLocation of
         PLImmutable loc ->
@@ -901,8 +901,8 @@ adrInRange ::
 adrInRange pkgId name range adr = if adrVersion adr `withinRange` range
   then pure True
   else do
-    allowNewer <- view $ configL . to (.configAllowNewer)
-    allowNewerDeps <- view $ configL . to (.configAllowNewerDeps)
+    allowNewer <- view $ configL . to (.allowNewer)
+    allowNewerDeps <- view $ configL . to (.allowNewerDeps)
     if allowNewer
       then case allowNewerDeps of
         Nothing -> do
@@ -1093,7 +1093,7 @@ describeConfigDiff config old new
     isKeeper = (== "-fhpc") -- more to be added later
 
   userOpts = filter (not . isStackOpt)
-           . (if config.configRebuildGhcOptions
+           . (if config.rebuildGhcOptions
                 then id
                 else stripGhcOptions)
            . map T.pack
@@ -1174,7 +1174,7 @@ checkAndWarnForUnknownTools p = do
   notOnPath toolName = MaybeT $ do
     let settings = minimalEnvSettings { esIncludeLocals = True }
     config <- view configL
-    menv <- liftIO $ config.configProcessContextSettings settings
+    menv <- liftIO $ config.processContextSettings settings
     eFound <- runRIO menv $ findExecutable $ T.unpack toolName
     skipIf $ isRight eFound
   -- From Cabal 1.12, build-tools can specify another executable in the same

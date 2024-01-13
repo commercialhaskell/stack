@@ -58,7 +58,7 @@ runShellAndExit = do
 
     mshellFile <- case configProjectRoot config of
       Just projectRoot ->
-        traverse (resolveFile projectRoot) config.configNix.nixInitFile
+        traverse (resolveFile projectRoot) config.nix.nixInitFile
       Nothing -> pure Nothing
 
     -- This will never result in double loading the build config, since:
@@ -71,11 +71,11 @@ runShellAndExit = do
 
     ghc <- either throwIO pure $ nixCompiler compilerVersion
     ghcVersion <- either throwIO pure $ nixCompilerVersion compilerVersion
-    let pkgsInConfig = config.configNix.nixPackages
+    let pkgsInConfig = config.nix.nixPackages
         pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
         pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
-        pureShell = config.configNix.nixPureShell
-        addGCRoots = config.configNix.nixAddGCRoots
+        pureShell = config.nix.nixPureShell
+        addGCRoots = config.nix.nixAddGCRoots
         nixopts = case mshellFile of
           Just fp ->
             [ toFilePath fp
@@ -122,12 +122,12 @@ runShellAndExit = do
               then [ "--indirect"
                    , "--add-root"
                    , toFilePath
-                             config.configWorkDir
+                             config.workDir
                        F.</> "nix-gc-symlinks"
                        F.</> "gc-root"
                    ]
               else []
-          , map T.unpack config.configNix.nixShellOptions
+          , map T.unpack config.nix.nixShellOptions
           , nixopts
           , ["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args')]
             -- Using --run instead of --command so we cannot end up in the

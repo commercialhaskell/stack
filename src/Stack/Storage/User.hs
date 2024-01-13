@@ -167,7 +167,7 @@ withUserStorage ::
   => ReaderT SqlBackend (RIO env) a
   -> RIO env a
 withUserStorage inner = do
-  storage <- view (configL . to (.configUserStorage.unUserStorage))
+  storage <- view (configL . to (.userStorage.unUserStorage))
   withStorage_ storage inner
 
 -- | Key used to retrieve the precompiled cache

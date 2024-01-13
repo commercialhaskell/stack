@@ -136,8 +136,8 @@ getCompilerVersion wc exe =
 extraDirs :: HasConfig env => Tool -> RIO env ExtraDirs
 extraDirs tool = do
   config <- view configL
-  dir <- installDir config.configLocalPrograms tool
-  case (config.configPlatform, toolNameString tool) of
+  dir <- installDir config.localPrograms tool
+  case (config.platform, toolNameString tool) of
     (Platform _ Cabal.Windows, isGHC -> True) -> pure mempty
       { edBins =
           [ dir </> relDirBin

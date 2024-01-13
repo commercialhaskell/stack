@@ -146,8 +146,8 @@ withConfig shouldReexec inner =
 -- action.
 reexec :: RIO Config a -> RIO Config a
 reexec inner = do
-  nixEnable' <- asks $ (.configNix.nixEnable)
-  notifyIfNixOnPath <- asks (.configNotifyIfNixOnPath)
+  nixEnable' <- asks $ (.nix.nixEnable)
+  notifyIfNixOnPath <- asks (.notifyIfNixOnPath)
   when (not nixEnable' && notifyIfNixOnPath) $ do
     eNix <- findExecutable nixProgName
     case eNix of
@@ -190,7 +190,7 @@ reexec inner = do
                    , muteMsg
                    ]
                 <> line
-  dockerEnable' <- asks (.configDocker.dockerEnable)
+  dockerEnable' <- asks (.docker.dockerEnable)
   case (nixEnable', dockerEnable') of
     (True, True) -> throwIO DockerAndNixInvalid
     (False, False) -> inner
@@ -252,7 +252,7 @@ withRunnerGlobal go inner = do
 shouldUpgradeCheck :: RIO Config ()
 shouldUpgradeCheck = do
   config <- ask
-  when config.configRecommendUpgrade $ do
+  when config.recommendUpgrade $ do
     now <- getCurrentTime
     let yesterday = addUTCTime (-24 * 60 * 60) now
     checks <- upgradeChecksSince yesterday
@@ -280,7 +280,7 @@ shouldUpgradeCheck = do
                  [ flow "Tired of seeing this? Add"
                  , style Shell (flow "recommend-stack-upgrade: false")
                  , "to"
-                 , pretty config.configUserConfigPath <> "."
+                 , pretty config.userConfigPath <> "."
                  ]
             <> blankLine
         _ -> pure ()

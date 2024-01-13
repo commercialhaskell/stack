@@ -136,7 +136,7 @@ build :: HasEnvConfig env
       => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> RIO env ()
 build msetLocalFiles = do
-  mcp <- view $ configL . to (.configModifyCodePage)
+  mcp <- view $ configL . to (.modifyCodePage)
   ghcVersion <- view $ actualCompilerVersionL . to getGhcVersion
   fixCodePage mcp ghcVersion $ do
     bopts <- view buildOptsL
@@ -178,7 +178,7 @@ build msetLocalFiles = do
               installedMap
               boptsCli.boptsCLIInitialBuildSteps
 
-    allowLocals <- view $ configL . to (.configAllowLocals)
+    allowLocals <- view $ configL . to (.allowLocals)
     unless allowLocals $ case justLocals plan of
       [] -> pure ()
       localsIdents -> throwM $ LocalPackagesPresent localsIdents

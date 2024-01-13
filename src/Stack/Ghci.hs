@@ -542,12 +542,12 @@ runGhci
                concatMap (concatMap ((.bioOpts) . snd) . (.ghciPkgOpts)) pkgs
             ++ map
                  T.unpack
-                 (  fold config.configGhcOptionsByCat
+                 (  fold config.ghcOptionsByCat
                     -- ^ include everything, locals, and targets
                  ++ concatMap (getUserOptions . (.ghciPkgName)) pkgs
                  )
           getUserOptions pkg =
-            M.findWithDefault [] pkg config.configGhcOptionsByName
+            M.findWithDefault [] pkg config.ghcOptionsByName
           badForGhci x =
                L.isPrefixOf "-O" x
             || elem x (words "-debug -threaded -ticky -static -Werror")
@@ -574,7 +574,7 @@ runGhci
         view $ compilerPathsL . to (.cpCompiler) . to toFilePath
       let execGhci extras = do
             menv <-
-              liftIO $ config.configProcessContextSettings defaultEnvSettings
+              liftIO $ config.processContextSettings defaultEnvSettings
             withPackageWorkingDir $ withProcessContext menv $ exec
               (fromMaybe compilerExeName ghciOpts.ghciGhcCommand)
               ( ("--interactive" : ) $

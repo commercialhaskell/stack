@@ -562,7 +562,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
       -- No log files generated, nothing to dump
       [] -> pure ()
       firstLog:_ -> do
-        toDump <- view $ configL . to (.configDumpLogs)
+        toDump <- view $ configL . to (.dumpLogs)
         case toDump of
           DumpAllLogs -> mapM_ (dumpLog "") allLogs
           DumpWarningLogs -> mapM_ dumpLogIfWarning allLogs
@@ -698,7 +698,7 @@ executePlan
     copyExecutables plan.planInstallExes
 
     config <- view configL
-    menv' <- liftIO $ config.configProcessContextSettings EnvSettings
+    menv' <- liftIO $ config.processContextSettings EnvSettings
                { esIncludeLocals = True
                , esIncludeGhcPackagePath = True
                , esStackExe = True
@@ -725,7 +725,7 @@ copyExecutables exes = do
   compilerSpecific <- (.boptsInstallCompilerTool) <$> view buildOptsL
   destDir <- if compilerSpecific
                then bindirCompilerTools
-               else view $ configL . to (.configLocalBin)
+               else view $ configL . to (.localBin)
   ensureDir destDir
 
   destDir' <- liftIO . D.canonicalizePath . toFilePath $ destDir
@@ -815,7 +815,7 @@ executePlan' installedMap0 targets plan ee = do
 
   -- If running tests concurrently with each other, then create an MVar
   -- which is empty while each test is being run.
-  concurrentTests <- view $ configL . to (.configConcurrentTests)
+  concurrentTests <- view $ configL . to (.concurrentTests)
   mtestLock <- if concurrentTests
                  then pure Nothing
                  else Just <$> liftIO (newMVar ())
@@ -827,7 +827,7 @@ executePlan' installedMap0 targets plan ee = do
           (Map.zipWithMatched (\_ b f -> (Just b, Just f)))
           plan.planTasks
           plan.planFinals
-  threads <- view $ configL . to (.configJobs)
+  threads <- view $ configL . to (.jobs)
   let keepGoing = fromMaybe
         (not (Map.null plan.planFinals))
         ee.eeBuildOpts.boptsKeepGoing
@@ -1428,8 +1428,8 @@ withSingleContext
     -> RIO env a
   withCabal package pkgDir outputType inner = do
     config <- view configL
-    unless config.configAllowDifferentUser $
-      checkOwnership (pkgDir </> config.configWorkDir)
+    unless config.allowDifferentUser $
+      checkOwnership (pkgDir </> config.workDir)
     let envSettings = EnvSettings
           { esIncludeLocals = taskTypeLocation taskType == Local
           , esIncludeGhcPackagePath = False
@@ -1437,7 +1437,7 @@ withSingleContext
           , esLocaleUtf8 = True
           , esKeepGhcRts = False
           }
-    menv <- liftIO $ config.configProcessContextSettings envSettings
+    menv <- liftIO $ config.processContextSettings envSettings
     distRelativeDir' <- distRelativeDir
     esetupexehs <-
       -- Avoid broken Setup.hs files causing problems for simple build
@@ -1601,7 +1601,7 @@ withSingleContext
               withProcessContext menv $ case outputType of
                 OTLogFile _ h -> do
                   let prefixWithTimestamps =
-                        if config.configPrefixTimestamps
+                        if config.prefixTimestamps
                           then PrefixWithTimestamps
                           else WithoutTimestamps
                   void $ sinkProcessStderrStdout (toFilePath exeName) fullArgs
@@ -1665,8 +1665,8 @@ withSingleContext
                   ( Map.findWithDefault
                       []
                       AGOEverything
-                      config.configGhcOptionsByCat
-                  ++ case config.configApplyGhcOptions of
+                      config.ghcOptionsByCat
+                  ++ case config.applyGhcOptions of
                        AGOEverything -> ee.eeBuildOptsCLI.boptsCLIGhcOptions
                        AGOTargets -> []
                        AGOLocals -> []
@@ -2004,7 +2004,7 @@ singleBuild
     config <- view configL
     extraOpts <- extraBuildOptions wc ee.eeBuildOpts
     let stripTHLoading
-          | config.configHideTHLoading = ExcludeTHLoading
+          | config.hideTHLoading = ExcludeTHLoading
           | otherwise                  = KeepTHLoading
     cabal stripTHLoading (("build" :) $ (++ extraOpts) $
         case (task.taskType, task.taskAllInOne, isFinalBuild) of
@@ -2310,7 +2310,7 @@ singleTest topts testsToRun ac ee task installedMap = do
               interface -> throwM (TestSuiteTypeUnsupported interface)
 
           let exeName = testName' ++
-                case config.configPlatform of
+                case config.platform of
                   Platform _ Windows -> ".exe"
                   _ -> ""
           tixPath <- fmap (pkgDir </>) $ parseRelFile $ exeName ++ ".tix"
@@ -2372,7 +2372,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                      (pkgGhcIdList ++ thGhcId:Map.elems allDepsMap)
           writeFileUtf8Builder fp ghcEnv
           menv <- liftIO $
-            setEnv fp =<< config.configProcessContextSettings EnvSettings
+            setEnv fp =<< config.processContextSettings EnvSettings
               { esIncludeLocals = taskLocation task == Local
               , esIncludeGhcPackagePath = True
               , esStackExe = True

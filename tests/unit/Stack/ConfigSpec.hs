@@ -190,7 +190,7 @@ spec = beforeAll setup $ do
     it "parses build config options" $ inTempDir $ do
      writeFile (toFilePath stackDotYaml) buildOptsConfig
      loadConfig' $ \config -> liftIO $ do
-      let bopts = config.configBuild
+      let bopts = config.build
       bopts.boptsLibProfile `shouldBe` True
       bopts.boptsExeProfile `shouldBe` True
       bopts.boptsHaddock `shouldBe` True

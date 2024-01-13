@@ -203,7 +203,7 @@ getSDistTarball ::
 getSDistTarball mpvpBounds pkgDir = do
   config <- view configL
   let PvpBounds pvpBounds asRevision =
-        fromMaybe config.configPvpBounds mpvpBounds
+        fromMaybe config.pvpBounds mpvpBounds
       tweakCabal = pvpBounds /= PvpBoundsNone
       pkgFp = toFilePath pkgDir
   lp <- readLocalPackage pkgDir
@@ -625,7 +625,7 @@ buildExtractedTarball pkgDir = do
               }
             updateBuildConfig bc = bc
               { bcConfig = bc.bcConfig
-                 { configBuild = defaultBuildOpts { boptsTests = True } }
+                 { build = defaultBuildOpts { boptsTests = True } }
               }
         in  set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =

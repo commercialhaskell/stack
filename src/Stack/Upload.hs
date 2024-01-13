@@ -186,7 +186,7 @@ uploadCmd (UploadOpts [] uoDocumentation _ _ _ _ _) = do
   prettyThrowIO $ NoItemSpecified subject
 uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
   config <- view configL
-  let hackageUrl = T.unpack config.configHackageBaseUrl
+  let hackageUrl = T.unpack config.hackageBaseUrl
   if uo.uoDocumentation
     then do
       (dirs, invalid) <-
@@ -334,7 +334,7 @@ loadUserAndPassword config = do
       -- didn't do this
       writeFilePrivate fp $ lazyByteString lbs
 
-      unless config.configSaveHackageCreds $ do
+      unless config.saveHackageCreds $ do
         prettyWarnL
           [ flow "You've set"
           , style Shell "save-hackage-creds"
@@ -355,7 +355,7 @@ loadUserAndPassword config = do
           , hcCredsFile = fp
           }
 
-    when config.configSaveHackageCreds $ do
+    when config.saveHackageCreds $ do
       shouldSave <- promptBool $ T.pack $
         "Save Hackage credentials to file at " ++ fp ++ " [y/n]? "
       prettyNoteL

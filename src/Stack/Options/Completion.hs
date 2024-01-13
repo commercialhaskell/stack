@@ -91,7 +91,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
         let flname = C.unFlagName $ C.flagName fl
         in  (if flagEnabled name fl then "-" else "") ++ flname
       prjFlags =
-        case bconfig.bcConfig.configProject of
+        case bconfig.bcConfig.project of
           PCProject (p, _) -> p.projectFlags
           PCGlobalProject -> mempty
           PCNoProject _ -> mempty

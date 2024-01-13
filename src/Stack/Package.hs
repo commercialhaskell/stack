@@ -250,8 +250,8 @@ generatePkgDescOpts
             , buildInfo = binfo
             , dotCabalPaths =
                 fromMaybe [] (M.lookup namedComponent componentPaths)
-            , configLibDirs =  config.configExtraLibDirs
-            , configIncludeDirs =  config.configExtraIncludeDirs
+            , configLibDirs =  config.extraLibDirs
+            , configIncludeDirs =  config.extraIncludeDirs
             , componentName = namedComponent
             , cabalVersion = cabalVer
             }
