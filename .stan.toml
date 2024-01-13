@@ -54,10 +54,10 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-fki0nd-1132:21"
+  id = "OBS-STAN-0203-tuE+RG-233:21"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
-# ✦ File:          src\Stack\Build\Execute.hs
+# ✦ File:          src\Stack\Build\ExecutePackage.hs
 #
 #  1131 ┃
 #  1132 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
@@ -65,14 +65,14 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-fki0nd-2678:3"
+  id = "OBS-STAN-0203-fki0nd-1244:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\Execute.hs
 #
-#  2677 ┃
-#  2678 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  2679 ┃   ^^^^^^^
+#  1243 ┃
+#  1244 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+#  1245 ┃   ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
@@ -172,25 +172,25 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-H4Wfj/-151:17"
+  id = "OBS-STAN-0212-H4Wfj/-152:17"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\Types\BuildOpts.hs
 #
-#  150 ┃
-#  151 ┃   buildMonoid = undefined :: BuildOptsMonoid
-#  152 ┃                 ^^^^^^^^^
+#  151 ┃
+#  152 ┃   buildMonoid = undefined :: BuildOptsMonoid
+#  153 ┃                 ^^^^^^^^^
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-H4Wfj/-480:14"
+  id = "OBS-STAN-0212-H4Wfj/-481:14"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\Types\BuildOpts.hs
 #
-#   479 ┃
-#   480 ┃   toMonoid = undefined :: TestOptsMonoid
-#   481 ┃              ^^^^^^^^^
+#   480 ┃
+#   481 ┃   toMonoid = undefined :: TestOptsMonoid
+#   482 ┃              ^^^^^^^^^
 
 # Anti-pattern: Pattern matching on '_'
 # Pattern matching on '_' for sum types can create maintainability issues

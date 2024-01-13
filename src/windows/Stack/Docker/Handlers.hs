@@ -27,13 +27,13 @@ handleSignals ::
 handleSignals docker keepStdinOpen containerID = do
   let args' = concat
         [ ["start"]
-        , ["-a" | not docker.dockerDetach]
+        , ["-a" | not docker.detach]
         , ["-i" | keepStdinOpen]
         , [containerID]
         ]
   finally
     (try $ proc "docker" args' $ runProcess_ . setDelegateCtlc False)
-    ( unless (docker.dockerPersist || docker.dockerDetach) $
+    ( unless (docker.persist || docker.detach) $
         readProcessNull "docker" ["rm", "-f", containerID]
           `catch` (\(_ :: ExitCodeException) -> pure ())
     )

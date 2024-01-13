@@ -45,7 +45,7 @@ import           Stack.Types.BuildOpts
 import           Stack.Types.ColorWhen ( ColorWhen (..) )
 import           Stack.Types.Config ( Config (..) )
 import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
-import           Stack.Types.Docker ( dockerEnable )
+import           Stack.Types.Docker ( DockerOpts (..) )
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Nix ( NixOpts (..) )
@@ -190,7 +190,7 @@ reexec inner = do
                    , muteMsg
                    ]
                 <> line
-  dockerEnable' <- asks (.docker.dockerEnable)
+  dockerEnable' <- asks (.docker.enable)
   case (nixEnable', dockerEnable') of
     (True, True) -> throwIO DockerAndNixInvalid
     (False, False) -> inner

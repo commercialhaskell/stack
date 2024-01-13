@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -240,41 +241,41 @@ instance Exception DockerException where
 
 -- | Docker configuration.
 data DockerOpts = DockerOpts
-  { dockerEnable :: !Bool
+  { enable :: !Bool
      -- ^ Is using Docker enabled?
-  , dockerImage :: !(Either SomeException String)
+  , image :: !(Either SomeException String)
      -- ^ Exact Docker image tag or ID.  Overrides docker-repo-*/tag.
-  , dockerRegistryLogin :: !Bool
+  , registryLogin :: !Bool
      -- ^ Does registry require login for pulls?
-  , dockerRegistryUsername :: !(Maybe String)
+  , registryUsername :: !(Maybe String)
      -- ^ Optional username for Docker registry.
-  , dockerRegistryPassword :: !(Maybe String)
+  , registryPassword :: !(Maybe String)
      -- ^ Optional password for Docker registry.
-  , dockerAutoPull :: !Bool
+  , autoPull :: !Bool
      -- ^ Automatically pull new images.
-  , dockerDetach :: !Bool
+  , detach :: !Bool
      -- ^ Whether to run a detached container
-  , dockerPersist :: !Bool
+  , persist :: !Bool
      -- ^ Create a persistent container (don't remove it when finished). Implied
      -- by `dockerDetach`.
-  , dockerContainerName :: !(Maybe String)
+  , containerName :: !(Maybe String)
      -- ^ Container name to use, only makes sense from command-line with
      -- `dockerPersist` or `dockerDetach`.
-  , dockerNetwork :: !(Maybe String)
+  , network :: !(Maybe String)
     -- ^ The network docker uses.
-  , dockerRunArgs :: ![String]
+  , runArgs :: ![String]
      -- ^ Arguments to pass directly to @docker run@.
-  , dockerMount :: ![Mount]
+  , mount :: ![Mount]
      -- ^ Volumes to mount in the container.
-  , dockerMountMode :: !(Maybe String)
+  , mountMode :: !(Maybe String)
      -- ^ Volume mount mode
-  , dockerEnv :: ![String]
+  , env :: ![String]
      -- ^ Environment variables to set in the container.
-  , dockerStackExe :: !(Maybe DockerStackExe)
+  , stackExe :: !(Maybe DockerStackExe)
      -- ^ Location of container-compatible Stack executable
-  , dockerSetUser :: !(Maybe Bool)
+  , setUser :: !(Maybe Bool)
     -- ^ Set in-container user to match host's
-  , dockerRequireDockerVersion :: !VersionRange
+  , requireDockerVersion :: !VersionRange
     -- ^ Require a version of Docker within this range.
   }
   deriving Show

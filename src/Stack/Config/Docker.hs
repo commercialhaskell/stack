@@ -69,61 +69,61 @@ dockerOptsFromMonoid ::
   -> DockerOptsMonoid
   -> m DockerOpts
 dockerOptsFromMonoid mproject maresolver dockerMonoid = do
-  let dockerImage =
+  let image =
         case getFirst dockerMonoid.dockerMonoidRepoOrImage of
           Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
-          Just (DockerMonoidImage image) -> pure image
+          Just (DockerMonoidImage image') -> pure image'
           Just (DockerMonoidRepo repo) ->
             case find (`elem` (":@" :: String)) repo of
               Nothing -> addDefaultTag repo mproject maresolver
               -- Repo already specified a tag or digest, so don't append default
               Just _ -> pure repo
-  let dockerEnable =
+  let enable =
         fromFirst
           (getAny dockerMonoid.dockerMonoidDefaultEnable)
           dockerMonoid.dockerMonoidEnable
-      dockerRegistryLogin =
+      registryLogin =
         fromFirst
           (isJust (emptyToNothing (getFirst dockerMonoid.dockerMonoidRegistryUsername)))
           dockerMonoid.dockerMonoidRegistryLogin
-      dockerRegistryUsername =
+      registryUsername =
         emptyToNothing (getFirst dockerMonoid.dockerMonoidRegistryUsername)
-      dockerRegistryPassword =
+      registryPassword =
         emptyToNothing (getFirst dockerMonoid.dockerMonoidRegistryPassword)
-      dockerAutoPull = fromFirstTrue dockerMonoid.dockerMonoidAutoPull
-      dockerDetach = fromFirstFalse dockerMonoid.dockerMonoidDetach
-      dockerPersist = fromFirstFalse dockerMonoid.dockerMonoidPersist
-      dockerContainerName =
+      autoPull = fromFirstTrue dockerMonoid.dockerMonoidAutoPull
+      detach = fromFirstFalse dockerMonoid.dockerMonoidDetach
+      persist = fromFirstFalse dockerMonoid.dockerMonoidPersist
+      containerName =
         emptyToNothing (getFirst dockerMonoid.dockerMonoidContainerName)
-      dockerNetwork = emptyToNothing (getFirst dockerMonoid.dockerMonoidNetwork)
-      dockerRunArgs = dockerMonoid.dockerMonoidRunArgs
-      dockerMount = dockerMonoid.dockerMonoidMount
-      dockerMountMode =
+      network = emptyToNothing (getFirst dockerMonoid.dockerMonoidNetwork)
+      runArgs = dockerMonoid.dockerMonoidRunArgs
+      mount = dockerMonoid.dockerMonoidMount
+      mountMode =
         emptyToNothing (getFirst dockerMonoid.dockerMonoidMountMode)
-      dockerEnv = dockerMonoid.dockerMonoidEnv
-      dockerSetUser = getFirst dockerMonoid.dockerMonoidSetUser
-      dockerRequireDockerVersion =
+      env = dockerMonoid.dockerMonoidEnv
+      setUser = getFirst dockerMonoid.dockerMonoidSetUser
+      requireDockerVersion =
         simplifyVersionRange
           dockerMonoid.dockerMonoidRequireDockerVersion.getIntersectingVersionRange
-      dockerStackExe = getFirst dockerMonoid.dockerMonoidStackExe
+      stackExe = getFirst dockerMonoid.dockerMonoidStackExe
   pure $ DockerOpts
-    { dockerEnable
-    , dockerImage
-    , dockerRegistryLogin
-    , dockerRegistryUsername
-    , dockerRegistryPassword
-    , dockerAutoPull
-    , dockerDetach
-    , dockerPersist
-    , dockerContainerName
-    , dockerNetwork
-    , dockerRunArgs
-    , dockerMount
-    , dockerMountMode
-    , dockerEnv
-    , dockerStackExe
-    , dockerSetUser
-    , dockerRequireDockerVersion
+    { enable
+    , image
+    , registryLogin
+    , registryUsername
+    , registryPassword
+    , autoPull
+    , detach
+    , persist
+    , containerName
+    , network
+    , runArgs
+    , mount
+    , mountMode
+    , env
+    , stackExe
+    , setUser
+    , requireDockerVersion
     }
  where
   emptyToNothing Nothing = Nothing
