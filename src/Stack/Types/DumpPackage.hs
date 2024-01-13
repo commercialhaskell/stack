@@ -43,9 +43,9 @@ data DumpPackage = DumpPackage
 -- | ghc-pkg has a notion of sublibraries when using ghc-pkg dump. We can only
 -- know it's different through the fields it shows.
 data SublibDump = SublibDump
-  { sdPackageName :: PackageName
+  { packageName :: PackageName
     -- ^ "package-name" field from ghc-pkg
-  , sdLibraryName :: StackUnqualCompName
+  , libraryName :: StackUnqualCompName
     -- ^ "lib-name" field from ghc-pkg
   }
   deriving (Eq, Read, Show)
@@ -56,4 +56,4 @@ dpParentLibIdent dp = case (dp.sublib, dp.packageIdent) of
   (Just sublibDump, PackageIdentifier _ v) ->
     Just $ PackageIdentifier libParentPackageName v
    where
-    SublibDump { sdPackageName = libParentPackageName } = sublibDump
+    SublibDump { packageName = libParentPackageName } = sublibDump

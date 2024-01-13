@@ -21,9 +21,7 @@ import           Stack.Prelude
 import           Stack.SourceMap ( getPLIVersion, loadVersion )
 import           Stack.Types.CompilerPaths ( getGhcPkgExe )
 import           Stack.Types.DumpPackage
-                   ( DumpPackage (..), SublibDump (..), dpParentLibIdent
-                   , sdPackageName
-                   )
+                   ( DumpPackage (..), SublibDump (..), dpParentLibIdent )
 import           Stack.Types.EnvConfig
                     ( HasEnvConfig, packageDatabaseDeps, packageDatabaseExtra
                     , packageDatabaseLocal
@@ -311,12 +309,12 @@ gatherAndTransformSubLoadHelper lh =
   onPreviousLoadHelper newVal _oldVal = newVal
   (key, value) = case lh.lhSublibrary of
     Nothing -> (rawPackageName, rawValue)
-    Just sd -> (sd.sdPackageName, updateAsSublib sd <$> rawValue)
+    Just sd -> (sd.packageName, updateAsSublib sd <$> rawValue)
   (rawPackageName, rawValue) = lh.lhPair
   updateAsSublib
       sd
       (Library (PackageIdentifier _sublibMungedPackageName version) libInfo)
     = Library
         (PackageIdentifier key version)
-        libInfo {iliSublib = Map.singleton sd.sdLibraryName libInfo.iliId}
+        libInfo {iliSublib = Map.singleton sd.libraryName libInfo.iliId}
   updateAsSublib _ v = v
