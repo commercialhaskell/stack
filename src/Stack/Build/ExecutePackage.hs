@@ -1,8 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 -- | Perform a build
 module Stack.Build.ExecutePackage
@@ -89,10 +90,11 @@ import           Stack.Prelude
 import           Stack.Types.Build
                    ( ConfigCache (..), PrecompiledCache (..)
                    , Task (..), TaskConfigOpts (..), TaskType (..)
-                   , configCacheComponents, taskAnyMissing, taskIsTarget
+                   , taskAnyMissing, taskIsTarget
                    , taskLocation, taskProvides
                    , taskTypePackageIdentifier
                    )
+import qualified  Stack.Types.Build as ConfigCache ( ConfigCache (..) )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig
@@ -194,18 +196,16 @@ getConfigCache ee task installedMap enableTest enableBench = do
       opts = mkOpts missing'
       allDeps = Set.fromList $ Map.elems missing' ++ Map.elems task.taskPresent
       cache = ConfigCache
-        { configCacheOpts = opts
-            { coNoDirs = opts.coNoDirs ++ map T.unpack extra
-            }
-        , configCacheDeps = allDeps
-        , configCacheComponents =
+        { opts = opts { coNoDirs = opts.coNoDirs ++ map T.unpack extra }
+        , deps = allDeps
+        , components =
             case task.taskType of
               TTLocalMutable lp ->
                 Set.map (encodeUtf8 . renderComponent) lp.components
               TTRemotePackage{} -> Set.empty
-        , configCacheHaddock = task.taskBuildHaddock
-        , configCachePkgSrc = task.taskCachePkgSrc
-        , configCachePathEnvVar = ee.pathEnvVar
+        , haddock = task.taskBuildHaddock
+        , pkgSrc = task.taskCachePkgSrc
+        , pathEnvVar = ee.pathEnvVar
         }
       allDepsMap = Map.union missing' task.taskPresent
   pure (allDepsMap, cache)
@@ -252,7 +252,8 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalfp task = do
         -- plan that we need to plan to build additional
         -- components. These components don't affect the actual
         -- package configuration.
-        let ignoreComponents cc = cc { configCacheComponents = Set.empty }
+        let ignoreComponents :: ConfigCache -> ConfigCache
+            ignoreComponents cc = cc { ConfigCache.components = Set.empty }
         -- Determine the old and new configuration in the local directory, to
         -- determine if we need to reconfigure.
         mOldConfigCache <- tryGetConfigCache pkgDir
@@ -270,7 +271,7 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalfp task = do
           || mOldCabalMod /= Just newCabalMod
           || mOldSetupConfigMod /= newSetupConfigMod
           || mOldProjectRoot /= Just newProjectRoot
-  let ConfigureOpts dirs nodirs = newConfigCache.configCacheOpts
+  let ConfigureOpts dirs nodirs = newConfigCache.opts
 
   when task.taskBuildTypeConfig $
     -- When build-type is Configure, we need to have a configure script in the
@@ -438,8 +439,8 @@ singleBuild
       TTRemotePackage Immutable _ loc -> do
         mpc <- readPrecompiledCache
                  loc
-                 cache.configCacheOpts
-                 cache.configCacheHaddock
+                 cache.opts
+                 cache.haddock
         case mpc of
           Nothing -> pure Nothing
           -- Only pay attention to precompiled caches that refer to packages
@@ -796,8 +797,8 @@ singleBuild
         writePrecompiledCache
           ee.baseConfigOpts
           loc
-          cache.configCacheOpts
-          cache.configCacheHaddock
+          cache.opts
+          cache.haddock
           mpkgid
           subLibsPkgIds
           (buildableExes package)

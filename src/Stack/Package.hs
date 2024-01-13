@@ -52,6 +52,7 @@ import           Distribution.PackageDescription
                    , buildType, depPkgName, depVerRange
                    )
 import qualified Distribution.PackageDescription as Executable
+                   ( Executable (..) )
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
 import           Distribution.System ( OS (..), Arch, Platform (..) )
 import           Distribution.Text ( display )
