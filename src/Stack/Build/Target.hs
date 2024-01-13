@@ -537,7 +537,7 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   logDebug "Parsing the targets"
   bconfig <- view buildConfigL
   workingDir <- getCurrentDir
-  locals <- view $ buildConfigL . to (.bcSMWanted.smwProject)
+  locals <- view $ buildConfigL . to (.smWanted.smwProject)
   let (textTargets', rawInput) = getRawInput boptscli locals
 
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
@@ -582,7 +582,7 @@ parseTargets needTargets haddockDeps boptscli smActual = do
     }
  where
   bcImplicitGlobal bconfig =
-    case bconfig.bcConfig.project of
+    case bconfig.config.project of
       PCProject _ -> False
       PCGlobalProject -> True
       PCNoProject _ -> False

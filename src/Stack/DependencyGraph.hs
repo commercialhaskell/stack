@@ -87,7 +87,7 @@ createPrunedDependencyGraph ::
        (Set PackageName, Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
   localNames <-
-    view $ buildConfigL . to (Map.keysSet . (.bcSMWanted.smwProject))
+    view $ buildConfigL . to (Map.keysSet . (.smWanted.smwProject))
   logDebug "Creating dependency graph"
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotOpts.dotIncludeBase
@@ -110,14 +110,14 @@ withDotConfig opts inner =
  where
   withGlobalHints = do
     bconfig <- view buildConfigL
-    globals <- globalsFromHints bconfig.bcSMWanted.smwCompiler
+    globals <- globalsFromHints bconfig.smWanted.smwCompiler
     fakeGhcPkgId <- parseGhcPkgId "ignored"
     actual <- either throwIO pure $
-      wantedToActual bconfig.bcSMWanted.smwCompiler
+      wantedToActual bconfig.smWanted.smwCompiler
     let smActual = SMActual
           { smaCompiler = actual
-          , smaProject = bconfig.bcSMWanted.smwProject
-          , smaDeps =  bconfig.bcSMWanted.smwDeps
+          , smaProject = bconfig.smWanted.smwProject
+          , smaDeps =  bconfig.smWanted.smwDeps
           , smaGlobal = Map.mapWithKey toDump globals
           }
         toDump :: PackageName -> Version -> DumpPackage
@@ -392,7 +392,7 @@ instance HasProcessContext DotConfig where
   processContextL = runnerL . processContextL
 
 instance HasConfig DotConfig where
-  configL = buildConfigL . lens (.bcConfig) (\x y -> x { bcConfig = y })
+  configL = buildConfigL . lens (.config) (\x y -> x { config = y })
   {-# INLINE configL #-}
 
 instance HasBuildConfig DotConfig where

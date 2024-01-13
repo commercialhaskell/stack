@@ -1141,7 +1141,7 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
              \to ghci via -package flags."
       ]
   when (null localTargets && isNothing mfileTargets) $ do
-    smWanted <- view $ buildConfigL . to (.bcSMWanted)
+    smWanted <- view $ buildConfigL . to (.smWanted)
     stackYaml <- view stackYamlL
     prettyNote $ vsep
       [ flow "No local targets specified, so a plain ghci will be started with \

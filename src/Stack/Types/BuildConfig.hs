@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeFamilies        #-}
 
@@ -30,19 +31,19 @@ import           Stack.Types.Storage ( ProjectStorage )
 --
 -- These are the components which know nothing about local configuration.
 data BuildConfig = BuildConfig
-  { bcConfig     :: !Config
-  , bcSMWanted :: !SMWanted
-  , bcExtraPackageDBs :: ![Path Abs Dir]
+  { config     :: !Config
+  , smWanted :: !SMWanted
+  , extraPackageDBs :: ![Path Abs Dir]
     -- ^ Extra package databases
-  , bcStackYaml  :: !(Path Abs File)
+  , stackYaml  :: !(Path Abs File)
     -- ^ Location of the stack.yaml file.
     --
     -- Note: if the STACK_YAML environment variable is used, this may be
     -- different from projectRootL </> "stack.yaml" if a different file
     -- name is used.
-  , bcProjectStorage :: !ProjectStorage
+  , projectStorage :: !ProjectStorage
   -- ^ Database connection pool for project Stack database
-  , bcCurator :: !(Maybe Curator)
+  , curator :: !(Maybe Curator)
   }
 
 instance HasPlatform BuildConfig where
@@ -62,7 +63,7 @@ instance HasPantryConfig BuildConfig where
   pantryConfigL = configL . pantryConfigL
 
 instance HasConfig BuildConfig where
-  configL = lens (.bcConfig) (\x y -> x { bcConfig = y })
+  configL = lens (.config) (\x y -> x { config = y })
 
 instance HasRunner BuildConfig where
   runnerL = configL . runnerL
@@ -85,7 +86,7 @@ instance HasBuildConfig BuildConfig where
   {-# INLINE buildConfigL #-}
 
 stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
-stackYamlL = buildConfigL . lens (.bcStackYaml) (\x y -> x { bcStackYaml = y })
+stackYamlL = buildConfigL . lens (.stackYaml) (\x y -> x { stackYaml = y })
 
 -- | Directory containing the project's stack.yaml file
 projectRootL :: HasBuildConfig env => Getting r env (Path Abs Dir)
@@ -101,4 +102,4 @@ getProjectWorkDir = do
 -- | The compiler specified by the @SnapshotDef@. This may be different from the
 -- actual compiler used!
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
-wantedCompilerVersionL = buildConfigL . to (.bcSMWanted.smwCompiler)
+wantedCompilerVersionL = buildConfigL . to (.smWanted.smwCompiler)

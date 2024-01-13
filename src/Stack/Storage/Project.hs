@@ -98,7 +98,7 @@ withProjectStorage ::
   => ReaderT SqlBackend (RIO env) a
   -> RIO env a
 withProjectStorage inner = do
-  storage <- view (buildConfigL . to (.bcProjectStorage.unProjectStorage))
+  storage <- view (buildConfigL . to (.projectStorage.unProjectStorage))
   withStorage_ storage inner
 
 -- | Key used to retrieve configuration or flag cache

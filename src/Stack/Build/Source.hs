@@ -101,7 +101,7 @@ loadSourceMap smt boptsCli sma = do
   bconfig <- view buildConfigL
   let compiler = sma.smaCompiler
       project = M.map applyOptsFlagsPP sma.smaProject
-      bopts = bconfig.bcConfig.build
+      bopts = bconfig.config.build
       applyOptsFlagsPP p@ProjectPackage{ppCommon = c} =
         p{ppCommon = applyOptsFlags (M.member c.cpName smt.smtTargets) True c}
       deps0 = smt.smtDeps <> sma.smaDeps
@@ -302,7 +302,7 @@ loadLocalPackage pp = do
   sm <- view sourceMapL
   let common = pp.ppCommon
   bopts <- view buildOptsL
-  mcurator <- view $ buildConfigL . to (.bcCurator)
+  mcurator <- view $ buildConfigL . to (.curator)
   config <- getPackageConfig
               common.cpFlags
               common.cpGhcOptions
