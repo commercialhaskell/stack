@@ -210,9 +210,8 @@ ghciCmd ghciOpts =
         bopts <- view buildOptsL
         -- override env so running of tests and benchmarks is disabled
         let boptsLocal = bopts
-              { boptsTestOpts = bopts.boptsTestOpts { toDisableRun = True }
-              , boptsBenchmarkOpts =
-                  bopts.boptsBenchmarkOpts { beoDisableRun = True }
+              { testOpts = bopts.testOpts { toDisableRun = True }
+              , benchmarkOpts = bopts.benchmarkOpts { beoDisableRun = True }
               }
         local (set buildOptsL boptsLocal) (ghci ghciOpts)
 
@@ -959,8 +958,8 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
      )
   <> map CExe buildableExes'
   <> map CSubLib buildableSubLibs
-  <> (if bopts.boptsTests then map CTest buildableTestSuites else [])
-  <> (if bopts.boptsBenchmarks then map CBench buildableBenchmarks else [])
+  <> (if bopts.tests then map CTest buildableTestSuites else [])
+  <> (if bopts.benchmarks then map CBench buildableBenchmarks else [])
  where
   buildableForeignLibs' = S.toList $ buildableForeignLibs pkg
   buildableSubLibs = getBuildableListText pkg.subLibraries

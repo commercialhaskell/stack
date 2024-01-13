@@ -126,7 +126,7 @@ loadSourceMap smt boptsCli sma = do
                   cabalConfigOpts ++ common.cpCabalConfigOpts
               , cpHaddocks =
                   if isTarget
-                    then bopts.boptsHaddock
+                    then bopts.haddock
                     else shouldHaddockDeps bopts
               }
       packageCliFlags = Map.fromList $
@@ -261,11 +261,11 @@ generalGhcOptions bconfig boptsCli isTarget isLocal = concat
   , if isTarget
       then Map.findWithDefault [] AGOTargets config.ghcOptionsByCat
       else []
-  , concat [["-fhpc"] | isLocal && bopts.boptsTestOpts.toCoverage]
-  , if bopts.boptsLibProfile || bopts.boptsExeProfile
+  , concat [["-fhpc"] | isLocal && bopts.testOpts.toCoverage]
+  , if bopts.libProfile || bopts.exeProfile
       then ["-fprof-auto", "-fprof-cafs"]
       else []
-  , [ "-g" | not $ bopts.boptsLibStrip || bopts.boptsExeStrip ]
+  , [ "-g" | not $ bopts.libStrip || bopts.exeStrip ]
   , if includeExtraOptions
       then boptsCli.boptsCLIGhcOptions
       else []
@@ -319,11 +319,11 @@ loadLocalPackage pp = do
             in  (e, t, b)
           Just (TargetAll _packageType) ->
             ( buildableExes pkg
-            , if    bopts.boptsTests
+            , if    bopts.tests
                  && maybe True (Set.notMember name . (.curatorSkipTest)) mcurator
                 then buildableTestSuites pkg
                 else Set.empty
-            , if    bopts.boptsBenchmarks
+            , if    bopts.benchmarks
                  && maybe
                       True
                       (Set.notMember name . (.curatorSkipBenchmark))
@@ -345,7 +345,7 @@ loadLocalPackage pp = do
           || not (null pkg.subLibraries)
 
       filterSkippedComponents =
-        Set.filter (not . (`elem` bopts.boptsSkipComponents))
+        Set.filter (not . (`elem` bopts.skipComponents))
 
       (exes, tests, benches) = ( filterSkippedComponents exeCandidates
                                , filterSkippedComponents testCandidates
@@ -410,7 +410,7 @@ loadLocalPackage pp = do
     , testBench = btpkg
     , componentFiles = componentFiles
     , buildHaddocks = pp.ppCommon.cpHaddocks
-    , forceDirty = bopts.boptsForceDirty
+    , forceDirty = bopts.forceDirty
     , dirtyFiles = dirtyFiles
     , newBuildCaches = newBuildCaches
     , cabalFile = pp.ppCabalFP

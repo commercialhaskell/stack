@@ -552,7 +552,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
   toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dp.ghcPkgId, dp))
 
   createTempDirFunction
-    | bopts.boptsKeepTmpFiles = withKeepSystemTempDir
+    | bopts.keepTmpFiles = withKeepSystemTempDir
     | otherwise = withSystemTempDir
 
   dumpLogs :: TChan (Path Abs Dir, Path Abs File) -> Int -> RIO env ()
@@ -722,7 +722,7 @@ copyExecutables exes | Map.null exes = pure ()
 copyExecutables exes = do
   snapBin <- (</> bindirSuffix) <$> installationRootDeps
   localBin <- (</> bindirSuffix) <$> installationRootLocal
-  compilerSpecific <- (.boptsInstallCompilerTool) <$> view buildOptsL
+  compilerSpecific <- (.installCompilerTool) <$> view buildOptsL
   destDir <- if compilerSpecific
                then bindirCompilerTools
                else view $ configL . to (.localBin)
@@ -800,7 +800,7 @@ executePlan' :: HasEnvConfig env
              -> ExecuteEnv
              -> RIO env ()
 executePlan' installedMap0 targets plan ee = do
-  when ee.eeBuildOpts.boptsTestOpts.toCoverage deleteHpcReports
+  when ee.eeBuildOpts.testOpts.toCoverage deleteHpcReports
   cv <- view actualCompilerVersionL
   case nonEmpty $ Map.toList plan.planUnregisterLocal of
     Nothing -> pure ()
@@ -830,7 +830,7 @@ executePlan' installedMap0 targets plan ee = do
   threads <- view $ configL . to (.jobs)
   let keepGoing = fromMaybe
         (not (Map.null plan.planFinals))
-        ee.eeBuildOpts.boptsKeepGoing
+        ee.eeBuildOpts.keepGoing
   terminal <- view terminalL
   terminalWidth <- view termWidthL
   errs <- liftIO $ runActions threads keepGoing actions $
@@ -850,7 +850,7 @@ executePlan' installedMap0 targets plan ee = do
                     nowBuilding names = mconcat $
                         ": "
                       : L.intersperse ", " (map fromPackageName names)
-                    progressFormat = ee.eeBuildOpts.boptsProgressBar
+                    progressFormat = ee.eeBuildOpts.progressBar
                     progressLine prev' total' =
                          "Progress "
                       <> display prev' <> "/" <> display total'
@@ -870,13 +870,13 @@ executePlan' installedMap0 targets plan ee = do
                   pure done
                 loop done
       when (total > 1) $ loop 0
-  when ee.eeBuildOpts.boptsTestOpts.toCoverage $ do
+  when ee.eeBuildOpts.testOpts.toCoverage $ do
     generateHpcUnifiedReport
     generateHpcMarkupIndex
   unless (null errs) $
     prettyThrowM $ ExecutionFailure errs
-  when ee.eeBuildOpts.boptsHaddock $ do
-    if ee.eeBuildOpts.boptsHaddockForHackage
+  when ee.eeBuildOpts.haddock $ do
+    if ee.eeBuildOpts.haddockForHackage
       then
         generateLocalHaddockForHackageArchives ee.eeLocals
       else do
@@ -893,7 +893,7 @@ executePlan' installedMap0 targets plan ee = do
           ee.eeBaseConfigOpts
           ee.eeGlobalDumpPkgs
           snapshotDumpPkgs
-        when ee.eeBuildOpts.boptsOpenHaddocks $ do
+        when ee.eeBuildOpts.openHaddocks $ do
           let planPkgs, localPkgs, installedPkgs, availablePkgs
                 :: Map PackageName (PackageIdentifier, InstallLocation)
               planPkgs =
@@ -1046,8 +1046,8 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
   withLock Nothing f = f
   withLock (Just lock) f = withMVar lock $ \() -> f
   bopts = ee.eeBuildOpts
-  topts = bopts.boptsTestOpts
-  beopts = bopts.boptsBenchmarkOpts
+  topts = bopts.testOpts
+  beopts = bopts.benchmarkOpts
 
 -- | Generate the ConfigCache
 getConfigCache ::
@@ -1135,7 +1135,7 @@ ensureConfig newConfigCache pkgDir ee announce cabal cabalfp task = do
   taskAnyMissingHackEnabled <-
     view $ actualCompilerVersionL . to getGhcVersion . to (< mkVersion [8, 4])
   needConfig <-
-    if    ee.eeBuildOpts.boptsReconfigure
+    if    ee.eeBuildOpts.reconfigure
           -- The reason 'taskAnyMissing' is necessary is a bug in Cabal. See:
           -- <https://github.com/haskell/cabal/issues/4728#issuecomment-337937673>.
           -- The problem is that Cabal may end up generating the same package ID
@@ -1401,7 +1401,7 @@ withSingleContext
 
     -- If the user requested interleaved output, dump to the console with a
     -- prefix.
-    | ee.eeBuildOpts.boptsInterleavedOutput = inner $
+    | ee.eeBuildOpts.interleavedOutput = inner $
         OTConsole $ Just $ fromString (packageNamePrefix ee package.name)
 
     -- Neither condition applies, dump to a file.
@@ -1677,7 +1677,7 @@ withSingleContext
                   (Set.insert package.name oldCustomBuilt, ())
               pure outputFile
       let cabalVerboseArg =
-            let CabalVerbosity cv = ee.eeBuildOpts.boptsCabalVerbose
+            let CabalVerbosity cv = ee.eeBuildOpts.cabalVerbose
             in  "--verbose=" <> showForCabal cv
       runExe exeName $ cabalVerboseArg:setupArgs
 
@@ -1740,7 +1740,7 @@ singleBuild
     && maybe True (Set.notMember pname . (.curatorSkipHaddock)) mcurator
   expectHaddockFailure =
       maybe False (Set.member pname . (.curatorExpectHaddockFailure))
-  isHaddockForHackage = ee.eeBuildOpts.boptsHaddockForHackage
+  isHaddockForHackage = ee.eeBuildOpts.haddockForHackage
   fulfillHaddockExpectations mcurator action
     | expectHaddockFailure mcurator = do
         eres <- tryAny $ action KeepOpen
@@ -2046,13 +2046,13 @@ singleBuild
                        , "--html-location=../$pkg-$version/"
                        ]
                      , [ "--haddock-option=--hyperlinked-source"
-                       | ee.eeBuildOpts.boptsHaddockHyperlinkSource
+                       | ee.eeBuildOpts.haddockHyperlinkSource
                        ]
-                     , [ "--internal" | ee.eeBuildOpts.boptsHaddockInternal  ]
+                     , [ "--internal" | ee.eeBuildOpts.haddockInternal  ]
                      , quickjump
                      ]
               <> [ [ "--haddock-option=" <> opt
-                   | opt <- ee.eeBuildOpts.boptsHaddockOpts.hoAdditionalArgs
+                   | opt <- ee.eeBuildOpts.haddockOpts.hoAdditionalArgs
                    ]
                  ]
               )
@@ -2077,7 +2077,7 @@ singleBuild
       when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
     -- copy ddump-* files
-    case T.unpack <$> ee.eeBuildOpts.boptsDdumpDir of
+    case T.unpack <$> ee.eeBuildOpts.ddumpDir of
       Just ddumpPath | buildingFinals && not (null ddumpPath) -> do
         distDir <- distRelativeDir
         ddumpDir <- parseRelDir ddumpPath
@@ -2703,7 +2703,7 @@ extraBuildOptions wc bopts = do
   colorOpt <- appropriateGhcColorFlag
   let optsFlag = compilerOptionsCabalFlag wc
       baseOpts = maybe "" (" " ++) colorOpt
-  if bopts.boptsTestOpts.toCoverage
+  if bopts.testOpts.toCoverage
     then do
       hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
       pure [optsFlag, "-hpcdir " ++ hpcIndexDir ++ baseOpts]

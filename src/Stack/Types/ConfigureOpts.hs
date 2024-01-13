@@ -105,14 +105,14 @@ configureOptsNoDir ::
 configureOptsNoDir econfig bco deps isLocal package = concat
   [ depOptions
   , [ "--enable-library-profiling"
-    | bopts.boptsLibProfile || bopts.boptsExeProfile
+    | bopts.libProfile || bopts.exeProfile
     ]
-  , ["--enable-profiling" | bopts.boptsExeProfile && isLocal]
-  , ["--enable-split-objs" | bopts.boptsSplitObjs]
+  , ["--enable-profiling" | bopts.exeProfile && isLocal]
+  , ["--enable-split-objs" | bopts.splitObjs]
   , [ "--disable-library-stripping"
-    | not $ bopts.boptsLibStrip || bopts.boptsExeStrip
+    | not $ bopts.libStrip || bopts.exeStrip
     ]
-  , ["--disable-executable-stripping" | not bopts.boptsExeStrip && isLocal]
+  , ["--disable-executable-stripping" | not bopts.exeStrip && isLocal]
   , map (\(name,enabled) ->
                      "-f" <>
                      (if enabled

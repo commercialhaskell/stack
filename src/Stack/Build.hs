@@ -187,7 +187,7 @@ build msetLocalFiles = do
     warnAboutSplitObjs bopts
     warnIfExecutablesWithSameNameCouldBeOverwritten locals plan
 
-    when bopts.boptsPreFetch $
+    when bopts.preFetch $
         preFetch plan
 
     if boptsCli.boptsCLIDryrun
@@ -308,7 +308,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   collect = Map.mapMaybe nonEmpty . Map.fromDistinctAscList . groupSort
 
 warnAboutSplitObjs :: HasTerm env => BuildOpts -> RIO env ()
-warnAboutSplitObjs bopts |  bopts.boptsSplitObjs =
+warnAboutSplitObjs bopts |  bopts.splitObjs =
   prettyWarnL
     [ flow "Building with"
     , style Shell "--split-objs"

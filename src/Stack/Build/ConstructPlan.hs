@@ -179,8 +179,8 @@ constructPlan
           , planUnregisterLocal =
               mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps
           , planInstallExes =
-              if    baseConfigOpts0.bcoBuildOpts.boptsInstallExes
-                 || baseConfigOpts0.bcoBuildOpts.boptsInstallCompilerTool
+              if    baseConfigOpts0.bcoBuildOpts.installExes
+                 || baseConfigOpts0.bcoBuildOpts.installCompilerTool
                 then installExes
                 else Map.empty
           }
