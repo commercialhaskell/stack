@@ -35,6 +35,9 @@ module Stack.Types.Build
   , toCachePkgSrc
   , FileCacheInfo (..)
   , PrecompiledCache (..)
+  , ExcludeTHLoading (..)
+  , ConvertPathsToAbsolute (..)
+  , KeepOutputOpen (..)
   ) where
 
 import           Data.Aeson ( ToJSON, FromJSON )
@@ -243,3 +246,18 @@ data PrecompiledCache base = PrecompiledCache
 instance NFData (PrecompiledCache Abs)
 
 instance NFData (PrecompiledCache Rel)
+
+data ExcludeTHLoading
+  = ExcludeTHLoading
+  | KeepTHLoading
+
+data ConvertPathsToAbsolute
+  = ConvertPathsToAbsolute
+  | KeepPathsAsIs
+
+-- | special marker for expected failures in curator builds, using those we need
+-- to keep log handle open as build continues further even after a failure
+data KeepOutputOpen
+  = KeepOpen
+  | CloseOnException
+  deriving Eq
