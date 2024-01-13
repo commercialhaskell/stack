@@ -140,12 +140,12 @@ build msetLocalFiles = do
   ghcVersion <- view $ actualCompilerVersionL . to getGhcVersion
   fixCodePage mcp ghcVersion $ do
     bopts <- view buildOptsL
-    sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
+    sourceMap <- view $ envConfigL . to (.sourceMap)
     locals <- projectLocalPackages
     depsLocals <- localDependencies
     let allLocals = locals <> depsLocals
 
-    boptsCli <- view $ envConfigL . to (.envConfigBuildOptsCLI)
+    boptsCli <- view $ envConfigL . to (.buildOptsCLI)
     -- Set local files, necessary for file watching
     stackYaml <- view stackYamlL
     for_ msetLocalFiles $ \setLocalFiles -> do

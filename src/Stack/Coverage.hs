@@ -372,7 +372,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
           : mkNarrativeList (Just Target) False
               (map (fromString . T.unpack) targetNames :: [StyleDoc])
       targets <-
-        view $ envConfigL . to (.envConfigSourceMap.smTargets.smtTargets)
+        view $ envConfigL . to (.sourceMap.smTargets.smtTargets)
       fmap concat $ forM (Map.toList targets) $ \(name, target) ->
         case target of
           TargetAll PTDependency -> prettyThrowIO $ NotLocalPackage name

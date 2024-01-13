@@ -330,7 +330,7 @@ getPackagesFromModuleNames mns = do
 
 hashSnapshot :: RIO EnvConfig SnapshotCacheHash
 hashSnapshot = do
-  sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
+  sourceMap <- view $ envConfigL . to (.sourceMap)
   compilerInfo <- getCompilerInfo
   let eitherPliHash (pn, dep)
         | PLImmutable pli <- dep.dpLocation = Right $ immutableLocSha pli
@@ -346,7 +346,7 @@ hashSnapshot = do
 
 mapSnapshotPackageModules :: RIO EnvConfig (Map PackageName (Set ModuleName))
 mapSnapshotPackageModules = do
-  sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
+  sourceMap <- view $ envConfigL . to (.sourceMap)
   installMap <- toInstallMap sourceMap
   (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
     getInstalled installMap

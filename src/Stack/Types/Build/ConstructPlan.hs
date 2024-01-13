@@ -200,8 +200,8 @@ instance HasProcessContext Ctx where
 
 instance HasBuildConfig Ctx where
   buildConfigL = envConfigL . lens
-    (.envConfigBuildConfig)
-    (\x y -> x { envConfigBuildConfig = y })
+    (.buildConfig)
+    (\x y -> x { buildConfig = y })
 
 instance HasSourceMap Ctx where
   sourceMapL = envConfigL . sourceMapL

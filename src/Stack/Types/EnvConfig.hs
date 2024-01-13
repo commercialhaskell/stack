@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.EnvConfig
@@ -63,12 +64,12 @@ import           Stack.Types.SourceMap
 
 -- | Configuration after the environment has been setup.
 data EnvConfig = EnvConfig
-  { envConfigBuildConfig :: !BuildConfig
-  , envConfigBuildOptsCLI :: !BuildOptsCLI
-  , envConfigFileDigestCache :: !FileDigestCache
-  , envConfigSourceMap :: !SourceMap
-  , envConfigSourceMapHash :: !SourceMapHash
-  , envConfigCompilerPaths :: !CompilerPaths
+  { buildConfig :: !BuildConfig
+  , buildOptsCLI :: !BuildOptsCLI
+  , fileDigestCache :: !FileDigestCache
+  , sourceMap :: !SourceMap
+  , sourceMapHash :: !SourceMapHash
+  , compilerPaths :: !CompilerPaths
   }
 
 instance HasConfig EnvConfig where
@@ -77,8 +78,8 @@ instance HasConfig EnvConfig where
 
 instance HasBuildConfig EnvConfig where
   buildConfigL = envConfigL . lens
-    (.envConfigBuildConfig)
-    (\x y -> x { envConfigBuildConfig = y })
+    (.buildConfig)
+    (\x y -> x { buildConfig = y })
 
 instance HasPlatform EnvConfig where
   platformL = configL . platformL
@@ -97,7 +98,7 @@ instance HasPantryConfig EnvConfig where
   pantryConfigL = configL . pantryConfigL
 
 instance HasCompiler EnvConfig where
-  compilerPathsL = to (.envConfigCompilerPaths)
+  compilerPathsL = to (.compilerPaths)
 
 instance HasRunner EnvConfig where
   runnerL = configL . runnerL
@@ -123,7 +124,7 @@ class HasSourceMap env where
   sourceMapL :: Lens' env SourceMap
 
 instance HasSourceMap EnvConfig where
-  sourceMapL = lens (.envConfigSourceMap) (\x y -> x { envConfigSourceMap = y })
+  sourceMapL = lens (.sourceMap) (\x y -> x { sourceMap = y })
 
 shouldForceGhcColorFlag ::
      (HasEnvConfig env, HasRunner env)
@@ -177,7 +178,7 @@ hoogleDatabasePath = do
 platformSnapAndCompilerRel :: HasEnvConfig env => RIO env (Path Rel Dir)
 platformSnapAndCompilerRel = do
   platform <- platformGhcRelDir
-  smh <- view $ envConfigL . to (.envConfigSourceMapHash)
+  smh <- view $ envConfigL . to (.sourceMapHash)
   name <- smRelDir smh
   ghc <- compilerVersionDir
   useShaPathOnWindows (platform </> name </> ghc)

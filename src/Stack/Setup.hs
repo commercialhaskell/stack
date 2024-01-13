@@ -691,12 +691,12 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
   fileDigestCache <- newFileDigestCache
 
   let envConfig0 = EnvConfig
-        { envConfigBuildConfig = bc
-        , envConfigBuildOptsCLI = boptsCLI
-        , envConfigFileDigestCache = fileDigestCache
-        , envConfigSourceMap = sourceMap
-        , envConfigSourceMapHash = sourceMapHash
-        , envConfigCompilerPaths = compilerPaths
+        { buildConfig = bc
+        , buildOptsCLI = boptsCLI
+        , fileDigestCache = fileDigestCache
+        , sourceMap = sourceMap
+        , sourceMapHash = sourceMapHash
+        , compilerPaths = compilerPaths
         }
 
   -- extra installation bin directories
@@ -797,18 +797,18 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
 
   envOverride <- liftIO $ getProcessContext' minimalEnvSettings
   pure EnvConfig
-    { envConfigBuildConfig = bc
+    { buildConfig = bc
         { config = addIncludeLib ghcBin
                  $ set processContextL envOverride
                     (view configL bc)
             { processContextSettings = getProcessContext'
             }
         }
-    , envConfigBuildOptsCLI = boptsCLI
-    , envConfigFileDigestCache = fileDigestCache
-    , envConfigSourceMap = sourceMap
-    , envConfigSourceMapHash = sourceMapHash
-    , envConfigCompilerPaths = compilerPaths
+    , buildOptsCLI = boptsCLI
+    , fileDigestCache = fileDigestCache
+    , sourceMap = sourceMap
+    , sourceMapHash = sourceMapHash
+    , compilerPaths = compilerPaths
     }
 
 -- | A modified env which we know has an installed compiler on the PATH.
@@ -947,9 +947,9 @@ rebuildEnv ::
   -> BuildOptsCLI
   -> RIO env EnvConfig
 rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
-  let bc = envConfig.envConfigBuildConfig
-      cp = envConfig.envConfigCompilerPaths
-      compilerVer = envConfig.envConfigSourceMap.smCompiler
+  let bc = envConfig.buildConfig
+      cp = envConfig.compilerPaths
+      compilerVer = envConfig.sourceMap.smCompiler
   runRIO (WithGHC cp bc) $ do
     smActual <- actualFromGhc bc.smWanted compilerVer
     let actualPkgs =
@@ -959,8 +959,8 @@ rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
     pure $ envConfig
-      { envConfigSourceMap = sourceMap
-      , envConfigBuildOptsCLI = boptsCLI
+      { sourceMap = sourceMap
+      , buildOptsCLI = boptsCLI
       }
 
 -- | Some commands (script, ghci and exec) set targets dynamically
@@ -973,7 +973,7 @@ withNewLocalBuildTargets ::
 withNewLocalBuildTargets targets f = do
   envConfig <- view envConfigL
   haddockDeps <- view $ configL . to (.build) . to shouldHaddockDeps
-  let boptsCLI = envConfig.envConfigBuildOptsCLI
+  let boptsCLI = envConfig.buildOptsCLI
   envConfig' <- rebuildEnv envConfig NeedTargets haddockDeps $
                 boptsCLI {boptsCLITargets = targets}
   local (set envConfigL envConfig') f

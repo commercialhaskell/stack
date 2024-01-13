@@ -75,14 +75,14 @@ import           System.IO.Error ( isDoesNotExistError )
 -- | loads and returns project packages
 projectLocalPackages :: HasEnvConfig env => RIO env [LocalPackage]
 projectLocalPackages = do
-  sm <- view $ envConfigL . to (.envConfigSourceMap)
+  sm <- view $ envConfigL . to (.sourceMap)
   for (toList sm.smProject) loadLocalPackage
 
 -- | loads all local dependencies - project packages and local extra-deps
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
 localDependencies = do
   bopts <- view $ configL . to (.build)
-  sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
+  sourceMap <- view $ envConfigL . to (.sourceMap)
   forMaybeM (Map.elems sourceMap.smDeps) $ \dp ->
     case dp.dpLocation of
       PLMutable dir -> do
@@ -516,7 +516,7 @@ getPackageFilesForTargets pkg cabalFP nonLibComponents = do
 -- | Get file digest, if it exists
 getFileDigestMaybe :: HasEnvConfig env => FilePath -> RIO env (Maybe SHA256)
 getFileDigestMaybe fp = do
-  cache <- view $ envConfigL . to (.envConfigFileDigestCache)
+  cache <- view $ envConfigL . to (.fileDigestCache)
   catch
     (Just <$> readFileDigest cache fp)
     (\e -> if isDoesNotExistError e then pure Nothing else throwM e)

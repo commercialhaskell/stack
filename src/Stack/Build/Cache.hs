@@ -132,7 +132,7 @@ buildCacheFile :: (HasEnvConfig env, MonadReader env m, MonadThrow m)
                -> m (Path Abs File)
 buildCacheFile dir component = do
   cachesDir <- buildCachesDir dir
-  smh <- view $ envConfigL . to (.envConfigSourceMapHash)
+  smh <- view $ envConfigL . to (.sourceMapHash)
   smDirName <- smRelDir smh
   let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
   cacheFileName <- parseRelFile $ case component of

@@ -225,7 +225,7 @@ ghci opts = do
         { boptsCLITargets = []
         , boptsCLIFlags = opts.ghciFlags
         }
-  sourceMap <- view $ envConfigL . to (.envConfigSourceMap)
+  sourceMap <- view $ envConfigL . to (.sourceMap)
   installMap <- toInstallMap sourceMap
   locals <- projectLocalPackages
   depLocals <- localDependencies
@@ -418,7 +418,7 @@ getAllLocalTargets ghciOpts targets0 mainIsTargets localMap = do
   -- independently in order to handle the case where no targets are
   -- specified.
   let targets = maybe targets0 (unionTargets targets0) mainIsTargets
-  packages <- view $ envConfigL . to (.envConfigSourceMap.smProject)
+  packages <- view $ envConfigL . to (.sourceMap.smProject)
   -- Find all of the packages that are directly demanded by the
   -- targets.
   let directlyWanted = flip mapMaybe (M.toList packages) $
@@ -843,7 +843,7 @@ loadGhciPkgDesc ::
 loadGhciPkgDesc buildOptsCLI name cabalfp target = do
   econfig <- view envConfigL
   compilerVersion <- view actualCompilerVersionL
-  let sm = econfig.envConfigSourceMap
+  let sm = econfig.sourceMap
       -- Currently this source map is being build with
       -- the default targets
       sourceMapGhcOptions = fromMaybe [] $
