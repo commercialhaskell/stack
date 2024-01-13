@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE TypeFamilies        #-}
@@ -141,32 +142,32 @@ data ExecutableBuildStatus
   deriving (Eq, Ord, Show)
 
 data ExecuteEnv = ExecuteEnv
-  { eeInstallLock    :: !(MVar ())
-  , eeBuildOpts      :: !BuildOpts
-  , eeBuildOptsCLI   :: !BuildOptsCLI
-  , eeBaseConfigOpts :: !BaseConfigOpts
-  , eeGhcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
-  , eeTempDir        :: !(Path Abs Dir)
-  , eeSetupHs        :: !(Path Abs File)
+  { installLock    :: !(MVar ())
+  , buildOpts      :: !BuildOpts
+  , buildOptsCLI   :: !BuildOptsCLI
+  , baseConfigOpts :: !BaseConfigOpts
+  , ghcPkgIds      :: !(TVar (Map PackageIdentifier Installed))
+  , tempDir        :: !(Path Abs Dir)
+  , setupHs        :: !(Path Abs File)
     -- ^ Temporary Setup.hs for simple builds
-  , eeSetupShimHs    :: !(Path Abs File)
+  , setupShimHs    :: !(Path Abs File)
     -- ^ Temporary SetupShim.hs, to provide access to initial-build-steps
-  , eeSetupExe       :: !(Maybe (Path Abs File))
+  , setupExe       :: !(Maybe (Path Abs File))
     -- ^ Compiled version of eeSetupHs
-  , eeCabalPkgVer    :: !Version
-  , eeTotalWanted    :: !Int
-  , eeLocals         :: ![LocalPackage]
-  , eeGlobalDB       :: !(Path Abs Dir)
-  , eeGlobalDumpPkgs :: !(Map GhcPkgId DumpPackage)
-  , eeSnapshotDumpPkgs :: !(TVar (Map GhcPkgId DumpPackage))
-  , eeLocalDumpPkgs  :: !(TVar (Map GhcPkgId DumpPackage))
-  , eeLogFiles       :: !(TChan (Path Abs Dir, Path Abs File))
-  , eeCustomBuilt    :: !(IORef (Set PackageName))
+  , cabalPkgVer    :: !Version
+  , totalWanted    :: !Int
+  , locals         :: ![LocalPackage]
+  , globalDB       :: !(Path Abs Dir)
+  , globalDumpPkgs :: !(Map GhcPkgId DumpPackage)
+  , snapshotDumpPkgs :: !(TVar (Map GhcPkgId DumpPackage))
+  , localDumpPkgs  :: !(TVar (Map GhcPkgId DumpPackage))
+  , logFiles       :: !(TChan (Path Abs Dir, Path Abs File))
+  , customBuilt    :: !(IORef (Set PackageName))
     -- ^ Stores which packages with custom-setup have already had their
     -- Setup.hs built.
-  , eeLargestPackageName :: !(Maybe Int)
+  , largestPackageName :: !(Maybe Int)
     -- ^ For nicer interleaved output: track the largest package name size
-  , eePathEnvVar :: !Text
+  , pathEnvVar :: !Text
     -- ^ Value of the PATH environment variable
   }
 
@@ -337,30 +338,30 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
     let totalWanted = length $ filter (.wanted) locals
     pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
     inner ExecuteEnv
-      { eeBuildOpts = bopts
-      , eeBuildOptsCLI = boptsCli
+      { buildOpts = bopts
+      , buildOptsCLI = boptsCli
         -- Uncertain as to why we cannot run configures in parallel. This
         -- appears to be a Cabal library bug. Original issue:
         -- https://github.com/commercialhaskell/stack/issues/84. Ideally
         -- we'd be able to remove this.
-      , eeInstallLock = installLock
-      , eeBaseConfigOpts = baseConfigOpts
-      , eeGhcPkgIds = idMap
-      , eeTempDir = tmpdir
-      , eeSetupHs = setupHs
-      , eeSetupShimHs = setupShimHs
-      , eeSetupExe = setupExe
-      , eeCabalPkgVer = cabalPkgVer
-      , eeTotalWanted = totalWanted
-      , eeLocals = locals
-      , eeGlobalDB = globalDB
-      , eeGlobalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
-      , eeSnapshotDumpPkgs = snapshotPackagesTVar
-      , eeLocalDumpPkgs = localPackagesTVar
-      , eeLogFiles = logFilesTChan
-      , eeCustomBuilt = customBuiltRef
-      , eeLargestPackageName = mlargestPackageName
-      , eePathEnvVar = pathEnvVar
+      , installLock = installLock
+      , baseConfigOpts = baseConfigOpts
+      , ghcPkgIds = idMap
+      , tempDir = tmpdir
+      , setupHs = setupHs
+      , setupShimHs = setupShimHs
+      , setupExe = setupExe
+      , cabalPkgVer = cabalPkgVer
+      , totalWanted = totalWanted
+      , locals = locals
+      , globalDB = globalDB
+      , globalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
+      , snapshotDumpPkgs = snapshotPackagesTVar
+      , localDumpPkgs = localPackagesTVar
+      , logFiles = logFilesTChan
+      , customBuilt = customBuiltRef
+      , largestPackageName = mlargestPackageName
+      , pathEnvVar = pathEnvVar
       } `finally` dumpLogs logFilesTChan totalWanted
  where
   toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dp.ghcPkgId, dp))
@@ -478,7 +479,7 @@ packageNamePrefix :: ExecuteEnv -> PackageName -> String
 packageNamePrefix ee name' =
   let name = packageNameString name'
       paddedName =
-        case ee.eeLargestPackageName of
+        case ee.largestPackageName of
           Nothing -> name
           Just len ->
             assert (len >= length name) $ take len $ name ++ L.repeat ' '
@@ -618,7 +619,7 @@ withSingleContext
        && all
             (\(ActionId ident _) -> ident == pkgId)
             (Set.toList ac.acRemaining)
-       && ee.eeTotalWanted == 1
+       && ee.totalWanted == 1
        )
     || ac.acConcurrency == ConcurrencyDisallowed
 
@@ -631,7 +632,7 @@ withSingleContext
       TTRemotePackage _ package pkgloc -> do
         suffix <-
           parseRelDir $ packageIdentifierString $ packageIdentifier package
-        let dir = ee.eeTempDir </> suffix
+        let dir = ee.tempDir </> suffix
         unpackPackageLocation dir pkgloc
 
         -- See: https://github.com/commercialhaskell/stack/issues/157
@@ -660,7 +661,7 @@ withSingleContext
 
     -- If the user requested interleaved output, dump to the console with a
     -- prefix.
-    | ee.eeBuildOpts.interleavedOutput = inner $
+    | ee.buildOpts.interleavedOutput = inner $
         OTConsole $ Just $ fromString (packageNamePrefix ee package.name)
 
     -- Neither condition applies, dump to a file.
@@ -672,7 +673,7 @@ withSingleContext
         -- We only want to dump logs for local non-dependency packages
         case taskType of
           TTLocalMutable lp | lp.wanted ->
-              liftIO $ atomically $ writeTChan ee.eeLogFiles (pkgDir, logPath)
+              liftIO $ atomically $ writeTChan ee.logFiles (pkgDir, logPath)
           _ -> pure ()
 
         withBinaryFile fp WriteMode $ \h -> inner $ OTLogFile logPath h
@@ -702,7 +703,7 @@ withSingleContext
       -- Avoid broken Setup.hs files causing problems for simple build
       -- types, see:
       -- https://github.com/commercialhaskell/stack/issues/370
-      case (package.buildType, ee.eeSetupExe) of
+      case (package.buildType, ee.setupExe) of
         (C.Simple, Just setupExe) -> pure $ Left setupExe
         _ -> liftIO $ Right <$> getSetupHs pkgDir
     inner $ \keepOutputOpen stripTHLoading args -> do
@@ -714,19 +715,19 @@ withSingleContext
             | otherwise =
                 ["-package=" ++ packageIdentifierString
                                     (PackageIdentifier cabalPackageName
-                                                      ee.eeCabalPkgVer)]
+                                                      ee.cabalPkgVer)]
           packageDBArgs =
             ( "-clear-package-db"
             : "-global-package-db"
             : map
                 (("-package-db=" ++) . toFilePathNoTrailingSep)
-                ee.eeBaseConfigOpts.bcoExtraDBs
+                ee.baseConfigOpts.bcoExtraDBs
             ) ++
             ( (  "-package-db="
-              ++ toFilePathNoTrailingSep ee.eeBaseConfigOpts.bcoSnapDB
+              ++ toFilePathNoTrailingSep ee.baseConfigOpts.bcoSnapDB
               )
             : (  "-package-db="
-              ++ toFilePathNoTrailingSep ee.eeBaseConfigOpts.bcoLocalDB
+              ++ toFilePathNoTrailingSep ee.baseConfigOpts.bcoLocalDB
               )
             : ["-hide-all-packages"]
             )
@@ -822,9 +823,9 @@ withSingleContext
                      : "-global-package-db"
                      : map
                          (("-package-db=" ++) . toFilePathNoTrailingSep)
-                         ee.eeBaseConfigOpts.bcoExtraDBs
+                         ee.baseConfigOpts.bcoExtraDBs
                      ++ [    "-package-db="
-                          ++ toFilePathNoTrailingSep ee.eeBaseConfigOpts.bcoSnapDB
+                          ++ toFilePathNoTrailingSep ee.baseConfigOpts.bcoSnapDB
                         ]
                      )
 
@@ -896,7 +897,7 @@ withSingleContext
           distDir <- distDirFromDir pkgDir
           let setupDir = distDir </> relDirSetup
               outputFile = setupDir </> relFileSetupLower
-          customBuilt <- liftIO $ readIORef ee.eeCustomBuilt
+          customBuilt <- liftIO $ readIORef ee.customBuilt
           if Set.member package.name customBuilt
             then pure outputFile
             else do
@@ -910,7 +911,7 @@ withSingleContext
                 , "-i", "-i."
                 ] ++ packageArgs ++
                 [ toFilePath setuphs
-                , toFilePath ee.eeSetupShimHs
+                , toFilePath ee.setupShimHs
                 , "-main-is"
                 , "StackSetupShim.mainOverride"
                 , "-o", toFilePath outputFile
@@ -926,17 +927,17 @@ withSingleContext
                       AGOEverything
                       config.ghcOptionsByCat
                   ++ case config.applyGhcOptions of
-                       AGOEverything -> ee.eeBuildOptsCLI.boptsCLIGhcOptions
+                       AGOEverything -> ee.buildOptsCLI.boptsCLIGhcOptions
                        AGOTargets -> []
                        AGOLocals -> []
                   )
 
-              liftIO $ atomicModifyIORef' ee.eeCustomBuilt $
+              liftIO $ atomicModifyIORef' ee.customBuilt $
                 \oldCustomBuilt ->
                   (Set.insert package.name oldCustomBuilt, ())
               pure outputFile
       let cabalVerboseArg =
-            let CabalVerbosity cv = ee.eeBuildOpts.cabalVerbose
+            let CabalVerbosity cv = ee.buildOpts.cabalVerbose
             in  "--verbose=" <> showForCabal cv
       runExe exeName $ cabalVerboseArg:setupArgs
 
