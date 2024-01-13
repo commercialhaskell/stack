@@ -82,7 +82,7 @@ import           Stack.Config.Nix ( nixOptsFromMonoid )
 import           Stack.Constants
                    ( defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated
                    , defaultUserConfigPath, defaultUserConfigPathDeprecated
-                   , hackageBaseUrl, implicitGlobalProjectDir
+                   , implicitGlobalProjectDir
                    , implicitGlobalProjectDirDeprecated, inContainerEnvVar
                    , inNixShellEnvVar, osIsWindows, pantryRootEnvVar
                    , platformVariantEnvVar, relDirBin, relDirStackWork
@@ -91,6 +91,7 @@ import           Stack.Constants
                    , stackDeveloperModeDefault, stackDotYaml, stackProgName
                    , stackRootEnvVar, stackWorkEnvVar, stackXdgEnvVar
                    )
+import qualified Stack.Constants as Constants
 import           Stack.Lock ( lockCachedWanted )
 import           Stack.Prelude
 import           Stack.SourceMap
@@ -419,7 +420,7 @@ configFromConfigMonoid
         saveHackageCreds =
           fromFirst True configMonoid.configMonoidSaveHackageCreds
         hackageBaseUrl =
-          fromFirst hackageBaseUrl configMonoid.configMonoidHackageBaseUrl
+          fromFirst Constants.hackageBaseUrl configMonoid.configMonoidHackageBaseUrl
         hideSourcePaths = fromFirstTrue configMonoid.configMonoidHideSourcePaths
         recommendUpgrade = fromFirstTrue configMonoid.configMonoidRecommendUpgrade
         notifyIfNixOnPath = fromFirstTrue configMonoid.configMonoidNotifyIfNixOnPath
