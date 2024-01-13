@@ -281,7 +281,7 @@ displayTask task = fillSep $
      | not $ Set.null missing
      ]
  where
-  missing = task.taskConfigOpts.tcoMissing
+  missing = task.configOpts.tcoMissing
 
 -- | Perform the actual plan
 executePlan :: HasEnvConfig env
@@ -601,7 +601,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
       [ Action
           { actionId = ActionId (taskProvides task) ATBuild
           , actionDeps =
-              Set.map (`ActionId` ATBuild) task.taskConfigOpts.tcoMissing
+              Set.map (`ActionId` ATBuild) task.configOpts.tcoMissing
           , actionDo =
               \ac -> runInBase $ singleBuild ac ee task installedMap False
           , actionConcurrency = ConcurrencyAllowed
@@ -610,12 +610,12 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
   afinal = case mfinal of
     Nothing -> []
     Just task ->
-      ( if task.taskAllInOne
+      ( if task.allInOne
           then id
           else (:) Action
             { actionId = ActionId pkgId ATBuildFinal
             , actionDeps = addBuild
-                (Set.map (`ActionId` ATBuild) task.taskConfigOpts.tcoMissing)
+                (Set.map (`ActionId` ATBuild) task.configOpts.tcoMissing)
             , actionDo =
                 \ac -> runInBase $ singleBuild ac ee task installedMap True
             , actionConcurrency = ConcurrencyAllowed
@@ -660,7 +660,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
       tests = testComponents comps
       benches = benchComponents comps
       finalDeps =
-        if task.taskAllInOne
+        if task.allInOne
           then addBuild mempty
           else Set.singleton (ActionId pkgId ATBuildFinal)
       addBuild =
