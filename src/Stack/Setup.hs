@@ -974,19 +974,17 @@ withNewLocalBuildTargets targets f = do
   envConfig <- view envConfigL
   haddockDeps <- view $ configL . to (.build) . to shouldHaddockDeps
   let boptsCLI = envConfig.buildOptsCLI
-  envConfig' <- rebuildEnv envConfig NeedTargets haddockDeps $
-                boptsCLI {boptsCLITargets = targets}
+  envConfig' <-
+    rebuildEnv envConfig NeedTargets haddockDeps $ boptsCLI {targets = targets}
   local (set envConfigL envConfig') f
 
 -- | Add the include and lib paths to the given Config
 addIncludeLib :: ExtraDirs -> Config -> Config
 addIncludeLib (ExtraDirs _bins includes libs) config = config
   { extraIncludeDirs =
-      config.extraIncludeDirs ++
-      map toFilePathNoTrailingSep includes
+      config.extraIncludeDirs ++ map toFilePathNoTrailingSep includes
   , extraLibDirs =
-      config.extraLibDirs ++
-      map toFilePathNoTrailingSep libs
+      config.extraLibDirs ++ map toFilePathNoTrailingSep libs
   }
 
 -- | Ensure both the compiler and the msys toolchain are installed and

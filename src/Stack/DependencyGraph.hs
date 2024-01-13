@@ -163,8 +163,8 @@ withDotConfig opts inner =
     runRIO dc inner
 
   boptsCLI = defaultBuildOptsCLI
-    { boptsCLITargets = opts.dotTargets
-    , boptsCLIFlags = opts.dotFlags
+    { targets = opts.dotTargets
+    , flags = opts.dotFlags
     }
   modifyGO =
     (if opts.dotTestTargets

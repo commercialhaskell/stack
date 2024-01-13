@@ -225,7 +225,7 @@ constructPlan
   toMaybe (k, Just v) = Just (k, v)
 
   takeSubset :: Plan -> RIO env Plan
-  takeSubset = case baseConfigOpts0.bcoBuildOptsCLI.boptsCLIBuildSubset of
+  takeSubset = case baseConfigOpts0.bcoBuildOptsCLI.buildSubset of
     BSAll -> pure
     BSOnlySnapshot -> stripLocals
     BSOnlyDependencies -> stripNonDeps

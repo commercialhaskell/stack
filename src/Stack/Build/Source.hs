@@ -131,7 +131,7 @@ loadSourceMap smt boptsCli sma = do
               }
       packageCliFlags = Map.fromList $
         mapMaybe maybeProjectFlags $
-        Map.toList boptsCli.boptsCLIFlags
+        Map.toList boptsCli.flags
       maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
       maybeProjectFlags _ = Nothing
       globals = pruneGlobals sma.smaGlobal (Map.keysSet deps)
@@ -219,7 +219,7 @@ getLocalFlags boptsCli name = Map.unions
   , Map.findWithDefault Map.empty ACFAllProjectPackages cliFlags
   ]
  where
-  cliFlags = boptsCli.boptsCLIFlags
+  cliFlags = boptsCli.flags
 
 -- | Get the options to pass to @./Setup.hs configure@
 generalCabalConfigOpts ::
@@ -267,7 +267,7 @@ generalGhcOptions bconfig boptsCli isTarget isLocal = concat
       else []
   , [ "-g" | not $ bopts.libStrip || bopts.exeStrip ]
   , if includeExtraOptions
-      then boptsCli.boptsCLIGhcOptions
+      then boptsCli.ghcOptions
       else []
   ]
  where
