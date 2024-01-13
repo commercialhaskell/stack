@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -81,21 +82,21 @@ instance NFData BuildCache
 
 -- | Stored on disk to know whether the flags have changed.
 data ConfigCache = ConfigCache
-  { configCacheOpts :: !ConfigureOpts
+  { opts :: !ConfigureOpts
     -- ^ All options used for this package.
-  , configCacheDeps :: !(Set GhcPkgId)
+  , deps :: !(Set GhcPkgId)
     -- ^ The GhcPkgIds of all of the dependencies. Since Cabal doesn't take
     -- the complete GhcPkgId (only a PackageIdentifier) in the configure
     -- options, just using the previous value is insufficient to know if
     -- dependencies have changed.
-  , configCacheComponents :: !(Set S.ByteString)
+  , components :: !(Set S.ByteString)
     -- ^ The components to be built. It's a bit of a hack to include this in
     -- here, as it's not a configure option (just a build option), but this
     -- is a convenient way to force compilation when the components change.
-  , configCacheHaddock :: !Bool
+  , haddock :: !Bool
     -- ^ Are haddocks to be built?
-  , configCachePkgSrc :: !CachePkgSrc
-  , configCachePathEnvVar :: !Text
+  , pkgSrc :: !CachePkgSrc
+  , pathEnvVar :: !Text
   -- ^ Value of the PATH env var, see
   -- <https://github.com/commercialhaskell/stack/issues/3138>
   }

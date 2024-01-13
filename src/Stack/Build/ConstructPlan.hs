@@ -1016,16 +1016,16 @@ checkDirtiness ps installed package present buildHaddocks = do
         (installLocationIsMutable $ psLocation ps) -- should be Local i.e. mutable always
         package
       wantConfigCache = ConfigCache
-        { configCacheOpts = configOpts
-        , configCacheDeps = Set.fromList $ Map.elems present
-        , configCacheComponents =
+        { opts = configOpts
+        , deps = Set.fromList $ Map.elems present
+        , components =
             case ps of
               PSFilePath lp ->
                 Set.map (encodeUtf8 . renderComponent) lp.components
               PSRemote{} -> Set.empty
-        , configCacheHaddock = buildHaddocks
-        , configCachePkgSrc = toCachePkgSrc ps
-        , configCachePathEnvVar = ctx.pathEnvVar
+        , haddock = buildHaddocks
+        , pkgSrc = toCachePkgSrc ps
+        , pathEnvVar = ctx.pathEnvVar
         }
       config = view configL ctx
   mreason <-
@@ -1051,16 +1051,16 @@ checkDirtiness ps installed package present buildHaddocks = do
 
 describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
 describeConfigDiff config old new
-  | old.configCachePkgSrc /= new.configCachePkgSrc = Just $
+  | old.pkgSrc /= new.pkgSrc = Just $
       "switching from " <>
-      pkgSrcName old.configCachePkgSrc <> " to " <>
-      pkgSrcName new.configCachePkgSrc
-  | not (new.configCacheDeps `Set.isSubsetOf` old.configCacheDeps) =
+      pkgSrcName old.pkgSrc <> " to " <>
+      pkgSrcName new.pkgSrc
+  | not (new.deps `Set.isSubsetOf` old.deps) =
       Just "dependencies changed"
   | not $ Set.null newComponents =
       Just $ "components added: " `T.append` T.intercalate ", "
           (map (decodeUtf8With lenientDecode) (Set.toList newComponents))
-  | not old.configCacheHaddock && new.configCacheHaddock =
+  | not old.haddock && new.haddock =
       Just "rebuilding with haddocks"
   | oldOpts /= newOpts = Just $ T.pack $ concat
       [ "flags changed from "
@@ -1098,7 +1098,7 @@ describeConfigDiff config old new
                 else stripGhcOptions)
            . map T.pack
            . (\(ConfigureOpts x y) -> x ++ y)
-           . (.configCacheOpts)
+           . (.opts)
    where
     -- options set by Stack
     isStackOpt :: Text -> Bool
@@ -1132,7 +1132,7 @@ describeConfigDiff config old new
   removeMatching xs ys = (xs, ys)
 
   newComponents =
-    new.configCacheComponents `Set.difference` old.configCacheComponents
+    new.components `Set.difference` old.components
 
   pkgSrcName (CacheSrcLocal fp) = T.pack fp
   pkgSrcName CacheSrcUpstream = "upstream source"

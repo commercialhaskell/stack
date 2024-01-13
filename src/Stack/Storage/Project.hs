@@ -114,7 +114,7 @@ readConfigCache ::
   => Entity ConfigCacheParent
   -> ReaderT SqlBackend (RIO env) ConfigCache
 readConfigCache (Entity parentId configCacheParent) = do
-  let configCachePkgSrc = configCacheParent.configCacheParentPkgSrc
+  let pkgSrc = configCacheParent.configCacheParentPkgSrc
   coDirs <-
     map ((.configCacheDirOptionValue) . entityVal) <$>
     selectList
@@ -125,25 +125,25 @@ readConfigCache (Entity parentId configCacheParent) = do
     selectList
       [ConfigCacheNoDirOptionParent ==. parentId]
       [Asc ConfigCacheNoDirOptionIndex]
-  let configCacheOpts = ConfigureOpts
+  let opts = ConfigureOpts
         { coDirs
         , coNoDirs
         }
-  configCacheDeps <-
+  deps <-
     Set.fromList . map ((.configCacheDepValue) . entityVal) <$>
     selectList [ConfigCacheDepParent ==. parentId] []
-  configCacheComponents <-
+  components <-
     Set.fromList . map ((.configCacheComponentValue) . entityVal) <$>
     selectList [ConfigCacheComponentParent ==. parentId] []
-  let configCachePathEnvVar = configCacheParent.configCacheParentPathEnvVar
-  let configCacheHaddock = configCacheParent.configCacheParentHaddock
+  let pathEnvVar = configCacheParent.configCacheParentPathEnvVar
+  let haddock = configCacheParent.configCacheParentHaddock
   pure $ ConfigCache
-    { configCacheOpts
-    , configCacheDeps
-    , configCacheComponents
-    , configCacheHaddock
-    , configCachePkgSrc
-    , configCachePathEnvVar
+    { opts
+    , deps
+    , components
+    , haddock
+    , pkgSrc
+    , pathEnvVar
     }
 
 -- | Load 'ConfigCache' from the database.
@@ -178,18 +178,18 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
             ConfigCacheParent
               { configCacheParentDirectory = dir
               , configCacheParentType = type_
-              , configCacheParentPkgSrc = new.configCachePkgSrc
+              , configCacheParentPkgSrc = new.pkgSrc
               , configCacheParentActive = True
-              , configCacheParentPathEnvVar = new.configCachePathEnvVar
-              , configCacheParentHaddock = new.configCacheHaddock
+              , configCacheParentPathEnvVar = new.pathEnvVar
+              , configCacheParentHaddock = new.haddock
               }
         Just parentEntity@(Entity parentId _) -> do
           old <- readConfigCache parentEntity
           update
             parentId
-            [ ConfigCacheParentPkgSrc =. new.configCachePkgSrc
+            [ ConfigCacheParentPkgSrc =. new.pkgSrc
             , ConfigCacheParentActive =. True
-            , ConfigCacheParentPathEnvVar =. new.configCachePathEnvVar
+            , ConfigCacheParentPathEnvVar =. new.pathEnvVar
             ]
           pure (parentId, Just old)
     updateList
@@ -197,29 +197,29 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
       ConfigCacheDirOptionParent
       parentId
       ConfigCacheDirOptionIndex
-      (maybe [] (.configCacheOpts.coDirs) mold)
-      new.configCacheOpts.coDirs
+      (maybe [] (.opts.coDirs) mold)
+      new.opts.coDirs
     updateList
       ConfigCacheNoDirOption
       ConfigCacheNoDirOptionParent
       parentId
       ConfigCacheNoDirOptionIndex
-      (maybe [] (.configCacheOpts.coNoDirs) mold)
-      new.configCacheOpts.coNoDirs
+      (maybe [] (.opts.coNoDirs) mold)
+      new.opts.coNoDirs
     updateSet
       ConfigCacheDep
       ConfigCacheDepParent
       parentId
       ConfigCacheDepValue
-      (maybe Set.empty (.configCacheDeps) mold)
-      new.configCacheDeps
+      (maybe Set.empty (.deps) mold)
+      new.deps
     updateSet
       ConfigCacheComponent
       ConfigCacheComponentParent
       parentId
       ConfigCacheComponentValue
-      (maybe Set.empty (.configCacheComponents) mold)
-      new.configCacheComponents
+      (maybe Set.empty (.components) mold)
+      new.components
 
 -- | Mark 'ConfigCache' as inactive in the database.
 -- We use a flag instead of deleting the records since, in most cases, the same
