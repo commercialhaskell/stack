@@ -154,7 +154,7 @@ constructPlan
     econfig <- view envConfigL
     globalCabalVersion <- view $ compilerPathsL . to (.cpCabalVersion)
     sources <- getSources globalCabalVersion
-    mcur <- view $ buildConfigL . to (.bcCurator)
+    mcur <- view $ buildConfigL . to (.curator)
     pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
     let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
         targetPackageNames = Map.keys sourceMap.smTargets.smtTargets

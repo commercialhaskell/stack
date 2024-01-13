@@ -167,7 +167,7 @@ instance HasGHCVariant PathInfo where
   {-# INLINE ghcVariantL #-}
 
 instance HasConfig PathInfo where
-  configL = buildConfigL . lens (.bcConfig) (\x y -> x { bcConfig = y })
+  configL = buildConfigL . lens (.config) (\x y -> x { config = y })
   {-# INLINE configL #-}
 
 instance HasPantryConfig PathInfo where

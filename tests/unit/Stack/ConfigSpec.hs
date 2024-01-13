@@ -236,8 +236,8 @@ spec = beforeAll setup $ do
         withEnvVar "STACK_YAML" stackYamlFp $
           loadConfig' $ \config -> liftIO $ do
             bc <- runRIO config $ withBuildConfig ask
-            bc.bcStackYaml `shouldBe` dir </> stackDotYaml
-            parent bc.bcStackYaml `shouldBe` dir
+            bc.stackYaml `shouldBe` dir </> stackDotYaml
+            parent bc.stackYaml `shouldBe` dir
 
     it "STACK_YAML can be relative" $ inTempDir $ do
         parentDir <- getCurrentDirectory >>= parseAbsDir
@@ -253,7 +253,7 @@ spec = beforeAll setup $ do
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $
           loadConfig' $ \config -> liftIO $ do
             bc <- runRIO config $ withBuildConfig ask
-            bc.bcStackYaml `shouldBe` yamlAbs
+            bc.stackYaml `shouldBe` yamlAbs
 
   describe "defaultConfigYaml" $
     it "is parseable" $ \_ -> do

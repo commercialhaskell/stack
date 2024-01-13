@@ -1718,7 +1718,7 @@ singleBuild
       case mprecompiled of
         Just precompiled -> copyPreCompiled precompiled
         Nothing -> do
-          mcurator <- view $ buildConfigL . to (.bcCurator)
+          mcurator <- view $ buildConfigL . to (.curator)
           realConfigAndBuild cache mcurator allDepsMap
     case minstalled of
       Nothing -> pure ()
@@ -2022,7 +2022,7 @@ singleBuild
         _ -> throwM ex
     postBuildCheck True
 
-    mcurator <- view $ buildConfigL . to (.bcCurator)
+    mcurator <- view $ buildConfigL . to (.curator)
     when (doHaddock mcurator package) $ do
       announce $ if isHaddockForHackage
         then "haddock for Hackage"
@@ -2256,7 +2256,7 @@ singleTest topts testsToRun ac ee task installedMap = do
   -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
   -- full blown 'withSingleContext'.
   (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
-  mcurator <- view $ buildConfigL . to (.bcCurator)
+  mcurator <- view $ buildConfigL . to (.curator)
   let pname = pkgName $ taskProvides task
       expectFailure = expectTestFailure pname mcurator
   withSingleContext ac ee task.taskType allDepsMap (Just "test") $

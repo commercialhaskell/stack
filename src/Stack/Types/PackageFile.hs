@@ -57,7 +57,7 @@ instance HasTerm GetPackageFileContext where
   termWidthL = runnerL . termWidthL
 
 instance HasConfig GetPackageFileContext where
-  configL = buildConfigL . lens (.bcConfig) (\x y -> x { bcConfig = y })
+  configL = buildConfigL . lens (.config) (\x y -> x { config = y })
   {-# INLINE configL #-}
 
 instance HasBuildConfig GetPackageFileContext where

@@ -642,7 +642,7 @@ setupEnv ::
 setupEnv needTargets boptsCLI mResolveMissingGHC = do
   config <- view configL
   bc <- view buildConfigL
-  let stackYaml = bc.bcStackYaml
+  let stackYaml = bc.stackYaml
   platform <- view platformL
   wcVersion <- view wantedCompilerVersionL
   wanted <- view wantedCompilerVersionL
@@ -677,7 +677,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
   logDebug "Resolving package entries"
 
   (sourceMap, sourceMapHash) <- runWithGHC menv compilerPaths $ do
-    smActual <- actualFromGhc bc.bcSMWanted compilerVer
+    smActual <- actualFromGhc bc.smWanted compilerVer
     let actualPkgs = Map.keysSet smActual.smaDeps <>
                      Map.keysSet smActual.smaProject
         prunedActual = smActual
@@ -798,9 +798,9 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
   envOverride <- liftIO $ getProcessContext' minimalEnvSettings
   pure EnvConfig
     { envConfigBuildConfig = bc
-        { bcConfig = addIncludeLib ghcBin
-                   $ set processContextL envOverride
-                     (view configL bc)
+        { config = addIncludeLib ghcBin
+                 $ set processContextL envOverride
+                    (view configL bc)
             { processContextSettings = getProcessContext'
             }
         }
@@ -951,7 +951,7 @@ rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
       cp = envConfig.envConfigCompilerPaths
       compilerVer = envConfig.envConfigSourceMap.smCompiler
   runRIO (WithGHC cp bc) $ do
-    smActual <- actualFromGhc bc.bcSMWanted compilerVer
+    smActual <- actualFromGhc bc.smWanted compilerVer
     let actualPkgs =
           Map.keysSet smActual.smaDeps <> Map.keysSet smActual.smaProject
         prunedActual = smActual
@@ -2093,7 +2093,7 @@ getGhcKey ::
   -> RIO env Text
 getGhcKey ghcBuild = do
   ghcVariant <- view ghcVariantL
-  wantedComiler <- view $ buildConfigL . to (.bcSMWanted.smwCompiler)
+  wantedComiler <- view $ buildConfigL . to (.smWanted.smwCompiler)
   ghcVersion <- case wantedComiler of
         WCGhc version -> pure version
         WCGhcjs _ _ ->  throwIO GhcjsNotSupported

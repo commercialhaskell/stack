@@ -148,7 +148,7 @@ sdistCmd sdistOpts =
     dirs' <- if null sdistOpts.sdoptsDirsToWorkWith
       then do
         dirs <- view $
-          buildConfigL . to (map ppRoot . Map.elems . (.bcSMWanted.smwProject))
+          buildConfigL . to (map ppRoot . Map.elems . (.smWanted.smwProject))
         when (null dirs) $ do
           stackYaml <- view stackYamlL
           prettyErrorL
@@ -614,7 +614,7 @@ buildExtractedTarball pkgDir = do
           == localPackageToBuild.package.name
   pathsToKeep <- Map.fromList <$> filterM
     (fmap not . isPathToRemove . resolvedAbsolute . (.ppResolvedDir) . snd)
-    (Map.toList envConfig.envConfigBuildConfig.bcSMWanted.smwProject)
+    (Map.toList envConfig.envConfigBuildConfig.smWanted.smwProject)
   pp <- mkProjectPackage YesPrintWarnings pkgDir False
   let adjustEnvForBuild env =
         let updatedEnvConfig = envConfig
@@ -624,8 +624,8 @@ buildExtractedTarball pkgDir = do
                   updateBuildConfig envConfig.envConfigBuildConfig
               }
             updateBuildConfig bc = bc
-              { bcConfig = bc.bcConfig
-                 { build = defaultBuildOpts { boptsTests = True } }
+              { config = bc.config
+                  { build = defaultBuildOpts { boptsTests = True } }
               }
         in  set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =

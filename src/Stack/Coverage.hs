@@ -286,7 +286,7 @@ generateHpcReportInternal
           hpcRelDir <- hpcRelativeDir
           -- Compute arguments used for both "hpc markup" and "hpc report".
           pkgDirs <- view $ buildConfigL . to
-            (map ppRoot . Map.elems . (.bcSMWanted.smwProject))
+            (map ppRoot . Map.elems . (.smWanted.smwProject))
           let args =
                 -- Use index files from all packages (allows cross-package
                 -- coverage results).

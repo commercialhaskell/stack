@@ -72,7 +72,7 @@ data EnvConfig = EnvConfig
   }
 
 instance HasConfig EnvConfig where
-  configL = buildConfigL . lens (.bcConfig) (\x y -> x { bcConfig = y })
+  configL = buildConfigL . lens (.config) (\x y -> x { config = y })
   {-# INLINE configL #-}
 
 instance HasBuildConfig EnvConfig where
@@ -240,7 +240,7 @@ packageDatabaseLocal = do
 packageDatabaseExtra ::
      (HasEnvConfig env, MonadReader env m)
   => m [Path Abs Dir]
-packageDatabaseExtra = view $ buildConfigL . to (.bcExtraPackageDBs)
+packageDatabaseExtra = view $ buildConfigL . to (.extraPackageDBs)
 
 -- | Where HPC reports and tix files get stored.
 hpcReportDir :: HasEnvConfig env => RIO env (Path Abs Dir)

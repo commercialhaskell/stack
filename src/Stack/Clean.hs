@@ -81,7 +81,7 @@ cleanDir dir = do
 
 dirsToDelete :: CleanOpts -> RIO BuildConfig [Path Abs Dir]
 dirsToDelete cleanOpts = do
-  packages <- view $ buildConfigL . to (.bcSMWanted.smwProject)
+  packages <- view $ buildConfigL . to (.smWanted.smwProject)
   case cleanOpts of
     CleanShallow [] ->
       -- Filter out packages listed as extra-deps

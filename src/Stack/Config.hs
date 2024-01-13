@@ -801,12 +801,12 @@ withBuildConfig inner = do
 
   initProjectStorage projectStorageFile $ \projectStorage -> do
     let bc = BuildConfig
-          { bcConfig = config
-          , bcSMWanted = wanted
-          , bcExtraPackageDBs = extraPackageDBs
-          , bcStackYaml = stackYamlFP
-          , bcCurator = project.projectCurator
-          , bcProjectStorage = projectStorage
+          { config = config
+          , smWanted = wanted
+          , extraPackageDBs = extraPackageDBs
+          , stackYaml = stackYamlFP
+          , curator = project.projectCurator
+          , projectStorage = projectStorage
           }
     runRIO bc inner
  where

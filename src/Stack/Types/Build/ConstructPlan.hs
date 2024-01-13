@@ -189,7 +189,7 @@ instance HasTerm Ctx where
   termWidthL = runnerL . termWidthL
 
 instance HasConfig Ctx where
-  configL = buildConfigL . lens (.bcConfig) (\x y -> x { bcConfig = y })
+  configL = buildConfigL . lens (.config) (\x y -> x { config = y })
   {-# INLINE configL #-}
 
 instance HasPantryConfig Ctx where
