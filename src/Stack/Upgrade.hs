@@ -287,9 +287,7 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                                      -- stack.yaml file
           , globalStackYaml = SYLOverride $ dir </> stackDotYaml
           }
-        boptsCLI = defaultBuildOptsCLI
-          { boptsCLITargets = ["stack"]
-          }
+        boptsCLI = defaultBuildOptsCLI { targets = ["stack"] }
     forM_ mdir $ \dir ->
       local (over globalOptsL (modifyGO dir))
         $ withConfig NoReexec

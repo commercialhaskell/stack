@@ -97,10 +97,10 @@ instance Exception CabalVersionPrettyException
 -- | Helper for build and install commands
 buildCmd :: BuildOptsCLI -> RIO Runner ()
 buildCmd opts = do
-  when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) opts.boptsCLIGhcOptions) $
+  when (any (("-prof" `elem`) . fromRight [] . parseArgs Escaping) opts.ghcOptions) $
     prettyThrowIO GHCProfOptionInvalid
   local (over globalOptsL modifyGO) $
-    case opts.boptsCLIFileWatch of
+    case opts.fileWatch of
       FileWatchPoll -> fileWatchPoll (inner . Just)
       FileWatch -> fileWatch (inner . Just)
       NoFileWatch -> inner Nothing
@@ -112,7 +112,7 @@ buildCmd opts = do
       Stack.Build.build setLocalFiles
   -- Read the build command from the CLI and enable it to run
   modifyGO =
-    case opts.boptsCLICommand of
+    case opts.command of
       Test -> set
         (globalOptsBuildOptsMonoidL . buildOptsMonoidTestsL)
         (Just True)
@@ -150,7 +150,7 @@ build msetLocalFiles = do
     stackYaml <- view stackYamlL
     for_ msetLocalFiles $ \setLocalFiles -> do
       files <-
-        if boptsCli.boptsCLIWatchAll
+        if boptsCli.watchAll
         then sequence [lpFiles lp | lp <- allLocals]
         else forM allLocals $ \lp -> do
           let pn = lp.package.name
@@ -176,7 +176,7 @@ build msetLocalFiles = do
               loadPackage
               sourceMap
               installedMap
-              boptsCli.boptsCLIInitialBuildSteps
+              boptsCli.initialBuildSteps
 
     allowLocals <- view $ configL . to (.allowLocals)
     unless allowLocals $ case justLocals plan of
@@ -190,7 +190,7 @@ build msetLocalFiles = do
     when bopts.preFetch $
         preFetch plan
 
-    if boptsCli.boptsCLIDryrun
+    if boptsCli.dryrun
       then printPlan plan
       else executePlan
              boptsCli

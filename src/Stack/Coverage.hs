@@ -113,7 +113,7 @@ hpcReportCmd hropts = do
   let (tixFiles, targetNames) =
         L.partition (".tix" `T.isSuffixOf`) hropts.hroptsInputs
       boptsCLI = defaultBuildOptsCLI
-        { boptsCLITargets = if hropts.hroptsAll then [] else targetNames }
+        { targets = if hropts.hroptsAll then [] else targetNames }
   withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
     generateHpcReportForTargets hropts tixFiles targetNames
 
