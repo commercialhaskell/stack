@@ -335,7 +335,7 @@ hashSnapshot = do
   let eitherPliHash (pn, dep)
         | PLImmutable pli <- dep.location = Right $ immutableLocSha pli
         | otherwise = Left pn
-      deps = Map.toList sourceMap.smDeps
+      deps = Map.toList sourceMap.deps
   case partitionEithers (map eitherPliHash deps) of
     ([], pliHashes) -> do
       let hashedContent = mconcat $ compilerInfo : pliHashes
@@ -350,9 +350,9 @@ mapSnapshotPackageModules = do
   installMap <- toInstallMap sourceMap
   (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
     getInstalled installMap
-  let globals = dumpedPackageModules sourceMap.smGlobal globalDumpPkgs
+  let globals = dumpedPackageModules sourceMap.global globalDumpPkgs
       notHidden = Map.filter (not . (.hidden))
-      notHiddenDeps = notHidden sourceMap.smDeps
+      notHiddenDeps = notHidden sourceMap.deps
       installedDeps = dumpedPackageModules notHiddenDeps snapshotDumpPkgs
       dumpPkgs =
         Set.fromList $ map (pkgName . (.packageIdent)) snapshotDumpPkgs

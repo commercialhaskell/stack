@@ -57,6 +57,7 @@ import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
                    , SMActual (..), SMWanted (..), SourceMap (..)
                    )
+import qualified Stack.Types.SourceMap as SMActual ( SMActual (..) )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.DependencyGraph" module.
@@ -137,8 +138,8 @@ withDotConfig opts inner =
           }
         actualPkgs =
           Map.keysSet smActual.deps <> Map.keysSet smActual.project
-        prunedActual =
-          smActual { global = pruneGlobals smActual.global actualPkgs }
+        prunedActual = smActual
+          { SMActual.global = pruneGlobals smActual.global actualPkgs }
     targets <- parseTargets NeedTargets False boptsCLI prunedActual
     logDebug "Loading source map"
     sourceMap <- loadSourceMap targets boptsCLI smActual
@@ -183,7 +184,7 @@ createDependencyGraph ::
   -> RIO DotConfig (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
-  locals <- for (toList sourceMap.smProject) loadLocalPackage
+  locals <- for (toList sourceMap.project) loadLocalPackage
   let graph =
         Map.fromList $ projectPackageDependencies dotOpts (filter (.wanted) locals)
   globalDump <- view $ to (.dcGlobalDump)
@@ -253,14 +254,14 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
   fromMaybe (throwIO $ PackageNotFoundBug pkgName)
     (projectPackageDeps <|> dependencyDeps <|> globalDeps)
  where
-  projectPackageDeps = loadDeps <$> Map.lookup pkgName sourceMap.smProject
+  projectPackageDeps = loadDeps <$> Map.lookup pkgName sourceMap.project
    where
     loadDeps pp = do
       pkg <- loadCommonPackage pp.common
       pure (setOfPackageDeps pkg, payloadFromLocal pkg Nothing)
 
   dependencyDeps =
-    loadDeps <$> Map.lookup pkgName sourceMap.smDeps
+    loadDeps <$> Map.lookup pkgName sourceMap.deps
    where
     loadDeps DepPackage{ location = PLMutable dir } = do
       pp <- mkProjectPackage YesPrintWarnings dir False

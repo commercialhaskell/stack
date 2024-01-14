@@ -60,6 +60,7 @@ import           Stack.Types.BuildOpts
                    ( ApplyCLIFlag, BenchmarkOpts (..), BuildOpts (..)
                    , BuildOptsCLI (..), TestOpts (..), defaultBuildOptsCLI
                    )
+import qualified Stack.Types.BuildOpts as BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.CompCollection ( getBuildableListText )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
@@ -232,10 +233,10 @@ ghci opts = do
         M.fromList [(lp.package.name, lp) | lp <- locals ++ depLocals]
       -- FIXME:qrilka this looks wrong to go back to SMActual
       sma = SMActual
-        { compiler = sourceMap.smCompiler
-        , project = sourceMap.smProject
-        , deps = sourceMap.smDeps
-        , global = sourceMap.smGlobal
+        { compiler = sourceMap.compiler
+        , project = sourceMap.project
+        , deps = sourceMap.deps
+        , global = sourceMap.global
         }
   -- Parse --main-is argument.
   mainIsTargets <- parseMainIsTargets buildOptsCLI sma opts.ghciMainIs
@@ -320,7 +321,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
     else do
       -- Try parsing targets before checking if both file and
       -- module targets are specified (see issue#3342).
-      let boptsCLI = buildOptsCLI { targets = normalTargetsRaw }
+      let boptsCLI = buildOptsCLI { BuildOptsCLI.targets = normalTargetsRaw }
       normalTargets <- parseTargets AllowNoTargets False boptsCLI sma
         `catch` \pex@(PrettyException ex) ->
           case fromException $ toException ex of
@@ -328,7 +329,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
               prettyThrowM $ GhciTargetParseException xs
             _ -> throwM pex
       unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
-      pure (Right normalTargets.smtTargets)
+      pure (Right normalTargets.targets)
 
 parseMainIsTargets ::
      HasEnvConfig env
@@ -337,9 +338,9 @@ parseMainIsTargets ::
   -> Maybe Text
   -> RIO env (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do
-  let boptsCLI = buildOptsCLI { targets = [target] }
+  let boptsCLI = buildOptsCLI { BuildOptsCLI.targets = [target] }
   targets <- parseTargets AllowNoTargets False boptsCLI sma
-  pure targets.smtTargets
+  pure targets.targets
 
 -- | Display PackageName + NamedComponent
 displayPkgComponent :: (PackageName, NamedComponent) -> StyleDoc
@@ -417,7 +418,7 @@ getAllLocalTargets ghciOpts targets0 mainIsTargets localMap = do
   -- independently in order to handle the case where no targets are
   -- specified.
   let targets = maybe targets0 (unionTargets targets0) mainIsTargets
-  packages <- view $ envConfigL . to (.sourceMap.smProject)
+  packages <- view $ envConfigL . to (.sourceMap.project)
   -- Find all of the packages that are directly demanded by the
   -- targets.
   let directlyWanted = flip mapMaybe (M.toList packages) $
@@ -846,15 +847,15 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
       -- Currently this source map is being build with
       -- the default targets
       sourceMapGhcOptions = fromMaybe [] $
-        ((.common.ghcOptions) <$> M.lookup name sm.smProject)
+        ((.common.ghcOptions) <$> M.lookup name sm.project)
         <|>
-        ((.common.ghcOptions) <$> M.lookup name sm.smDeps)
+        ((.common.ghcOptions) <$> M.lookup name sm.deps)
       sourceMapCabalConfigOpts = fromMaybe [] $
-        ( (.common.cabalConfigOpts) <$> M.lookup name sm.smProject)
+        ( (.common.cabalConfigOpts) <$> M.lookup name sm.project)
         <|>
-        ((.common.cabalConfigOpts) <$> M.lookup name sm.smDeps)
+        ((.common.cabalConfigOpts) <$> M.lookup name sm.deps)
       sourceMapFlags =
-        maybe mempty (.common.flags) $ M.lookup name sm.smProject
+        maybe mempty (.common.flags) $ M.lookup name sm.project
       config = PackageConfig
         { enableTests = True
         , enableBenchmarks = True

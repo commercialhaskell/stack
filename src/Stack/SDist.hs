@@ -85,6 +85,7 @@ import           Stack.Types.SourceMap
                    ( CommonPackage (..), ProjectPackage (..), SMWanted (..)
                    , SourceMap (..), ppRoot
                    )
+import qualified Stack.Types.SourceMap as SourceMap ( SourceMap (..) )
 import           Stack.Types.Version
                    ( intersectVersionRanges, nextMajorVersion )
 import           System.Directory
@@ -625,7 +626,7 @@ buildExtractedTarball pkgDir = do
               }
         in  set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =
-        sm {smProject = Map.insert pp.common.name pp pathsToKeep}
+        sm { SourceMap.project = Map.insert pp.common.name pp pathsToKeep }
   local adjustEnvForBuild $ build Nothing
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to

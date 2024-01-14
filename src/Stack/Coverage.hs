@@ -1,7 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Generate HPC (Haskell Program Coverage) reports
 module Stack.Coverage
@@ -48,7 +49,8 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompCollection ( getBuildableSetText )
-import           Stack.Types.BuildOpts ( BuildOptsCLI (..), defaultBuildOptsCLI )
+import           Stack.Types.BuildOpts ( defaultBuildOptsCLI )
+import qualified Stack.Types.BuildOpts as BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , hpcReportDir
@@ -113,7 +115,7 @@ hpcReportCmd hropts = do
   let (tixFiles, targetNames) =
         L.partition (".tix" `T.isSuffixOf`) hropts.hroptsInputs
       boptsCLI = defaultBuildOptsCLI
-        { targets = if hropts.hroptsAll then [] else targetNames }
+        { BuildOptsCLI.targets = if hropts.hroptsAll then [] else targetNames }
   withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
     generateHpcReportForTargets hropts tixFiles targetNames
 
@@ -372,7 +374,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
           : mkNarrativeList (Just Target) False
               (map (fromString . T.unpack) targetNames :: [StyleDoc])
       targets <-
-        view $ envConfigL . to (.sourceMap.smTargets.smtTargets)
+        view $ envConfigL . to (.sourceMap.targets.targets)
       fmap concat $ forM (Map.toList targets) $ \(name, target) ->
         case target of
           TargetAll PTDependency -> prettyThrowIO $ NotLocalPackage name

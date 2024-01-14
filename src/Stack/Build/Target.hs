@@ -1,10 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -- | Parsing command line targets
 --
@@ -577,8 +578,8 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   addedDeps' <- mapM (additionalDepPackage haddockDeps . PLImmutable) addedDeps
 
   pure SMTargets
-    { smtTargets = targets
-    , smtDeps = addedDeps'
+    { targets = targets
+    , deps = addedDeps'
     }
  where
   bcImplicitGlobal bconfig =
