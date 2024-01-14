@@ -76,9 +76,9 @@ data DepPackage = DepPackage
 
 -- | A view of a project package needed for resolving components
 data ProjectPackage = ProjectPackage
-  { ppCommon :: !CommonPackage
-  , ppCabalFP :: !(Path Abs File)
-  , ppResolvedDir :: !(ResolvedPath Dir)
+  { common :: !CommonPackage
+  , cabalFP :: !(Path Abs File)
+  , resolvedDir :: !(ResolvedPath Dir)
   }
 
 -- | A view of a package installed in the global package database also could
@@ -172,11 +172,11 @@ smRelDir :: (MonadThrow m) => SourceMapHash -> m (Path Rel Dir)
 smRelDir (SourceMapHash smh) = parseRelDir $ T.unpack $ SHA256.toHexText smh
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
-ppGPD = liftIO . (.ppCommon.gpd)
+ppGPD = liftIO . (.common.gpd)
 
 -- | Root directory for the given 'ProjectPackage'
 ppRoot :: ProjectPackage -> Path Abs Dir
-ppRoot = parent . (.ppCabalFP)
+ppRoot = parent . (.cabalFP)
 
 -- | All components available in the given 'ProjectPackage'
 ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)

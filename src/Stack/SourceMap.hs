@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Stack.SourceMap
   ( mkProjectPackage
@@ -63,9 +64,9 @@ mkProjectPackage printWarnings dir buildHaddocks = do
   (gpd, name, cabalfp) <-
     loadCabalFilePath (Just stackProgName') (resolvedAbsolute dir)
   pure ProjectPackage
-    { ppCabalFP = cabalfp
-    , ppResolvedDir = dir
-    , ppCommon =
+    { cabalFP = cabalfp
+    , resolvedDir = dir
+    , common =
         CommonPackage
           { gpd = gpd printWarnings
           , name = name
@@ -236,7 +237,7 @@ getUnusedPackageFlags ::
   -> Map PackageName DepPackage
   -> m (Maybe UnusedFlags)
 getUnusedPackageFlags (name, userFlags) source prj deps =
-  let maybeCommon =     fmap (.ppCommon) (Map.lookup name prj)
+  let maybeCommon =     fmap (.common) (Map.lookup name prj)
                     <|> fmap (.common) (Map.lookup name deps)
   in  case maybeCommon of
         -- Package is not available as project or dependency
@@ -297,7 +298,7 @@ loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
   pure $ \projectPackages -> do
     prjPkgs <- fmap Map.fromList . for projectPackages $ \resolved -> do
       pp <- mkProjectPackage printWarnings resolved buildHaddocks
-      pure (pp.ppCommon.name, pp)
+      pure (pp.common.name, pp)
     compiler <- either throwIO pure $ wantedToActual $ snapshotCompiler snapshot
     pure
       SMActual

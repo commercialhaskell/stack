@@ -78,7 +78,7 @@ listPackages stream flag = do
         ListPackageNames ->
           map packageNameString (Map.keys packages)
         ListPackageCabalFiles ->
-          map (toFilePath . (.ppCabalFP)) (Map.elems packages)
+          map (toFilePath . (.cabalFP)) (Map.elems packages)
   mapM_ (outputFunc stream) strs
 
 -- | List the targets in the current project.

@@ -68,6 +68,8 @@ import           Stack.Types.SourceMap
                    , SMActual (..), SMTargets (..), SourceMap (..)
                    , SourceMapHash (..), Target (..), ppGPD, ppRoot
                    )
+import qualified Stack.Types.SourceMap as DepPackage ( DepPackage (..) )
+import qualified Stack.Types.SourceMap as ProjectPackage ( ProjectPackage (..) )
 import           Stack.Types.UnusedFlags ( FlagSource (..) )
 import           System.FilePath ( takeFileName )
 import           System.IO.Error ( isDoesNotExistError )
@@ -102,12 +104,16 @@ loadSourceMap smt boptsCli sma = do
   let compiler = sma.smaCompiler
       project = M.map applyOptsFlagsPP sma.smaProject
       bopts = bconfig.config.build
-      applyOptsFlagsPP p@ProjectPackage{ppCommon = c} =
-        p{ppCommon = applyOptsFlags (M.member c.name smt.smtTargets) True c}
+      applyOptsFlagsPP p@ProjectPackage{ common = c } = p
+        { ProjectPackage.common =
+            applyOptsFlags (M.member c.name smt.smtTargets) True c
+        }
       deps0 = smt.smtDeps <> sma.smaDeps
       deps = M.map applyOptsFlagsDep deps0
-      applyOptsFlagsDep d@DepPackage{ common = c } =
-        d{ common = applyOptsFlags (M.member c.name smt.smtDeps) False c }
+      applyOptsFlagsDep d@DepPackage{ common = c } = d
+        { DepPackage.common =
+            applyOptsFlags (M.member c.name smt.smtDeps) False c
+        }
       applyOptsFlags isTarget isProjectPackage common =
         let name = common.name
             flags = getLocalFlags boptsCli name
@@ -300,7 +306,7 @@ loadLocalPackage ::
   -> RIO env LocalPackage
 loadLocalPackage pp = do
   sm <- view sourceMapL
-  let common = pp.ppCommon
+  let common = pp.common
   bopts <- view buildOptsL
   mcurator <- view $ buildConfigL . to (.curator)
   config <- getPackageConfig
@@ -381,7 +387,7 @@ loadLocalPackage pp = do
         | otherwise = Just (resolvePackage btconfig gpkg)
 
   componentFiles <- memoizeRefWith $
-    fst <$> getPackageFilesForTargets pkg pp.ppCabalFP nonLibComponents
+    fst <$> getPackageFilesForTargets pkg pp.cabalFP nonLibComponents
 
   checkCacheResults <- memoizeRefWith $ do
     componentFiles' <- runMemoizedWith componentFiles
@@ -409,11 +415,11 @@ loadLocalPackage pp = do
     { package = pkg
     , testBench = btpkg
     , componentFiles = componentFiles
-    , buildHaddocks = pp.ppCommon.haddocks
+    , buildHaddocks = pp.common.haddocks
     , forceDirty = bopts.forceDirty
     , dirtyFiles = dirtyFiles
     , newBuildCaches = newBuildCaches
-    , cabalFile = pp.ppCabalFP
+    , cabalFile = pp.cabalFP
     , wanted = isWanted
     , components = nonLibComponents
       -- TODO: refactor this so that it's easier to be sure that these

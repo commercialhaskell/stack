@@ -423,7 +423,7 @@ getAllLocalTargets ghciOpts targets0 mainIsTargets localMap = do
   let directlyWanted = flip mapMaybe (M.toList packages) $
         \(name, pp) ->
               case M.lookup name targets of
-                Just simpleTargets -> Just (name, (pp.ppCabalFP, simpleTargets))
+                Just simpleTargets -> Just (name, (pp.cabalFP, simpleTargets))
                 Nothing -> Nothing
   -- Figure out
   let extraLoadDeps =
@@ -846,15 +846,15 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
       -- Currently this source map is being build with
       -- the default targets
       sourceMapGhcOptions = fromMaybe [] $
-        ((.ppCommon.ghcOptions) <$> M.lookup name sm.smProject)
+        ((.common.ghcOptions) <$> M.lookup name sm.smProject)
         <|>
         ((.common.ghcOptions) <$> M.lookup name sm.smDeps)
       sourceMapCabalConfigOpts = fromMaybe [] $
-        ( (.ppCommon.cabalConfigOpts) <$> M.lookup name sm.smProject)
+        ( (.common.cabalConfigOpts) <$> M.lookup name sm.smProject)
         <|>
         ((.common.cabalConfigOpts) <$> M.lookup name sm.smDeps)
       sourceMapFlags =
-        maybe mempty (.ppCommon.flags) $ M.lookup name sm.smProject
+        maybe mempty (.common.flags) $ M.lookup name sm.smProject
       config = PackageConfig
         { enableTests = True
         , enableBenchmarks = True

@@ -40,7 +40,7 @@ toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do
   projectInstalls <-
     for sourceMap.smProject $ \pp -> do
-      version <- loadVersion pp.ppCommon
+      version <- loadVersion pp.common
       pure (Local, version)
   depInstalls <-
     for sourceMap.smDeps $ \dp ->

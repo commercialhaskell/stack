@@ -256,7 +256,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
   projectPackageDeps = loadDeps <$> Map.lookup pkgName sourceMap.smProject
    where
     loadDeps pp = do
-      pkg <- loadCommonPackage pp.ppCommon
+      pkg <- loadCommonPackage pp.common
       pure (setOfPackageDeps pkg, payloadFromLocal pkg Nothing)
 
   dependencyDeps =
@@ -264,7 +264,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
    where
     loadDeps DepPackage{ location = PLMutable dir } = do
       pp <- mkProjectPackage YesPrintWarnings dir False
-      pkg <- loadCommonPackage pp.ppCommon
+      pkg <- loadCommonPackage pp.common
       pure (setOfPackageDeps pkg, payloadFromLocal pkg (Just $ PLMutable dir))
 
     loadDeps dp@DepPackage{ location = PLImmutable loc } = do
