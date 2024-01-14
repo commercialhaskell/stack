@@ -350,6 +350,43 @@ Once installed, you can check your changes with command:
 stack exec -- sh ./etc/scripts/hlint.sh
 ~~~
 
+## Code syntax
+
+Stack makes use of GHC's `GHC2021` collection of language extensions, which is
+set using the `language` key in the `package.yaml` file.
+
+Stack makes use of single-constructor types where the constructor has a large
+number of fields. Some of those fields have similar types, and so on. Given
+that, Stack makes use of `OverloadedRecordDot`, introduced in GHC 9.2.1. It also
+makes use of `NoFieldSelectors`, also introduced in GHC 9.2.1, and, where
+necessary, `DuplicateRecordFields`. Together, these language extensions enable
+the removal from the names of fields of the prefixes that were used historically
+to indicate the type and make field names unique. This is because the names of
+fields no longer need to be unique in situations where the intended field is
+unambiguous. This allows for a terser syntax without loss of expressiveness.
+For example:
+
+~~~haskell
+let cliTargets = (boptsCLITargets . bcoBuildOptsCLI) bco
+~~~
+
+can become:
+
+~~~haskell
+let cliTargets = bco.buildOptsCLI.targets
+~~~
+
+The intended field is unambiguous in almost all cases. In the case of a few
+record updates it is ambiguous. The name of the field needs to be qualified in
+those cases. For example:
+
+~~~haskell
+import qualified  Stack.Types.Build as ConfigCache ( ConfigCache (..) )
+...
+let ignoreComponents :: ConfigCache -> ConfigCache
+    ignoreComponents cc = cc { ConfigCache.components = Set.empty }
+~~~
+
 ## Code Style
 
 A single code style is not applied consistently to Stack's code and Stack is not
