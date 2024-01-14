@@ -98,7 +98,7 @@ getCmdArgs ::
 getCmdArgs docker imageInfo isRemoteDocker = do
     config <- view configL
     deUser <-
-        if fromMaybe (not isRemoteDocker) docker.dockerSetUser
+        if fromMaybe (not isRemoteDocker) docker.setUser
             then liftIO $ do
               duUid <- User.getEffectiveUserID
               duGid <- User.getEffectiveGroupID
@@ -121,7 +121,7 @@ getCmdArgs docker imageInfo isRemoteDocker = do
              ] ++
           )
           (liftIO getArgs)
-    case config.docker.dockerStackExe of
+    case config.docker.stackExe of
         Just DockerStackExeHost
           | config.platform == dockerContainerPlatform -> do
               exePath <- resolveFile' =<< liftIO getExecutablePath
@@ -216,7 +216,7 @@ runContainerAndExit = do
       muserEnv = lookup "USER" env
       isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
   mstackYaml <- for (lookup "STACK_YAML" env) RIO.Directory.makeAbsolute
-  image <- either throwIO pure docker.dockerImage
+  image <- either throwIO pure docker.image
   when
     ( isRemoteDocker && maybe False (isInfixOf "boot2docker") dockerCertPath )
     ( prettyWarnS
@@ -226,7 +226,7 @@ runContainerAndExit = do
   imageInfo <- case maybeImageInfo of
     Just ii -> pure ii
     Nothing
-      | docker.dockerAutoPull -> do
+      | docker.autoPull -> do
           pullImage docker image
           mii2 <- inspect image
           case mii2 of
@@ -240,11 +240,11 @@ runContainerAndExit = do
       platformVariant = show $ hashRepoName image
       stackRoot = view stackRootL config
       sandboxHomeDir = sandboxDir </> homeDirName
-      isTerm = not docker.dockerDetach &&
+      isTerm = not docker.detach &&
                isStdinTerminal &&
                isStdoutTerminal &&
                isStderrTerminal
-      keepStdinOpen = not docker.dockerDetach &&
+      keepStdinOpen = not docker.detach &&
                       -- Workaround for https://github.com/docker/docker/issues/12319
                       -- This is fixed in Docker 1.9.1, but will leave the workaround
                       -- in place for now, for users who haven't upgraded yet.
@@ -277,7 +277,7 @@ runContainerAndExit = do
       (Files.createSymbolicLink
         (toFilePathNoTrailingSep sshDir)
         (toFilePathNoTrailingSep (sandboxHomeDir </> sshRelDir))))
-  let mountSuffix = maybe "" (":" ++) docker.dockerMountMode
+  let mountSuffix = maybe "" (":" ++) docker.mountMode
   containerID <- withWorkingDir (toFilePath projectRoot) $
     trim . decodeUtf8 <$> readDockerProcess
       ( concat
@@ -302,7 +302,7 @@ runContainerAndExit = do
               toFilePathNoTrailingSep sandboxHomeDir ++ mountSuffix
           , "-w", toFilePathNoTrailingSep pwd
           ]
-        , case docker.dockerNetwork of
+        , case docker.network of
             Nothing -> ["--net=host"]
             Just name -> ["--net=" ++ name]
         , case muserEnv of
@@ -328,14 +328,14 @@ runContainerAndExit = do
              )
           ]
         , concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
-        , concatMap (mountArg mountSuffix) (extraMount ++ docker.dockerMount)
-        , concatMap (\nv -> ["-e", nv]) docker.dockerEnv
-        , case docker.dockerContainerName of
+        , concatMap (mountArg mountSuffix) (extraMount ++ docker.mount)
+        , concatMap (\nv -> ["-e", nv]) docker.env
+        , case docker.containerName of
             Just name -> ["--name=" ++ name]
             Nothing -> []
         , ["-t" | isTerm]
         , ["-i" | keepStdinOpen]
-        , docker.dockerRunArgs
+        , docker.runArgs
         , [image]
         , [cmnd]
         , args
@@ -400,7 +400,7 @@ pull = do
   config <- view configL
   let docker = config.docker
   checkDockerVersion docker
-  either throwIO (pullImage docker) docker.dockerImage
+  either throwIO (pullImage docker) docker.image
 
 -- | Pull Docker image from registry.
 pullImage :: (HasProcessContext env, HasTerm env)
@@ -412,14 +412,14 @@ pullImage docker image = do
     [ flow "Pulling image from registry:"
     , style Current (fromString image) <> "."
     ]
-  when docker.dockerRegistryLogin $ do
+  when docker.registryLogin $ do
     prettyInfoS "You may need to log in."
     proc
       "docker"
       ( concat
           [ ["login"]
-          , maybe [] (\n -> ["--username=" ++ n]) docker.dockerRegistryUsername
-          , maybe [] (\p -> ["--password=" ++ p]) docker.dockerRegistryPassword
+          , maybe [] (\n -> ["--username=" ++ n]) docker.registryUsername
+          , maybe [] (\p -> ["--password=" ++ p]) docker.registryPassword
           , [takeWhile (/= '/') image]
           ]
       )
@@ -454,8 +454,8 @@ checkDockerVersion docker = do
             throwIO (DockerTooOldException minimumDockerVersion v')
           | v' `elem` prohibitedDockerVersions ->
             throwIO (DockerVersionProhibitedException prohibitedDockerVersions v')
-          | not (v' `withinRange` docker.dockerRequireDockerVersion) ->
-            throwIO (BadDockerVersionException docker.dockerRequireDockerVersion v')
+          | not (v' `withinRange` docker.requireDockerVersion) ->
+            throwIO (BadDockerVersionException docker.requireDockerVersion v')
           | otherwise ->
             pure ()
         _ -> throwIO InvalidVersionOutputException

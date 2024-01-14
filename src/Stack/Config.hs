@@ -119,7 +119,7 @@ import           Stack.Types.Config.Exception
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )
 import           Stack.Types.Casa ( CasaOptsMonoid (..) )
-import           Stack.Types.Docker ( DockerOptsMonoid (..), dockerEnable )
+import           Stack.Types.Docker ( DockerOpts (..), DockerOptsMonoid (..) )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
 import           Stack.Types.Nix ( NixOpts (..) )
@@ -337,7 +337,7 @@ configFromConfigMonoid
         _ ->
           pure
             (fromFirst
-              (docker.dockerEnable || nix.enable)
+              (docker.enable || nix.enable)
               configMonoid.configMonoidSystemGHC)
     when (isJust ghcVariant && systemGHC) $
       throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
