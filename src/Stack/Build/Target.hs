@@ -254,9 +254,9 @@ resolveRawTarget ::
 resolveRawTarget sma allLocs (ri, rt) =
   go rt
  where
-  locals = sma.smaProject
-  deps = sma.smaDeps
-  globals = sma.smaGlobal
+  locals = sma.project
+  deps = sma.deps
+  globals = sma.global
   -- Helper function: check if a 'NamedComponent' matches the given
   -- 'ComponentName'
   isCompNamed :: ComponentName -> NamedComponent -> Bool
@@ -543,7 +543,7 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir locals
 
-  let depLocs = Map.map (.location) smActual.smaDeps
+  let depLocs = Map.map (.location) smActual.deps
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
     resolveRawTarget smActual depLocs

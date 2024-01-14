@@ -114,10 +114,10 @@ data SMWanted = SMWanted
 --
 -- Invariant: a @PackageName@ appears in only one of the @Map@s.
 data SMActual global = SMActual
-  { smaCompiler :: !ActualCompiler
-  , smaProject :: !(Map PackageName ProjectPackage)
-  , smaDeps :: !(Map PackageName DepPackage)
-  , smaGlobal :: !(Map PackageName global)
+  { compiler :: !ActualCompiler
+  , project :: !(Map PackageName ProjectPackage)
+  , deps :: !(Map PackageName DepPackage)
+  , global :: !(Map PackageName global)
   }
 
 newtype GlobalPackageVersion

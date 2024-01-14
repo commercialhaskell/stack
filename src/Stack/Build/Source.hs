@@ -101,14 +101,14 @@ loadSourceMap :: HasBuildConfig env
               -> RIO env SourceMap
 loadSourceMap smt boptsCli sma = do
   bconfig <- view buildConfigL
-  let compiler = sma.smaCompiler
-      project = M.map applyOptsFlagsPP sma.smaProject
+  let compiler = sma.compiler
+      project = M.map applyOptsFlagsPP sma.project
       bopts = bconfig.config.build
       applyOptsFlagsPP p@ProjectPackage{ common = c } = p
         { ProjectPackage.common =
             applyOptsFlags (M.member c.name smt.smtTargets) True c
         }
-      deps0 = smt.smtDeps <> sma.smaDeps
+      deps0 = smt.smtDeps <> sma.deps
       deps = M.map applyOptsFlagsDep deps0
       applyOptsFlagsDep d@DepPackage{ common = c } = d
         { DepPackage.common =
@@ -140,7 +140,7 @@ loadSourceMap smt boptsCli sma = do
         Map.toList boptsCli.flags
       maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
       maybeProjectFlags _ = Nothing
-      globals = pruneGlobals sma.smaGlobal (Map.keysSet deps)
+      globals = pruneGlobals sma.global (Map.keysSet deps)
   logDebug "Checking flags"
   checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
   logDebug "SourceMap constructed"

@@ -680,10 +680,10 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
 
   (sourceMap, sourceMapHash) <- runWithGHC menv compilerPaths $ do
     smActual <- actualFromGhc bc.smWanted compilerVer
-    let actualPkgs = Map.keysSet smActual.smaDeps <>
-                     Map.keysSet smActual.smaProject
+    let actualPkgs = Map.keysSet smActual.deps <>
+                     Map.keysSet smActual.project
         prunedActual = smActual
-          { smaGlobal = pruneGlobals smActual.smaGlobal actualPkgs }
+          { global = pruneGlobals smActual.global actualPkgs }
         haddockDeps = shouldHaddockDeps config.build
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
@@ -955,9 +955,9 @@ rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
   runRIO (WithGHC cp bc) $ do
     smActual <- actualFromGhc bc.smWanted compilerVer
     let actualPkgs =
-          Map.keysSet smActual.smaDeps <> Map.keysSet smActual.smaProject
+          Map.keysSet smActual.deps <> Map.keysSet smActual.project
         prunedActual = smActual
-          { smaGlobal = pruneGlobals smActual.smaGlobal actualPkgs }
+          { global = pruneGlobals smActual.global actualPkgs }
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
     pure $ envConfig

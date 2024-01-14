@@ -232,10 +232,10 @@ ghci opts = do
         M.fromList [(lp.package.name, lp) | lp <- locals ++ depLocals]
       -- FIXME:qrilka this looks wrong to go back to SMActual
       sma = SMActual
-        { smaCompiler = sourceMap.smCompiler
-        , smaProject = sourceMap.smProject
-        , smaDeps = sourceMap.smDeps
-        , smaGlobal = sourceMap.smGlobal
+        { compiler = sourceMap.smCompiler
+        , project = sourceMap.smProject
+        , deps = sourceMap.smDeps
+        , global = sourceMap.smGlobal
         }
   -- Parse --main-is argument.
   mainIsTargets <- parseMainIsTargets buildOptsCLI sma opts.ghciMainIs

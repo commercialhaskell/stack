@@ -115,10 +115,10 @@ withDotConfig opts inner =
     actual <- either throwIO pure $
       wantedToActual bconfig.smWanted.compiler
     let smActual = SMActual
-          { smaCompiler = actual
-          , smaProject = bconfig.smWanted.project
-          , smaDeps =  bconfig.smWanted.deps
-          , smaGlobal = Map.mapWithKey toDump globals
+          { compiler = actual
+          , project = bconfig.smWanted.project
+          , deps =  bconfig.smWanted.deps
+          , global = Map.mapWithKey toDump globals
           }
         toDump :: PackageName -> Version -> DumpPackage
         toDump name version = DumpPackage
@@ -136,16 +136,16 @@ withDotConfig opts inner =
           , isExposed = True
           }
         actualPkgs =
-          Map.keysSet smActual.smaDeps <> Map.keysSet smActual.smaProject
+          Map.keysSet smActual.deps <> Map.keysSet smActual.project
         prunedActual =
-          smActual { smaGlobal = pruneGlobals smActual.smaGlobal actualPkgs }
+          smActual { global = pruneGlobals smActual.global actualPkgs }
     targets <- parseTargets NeedTargets False boptsCLI prunedActual
     logDebug "Loading source map"
     sourceMap <- loadSourceMap targets boptsCLI smActual
     let dc = DotConfig
                 { dcBuildConfig = bconfig
                 , dcSourceMap = sourceMap
-                , dcGlobalDump = toList smActual.smaGlobal
+                , dcGlobalDump = toList smActual.global
                 }
     logDebug "DotConfig fully loaded"
     runRIO dc inner
