@@ -1,8 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Resolving a build plan for a set of packages in a given Stackage snapshot.
 
@@ -380,7 +381,7 @@ checkSnapBuildPlan ::
 checkSnapBuildPlan pkgDirs flags snapCandidate = do
   platform <- view platformL
   sma <- snapCandidate pkgDirs
-  gpds <- liftIO $ forM (Map.elems sma.smaProject) (.ppCommon.cpGPD)
+  gpds <- liftIO $ forM (Map.elems sma.smaProject) (.ppCommon.gpd)
 
   let compiler = sma.smaCompiler
       globalVersion (GlobalPackageVersion v) = v

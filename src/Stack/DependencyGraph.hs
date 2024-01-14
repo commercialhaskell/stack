@@ -269,11 +269,11 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
 
     loadDeps dp@DepPackage{dpLocation=PLImmutable loc} = do
       let common = dp.dpCommon
-      gpd <- liftIO common.cpGPD
+      gpd <- liftIO common.gpd
       let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
-          flags = common.cpFlags
-          ghcOptions = common.cpGhcOptions
-          cabalConfigOpts = common.cpCabalConfigOpts
+          flags = common.flags
+          ghcOptions = common.ghcOptions
+          cabalConfigOpts = common.cabalConfigOpts
       assert
         (pkgName == name)
         (loadPackageDeps pkgName version loc flags ghcOptions cabalConfigOpts)

@@ -138,6 +138,7 @@ import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
                    , SMWanted (..)
                    )
+import qualified Stack.Types.SourceMap as CommonPackage ( CommonPackage (..) )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
 import           Stack.Types.UnusedFlags ( FlagSource (..) )
 import           Stack.Types.Version
@@ -861,7 +862,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
     abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
     let resolved = ResolvedPath fp abs'
     pp <- mkProjectPackage YesPrintWarnings resolved bopts.haddock
-    pure (pp.ppCommon.cpName, pp)
+    pure (pp.ppCommon.name, pp)
 
   -- prefetch git repos to avoid cloning per subdirectory
   -- see https://github.com/commercialhaskell/stack/issues/5411
@@ -891,7 +892,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
        RPLMutable p ->
          pure (PLMutable p, Nothing)
     dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
-    pure ((dp.dpCommon.cpName, dp), mCompleted)
+    pure ((dp.dpCommon.name, dp), mCompleted)
 
   checkDuplicateNames $
     map (second (PLMutable . (.ppResolvedDir))) packages0 ++
@@ -911,17 +912,17 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
         MS.merge MS.preserveMissing MS.dropMissing (MS.zipWithMatched f) m1 m2
       pFlags = project.flags
       packages2 = mergeApply packages1 pFlags $
-        \_ p flags -> p{ppCommon = p.ppCommon {cpFlags=flags}}
+        \_ p flags -> p{ ppCommon = p.ppCommon { CommonPackage.flags = flags } }
       deps2 = mergeApply deps1 pFlags $
-        \_ d flags -> d{dpCommon = d.dpCommon {cpFlags=flags}}
+        \_ d flags -> d{ dpCommon = d.dpCommon { CommonPackage.flags = flags } }
 
   checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
 
   let pkgGhcOptions = config.ghcOptionsByName
       deps = mergeApply deps2 pkgGhcOptions $
-        \_ d options -> d{dpCommon = d.dpCommon {cpGhcOptions=options}}
+        \_ d options -> d{ dpCommon = d.dpCommon { ghcOptions = options } }
       packages = mergeApply packages2 pkgGhcOptions $
-        \_ p options -> p{ppCommon = p.ppCommon {cpGhcOptions=options}}
+        \_ p options -> p{ ppCommon = p.ppCommon { ghcOptions = options } }
       unusedPkgGhcOptions =
         pkgGhcOptions `Map.restrictKeys` Map.keysSet packages2
           `Map.restrictKeys` Map.keysSet deps2
