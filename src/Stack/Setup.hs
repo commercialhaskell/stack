@@ -2093,7 +2093,7 @@ getGhcKey ::
   -> RIO env Text
 getGhcKey ghcBuild = do
   ghcVariant <- view ghcVariantL
-  wantedComiler <- view $ buildConfigL . to (.smWanted.smwCompiler)
+  wantedComiler <- view $ buildConfigL . to (.smWanted.compiler)
   ghcVersion <- case wantedComiler of
         WCGhc version -> pure version
         WCGhcjs _ _ ->  throwIO GhcjsNotSupported

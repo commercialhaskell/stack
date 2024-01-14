@@ -102,4 +102,4 @@ getProjectWorkDir = do
 -- | The compiler specified by the @SnapshotDef@. This may be different from the
 -- actual compiler used!
 wantedCompilerVersionL :: HasBuildConfig s => Getting r s WantedCompiler
-wantedCompilerVersionL = buildConfigL . to (.smWanted.smwCompiler)
+wantedCompilerVersionL = buildConfigL . to (.smWanted.compiler)

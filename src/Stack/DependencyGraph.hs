@@ -87,7 +87,7 @@ createPrunedDependencyGraph ::
        (Set PackageName, Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
   localNames <-
-    view $ buildConfigL . to (Map.keysSet . (.smWanted.smwProject))
+    view $ buildConfigL . to (Map.keysSet . (.smWanted.project))
   logDebug "Creating dependency graph"
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotOpts.dotIncludeBase
@@ -110,14 +110,14 @@ withDotConfig opts inner =
  where
   withGlobalHints = do
     bconfig <- view buildConfigL
-    globals <- globalsFromHints bconfig.smWanted.smwCompiler
+    globals <- globalsFromHints bconfig.smWanted.compiler
     fakeGhcPkgId <- parseGhcPkgId "ignored"
     actual <- either throwIO pure $
-      wantedToActual bconfig.smWanted.smwCompiler
+      wantedToActual bconfig.smWanted.compiler
     let smActual = SMActual
           { smaCompiler = actual
-          , smaProject = bconfig.smWanted.smwProject
-          , smaDeps =  bconfig.smWanted.smwDeps
+          , smaProject = bconfig.smWanted.project
+          , smaDeps =  bconfig.smWanted.deps
           , smaGlobal = Map.mapWithKey toDump globals
           }
         toDump :: PackageName -> Version -> DumpPackage

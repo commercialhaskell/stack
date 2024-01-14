@@ -1148,7 +1148,7 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
       , ""
       , flow $ T.unpack $ utf8BuilderToText $
                "You are using snapshot: " <>
-               display smWanted.smwSnapshotLocation
+               display smWanted.snapshotLocation
       , ""
       , flow "If you want to use package hiding and options, then you can try \
              \one of the following:"

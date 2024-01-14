@@ -102,10 +102,10 @@ isReplacedGlobal (GlobalPackage _) = False
 -- Invariant: a @PackageName@ appears in either 'smwProject' or 'smwDeps', but
 -- not both.
 data SMWanted = SMWanted
-  { smwCompiler :: !WantedCompiler
-  , smwProject :: !(Map PackageName ProjectPackage)
-  , smwDeps :: !(Map PackageName DepPackage)
-  , smwSnapshotLocation :: !RawSnapshotLocation
+  { compiler :: !WantedCompiler
+  , project :: !(Map PackageName ProjectPackage)
+  , deps :: !(Map PackageName DepPackage)
+  , snapshotLocation :: !RawSnapshotLocation
     -- ^ Where this snapshot is loaded from.
   }
 

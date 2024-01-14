@@ -183,8 +183,8 @@ actualFromGhc smw ac = do
   pure
     SMActual
       { smaCompiler = ac
-      , smaProject = smw.smwProject
-      , smaDeps = smw.smwDeps
+      , smaProject = smw.project
+      , smaDeps = smw.deps
       , smaGlobal = globals
       }
 
@@ -198,8 +198,8 @@ actualFromHints smw ac = do
   pure
     SMActual
       { smaCompiler = ac
-      , smaProject = smw.smwProject
-      , smaDeps = smw.smwDeps
+      , smaProject = smw.project
+      , smaDeps = smw.deps
       , smaGlobal = Map.map GlobalPackageVersion globals
       }
 
