@@ -437,7 +437,7 @@ configFromConfigMonoid
     useAnsi <- liftIO $ hNowSupportsANSI stderr
     let stylesUpdate' = (configRunner' ^. stylesUpdateL) <>
           configMonoid.configMonoidStyles
-        useColor' = configRunner'.runnerUseColor
+        useColor' = configRunner'.useColor
         mUseColor = do
           colorWhen <- getFirst configMonoid.configMonoidColorWhen
           pure $ case colorWhen of
@@ -449,7 +449,7 @@ configFromConfigMonoid
           & processContextL .~ origEnv
           & stylesUpdateL .~ stylesUpdate'
           & useColorL .~ useColor''
-        go = configRunner'.runnerGlobalOpts
+        go = configRunner'.globalOpts
     pic <-
       case getFirst configMonoid.configMonoidPackageIndex of
         Nothing ->

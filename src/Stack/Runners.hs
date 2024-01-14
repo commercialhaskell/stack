@@ -1,7 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Utilities for running stack commands.
 --
@@ -235,12 +236,12 @@ withRunnerGlobal go inner = do
   let update = go.stylesUpdate
   withNewLogFunc go useColor update $ \logFunc -> do
     runRIO Runner
-      { runnerGlobalOpts = go
-      , runnerUseColor = useColor
-      , runnerLogFunc = logFunc
-      , runnerTermWidth = termWidth
-      , runnerProcessContext = menv
-      , runnerDockerEntrypointMVar = dockerEntrypointMVar
+      { globalOpts = go
+      , useColor = useColor
+      , logFunc = logFunc
+      , termWidth = termWidth
+      , processContext = menv
+      , dockerEntrypointMVar = dockerEntrypointMVar
       } inner
  where
   clipWidth w
