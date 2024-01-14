@@ -179,8 +179,8 @@ constructPlan
           , unregisterLocal =
               mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps
           , installExes =
-              if    baseConfigOpts0.bcoBuildOpts.installExes
-                 || baseConfigOpts0.bcoBuildOpts.installCompilerTool
+              if    baseConfigOpts0.buildOpts.installExes
+                 || baseConfigOpts0.buildOpts.installCompilerTool
                 then installExes
                 else Map.empty
           }
@@ -225,7 +225,7 @@ constructPlan
   toMaybe (k, Just v) = Just (k, v)
 
   takeSubset :: Plan -> RIO env Plan
-  takeSubset = case baseConfigOpts0.bcoBuildOptsCLI.buildSubset of
+  takeSubset = case baseConfigOpts0.buildOptsCLI.buildSubset of
     BSAll -> pure
     BSOnlySnapshot -> stripLocals
     BSOnlyDependencies -> stripNonDeps

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -37,13 +38,13 @@ import           System.FilePath ( pathSeparator )
 
 -- | Basic information used to calculate what the configure options are
 data BaseConfigOpts = BaseConfigOpts
-  { bcoSnapDB :: !(Path Abs Dir)
-  , bcoLocalDB :: !(Path Abs Dir)
-  , bcoSnapInstallRoot :: !(Path Abs Dir)
-  , bcoLocalInstallRoot :: !(Path Abs Dir)
-  , bcoBuildOpts :: !BuildOpts
-  , bcoBuildOptsCLI :: !BuildOptsCLI
-  , bcoExtraDBs :: ![Path Abs Dir]
+  { snapDB :: !(Path Abs Dir)
+  , localDB :: !(Path Abs Dir)
+  , snapInstallRoot :: !(Path Abs Dir)
+  , localInstallRoot :: !(Path Abs Dir)
+  , buildOpts :: !BuildOpts
+  , buildOptsCLI :: !BuildOptsCLI
+  , extraDBs :: ![Path Abs Dir]
   }
   deriving Show
 
@@ -68,8 +69,8 @@ configureOptsDirs :: BaseConfigOpts
 configureOptsDirs bco isMutable package = concat
   [ ["--user", "--package-db=clear", "--package-db=global"]
   , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case isMutable of
-      Immutable -> bco.bcoExtraDBs ++ [bco.bcoSnapDB]
-      Mutable -> bco.bcoExtraDBs ++ [bco.bcoSnapDB] ++ [bco.bcoLocalDB]
+      Immutable -> bco.extraDBs ++ [bco.snapDB]
+      Mutable -> bco.extraDBs ++ [bco.snapDB] ++ [bco.localDB]
   , [ "--libdir=" ++ toFilePathNoTrailingSep (installRoot </> relDirLib)
     , "--bindir=" ++ toFilePathNoTrailingSep (installRoot </> bindirSuffix)
     , "--datadir=" ++ toFilePathNoTrailingSep (installRoot </> relDirShare)
@@ -82,8 +83,8 @@ configureOptsDirs bco isMutable package = concat
  where
   installRoot =
     case isMutable of
-      Immutable -> bco.bcoSnapInstallRoot
-      Mutable -> bco.bcoLocalInstallRoot
+      Immutable -> bco.snapInstallRoot
+      Mutable -> bco.localInstallRoot
   docDir =
     case pkgVerDir of
       Nothing -> installRoot </> docDirSuffix
@@ -169,7 +170,7 @@ configureOptsNoDir econfig bco deps isLocal package = concat
     ghcVersion >= C.mkVersion [8, 2] && config.hideSourcePaths
 
   config = view configL econfig
-  bopts = bco.bcoBuildOpts
+  bopts = bco.buildOpts
 
   -- Unioning atop defaults is needed so that all flags are specified with
   -- --exact-configuration.

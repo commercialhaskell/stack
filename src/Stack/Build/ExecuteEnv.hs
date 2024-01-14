@@ -1,9 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE NoFieldSelectors    #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 -- | Provides all the necessary types and functions for running cabal Setup.hs
 -- commands. Only used in the "Execute" and "ExecutePackage" modules
@@ -696,13 +697,13 @@ withSingleContext
             : "-global-package-db"
             : map
                 (("-package-db=" ++) . toFilePathNoTrailingSep)
-                ee.baseConfigOpts.bcoExtraDBs
+                ee.baseConfigOpts.extraDBs
             ) ++
             ( (  "-package-db="
-              ++ toFilePathNoTrailingSep ee.baseConfigOpts.bcoSnapDB
+              ++ toFilePathNoTrailingSep ee.baseConfigOpts.snapDB
               )
             : (  "-package-db="
-              ++ toFilePathNoTrailingSep ee.baseConfigOpts.bcoLocalDB
+              ++ toFilePathNoTrailingSep ee.baseConfigOpts.localDB
               )
             : ["-hide-all-packages"]
             )
@@ -798,9 +799,9 @@ withSingleContext
                      : "-global-package-db"
                      : map
                          (("-package-db=" ++) . toFilePathNoTrailingSep)
-                         ee.baseConfigOpts.bcoExtraDBs
+                         ee.baseConfigOpts.extraDBs
                      ++ [    "-package-db="
-                          ++ toFilePathNoTrailingSep ee.baseConfigOpts.bcoSnapDB
+                          ++ toFilePathNoTrailingSep ee.baseConfigOpts.snapDB
                         ]
                      )
 
