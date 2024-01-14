@@ -83,17 +83,6 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-fki0nd-1205:3"
-# ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
-# ✦ Category:      #AntiPattern
-# ✦ File:          src\Stack\Build\Execute.hs
-#
-#  1204 ┃
-#  1205 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  1206 ┃   ^^^^^^^
-
-# Anti-pattern: Data.ByteString.Char8.pack
-[[ignore]]
   id = "OBS-STAN-0203-erw24B-1020:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern

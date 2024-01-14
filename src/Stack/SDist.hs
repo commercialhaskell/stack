@@ -50,9 +50,8 @@ import           RIO.NonEmpty ( nonEmpty )
 import qualified RIO.NonEmpty as NE
 import           Stack.Build ( mkBaseConfigOpts, build, buildLocalTargets )
 import           Stack.Build.Execute
-                   ( ExcludeTHLoading (..), KeepOutputOpen (..), withExecuteEnv
-                   , withSingleContext
-                   )
+                   ( ExcludeTHLoading (..), KeepOutputOpen (..) )
+import           Stack.Build.ExecuteEnv ( withExecuteEnv, withSingleContext )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source ( projectLocalPackages )
 import           Stack.Constants ( stackProgName, stackProgName' )
