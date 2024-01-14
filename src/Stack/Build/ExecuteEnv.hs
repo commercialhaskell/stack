@@ -19,20 +19,19 @@ module Stack.Build.ExecuteEnv
 
 import           Control.Concurrent.Companion ( Companion, withCompanion )
 import           Control.Concurrent.Execute
-                   ( ActionContext (..), ActionId (..)
-                   , Concurrency (..)
-                   )
+                   ( ActionContext (..), ActionId (..), Concurrency (..) )
 import           Crypto.Hash ( SHA256 (..), hashWith )
 import           Data.Attoparsec.Text ( char, choice, digit, parseOnly )
 import qualified Data.Attoparsec.Text as P ( string )
 import qualified Data.ByteArray as Mem ( convert )
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Builder ( toLazyByteString )
 import qualified Data.ByteString.Base64.URL as B64URL
+import qualified Data.ByteString.Builder ( toLazyByteString )
+import qualified Data.ByteString.Char8 as S8
 import           Data.Char ( isSpace )
 import           Conduit
-                   ( ConduitT, awaitForever, sinkHandle
-                   , withSinkFile, withSourceFile, yield
+                   ( ConduitT, awaitForever, sinkHandle, withSinkFile
+                   , withSourceFile, yield
                    )
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
@@ -43,97 +42,73 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Text.Encoding ( decodeUtf8 )
 import           Data.Time
-                   ( ZonedTime, getZonedTime, formatTime, defaultTimeLocale )
-import qualified Data.ByteString.Char8 as S8
+                   ( ZonedTime, defaultTimeLocale, formatTime, getZonedTime )
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Simple.Build.Macros as C
-import           Distribution.System ( OS (Windows), Platform (Platform) )
+import           Distribution.System ( OS (..), Platform (..) )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Verbosity ( showForCabal )
 import           Distribution.Version ( mkVersion )
 import           Path
-                   ( PathException, (</>)
-                   , parent, parseRelDir, parseRelFile
-
-                   )
-import           Path.Extra
-                   ( forgivingResolveFile
-                   , toFilePathNoTrailingSep
-                   )
+                   ( PathException, (</>), parent, parseRelDir, parseRelFile )
+import           Path.Extra ( forgivingResolveFile, toFilePathNoTrailingSep )
 import           Path.IO
-                   ( doesDirExist, doesFileExist, ensureDir
-                   , ignoringAbsence, removeFile, renameDir
-                   , renameFile
+                   ( doesDirExist, doesFileExist, ensureDir, ignoringAbsence
+                   , removeFile, renameDir, renameFile
                    )
 import           RIO.Process
-                   ( eceExitCode, proc, runProcess_
-                   , setStdout, useHandleOpen
+                   ( eceExitCode, proc, runProcess_, setStdout, useHandleOpen
                    , withWorkingDir
                    )
 import           Stack.Config ( checkOwnership )
 import           Stack.Constants
-                   ( cabalPackageName
-                   , relDirDist, relDirSetup, relDirSetupExeCache
-                   , relDirSetupExeSrc, relFileBuildLock, relFileSetupHs
-                   , relFileSetupLhs, relFileSetupLower, relFileSetupMacrosH
-                   , setupGhciShimCode, stackProgName
+                   ( cabalPackageName, relDirDist, relDirSetup
+                   , relDirSetupExeCache, relDirSetupExeSrc, relFileBuildLock
+                   , relFileSetupHs, relFileSetupLhs, relFileSetupLower
+                   , relFileSetupMacrosH, setupGhciShimCode, stackProgName
                    )
-import           Stack.Constants.Config
-                   ( distDirFromDir, distRelativeDir
-
-                   )
-import           Stack.Package
-                   ( buildLogPath
-                   )
+import           Stack.Constants.Config ( distDirFromDir, distRelativeDir )
+import           Stack.Package ( buildLogPath )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build
-                   ( TaskType (..), ExcludeTHLoading (..)
-                   , ConvertPathsToAbsolute (..), KeepOutputOpen (..)
-                   , taskTypeLocation, taskTypePackageIdentifier
+                   ( ConvertPathsToAbsolute (..), ExcludeTHLoading (..)
+                   , KeepOutputOpen (..), TaskType (..), taskTypeLocation
+                   , taskTypePackageIdentifier
                    )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildOpts
-                   ( BuildOpts (..), BuildOptsCLI (..)
-                   , CabalVerbosity (..)
-                   )
+                   ( BuildOpts (..), BuildOptsCLI (..), CabalVerbosity (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
                    , compilerVersionString, getGhcVersion, whichCompilerL
                    )
 import           Stack.Types.CompilerPaths
-                   ( CompilerPaths (..), HasCompiler (..)
-                   , cabalVersionL, getCompilerPath
+                   ( CompilerPaths (..), HasCompiler (..), cabalVersionL
+                   , getCompilerPath
                    )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), stackRootL )
-import           Stack.Types.ConfigureOpts
-                   ( BaseConfigOpts (..) )
-import           Stack.Types.Dependency (DepValue(dvVersionRange))
+import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
+import           Stack.Types.Dependency ( DepValue(..) )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( HasEnvConfig (..), actualCompilerVersionL
-                   , platformGhcRelDir
-                   , shouldForceGhcColorFlag
+                   , platformGhcRelDir, shouldForceGhcColorFlag
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
-import           Stack.Types.Installed
-                   ( InstallLocation (..), Installed (..)
-                   )
+import           Stack.Types.Installed ( InstallLocation (..), Installed (..) )
 import           Stack.Types.Package
-                   ( LocalPackage (..), Package (..)
-                   , packageIdentifier
-                   )
+                   ( LocalPackage (..), Package (..), packageIdentifier )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Version ( withinRange )
 import qualified System.Directory as D
 import           System.Environment ( lookupEnv )
 import           System.FileLock
-                   ( SharedExclusive (Exclusive), withFileLock, withTryFileLock
-                   )
+                   ( SharedExclusive (..), withFileLock, withTryFileLock )
 
 -- | Has an executable been built or not?
 data ExecutableBuildStatus

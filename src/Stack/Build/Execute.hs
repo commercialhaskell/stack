@@ -20,8 +20,7 @@ module Stack.Build.Execute
 import           Control.Concurrent.Companion ( Companion, withCompanion )
 import           Control.Concurrent.Execute
                    ( Action (..), ActionContext (..), ActionId (..)
-                   , ActionType (..)
-                   , Concurrency (..), runActions
+                   , ActionType (..), Concurrency (..), runActions
                    )
 import           Control.Concurrent.STM ( check )
 import           Data.Attoparsec.Text ( char, choice, digit, parseOnly )
@@ -29,9 +28,7 @@ import qualified Data.Attoparsec.Text as P ( string )
 import qualified Data.ByteString as S
 import           Data.Char ( isSpace )
 import           Conduit
-                   ( ConduitT, awaitForever, sinkHandle
-                   , withSourceFile, yield
-                   )
+                   ( ConduitT, awaitForever, sinkHandle, withSourceFile, yield )
 import qualified Data.Conduit.Binary as CB
 import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
@@ -43,90 +40,68 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Tuple ( swap )
 import           Data.Time
-                   ( ZonedTime, getZonedTime, formatTime, defaultTimeLocale )
+                   ( ZonedTime, defaultTimeLocale, formatTime, getZonedTime )
 import qualified Data.ByteString.Char8 as S8
 import qualified Distribution.PackageDescription as C
 import qualified Distribution.Simple.Build.Macros as C
-import           Distribution.System ( OS (Windows), Platform (Platform) )
+import           Distribution.System ( OS (..), Platform (..) )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Verbosity ( showForCabal )
 import           Distribution.Version ( mkVersion )
 import           Path
-                   ( PathException, (</>)
-                   , parent, parseRelDir, parseRelFile
-
-                   )
+                   ( PathException, (</>), parent, parseRelDir, parseRelFile )
 import           Path.CheckInstall ( warnInstallSearchPathIssues )
 import           Path.Extra
                    ( forgivingResolveFile, rejectMissingFile
                    , toFilePathNoTrailingSep
                    )
-import           Path.IO
-                   ( doesDirExist, doesFileExist, ensureDir
-                   , renameDir
-
-                   )
+import           Path.IO ( doesDirExist, doesFileExist, ensureDir, renameDir )
 import           RIO.NonEmpty ( nonEmpty )
 import qualified RIO.NonEmpty as NE
 import           RIO.Process
-                   ( HasProcessContext, eceExitCode
-
-                   , proc, runProcess_
-
+                   ( HasProcessContext, eceExitCode, proc, runProcess_
                    , withWorkingDir
                    )
+import           Stack.Build.ExecuteEnv
+                   ( ExecuteEnv (..), withExecuteEnv )
+import           Stack.Build.ExecutePackage
+                   ( singleBench, singleBuild, singleTest )
 import           Stack.Build.Haddock
                    ( generateDepsHaddockIndex
                    , generateLocalHaddockForHackageArchives
                    , generateLocalHaddockIndex, generateSnapHaddockIndex
                    , openHaddocksInBrowser
                    )
-import           Stack.Build.Installed (  )
-import           Stack.Build.Target (  )
 import           Stack.Config ( checkOwnership )
 import           Stack.Constants
-                   ( bindirSuffix, cabalPackageName
-                   , relDirDist, relDirSetup
-                   , relFileBuildLock, relFileSetupHs
-                   , relFileSetupLhs, relFileSetupLower, relFileSetupMacrosH
-
+                   ( bindirSuffix, cabalPackageName, relDirDist, relDirSetup
+                   , relFileBuildLock, relFileSetupHs, relFileSetupLhs
+                   , relFileSetupLower, relFileSetupMacrosH
                    )
-import           Stack.Constants.Config
-                   ( distDirFromDir, distRelativeDir
-
-                   )
+import           Stack.Constants.Config ( distDirFromDir, distRelativeDir )
 import           Stack.Coverage
                    ( deleteHpcReports, generateHpcMarkupIndex
                    , generateHpcUnifiedReport
                    )
 import           Stack.GhcPkg ( unregisterGhcPkgIds )
-import           Stack.Package
-                   ( buildLogPath
-                   )
+import           Stack.Package ( buildLogPath )
 import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build
-                   ( Plan (..)
-                   , Task (..), TaskConfigOpts (..), TaskType (..)
-                   , ExcludeTHLoading (..), ConvertPathsToAbsolute (..), KeepOutputOpen (..)
-                   , taskLocation, taskProvides, taskTypeLocation
-                   , taskTypePackageIdentifier
+                   ( ConvertPathsToAbsolute (..), ExcludeTHLoading (..)
+                   , KeepOutputOpen (..), Plan (..), Task (..)
+                   , TaskConfigOpts (..), TaskType (..), taskLocation
+                   , taskProvides, taskTypeLocation, taskTypePackageIdentifier
                    )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildOpts
-                   ( BuildOpts (..), BuildOptsCLI (..)
-                   , CabalVerbosity (..)
+                   ( BuildOpts (..), BuildOptsCLI (..), CabalVerbosity (..)
                    , ProgressBarFormat (..), TestOpts (..)
                    )
-import           Stack.Types.Compiler
-                   ( ActualCompiler (..)
-                   , getGhcVersion
-                   )
+import           Stack.Types.Compiler ( ActualCompiler (..), getGhcVersion )
 import           Stack.Types.CompilerPaths
-                   ( CompilerPaths (..), HasCompiler (..)
-                   , getGhcPkgExe
-                   )
+                   ( CompilerPaths (..), HasCompiler (..), getGhcPkgExe )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.ConfigureOpts
@@ -135,10 +110,8 @@ import           Stack.Types.Dependency (DepValue(dvVersionRange))
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( HasEnvConfig (..), actualCompilerVersionL
-                   , bindirCompilerTools
-                   , installationRootDeps, installationRootLocal
-                   , packageDatabaseLocal
-
+                   , bindirCompilerTools, installationRootDeps
+                   , installationRootLocal, packageDatabaseLocal
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
@@ -147,14 +120,9 @@ import           Stack.Types.Installed
                    , installedPackageIdentifier
                    )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent, benchComponents
-                   , testComponents
-                   )
+                   ( NamedComponent, benchComponents, testComponents )
 import           Stack.Types.Package
-                   ( LocalPackage (..), Package (..)
-                   , packageIdentifier
-
-                   )
+                   ( LocalPackage (..), Package (..), packageIdentifier )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner, terminalL )
 import           Stack.Types.SourceMap ( Target )
@@ -162,14 +130,8 @@ import           Stack.Types.Version ( withinRange )
 import qualified System.Directory as D
 import           System.Environment ( getExecutablePath )
 import           System.FileLock
-                   ( SharedExclusive (Exclusive), withFileLock, withTryFileLock
-                   )
+                   ( SharedExclusive (..), withFileLock, withTryFileLock )
 import qualified System.FilePath as FP
-import           Stack.Build.ExecutePackage
-                 ( singleBuild, singleTest, singleBench )
-import Stack.Build.ExecuteEnv
-                 (ExecuteEnv (..), withExecuteEnv
-                 )
 
 -- | Fetch the packages necessary for a build, for example in combination with
 -- a dry run.
@@ -403,7 +365,6 @@ copyExecutables exes = do
       <> bulletedList
            (map (fromString . T.unpack . textDisplay) installed :: [StyleDoc])
   unless compilerSpecific $ warnInstallSearchPathIssues destDir' installed
-
 
 -- | Windows can't write over the current executable. Instead, we rename the
 -- current executable to something else and then do the copy.

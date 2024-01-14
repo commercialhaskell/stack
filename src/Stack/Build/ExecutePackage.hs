@@ -13,9 +13,9 @@ module Stack.Build.ExecutePackage
   ) where
 
 import           Control.Concurrent.Execute
-                   ( ActionContext (..), ActionId (..)
-                   )
+                   ( ActionContext (..), ActionId (..) )
 import qualified Data.ByteString as S
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
 import           Conduit ( runConduitRes )
 import qualified Data.Conduit.Filesystem as CF
@@ -26,9 +26,8 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import qualified Data.ByteString.Char8 as S8
 import qualified Distribution.PackageDescription as C
-import           Distribution.System ( OS (Windows), Platform (Platform) )
+import           Distribution.System ( OS (..), Platform (..) )
 import qualified Distribution.Text as C
 import           Distribution.Types.MungedPackageName
                    ( encodeCompatPackageName )
@@ -36,22 +35,18 @@ import           Distribution.Types.UnqualComponentName
                    ( mkUnqualComponentName )
 import           Distribution.Version ( mkVersion )
 import           Path
-                   ( (</>), addExtension, filename
-                   , isProperPrefixOf, parent, parseRelDir, parseRelFile
-                   , stripProperPrefix
+                   ( (</>), addExtension, filename, isProperPrefixOf, parent
+                   , parseRelDir, parseRelFile, stripProperPrefix
                    )
-import           Path.Extra
-                   ( toFilePathNoTrailingSep
-                   )
+import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
-                   ( copyFile, doesFileExist, ensureDir
-                   , ignoringAbsence, removeDirRecur, removeFile
-
+                   ( copyFile, doesFileExist, ensureDir, ignoringAbsence
+                   , removeDirRecur, removeFile
                    )
 import           RIO.NonEmpty ( nonEmpty )
 import           RIO.Process
-                   ( byteStringInput, findExecutable, getStderr, getStdout, inherit
-                   , modifyEnvVars, proc, setStderr, setStdin
+                   ( byteStringInput, findExecutable, getStderr, getStdout
+                   , inherit, modifyEnvVars, proc, setStderr, setStdin
                    , setStdout, showProcessArgDebug, useHandleOpen, waitExitCode
                    , withProcessWait, withWorkingDir
                    )
@@ -64,22 +59,22 @@ import           Stack.Build.Cache
                    , writeFlagCache, writePrecompiledCache
                    , writePackageProjectRoot, writeSetupConfigMod
                    )
+import           Stack.Build.ExecuteEnv
+                   ( ExcludeTHLoading (..), ExecutableBuildStatus (..)
+                   , ExecuteEnv (..), KeepOutputOpen (..), OutputType (..)
+                   , withSingleContext
+                   )
 import           Stack.Build.Source ( addUnlistedToBuildCache )
-import           Stack.Build.Target (  )
 import           Stack.Config.ConfigureScript ( ensureConfigureScript )
 import           Stack.Constants
-                   ( bindirSuffix, compilerOptionsCabalFlag
-                   , relDirBuild
+                   ( bindirSuffix, compilerOptionsCabalFlag, relDirBuild
                    , testGhcEnvRelFile
                    )
 import           Stack.Constants.Config
                    ( distDirFromDir, distRelativeDir, hpcDirFromDir
                    , hpcRelativeDir, setupConfigFromDir
                    )
-import           Stack.Coverage
-                   ( generateHpcReport
-                   , updateTixFile
-                   )
+import           Stack.Coverage ( generateHpcReport, updateTixFile )
 import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
 import           Stack.Package
                    ( buildLogPath, buildableExes, buildableSubLibs
@@ -88,13 +83,12 @@ import           Stack.Package
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
 import           Stack.Types.Build
-                   ( ConfigCache (..), PrecompiledCache (..)
-                   , Task (..), TaskConfigOpts (..), TaskType (..)
-                   , taskAnyMissing, taskIsTarget
-                   , taskLocation, taskProvides
+                   ( ConfigCache (..), PrecompiledCache (..), Task (..)
+                   , TaskConfigOpts (..), TaskType (..), taskAnyMissing
+                   , taskIsTarget, taskLocation, taskProvides
                    , taskTypePackageIdentifier
                    )
-import qualified  Stack.Types.Build as ConfigCache ( ConfigCache (..) )
+import qualified Stack.Types.Build as ConfigCache ( ConfigCache (..) )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig
@@ -108,18 +102,18 @@ import           Stack.Types.CompCollection
                    , getBuildableListAs, getBuildableListText
                    )
 import           Stack.Types.Compiler
-                   ( ActualCompiler (..), WhichCompiler (..)
-                   , getGhcVersion, whichCompilerL
+                   ( ActualCompiler (..), WhichCompiler (..), getGhcVersion
+                   , whichCompilerL
                    )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..)
                    , cpWhich, getGhcPkgExe
                    )
 import qualified Stack.Types.Component as Component
-import           Stack.Types.Config
-                   ( Config (..), HasConfig (..) )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
+import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( HasEnvConfig (..), actualCompilerVersionL
@@ -134,8 +128,8 @@ import           Stack.Types.Installed
                    )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent, exeComponents, isCBench
-                   , isCTest, renderComponent
+                   ( NamedComponent, exeComponents, isCBench, isCTest
+                   , renderComponent
                    )
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), installedMapGhcPkgId
@@ -144,13 +138,11 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
-import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Runner ( HasRunner, globalOptsL )
 import           System.IO.Error ( isDoesNotExistError )
 import           System.PosixCompat.Files
                    ( createLink, getFileStatus, modificationTime )
 import           System.Random ( randomIO )
-import           Stack.Build.ExecuteEnv
 
 -- | Generate the ConfigCache
 getConfigCache ::
