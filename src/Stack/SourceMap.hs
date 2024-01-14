@@ -96,10 +96,10 @@ additionalDepPackage buildHaddocks pl = do
         run <- askRunInIO
         pure (name, run $ loadCabalFileImmutable pli)
   pure DepPackage
-    { dpLocation = pl
-    , dpHidden = False
-    , dpFromSnapshot = NotFromSnapshot
-    , dpCommon =
+    { location = pl
+    , hidden = False
+    , fromSnapshot = NotFromSnapshot
+    , common =
         CommonPackage
           { gpd = gpdio
           , name = name
@@ -120,10 +120,10 @@ snapToDepPackage ::
 snapToDepPackage buildHaddocks name sp = do
   run <- askRunInIO
   pure DepPackage
-    { dpLocation = PLImmutable sp.spLocation
-    , dpHidden = sp.spHidden
-    , dpFromSnapshot = FromSnapshot
-    , dpCommon =
+    { location = PLImmutable sp.spLocation
+    , hidden = sp.spHidden
+    , fromSnapshot = FromSnapshot
+    , common =
         CommonPackage
           { gpd = run $ loadCabalFileImmutable sp.spLocation
           , name = name
@@ -237,7 +237,7 @@ getUnusedPackageFlags ::
   -> m (Maybe UnusedFlags)
 getUnusedPackageFlags (name, userFlags) source prj deps =
   let maybeCommon =     fmap (.ppCommon) (Map.lookup name prj)
-                    <|> fmap (.dpCommon) (Map.lookup name deps)
+                    <|> fmap (.common) (Map.lookup name deps)
   in  case maybeCommon of
         -- Package is not available as project or dependency
         Nothing ->

@@ -543,7 +543,7 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir locals
 
-  let depLocs = Map.map (.dpLocation) smActual.smaDeps
+  let depLocs = Map.map (.location) smActual.smaDeps
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
     resolveRawTarget smActual depLocs

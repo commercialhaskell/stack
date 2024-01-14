@@ -386,7 +386,7 @@ checkSnapBuildPlan pkgDirs flags snapCandidate = do
   let compiler = sma.smaCompiler
       globalVersion (GlobalPackageVersion v) = v
       depVersion dep
-        | PLImmutable loc <- dep.dpLocation = Just $ packageLocationVersion loc
+        | PLImmutable loc <- dep.location = Just $ packageLocationVersion loc
         | otherwise = Nothing
       snapPkgs = Map.union
         (Map.mapMaybe depVersion sma.smaDeps)

@@ -848,11 +848,11 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
       sourceMapGhcOptions = fromMaybe [] $
         ((.ppCommon.ghcOptions) <$> M.lookup name sm.smProject)
         <|>
-        ((.dpCommon.ghcOptions) <$> M.lookup name sm.smDeps)
+        ((.common.ghcOptions) <$> M.lookup name sm.smDeps)
       sourceMapCabalConfigOpts = fromMaybe [] $
         ( (.ppCommon.cabalConfigOpts) <$> M.lookup name sm.smProject)
         <|>
-        ((.dpCommon.cabalConfigOpts) <$> M.lookup name sm.smDeps)
+        ((.common.cabalConfigOpts) <$> M.lookup name sm.smDeps)
       sourceMapFlags =
         maybe mempty (.ppCommon.flags) $ M.lookup name sm.smProject
       config = PackageConfig

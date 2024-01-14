@@ -892,11 +892,11 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
        RPLMutable p ->
          pure (PLMutable p, Nothing)
     dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
-    pure ((dp.dpCommon.name, dp), mCompleted)
+    pure ((dp.common.name, dp), mCompleted)
 
   checkDuplicateNames $
     map (second (PLMutable . (.ppResolvedDir))) packages0 ++
-    map (second (.dpLocation)) deps0
+    map (second (.location)) deps0
 
   let packages1 = Map.fromList packages0
       snPackages = snapPackages
@@ -914,13 +914,13 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
       packages2 = mergeApply packages1 pFlags $
         \_ p flags -> p{ ppCommon = p.ppCommon { CommonPackage.flags = flags } }
       deps2 = mergeApply deps1 pFlags $
-        \_ d flags -> d{ dpCommon = d.dpCommon { CommonPackage.flags = flags } }
+        \_ d flags -> d{ common = d.common { CommonPackage.flags = flags } }
 
   checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
 
   let pkgGhcOptions = config.ghcOptionsByName
       deps = mergeApply deps2 pkgGhcOptions $
-        \_ d options -> d{ dpCommon = d.dpCommon { ghcOptions = options } }
+        \_ d options -> d{ common = d.common { ghcOptions = options } }
       packages = mergeApply packages2 pkgGhcOptions $
         \_ p options -> p{ ppCommon = p.ppCommon { ghcOptions = options } }
       unusedPkgGhcOptions =

@@ -333,7 +333,7 @@ hashSnapshot = do
   sourceMap <- view $ envConfigL . to (.sourceMap)
   compilerInfo <- getCompilerInfo
   let eitherPliHash (pn, dep)
-        | PLImmutable pli <- dep.dpLocation = Right $ immutableLocSha pli
+        | PLImmutable pli <- dep.location = Right $ immutableLocSha pli
         | otherwise = Left pn
       deps = Map.toList sourceMap.smDeps
   case partitionEithers (map eitherPliHash deps) of
@@ -351,14 +351,14 @@ mapSnapshotPackageModules = do
   (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
     getInstalled installMap
   let globals = dumpedPackageModules sourceMap.smGlobal globalDumpPkgs
-      notHidden = Map.filter (not . (.dpHidden))
+      notHidden = Map.filter (not . (.hidden))
       notHiddenDeps = notHidden sourceMap.smDeps
       installedDeps = dumpedPackageModules notHiddenDeps snapshotDumpPkgs
       dumpPkgs =
         Set.fromList $ map (pkgName . (.packageIdent)) snapshotDumpPkgs
       notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
   otherDeps <- for notInstalledDeps $ \dep -> do
-    gpd <- liftIO dep.dpCommon.gpd
+    gpd <- liftIO dep.common.gpd
     Set.fromList <$> allExposedModules gpd
   -- source map construction process should guarantee unique package names in
   -- these maps

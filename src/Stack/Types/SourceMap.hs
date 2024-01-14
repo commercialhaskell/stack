@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE NoFieldSelectors    #-}
-{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 -- | A sourcemap maps a package name to how it should be built, including source
 -- code, flags, options, etc. This module contains various stages of source map
@@ -63,12 +64,12 @@ data FromSnapshot
 
 -- | A view of a dependency package, specified in stack.yaml
 data DepPackage = DepPackage
-  { dpCommon :: !CommonPackage
-  , dpLocation :: !PackageLocation
-  , dpHidden :: !Bool
+  { common :: !CommonPackage
+  , location :: !PackageLocation
+  , hidden :: !Bool
     -- ^ Should the package be hidden after registering? Affects the script
     -- interpreter's module name import parser.
-  , dpFromSnapshot :: !FromSnapshot
+  , fromSnapshot :: !FromSnapshot
     -- ^ Needed to ignore bounds between snapshot packages
     -- See https://github.com/commercialhaskell/stackage/issues/3185
   }

@@ -299,10 +299,10 @@ constructPlan
       pure $ PSFilePath lp
     bopts <- view $ configL . to (.build)
     deps <- for sourceDeps $ \dp ->
-      case dp.dpLocation of
+      case dp.location of
         PLImmutable loc ->
           pure $
-            PSRemote loc (getPLIVersion loc) dp.dpFromSnapshot dp.dpCommon
+            PSRemote loc (getPLIVersion loc) dp.fromSnapshot dp.common
         PLMutable dir -> do
           pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
           lp <- loadLocalPackage' pp

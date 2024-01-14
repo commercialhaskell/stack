@@ -262,13 +262,13 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
   dependencyDeps =
     loadDeps <$> Map.lookup pkgName sourceMap.smDeps
    where
-    loadDeps DepPackage{dpLocation=PLMutable dir} = do
+    loadDeps DepPackage{ location = PLMutable dir } = do
       pp <- mkProjectPackage YesPrintWarnings dir False
       pkg <- loadCommonPackage pp.ppCommon
       pure (setOfPackageDeps pkg, payloadFromLocal pkg (Just $ PLMutable dir))
 
-    loadDeps dp@DepPackage{dpLocation=PLImmutable loc} = do
-      let common = dp.dpCommon
+    loadDeps dp@DepPackage{ location = PLImmutable loc } = do
+      let common = dp.common
       gpd <- liftIO common.gpd
       let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
           flags = common.flags

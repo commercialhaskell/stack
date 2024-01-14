@@ -84,7 +84,7 @@ localDependencies = do
   bopts <- view $ configL . to (.build)
   sourceMap <- view $ envConfigL . to (.sourceMap)
   forMaybeM (Map.elems sourceMap.smDeps) $ \dp ->
-    case dp.dpLocation of
+    case dp.location of
       PLMutable dir -> do
         pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
         Just <$> loadLocalPackage pp
@@ -106,8 +106,8 @@ loadSourceMap smt boptsCli sma = do
         p{ppCommon = applyOptsFlags (M.member c.name smt.smtTargets) True c}
       deps0 = smt.smtDeps <> sma.smaDeps
       deps = M.map applyOptsFlagsDep deps0
-      applyOptsFlagsDep d@DepPackage{dpCommon = c} =
-        d{dpCommon = applyOptsFlags (M.member c.name smt.smtDeps) False c}
+      applyOptsFlagsDep d@DepPackage{ common = c } =
+        d{ common = applyOptsFlags (M.member c.name smt.smtDeps) False c }
       applyOptsFlags isTarget isProjectPackage common =
         let name = common.name
             flags = getLocalFlags boptsCli name
@@ -190,17 +190,17 @@ hashSourceMapData boptsCli sm = do
 
 depPackageHashableContent :: (HasConfig env) => DepPackage -> RIO env Builder
 depPackageHashableContent dp =
-  case dp.dpLocation of
+  case dp.location of
     PLMutable _ -> pure ""
     PLImmutable pli -> do
       let flagToBs (f, enabled) =
             if enabled
               then ""
               else "-" <> fromString (C.unFlagName f)
-          flags = map flagToBs $ Map.toList dp.dpCommon.flags
-          ghcOptions = map display dp.dpCommon.ghcOptions
-          cabalConfigOpts = map display dp.dpCommon.cabalConfigOpts
-          haddocks = if dp.dpCommon.haddocks then "haddocks" else ""
+          flags = map flagToBs $ Map.toList dp.common.flags
+          ghcOptions = map display dp.common.ghcOptions
+          cabalConfigOpts = map display dp.common.cabalConfigOpts
+          haddocks = if dp.common.haddocks then "haddocks" else ""
           hash = immutableLocSha pli
       pure
         $  hash
