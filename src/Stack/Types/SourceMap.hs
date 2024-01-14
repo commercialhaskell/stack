@@ -102,10 +102,10 @@ isReplacedGlobal (GlobalPackage _) = False
 -- Invariant: a @PackageName@ appears in either 'smwProject' or 'smwDeps', but
 -- not both.
 data SMWanted = SMWanted
-  { smwCompiler :: !WantedCompiler
-  , smwProject :: !(Map PackageName ProjectPackage)
-  , smwDeps :: !(Map PackageName DepPackage)
-  , smwSnapshotLocation :: !RawSnapshotLocation
+  { compiler :: !WantedCompiler
+  , project :: !(Map PackageName ProjectPackage)
+  , deps :: !(Map PackageName DepPackage)
+  , snapshotLocation :: !RawSnapshotLocation
     -- ^ Where this snapshot is loaded from.
   }
 
@@ -114,10 +114,10 @@ data SMWanted = SMWanted
 --
 -- Invariant: a @PackageName@ appears in only one of the @Map@s.
 data SMActual global = SMActual
-  { smaCompiler :: !ActualCompiler
-  , smaProject :: !(Map PackageName ProjectPackage)
-  , smaDeps :: !(Map PackageName DepPackage)
-  , smaGlobal :: !(Map PackageName global)
+  { compiler :: !ActualCompiler
+  , project :: !(Map PackageName ProjectPackage)
+  , deps :: !(Map PackageName DepPackage)
+  , global :: !(Map PackageName global)
   }
 
 newtype GlobalPackageVersion
@@ -136,27 +136,27 @@ data PackageType = PTProject | PTDependency
 -- | Builds on an 'SMActual' by resolving the targets specified on the command
 -- line, potentially adding in new dependency packages in the process.
 data SMTargets = SMTargets
-  { smtTargets :: !(Map PackageName Target)
-  , smtDeps :: !(Map PackageName DepPackage)
+  { targets :: !(Map PackageName Target)
+  , deps :: !(Map PackageName DepPackage)
   }
 
 -- | The final source map, taking an 'SMTargets' and applying all command line
 -- flags and GHC options.
 data SourceMap = SourceMap
-  { smTargets :: !SMTargets
+  { targets :: !SMTargets
     -- ^ Doesn't need to be included in the hash, does not affect the source
     -- map.
-  , smCompiler :: !ActualCompiler
+  , compiler :: !ActualCompiler
     -- ^ Need to hash the compiler version _and_ its installation path. Ideally
     -- there would be some kind of output from GHC telling us some unique ID for
     -- the compiler itself.
-  , smProject :: !(Map PackageName ProjectPackage)
+  , project :: !(Map PackageName ProjectPackage)
     -- ^ Doesn't need to be included in hash, doesn't affect any of the packages
     -- that get stored in the snapshot database.
-  , smDeps :: !(Map PackageName DepPackage)
+  , deps :: !(Map PackageName DepPackage)
     -- ^ Need to hash all of the immutable dependencies, can ignore the mutable
     -- dependencies.
-  , smGlobal :: !(Map PackageName GlobalPackage)
+  , global :: !(Map PackageName GlobalPackage)
     -- ^ Doesn't actually need to be hashed, implicitly captured by smCompiler.
     -- Can be broken if someone installs new global packages. We can document
     -- that as not supported, _or_ we could actually include all of this in the

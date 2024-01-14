@@ -381,16 +381,16 @@ checkSnapBuildPlan ::
 checkSnapBuildPlan pkgDirs flags snapCandidate = do
   platform <- view platformL
   sma <- snapCandidate pkgDirs
-  gpds <- liftIO $ forM (Map.elems sma.smaProject) (.common.gpd)
+  gpds <- liftIO $ forM (Map.elems sma.project) (.common.gpd)
 
-  let compiler = sma.smaCompiler
+  let compiler = sma.compiler
       globalVersion (GlobalPackageVersion v) = v
       depVersion dep
         | PLImmutable loc <- dep.location = Just $ packageLocationVersion loc
         | otherwise = Nothing
       snapPkgs = Map.union
-        (Map.mapMaybe depVersion sma.smaDeps)
-        (Map.map globalVersion sma.smaGlobal)
+        (Map.mapMaybe depVersion sma.deps)
+        (Map.map globalVersion sma.global)
       (f, errs) = checkBundleBuildPlan platform compiler snapPkgs flags gpds
       cerrs = compilerErrors compiler errs
 

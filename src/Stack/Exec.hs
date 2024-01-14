@@ -142,7 +142,7 @@ execCmd opts =
     map ("-package-id=" ++) <$> mapM getPkgId pkgs
 
   getRunCmd args = do
-    packages <- view $ buildConfigL . to (.smWanted.smwProject)
+    packages <- view $ buildConfigL . to (.smWanted.project)
     pkgComponents <- for (Map.elems packages) ppComponents
     let executables = concatMap (filter isCExe . Set.toList) pkgComponents
     let (exe, args') = case args of

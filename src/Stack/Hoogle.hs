@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | A wrapper around hoogle.
 module Stack.Hoogle
@@ -28,9 +29,8 @@ import           Stack.Runners
                    , withEnvConfig
                    )
 import           Stack.Types.BuildOpts
-                   ( BuildOptsCLI (..), buildOptsMonoidHaddockL
-                   , defaultBuildOptsCLI
-                   )
+                   ( buildOptsMonoidHaddockL, defaultBuildOptsCLI )
+import qualified Stack.Types.BuildOpts as BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig
@@ -154,7 +154,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
   requiringHoogle :: Muted -> RIO EnvConfig x -> RIO EnvConfig x
   requiringHoogle muted f = do
     hoogleTarget <- do
-      sourceMap <- view $ sourceMapL . to (.smDeps)
+      sourceMap <- view $ sourceMapL . to (.deps)
       case Map.lookup hooglePackageName sourceMap of
         Just hoogleDep ->
           case hoogleDep.location of
@@ -176,7 +176,8 @@ hoogleCmd (args, setup, rebuild, startServer) =
           T.pack . packageIdentifierString <$>
               restrictMinHoogleVersion muted hoogleIdent
     config <- view configL
-    let boptsCLI = defaultBuildOptsCLI { targets =  [hoogleTarget] }
+    let boptsCLI = defaultBuildOptsCLI
+          { BuildOptsCLI.targets =  [hoogleTarget] }
     runRIO config $ withEnvConfig NeedTargets boptsCLI f
 
   restrictMinHoogleVersion ::

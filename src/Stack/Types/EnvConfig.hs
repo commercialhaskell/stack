@@ -265,7 +265,7 @@ extraBinDirs = do
 -- than that specified in the 'SnapshotDef' and returned by
 -- 'wantedCompilerVersionL'.
 actualCompilerVersionL :: HasSourceMap env => SimpleGetter env ActualCompiler
-actualCompilerVersionL = sourceMapL . to (.smCompiler)
+actualCompilerVersionL = sourceMapL . to (.compiler)
 
 -- | Relative directory for the platform and GHC identifier without GHC bindist
 -- build

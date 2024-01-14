@@ -126,6 +126,7 @@ import           Stack.Types.BuildConfig
                    , wantedCompilerVersionL
                    )
 import           Stack.Types.BuildOpts ( BuildOptsCLI (..) )
+import qualified Stack.Types.BuildOpts as BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), CompilerException (..)
                    , CompilerRepository (..), WhichCompiler (..)
@@ -163,6 +164,7 @@ import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
 import           Stack.Types.SourceMap
                    ( SMActual (..), SMWanted (..), SourceMap (..) )
+import qualified Stack.Types.SourceMap as SMActual ( SMActual (..) )
 import           Stack.Types.Version
                    ( VersionCheck, stackMinorVersion, stackVersion )
 import           Stack.Types.VersionedDownloadInfo
@@ -680,10 +682,10 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
 
   (sourceMap, sourceMapHash) <- runWithGHC menv compilerPaths $ do
     smActual <- actualFromGhc bc.smWanted compilerVer
-    let actualPkgs = Map.keysSet smActual.smaDeps <>
-                     Map.keysSet smActual.smaProject
+    let actualPkgs = Map.keysSet smActual.deps <>
+                     Map.keysSet smActual.project
         prunedActual = smActual
-          { smaGlobal = pruneGlobals smActual.smaGlobal actualPkgs }
+          { SMActual.global = pruneGlobals smActual.global actualPkgs }
         haddockDeps = shouldHaddockDeps config.build
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
@@ -951,13 +953,13 @@ rebuildEnv ::
 rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
   let bc = envConfig.buildConfig
       cp = envConfig.compilerPaths
-      compilerVer = envConfig.sourceMap.smCompiler
+      compilerVer = envConfig.sourceMap.compiler
   runRIO (WithGHC cp bc) $ do
     smActual <- actualFromGhc bc.smWanted compilerVer
     let actualPkgs =
-          Map.keysSet smActual.smaDeps <> Map.keysSet smActual.smaProject
+          Map.keysSet smActual.deps <> Map.keysSet smActual.project
         prunedActual = smActual
-          { smaGlobal = pruneGlobals smActual.smaGlobal actualPkgs }
+          { SMActual.global = pruneGlobals smActual.global actualPkgs }
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
     pure $ envConfig
@@ -977,7 +979,8 @@ withNewLocalBuildTargets targets f = do
   haddockDeps <- view $ configL . to (.build) . to shouldHaddockDeps
   let boptsCLI = envConfig.buildOptsCLI
   envConfig' <-
-    rebuildEnv envConfig NeedTargets haddockDeps $ boptsCLI {targets = targets}
+    rebuildEnv envConfig NeedTargets haddockDeps $ boptsCLI
+      { BuildOptsCLI.targets = targets}
   local (set envConfigL envConfig') f
 
 -- | Add the include and lib paths to the given Config
@@ -2093,7 +2096,7 @@ getGhcKey ::
   -> RIO env Text
 getGhcKey ghcBuild = do
   ghcVariant <- view ghcVariantL
-  wantedComiler <- view $ buildConfigL . to (.smWanted.smwCompiler)
+  wantedComiler <- view $ buildConfigL . to (.smWanted.compiler)
   ghcVersion <- case wantedComiler of
         WCGhc version -> pure version
         WCGhcjs _ _ ->  throwIO GhcjsNotSupported

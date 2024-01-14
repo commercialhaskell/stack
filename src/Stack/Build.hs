@@ -154,7 +154,7 @@ build msetLocalFiles = do
         then sequence [lpFiles lp | lp <- allLocals]
         else forM allLocals $ \lp -> do
           let pn = lp.package.name
-          case Map.lookup pn sourceMap.smTargets.smtTargets of
+          case Map.lookup pn sourceMap.targets.targets of
             Nothing ->
               pure Set.empty
             Just (TargetAll _) ->
@@ -200,7 +200,7 @@ build msetLocalFiles = do
              snapshotDumpPkgs
              localDumpPkgs
              installedMap
-             sourceMap.smTargets.smtTargets
+             sourceMap.targets.targets
              plan
 
 buildLocalTargets ::

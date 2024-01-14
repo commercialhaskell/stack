@@ -57,6 +57,7 @@ import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
                    , SMActual (..), SMWanted (..), SourceMap (..)
                    )
+import qualified Stack.Types.SourceMap as SMActual ( SMActual (..) )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.DependencyGraph" module.
@@ -87,7 +88,7 @@ createPrunedDependencyGraph ::
        (Set PackageName, Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
   localNames <-
-    view $ buildConfigL . to (Map.keysSet . (.smWanted.smwProject))
+    view $ buildConfigL . to (Map.keysSet . (.smWanted.project))
   logDebug "Creating dependency graph"
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotOpts.dotIncludeBase
@@ -110,15 +111,15 @@ withDotConfig opts inner =
  where
   withGlobalHints = do
     bconfig <- view buildConfigL
-    globals <- globalsFromHints bconfig.smWanted.smwCompiler
+    globals <- globalsFromHints bconfig.smWanted.compiler
     fakeGhcPkgId <- parseGhcPkgId "ignored"
     actual <- either throwIO pure $
-      wantedToActual bconfig.smWanted.smwCompiler
+      wantedToActual bconfig.smWanted.compiler
     let smActual = SMActual
-          { smaCompiler = actual
-          , smaProject = bconfig.smWanted.smwProject
-          , smaDeps =  bconfig.smWanted.smwDeps
-          , smaGlobal = Map.mapWithKey toDump globals
+          { compiler = actual
+          , project = bconfig.smWanted.project
+          , deps =  bconfig.smWanted.deps
+          , global = Map.mapWithKey toDump globals
           }
         toDump :: PackageName -> Version -> DumpPackage
         toDump name version = DumpPackage
@@ -136,16 +137,16 @@ withDotConfig opts inner =
           , isExposed = True
           }
         actualPkgs =
-          Map.keysSet smActual.smaDeps <> Map.keysSet smActual.smaProject
-        prunedActual =
-          smActual { smaGlobal = pruneGlobals smActual.smaGlobal actualPkgs }
+          Map.keysSet smActual.deps <> Map.keysSet smActual.project
+        prunedActual = smActual
+          { SMActual.global = pruneGlobals smActual.global actualPkgs }
     targets <- parseTargets NeedTargets False boptsCLI prunedActual
     logDebug "Loading source map"
     sourceMap <- loadSourceMap targets boptsCLI smActual
     let dc = DotConfig
                 { dcBuildConfig = bconfig
                 , dcSourceMap = sourceMap
-                , dcGlobalDump = toList smActual.smaGlobal
+                , dcGlobalDump = toList smActual.global
                 }
     logDebug "DotConfig fully loaded"
     runRIO dc inner
@@ -183,7 +184,7 @@ createDependencyGraph ::
   -> RIO DotConfig (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
-  locals <- for (toList sourceMap.smProject) loadLocalPackage
+  locals <- for (toList sourceMap.project) loadLocalPackage
   let graph =
         Map.fromList $ projectPackageDependencies dotOpts (filter (.wanted) locals)
   globalDump <- view $ to (.dcGlobalDump)
@@ -253,14 +254,14 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
   fromMaybe (throwIO $ PackageNotFoundBug pkgName)
     (projectPackageDeps <|> dependencyDeps <|> globalDeps)
  where
-  projectPackageDeps = loadDeps <$> Map.lookup pkgName sourceMap.smProject
+  projectPackageDeps = loadDeps <$> Map.lookup pkgName sourceMap.project
    where
     loadDeps pp = do
       pkg <- loadCommonPackage pp.common
       pure (setOfPackageDeps pkg, payloadFromLocal pkg Nothing)
 
   dependencyDeps =
-    loadDeps <$> Map.lookup pkgName sourceMap.smDeps
+    loadDeps <$> Map.lookup pkgName sourceMap.deps
    where
     loadDeps DepPackage{ location = PLMutable dir } = do
       pp <- mkProjectPackage YesPrintWarnings dir False

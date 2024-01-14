@@ -933,10 +933,10 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
     throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
 
   let wanted = SMWanted
-        { smwCompiler = fromMaybe snapCompiler project.compiler
-        , smwProject = packages
-        , smwDeps = deps
-        , smwSnapshotLocation = project.resolver
+        { compiler = fromMaybe snapCompiler project.compiler
+        , project = packages
+        , deps = deps
+        , snapshotLocation = project.resolver
         }
 
   pure (wanted, catMaybes mcompleted)

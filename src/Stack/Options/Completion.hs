@@ -63,7 +63,7 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
 
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do
-  packages <- view $ buildConfigL . to (.smWanted.smwProject)
+  packages <- view $ buildConfigL . to (.smWanted.project)
   comps <- for packages ppComponents
   pure $
     concatMap
@@ -76,7 +76,7 @@ targetCompleter = buildConfigCompleter $ \input -> do
 flagCompleter :: Completer
 flagCompleter = buildConfigCompleter $ \input -> do
   bconfig <- view buildConfigL
-  gpds <- for bconfig.smWanted.smwProject ppGPD
+  gpds <- for bconfig.smWanted.project ppGPD
   let wildcardFlags
         = nubOrd
         $ concatMap (\(name, gpd) ->
@@ -107,7 +107,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
 
 projectExeCompleter :: Completer
 projectExeCompleter = buildConfigCompleter $ \input -> do
-  packages <- view $ buildConfigL . to (.smWanted.smwProject)
+  packages <- view $ buildConfigL . to (.smWanted.project)
   gpds <- Map.traverseWithKey (const ppGPD) packages
   pure
     $ filter (input `isPrefixOf`)

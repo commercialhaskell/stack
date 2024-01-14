@@ -157,7 +157,7 @@ constructPlan
     mcur <- view $ buildConfigL . to (.curator)
     pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
     let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
-        targetPackageNames = Map.keys sourceMap.smTargets.smtTargets
+        targetPackageNames = Map.keys sourceMap.targets.targets
         -- Ignore the result of 'getCachedDepOrAddDep'.
         onTarget = void . getCachedDepOrAddDep
         inner = mapM_ onTarget targetPackageNames
@@ -198,8 +198,8 @@ constructPlan
           ctx.wanted
           prunedGlobalDeps
  where
-  sourceProject = sourceMap.smProject
-  sourceDeps = sourceMap.smDeps
+  sourceProject = sourceMap.project
+  sourceDeps = sourceMap.deps
 
   hasBaseInDeps = Map.member (mkPackageName "base") sourceDeps
 
@@ -210,7 +210,7 @@ constructPlan
     , combinedMap = combineMap sources installedMap
     , ctxEnvConfig = econfig
     , callStack = []
-    , wanted = Map.keysSet sourceMap.smTargets.smtTargets
+    , wanted = Map.keysSet sourceMap.targets.targets
     , localNames = Map.keysSet sourceProject
     , mcurator = mcur
     , pathEnvVar = pathEnvVar'
@@ -277,7 +277,7 @@ constructPlan
     pure plan
 
   prunedGlobalDeps :: Map PackageName [PackageName]
-  prunedGlobalDeps = flip Map.mapMaybe sourceMap.smGlobal $
+  prunedGlobalDeps = flip Map.mapMaybe sourceMap.global $
     \case
       ReplacedGlobalPackage deps ->
         let pruned = filter (not . inSourceMap) deps

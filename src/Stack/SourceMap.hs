@@ -182,10 +182,10 @@ actualFromGhc smw ac = do
   globals <- view $ compilerPathsL . to (.cpGlobalDump)
   pure
     SMActual
-      { smaCompiler = ac
-      , smaProject = smw.smwProject
-      , smaDeps = smw.smwDeps
-      , smaGlobal = globals
+      { compiler = ac
+      , project = smw.project
+      , deps = smw.deps
+      , global = globals
       }
 
 actualFromHints ::
@@ -197,10 +197,10 @@ actualFromHints smw ac = do
   globals <- globalsFromHints (actualToWanted ac)
   pure
     SMActual
-      { smaCompiler = ac
-      , smaProject = smw.smwProject
-      , smaDeps = smw.smwDeps
-      , smaGlobal = Map.map GlobalPackageVersion globals
+      { compiler = ac
+      , project = smw.project
+      , deps = smw.deps
+      , global = Map.map GlobalPackageVersion globals
       }
 
 -- | Simple cond check for boot packages - checks only OS and Arch
@@ -302,8 +302,8 @@ loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
     compiler <- either throwIO pure $ wantedToActual $ snapshotCompiler snapshot
     pure
       SMActual
-        { smaCompiler = compiler
-        , smaProject = prjPkgs
-        , smaDeps = Map.difference deps prjPkgs
-        , smaGlobal = globals
+        { compiler = compiler
+        , project = prjPkgs
+        , deps = Map.difference deps prjPkgs
+        , global = globals
         }

@@ -78,14 +78,14 @@ import           System.IO.Error ( isDoesNotExistError )
 projectLocalPackages :: HasEnvConfig env => RIO env [LocalPackage]
 projectLocalPackages = do
   sm <- view $ envConfigL . to (.sourceMap)
-  for (toList sm.smProject) loadLocalPackage
+  for (toList sm.project) loadLocalPackage
 
 -- | loads all local dependencies - project packages and local extra-deps
 localDependencies :: HasEnvConfig env => RIO env [LocalPackage]
 localDependencies = do
   bopts <- view $ configL . to (.build)
   sourceMap <- view $ envConfigL . to (.sourceMap)
-  forMaybeM (Map.elems sourceMap.smDeps) $ \dp ->
+  forMaybeM (Map.elems sourceMap.deps) $ \dp ->
     case dp.location of
       PLMutable dir -> do
         pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
@@ -101,18 +101,18 @@ loadSourceMap :: HasBuildConfig env
               -> RIO env SourceMap
 loadSourceMap smt boptsCli sma = do
   bconfig <- view buildConfigL
-  let compiler = sma.smaCompiler
-      project = M.map applyOptsFlagsPP sma.smaProject
+  let compiler = sma.compiler
+      project = M.map applyOptsFlagsPP sma.project
       bopts = bconfig.config.build
       applyOptsFlagsPP p@ProjectPackage{ common = c } = p
         { ProjectPackage.common =
-            applyOptsFlags (M.member c.name smt.smtTargets) True c
+            applyOptsFlags (M.member c.name smt.targets) True c
         }
-      deps0 = smt.smtDeps <> sma.smaDeps
+      deps0 = smt.deps <> sma.deps
       deps = M.map applyOptsFlagsDep deps0
       applyOptsFlagsDep d@DepPackage{ common = c } = d
         { DepPackage.common =
-            applyOptsFlags (M.member c.name smt.smtDeps) False c
+            applyOptsFlags (M.member c.name smt.deps) False c
         }
       applyOptsFlags isTarget isProjectPackage common =
         let name = common.name
@@ -140,17 +140,17 @@ loadSourceMap smt boptsCli sma = do
         Map.toList boptsCli.flags
       maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
       maybeProjectFlags _ = Nothing
-      globals = pruneGlobals sma.smaGlobal (Map.keysSet deps)
+      globals = pruneGlobals sma.global (Map.keysSet deps)
   logDebug "Checking flags"
   checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
   logDebug "SourceMap constructed"
   pure
     SourceMap
-      { smTargets = smt
-      , smCompiler = compiler
-      , smProject = project
-      , smDeps = deps
-      , smGlobal = globals
+      { targets = smt
+      , compiler = compiler
+      , project = project
+      , deps = deps
+      , global = globals
       }
 
 -- | Get a 'SourceMapHash' for a given 'SourceMap'
@@ -180,7 +180,7 @@ hashSourceMapData ::
 hashSourceMapData boptsCli sm = do
   compilerPath <- getUtf8Builder . fromString . toFilePath <$> getCompilerPath
   compilerInfo <- getCompilerInfo
-  immDeps <- forM (Map.elems sm.smDeps) depPackageHashableContent
+  immDeps <- forM (Map.elems sm.deps) depPackageHashableContent
   bc <- view buildConfigL
   let -- extra bytestring specifying GHC options supposed to be applied to GHC
       -- boot packages so we'll have different hashes when bare resolver
@@ -315,7 +315,7 @@ loadLocalPackage pp = do
               common.cabalConfigOpts
   gpkg <- ppGPD pp
   let name = common.name
-      mtarget = M.lookup name sm.smTargets.smtTargets
+      mtarget = M.lookup name sm.targets.targets
       (exeCandidates, testCandidates, benchCandidates) =
         case mtarget of
           Just (TargetComps comps) ->

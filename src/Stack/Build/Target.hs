@@ -1,10 +1,11 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -- | Parsing command line targets
 --
@@ -254,9 +255,9 @@ resolveRawTarget ::
 resolveRawTarget sma allLocs (ri, rt) =
   go rt
  where
-  locals = sma.smaProject
-  deps = sma.smaDeps
-  globals = sma.smaGlobal
+  locals = sma.project
+  deps = sma.deps
+  globals = sma.global
   -- Helper function: check if a 'NamedComponent' matches the given
   -- 'ComponentName'
   isCompNamed :: ComponentName -> NamedComponent -> Bool
@@ -537,13 +538,13 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   logDebug "Parsing the targets"
   bconfig <- view buildConfigL
   workingDir <- getCurrentDir
-  locals <- view $ buildConfigL . to (.smWanted.smwProject)
+  locals <- view $ buildConfigL . to (.smWanted.project)
   let (textTargets', rawInput) = getRawInput boptscli locals
 
   (errs1, concat -> rawTargets) <- fmap partitionEithers $ forM rawInput $
     parseRawTargetDirs workingDir locals
 
-  let depLocs = Map.map (.location) smActual.smaDeps
+  let depLocs = Map.map (.location) smActual.deps
 
   (errs2, resolveResults) <- fmap partitionEithers $ forM rawTargets $
     resolveRawTarget smActual depLocs
@@ -577,8 +578,8 @@ parseTargets needTargets haddockDeps boptscli smActual = do
   addedDeps' <- mapM (additionalDepPackage haddockDeps . PLImmutable) addedDeps
 
   pure SMTargets
-    { smtTargets = targets
-    , smtDeps = addedDeps'
+    { targets = targets
+    , deps = addedDeps'
     }
  where
   bcImplicitGlobal bconfig =

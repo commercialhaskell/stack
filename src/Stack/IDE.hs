@@ -73,7 +73,7 @@ listPackages ::
   -> ListPackagesCmd
   -> RIO env ()
 listPackages stream flag = do
-  packages <- view $ buildConfigL . to (.smWanted.smwProject)
+  packages <- view $ buildConfigL . to (.smWanted.project)
   let strs = case flag of
         ListPackageNames ->
           map packageNameString (Map.keys packages)
@@ -88,7 +88,7 @@ listTargets ::
   -> (NamedComponent -> Bool)
   -> RIO env ()
 listTargets stream isCompType = do
-  packages <- view $ buildConfigL . to (.smWanted.smwProject)
+  packages <- view $ buildConfigL . to (.smWanted.project)
   pairs <- concat <$> Map.traverseWithKey toNameAndComponent packages
   outputFunc stream $ T.unpack $ T.intercalate "\n" $
     map renderPkgComponent pairs
