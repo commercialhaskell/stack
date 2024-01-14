@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -18,17 +19,17 @@ import           Stack.Prelude
 -- | Type representing configuration options which support the needs of the
 -- [@curator@ tool](https://github.com/commercialhaskell/curator).
 data Curator = Curator
-  { curatorSkipTest :: !(Set PackageName)
+  { skipTest :: !(Set PackageName)
     -- ^ Packages for which Stack should ignore test suites.
-  , curatorExpectTestFailure :: !(Set PackageName)
+  , expectTestFailure :: !(Set PackageName)
     -- ^ Packages for which Stack should expect building test suites to fail.
-  , curatorSkipBenchmark :: !(Set PackageName)
+  , skipBenchmark :: !(Set PackageName)
     -- ^ Packages for which Stack should ignore benchmarks.
-  , curatorExpectBenchmarkFailure :: !(Set PackageName)
+  , expectBenchmarkFailure :: !(Set PackageName)
     -- ^ Packages for which Stack should expect building benchmarks to fail.
-  , curatorSkipHaddock :: !(Set PackageName)
+  , skipHaddock :: !(Set PackageName)
     -- ^ Packages for which Stack should ignore creating Haddock documentation.
-  , curatorExpectHaddockFailure :: !(Set PackageName)
+  , expectHaddockFailure :: !(Set PackageName)
     -- ^ Packages for which Stack should expect creating Haddock documentation
     -- to fail.
   }
@@ -36,14 +37,14 @@ data Curator = Curator
 
 instance ToJSON Curator where
   toJSON c = object
-    [ "skip-test" .= Set.map CabalString c.curatorSkipTest
-    , "expect-test-failure" .= Set.map CabalString c.curatorExpectTestFailure
-    , "skip-bench" .= Set.map CabalString c.curatorSkipBenchmark
+    [ "skip-test" .= Set.map CabalString c.skipTest
+    , "expect-test-failure" .= Set.map CabalString c.expectTestFailure
+    , "skip-bench" .= Set.map CabalString c.skipBenchmark
     , "expect-benchmark-failure" .=
-        Set.map CabalString c.curatorExpectTestFailure
-    , "skip-haddock" .= Set.map CabalString c.curatorSkipHaddock
+        Set.map CabalString c.expectTestFailure
+    , "skip-haddock" .= Set.map CabalString c.skipHaddock
     , "expect-haddock-failure" .=
-        Set.map CabalString c.curatorExpectHaddockFailure
+        Set.map CabalString c.expectHaddockFailure
     ]
 
 instance FromJSON (WithJSONWarnings Curator) where
