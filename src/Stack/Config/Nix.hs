@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Nix configuration
 module Stack.Config.Nix
@@ -50,17 +51,17 @@ nixOptsFromMonoid nixMonoid os = do
   let defaultPure = case os of
         OSX -> False
         _ -> True
-      pureShell = fromFirst defaultPure nixMonoid.nixMonoidPureShell
-      packages = fromFirst [] nixMonoid.nixMonoidPackages
-      initFile = getFirst nixMonoid.nixMonoidInitFile
+      pureShell = fromFirst defaultPure nixMonoid.pureShell
+      packages = fromFirst [] nixMonoid.packages
+      initFile = getFirst nixMonoid.initFile
       shellOptions =
-           fromFirst [] nixMonoid.nixMonoidShellOptions
-        ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoid.nixMonoidPath)
-      addGCRoots   = fromFirstFalse nixMonoid.nixMonoidAddGCRoots
+           fromFirst [] nixMonoid.shellOptions
+        ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoid.path)
+      addGCRoots   = fromFirstFalse nixMonoid.addGCRoots
 
   -- Enable Nix-mode by default on NixOS, unless Docker-mode was specified
   osIsNixOS <- isNixOS
-  let nixEnable0 = fromFirst osIsNixOS nixMonoid.nixMonoidEnable
+  let nixEnable0 = fromFirst osIsNixOS nixMonoid.enable
 
   enable <-
     if nixEnable0 && osIsWindows

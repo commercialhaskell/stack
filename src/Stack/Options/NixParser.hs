@@ -66,7 +66,7 @@ nixOptsParser hide0 = overrideActivation <$>
  where
   hide = hideMods hide0
   overrideActivation m =
-    if fromFirst False m.nixMonoidPureShell
-      then m { nixMonoidEnable = (First . Just . fromFirst True) m.nixMonoidEnable }
+    if fromFirst False m.pureShell
+      then m { enable = (First . Just . fromFirst True) m.enable }
       else m
   textArgsOption = fmap (map T.pack) . argsOption
