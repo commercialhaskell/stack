@@ -342,7 +342,9 @@ executePlan' :: HasEnvConfig env
              -> ExecuteEnv
              -> RIO env ()
 executePlan' installedMap0 targets plan ee = do
-  when ee.buildOpts.testOpts.toCoverage deleteHpcReports
+  let !buildOpts = ee.buildOpts
+  let !testOpts = buildOpts.testOpts
+  when testOpts.toCoverage deleteHpcReports
   cv <- view actualCompilerVersionL
   case nonEmpty $ Map.toList plan.unregisterLocal of
     Nothing -> pure ()
@@ -372,7 +374,7 @@ executePlan' installedMap0 targets plan ee = do
   threads <- view $ configL . to (.jobs)
   let keepGoing = fromMaybe
         (not (Map.null plan.finals))
-        ee.buildOpts.keepGoing
+        buildOpts.keepGoing
   terminal <- view terminalL
   terminalWidth <- view termWidthL
   errs <- liftIO $ runActions threads keepGoing actions $
@@ -392,7 +394,7 @@ executePlan' installedMap0 targets plan ee = do
                     nowBuilding names = mconcat $
                         ": "
                       : L.intersperse ", " (map fromPackageName names)
-                    progressFormat = ee.buildOpts.progressBar
+                    progressFormat = buildOpts.progressBar
                     progressLine prev' total' =
                          "Progress "
                       <> display prev' <> "/" <> display total'
@@ -412,13 +414,13 @@ executePlan' installedMap0 targets plan ee = do
                   pure done
                 loop done
       when (total > 1) $ loop 0
-  when ee.buildOpts.testOpts.toCoverage $ do
+  when testOpts.toCoverage $ do
     generateHpcUnifiedReport
     generateHpcMarkupIndex
   unless (null errs) $
     prettyThrowM $ ExecutionFailure errs
-  when ee.buildOpts.haddock $ do
-    if ee.buildOpts.haddockForHackage
+  when buildOpts.haddock $ do
+    if buildOpts.haddockForHackage
       then
         generateLocalHaddockForHackageArchives ee.locals
       else do
@@ -435,7 +437,7 @@ executePlan' installedMap0 targets plan ee = do
           ee.baseConfigOpts
           ee.globalDumpPkgs
           snapshotDumpPkgs
-        when ee.buildOpts.openHaddocks $ do
+        when buildOpts.openHaddocks $ do
           let planPkgs, localPkgs, installedPkgs, availablePkgs
                 :: Map PackageName (PackageIdentifier, InstallLocation)
               planPkgs =
