@@ -126,6 +126,7 @@ import           Stack.Types.Nix ( NixOpts (..) )
 import           Stack.Types.Platform
                    ( PlatformVariant (..), platformOnlyRelDir )
 import           Stack.Types.Project ( Project (..) )
+import qualified Stack.Types.Project as Project ( Project (..) )
 import           Stack.Types.ProjectAndConfigMonoid
                    ( ProjectAndConfigMonoid (..), parseProjectAndConfigMonoid )
 import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
@@ -785,9 +786,10 @@ withBuildConfig inner = do
               "real project.\n"
           pure (p, dest)
   mcompiler <- view $ globalOptsL . to (.compiler)
-  let project = project'
-        { compiler = mcompiler <|> project'.compiler
-        , resolver = fromMaybe project'.resolver mresolver
+  let project :: Project
+      project = project'
+        { Project.compiler = mcompiler <|> project'.compiler
+        , Project.resolver = fromMaybe project'.resolver mresolver
         }
   extraPackageDBs <- mapM resolveDir' project.extraPackageDBs
 
