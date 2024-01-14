@@ -691,8 +691,8 @@ installPackage name ps minstalled = do
  where
   expectedTestOrBenchFailures maybeCurator = fromMaybe False $ do
     curator <- maybeCurator
-    pure $  Set.member name curator.curatorExpectTestFailure
-         || Set.member name curator.curatorExpectBenchmarkFailure
+    pure $  Set.member name curator.expectTestFailure
+         || Set.member name curator.expectBenchmarkFailure
 
 resolveDepsAndInstall ::
      Bool

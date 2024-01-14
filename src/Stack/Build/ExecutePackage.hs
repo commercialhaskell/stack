@@ -386,9 +386,9 @@ singleBuild
     && mainLibraryHasExposedModules package
        -- Special help for the curator tool to avoid haddocks that are known
        -- to fail
-    && maybe True (Set.notMember pname . (.curatorSkipHaddock)) mcurator
+    && maybe True (Set.notMember pname . (.skipHaddock)) mcurator
   expectHaddockFailure =
-      maybe False (Set.member pname . (.curatorExpectHaddockFailure))
+      maybe False (Set.member pname . (.expectHaddockFailure))
   isHaddockForHackage = ee.buildOpts.haddockForHackage
   fulfillHaddockExpectations mcurator action
     | expectHaddockFailure mcurator = do
@@ -1285,11 +1285,11 @@ taskComponents task =
 
 expectTestFailure :: PackageName -> Maybe Curator -> Bool
 expectTestFailure pname =
-  maybe False (Set.member pname . (.curatorExpectTestFailure))
+  maybe False (Set.member pname . (.expectTestFailure))
 
 expectBenchmarkFailure :: PackageName -> Maybe Curator -> Bool
 expectBenchmarkFailure pname =
-  maybe False (Set.member pname . (.curatorExpectBenchmarkFailure))
+  maybe False (Set.member pname . (.expectBenchmarkFailure))
 
 fulfillCuratorBuildExpectations ::
      (HasCallStack, HasTerm env)

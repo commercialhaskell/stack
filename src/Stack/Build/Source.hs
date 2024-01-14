@@ -320,13 +320,13 @@ loadLocalPackage pp = do
           Just (TargetAll _packageType) ->
             ( buildableExes pkg
             , if    bopts.tests
-                 && maybe True (Set.notMember name . (.curatorSkipTest)) mcurator
+                 && maybe True (Set.notMember name . (.skipTest)) mcurator
                 then buildableTestSuites pkg
                 else Set.empty
             , if    bopts.benchmarks
                  && maybe
                       True
-                      (Set.notMember name . (.curatorSkipBenchmark))
+                      (Set.notMember name . (.skipBenchmark))
                       mcurator
                 then buildableBenchmarks pkg
                 else Set.empty
