@@ -1,11 +1,13 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 module Stack.Setup
   ( setupEnv
@@ -610,23 +612,23 @@ defaultSetupInfoYaml =
   "https://raw.githubusercontent.com/commercialhaskell/stackage-content/master/stack/stack-setup-2.yaml"
 
 data SetupOpts = SetupOpts
-  { soptsInstallIfMissing :: !Bool
-  , soptsUseSystem :: !Bool
+  { installIfMissing :: !Bool
+  , useSystem :: !Bool
     -- ^ Should we use a system compiler installation, if available?
-  , soptsWantedCompiler :: !WantedCompiler
-  , soptsCompilerCheck :: !VersionCheck
-  , soptsStackYaml :: !(Maybe (Path Abs File))
+  , wantedCompiler :: !WantedCompiler
+  , compilerCheck :: !VersionCheck
+  , stackYaml :: !(Maybe (Path Abs File))
     -- ^ If we got the desired GHC version from that file
-  , soptsForceReinstall :: !Bool
-  , soptsSanityCheck :: !Bool
+  , forceReinstall :: !Bool
+  , sanityCheck :: !Bool
     -- ^ Run a sanity check on the selected GHC
-  , soptsSkipGhcCheck :: !Bool
+  , skipGhcCheck :: !Bool
     -- ^ Don't check for a compatible GHC version/architecture
-  , soptsSkipMsys :: !Bool
+  , skipMsys :: !Bool
     -- ^ Do not use a custom msys installation on Windows
-  , soptsResolveMissingGHC :: !(Maybe StyleDoc)
+  , resolveMissingGHC :: !(Maybe StyleDoc)
     -- ^ Message shown to user for how to resolve the missing GHC
-  , soptsGHCBindistURL :: !(Maybe String)
+  , ghcBindistURL :: !(Maybe String)
     -- ^ Alternate GHC binary distribution (requires custom GHCVariant)
   }
   deriving Show
@@ -649,17 +651,17 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
   actual <- either throwIO pure $ wantedToActual wanted
   let wc = actual^.whichCompilerL
   let sopts = SetupOpts
-        { soptsInstallIfMissing = config.installGHC
-        , soptsUseSystem = config.systemGHC
-        , soptsWantedCompiler = wcVersion
-        , soptsCompilerCheck = config.compilerCheck
-        , soptsStackYaml = Just stackYaml
-        , soptsForceReinstall = False
-        , soptsSanityCheck = False
-        , soptsSkipGhcCheck = config.skipGHCCheck
-        , soptsSkipMsys = config.skipMsys
-        , soptsResolveMissingGHC = mResolveMissingGHC
-        , soptsGHCBindistURL = Nothing
+        { installIfMissing = config.installGHC
+        , useSystem = config.systemGHC
+        , wantedCompiler = wcVersion
+        , compilerCheck = config.compilerCheck
+        , stackYaml = Just stackYaml
+        , forceReinstall = False
+        , sanityCheck = False
+        , skipGhcCheck = config.skipGHCCheck
+        , skipMsys = config.skipMsys
+        , resolveMissingGHC = mResolveMissingGHC
+        , ghcBindistURL = Nothing
         }
 
   (compilerPaths, ghcBin) <- ensureCompilerAndMsys sopts
@@ -748,7 +750,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                    then Map.union utf8EnvVars
                    else id)
 
-              $ case (sopts.soptsSkipMsys, platform) of
+              $ case (sopts.skipMsys, platform) of
                   (False, Platform Cabal.I386   Cabal.Windows) ->
                     Map.insert "MSYSTEM" "MINGW32"
                   (False, Platform Cabal.X86_64 Cabal.Windows) ->
@@ -997,7 +999,7 @@ ensureCompilerAndMsys sopts = do
   getSetupInfo' <- memoizeRef getSetupInfo
   mmsys2Tool <- ensureMsys sopts getSetupInfo'
   mmsysPaths <- maybe (pure Nothing) (fmap Just . extraDirs) mmsys2Tool
-  actual <- either throwIO pure $ wantedToActual sopts.soptsWantedCompiler
+  actual <- either throwIO pure $ wantedToActual sopts.wantedCompiler
   didWarn <- warnUnsupportedCompiler $ getGhcVersion actual
   -- Modify the initial environment to include the MSYS2 path, if MSYS2 is being
   -- used
@@ -1092,11 +1094,11 @@ ensureMsys sopts getSetupInfo' = do
   installed <- listInstalled localPrograms
 
   case platform of
-    Platform _ Cabal.Windows | not sopts.soptsSkipMsys ->
+    Platform _ Cabal.Windows | not sopts.skipMsys ->
       case getInstalledTool installed (mkPackageName "msys2") (const True) of
         Just tool -> pure (Just tool)
         Nothing
-          | sopts.soptsInstallIfMissing -> do
+          | sopts.installIfMissing -> do
               si <- runMemoized getSetupInfo'
               let msysDir = fillSep
                     [ style Dir "msys2-yyyymmdd"
@@ -1127,9 +1129,9 @@ installGhcBindist ::
   -> RIO env (Tool, CompilerBuild)
 installGhcBindist sopts getSetupInfo' installed = do
   Platform expectedArch _ <- view platformL
-  let wanted = sopts.soptsWantedCompiler
+  let wanted = sopts.wantedCompiler
       isWanted =
-        isWantedCompiler sopts.soptsCompilerCheck sopts.soptsWantedCompiler
+        isWantedCompiler sopts.compilerCheck sopts.wantedCompiler
   config <- view configL
   ghcVariant <- view ghcVariantL
   wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
@@ -1146,7 +1148,7 @@ installGhcBindist sopts getSetupInfo' installed = do
           pure (getInstalledTool installed ghcPkgName (isWanted . ACGhc), ghcBuild)
   let existingCompilers = concatMap
         (\(installedCompiler, compilerBuild) ->
-          case (installedCompiler, sopts.soptsForceReinstall) of
+          case (installedCompiler, sopts.forceReinstall) of
             (Just tool, False) -> [(tool, compilerBuild)]
             _ -> [])
         possibleCompilers
@@ -1156,17 +1158,17 @@ installGhcBindist sopts getSetupInfo' installed = do
   case existingCompilers of
     (tool, build_):_ -> pure (tool, build_)
     []
-      | sopts.soptsInstallIfMissing -> do
+      | sopts.installIfMissing -> do
           si <- runMemoized getSetupInfo'
           downloadAndInstallPossibleCompilers
             (map snd possibleCompilers)
             si
-            sopts.soptsWantedCompiler
-            sopts.soptsCompilerCheck
-            sopts.soptsGHCBindistURL
+            sopts.wantedCompiler
+            sopts.compilerCheck
+            sopts.ghcBindistURL
       | otherwise -> do
           let suggestion =
-                fromMaybe defaultSuggestion sopts.soptsResolveMissingGHC
+                fromMaybe defaultSuggestion sopts.resolveMissingGHC
               defaultSuggestion = fillSep
                 [ flow "To install the correct version of GHC into the \
                        \subdirectory for the specified platform in Stack's \
@@ -1188,13 +1190,13 @@ installGhcBindist sopts getSetupInfo' installed = do
 
           prettyThrowM $ CompilerVersionMismatch
             Nothing -- FIXME ((\(x, y, _) -> (x, y)) <$> msystem)
-            (sopts.soptsWantedCompiler, expectedArch)
+            (sopts.wantedCompiler, expectedArch)
             ghcVariant
             (case possibleCompilers of
               [] -> CompilerBuildStandard
               (_, compilerBuild):_ -> compilerBuild)
-            sopts.soptsCompilerCheck
-            sopts.soptsStackYaml
+            sopts.compilerCheck
+            sopts.stackYaml
             suggestion
 
 -- | Ensure compiler is installed.
@@ -1204,7 +1206,7 @@ ensureCompiler ::
   -> Memoized SetupInfo
   -> RIO (WithMSYS env) (CompilerPaths, ExtraDirs)
 ensureCompiler sopts getSetupInfo' = do
-  let wanted = sopts.soptsWantedCompiler
+  let wanted = sopts.wantedCompiler
   wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
 
   hook <- ghcInstallHook
@@ -1216,13 +1218,13 @@ ensureCompiler sopts getSetupInfo' = do
   Platform expectedArch _ <- view platformL
 
   let canUseCompiler cp
-        | sopts.soptsSkipGhcCheck = pure cp
+        | sopts.skipGhcCheck = pure cp
         | not $ isWanted cp.cpCompilerVersion =
             prettyThrowIO UnwantedCompilerVersion
         | cp.cpArch /= expectedArch = prettyThrowIO UnwantedArchitecture
         | otherwise = pure cp
       isWanted =
-        isWantedCompiler sopts.soptsCompilerCheck sopts.soptsWantedCompiler
+        isWantedCompiler sopts.compilerCheck sopts.wantedCompiler
 
   let checkCompiler :: Path Abs File -> RIO (WithMSYS env) (Maybe CompilerPaths)
       checkCompiler compiler = do
@@ -1239,7 +1241,7 @@ ensureCompiler sopts getSetupInfo' = do
           Right cp -> pure $ Just cp
 
   mcp <-
-    if | sopts.soptsUseSystem -> do
+    if | sopts.useSystem -> do
           logDebug "Getting system compiler version"
           runConduit $
             sourceSystemCompilers wanted .|
@@ -1271,7 +1273,7 @@ runGHCInstallHook ::
   -> RIO env (Maybe (Path Abs File))
 runGHCInstallHook sopts hook = do
   logDebug "Getting hook installed compiler version"
-  let wanted = sopts.soptsWantedCompiler
+  let wanted = sopts.wantedCompiler
   menv0 <- view processContextL
   menv <- mkProcessContext (Map.union (wantedCompilerToEnv wanted) $
     removeHaskellEnvVars (view envVarsL menv0))
@@ -1281,7 +1283,7 @@ runGHCInstallHook sopts hook = do
       let ghcPath = stripNewline . TL.unpack . TL.decodeUtf8With T.lenientDecode $ out
       case parseAbsFile ghcPath of
         Just compiler -> do
-          when sopts.soptsSanityCheck $ sanityCheck compiler
+          when sopts.sanityCheck $ sanityCheck compiler
           logDebug ("Using GHC compiler at: " <> fromString (toFilePath compiler))
           pure (Just compiler)
         Nothing -> do
@@ -1325,7 +1327,7 @@ ensureSandboxedCompiler ::
   -> Memoized SetupInfo
   -> RIO (WithMSYS env) (CompilerPaths, ExtraDirs)
 ensureSandboxedCompiler sopts getSetupInfo' = do
-  let wanted = sopts.soptsWantedCompiler
+  let wanted = sopts.wantedCompiler
   -- List installed tools
   config <- view configL
   let localPrograms = config.localPrograms
@@ -1334,7 +1336,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
        "Installed tools: \n - "
     <> mconcat (intersperse "\n - " (map (fromString . toolString) installed))
   (compilerTool, compilerBuild) <-
-    case sopts.soptsWantedCompiler of
+    case sopts.wantedCompiler of
      -- shall we build GHC from source?
      WCGhcGit commitId flavour ->
        buildGhcFromSource
@@ -1388,7 +1390,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
     -- Run this here to ensure that the sanity check uses the modified
     -- environment, otherwise we may infect GHC_PACKAGE_PATH and break sanity
     -- checks.
-    when sopts.soptsSanityCheck $ sanityCheck compiler
+    when sopts.sanityCheck $ sanityCheck compiler
 
     pure compiler
 

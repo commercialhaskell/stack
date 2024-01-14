@@ -1,7 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Types and functions related to Stack's @setup@ command.
 module Stack.SetupCmd
@@ -65,17 +66,17 @@ setup ::
 setup sco wantedCompiler compilerCheck mstack = do
   config <- view configL
   sandboxedGhc <- (.cpSandboxed) . fst <$> ensureCompilerAndMsys SetupOpts
-    { soptsInstallIfMissing = True
-    , soptsUseSystem = config.systemGHC && not sco.scoForceReinstall
-    , soptsWantedCompiler = wantedCompiler
-    , soptsCompilerCheck = compilerCheck
-    , soptsStackYaml = mstack
-    , soptsForceReinstall = sco.scoForceReinstall
-    , soptsSanityCheck = True
-    , soptsSkipGhcCheck = False
-    , soptsSkipMsys = config.skipMsys
-    , soptsResolveMissingGHC = Nothing
-    , soptsGHCBindistURL = sco.scoGHCBindistURL
+    { installIfMissing = True
+    , useSystem = config.systemGHC && not sco.scoForceReinstall
+    , wantedCompiler = wantedCompiler
+    , compilerCheck = compilerCheck
+    , stackYaml = mstack
+    , forceReinstall = sco.scoForceReinstall
+    , sanityCheck = True
+    , skipGhcCheck = False
+    , skipMsys = config.skipMsys
+    , resolveMissingGHC = Nothing
+    , ghcBindistURL = sco.scoGHCBindistURL
     }
   let compiler = case wantedCompiler of
         WCGhc _ -> "GHC"
