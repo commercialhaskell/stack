@@ -67,12 +67,12 @@ mkProjectPackage printWarnings dir buildHaddocks = do
     , ppResolvedDir = dir
     , ppCommon =
         CommonPackage
-          { cpGPD = gpd printWarnings
-          , cpName = name
-          , cpFlags = mempty
-          , cpGhcOptions = mempty
-          , cpCabalConfigOpts = mempty
-          , cpHaddocks = buildHaddocks
+          { gpd = gpd printWarnings
+          , name = name
+          , flags = mempty
+          , ghcOptions = mempty
+          , cabalConfigOpts = mempty
+          , haddocks = buildHaddocks
           }
     }
 
@@ -101,12 +101,12 @@ additionalDepPackage buildHaddocks pl = do
     , dpFromSnapshot = NotFromSnapshot
     , dpCommon =
         CommonPackage
-          { cpGPD = gpdio
-          , cpName = name
-          , cpFlags = mempty
-          , cpGhcOptions = mempty
-          , cpCabalConfigOpts = mempty
-          , cpHaddocks = buildHaddocks
+          { gpd = gpdio
+          , name = name
+          , flags = mempty
+          , ghcOptions = mempty
+          , cabalConfigOpts = mempty
+          , haddocks = buildHaddocks
           }
     }
 
@@ -125,18 +125,18 @@ snapToDepPackage buildHaddocks name sp = do
     , dpFromSnapshot = FromSnapshot
     , dpCommon =
         CommonPackage
-          { cpGPD = run $ loadCabalFileImmutable sp.spLocation
-          , cpName = name
-          , cpFlags = sp.spFlags
-          , cpGhcOptions = sp.spGhcOptions
-          , cpCabalConfigOpts = [] -- No spCabalConfigOpts, not present in snapshots
-          , cpHaddocks = buildHaddocks
+          { gpd = run $ loadCabalFileImmutable sp.spLocation
+          , name = name
+          , flags = sp.spFlags
+          , ghcOptions = sp.spGhcOptions
+          , cabalConfigOpts = [] -- No spCabalConfigOpts, not present in snapshots
+          , haddocks = buildHaddocks
           }
     }
 
 loadVersion :: MonadIO m => CommonPackage -> m Version
 loadVersion common = do
-  gpd <- liftIO common.cpGPD
+  gpd <- liftIO common.gpd
   pure (pkgVersion $ PD.package $ PD.packageDescription gpd)
 
 getPLIVersion :: PackageLocationImmutable -> Version
@@ -244,7 +244,7 @@ getUnusedPackageFlags (name, userFlags) source prj deps =
           pure $ Just $ UFNoPackage source name
         -- Package exists, let's check if the flags are defined
         Just common -> do
-          gpd <- liftIO common.cpGPD
+          gpd <- liftIO common.gpd
           let pname = pkgName $ PD.package $ PD.packageDescription gpd
               pkgFlags = Set.fromList $ map PD.flagName $ PD.genPackageFlags gpd
               unused = Map.keysSet $ Map.withoutKeys userFlags pkgFlags
@@ -297,7 +297,7 @@ loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
   pure $ \projectPackages -> do
     prjPkgs <- fmap Map.fromList . for projectPackages $ \resolved -> do
       pp <- mkProjectPackage printWarnings resolved buildHaddocks
-      pure (pp.ppCommon.cpName, pp)
+      pure (pp.ppCommon.name, pp)
     compiler <- either throwIO pure $ wantedToActual $ snapshotCompiler snapshot
     pure
       SMActual

@@ -223,12 +223,12 @@ installLocationIsMutable Local = Mutable
 
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
-  { planTasks :: !(Map PackageName Task)
-  , planFinals :: !(Map PackageName Task)
+  { tasks :: !(Map PackageName Task)
+  , finals :: !(Map PackageName Task)
     -- ^ Final actions to be taken (test, benchmark, etc)
-  , planUnregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
+  , unregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
     -- ^ Text is reason we're unregistering, for display only
-  , planInstallExes :: !(Map Text InstallLocation)
+  , installExes :: !(Map Text InstallLocation)
     -- ^ Executables that should be installed after successful building
   }
   deriving Show

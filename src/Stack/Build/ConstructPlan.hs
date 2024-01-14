@@ -174,11 +174,11 @@ constructPlan
       then do
         let tasks = Map.fromList $ mapMaybe (toMaybe . second toTask) adrs
         takeSubset Plan
-          { planTasks = tasks
-          , planFinals = Map.fromList finals
-          , planUnregisterLocal =
+          { tasks = tasks
+          , finals = Map.fromList finals
+          , unregisterLocal =
               mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps
-          , planInstallExes =
+          , installExes =
               if    baseConfigOpts0.buildOpts.installExes
                  || baseConfigOpts0.buildOpts.installCompilerTool
                 then installExes
@@ -234,25 +234,25 @@ constructPlan
   -- | Strip out anything from the 'Plan' intended for the local database.
   stripLocals :: Plan -> RIO env Plan
   stripLocals plan = pure plan
-    { planTasks = Map.filter checkTask plan.planTasks
-    , planFinals = Map.empty
-    , planUnregisterLocal = Map.empty
-    , planInstallExes = Map.filter (/= Local) plan.planInstallExes
+    { tasks = Map.filter checkTask plan.tasks
+    , finals = Map.empty
+    , unregisterLocal = Map.empty
+    , installExes = Map.filter (/= Local) plan.installExes
     }
    where
     checkTask task = taskLocation task == Snap
 
   stripNonDeps :: Plan -> RIO env Plan
   stripNonDeps plan = pure plan
-    { planTasks = Map.filter checkTask plan.planTasks
-    , planFinals = Map.empty
-    , planInstallExes = Map.empty -- TODO maybe don't disable this?
+    { tasks = Map.filter checkTask plan.tasks
+    , finals = Map.empty
+    , installExes = Map.empty -- TODO maybe don't disable this?
     }
    where
     deps = Map.keysSet sourceDeps
     checkTask task = taskProvides task `Set.member` missingForDeps
     providesDep task = pkgName (taskProvides task) `Set.member` deps
-    tasks = Map.elems plan.planTasks
+    tasks = Map.elems plan.tasks
     missing =
       Map.fromList $ map (taskProvides &&&  (.configOpts.missing)) tasks
     missingForDeps = flip execState mempty $
@@ -568,7 +568,7 @@ tellExecutables _name (PSFilePath lp)
   | otherwise = pure ()
 -- Ignores ghcOptions because they don't matter for enumerating executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnapshot cp) =
-  tellExecutablesUpstream name (pure $ Just pkgloc) Snap cp.cpFlags
+  tellExecutablesUpstream name (pure $ Just pkgloc) Snap cp.flags
 
 -- | For a given 'PackageName' value, known to be immutable, adds relevant
 -- executables to the collected output.
@@ -630,8 +630,8 @@ installPackage name ps minstalled = do
         <> fromPackageName name
         <> "."
       package <- ctx.loadPackage
-        pkgLoc cp.cpFlags cp.cpGhcOptions cp.cpCabalConfigOpts
-      resolveDepsAndInstall True cp.cpHaddocks ps package minstalled
+        pkgLoc cp.flags cp.ghcOptions cp.cabalConfigOpts
+      resolveDepsAndInstall True cp.haddocks ps package minstalled
     PSFilePath lp -> do
       case lp.testBench of
         Nothing -> do

@@ -215,7 +215,7 @@ justLocals =
   map taskProvides .
   filter ((== Local) . taskLocation) .
   Map.elems .
-  (.planTasks)
+  (.tasks)
 
 checkCabalVersion :: HasEnvConfig env => RIO env ()
 checkCabalVersion = do
@@ -293,7 +293,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   exesToBuild =
     collect
       [ (exe, pkgName')
-      | (pkgName', task) <- Map.toList plan.planTasks
+      | (pkgName', task) <- Map.toList plan.tasks
       , TTLocalMutable lp <- [task.taskType]
       , exe <- (Set.toList . exeComponents . (.components)) lp
       ]
