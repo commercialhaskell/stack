@@ -36,15 +36,15 @@ data Curator = Curator
   deriving Show
 
 instance ToJSON Curator where
-  toJSON c = object
-    [ "skip-test" .= Set.map CabalString c.skipTest
-    , "expect-test-failure" .= Set.map CabalString c.expectTestFailure
-    , "skip-bench" .= Set.map CabalString c.skipBenchmark
+  toJSON curator = object
+    [ "skip-test" .= Set.map CabalString curator.skipTest
+    , "expect-test-failure" .= Set.map CabalString curator.expectTestFailure
+    , "skip-bench" .= Set.map CabalString curator.skipBenchmark
     , "expect-benchmark-failure" .=
-        Set.map CabalString c.expectTestFailure
-    , "skip-haddock" .= Set.map CabalString c.skipHaddock
+        Set.map CabalString curator.expectTestFailure
+    , "skip-haddock" .= Set.map CabalString curator.skipHaddock
     , "expect-haddock-failure" .=
-        Set.map CabalString c.expectHaddockFailure
+        Set.map CabalString curator.expectHaddockFailure
     ]
 
 instance FromJSON (WithJSONWarnings Curator) where
