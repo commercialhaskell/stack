@@ -40,14 +40,14 @@ toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do
   projectInstalls <-
     for sourceMap.smProject $ \pp -> do
-      version <- loadVersion pp.ppCommon
+      version <- loadVersion pp.common
       pure (Local, version)
   depInstalls <-
     for sourceMap.smDeps $ \dp ->
-      case dp.dpLocation of
+      case dp.location of
         PLImmutable pli -> pure (Snap, getPLIVersion pli)
         PLMutable _ -> do
-          version <- loadVersion dp.dpCommon
+          version <- loadVersion dp.common
           pure (Local, version)
   pure $ projectInstalls <> depInstalls
 

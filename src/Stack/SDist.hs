@@ -612,7 +612,7 @@ buildExtractedTarball pkgDir = do
           $  localPackage.package.name
           == localPackageToBuild.package.name
   pathsToKeep <- Map.fromList <$> filterM
-    (fmap not . isPathToRemove . resolvedAbsolute . (.ppResolvedDir) . snd)
+    (fmap not . isPathToRemove . resolvedAbsolute . (.resolvedDir) . snd)
     (Map.toList envConfig.buildConfig.smWanted.smwProject)
   pp <- mkProjectPackage YesPrintWarnings pkgDir False
   let adjustEnvForBuild env =
@@ -625,7 +625,7 @@ buildExtractedTarball pkgDir = do
               }
         in  set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =
-        sm {smProject = Map.insert pp.ppCommon.name pp pathsToKeep}
+        sm {smProject = Map.insert pp.common.name pp pathsToKeep}
   local adjustEnvForBuild $ build Nothing
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to

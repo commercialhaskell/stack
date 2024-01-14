@@ -157,7 +157,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
       sourceMap <- view $ sourceMapL . to (.smDeps)
       case Map.lookup hooglePackageName sourceMap of
         Just hoogleDep ->
-          case hoogleDep.dpLocation of
+          case hoogleDep.location of
             PLImmutable pli ->
               T.pack . packageIdentifierString <$>
                   restrictMinHoogleVersion muted (packageLocationIdent pli)

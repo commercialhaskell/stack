@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE NoFieldSelectors    #-}
-{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 -- | A sourcemap maps a package name to how it should be built, including source
 -- code, flags, options, etc. This module contains various stages of source map
@@ -63,21 +64,21 @@ data FromSnapshot
 
 -- | A view of a dependency package, specified in stack.yaml
 data DepPackage = DepPackage
-  { dpCommon :: !CommonPackage
-  , dpLocation :: !PackageLocation
-  , dpHidden :: !Bool
+  { common :: !CommonPackage
+  , location :: !PackageLocation
+  , hidden :: !Bool
     -- ^ Should the package be hidden after registering? Affects the script
     -- interpreter's module name import parser.
-  , dpFromSnapshot :: !FromSnapshot
+  , fromSnapshot :: !FromSnapshot
     -- ^ Needed to ignore bounds between snapshot packages
     -- See https://github.com/commercialhaskell/stackage/issues/3185
   }
 
 -- | A view of a project package needed for resolving components
 data ProjectPackage = ProjectPackage
-  { ppCommon :: !CommonPackage
-  , ppCabalFP :: !(Path Abs File)
-  , ppResolvedDir :: !(ResolvedPath Dir)
+  { common :: !CommonPackage
+  , cabalFP :: !(Path Abs File)
+  , resolvedDir :: !(ResolvedPath Dir)
   }
 
 -- | A view of a package installed in the global package database also could
@@ -171,11 +172,11 @@ smRelDir :: (MonadThrow m) => SourceMapHash -> m (Path Rel Dir)
 smRelDir (SourceMapHash smh) = parseRelDir $ T.unpack $ SHA256.toHexText smh
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
-ppGPD = liftIO . (.ppCommon.gpd)
+ppGPD = liftIO . (.common.gpd)
 
 -- | Root directory for the given 'ProjectPackage'
 ppRoot :: ProjectPackage -> Path Abs Dir
-ppRoot = parent . (.ppCabalFP)
+ppRoot = parent . (.cabalFP)
 
 -- | All components available in the given 'ProjectPackage'
 ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
