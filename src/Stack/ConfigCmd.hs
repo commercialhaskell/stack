@@ -90,7 +90,7 @@ cfgCmdSet cmd = do
   configFilePath <-
     case configCmdSetScope cmd of
       CommandScopeProject -> do
-        mstackYamlOption <- view $ globalOptsL . to (.globalStackYaml)
+        mstackYamlOption <- view $ globalOptsL . to (.stackYaml)
         mstackYaml <- getProjectConfig mstackYamlOption
         case mstackYaml of
           PCProject stackYaml -> pure stackYaml

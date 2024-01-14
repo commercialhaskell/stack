@@ -136,7 +136,7 @@ scriptCmd opts = do
   -- Note that in this functions we use logError instead of logWarn because,
   -- when using the interpreter mode, only error messages are shown. See:
   -- https://github.com/commercialhaskell/stack/issues/3007
-  view (globalOptsL . to (.globalStackYaml)) >>= \case
+  view (globalOptsL . to (.stackYaml)) >>= \case
     SYLOverride fp -> logError $
          "Ignoring override stack.yaml file for script command: "
       <> fromString (toFilePath fp)
@@ -148,14 +148,14 @@ scriptCmd opts = do
   let scriptFile = filename file
 
   isNoRunCompile <- fromFirstFalse . (.configMonoidNoRunCompile) <$>
-                           view (globalOptsL . to (.globalConfigMonoid))
+                           view (globalOptsL . to (.configMonoid))
 
   let scriptDir = parent file
       modifyGO go = go
-        { globalConfigMonoid = go.globalConfigMonoid
+        { configMonoid = go.configMonoid
             { configMonoidInstallGHC = FirstTrue $ Just True
             }
-        , globalStackYaml = SYLNoProject opts.soScriptExtraDeps
+        , stackYaml = SYLNoProject opts.soScriptExtraDeps
         }
       (shouldRun, shouldCompile) = if isNoRunCompile
         then (NoRun, SECompile)

@@ -58,7 +58,7 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
     ('-': _) -> pure []
     _ -> do
       go' <- globalOptsFromMonoid False mempty
-      let go = go' { globalLogLevel = LevelOther "silent" }
+      let go = go' { logLevel = LevelOther "silent" }
       withRunnerGlobal go $ withConfig NoReexec $ withDefaultEnvConfig $ inner input
 
 targetCompleter :: Completer

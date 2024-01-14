@@ -128,7 +128,7 @@ withConfig shouldReexec inner =
     -- If we have been relaunched in a Docker container, perform in-container
     -- initialization (switch UID, etc.).  We do this after first loading the
     -- configuration since it must happen ASAP but needs a configuration.
-    view (globalOptsL . to (.globalDockerEntrypoint)) >>=
+    view (globalOptsL . to (.dockerEntrypoint)) >>=
       traverse_ (Docker.entrypoint config)
     runRIO config $ do
       -- Catching all exceptions here, since we don't want this
@@ -221,18 +221,18 @@ withRunnerGlobal :: GlobalOpts -> RIO Runner a -> IO a
 withRunnerGlobal go inner = do
   colorWhen <-
     maybe defaultColorWhen pure $
-    getFirst go.globalConfigMonoid.configMonoidColorWhen
+    getFirst go.configMonoid.configMonoidColorWhen
   useColor <- case colorWhen of
     ColorNever -> pure False
     ColorAlways -> pure True
     ColorAuto -> hNowSupportsANSI stderr
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
                                     <$> getTerminalWidth)
-                                   pure go.globalTermWidth
+                                   pure go.termWidth
   menv <- mkDefaultProcessContext
   -- MVar used to ensure the Docker entrypoint is performed exactly once.
   dockerEntrypointMVar <- newMVar False
-  let update = go.globalStylesUpdate
+  let update = go.stylesUpdate
   withNewLogFunc go useColor update $ \logFunc -> do
     runRIO Runner
       { runnerGlobalOpts = go

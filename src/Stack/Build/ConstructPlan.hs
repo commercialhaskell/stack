@@ -1220,7 +1220,7 @@ logDebugPlanS ::
   -> Utf8Builder
   -> m ()
 logDebugPlanS s msg = do
-  debugPlan <- view $ globalOptsL . to (.globalPlanInLog)
+  debugPlan <- view $ globalOptsL . to (.planInLog)
   when debugPlan $ logDebugS s msg
 
 -- | A function to yield a 'PackageInfo' value from: (1) a 'PackageSource'

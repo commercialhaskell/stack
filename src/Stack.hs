@@ -78,9 +78,9 @@ main = do
       throwIO exitCode
     Right (globalMonoid, run) -> do
       global <- globalOptsFromMonoid isTerminal globalMonoid
-      when (global.globalLogLevel == LevelDebug) $
+      when (global.logLevel == LevelDebug) $
         hPutStrLn stderr versionString'
-      case global.globalReExecVersion of
+      case global.reExecVersion of
         Just expectVersion -> do
           expectVersion' <- parseVersionThrowing expectVersion
           unless (checkVersion MatchMinor expectVersion' stackVersion) $

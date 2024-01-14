@@ -35,7 +35,7 @@ instance Exception ListPrettyException
 -- | Function underlying the @stack list@ command. List packages.
 listCmd :: [String] -> RIO Runner ()
 listCmd names = withConfig NoReexec $ do
-  mresolver <- view $ globalOptsL . to (.globalResolver)
+  mresolver <- view $ globalOptsL . to (.resolver)
   mSnapshot <- forM mresolver $ \resolver -> do
     concrete <- makeConcreteResolver resolver
     loc <- completeSnapshotLocation concrete

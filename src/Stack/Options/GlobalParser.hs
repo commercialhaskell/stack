@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 -- | Functions to parse Stack's \'global\' command line arguments.
 module Stack.Options.GlobalParser
@@ -128,23 +129,23 @@ globalOptsFromMonoid defaultTerminal globalMonoid = do
       Nothing -> pure SYLDefault
       Just fp -> SYLOverride <$> resolveFile' fp
   pure GlobalOpts
-    { globalReExecVersion = getFirst globalMonoid.globalMonoidReExecVersion
-    , globalDockerEntrypoint =
+    { reExecVersion = getFirst globalMonoid.globalMonoidReExecVersion
+    , dockerEntrypoint =
         getFirst globalMonoid.globalMonoidDockerEntrypoint
-    , globalLogLevel =
+    , logLevel =
         fromFirst defaultLogLevel globalMonoid.globalMonoidLogLevel
-    , globalTimeInLog = fromFirstTrue globalMonoid.globalMonoidTimeInLog
-    , globalRSLInLog = fromFirstFalse globalMonoid.globalMonoidRSLInLog
-    , globalPlanInLog = fromFirstFalse globalMonoid.globalMonoidPlanInLog
-    , globalConfigMonoid = globalMonoid.globalMonoidConfigMonoid
-    , globalResolver = resolver
-    , globalCompiler = getFirst globalMonoid.globalMonoidCompiler
-    , globalTerminal =
+    , timeInLog = fromFirstTrue globalMonoid.globalMonoidTimeInLog
+    , rslInLog = fromFirstFalse globalMonoid.globalMonoidRSLInLog
+    , planInLog = fromFirstFalse globalMonoid.globalMonoidPlanInLog
+    , configMonoid = globalMonoid.globalMonoidConfigMonoid
+    , resolver = resolver
+    , compiler = getFirst globalMonoid.globalMonoidCompiler
+    , terminal =
         fromFirst defaultTerminal globalMonoid.globalMonoidTerminal
-    , globalStylesUpdate = globalMonoid.globalMonoidStyles
-    , globalTermWidth = getFirst globalMonoid.globalMonoidTermWidth
-    , globalStackYaml = stackYaml
-    , globalLockFileBehavior =
+    , stylesUpdate = globalMonoid.globalMonoidStyles
+    , termWidth = getFirst globalMonoid.globalMonoidTermWidth
+    , stackYaml = stackYaml
+    , lockFileBehavior =
         let defLFB =
               case getFirst globalMonoid.globalMonoidResolver of
                 Nothing -> LFBReadWrite

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.GlobalOpts
@@ -16,35 +17,35 @@ import          Stack.Types.StackYamlLoc ( StackYamlLoc )
 
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts
-  { globalReExecVersion :: !(Maybe String)
+  { reExecVersion :: !(Maybe String)
     -- ^ Expected re-exec in container version
-  , globalDockerEntrypoint :: !(Maybe DockerEntrypoint)
+  , dockerEntrypoint :: !(Maybe DockerEntrypoint)
     -- ^ Data used when Stack is acting as a Docker entrypoint (internal use
     -- only)
-  , globalLogLevel     :: !LogLevel -- ^ Log level
-  , globalTimeInLog    :: !Bool -- ^ Whether to include timings in logs.
-  , globalRSLInLog     :: !Bool
+  , logLevel     :: !LogLevel -- ^ Log level
+  , timeInLog    :: !Bool -- ^ Whether to include timings in logs.
+  , rslInLog     :: !Bool
     -- ^ Whether to include raw snapshot layer (RSL) in logs.
-  , globalPlanInLog :: !Bool
+  , planInLog :: !Bool
     -- ^ Whether to include debug information about the construction of the
     -- build plan in logs.
-  , globalConfigMonoid :: !ConfigMonoid
+  , configMonoid :: !ConfigMonoid
     -- ^ Config monoid, for passing into 'loadConfig'
-  , globalResolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
-  , globalCompiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
-  , globalTerminal     :: !Bool -- ^ We're in a terminal?
-  , globalStylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
-  , globalTermWidth    :: !(Maybe Int) -- ^ Terminal width override
-  , globalStackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
-  , globalLockFileBehavior :: !LockFileBehavior
+  , resolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
+  , compiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
+  , terminal     :: !Bool -- ^ We're in a terminal?
+  , stylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
+  , termWidth    :: !(Maybe Int) -- ^ Terminal width override
+  , stackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
+  , lockFileBehavior :: !LockFileBehavior
   }
   deriving Show
 
 globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL =
   lens
-    (.globalConfigMonoid)
-    (\x y -> x { globalConfigMonoid = y })
+    (.configMonoid)
+    (\x y -> x { configMonoid = y })
   .
   lens
     (.configMonoidBuildOpts)
