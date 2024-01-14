@@ -226,7 +226,7 @@ makeConcreteResolver ar = do
         let fp = implicitGlobalDir </> stackDotYaml
         iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
         ProjectAndConfigMonoid project _ <- liftIO iopc
-        pure project.projectResolver
+        pure project.resolver
       ARLatestNightly ->
         RSLSynonym . Nightly . (.snapshotsNightly) <$> getSnapshots
       ARLatestLTSMajor x -> do
@@ -727,7 +727,7 @@ withBuildConfig inner = do
 
   (project', stackYamlFP) <- case config.project of
     PCProject (project, fp) -> do
-      forM_ project.projectUserMsg prettyWarnS
+      forM_ project.userMsg prettyWarnS
       pure (project, fp)
     PCNoProject extraDeps -> do
       p <-
@@ -753,7 +753,7 @@ withBuildConfig inner = do
               Nothing ->
                 logDebug $
                      "Using resolver: "
-                  <> display project.projectResolver
+                  <> display project.resolver
                   <> " from implicit global project's config file: "
                   <> fromString dest'
               Just _ -> pure ()
@@ -786,12 +786,12 @@ withBuildConfig inner = do
           pure (p, dest)
   mcompiler <- view $ globalOptsL . to (.compiler)
   let project = project'
-        { projectCompiler = mcompiler <|> project'.projectCompiler
-        , projectResolver = fromMaybe project'.projectResolver mresolver
+        { compiler = mcompiler <|> project'.compiler
+        , resolver = fromMaybe project'.resolver mresolver
         }
-  extraPackageDBs <- mapM resolveDir' project.projectExtraPackageDBs
+  extraPackageDBs <- mapM resolveDir' project.extraPackageDBs
 
-  wanted <- lockCachedWanted stackYamlFP project.projectResolver $
+  wanted <- lockCachedWanted stackYamlFP project.resolver $
     fillProjectWanted stackYamlFP config project
 
   -- Unfortunately redoes getProjectWorkDir, since we don't have a BuildConfig
@@ -805,7 +805,7 @@ withBuildConfig inner = do
           , smWanted = wanted
           , extraPackageDBs = extraPackageDBs
           , stackYaml = stackYamlFP
-          , curator = project.projectCurator
+          , curator = project.curator
           , projectStorage = projectStorage
           }
     runRIO bc inner
@@ -831,16 +831,16 @@ withBuildConfig inner = do
           ]
         pure r''
     pure Project
-      { projectUserMsg = Nothing
-      , projectPackages = []
-      , projectDependencies =
+      { userMsg = Nothing
+      , packages = []
+      , dependencies =
           map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
-      , projectFlags = mempty
-      , projectResolver = r
-      , projectCompiler = Nothing
-      , projectExtraPackageDBs = []
-      , projectCurator = Nothing
-      , projectDropPackages = mempty
+      , flags = mempty
+      , resolver = r
+      , compiler = Nothing
+      , extraPackageDBs = []
+      , curator = Nothing
+      , dropPackages = mempty
       }
 
 fillProjectWanted ::
@@ -855,7 +855,7 @@ fillProjectWanted ::
 fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages = do
   let bopts = config.build
 
-  packages0 <- for project.projectPackages $ \fp@(RelFilePath t) -> do
+  packages0 <- for project.packages $ \fp@(RelFilePath t) -> do
     abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
     let resolved = ResolvedPath fp abs'
     pp <- mkProjectPackage YesPrintWarnings resolved bopts.haddock
@@ -868,11 +868,11 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
             (RPLImmutable (RPLIRepo repo rpm)) -> Just (repo, rpm)
             _ -> Nothing
         )
-        project.projectDependencies
+        project.dependencies
   logDebug ("Prefetching git repos: " <> display (T.pack (show gitRepos)))
   fetchReposRaw gitRepos
 
-  (deps0, mcompleted) <- fmap unzip . forM project.projectDependencies $ \rpl -> do
+  (deps0, mcompleted) <- fmap unzip . forM project.dependencies $ \rpl -> do
     (pl, mCompleted) <- case rpl of
        RPLImmutable rpli -> do
          (compl, mcompl) <-
@@ -899,7 +899,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
       snPackages = snapPackages
         `Map.difference` packages1
         `Map.difference` Map.fromList deps0
-        `Map.withoutKeys` project.projectDropPackages
+        `Map.withoutKeys` project.dropPackages
 
   snDeps <- for snPackages $ \getDep -> getDep (shouldHaddockDeps bopts)
 
@@ -907,7 +907,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
 
   let mergeApply m1 m2 f =
         MS.merge MS.preserveMissing MS.dropMissing (MS.zipWithMatched f) m1 m2
-      pFlags = project.projectFlags
+      pFlags = project.flags
       packages2 = mergeApply packages1 pFlags $
         \_ p flags -> p{ppCommon = p.ppCommon {cpFlags=flags}}
       deps2 = mergeApply deps1 pFlags $
@@ -928,10 +928,10 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
     throwM $ InvalidGhcOptionsSpecification (Map.keys unusedPkgGhcOptions)
 
   let wanted = SMWanted
-        { smwCompiler = fromMaybe snapCompiler project.projectCompiler
+        { smwCompiler = fromMaybe snapCompiler project.compiler
         , smwProject = packages
         , smwDeps = deps
-        , smwSnapshotLocation = project.projectResolver
+        , smwSnapshotLocation = project.resolver
         }
 
   pure (wanted, catMaybes mcompleted)

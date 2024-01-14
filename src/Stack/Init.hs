@@ -281,15 +281,15 @@ initProject currDir initOpts mresolver = do
       completePackageLocation
         (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
   let p = Project
-        { projectUserMsg = if userMsg == "" then Nothing else Just userMsg
-        , projectPackages = resolvedRelative <$> Map.elems rbundle
-        , projectDependencies = map toRawPL deps
-        , projectFlags = removeSrcPkgDefaultFlags gpds flags
-        , projectResolver = snapshotLoc
-        , projectCompiler = Nothing
-        , projectExtraPackageDBs = []
-        , projectCurator = Nothing
-        , projectDropPackages = mempty
+        { userMsg = if userMsg == "" then Nothing else Just userMsg
+        , packages = resolvedRelative <$> Map.elems rbundle
+        , dependencies = map toRawPL deps
+        , flags = removeSrcPkgDefaultFlags gpds flags
+        , resolver = snapshotLoc
+        , compiler = Nothing
+        , extraPackageDBs = []
+        , curator = Nothing
+        , dropPackages = mempty
         }
       makeRel = fmap toFilePath . makeRelativeToCurrentDir
   prettyInfoL

@@ -44,15 +44,15 @@ parseProjectAndConfigMonoid rootDir =
       deps' <- mapM (resolvePaths (Just rootDir)) deps
       resolver' <- resolvePaths (Just rootDir) resolver
       let project = Project
-            { projectUserMsg = msg
-            , projectResolver = resolver'
-            , projectCompiler = mcompiler -- FIXME make sure resolver' isn't SLCompiler
-            , projectExtraPackageDBs = extraPackageDBs
-            , projectPackages = packages
-            , projectDependencies =
+            { userMsg = msg
+            , resolver = resolver'
+            , compiler = mcompiler -- FIXME make sure resolver' isn't SLCompiler
+            , extraPackageDBs = extraPackageDBs
+            , packages = packages
+            , dependencies =
                 concatMap toList (deps' :: [NonEmpty RawPackageLocation])
-            , projectFlags = flags
-            , projectCurator = mcurator
-            , projectDropPackages = Set.map unCabalString drops
+            , flags = flags
+            , curator = mcurator
+            , dropPackages = Set.map unCabalString drops
             }
       pure $ ProjectAndConfigMonoid project config
