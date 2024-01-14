@@ -1,8 +1,9 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE NoFieldSelectors    #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Build-specific types.
 
@@ -153,9 +154,9 @@ data Task = Task
 
 -- | Given the IDs of any missing packages, produce the configure options
 data TaskConfigOpts = TaskConfigOpts
-  { tcoMissing :: !(Set PackageIdentifier)
+  { missing :: !(Set PackageIdentifier)
     -- ^ Dependencies for which we don't yet have an GhcPkgId
-  , tcoOpts    :: !(Map PackageIdentifier GhcPkgId -> ConfigureOpts)
+  , opts    :: !(Map PackageIdentifier GhcPkgId -> ConfigureOpts)
     -- ^ Produce the list of options given the missing @GhcPkgId@s
   }
 
@@ -179,7 +180,7 @@ data TaskType
 -- | Were any of the dependencies missing?
 
 taskAnyMissing :: Task -> Bool
-taskAnyMissing task = not $ Set.null task.configOpts.tcoMissing
+taskAnyMissing task = not $ Set.null task.configOpts.missing
 
 -- | A function to yield the package name and version of a given 'TaskType'
 -- value.

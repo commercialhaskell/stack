@@ -200,7 +200,7 @@ displayTask task = fillSep $
      | not $ Set.null missing
      ]
  where
-  missing = task.configOpts.tcoMissing
+  missing = task.configOpts.missing
 
 -- | Perform the actual plan
 executePlan :: HasEnvConfig env
@@ -519,7 +519,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
       [ Action
           { actionId = ActionId (taskProvides task) ATBuild
           , actionDeps =
-              Set.map (`ActionId` ATBuild) task.configOpts.tcoMissing
+              Set.map (`ActionId` ATBuild) task.configOpts.missing
           , actionDo =
               \ac -> runInBase $ singleBuild ac ee task installedMap False
           , actionConcurrency = ConcurrencyAllowed
@@ -533,7 +533,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
           else (:) Action
             { actionId = ActionId pkgId ATBuildFinal
             , actionDeps = addBuild
-                (Set.map (`ActionId` ATBuild) task.configOpts.tcoMissing)
+                (Set.map (`ActionId` ATBuild) task.configOpts.missing)
             , actionDo =
                 \ac -> runInBase $ singleBuild ac ee task installedMap True
             , actionConcurrency = ConcurrencyAllowed
