@@ -64,7 +64,7 @@ openHaddocksInBrowser ::
   -- ^ Build targets as determined by 'Stack.Build.Source.loadSourceMap'
   -> RIO env ()
 openHaddocksInBrowser bco pkgLocations buildTargets = do
-  let cliTargets = bco.bcoBuildOptsCLI.targets
+  let cliTargets = bco.buildOptsCLI.targets
       getDocIndex = do
         let localDocs = haddockIndexFile (localDepsDocDir bco)
         localExists <- doesFileExist localDocs
@@ -241,8 +241,8 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
           haddockExeName
           ( map
               (("--optghc=-package-db=" ++ ) . toFilePathNoTrailingSep)
-                 [bco.bcoSnapDB, bco.bcoLocalDB]
-              ++ bco.bcoBuildOpts.haddockOpts.hoAdditionalArgs
+                 [bco.snapDB, bco.localDB]
+              ++ bco.buildOpts.haddockOpts.hoAdditionalArgs
               ++ ["--gen-contents", "--gen-index"]
               ++ [x | (xs, _, _, _) <- interfaceOpts, x <- xs]
           )
@@ -322,7 +322,7 @@ haddockIndexFile destDir = destDir </> relFileIndexHtml
 
 -- | Path of local packages documentation directory.
 localDocDir :: BaseConfigOpts -> Path Abs Dir
-localDocDir bco = bco.bcoLocalInstallRoot </> docDirSuffix
+localDocDir bco = bco.localInstallRoot </> docDirSuffix
 
 -- | Path of documentation directory for the dependencies of local packages
 localDepsDocDir :: BaseConfigOpts -> Path Abs Dir
@@ -330,7 +330,7 @@ localDepsDocDir bco = localDocDir bco </> relDirAll
 
 -- | Path of snapshot packages documentation directory.
 snapDocDir :: BaseConfigOpts -> Path Abs Dir
-snapDocDir bco = bco.bcoSnapInstallRoot </> docDirSuffix
+snapDocDir bco = bco.snapInstallRoot </> docDirSuffix
 
 generateLocalHaddockForHackageArchives ::
      (HasEnvConfig env, HasTerm env)

@@ -398,7 +398,7 @@ writePrecompiledCache
       exes' <- forM (Set.toList exes) $ \exe -> do
         name <- parseRelFile $ T.unpack exe
         stackRootRelative $
-           baseConfigOpts.bcoSnapInstallRoot </> bindirSuffix </> name
+           baseConfigOpts.snapInstallRoot </> bindirSuffix </> name
       let precompiled = PrecompiledCache
             { pcLibrary = mlibpath
             , pcSubLibs = subLibPaths
@@ -413,7 +413,7 @@ writePrecompiledCache
  where
   pathFromPkgId stackRootRelative ipid = do
     ipid' <- parseRelFile $ ghcPkgIdString ipid ++ ".conf"
-    stackRootRelative $ baseConfigOpts.bcoSnapDB </> ipid'
+    stackRootRelative $ baseConfigOpts.snapDB </> ipid'
 
 -- | Check the cache for a precompiled package matching the given configuration.
 readPrecompiledCache ::

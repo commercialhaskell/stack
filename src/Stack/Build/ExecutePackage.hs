@@ -439,7 +439,7 @@ singleBuild
           -- within the snapshot.
           Just pc
             | maybe False
-                (ee.baseConfigOpts.bcoSnapInstallRoot `isProperPrefixOf`)
+                (ee.baseConfigOpts.snapInstallRoot `isProperPrefixOf`)
                 pc.pcLibrary -> pure Nothing
           -- If old precompiled cache files are left around but snapshots are
           -- deleted, it is possible for the precompiled file to refer to the
@@ -485,7 +485,7 @@ singleBuild
         -- We want to ignore the global and user package databases. ghc-pkg
         -- allows us to specify --no-user-package-db and --package-db=<db> on
         -- the command line.
-        let pkgDb = ee.baseConfigOpts.bcoSnapDB
+        let pkgDb = ee.baseConfigOpts.snapDB
         ghcPkgExe <- getGhcPkgExe
         -- First unregister, silently, everything that needs to be unregistered.
         case nonEmpty allToUnregister of
@@ -506,7 +506,7 @@ singleBuild
       _ -> pure ()
 
     -- Find the package in the database
-    let pkgDbs = [ee.baseConfigOpts.bcoSnapDB]
+    let pkgDbs = [ee.baseConfigOpts.snapDB]
 
     case mlib of
       Nothing -> pure $ Just $ Executable pkgId
@@ -518,7 +518,7 @@ singleBuild
             Nothing -> assert False $ Executable pkgId
             Just pkgid -> simpleInstalledLib pkgId pkgid mempty
    where
-    bindir = ee.baseConfigOpts.bcoSnapInstallRoot </> bindirSuffix
+    bindir = ee.baseConfigOpts.snapInstallRoot </> bindirSuffix
 
   realConfigAndBuild cache mcurator allDepsMap =
     withSingleContext ac ee task.taskType allDepsMap Nothing $
@@ -751,10 +751,10 @@ singleBuild
     let (installedPkgDb, installedDumpPkgsTVar) =
           case taskLocation task of
             Snap ->
-              ( ee.baseConfigOpts.bcoSnapDB
+              ( ee.baseConfigOpts.snapDB
               , ee.snapshotDumpPkgs )
             Local ->
-              ( ee.baseConfigOpts.bcoLocalDB
+              ( ee.baseConfigOpts.localDB
               , ee.localDumpPkgs )
     let ident = PackageIdentifier package.name package.version
     -- only pure the sub-libraries to cache them if we also cache the main
@@ -999,9 +999,9 @@ singleTest topts testsToRun ac ee task installedMap = do
           let randomSuffix = "." <> show (abs randomInt)
           fp <- toFilePath <$> addExtension randomSuffix fp'
           let snapDBPath =
-                toFilePathNoTrailingSep ee.baseConfigOpts.bcoSnapDB
+                toFilePathNoTrailingSep ee.baseConfigOpts.snapDB
               localDBPath =
-                toFilePathNoTrailingSep ee.baseConfigOpts.bcoLocalDB
+                toFilePathNoTrailingSep ee.baseConfigOpts.localDB
               ghcEnv =
                    "clear-package-db\n"
                 <> "global-package-db\n"
