@@ -625,7 +625,7 @@ buildExtractedTarball pkgDir = do
               }
         in  set envConfigL updatedEnvConfig env
       updatePackagesInSourceMap sm =
-        sm {smProject = Map.insert pp.ppCommon.cpName pp pathsToKeep}
+        sm {smProject = Map.insert pp.ppCommon.name pp pathsToKeep}
   local adjustEnvForBuild $ build Nothing
 
 -- | Version of 'checkSDistTarball' that first saves lazy bytestring to

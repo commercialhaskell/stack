@@ -358,7 +358,7 @@ mapSnapshotPackageModules = do
         Set.fromList $ map (pkgName . (.packageIdent)) snapshotDumpPkgs
       notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
   otherDeps <- for notInstalledDeps $ \dep -> do
-    gpd <- liftIO dep.dpCommon.cpGPD
+    gpd <- liftIO dep.dpCommon.gpd
     Set.fromList <$> allExposedModules gpd
   -- source map construction process should guarantee unique package names in
   -- these maps

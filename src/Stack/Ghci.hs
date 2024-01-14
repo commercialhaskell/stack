@@ -846,15 +846,15 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
       -- Currently this source map is being build with
       -- the default targets
       sourceMapGhcOptions = fromMaybe [] $
-        ((.ppCommon.cpGhcOptions) <$> M.lookup name sm.smProject)
+        ((.ppCommon.ghcOptions) <$> M.lookup name sm.smProject)
         <|>
-        ((.dpCommon.cpGhcOptions) <$> M.lookup name sm.smDeps)
+        ((.dpCommon.ghcOptions) <$> M.lookup name sm.smDeps)
       sourceMapCabalConfigOpts = fromMaybe [] $
-        ( (.ppCommon.cpCabalConfigOpts) <$> M.lookup name sm.smProject)
+        ( (.ppCommon.cabalConfigOpts) <$> M.lookup name sm.smProject)
         <|>
-        ((.dpCommon.cpCabalConfigOpts) <$> M.lookup name sm.smDeps)
+        ((.dpCommon.cabalConfigOpts) <$> M.lookup name sm.smDeps)
       sourceMapFlags =
-        maybe mempty (.ppCommon.cpFlags) $ M.lookup name sm.smProject
+        maybe mempty (.ppCommon.flags) $ M.lookup name sm.smProject
       config = PackageConfig
         { enableTests = True
         , enableBenchmarks = True

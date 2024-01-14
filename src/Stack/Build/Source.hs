@@ -103,28 +103,28 @@ loadSourceMap smt boptsCli sma = do
       project = M.map applyOptsFlagsPP sma.smaProject
       bopts = bconfig.config.build
       applyOptsFlagsPP p@ProjectPackage{ppCommon = c} =
-        p{ppCommon = applyOptsFlags (M.member c.cpName smt.smtTargets) True c}
+        p{ppCommon = applyOptsFlags (M.member c.name smt.smtTargets) True c}
       deps0 = smt.smtDeps <> sma.smaDeps
       deps = M.map applyOptsFlagsDep deps0
       applyOptsFlagsDep d@DepPackage{dpCommon = c} =
-        d{dpCommon = applyOptsFlags (M.member c.cpName smt.smtDeps) False c}
+        d{dpCommon = applyOptsFlags (M.member c.name smt.smtDeps) False c}
       applyOptsFlags isTarget isProjectPackage common =
-        let name = common.cpName
+        let name = common.name
             flags = getLocalFlags boptsCli name
             ghcOptions =
               generalGhcOptions bconfig boptsCli isTarget isProjectPackage
             cabalConfigOpts =
-              generalCabalConfigOpts bconfig boptsCli common.cpName isTarget isProjectPackage
+              generalCabalConfigOpts bconfig boptsCli common.name isTarget isProjectPackage
         in  common
-              { cpFlags =
+              { flags =
                   if M.null flags
-                    then common.cpFlags
+                    then common.flags
                     else flags
-              , cpGhcOptions =
-                  ghcOptions ++ common.cpGhcOptions
-              , cpCabalConfigOpts =
-                  cabalConfigOpts ++ common.cpCabalConfigOpts
-              , cpHaddocks =
+              , ghcOptions =
+                  ghcOptions ++ common.ghcOptions
+              , cabalConfigOpts =
+                  cabalConfigOpts ++ common.cabalConfigOpts
+              , haddocks =
                   if isTarget
                     then bopts.haddock
                     else shouldHaddockDeps bopts
@@ -197,10 +197,10 @@ depPackageHashableContent dp =
             if enabled
               then ""
               else "-" <> fromString (C.unFlagName f)
-          flags = map flagToBs $ Map.toList dp.dpCommon.cpFlags
-          ghcOptions = map display dp.dpCommon.cpGhcOptions
-          cabalConfigOpts = map display dp.dpCommon.cpCabalConfigOpts
-          haddocks = if dp.dpCommon.cpHaddocks then "haddocks" else ""
+          flags = map flagToBs $ Map.toList dp.dpCommon.flags
+          ghcOptions = map display dp.dpCommon.ghcOptions
+          cabalConfigOpts = map display dp.dpCommon.cabalConfigOpts
+          haddocks = if dp.dpCommon.haddocks then "haddocks" else ""
           hash = immutableLocSha pli
       pure
         $  hash
@@ -286,10 +286,10 @@ loadCommonPackage ::
 loadCommonPackage common = do
   config <-
     getPackageConfig
-      common.cpFlags
-      common.cpGhcOptions
-      common.cpCabalConfigOpts
-  gpkg <- liftIO common.cpGPD
+      common.flags
+      common.ghcOptions
+      common.cabalConfigOpts
+  gpkg <- liftIO common.gpd
   pure $ resolvePackage config gpkg
 
 -- | Upgrade the initial project package info to a full-blown @LocalPackage@
@@ -304,11 +304,11 @@ loadLocalPackage pp = do
   bopts <- view buildOptsL
   mcurator <- view $ buildConfigL . to (.curator)
   config <- getPackageConfig
-              common.cpFlags
-              common.cpGhcOptions
-              common.cpCabalConfigOpts
+              common.flags
+              common.ghcOptions
+              common.cabalConfigOpts
   gpkg <- ppGPD pp
-  let name = common.cpName
+  let name = common.name
       mtarget = M.lookup name sm.smTargets.smtTargets
       (exeCandidates, testCandidates, benchCandidates) =
         case mtarget of
@@ -409,7 +409,7 @@ loadLocalPackage pp = do
     { package = pkg
     , testBench = btpkg
     , componentFiles = componentFiles
-    , buildHaddocks = pp.ppCommon.cpHaddocks
+    , buildHaddocks = pp.ppCommon.haddocks
     , forceDirty = bopts.forceDirty
     , dirtyFiles = dirtyFiles
     , newBuildCaches = newBuildCaches

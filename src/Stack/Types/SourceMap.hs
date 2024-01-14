@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 -- | A sourcemap maps a package name to how it should be built, including source
@@ -42,14 +43,14 @@ import           Stack.Types.NamedComponent ( NamedComponent (..) )
 -- | Settings common to dependency packages ('Stack.Types.SourceMap.DepPackage')
 -- and project packages ('Stack.Types.SourceMap.ProjectPackage').
 data CommonPackage = CommonPackage
-  { cpGPD :: !(IO GenericPackageDescription)
-  , cpName :: !PackageName
-  , cpFlags :: !(Map FlagName Bool)
+  { gpd :: !(IO GenericPackageDescription)
+  , name :: !PackageName
+  , flags :: !(Map FlagName Bool)
     -- ^ overrides default flags
-  , cpGhcOptions :: ![Text]
+  , ghcOptions :: ![Text]
     -- also lets us know if we're doing profiling
-  , cpCabalConfigOpts :: ![Text]
-  , cpHaddocks :: !Bool
+  , cabalConfigOpts :: ![Text]
+  , haddocks :: !Bool
     -- ^ Should Haddock documentation be built for this package?
   }
 
@@ -170,7 +171,7 @@ smRelDir :: (MonadThrow m) => SourceMapHash -> m (Path Rel Dir)
 smRelDir (SourceMapHash smh) = parseRelDir $ T.unpack $ SHA256.toHexText smh
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
-ppGPD = liftIO . (.ppCommon.cpGPD)
+ppGPD = liftIO . (.ppCommon.gpd)
 
 -- | Root directory for the given 'ProjectPackage'
 ppRoot :: ProjectPackage -> Path Abs Dir

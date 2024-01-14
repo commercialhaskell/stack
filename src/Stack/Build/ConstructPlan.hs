@@ -568,7 +568,7 @@ tellExecutables _name (PSFilePath lp)
   | otherwise = pure ()
 -- Ignores ghcOptions because they don't matter for enumerating executables.
 tellExecutables name (PSRemote pkgloc _version _fromSnapshot cp) =
-  tellExecutablesUpstream name (pure $ Just pkgloc) Snap cp.cpFlags
+  tellExecutablesUpstream name (pure $ Just pkgloc) Snap cp.flags
 
 -- | For a given 'PackageName' value, known to be immutable, adds relevant
 -- executables to the collected output.
@@ -630,8 +630,8 @@ installPackage name ps minstalled = do
         <> fromPackageName name
         <> "."
       package <- ctx.loadPackage
-        pkgLoc cp.cpFlags cp.cpGhcOptions cp.cpCabalConfigOpts
-      resolveDepsAndInstall True cp.cpHaddocks ps package minstalled
+        pkgLoc cp.flags cp.ghcOptions cp.cabalConfigOpts
+      resolveDepsAndInstall True cp.haddocks ps package minstalled
     PSFilePath lp -> do
       case lp.testBench of
         Nothing -> do
