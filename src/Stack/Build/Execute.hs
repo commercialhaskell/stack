@@ -101,7 +101,7 @@ preFetch plan
         <> mconcat (L.intersperse ", " (display <$> Set.toList pkgLocs))
       fetchPackages pkgLocs
  where
-  pkgLocs = Set.unions $ map toPkgLoc $ Map.elems plan.planTasks
+  pkgLocs = Set.unions $ map toPkgLoc $ Map.elems plan.tasks
 
   toPkgLoc task =
     case task.taskType of
@@ -111,7 +111,7 @@ preFetch plan
 -- | Print a description of build plan for human consumption.
 printPlan :: (HasRunner env, HasTerm env) => Plan -> RIO env ()
 printPlan plan = do
-  case Map.elems plan.planUnregisterLocal of
+  case Map.elems plan.unregisterLocal of
     [] -> prettyInfo $
                flow "No packages would be unregistered."
             <> line
@@ -125,7 +125,7 @@ printPlan plan = do
         <> bulletedList (map unregisterMsg xs)
         <> line
 
-  case Map.elems plan.planTasks of
+  case Map.elems plan.tasks of
     [] -> prettyInfo $
                flow "Nothing to build."
             <> line
@@ -138,8 +138,8 @@ printPlan plan = do
 
   let hasTests = not . Set.null . testComponents . taskComponents
       hasBenches = not . Set.null . benchComponents . taskComponents
-      tests = Map.elems $ Map.filter hasTests plan.planFinals
-      benches = Map.elems $ Map.filter hasBenches plan.planFinals
+      tests = Map.elems $ Map.filter hasTests plan.finals
+      benches = Map.elems $ Map.filter hasBenches plan.finals
 
   unless (null tests) $ do
     prettyInfo $
@@ -155,7 +155,7 @@ printPlan plan = do
       <> bulletedList (map displayTask benches)
       <> line
 
-  case Map.toList plan.planInstallExes of
+  case Map.toList plan.installExes of
     [] -> prettyInfo $
                flow "No executables to be installed."
             <> line
@@ -238,7 +238,7 @@ executePlan
       mlargestPackageName
       (executePlan' installedMap targets plan)
 
-    copyExecutables plan.planInstallExes
+    copyExecutables plan.installExes
 
     config <- view configL
     menv' <- liftIO $ config.processContextSettings EnvSettings
@@ -255,7 +255,7 @@ executePlan
   mlargestPackageName =
     Set.lookupMax $
     Set.map (length . packageNameString) $
-    Map.keysSet plan.planTasks <> Map.keysSet plan.planFinals
+    Map.keysSet plan.tasks <> Map.keysSet plan.finals
 
 copyExecutables ::
        HasEnvConfig env
@@ -344,14 +344,14 @@ executePlan' :: HasEnvConfig env
 executePlan' installedMap0 targets plan ee = do
   when ee.buildOpts.testOpts.toCoverage deleteHpcReports
   cv <- view actualCompilerVersionL
-  case nonEmpty $ Map.toList plan.planUnregisterLocal of
+  case nonEmpty $ Map.toList plan.unregisterLocal of
     Nothing -> pure ()
     Just ids -> do
       localDB <- packageDatabaseLocal
       unregisterPackages cv localDB ids
 
   liftIO $ atomically $ modifyTVar' ee.localDumpPkgs $ \initMap ->
-    foldl' (flip Map.delete) initMap $ Map.keys plan.planUnregisterLocal
+    foldl' (flip Map.delete) initMap $ Map.keys plan.unregisterLocal
 
   run <- askRunInIO
 
@@ -367,11 +367,11 @@ executePlan' installedMap0 targets plan ee = do
           (Map.mapMissing (\_ b -> (Just b, Nothing)))
           (Map.mapMissing (\_ f -> (Nothing, Just f)))
           (Map.zipWithMatched (\_ b f -> (Just b, Just f)))
-          plan.planTasks
-          plan.planFinals
+          plan.tasks
+          plan.finals
   threads <- view $ configL . to (.jobs)
   let keepGoing = fromMaybe
-        (not (Map.null plan.planFinals))
+        (not (Map.null plan.finals))
         ee.buildOpts.keepGoing
   terminal <- view terminalL
   terminalWidth <- view termWidthL
@@ -439,7 +439,7 @@ executePlan' installedMap0 targets plan ee = do
           let planPkgs, localPkgs, installedPkgs, availablePkgs
                 :: Map PackageName (PackageIdentifier, InstallLocation)
               planPkgs =
-                Map.map (taskProvides &&& taskLocation) plan.planTasks
+                Map.map (taskProvides &&& taskLocation) plan.tasks
               localPkgs =
                 Map.fromList
                   [ (p.name, (packageIdentifier p, Local))
@@ -456,7 +456,7 @@ executePlan' installedMap0 targets plan ee = do
   installedMap' = Map.difference installedMap0
                 $ Map.fromList
                 $ map (\(ident, _) -> (pkgName ident, ()))
-                $ Map.elems plan.planUnregisterLocal
+                $ Map.elems plan.unregisterLocal
 
 unregisterPackages ::
      (HasCompiler env, HasPlatform env, HasProcessContext env, HasTerm env)
