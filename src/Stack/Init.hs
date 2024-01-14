@@ -205,7 +205,7 @@ initCmd initOpts = do
   pwd <- getCurrentDir
   go <- view globalOptsL
   withGlobalProject $
-    withConfig YesReexec (initProject pwd initOpts go.globalResolver)
+    withConfig YesReexec (initProject pwd initOpts go.resolver)
 
 -- | Generate a @stack.yaml@ file.
 initProject ::

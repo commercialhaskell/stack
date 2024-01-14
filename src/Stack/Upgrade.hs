@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Types and functions related to Stack's @upgrade@ command.
 module Stack.Upgrade
@@ -118,7 +119,7 @@ data UpgradeOpts = UpgradeOpts
 upgradeCmd :: UpgradeOpts -> RIO Runner ()
 upgradeCmd upgradeOpts = do
   go <- view globalOptsL
-  case go.globalResolver of
+  case go.resolver of
     Just _ -> prettyThrowIO ResolverOptionInvalid
     Nothing -> withGlobalProject $ upgrade maybeGitHash upgradeOpts
 
@@ -283,9 +284,9 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                 pure $ Just dir
 
     let modifyGO dir go = go
-          { globalResolver = Nothing -- always use the resolver settings in the
+          { resolver = Nothing -- always use the resolver settings in the
                                      -- stack.yaml file
-          , globalStackYaml = SYLOverride $ dir </> stackDotYaml
+          , stackYaml = SYLOverride $ dir </> stackDotYaml
           }
         boptsCLI = defaultBuildOptsCLI { targets = ["stack"] }
     forM_ mdir $ \dir ->

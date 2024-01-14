@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 module Stack.Types.Runner
   ( Runner (..)
@@ -16,6 +17,7 @@ module Stack.Types.Runner
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
 import           Stack.Prelude
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import qualified Stack.Types.GlobalOpts as GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.LockFileBehavior ( LockFileBehavior )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc )
 
@@ -44,8 +46,8 @@ instance HasRunner Runner where
 
 instance HasStylesUpdate Runner where
   stylesUpdateL = globalOptsL . lens
-    (.globalStylesUpdate)
-    (\x y -> x { globalStylesUpdate = y })
+    (.stylesUpdate)
+    (\x y -> x { GlobalOpts.stylesUpdate = y })
 instance HasTerm Runner where
   useColorL = lens (.runnerUseColor) (\x y -> x { runnerUseColor = y })
   termWidthL = lens (.runnerTermWidth) (\x y -> x { runnerTermWidth = y })
@@ -65,10 +67,10 @@ class HasRunner env => HasDockerEntrypointMVar env where
 
 stackYamlLocL :: HasRunner env => Lens' env StackYamlLoc
 stackYamlLocL =
-  globalOptsL . lens (.globalStackYaml) (\x y -> x { globalStackYaml = y })
+  globalOptsL . lens (.stackYaml) (\x y -> x { stackYaml = y })
 
 lockFileBehaviorL :: HasRunner env => SimpleGetter env LockFileBehavior
-lockFileBehaviorL = globalOptsL . to (.globalLockFileBehavior)
+lockFileBehaviorL = globalOptsL . to (.lockFileBehavior)
 
 globalOptsL :: HasRunner env => Lens' env GlobalOpts
 globalOptsL = runnerL . lens
@@ -78,12 +80,12 @@ globalOptsL = runnerL . lens
 -- | See 'globalTerminal'
 terminalL :: HasRunner env => Lens' env Bool
 terminalL = globalOptsL . lens
-  (.globalTerminal)
-  (\x y -> x { globalTerminal = y })
+  (.terminal)
+  (\x y -> x { terminal = y })
 
 -- | See 'globalReExecVersion'
 reExecL :: HasRunner env => SimpleGetter env Bool
-reExecL = globalOptsL . to (isJust . (.globalReExecVersion))
+reExecL = globalOptsL . to (isJust . (.reExecVersion))
 
 rslInLogL :: HasRunner env => SimpleGetter env Bool
-rslInLogL = globalOptsL . to (.globalRSLInLog)
+rslInLogL = globalOptsL . to (.rslInLog)

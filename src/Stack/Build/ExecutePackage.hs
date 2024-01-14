@@ -1093,7 +1093,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                                  , mkUnqualComponentName (T.unpack testName)
                                  )
                         else do
-                          isTerminal <- view $ globalOptsL . to (.globalTerminal)
+                          isTerminal <- view $ globalOptsL . to (.terminal)
                           if topts.toAllowStdin && isTerminal
                             then pure id
                             else pure $ setStdin $ byteStringInput mempty

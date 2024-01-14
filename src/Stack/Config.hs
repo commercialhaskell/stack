@@ -607,10 +607,10 @@ withNewLogFunc go useColor (StylesUpdate update) inner = do
         $ setLogLevelColors logLevelColors
         $ setLogSecondaryColor secondaryColor
         $ setLogAccentColors (const highlightColor)
-        $ setLogUseTime go.globalTimeInLog
-        $ setLogMinLevel go.globalLogLevel
-        $ setLogVerboseFormat (go.globalLogLevel <= LevelDebug)
-        $ setLogTerminal go.globalTerminal
+        $ setLogUseTime go.timeInLog
+        $ setLogMinLevel go.logLevel
+        $ setLogVerboseFormat (go.logLevel <= LevelDebug)
+        $ setLogTerminal go.terminal
           logOptions0
   withLogFunc logOptions inner
  where
@@ -653,10 +653,10 @@ loadConfig ::
   => (Config -> RIO env a)
   -> RIO env a
 loadConfig inner = do
-  mstackYaml <- view $ globalOptsL . to (.globalStackYaml)
+  mstackYaml <- view $ globalOptsL . to (.stackYaml)
   mproject <- loadProjectConfig mstackYaml
-  mresolver <- view $ globalOptsL . to (.globalResolver)
-  configArgs <- view $ globalOptsL . to (.globalConfigMonoid)
+  mresolver <- view $ globalOptsL . to (.resolver)
+  configArgs <- view $ globalOptsL . to (.configMonoid)
   (configRoot, stackRoot, userOwnsStackRoot) <-
     determineStackRootAndOwnership configArgs
 
@@ -784,7 +784,7 @@ withBuildConfig inner = do
               "used only when 'stack' is run\noutside of a " <>
               "real project.\n"
           pure (p, dest)
-  mcompiler <- view $ globalOptsL . to (.globalCompiler)
+  mcompiler <- view $ globalOptsL . to (.compiler)
   let project = project'
         { projectCompiler = mcompiler <|> project'.projectCompiler
         , projectResolver = fromMaybe project'.projectResolver mresolver

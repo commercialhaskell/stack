@@ -54,7 +54,7 @@ path :: [Text] -> RIO Runner ()
 -- Distinguish a request for only the Stack root, as such a request does not
 -- require 'withDefaultEnvConfig'.
 path [key] | key == stackRootOptionName' = do
-  clArgs <- view $ globalOptsL . to (.globalConfigMonoid)
+  clArgs <- view $ globalOptsL . to (.configMonoid)
   liftIO $ do
     (_, stackRoot, _) <- determineStackRootAndOwnership clArgs
     T.putStrLn $ T.pack $ toFilePathNoTrailingSep stackRoot
