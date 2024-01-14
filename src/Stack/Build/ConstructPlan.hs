@@ -254,7 +254,7 @@ constructPlan
     providesDep task = pkgName (taskProvides task) `Set.member` deps
     tasks = Map.elems plan.planTasks
     missing =
-      Map.fromList $ map (taskProvides &&&  (.configOpts.tcoMissing)) tasks
+      Map.fromList $ map (taskProvides &&&  (.configOpts.missing)) tasks
     missingForDeps = flip execState mempty $
       for_ tasks $ \task ->
         when (providesDep task) $
