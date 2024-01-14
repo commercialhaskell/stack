@@ -177,6 +177,8 @@ library:
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
   - Stack.Build.Execute
+  - Stack.Build.ExecuteEnv
+  - Stack.Build.ExecutePackage
   - Stack.Build.Haddock
   - Stack.Build.Installed
   - Stack.Build.Source
