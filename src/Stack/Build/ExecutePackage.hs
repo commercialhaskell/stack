@@ -376,13 +376,89 @@ singleBuild
         Just precompiled -> copyPreCompiled ee task pkgId precompiled
         Nothing -> do
           curator <- view $ buildConfigL . to (.curator)
-          realConfigAndBuild isOldCabalCopy cache curator allDepsMap
+          realConfigAndBuild isOldCabalCopy ac ee task installedMap (enableTests, enableBenchmarks) (isFinalBuild, buildingFinals) cache curator allDepsMap
     case minstalled of
       Nothing -> pure ()
       Just installed -> do
         writeFlagCache installed cache
         liftIO $ atomically $
           modifyTVar ee.ghcPkgIds $ Map.insert pkgId installed
+ where
+  pkgId = taskProvides task
+  buildingFinals = isFinalBuild || task.allInOne
+  enableTests = buildingFinals && any isCTest (taskComponents task)
+  enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
+
+realConfigAndBuild ::
+  forall env a.
+  HasEnvConfig env
+  => Bool
+  -- ^ is cabal older than 2.0
+  -> ActionContext
+  -> ExecuteEnv
+  -> Task
+  -> Map PackageName (a, Installed)
+  -> (Bool, Bool)
+   -- ^ (enableTests, enableBenchmarks)
+  -> (Bool, Bool)
+   -- ^ (isFinalBuild, buildingFinals)
+  -> ConfigCache
+  -> Maybe Curator
+  -> Map PackageIdentifier GhcPkgId
+  -> RIO env (Maybe Installed)
+realConfigAndBuild isOldCabalCopy ac ee task installedMap (enableTests, enableBenchmarks) (isFinalBuild, buildingFinals) cache mcurator0 allDepsMap =
+  withSingleContext ac ee task.taskType allDepsMap Nothing $
+    \package cabalFP pkgDir cabal0 announce _outputType -> do
+      let cabal = cabal0 CloseOnException
+      executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
+      when (  not (cabalIsSatisfied isOldCabalCopy executableBuildStatuses)
+            && taskIsTarget task
+            ) $
+        prettyInfoL
+          [ flow "Building all executables for"
+          , style Current (fromPackageName package.name)
+          , flow "once. After a successful build of all of them, only \
+                  \specified executables will be rebuilt."
+          ]
+      _neededConfig <-
+        ensureConfig
+          cache
+          pkgDir
+          ee.buildOpts
+          ( announce
+              (  "configure"
+              <> display (annSuffix executableBuildStatuses)
+              )
+          )
+          cabal
+          cabalFP
+          task
+      let installedMapHasThisPkg :: Bool
+          installedMapHasThisPkg =
+            case Map.lookup package.name installedMap of
+              Just (_, Library ident _) -> ident == pkgId
+              Just (_, Executable _) -> True
+              _ -> False
+
+      case ( ee.buildOptsCLI.onlyConfigure
+            , ee.buildOptsCLI.initialBuildSteps && taskIsTarget task
+            ) of
+        -- A full build is done if there are downstream actions,
+        -- because their configure step will require that this
+        -- package is built. See
+        -- https://github.com/commercialhaskell/stack/issues/2787
+        (True, _) | null ac.downstream -> pure Nothing
+        (_, True) | null ac.downstream || installedMapHasThisPkg -> do
+          initialBuildSteps executableBuildStatuses cabal announce
+          pure Nothing
+        _ -> fulfillCuratorBuildExpectations
+                pname
+                mcurator0
+                enableTests
+                enableBenchmarks
+                Nothing
+                (Just <$>
+                  realBuild package pkgDir cabal0 announce executableBuildStatuses)
  where
   pkgId = taskProvides task
   PackageIdentifier pname _ = pkgId
@@ -396,11 +472,7 @@ singleBuild
        -- to fail
     && maybe True (Set.notMember pname . (.skipHaddock)) curator
 
-  buildingFinals = isFinalBuild || task.allInOne
-  enableTests = buildingFinals && any isCTest (taskComponents task)
-  enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
-
-  annSuffix isOldCabalCopy executableBuildStatuses =
+  annSuffix executableBuildStatuses =
     if result == "" then "" else " (" <> result <> ")"
    where
     result = T.intercalate " + " $ concat
@@ -420,80 +492,22 @@ singleBuild
         in  (hasLibrary, hasSubLibraries, hasExecutables)
       -- This isn't true, but we don't want to have this info for upstream deps.
       _ -> (False, False, False)
-
-  realConfigAndBuild isOldCabalCopy cache mcurator allDepsMap =
-    withSingleContext ac ee task.taskType allDepsMap Nothing $
-      \package cabalFP pkgDir cabal0 announce _outputType -> do
-        let cabal = cabal0 CloseOnException
-        executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
-        when (  not (cabalIsSatisfied isOldCabalCopy executableBuildStatuses)
-             && taskIsTarget task
-             ) $
-          prettyInfoL
-            [ flow "Building all executables for"
-            , style Current (fromPackageName package.name)
-            , flow "once. After a successful build of all of them, only \
-                   \specified executables will be rebuilt."
-            ]
-        _neededConfig <-
-          ensureConfig
-            cache
-            pkgDir
-            ee.buildOpts
-            ( announce
-                (  "configure"
-                <> display (annSuffix isOldCabalCopy executableBuildStatuses)
-                )
-            )
-            cabal
-            cabalFP
-            task
-        let installedMapHasThisPkg :: Bool
-            installedMapHasThisPkg =
-              case Map.lookup package.name installedMap of
-                Just (_, Library ident _) -> ident == pkgId
-                Just (_, Executable _) -> True
-                _ -> False
-
-        case ( ee.buildOptsCLI.onlyConfigure
-             , ee.buildOptsCLI.initialBuildSteps && taskIsTarget task
-             ) of
-          -- A full build is done if there are downstream actions,
-          -- because their configure step will require that this
-          -- package is built. See
-          -- https://github.com/commercialhaskell/stack/issues/2787
-          (True, _) | null ac.downstream -> pure Nothing
-          (_, True) | null ac.downstream || installedMapHasThisPkg -> do
-            initialBuildSteps isOldCabalCopy executableBuildStatuses cabal announce
-            pure Nothing
-          _ -> fulfillCuratorBuildExpectations
-                 pname
-                 mcurator
-                 enableTests
-                 enableBenchmarks
-                 Nothing
-                 (Just <$>
-                    realBuild isOldCabalCopy cache package pkgDir cabal0 announce executableBuildStatuses)
-
-  initialBuildSteps isOldCabalCopy executableBuildStatuses cabal announce = do
+  initialBuildSteps executableBuildStatuses cabal announce = do
     announce
       (  "initial-build-steps"
-      <> display (annSuffix isOldCabalCopy executableBuildStatuses)
+      <> display (annSuffix executableBuildStatuses)
       )
     cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
   realBuild ::
-       Bool
-       -- ^ Is Cabal copy limited to all libraries and executables?
-    -> ConfigCache
-    -> Package
+    Package
     -> Path Abs Dir
     -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
     -> (Utf8Builder -> RIO env ())
        -- ^ A plain 'announce' function
     -> Map Text ExecutableBuildStatus
     -> RIO env Installed
-  realBuild isOldCabalCopy cache package pkgDir cabal0 announce executableBuildStatuses = do
+  realBuild package pkgDir cabal0 announce executableBuildStatuses = do
     let cabal = cabal0 CloseOnException
     wc <- view $ actualCompilerVersionL . whichCompilerL
 
@@ -508,7 +522,6 @@ singleBuild
       TTRemotePackage{} -> pure ()
 
     -- FIXME: only output these if they're in the build plan.
-
     let postBuildCheck _succeeded = do
           mlocalWarnings <- case task.taskType of
             TTLocalMutable lp -> do
@@ -549,7 +562,7 @@ singleBuild
     actualCompiler <- view actualCompilerVersionL
     () <- announce
       (  "build"
-      <> display (annSuffix isOldCabalCopy executableBuildStatuses)
+      <> display (annSuffix executableBuildStatuses)
       <> " with "
       <> display actualCompiler
       )
