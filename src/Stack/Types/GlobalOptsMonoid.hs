@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 
 module Stack.Types.GlobalOptsMonoid
   ( GlobalOptsMonoid (..)
@@ -13,37 +14,37 @@ import           Stack.Types.Resolver ( AbstractResolver )
 
 -- | Parsed global command-line options monoid.
 data GlobalOptsMonoid = GlobalOptsMonoid
-  { globalMonoidReExecVersion :: !(First String)
+  { reExecVersion :: !(First String)
     -- ^ Expected re-exec in container version
-  , globalMonoidDockerEntrypoint :: !(First DockerEntrypoint)
+  , dockerEntrypoint :: !(First DockerEntrypoint)
     -- ^ Data used when Stack is acting as a Docker entrypoint (internal use
     -- only)
-  , globalMonoidLogLevel     :: !(First LogLevel)
+  , logLevel     :: !(First LogLevel)
     -- ^ Log level
-  , globalMonoidTimeInLog    :: !FirstTrue
+  , timeInLog    :: !FirstTrue
     -- ^ Whether to include timings in logs.
-  , globalMonoidRSLInLog     :: !FirstFalse
+  , rslInLog     :: !FirstFalse
     -- ^ Whether to include raw snapshot layer (RSL) in logs.
-  , globalMonoidPlanInLog :: !FirstFalse
+  , planInLog :: !FirstFalse
     -- ^ Whether to include debug information about the construction of the
     -- build plan in logs.
-  , globalMonoidConfigMonoid :: !ConfigMonoid
+  , configMonoid :: !ConfigMonoid
     -- ^ Config monoid, for passing into 'loadConfig'
-  , globalMonoidResolver     :: !(First (Unresolved AbstractResolver))
+  , resolver     :: !(First (Unresolved AbstractResolver))
     -- ^ Resolver override
-  , globalMonoidResolverRoot :: !(First FilePath)
+  , resolverRoot :: !(First FilePath)
     -- ^ root directory for resolver relative path
-  , globalMonoidCompiler     :: !(First WantedCompiler)
+  , compiler     :: !(First WantedCompiler)
     -- ^ Compiler override
-  , globalMonoidTerminal     :: !(First Bool)
+  , terminal     :: !(First Bool)
     -- ^ We're in a terminal?
-  , globalMonoidStyles       :: !StylesUpdate
+  , styles       :: !StylesUpdate
     -- ^ Stack's output styles
-  , globalMonoidTermWidth    :: !(First Int)
+  , termWidth    :: !(First Int)
     -- ^ Terminal width override
-  , globalMonoidStackYaml    :: !(First FilePath)
+  , stackYaml    :: !(First FilePath)
     -- ^ Override project stack.yaml
-  , globalMonoidLockFileBehavior :: !(First LockFileBehavior)
+  , lockFileBehavior :: !(First LockFileBehavior)
     -- ^ See 'globalLockFileBehavior'
   }
   deriving Generic

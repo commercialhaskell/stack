@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Stack.NixSpec
   ( sampleConfigNixEnabled
@@ -22,7 +23,7 @@ import           Stack.Prelude
 import           Stack.Runners ( withRunnerGlobal )
 import           Stack.Types.Config ( Config (..) )
 import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
-import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
+import qualified Stack.Types.GlobalOpts as GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.GlobalOptsMonoid ( GlobalOptsMonoid (..) )
 import           Stack.Types.Nix ( NixOpts (..) )
 import           System.Directory ( getCurrentDirectory, setCurrentDirectory )
@@ -52,8 +53,8 @@ spec :: Spec
 spec = beforeAll setup $ do
   let loadConfig' :: ConfigMonoid -> (Config -> IO ()) -> IO ()
       loadConfig' cmdLineArgs inner = do
-        globalOpts <- globalOptsFromMonoid False mempty { globalMonoidConfigMonoid = cmdLineArgs }
-        withRunnerGlobal globalOpts { logLevel = LevelOther "silent" } $
+        globalOpts <- globalOptsFromMonoid False mempty { configMonoid = cmdLineArgs }
+        withRunnerGlobal globalOpts { GlobalOpts.logLevel = LevelOther "silent" } $
           loadConfig (liftIO . inner)
       inTempDir test = do
         currentDirectory <- getCurrentDirectory
