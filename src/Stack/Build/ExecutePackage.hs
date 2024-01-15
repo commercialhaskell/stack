@@ -771,7 +771,7 @@ getPrecompiled cache taskType bcoSnapInstallRoot =
         Just pc
           | maybe False
               (bcoSnapInstallRoot `isProperPrefixOf`)
-              pc.pcLibrary -> pure Nothing
+              pc.library -> pure Nothing
         -- If old precompiled cache files are left around but snapshots are
         -- deleted, it is possible for the precompiled file to refer to the
         -- very library we're building, and if flags are changed it may try to
@@ -783,7 +783,7 @@ getPrecompiled cache taskType bcoSnapInstallRoot =
                 b <- f x
                 if b then allM f xs else pure False
           b <- liftIO $
-                  allM doesFileExist $ maybe id (:) pc.pcLibrary pc.pcExes
+                  allM doesFileExist $ maybe id (:) pc.library pc.exes
           pure $ if b then Just pc else Nothing
     _ -> pure Nothing
 

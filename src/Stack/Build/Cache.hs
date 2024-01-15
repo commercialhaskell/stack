@@ -154,7 +154,7 @@ tryGetBuildCache dir component = do
   ensureDir $ parent fp
   let decode :: MonadIO m => m BuildCache
       decode = Yaml.decodeFileThrow (toFilePath fp)
-  either (const Nothing) (Just . (.buildCacheTimes)) <$> liftIO (tryAny decode)
+  either (const Nothing) (Just . (.times)) <$> liftIO (tryAny decode)
 
 -- | Try to read the dirtiness cache for the given package directory.
 tryGetConfigCache ::
@@ -208,9 +208,7 @@ writeBuildCache :: HasEnvConfig env
                 -> Map FilePath FileCacheInfo -> RIO env ()
 writeBuildCache dir component times = do
   fp <- toFilePath <$> buildCacheFile dir component
-  liftIO $ Yaml.encodeFile fp BuildCache
-    { buildCacheTimes = times
-    }
+  liftIO $ Yaml.encodeFile fp BuildCache { times = times }
 
 -- | Write the dirtiness cache for this package's configuration.
 writeConfigCache :: HasEnvConfig env
@@ -400,9 +398,9 @@ writePrecompiledCache
         stackRootRelative $
            baseConfigOpts.snapInstallRoot </> bindirSuffix </> name
       let precompiled = PrecompiledCache
-            { pcLibrary = mlibpath
-            , pcSubLibs = subLibPaths
-            , pcExes = exes'
+            { library = mlibpath
+            , subLibs = subLibPaths
+            , exes = exes'
             }
       savePrecompiledCache key precompiled
       -- reuse precompiled cache with haddocks also in case when haddocks are
@@ -437,7 +435,7 @@ readPrecompiledCache loc copts buildHaddocks = do
     stackRoot <- view stackRootL
     let mkAbs' = (stackRoot </>)
     pure PrecompiledCache
-      { pcLibrary = mkAbs' <$> pc0.pcLibrary
-      , pcSubLibs = mkAbs' <$> pc0.pcSubLibs
-      , pcExes = mkAbs' <$> pc0.pcExes
+      { library = mkAbs' <$> pc0.library
+      , subLibs = mkAbs' <$> pc0.subLibs
+      , exes = mkAbs' <$> pc0.exes
       }
