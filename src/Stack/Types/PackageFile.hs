@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 -- | The facility for retrieving all files from the main Stack
@@ -27,10 +28,10 @@ import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 
 data GetPackageFileContext = GetPackageFileContext
-  { ctxFile :: !(Path Abs File)
-  , ctxDistDir :: !(Path Abs Dir)
-  , ctxBuildConfig :: !BuildConfig
-  , ctxCabalVer :: !Version
+  { file :: !(Path Abs File)
+  , distDir :: !(Path Abs Dir)
+  , buildConfig :: !BuildConfig
+  , cabalVer :: !Version
   }
 
 instance HasPlatform GetPackageFileContext where
@@ -61,7 +62,7 @@ instance HasConfig GetPackageFileContext where
   {-# INLINE configL #-}
 
 instance HasBuildConfig GetPackageFileContext where
-  buildConfigL = lens (.ctxBuildConfig) (\x y -> x { ctxBuildConfig = y })
+  buildConfigL = lens (.buildConfig) (\x y -> x { buildConfig = y })
 
 instance HasPantryConfig GetPackageFileContext where
   pantryConfigL = configL . pantryConfigL

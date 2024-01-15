@@ -90,7 +90,7 @@ resolveGlobFiles cabalFileVersion =
       then explode name
       else fmap pure (resolveFileOrWarn name)
   explode name = do
-    dir <- asks (parent . (.ctxFile))
+    dir <- asks (parent . (.file))
     names <- matchDirFileGlob' (toFilePath dir) name
     mapM resolveFileOrWarn names
   matchDirFileGlob' dir glob =
