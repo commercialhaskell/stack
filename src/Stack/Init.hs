@@ -629,9 +629,9 @@ getRecommendedSnapshots snapshots =
     Just (mostRecent :| older) -> mostRecent :| (nightly : older)
     Nothing -> nightly :| []
  where
-  ltss = map (uncurry LTS) (IntMap.toDescList snapshots.snapshotsLts )
+  ltss = map (uncurry LTS) (IntMap.toDescList snapshots.lts )
   supportedLtss = filter (>= minSupportedLts) ltss
-  nightly = Nightly snapshots.snapshotsNightly
+  nightly = Nightly snapshots.nightly
 
 -- |Yields the minimum LTS supported by Stack.
 minSupportedLts :: SnapName
