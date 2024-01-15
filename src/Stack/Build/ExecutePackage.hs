@@ -48,7 +48,7 @@ import           RIO.Process
                    ( byteStringInput, findExecutable, getStderr, getStdout
                    , inherit, modifyEnvVars, proc, setStderr, setStdin
                    , setStdout, showProcessArgDebug, useHandleOpen, waitExitCode
-                   , withProcessWait, withWorkingDir
+                   , withProcessWait, withWorkingDir, HasProcessContext
                    )
 import           Stack.Build.Cache
                    ( TestStatus (..), deleteCaches, getTestStatus
@@ -362,10 +362,11 @@ singleBuild
   = do
     (allDepsMap, cache) <-
       getConfigCache ee task installedMap enableTests enableBenchmarks
-    mprecompiled <- getPrecompiled cache
+    let bcoSnapInstallRoot = ee.baseConfigOpts.snapInstallRoot
+    mprecompiled <- getPrecompiled cache task.taskType bcoSnapInstallRoot
     minstalled <-
       case mprecompiled of
-        Just precompiled -> copyPreCompiled precompiled
+        Just precompiled -> copyPreCompiled ee task pkgId precompiled
         Nothing -> do
           mcurator <- view $ buildConfigL . to (.curator)
           realConfigAndBuild cache mcurator allDepsMap
@@ -377,7 +378,7 @@ singleBuild
           modifyTVar ee.ghcPkgIds $ Map.insert pkgId installed
  where
   pkgId = taskProvides task
-  PackageIdentifier pname pversion = pkgId
+  PackageIdentifier pname _ = pkgId
   doHaddock mcurator package =
        task.buildHaddock
     && not isFinalBuild
@@ -387,19 +388,6 @@ singleBuild
        -- Special help for the curator tool to avoid haddocks that are known
        -- to fail
     && maybe True (Set.notMember pname . (.skipHaddock)) mcurator
-  expectHaddockFailure =
-      maybe False (Set.member pname . (.expectHaddockFailure))
-  isHaddockForHackage = ee.buildOpts.haddockForHackage
-  fulfillHaddockExpectations mcurator action
-    | expectHaddockFailure mcurator = do
-        eres <- tryAny $ action KeepOpen
-        case eres of
-          Right () -> prettyWarnL
-            [ style Current (fromPackageName pname) <> ":"
-            , flow "unexpected Haddock success."
-            ]
-          Left _ -> pure ()
-  fulfillHaddockExpectations _ action = action CloseOnException
 
   buildingFinals = isFinalBuild || task.allInOne
   enableTests = buildingFinals && any isCTest (taskComponents task)
@@ -425,100 +413,6 @@ singleBuild
         in  (hasLibrary, hasSubLibraries, hasExecutables)
       -- This isn't true, but we don't want to have this info for upstream deps.
       _ -> (False, False, False)
-
-  getPrecompiled cache =
-    case task.taskType of
-      TTRemotePackage Immutable _ loc -> do
-        mpc <- readPrecompiledCache
-                 loc
-                 cache.opts
-                 cache.haddock
-        case mpc of
-          Nothing -> pure Nothing
-          -- Only pay attention to precompiled caches that refer to packages
-          -- within the snapshot.
-          Just pc
-            | maybe False
-                (ee.baseConfigOpts.snapInstallRoot `isProperPrefixOf`)
-                pc.pcLibrary -> pure Nothing
-          -- If old precompiled cache files are left around but snapshots are
-          -- deleted, it is possible for the precompiled file to refer to the
-          -- very library we're building, and if flags are changed it may try to
-          -- copy the library to itself. This check prevents that from
-          -- happening.
-          Just pc -> do
-            let allM _ [] = pure True
-                allM f (x:xs) = do
-                  b <- f x
-                  if b then allM f xs else pure False
-            b <- liftIO $
-                   allM doesFileExist $ maybe id (:) pc.pcLibrary pc.pcExes
-            pure $ if b then Just pc else Nothing
-      _ -> pure Nothing
-
-  copyPreCompiled (PrecompiledCache mlib subLibs exes) = do
-    announceTask ee task.taskType "using precompiled package"
-
-    -- We need to copy .conf files for the main library and all sub-libraries
-    -- which exist in the cache, from their old snapshot to the new one.
-    -- However, we must unregister any such library in the new snapshot, in case
-    -- it was built with different flags.
-    let
-      subLibNames = Set.toList $ buildableSubLibs $ case task.taskType of
-        TTLocalMutable lp -> lp.package
-        TTRemotePackage _ p _ -> p
-      toMungedPackageId :: Text -> MungedPackageId
-      toMungedPackageId subLib =
-        let subLibName = LSubLibName $ mkUnqualComponentName $ T.unpack subLib
-        in  MungedPackageId (MungedPackageName pname subLibName) pversion
-      toPackageId :: MungedPackageId -> PackageIdentifier
-      toPackageId (MungedPackageId n v) =
-        PackageIdentifier (encodeCompatPackageName n) v
-      allToUnregister :: [Either PackageIdentifier GhcPkgId]
-      allToUnregister = mcons
-        (Left pkgId <$ mlib)
-        (map (Left . toPackageId . toMungedPackageId) subLibNames)
-      allToRegister = mcons mlib subLibs
-
-    unless (null allToRegister) $
-      withMVar ee.installLock $ \() -> do
-        -- We want to ignore the global and user package databases. ghc-pkg
-        -- allows us to specify --no-user-package-db and --package-db=<db> on
-        -- the command line.
-        let pkgDb = ee.baseConfigOpts.snapDB
-        ghcPkgExe <- getGhcPkgExe
-        -- First unregister, silently, everything that needs to be unregistered.
-        case nonEmpty allToUnregister of
-          Nothing -> pure ()
-          Just allToUnregister' -> catchAny
-            (unregisterGhcPkgIds False ghcPkgExe pkgDb allToUnregister')
-            (const (pure ()))
-        -- Now, register the cached conf files.
-        forM_ allToRegister $ \libpath ->
-          ghcPkg ghcPkgExe [pkgDb] ["register", "--force", toFilePath libpath]
-
-    liftIO $ forM_ exes $ \exe -> do
-      ensureDir bindir
-      let dst = bindir </> filename exe
-      createLink (toFilePath exe) (toFilePath dst) `catchIO` \_ -> copyFile exe dst
-    case (mlib, exes) of
-      (Nothing, _:_) -> markExeInstalled (taskLocation task) pkgId
-      _ -> pure ()
-
-    -- Find the package in the database
-    let pkgDbs = [ee.baseConfigOpts.snapDB]
-
-    case mlib of
-      Nothing -> pure $ Just $ Executable pkgId
-      Just _ -> do
-        mpkgid <- loadInstalledPkg pkgDbs ee.snapshotDumpPkgs pname
-
-        pure $ Just $
-          case mpkgid of
-            Nothing -> assert False $ Executable pkgId
-            Just pkgid -> simpleInstalledLib pkgId pkgid mempty
-   where
-    bindir = ee.baseConfigOpts.snapInstallRoot </> bindirSuffix
 
   realConfigAndBuild cache mcurator allDepsMap =
     withSingleContext ac ee task.taskType allDepsMap Nothing $
@@ -673,6 +567,7 @@ singleBuild
 
     mcurator <- view $ buildConfigL . to (.curator)
     when (doHaddock mcurator package) $ do
+      let isHaddockForHackage = ee.buildOpts.haddockForHackage
       announce $ if isHaddockForHackage
         then "haddock for Hackage"
         else "haddock"
@@ -684,7 +579,7 @@ singleBuild
                 | ghcVer >= mkVersion [8, 4] -> ["--haddock-option=--quickjump"]
               _ -> []
 
-      fulfillHaddockExpectations mcurator $ \keep -> do
+      fulfillHaddockExpectations pname mcurator $ \keep -> do
         let args = concat
               (  if isHaddockForHackage
                    then
@@ -810,21 +705,6 @@ singleBuild
 
     pure mpkgid
 
-  loadInstalledPkg ::
-       [Path Abs Dir]
-    -> TVar (Map GhcPkgId DumpPackage)
-    -> PackageName
-    -> RIO env (Maybe GhcPkgId)
-  loadInstalledPkg pkgDbs tvar name = do
-    pkgexe <- getGhcPkgExe
-    dps <- ghcPkgDescribe pkgexe name pkgDbs $ conduitDumpPackage .| CL.consume
-    case dps of
-      [] -> pure Nothing
-      [dp] -> do
-        liftIO $ atomically $ modifyTVar' tvar (Map.insert dp.ghcPkgId dp)
-        pure $ Just dp.ghcPkgId
-      _ -> throwM $ MultipleResultsBug name dps
-
 -- | Get the build status of all the package executables. Do so by
 -- testing whether their expected output file exists, e.g.
 --
@@ -869,6 +749,148 @@ checkExeStatus platform distDir name = do
         doesFileExist (base </> fileandext)
    where
     file = T.unpack name
+
+getPrecompiled ::
+  (HasEnvConfig env)
+  => ConfigCache
+  -> TaskType
+  -> Path Abs Dir
+  -> RIO env (Maybe (PrecompiledCache Abs))
+getPrecompiled cache taskType bcoSnapInstallRoot =
+  case taskType of
+    TTRemotePackage Immutable _ loc -> do
+      mpc <- readPrecompiledCache
+                loc
+                cache.opts
+                cache.haddock
+      case mpc of
+        Nothing -> pure Nothing
+        -- Only pay attention to precompiled caches that refer to packages
+        -- within the snapshot.
+        Just pc
+          | maybe False
+              (bcoSnapInstallRoot `isProperPrefixOf`)
+              pc.pcLibrary -> pure Nothing
+        -- If old precompiled cache files are left around but snapshots are
+        -- deleted, it is possible for the precompiled file to refer to the
+        -- very library we're building, and if flags are changed it may try to
+        -- copy the library to itself. This check prevents that from
+        -- happening.
+        Just pc -> do
+          let allM _ [] = pure True
+              allM f (x:xs) = do
+                b <- f x
+                if b then allM f xs else pure False
+          b <- liftIO $
+                  allM doesFileExist $ maybe id (:) pc.pcLibrary pc.pcExes
+          pure $ if b then Just pc else Nothing
+    _ -> pure Nothing
+
+copyPreCompiled ::
+  (HasLogFunc env, HasCompiler env, HasTerm env, HasProcessContext env, HasEnvConfig env) =>
+  ExecuteEnv
+  -> Task
+  -> PackageIdentifier
+  -> PrecompiledCache b0
+  -> RIO env (Maybe Installed)
+copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
+  let PackageIdentifier pname pversion = pkgId
+  announceTask ee task.taskType "using precompiled package"
+
+  -- We need to copy .conf files for the main library and all sub-libraries
+  -- which exist in the cache, from their old snapshot to the new one.
+  -- However, we must unregister any such library in the new snapshot, in case
+  -- it was built with different flags.
+  let
+    subLibNames = Set.toList $ buildableSubLibs $ case task.taskType of
+      TTLocalMutable lp -> lp.package
+      TTRemotePackage _ p _ -> p
+    toMungedPackageId :: Text -> MungedPackageId
+    toMungedPackageId subLib =
+      let subLibName = LSubLibName $ mkUnqualComponentName $ T.unpack subLib
+      in  MungedPackageId (MungedPackageName pname subLibName) pversion
+    toPackageId :: MungedPackageId -> PackageIdentifier
+    toPackageId (MungedPackageId n v) =
+      PackageIdentifier (encodeCompatPackageName n) v
+    allToUnregister :: [Either PackageIdentifier GhcPkgId]
+    allToUnregister = mcons
+      (Left pkgId <$ mlib)
+      (map (Left . toPackageId . toMungedPackageId) subLibNames)
+    allToRegister = mcons mlib subLibs
+
+  unless (null allToRegister) $
+    withMVar ee.installLock $ \() -> do
+      -- We want to ignore the global and user package databases. ghc-pkg
+      -- allows us to specify --no-user-package-db and --package-db=<db> on
+      -- the command line.
+      let pkgDb = ee.baseConfigOpts.snapDB
+      ghcPkgExe <- getGhcPkgExe
+      -- First unregister, silently, everything that needs to be unregistered.
+      case nonEmpty allToUnregister of
+        Nothing -> pure ()
+        Just allToUnregister' -> catchAny
+          (unregisterGhcPkgIds False ghcPkgExe pkgDb allToUnregister')
+          (const (pure ()))
+      -- Now, register the cached conf files.
+      forM_ allToRegister $ \libpath ->
+        ghcPkg ghcPkgExe [pkgDb] ["register", "--force", toFilePath libpath]
+
+  liftIO $ forM_ exes $ \exe -> do
+    ensureDir bindir
+    let dst = bindir </> filename exe
+    createLink (toFilePath exe) (toFilePath dst) `catchIO` \_ -> copyFile exe dst
+  case (mlib, exes) of
+    (Nothing, _:_) -> markExeInstalled (taskLocation task) pkgId
+    _ -> pure ()
+
+  -- Find the package in the database
+  let pkgDbs = [ee.baseConfigOpts.snapDB]
+
+  case mlib of
+    Nothing -> pure $ Just $ Executable pkgId
+    Just _ -> do
+      mpkgid <- loadInstalledPkg pkgDbs ee.snapshotDumpPkgs pname
+
+      pure $ Just $
+        case mpkgid of
+          Nothing -> assert False $ Executable pkgId
+          Just pkgid -> simpleInstalledLib pkgId pkgid mempty
+  where
+    bindir = ee.baseConfigOpts.snapInstallRoot </> bindirSuffix
+
+loadInstalledPkg ::
+  ( HasCompiler env, HasProcessContext env, HasTerm env )
+  => [Path Abs Dir]
+  -> TVar (Map GhcPkgId DumpPackage)
+  -> PackageName
+  -> RIO env (Maybe GhcPkgId)
+loadInstalledPkg pkgDbs tvar name = do
+  pkgexe <- getGhcPkgExe
+  dps <- ghcPkgDescribe pkgexe name pkgDbs $ conduitDumpPackage .| CL.consume
+  case dps of
+    [] -> pure Nothing
+    [dp] -> do
+      liftIO $ atomically $ modifyTVar' tvar (Map.insert dp.ghcPkgId dp)
+      pure $ Just dp.ghcPkgId
+    _ -> throwM $ MultipleResultsBug name dps
+
+fulfillHaddockExpectations :: (MonadUnliftIO m, HasTerm env, MonadReader env m)
+  => PackageName
+  -> Maybe Curator
+  -> (KeepOutputOpen -> m ())
+  -> m ()
+fulfillHaddockExpectations pname mcurator action
+  | expectHaddockFailure mcurator = do
+      eres <- tryAny $ action KeepOpen
+      case eres of
+        Right () -> prettyWarnL
+          [ style Current (fromPackageName pname) <> ":"
+          , flow "unexpected Haddock success."
+          ]
+        Left _ -> pure ()
+  where
+    expectHaddockFailure = maybe False (Set.member pname . (.expectHaddockFailure))
+fulfillHaddockExpectations _ _ action = action CloseOnException
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
 checkForUnlistedFiles ::
