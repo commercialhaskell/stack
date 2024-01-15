@@ -54,6 +54,7 @@ import           Stack.Build.Execute
 import           Stack.Build.ExecuteEnv ( withExecuteEnv, withSingleContext )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source ( projectLocalPackages )
+import           Stack.BuildOpts ( defaultBuildOpts )
 import           Stack.Constants ( stackProgName, stackProgName' )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Package ( resolvePackage, resolvePackageDescription )
@@ -64,8 +65,8 @@ import           Stack.SourceMap ( mkProjectPackage )
 import           Stack.Types.Build ( TaskType (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
-import           Stack.Types.BuildOpts
-                   ( BuildOpts (..), defaultBuildOpts, defaultBuildOptsCLI )
+import           Stack.Types.BuildOpts ( BuildOpts (..) )
+import           Stack.Types.BuildOptsCLI ( defaultBuildOptsCLI )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )

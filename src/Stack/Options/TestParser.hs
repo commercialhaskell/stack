@@ -11,7 +11,7 @@ import           Options.Applicative.Builder.Extra
                    ( firstBoolFlagsTrue, optionalFirst, optionalFirstFalse )
 import           Stack.Options.Utils ( hideMods )
 import           Stack.Prelude
-import           Stack.Types.BuildOpts ( TestOptsMonoid (..) )
+import           Stack.Types.BuildOptsMonoid ( TestOptsMonoid (..) )
 
 -- | Parser for test arguments.
 -- FIXME hide args

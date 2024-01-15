@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Stack.ConfigSpec
   ( sampleConfig
@@ -28,9 +29,8 @@ import           Stack.Prelude
 import           Stack.Runners ( withBuildConfig, withRunnerGlobal )
 import           Stack.Types.BuildConfig ( BuildConfig (..), projectRootL )
 import           Stack.Types.BuildOpts
-                   ( BenchmarkOpts (..), BuildOpts (..), CabalVerbosity (..)
-                   , TestOpts (..)
-                   )
+                   ( BenchmarkOpts (..), BuildOpts (..), TestOpts (..) )
+import           Stack.Types.BuildOptsMonoid ( CabalVerbosity (..) )
 import           Stack.Types.Config ( Config (..) )
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )
@@ -202,17 +202,17 @@ spec = beforeAll setup $ do
       bopts.forceDirty `shouldBe` True
       bopts.tests `shouldBe` True
       bopts.testOpts `shouldBe` TestOpts
-        { toRerunTests = True
-        , toAdditionalArgs = ["-fprof"]
-        , toCoverage = True
-        , toDisableRun = True
-        , toMaximumTimeSeconds = Nothing
-        , toAllowStdin = True
+        { rerunTests = True
+        , additionalArgs = ["-fprof"]
+        , coverage = True
+        , disableRun = True
+        , maximumTimeSeconds = Nothing
+        , allowStdin = True
         }
       bopts.benchmarks `shouldBe` True
       bopts.benchmarkOpts `shouldBe` BenchmarkOpts
-         { beoAdditionalArgs = Just "-O2"
-         , beoDisableRun = True
+         { additionalArgs = Just "-O2"
+         , disableRun = True
          }
       bopts.reconfigure `shouldBe` True
       bopts.cabalVerbose `shouldBe` CabalVerbosity verbose

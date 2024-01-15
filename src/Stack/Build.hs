@@ -42,11 +42,12 @@ import           Stack.Types.Build
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig ( HasBuildConfig, stackYamlL )
-import           Stack.Types.BuildOpts
-                   ( BuildCommand (..), BuildOpts (..), BuildOptsCLI (..)
-                   , FileWatchOpts (..), buildOptsMonoidBenchmarksL
-                   , buildOptsMonoidHaddockL, buildOptsMonoidInstallExesL
-                   , buildOptsMonoidTestsL
+import           Stack.Types.BuildOpts ( BuildOpts (..) )
+import           Stack.Types.BuildOptsCLI
+                   ( BuildCommand (..), BuildOptsCLI (..), FileWatchOpts (..) )
+import           Stack.Types.BuildOptsMonoid
+                   ( buildOptsMonoidBenchmarksL, buildOptsMonoidHaddockL
+                   , buildOptsMonoidInstallExesL, buildOptsMonoidTestsL
                    )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( cabalVersionL )

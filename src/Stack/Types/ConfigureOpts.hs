@@ -26,7 +26,8 @@ import           Stack.Constants
                    , relDirEtc, relDirLib, relDirLibexec, relDirShare
                    )
 import           Stack.Prelude
-import           Stack.Types.BuildOpts ( BuildOpts (..), BuildOptsCLI )
+import           Stack.Types.BuildOpts ( BuildOpts (..) )
+import           Stack.Types.BuildOptsCLI ( BuildOptsCLI )
 import           Stack.Types.Compiler ( getGhcVersion, whichCompiler )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..) )

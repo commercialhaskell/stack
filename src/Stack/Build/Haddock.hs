@@ -45,8 +45,8 @@ import           Stack.Types.Build.Exception ( BuildException (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
-import           Stack.Types.BuildOpts
-                   ( BuildOpts (..), BuildOptsCLI (..), HaddockOpts (..) )
+import           Stack.Types.BuildOpts ( BuildOpts (..), HaddockOpts (..) )
+import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig ( HasEnvConfig (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
@@ -242,7 +242,7 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
           ( map
               (("--optghc=-package-db=" ++ ) . toFilePathNoTrailingSep)
                  [bco.snapDB, bco.localDB]
-              ++ bco.buildOpts.haddockOpts.hoAdditionalArgs
+              ++ bco.buildOpts.haddockOpts.additionalArgs
               ++ ["--gen-contents", "--gen-index"]
               ++ [x | (xs, _, _, _) <- interfaceOpts, x <- xs]
           )

@@ -29,7 +29,7 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL
                    , stackYamlL
                    )
-import           Stack.Types.BuildOpts ( buildOptsMonoidHaddockL )
+import           Stack.Types.BuildOptsMonoid ( buildOptsMonoidHaddockL )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getCompilerPath )
 import           Stack.Types.Config

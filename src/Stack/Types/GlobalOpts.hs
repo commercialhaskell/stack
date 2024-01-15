@@ -8,7 +8,7 @@ module Stack.Types.GlobalOpts
   ) where
 
 import          Stack.Prelude
-import          Stack.Types.BuildOpts ( BuildOptsMonoid )
+import          Stack.Types.BuildOptsMonoid ( BuildOptsMonoid )
 import          Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import          Stack.Types.DockerEntrypoint ( DockerEntrypoint )
 import          Stack.Types.LockFileBehavior ( LockFileBehavior )

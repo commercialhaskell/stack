@@ -40,9 +40,10 @@ import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.BuildOpts
-                   ( ApplyCLIFlag (..), BuildOpts (..), BuildOptsCLI (..)
-                   , TestOpts (..), boptsCLIAllProgOptions
+import           Stack.Types.BuildOpts ( BuildOpts (..), TestOpts (..) )
+import           Stack.Types.BuildOptsCLI
+                   ( ApplyCLIFlag (..), BuildOptsCLI (..)
+                   , boptsCLIAllProgOptions
                    )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
@@ -267,7 +268,7 @@ generalGhcOptions bconfig boptsCli isTarget isLocal = concat
   , if isTarget
       then Map.findWithDefault [] AGOTargets config.ghcOptionsByCat
       else []
-  , concat [["-fhpc"] | isLocal && bopts.testOpts.toCoverage]
+  , concat [["-fhpc"] | isLocal && bopts.testOpts.coverage]
   , if bopts.libProfile || bopts.exeProfile
       then ["-fprof-auto", "-fprof-cafs"]
       else []

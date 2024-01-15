@@ -8,7 +8,7 @@ import qualified Data.Map as Map
 import           Options.Applicative ( ReadM, readerError )
 import           Options.Applicative.Types ( readerAsk )
 import           Stack.Prelude
-import           Stack.Types.BuildOpts ( ApplyCLIFlag (..) )
+import           Stack.Types.BuildOptsCLI ( ApplyCLIFlag (..) )
 
 -- | Parser for package:[-]flag
 readFlag :: ReadM (Map ApplyCLIFlag (Map FlagName Bool))

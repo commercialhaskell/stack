@@ -56,11 +56,12 @@ import           Stack.Types.Build.Exception
                    ( BuildPrettyException (..), pprintTargetParseErrors )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
-import           Stack.Types.BuildOpts
-                   ( ApplyCLIFlag, BenchmarkOpts (..), BuildOpts (..)
-                   , BuildOptsCLI (..), TestOpts (..), defaultBuildOptsCLI
-                   )
-import qualified Stack.Types.BuildOpts as BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOpts ( BuildOpts (..) )
+import qualified Stack.Types.BuildOpts as BenchmarkOpts ( BenchmarkOpts (..) )
+import qualified Stack.Types.BuildOpts as TestOpts ( TestOpts (..) )
+import           Stack.Types.BuildOptsCLI
+                   ( ApplyCLIFlag, BuildOptsCLI (..), defaultBuildOptsCLI )
+import qualified Stack.Types.BuildOptsCLI as BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.CompCollection ( getBuildableListText )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
@@ -211,8 +212,9 @@ ghciCmd ghciOpts =
         bopts <- view buildOptsL
         -- override env so running of tests and benchmarks is disabled
         let boptsLocal = bopts
-              { testOpts = bopts.testOpts { toDisableRun = True }
-              , benchmarkOpts = bopts.benchmarkOpts { beoDisableRun = True }
+              { testOpts = bopts.testOpts { TestOpts.disableRun = True }
+              , benchmarkOpts =
+                  bopts.benchmarkOpts { BenchmarkOpts.disableRun = True }
               }
         local (set buildOptsL boptsLocal) (ghci ghciOpts)
 

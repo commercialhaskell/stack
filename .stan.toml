@@ -72,25 +72,25 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-tuE+RG-225:21"
-# ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
-# ✦ Category:      #AntiPattern
-# ✦ File:          src\Stack\Build\ExecutePackage.hs
-#
-#   224 ┃
-#   225 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
-#   226 ┃                     ^^^^^^^
-
-# Anti-pattern: Data.ByteString.Char8.pack
-[[ignore]]
-  id = "OBS-STAN-0203-erw24B-1021:3"
+  id = "OBS-STAN-0203-erw24B-1022:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecuteEnv.hs
 #
-#  1020 ┃
-#  1021 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  1022 ┃   ^^^^^^^
+#  1021 ┃
+#  1022 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+#  1023 ┃   ^^^^^^^
+
+# Anti-pattern: Data.ByteString.Char8.pack
+[[ignore]]
+  id = "OBS-STAN-0203-tuE+RG-226:21"
+# ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
+# ✦ Category:      #AntiPattern
+# ✦ File:          src\Stack\Build\ExecutePackage.hs
+#
+#   225 ┃
+#   226 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
+#   227 ┃                     ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
@@ -190,25 +190,25 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-H4Wfj/-152:17"
+  id = "OBS-STAN-0212-FNS1cF-56:17"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
-# ✦ File:          src\Stack\Types\BuildOpts.hs
+# ✦ File:          src\Stack\BuildOpts.hs
 #
-#  151 ┃
-#  152 ┃   buildMonoid = undefined :: BuildOptsMonoid
-#  153 ┃                 ^^^^^^^^^
+#   55 ┃
+#   56 ┃   buildMonoid = undefined :: BuildOptsMonoid
+#   57 ┃                 ^^^^^^^^^
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-H4Wfj/-481:14"
+  id = "OBS-STAN-0212-FNS1cF-68:14"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
-# ✦ File:          src\Stack\Types\BuildOpts.hs
+# ✦ File:          src\Stack\BuildOpts.hs
 #
-#   480 ┃
-#   481 ┃   toMonoid = undefined :: TestOptsMonoid
-#   482 ┃              ^^^^^^^^^
+#    67 ┃
+#    68 ┃   toMonoid = undefined :: TestOptsMonoid
+#    69 ┃              ^^^^^^^^^
 
 # Anti-pattern: Pattern matching on '_'
 # Pattern matching on '_' for sum types can create maintainability issues

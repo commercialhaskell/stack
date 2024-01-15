@@ -49,8 +49,8 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompCollection ( getBuildableSetText )
-import           Stack.Types.BuildOpts ( defaultBuildOptsCLI )
-import qualified Stack.Types.BuildOpts as BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOptsCLI ( defaultBuildOptsCLI )
+import qualified Stack.Types.BuildOptsCLI as BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , hpcReportDir

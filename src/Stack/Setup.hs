@@ -125,8 +125,8 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL
                    , wantedCompilerVersionL
                    )
-import           Stack.Types.BuildOpts ( BuildOptsCLI (..) )
-import qualified Stack.Types.BuildOpts as BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
+import qualified Stack.Types.BuildOptsCLI as BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), CompilerException (..)
                    , CompilerRepository (..), WhichCompiler (..)
