@@ -75,7 +75,7 @@ newtype PkgDepsOracle
 
 -- | Stored on disk to know whether the files have changed.
 newtype BuildCache = BuildCache
-  { buildCacheTimes :: Map FilePath FileCacheInfo
+  { times :: Map FilePath FileCacheInfo
     -- ^ Modification times of files.
   }
   deriving (Eq, FromJSON, Generic, Show, ToJSON, Typeable)
@@ -237,11 +237,11 @@ data Plan = Plan
 -- | Information on a compiled package: the library .conf file (if relevant),
 -- the sub-libraries (if present) and all of the executable paths.
 data PrecompiledCache base = PrecompiledCache
-  { pcLibrary :: !(Maybe (Path base File))
+  { library :: !(Maybe (Path base File))
     -- ^ .conf file inside the package database
-  , pcSubLibs :: ![Path base File]
+  , subLibs :: ![Path base File]
     -- ^ .conf file inside the package database, for each of the sub-libraries
-  , pcExes    :: ![Path base File]
+  , exes    :: ![Path base File]
     -- ^ Full paths to executables
   }
   deriving (Eq, Generic, Show, Typeable)

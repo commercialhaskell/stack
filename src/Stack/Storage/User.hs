@@ -197,20 +197,20 @@ readPrecompiledCache ::
 readPrecompiledCache key = do
   mparent <- getBy key
   forM mparent $ \(Entity parentId precompiledCacheParent) -> do
-    pcLibrary <-
+    library <-
       mapM parseRelFile precompiledCacheParent.precompiledCacheParentLibrary
-    pcSubLibs <-
+    subLibs <-
       mapM (parseRelFile . (.precompiledCacheSubLibValue) . entityVal) =<<
       selectList [PrecompiledCacheSubLibParent ==. parentId] []
-    pcExes <-
+    exes <-
       mapM (parseRelFile . (.precompiledCacheExeValue) . entityVal) =<<
       selectList [PrecompiledCacheExeParent ==. parentId] []
     pure
       ( parentId
       , PrecompiledCache
-          { pcLibrary
-          , pcSubLibs
-          , pcExes
+          { library
+          , subLibs
+          , exes
           }
       )
 
@@ -239,7 +239,7 @@ savePrecompiledCache
       )
   new
   = withUserStorage $ do
-      let precompiledCacheParentLibrary = fmap toFilePath new.pcLibrary
+      let precompiledCacheParentLibrary = fmap toFilePath new.library
       mIdOld <- readPrecompiledCache key
       (parentId, mold) <-
         case mIdOld of
@@ -264,15 +264,15 @@ savePrecompiledCache
         PrecompiledCacheSubLibParent
         parentId
         PrecompiledCacheSubLibValue
-        (maybe Set.empty (toFilePathSet . (.pcSubLibs)) mold)
-        (toFilePathSet new.pcSubLibs)
+        (maybe Set.empty (toFilePathSet . (.subLibs)) mold)
+        (toFilePathSet new.subLibs)
       updateSet
         PrecompiledCacheExe
         PrecompiledCacheExeParent
         parentId
         PrecompiledCacheExeValue
-        (maybe Set.empty (toFilePathSet . (.pcExes)) mold)
-        (toFilePathSet new.pcExes)
+        (maybe Set.empty (toFilePathSet . (.exes)) mold)
+        (toFilePathSet new.exes)
  where
   toFilePathSet = Set.fromList . map toFilePath
 
