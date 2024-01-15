@@ -494,14 +494,14 @@ configFromConfigMonoid
           stackDeveloperModeDefault
           configMonoid.configMonoidStackDeveloperMode
         casa =
-          if fromFirstTrue configMonoid.configMonoidCasaOpts.casaMonoidEnable
+          if fromFirstTrue configMonoid.configMonoidCasaOpts.enable
             then
               let casaRepoPrefix = fromFirst
                     (fromFirst defaultCasaRepoPrefix configMonoid.configMonoidCasaRepoPrefix)
-                    configMonoid.configMonoidCasaOpts.casaMonoidRepoPrefix
+                    configMonoid.configMonoidCasaOpts.repoPrefix
                   casaMaxKeysPerRequest = fromFirst
                     defaultCasaMaxPerRequest
-                    configMonoid.configMonoidCasaOpts.casaMonoidMaxKeysPerRequest
+                    configMonoid.configMonoidCasaOpts.maxKeysPerRequest
               in  Just (casaRepoPrefix, casaMaxKeysPerRequest)
             else Nothing
     withNewLogFunc go useColor'' stylesUpdate' $ \logFunc -> do
