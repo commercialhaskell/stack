@@ -177,8 +177,9 @@ library
       Stack.Build.Installed
       Stack.Build.Source
       Stack.Build.Target
-      Stack.BuildPlan
       Stack.BuildInfo
+      Stack.BuildOpts
+      Stack.BuildPlan
       Stack.CLI
       Stack.Clean
       Stack.Component
@@ -270,6 +271,8 @@ library
       Stack.Types.Build.Exception
       Stack.Types.BuildConfig
       Stack.Types.BuildOpts
+      Stack.Types.BuildOptsCLI
+      Stack.Types.BuildOptsMonoid
       Stack.Types.CabalConfigKey
       Stack.Types.Cache
       Stack.Types.Casa

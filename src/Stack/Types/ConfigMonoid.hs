@@ -32,7 +32,7 @@ import           Stack.Prelude
 import           Stack.Types.AllowNewerDeps ( AllowNewerDeps )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
-import           Stack.Types.BuildOpts ( BuildOptsMonoid )
+import           Stack.Types.BuildOptsMonoid ( BuildOptsMonoid )
 import           Stack.Types.Casa ( CasaOptsMonoid )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
 import           Stack.Types.ColorWhen ( ColorWhen )

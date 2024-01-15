@@ -20,7 +20,7 @@ import           Stack.Options.Completion
                    ( flagCompleter, ghcOptsCompleter, targetCompleter )
 import           Stack.Options.PackageParser ( readFlag )
 import           Stack.Prelude
-import           Stack.Types.BuildOpts
+import           Stack.Types.BuildOptsCLI
                    ( ApplyCLIFlag, BuildCommand, BuildOptsCLI (..)
                    , BuildSubset (..), FileWatchOpts (..)
                    )

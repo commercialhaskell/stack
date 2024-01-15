@@ -57,10 +57,10 @@ import           Stack.Types.Build
                    , taskProvides
                    )
 import           Stack.Types.Build.Exception ( BuildPrettyException (..) )
-import           Stack.Types.BuildOpts
-                   ( BuildOpts (..), BuildOptsCLI (..), ProgressBarFormat (..)
-                   , TestOpts (..)
+import           Stack.Types.BuildOpts ( BuildOpts (..), TestOpts (..)
                    )
+import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOptsMonoid ( ProgressBarFormat (..) )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler (..), getGhcPkgExe )
 import           Stack.Types.Config
@@ -344,7 +344,7 @@ executePlan' :: HasEnvConfig env
 executePlan' installedMap0 targets plan ee = do
   let !buildOpts = ee.buildOpts
   let !testOpts = buildOpts.testOpts
-  when testOpts.toCoverage deleteHpcReports
+  when testOpts.coverage deleteHpcReports
   cv <- view actualCompilerVersionL
   case nonEmpty $ Map.toList plan.unregisterLocal of
     Nothing -> pure ()
@@ -414,7 +414,7 @@ executePlan' installedMap0 targets plan ee = do
                   pure done
                 loop done
       when (total > 1) $ loop 0
-  when testOpts.toCoverage $ do
+  when testOpts.coverage $ do
     generateHpcUnifiedReport
     generateHpcMarkupIndex
   unless (null errs) $

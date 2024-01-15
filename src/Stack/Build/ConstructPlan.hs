@@ -51,8 +51,9 @@ import           Stack.Types.Build.Exception
                    )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
-import           Stack.Types.BuildOpts
-                   ( BuildOpts (..), BuildOptsCLI (..), BuildSubset (..) )
+import           Stack.Types.BuildOpts ( BuildOpts (..) )
+import           Stack.Types.BuildOptsCLI
+                   ( BuildOptsCLI (..), BuildSubset (..) )
 import           Stack.Types.CompCollection ( collectionMember )
 import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           Stack.Types.CompilerPaths

@@ -47,7 +47,7 @@ import           Stack.Constants
 import           Stack.Prelude
 import           Stack.Types.BuildConfig
                     ( BuildConfig (..), HasBuildConfig (..), getProjectWorkDir )
-import           Stack.Types.BuildOpts ( BuildOptsCLI )
+import           Stack.Types.BuildOptsCLI ( BuildOptsCLI )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), compilerVersionString, getGhcVersion )
 import           Stack.Types.CompilerBuild ( compilerBuildSuffix )

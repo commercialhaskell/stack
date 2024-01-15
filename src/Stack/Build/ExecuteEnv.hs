@@ -79,8 +79,9 @@ import           Stack.Types.Build
                    )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
-import           Stack.Types.BuildOpts
-                   ( BuildOpts (..), BuildOptsCLI (..), CabalVerbosity (..) )
+import           Stack.Types.BuildOpts ( BuildOpts (..) )
+import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOptsMonoid ( CabalVerbosity (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..)
                    , compilerVersionString, getGhcVersion, whichCompilerL

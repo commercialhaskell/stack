@@ -53,11 +53,12 @@ import           Database.Persist.Sql
                    )
 import           Path ( parent )
 import qualified RIO.Set as Set
+import           Stack.BuildOpts ( defaultBuildOpts )
 import           Stack.Prelude
 import           Stack.Types.BuildOpts
-                   ( BenchmarkOpts (..), BuildOpts (..), BuildSubset (..)
-                   , FileWatchOpts (..), TestOpts (..), defaultBuildOpts
-                   )
+                   ( BenchmarkOpts (..), BuildOpts (..), TestOpts (..) )
+import           Stack.Types.BuildOptsCLI
+                   ( BuildSubset (..), FileWatchOpts (..) )
 import           Stack.Types.ConfigureOpts ( ConfigureOpts, configureOpts )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.IsMutable ( IsMutable (..) )

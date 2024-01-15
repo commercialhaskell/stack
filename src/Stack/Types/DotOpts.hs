@@ -7,7 +7,7 @@ module Stack.Types.DotOpts
   ) where
 
 import           Stack.Prelude
-import           Stack.Types.BuildOpts ( ApplyCLIFlag )
+import           Stack.Types.BuildOptsCLI ( ApplyCLIFlag )
 
 -- | Options record for @stack dot@ and @stack ls dependencies@
 data DotOpts = DotOpts

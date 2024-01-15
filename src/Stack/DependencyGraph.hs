@@ -36,10 +36,10 @@ import           Stack.SourceMap
                    ( globalsFromHints, mkProjectPackage, pruneGlobals )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.BuildOpts
-                   ( BuildOptsCLI (..), buildOptsMonoidBenchmarksL
-                   , buildOptsMonoidTestsL, defaultBuildOptsCLI
-                   )
+import           Stack.Types.BuildOptsCLI
+                   ( BuildOptsCLI (..), defaultBuildOptsCLI )
+import           Stack.Types.BuildOptsMonoid
+                   ( buildOptsMonoidBenchmarksL, buildOptsMonoidTestsL )
 import           Stack.Types.Compiler ( wantedToActual )
 import           Stack.Types.Config ( HasConfig (..) )
 import           Stack.Types.DependencyTree ( DotPayload (..) )

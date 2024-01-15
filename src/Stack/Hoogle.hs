@@ -28,9 +28,9 @@ import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig
                    , withEnvConfig
                    )
-import           Stack.Types.BuildOpts
-                   ( buildOptsMonoidHaddockL, defaultBuildOptsCLI )
-import qualified Stack.Types.BuildOpts as BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOptsCLI ( defaultBuildOptsCLI )
+import qualified Stack.Types.BuildOptsCLI as BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOptsMonoid ( buildOptsMonoidHaddockL )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig

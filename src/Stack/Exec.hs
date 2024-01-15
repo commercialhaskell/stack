@@ -26,7 +26,7 @@ import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.BuildOpts
+import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getGhcPkgExe )

@@ -1,86 +1,111 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 -- | Build configuration
 module Stack.Config.Build
- ( benchmarkOptsFromMonoid
- , buildOptsFromMonoid
+ ( buildOptsFromMonoid
  , haddockOptsFromMonoid
  , testOptsFromMonoid
+ , benchmarkOptsFromMonoid
  ) where
 
 import           Distribution.Verbosity ( normal )
-import           Stack.Prelude
+import Stack.Prelude
+    ( ($),
+      Functor(fmap),
+      Semigroup((<>)),
+      Bool(False, True),
+      String,
+      Maybe(..),
+      not,
+      (&&),
+      catMaybes,
+      unwords,
+      (||),
+      Any(getAny),
+      First(getFirst),
+      fromMaybe,
+      fromFirst,
+      fromFirstFalse,
+      fromFirstTrue,
+      FirstFalse(FirstFalse),
+      FirstTrue(FirstTrue) )
+import           Stack.BuildOpts
+                   ( defaultBenchmarkOpts, defaultHaddockOpts, defaultTestOpts )
 import           Stack.Types.BuildOpts
-                   ( BenchmarkOpts (..), BenchmarkOptsMonoid (..)
-                   , BuildOpts (..), BuildOptsMonoid (..), CabalVerbosity (..)
-                   , HaddockOpts (..), HaddockOptsMonoid (..)
-                   , ProgressBarFormat (..), TestOpts (..), TestOptsMonoid (..)
-                   , defaultBenchmarkOpts, defaultHaddockOpts, defaultTestOpts
+                   ( BenchmarkOpts (..), BuildOpts (..), HaddockOpts (..)
+                   , TestOpts (..)
+                   )
+import qualified Stack.Types.BuildOpts as BenchmarkOpts ( BenchmarkOpts (..) )
+import qualified Stack.Types.BuildOpts as HaddockOpts ( HaddockOpts (..) )
+import qualified Stack.Types.BuildOpts as TestOpts ( TestOpts (..) )
+import           Stack.Types.BuildOptsMonoid
+                   ( BenchmarkOptsMonoid (..), BuildOptsMonoid (..)
+                   , CabalVerbosity (..), HaddockOptsMonoid (..)
+                   , ProgressBarFormat (..), TestOptsMonoid (..)
                    )
 
 -- | Interprets BuildOptsMonoid options.
 buildOptsFromMonoid :: BuildOptsMonoid -> BuildOpts
 buildOptsFromMonoid buildMonoid = BuildOpts
   { libProfile = fromFirstFalse
-      (buildMonoid.buildMonoidLibProfile <>
-       FirstFalse (if tracing || profiling then Just True else Nothing))
+      (  buildMonoid.libProfile
+      <> FirstFalse (if tracing || profiling then Just True else Nothing)
+      )
   , exeProfile = fromFirstFalse
-      (buildMonoid.buildMonoidExeProfile <>
-       FirstFalse (if tracing || profiling then Just True else Nothing))
+      (  buildMonoid.exeProfile
+      <> FirstFalse (if tracing || profiling then Just True else Nothing)
+      )
   , libStrip = fromFirstTrue
-      (buildMonoid.buildMonoidLibStrip <>
-       FirstTrue (if noStripping then Just False else Nothing))
+      (  buildMonoid.libStrip
+      <> FirstTrue (if noStripping then Just False else Nothing)
+      )
   , exeStrip = fromFirstTrue
-      (buildMonoid.buildMonoidExeStrip <>
-       FirstTrue (if noStripping then Just False else Nothing))
-  , haddock = fromFirstFalse buildMonoid.buildMonoidHaddock
-  , haddockOpts = haddockOptsFromMonoid buildMonoid.buildMonoidHaddockOpts
+      (  buildMonoid.exeStrip
+      <> FirstTrue (if noStripping then Just False else Nothing)
+      )
+  , haddock = fromFirstFalse buildMonoid.haddock
+  , haddockOpts = haddockOptsFromMonoid buildMonoid.haddockOpts
   , openHaddocks =
          not isHaddockFromHackage
-      && fromFirstFalse buildMonoid.buildMonoidOpenHaddocks
+      && fromFirstFalse buildMonoid.openHaddocks
   , haddockDeps = if isHaddockFromHackage
       then Nothing
-      else getFirst buildMonoid.buildMonoidHaddockDeps
+      else getFirst buildMonoid.haddockDeps
   , haddockInternal =
          not isHaddockFromHackage
-      && fromFirstFalse buildMonoid.buildMonoidHaddockInternal
+      && fromFirstFalse buildMonoid.haddockInternal
   , haddockHyperlinkSource =
          isHaddockFromHackage
-      || fromFirstTrue buildMonoid.buildMonoidHaddockHyperlinkSource
+      || fromFirstTrue buildMonoid.haddockHyperlinkSource
   , haddockForHackage = isHaddockFromHackage
-  , installExes = fromFirstFalse buildMonoid.buildMonoidInstallExes
-  , installCompilerTool =
-      fromFirstFalse buildMonoid.buildMonoidInstallCompilerTool
-  , preFetch = fromFirstFalse buildMonoid.buildMonoidPreFetch
-  , keepGoing = getFirst buildMonoid.buildMonoidKeepGoing
-  , keepTmpFiles = fromFirstFalse buildMonoid.buildMonoidKeepTmpFiles
-  , forceDirty =
-      isHaddockFromHackage || fromFirstFalse buildMonoid.buildMonoidForceDirty
-  , tests = fromFirstFalse buildMonoid.buildMonoidTests
-  , testOpts =
-      testOptsFromMonoid buildMonoid.buildMonoidTestOpts additionalArgs
-  , benchmarks = fromFirstFalse buildMonoid.buildMonoidBenchmarks
+  , installExes = fromFirstFalse buildMonoid.installExes
+  , installCompilerTool = fromFirstFalse buildMonoid.installCompilerTool
+  , preFetch = fromFirstFalse buildMonoid.preFetch
+  , keepGoing = getFirst buildMonoid.keepGoing
+  , keepTmpFiles = fromFirstFalse buildMonoid.keepTmpFiles
+  , forceDirty = isHaddockFromHackage || fromFirstFalse buildMonoid.forceDirty
+  , tests = fromFirstFalse buildMonoid.tests
+  , testOpts = testOptsFromMonoid buildMonoid.testOpts additionalArgs
+  , benchmarks = fromFirstFalse buildMonoid.benchmarks
   , benchmarkOpts =
-      benchmarkOptsFromMonoid
-        buildMonoid.buildMonoidBenchmarkOpts
-        additionalArgs
-  , reconfigure = fromFirstFalse buildMonoid.buildMonoidReconfigure
-  , cabalVerbose =
-      fromFirst (CabalVerbosity normal) buildMonoid.buildMonoidCabalVerbose
-  , splitObjs = fromFirstFalse buildMonoid.buildMonoidSplitObjs
-  , skipComponents = buildMonoid.buildMonoidSkipComponents
-  , interleavedOutput = fromFirstTrue buildMonoid.buildMonoidInterleavedOutput
-  , progressBar = fromFirst CappedBar buildMonoid.buildMonoidProgressBar
-  , ddumpDir = getFirst buildMonoid.buildMonoidDdumpDir
+      benchmarkOptsFromMonoid buildMonoid.benchmarkOpts additionalArgs
+  , reconfigure = fromFirstFalse buildMonoid.reconfigure
+  , cabalVerbose = fromFirst (CabalVerbosity normal) buildMonoid.cabalVerbose
+  , splitObjs = fromFirstFalse buildMonoid.splitObjs
+  , skipComponents = buildMonoid.skipComponents
+  , interleavedOutput = fromFirstTrue buildMonoid.interleavedOutput
+  , progressBar = fromFirst CappedBar buildMonoid.progressBar
+  , ddumpDir = getFirst buildMonoid.ddumpDir
   }
  where
-  isHaddockFromHackage = fromFirstFalse buildMonoid.buildMonoidHaddockForHackage
+  isHaddockFromHackage = fromFirstFalse buildMonoid.haddockForHackage
   -- These options are not directly used in bopts, instead they
   -- transform other options.
-  tracing = getAny buildMonoid.buildMonoidTrace
-  profiling = getAny buildMonoid.buildMonoidProfile
-  noStripping = getAny buildMonoid.buildMonoidNoStrip
+  tracing = getAny buildMonoid.trace
+  profiling = getAny buildMonoid.profile
+  noStripping = getAny buildMonoid.noStrip
   -- Additional args for tracing / profiling
   additionalArgs =
     if tracing || profiling
@@ -95,34 +120,37 @@ buildOptsFromMonoid buildMonoid = BuildOpts
       then Just "-p"
       else Nothing
 
+-- | Interprets HaddockOptsMonoid options.
 haddockOptsFromMonoid :: HaddockOptsMonoid -> HaddockOpts
 haddockOptsFromMonoid hoMonoid = defaultHaddockOpts
-  { hoAdditionalArgs = hoMonoid.hoMonoidAdditionalArgs }
+  { HaddockOpts.additionalArgs = hoMonoid.additionalArgs }
 
+-- | Interprets TestOptsMonoid options.
 testOptsFromMonoid :: TestOptsMonoid -> Maybe [String] -> TestOpts
 testOptsFromMonoid toMonoid madditional = defaultTestOpts
-  { toRerunTests = fromFirstTrue toMonoid.toMonoidRerunTests
-  , toAdditionalArgs =
-      fromMaybe [] madditional <> toMonoid.toMonoidAdditionalArgs
-  , toCoverage = fromFirstFalse toMonoid.toMonoidCoverage
-  , toDisableRun = fromFirstFalse toMonoid.toMonoidDisableRun
-  , toMaximumTimeSeconds =
+  { TestOpts.rerunTests = fromFirstTrue toMonoid.rerunTests
+  , TestOpts.additionalArgs =
+      fromMaybe [] madditional <> toMonoid.additionalArgs
+  , TestOpts.coverage = fromFirstFalse toMonoid.coverage
+  , TestOpts.disableRun = fromFirstFalse toMonoid.disableRun
+  , TestOpts.maximumTimeSeconds =
       fromFirst
-        defaultTestOpts.toMaximumTimeSeconds
-        toMonoid.toMonoidMaximumTimeSeconds
-  , toAllowStdin = fromFirstTrue toMonoid.toMonoidAllowStdin
+        defaultTestOpts.maximumTimeSeconds
+        toMonoid.maximumTimeSeconds
+  , TestOpts.allowStdin = fromFirstTrue toMonoid.allowStdin
   }
 
+-- | Interprets BenchmarkOptsMonoid options.
 benchmarkOptsFromMonoid ::
      BenchmarkOptsMonoid
   -> Maybe [String]
   -> BenchmarkOpts
 benchmarkOptsFromMonoid beoMonoid madditional =
   defaultBenchmarkOpts
-    { beoAdditionalArgs =
+    { BenchmarkOpts.additionalArgs =
         fmap (\args -> unwords args <> " ") madditional <>
-        getFirst beoMonoid.beoMonoidAdditionalArgs
-    , beoDisableRun = fromFirst
-        defaultBenchmarkOpts.beoDisableRun
-        beoMonoid.beoMonoidDisableRun
+        getFirst beoMonoid.additionalArgs
+    , BenchmarkOpts.disableRun = fromFirst
+        defaultBenchmarkOpts.disableRun
+        beoMonoid.disableRun
     }

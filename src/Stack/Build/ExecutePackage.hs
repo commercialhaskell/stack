@@ -94,9 +94,10 @@ import           Stack.Types.Build.Exception
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), projectRootL )
 import           Stack.Types.BuildOpts
-                   ( BenchmarkOpts (..), BuildOpts (..), BuildOptsCLI (..)
-                   , HaddockOpts (..), TestOpts (..)
+                   ( BenchmarkOpts (..), BuildOpts (..), HaddockOpts (..)
+                   , TestOpts (..)
                    )
+import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
                    , getBuildableListAs, getBuildableListText
@@ -596,7 +597,7 @@ singleBuild
                      , quickjump
                      ]
               <> [ [ "--haddock-option=" <> opt
-                   | opt <- ee.buildOpts.haddockOpts.hoAdditionalArgs
+                   | opt <- ee.buildOpts.haddockOpts.additionalArgs
                    ]
                  ]
               )
@@ -933,13 +934,13 @@ singleTest topts testsToRun ac ee task installedMap = do
   withSingleContext ac ee task.taskType allDepsMap (Just "test") $
     \package _cabalfp pkgDir _cabal announce outputType -> do
       config <- view configL
-      let needHpc = topts.toCoverage
+      let needHpc = topts.coverage
       toRun <-
-        if topts.toDisableRun
+        if topts.disableRun
           then do
             announce "Test running disabled by --no-run-tests flag."
             pure False
-          else if topts.toRerunTests
+          else if topts.rerunTests
             then pure True
             else do
               status <- getTestStatus pkgDir
@@ -1062,7 +1063,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                       ]
                   liftIO $ ignoringAbsence (removeFile tixPath)
 
-                let args = topts.toAdditionalArgs
+                let args = topts.additionalArgs
                     argsDisplay = case args of
                       [] -> ""
                       _ ->    ", args: "
@@ -1095,7 +1096,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                         createSource
                       OTLogFile _ h -> Nothing <$ useHandleOpen h
                     optionalTimeout action
-                      | Just maxSecs <- topts.toMaximumTimeSeconds, maxSecs > 0 =
+                      | Just maxSecs <- topts.maximumTimeSeconds, maxSecs > 0 =
                           timeout (maxSecs * 1000000) action
                       | otherwise = Just <$> action
 
@@ -1116,7 +1117,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                                  )
                         else do
                           isTerminal <- view $ globalOptsL . to (.terminal)
-                          if topts.toAllowStdin && isTerminal
+                          if topts.allowStdin && isTerminal
                             then pure id
                             else pure $ setStdin $ byteStringInput mempty
                     let pc = changeStdin
@@ -1216,10 +1217,10 @@ singleBench beopts benchesToRun ac ee task installedMap = do
     \_package _cabalfp _pkgDir cabal announce _outputType -> do
       let args = map T.unpack benchesToRun <> maybe []
                        ((:[]) . ("--benchmark-options=" <>))
-                       beopts.beoAdditionalArgs
+                       beopts.additionalArgs
 
       toRun <-
-        if beopts.beoDisableRun
+        if beopts.disableRun
           then do
             announce "Benchmark running disabled by --no-run-benchmarks flag."
             pure False
@@ -1238,7 +1239,7 @@ extraBuildOptions wc bopts = do
   colorOpt <- appropriateGhcColorFlag
   let optsFlag = compilerOptionsCabalFlag wc
       baseOpts = maybe "" (" " ++) colorOpt
-  if bopts.testOpts.toCoverage
+  if bopts.testOpts.coverage
     then do
       hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
       pure [optsFlag, "-hpcdir " ++ hpcIndexDir ++ baseOpts]
