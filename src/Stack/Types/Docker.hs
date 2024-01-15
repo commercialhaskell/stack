@@ -1,7 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE NoFieldSelectors    #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Docker types.
 
@@ -283,45 +284,45 @@ data DockerOpts = DockerOpts
 -- | An uninterpreted representation of docker options. Configurations may be
 -- "cascaded" using mappend (left-biased).
 data DockerOptsMonoid = DockerOptsMonoid
-  { dockerMonoidDefaultEnable :: !Any
+  { defaultEnable :: !Any
     -- ^ Should Docker be defaulted to enabled (does @docker:@ section exist in
     -- the config)?
-  , dockerMonoidEnable :: !(First Bool)
+  , enable :: !(First Bool)
     -- ^ Is using Docker enabled?
-  , dockerMonoidRepoOrImage :: !(First DockerMonoidRepoOrImage)
+  , repoOrImage :: !(First DockerMonoidRepoOrImage)
     -- ^ Docker repository name (e.g. @fpco/stack-build@ or
     -- @fpco/stack-full:lts-2.8@)
-  , dockerMonoidRegistryLogin :: !(First Bool)
+  , registryLogin :: !(First Bool)
     -- ^ Does registry require login for pulls?
-  , dockerMonoidRegistryUsername :: !(First String)
+  , registryUsername :: !(First String)
     -- ^ Optional username for Docker registry.
-  , dockerMonoidRegistryPassword :: !(First String)
+  , registryPassword :: !(First String)
     -- ^ Optional password for Docker registry.
-  , dockerMonoidAutoPull :: !FirstTrue
+  , autoPull :: !FirstTrue
     -- ^ Automatically pull new images.
-  , dockerMonoidDetach :: !FirstFalse
+  , detach :: !FirstFalse
     -- ^ Whether to run a detached container
-  , dockerMonoidPersist :: !FirstFalse
+  , persist :: !FirstFalse
     -- ^ Create a persistent container (don't remove it when finished). Implied
     -- by -- `dockerDetach`.
-  , dockerMonoidContainerName :: !(First String)
+  , containerName :: !(First String)
     -- ^ Container name to use, only makes sense from command-line with
     -- `dockerPersist` or `dockerDetach`.
-  , dockerMonoidNetwork :: !(First String)
+  , network :: !(First String)
     -- ^ See: 'dockerNetwork'
-  , dockerMonoidRunArgs :: ![String]
+  , runArgs :: ![String]
     -- ^ Arguments to pass directly to @docker run@
-  , dockerMonoidMount :: ![Mount]
+  , mount :: ![Mount]
     -- ^ Volumes to mount in the container
-  , dockerMonoidMountMode :: !(First String)
+  , mountMode :: !(First String)
     -- ^ Volume mount mode
-  , dockerMonoidEnv :: ![String]
+  , env :: ![String]
     -- ^ Environment variables to set in the container
-  , dockerMonoidStackExe :: !(First DockerStackExe)
+  , stackExe :: !(First DockerStackExe)
     -- ^ Location of container-compatible Stack executable
-  , dockerMonoidSetUser :: !(First Bool)
+  , setUser :: !(First Bool)
     -- ^ Set in-container user to match host's
-  , dockerMonoidRequireDockerVersion :: !IntersectingVersionRange
+  , requireDockerVersion :: !IntersectingVersionRange
     -- ^ See: 'dockerRequireDockerVersion'
   }
   deriving (Show, Generic)
@@ -329,53 +330,53 @@ data DockerOptsMonoid = DockerOptsMonoid
 -- | Decode uninterpreted docker options from JSON/YAML.
 instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
   parseJSON = withObjectWarnings "DockerOptsMonoid" $ \o -> do
-    let dockerMonoidDefaultEnable = Any True
-    dockerMonoidEnable <- First <$> o ..:? dockerEnableArgName
-    dockerMonoidRepoOrImage <- First <$>
+    let defaultEnable = Any True
+    enable <- First <$> o ..:? dockerEnableArgName
+    repoOrImage <- First <$>
       (   (Just . DockerMonoidImage <$> o ..: dockerImageArgName)
       <|> (Just . DockerMonoidRepo <$> o ..: dockerRepoArgName)
       <|> pure Nothing
       )
-    dockerMonoidRegistryLogin <- First <$> o ..:? dockerRegistryLoginArgName
-    dockerMonoidRegistryUsername <-
+    registryLogin <- First <$> o ..:? dockerRegistryLoginArgName
+    registryUsername <-
       First <$> o ..:? dockerRegistryUsernameArgName
-    dockerMonoidRegistryPassword <-
+    registryPassword <-
       First <$> o ..:? dockerRegistryPasswordArgName
-    dockerMonoidAutoPull <- FirstTrue <$> o ..:? dockerAutoPullArgName
-    dockerMonoidDetach <- FirstFalse <$> o ..:? dockerDetachArgName
-    dockerMonoidPersist <- FirstFalse <$> o ..:? dockerPersistArgName
-    dockerMonoidContainerName <- First <$> o ..:? dockerContainerNameArgName
-    dockerMonoidNetwork <- First <$> o ..:? dockerNetworkArgName
-    dockerMonoidRunArgs <- o ..:? dockerRunArgsArgName ..!= []
-    dockerMonoidMount <- o ..:? dockerMountArgName ..!= []
-    dockerMonoidMountMode <- First <$> o ..:? dockerMountModeArgName
-    dockerMonoidEnv <- o ..:? dockerEnvArgName ..!= []
-    dockerMonoidStackExe <- First <$> o ..:? dockerStackExeArgName
-    dockerMonoidSetUser <- First <$> o ..:? dockerSetUserArgName
-    dockerMonoidRequireDockerVersion <-
+    autoPull <- FirstTrue <$> o ..:? dockerAutoPullArgName
+    detach <- FirstFalse <$> o ..:? dockerDetachArgName
+    persist <- FirstFalse <$> o ..:? dockerPersistArgName
+    containerName <- First <$> o ..:? dockerContainerNameArgName
+    network <- First <$> o ..:? dockerNetworkArgName
+    runArgs <- o ..:? dockerRunArgsArgName ..!= []
+    mount <- o ..:? dockerMountArgName ..!= []
+    mountMode <- First <$> o ..:? dockerMountModeArgName
+    env <- o ..:? dockerEnvArgName ..!= []
+    stackExe <- First <$> o ..:? dockerStackExeArgName
+    setUser <- First <$> o ..:? dockerSetUserArgName
+    requireDockerVersion <-
       IntersectingVersionRange . (.unVersionRangeJSON) <$>
         ( o ..:? dockerRequireDockerVersionArgName
           ..!= VersionRangeJSON anyVersion
         )
     pure $ DockerOptsMonoid
-      { dockerMonoidDefaultEnable
-      , dockerMonoidEnable
-      , dockerMonoidRepoOrImage
-      , dockerMonoidRegistryLogin
-      , dockerMonoidRegistryUsername
-      , dockerMonoidRegistryPassword
-      , dockerMonoidAutoPull
-      , dockerMonoidDetach
-      , dockerMonoidPersist
-      , dockerMonoidContainerName
-      , dockerMonoidNetwork
-      , dockerMonoidRunArgs
-      , dockerMonoidMount
-      , dockerMonoidMountMode
-      , dockerMonoidEnv
-      , dockerMonoidStackExe
-      , dockerMonoidSetUser
-      , dockerMonoidRequireDockerVersion
+      { defaultEnable
+      , enable
+      , repoOrImage
+      , registryLogin
+      , registryUsername
+      , registryPassword
+      , autoPull
+      , detach
+      , persist
+      , containerName
+      , network
+      , runArgs
+      , mount
+      , mountMode
+      , env
+      , stackExe
+      , setUser
+      , requireDockerVersion
       }
 
 -- | Left-biased combine Docker options
