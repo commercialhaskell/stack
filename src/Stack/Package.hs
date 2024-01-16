@@ -27,7 +27,7 @@ module Stack.Package
   , buildableTestSuites
   , buildableBenchmarks
   , getPackageOpts
-  , processPackageDepsToList
+  , processPackageDepsEither
   , listOfPackageDeps
   , setOfPackageDeps
   , topSortPackageComponent
@@ -737,12 +737,12 @@ processPackageMapDeps pkg fn = do
 -- | This is a function to iterate in a monad over all of a package component's
 -- dependencies, and yield a collection of results.
 processPackageDeps ::
-     (Monad m, Monoid (targetedCollection resT))
+     (Monad m)
   => Package
-  -> (resT -> targetedCollection resT -> targetedCollection resT)
-  -> (PackageName -> DepValue -> m resT)
-  -> m (targetedCollection resT)
-  -> m (targetedCollection resT)
+  -> (smallResT -> resT -> resT)
+  -> (PackageName -> DepValue -> m smallResT)
+  -> m resT
+  -> m resT
 processPackageDeps pkg combineResults fn = do
   let asPackageNameSet accessor =
         S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
@@ -771,6 +771,21 @@ processPackageDepsToList ::
   -> (PackageName -> DepValue -> m resT)
   -> m [resT]
 processPackageDepsToList pkg fn = processPackageDeps pkg (:) fn (pure [])
+
+-- | Iterate/fold on all the package dependencies, components, setup deps and
+-- all.
+processPackageDepsEither ::
+     (Monad m, Monoid a, Monoid b)
+  => Package
+  -> (PackageName -> DepValue -> m (Either a b))
+  -> m (Either a b)
+processPackageDepsEither pkg fn = processPackageDeps pkg combineRes fn (pure (Right mempty))
+  where
+    combineRes (Left err) (Left errs) = Left (errs <> err) 
+    combineRes _ (Left b) = Left b
+    combineRes (Left err) _ = Left err
+    combineRes (Right a) (Right b) = Right $ a <> b
+
 
 -- | List all package's dependencies in a "free" context through the identity
 -- monad.
