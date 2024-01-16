@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Docker configuration
 module Stack.Config.Docker
@@ -70,7 +71,7 @@ dockerOptsFromMonoid ::
   -> m DockerOpts
 dockerOptsFromMonoid mproject maresolver dockerMonoid = do
   let image =
-        case getFirst dockerMonoid.dockerMonoidRepoOrImage of
+        case getFirst dockerMonoid.repoOrImage of
           Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
           Just (DockerMonoidImage image') -> pure image'
           Just (DockerMonoidRepo repo) ->
@@ -80,32 +81,32 @@ dockerOptsFromMonoid mproject maresolver dockerMonoid = do
               Just _ -> pure repo
   let enable =
         fromFirst
-          (getAny dockerMonoid.dockerMonoidDefaultEnable)
-          dockerMonoid.dockerMonoidEnable
+          (getAny dockerMonoid.defaultEnable)
+          dockerMonoid.enable
       registryLogin =
         fromFirst
-          (isJust (emptyToNothing (getFirst dockerMonoid.dockerMonoidRegistryUsername)))
-          dockerMonoid.dockerMonoidRegistryLogin
+          (isJust (emptyToNothing (getFirst dockerMonoid.registryUsername)))
+          dockerMonoid.registryLogin
       registryUsername =
-        emptyToNothing (getFirst dockerMonoid.dockerMonoidRegistryUsername)
+        emptyToNothing (getFirst dockerMonoid.registryUsername)
       registryPassword =
-        emptyToNothing (getFirst dockerMonoid.dockerMonoidRegistryPassword)
-      autoPull = fromFirstTrue dockerMonoid.dockerMonoidAutoPull
-      detach = fromFirstFalse dockerMonoid.dockerMonoidDetach
-      persist = fromFirstFalse dockerMonoid.dockerMonoidPersist
+        emptyToNothing (getFirst dockerMonoid.registryPassword)
+      autoPull = fromFirstTrue dockerMonoid.autoPull
+      detach = fromFirstFalse dockerMonoid.detach
+      persist = fromFirstFalse dockerMonoid.persist
       containerName =
-        emptyToNothing (getFirst dockerMonoid.dockerMonoidContainerName)
-      network = emptyToNothing (getFirst dockerMonoid.dockerMonoidNetwork)
-      runArgs = dockerMonoid.dockerMonoidRunArgs
-      mount = dockerMonoid.dockerMonoidMount
+        emptyToNothing (getFirst dockerMonoid.containerName)
+      network = emptyToNothing (getFirst dockerMonoid.network)
+      runArgs = dockerMonoid.runArgs
+      mount = dockerMonoid.mount
       mountMode =
-        emptyToNothing (getFirst dockerMonoid.dockerMonoidMountMode)
-      env = dockerMonoid.dockerMonoidEnv
-      setUser = getFirst dockerMonoid.dockerMonoidSetUser
+        emptyToNothing (getFirst dockerMonoid.mountMode)
+      env = dockerMonoid.env
+      setUser = getFirst dockerMonoid.setUser
       requireDockerVersion =
         simplifyVersionRange
-          dockerMonoid.dockerMonoidRequireDockerVersion.getIntersectingVersionRange
-      stackExe = getFirst dockerMonoid.dockerMonoidStackExe
+          dockerMonoid.requireDockerVersion.getIntersectingVersionRange
+      stackExe = getFirst dockerMonoid.stackExe
   pure $ DockerOpts
     { enable
     , image

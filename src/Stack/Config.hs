@@ -678,7 +678,7 @@ loadConfig inner = do
         -- default docker to enabled, so make it look like they didn't exist
         map
           ( \c -> c {configMonoidDockerOpts =
-              c.configMonoidDockerOpts {dockerMonoidDefaultEnable = Any False}}
+              c.configMonoidDockerOpts { defaultEnable = Any False }}
           )
           extraConfigs0
 
