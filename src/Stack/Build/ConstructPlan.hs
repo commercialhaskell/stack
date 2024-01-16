@@ -43,7 +43,7 @@ import           Stack.Types.Build
 import           Stack.Types.Build.ConstructPlan
                    ( AddDepRes (..), CombinedMap, Ctx (..), M, PackageInfo (..)
                    , ToolWarning(..), UnregisterState (..), W (..)
-                   , adrHasLibrary, adrVersion, toTask
+                   , adrHasLibrary, adrVersion, toTask, isAdrToInstall
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -667,9 +667,7 @@ installPackage name ps minstalled = do
               let isAllInOne = not splitRequired
               adr <- installPackageGivenDeps
                 isAllInOne lp.buildHaddocks ps tb minstalled deps
-              let finalAllInOne = case adr of
-                    ADRToInstall _ | splitRequired -> False
-                    _ -> True
+              let finalAllInOne = not (isAdrToInstall adr && splitRequired)
               -- FIXME: this redundantly adds the deps (but they'll all just
               -- get looked up in the map)
               addFinal lp tb finalAllInOne False
