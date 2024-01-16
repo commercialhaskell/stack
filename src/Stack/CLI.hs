@@ -125,7 +125,7 @@ commandLineHandler currentDir progName isInterpreter =
   defaultGlobalOpts = if isInterpreter
     then
       -- Silent except when errors occur - see #2879
-      mempty { globalMonoidLogLevel = First (Just LevelError) }
+      mempty { logLevel = First (Just LevelError) }
     else mempty
   failureCallback f args =
     case L.stripPrefix "Invalid argument" (fst (renderFailure f "")) of
@@ -454,12 +454,7 @@ commandLineHandler currentDir progName isInterpreter =
     "Run a Stack script."
     globalFooter
     scriptCmd
-    ( \so gom ->
-        gom
-          { globalMonoidResolverRoot =
-              First $ Just $ takeDirectory so.soFile
-          }
-    )
+    (\so gom -> gom { resolverRoot = First $ Just $ takeDirectory so.soFile })
     (globalOpts OtherCmdGlobalOpts)
     scriptOptsParser
 

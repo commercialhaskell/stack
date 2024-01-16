@@ -118,39 +118,39 @@ globalOptsFromMonoid ::
   -> GlobalOptsMonoid
   -> m GlobalOpts
 globalOptsFromMonoid defaultTerminal globalMonoid = do
-  resolver <- for (getFirst globalMonoid.globalMonoidResolver) $ \ur -> do
+  resolver <- for (getFirst globalMonoid.resolver) $ \ur -> do
     root <-
-      case globalMonoid.globalMonoidResolverRoot of
+      case globalMonoid.resolverRoot of
         First Nothing -> getCurrentDir
         First (Just dir) -> resolveDir' dir
     resolvePaths (Just root) ur
   stackYaml <-
-    case getFirst globalMonoid.globalMonoidStackYaml of
+    case getFirst globalMonoid.stackYaml of
       Nothing -> pure SYLDefault
       Just fp -> SYLOverride <$> resolveFile' fp
   pure GlobalOpts
-    { reExecVersion = getFirst globalMonoid.globalMonoidReExecVersion
+    { reExecVersion = getFirst globalMonoid.reExecVersion
     , dockerEntrypoint =
-        getFirst globalMonoid.globalMonoidDockerEntrypoint
+        getFirst globalMonoid.dockerEntrypoint
     , logLevel =
-        fromFirst defaultLogLevel globalMonoid.globalMonoidLogLevel
-    , timeInLog = fromFirstTrue globalMonoid.globalMonoidTimeInLog
-    , rslInLog = fromFirstFalse globalMonoid.globalMonoidRSLInLog
-    , planInLog = fromFirstFalse globalMonoid.globalMonoidPlanInLog
-    , configMonoid = globalMonoid.globalMonoidConfigMonoid
+        fromFirst defaultLogLevel globalMonoid.logLevel
+    , timeInLog = fromFirstTrue globalMonoid.timeInLog
+    , rslInLog = fromFirstFalse globalMonoid.rslInLog
+    , planInLog = fromFirstFalse globalMonoid.planInLog
+    , configMonoid = globalMonoid.configMonoid
     , resolver = resolver
-    , compiler = getFirst globalMonoid.globalMonoidCompiler
+    , compiler = getFirst globalMonoid.compiler
     , terminal =
-        fromFirst defaultTerminal globalMonoid.globalMonoidTerminal
-    , stylesUpdate = globalMonoid.globalMonoidStyles
-    , termWidth = getFirst globalMonoid.globalMonoidTermWidth
+        fromFirst defaultTerminal globalMonoid.terminal
+    , stylesUpdate = globalMonoid.styles
+    , termWidth = getFirst globalMonoid.termWidth
     , stackYaml = stackYaml
     , lockFileBehavior =
         let defLFB =
-              case getFirst globalMonoid.globalMonoidResolver of
+              case getFirst globalMonoid.resolver of
                 Nothing -> LFBReadWrite
                 _ -> LFBReadOnly
-        in  fromFirst defLFB globalMonoid.globalMonoidLockFileBehavior
+        in  fromFirst defLFB globalMonoid.lockFileBehavior
     }
 
 -- | Default logging level should be something useful but not crazy.
