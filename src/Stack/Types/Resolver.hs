@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude    #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE GADTs                #-}
+{-# LANGUAGE NoFieldSelectors     #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -79,8 +80,8 @@ readAbstractResolver = do
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots
-  { snapshotsNightly :: !Day
-  , snapshotsLts     :: !(IntMap Int)
+  { nightly :: !Day
+  , lts     :: !(IntMap Int)
   }
   deriving Show
 

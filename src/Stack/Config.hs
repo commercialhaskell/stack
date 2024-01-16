@@ -232,17 +232,17 @@ makeConcreteResolver ar = do
         ProjectAndConfigMonoid project _ <- liftIO iopc
         pure project.resolver
       ARLatestNightly ->
-        RSLSynonym . Nightly . (.snapshotsNightly) <$> getSnapshots
+        RSLSynonym . Nightly . (.nightly) <$> getSnapshots
       ARLatestLTSMajor x -> do
         snapshots <- getSnapshots
-        case IntMap.lookup x snapshots.snapshotsLts of
+        case IntMap.lookup x snapshots.lts of
           Nothing -> throwIO $ NoLTSWithMajorVersion x
           Just y -> pure $ RSLSynonym $ LTS x y
       ARLatestLTS -> do
         snapshots <- getSnapshots
-        if IntMap.null snapshots.snapshotsLts
+        if IntMap.null snapshots.lts
           then throwIO NoLTSFound
-          else let (x, y) = IntMap.findMax snapshots.snapshotsLts
+          else let (x, y) = IntMap.findMax snapshots.lts
                in  pure $ RSLSynonym $ LTS x y
   prettyInfoL
     [ flow "Selected resolver:"
@@ -255,8 +255,8 @@ getLatestResolver :: HasConfig env => RIO env RawSnapshotLocation
 getLatestResolver = do
   snapshots <- getSnapshots
   let mlts = uncurry LTS <$>
-             listToMaybe (reverse (IntMap.toList snapshots.snapshotsLts))
-  pure $ RSLSynonym $ fromMaybe (Nightly snapshots.snapshotsNightly) mlts
+             listToMaybe (reverse (IntMap.toList snapshots.lts))
+  pure $ RSLSynonym $ fromMaybe (Nightly snapshots.nightly) mlts
 
 -- Interprets ConfigMonoid options.
 configFromConfigMonoid ::
