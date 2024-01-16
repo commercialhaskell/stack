@@ -144,7 +144,7 @@ resolveComponentFiles ::
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 resolveComponentFiles component build names = do
   dirs <- mapMaybeM (resolveDirOrWarn . getSymbolicPath) build.hsSourceDirs
-  dir <- asks (parent . (.ctxFile))
+  dir <- asks (parent . (.file))
   agdirs <- autogenDirs
   (modules,files,warnings) <-
     resolveFilesAndDeps
@@ -155,8 +155,8 @@ resolveComponentFiles component build names = do
   pure (component, ComponentFile modules (files <> cfiles) warnings)
  where
   autogenDirs = do
-    cabalVer <- asks (.ctxCabalVer)
-    distDir <- asks (.ctxDistDir)
+    cabalVer <- asks (.cabalVer)
+    distDir <- asks (.distDir)
     let compDir = componentAutogenDir cabalVer component distDir
         pkgDir = maybeToList $ packageAutogenDir cabalVer distDir
     filterM doesDirExist $ compDir : pkgDir
@@ -272,8 +272,8 @@ getDependencies knownUsages component dirs dotCabalPath =
     DotCabalCFilePath{} -> pure (S.empty, M.empty)
  where
   readResolvedHi resolvedFile = do
-    dumpHIDir <- componentOutputDir component <$> asks (.ctxDistDir)
-    dir <- asks (parent . (.ctxFile))
+    dumpHIDir <- componentOutputDir component <$> asks (.distDir)
+    dir <- asks (parent . (.file))
     let sourceDir = fromMaybe dir $ find (`isProperPrefixOf` resolvedFile) dirs
         stripSourceDir d = stripProperPrefix d resolvedFile
     case stripSourceDir sourceDir of
@@ -296,7 +296,7 @@ parseHI ::
      -- ^ The path to the *.hi file to be parsed
   -> RIO GetPackageFileContext (Set ModuleName, Map FilePath (Path Abs File))
 parseHI knownUsages hiPath = do
-  dir <- asks (parent . (.ctxFile))
+  dir <- asks (parent . (.file))
   result <-
     liftIO $ catchAnyDeep
       (Iface.fromFile hiPath)
@@ -363,7 +363,7 @@ findCandidate ::
   -> DotCabalDescriptor
   -> RIO GetPackageFileContext (Maybe DotCabalPath)
 findCandidate dirs name = do
-  pkg <- asks (.ctxFile) >>= parsePackageNameFromFilePath
+  pkg <- asks (.file) >>= parsePackageNameFromFilePath
   customPreprocessorExts <- view $ configL . to (.customPreprocessorExts)
   let haskellPreprocessorExts =
         haskellDefaultPreprocessorExts ++ customPreprocessorExts
@@ -460,8 +460,8 @@ buildOtherSources ::
   -> RIO GetPackageFileContext [DotCabalPath]
 buildOtherSources build = do
   cwd <- liftIO getCurrentDir
-  dir <- asks (parent . (.ctxFile))
-  file <- asks (.ctxFile)
+  dir <- asks (parent . (.file))
+  file <- asks (.file)
   let resolveDirFiles files toCabalPath =
         forMaybeM files $ \fp -> do
           result <- resolveDirFile dir fp
@@ -576,8 +576,8 @@ resolveOrWarn ::
   -> RIO GetPackageFileContext (Maybe a)
 resolveOrWarn subject resolver path = do
   cwd <- liftIO getCurrentDir
-  file <- asks (.ctxFile)
-  dir <- asks (parent . (.ctxFile))
+  file <- asks (.file)
+  dir <- asks (parent . (.file))
   result <- resolver dir path
   when (isNothing result) $ warnMissingFile subject cwd path file
   pure result
