@@ -16,6 +16,7 @@ module Stack.Types.Build.ConstructPlan
   , Ctx (..)
   , UnregisterState (..)
   , ToolWarning (..)
+  , MissingPresentDeps (..)
   ) where
 
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
@@ -47,6 +48,7 @@ import           Stack.Types.Package
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
+import Stack.Types.IsMutable (IsMutable)
 
 -- | Type representing information about packages, namely information about
 -- whether or not a package is already installed and, unless the package is not
@@ -142,6 +144,22 @@ adrHasLibrary (ADRToInstall task) = case task.taskType of
     hasBuildableMainLibrary p || not (null p.subLibraries)
 adrHasLibrary (ADRFound _ Library{}) = True
 adrHasLibrary (ADRFound _ Executable{}) = False
+
+data MissingPresentDeps = MissingPresentDeps
+  { missingPackages :: !(Set PackageIdentifier)
+  , presentPackages :: !(Map PackageIdentifier GhcPkgId)
+  , isMutable :: !IsMutable
+  }
+  deriving (Show)
+instance Semigroup MissingPresentDeps where
+  (<>) a b = MissingPresentDeps
+    { missingPackages = missingPackages a <> missingPackages b
+    , presentPackages = presentPackages a <> presentPackages b
+    , isMutable = isMutable a <> isMutable b
+    }
+
+instance Monoid MissingPresentDeps where
+  mempty = MissingPresentDeps mempty mempty mempty
 
 -- | Type representing values used as the environment to be read from during the
 -- construction of a build plan (the \'context\').

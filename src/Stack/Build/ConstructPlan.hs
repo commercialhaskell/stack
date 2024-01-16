@@ -30,7 +30,7 @@ import           Stack.Build.Source ( loadLocalPackage )
 import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
                    ( applyForceCustomBuild, buildableExes, packageUnknownTools
-                   , processPackageDepsToList
+                   , processPackageDepsEither
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
@@ -42,7 +42,7 @@ import           Stack.Types.Build
                    )
 import           Stack.Types.Build.ConstructPlan
                    ( AddDepRes (..), CombinedMap, Ctx (..), M, PackageInfo (..)
-                   , ToolWarning(..), UnregisterState (..), W (..)
+                   , ToolWarning(..), UnregisterState (..), W (..), MissingPresentDeps (..)
                    , adrHasLibrary, adrVersion, toTask, isAdrToInstall
                    )
 import           Stack.Types.Build.Exception
@@ -436,7 +436,7 @@ addFinal lp package isAllInOne buildHaddocks = do
   depsRes <- addPackageDeps package
   res <- case depsRes of
     Left e -> pure $ Left e
-    Right (missing, present, _minLoc) -> do
+    Right (MissingPresentDeps missing present _minLoc) -> do
       ctx <- ask
       pure $ Right Task
         { configOpts = TaskConfigOpts missing $ \missing' ->
@@ -723,12 +723,10 @@ installPackageGivenDeps ::
   -> PackageSource
   -> Package
   -> Maybe Installed
-  -> ( Set PackageIdentifier
-     , Map PackageIdentifier GhcPkgId
-     , IsMutable )
+  -> MissingPresentDeps
   -> M AddDepRes
 installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
-  (missing, present, minMutable) = do
+  (MissingPresentDeps missing present minMutable) = do
     let name = package.name
     ctx <- ask
     mRightVersionInstalled <- case (minstalled, Set.null missing) of
@@ -798,21 +796,18 @@ addPackageDeps ::
      Package
   -> M ( Either
            ConstructPlanException
-           ( Set PackageIdentifier
-           , Map PackageIdentifier GhcPkgId
-           , IsMutable
-           )
+           MissingPresentDeps
        )
 addPackageDeps package = do
   checkAndWarnForUnknownTools package
   let pkgId = packageIdentifier package
-  deps <- processPackageDepsToList package (processDep pkgId)
-  pure $ case partitionEithers deps of
+  result <- processPackageDepsEither package (processDep pkgId)
+  pure $ case result of
     -- Note that the Monoid for 'IsMutable' means that if any is 'Mutable',
     -- the result is 'Mutable'. Otherwise the result is 'Immutable'.
-    ([], pairs) -> Right $ mconcat pairs
-    (errs, _) ->
-      Left $ DependencyPlanFailures package (Map.fromList errs)
+    Right v -> Right v
+    Left errs ->
+      Left $ DependencyPlanFailures package errs
 
 -- | Given a dependency, yields either information for an error message or a
 -- triple indicating: (1) if the dependency is to be installed, its package
@@ -827,14 +822,15 @@ processDep ::
   -> DepValue
      -- ^ The version range and dependency type of the dependency.
   -> M ( Either
-           ( PackageName
-           , (VersionRange, Maybe (Version, BlobKey), BadDependency)
+           (Map PackageName
+            (VersionRange, Maybe (Version, BlobKey), BadDependency)
            )
-           (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable)
+           MissingPresentDeps
        )
 processDep pkgId name value = do
   mLatestApplicable <- getLatestApplicableVersionAndRev name range
   eRes <- getCachedDepOrAddDep name
+  let failure mLatestApp err = Left $ Map.singleton name (range, mLatestApp, err)
   case eRes of
     Left e -> do
       addParent
@@ -846,22 +842,17 @@ processDep pkgId name value = do
             -- spamming the user too much
             DependencyPlanFailures _ _  ->
               Couldn'tResolveItsDependencies version
-      pure $ Left (name, (range, mLatestApplicable, bd))
+      pure $ failure mLatestApplicable bd
     Right adr
       | isDepTypeLibrary value.depType && not (adrHasLibrary adr) ->
-          pure $ Left (name, (range, Nothing, HasNoLibrary))
+          pure $ failure Nothing HasNoLibrary
     Right adr -> do
       addParent
       inRange <- adrInRange pkgId name range adr
       pure $ if inRange
         then Right $ processAdr adr
-        else Left
-          ( name
-          , ( range
-            , mLatestApplicable
-            , DependencyMismatch $ adrVersion adr
-            )
-          )
+        else failure mLatestApplicable (DependencyMismatch $ adrVersion adr)
+          
  where
   range = value.versionRange
   version = pkgVersion pkgId
@@ -985,17 +976,24 @@ adrInRange pkgId name range adr = if adrVersion adr `withinRange` range
 -- the dependency is, or will be when installed, mutable or immutable.
 processAdr ::
      AddDepRes
-  -> (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable)
+  -> MissingPresentDeps
 processAdr adr = case adr of
   ADRToInstall task ->
-    (Set.singleton $ taskProvides task, Map.empty, taskTargetIsMutable task)
-  ADRFound loc (Executable _) ->
-    (Set.empty, Map.empty, installLocationIsMutable loc)
-  ADRFound loc (Library ident installedInfo) ->
-    ( Set.empty
-    , installedMapGhcPkgId ident installedInfo
-    , installLocationIsMutable loc
-    )
+    MissingPresentDeps
+      { missingPackages = Set.singleton $ taskProvides task
+      , presentPackages = mempty
+      , isMutable = taskTargetIsMutable task
+      }
+  ADRFound loc installed ->
+    MissingPresentDeps
+      { missingPackages = mempty
+      , presentPackages = presentPackagesV
+      , isMutable = installLocationIsMutable loc
+      }
+    where
+      presentPackagesV = case installed of
+        Library ident installedInfo -> installedMapGhcPkgId ident installedInfo
+        _ -> Map.empty
 
 checkDirtiness ::
      PackageSource
