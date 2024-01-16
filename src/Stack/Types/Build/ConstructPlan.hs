@@ -12,6 +12,7 @@ module Stack.Types.Build.ConstructPlan
   , toTask
   , adrVersion
   , adrHasLibrary
+  , isAdrToInstall
   , Ctx (..)
   , UnregisterState (..)
   , ToolWarning (..)
@@ -117,6 +118,10 @@ data AddDepRes
   | ADRFound InstallLocation Installed
     -- ^ An existing installation provides the package name.
   deriving Show
+
+isAdrToInstall :: AddDepRes -> Bool
+isAdrToInstall ADRToInstall{} = True
+isAdrToInstall _ = False
 
 toTask :: AddDepRes -> Maybe Task
 toTask (ADRToInstall task) = Just task
