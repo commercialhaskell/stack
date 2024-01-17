@@ -1,6 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Stack.Types.ConfigMonoid
   ( ConfigMonoid (..)
@@ -28,7 +30,7 @@ import           Data.Monoid.Map ( MonoidMap (..) )
 import qualified Data.Yaml as Yaml
 import           Distribution.Version ( anyVersion )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
-import           Stack.Prelude
+import           Stack.Prelude hiding ( snapshotLocation )
 import           Stack.Types.AllowNewerDeps ( AllowNewerDeps )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
@@ -55,136 +57,136 @@ import qualified System.FilePath as FilePath
 -- | An uninterpreted representation of configuration options.
 -- Configurations may be "cascaded" using mappend (left-biased).
 data ConfigMonoid = ConfigMonoid
-  { configMonoidStackRoot          :: !(First (Path Abs Dir))
+  { stackRoot          :: !(First (Path Abs Dir))
     -- ^ See: 'clStackRoot'
-  , configMonoidWorkDir            :: !(First (Path Rel Dir))
+  , workDir            :: !(First (Path Rel Dir))
     -- ^ See: 'configWorkDir'.
-  , configMonoidBuildOpts          :: !BuildOptsMonoid
+  , buildOpts          :: !BuildOptsMonoid
     -- ^ build options.
-  , configMonoidDockerOpts         :: !DockerOptsMonoid
+  , dockerOpts         :: !DockerOptsMonoid
     -- ^ Docker options.
-  , configMonoidNixOpts            :: !NixOptsMonoid
+  , nixOpts            :: !NixOptsMonoid
     -- ^ Options for the execution environment (nix-shell or container)
-  , configMonoidConnectionCount    :: !(First Int)
+  , connectionCount    :: !(First Int)
     -- ^ See: 'configConnectionCount'
-  , configMonoidHideTHLoading      :: !FirstTrue
+  , hideTHLoading      :: !FirstTrue
     -- ^ See: 'configHideTHLoading'
-  , configMonoidPrefixTimestamps   :: !(First Bool)
+  , prefixTimestamps   :: !(First Bool)
     -- ^ See: 'configPrefixTimestamps'
-  , configMonoidLatestSnapshot     :: !(First Text)
+  , latestSnapshot     :: !(First Text)
     -- ^ See: 'configLatestSnapshot'
-  , configMonoidPackageIndex     :: !(First PackageIndexConfig)
+  , packageIndex     :: !(First PackageIndexConfig)
     -- ^ See: 'withPantryConfig'
-  , configMonoidPackageIndices     :: !(First [PackageIndexConfig])
+  , packageIndices     :: !(First [PackageIndexConfig])
     -- ^ Deprecated in favour of package-index
-  , configMonoidSystemGHC          :: !(First Bool)
+  , systemGHC          :: !(First Bool)
     -- ^ See: 'configSystemGHC'
-  , configMonoidInstallGHC          :: !FirstTrue
+  , installGHC          :: !FirstTrue
     -- ^ See: 'configInstallGHC'
-  , configMonoidSkipGHCCheck        :: !FirstFalse
+  , skipGHCCheck        :: !FirstFalse
     -- ^ See: 'configSkipGHCCheck'
-  , configMonoidSkipMsys            :: !FirstFalse
+  , skipMsys            :: !FirstFalse
     -- ^ See: 'configSkipMsys'
-  , configMonoidCompilerCheck       :: !(First VersionCheck)
+  , compilerCheck       :: !(First VersionCheck)
     -- ^ See: 'configCompilerCheck'
-  , configMonoidCompilerRepository  :: !(First CompilerRepository)
+  , compilerRepository  :: !(First CompilerRepository)
     -- ^ See: 'configCompilerRepository'
-  , configMonoidRequireStackVersion :: !IntersectingVersionRange
+  , requireStackVersion :: !IntersectingVersionRange
     -- ^ See: 'configRequireStackVersion'
-  , configMonoidArch                :: !(First String)
+  , arch                :: !(First String)
     -- ^ Used for overriding the platform
-  , configMonoidGHCVariant          :: !(First GHCVariant)
+  , ghcVariant          :: !(First GHCVariant)
     -- ^ Used for overriding the platform
-  , configMonoidGHCBuild            :: !(First CompilerBuild)
+  , ghcBuild            :: !(First CompilerBuild)
     -- ^ Used for overriding the GHC build
-  , configMonoidJobs                :: !(First Int)
+  , jobs                :: !(First Int)
     -- ^ See: 'configJobs'
-  , configMonoidExtraIncludeDirs    :: ![FilePath]
+  , extraIncludeDirs    :: ![FilePath]
     -- ^ See: 'configExtraIncludeDirs'
-  , configMonoidExtraLibDirs        :: ![FilePath]
+  , extraLibDirs        :: ![FilePath]
     -- ^ See: 'configExtraLibDirs'
-  , configMonoidCustomPreprocessorExts :: ![Text]
+  , customPreprocessorExts :: ![Text]
     -- ^ See: 'configCustomPreprocessorExts'
-  , configMonoidOverrideGccPath    :: !(First (Path Abs File))
+  , overrideGccPath    :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
-  , configMonoidOverrideHpack       :: !(First FilePath)
+  , overrideHpack       :: !(First FilePath)
     -- ^ Use Hpack executable (overrides bundled Hpack)
-  , configMonoidConcurrentTests     :: !(First Bool)
+  , concurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'
-  , configMonoidLocalBinPath        :: !(First FilePath)
+  , localBinPath        :: !(First FilePath)
     -- ^ Used to override the binary installation dir
-  , configMonoidTemplateParameters  :: !(Map Text Text)
+  , templateParameters  :: !(Map Text Text)
     -- ^ Template parameters.
-  , configMonoidScmInit             :: !(First SCM)
+  , scmInit             :: !(First SCM)
     -- ^ Initialize SCM (e.g. git init) when making new projects?
-  , configMonoidGhcOptionsByName    :: !(MonoidMap PackageName (Monoid.Dual [Text]))
+  , ghcOptionsByName    :: !(MonoidMap PackageName (Monoid.Dual [Text]))
     -- ^ See 'configGhcOptionsByName'. Uses 'Monoid.Dual' so that
     -- options from the configs on the right come first, so that they
     -- can be overridden.
-  , configMonoidGhcOptionsByCat     :: !(MonoidMap ApplyGhcOptions (Monoid.Dual [Text]))
+  , ghcOptionsByCat     :: !(MonoidMap ApplyGhcOptions (Monoid.Dual [Text]))
     -- ^ See 'configGhcOptionsAll'. Uses 'Monoid.Dual' so that options
     -- from the configs on the right come first, so that they can be
     -- overridden.
-  , configMonoidCabalConfigOpts     :: !(MonoidMap CabalConfigKey (Monoid.Dual [Text]))
+  , cabalConfigOpts     :: !(MonoidMap CabalConfigKey (Monoid.Dual [Text]))
     -- ^ See 'configCabalConfigOpts'.
-  , configMonoidExtraPath           :: ![Path Abs Dir]
+  , extraPath           :: ![Path Abs Dir]
     -- ^ Additional paths to search for executables in
-  , configMonoidSetupInfoLocations  :: ![String]
+  , setupInfoLocations  :: ![String]
     -- ^ See 'configSetupInfoLocations'
-  , configMonoidSetupInfoInline     :: !SetupInfo
+  , setupInfoInline     :: !SetupInfo
     -- ^ See 'configSetupInfoInline'
-  , configMonoidLocalProgramsBase   :: !(First (Path Abs Dir))
+  , localProgramsBase   :: !(First (Path Abs Dir))
     -- ^ Override the default local programs dir, where e.g. GHC is installed.
-  , configMonoidPvpBounds           :: !(First PvpBounds)
+  , pvpBounds           :: !(First PvpBounds)
     -- ^ See 'configPvpBounds'
-  , configMonoidModifyCodePage      :: !FirstTrue
+  , modifyCodePage      :: !FirstTrue
     -- ^ See 'configModifyCodePage'
-  , configMonoidRebuildGhcOptions   :: !FirstFalse
+  , rebuildGhcOptions   :: !FirstFalse
     -- ^ See 'configMonoidRebuildGhcOptions'
-  , configMonoidApplyGhcOptions     :: !(First ApplyGhcOptions)
+  , applyGhcOptions     :: !(First ApplyGhcOptions)
     -- ^ See 'configApplyGhcOptions'
-  , configMonoidApplyProgOptions     :: !(First ApplyProgOptions)
+  , applyProgOptions     :: !(First ApplyProgOptions)
     -- ^ See 'configApplyProgOptions'
-  , configMonoidAllowNewer          :: !(First Bool)
+  , allowNewer          :: !(First Bool)
     -- ^ See 'configMonoidAllowNewer'
-  , configMonoidAllowNewerDeps      :: !(Maybe AllowNewerDeps)
+  , allowNewerDeps      :: !(Maybe AllowNewerDeps)
     -- ^ See 'configMonoidAllowNewerDeps'
-  , configMonoidDefaultTemplate     :: !(First TemplateName)
+  , defaultTemplate     :: !(First TemplateName)
    -- ^ The default template to use when none is specified.
    -- (If Nothing, the 'default' default template is used.)
-  , configMonoidAllowDifferentUser :: !(First Bool)
+  , allowDifferentUser :: !(First Bool)
    -- ^ Allow users other than the Stack root owner to use the Stack
    -- installation.
-  , configMonoidDumpLogs           :: !(First DumpLogs)
+  , dumpLogs           :: !(First DumpLogs)
     -- ^ See 'configDumpLogs'
-  , configMonoidSaveHackageCreds   :: !(First Bool)
+  , saveHackageCreds   :: !(First Bool)
     -- ^ See 'configSaveHackageCreds'
-  , configMonoidHackageBaseUrl     :: !(First Text)
+  , hackageBaseUrl     :: !(First Text)
     -- ^ See 'configHackageBaseUrl'
-  , configMonoidColorWhen          :: !(First ColorWhen)
+  , colorWhen          :: !(First ColorWhen)
     -- ^ When to use 'ANSI' colors
-  , configMonoidStyles             :: !StylesUpdate
-  , configMonoidHideSourcePaths    :: !FirstTrue
+  , styles             :: !StylesUpdate
+  , hideSourcePaths    :: !FirstTrue
     -- ^ See 'configHideSourcePaths'
-  , configMonoidRecommendUpgrade   :: !FirstTrue
+  , recommendUpgrade   :: !FirstTrue
     -- ^ See 'configRecommendUpgrade'
-  , configMonoidNotifyIfNixOnPath  :: !FirstTrue
+  , notifyIfNixOnPath  :: !FirstTrue
     -- ^ See 'configNotifyIfNixOnPath'
-  , configMonoidNotifyIfGhcUntested  :: !FirstTrue
+  , notifyIfGhcUntested  :: !FirstTrue
     -- ^ See 'configNotifyIfGhcUntested'
-  , configMonoidNotifyIfCabalUntested  :: !FirstTrue
+  , notifyIfCabalUntested  :: !FirstTrue
     -- ^ See 'configNotifyIfCabalUntested'
-  , configMonoidNotifyIfArchUnknown  :: !FirstTrue
+  , notifyIfArchUnknown  :: !FirstTrue
     -- ^ See 'configNotifyIfArchUnknown'
-  , configMonoidCasaOpts :: !CasaOptsMonoid
+  , casaOpts :: !CasaOptsMonoid
     -- ^ Casa configuration options.
-  , configMonoidCasaRepoPrefix     :: !(First CasaRepoPrefix)
+  , casaRepoPrefix     :: !(First CasaRepoPrefix)
     -- ^ Casa repository prefix (deprecated).
-  , configMonoidSnapshotLocation :: !(First Text)
+  , snapshotLocation :: !(First Text)
     -- ^ Custom location of LTS/Nightly snapshots
-  , configMonoidNoRunCompile  :: !FirstFalse
+  , noRunCompile  :: !FirstFalse
     -- ^ See: 'configNoRunCompile'
-  , configMonoidStackDeveloperMode :: !(First Bool)
+  , stackDeveloperMode :: !(First Bool)
     -- ^ See 'configStackDeveloperMode'
   }
   deriving (Generic, Show)
@@ -208,23 +210,18 @@ parseConfigMonoid = withObjectWarnings "ConfigMonoid" . parseConfigMonoidObject
 parseConfigMonoidObject :: Path Abs Dir -> Object -> WarningParser ConfigMonoid
 parseConfigMonoidObject rootDir obj = do
   -- Parsing 'stackRoot' from 'stackRoot'/config.yaml would be nonsensical
-  let configMonoidStackRoot = First Nothing
-  configMonoidWorkDir <- First <$> obj ..:? configMonoidWorkDirName
-  configMonoidBuildOpts <-
-    jsonSubWarnings (obj ..:? configMonoidBuildOptsName ..!= mempty)
-  configMonoidDockerOpts <-
+  let stackRoot = First Nothing
+  workDir <- First <$> obj ..:? configMonoidWorkDirName
+  buildOpts <- jsonSubWarnings (obj ..:? configMonoidBuildOptsName ..!= mempty)
+  dockerOpts <-
     jsonSubWarnings (obj ..:? configMonoidDockerOptsName ..!= mempty)
-  configMonoidNixOpts <-
-    jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
-  configMonoidConnectionCount <-
-    First <$> obj ..:? configMonoidConnectionCountName
-  configMonoidHideTHLoading <-
-    FirstTrue <$> obj ..:? configMonoidHideTHLoadingName
-  configMonoidPrefixTimestamps <-
-    First <$> obj ..:? configMonoidPrefixTimestampsName
+  nixOpts <- jsonSubWarnings (obj ..:? configMonoidNixOptsName ..!= mempty)
+  connectionCount <- First <$> obj ..:? configMonoidConnectionCountName
+  hideTHLoading <- FirstTrue <$> obj ..:? configMonoidHideTHLoadingName
+  prefixTimestamps <- First <$> obj ..:? configMonoidPrefixTimestampsName
 
   murls :: Maybe Value <- obj ..:? configMonoidUrlsName
-  configMonoidLatestSnapshot <-
+  latestSnapshot <-
     case murls of
       Nothing -> pure $ First Nothing
       Just urls -> jsonSubWarnings $ lift $ withObjectWarnings
@@ -232,49 +229,43 @@ parseConfigMonoidObject rootDir obj = do
         (\o -> First <$> o ..:? "latest-snapshot" :: WarningParser (First Text))
         urls
 
-  configMonoidPackageIndex <-
+  packageIndex <-
     First <$> jsonSubWarningsT (obj ..:?  configMonoidPackageIndexName)
-  configMonoidPackageIndices <-
+  packageIndices <-
     First <$> jsonSubWarningsTT (obj ..:?  configMonoidPackageIndicesName)
-  configMonoidSystemGHC <- First <$> obj ..:? configMonoidSystemGHCName
-  configMonoidInstallGHC <- FirstTrue <$> obj ..:? configMonoidInstallGHCName
-  configMonoidSkipGHCCheck <-
-    FirstFalse <$> obj ..:? configMonoidSkipGHCCheckName
-  configMonoidSkipMsys <- FirstFalse <$> obj ..:? configMonoidSkipMsysName
-  configMonoidRequireStackVersion <-
+  systemGHC <- First <$> obj ..:? configMonoidSystemGHCName
+  installGHC <- FirstTrue <$> obj ..:? configMonoidInstallGHCName
+  skipGHCCheck <- FirstFalse <$> obj ..:? configMonoidSkipGHCCheckName
+  skipMsys <- FirstFalse <$> obj ..:? configMonoidSkipMsysName
+  requireStackVersion <-
     IntersectingVersionRange . (.unVersionRangeJSON) <$>
       ( obj ..:? configMonoidRequireStackVersionName
           ..!= VersionRangeJSON anyVersion
       )
-  configMonoidArch <- First <$> obj ..:? configMonoidArchName
-  configMonoidGHCVariant <- First <$> obj ..:? configMonoidGHCVariantName
-  configMonoidGHCBuild <- First <$> obj ..:? configMonoidGHCBuildName
-  configMonoidJobs <- First <$> obj ..:? configMonoidJobsName
-  configMonoidExtraIncludeDirs <- map (toFilePath rootDir FilePath.</>) <$>
+  arch <- First <$> obj ..:? configMonoidArchName
+  ghcVariant <- First <$> obj ..:? configMonoidGHCVariantName
+  ghcBuild <- First <$> obj ..:? configMonoidGHCBuildName
+  jobs <- First <$> obj ..:? configMonoidJobsName
+  extraIncludeDirs <- map (toFilePath rootDir FilePath.</>) <$>
     obj ..:?  configMonoidExtraIncludeDirsName ..!= []
-  configMonoidExtraLibDirs <- map (toFilePath rootDir FilePath.</>) <$>
+  extraLibDirs <- map (toFilePath rootDir FilePath.</>) <$>
     obj ..:?  configMonoidExtraLibDirsName ..!= []
-  configMonoidCustomPreprocessorExts <-
+  customPreprocessorExts <-
     obj ..:?  configMonoidCustomPreprocessorExtsName ..!= []
-  configMonoidOverrideGccPath <-
-    First <$> obj ..:? configMonoidOverrideGccPathName
-  configMonoidOverrideHpack <-
-    First <$> obj ..:? configMonoidOverrideHpackName
-  configMonoidConcurrentTests <-
-    First <$> obj ..:? configMonoidConcurrentTestsName
-  configMonoidLocalBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
+  overrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
+  overrideHpack <- First <$> obj ..:? configMonoidOverrideHpackName
+  concurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
+  localBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
   templates <- obj ..:? "templates"
-  (configMonoidScmInit,configMonoidTemplateParameters) <-
+  (scmInit, templateParameters) <-
     case templates of
       Nothing -> pure (First Nothing,M.empty)
       Just tobj -> do
         scmInit <- tobj ..:? configMonoidScmInitName
         params <- tobj ..:? configMonoidTemplateParametersName
         pure (First scmInit,fromMaybe M.empty params)
-  configMonoidCompilerCheck <-
-    First <$> obj ..:? configMonoidCompilerCheckName
-  configMonoidCompilerRepository <-
-    First <$> (obj ..:? configMonoidCompilerRepositoryName)
+  compilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
+  compilerRepository <- First <$> (obj ..:? configMonoidCompilerRepositoryName)
 
   options <- Map.map (.unGhcOptions) <$>
     obj ..:? configMonoidGhcOptionsName ..!= (mempty :: Map GhcOptionKey GhcOptions)
@@ -290,146 +281,118 @@ parseConfigMonoidObject rootDir obj = do
         pure x
       (Nothing, Nothing) -> pure []
 
-  let configMonoidGhcOptionsByCat = coerce $ Map.fromList
+  let ghcOptionsByCat = coerce $ Map.fromList
         [ (AGOEverything, optionsEverything)
         , (AGOLocals, Map.findWithDefault [] GOKLocals options)
         , (AGOTargets, Map.findWithDefault [] GOKTargets options)
         ]
 
-      configMonoidGhcOptionsByName = coerce $ Map.fromList
+      ghcOptionsByName = coerce $ Map.fromList
           [(name, opts) | (GOKPackage name, opts) <- Map.toList options]
 
-  configMonoidCabalConfigOpts' <-
-    obj ..:? configMonoidConfigureOptionsName ..!= mempty
-  let configMonoidCabalConfigOpts =
-        coerce (configMonoidCabalConfigOpts' :: Map CabalConfigKey [Text])
-
-  configMonoidExtraPath <- obj ..:? configMonoidExtraPathName ..!= []
-  configMonoidSetupInfoLocations <-
-    obj ..:? configMonoidSetupInfoLocationsName ..!= []
-  configMonoidSetupInfoInline <-
+  cabalConfigOpts' <- obj ..:? configMonoidConfigureOptionsName ..!= mempty
+  let cabalConfigOpts = coerce (cabalConfigOpts' :: Map CabalConfigKey [Text])
+  extraPath <- obj ..:? configMonoidExtraPathName ..!= []
+  setupInfoLocations <- obj ..:? configMonoidSetupInfoLocationsName ..!= []
+  setupInfoInline <-
     jsonSubWarningsT (obj ..:? configMonoidSetupInfoInlineName) ..!= mempty
-  configMonoidLocalProgramsBase <-
-    First <$> obj ..:? configMonoidLocalProgramsBaseName
-  configMonoidPvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName
-  configMonoidModifyCodePage <-
-    FirstTrue <$> obj ..:? configMonoidModifyCodePageName
-  configMonoidRebuildGhcOptions <-
-    FirstFalse <$> obj ..:? configMonoidRebuildGhcOptionsName
-  configMonoidApplyGhcOptions <-
-    First <$> obj ..:? configMonoidApplyGhcOptionsName
-  configMonoidApplyProgOptions <-
-    First <$> obj ..:? configMonoidApplyProgOptionsName
-  configMonoidAllowNewer <- First <$> obj ..:? configMonoidAllowNewerName
-  configMonoidAllowNewerDeps <- obj ..:? configMonoidAllowNewerDepsName
-  configMonoidDefaultTemplate <-
-    First <$> obj ..:? configMonoidDefaultTemplateName
-  configMonoidAllowDifferentUser <-
-    First <$> obj ..:? configMonoidAllowDifferentUserName
-  configMonoidDumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
-  configMonoidSaveHackageCreds <-
-    First <$> obj ..:? configMonoidSaveHackageCredsName
-  configMonoidHackageBaseUrl <-
-    First <$> obj ..:? configMonoidHackageBaseUrlName
-
+  localProgramsBase <- First <$> obj ..:? configMonoidLocalProgramsBaseName
+  pvpBounds <- First <$> obj ..:? configMonoidPvpBoundsName
+  modifyCodePage <- FirstTrue <$> obj ..:? configMonoidModifyCodePageName
+  rebuildGhcOptions <- FirstFalse <$> obj ..:? configMonoidRebuildGhcOptionsName
+  applyGhcOptions <- First <$> obj ..:? configMonoidApplyGhcOptionsName
+  applyProgOptions <- First <$> obj ..:? configMonoidApplyProgOptionsName
+  allowNewer <- First <$> obj ..:? configMonoidAllowNewerName
+  allowNewerDeps <- obj ..:? configMonoidAllowNewerDepsName
+  defaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
+  allowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
+  dumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
+  saveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
+  hackageBaseUrl <- First <$> obj ..:? configMonoidHackageBaseUrlName
   configMonoidColorWhenUS <- obj ..:? configMonoidColorWhenUSName
   configMonoidColorWhenGB <- obj ..:? configMonoidColorWhenGBName
-  let configMonoidColorWhen =  First $   configMonoidColorWhenUS
-                                     <|> configMonoidColorWhenGB
-
+  let colorWhen = First $ configMonoidColorWhenUS <|> configMonoidColorWhenGB
   configMonoidStylesUS <- obj ..:? configMonoidStylesUSName
   configMonoidStylesGB <- obj ..:? configMonoidStylesGBName
-  let configMonoidStyles = fromMaybe mempty $   configMonoidStylesUS
-                                            <|> configMonoidStylesGB
-
-  configMonoidHideSourcePaths <-
-    FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
-  configMonoidRecommendUpgrade <-
-    FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
-  configMonoidNotifyIfNixOnPath <-
-    FirstTrue <$> obj ..:? configMonoidNotifyIfNixOnPathName
-  configMonoidNotifyIfGhcUntested <-
+  let styles = fromMaybe mempty $ configMonoidStylesUS <|> configMonoidStylesGB
+  hideSourcePaths <- FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
+  recommendUpgrade <- FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
+  notifyIfNixOnPath <- FirstTrue <$> obj ..:? configMonoidNotifyIfNixOnPathName
+  notifyIfGhcUntested <-
     FirstTrue <$> obj ..:? configMonoidNotifyIfGhcUntestedName
-  configMonoidNotifyIfCabalUntested <-
+  notifyIfCabalUntested <-
     FirstTrue <$> obj ..:? configMonoidNotifyIfCabalUntestedName
-  configMonoidNotifyIfArchUnknown <-
+  notifyIfArchUnknown <-
     FirstTrue <$> obj ..:? configMonoidNotifyIfArchUnknownName
-  configMonoidCasaOpts <-
-    jsonSubWarnings (obj ..:? configMonoidCasaOptsName ..!= mempty)
-  configMonoidCasaRepoPrefix <-
-    First <$> obj ..:? configMonoidCasaRepoPrefixName
-  configMonoidSnapshotLocation <-
-    First <$> obj ..:? configMonoidSnapshotLocationName
-  configMonoidNoRunCompile <-
-    FirstFalse <$> obj ..:? configMonoidNoRunCompileName
-
-  configMonoidStackDeveloperMode <-
-    First <$> obj ..:? configMonoidStackDeveloperModeName
-
+  casaOpts <- jsonSubWarnings (obj ..:? configMonoidCasaOptsName ..!= mempty)
+  casaRepoPrefix <- First <$> obj ..:? configMonoidCasaRepoPrefixName
+  snapshotLocation <- First <$> obj ..:? configMonoidSnapshotLocationName
+  noRunCompile <- FirstFalse <$> obj ..:? configMonoidNoRunCompileName
+  stackDeveloperMode <- First <$> obj ..:? configMonoidStackDeveloperModeName
   pure $ ConfigMonoid
-    { configMonoidStackRoot
-    , configMonoidWorkDir
-    , configMonoidBuildOpts
-    , configMonoidDockerOpts
-    , configMonoidNixOpts
-    , configMonoidConnectionCount
-    , configMonoidHideTHLoading
-    , configMonoidPrefixTimestamps
-    , configMonoidLatestSnapshot
-    , configMonoidPackageIndex
-    , configMonoidPackageIndices
-    , configMonoidSystemGHC
-    , configMonoidInstallGHC
-    , configMonoidSkipGHCCheck
-    , configMonoidSkipMsys
-    , configMonoidCompilerCheck
-    , configMonoidCompilerRepository
-    , configMonoidRequireStackVersion
-    , configMonoidArch
-    , configMonoidGHCVariant
-    , configMonoidGHCBuild
-    , configMonoidJobs
-    , configMonoidExtraIncludeDirs
-    , configMonoidExtraLibDirs
-    , configMonoidCustomPreprocessorExts
-    , configMonoidOverrideGccPath
-    , configMonoidOverrideHpack
-    , configMonoidConcurrentTests
-    , configMonoidLocalBinPath
-    , configMonoidTemplateParameters
-    , configMonoidScmInit
-    , configMonoidGhcOptionsByName
-    , configMonoidGhcOptionsByCat
-    , configMonoidCabalConfigOpts
-    , configMonoidExtraPath
-    , configMonoidSetupInfoLocations
-    , configMonoidSetupInfoInline
-    , configMonoidLocalProgramsBase
-    , configMonoidPvpBounds
-    , configMonoidModifyCodePage
-    , configMonoidRebuildGhcOptions
-    , configMonoidApplyGhcOptions
-    , configMonoidApplyProgOptions
-    , configMonoidAllowNewer
-    , configMonoidAllowNewerDeps
-    , configMonoidDefaultTemplate
-    , configMonoidAllowDifferentUser
-    , configMonoidDumpLogs
-    , configMonoidSaveHackageCreds
-    , configMonoidHackageBaseUrl
-    , configMonoidColorWhen
-    , configMonoidStyles
-    , configMonoidHideSourcePaths
-    , configMonoidRecommendUpgrade
-    , configMonoidNotifyIfNixOnPath
-    , configMonoidNotifyIfGhcUntested
-    , configMonoidNotifyIfCabalUntested
-    , configMonoidNotifyIfArchUnknown
-    , configMonoidCasaOpts
-    , configMonoidCasaRepoPrefix
-    , configMonoidSnapshotLocation
-    , configMonoidNoRunCompile
-    , configMonoidStackDeveloperMode
+    { stackRoot
+    , workDir
+    , buildOpts
+    , dockerOpts
+    , nixOpts
+    , connectionCount
+    , hideTHLoading
+    , prefixTimestamps
+    , latestSnapshot
+    , packageIndex
+    , packageIndices
+    , systemGHC
+    , installGHC
+    , skipGHCCheck
+    , skipMsys
+    , compilerCheck
+    , compilerRepository
+    , requireStackVersion
+    , arch
+    , ghcVariant
+    , ghcBuild
+    , jobs
+    , extraIncludeDirs
+    , extraLibDirs
+    , customPreprocessorExts
+    , overrideGccPath
+    , overrideHpack
+    , concurrentTests
+    , localBinPath
+    , templateParameters
+    , scmInit
+    , ghcOptionsByName
+    , ghcOptionsByCat
+    , cabalConfigOpts
+    , extraPath
+    , setupInfoLocations
+    , setupInfoInline
+    , localProgramsBase
+    , pvpBounds
+    , modifyCodePage
+    , rebuildGhcOptions
+    , applyGhcOptions
+    , applyProgOptions
+    , allowNewer
+    , allowNewerDeps
+    , defaultTemplate
+    , allowDifferentUser
+    , dumpLogs
+    , saveHackageCreds
+    , hackageBaseUrl
+    , colorWhen
+    , styles
+    , hideSourcePaths
+    , recommendUpgrade
+    , notifyIfNixOnPath
+    , notifyIfGhcUntested
+    , notifyIfCabalUntested
+    , notifyIfArchUnknown
+    , casaOpts
+    , casaRepoPrefix
+    , snapshotLocation
+    , noRunCompile
+    , stackDeveloperMode
     }
 
 configMonoidWorkDirName :: Text

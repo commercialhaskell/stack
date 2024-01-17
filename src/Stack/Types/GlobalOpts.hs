@@ -43,10 +43,5 @@ data GlobalOpts = GlobalOpts
 
 globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL =
-  lens
-    (.configMonoid)
-    (\x y -> x { configMonoid = y })
-  .
-  lens
-    (.configMonoidBuildOpts)
-    (\x y -> x { configMonoidBuildOpts = y })
+    lens (.configMonoid) (\x y -> x { configMonoid = y })
+  . lens (.buildOpts) (\x y -> x { buildOpts = y })

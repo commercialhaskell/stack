@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 module Stack.Options.ConfigParser
   ( configOptsParser
@@ -36,32 +37,32 @@ configOptsParser currentDir hide0 =
      ghcVariant ghcBuild jobs includes libs preprocs overrideGccPath overrideHpack
      skipGHCCheck skipMsys localBin setupInfoLocations modifyCodePage
      allowDifferentUser dumpLogs colorWhen snapLoc noRunCompile -> mempty
-       { configMonoidStackRoot = stackRoot
-       , configMonoidWorkDir = workDir
-       , configMonoidBuildOpts = buildOpts
-       , configMonoidDockerOpts = dockerOpts
-       , configMonoidNixOpts = nixOpts
-       , configMonoidSystemGHC = systemGHC
-       , configMonoidInstallGHC = installGHC
-       , configMonoidSkipGHCCheck = skipGHCCheck
-       , configMonoidArch = arch
-       , configMonoidGHCVariant = ghcVariant
-       , configMonoidGHCBuild = ghcBuild
-       , configMonoidJobs = jobs
-       , configMonoidExtraIncludeDirs = includes
-       , configMonoidExtraLibDirs = libs
-       , configMonoidCustomPreprocessorExts = preprocs
-       , configMonoidOverrideGccPath = overrideGccPath
-       , configMonoidOverrideHpack = overrideHpack
-       , configMonoidSkipMsys = skipMsys
-       , configMonoidLocalBinPath = localBin
-       , configMonoidSetupInfoLocations = setupInfoLocations
-       , configMonoidModifyCodePage = modifyCodePage
-       , configMonoidAllowDifferentUser = allowDifferentUser
-       , configMonoidDumpLogs = dumpLogs
-       , configMonoidColorWhen = colorWhen
-       , configMonoidSnapshotLocation = snapLoc
-       , configMonoidNoRunCompile = noRunCompile
+       { stackRoot = stackRoot
+       , workDir = workDir
+       , buildOpts = buildOpts
+       , dockerOpts = dockerOpts
+       , nixOpts = nixOpts
+       , systemGHC = systemGHC
+       , installGHC = installGHC
+       , skipGHCCheck = skipGHCCheck
+       , arch = arch
+       , ghcVariant = ghcVariant
+       , ghcBuild = ghcBuild
+       , jobs = jobs
+       , extraIncludeDirs = includes
+       , extraLibDirs = libs
+       , customPreprocessorExts = preprocs
+       , overrideGccPath = overrideGccPath
+       , overrideHpack = overrideHpack
+       , skipMsys = skipMsys
+       , localBinPath = localBin
+       , setupInfoLocations = setupInfoLocations
+       , modifyCodePage = modifyCodePage
+       , allowDifferentUser = allowDifferentUser
+       , dumpLogs = dumpLogs
+       , colorWhen = colorWhen
+       , snapshotLocation = snapLoc
+       , noRunCompile = noRunCompile
        }
   )
   <$> optionalFirst (absDirOption

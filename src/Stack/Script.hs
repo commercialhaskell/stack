@@ -1,7 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- Types and functions related to Stack's @script@ command.
 module Stack.Script
@@ -47,6 +48,7 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
+import qualified Stack.Types.ConfigMonoid as ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
@@ -147,13 +149,13 @@ scriptCmd opts = do
   file <- resolveFile' opts.soFile
   let scriptFile = filename file
 
-  isNoRunCompile <- fromFirstFalse . (.configMonoidNoRunCompile) <$>
+  isNoRunCompile <- fromFirstFalse . (.noRunCompile) <$>
                            view (globalOptsL . to (.configMonoid))
 
   let scriptDir = parent file
       modifyGO go = go
         { configMonoid = go.configMonoid
-            { configMonoidInstallGHC = FirstTrue $ Just True
+            { ConfigMonoid.installGHC = FirstTrue $ Just True
             }
         , stackYaml = SYLNoProject opts.soScriptExtraDeps
         }

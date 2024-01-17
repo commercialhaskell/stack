@@ -69,7 +69,7 @@ spec = beforeAll setup $ do
         defaultPrefs
         (info (nixOptsParser False) mempty)
         cmdLineOpts
-      parseOpts cmdLineOpts = mempty { configMonoidNixOpts = parseNixOpts cmdLineOpts }
+      parseOpts cmdLineOpts = mempty { nixOpts = parseNixOpts cmdLineOpts }
   let trueOnNonWindows = not osIsWindows
   describe "nix disabled in config file" $
     around_ (withStackDotYaml sampleConfigNixDisabled) $ do

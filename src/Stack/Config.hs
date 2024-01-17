@@ -299,59 +299,59 @@ configFromConfigMonoid
                   _ -> throwIO e
               )
       in  maybe (pure relDirStackWork) (liftIO . parseStackWorkEnv) mstackWorkEnv
-    let workDir = fromFirst configWorkDir0 configMonoid.configMonoidWorkDir
+    let workDir = fromFirst configWorkDir0 configMonoid.workDir
         latestSnapshot = fromFirst
           "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
-          configMonoid.configMonoidLatestSnapshot
-        clConnectionCount = fromFirst 8 configMonoid.configMonoidConnectionCount
-        hideTHLoading = fromFirstTrue configMonoid.configMonoidHideTHLoading
-        prefixTimestamps = fromFirst False configMonoid.configMonoidPrefixTimestamps
-        ghcVariant = getFirst configMonoid.configMonoidGHCVariant
+          configMonoid.latestSnapshot
+        clConnectionCount = fromFirst 8 configMonoid.connectionCount
+        hideTHLoading = fromFirstTrue configMonoid.hideTHLoading
+        prefixTimestamps = fromFirst False configMonoid.prefixTimestamps
+        ghcVariant = getFirst configMonoid.ghcVariant
         compilerRepository = fromFirst
           defaultCompilerRepository
-          configMonoid.configMonoidCompilerRepository
-        ghcBuild = getFirst configMonoid.configMonoidGHCBuild
-        installGHC = fromFirstTrue configMonoid.configMonoidInstallGHC
-        skipGHCCheck = fromFirstFalse configMonoid.configMonoidSkipGHCCheck
-        skipMsys = fromFirstFalse configMonoid.configMonoidSkipMsys
-        extraIncludeDirs = configMonoid.configMonoidExtraIncludeDirs
-        extraLibDirs = configMonoid.configMonoidExtraLibDirs
-        customPreprocessorExts = configMonoid.configMonoidCustomPreprocessorExts
-        overrideGccPath = getFirst configMonoid.configMonoidOverrideGccPath
+          configMonoid.compilerRepository
+        ghcBuild = getFirst configMonoid.ghcBuild
+        installGHC = fromFirstTrue configMonoid.installGHC
+        skipGHCCheck = fromFirstFalse configMonoid.skipGHCCheck
+        skipMsys = fromFirstFalse configMonoid.skipMsys
+        extraIncludeDirs = configMonoid.extraIncludeDirs
+        extraLibDirs = configMonoid.extraLibDirs
+        customPreprocessorExts = configMonoid.customPreprocessorExts
+        overrideGccPath = getFirst configMonoid.overrideGccPath
         -- Only place in the codebase where platform is hard-coded. In theory in
         -- the future, allow it to be configured.
         (Platform defArch defOS) = buildPlatform
         arch = fromMaybe defArch
-          $ getFirst configMonoid.configMonoidArch >>= Distribution.Text.simpleParse
+          $ getFirst configMonoid.arch >>= Distribution.Text.simpleParse
         os = defOS
         platform = Platform arch os
         requireStackVersion = simplifyVersionRange
-          configMonoid.configMonoidRequireStackVersion.getIntersectingVersionRange
-        compilerCheck = fromFirst MatchMinor configMonoid.configMonoidCompilerCheck
+          configMonoid.requireStackVersion.getIntersectingVersionRange
+        compilerCheck = fromFirst MatchMinor configMonoid.compilerCheck
     platformVariant <- liftIO $
       maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
-    let build = buildOptsFromMonoid configMonoid.configMonoidBuildOpts
+    let build = buildOptsFromMonoid configMonoid.buildOpts
     docker <-
-      dockerOptsFromMonoid (fmap fst mproject) resolver configMonoid.configMonoidDockerOpts
-    nix <- nixOptsFromMonoid configMonoid.configMonoidNixOpts os
+      dockerOptsFromMonoid (fmap fst mproject) resolver configMonoid.dockerOpts
+    nix <- nixOptsFromMonoid configMonoid.nixOpts os
     systemGHC <-
-      case (getFirst configMonoid.configMonoidSystemGHC, nix.enable) of
+      case (getFirst configMonoid.systemGHC, nix.enable) of
         (Just False, True) ->
           throwM NixRequiresSystemGhc
         _ ->
           pure
             (fromFirst
               (docker.enable || nix.enable)
-              configMonoid.configMonoidSystemGHC)
+              configMonoid.systemGHC)
     when (isJust ghcVariant && systemGHC) $
       throwM ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
     rawEnv <- liftIO getEnvironment
     pathsEnv <- either throwM pure
-      $ augmentPathMap (map toFilePath configMonoid.configMonoidExtraPath)
+      $ augmentPathMap (map toFilePath configMonoid.extraPath)
                        (Map.fromList (map (T.pack *** T.pack) rawEnv))
     origEnv <- mkProcessContext pathsEnv
     let processContextSettings _ = pure origEnv
-    localProgramsBase <- case getFirst configMonoid.configMonoidLocalProgramsBase of
+    localProgramsBase <- case getFirst configMonoid.localProgramsBase of
       Nothing -> getDefaultLocalProgramsBase stackRoot platform origEnv
       Just path -> pure path
     let localProgramsFilePath = toFilePath localProgramsBase
@@ -379,7 +379,7 @@ configFromConfigMonoid
       runReaderT platformOnlyRelDir (platform, platformVariant)
     let localPrograms = localProgramsBase </> platformOnlyDir
     localBin <-
-      case getFirst configMonoid.configMonoidLocalBinPath of
+      case getFirst configMonoid.localBinPath of
         Nothing -> do
           localDir <- getAppUserDataDir "local"
           pure $ localDir </> relDirBin
@@ -396,53 +396,53 @@ configFromConfigMonoid
           `catchAny`
           const (throwIO (NoSuchDirectory userPath))
     jobs <-
-      case getFirst configMonoid.configMonoidJobs of
+      case getFirst configMonoid.jobs of
         Nothing -> liftIO getNumProcessors
         Just i -> pure i
     let concurrentTests =
-          fromFirst True configMonoid.configMonoidConcurrentTests
-        templateParams = configMonoid.configMonoidTemplateParameters
-        scmInit = getFirst configMonoid.configMonoidScmInit
-        cabalConfigOpts = coerce configMonoid.configMonoidCabalConfigOpts
-        ghcOptionsByName = coerce configMonoid.configMonoidGhcOptionsByName
-        ghcOptionsByCat = coerce configMonoid.configMonoidGhcOptionsByCat
-        setupInfoLocations = configMonoid.configMonoidSetupInfoLocations
-        setupInfoInline = configMonoid.configMonoidSetupInfoInline
+          fromFirst True configMonoid.concurrentTests
+        templateParams = configMonoid.templateParameters
+        scmInit = getFirst configMonoid.scmInit
+        cabalConfigOpts = coerce configMonoid.cabalConfigOpts
+        ghcOptionsByName = coerce configMonoid.ghcOptionsByName
+        ghcOptionsByCat = coerce configMonoid.ghcOptionsByCat
+        setupInfoLocations = configMonoid.setupInfoLocations
+        setupInfoInline = configMonoid.setupInfoInline
         pvpBounds =
-          fromFirst (PvpBounds PvpBoundsNone False) configMonoid.configMonoidPvpBounds
-        modifyCodePage = fromFirstTrue configMonoid.configMonoidModifyCodePage
+          fromFirst (PvpBounds PvpBoundsNone False) configMonoid.pvpBounds
+        modifyCodePage = fromFirstTrue configMonoid.modifyCodePage
         rebuildGhcOptions =
-          fromFirstFalse configMonoid.configMonoidRebuildGhcOptions
+          fromFirstFalse configMonoid.rebuildGhcOptions
         applyGhcOptions =
-          fromFirst AGOLocals configMonoid.configMonoidApplyGhcOptions
+          fromFirst AGOLocals configMonoid.applyGhcOptions
         applyProgOptions =
-          fromFirst APOLocals configMonoid.configMonoidApplyProgOptions
-        allowNewer = fromFirst False configMonoid.configMonoidAllowNewer
-        allowNewerDeps = coerce configMonoid.configMonoidAllowNewerDeps
-        defaultTemplate = getFirst configMonoid.configMonoidDefaultTemplate
-        dumpLogs = fromFirst DumpWarningLogs configMonoid.configMonoidDumpLogs
+          fromFirst APOLocals configMonoid.applyProgOptions
+        allowNewer = fromFirst False configMonoid.allowNewer
+        allowNewerDeps = coerce configMonoid.allowNewerDeps
+        defaultTemplate = getFirst configMonoid.defaultTemplate
+        dumpLogs = fromFirst DumpWarningLogs configMonoid.dumpLogs
         saveHackageCreds =
-          fromFirst True configMonoid.configMonoidSaveHackageCreds
+          fromFirst True configMonoid.saveHackageCreds
         hackageBaseUrl =
-          fromFirst Constants.hackageBaseUrl configMonoid.configMonoidHackageBaseUrl
-        hideSourcePaths = fromFirstTrue configMonoid.configMonoidHideSourcePaths
-        recommendUpgrade = fromFirstTrue configMonoid.configMonoidRecommendUpgrade
-        notifyIfNixOnPath = fromFirstTrue configMonoid.configMonoidNotifyIfNixOnPath
-        notifyIfGhcUntested = fromFirstTrue configMonoid.configMonoidNotifyIfGhcUntested
-        notifyIfCabalUntested = fromFirstTrue configMonoid.configMonoidNotifyIfCabalUntested
-        notifyIfArchUnknown = fromFirstTrue configMonoid.configMonoidNotifyIfArchUnknown
-        noRunCompile = fromFirstFalse configMonoid.configMonoidNoRunCompile
+          fromFirst Constants.hackageBaseUrl configMonoid.hackageBaseUrl
+        hideSourcePaths = fromFirstTrue configMonoid.hideSourcePaths
+        recommendUpgrade = fromFirstTrue configMonoid.recommendUpgrade
+        notifyIfNixOnPath = fromFirstTrue configMonoid.notifyIfNixOnPath
+        notifyIfGhcUntested = fromFirstTrue configMonoid.notifyIfGhcUntested
+        notifyIfCabalUntested = fromFirstTrue configMonoid.notifyIfCabalUntested
+        notifyIfArchUnknown = fromFirstTrue configMonoid.notifyIfArchUnknown
+        noRunCompile = fromFirstFalse configMonoid.noRunCompile
     allowDifferentUser <-
-      case getFirst configMonoid.configMonoidAllowDifferentUser of
+      case getFirst configMonoid.allowDifferentUser of
         Just True -> pure True
         _ -> getInContainer
     configRunner' <- view runnerL
     useAnsi <- liftIO $ hNowSupportsANSI stderr
     let stylesUpdate' = (configRunner' ^. stylesUpdateL) <>
-          configMonoid.configMonoidStyles
+          configMonoid.styles
         useColor' = configRunner'.useColor
         mUseColor = do
-          colorWhen <- getFirst configMonoid.configMonoidColorWhen
+          colorWhen <- getFirst configMonoid.colorWhen
           pure $ case colorWhen of
             ColorNever  -> False
             ColorAlways -> True
@@ -454,9 +454,9 @@ configFromConfigMonoid
           & useColorL .~ useColor''
         go = configRunner'.globalOpts
     pic <-
-      case getFirst configMonoid.configMonoidPackageIndex of
+      case getFirst configMonoid.packageIndex of
         Nothing ->
-          case getFirst configMonoid.configMonoidPackageIndices of
+          case getFirst configMonoid.packageIndices of
             Nothing -> pure defaultPackageIndexConfig
             Just [pic] -> do
               prettyWarn packageIndicesWarning
@@ -472,7 +472,7 @@ configFromConfigMonoid
             Just x -> pure x
         Nothing -> pure $ stackRoot </> relDirPantry
     let snapLoc =
-          case getFirst configMonoid.configMonoidSnapshotLocation of
+          case getFirst configMonoid.snapshotLocation of
             Nothing -> defaultSnapshotLocation
             Just addr ->
               customSnapshotLocation
@@ -492,16 +492,16 @@ configFromConfigMonoid
                 addr' = display $ T.dropWhileEnd (=='/') addr
     let stackDeveloperMode = fromFirst
           stackDeveloperModeDefault
-          configMonoid.configMonoidStackDeveloperMode
+          configMonoid.stackDeveloperMode
         casa =
-          if fromFirstTrue configMonoid.configMonoidCasaOpts.enable
+          if fromFirstTrue configMonoid.casaOpts.enable
             then
               let casaRepoPrefix = fromFirst
-                    (fromFirst defaultCasaRepoPrefix configMonoid.configMonoidCasaRepoPrefix)
-                    configMonoid.configMonoidCasaOpts.repoPrefix
+                    (fromFirst defaultCasaRepoPrefix configMonoid.casaRepoPrefix)
+                    configMonoid.casaOpts.repoPrefix
                   casaMaxKeysPerRequest = fromFirst
                     defaultCasaMaxPerRequest
-                    configMonoid.configMonoidCasaOpts.maxKeysPerRequest
+                    configMonoid.casaOpts.maxKeysPerRequest
               in  Just (casaRepoPrefix, casaMaxKeysPerRequest)
             else Nothing
     withNewLogFunc go useColor'' stylesUpdate' $ \logFunc -> do
@@ -518,7 +518,7 @@ configFromConfigMonoid
         withPantryConfig'
           pantryRoot
           pic
-          (maybe HpackBundled HpackCommand $ getFirst configMonoid.configMonoidOverrideHpack)
+          (maybe HpackBundled HpackCommand $ getFirst configMonoid.overrideHpack)
           clConnectionCount
           casa
           snapLoc
@@ -677,9 +677,7 @@ loadConfig inner = do
         -- non-project config files' existence of a docker section should never
         -- default docker to enabled, so make it look like they didn't exist
         map
-          ( \c -> c {configMonoidDockerOpts =
-              c.configMonoidDockerOpts { defaultEnable = Any False }}
-          )
+          (\c -> c {dockerOpts = c.dockerOpts { defaultEnable = Any False }})
           extraConfigs0
 
   let withConfig =
@@ -964,7 +962,7 @@ determineStackRootAndOwnership ::
   -> m (Path Abs Dir, Path Abs Dir, Bool)
 determineStackRootAndOwnership clArgs = liftIO $ do
   (configRoot, stackRoot) <- do
-    case getFirst clArgs.configMonoidStackRoot of
+    case getFirst clArgs.stackRoot of
       Just x -> pure (x, x)
       Nothing -> do
         mstackRoot <- lookupEnv stackRootEnvVar
