@@ -12,10 +12,10 @@ import           Options.Applicative ( idm )
 import           Options.Applicative.Builder.Extra ( boolFlags, textOption )
 import           Stack.Constants ( globalFooter )
 import           Stack.Ls
-                   ( ListDepsOpts (..), ListDepsFormat (..)
-                   , ListDepsFormatOpts (..), ListStylesOpts (..)
-                   , ListToolsOpts (..), LsCmdOpts (..), LsCmds (..)
-                   , LsView (..), SnapshotOpts (..)
+                   ( ListDepsFormat (..), ListDepsFormatOpts (..)
+                   , ListDepsOpts (..), ListDepsTextFilter (..)
+                   , ListStylesOpts (..), ListToolsOpts (..), LsCmdOpts (..)
+                   , LsCmds (..), LsView (..), SnapshotOpts (..)
                    )
 import           Stack.Options.DotParser ( dotOptsParser )
 import           Stack.Prelude
@@ -125,8 +125,36 @@ listDepsOptsParser = OA.subparser
       )
   <|> toListDepsOptsParser listDepsTextParser
 
+formatSubCommand ::
+     String
+  -> String
+  -> OA.Parser ListDepsFormat
+  -> OA.Mod OA.CommandFields ListDepsOpts
+formatSubCommand cmd desc formatParser =
+  OA.command
+    cmd
+    (OA.info (toListDepsOptsParser formatParser) (OA.progDesc desc))
+
 listDepsTextParser :: OA.Parser ListDepsFormat
-listDepsTextParser = ListDepsText <$> listDepsFormatOptsParser
+listDepsTextParser =
+  ListDepsText <$> listDepsFormatOptsParser <*> textFilterParser
+
+textFilterParser :: OA.Parser [ListDepsTextFilter]
+textFilterParser = many (OA.option parseListDepsTextFilter
+  (  OA.long "filter"
+  <> OA.metavar "ITEM"
+  <> OA.help "Item to be filtered out of the results, if present, being either \
+             \$locals (for all local packages) or a package name (can be \
+             \specified multiple times)."
+  ))
+
+parseListDepsTextFilter :: OA.ReadM ListDepsTextFilter
+parseListDepsTextFilter = OA.eitherReader $ \s ->
+  if s == "$locals"
+    then Right FilterLocals
+    else case parsePackageName s of
+      Just pkgName -> Right $ FilterPackage pkgName
+      Nothing -> Left $ s <> " is not a valid package name."
 
 listDepsConstraintsParser :: OA.Parser ListDepsFormat
 listDepsConstraintsParser = pure ListDepsConstraints
@@ -166,16 +194,6 @@ toListDepsOptsParser :: OA.Parser ListDepsFormat -> OA.Parser ListDepsOpts
 toListDepsOptsParser formatParser = ListDepsOpts
   <$> formatParser
   <*> dotOptsParser True
-
-formatSubCommand ::
-     String
-  -> String
-  -> OA.Parser ListDepsFormat
-  -> OA.Mod OA.CommandFields ListDepsOpts
-formatSubCommand cmd desc formatParser =
-  OA.command
-    cmd
-    (OA.info (toListDepsOptsParser formatParser) (OA.progDesc desc))
 
 listStylesOptsParser :: OA.Parser ListStylesOpts
 listStylesOptsParser = ListStylesOpts
