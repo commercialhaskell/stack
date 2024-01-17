@@ -179,7 +179,7 @@ actualFromGhc ::
   -> ActualCompiler
   -> RIO env (SMActual DumpedGlobalPackage)
 actualFromGhc smw ac = do
-  globals <- view $ compilerPathsL . to (.cpGlobalDump)
+  globals <- view $ compilerPathsL . to (.globalDump)
   pure
     SMActual
       { compiler = ac
@@ -267,7 +267,7 @@ pruneGlobals globals deps =
       Map.map ReplacedGlobalPackage prunedGlobals
 
 getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder
-getCompilerInfo = view $ compilerPathsL . to (byteString . (.cpGhcInfo))
+getCompilerInfo = view $ compilerPathsL . to (byteString . (.ghcInfo))
 
 immutableLocSha :: PackageLocationImmutable -> Builder
 immutableLocSha = byteString . treeKeyToBs . locationTreeKey

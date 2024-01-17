@@ -65,7 +65,7 @@ setup ::
   -> RIO env ()
 setup sco wantedCompiler compilerCheck mstack = do
   config <- view configL
-  sandboxedGhc <- (.cpSandboxed) . fst <$> ensureCompilerAndMsys SetupOpts
+  sandboxedGhc <- (.sandboxed) . fst <$> ensureCompilerAndMsys SetupOpts
     { installIfMissing = True
     , useSystem = config.systemGHC && not sco.scoForceReinstall
     , wantedCompiler = wantedCompiler

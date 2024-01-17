@@ -160,12 +160,12 @@ execCmd opts =
 
   getGhcCmd pkgs args = do
     pkgopts <- getPkgOpts pkgs
-    compiler <- view $ compilerPathsL . to (.cpCompiler)
+    compiler <- view $ compilerPathsL . to (.compiler)
     pure (toFilePath compiler, pkgopts ++ args)
 
   getRunGhcCmd pkgs args = do
     pkgopts <- getPkgOpts pkgs
-    interpret <- view $ compilerPathsL . to (.cpInterpreter)
+    interpret <- view $ compilerPathsL . to (.interpreter)
     pure (toFilePath interpret, pkgopts ++ args)
 
   runWithPath :: Maybe FilePath -> RIO EnvConfig () -> RIO EnvConfig ()

@@ -306,7 +306,7 @@ withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPacka
     setupExe <- getSetupExe setupHs setupShimHs tmpdir
 
     cabalPkgVer <- view cabalVersionL
-    globalDB <- view $ compilerPathsL . to (.cpGlobalDB)
+    globalDB <- view $ compilerPathsL . to (.globalDB)
     snapshotPackagesTVar <-
       liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
     localPackagesTVar <-
@@ -879,7 +879,7 @@ withSingleContext
             then pure outputFile
             else do
               ensureDir setupDir
-              compilerPath <- view $ compilerPathsL . to (.cpCompiler)
+              compilerPath <- view $ compilerPathsL . to (.compiler)
               packageArgs <- getPackageArgs setupDir
               runExe compilerPath $
                 [ "--make"

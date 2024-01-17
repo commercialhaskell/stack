@@ -573,7 +573,7 @@ runGhci
             (map (fromPackageName . (.ghciPkgName)) pkgs :: [StyleDoc])
         )
       compilerExeName <-
-        view $ compilerPathsL . to (.cpCompiler) . to toFilePath
+        view $ compilerPathsL . to (.compiler) . to toFilePath
       let execGhci extras = do
             menv <-
               liftIO $ config.processContextSettings defaultEnvSettings

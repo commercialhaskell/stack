@@ -236,7 +236,7 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
           <> line
           <> pretty destIndexFile
         liftIO (mapM_ copyPkgDocs interfaceOpts)
-        haddockExeName <- view $ compilerPathsL . to (toFilePath . (.cpHaddock))
+        haddockExeName <- view $ compilerPathsL . to (toFilePath . (.haddock))
         withWorkingDir (toFilePath destDir) $ readProcessNull
           haddockExeName
           ( map

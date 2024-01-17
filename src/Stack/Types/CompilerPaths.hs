@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.CompilerPaths
@@ -21,30 +22,30 @@ import           Stack.Types.DumpPackage ( DumpPackage )
 
 -- | Paths on the filesystem for the compiler we're using
 data CompilerPaths = CompilerPaths
-  { cpCompilerVersion :: !ActualCompiler
-  , cpArch :: !Arch
-  , cpBuild :: !CompilerBuild
-  , cpCompiler :: !(Path Abs File)
-  , cpPkg :: !GhcPkgExe
+  { compilerVersion :: !ActualCompiler
+  , arch :: !Arch
+  , build :: !CompilerBuild
+  , compiler :: !(Path Abs File)
+  , pkg :: !GhcPkgExe
     -- ^ ghc-pkg or equivalent
-  , cpInterpreter :: !(Path Abs File)
+  , interpreter :: !(Path Abs File)
     -- ^ runghc
-  , cpHaddock :: !(Path Abs File)
+  , haddock :: !(Path Abs File)
     -- ^ haddock, in 'IO' to allow deferring the lookup
-  , cpSandboxed :: !Bool
+  , sandboxed :: !Bool
     -- ^ Is this a Stack-sandboxed installation?
-  , cpCabalVersion :: !Version
+  , cabalVersion :: !Version
     -- ^ This is the version of Cabal that Stack will use to compile Setup.hs
     -- files in the build process.
     --
     -- Note that this is not necessarily the same version as the one that Stack
     -- depends on as a library and which is displayed when running
     -- @stack ls dependencies | grep Cabal@ in the Stack project.
-  , cpGlobalDB :: !(Path Abs Dir)
+  , globalDB :: !(Path Abs Dir)
     -- ^ Global package database
-  , cpGhcInfo :: !ByteString
+  , ghcInfo :: !ByteString
     -- ^ Output of @ghc --info@
-  , cpGlobalDump :: !(Map PackageName DumpPackage)
+  , globalDump :: !(Map PackageName DumpPackage)
   }
   deriving Show
 
@@ -62,20 +63,20 @@ newtype GhcPkgExe
   deriving Show
 
 cabalVersionL :: HasCompiler env => SimpleGetter env Version
-cabalVersionL = compilerPathsL . to (.cpCabalVersion)
+cabalVersionL = compilerPathsL . to (.cabalVersion)
 
 compilerVersionL :: HasCompiler env => SimpleGetter env ActualCompiler
-compilerVersionL = compilerPathsL . to (.cpCompilerVersion)
+compilerVersionL = compilerPathsL . to (.compilerVersion)
 
 cpWhich :: (MonadReader env m, HasCompiler env) => m WhichCompiler
-cpWhich = view $ compilerPathsL . to (whichCompiler . (.cpCompilerVersion))
+cpWhich = view $ compilerPathsL . to (whichCompiler . (.compilerVersion))
 
 -- | Get the path for the given compiler ignoring any local binaries.
 --
 -- https://github.com/commercialhaskell/stack/issues/1052
 getCompilerPath :: HasCompiler env => RIO env (Path Abs File)
-getCompilerPath = view $ compilerPathsL . to (.cpCompiler)
+getCompilerPath = view $ compilerPathsL . to (.compiler)
 
 -- | Get the 'GhcPkgExe' from a 'HasCompiler' environment
 getGhcPkgExe :: HasCompiler env => RIO env GhcPkgExe
-getGhcPkgExe = view $ compilerPathsL . to (.cpPkg)
+getGhcPkgExe = view $ compilerPathsL . to (.pkg)

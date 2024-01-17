@@ -169,7 +169,7 @@ unregisterGhcPkgIds ::
   -> NonEmpty (Either PackageIdentifier GhcPkgId)
   -> RIO env ()
 unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
-  globalDb <- view $ compilerPathsL . to (.cpGlobalDB)
+  globalDb <- view $ compilerPathsL . to (.globalDB)
   eres <- try $ do
     ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs
     -- ghcPkgUnregisterForce does not perform an effective
