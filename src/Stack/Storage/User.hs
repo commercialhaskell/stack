@@ -1,13 +1,14 @@
-{-# LANGUAGE NoImplicitPrelude    #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE DerivingStrategies   #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE OverloadedRecordDot  #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE QuasiQuotes          #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE QuasiQuotes           #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
 -- | Work with SQLite database used for caches across an entire user account.
@@ -366,18 +367,18 @@ loadCompilerPaths compiler build sandboxed = do
         Just arch -> pure arch
 
     pure CompilerPaths
-      { cpCompiler = compiler
-      , cpCompilerVersion = compilerCache.compilerCacheActualVersion
-      , cpArch = arch
-      , cpBuild = build
-      , cpPkg = GhcPkgExe pkgexe
-      , cpInterpreter = runghc
-      , cpHaddock = haddock
-      , cpSandboxed = sandboxed
-      , cpCabalVersion = cabalVersion
-      , cpGlobalDB = globaldb
-      , cpGhcInfo = compilerCache.compilerCacheInfo
-      , cpGlobalDump = globalDump
+      { compiler = compiler
+      , compilerVersion = compilerCache.compilerCacheActualVersion
+      , arch = arch
+      , build = build
+      , pkg = GhcPkgExe pkgexe
+      , interpreter = runghc
+      , haddock = haddock
+      , sandboxed = sandboxed
+      , cabalVersion = cabalVersion
+      , globalDB = globaldb
+      , ghcInfo = compilerCache.compilerCacheInfo
+      , globalDump = globalDump
       }
 
 -- | Save compiler information. May throw exceptions!
@@ -386,27 +387,27 @@ saveCompilerPaths ::
   => CompilerPaths
   -> RIO env ()
 saveCompilerPaths cp = withUserStorage $ do
-  deleteBy $ UniqueCompilerInfo $ toFilePath cp.cpCompiler
-  compilerStatus <- liftIO $ getFileStatus $ toFilePath cp.cpCompiler
+  deleteBy $ UniqueCompilerInfo $ toFilePath cp.compiler
+  compilerStatus <- liftIO $ getFileStatus $ toFilePath cp.compiler
   globalDbStatus <- liftIO $
-    getFileStatus $ toFilePath $ cp.cpGlobalDB </> $(mkRelFile "package.cache")
-  let GhcPkgExe pkgexe = cp.cpPkg
+    getFileStatus $ toFilePath $ cp.globalDB </> $(mkRelFile "package.cache")
+  let GhcPkgExe pkgexe = cp.pkg
   insert_ CompilerCache
-    { compilerCacheActualVersion = cp.cpCompilerVersion
-    , compilerCacheGhcPath = toFilePath cp.cpCompiler
+    { compilerCacheActualVersion = cp.compilerVersion
+    , compilerCacheGhcPath = toFilePath cp.compiler
     , compilerCacheGhcSize = sizeToInt64 $ fileSize compilerStatus
     , compilerCacheGhcModified = timeToInt64 $ modificationTime compilerStatus
     , compilerCacheGhcPkgPath = toFilePath pkgexe
-    , compilerCacheRunghcPath = toFilePath cp.cpInterpreter
-    , compilerCacheHaddockPath = toFilePath cp.cpHaddock
-    , compilerCacheCabalVersion = T.pack $ versionString cp.cpCabalVersion
-    , compilerCacheGlobalDb = toFilePath cp.cpGlobalDB
+    , compilerCacheRunghcPath = toFilePath cp.interpreter
+    , compilerCacheHaddockPath = toFilePath cp.haddock
+    , compilerCacheCabalVersion = T.pack $ versionString cp.cabalVersion
+    , compilerCacheGlobalDb = toFilePath cp.globalDB
     , compilerCacheGlobalDbCacheSize = sizeToInt64 $ fileSize globalDbStatus
     , compilerCacheGlobalDbCacheModified =
         timeToInt64 $ modificationTime globalDbStatus
-    , compilerCacheInfo = cp.cpGhcInfo
-    , compilerCacheGlobalDump = tshow cp.cpGlobalDump
-    , compilerCacheArch = T.pack $ Distribution.Text.display cp.cpArch
+    , compilerCacheInfo = cp.ghcInfo
+    , compilerCacheGlobalDump = tshow cp.globalDump
+    , compilerCacheArch = T.pack $ Distribution.Text.display cp.arch
     }
 
 -- | How many upgrade checks have occurred since the given timestamp?

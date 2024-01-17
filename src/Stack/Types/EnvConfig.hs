@@ -189,7 +189,7 @@ platformGhcRelDir ::
   => m (Path Rel Dir)
 platformGhcRelDir = do
   cp <- view compilerPathsL
-  let cbSuffix = compilerBuildSuffix cp.cpBuild
+  let cbSuffix = compilerBuildSuffix cp.build
   verOnly <- platformGhcVerOnlyRelDirStr
   parseRelDir (mconcat [ verOnly, cbSuffix ])
 

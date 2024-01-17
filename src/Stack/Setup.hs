@@ -667,7 +667,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         }
 
   (compilerPaths, ghcBin) <- ensureCompilerAndMsys sopts
-  let compilerVer = compilerPaths.cpCompilerVersion
+  let compilerVer = compilerPaths.compilerVersion
 
   -- Modify the initial environment to include the GHC path, if a local GHC
   -- is being used
@@ -712,12 +712,12 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
     either throwM pure $ augmentPath (toFilePath <$> mkDirs True) mpath
 
   deps <- runRIO envConfig0 packageDatabaseDeps
-  runWithGHC menv compilerPaths $ createDatabase compilerPaths.cpPkg deps
+  runWithGHC menv compilerPaths $ createDatabase compilerPaths.pkg deps
   localdb <- runRIO envConfig0 packageDatabaseLocal
-  runWithGHC menv compilerPaths $ createDatabase compilerPaths.cpPkg localdb
+  runWithGHC menv compilerPaths $ createDatabase compilerPaths.pkg localdb
   extras <- runReaderT packageDatabaseExtra envConfig0
   let mkGPP locals =
-        mkGhcPackagePath locals localdb deps extras compilerPaths.cpGlobalDB
+        mkGhcPackagePath locals localdb deps extras compilerPaths.globalDB
 
   distDir <- runReaderT distRelativeDir envConfig0 >>= canonicalizePath
 
@@ -788,7 +788,7 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
                 -- are ignored, since we're setting up our
                 -- own package databases. See
                 -- https://github.com/commercialhaskell/stack/issues/4706
-              $ (case compilerPaths.cpCompilerVersion of
+              $ (case compilerPaths.compilerVersion of
                   ACGhc version | version >= mkVersion [8, 4, 4] ->
                     Map.insert "GHC_ENVIRONMENT" "-"
                   _ -> id)
@@ -1052,8 +1052,8 @@ warnUnsupportedCompilerCabal ::
   -> RIO env ()
 warnUnsupportedCompilerCabal cp didWarn = do
   unless didWarn $
-    void $ warnUnsupportedCompiler $ getGhcVersion cp.cpCompilerVersion
-  let cabalVersion = cp.cpCabalVersion
+    void $ warnUnsupportedCompiler $ getGhcVersion cp.compilerVersion
+  let cabalVersion = cp.cabalVersion
   notifyIfCabalUntested <- view $ configL . to (.notifyIfCabalUntested)
   if
     | cabalVersion < mkVersion [1, 24, 0] -> do
@@ -1222,9 +1222,9 @@ ensureCompiler sopts getSetupInfo' = do
 
   let canUseCompiler cp
         | sopts.skipGhcCheck = pure cp
-        | not $ isWanted cp.cpCompilerVersion =
+        | not $ isWanted cp.compilerVersion =
             prettyThrowIO UnwantedCompilerVersion
-        | cp.cpArch /= expectedArch = prettyThrowIO UnwantedArchitecture
+        | cp.arch /= expectedArch = prettyThrowIO UnwantedArchitecture
         | otherwise = pure cp
       isWanted =
         isWantedCompiler sopts.compilerCheck sopts.wantedCompiler
@@ -1259,7 +1259,7 @@ ensureCompiler sopts getSetupInfo' = do
     Nothing -> ensureSandboxedCompiler sopts getSetupInfo'
     Just cp -> do
       let paths = ExtraDirs
-            { edBins = [parent cp.cpCompiler]
+            { edBins = [parent cp.compiler]
             , edInclude = [], edLib = []
             }
       pure (cp, paths)
@@ -1504,18 +1504,18 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler =
         Just dp -> pure $ pkgVersion dp.packageIdent
 
     pure CompilerPaths
-      { cpBuild = compilerBuild
-      , cpArch = arch
-      , cpSandboxed = isSandboxed
-      , cpCompilerVersion = compilerVer
-      , cpCompiler = compiler
-      , cpPkg = pkg
-      , cpInterpreter = interpreter
-      , cpHaddock = haddock
-      , cpCabalVersion = cabalPkgVer
-      , cpGlobalDB = globaldb
-      , cpGhcInfo = infobs
-      , cpGlobalDump = globalDump
+      { build = compilerBuild
+      , arch = arch
+      , sandboxed = isSandboxed
+      , compilerVersion = compilerVer
+      , compiler = compiler
+      , pkg = pkg
+      , interpreter = interpreter
+      , haddock = haddock
+      , cabalVersion = cabalPkgVer
+      , globalDB = globaldb
+      , ghcInfo = infobs
+      , globalDump = globalDump
       }
  where
   onErr = throwIO . PrettyException . InvalidGhcAt compiler

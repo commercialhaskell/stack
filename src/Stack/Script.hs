@@ -245,7 +245,7 @@ scriptCmd opts = do
           -- to check which packages are installed already. If all needed
           -- packages are available, we can skip the (rather expensive) build
           -- call below.
-          GhcPkgExe pkg <- view $ compilerPathsL . to (.cpPkg)
+          GhcPkgExe pkg <- view $ compilerPathsL . to (.pkg)
           -- https://github.com/haskell/process/issues/251
           bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
               ["list", "--simple-output"] CL.sinkNull CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
@@ -284,7 +284,7 @@ scriptCmd opts = do
               ]
         case shouldCompile of
           SEInterpret -> do
-            interpret <- view $ compilerPathsL . to (.cpInterpreter)
+            interpret <- view $ compilerPathsL . to (.interpreter)
             exec (toFilePath interpret)
                 (ghcArgs ++ toFilePath file : opts.soArgs)
           _ -> do
@@ -295,7 +295,7 @@ scriptCmd opts = do
             -- to the user.
             liftIO $ Dir.createDirectoryIfMissing True (fromAbsDir (parent exe))
             compilerExeName <-
-              view $ compilerPathsL . to (.cpCompiler) . to toFilePath
+              view $ compilerPathsL . to (.compiler) . to toFilePath
             withWorkingDir (fromAbsDir (parent file)) $ proc
               compilerExeName
               (ghcArgs ++ [toFilePath file])

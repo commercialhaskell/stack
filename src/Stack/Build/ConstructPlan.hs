@@ -153,7 +153,7 @@ constructPlan
         <> line
 
     econfig <- view envConfigL
-    globalCabalVersion <- view $ compilerPathsL . to (.cpCabalVersion)
+    globalCabalVersion <- view $ compilerPathsL . to (.cabalVersion)
     sources <- getSources globalCabalVersion
     mcur <- view $ buildConfigL . to (.curator)
     pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"

@@ -276,11 +276,11 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalfp task = do
     deleteCaches pkgDir
     announce
     cp <- view compilerPathsL
-    let (GhcPkgExe pkgPath) = cp.cpPkg
+    let (GhcPkgExe pkgPath) = cp.pkg
     let programNames =
           case cpWhich cp of
             Ghc ->
-              [ ("ghc", toFilePath cp.cpCompiler)
+              [ ("ghc", toFilePath cp.compiler)
               , ("ghc-pkg", toFilePath pkgPath)
               ]
     exes <- forM programNames $ \(name, file) -> do
