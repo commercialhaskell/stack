@@ -462,7 +462,7 @@ checkBuildCache oldCache files = do
   go fp _ _ | takeFileName fp == "cabal_macros.h" = pure (Set.empty, Map.empty)
   -- Common case where it's in the cache and on the filesystem.
   go fp (Just digest') (Just fci)
-      | fci.fciHash == digest' = pure (Set.empty, Map.singleton fp fci)
+      | fci.hash == digest' = pure (Set.empty, Map.singleton fp fci)
       | otherwise =
           pure (Set.singleton fp, Map.singleton fp $ FileCacheInfo digest')
   -- Missing file. Add it to dirty files, but no FileCacheInfo.

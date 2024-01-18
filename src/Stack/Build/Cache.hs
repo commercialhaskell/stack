@@ -266,7 +266,7 @@ flagCacheKey installed = do
   installationRoot <- installationRootLocal
   case installed of
     Library _ installedInfo -> do
-      let gid = installedInfo.iliId
+      let gid = installedInfo.ghcPkgId
       pure $ configCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
     Executable ident -> pure $
       configCacheKey installationRoot (ConfigCacheTypeFlagExecutable ident)

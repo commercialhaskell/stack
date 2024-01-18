@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 
 module Stack.Types.ExtraDirs
   ( ExtraDirs (..)
@@ -8,9 +9,9 @@ import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Stack.Prelude
 
 data ExtraDirs = ExtraDirs
-  { edBins :: ![Path Abs Dir]
-  , edInclude :: ![Path Abs Dir]
-  , edLib :: ![Path Abs Dir]
+  { bins :: ![Path Abs Dir]
+  , include :: ![Path Abs Dir]
+  , lib :: ![Path Abs Dir]
   }
   deriving (Show, Generic)
 

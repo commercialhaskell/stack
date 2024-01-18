@@ -398,8 +398,8 @@ readParseDatabase mode path = do
        [InstalledPackageInfo]
     -> GhcPkg.DbOpenMode mode GhcPkg.PackageDbLock
     -> RIO env (PackageDB mode)
-  mkPackageDB pkgs lock = do
-    pure $ PackageDB
+  mkPackageDB pkgs lock =
+    pure PackageDB
       { location = path
       , packageDbLock = lock
       , packages = pkgs

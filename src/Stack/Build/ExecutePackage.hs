@@ -999,7 +999,7 @@ singleTest topts testsToRun ac ee task installedMap = do
               idMap <- liftIO $ readTVarIO ee.ghcPkgIds
               pure $ Map.lookup (taskProvides task) idMap
           let pkgGhcIdList = case installed of
-                               Just (Library _ libInfo) -> [libInfo.iliId]
+                               Just (Library _ libInfo) -> [libInfo.ghcPkgId]
                                _ -> []
           -- doctest relies on template-haskell in QuickCheck-based tests
           thGhcId <-

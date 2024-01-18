@@ -137,7 +137,7 @@ readConfigCache (Entity parentId configCacheParent) = do
     selectList [ConfigCacheComponentParent ==. parentId] []
   let pathEnvVar = configCacheParent.configCacheParentPathEnvVar
   let haddock = configCacheParent.configCacheParentHaddock
-  pure $ ConfigCache
+  pure ConfigCache
     { opts
     , deps
     , components

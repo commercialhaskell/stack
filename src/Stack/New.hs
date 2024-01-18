@@ -445,7 +445,7 @@ settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) = do
           basicAuthMsg altGitHubTokenEnvVar
           pure $ Just (gitHubBasicAuthType, fromString wantAltGitHubToken)
         else pure Nothing
-  pure $ TemplateDownloadSettings
+  pure TemplateDownloadSettings
     { tplDownloadUrl = concat
         [ "https://api.github.com/repos/"
         , T.unpack user

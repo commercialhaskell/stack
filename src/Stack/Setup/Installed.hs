@@ -139,41 +139,41 @@ extraDirs tool = do
   dir <- installDir config.localPrograms tool
   case (config.platform, toolNameString tool) of
     (Platform _ Cabal.Windows, isGHC -> True) -> pure mempty
-      { edBins =
+      { bins =
           [ dir </> relDirBin
           , dir </> relDirMingw </> relDirBin
           ]
       }
     (Platform Cabal.I386 Cabal.Windows, "msys2") -> pure mempty
-      { edBins =
+      { bins =
           [ dir </> relDirMingw32 </> relDirBin
           , dir </> relDirUsr </> relDirBin
           , dir </> relDirUsr </> relDirLocal </> relDirBin
           ]
-      , edInclude =
+      , include =
           [ dir </> relDirMingw32 </> relDirInclude
           ]
-      , edLib =
+      , lib =
           [ dir </> relDirMingw32 </> relDirLib
           , dir </> relDirMingw32 </> relDirBin
           ]
       }
     (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> pure mempty
-      { edBins =
+      { bins =
           [ dir </> relDirMingw64 </> relDirBin
           , dir </> relDirUsr </> relDirBin
           , dir </> relDirUsr </> relDirLocal </> relDirBin
           ]
-      , edInclude =
+      , include =
           [ dir </> relDirMingw64 </> relDirInclude
           ]
-      , edLib =
+      , lib =
           [ dir </> relDirMingw64 </> relDirLib
           , dir </> relDirMingw64 </> relDirBin
           ]
       }
     (_, isGHC -> True) -> pure mempty
-      { edBins =
+      { bins =
           [ dir </> relDirBin
           ]
       }

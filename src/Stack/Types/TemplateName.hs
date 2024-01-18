@@ -54,9 +54,9 @@ data TemplatePath
 
 -- | Details for how to access a template from a remote repo.
 data RepoTemplatePath = RepoTemplatePath
-  { rtpService  :: RepoService
-  , rtpUser     :: Text
-  , rtpTemplate :: Text
+  { service  :: RepoService
+  , user     :: Text
+  , template :: Text
   }
   deriving (Eq, Ord, Show)
 

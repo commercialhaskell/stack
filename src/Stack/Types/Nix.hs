@@ -72,7 +72,7 @@ instance FromJSON (WithJSONWarnings NixOptsMonoid) where
     shellOptions  <- First <$> o ..:? nixShellOptsArgName
     path          <- First <$> o ..:? nixPathArgName
     addGCRoots    <- FirstFalse <$> o ..:? nixAddGCRootsArgName
-    pure $ NixOptsMonoid
+    pure NixOptsMonoid
       { enable
       , pureShell
       , packages
