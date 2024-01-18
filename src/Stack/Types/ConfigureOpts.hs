@@ -58,8 +58,8 @@ configureOpts :: EnvConfig
               -> Package
               -> ConfigureOpts
 configureOpts econfig bco deps isLocal isMutable package = ConfigureOpts
-  { coDirs = configureOptsDirs bco isMutable package
-  , coNoDirs = configureOptsNoDir econfig bco deps isLocal package
+  { dirs = configureOptsDirs bco isMutable package
+  , noDirs = configureOptsNoDir econfig bco deps isLocal package
   }
 
 
@@ -194,11 +194,11 @@ configureOptsNoDir econfig bco deps isLocal package = concat
 
 -- | Configure options to be sent to Setup.hs configure
 data ConfigureOpts = ConfigureOpts
-  { coDirs :: ![String]
+  { dirs :: ![String]
     -- ^ Options related to various paths. We separate these out since they do
     -- not have an impact on the contents of the compiled binary for checking
     -- if we can use an existing precompiled cache.
-  , coNoDirs :: ![String]
+  , noDirs :: ![String]
   }
   deriving (Data, Eq, Generic, Show, Typeable)
 

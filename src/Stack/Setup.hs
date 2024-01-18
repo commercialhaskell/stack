@@ -736,19 +736,19 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
             eo <- mkProcessContext
               $ Map.insert
                   "PATH"
-                  (if es.esIncludeLocals then localsPath else depsPath)
-              $ (if es.esIncludeGhcPackagePath
+                  (if es.includeLocals then localsPath else depsPath)
+              $ (if es.includeGhcPackagePath
                    then
                      Map.insert
                        (ghcPkgPathEnvVar wc)
-                       (mkGPP es.esIncludeLocals)
+                       (mkGPP es.includeLocals)
                    else id)
 
-              $ (if es.esStackExe
+              $ (if es.stackExe
                    then Map.insert "STACK_EXE" (T.pack executablePath)
                    else id)
 
-              $ (if es.esLocaleUtf8
+              $ (if es.localeUtf8
                    then Map.union utf8EnvVars
                    else id)
 
@@ -760,7 +760,7 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
                   _ -> id
 
               -- See https://github.com/commercialhaskell/stack/issues/3444
-              $ case (es.esKeepGhcRts, mGhcRtsEnvVar) of
+              $ case (es.keepGhcRts, mGhcRtsEnvVar) of
                   (True, Just ghcRts) -> Map.insert "GHCRTS" (T.pack ghcRts)
                   _ -> id
 
@@ -770,7 +770,7 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
                   "HASKELL_PACKAGE_SANDBOX"
                   (T.pack $ toFilePathNoTrailingSep deps)
               $ Map.insert "HASKELL_PACKAGE_SANDBOXES"
-                  (T.pack $ if es.esIncludeLocals
+                  (T.pack $ if es.includeLocals
                     then intercalate [searchPathSeparator]
                            [ toFilePathNoTrailingSep localdb
                            , toFilePathNoTrailingSep deps
@@ -1640,12 +1640,12 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
           [bindist] -> do
             let bindist' = T.pack (toFilePath bindist)
                 dlinfo = DownloadInfo
-                          { downloadInfoUrl           = bindist'
-                            -- we can specify a filepath instead of a URL
-                          , downloadInfoContentLength = Nothing
-                          , downloadInfoSha1          = Nothing
-                          , downloadInfoSha256        = Nothing
-                          }
+                  { url = bindist'
+                    -- we can specify a filepath instead of a URL
+                  , contentLength = Nothing
+                  , sha1 = Nothing
+                  , sha256 = Nothing
+                  }
                 ghcdlinfo = GHCDownloadInfo mempty mempty dlinfo
                 installer
                    | osIsWindows = installGHCWindows
@@ -1977,10 +1977,10 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
       pure
         ( version
         , GHCDownloadInfo mempty mempty DownloadInfo
-            { downloadInfoUrl = T.pack bindistURL
-            , downloadInfoContentLength = Nothing
-            , downloadInfoSha1 = Nothing
-            , downloadInfoSha256 = Nothing
+            { url = T.pack bindistURL
+            , contentLength = Nothing
+            , sha1 = Nothing
+            , sha256 = Nothing
             }
         )
     _ -> do
@@ -2163,12 +2163,12 @@ downloadOrUseLocal downloadLabel downloadInfo destination =
       pure (root </> path)
     _ -> prettyThrowIO $ URLInvalid url
  where
-  url = T.unpack downloadInfo.downloadInfoUrl
+  url = T.unpack downloadInfo.url
   warnOnIgnoredChecks = do
     let DownloadInfo
-          { downloadInfoContentLength = contentLength
-          , downloadInfoSha1 = sha1
-          , downloadInfoSha256 = sha256
+          { contentLength
+          , sha1
+          , sha256
           } = downloadInfo
     when (isJust contentLength) $
       prettyWarnS
@@ -2205,7 +2205,7 @@ downloadFromInfo programsDir downloadInfo tool = do
   pure (localPath, archiveType)
 
  where
-  url = T.unpack downloadInfo.downloadInfoUrl
+  url = T.unpack downloadInfo.url
   extension = loop url
    where
     loop fp
@@ -2509,7 +2509,7 @@ chattyDownload ::
   -> Path Abs File -- ^ destination
   -> RIO env ()
 chattyDownload label downloadInfo path = do
-  let url = downloadInfo.downloadInfoUrl
+  let url = downloadInfo.url
   req <- parseUrlThrow $ T.unpack url
   logSticky $
        "Preparing to download "
@@ -2522,8 +2522,8 @@ chattyDownload label downloadInfo path = do
     <> fromString (toFilePath path)
     <> " ..."
   hashChecks <- fmap catMaybes $ forM
-    [ ("sha1", HashCheck SHA1, (.downloadInfoSha1))
-    , ("sha256", HashCheck SHA256, (.downloadInfoSha256))
+    [ ("sha1", HashCheck SHA1, (.sha1))
+    , ("sha256", HashCheck SHA256, (.sha256))
     ]
     $ \(name, constr, getter) ->
       case getter downloadInfo of
@@ -2546,7 +2546,7 @@ chattyDownload label downloadInfo path = do
     then logStickyDone ("Downloaded " <> display label <> ".")
     else logStickyDone ("Already downloaded " <> display label <> ".")
  where
-  mtotalSize = downloadInfo.downloadInfoContentLength
+  mtotalSize = downloadInfo.contentLength
 
 -- | Perform a basic sanity check of GHC
 sanityCheck ::

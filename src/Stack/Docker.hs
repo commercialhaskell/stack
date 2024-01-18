@@ -97,27 +97,27 @@ getCmdArgs ::
   -> RIO env (FilePath,[String],[(String,String)],[Mount])
 getCmdArgs docker imageInfo isRemoteDocker = do
     config <- view configL
-    deUser <-
+    user <-
         if fromMaybe (not isRemoteDocker) docker.setUser
             then liftIO $ do
-              duUid <- User.getEffectiveUserID
-              duGid <- User.getEffectiveGroupID
-              duGroups <- nubOrd <$> User.getGroups
-              duUmask <- Files.setFileCreationMask 0o022
+              uid <- User.getEffectiveUserID
+              gid <- User.getEffectiveGroupID
+              groups <- nubOrd <$> User.getGroups
+              umask <- Files.setFileCreationMask 0o022
               -- Only way to get old umask seems to be to change it, so set it back afterward
-              _ <- Files.setFileCreationMask duUmask
+              _ <- Files.setFileCreationMask umask
               pure $ Just DockerUser
-                { duUid
-                , duGid
-                , duGroups
-                , duUmask
+                { uid
+                , gid
+                , groups
+                , umask
                 }
             else pure Nothing
     args <-
         fmap
           (  [ "--" ++ reExecArgName ++ "=" ++ showStackVersion
              , "--" ++ dockerEntrypointArgName
-             , show DockerEntrypoint {deUser}
+             , show DockerEntrypoint { user }
              ] ++
           )
           (liftIO getArgs)
@@ -498,7 +498,7 @@ entrypoint config@Config{} de = do
       estackUserEntry0 <- liftIO $ tryJust (guard . isDoesNotExistError) $
         User.getUserEntryForName stackUserName
       -- Switch UID/GID if needed, and update user's home directory
-      case de.deUser of
+      case de.user of
         Nothing -> pure ()
         Just (DockerUser 0 _ _ _) -> pure ()
         Just du -> withProcessContext envOverride $
@@ -530,13 +530,13 @@ entrypoint config@Config{} de = do
         -- directory
         readProcessNull "groupadd"
           [ "-o"
-          , "--gid",show du.duGid
+          , "--gid",show du.gid
           , stackUserName
           ]
         readProcessNull "useradd"
           [ "-oN"
-          , "--uid", show du.duUid
-          , "--gid", show du.duGid
+          , "--uid", show du.uid
+          , "--gid", show du.gid
           , "--home", toFilePathNoTrailingSep homeDir
           , stackUserName
           ]
@@ -545,16 +545,16 @@ entrypoint config@Config{} de = do
         -- and home directory
         readProcessNull "usermod"
           [ "-o"
-          , "--uid", show du.duUid
+          , "--uid", show du.uid
           , "--home", toFilePathNoTrailingSep homeDir
           , stackUserName
           ]
         readProcessNull "groupmod"
           [ "-o"
-          , "--gid", show du.duGid
+          , "--gid", show du.gid
           , stackUserName
           ]
-    forM_ du.duGroups $ \gid ->
+    forM_ du.groups $ \gid ->
       readProcessNull "groupadd"
         [ "-o"
         , "--gid", show gid
@@ -562,10 +562,10 @@ entrypoint config@Config{} de = do
         ]
     -- 'setuid' to the wanted UID and GID
     liftIO $ do
-      User.setGroupID du.duGid
-      handleSetGroups du.duGroups
-      User.setUserID du.duUid
-      _ <- Files.setFileCreationMask du.duUmask
+      User.setGroupID du.gid
+      handleSetGroups du.groups
+      User.setUserID du.uid
+      _ <- Files.setFileCreationMask du.umask
       pure ()
   stackUserName = "stack" :: String
 

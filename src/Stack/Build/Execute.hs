@@ -242,11 +242,11 @@ executePlan
 
     config <- view configL
     menv' <- liftIO $ config.processContextSettings EnvSettings
-               { esIncludeLocals = True
-               , esIncludeGhcPackagePath = True
-               , esStackExe = True
-               , esLocaleUtf8 = False
-               , esKeepGhcRts = False
+               { includeLocals = True
+               , includeGhcPackagePath = True
+               , stackExe = True
+               , localeUtf8 = False
+               , keepGhcRts = False
                }
     withProcessContext menv' $
       forM_ boptsCli.exec $ \(cmd, args) ->

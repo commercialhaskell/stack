@@ -42,7 +42,7 @@ printGraph dotOpts locals graph = do
   liftIO $ Text.putStrLn "}"
  where
   filteredLocals =
-    Set.filter (\local' -> local' `Set.notMember` dotOpts.dotPrune) locals
+    Set.filter (\local' -> local' `Set.notMember` dotOpts.prune) locals
 
 -- | Print the local nodes with a different style depending on options
 printLocalNodes ::
@@ -54,7 +54,7 @@ printLocalNodes dotOpts locals =
   liftIO $ Text.putStrLn (Text.intercalate "\n" lpNodes)
  where
   applyStyle :: Text -> Text
-  applyStyle n = if dotOpts.dotIncludeExternal
+  applyStyle n = if dotOpts.includeExternal
                    then n <> " [style=dashed];"
                    else n <> " [style=solid];"
   lpNodes :: [Text]

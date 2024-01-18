@@ -189,7 +189,7 @@ getConfigCache ee task installedMap enableTest enableBench = do
       opts = mkOpts missing'
       allDeps = Set.fromList $ Map.elems missing' ++ Map.elems task.present
       cache = ConfigCache
-        { opts = opts { coNoDirs = opts.coNoDirs ++ map T.unpack extra }
+        { opts = opts { noDirs = opts.noDirs ++ map T.unpack extra }
         , deps = allDeps
         , components =
             case task.taskType of
@@ -1044,11 +1044,11 @@ singleTest topts testsToRun ac ee task installedMap = do
           writeFileUtf8Builder fp ghcEnv
           menv <- liftIO $
             setEnv fp =<< config.processContextSettings EnvSettings
-              { esIncludeLocals = taskLocation task == Local
-              , esIncludeGhcPackagePath = True
-              , esStackExe = True
-              , esLocaleUtf8 = False
-              , esKeepGhcRts = False
+              { includeLocals = taskLocation task == Local
+              , includeGhcPackagePath = True
+              , stackExe = True
+              , localeUtf8 = False
+              , keepGhcRts = False
               }
           let emptyResult = Map.singleton testName Nothing
           withProcessContext menv $ if exists

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Types.DownloadInfo
@@ -16,11 +17,11 @@ import           Stack.Prelude
 -- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
-  { downloadInfoUrl :: Text
+  { url :: Text
     -- ^ URL or absolute file path
-  , downloadInfoContentLength :: Maybe Int
-  , downloadInfoSha1 :: Maybe ByteString
-  , downloadInfoSha256 :: Maybe ByteString
+  , contentLength :: Maybe Int
+  , sha1 :: Maybe ByteString
+  , sha256 :: Maybe ByteString
   }
   deriving Show
 
@@ -34,10 +35,12 @@ parseDownloadInfoFromObject o = do
   contentLength <- o ..:? "content-length"
   sha1TextMay <- o ..:? "sha1"
   sha256TextMay <- o ..:? "sha256"
+  let sha1 = fmap encodeUtf8 sha1TextMay
+      sha256 = fmap encodeUtf8 sha256TextMay
   pure
     DownloadInfo
-    { downloadInfoUrl = url
-    , downloadInfoContentLength = contentLength
-    , downloadInfoSha1 = fmap encodeUtf8 sha1TextMay
-    , downloadInfoSha256 = fmap encodeUtf8 sha256TextMay
+    { url
+    , contentLength
+    , sha1
+    , sha256
     }

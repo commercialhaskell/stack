@@ -675,11 +675,11 @@ withSingleContext
     unless config.allowDifferentUser $
       checkOwnership (pkgDir </> config.workDir)
     let envSettings = EnvSettings
-          { esIncludeLocals = taskTypeLocation taskType == Local
-          , esIncludeGhcPackagePath = False
-          , esStackExe = False
-          , esLocaleUtf8 = True
-          , esKeepGhcRts = False
+          { includeLocals = taskTypeLocation taskType == Local
+          , includeGhcPackagePath = False
+          , stackExe = False
+          , localeUtf8 = True
+          , keepGhcRts = False
           }
     menv <- liftIO $ config.processContextSettings envSettings
     distRelativeDir' <- distRelativeDir
@@ -748,7 +748,7 @@ withSingleContext
                   forM (Map.toList customSetupDeps) $ \(name, depValue) -> do
                     let matches (PackageIdentifier name' version) =
                              name == name'
-                          && version `withinRange` depValue.dvVersionRange
+                          && version `withinRange` depValue.versionRange
                     case filter (matches . fst) (Map.toList allDeps) of
                       x:xs -> do
                         unless (null xs) $

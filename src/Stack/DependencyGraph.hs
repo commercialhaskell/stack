@@ -91,9 +91,9 @@ createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
     view $ buildConfigL . to (Map.keysSet . (.smWanted.project))
   logDebug "Creating dependency graph"
   resultGraph <- createDependencyGraph dotOpts
-  let pkgsToPrune = if dotOpts.dotIncludeBase
-                      then dotOpts.dotPrune
-                      else Set.insert "base" dotOpts.dotPrune
+  let pkgsToPrune = if dotOpts.includeBase
+                      then dotOpts.prune
+                      else Set.insert "base" dotOpts.prune
       prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
   logDebug "Returning pruned dependency graph"
   pure (localNames, prunedGraph)
@@ -105,7 +105,7 @@ withDotConfig ::
   -> RIO Runner a
 withDotConfig opts inner =
   local (over globalOptsL modifyGO) $
-    if opts.dotGlobalHints
+    if opts.globalHints
       then withConfig NoReexec $ withBuildConfig withGlobalHints
       else withConfig YesReexec withReal
  where
@@ -165,13 +165,13 @@ withDotConfig opts inner =
 
   boptsCLI = defaultBuildOptsCLI
     { targets = opts.dotTargets
-    , flags = opts.dotFlags
+    , flags = opts.flags
     }
   modifyGO =
-    (if opts.dotTestTargets
+    (if opts.testTargets
        then set (globalOptsBuildOptsMonoidL . buildOptsMonoidTestsL) (Just True)
        else id) .
-    (if opts.dotBenchTargets
+    (if opts.benchTargets
        then set (globalOptsBuildOptsMonoidL . buildOptsMonoidBenchmarksL) (Just True)
        else id)
 
@@ -205,7 +205,7 @@ createDependencyGraph dotOpts = do
         | otherwise =
             fmap (setOfPackageDeps &&& makePayload loc)
                  (loadPackage loc flags ghcOptions cabalConfigOpts)
-  resolveDependencies dotOpts.dotDependencyDepth graph depLoader
+  resolveDependencies dotOpts.dependencyDepth graph depLoader
  where
   makePayload loc pkg = DotPayload (Just pkg.version)
                                    (Just pkg.license)
@@ -225,7 +225,7 @@ projectPackageDependencies dotOpts locals =
               in  (pkg.name, (deps pkg packageDepsSet, lpPayload pkg loc)))
       locals
  where
-  deps pkg packageDepsSet = if dotOpts.dotIncludeExternal
+  deps pkg packageDepsSet = if dotOpts.includeExternal
     then Set.delete pkg.name packageDepsSet
     else Set.intersection localNames packageDepsSet
   localNames = Set.fromList $ map (.package.name) locals

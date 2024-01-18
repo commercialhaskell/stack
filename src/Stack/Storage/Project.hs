@@ -115,19 +115,19 @@ readConfigCache ::
   -> ReaderT SqlBackend (RIO env) ConfigCache
 readConfigCache (Entity parentId configCacheParent) = do
   let pkgSrc = configCacheParent.configCacheParentPkgSrc
-  coDirs <-
+  dirs <-
     map ((.configCacheDirOptionValue) . entityVal) <$>
     selectList
       [ConfigCacheDirOptionParent ==. parentId]
       [Asc ConfigCacheDirOptionIndex]
-  coNoDirs <-
+  noDirs <-
     map ((.configCacheNoDirOptionValue) . entityVal) <$>
     selectList
       [ConfigCacheNoDirOptionParent ==. parentId]
       [Asc ConfigCacheNoDirOptionIndex]
   let opts = ConfigureOpts
-        { coDirs
-        , coNoDirs
+        { dirs
+        , noDirs
         }
   deps <-
     Set.fromList . map ((.configCacheDepValue) . entityVal) <$>
@@ -197,15 +197,15 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
       ConfigCacheDirOptionParent
       parentId
       ConfigCacheDirOptionIndex
-      (maybe [] (.opts.coDirs) mold)
-      new.opts.coDirs
+      (maybe [] (.opts.dirs) mold)
+      new.opts.dirs
     updateList
       ConfigCacheNoDirOption
       ConfigCacheNoDirOptionParent
       parentId
       ConfigCacheNoDirOptionIndex
-      (maybe [] (.opts.coNoDirs) mold)
-      new.opts.coNoDirs
+      (maybe [] (.opts.noDirs) mold)
+      new.opts.noDirs
     updateSet
       ConfigCacheDep
       ConfigCacheDepParent

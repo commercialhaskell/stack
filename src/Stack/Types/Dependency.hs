@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Stack.Types.Dependency
@@ -24,8 +25,8 @@ import           Stack.Types.ComponentUtils
 -- | The value for a map from dependency name. This contains both the version
 -- range and the type of dependency.
 data DepValue = DepValue
-  { dvVersionRange :: !VersionRange
-  , dvType :: !DepType
+  { versionRange :: !VersionRange
+  , depType :: !DepType
   }
   deriving (Show, Typeable)
 
@@ -38,14 +39,14 @@ data DepType
   deriving (Eq, Show)
 
 data DepLibrary = DepLibrary
-  { dlMain :: !Bool
-  , dlSublib :: Set StackUnqualCompName
+  { main :: !Bool
+  , subLib :: Set StackUnqualCompName
   }
   deriving (Eq, Show)
 
 getDepSublib :: DepValue -> Maybe (Set StackUnqualCompName)
-getDepSublib val = case val.dvType of
-  AsLibrary libVal -> Just libVal.dlSublib
+getDepSublib val = case val.depType of
+  AsLibrary libVal -> Just libVal.subLib
   _ -> Nothing
 
 defaultDepLibrary :: DepLibrary
@@ -57,7 +58,7 @@ isDepTypeLibrary AsBuildTool = False
 
 cabalToStackDep :: Cabal.Dependency -> DepValue
 cabalToStackDep (Cabal.Dependency _ verRange libNameSet) =
-  DepValue{dvVersionRange = verRange, dvType = AsLibrary depLibrary}
+  DepValue { versionRange = verRange, depType = AsLibrary depLibrary }
  where
   depLibrary = DepLibrary finalHasMain filteredItems
   (finalHasMain, filteredItems) = foldr' iterator (False, mempty) libNameSet
@@ -67,7 +68,7 @@ cabalToStackDep (Cabal.Dependency _ verRange libNameSet) =
 
 cabalExeToStackDep :: Cabal.ExeDependency -> DepValue
 cabalExeToStackDep (Cabal.ExeDependency _ _name verRange) =
-  DepValue{dvVersionRange = verRange, dvType = AsBuildTool}
+  DepValue { versionRange = verRange, depType = AsBuildTool }
 
 cabalSetupDepsToStackDep :: Cabal.SetupBuildInfo -> Map PackageName DepValue
 cabalSetupDepsToStackDep setupInfo =
@@ -78,6 +79,6 @@ cabalSetupDepsToStackDep setupInfo =
 
 libraryDepFromVersionRange :: VersionRange -> DepValue
 libraryDepFromVersionRange range = DepValue
-  { dvVersionRange = range
-  , dvType = AsLibrary defaultDepLibrary
+  { versionRange = range
+  , depType = AsLibrary defaultDepLibrary
   }
