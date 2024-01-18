@@ -285,7 +285,7 @@ initProject currDir initOpts mresolver = do
         { userMsg = if userMsg == "" then Nothing else Just userMsg
         , packages = resolvedRelative <$> Map.elems rbundle
         , dependencies = map toRawPL deps
-        , flags = removeSrcPkgDefaultFlags gpds flags
+        , flagsByPkg = removeSrcPkgDefaultFlags gpds flags
         , resolver = snapshotLoc
         , compiler = Nothing
         , extraPackageDBs = []

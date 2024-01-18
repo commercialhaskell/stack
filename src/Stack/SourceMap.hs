@@ -66,7 +66,7 @@ mkProjectPackage printWarnings dir buildHaddocks = do
   pure ProjectPackage
     { cabalFP = cabalfp
     , resolvedDir = dir
-    , common =
+    , projectCommon =
         CommonPackage
           { gpd = gpd printWarnings
           , name = name
@@ -100,7 +100,7 @@ additionalDepPackage buildHaddocks pl = do
     { location = pl
     , hidden = False
     , fromSnapshot = NotFromSnapshot
-    , common =
+    , depCommon =
         CommonPackage
           { gpd = gpdio
           , name = name
@@ -124,7 +124,7 @@ snapToDepPackage buildHaddocks name sp = do
     { location = PLImmutable sp.spLocation
     , hidden = sp.spHidden
     , fromSnapshot = FromSnapshot
-    , common =
+    , depCommon =
         CommonPackage
           { gpd = run $ loadCabalFileImmutable sp.spLocation
           , name = name
@@ -237,8 +237,8 @@ getUnusedPackageFlags ::
   -> Map PackageName DepPackage
   -> m (Maybe UnusedFlags)
 getUnusedPackageFlags (name, userFlags) source prj deps =
-  let maybeCommon =     fmap (.common) (Map.lookup name prj)
-                    <|> fmap (.common) (Map.lookup name deps)
+  let maybeCommon =     fmap (.projectCommon) (Map.lookup name prj)
+                    <|> fmap (.depCommon) (Map.lookup name deps)
   in  case maybeCommon of
         -- Package is not available as project or dependency
         Nothing ->
@@ -298,7 +298,7 @@ loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
   pure $ \projectPackages -> do
     prjPkgs <- fmap Map.fromList . for projectPackages $ \resolved -> do
       pp <- mkProjectPackage printWarnings resolved buildHaddocks
-      pure (pp.common.name, pp)
+      pure (pp.projectCommon.name, pp)
     compiler <- either throwIO pure $ wantedToActual $ snapshotCompiler snapshot
     pure
       SMActual

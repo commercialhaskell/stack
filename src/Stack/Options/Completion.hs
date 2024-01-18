@@ -92,7 +92,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
         in  (if flagEnabled name fl then "-" else "") ++ flname
       prjFlags =
         case bconfig.config.project of
-          PCProject (p, _) -> p.flags
+          PCProject (p, _) -> p.flagsByPkg
           PCGlobalProject -> mempty
           PCNoProject _ -> mempty
       flagEnabled name fl =

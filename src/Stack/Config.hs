@@ -138,9 +138,6 @@ import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
                    , SMWanted (..)
                    )
-import qualified Stack.Types.SourceMap as DepPackage ( DepPackage (..) )
-import qualified Stack.Types.SourceMap as ProjectPackage ( ProjectPackage (..) )
-import qualified Stack.Types.SourceMap as CommonPackage ( CommonPackage (..) )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
 import           Stack.Types.UnusedFlags ( FlagSource (..) )
 import           Stack.Types.Version
@@ -837,7 +834,7 @@ withBuildConfig inner = do
       { userMsg = Nothing
       , packages = []
       , dependencies = map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
-      , flags = mempty
+      , flagsByPkg = mempty
       , resolver = r
       , compiler = Nothing
       , extraPackageDBs = []
@@ -861,7 +858,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
     abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
     let resolved = ResolvedPath fp abs'
     pp <- mkProjectPackage YesPrintWarnings resolved bopts.haddock
-    pure (pp.common.name, pp)
+    pure (pp.projectCommon.name, pp)
 
   -- prefetch git repos to avoid cloning per subdirectory
   -- see https://github.com/commercialhaskell/stack/issues/5411
@@ -891,7 +888,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
        RPLMutable p ->
          pure (PLMutable p, Nothing)
     dp <- additionalDepPackage (shouldHaddockDeps bopts) pl
-    pure ((dp.common.name, dp), mCompleted)
+    pure ((dp.depCommon.name, dp), mCompleted)
 
   checkDuplicateNames $
     map (second (PLMutable . (.resolvedDir))) packages0 ++
@@ -909,19 +906,19 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
 
   let mergeApply m1 m2 f =
         MS.merge MS.preserveMissing MS.dropMissing (MS.zipWithMatched f) m1 m2
-      pFlags = project.flags
+      pFlags = project.flagsByPkg
       packages2 = mergeApply packages1 pFlags $ \_ p flags ->
-        p { ProjectPackage.common = p.common { CommonPackage.flags = flags } }
+        p { projectCommon = p.projectCommon { flags = flags } }
       deps2 = mergeApply deps1 pFlags $ \_ d flags ->
-        d { DepPackage.common = d.common { CommonPackage.flags = flags } }
+        d { depCommon = d.depCommon { flags = flags } }
 
   checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
 
   let pkgGhcOptions = config.ghcOptionsByName
       deps = mergeApply deps2 pkgGhcOptions $ \_ d options ->
-        d { DepPackage.common = d.common { ghcOptions = options } }
+        d { depCommon = d.depCommon { ghcOptions = options } }
       packages = mergeApply packages2 pkgGhcOptions $ \_ p options ->
-        p { ProjectPackage.common = p.common { ghcOptions = options } }
+        p { projectCommon = p.projectCommon { ghcOptions = options } }
       unusedPkgGhcOptions =
         pkgGhcOptions `Map.restrictKeys` Map.keysSet packages2
           `Map.restrictKeys` Map.keysSet deps2

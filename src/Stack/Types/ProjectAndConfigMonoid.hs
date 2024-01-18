@@ -30,7 +30,7 @@ parseProjectAndConfigMonoid rootDir =
     packages <- o ..:? "packages" ..!= [RelFilePath "."]
     deps <- jsonSubWarningsTT (o ..:? "extra-deps") ..!= []
     flags' <- o ..:? "flags" ..!= mempty
-    let flags = unCabalStringMap <$> unCabalStringMap
+    let flagsByPkg = unCabalStringMap <$> unCabalStringMap
                 (flags' :: Map (CabalString PackageName) (Map (CabalString FlagName) Bool))
 
     resolver' <- jsonSubWarnings $ o ...: ["snapshot", "resolver"]
@@ -53,7 +53,7 @@ parseProjectAndConfigMonoid rootDir =
             , extraPackageDBs
             , packages
             , dependencies
-            , flags
+            , flagsByPkg
             , curator
             , dropPackages
             }

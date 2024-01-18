@@ -278,7 +278,7 @@ constructPlan
     pure plan
 
   prunedGlobalDeps :: Map PackageName [PackageName]
-  prunedGlobalDeps = flip Map.mapMaybe sourceMap.global $
+  prunedGlobalDeps = flip Map.mapMaybe sourceMap.globalPkgs $
     \case
       ReplacedGlobalPackage deps ->
         let pruned = filter (not . inSourceMap) deps
@@ -303,7 +303,7 @@ constructPlan
       case dp.location of
         PLImmutable loc ->
           pure $
-            PSRemote loc (getPLIVersion loc) dp.fromSnapshot dp.common
+            PSRemote loc (getPLIVersion loc) dp.fromSnapshot dp.depCommon
         PLMutable dir -> do
           pp <- mkProjectPackage YesPrintWarnings dir (shouldHaddockDeps bopts)
           lp <- loadLocalPackage' pp

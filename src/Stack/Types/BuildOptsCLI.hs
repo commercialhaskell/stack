@@ -21,7 +21,7 @@ import           Stack.Prelude
 
 -- | Build options that may only be specified from the CLI
 data BuildOptsCLI = BuildOptsCLI
-  { targets :: ![Text]
+  { targetsCLI :: ![Text]
   , dryrun :: !Bool
   , ghcOptions :: ![Text]
   , progsOptions :: ![(Text, [Text])]
@@ -38,7 +38,7 @@ data BuildOptsCLI = BuildOptsCLI
 
 defaultBuildOptsCLI ::BuildOptsCLI
 defaultBuildOptsCLI = BuildOptsCLI
-  { targets = []
+  { targetsCLI = []
   , dryrun = False
   , flags = Map.empty
   , ghcOptions = []

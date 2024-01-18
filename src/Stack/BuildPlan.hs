@@ -381,7 +381,7 @@ checkSnapBuildPlan ::
 checkSnapBuildPlan pkgDirs flags snapCandidate = do
   platform <- view platformL
   sma <- snapCandidate pkgDirs
-  gpds <- liftIO $ forM (Map.elems sma.project) (.common.gpd)
+  gpds <- liftIO $ forM (Map.elems sma.project) (.projectCommon.gpd)
 
   let compiler = sma.compiler
       globalVersion (GlobalPackageVersion v) = v

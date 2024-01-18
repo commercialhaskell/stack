@@ -64,7 +64,7 @@ openHaddocksInBrowser ::
   -- ^ Build targets as determined by 'Stack.Build.Source.loadSourceMap'
   -> RIO env ()
 openHaddocksInBrowser bco pkgLocations buildTargets = do
-  let cliTargets = bco.buildOptsCLI.targets
+  let cliTargets = bco.buildOptsCLI.targetsCLI
       getDocIndex = do
         let localDocs = haddockIndexFile (localDepsDocDir bco)
         localExists <- doesFileExist localDocs

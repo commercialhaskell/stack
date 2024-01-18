@@ -24,7 +24,7 @@ data Project = Project
   , dependencies :: ![RawPackageLocation]
     -- ^ Dependencies defined within the stack.yaml file, to be applied on top
     -- of the snapshot.
-  , flags :: !(Map PackageName (Map FlagName Bool))
+  , flagsByPkg :: !(Map PackageName (Map FlagName Bool))
     -- ^ Flags to be applied on top of the snapshot flags.
   , resolver :: !RawSnapshotLocation
     -- ^ How we resolve which @Snapshot@ to use

@@ -69,8 +69,6 @@ import           Stack.Types.SourceMap
                    , SMActual (..), SMTargets (..), SourceMap (..)
                    , SourceMapHash (..), Target (..), ppGPD, ppRoot
                    )
-import qualified Stack.Types.SourceMap as DepPackage ( DepPackage (..) )
-import qualified Stack.Types.SourceMap as ProjectPackage ( ProjectPackage (..) )
 import           Stack.Types.UnusedFlags ( FlagSource (..) )
 import           System.FilePath ( takeFileName )
 import           System.IO.Error ( isDoesNotExistError )
@@ -100,21 +98,17 @@ loadSourceMap :: HasBuildConfig env
               -> BuildOptsCLI
               -> SMActual DumpedGlobalPackage
               -> RIO env SourceMap
-loadSourceMap smt boptsCli sma = do
+loadSourceMap targets boptsCli sma = do
   bconfig <- view buildConfigL
   let compiler = sma.compiler
       project = M.map applyOptsFlagsPP sma.project
       bopts = bconfig.config.build
-      applyOptsFlagsPP p@ProjectPackage{ common = c } = p
-        { ProjectPackage.common =
-            applyOptsFlags (M.member c.name smt.targets) True c
-        }
-      deps0 = smt.deps <> sma.deps
+      applyOptsFlagsPP p@ProjectPackage{ projectCommon = c } = p
+        { projectCommon = applyOptsFlags (M.member c.name targets.targets) True c }
+      deps0 = targets.deps <> sma.deps
       deps = M.map applyOptsFlagsDep deps0
-      applyOptsFlagsDep d@DepPackage{ common = c } = d
-        { DepPackage.common =
-            applyOptsFlags (M.member c.name smt.deps) False c
-        }
+      applyOptsFlagsDep d@DepPackage{ depCommon = c } = d
+        { depCommon = applyOptsFlags (M.member c.name targets.deps) False c }
       applyOptsFlags isTarget isProjectPackage common =
         let name = common.name
             flags = getLocalFlags boptsCli name
@@ -141,18 +135,17 @@ loadSourceMap smt boptsCli sma = do
         Map.toList boptsCli.flags
       maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
       maybeProjectFlags _ = Nothing
-      globals = pruneGlobals sma.global (Map.keysSet deps)
+      globalPkgs = pruneGlobals sma.global (Map.keysSet deps)
   logDebug "Checking flags"
   checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
   logDebug "SourceMap constructed"
-  pure
-    SourceMap
-      { targets = smt
-      , compiler = compiler
-      , project = project
-      , deps = deps
-      , global = globals
-      }
+  pure SourceMap
+    { targets
+    , compiler
+    , project
+    , deps
+    , globalPkgs
+    }
 
 -- | Get a 'SourceMapHash' for a given 'SourceMap'
 --
@@ -204,10 +197,10 @@ depPackageHashableContent dp =
             if enabled
               then ""
               else "-" <> fromString (C.unFlagName f)
-          flags = map flagToBs $ Map.toList dp.common.flags
-          ghcOptions = map display dp.common.ghcOptions
-          cabalConfigOpts = map display dp.common.cabalConfigOpts
-          haddocks = if dp.common.haddocks then "haddocks" else ""
+          flags = map flagToBs $ Map.toList dp.depCommon.flags
+          ghcOptions = map display dp.depCommon.ghcOptions
+          cabalConfigOpts = map display dp.depCommon.cabalConfigOpts
+          haddocks = if dp.depCommon.haddocks then "haddocks" else ""
           hash = immutableLocSha pli
       pure
         $  hash
@@ -307,7 +300,7 @@ loadLocalPackage ::
   -> RIO env LocalPackage
 loadLocalPackage pp = do
   sm <- view sourceMapL
-  let common = pp.common
+  let common = pp.projectCommon
   bopts <- view buildOptsL
   mcurator <- view $ buildConfigL . to (.curator)
   config <- getPackageConfig
@@ -416,7 +409,7 @@ loadLocalPackage pp = do
     { package = pkg
     , testBench = btpkg
     , componentFiles
-    , buildHaddocks = pp.common.haddocks
+    , buildHaddocks = pp.projectCommon.haddocks
     , forceDirty = bopts.forceDirty
     , dirtyFiles
     , newBuildCaches
