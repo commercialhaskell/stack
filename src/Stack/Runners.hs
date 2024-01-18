@@ -229,7 +229,7 @@ withRunnerGlobal go inner = do
     ColorAuto -> hNowSupportsANSI stderr
   termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
                                     <$> getTerminalWidth)
-                                   pure go.termWidth
+                                   pure go.termWidthOpt
   menv <- mkDefaultProcessContext
   -- MVar used to ensure the Docker entrypoint is performed exactly once.
   dockerEntrypointMVar <- newMVar False

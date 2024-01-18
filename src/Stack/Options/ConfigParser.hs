@@ -24,7 +24,7 @@ import           Stack.Options.GhcBuildParser ( ghcBuildParser )
 import           Stack.Options.GhcVariantParser ( ghcVariantParser )
 import           Stack.Options.NixParser ( nixOptsParser )
 import           Stack.Options.Utils ( GlobalOptsContext (..), hideMods )
-import           Stack.Prelude
+import           Stack.Prelude hiding ( snapshotLocation )
 import           Stack.Types.ColorWhen ( readColorWhen )
 import           Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
@@ -34,35 +34,36 @@ import qualified System.FilePath as FilePath
 configOptsParser :: FilePath -> GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser currentDir hide0 =
   ( \stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch
-     ghcVariant ghcBuild jobs includes libs preprocs overrideGccPath overrideHpack
-     skipGHCCheck skipMsys localBin setupInfoLocations modifyCodePage
-     allowDifferentUser dumpLogs colorWhen snapLoc noRunCompile -> mempty
-       { stackRoot = stackRoot
-       , workDir = workDir
-       , buildOpts = buildOpts
-       , dockerOpts = dockerOpts
-       , nixOpts = nixOpts
-       , systemGHC = systemGHC
-       , installGHC = installGHC
-       , skipGHCCheck = skipGHCCheck
-       , arch = arch
-       , ghcVariant = ghcVariant
-       , ghcBuild = ghcBuild
-       , jobs = jobs
-       , extraIncludeDirs = includes
-       , extraLibDirs = libs
-       , customPreprocessorExts = preprocs
-       , overrideGccPath = overrideGccPath
-       , overrideHpack = overrideHpack
-       , skipMsys = skipMsys
-       , localBinPath = localBin
-       , setupInfoLocations = setupInfoLocations
-       , modifyCodePage = modifyCodePage
-       , allowDifferentUser = allowDifferentUser
-       , dumpLogs = dumpLogs
-       , colorWhen = colorWhen
-       , snapshotLocation = snapLoc
-       , noRunCompile = noRunCompile
+     ghcVariant ghcBuild jobs extraIncludeDirs extraLibDirs
+     customPreprocessorExts overrideGccPath overrideHpack skipGHCCheck skipMsys
+     localBinPath setupInfoLocations modifyCodePage allowDifferentUser dumpLogs
+     colorWhen snapshotLocation noRunCompile -> mempty
+       { stackRoot
+       , workDir
+       , buildOpts
+       , dockerOpts
+       , nixOpts
+       , systemGHC
+       , installGHC
+       , skipGHCCheck
+       , arch
+       , ghcVariant
+       , ghcBuild
+       , jobs
+       , extraIncludeDirs
+       , extraLibDirs
+       , customPreprocessorExts
+       , overrideGccPath
+       , overrideHpack
+       , skipMsys
+       , localBinPath
+       , setupInfoLocations
+       , modifyCodePage
+       , allowDifferentUser
+       , dumpLogs
+       , colorWhen
+       , snapshotLocation
+       , noRunCompile
        }
   )
   <$> optionalFirst (absDirOption

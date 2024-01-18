@@ -349,10 +349,10 @@ loadCompilerPaths compiler build sandboxed = do
     -- We could use parseAbsFile instead of resolveFile' below to bypass some
     -- system calls, at the cost of some really wonky error messages in case
     -- someone screws up their GHC installation
-    pkgexe <- resolveFile' compilerCache.compilerCacheGhcPkgPath
-    runghc <- resolveFile' compilerCache.compilerCacheRunghcPath
+    pkg <- GhcPkgExe <$> resolveFile' compilerCache.compilerCacheGhcPkgPath
+    interpreter <- resolveFile' compilerCache.compilerCacheRunghcPath
     haddock <- resolveFile' compilerCache.compilerCacheHaddockPath
-    globaldb <- resolveDir' compilerCache.compilerCacheGlobalDb
+    globalDB <- resolveDir' compilerCache.compilerCacheGlobalDb
 
     cabalVersion <- parseVersionThrowing $
       T.unpack compilerCache.compilerCacheCabalVersion
@@ -365,20 +365,19 @@ loadCompilerPaths compiler build sandboxed = do
         Nothing -> throwIO $
           CompilerCacheArchitectureInvalid compilerCache.compilerCacheArch
         Just arch -> pure arch
-
     pure CompilerPaths
-      { compiler = compiler
+      { compiler
       , compilerVersion = compilerCache.compilerCacheActualVersion
-      , arch = arch
-      , build = build
-      , pkg = GhcPkgExe pkgexe
-      , interpreter = runghc
-      , haddock = haddock
-      , sandboxed = sandboxed
-      , cabalVersion = cabalVersion
-      , globalDB = globaldb
+      , arch
+      , build
+      , pkg
+      , interpreter
+      , haddock
+      , sandboxed
+      , cabalVersion
+      , globalDB
       , ghcInfo = compilerCache.compilerCacheInfo
-      , globalDump = globalDump
+      , globalDump
       }
 
 -- | Save compiler information. May throw exceptions!

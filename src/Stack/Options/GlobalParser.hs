@@ -128,29 +128,27 @@ globalOptsFromMonoid defaultTerminal globalMonoid = do
     case getFirst globalMonoid.stackYaml of
       Nothing -> pure SYLDefault
       Just fp -> SYLOverride <$> resolveFile' fp
-  pure GlobalOpts
-    { reExecVersion = getFirst globalMonoid.reExecVersion
-    , dockerEntrypoint =
-        getFirst globalMonoid.dockerEntrypoint
-    , logLevel =
-        fromFirst defaultLogLevel globalMonoid.logLevel
-    , timeInLog = fromFirstTrue globalMonoid.timeInLog
-    , rslInLog = fromFirstFalse globalMonoid.rslInLog
-    , planInLog = fromFirstFalse globalMonoid.planInLog
-    , configMonoid = globalMonoid.configMonoid
-    , resolver = resolver
-    , compiler = getFirst globalMonoid.compiler
-    , terminal =
-        fromFirst defaultTerminal globalMonoid.terminal
-    , stylesUpdate = globalMonoid.styles
-    , termWidth = getFirst globalMonoid.termWidth
-    , stackYaml = stackYaml
-    , lockFileBehavior =
+  let lockFileBehavior =
         let defLFB =
               case getFirst globalMonoid.resolver of
                 Nothing -> LFBReadWrite
                 _ -> LFBReadOnly
         in  fromFirst defLFB globalMonoid.lockFileBehavior
+  pure GlobalOpts
+    { reExecVersion = getFirst globalMonoid.reExecVersion
+    , dockerEntrypoint = getFirst globalMonoid.dockerEntrypoint
+    , logLevel = fromFirst defaultLogLevel globalMonoid.logLevel
+    , timeInLog = fromFirstTrue globalMonoid.timeInLog
+    , rslInLog = fromFirstFalse globalMonoid.rslInLog
+    , planInLog = fromFirstFalse globalMonoid.planInLog
+    , configMonoid = globalMonoid.configMonoid
+    , resolver
+    , compiler = getFirst globalMonoid.compiler
+    , terminal = fromFirst defaultTerminal globalMonoid.terminal
+    , stylesUpdate = globalMonoid.styles
+    , termWidthOpt = getFirst globalMonoid.termWidthOpt
+    , stackYaml
+    , lockFileBehavior
     }
 
 -- | Default logging level should be something useful but not crazy.

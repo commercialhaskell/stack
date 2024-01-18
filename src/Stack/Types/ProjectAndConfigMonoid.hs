@@ -33,26 +33,28 @@ parseProjectAndConfigMonoid rootDir =
     let flags = unCabalStringMap <$> unCabalStringMap
                 (flags' :: Map (CabalString PackageName) (Map (CabalString FlagName) Bool))
 
-    resolver <- jsonSubWarnings $ o ...: ["snapshot", "resolver"]
-    mcompiler <- o ..:? "compiler"
-    msg <- o ..:? "user-message"
+    resolver' <- jsonSubWarnings $ o ...: ["snapshot", "resolver"]
+    compiler <- o ..:? "compiler"
+    userMsg <- o ..:? "user-message"
     config <- parseConfigMonoidObject rootDir o
     extraPackageDBs <- o ..:? "extra-package-dbs" ..!= []
-    mcurator <- jsonSubWarningsT (o ..:? "curator")
+    curator <- jsonSubWarningsT (o ..:? "curator")
     drops <- o ..:? "drop-packages" ..!= mempty
+    let dropPackages = Set.map unCabalString drops
     pure $ do
       deps' <- mapM (resolvePaths (Just rootDir)) deps
-      resolver' <- resolvePaths (Just rootDir) resolver
+      let dependencies =
+            concatMap toList (deps' :: [NonEmpty RawPackageLocation])
+      resolver <- resolvePaths (Just rootDir) resolver'
       let project = Project
-            { userMsg = msg
-            , resolver = resolver'
-            , compiler = mcompiler -- FIXME make sure resolver' isn't SLCompiler
-            , extraPackageDBs = extraPackageDBs
-            , packages = packages
-            , dependencies =
-                concatMap toList (deps' :: [NonEmpty RawPackageLocation])
-            , flags = flags
-            , curator = mcurator
-            , dropPackages = Set.map unCabalString drops
+            { userMsg
+            , resolver
+            , compiler -- FIXME make sure resolver' isn't SLCompiler
+            , extraPackageDBs
+            , packages
+            , dependencies
+            , flags
+            , curator
+            , dropPackages
             }
       pure $ ProjectAndConfigMonoid project config

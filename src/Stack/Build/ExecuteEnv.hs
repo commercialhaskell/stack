@@ -261,90 +261,97 @@ withExecuteEnv ::
   -> Maybe Int -- ^ largest package name, for nicer interleaved output
   -> (ExecuteEnv -> RIO env a)
   -> RIO env a
-withExecuteEnv bopts boptsCli baseConfigOpts locals globalPackages snapshotPackages localPackages mlargestPackageName inner =
-  createTempDirFunction stackProgName $ \tmpdir -> do
-    installLock <- liftIO $ newMVar ()
-    idMap <- liftIO $ newTVarIO Map.empty
-    config <- view configL
-
-    customBuiltRef <- newIORef Set.empty
-
-    -- Create files for simple setup and setup shim, if necessary
-    let setupSrcDir =
-            view stackRootL config </>
-            relDirSetupExeSrc
-    ensureDir setupSrcDir
-    let setupStub = "setup-" ++ simpleSetupHash
-    setupFileName <- parseRelFile (setupStub ++ ".hs")
-    setupHiName <- parseRelFile (setupStub ++ ".hi")
-    setupOName <- parseRelFile (setupStub ++ ".o")
-    let setupHs = setupSrcDir </> setupFileName
-        setupHi = setupSrcDir </> setupHiName
-        setupO =  setupSrcDir </> setupOName
-    setupHsExists <- doesFileExist setupHs
-    unless setupHsExists $ writeBinaryFileAtomic setupHs simpleSetupCode
-    -- See https://github.com/commercialhaskell/stack/issues/6267. Remove any
-    -- historical *.hi or *.o files. This can be dropped when Stack drops
-    -- support for the problematic versions of GHC.
-    ignoringAbsence (removeFile setupHi)
-    ignoringAbsence (removeFile setupO)
-    let setupShimStub = "setup-shim-" ++ simpleSetupHash
-    setupShimFileName <- parseRelFile (setupShimStub ++ ".hs")
-    setupShimHiName <- parseRelFile (setupShimStub ++ ".hi")
-    setupShimOName <- parseRelFile (setupShimStub ++ ".o")
-    let setupShimHs = setupSrcDir </> setupShimFileName
-        setupShimHi = setupSrcDir </> setupShimHiName
-        setupShimO = setupSrcDir </> setupShimOName
-    setupShimHsExists <- doesFileExist setupShimHs
-    unless setupShimHsExists $
-      writeBinaryFileAtomic setupShimHs setupGhciShimCode
-    -- See https://github.com/commercialhaskell/stack/issues/6267. Remove any
-    -- historical *.hi or *.o files. This can be dropped when Stack drops
-    -- support for the problematic versions of GHC.
-    ignoringAbsence (removeFile setupShimHi)
-    ignoringAbsence (removeFile setupShimO)
-    setupExe <- getSetupExe setupHs setupShimHs tmpdir
-
-    cabalPkgVer <- view cabalVersionL
-    globalDB <- view $ compilerPathsL . to (.globalDB)
-    snapshotPackagesTVar <-
-      liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
-    localPackagesTVar <-
-      liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
-    logFilesTChan <- liftIO $ atomically newTChan
-    let totalWanted = length $ filter (.wanted) locals
-    pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
-    inner ExecuteEnv
-      { buildOpts = bopts
-      , buildOptsCLI = boptsCli
-        -- Uncertain as to why we cannot run configures in parallel. This
-        -- appears to be a Cabal library bug. Original issue:
-        -- https://github.com/commercialhaskell/stack/issues/84. Ideally
-        -- we'd be able to remove this.
-      , installLock = installLock
-      , baseConfigOpts = baseConfigOpts
-      , ghcPkgIds = idMap
-      , tempDir = tmpdir
-      , setupHs = setupHs
-      , setupShimHs = setupShimHs
-      , setupExe = setupExe
-      , cabalPkgVer = cabalPkgVer
-      , totalWanted = totalWanted
-      , locals = locals
-      , globalDB = globalDB
-      , globalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
-      , snapshotDumpPkgs = snapshotPackagesTVar
-      , localDumpPkgs = localPackagesTVar
-      , logFiles = logFilesTChan
-      , customBuilt = customBuiltRef
-      , largestPackageName = mlargestPackageName
-      , pathEnvVar = pathEnvVar
-      } `finally` dumpLogs logFilesTChan totalWanted
+withExecuteEnv
+    buildOpts
+    buildOptsCLI
+    baseConfigOpts
+    locals
+    globalPackages
+    snapshotPackages
+    localPackages
+    largestPackageName
+    inner
+  = createTempDirFunction stackProgName $ \tempDir -> do
+      installLock <- liftIO $ newMVar ()
+      ghcPkgIds <- liftIO $ newTVarIO Map.empty
+      config <- view configL
+      customBuilt <- newIORef Set.empty
+      -- Create files for simple setup and setup shim, if necessary
+      let setupSrcDir =
+              view stackRootL config </>
+              relDirSetupExeSrc
+      ensureDir setupSrcDir
+      let setupStub = "setup-" ++ simpleSetupHash
+      setupFileName <- parseRelFile (setupStub ++ ".hs")
+      setupHiName <- parseRelFile (setupStub ++ ".hi")
+      setupOName <- parseRelFile (setupStub ++ ".o")
+      let setupHs = setupSrcDir </> setupFileName
+          setupHi = setupSrcDir </> setupHiName
+          setupO =  setupSrcDir </> setupOName
+      setupHsExists <- doesFileExist setupHs
+      unless setupHsExists $ writeBinaryFileAtomic setupHs simpleSetupCode
+      -- See https://github.com/commercialhaskell/stack/issues/6267. Remove any
+      -- historical *.hi or *.o files. This can be dropped when Stack drops
+      -- support for the problematic versions of GHC.
+      ignoringAbsence (removeFile setupHi)
+      ignoringAbsence (removeFile setupO)
+      let setupShimStub = "setup-shim-" ++ simpleSetupHash
+      setupShimFileName <- parseRelFile (setupShimStub ++ ".hs")
+      setupShimHiName <- parseRelFile (setupShimStub ++ ".hi")
+      setupShimOName <- parseRelFile (setupShimStub ++ ".o")
+      let setupShimHs = setupSrcDir </> setupShimFileName
+          setupShimHi = setupSrcDir </> setupShimHiName
+          setupShimO = setupSrcDir </> setupShimOName
+      setupShimHsExists <- doesFileExist setupShimHs
+      unless setupShimHsExists $
+        writeBinaryFileAtomic setupShimHs setupGhciShimCode
+      -- See https://github.com/commercialhaskell/stack/issues/6267. Remove any
+      -- historical *.hi or *.o files. This can be dropped when Stack drops
+      -- support for the problematic versions of GHC.
+      ignoringAbsence (removeFile setupShimHi)
+      ignoringAbsence (removeFile setupShimO)
+      setupExe <- getSetupExe setupHs setupShimHs tempDir
+      cabalPkgVer <- view cabalVersionL
+      globalDB <- view $ compilerPathsL . to (.globalDB)
+      let globalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
+      snapshotDumpPkgs <-
+        liftIO $ newTVarIO (toDumpPackagesByGhcPkgId snapshotPackages)
+      localDumpPkgs <-
+        liftIO $ newTVarIO (toDumpPackagesByGhcPkgId localPackages)
+      logFiles <- liftIO $ atomically newTChan
+      let totalWanted = length $ filter (.wanted) locals
+      pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
+      inner ExecuteEnv
+        { buildOpts
+        , buildOptsCLI
+          -- Uncertain as to why we cannot run configures in parallel. This
+          -- appears to be a Cabal library bug. Original issue:
+          -- https://github.com/commercialhaskell/stack/issues/84. Ideally
+          -- we'd be able to remove this.
+        , installLock
+        , baseConfigOpts
+        , ghcPkgIds
+        , tempDir
+        , setupHs
+        , setupShimHs
+        , setupExe
+        , cabalPkgVer
+        , totalWanted
+        , locals
+        , globalDB
+        , globalDumpPkgs
+        , snapshotDumpPkgs
+        , localDumpPkgs
+        , logFiles
+        , customBuilt
+        , largestPackageName
+        , pathEnvVar
+        } `finally` dumpLogs logFiles totalWanted
  where
   toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dp.ghcPkgId, dp))
 
   createTempDirFunction
-    | bopts.keepTmpFiles = withKeepSystemTempDir
+    | buildOpts.keepTmpFiles = withKeepSystemTempDir
     | otherwise = withSystemTempDir
 
   dumpLogs :: TChan (Path Abs Dir, Path Abs File) -> Int -> RIO env ()

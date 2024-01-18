@@ -234,29 +234,29 @@ generatePkgDescOpts ::
 generatePkgDescOpts
     installMap
     installedMap
-    omitPkgs
-    addPkgs
+    omitPackages
+    addPackages
     cabalfp
     pkg
     componentPaths
   = do
       config <- view configL
-      cabalVer <- view cabalVersionL
+      cabalVersion <- view cabalVersionL
       distDir <- distDirFromDir cabalDir
-      let generate namedComponent binfo = generateBuildInfoOpts BioInput
-            { installMap = installMap
-            , installedMap = installedMap
-            , cabalDir = cabalDir
-            , distDir = distDir
-            , omitPackages = omitPkgs
-            , addPackages = addPkgs
-            , buildInfo = binfo
+      let generate componentName buildInfo = generateBuildInfoOpts BioInput
+            { installMap
+            , installedMap
+            , cabalDir
+            , distDir
+            , omitPackages
+            , addPackages
+            , buildInfo
             , dotCabalPaths =
-                fromMaybe [] (M.lookup namedComponent componentPaths)
-            , configLibDirs =  config.extraLibDirs
-            , configIncludeDirs =  config.extraIncludeDirs
-            , componentName = namedComponent
-            , cabalVersion = cabalVer
+                fromMaybe [] (M.lookup componentName componentPaths)
+            , configLibDirs = config.extraLibDirs
+            , configIncludeDirs = config.extraIncludeDirs
+            , componentName
+            , cabalVersion
             }
       let insertInMap name compVal = M.insert name (generate name compVal)
       let translatedInsertInMap constructor name =

@@ -694,6 +694,6 @@ getDefaultPackageConfig = do
     , flags = mempty
     , ghcOptions = []
     , cabalConfigOpts = []
-    , compilerVersion = compilerVersion
-    , platform = platform
+    , compilerVersion
+    , platform
     }
