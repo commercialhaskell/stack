@@ -126,7 +126,6 @@ import           Stack.Types.BuildConfig
                    , wantedCompilerVersionL
                    )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
-import qualified Stack.Types.BuildOptsCLI as BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), CompilerException (..)
                    , CompilerRepository (..), WhichCompiler (..)
@@ -149,7 +148,8 @@ import           Stack.Types.EnvConfig
                    , packageDatabaseDeps, packageDatabaseExtra
                    , packageDatabaseLocal
                    )
-import           Stack.Types.EnvSettings ( EnvSettings (..), minimalEnvSettings )
+import           Stack.Types.EnvSettings
+                   ( EnvSettings (..), minimalEnvSettings )
 import           Stack.Types.ExtraDirs ( ExtraDirs (..) )
 import           Stack.Types.FileDigestCache ( newFileDigestCache )
 import           Stack.Types.GHCDownloadInfo ( GHCDownloadInfo (..) )
@@ -164,7 +164,6 @@ import           Stack.Types.Runner ( HasRunner (..) )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
 import           Stack.Types.SourceMap
                    ( SMActual (..), SMWanted (..), SourceMap (..) )
-import qualified Stack.Types.SourceMap as SMActual ( SMActual (..) )
 import           Stack.Types.Version
                    ( VersionCheck, stackMinorVersion, stackVersion )
 import           Stack.Types.VersionedDownloadInfo
@@ -685,7 +684,7 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
     let actualPkgs = Map.keysSet smActual.deps <>
                      Map.keysSet smActual.project
         prunedActual = smActual
-          { SMActual.global = pruneGlobals smActual.global actualPkgs }
+          { global = pruneGlobals smActual.global actualPkgs }
         haddockDeps = shouldHaddockDeps config.build
     targets <- parseTargets needTargets haddockDeps buildOptsCLI prunedActual
     sourceMap <- loadSourceMap targets buildOptsCLI smActual
@@ -959,7 +958,7 @@ rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
     let actualPkgs =
           Map.keysSet smActual.deps <> Map.keysSet smActual.project
         prunedActual = smActual
-          { SMActual.global = pruneGlobals smActual.global actualPkgs }
+          { global = pruneGlobals smActual.global actualPkgs }
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
     pure $ envConfig
@@ -980,7 +979,7 @@ withNewLocalBuildTargets targets f = do
   let boptsCLI = envConfig.buildOptsCLI
   envConfig' <-
     rebuildEnv envConfig NeedTargets haddockDeps $ boptsCLI
-      { BuildOptsCLI.targets = targets}
+      { targetsCLI = targets}
   local (set envConfigL envConfig') f
 
 -- | Add the include and lib paths to the given Config

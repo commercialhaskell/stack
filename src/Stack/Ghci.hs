@@ -61,7 +61,6 @@ import qualified Stack.Types.BuildOpts as BenchmarkOpts ( BenchmarkOpts (..) )
 import qualified Stack.Types.BuildOpts as TestOpts ( TestOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( ApplyCLIFlag, BuildOptsCLI (..), defaultBuildOptsCLI )
-import qualified Stack.Types.BuildOptsCLI as BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.CompCollection ( getBuildableListText )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
@@ -203,7 +202,7 @@ ghciCmd :: GhciOpts -> RIO Runner ()
 ghciCmd ghciOpts =
   let boptsCLI = defaultBuildOptsCLI
         -- using only additional packages, targets then get overridden in `ghci`
-        { targets = map T.pack ghciOpts.ghciAdditionalPackages
+        { targetsCLI = map T.pack ghciOpts.ghciAdditionalPackages
         , initialBuildSteps = True
         , flags = ghciOpts.ghciFlags
         , ghcOptions = map T.pack ghciOpts.ghciGhcOptions
@@ -224,7 +223,7 @@ ghciCmd ghciOpts =
 ghci :: HasEnvConfig env => GhciOpts -> RIO env ()
 ghci opts = do
   let buildOptsCLI = defaultBuildOptsCLI
-        { targets = []
+        { targetsCLI = []
         , flags = opts.ghciFlags
         }
   sourceMap <- view $ envConfigL . to (.sourceMap)
@@ -238,7 +237,7 @@ ghci opts = do
         { compiler = sourceMap.compiler
         , project = sourceMap.project
         , deps = sourceMap.deps
-        , global = sourceMap.global
+        , global = sourceMap.globalPkgs
         }
   -- Parse --main-is argument.
   mainIsTargets <- parseMainIsTargets buildOptsCLI sma opts.ghciMainIs
@@ -323,7 +322,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
     else do
       -- Try parsing targets before checking if both file and
       -- module targets are specified (see issue#3342).
-      let boptsCLI = buildOptsCLI { BuildOptsCLI.targets = normalTargetsRaw }
+      let boptsCLI = buildOptsCLI { targetsCLI = normalTargetsRaw }
       normalTargets <- parseTargets AllowNoTargets False boptsCLI sma
         `catch` \pex@(PrettyException ex) ->
           case fromException $ toException ex of
@@ -340,7 +339,7 @@ parseMainIsTargets ::
   -> Maybe Text
   -> RIO env (Maybe (Map PackageName Target))
 parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do
-  let boptsCLI = buildOptsCLI { BuildOptsCLI.targets = [target] }
+  let boptsCLI = buildOptsCLI { targetsCLI = [target] }
   targets <- parseTargets AllowNoTargets False boptsCLI sma
   pure targets.targets
 
@@ -849,15 +848,15 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
       -- Currently this source map is being build with
       -- the default targets
       sourceMapGhcOptions = fromMaybe [] $
-        ((.common.ghcOptions) <$> M.lookup name sm.project)
+        ((.projectCommon.ghcOptions) <$> M.lookup name sm.project)
         <|>
-        ((.common.ghcOptions) <$> M.lookup name sm.deps)
+        ((.depCommon.ghcOptions) <$> M.lookup name sm.deps)
       sourceMapCabalConfigOpts = fromMaybe [] $
-        ( (.common.cabalConfigOpts) <$> M.lookup name sm.project)
+        ( (.projectCommon.cabalConfigOpts) <$> M.lookup name sm.project)
         <|>
-        ((.common.cabalConfigOpts) <$> M.lookup name sm.deps)
+        ((.depCommon.cabalConfigOpts) <$> M.lookup name sm.deps)
       sourceMapFlags =
-        maybe mempty (.common.flags) $ M.lookup name sm.project
+        maybe mempty (.projectCommon.flags) $ M.lookup name sm.project
       config = PackageConfig
         { enableTests = True
         , enableBenchmarks = True

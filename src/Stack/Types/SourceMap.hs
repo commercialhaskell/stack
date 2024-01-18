@@ -64,7 +64,7 @@ data FromSnapshot
 
 -- | A view of a dependency package, specified in stack.yaml
 data DepPackage = DepPackage
-  { common :: !CommonPackage
+  { depCommon :: !CommonPackage
   , location :: !PackageLocation
   , hidden :: !Bool
     -- ^ Should the package be hidden after registering? Affects the script
@@ -76,7 +76,7 @@ data DepPackage = DepPackage
 
 -- | A view of a project package needed for resolving components
 data ProjectPackage = ProjectPackage
-  { common :: !CommonPackage
+  { projectCommon :: !CommonPackage
   , cabalFP :: !(Path Abs File)
   , resolvedDir :: !(ResolvedPath Dir)
   }
@@ -156,7 +156,7 @@ data SourceMap = SourceMap
   , deps :: !(Map PackageName DepPackage)
     -- ^ Need to hash all of the immutable dependencies, can ignore the mutable
     -- dependencies.
-  , global :: !(Map PackageName GlobalPackage)
+  , globalPkgs :: !(Map PackageName GlobalPackage)
     -- ^ Doesn't actually need to be hashed, implicitly captured by smCompiler.
     -- Can be broken if someone installs new global packages. We can document
     -- that as not supported, _or_ we could actually include all of this in the
@@ -172,7 +172,7 @@ smRelDir :: (MonadThrow m) => SourceMapHash -> m (Path Rel Dir)
 smRelDir (SourceMapHash smh) = parseRelDir $ T.unpack $ SHA256.toHexText smh
 
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
-ppGPD = liftIO . (.common.gpd)
+ppGPD = liftIO . (.projectCommon.gpd)
 
 -- | Root directory for the given 'ProjectPackage'
 ppRoot :: ProjectPackage -> Path Abs Dir

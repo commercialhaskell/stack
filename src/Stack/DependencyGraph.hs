@@ -57,7 +57,6 @@ import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
                    , SMActual (..), SMWanted (..), SourceMap (..)
                    )
-import qualified Stack.Types.SourceMap as SMActual ( SMActual (..) )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.DependencyGraph" module.
@@ -139,7 +138,7 @@ withDotConfig opts inner =
         actualPkgs =
           Map.keysSet smActual.deps <> Map.keysSet smActual.project
         prunedActual = smActual
-          { SMActual.global = pruneGlobals smActual.global actualPkgs }
+          { global = pruneGlobals smActual.global actualPkgs }
     targets <- parseTargets NeedTargets False boptsCLI prunedActual
     logDebug "Loading source map"
     sourceMap <- loadSourceMap targets boptsCLI smActual
@@ -164,7 +163,7 @@ withDotConfig opts inner =
     runRIO dc inner
 
   boptsCLI = defaultBuildOptsCLI
-    { targets = opts.dotTargets
+    { targetsCLI = opts.dotTargets
     , flags = opts.flags
     }
   modifyGO =
@@ -257,7 +256,7 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
   projectPackageDeps = loadDeps <$> Map.lookup pkgName sourceMap.project
    where
     loadDeps pp = do
-      pkg <- loadCommonPackage pp.common
+      pkg <- loadCommonPackage pp.projectCommon
       pure (setOfPackageDeps pkg, payloadFromLocal pkg Nothing)
 
   dependencyDeps =
@@ -265,11 +264,11 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
    where
     loadDeps DepPackage{ location = PLMutable dir } = do
       pp <- mkProjectPackage YesPrintWarnings dir False
-      pkg <- loadCommonPackage pp.common
+      pkg <- loadCommonPackage pp.projectCommon
       pure (setOfPackageDeps pkg, payloadFromLocal pkg (Just $ PLMutable dir))
 
     loadDeps dp@DepPackage{ location = PLImmutable loc } = do
-      let common = dp.common
+      let common = dp.depCommon
       gpd <- liftIO common.gpd
       let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
           flags = common.flags

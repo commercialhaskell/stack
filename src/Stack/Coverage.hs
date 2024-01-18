@@ -49,8 +49,8 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompCollection ( getBuildableSetText )
-import           Stack.Types.BuildOptsCLI ( defaultBuildOptsCLI )
-import qualified Stack.Types.BuildOptsCLI as BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOptsCLI
+                   ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , hpcReportDir
@@ -115,7 +115,7 @@ hpcReportCmd hropts = do
   let (tixFiles, targetNames) =
         L.partition (".tix" `T.isSuffixOf`) hropts.hroptsInputs
       boptsCLI = defaultBuildOptsCLI
-        { BuildOptsCLI.targets = if hropts.hroptsAll then [] else targetNames }
+        { targetsCLI = if hropts.hroptsAll then [] else targetNames }
   withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
     generateHpcReportForTargets hropts tixFiles targetNames
 

@@ -21,15 +21,15 @@ import           Path.IO ( createDirIfMissing, doesFileExist )
 import qualified RIO.Map as Map
 import           RIO.Process ( findExecutable, proc, readProcess_, runProcess_)
 import qualified Stack.Build ( build )
-import           Stack.Build.Target ( NeedTargets (NeedTargets) )
+import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Constants ( stackProgName' )
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig
                    , withEnvConfig
                    )
-import           Stack.Types.BuildOptsCLI ( defaultBuildOptsCLI )
-import qualified Stack.Types.BuildOptsCLI as BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOptsCLI
+                   ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.BuildOptsMonoid ( buildOptsMonoidHaddockL )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..) )
@@ -177,7 +177,7 @@ hoogleCmd (args, setup, rebuild, startServer) =
               restrictMinHoogleVersion muted hoogleIdent
     config <- view configL
     let boptsCLI = defaultBuildOptsCLI
-          { BuildOptsCLI.targets =  [hoogleTarget] }
+          { targetsCLI =  [hoogleTarget] }
     runRIO config $ withEnvConfig NeedTargets boptsCLI f
 
   restrictMinHoogleVersion ::

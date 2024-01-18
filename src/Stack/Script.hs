@@ -352,7 +352,7 @@ mapSnapshotPackageModules = do
   installMap <- toInstallMap sourceMap
   (_installedMap, globalDumpPkgs, snapshotDumpPkgs, _localDumpPkgs) <-
     getInstalled installMap
-  let globals = dumpedPackageModules sourceMap.global globalDumpPkgs
+  let globals = dumpedPackageModules sourceMap.globalPkgs globalDumpPkgs
       notHidden = Map.filter (not . (.hidden))
       notHiddenDeps = notHidden sourceMap.deps
       installedDeps = dumpedPackageModules notHiddenDeps snapshotDumpPkgs
@@ -360,7 +360,7 @@ mapSnapshotPackageModules = do
         Set.fromList $ map (pkgName . (.packageIdent)) snapshotDumpPkgs
       notInstalledDeps = Map.withoutKeys notHiddenDeps dumpPkgs
   otherDeps <- for notInstalledDeps $ \dep -> do
-    gpd <- liftIO dep.common.gpd
+    gpd <- liftIO dep.depCommon.gpd
     Set.fromList <$> allExposedModules gpd
   -- source map construction process should guarantee unique package names in
   -- these maps
