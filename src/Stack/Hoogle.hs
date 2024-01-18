@@ -277,11 +277,10 @@ hoogleCmd (args, setup, rebuild, startServer) =
             installHoogle
         | otherwise -> prettyThrowIO $ HoogleNotFound err
 
-  envSettings =
-    EnvSettings
-      { esIncludeLocals = True
-      , esIncludeGhcPackagePath = True
-      , esStackExe = True
-      , esLocaleUtf8 = False
-      , esKeepGhcRts = False
-      }
+  envSettings = EnvSettings
+    { includeLocals = True
+    , includeGhcPackagePath = True
+    , stackExe = True
+    , localeUtf8 = False
+    , keepGhcRts = False
+    }

@@ -384,7 +384,7 @@ printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
     in  case Map.lookup name dependencyMap of
           Just (deps, payload) -> do
             printTreeNode opts dotOpts depth newDepsCounts deps payload name
-            if Just depth == dotOpts.dotDependencyDepth
+            if Just depth == dotOpts.dependencyDepth
               then pure ()
               else printTree opts dotOpts (depth + 1) newDepsCounts deps
                      dependencyMap
@@ -401,7 +401,7 @@ printTreeNode ::
   -> PackageName
   -> IO ()
 printTreeNode opts dotOpts depth remainingDepsCounts deps payload name =
-  let remainingDepth = fromMaybe 999 dotOpts.dotDependencyDepth - depth
+  let remainingDepth = fromMaybe 999 dotOpts.dependencyDepth - depth
       hasDeps = not $ null deps
   in  T.putStrLn $
         treeNodePrefix "" remainingDepsCounts hasDeps remainingDepth <> " " <>

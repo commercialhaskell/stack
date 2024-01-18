@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -20,11 +21,11 @@ import           Stack.Prelude hiding ( Display (..), pkgName, loadPackage )
 
 -- | Information about a package in the dependency graph, when available.
 data DotPayload = DotPayload
-  { payloadVersion :: Maybe Version
+  { version :: Maybe Version
     -- ^ The package version.
-  , payloadLicense :: Maybe (Either SPDX.License License)
+  , license :: Maybe (Either SPDX.License License)
     -- ^ The license the package was released under.
-  , payloadLocation :: Maybe PackageLocation
+  , location :: Maybe PackageLocation
     -- ^ The location of the package.
   }
   deriving (Eq, Show)
@@ -48,7 +49,7 @@ dependencyToJSON pkg (deps, payload) =
                             , "dependencies" .= Set.map packageNameString deps
                             ]
       loc = catMaybes
-              [("location" .=) . pkgLocToJSON <$> payload.payloadLocation]
+              [("location" .=) . pkgLocToJSON <$> payload.location]
   in  object $ fieldsAlwaysPresent ++ loc
 
 pkgLocToJSON :: PackageLocation -> Value
@@ -83,8 +84,8 @@ pkgLocToJSON (PLImmutable (PLIRepo repo _)) = object
 licenseText :: DotPayload -> Text
 licenseText payload =
   maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id)
-                    payload.payloadLicense
+                    payload.license
 
 versionText :: DotPayload -> Text
 versionText payload =
-  maybe "<unknown>" (Text.pack . display) payload.payloadVersion
+  maybe "<unknown>" (Text.pack . display) payload.version

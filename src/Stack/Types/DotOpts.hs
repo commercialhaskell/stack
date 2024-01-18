@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 
 -- | Module exporting the `DotOpts` type used by Stack's @dot@ and
 -- @ls dependencies@ commands.
@@ -11,23 +12,23 @@ import           Stack.Types.BuildOptsCLI ( ApplyCLIFlag )
 
 -- | Options record for @stack dot@ and @stack ls dependencies@
 data DotOpts = DotOpts
-  { dotIncludeExternal :: !Bool
+  { includeExternal :: !Bool
     -- ^ Include external dependencies
-  , dotIncludeBase :: !Bool
+  , includeBase :: !Bool
     -- ^ Include dependencies on base
-  , dotDependencyDepth :: !(Maybe Int)
+  , dependencyDepth :: !(Maybe Int)
     -- ^ Limit the depth of dependency resolution to (Just n) or continue until
     -- fixpoint
-  , dotPrune :: !(Set PackageName)
+  , prune :: !(Set PackageName)
     -- ^ Package names to prune from the graph
   , dotTargets :: [Text]
     -- ^ Stack TARGETs to trace dependencies for
-  , dotFlags :: !(Map ApplyCLIFlag (Map FlagName Bool))
+  , flags :: !(Map ApplyCLIFlag (Map FlagName Bool))
     -- ^ Flags to apply when calculating dependencies
-  , dotTestTargets :: Bool
+  , testTargets :: Bool
     -- ^ Like the "--test" flag for build, affects the meaning of 'dotTargets'.
-  , dotBenchTargets :: Bool
+  , benchTargets :: Bool
     -- ^ Like the "--bench" flag for build, affects the meaning of 'dotTargets'.
-  , dotGlobalHints :: Bool
+  , globalHints :: Bool
     -- ^ Use global hints instead of relying on an actual GHC installation.
   }

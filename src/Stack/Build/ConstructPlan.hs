@@ -849,7 +849,7 @@ processDep pkgId name value = do
               Couldn'tResolveItsDependencies version
       pure $ Left (name, (range, mLatestApplicable, bd))
     Right adr
-      | isDepTypeLibrary value.dvType && not (adrHasLibrary adr) ->
+      | isDepTypeLibrary value.depType && not (adrHasLibrary adr) ->
           pure $ Left (name, (range, Nothing, HasNoLibrary))
     Right adr -> do
       addParent
@@ -864,7 +864,7 @@ processDep pkgId name value = do
             )
           )
  where
-  range = value.dvVersionRange
+  range = value.versionRange
   version = pkgVersion pkgId
   -- Update the parents map, for later use in plan construction errors
   -- - see 'getShortestDepsPath'.
@@ -1173,7 +1173,7 @@ checkAndWarnForUnknownTools p = do
   -- From Cabal 2.0, build-tools can specify a pre-built executable that should
   -- already be on the PATH.
   notOnPath toolName = MaybeT $ do
-    let settings = minimalEnvSettings { esIncludeLocals = True }
+    let settings = minimalEnvSettings { includeLocals = True }
     config <- view configL
     menv <- liftIO $ config.processContextSettings settings
     eFound <- runRIO menv $ findExecutable $ T.unpack toolName

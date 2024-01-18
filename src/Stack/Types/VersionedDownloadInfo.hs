@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Types.VersionedDownloadInfo
@@ -13,8 +14,8 @@ import           Stack.Types.DownloadInfo
                    ( DownloadInfo, parseDownloadInfoFromObject )
 
 data VersionedDownloadInfo = VersionedDownloadInfo
-  { vdiVersion :: Version
-  , vdiDownloadInfo :: DownloadInfo
+  { version :: Version
+  , downloadInfo :: DownloadInfo
   }
   deriving Show
 
@@ -23,6 +24,6 @@ instance FromJSON (WithJSONWarnings VersionedDownloadInfo) where
     CabalString version <- o ..: "version"
     downloadInfo <- parseDownloadInfoFromObject o
     pure VersionedDownloadInfo
-      { vdiVersion = version
-      , vdiDownloadInfo = downloadInfo
+      { version
+      , downloadInfo
       }

@@ -838,7 +838,7 @@ topSortPackageComponent package target includeDirectTarget = runST $ do
       then package.library
       else collectionLookup name package.subLibraries
     processOneDep alreadyProcessed mDependency res =
-      case (.dvType) <$> mDependency of
+      case (.depType) <$> mDependency of
         Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
           let processMainLibDep =
                 case (mainLibDep, lookupLibName True mempty) of
