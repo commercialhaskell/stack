@@ -35,7 +35,7 @@ data GlobalOpts = GlobalOpts
   , compiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
   , terminal     :: !Bool -- ^ We're in a terminal?
   , stylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles
-  , termWidth    :: !(Maybe Int) -- ^ Terminal width override
+  , termWidthOpt  :: !(Maybe Int) -- ^ Terminal width override
   , stackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
   , lockFileBehavior :: !LockFileBehavior
   }

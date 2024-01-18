@@ -231,44 +231,41 @@ conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
       -- If name of parent library is missing, this is not a sub-library.
       let maybePackageName :: Maybe PackageName =
             parseS "package-name" >>= parsePackageNameThrowing . T.unpack
-      let maybeLibName = parseS "lib-name"
-      let getLibNameFromLegacyName = case decodeCompatPackageName name of
-            MungedPackageName _parentPackageName (LSubLibName libName) ->
-              fromCabalName libName
+          maybeLibName = parseS "lib-name"
+          getLibNameFromLegacyName = case decodeCompatPackageName name of
+            MungedPackageName _parentPackageName (LSubLibName libName') ->
+              fromCabalName libName'
             MungedPackageName _parentPackageName _ -> ""
-      let libName =
+          libName =
             maybe getLibNameFromLegacyName StackUnqualCompName maybeLibName
-      let subLibDump = flip SublibDump libName <$> maybePackageName
-      let parseQuoted key =
+          sublib = flip SublibDump libName <$> maybePackageName
+          parseQuoted key =
             case mapM (P.parseOnly (argsParser NoEscaping)) val of
               Left{} -> throwM (Couldn'tParseField key val)
               Right dirs -> pure (concat dirs)
            where
             val = parseM key
-      libDirPaths <- parseQuoted libDirKey
+      libDirs <- parseQuoted libDirKey
       haddockInterfaces <- parseQuoted "haddock-interfaces"
-      haddockHtml <- parseQuoted "haddock-html"
-
+      haddockHtml <- listToMaybe <$> parseQuoted "haddock-html"
       pure $ Just DumpPackage
-        { ghcPkgId = ghcPkgId
+        { ghcPkgId
         , packageIdent = PackageIdentifier name version
-        , sublib = subLibDump
-        , license = license
-        , libDirs = libDirPaths
+        , sublib
+        , license
+        , libDirs
         , libraries = T.words $ T.unwords libraries
         , hasExposedModules = not (null libraries || null exposedModules)
-
-        -- Strip trailing commas from ghc package exposed-modules (looks buggy to me...).
-        -- Then try to parse the module names.
+        -- Strip trailing commas from ghc package exposed-modules (looks buggy
+        -- to me...). Then try to parse the module names.
         , exposedModules =
               Set.fromList
             $ mapMaybe (C.simpleParse . T.unpack . T.dropSuffix ",")
             $ T.words
             $ T.unwords exposedModules
-
-        , depends = depends
-        , haddockInterfaces = haddockInterfaces
-        , haddockHtml = listToMaybe haddockHtml
+        , depends
+        , haddockInterfaces
+        , haddockHtml
         , isExposed = exposed == ["True"]
         }
 

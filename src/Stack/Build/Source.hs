@@ -415,11 +415,11 @@ loadLocalPackage pp = do
   pure LocalPackage
     { package = pkg
     , testBench = btpkg
-    , componentFiles = componentFiles
+    , componentFiles
     , buildHaddocks = pp.common.haddocks
     , forceDirty = bopts.forceDirty
-    , dirtyFiles = dirtyFiles
-    , newBuildCaches = newBuildCaches
+    , dirtyFiles
+    , newBuildCaches
     , cabalFile = pp.cabalFP
     , wanted = isWanted
     , components = nonLibComponents

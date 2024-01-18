@@ -328,21 +328,21 @@ splitObjsWarning =
 -- | Get the @BaseConfigOpts@ necessary for constructing configure options
 mkBaseConfigOpts :: (HasEnvConfig env)
                  => BuildOptsCLI -> RIO env BaseConfigOpts
-mkBaseConfigOpts boptsCli = do
-  bopts <- view buildOptsL
-  snapDBPath <- packageDatabaseDeps
-  localDBPath <- packageDatabaseLocal
+mkBaseConfigOpts buildOptsCLI = do
+  buildOpts <- view buildOptsL
+  snapDB <- packageDatabaseDeps
+  localDB <- packageDatabaseLocal
   snapInstallRoot <- installationRootDeps
   localInstallRoot <- installationRootLocal
-  packageExtraDBs <- packageDatabaseExtra
+  extraDBs <- packageDatabaseExtra
   pure BaseConfigOpts
-    { snapDB = snapDBPath
-    , localDB = localDBPath
-    , snapInstallRoot = snapInstallRoot
-    , localInstallRoot = localInstallRoot
-    , buildOpts = bopts
-    , buildOptsCLI = boptsCli
-    , extraDBs = packageExtraDBs
+    { snapDB
+    , localDB
+    , snapInstallRoot
+    , localInstallRoot
+    , buildOpts
+    , buildOptsCLI
+    , extraDBs
     }
 
 -- | Provide a function for loading package information from the package index
@@ -354,16 +354,16 @@ loadPackage ::
   -> [Text] -- ^ Cabal configure options
   -> RIO env Package
 loadPackage loc flags ghcOptions cabalConfigOpts = do
-  compiler <- view actualCompilerVersionL
+  compilerVersion <- view actualCompilerVersionL
   platform <- view platformL
   let pkgConfig = PackageConfig
         { enableTests = False
         , enableBenchmarks = False
-        , flags = flags
-        , ghcOptions = ghcOptions
-        , cabalConfigOpts = cabalConfigOpts
-        , compilerVersion = compiler
-        , platform = platform
+        , flags
+        , ghcOptions
+        , cabalConfigOpts
+        , compilerVersion
+        , platform
         }
   resolvePackage pkgConfig <$> loadCabalFileImmutable loc
 

@@ -643,7 +643,7 @@ setupEnv ::
   -> Maybe StyleDoc
      -- ^ Message to give user when necessary GHC is not available.
   -> RIO BuildConfig EnvConfig
-setupEnv needTargets boptsCLI mResolveMissingGHC = do
+setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
   config <- view configL
   bc <- view buildConfigL
   let stackYaml = bc.stackYaml
@@ -687,20 +687,20 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
         prunedActual = smActual
           { SMActual.global = pruneGlobals smActual.global actualPkgs }
         haddockDeps = shouldHaddockDeps config.build
-    targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
-    sourceMap <- loadSourceMap targets boptsCLI smActual
-    sourceMapHash <- hashSourceMapData boptsCLI sourceMap
+    targets <- parseTargets needTargets haddockDeps buildOptsCLI prunedActual
+    sourceMap <- loadSourceMap targets buildOptsCLI smActual
+    sourceMapHash <- hashSourceMapData buildOptsCLI sourceMap
     pure (sourceMap, sourceMapHash)
 
   fileDigestCache <- newFileDigestCache
 
   let envConfig0 = EnvConfig
         { buildConfig = bc
-        , buildOptsCLI = boptsCLI
-        , fileDigestCache = fileDigestCache
-        , sourceMap = sourceMap
-        , sourceMapHash = sourceMapHash
-        , compilerPaths = compilerPaths
+        , buildOptsCLI
+        , fileDigestCache
+        , sourceMap
+        , sourceMapHash
+        , compilerPaths
         }
 
   -- extra installation bin directories
@@ -808,11 +808,11 @@ setupEnv needTargets boptsCLI mResolveMissingGHC = do
             { processContextSettings = getProcessContext'
             }
         }
-    , buildOptsCLI = boptsCLI
-    , fileDigestCache = fileDigestCache
-    , sourceMap = sourceMap
-    , sourceMapHash = sourceMapHash
-    , compilerPaths = compilerPaths
+    , buildOptsCLI
+    , fileDigestCache
+    , sourceMap
+    , sourceMapHash
+    , compilerPaths
     }
 
 -- | A modified env which we know has an installed compiler on the PATH.
@@ -1407,7 +1407,7 @@ pathsFromCompiler ::
   -> Bool
   -> Path Abs File -- ^ executable filepath
   -> RIO env CompilerPaths
-pathsFromCompiler wc compilerBuild isSandboxed compiler =
+pathsFromCompiler wc build sandboxed compiler =
   withCache $ handleAny onErr $ do
     let dir = toFilePath $ parent compiler
 
@@ -1450,10 +1450,10 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler =
     haddock <- findHelper $
                \case
                   Ghc -> ["haddock", "haddock-ghc"]
-    infobs <- proc (toFilePath compiler) ["--info"]
+    ghcInfo <- proc (toFilePath compiler) ["--info"]
             $ fmap (toStrictBytes . fst) . readProcess_
     infotext <-
-      case decodeUtf8' infobs of
+      case decodeUtf8' ghcInfo of
         Left e -> prettyThrowIO $ GHCInfoNotValidUTF8 e
         Right info -> pure info
     infoPairs :: [(String, String)] <-
@@ -1475,7 +1475,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler =
             Nothing ->
               prettyThrowIO $ GHCInfoTargetPlatformInvalid targetPlatform
             Just arch -> pure arch
-    compilerVer <-
+    compilerVersion <-
       case wc of
         Ghc ->
           case Map.lookup "Project version" infoMap of
@@ -1483,7 +1483,7 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler =
               prettyWarnS "Key 'Project version' not found in GHC info."
               getCompilerVersion wc compiler
             Just versionString' -> ACGhc <$> parseVersionThrowing versionString'
-    globaldb <-
+    globalDB <-
       case eglobaldb of
         Left e -> do
           prettyWarn $
@@ -1498,30 +1498,30 @@ pathsFromCompiler wc compilerBuild isSandboxed compiler =
         Right x -> pure x
 
     globalDump <- withProcessContext menv $ globalsFromDump pkg
-    cabalPkgVer <-
+    cabalVersion <-
       case Map.lookup cabalPackageName globalDump of
         Nothing -> prettyThrowIO $ CabalNotFound compiler
         Just dp -> pure $ pkgVersion dp.packageIdent
 
     pure CompilerPaths
-      { build = compilerBuild
-      , arch = arch
-      , sandboxed = isSandboxed
-      , compilerVersion = compilerVer
-      , compiler = compiler
-      , pkg = pkg
-      , interpreter = interpreter
-      , haddock = haddock
-      , cabalVersion = cabalPkgVer
-      , globalDB = globaldb
-      , ghcInfo = infobs
-      , globalDump = globalDump
+      { build
+      , arch
+      , sandboxed
+      , compilerVersion
+      , compiler
+      , pkg
+      , interpreter
+      , haddock
+      , cabalVersion
+      , globalDB
+      , ghcInfo
+      , globalDump
       }
  where
   onErr = throwIO . PrettyException . InvalidGhcAt compiler
 
   withCache inner = do
-    eres <- tryAny $ loadCompilerPaths compiler compilerBuild isSandboxed
+    eres <- tryAny $ loadCompilerPaths compiler build sandboxed
     mres <-
       case eres of
         Left e -> do

@@ -727,7 +727,7 @@ withBuildConfig inner = do
     logDebug ("Using resolver: " <> display aresolver <> " specified on command line")
     makeConcreteResolver aresolver
 
-  (project', stackYamlFP) <- case config.project of
+  (project', stackYaml) <- case config.project of
     PCProject (project, fp) -> do
       forM_ project.userMsg prettyWarnS
       pure (project, fp)
@@ -794,22 +794,22 @@ withBuildConfig inner = do
         }
   extraPackageDBs <- mapM resolveDir' project.extraPackageDBs
 
-  wanted <- lockCachedWanted stackYamlFP project.resolver $
-    fillProjectWanted stackYamlFP config project
+  smWanted <- lockCachedWanted stackYaml project.resolver $
+    fillProjectWanted stackYaml config project
 
   -- Unfortunately redoes getProjectWorkDir, since we don't have a BuildConfig
   -- yet
   workDir <- view workDirL
-  let projectStorageFile = parent stackYamlFP </> workDir </> relFileStorage
+  let projectStorageFile = parent stackYaml </> workDir </> relFileStorage
 
   initProjectStorage projectStorageFile $ \projectStorage -> do
     let bc = BuildConfig
-          { config = config
-          , smWanted = wanted
-          , extraPackageDBs = extraPackageDBs
-          , stackYaml = stackYamlFP
+          { config
+          , smWanted
+          , extraPackageDBs
+          , stackYaml
           , curator = project.curator
-          , projectStorage = projectStorage
+          , projectStorage
           }
     runRIO bc inner
  where
@@ -836,8 +836,7 @@ withBuildConfig inner = do
     pure Project
       { userMsg = Nothing
       , packages = []
-      , dependencies =
-          map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
+      , dependencies = map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
       , flags = mempty
       , resolver = r
       , compiler = Nothing

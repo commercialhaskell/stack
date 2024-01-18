@@ -166,7 +166,7 @@ gpdPackageDeps ::
   -> Platform
   -> Map FlagName Bool
   -> Map PackageName VersionRange
-gpdPackageDeps gpd ac platform flags =
+gpdPackageDeps gpd compilerVersion platform flags =
   Map.filterWithKey (const . not . isLocalLibrary) (packageDependencies pkgDesc)
  where
   isLocalLibrary name' = name' == name || name' `Set.member` subs
@@ -182,11 +182,11 @@ gpdPackageDeps gpd ac platform flags =
   pkgConfig = PackageConfig
     { enableTests = True
     , enableBenchmarks = True
-    , flags = flags
+    , flags
     , ghcOptions = []
     , cabalConfigOpts = []
-    , compilerVersion = ac
-    , platform = platform
+    , compilerVersion
+    , platform
     }
 
 -- Remove any src package flags having default values
