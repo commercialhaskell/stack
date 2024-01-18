@@ -134,7 +134,7 @@ import           Stack.Types.NamedComponent
                    , renderComponent
                    )
 import           Stack.Types.Package
-                   ( LocalPackage (..), Package (..), installedMapGhcPkgId
+                   ( LocalPackage (..), Package (..), installedPackageToGhcPkgId
                    , runMemoizedWith, simpleInstalledLib
                    , toCabalMungedPackageName
                    )
@@ -178,13 +178,10 @@ getConfigCache ee task installedMap enableTest enableBench = do
               -- an initialBuildSteps target.
               | ee.buildOptsCLI.initialBuildSteps && taskIsTarget task
               , Just (_, installed) <- Map.lookup (pkgName ident) installedMap
-                  -> pure $ installedToGhcPkgId ident installed
-          Just installed -> pure $ installedToGhcPkgId ident installed
+                  -> pure $ installedPackageToGhcPkgId ident installed
+          Just installed -> pure $ installedPackageToGhcPkgId ident installed
           _ -> throwM $ PackageIdMissingBug ident
-      installedToGhcPkgId ident (Library ident' libInfo) =
-        assert (ident == ident') (installedMapGhcPkgId ident libInfo)
-      installedToGhcPkgId _ (Executable _) = mempty
-      TaskConfigOpts missing mkOpts = task.configOpts
+  let TaskConfigOpts missing mkOpts = task.configOpts
   missingMapList <- traverse getMissing $ toList missing
   let missing' = Map.unions missingMapList
       configureOpts' = mkOpts missing'
@@ -1452,3 +1449,4 @@ fulfillCuratorBuildExpectations pname mcurator _ enableBench defValue action
           pure res
         Left _ -> pure defValue
 fulfillCuratorBuildExpectations _ _ _ _ _ action = action
+
