@@ -3,31 +3,10 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages:
-- completed:
-    hackage: ansi-terminal-1.0.2@sha256:1f90bb88e670ce63fbf2c9216d50857f2419582f1c6791e542c3eab97ecfd364,2897
-    pantry-tree:
-      sha256: d4405abe08cf99c47f2af8534346492a5679e17a19529667b3eeddad4c0f0149
-      size: 1184
-  original:
-    hackage: ansi-terminal-1.0.2@sha256:1f90bb88e670ce63fbf2c9216d50857f2419582f1c6791e542c3eab97ecfd364,2897
-- completed:
-    hackage: pantry-0.9.3.1@sha256:79e9be1b28a9829cb9630ca97ac5732b0843ee8d60ce26b347ecd57740305c2b,7859
-    pantry-tree:
-      sha256: 016257a65a69519e076fde13276571dfb5fcebeda3bce63a5bee9a6a87d2cc24
-      size: 2665
-  original:
-    hackage: pantry-0.9.3.1@sha256:79e9be1b28a9829cb9630ca97ac5732b0843ee8d60ce26b347ecd57740305c2b,7859
-- completed:
-    hackage: tar-conduit-0.4.1@sha256:112d28118eb71901ea9e224e1b174c648b378256729669c2739b8b803d25b43a,3126
-    pantry-tree:
-      sha256: ef68ea6504605689648cd26a461e855247ac66518a0caf615af2d97fdfe9ceef
-      size: 828
-  original:
-    hackage: tar-conduit-0.4.1@sha256:112d28118eb71901ea9e224e1b174c648b378256729669c2739b8b803d25b43a,3126
+packages: []
 snapshots:
 - completed:
-    sha256: bf0a6c05b171e596add050617f50e816dba3a4e93dc6c8c24c1a31f501f79422
-    size: 552863
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/1/6.yaml
-  original: nightly-2024-01-06
+    sha256: ebdaf8d4d6b365aac63aa06e57053313953d7a37d3eb84b0bbf5398734044952
+    size: 557524
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/1/17.yaml
+  original: nightly-2024-01-17

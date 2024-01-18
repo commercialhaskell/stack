@@ -1,19 +1,11 @@
-resolver: lts-22.0 # GHC 9.6.3
+resolver: lts-22.6 # GHC 9.6.3
 
 extra-deps:
 # Cabal is pruned because process is a GHC boot package, and has to be specified
 # again.
 - Cabal-3.10.1.0@sha256:6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94,12316
-# lts-22.0 specifies ansi-terminal-1.0
-- ansi-terminal-1.0.2@sha256:1f90bb88e670ce63fbf2c9216d50857f2419582f1c6791e542c3eab97ecfd364,2897
-# lts-22.0 specifies pantry-0.9.3.1@rev:0
-- pantry-0.9.3.1@sha256:79e9be1b28a9829cb9630ca97ac5732b0843ee8d60ce26b347ecd57740305c2b,7859
 # GHC 9.6.3 comes with process-1.6.17.0, which can segfault on macOS.
 - process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
-# lts-22.0 specifies rio-prettyprint-0.1.7.0:
-- rio-prettyprint-0.1.8.0@sha256:28a034bfa2842043d4603800e47943027677746cca0b3b8088aee10168870105,1428
-# lts-22.0 specifies tar-conduit-0.4.0
-- tar-conduit-0.4.1@sha256:112d28118eb71901ea9e224e1b174c648b378256729669c2739b8b803d25b43a,3126
 
 docker:
   enable: false

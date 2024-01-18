@@ -12,43 +12,15 @@ packages:
   original:
     hackage: Cabal-3.10.1.0@sha256:6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94,12316
 - completed:
-    hackage: ansi-terminal-1.0.2@sha256:1f90bb88e670ce63fbf2c9216d50857f2419582f1c6791e542c3eab97ecfd364,2897
-    pantry-tree:
-      sha256: d4405abe08cf99c47f2af8534346492a5679e17a19529667b3eeddad4c0f0149
-      size: 1184
-  original:
-    hackage: ansi-terminal-1.0.2@sha256:1f90bb88e670ce63fbf2c9216d50857f2419582f1c6791e542c3eab97ecfd364,2897
-- completed:
-    hackage: pantry-0.9.3.1@sha256:79e9be1b28a9829cb9630ca97ac5732b0843ee8d60ce26b347ecd57740305c2b,7859
-    pantry-tree:
-      sha256: 016257a65a69519e076fde13276571dfb5fcebeda3bce63a5bee9a6a87d2cc24
-      size: 2665
-  original:
-    hackage: pantry-0.9.3.1@sha256:79e9be1b28a9829cb9630ca97ac5732b0843ee8d60ce26b347ecd57740305c2b,7859
-- completed:
     hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
     pantry-tree:
       sha256: 3f9fef1f9a6ed1a6923578ada0bc8c16d016344cc67614473384524334463cc2
       size: 1675
   original:
     hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
-- completed:
-    hackage: rio-prettyprint-0.1.8.0@sha256:28a034bfa2842043d4603800e47943027677746cca0b3b8088aee10168870105,1428
-    pantry-tree:
-      sha256: 69850784d99d1c44e85f934433abafad729f87fdc40d375c590c8d4a1cb2886d
-      size: 779
-  original:
-    hackage: rio-prettyprint-0.1.8.0@sha256:28a034bfa2842043d4603800e47943027677746cca0b3b8088aee10168870105,1428
-- completed:
-    hackage: tar-conduit-0.4.1@sha256:112d28118eb71901ea9e224e1b174c648b378256729669c2739b8b803d25b43a,3126
-    pantry-tree:
-      sha256: ef68ea6504605689648cd26a461e855247ac66518a0caf615af2d97fdfe9ceef
-      size: 828
-  original:
-    hackage: tar-conduit-0.4.1@sha256:112d28118eb71901ea9e224e1b174c648b378256729669c2739b8b803d25b43a,3126
 snapshots:
 - completed:
-    sha256: e176944bc843f740e05242fa7a66ca1f440c127e425254f7f1257f9b19add23f
-    size: 712153
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/0.yaml
-  original: lts-22.0
+    sha256: 1b4c2669e26fa828451830ed4725e4d406acc25a1fa24fcc039465dd13d7a575
+    size: 714100
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/6.yaml
+  original: lts-22.6
