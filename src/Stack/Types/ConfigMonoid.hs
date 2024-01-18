@@ -267,7 +267,7 @@ parseConfigMonoidObject rootDir obj = do
   compilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
   compilerRepository <- First <$> (obj ..:? configMonoidCompilerRepositoryName)
 
-  options <- Map.map (.unGhcOptions) <$>
+  options <- Map.map (.ghcOptions) <$>
     obj ..:? configMonoidGhcOptionsName ..!= (mempty :: Map GhcOptionKey GhcOptions)
 
   optionsEverything <-
@@ -329,7 +329,7 @@ parseConfigMonoidObject rootDir obj = do
   snapshotLocation <- First <$> obj ..:? configMonoidSnapshotLocationName
   noRunCompile <- FirstFalse <$> obj ..:? configMonoidNoRunCompileName
   stackDeveloperMode <- First <$> obj ..:? configMonoidStackDeveloperModeName
-  pure $ ConfigMonoid
+  pure ConfigMonoid
     { stackRoot
     , workDir
     , buildOpts

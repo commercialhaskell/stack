@@ -326,7 +326,7 @@ configFromConfigMonoid
         os = defOS
         platform = Platform arch os
         requireStackVersion = simplifyVersionRange
-          configMonoid.requireStackVersion.getIntersectingVersionRange
+          configMonoid.requireStackVersion.intersectingVersionRange
         compilerCheck = fromFirst MatchMinor configMonoid.compilerCheck
     platformVariant <- liftIO $
       maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar

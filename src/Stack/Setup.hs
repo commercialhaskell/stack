@@ -674,7 +674,7 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
   menv0 <- view processContextL
   env <- either throwM (pure . removeHaskellEnvVars)
            $ augmentPathMap
-               (map toFilePath ghcBin.edBins)
+               (map toFilePath ghcBin.bins)
                (view envVarsL menv0)
   menv <- mkProcessContext env
 
@@ -932,7 +932,7 @@ runWithMSYS mmsysPaths inner = do
     Just msysPaths -> do
       envars <- either throwM pure $
         augmentPathMap
-          (map toFilePath msysPaths.edBins)
+          (map toFilePath msysPaths.bins)
           (view envVarsL pc0)
       mkProcessContext envars
   let envMsys
@@ -1110,7 +1110,7 @@ ensureMsys sopts getSetupInfo' = do
               osKey <- getOSKey "MSYS2" msysDir
               config <- view configL
               VersionedDownloadInfo version info <-
-                case Map.lookup osKey si.siMsys2 of
+                case Map.lookup osKey si.msys2 of
                   Just x -> pure x
                   Nothing -> prettyThrowIO $ MSYS2NotFound osKey
               let tool = Tool (PackageIdentifier (mkPackageName "msys2") version)
@@ -1259,11 +1259,11 @@ ensureCompiler sopts getSetupInfo' = do
     Nothing -> ensureSandboxedCompiler sopts getSetupInfo'
     Just cp -> do
       let paths = ExtraDirs
-            { edBins = [parent cp.compiler]
-            , edInclude = [], edLib = []
+            { bins = [parent cp.compiler]
+            , include = []
+            , lib = []
             }
       pure (cp, paths)
-
 
 -- | Runs @STACK_ROOT\/hooks\/ghc-install.sh@.
 --
@@ -1354,7 +1354,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
   wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
   menv0 <- view processContextL
   m <- either throwM pure
-     $ augmentPathMap (toFilePath <$> paths.edBins) (view envVarsL menv0)
+     $ augmentPathMap (toFilePath <$> paths.bins) (view envVarsL menv0)
   menv <- mkProcessContext (removeHaskellEnvVars m)
 
   names <-
@@ -1368,10 +1368,10 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
   -- sandbox. This led to a specific issue on Windows with GHC 9.0.1. See
   -- https://gitlab.haskell.org/ghc/ghc/-/issues/20074. Instead, now, we look
   -- on the paths specified only.
-  let loop [] = prettyThrowIO $ SandboxedCompilerNotFound names paths.edBins
+  let loop [] = prettyThrowIO $ SandboxedCompilerNotFound names paths.bins
       loop (x:xs) = do
         res <- liftIO $
-          D.findExecutablesInDirectories (map toFilePath paths.edBins) x
+          D.findExecutablesInDirectories (map toFilePath paths.bins) x
         case res of
           [] -> loop xs
           compiler:rest -> do
@@ -1985,7 +1985,7 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
         )
     _ -> do
       ghcKey <- getGhcKey ghcBuild
-      case Map.lookup ghcKey si.siGHCs of
+      case Map.lookup ghcKey si.ghcByVersion of
         Nothing -> throwM $ UnknownOSKey ghcKey
         Just pairs_ ->
           getWantedCompilerInfo ghcKey versionCheck wanted ACGhc pairs_
@@ -2011,7 +2011,7 @@ downloadAndInstallCompiler ghcBuild si wanted@(WCGhc version) versionCheck mbind
   let tool = Tool $ PackageIdentifier ghcPkgName selectedVersion
   downloadAndInstallTool
     config.localPrograms
-    downloadInfo.gdiDownloadInfo
+    downloadInfo.downloadInfo
     tool
     (installer si)
 
@@ -2289,14 +2289,14 @@ installGHCPosix downloadInfo _ archiveFile archiveType tempDir destDir = do
 
   -- Data.Map.union provides a left-biased union, so mGccEnv will prevail
   let ghcConfigureEnv =
-        fromMaybe Map.empty mGccEnv `Map.union` downloadInfo.gdiConfigureEnv
+        fromMaybe Map.empty mGccEnv `Map.union` downloadInfo.configureEnv
 
   logSticky "Configuring GHC ..."
   runStep "configuring" dir
     ghcConfigureEnv
     (toFilePath $ dir </> relFileConfigure)
     ( ("--prefix=" ++ toFilePath destDir)
-    : map T.unpack downloadInfo.gdiConfigureOpts
+    : map T.unpack downloadInfo.configureOpts
     )
 
   logSticky "Installing GHC ..."
@@ -2457,7 +2457,7 @@ setup7z si = do
   ensureDir dir
   let exeDestination = dir </> relFile7zexe
       dllDestination = dir </> relFile7zdll
-  case (si.siSevenzDll, si.siSevenzExe) of
+  case (si.sevenzDll, si.sevenzExe) of
     (Just sevenzDll, Just sevenzExe) -> do
       _ <- downloadOrUseLocal "7z.dll" sevenzDll dllDestination
       exePath <- downloadOrUseLocal "7z.exe" sevenzExe exeDestination

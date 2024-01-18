@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Stack.Types.GHCDownloadInfo
@@ -13,9 +14,9 @@ import           Stack.Types.DownloadInfo
                    ( DownloadInfo, parseDownloadInfoFromObject )
 
 data GHCDownloadInfo = GHCDownloadInfo
-  { gdiConfigureOpts :: [Text]
-  , gdiConfigureEnv :: Map Text Text
-  , gdiDownloadInfo :: DownloadInfo
+  { configureOpts :: [Text]
+  , configureEnv :: Map Text Text
+  , downloadInfo :: DownloadInfo
   }
   deriving Show
 
@@ -25,7 +26,7 @@ instance FromJSON (WithJSONWarnings GHCDownloadInfo) where
     configureEnv <- o ..:? "configure-env" ..!= mempty
     downloadInfo <- parseDownloadInfoFromObject o
     pure GHCDownloadInfo
-      { gdiConfigureOpts = configureOpts
-      , gdiConfigureEnv = configureEnv
-      , gdiDownloadInfo = downloadInfo
+      { configureOpts
+      , configureEnv
+      , downloadInfo
       }

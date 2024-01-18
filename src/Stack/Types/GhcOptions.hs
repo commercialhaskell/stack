@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 
 module Stack.Types.GhcOptions
   ( GhcOptions (..)
@@ -9,7 +10,7 @@ import           Data.Attoparsec.Args ( EscapingMode (Escaping), parseArgs )
 import qualified Data.Text as T
 import           Stack.Prelude
 
-newtype GhcOptions = GhcOptions { unGhcOptions :: [Text] }
+newtype GhcOptions = GhcOptions { ghcOptions :: [Text] }
 
 instance FromJSON GhcOptions where
   parseJSON = withText "GhcOptions" $ \t ->

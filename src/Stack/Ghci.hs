@@ -536,12 +536,12 @@ runGhci
                 ++ M.foldMapWithKey subDepsPackageUnhide exposeInternalDep
               else []
           oneWordOpts bio
-            | shouldHidePackages = bio.bioOneWordOpts ++ bio.bioPackageFlags
-            | otherwise = bio.bioOneWordOpts
+            | shouldHidePackages = bio.oneWordOpts ++ bio.packageFlags
+            | otherwise = bio.oneWordOpts
           genOpts = nubOrd
             (concatMap (concatMap (oneWordOpts . snd) . (.ghciPkgOpts)) pkgs)
           (omittedOpts, ghcOpts) = L.partition badForGhci $
-               concatMap (concatMap ((.bioOpts) . snd) . (.ghciPkgOpts)) pkgs
+               concatMap (concatMap ((.opts) . snd) . (.ghciPkgOpts)) pkgs
             ++ map
                  T.unpack
                  (  fold config.ghcOptionsByCat
@@ -623,7 +623,7 @@ writeMacrosFile ::
 writeMacrosFile outputDirectory pkgs = do
   fps <- fmap (nubOrd . catMaybes . concat) $
     forM pkgs $ \pkg -> forM pkg.ghciPkgOpts $ \(_, bio) -> do
-      let cabalMacros = bio.bioCabalMacros
+      let cabalMacros = bio.cabalMacros
       exists <- liftIO $ doesFileExist cabalMacros
       if exists
         then pure $ Just cabalMacros
@@ -1076,7 +1076,7 @@ checkForIssues pkgs =
    where
     (xs, ys) = L.partition (any f . snd) compsWithOpts
   compsWithOpts = map (\(k, bio) ->
-    (k, bio.bioOneWordOpts ++ bio.bioOpts)) compsWithBios
+    (k, bio.oneWordOpts ++ bio.opts)) compsWithBios
   compsWithBios =
     [ ((pkg.ghciPkgName, c), bio)
     | pkg <- pkgs

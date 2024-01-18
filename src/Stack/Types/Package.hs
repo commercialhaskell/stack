@@ -157,7 +157,7 @@ instance Exception PackageException where
 
 -- | Name of an executable.
 newtype ExeName
-  = ExeName { unExeName :: Text }
+  = ExeName { exeName :: Text }
   deriving (Data, Eq, Generic, Hashable, IsString, NFData, Ord, Show, Typeable)
 
 -- | Some package info.
@@ -216,13 +216,13 @@ packageDefinedFlags = M.keysSet . (.defaultFlags)
 
 -- | GHC options based on cabal information and ghc-options.
 data BuildInfoOpts = BuildInfoOpts
-  { bioOpts :: [String]
-  , bioOneWordOpts :: [String]
-  , bioPackageFlags :: [String]
+  { opts :: [String]
+  , oneWordOpts :: [String]
+  , packageFlags :: [String]
     -- ^ These options can safely have 'nubOrd' applied to them, as there are no
     -- multi-word options (see
     -- https://github.com/commercialhaskell/stack/issues/1255)
-  , bioCabalMacros :: Path Abs File
+  , cabalMacros :: Path Abs File
   }
   deriving Show
 
@@ -314,7 +314,7 @@ data LocalPackage = LocalPackage
   deriving Show
 
 newtype MemoizedWith env a
-  = MemoizedWith { unMemoizedWith :: RIO env a }
+  = MemoizedWith { memoizedWith :: RIO env a }
   deriving (Applicative, Functor, Monad)
 
 memoizeRefWith :: MonadIO m => RIO env a -> m (MemoizedWith env a)
@@ -354,7 +354,7 @@ lpFilesForComponents components lp = runMemoizedWith $ do
   pure $ mconcat (M.elems (M.restrictKeys componentFiles components))
 
 newtype FileCacheInfo = FileCacheInfo
-  { fciHash :: SHA256
+  { hash :: SHA256
   }
   deriving (Eq, Generic, Show, Typeable)
 
@@ -412,11 +412,11 @@ installedMapGhcPkgId ::
 installedMapGhcPkgId pkgId@(PackageIdentifier pkgName version) installedLib =
   finalMap
  where
-  finalMap = M.insert pkgId installedLib.iliId baseMap
+  finalMap = M.insert pkgId installedLib.ghcPkgId baseMap
   baseMap =
     M.mapKeysMonotonic
       (toCabalMungedPackageIdentifier pkgName version)
-      installedLib.iliSublib
+      installedLib.subLib
 
 -- | Creates a 'MungedPackageName' identifier.
 toCabalMungedPackageIdentifier ::

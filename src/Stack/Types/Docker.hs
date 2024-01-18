@@ -358,7 +358,7 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
         ( o ..:? dockerRequireDockerVersionArgName
           ..!= VersionRangeJSON anyVersion
         )
-    pure $ DockerOptsMonoid
+    pure DockerOptsMonoid
       { defaultEnable
       , enable
       , repoOrImage

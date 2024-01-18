@@ -103,7 +103,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     interleavedOutput <- FirstTrue <$> o ..:? interleavedOutputName
     progressBar <- First <$> o ..:? progressBarName
     ddumpDir <- o ..:? ddumpDirName ..!= mempty
-    pure $ BuildOptsMonoid
+    pure BuildOptsMonoid
       { trace
       , profile
       , noStrip
@@ -249,7 +249,7 @@ instance FromJSON (WithJSONWarnings TestOptsMonoid) where
     disableRun <- FirstFalse <$> o ..:? testDisableRunArgName
     maximumTimeSeconds <- First <$> o ..:? maximumTimeSecondsArgName
     allowStdin <- FirstTrue <$> o ..:? testsAllowStdinName
-    pure $ TestOptsMonoid
+    pure TestOptsMonoid
       { rerunTests
       , additionalArgs
       , coverage
@@ -291,7 +291,7 @@ newtype HaddockOptsMonoid = HaddockOptsMonoid
 instance FromJSON (WithJSONWarnings HaddockOptsMonoid) where
   parseJSON = withObjectWarnings "HaddockOptsMonoid" $ \o -> do
     additionalArgs <- o ..:? haddockAdditionalArgsName ..!= []
-    pure $ HaddockOptsMonoid { additionalArgs }
+    pure HaddockOptsMonoid { additionalArgs }
 
 instance Semigroup HaddockOptsMonoid where
   (<>) = mappenddefault
@@ -313,7 +313,7 @@ instance FromJSON (WithJSONWarnings BenchmarkOptsMonoid) where
   parseJSON = withObjectWarnings "BenchmarkOptsMonoid" $ \o -> do
     additionalArgs <- First <$> o ..:? benchmarkAdditionalArgsName
     disableRun <- First <$> o ..:? benchmarkDisableRunArgName
-    pure $ BenchmarkOptsMonoid
+    pure BenchmarkOptsMonoid
       { additionalArgs
       , disableRun
       }

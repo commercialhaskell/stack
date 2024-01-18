@@ -30,7 +30,7 @@ instance FromJSON (WithJSONWarnings CasaOptsMonoid) where
     enable <- FirstTrue <$> o ..:? casaEnableName
     repoPrefix <- First <$> o ..:? casaRepoPrefixName
     maxKeysPerRequest <- First <$> o ..:? casaMaxKeysPerRequestName
-    pure $ CasaOptsMonoid
+    pure CasaOptsMonoid
       { enable
       , repoPrefix
       , maxKeysPerRequest

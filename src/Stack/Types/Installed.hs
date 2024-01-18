@@ -96,9 +96,9 @@ type InstallMap = Map PackageName (InstallLocation, Version)
 type InstalledMap = Map PackageName (InstallLocation, Installed)
 
 data InstalledLibraryInfo = InstalledLibraryInfo
-  { iliId :: GhcPkgId
-  , iliLicense :: Maybe (Either SPDX.License License)
-  , iliSublib :: Map StackUnqualCompName GhcPkgId
+  { ghcPkgId :: GhcPkgId
+  , license :: Maybe (Either SPDX.License License)
+  , subLib :: Map StackUnqualCompName GhcPkgId
   }
   deriving (Eq, Show)
 
@@ -125,7 +125,7 @@ simpleInstalledLib pkgIdentifier ghcPkgId =
 
 installedToPackageIdOpt :: InstalledLibraryInfo -> [String]
 installedToPackageIdOpt libInfo =
-  M.foldr' (iterator (++)) (pure $ toStr libInfo.iliId) libInfo.iliSublib
+  M.foldr' (iterator (++)) (pure $ toStr libInfo.ghcPkgId) libInfo.subLib
  where
   toStr ghcPkgId = "-package-id=" <> ghcPkgIdString ghcPkgId
   iterator op ghcPkgId acc = pure (toStr ghcPkgId) `op` acc
@@ -135,7 +135,7 @@ installedPackageIdentifier (Library pid _) = pid
 installedPackageIdentifier (Executable pid) = pid
 
 installedGhcPkgId :: Installed -> Maybe GhcPkgId
-installedGhcPkgId (Library _ libInfo) = Just libInfo.iliId
+installedGhcPkgId (Library _ libInfo) = Just libInfo.ghcPkgId
 installedGhcPkgId (Executable _) = Nothing
 
 -- | Get the installed Version.

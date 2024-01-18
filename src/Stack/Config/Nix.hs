@@ -73,7 +73,7 @@ nixOptsFromMonoid nixMonoid os = do
 
   when (not (null packages) && isJust initFile) $
     throwIO NixCannotUseShellFileAndPackagesException
-  pure $ NixOpts
+  pure NixOpts
     { enable
     , pureShell
     , packages

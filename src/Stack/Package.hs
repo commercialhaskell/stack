@@ -280,7 +280,7 @@ generatePkgDescOpts
 generateBuildInfoOpts :: BioInput -> BuildInfoOpts
 generateBuildInfoOpts bi =
   BuildInfoOpts
-    { bioOpts =
+    { opts =
            ghcOpts
         ++ fmap ("-optP" <>) bi.buildInfo.cppOptions
     -- NOTE for future changes: Due to this use of nubOrd (and other uses
@@ -290,10 +290,10 @@ generateBuildInfoOpts bi =
     -- "--main-is" being removed.
     --
     -- See https://github.com/commercialhaskell/stack/issues/1255
-    , bioOneWordOpts = nubOrd $ concat
+    , oneWordOpts = nubOrd $ concat
         [extOpts, srcOpts, includeOpts, libOpts, fworks, cObjectFiles]
-    , bioPackageFlags = deps
-    , bioCabalMacros = componentAutogen </> relFileCabalMacrosH
+    , packageFlags = deps
+    , cabalMacros = componentAutogen </> relFileCabalMacrosH
     }
  where
   cObjectFiles = mapMaybe
@@ -503,10 +503,10 @@ flagMap = M.fromList . map pair
   pair = flagName &&& flagDefault
 
 data ResolveConditions = ResolveConditions
-  { rcFlags :: Map FlagName Bool
-  , rcCompilerVersion :: ActualCompiler
-  , rcOS :: OS
-  , rcArch :: Arch
+  { flags :: Map FlagName Bool
+  , compilerVersion :: ActualCompiler
+  , os :: OS
+  , arch :: Arch
   }
 
 -- | Generic a @ResolveConditions@ using sensible defaults.
@@ -516,10 +516,10 @@ mkResolveConditions ::
   -> Map FlagName Bool -- ^ enabled flags
   -> ResolveConditions
 mkResolveConditions compilerVersion (Platform arch os) flags = ResolveConditions
-  { rcFlags = flags
-  , rcCompilerVersion = compilerVersion
-  , rcOS = os
-  , rcArch = arch
+  { flags
+  , compilerVersion
+  , os
+  , arch
   }
 
 -- | Resolve the condition tree for the library.
@@ -547,13 +547,13 @@ resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
         CAnd cx cy -> condSatisfied cx && condSatisfied cy
     varSatisfied v =
       case v of
-        OS os -> os == rc.rcOS
-        Arch arch -> arch == rc.rcArch
-        PackageFlag flag -> fromMaybe False $ M.lookup flag rc.rcFlags
+        OS os -> os == rc.os
+        Arch arch -> arch == rc.arch
+        PackageFlag flag -> fromMaybe False $ M.lookup flag rc.flags
         -- NOTE:  ^^^^^ This should never happen, as all flags which are used
         -- must be declared. Defaulting to False.
         Impl flavor range ->
-          case (flavor, rc.rcCompilerVersion) of
+          case (flavor, rc.compilerVersion) of
             (GHC, ACGhc vghc) -> vghc `withinRange` range
             _ -> False
 

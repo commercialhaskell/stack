@@ -1,7 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 
 -- Determine which packages are already installed
 module Stack.Build.Installed
@@ -298,12 +299,12 @@ gatherAndTransformSubLoadHelper lh =
       (_, Library _ existingLibInfo)
     = ( pLoc
       , Library pn existingLibInfo
-          { iliSublib = Map.union
-              incomingLibInfo.iliSublib
-              existingLibInfo.iliSublib
-          , iliId = if isJust lh.lhSublibrary
-                      then existingLibInfo.iliId
-                      else incomingLibInfo.iliId
+          { subLib = Map.union
+              incomingLibInfo.subLib
+              existingLibInfo.subLib
+          , ghcPkgId = if isJust lh.lhSublibrary
+                      then existingLibInfo.ghcPkgId
+                      else incomingLibInfo.ghcPkgId
           }
       )
   onPreviousLoadHelper newVal _oldVal = newVal
@@ -316,5 +317,5 @@ gatherAndTransformSubLoadHelper lh =
       (Library (PackageIdentifier _sublibMungedPackageName version) libInfo)
     = Library
         (PackageIdentifier key version)
-        libInfo {iliSublib = Map.singleton sd.libraryName libInfo.iliId}
+        libInfo { subLib = Map.singleton sd.libraryName libInfo.ghcPkgId }
   updateAsSublib _ v = v

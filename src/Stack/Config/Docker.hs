@@ -20,7 +20,7 @@ import           Stack.Types.Docker
                    , DockerOptsMonoid (..), dockerImageArgName
                    )
 import           Stack.Types.Resolver ( AbstractResolver (..) )
-import           Stack.Types.Version ( getIntersectingVersionRange )
+import           Stack.Types.Version ( IntersectingVersionRange (..) )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Config.Docker" module.
@@ -105,9 +105,9 @@ dockerOptsFromMonoid mproject maresolver dockerMonoid = do
       setUser = getFirst dockerMonoid.setUser
       requireDockerVersion =
         simplifyVersionRange
-          dockerMonoid.requireDockerVersion.getIntersectingVersionRange
+          dockerMonoid.requireDockerVersion.intersectingVersionRange
       stackExe = getFirst dockerMonoid.stackExe
-  pure $ DockerOpts
+  pure DockerOpts
     { enable
     , image
     , registryLogin

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
 
@@ -34,7 +35,7 @@ import           Stack.Prelude hiding ( Vector, pretty )
 import           Text.PrettyPrint ( render )
 
 newtype IntersectingVersionRange = IntersectingVersionRange
-  { getIntersectingVersionRange :: Cabal.VersionRange }
+  { intersectingVersionRange :: Cabal.VersionRange }
   deriving Show
 
 instance Semigroup IntersectingVersionRange where

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ViewPatterns        #-}
@@ -20,29 +21,29 @@ import           Stack.Types.VersionedDownloadInfo ( VersionedDownloadInfo )
 import           Stack.Types.GHCDownloadInfo ( GHCDownloadInfo )
 
 data SetupInfo = SetupInfo
-  { siSevenzExe :: Maybe DownloadInfo
-  , siSevenzDll :: Maybe DownloadInfo
-  , siMsys2 :: Map Text VersionedDownloadInfo
-  , siGHCs :: Map Text (Map Version GHCDownloadInfo)
-  , siStack :: Map Text (Map Version DownloadInfo)
+  { sevenzExe :: Maybe DownloadInfo
+  , sevenzDll :: Maybe DownloadInfo
+  , msys2 :: Map Text VersionedDownloadInfo
+  , ghcByVersion :: Map Text (Map Version GHCDownloadInfo)
+  , stackByVersion :: Map Text (Map Version DownloadInfo)
   }
   deriving Show
 
 instance FromJSON (WithJSONWarnings SetupInfo) where
   parseJSON = withObjectWarnings "SetupInfo" $ \o -> do
-    siSevenzExe <- jsonSubWarningsT (o ..:? "sevenzexe-info")
-    siSevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
-    siMsys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
-    (fmap unCabalStringMap -> siGHCs) <-
+    sevenzExe <- jsonSubWarningsT (o ..:? "sevenzexe-info")
+    sevenzDll <- jsonSubWarningsT (o ..:? "sevenzdll-info")
+    msys2 <- jsonSubWarningsT (o ..:? "msys2" ..!= mempty)
+    (fmap unCabalStringMap -> ghcByVersion) <-
       jsonSubWarningsTT (o ..:? "ghc" ..!= mempty)
-    (fmap unCabalStringMap -> siStack) <-
+    (fmap unCabalStringMap -> stackByVersion) <-
       jsonSubWarningsTT (o ..:? "stack" ..!= mempty)
-    pure $ SetupInfo
-      { siSevenzExe
-      , siSevenzDll
-      , siMsys2
-      , siGHCs
-      , siStack
+    pure SetupInfo
+      { sevenzExe
+      , sevenzDll
+      , msys2
+      , ghcByVersion
+      , stackByVersion
       }
 
 -- | For the @siGHCs@ field maps are deeply merged. For all fields the values
@@ -50,20 +51,20 @@ instance FromJSON (WithJSONWarnings SetupInfo) where
 instance Semigroup SetupInfo where
   l <> r =
     SetupInfo
-      { siSevenzExe = l.siSevenzExe <|> r.siSevenzExe
-      , siSevenzDll = l.siSevenzDll <|> r.siSevenzDll
-      , siMsys2 = l.siMsys2 <> r.siMsys2
-      , siGHCs = Map.unionWith (<>) l.siGHCs r.siGHCs
-      , siStack = Map.unionWith (<>) l.siStack r.siStack
+      { sevenzExe = l.sevenzExe <|> r.sevenzExe
+      , sevenzDll = l.sevenzDll <|> r.sevenzDll
+      , msys2 = l.msys2 <> r.msys2
+      , ghcByVersion = Map.unionWith (<>) l.ghcByVersion r.ghcByVersion
+      , stackByVersion = Map.unionWith (<>) l.stackByVersion r.stackByVersion
       }
 
 instance Monoid SetupInfo where
   mempty =
     SetupInfo
-      { siSevenzExe = Nothing
-      , siSevenzDll = Nothing
-      , siMsys2 = Map.empty
-      , siGHCs = Map.empty
-      , siStack = Map.empty
+      { sevenzExe = Nothing
+      , sevenzDll = Nothing
+      , msys2 = Map.empty
+      , ghcByVersion = Map.empty
+      , stackByVersion = Map.empty
       }
   mappend = (<>)
