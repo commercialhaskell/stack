@@ -1,5 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 -- Concurrent execution with dependencies. Types currently hard-coded for needs
 -- of stack, but could be generalized easily.
@@ -55,9 +57,9 @@ data Action = Action
     -- ^ The action's unique id.
   , actionDeps :: !(Set ActionId)
     -- ^ Actions on which this action depends.
-  , actionDo :: !(ActionContext -> IO ())
+  , action :: !(ActionContext -> IO ())
     -- ^ The action's 'IO' action, given a context.
-  , actionConcurrency :: !Concurrency
+  , concurrency :: !Concurrency
     -- ^ Whether this action may be run concurrently with others.
   }
 
@@ -69,20 +71,20 @@ data Concurrency
   deriving Eq
 
 data ActionContext = ActionContext
-  { acRemaining :: !(Set ActionId)
+  { remaining :: !(Set ActionId)
     -- ^ Does not include the current action.
-  , acDownstream :: [Action]
+  , downstream :: [Action]
     -- ^ Actions which depend on the current action.
-  , acConcurrency :: !Concurrency
+  , concurrency :: !Concurrency
     -- ^ Whether this action may be run concurrently with others.
   }
 
 data ExecuteState = ExecuteState
-  { esActions    :: TVar [Action]
-  , esExceptions :: TVar [SomeException]
-  , esInAction   :: TVar (Set ActionId)
-  , esCompleted  :: TVar Int
-  , esKeepGoing  :: Bool
+  { actions    :: TVar [Action]
+  , exceptions :: TVar [SomeException]
+  , inAction   :: TVar (Set ActionId)
+  , completed  :: TVar Int
+  , keepGoing  :: Bool
   }
 
 runActions ::
@@ -98,16 +100,16 @@ runActions threads keepGoing actions withProgress = do
     <*> newTVarIO Set.empty -- esInAction
     <*> newTVarIO 0 -- esCompleted
     <*> pure keepGoing -- esKeepGoing
-  _ <- async $ withProgress es.esCompleted es.esInAction
+  _ <- async $ withProgress es.completed es.inAction
   if threads <= 1
     then runActions' es
     else replicateConcurrently_ threads $ runActions' es
-  readTVarIO es.esExceptions
+  readTVarIO es.exceptions
 
 -- | Sort actions such that those that can't be run concurrently are at
 -- the end.
 sortActions :: [Action] -> [Action]
-sortActions = sortBy (compareConcurrency `on` (.actionConcurrency))
+sortActions = sortBy (compareConcurrency `on` (.concurrency))
  where
   -- NOTE: Could derive Ord. However, I like to make this explicit so
   -- that changes to the datatype must consider how it's affecting
@@ -124,53 +126,54 @@ runActions' es = loop
 
   breakOnErrs :: STM (IO ()) -> STM (IO ())
   breakOnErrs inner = do
-    errs <- readTVar es.esExceptions
-    if null errs || es.esKeepGoing
+    errs <- readTVar es.exceptions
+    if null errs || es.keepGoing
       then inner
       else doNothing
 
   withActions :: ([Action] -> STM (IO ())) -> STM (IO ())
   withActions inner = do
-    actions <- readTVar es.esActions
+    actions <- readTVar es.actions
     if null actions
       then doNothing
       else inner actions
 
   processActions :: [Action] -> STM (IO ())
   processActions actions = do
-    inAction <- readTVar es.esInAction
+    inAction <- readTVar es.inAction
     case break (Set.null . (.actionDeps)) actions of
       (_, []) -> do
         check (Set.null inAction)
-        unless es.esKeepGoing $
-          modifyTVar es.esExceptions (toException InconsistentDependenciesBug:)
+        unless es.keepGoing $
+          modifyTVar es.exceptions (toException InconsistentDependenciesBug:)
         doNothing
       (xs, action:ys) -> processAction inAction (xs ++ ys) action
 
   processAction :: Set ActionId -> [Action] -> Action -> STM (IO ())
   processAction inAction otherActions action = do
-    let concurrency = action.actionConcurrency
+    let concurrency = action.concurrency
     unless (concurrency == ConcurrencyAllowed) $
       check (Set.null inAction)
     let action' = action.actionId
         otherActions' = Set.fromList $ map (.actionId) otherActions
         remaining = Set.union otherActions' inAction
+        downstream = downstreamActions action' otherActions
         actionContext = ActionContext
-          { acRemaining = remaining
-          , acDownstream = downstreamActions action' otherActions
-          , acConcurrency = concurrency
+          { remaining
+          , downstream
+          , concurrency
           }
-    writeTVar es.esActions otherActions
-    modifyTVar es.esInAction (Set.insert action')
+    writeTVar es.actions otherActions
+    modifyTVar es.inAction (Set.insert action')
     pure $ do
       mask $ \restore -> do
-        eres <- try $ restore $ action.actionDo actionContext
+        eres <- try $ restore $ action.action actionContext
         atomically $ do
-          modifyTVar es.esInAction (Set.delete action')
-          modifyTVar es.esCompleted (+1)
+          modifyTVar es.inAction (Set.delete action')
+          modifyTVar es.completed (+1)
           case eres of
-            Left err -> modifyTVar es.esExceptions (err:)
-            Right () -> modifyTVar es.esActions $ map (dropDep action')
+            Left err -> modifyTVar es.exceptions (err:)
+            Right () -> modifyTVar es.actions $ map (dropDep action')
       loop
 
   -- | Filter a list of actions to include only those that depend on the given

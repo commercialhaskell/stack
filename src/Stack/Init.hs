@@ -40,7 +40,7 @@ import           RIO.List ( (\\), intercalate, isSuffixOf, isPrefixOf )
 import           RIO.NonEmpty ( nonEmpty )
 import qualified RIO.NonEmpty as NE
 import           Stack.BuildPlan
-                   ( BuildPlanCheck (..), checkSnapBuildPlan, deNeededBy
+                   ( BuildPlanCheck (..), DepError (..), checkSnapBuildPlan
                    , removeSrcPkgDefaultFlags, selectBestSnapshot
                    )
 import           Stack.Config ( getSnapshots, makeConcreteResolver )
@@ -620,7 +620,7 @@ checkBundleResolver initOpts snapshotLoc snapCandidate pkgDirs = do
       <> line
       <> indent 4 (string $ show res)
 
-  failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap (.deNeededBy) e))
+  failedUserPkgs e = Map.keys $ Map.unions (Map.elems (fmap (.neededBy) e))
 
 getRecommendedSnapshots :: Snapshots -> NonEmpty SnapName
 getRecommendedSnapshots snapshots =

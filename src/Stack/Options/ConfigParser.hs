@@ -79,7 +79,7 @@ configOptsParser currentDir hide0 =
         <> completer
              ( pathCompleterWith
                ( defaultPathCompleterOpts
-                   { pcoAbsolute = False, pcoFileFilter = const False }
+                   { absolute = False, fileFilter = const False }
                )
              )
         <> help "Relative path to Stack's work directory. Overrides any \

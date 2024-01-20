@@ -456,8 +456,8 @@ singleBuild
           -- because their configure step will require that this
           -- package is built. See
           -- https://github.com/commercialhaskell/stack/issues/2787
-          (True, _) | null ac.acDownstream -> pure Nothing
-          (_, True) | null ac.acDownstream || installedMapHasThisPkg -> do
+          (True, _) | null ac.downstream -> pure Nothing
+          (_, True) | null ac.downstream || installedMapHasThisPkg -> do
             initialBuildSteps executableBuildStatuses cabal announce
             pure Nothing
           _ -> fulfillCuratorBuildExpectations
@@ -700,7 +700,7 @@ singleBuild
         let remaining =
               filter
                 (\(ActionId x _) -> x == pkgId)
-                (Set.toList ac.acRemaining)
+                (Set.toList ac.remaining)
         when (null remaining) $ removeDirRecur pkgDir
       TTLocalMutable{} -> pure ()
 
