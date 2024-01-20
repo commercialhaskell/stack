@@ -38,6 +38,9 @@ Behavior changes:
 * If Stack's `--resolver` option is not specified, Stack's `unpack` command with
   a package name will seek to update the package index before seeking to
   download the most recent version of the package in the index.
+* If the version of Cabal (the library) provided with the specified GHC can copy
+  specific components, Stack will copy only the components built and will not
+  build all executable components at least once.
 
 Other enhancements:
 

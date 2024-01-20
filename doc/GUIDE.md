@@ -972,88 +972,44 @@ end up including the helloworld-test component as well.
 
 You can bypass this implicit adding of components by being much more explicit,
 and stating the components directly. For example, the following will not build
-the `helloworld-exe` executable once all executables have been successfully
-built:
+the `helloworld-exe` executable:
 
 ~~~text
-stack clean
+stack purge
 stack build :helloworld-test
-Building all executables for `helloworld' once. After a successful build of all of them, only specified executables will be rebuilt.
-helloworld> configure (lib + exe + test)
+helloworld> configure (lib + test)
 Configuring helloworld-0.1.0.0...
-helloworld> build (lib + exe + test) with ghc-x.y.z
+helloworld> build (lib + test) with ghc-9.6.4
 Preprocessing library for helloworld-0.1.0.0..
 Building library for helloworld-0.1.0.0..
 [1 of 2] Compiling Lib
 [2 of 2] Compiling Paths_helloworld
-Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0..
-Building executable 'helloworld-exe' for helloworld-0.1.0.0..
-[1 of 2] Compiling Main
-[2 of 2] Compiling Paths_helloworld
-Linking .stack-work\dist\<hash>\build\helloworld-exe\helloworld-exe.exe ...
 Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
 Building test suite 'helloworld-test' for helloworld-0.1.0.0..
 [1 of 2] Compiling Main
 [2 of 2] Compiling Paths_helloworld
-Linking .stack-work\dist\<hash>\build\helloworld-test\helloworld-test.exe ...
+[3 of 3] Linking .stack-work\dist\<hash>\build\helloworld-test\helloworld-test.exe
 helloworld> copy/register
 Installing library in ...\helloworld\.stack-work\install\...
-Installing executable helloworld-exe in ...\helloworld\.stack-work\install\...\bin
 Registering library for helloworld-0.1.0.0..
 helloworld> test (suite: helloworld-test)
 
 Test suite not yet implemented
 
-helloworld> Test suite helloworld-test passed
-Completed 2 action(s).
-~~~
 
-We first cleaned our project to clear old results so we know exactly what Stack
-is trying to do. Note that it says it is building all executables for
-`helloworld` once, and that after a successful build of all of them, only
-specified executables will be rebuilt. If we change the source code of
-`test/Spec.hs`, say to:
-
-~~~haskell
-main :: IO ()
-main = putStrLn "Test suite still not yet implemented"
-~~~
-
-and command again:
-
-~~~text
-stack build :helloworld-test
-helloworld-0.1.0.0: unregistering (local file changes: test\Spec.hs)
-helloworld> build (lib + test) with ghc-x.y.z
-Preprocessing library for helloworld-0.1.0.0..
-Building library for helloworld-0.1.0.0..
-Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
-Building test suite 'helloworld-test' for helloworld-0.1.0.0..
-[2 of 2] Compiling Main
-Linking .stack-work\dist\<hash>\build\helloworld-test\helloworld-test.exe ...
-helloworld> copy/register
-Installing library in ...\helloworld\.stack-work\install\...
-Installing executable helloworld-exe in ...\helloworld\.stack-work\install\...\bin
-Registering library for helloworld-0.1.0.0..
-helloworld> blocking for directory lock on ...\helloworld\.stack-work\dist\<hash>\build-lock
-helloworld> test (suite: helloworld-test)
-
-Test suite still not yet implemented
 
 helloworld> Test suite helloworld-test passed
 Completed 2 action(s).
 ~~~
 
-Notice that this time it builds the `helloworld-test` test suite, and the
-`helloworld` library (since it's used by the test suite), but it does not build
-the `helloworld-exe` executable.
+We first purged our project to clear old results so we know exactly what Stack
+is trying to do.
 
-And now the final point: in both cases, the last line shows that our command
-also *runs* the test suite it just built. This may surprise some people who
-would expect tests to only be run when using `stack test`, but this design
-decision is what allows the `stack build` command to be as composable as it is
-(as described previously). The same rule applies to benchmarks. To spell it out
-completely:
+The last line shows that our command also *runs* the test suite it just built.
+This may surprise some people who would expect tests to only be run when using
+`stack test`, but this design decision is what allows the `stack build` command
+to be as composable as it is (as described previously). The same rule applies to
+benchmarks. To spell it out completely:
 
 * The `--test` and `--bench` flags simply state which components of a package
   should be built, if no explicit set of components is given
