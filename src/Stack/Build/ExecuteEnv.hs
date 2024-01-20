@@ -602,10 +602,10 @@ withSingleContext
        (  wanted
        && all
             (\(ActionId ident _) -> ident == pkgId)
-            (Set.toList ac.acRemaining)
+            (Set.toList ac.remaining)
        && ee.totalWanted == 1
        )
-    || ac.acConcurrency == ConcurrencyDisallowed
+    || ac.concurrency == ConcurrencyDisallowed
 
   withPackage inner =
     case taskType of

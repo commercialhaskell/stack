@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 -- | Extra functions for optparse-applicative.
@@ -260,13 +261,13 @@ optionalFirstFalse = fmap FirstFalse . optional
 absFileOption :: Mod OptionFields (Path Abs File) -> Parser (Path Abs File)
 absFileOption mods = option (eitherReader' parseAbsFile) $
      completer
-       (pathCompleterWith defaultPathCompleterOpts { pcoRelative = False })
+       (pathCompleterWith defaultPathCompleterOpts { relative = False })
   <> mods
 
 relFileOption :: Mod OptionFields (Path Rel File) -> Parser (Path Rel File)
 relFileOption mods = option (eitherReader' parseRelFile) $
      completer
-       (pathCompleterWith defaultPathCompleterOpts { pcoAbsolute = False })
+       (pathCompleterWith defaultPathCompleterOpts { absolute = False })
   <> mods
 
 absDirOption :: Mod OptionFields (Path Abs Dir) -> Parser (Path Abs Dir)
@@ -274,8 +275,8 @@ absDirOption mods = option (eitherReader' parseAbsDir) $
      completer
        ( pathCompleterWith
           defaultPathCompleterOpts
-            { pcoRelative = False
-            , pcoFileFilter = const False
+            { relative = False
+            , fileFilter = const False
             }
        )
   <> mods
@@ -285,8 +286,8 @@ relDirOption mods = option (eitherReader' parseRelDir) $
      completer
        ( pathCompleterWith
            defaultPathCompleterOpts
-             { pcoAbsolute = False
-             , pcoFileFilter = const False
+             { absolute = False
+             , fileFilter = const False
              }
        )
   <> mods
@@ -296,20 +297,20 @@ eitherReader' :: Show e => (String -> Either e a) -> ReadM a
 eitherReader' f = eitherReader (mapLeft show . f)
 
 data PathCompleterOpts = PathCompleterOpts
-  { pcoAbsolute :: Bool
-  , pcoRelative :: Bool
-  , pcoRootDir :: Maybe FilePath
-  , pcoFileFilter :: FilePath -> Bool
-  , pcoDirFilter :: FilePath -> Bool
+  { absolute :: Bool
+  , relative :: Bool
+  , rootDir :: Maybe FilePath
+  , fileFilter :: FilePath -> Bool
+  , dirFilter :: FilePath -> Bool
   }
 
 defaultPathCompleterOpts :: PathCompleterOpts
 defaultPathCompleterOpts = PathCompleterOpts
-  { pcoAbsolute = True
-  , pcoRelative = True
-  , pcoRootDir = Nothing
-  , pcoFileFilter = const True
-  , pcoDirFilter = const True
+  { absolute = True
+  , relative = True
+  , rootDir = Nothing
+  , fileFilter = const True
+  , dirFilter = const True
   }
 
 fileCompleter :: Completer
@@ -318,11 +319,11 @@ fileCompleter = pathCompleterWith defaultPathCompleterOpts
 fileExtCompleter :: [String] -> Completer
 fileExtCompleter exts =
   pathCompleterWith
-    defaultPathCompleterOpts { pcoFileFilter = (`elem` exts) . takeExtension }
+    defaultPathCompleterOpts { fileFilter = (`elem` exts) . takeExtension }
 
 dirCompleter :: Completer
 dirCompleter =
-  pathCompleterWith defaultPathCompleterOpts { pcoFileFilter = const False }
+  pathCompleterWith defaultPathCompleterOpts { fileFilter = const False }
 
 pathCompleterWith :: PathCompleterOpts -> Completer
 pathCompleterWith pco = mkCompleter $ \inputRaw -> do
@@ -333,15 +334,15 @@ pathCompleterWith pco = mkCompleter $ \inputRaw -> do
   let (inputSearchDir0, searchPrefix) = splitFileName input
       inputSearchDir = if inputSearchDir0 == "./" then "" else inputSearchDir0
   msearchDir <-
-    case (isRelative inputSearchDir, pco.pcoAbsolute, pco.pcoRelative) of
+    case (isRelative inputSearchDir, pco.absolute, pco.relative) of
       (True, _, True) -> do
-        rootDir <- maybe getCurrentDirectory pure pco.pcoRootDir
+        rootDir <- maybe getCurrentDirectory pure pco.rootDir
         pure $ Just (rootDir </> inputSearchDir)
       (False, True, _) -> pure $ Just inputSearchDir
       _ -> pure Nothing
   case msearchDir of
     Nothing
-      | input == "" && pco.pcoAbsolute -> pure ["/"]
+      | input == "" && pco.absolute -> pure ["/"]
       | otherwise -> pure []
     Just searchDir -> do
       entries <-
@@ -354,7 +355,7 @@ pathCompleterWith pco = mkCompleter $ \inputRaw -> do
             if searchPrefix `isPrefixOf` entry
               then do
                 let path = searchDir </> entry
-                case (pco.pcoFileFilter path, pco.pcoDirFilter path) of
+                case (pco.fileFilter path, pco.dirFilter path) of
                   (True, True) -> pure $ Just (inputSearchDir </> entry)
                   (fileAllowed, dirAllowed) -> do
                     isDir <- doesDirectoryExist path

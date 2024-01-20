@@ -522,9 +522,9 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
           { actionId = ActionId (taskProvides task) ATBuild
           , actionDeps =
               Set.map (`ActionId` ATBuild) task.configOpts.missing
-          , actionDo =
+          , action =
               \ac -> runInBase $ singleBuild ac ee task installedMap False
-          , actionConcurrency = ConcurrencyAllowed
+          , concurrency = ConcurrencyAllowed
           }
       ]
   afinal = case mfinal of
@@ -536,9 +536,9 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
             { actionId = ActionId pkgId ATBuildFinal
             , actionDeps = addBuild
                 (Set.map (`ActionId` ATBuild) task.configOpts.missing)
-            , actionDo =
+            , action =
                 \ac -> runInBase $ singleBuild ac ee task installedMap True
-            , actionConcurrency = ConcurrencyAllowed
+            , concurrency = ConcurrencyAllowed
             }
       ) $
       -- These are the "final" actions - running tests and benchmarks.
@@ -547,12 +547,12 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
           else (:) Action
             { actionId = ActionId pkgId ATRunTests
             , actionDeps = finalDeps
-            , actionDo = \ac -> withLock mtestLock $ runInBase $
+            , action = \ac -> withLock mtestLock $ runInBase $
                 singleTest topts (Set.toList tests) ac ee task installedMap
               -- Always allow tests tasks to run concurrently with other tasks,
               -- particularly build tasks. Note that 'mtestLock' can optionally
               -- make it so that only one test is run at a time.
-            , actionConcurrency = ConcurrencyAllowed
+            , concurrency = ConcurrencyAllowed
             }
       ) $
       ( if Set.null benches
@@ -560,7 +560,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
           else (:) Action
             { actionId = ActionId pkgId ATRunBenchmarks
             , actionDeps = finalDeps
-            , actionDo = \ac -> runInBase $
+            , action = \ac -> runInBase $
                 singleBench
                   beopts
                   (Set.toList benches)
@@ -570,7 +570,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
                   installedMap
               -- Never run benchmarks concurrently with any other task, see
               -- #3663
-            , actionConcurrency = ConcurrencyDisallowed
+            , concurrency = ConcurrencyDisallowed
             }
       )
       []

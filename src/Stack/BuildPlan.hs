@@ -290,21 +290,21 @@ checkPackageDeps myName deps packages =
   go (name, range) =
     case Map.lookup name packages of
       Nothing -> Map.singleton name DepError
-        { deVersion = Nothing
-        , deNeededBy = Map.singleton myName range
+        { version = Nothing
+        , neededBy = Map.singleton myName range
         }
       Just v
         | withinRange v range -> Map.empty
         | otherwise -> Map.singleton name DepError
-            { deVersion = Just v
-            , deNeededBy = Map.singleton myName range
+            { version = Just v
+            , neededBy = Map.singleton myName range
             }
 
 type DepErrors = Map PackageName DepError
 
 data DepError = DepError
-  { deVersion :: !(Maybe Version)
-  , deNeededBy :: !(Map PackageName VersionRange)
+  { version :: !(Maybe Version)
+  , neededBy :: !(Map PackageName VersionRange)
   }
   deriving Show
 
@@ -356,7 +356,7 @@ compareBuildPlanCheck
     -- Note: order of comparison flipped, since it's better to have fewer errors.
     compare (Map.size e2) (Map.size e1)
 compareBuildPlanCheck (BuildPlanCheckFail _ e1 _) (BuildPlanCheckFail _ e2 _) =
-  let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap (.deNeededBy) e))
+  let numUserPkgs e = Map.size $ Map.unions (Map.elems (fmap (.neededBy) e))
   in  compare (numUserPkgs e2) (numUserPkgs e1)
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckOk{}      = EQ
 compareBuildPlanCheck BuildPlanCheckOk{}      BuildPlanCheckPartial{} = GT
@@ -503,7 +503,7 @@ showCompilerErrors flags errs compiler =
   T.concat
     [ compilerVersionText compiler
     , " cannot be used for these packages:\n"
-    , showMapPackages $ Map.unions (Map.elems (fmap (.deNeededBy) errs))
+    , showMapPackages $ Map.unions (Map.elems (fmap (.neededBy) errs))
     , showDepErrors flags errs -- TODO only in debug mode
     ]
 
@@ -541,5 +541,5 @@ showDepErrors flags errs =
     ]
 
   flagVals = T.concat (map showFlags userPkgs)
-  userPkgs = Map.keys $ Map.unions (Map.elems (fmap (.deNeededBy) errs))
+  userPkgs = Map.keys $ Map.unions (Map.elems (fmap (.neededBy) errs))
   showFlags pkg = maybe "" (showPackageFlags pkg) (Map.lookup pkg flags)
