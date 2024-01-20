@@ -28,7 +28,7 @@ withFakeHackage act = do
     -- Start the fake server
     withCreateProcess (proc stackEnv $ withNetworkArgs ++ ["FakeHackage.hs"]) $ \_ _ _ _ -> do
         -- Wait for the fake server to start accepting requests
-        threadDelay 2000000
+        threadDelay 3000000
         act
   where
     withNetworkArgs = ["runghc", "--package", "network"]
