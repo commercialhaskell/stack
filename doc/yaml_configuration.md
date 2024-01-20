@@ -106,7 +106,7 @@ installation, and various settings like build flags. It is called a resolver
 since a snapshot states how dependencies are resolved. There are currently
 four resolver types:
 
-* LTS Haskell snapshots, e.g. `resolver: lts-22.0`
+* LTS Haskell snapshots, e.g. `resolver: lts-22.6`
 * Stackage Nightly snapshots, e.g. `resolver: nightly-2023-12-16`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
   like `resolver: ghc-9.6.3`
@@ -649,7 +649,7 @@ resolvers like `ghc-9.6.2`. This can be used to override the
 compiler for a Stackage snapshot, like this:
 
 ~~~yaml
-resolver: lts-22.0
+resolver: lts-22.6
 compiler: ghc-9.6.2
 compiler-check: match-exact
 ~~~
