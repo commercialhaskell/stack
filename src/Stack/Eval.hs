@@ -1,5 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 -- | Types and functions related to Stack's @eval@ command.
 module Stack.Eval
@@ -16,8 +18,8 @@ import           Stack.Types.Runner ( Runner )
 
 -- Type representing command line options for the @stack eval@ command.
 data EvalOpts = EvalOpts
-  { evalArg :: !String
-  , evalExtra :: !ExecOptsExtra
+  { arg :: !String
+  , extra :: !ExecOptsExtra
   }
   deriving Show
 
@@ -27,7 +29,7 @@ evalCmd :: EvalOpts -> RIO Runner ()
 evalCmd eval = execCmd execOpts
  where
   execOpts = ExecOpts
-    { eoCmd = ExecGhc
-    , eoArgs = ["-e", eval.evalArg]
-    , eoExtra = eval.evalExtra
+    { cmd = ExecGhc
+    , args = ["-e", eval.arg]
+    , extra = eval.extra
     }
