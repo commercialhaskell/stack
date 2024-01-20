@@ -33,13 +33,13 @@ jobs:
         include:
         - os: ubuntu-latest
           release-args: "--alpine"
-          cache-bust: "2023-10-11"
+          cache-bust: "2024-01-20"
         - os: windows-latest
           release-args: ""
-          cache-bust: "13"
+          cache-bust: "2024-01-20"
         - os: macos-latest
           release-args: ""
-          cache-bust: "23"
+          cache-bust: "2024-01-20"
     steps:
     - name: Clone project
       uses: actions/checkout@v3

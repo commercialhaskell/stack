@@ -23,7 +23,7 @@ jobs:
       run: |
         git clone https://github.com/kowainik/stan.git
         cd stan
-        stack --compiler ghc-9.6.3 --local-bin-path ../.bin install
+        stack --compiler ghc-9.6.4 --local-bin-path ../.bin install
         cd ..
 
     - name: Generate .hie for analysis

@@ -1,5 +1,5 @@
 {- stack script
-   --resolver lts-22.6
+   --resolver lts-22.7
    --ghc-options -Wall
 -}
 
@@ -8,7 +8,7 @@
 -- module imports, being: Cabal, base, bytestring, directory, extra, process,
 -- shake, tar, zip-archive and zlib. These are either GHC boot packages or in
 -- the snapshot. Stackage LTS Haskell 22.0 does not include boot packages
--- directly. As GHC 9.6.3 boot packages Cabal and Cabal-syntax expose modules
+-- directly. As GHC 9.6.4 boot packages Cabal and Cabal-syntax expose modules
 -- with the same names, the language extension PackageImports is required.
 
 {-# LANGUAGE OverloadedRecordDot #-}
