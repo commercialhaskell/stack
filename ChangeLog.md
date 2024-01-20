@@ -65,7 +65,7 @@ Other enhancements:
   `notify-if-cabal-untested` keys are introduced, to allow the notification to
   be muted if unwanted.
 * The compiler version is included in Stack's build message (e.g.
-  `stack> build (lib + exe + test) with ghc-9.6.3`).
+  `stack> build (lib + exe + test) with ghc-9.6.4`).
 * Add flag `--candidate` to Stack's `unpack` command, to allow package
   candidates to be unpacked locally.
 * Stack will notify the user if a specified architecture value is unknown to

@@ -1,4 +1,4 @@
-resolver: lts-22.6
+resolver: lts-22.7
 extra-deps:
 - bytestring-0.11.3.1
 - binary-0.8.9.0
