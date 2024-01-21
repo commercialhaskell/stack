@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
@@ -120,14 +121,14 @@ data ShouldRun
 
 -- | Type representing command line options for the @stack script@ command.
 data ScriptOpts = ScriptOpts
-  { soPackages :: ![String]
-  , soFile :: !FilePath
-  , soArgs :: ![String]
-  , soCompile :: !ScriptExecute
-  , soUseRoot :: !Bool
-  , soGhcOptions :: ![String]
-  , soScriptExtraDeps :: ![PackageIdentifierRevision]
-  , soShouldRun :: !ShouldRun
+  { packages :: ![String]
+  , file :: !FilePath
+  , args :: ![String]
+  , compile :: !ScriptExecute
+  , useRoot :: !Bool
+  , ghcOptions :: ![String]
+  , scriptExtraDeps :: ![PackageIdentifierRevision]
+  , shouldRun :: !ShouldRun
   }
   deriving Show
 
@@ -146,7 +147,7 @@ scriptCmd opts = do
     SYLDefault -> pure ()
     SYLNoProject _ -> assert False (pure ())
 
-  file <- resolveFile' opts.soFile
+  file <- resolveFile' opts.file
   let scriptFile = filename file
 
   isNoRunCompile <- fromFirstFalse . (.noRunCompile) <$>
@@ -157,14 +158,14 @@ scriptCmd opts = do
         { configMonoid = go.configMonoid
             { ConfigMonoid.installGHC = FirstTrue $ Just True
             }
-        , stackYaml = SYLNoProject opts.soScriptExtraDeps
+        , stackYaml = SYLNoProject opts.scriptExtraDeps
         }
       (shouldRun, shouldCompile) = if isNoRunCompile
         then (NoRun, SECompile)
-        else (opts.soShouldRun, opts.soCompile)
+        else (opts.shouldRun, opts.compile)
 
   root <- withConfig NoReexec $ view stackRootL
-  outputDir <- if opts.soUseRoot
+  outputDir <- if opts.useRoot
     then do
       scriptFileAsDir <- maybe
         (throwIO $ FailedToParseScriptFileAsDirBug scriptFile)
@@ -193,7 +194,7 @@ scriptCmd opts = do
   case shouldRun of
     YesRun -> pure ()
     NoRun -> do
-      unless (null opts.soArgs) $ throwIO ArgumentsWithNoRunInvalid
+      unless (null opts.args) $ throwIO ArgumentsWithNoRunInvalid
       case shouldCompile of
         SEInterpret -> throwIO NoRunWithoutCompilationInvalid
         SECompile -> pure ()
@@ -210,7 +211,7 @@ scriptCmd opts = do
  where
   runCompiled shouldRun exe = do
     case shouldRun of
-      YesRun -> exec (fromAbsFile exe) opts.soArgs
+      YesRun -> exec (fromAbsFile exe) opts.args
       NoRun -> prettyInfoL
         [ flow "Compilation finished, executable available at"
         , style File (fromString (fromAbsFile exe)) <> "."
@@ -233,8 +234,8 @@ scriptCmd opts = do
         colorFlag <- appropriateGhcColorFlag
 
         targetsSet <-
-          case opts.soPackages of
-            [] -> getPackagesFromImports opts.soFile -- Using the import parser
+          case opts.packages of
+            [] -> getPackagesFromImports opts.file -- Using the import parser
             packages -> do
               let targets = concatMap wordsComma packages
               targets' <- mapM parsePackageNameThrowing targets
@@ -274,8 +275,8 @@ scriptCmd opts = do
                   SEInterpret -> []
                   SECompile -> []
                   SEOptimize -> ["-O2"]
-              , opts.soGhcOptions
-              , if opts.soUseRoot
+              , opts.ghcOptions
+              , if opts.useRoot
                   then
                     [ "-outputdir=" ++ fromAbsDir (parent exe)
                     , "-o", fromAbsFile exe
@@ -286,7 +287,7 @@ scriptCmd opts = do
           SEInterpret -> do
             interpret <- view $ compilerPathsL . to (.interpreter)
             exec (toFilePath interpret)
-                (ghcArgs ++ toFilePath file : opts.soArgs)
+                (ghcArgs ++ toFilePath file : opts.args)
           _ -> do
             -- Use readProcessStdout_ so that (1) if GHC does send any output
             -- to stdout, we capture it and stop it from being sent to our

@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
@@ -25,11 +26,11 @@ import           Stack.Types.Version ( VersionCheck (..) )
 
 -- | Type representing command line options for the @stack setup@ command.
 data SetupCmdOpts = SetupCmdOpts
-  { scoCompilerVersion :: !(Maybe WantedCompiler)
-  , scoForceReinstall  :: !Bool
-  , scoGHCBindistURL   :: !(Maybe String)
-  , scoGHCJSBootOpts   :: ![String]
-  , scoGHCJSBootClean  :: !Bool
+  { compilerVersion :: !(Maybe WantedCompiler)
+  , forceReinstall  :: !Bool
+  , ghcBindistUrl   :: !(Maybe String)
+  , ghcjsBootOpts   :: ![String]
+  , ghcjsBootClean  :: !Bool
   }
 
 -- | Function underlying the @stack setup@ command.
@@ -40,7 +41,7 @@ setupCmd sco = withConfig YesReexec $ do
     then
        withBuildConfig $ do
        (wantedCompiler, compilerCheck, mstack) <-
-         case sco.scoCompilerVersion of
+         case sco.compilerVersion of
            Just v -> pure (v, MatchMinor, Nothing)
            Nothing -> (,,)
              <$> view wantedCompilerVersionL
@@ -63,20 +64,20 @@ setup ::
   -> VersionCheck
   -> Maybe (Path Abs File)
   -> RIO env ()
-setup sco wantedCompiler compilerCheck mstack = do
+setup sco wantedCompiler compilerCheck stackYaml = do
   config <- view configL
   sandboxedGhc <- (.sandboxed) . fst <$> ensureCompilerAndMsys SetupOpts
     { installIfMissing = True
-    , useSystem = config.systemGHC && not sco.scoForceReinstall
-    , wantedCompiler = wantedCompiler
-    , compilerCheck = compilerCheck
-    , stackYaml = mstack
-    , forceReinstall = sco.scoForceReinstall
+    , useSystem = config.systemGHC && not sco.forceReinstall
+    , wantedCompiler
+    , compilerCheck
+    , stackYaml
+    , forceReinstall = sco.forceReinstall
     , sanityCheck = True
     , skipGhcCheck = False
     , skipMsys = config.skipMsys
     , resolveMissingGHC = Nothing
-    , ghcBindistURL = sco.scoGHCBindistURL
+    , ghcBindistURL = sco.ghcBindistUrl
     }
   let compiler = case wantedCompiler of
         WCGhc _ -> "GHC"

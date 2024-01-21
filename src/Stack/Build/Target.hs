@@ -3,6 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiWayIf            #-}
+{-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ViewPatterns          #-}
@@ -101,7 +102,7 @@ data NeedTargets
 --------------------------------------------------------------------------------
 
 -- | Raw target information passed on the command line.
-newtype RawInput = RawInput { unRawInput :: Text }
+newtype RawInput = RawInput { rawInput :: Text }
 
 getRawInput ::
      BuildOptsCLI
@@ -235,13 +236,13 @@ parseRawTarget t =
 --------------------------------------------------------------------------------
 
 data ResolveResult = ResolveResult
-  { rrName :: !PackageName
-  , rrRaw :: !RawInput
-  , rrComponent :: !(Maybe NamedComponent)
+  { name :: !PackageName
+  , rawInput :: !RawInput
+  , component :: !(Maybe NamedComponent)
     -- ^ Was a concrete component specified?
-  , rrAddedDep :: !(Maybe PackageLocationImmutable)
+  , addedDep :: !(Maybe PackageLocationImmutable)
     -- ^ Only if we're adding this as a dependency
-  , rrPackageType :: !PackageType
+  , packageType :: !PackageType
   }
 
 -- | Convert a 'RawTarget' into a 'ResolveResult' (see description on the
@@ -252,7 +253,7 @@ resolveRawTarget ::
   -> Map PackageName PackageLocation
   -> (RawInput, RawTarget)
   -> RIO env (Either StyleDoc ResolveResult)
-resolveRawTarget sma allLocs (ri, rt) =
+resolveRawTarget sma allLocs (rawInput, rt) =
   go rt
  where
   locals = sma.project
@@ -283,12 +284,12 @@ resolveRawTarget sma allLocs (ri, rt) =
           , style Shell $ flow "stack ide targets"
           , flow "for a list of available targets."
           ]
-      [(name, comp)] -> Right ResolveResult
-        { rrName = name
-        , rrRaw = ri
-        , rrComponent = Just comp
-        , rrAddedDep = Nothing
-        , rrPackageType = PTProject
+      [(name, component)] -> Right ResolveResult
+        { name
+        , rawInput
+        , component = Just component
+        , addedDep = Nothing
+        , packageType = PTProject
         }
       matches -> Left $
            fillSep
@@ -321,41 +322,43 @@ resolveRawTarget sma allLocs (ri, rt) =
       Just pp -> do
         comps <- ppComponents pp
         pure $ case ucomp of
-          ResolvedComponent comp
-            | comp `Set.member` comps -> Right ResolveResult
-                { rrName = name
-                , rrRaw = ri
-                , rrComponent = Just comp
-                , rrAddedDep = Nothing
-                , rrPackageType = PTProject
+          ResolvedComponent component
+            | component `Set.member` comps -> Right ResolveResult
+                { name
+                , rawInput
+                , component = Just component
+                , addedDep = Nothing
+                , packageType = PTProject
                 }
             | otherwise -> Left $
                 fillSep
                   [ "Component"
-                  , style Target (fromString $ T.unpack $ renderComponent comp)
+                  , style
+                      Target
+                      (fromString $ T.unpack $ renderComponent component)
                   , flow "does not exist in package"
                   , style Target (fromPackageName name) <> "."
                   ]
-          UnresolvedComponent comp ->
-            case filter (isCompNamed comp) $ Set.toList comps of
+          UnresolvedComponent comp' ->
+            case filter (isCompNamed comp') $ Set.toList comps of
               [] -> Left $
                 fillSep
                   [ "Component"
-                  , style Target (fromString $ T.unpack comp)
+                  , style Target (fromString $ T.unpack comp')
                   , flow "does not exist in package"
                   , style Target (fromPackageName name) <> "."
                   ]
-              [x] -> Right ResolveResult
-                { rrName = name
-                , rrRaw = ri
-                , rrComponent = Just x
-                , rrAddedDep = Nothing
-                , rrPackageType = PTProject
+              [component] -> Right ResolveResult
+                { name
+                , rawInput
+                , component = Just component
+                , addedDep = Nothing
+                , packageType = PTProject
                 }
               matches -> Left $
                 fillSep
                   [ flow "Ambiguous component name"
-                  , style Target (fromString $ T.unpack comp)
+                  , style Target (fromString $ T.unpack comp')
                   , flow "for package"
                   , style Target (fromPackageName name)
                   , flow "matches components:"
@@ -369,11 +372,11 @@ resolveRawTarget sma allLocs (ri, rt) =
 
   go (RTPackage name)
     | Map.member name locals = pure $ Right ResolveResult
-        { rrName = name
-        , rrRaw = ri
-        , rrComponent = Nothing
-        , rrAddedDep = Nothing
-        , rrPackageType = PTProject
+        { name
+        , rawInput
+        , component = Nothing
+        , addedDep = Nothing
+        , packageType = PTProject
         }
     | Map.member name deps =
         pure $ deferToConstructPlan name
@@ -428,12 +431,12 @@ resolveRawTarget sma allLocs (ri, rt) =
             pure $ case mrev of
               Nothing -> deferToConstructPlan name
               Just (_rev, cfKey, treeKey) -> Right ResolveResult
-                { rrName = name
-                , rrRaw = ri
-                , rrComponent = Nothing
-                , rrAddedDep = Just $
+                { name
+                , rawInput
+                , component = Nothing
+                , addedDep = Just $
                     PLIHackage (PackageIdentifier name version) cfKey treeKey
-                , rrPackageType = PTDependency
+                , packageType = PTDependency
                 }
 
   hackageLatest name = do
@@ -443,11 +446,11 @@ resolveRawTarget sma allLocs (ri, rt) =
       Nothing -> deferToConstructPlan name
       Just loc ->
         Right ResolveResult
-          { rrName = name
-          , rrRaw = ri
-          , rrComponent = Nothing
-          , rrAddedDep = Just loc
-          , rrPackageType = PTDependency
+          { name
+          , rawInput
+          , component = Nothing
+          , addedDep = Just loc
+          , packageType = PTDependency
           }
 
   hackageLatestRevision name version = do
@@ -455,12 +458,12 @@ resolveRawTarget sma allLocs (ri, rt) =
     pure $ case mrev of
       Nothing -> deferToConstructPlan name
       Just (_rev, cfKey, treeKey) -> Right ResolveResult
-        { rrName = name
-        , rrRaw = ri
-        , rrComponent = Nothing
-        , rrAddedDep =
+        { name
+        , rawInput
+        , component = Nothing
+        , addedDep =
             Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
-        , rrPackageType = PTDependency
+        , packageType = PTDependency
         }
 
   -- This is actually an error case. We _could_ pure a Left value here, but it
@@ -468,11 +471,11 @@ resolveRawTarget sma allLocs (ri, rt) =
   -- it complain about the missing package so that we get more errors together,
   -- plus the fancy colored output from that module.
   deferToConstructPlan name = Right ResolveResult
-    { rrName = name
-    , rrRaw = ri
-    , rrComponent = Nothing
-    , rrAddedDep = Nothing
-    , rrPackageType = PTDependency
+    { name
+    , rawInput
+    , component = Nothing
+    , addedDep = Nothing
+    , packageType = PTDependency
     }
 --------------------------------------------------------------------------------
 -- Combine the ResolveResults
@@ -489,23 +492,23 @@ combineResolveResults ::
        )
 combineResolveResults results = do
   addedDeps <- fmap Map.unions $ forM results $ \result ->
-    case result.rrAddedDep of
+    case result.addedDep of
       Nothing -> pure Map.empty
-      Just pl -> pure $ Map.singleton result.rrName pl
+      Just pl -> pure $ Map.singleton result.name pl
 
   let m0 = Map.unionsWith (++) $
-        map (\rr -> Map.singleton rr.rrName [rr]) results
+        map (\rr -> Map.singleton rr.name [rr]) results
       (errs, ms) = partitionEithers $ flip map (Map.toList m0) $
         \(name, rrs) ->
-          let mcomps = map (.rrComponent) rrs in
+          let mcomps = map (.component) rrs in
           -- Confirm that there is either exactly 1 with no component, or that
           -- all rrs are components
           case rrs of
             [] -> assert False $
               Left $
                 flow "Somehow got no rrComponent values, that can't happen."
-            [rr] | isNothing rr.rrComponent ->
-              Right $ Map.singleton name $ TargetAll rr.rrPackageType
+            [rr] | isNothing rr.component ->
+              Right $ Map.singleton name $ TargetAll rr.packageType
             _
               | all isJust mcomps ->
                   Right $ Map.singleton name $ TargetComps $ Set.fromList $
@@ -521,7 +524,7 @@ combineResolveResults results = do
   pure (errs, Map.unions ms, addedDeps)
  where
   rrToStyleDoc :: ResolveResult -> StyleDoc
-  rrToStyleDoc = fromString . T.unpack . (.rrRaw.unRawInput)
+  rrToStyleDoc = fromString . T.unpack . (.rawInput.rawInput)
 
 --------------------------------------------------------------------------------
 -- OK, let's do it!

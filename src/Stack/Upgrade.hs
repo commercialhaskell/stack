@@ -89,16 +89,16 @@ instance Exception UpgradePrettyException
 -- | Type representing options for upgrading Stack with a binary executable
 -- file.
 data BinaryOpts = BinaryOpts
-  { _boPlatform :: !(Maybe String)
-  , _boForce :: !Bool
+  { platform :: !(Maybe String)
+  , force :: !Bool
     -- ^ Force a download, even if the downloaded version is older than what we
     -- are.
-  , _boOnlyLocalBin :: !Bool
+  , onlyLocalBin :: !Bool
     -- ^ Only download to Stack's local binary directory.
-  , _boVersion :: !(Maybe String)
+  , version :: !(Maybe String)
     -- ^ Specific version to download
-  , _boGitHubOrg :: !(Maybe String)
-  , _boGitHubRepo :: !(Maybe String)
+  , gitHubOrg :: !(Maybe String)
+  , gitHubRepo :: !(Maybe String)
   }
   deriving Show
 
@@ -109,8 +109,8 @@ newtype SourceOpts
 
 -- | Type representing command line options for the @stack upgrade@ command.
 data UpgradeOpts = UpgradeOpts
-  { _uoBinary :: !(Maybe BinaryOpts)
-  , _uoSource :: !(Maybe SourceOpts)
+  { binary :: !(Maybe BinaryOpts)
+  , source :: !(Maybe SourceOpts)
   }
   deriving Show
 

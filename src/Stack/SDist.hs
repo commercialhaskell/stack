@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -129,15 +130,15 @@ instance Exception SDistPrettyException
 
 -- | Type representing command line options for @stack sdist@ command.
 data SDistOpts = SDistOpts
-  { sdoptsDirsToWorkWith :: [String]
+  { dirsToWorkWith :: [String]
     -- ^ Directories to package
-  , sdoptsPvpBounds :: Maybe PvpBounds
+  , pvpBounds :: Maybe PvpBounds
     -- ^ PVP Bounds overrides
-  , sdoptsIgnoreCheck :: Bool
+  , ignoreCheck :: Bool
     -- ^ Whether to ignore check of the package for common errors
-  , sdoptsBuildTarball :: Bool
+  , buildTarball :: Bool
     -- ^ Whether to build the tarball
-  , sdoptsTarPath :: Maybe FilePath
+  , tarPath :: Maybe FilePath
     -- ^ Where to copy the tarball
   }
 
@@ -146,7 +147,7 @@ sdistCmd :: SDistOpts -> RIO Runner ()
 sdistCmd sdistOpts =
   withConfig YesReexec $ withDefaultEnvConfig $ do
     -- If no directories are specified, build all sdist tarballs.
-    dirs' <- if null sdistOpts.sdoptsDirsToWorkWith
+    dirs' <- if null sdistOpts.dirsToWorkWith
       then do
         dirs <- view $
           buildConfigL . to (map ppRoot . Map.elems . (.smWanted.project))
@@ -162,10 +163,10 @@ sdistCmd sdistOpts =
             ]
           exitFailure
         pure dirs
-      else mapM resolveDir' sdistOpts.sdoptsDirsToWorkWith
+      else mapM resolveDir' sdistOpts.dirsToWorkWith
     forM_ dirs' $ \dir -> do
       (tarName, tarBytes, _mcabalRevision) <-
-        getSDistTarball sdistOpts.sdoptsPvpBounds dir
+        getSDistTarball sdistOpts.pvpBounds dir
       distDir <- distDirFromDir dir
       tarPath <- (distDir </>) <$> parseRelFile tarName
       ensureDir (parent tarPath)
@@ -177,7 +178,7 @@ sdistCmd sdistOpts =
         , pretty tarPath <> "."
         ]
       checkSDistTarball sdistOpts tarPath
-      forM_ sdistOpts.sdoptsTarPath $ copyTarToTarPath tarPath tarName
+      forM_ sdistOpts.tarPath $ copyTarToTarPath tarPath tarName
  where
   copyTarToTarPath tarPath tarName targetDir = liftIO $ do
     let targetTarPath = targetDir FP.</> tarName
@@ -552,13 +553,13 @@ checkSDistTarball opts tarball = withTempTarGzContents tarball $ \pkgDir' -> do
   pkgDir <- (pkgDir' </>) <$>
     (parseRelDir . FP.takeBaseName . FP.takeBaseName . toFilePath $ tarball)
   --               ^ drop ".tar"     ^ drop ".gz"
-  when opts.sdoptsBuildTarball
+  when opts.buildTarball
     ( buildExtractedTarball ResolvedPath
         { resolvedRelative = RelFilePath "this-is-not-used" -- ugly hack
         , resolvedAbsolute = pkgDir
         }
     )
-  unless opts.sdoptsIgnoreCheck (checkPackageInExtractedTarball pkgDir)
+  unless opts.ignoreCheck (checkPackageInExtractedTarball pkgDir)
 
 checkPackageInExtractedTarball ::
      HasEnvConfig env
