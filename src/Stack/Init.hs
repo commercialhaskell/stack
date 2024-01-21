@@ -281,10 +281,10 @@ initProject currDir initOpts mresolver = do
     PLImmutable . cplComplete <$>
       completePackageLocation
         (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
-  let p = Project
+  let project = Project
         { userMsg = if userMsg == "" then Nothing else Just userMsg
         , packages = resolvedRelative <$> Map.elems rbundle
-        , dependencies = map toRawPL deps
+        , extraDeps = map toRawPL deps
         , flagsByPkg = removeSrcPkgDefaultFlags gpds flags
         , resolver = snapshotLoc
         , compiler = Nothing
@@ -336,7 +336,7 @@ initProject currDir initOpts mresolver = do
         else "Writing configuration to"
     , style File (fromString reldest) <> "."
     ]
-  writeBinaryFileAtomic dest $ renderStackYaml p
+  writeBinaryFileAtomic dest $ renderStackYaml project
     (Map.elems $ fmap (makeRelDir . parent . fst) ignored)
     (map (makeRelDir . parent) dupPkgs)
   prettyInfoS
