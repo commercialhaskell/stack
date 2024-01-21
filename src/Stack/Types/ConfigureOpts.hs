@@ -7,8 +7,6 @@ module Stack.Types.ConfigureOpts
   ( ConfigureOpts (..)
   , BaseConfigOpts (..)
   , configureOpts
-  , configureOptsPathRelated
-  , configureOptsNonPathRelated
   ) where
 
 import qualified Data.Map as Map
