@@ -60,7 +60,7 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigureOpts
-                   ( BaseConfigOpts (..), ConfigureOpts (..) )
+                   ( BaseConfigOpts (..) )
 import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
@@ -1095,7 +1095,7 @@ describeConfigDiff config old new
                 then id
                 else stripGhcOptions)
            . map T.pack
-           . (\(ConfigureOpts x y) -> x ++ y)
+           . ConfigureOpts.renderConfigureOpts
            . (.configureOpts)
    where
     -- options set by Stack

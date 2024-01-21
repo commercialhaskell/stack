@@ -38,7 +38,7 @@ import           Stack.Types.Build ( CachePkgSrc, ConfigCache (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Cache ( ConfigCacheType )
-import           Stack.Types.ConfigureOpts  ( ConfigureOpts (..) )
+import           Stack.Types.ConfigureOpts  ( ConfigureOpts (..), configureOptsFromDb )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Storage ( ProjectStorage (..) )
 
@@ -115,20 +115,15 @@ readConfigCache ::
   -> ReaderT SqlBackend (RIO env) ConfigCache
 readConfigCache (Entity parentId configCacheParent) = do
   let pkgSrc = configCacheParent.configCacheParentPkgSrc
-  pathRelated <-
-    map ((.configCacheDirOptionValue) . entityVal) <$>
+  pathRelatedInfo <-
     selectList
       [ConfigCacheDirOptionParent ==. parentId]
       [Asc ConfigCacheDirOptionIndex]
-  nonPathRelated <-
-    map ((.configCacheNoDirOptionValue) . entityVal) <$>
+  nonPathRelatedInfo <-
     selectList
       [ConfigCacheNoDirOptionParent ==. parentId]
       [Asc ConfigCacheNoDirOptionIndex]
-  let configureOpts = ConfigureOpts
-        { pathRelated
-        , nonPathRelated
-        }
+  let configureOpts = configureOptsFromDb pathRelatedInfo nonPathRelatedInfo
   deps <-
     Set.fromList . map ((.configCacheDepValue) . entityVal) <$>
     selectList [ConfigCacheDepParent ==. parentId] []

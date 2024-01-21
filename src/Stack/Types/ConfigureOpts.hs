@@ -2,11 +2,14 @@
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE DataKinds           #-}
 
 module Stack.Types.ConfigureOpts
   ( ConfigureOpts (..)
   , BaseConfigOpts (..)
   , configureOpts
+  , configureOptsFromDb
+  , renderConfigureOpts
   ) where
 
 import qualified Data.Map as Map
@@ -34,6 +37,8 @@ import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.Package ( Package (..) )
 import           System.FilePath ( pathSeparator )
+import           Database.Persist (entityVal, Entity)
+import GHC.Records (HasField)
 
 -- | Basic information used to calculate what the configure options are
 data BaseConfigOpts = BaseConfigOpts
@@ -46,6 +51,16 @@ data BaseConfigOpts = BaseConfigOpts
   , extraDBs :: ![Path Abs Dir]
   }
   deriving Show
+
+configureOptsFromDb ::
+  (HasField "configCacheDirOptionValue" b1 String, HasField "configCacheNoDirOptionValue" b2 String)
+  => [Entity b1]
+  -> [Entity b2]
+  -> ConfigureOpts
+configureOptsFromDb x y = ConfigureOpts
+    { pathRelated = map ((.configCacheDirOptionValue) . entityVal) x
+    , nonPathRelated = map ((.configCacheNoDirOptionValue) . entityVal) y
+    }
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
 configureOpts ::
@@ -203,3 +218,7 @@ data ConfigureOpts = ConfigureOpts
   deriving (Data, Eq, Generic, Show, Typeable)
 
 instance NFData ConfigureOpts
+
+-- | Render configure options as a single list of options.
+renderConfigureOpts :: ConfigureOpts -> [String]
+renderConfigureOpts copts = copts.pathRelated ++ copts.nonPathRelated
