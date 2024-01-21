@@ -7,9 +7,11 @@
 module Stack.Types.ConfigureOpts
   ( ConfigureOpts (..)
   , BaseConfigOpts (..)
+  , PackageConfigureOpts (..)
   , configureOpts
   , configureOptsFromDb
   , renderConfigureOpts
+  , packageConfigureOptsFromPackage
   ) where
 
 import qualified Data.Map as Map
@@ -35,10 +37,10 @@ import           Stack.Types.Config
 import           Stack.Types.EnvConfig ( EnvConfig, actualCompilerVersionL )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.IsMutable ( IsMutable (..) )
-import           Stack.Types.Package ( Package (..) )
 import           System.FilePath ( pathSeparator )
 import           Database.Persist (entityVal, Entity)
-import GHC.Records (HasField)
+import           GHC.Records ( HasField )
+import           Stack.Types.Package ( Package(..), packageIdentifier )
 
 -- | Basic information used to calculate what the configure options are
 data BaseConfigOpts = BaseConfigOpts
@@ -51,6 +53,28 @@ data BaseConfigOpts = BaseConfigOpts
   , extraDBs :: ![Path Abs Dir]
   }
   deriving Show
+
+-- | All these fields come from the "Package" data type but bringing the whole Package
+-- is way too much, hence this datatype.
+data PackageConfigureOpts = PackageConfigureOpts
+  { pkgCabalConfigOpts :: [Text]
+  , pkgGhcOptions :: [Text]
+  , pkgFlags :: Map FlagName Bool
+  , pkgDefaultFlags :: Map FlagName Bool
+  , pkgIdentifier :: PackageIdentifier
+  }
+  deriving Show
+
+packageConfigureOptsFromPackage ::
+  Package
+  -> PackageConfigureOpts
+packageConfigureOptsFromPackage pkg = PackageConfigureOpts
+  { pkgCabalConfigOpts = pkg.cabalConfigOpts
+  , pkgGhcOptions = pkg.ghcOptions
+  , pkgFlags = pkg.flags
+  , pkgDefaultFlags = pkg.defaultFlags
+  , pkgIdentifier = packageIdentifier pkg
+  }
 
 configureOptsFromDb ::
   (HasField "configCacheDirOptionValue" b1 String, HasField "configCacheNoDirOptionValue" b2 String)
@@ -69,20 +93,20 @@ configureOpts ::
   -> Map PackageIdentifier GhcPkgId -- ^ dependencies
   -> Bool -- ^ local non-extra-dep?
   -> IsMutable
-  -> Package
+  -> PackageConfigureOpts
   -> ConfigureOpts
-configureOpts econfig bco deps isLocal isMutable package = ConfigureOpts
-  { pathRelated = configureOptsPathRelated bco isMutable package
+configureOpts econfig bco deps isLocal isMutable pkgConfigureOpts = ConfigureOpts
+  { pathRelated = configureOptsPathRelated bco isMutable pkgConfigureOpts
   , nonPathRelated =
-      configureOptsNonPathRelated econfig bco deps isLocal package
+      configureOptsNonPathRelated econfig bco deps isLocal pkgConfigureOpts
   }
 
 configureOptsPathRelated ::
      BaseConfigOpts
   -> IsMutable
-  -> Package
+  -> PackageConfigureOpts
   -> [String]
-configureOptsPathRelated bco isMutable package = concat
+configureOptsPathRelated bco isMutable pkgOpts = concat
   [ ["--user", "--package-db=clear", "--package-db=global"]
   , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case isMutable of
       Immutable -> bco.extraDBs ++ [bco.snapDB]
@@ -106,8 +130,7 @@ configureOptsPathRelated bco isMutable package = concat
       Nothing -> installRoot </> docDirSuffix
       Just dir -> installRoot </> docDirSuffix </> dir
   pkgVerDir = parseRelDir
-    (  packageIdentifierString
-        (PackageIdentifier package.name package.version)
+    (  packageIdentifierString pkgOpts.pkgIdentifier
     ++ [pathSeparator]
     )
 
@@ -117,7 +140,7 @@ configureOptsNonPathRelated ::
   -> BaseConfigOpts
   -> Map PackageIdentifier GhcPkgId -- ^ Dependencies.
   -> Bool -- ^ Is this a local, non-extra-dep?
-  -> Package
+  -> PackageConfigureOpts
   -> [String]
 configureOptsNonPathRelated econfig bco deps isLocal package = concat
   [ depOptions
@@ -131,8 +154,8 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
     ]
   , ["--disable-executable-stripping" | not bopts.exeStrip && isLocal]
   , flags
-  , map T.unpack package.cabalConfigOpts
-  , processGhcOptions package.ghcOptions
+  , map T.unpack package.pkgCabalConfigOpts
+  , processGhcOptions package.pkgGhcOptions
   , map ("--extra-include-dirs=" ++) config.extraIncludeDirs
   , map ("--extra-lib-dirs=" ++) config.extraLibDirs
   , maybe
@@ -184,7 +207,7 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
   mapAndAppend fn = Map.foldrWithKey' (fmap (:) . fn)
   -- Unioning atop defaults is needed so that all flags are specified with
   -- --exact-configuration.
-  flags = mapAndAppend renderFlags [] (package.flags `Map.union` package.defaultFlags)
+  flags = mapAndAppend renderFlags [] (package.pkgFlags `Map.union` package.pkgDefaultFlags)
   renderFlags name enabled = "-f" <>
                      (if enabled
                         then ""
