@@ -1,6 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Types and functions related to Stack's @path@ command.
 module Stack.Path
@@ -22,7 +24,7 @@ import           Stack.Constants
                    )
 import           Stack.Constants.Config ( distRelativeDir )
 import           Stack.GhcPkg as GhcPkg
-import           Stack.Prelude
+import           Stack.Prelude hiding ( pi )
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Types.BuildConfig
@@ -37,10 +39,11 @@ import           Stack.Types.Config
                    )
 import           Stack.Types.EnvConfig
                    ( EnvConfig, HasEnvConfig (..), bindirCompilerTools
-                   , hoogleRoot, hpcReportDir, installationRootDeps
-                   , installationRootLocal, packageDatabaseDeps
-                   , packageDatabaseExtra, packageDatabaseLocal
+                   , hpcReportDir, installationRootDeps, installationRootLocal
+                   , packageDatabaseDeps, packageDatabaseExtra
+                   , packageDatabaseLocal
                    )
+import qualified Stack.Types.EnvConfig as EnvConfig
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GlobalOpts
                    ( GlobalOpts (..), globalOptsBuildOptsMonoidL )
@@ -95,52 +98,52 @@ fillPathInfo :: HasEnvConfig env => RIO env PathInfo
 fillPathInfo = do
   -- We must use a BuildConfig from an EnvConfig to ensure that it contains the
   -- full environment info including GHC paths etc.
-  piBuildConfig <- view $ envConfigL . buildConfigL
+  buildConfig <- view $ envConfigL . buildConfigL
   -- This is the modified 'bin-path',
   -- including the local GHC or MSYS if not configured to operate on
   -- global GHC.
   -- It was set up in 'withBuildConfigAndLock -> withBuildConfigExt -> setupEnv'.
   -- So it's not the *minimal* override path.
-  piSnapDb <- packageDatabaseDeps
-  piLocalDb <- packageDatabaseLocal
-  piExtraDbs <- packageDatabaseExtra
-  piGlobalDb <- view $ compilerPathsL . to (.globalDB)
-  piSnapRoot <- installationRootDeps
-  piLocalRoot <- installationRootLocal
-  piToolsDir <- bindirCompilerTools
-  piHoogleRoot <- hoogleRoot
-  piDistDir <- distRelativeDir
-  piHpcDir <- hpcReportDir
-  piCompiler <- getCompilerPath
-  pure $ PathInfo
-    { piBuildConfig
-    , piSnapDb
-    , piLocalDb
-    , piGlobalDb
-    , piSnapRoot
-    , piLocalRoot
-    , piToolsDir
-    , piHoogleRoot
-    , piDistDir
-    , piHpcDir
-    , piExtraDbs
-    , piCompiler
+  snapDb <- packageDatabaseDeps
+  localDb <- packageDatabaseLocal
+  extraDbs <- packageDatabaseExtra
+  globalDb <- view $ compilerPathsL . to (.globalDB)
+  snapRoot <- installationRootDeps
+  localRoot <- installationRootLocal
+  toolsDir <- bindirCompilerTools
+  hoogleRoot <- EnvConfig.hoogleRoot
+  distDir <- distRelativeDir
+  hpcDir <- hpcReportDir
+  compiler <- getCompilerPath
+  pure PathInfo
+    { buildConfig
+    , snapDb
+    , localDb
+    , globalDb
+    , snapRoot
+    , localRoot
+    , toolsDir
+    , hoogleRoot
+    , distDir
+    , hpcDir
+    , extraDbs
+    , compiler
     }
 
 -- | Type representing information passed to all the path printers.
 data PathInfo = PathInfo
-  { piBuildConfig  :: !BuildConfig
-  , piSnapDb       :: !(Path Abs Dir)
-  , piLocalDb      :: !(Path Abs Dir)
-  , piGlobalDb     :: !(Path Abs Dir)
-  , piSnapRoot     :: !(Path Abs Dir)
-  , piLocalRoot    :: !(Path Abs Dir)
-  , piToolsDir     :: !(Path Abs Dir)
-  , piHoogleRoot   :: !(Path Abs Dir)
-  , piDistDir      :: Path Rel Dir
-  , piHpcDir       :: !(Path Abs Dir)
-  , piExtraDbs     :: ![Path Abs Dir]
-  , piCompiler     :: !(Path Abs File)
+  { buildConfig  :: !BuildConfig
+  , snapDb       :: !(Path Abs Dir)
+  , localDb      :: !(Path Abs Dir)
+  , globalDb     :: !(Path Abs Dir)
+  , snapRoot     :: !(Path Abs Dir)
+  , localRoot    :: !(Path Abs Dir)
+  , toolsDir     :: !(Path Abs Dir)
+  , hoogleRoot   :: !(Path Abs Dir)
+  , distDir      :: Path Rel Dir
+  , hpcDir       :: !(Path Abs Dir)
+  , extraDbs     :: ![Path Abs Dir]
+  , compiler     :: !(Path Abs File)
   }
 
 instance HasPlatform PathInfo where
@@ -177,8 +180,8 @@ instance HasProcessContext PathInfo where
   processContextL = configL . processContextL
 
 instance HasBuildConfig PathInfo where
-  buildConfigL = lens (.piBuildConfig) (\x y -> x { piBuildConfig = y })
-                 . buildConfigL
+  buildConfigL =
+    lens (.buildConfig) (\x y -> x { buildConfig = y }) . buildConfigL
 
 data UseHaddocks a
   = UseHaddocks a
@@ -218,13 +221,13 @@ paths =
         view (configL . to (.localPrograms) . to toFilePathNoTrailingSep . to T.pack))
   , ( "Compiler binary (e.g. ghc)"
     , "compiler-exe"
-    , WithoutHaddocks $ T.pack . toFilePath . (.piCompiler) )
+    , WithoutHaddocks $ T.pack . toFilePath . (.compiler) )
   , ( "Directory containing the compiler binary (e.g. ghc)"
     , "compiler-bin"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . parent . (.piCompiler) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . parent . (.compiler) )
   , ( "Directory containing binaries specific to a particular compiler"
     , "compiler-tools-bin"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.piToolsDir) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.toolsDir) )
   , ( "Directory where Stack installs executables (e.g. ~/.local/bin (Unix-like OSs) or %APPDATA%\\local\\bin (Windows))"
     , "local-bin"
     , WithoutHaddocks $
@@ -239,49 +242,49 @@ paths =
         T.intercalate ", " . map T.pack . (.extraLibDirs) . view configL )
   , ( "Snapshot package database"
     , "snapshot-pkg-db"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.piSnapDb) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.snapDb) )
   , ( "Local project package database"
     , "local-pkg-db"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.piLocalDb) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.localDb) )
   , ( "Global package database"
     , "global-pkg-db"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.piGlobalDb) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.globalDb) )
   , ( "GHC_PACKAGE_PATH environment variable"
     , "ghc-package-path"
     , WithoutHaddocks $
-        \pi' -> mkGhcPackagePath
-                  True
-                  pi'.piLocalDb
-                  pi'.piSnapDb
-                  pi'.piExtraDbs
-                  pi'.piGlobalDb
+        \pi -> mkGhcPackagePath
+                 True
+                 pi.localDb
+                 pi.snapDb
+                 pi.extraDbs
+                 pi.globalDb
     )
   , ( "Snapshot installation root"
     , "snapshot-install-root"
     , WithoutHaddocks $
-        T.pack . toFilePathNoTrailingSep . (.piSnapRoot) )
+        T.pack . toFilePathNoTrailingSep . (.snapRoot) )
   , ( "Local project installation root"
     , "local-install-root"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.piLocalRoot) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.localRoot) )
   , ( "Snapshot documentation root"
     , "snapshot-doc-root"
     , UseHaddocks $
-        \pi' -> T.pack (toFilePathNoTrailingSep (pi'.piSnapRoot </> docDirSuffix))
+        \pi -> T.pack (toFilePathNoTrailingSep (pi.snapRoot </> docDirSuffix))
     )
   , ( "Local project documentation root"
     , "local-doc-root"
     , UseHaddocks $
-        \pi' -> T.pack (toFilePathNoTrailingSep (pi'.piLocalRoot </> docDirSuffix))
+        \pi -> T.pack (toFilePathNoTrailingSep (pi.localRoot </> docDirSuffix))
     )
   , ( "Local project documentation root"
     , "local-hoogle-root"
-    , UseHaddocks $ T.pack . toFilePathNoTrailingSep . (.piHoogleRoot))
+    , UseHaddocks $ T.pack . toFilePathNoTrailingSep . (.hoogleRoot))
   , ( "Dist work directory, relative to package directory"
     , "dist-dir"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.piDistDir) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.distDir) )
   , ( "Where HPC reports and tix files are stored"
     , "local-hpc-root"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.piHpcDir) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.hpcDir) )
   ]
 
 -- | 'Text' equivalent of 'stackRootOptionName'.

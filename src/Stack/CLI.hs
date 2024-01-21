@@ -454,7 +454,7 @@ commandLineHandler currentDir progName isInterpreter =
     "Run a Stack script."
     globalFooter
     scriptCmd
-    (\so gom -> gom { resolverRoot = First $ Just $ takeDirectory so.soFile })
+    (\so gom -> gom { resolverRoot = First $ Just $ takeDirectory so.file })
     (globalOpts OtherCmdGlobalOpts)
     scriptOptsParser
 

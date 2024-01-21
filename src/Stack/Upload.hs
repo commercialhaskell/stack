@@ -1,6 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- | Types and functions related to Stack's @upload@ command.
 module Stack.Upload
@@ -166,15 +168,15 @@ data UploadVariant
 
 -- | Type representing command line options for the @stack upload@ command.
 data UploadOpts = UploadOpts
-  { uoItemsToWorkWith :: ![String]
+  { itemsToWorkWith :: ![String]
     -- ^ The items to work with.
-  , uoDocumentation :: !Bool
+  , documentation :: !Bool
     -- ^ Uploading documentation for packages?
-  , uoPvpBounds :: !(Maybe PvpBounds)
-  , uoCheck :: !Bool
-  , uoBuildPackage :: !Bool
-  , uoTarPath :: !(Maybe FilePath)
-  , uoUploadVariant :: !UploadVariant
+  , pvpBounds :: !(Maybe PvpBounds)
+  , check :: !Bool
+  , buildPackage :: !Bool
+  , tarPath :: !(Maybe FilePath)
+  , uploadVariant :: !UploadVariant
   }
 
 -- | Function underlying the @stack upload@ command. Upload to Hackage.
@@ -187,10 +189,10 @@ uploadCmd (UploadOpts [] uoDocumentation _ _ _ _ _) = do
 uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
   config <- view configL
   let hackageUrl = T.unpack config.hackageBaseUrl
-  if uo.uoDocumentation
+  if uo.documentation
     then do
       (dirs, invalid) <-
-        liftIO $ partitionM doesDirectoryExist uo.uoItemsToWorkWith
+        liftIO $ partitionM doesDirectoryExist uo.itemsToWorkWith
       unless (null invalid) $
         prettyThrowIO $ PackageDirectoryInvalid invalid
       (failed, items) <- partitionEithers <$> forM dirs checkDocsTarball
@@ -205,19 +207,19 @@ uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
           DocArchive
           (Just pkgIdName)
           (toFilePath tarGzFile)
-          uo.uoUploadVariant
+          uo.uploadVariant
     else do
       (files, nonFiles) <-
-        liftIO $ partitionM doesFileExist uo.uoItemsToWorkWith
+        liftIO $ partitionM doesFileExist uo.itemsToWorkWith
       (dirs, invalid) <- liftIO $ partitionM doesDirectoryExist nonFiles
       unless (null invalid) $ do
         prettyThrowIO $ ItemsInvalid invalid
       let sdistOpts = SDistOpts
-            uo.uoItemsToWorkWith
-            uo.uoPvpBounds
-            uo.uoCheck
-            uo.uoBuildPackage
-            uo.uoTarPath
+            uo.itemsToWorkWith
+            uo.pvpBounds
+            uo.check
+            uo.buildPackage
+            uo.tarPath
       getCreds <- memoizeRef $ loadAuth config
       mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
       forM_ files $ \file -> do
@@ -229,11 +231,11 @@ uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
           SDist
           Nothing
           (toFilePath tarFile)
-          uo.uoUploadVariant
+          uo.uploadVariant
       forM_ dirs $ \dir -> do
         pkgDir <- resolveDir' dir
         (tarName, tarBytes, mcabalRevision) <-
-          getSDistTarball uo.uoPvpBounds pkgDir
+          getSDistTarball uo.pvpBounds pkgDir
         checkSDistTarball' sdistOpts tarName tarBytes
         creds <- runMemoized getCreds
         uploadBytes
@@ -242,7 +244,7 @@ uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
           SDist
           Nothing
           tarName
-          uo.uoUploadVariant
+          uo.uploadVariant
           tarBytes
         forM_ mcabalRevision $ uncurry $ uploadRevision hackageUrl creds
    where
@@ -279,9 +281,9 @@ newtype HackageKey = HackageKey Text
 --
 -- Since 0.1.0.0
 data HackageCreds = HackageCreds
-  { hcUsername :: !Text
-  , hcPassword :: !Text
-  , hcCredsFile :: !FilePath
+  { username :: !Text
+  , password :: !Text
+  , credsFile :: !FilePath
   }
   deriving (Eq, Show)
 
@@ -350,9 +352,9 @@ loadUserAndPassword config = do
     username <- liftIO $ withEnvVariable "HACKAGE_USERNAME" (prompt "Hackage username: ")
     password <- liftIO $ withEnvVariable "HACKAGE_PASSWORD" (promptPassword "Hackage password: ")
     let hc = HackageCreds
-          { hcUsername = username
-          , hcPassword = password
-          , hcCredsFile = fp
+          { username
+          , password
+          , credsFile = fp
           }
 
     when config.saveHackageCreds $ do
@@ -428,8 +430,8 @@ applyCreds creds req0 = do
       pure (Left $ toException ExitSuccess )
     else
       liftIO $ applyDigestAuth
-        (encodeUtf8 creds.hcUsername)
-        (encodeUtf8 creds.hcPassword)
+        (encodeUtf8 creds.username)
+        (encodeUtf8 creds.password)
         req0
         manager
   case ereq of
@@ -517,7 +519,7 @@ uploadBytes baseUrl auth contentForm mPkgIdName tarName uploadVariant bytes = do
           HACreds creds ->
             handleIO
               (const $ pure ())
-              (liftIO $ removeFile creds.hcCredsFile)
+              (liftIO $ removeFile creds.credsFile)
           _ -> pure ()
         prettyThrowIO AuthenticationFailure
       403 -> do

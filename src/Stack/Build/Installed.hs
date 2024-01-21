@@ -132,8 +132,8 @@ loadDatabase installMap db lhs0 = do
   pkgexe <- getGhcPkgExe
   (lhs1', dps) <- ghcPkgDump pkgexe pkgDb $ conduitDumpPackage .| sink
   lhs1 <- mapMaybeM processLoadResult lhs1'
-  let lhs = pruneDeps id (.lhId) (.lhDeps) const (lhs0 ++ lhs1)
-  pure (map (\lh -> lh { lhDeps = [] }) $ Map.elems lhs, dps)
+  let lhs = pruneDeps id (.ghcPkgId) (.depsGhcPkgId) const (lhs0 ++ lhs1)
+  pure (map (\lh -> lh { depsGhcPkgId = [] }) $ Map.elems lhs, dps)
  where
   pkgDb = case db of
     GlobalPkgDb -> []
@@ -152,7 +152,7 @@ loadDatabase installMap db lhs0 = do
   processLoadResult (reason, lh) = do
     logDebug $
          "Ignoring package "
-      <> fromPackageName (fst lh.lhPair)
+      <> fromPackageName (fst lh.pair)
       <> case db of
            GlobalPkgDb -> mempty
            UserPkgDb loc fp -> ", from " <> displayShow (loc, fp) <> ","
@@ -241,13 +241,13 @@ isAllowed installMap pkgDb dp = case Map.lookup name installMap of
 
 -- | Type representing certain information about an installed package.
 data LoadHelper = LoadHelper
-  { lhId :: !GhcPkgId
+  { ghcPkgId :: !GhcPkgId
     -- ^ The package's id.
-  , lhSublibrary :: !(Maybe SublibDump)
-  , lhDeps :: ![GhcPkgId]
+  , subLibDump :: !(Maybe SublibDump)
+  , depsGhcPkgId :: ![GhcPkgId]
     -- ^ Unless the package's name is that of a 'wired-in' package, a list of
     -- the ids of the installed packages that are the package's dependencies.
-  , lhPair :: !(PackageName, (InstallLocation, Installed))
+  , pair :: !(PackageName, (InstallLocation, Installed))
     -- ^ A pair of (a) the package's name and (b) a pair of the relevant
     -- database (write-only or mutable) and information about the library
     -- installed.
@@ -256,32 +256,32 @@ data LoadHelper = LoadHelper
 
 toLoadHelper :: PackageDbVariety -> DumpPackage -> LoadHelper
 toLoadHelper pkgDb dp = LoadHelper
-  { lhId = gid
-  , lhDeps =
-      -- We always want to consider the wired in packages as having all of their
-      -- dependencies installed, since we have no ability to reinstall them.
-      -- This is especially important for using different minor versions of GHC,
-      -- where the dependencies of wired-in packages may change slightly and
-      -- therefore not match the snapshot.
-      if name `Set.member` wiredInPackages
-        then []
-        else dp.depends
-  , lhSublibrary = dp.sublib
-  , lhPair =
-      ( name
-      , (toInstallLocation pkgDb, Library ident installedLibInfo)
-      )
+  { ghcPkgId
+  , depsGhcPkgId
+  , subLibDump = dp.sublib
+  , pair
   }
  where
-  installedLibInfo = InstalledLibraryInfo gid (Right <$> dp.license) mempty
-  gid = dp.ghcPkgId
+  ghcPkgId = dp.ghcPkgId
   ident@(PackageIdentifier name _) = dp.packageIdent
+  depsGhcPkgId =
+    -- We always want to consider the wired in packages as having all of their
+    -- dependencies installed, since we have no ability to reinstall them. This
+    -- is especially important for using different minor versions of GHC, where
+    -- the dependencies of wired-in packages may change slightly and therefore
+    -- not match the snapshot.
+    if name `Set.member` wiredInPackages
+      then []
+      else dp.depends
+  installedLibInfo = InstalledLibraryInfo ghcPkgId (Right <$> dp.license) mempty
 
   toInstallLocation :: PackageDbVariety -> InstallLocation
   toInstallLocation GlobalDb = Snap
   toInstallLocation ExtraDb = Snap
   toInstallLocation WriteOnlyDb = Snap
   toInstallLocation MutableDb = Local
+
+  pair = (name, (toInstallLocation pkgDb, Library ident installedLibInfo))
 
 -- | This is where sublibraries and main libraries are assembled into a single
 -- entity Installed package, where all ghcPkgId live.
@@ -302,16 +302,16 @@ gatherAndTransformSubLoadHelper lh =
           { subLib = Map.union
               incomingLibInfo.subLib
               existingLibInfo.subLib
-          , ghcPkgId = if isJust lh.lhSublibrary
+          , ghcPkgId = if isJust lh.subLibDump
                       then existingLibInfo.ghcPkgId
                       else incomingLibInfo.ghcPkgId
           }
       )
   onPreviousLoadHelper newVal _oldVal = newVal
-  (key, value) = case lh.lhSublibrary of
+  (key, value) = case lh.subLibDump of
     Nothing -> (rawPackageName, rawValue)
     Just sd -> (sd.packageName, updateAsSublib sd <$> rawValue)
-  (rawPackageName, rawValue) = lh.lhPair
+  (rawPackageName, rawValue) = lh.pair
   updateAsSublib
       sd
       (Library (PackageIdentifier _sublibMungedPackageName version) libInfo)

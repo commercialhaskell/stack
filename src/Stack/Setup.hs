@@ -2732,8 +2732,8 @@ data StackReleaseInfo
     -- ^ Information on the latest available binary for the current platforms.
 
 data HaskellStackOrg = HaskellStackOrg
-  { hsoUrl :: !Text
-  , hsoVersion :: !Version
+  { url :: !Text
+  , version :: !Version
   }
   deriving Show
 
@@ -2804,8 +2804,8 @@ downloadStackReleaseInfo Nothing Nothing Nothing = do
                   -- We found a valid URL, let's use it!
                   Right version -> do
                     let hso = HaskellStackOrg
-                                { hsoUrl = loc
-                                , hsoVersion = version
+                                { url = loc
+                                , version
                                 }
                     logDebug $
                          "Downloading from haskellstack.org: "
@@ -2960,7 +2960,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
         String url <- KeyMap.lookup "browser_download_url" o
         Just url
     findMatch _ _ = Nothing
-  findArchive (SRIHaskellStackOrg hso) _ = pure hso.hsoUrl
+  findArchive (SRIHaskellStackOrg hso) _ = pure hso.url
 
   handleTarball :: Path Abs File -> Bool -> T.Text -> IO ()
   handleTarball tmpFile isWindows url = do
@@ -3092,4 +3092,4 @@ getDownloadVersion (SRIGitHub val) = do
   String rawName <- KeyMap.lookup "name" o
   -- drop the "v" at the beginning of the name
   parseVersion $ T.unpack (T.drop 1 rawName)
-getDownloadVersion (SRIHaskellStackOrg hso) = Just hso.hsoVersion
+getDownloadVersion (SRIHaskellStackOrg hso) = Just hso.version
