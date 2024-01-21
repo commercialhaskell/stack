@@ -117,13 +117,7 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
     | not $ bopts.libStrip || bopts.exeStrip
     ]
   , ["--disable-executable-stripping" | not bopts.exeStrip && isLocal]
-  , map (\(name,enabled) ->
-                     "-f" <>
-                     (if enabled
-                        then ""
-                        else "-") <>
-                     flagNameString name)
-                  (Map.toList flags)
+  , flags
   , map T.unpack package.cabalConfigOpts
   , processGhcOptions package.ghcOptions
   , map ("--extra-include-dirs=" ++) config.extraIncludeDirs
@@ -174,14 +168,19 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
 
   config = view configL econfig
   bopts = bco.buildOpts
-
+  mapAndAppend fn = Map.foldrWithKey' (fmap (:) . fn)
   -- Unioning atop defaults is needed so that all flags are specified with
   -- --exact-configuration.
-  flags = package.flags `Map.union` package.defaultFlags
+  flags = mapAndAppend renderFlags [] (package.flags `Map.union` package.defaultFlags)
+  renderFlags name enabled = "-f" <>
+                     (if enabled
+                        then ""
+                        else "-") <>
+                     flagNameString name
 
-  depOptions = map toDepOption $ Map.toList deps
+  depOptions = mapAndAppend toDepOption [] deps
 
-  toDepOption (PackageIdentifier name _, gid) = concat
+  toDepOption (PackageIdentifier name _) gid = concat
     [ "--dependency="
     , depOptionKey
     , "="
