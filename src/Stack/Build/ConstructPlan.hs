@@ -60,7 +60,7 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigureOpts
-                   ( BaseConfigOpts (..) )
+                   ( BaseConfigOpts (..), packageConfigureOptsFromPackage )
 import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
@@ -437,6 +437,7 @@ addFinal lp package isAllInOne buildHaddocks = do
   res <- case depsRes of
     Left e -> pure $ Left e
     Right (MissingPresentDeps missing present _minLoc) -> do
+      let packageConfigureOpt = packageConfigureOptsFromPackage package
       ctx <- ask
       pure $ Right Task
         { configOpts = TaskConfigOpts missing $ \missing' ->
@@ -447,7 +448,7 @@ addFinal lp package isAllInOne buildHaddocks = do
                   allDeps
                   True -- local
                   Mutable
-                  package
+                  packageConfigureOpt
         , buildHaddocks
         , present
         , taskType = TTLocalMutable lp
@@ -745,6 +746,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
       (Nothing, _) -> pure Nothing
     let loc = psLocation ps
         mutable = installLocationIsMutable loc <> minMutable
+    let packageConfigureOpt = packageConfigureOptsFromPackage package
     pure $ case mRightVersionInstalled of
       Just installed -> ADRFound loc installed
       Nothing -> ADRToInstall Task
@@ -756,7 +758,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
                   allDeps
                   (psLocal ps)
                   mutable
-                  package
+                  packageConfigureOpt
         , buildHaddocks
         , present
         , taskType =
@@ -1006,13 +1008,14 @@ checkDirtiness ::
 checkDirtiness ps installed package present buildHaddocks = do
   ctx <- ask
   moldOpts <- runRIO ctx $ tryGetFlagCache installed
+  let packageConfigureOpt = ConfigureOpts.packageConfigureOptsFromPackage package
   let configureOpts = ConfigureOpts.configureOpts
         (view envConfigL ctx)
         ctx.baseConfigOpts
         present
         (psLocal ps)
         (installLocationIsMutable $ psLocation ps) -- should be Local i.e. mutable always
-        package
+        packageConfigureOpt
       components = case ps of
         PSFilePath lp ->
           Set.map (encodeUtf8 . renderComponent) lp.components
