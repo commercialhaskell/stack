@@ -114,7 +114,7 @@ import           Stack.Types.CompilerPaths
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigureOpts
-                   ( BaseConfigOpts (..), ConfigureOpts (..) )
+                   ( BaseConfigOpts (..), ConfigureOpts (..), renderConfigureOpts )
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
@@ -287,13 +287,10 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
       pure $ case mpath of
           Left _ -> []
           Right x -> pure $ concat ["--with-", name, "=", x]
+    let allOpts = concat exes ++ renderConfigureOpts newConfigCache.configureOpts
     -- Configure cabal with arguments determined by
-    -- Stack.Types.Build.ureOpts
-    cabal KeepTHLoading $ "configure" : concat
-      [ concat exes
-      , newConfigCache.configureOpts.pathRelated
-      , newConfigCache.configureOpts.nonPathRelated
-      ]
+    -- Stack.Types.Build.configureOpts
+    cabal KeepTHLoading $ "configure" : allOpts
     -- Only write the cache for local packages.  Remote packages are built in a
     -- temporary directory so the cache would never be used anyway.
     case task.taskType of
