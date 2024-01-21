@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -52,14 +53,14 @@ instance Pretty LockPrettyException where
 instance Exception LockPrettyException
 
 data LockedLocation a b = LockedLocation
-  { llOriginal :: a
-  , llCompleted :: b
+  { original :: a
+  , completed :: b
   }
   deriving (Eq, Show)
 
 instance (ToJSON a, ToJSON b) => ToJSON (LockedLocation a b) where
   toJSON ll =
-      object [ "original" .= ll.llOriginal, "completed" .= ll.llCompleted ]
+      object [ "original" .= ll.original, "completed" .= ll.completed ]
 
 instance ( FromJSON (WithJSONWarnings (Unresolved a))
          , FromJSON (WithJSONWarnings (Unresolved b))
@@ -85,16 +86,16 @@ instance FromJSON (WithJSONWarnings (Unresolved SingleRPLI)) where
       pure $ withWarnings $ SingleRPLI . NE.head <$> unresolvedRPLIs
 
 data Locked = Locked
-  { lckSnapshotLocations :: [LockedLocation RawSnapshotLocation SnapshotLocation]
-  , lckPkgImmutableLocations :: [LockedLocation RawPackageLocationImmutable PackageLocationImmutable]
+  { snapshotLocations :: [LockedLocation RawSnapshotLocation SnapshotLocation]
+  , pkgImmutableLocations :: [LockedLocation RawPackageLocationImmutable PackageLocationImmutable]
   }
   deriving (Eq, Show)
 
 instance ToJSON Locked where
   toJSON lck =
     object
-      [ "snapshots" .= lck.lckSnapshotLocations
-      , "packages" .= lck.lckPkgImmutableLocations
+      [ "snapshots" .= lck.snapshotLocations
+      , "packages" .= lck.pkgImmutableLocations
       ]
 
 instance FromJSON (WithJSONWarnings (Unresolved Locked)) where
@@ -102,7 +103,7 @@ instance FromJSON (WithJSONWarnings (Unresolved Locked)) where
     snapshots <- jsonSubWarningsT $ o ..: "snapshots"
     packages <- jsonSubWarningsT $ o ..: "packages"
     let unwrap :: LockedLocation SingleRPLI b -> LockedLocation RawPackageLocationImmutable b
-        unwrap ll = ll { llOriginal = ll.llOriginal.unSingleRPLI }
+        unwrap ll = ll { original = ll.original.unSingleRPLI }
     pure $ Locked <$> sequenceA snapshots <*> (map unwrap <$> sequenceA packages)
 
 loadYamlThrow ::
@@ -151,9 +152,9 @@ lockCachedWanted stackFile resolver fillWanted = do
       logDebug "Not reading lock file"
       pure $ Locked [] []
   let toMap :: Ord a => [LockedLocation a b] -> Map a b
-      toMap =  Map.fromList . map ((.llOriginal) &&& (.llCompleted))
-      slocCache = toMap locked.lckSnapshotLocations
-      pkgLocCache = toMap locked.lckPkgImmutableLocations
+      toMap =  Map.fromList . map ((.original) &&& (.completed))
+      slocCache = toMap locked.snapshotLocations
+      pkgLocCache = toMap locked.pkgImmutableLocations
   debugRSL <- view rslInLogL
   (snap, slocCompleted, pliCompleted) <-
     loadAndCompleteSnapshotRaw' debugRSL resolver slocCache pkgLocCache
@@ -167,8 +168,8 @@ lockCachedWanted stackFile resolver fillWanted = do
         | raw == toRawSL complete = Nothing
         | otherwise = Just $ LockedLocation raw complete
       newLocked = Locked
-        { lckSnapshotLocations = mapMaybe differentSnapLocs slocCompleted
-        , lckPkgImmutableLocations =
+        { snapshotLocations = mapMaybe differentSnapLocs slocCompleted
+        , pkgImmutableLocations =
           lockLocations $ pliCompleted <> prjCompleted
         }
   when (newLocked /= locked) $

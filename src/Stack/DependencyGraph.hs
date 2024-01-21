@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
@@ -19,7 +20,6 @@ import           Distribution.License ( License (..) )
 import qualified Distribution.PackageDescription as PD
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Path ( parent )
-import           RIO.Process ( HasProcessContext (..) )
 import           Stack.Build ( loadPackage )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source
@@ -41,18 +41,16 @@ import           Stack.Types.BuildOptsCLI
 import           Stack.Types.BuildOptsMonoid
                    ( buildOptsMonoidBenchmarksL, buildOptsMonoidTestsL )
 import           Stack.Types.Compiler ( wantedToActual )
-import           Stack.Types.Config ( HasConfig (..) )
 import           Stack.Types.DependencyTree ( DotPayload (..) )
+import           Stack.Types.DotConfig ( DotConfig (..) )
 import           Stack.Types.DotOpts ( DotOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig ( EnvConfig (..), HasSourceMap (..) )
-import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GhcPkgId
                    ( GhcPkgId, ghcPkgIdString, parseGhcPkgId )
 import           Stack.Types.GlobalOpts ( globalOptsBuildOptsMonoidL )
 import           Stack.Types.Package ( LocalPackage (..) )
-import           Stack.Types.Platform ( HasPlatform (..) )
-import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
+import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
                    , SMActual (..), SMWanted (..), SourceMap (..)
@@ -109,15 +107,15 @@ withDotConfig opts inner =
       else withConfig YesReexec withReal
  where
   withGlobalHints = do
-    bconfig <- view buildConfigL
-    globals <- globalsFromHints bconfig.smWanted.compiler
+    buildConfig <- view buildConfigL
+    globals <- globalsFromHints buildConfig.smWanted.compiler
     fakeGhcPkgId <- parseGhcPkgId "ignored"
     actual <- either throwIO pure $
-      wantedToActual bconfig.smWanted.compiler
+      wantedToActual buildConfig.smWanted.compiler
     let smActual = SMActual
           { compiler = actual
-          , project = bconfig.smWanted.project
-          , deps =  bconfig.smWanted.deps
+          , project = buildConfig.smWanted.project
+          , deps =  buildConfig.smWanted.deps
           , global = Map.mapWithKey toDump globals
           }
         toDump :: PackageName -> Version -> DumpPackage
@@ -143,9 +141,9 @@ withDotConfig opts inner =
     logDebug "Loading source map"
     sourceMap <- loadSourceMap targets boptsCLI smActual
     let dc = DotConfig
-                { dcBuildConfig = bconfig
-                , dcSourceMap = sourceMap
-                , dcGlobalDump = toList smActual.global
+                { buildConfig
+                , sourceMap
+                , globalDump = toList smActual.global
                 }
     logDebug "DotConfig fully loaded"
     runRIO dc inner
@@ -156,9 +154,9 @@ withDotConfig opts inner =
     installMap <- toInstallMap sourceMap
     (_, globalDump, _, _) <- getInstalled installMap
     let dc = DotConfig
-          { dcBuildConfig = envConfig.buildConfig
-          , dcSourceMap = sourceMap
-          , dcGlobalDump = globalDump
+          { buildConfig = envConfig.buildConfig
+          , sourceMap
+          , globalDump
           }
     runRIO dc inner
 
@@ -186,7 +184,7 @@ createDependencyGraph dotOpts = do
   locals <- for (toList sourceMap.project) loadLocalPackage
   let graph =
         Map.fromList $ projectPackageDependencies dotOpts (filter (.wanted) locals)
-  globalDump <- view $ to (.dcGlobalDump)
+  globalDump <- view $ to (.globalDump)
   -- TODO: Can there be multiple entries for wired-in-packages? If so,
   -- this will choose one arbitrarily..
   let globalDumpMap = Map.fromList $
@@ -355,48 +353,3 @@ pruneUnreachable dontPrune = fixpoint prune
 
 localPackageToPackage :: LocalPackage -> Package
 localPackageToPackage lp = fromMaybe lp.package lp.testBench
-
-data DotConfig = DotConfig
-  { dcBuildConfig :: !BuildConfig
-  , dcSourceMap :: !SourceMap
-  , dcGlobalDump :: ![DumpPackage]
-  }
-
-instance HasLogFunc DotConfig where
-  logFuncL = runnerL . logFuncL
-
-instance HasPantryConfig DotConfig where
-  pantryConfigL = configL . pantryConfigL
-
-instance HasTerm DotConfig where
-  useColorL = runnerL . useColorL
-  termWidthL = runnerL . termWidthL
-
-instance HasStylesUpdate DotConfig where
-  stylesUpdateL = runnerL . stylesUpdateL
-
-instance HasGHCVariant DotConfig where
-  ghcVariantL = configL . ghcVariantL
-  {-# INLINE ghcVariantL #-}
-
-instance HasPlatform DotConfig where
-  platformL = configL . platformL
-  {-# INLINE platformL #-}
-  platformVariantL = configL . platformVariantL
-  {-# INLINE platformVariantL #-}
-
-instance HasRunner DotConfig where
-  runnerL = configL . runnerL
-
-instance HasProcessContext DotConfig where
-  processContextL = runnerL . processContextL
-
-instance HasConfig DotConfig where
-  configL = buildConfigL . lens (.config) (\x y -> x { config = y })
-  {-# INLINE configL #-}
-
-instance HasBuildConfig DotConfig where
-  buildConfigL = lens (.dcBuildConfig) (\x y -> x { dcBuildConfig = y })
-
-instance HasSourceMap DotConfig where
-  sourceMapL = lens (.dcSourceMap) (\x y -> x { dcSourceMap = y })

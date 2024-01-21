@@ -84,18 +84,18 @@ data SpecialExecCmd
   deriving (Eq, Show)
 
 data ExecOptsExtra = ExecOptsExtra
-  { eoEnvSettings :: !EnvSettings
-  , eoPackages :: ![String]
-  , eoRtsOptions :: ![String]
-  , eoCwd :: !(Maybe FilePath)
+  { envSettings :: !EnvSettings
+  , packages :: ![String]
+  , rtsOptions :: ![String]
+  , cwd :: !(Maybe FilePath)
   }
   deriving Show
 
 -- Type representing options for Stack's execution commands.
 data ExecOpts = ExecOpts
-  { eoCmd :: !SpecialExecCmd
-  , eoArgs :: ![String]
-  , eoExtra :: !ExecOptsExtra
+  { cmd :: !SpecialExecCmd
+  , args :: ![String]
+  , extra :: !ExecOptsExtra
   }
   deriving Show
 
@@ -107,23 +107,23 @@ execCmd opts =
     unless (null targets) $ build Nothing
 
     config <- view configL
-    menv <- liftIO $ config.processContextSettings eo.eoEnvSettings
+    menv <- liftIO $ config.processContextSettings eo.envSettings
     withProcessContext menv $ do
       -- Add RTS options to arguments
-      let argsWithRts args = if null eo.eoRtsOptions
+      let argsWithRts args = if null eo.rtsOptions
                   then args :: [String]
-                  else args ++ ["+RTS"] ++ eo.eoRtsOptions ++ ["-RTS"]
-      (cmd, args) <- case (opts.eoCmd, argsWithRts opts.eoArgs) of
+                  else args ++ ["+RTS"] ++ eo.rtsOptions ++ ["-RTS"]
+      (cmd, args) <- case (opts.cmd, argsWithRts opts.args) of
         (ExecCmd cmd, args) -> pure (cmd, args)
         (ExecRun, args) -> getRunCmd args
-        (ExecGhc, args) -> getGhcCmd eo.eoPackages args
-        (ExecRunGhc, args) -> getRunGhcCmd eo.eoPackages args
+        (ExecGhc, args) -> getGhcCmd eo.packages args
+        (ExecRunGhc, args) -> getRunGhcCmd eo.packages args
 
-      runWithPath eo.eoCwd $ exec cmd args
+      runWithPath eo.cwd $ exec cmd args
  where
-  eo = opts.eoExtra
+  eo = opts.extra
 
-  targets = concatMap words eo.eoPackages
+  targets = concatMap words eo.packages
   boptsCLI = defaultBuildOptsCLI { targetsCLI = map T.pack targets }
 
   -- return the package-id of the first package in GHC_PACKAGE_PATH

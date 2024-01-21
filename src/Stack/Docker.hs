@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -235,8 +236,8 @@ runContainerAndExit = do
       | otherwise -> throwM (NotPulledException image)
   projectRoot <- getProjectRoot
   sandboxDir <- projectDockerSandboxDir projectRoot
-  let ic = imageInfo.iiConfig
-      imageEnvVars = map (break (== '=')) ic.icEnv
+  let ic = imageInfo.config
+      imageEnvVars = map (break (== '=')) ic.env
       platformVariant = show $ hashRepoName image
       stackRoot = view stackRootL config
       sandboxHomeDir = sandboxDir </> homeDirName
@@ -323,8 +324,8 @@ runContainerAndExit = do
            -- Disable the deprecated entrypoint in FP Complete-generated images
         , [ "--entrypoint=/usr/bin/env"
           |  isJust (lookupImageEnv oldSandboxIdEnvVar imageEnvVars)
-          && (  ic.icEntrypoint == ["/usr/local/sbin/docker-entrypoint"]
-             || ic.icEntrypoint == ["/root/entrypoint.sh"]
+          && (  ic.entrypoint == ["/usr/local/sbin/docker-entrypoint"]
+             || ic.entrypoint == ["/root/entrypoint.sh"]
              )
           ]
         , concatMap (\(k,v) -> ["-e", k ++ "=" ++ v]) envVars
@@ -627,10 +628,10 @@ oldSandboxIdEnvVar = "DOCKER_SANDBOX_ID"
 
 -- | Parsed result of @docker inspect@.
 data Inspect = Inspect
-  { iiConfig      :: ImageConfig
-  , iiCreated     :: UTCTime
-  , iiId          :: Text
-  , iiVirtualSize :: Maybe Integer
+  { config      :: ImageConfig
+  , created     :: UTCTime
+  , iiId        :: Text
+  , virtualSize :: Maybe Integer
   }
   deriving Show
 
@@ -646,8 +647,8 @@ instance FromJSON Inspect where
 
 -- | Parsed @Config@ section of @docker inspect@ output.
 data ImageConfig = ImageConfig
-  { icEnv :: [String]
-  , icEntrypoint :: [String]
+  { env :: [String]
+  , entrypoint :: [String]
   }
   deriving Show
 
