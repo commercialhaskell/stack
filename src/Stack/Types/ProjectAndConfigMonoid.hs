@@ -43,7 +43,7 @@ parseProjectAndConfigMonoid rootDir =
     let dropPackages = Set.map unCabalString drops
     pure $ do
       deps' <- mapM (resolvePaths (Just rootDir)) deps
-      let dependencies =
+      let extraDeps =
             concatMap toList (deps' :: [NonEmpty RawPackageLocation])
       resolver <- resolvePaths (Just rootDir) resolver'
       let project = Project
@@ -52,7 +52,7 @@ parseProjectAndConfigMonoid rootDir =
             , compiler -- FIXME make sure resolver' isn't SLCompiler
             , extraPackageDBs
             , packages
-            , dependencies
+            , extraDeps
             , flagsByPkg
             , curator
             , dropPackages
