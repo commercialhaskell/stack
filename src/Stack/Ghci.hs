@@ -238,7 +238,7 @@ ghci opts = do
         { compiler = sourceMap.compiler
         , project = sourceMap.project
         , deps = sourceMap.deps
-        , global = sourceMap.globalPkgs
+        , globals = sourceMap.globalPkgs
         }
   -- Parse --main-is argument.
   mainIsTargets <- parseMainIsTargets buildOptsCLI sma opts.mainIs
@@ -356,7 +356,7 @@ findFileTargets ::
   -> RIO env (Map PackageName Target, Map PackageName [Path Abs File], [Path Abs File])
 findFileTargets locals fileTargets = do
   filePackages <- forM locals $ \lp -> do
-    PackageComponentFile _ compFiles _ _ <- getPackageFile lp.package lp.cabalFile
+    PackageComponentFile _ compFiles _ _ <- getPackageFile lp.package lp.cabalFP
     pure (lp, M.map (map dotCabalGetPath) compFiles)
   let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
       foundFileTargetComponents =
@@ -831,8 +831,8 @@ loadGhciPkgDescs ::
   -> [(PackageName, (Path Abs File, Target))]
   -> RIO env [GhciPkgDesc]
 loadGhciPkgDescs buildOptsCLI localTargets =
-  forM localTargets $ \(name, (cabalfp, target)) ->
-    loadGhciPkgDesc buildOptsCLI name cabalfp target
+  forM localTargets $ \(name, (cabalFP, target)) ->
+    loadGhciPkgDesc buildOptsCLI name cabalFP target
 
 -- | Load package description information for a ghci target.
 loadGhciPkgDesc ::
@@ -868,11 +868,11 @@ loadGhciPkgDesc buildOptsCLI name cabalFP target = do
         , compilerVersion = compilerVersion
         , platform = view platformL econfig
         }
-  -- TODO we've already parsed this information, otherwise we
-  -- wouldn't have figured out the cabalfp already. In the future:
-  -- retain that GenericPackageDescription in the relevant data
-  -- structures to avoid reparsing.
-  (gpdio, _name, _cabalfp) <-
+  -- TODO we've already parsed this information, otherwise we wouldn't have
+  -- figured out the cabalFP already. In the future: retain that
+  -- GenericPackageDescription in the relevant data structures to avoid
+  -- reparsing.
+  (gpdio, _name, _cabalFP) <-
     loadCabalFilePath (Just stackProgName') (parent cabalFP)
   gpkgdesc <- liftIO $ gpdio YesPrintWarnings
 
@@ -924,18 +924,18 @@ makeGhciPkgInfo ::
 makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
   bopts <- view buildOptsL
   let pkg = pkgDesc.package
-      cabalfp = pkgDesc.cabalFP
+      cabalFP = pkgDesc.cabalFP
       target = pkgDesc.target
       name = pkg.name
   (mods, files, opts) <-
-    getPackageOpts pkg installMap installedMap locals addPkgs cabalfp
+    getPackageOpts pkg installMap installedMap locals addPkgs cabalFP
   let filteredOpts = filterWanted opts
       filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
       allWanted = wantedPackageComponents bopts target pkg
   pure GhciPkgInfo
     { name
     , opts = M.toList filteredOpts
-    , dir = parent cabalfp
+    , dir = parent cabalFP
     , modules = unionModuleMaps $
         map
           ( \(comp, mp) -> M.map
@@ -1211,7 +1211,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
         shouldLoad <- or <$> mapM go deps
         if shouldLoad
           then do
-            modify (M.insert name (Just (lp.cabalFile, TargetComps (S.singleton CLib))))
+            modify (M.insert name (Just (lp.cabalFP, TargetComps (S.singleton CLib))))
             pure True
           else do
             modify (M.insert name Nothing)

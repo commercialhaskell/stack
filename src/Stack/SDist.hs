@@ -111,15 +111,15 @@ instance Pretty SDistPrettyException where
     <> flow "Package check reported the following errors:"
     <> line
     <> bulletedList (map (string . show) (NE.toList xs) :: [StyleDoc])
-  pretty (CabalFilePathsInconsistentBug cabalfp cabalfp') =
+  pretty (CabalFilePathsInconsistentBug cabalFP cabalFP') =
     "[S-9595]"
     <> line
     <> fillSep
          [ flow "The impossible happened! Two Cabal file paths are \
                 \inconsistent:"
-         , pretty cabalfp
+         , pretty cabalFP
          , "and"
-         , pretty cabalfp' <> "."
+         , pretty cabalFP' <> "."
          ]
   pretty (ToTarPathException e) =
     "[S-7875]"
@@ -234,7 +234,7 @@ getSDistTarball mpvpBounds pkgDir = do
     [ flow "Getting the file list for"
     , style File (fromString  pkgFp) <> "."
     ]
-  (fileList, cabalfp) <- getSDistFileList lp deps
+  (fileList, cabalFP) <- getSDistFileList lp deps
   prettyInfoL
     [ flow "Building a compressed archive file in the sdist format for"
     , style File (fromString pkgFp) <> "."
@@ -263,18 +263,18 @@ getSDistTarball mpvpBounds pkgDir = do
         -- This is a Cabal file, we're going to tweak it, but only tweak it as a
         -- revision.
         | tweakCabal && isCabalFp fp && asRevision = do
-            lbsIdent <- getCabalLbs pvpBounds (Just 1) cabalfp sourceMap
+            lbsIdent <- getCabalLbs pvpBounds (Just 1) cabalFP sourceMap
             liftIO (writeIORef cabalFileRevisionRef (Just lbsIdent))
             packWith packFileEntry False fp
         -- Same, except we'll include the Cabal file in the original tarball
         -- upload.
         | tweakCabal && isCabalFp fp = do
-            (_ident, lbs) <- getCabalLbs pvpBounds Nothing cabalfp sourceMap
+            (_ident, lbs) <- getCabalLbs pvpBounds Nothing cabalFP sourceMap
             currTime <- liftIO getPOSIXTime -- Seconds from UNIX epoch
             tp <- liftIO $ tarPath False fp
             pure $ (Tar.fileEntry tp lbs) { Tar.entryTime = floor currTime }
         | otherwise = packWith packFileEntry False fp
-      isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalfp
+      isCabalFp fp = toFilePath pkgDir FP.</> fp == toFilePath cabalFP
       tarName = pkgIdName FP.<.> "tar.gz"
       pkgIdName = packageIdentifierString pkgId
       pkgId = packageIdentifier lp.package
@@ -295,12 +295,12 @@ getCabalLbs ::
   -> Path Abs File -- ^ Cabal file
   -> SourceMap
   -> RIO env (PackageIdentifier, L.ByteString)
-getCabalLbs pvpBounds mrev cabalfp sourceMap = do
-  (gpdio, _name, cabalfp') <-
-    loadCabalFilePath (Just stackProgName') (parent cabalfp)
+getCabalLbs pvpBounds mrev cabalFP sourceMap = do
+  (gpdio, _name, cabalFP') <-
+    loadCabalFilePath (Just stackProgName') (parent cabalFP)
   gpd <- liftIO $ gpdio NoPrintWarnings
-  unless (cabalfp == cabalfp') $
-    prettyThrowIO $ CabalFilePathsInconsistentBug cabalfp cabalfp'
+  unless (cabalFP == cabalFP') $
+    prettyThrowIO $ CabalFilePathsInconsistentBug cabalFP cabalFP'
   installMap <- toInstallMap sourceMap
   (installedMap, _, _, _) <- getInstalled installMap
   let subLibPackages = Set.fromList $
@@ -334,7 +334,7 @@ getCabalLbs pvpBounds mrev cabalfp sourceMap = do
            fillSep
              [ flow "Bug detected in Cabal library. ((parse . render . parse) \
                     \=== id) does not hold for the Cabal file at"
-             , pretty cabalfp
+             , pretty cabalFP
              ]
         <> blankLine
       (_warnings, eres) = Cabal.runParseResult
@@ -456,14 +456,14 @@ gtraverseT f =
 readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
   config  <- getDefaultPackageConfig
-  (gpdio, _, cabalfp) <- loadCabalFilePath (Just stackProgName') pkgDir
+  (gpdio, _, cabalFP) <- loadCabalFilePath (Just stackProgName') pkgDir
   gpd <- liftIO $ gpdio YesPrintWarnings
   let package = resolvePackage config gpd
   pure LocalPackage
-    { package = package
+    { package
     , wanted = False -- HACK: makes it so that sdist output goes to a log
                        -- instead of a file.
-    , cabalFile = cabalfp
+    , cabalFP
     -- NOTE: these aren't the 'correct' values, but aren't used in the usage of
     -- this function in this module.
     , testBench = Nothing
@@ -494,14 +494,14 @@ getSDistFileList lp deps =
                        -- custom Setup.hs files
       $ \ee ->
       withSingleContext ac ee taskType deps (Just "sdist") $
-        \_package cabalfp _pkgDir cabal _announce _outputType -> do
+        \_package cabalFP _pkgDir cabal _announce _outputType -> do
           let outFile = toFilePath tmpdir FP.</> "source-files-list"
           cabal
             CloseOnException
             KeepTHLoading
             ["sdist", "--list-sources", outFile]
           contents <- liftIO (S.readFile outFile)
-          pure (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalfp)
+          pure (T.unpack $ T.decodeUtf8With T.lenientDecode contents, cabalFP)
  where
   ac = ActionContext Set.empty [] ConcurrencyAllowed
   taskType = TTLocalMutable lp

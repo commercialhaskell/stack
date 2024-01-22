@@ -258,7 +258,7 @@ resolveRawTarget sma allLocs (rawInput, rt) =
  where
   locals = sma.project
   deps = sma.deps
-  globals = sma.global
+  globals = sma.globals
   -- Helper function: check if a 'NamedComponent' matches the given
   -- 'ComponentName'
   isCompNamed :: ComponentName -> NamedComponent -> Bool

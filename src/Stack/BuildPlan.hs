@@ -390,7 +390,7 @@ checkSnapBuildPlan pkgDirs flags snapCandidate = do
         | otherwise = Nothing
       snapPkgs = Map.union
         (Map.mapMaybe depVersion sma.deps)
-        (Map.map globalVersion sma.global)
+        (Map.map globalVersion sma.globals)
       (f, errs) = checkBundleBuildPlan platform compiler snapPkgs flags gpds
       cerrs = compilerErrors compiler errs
 

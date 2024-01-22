@@ -193,7 +193,7 @@ spec = beforeAll setup $ do
       let bopts = config.build
       bopts.libProfile `shouldBe` True
       bopts.exeProfile `shouldBe` True
-      bopts.haddock `shouldBe` True
+      bopts.buildHaddocks `shouldBe` True
       bopts.haddockDeps `shouldBe` Just True
       bopts.installExes `shouldBe` True
       bopts.preFetch `shouldBe` True

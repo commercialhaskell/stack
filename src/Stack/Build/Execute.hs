@@ -186,7 +186,7 @@ displayTask task = fillSep $
        <> ","
      ,    "source="
        <> ( case task.taskType of
-              TTLocalMutable lp -> pretty $ parent lp.cabalFile
+              TTLocalMutable lp -> pretty $ parent lp.cabalFP
               TTRemotePackage _ _ pl -> fromString $ T.unpack $ textDisplay pl
           )
        <> if Set.null missing
@@ -419,7 +419,7 @@ executePlan' installedMap0 targets plan ee = do
     generateHpcMarkupIndex
   unless (null errs) $
     prettyThrowM $ ExecutionFailure errs
-  when buildOpts.haddock $ do
+  when buildOpts.buildHaddocks $ do
     if buildOpts.haddockForHackage
       then
         generateLocalHaddockForHackageArchives ee.locals

@@ -857,7 +857,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
   packages0 <- for project.packages $ \fp@(RelFilePath t) -> do
     abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
     let resolved = ResolvedPath fp abs'
-    pp <- mkProjectPackage YesPrintWarnings resolved bopts.haddock
+    pp <- mkProjectPackage YesPrintWarnings resolved bopts.buildHaddocks
     pure (pp.projectCommon.name, pp)
 
   -- prefetch git repos to avoid cloning per subdirectory

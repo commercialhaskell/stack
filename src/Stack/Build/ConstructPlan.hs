@@ -447,11 +447,11 @@ addFinal lp package isAllInOne buildHaddocks = do
                   True -- local
                   Mutable
                   package
-        , buildHaddock = buildHaddocks
-        , present = present
+        , buildHaddocks
+        , present
         , taskType = TTLocalMutable lp
         , allInOne = isAllInOne
-        , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFile))
+        , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFP))
         , buildTypeConfig = packageBuildTypeConfig package
         }
   tell mempty { wFinals = Map.singleton package.name res }
@@ -632,7 +632,7 @@ installPackage name ps minstalled = do
         <> "."
       package <- ctx.loadPackage
         pkgLoc cp.flags cp.ghcOptions cp.cabalConfigOpts
-      resolveDepsAndInstall True cp.haddocks ps package minstalled
+      resolveDepsAndInstall True cp.buildHaddocks ps package minstalled
     PSFilePath lp -> do
       case lp.testBench of
         Nothing -> do
@@ -760,8 +760,8 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
                   (psLocal ps)
                   mutable
                   package
-        , buildHaddock = buildHaddocks
-        , present = present
+        , buildHaddocks
+        , present
         , taskType =
             case ps of
               PSFilePath lp ->

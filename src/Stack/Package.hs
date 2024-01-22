@@ -200,10 +200,10 @@ getPackageOpts
     installedMap
     omitPkgs
     addPkgs
-    cabalfp
+    cabalFP
   = do
       PackageComponentFile !componentsModules componentFiles _ _ <-
-        getPackageFile stackPackage cabalfp
+        getPackageFile stackPackage cabalFP
       let subLibs =
             S.toList $ subLibComponents $ M.keysSet componentsModules
       excludedSubLibs <- mapM (parsePackageNameThrowing . T.unpack) subLibs
@@ -212,7 +212,7 @@ getPackageOpts
         installedMap
         (excludedSubLibs ++ omitPkgs)
         addPkgs
-        cabalfp
+        cabalFP
         stackPackage
         componentFiles
       pure (componentsModules, componentFiles, componentsOpts)
@@ -236,7 +236,7 @@ generatePkgDescOpts
     installedMap
     omitPackages
     addPackages
-    cabalfp
+    cabalFP
     pkg
     componentPaths
   = do
@@ -273,7 +273,7 @@ generatePkgDescOpts
             . makeBuildInfoOpts (.testSuites) CTest
       pure $ aggregateAllBuildInfoOpts mempty
  where
-  cabalDir = parent cabalfp
+  cabalDir = parent cabalFP
 
 -- | Generate GHC options for the target. Since Cabal also figures out these
 -- options, currently this is only used for invoking GHCI (via stack ghci).

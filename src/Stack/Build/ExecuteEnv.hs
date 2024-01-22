@@ -577,10 +577,10 @@ withSingleContext
     allDeps
     msuffix
     inner0
-  = withPackage $ \package cabalfp pkgDir ->
+  = withPackage $ \package cabalFP pkgDir ->
       withOutputType pkgDir package $ \outputType ->
         withCabal package pkgDir outputType $ \cabal ->
-          inner0 package cabalfp pkgDir cabal announce outputType
+          inner0 package cabalFP pkgDir cabal announce outputType
  where
   pkgId = taskTypePackageIdentifier taskType
   announce = announceTask ee taskType
@@ -610,9 +610,9 @@ withSingleContext
   withPackage inner =
     case taskType of
       TTLocalMutable lp -> do
-        let root = parent lp.cabalFile
+        let root = parent lp.cabalFP
         withLockedDistDir prettyAnnounce root $
-          inner lp.package lp.cabalFile root
+          inner lp.package lp.cabalFP root
       TTRemotePackage _ package pkgloc -> do
         suffix <-
           parseRelDir $ packageIdentifierString $ packageIdentifier package
@@ -635,8 +635,8 @@ withSingleContext
 
         let name = pkgName pkgId
         cabalfpRel <- parseRelFile $ packageNameString name ++ ".cabal"
-        let cabalfp = dir </> cabalfpRel
-        inner package cabalfp dir
+        let cabalFP = dir </> cabalfpRel
+        inner package cabalFP dir
 
   withOutputType pkgDir package inner
     -- Not in interleaved mode. When building a single wanted package, dump

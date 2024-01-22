@@ -24,8 +24,8 @@ data BuildOpts = BuildOpts
   , exeProfile :: !Bool
   , libStrip :: !Bool
   , exeStrip :: !Bool
-  , haddock :: !Bool
-    -- ^ Build haddocks?
+  , buildHaddocks :: !Bool
+    -- ^ Build Haddock documentation?
   , haddockOpts :: !HaddockOpts
     -- ^ Options to pass to haddock
   , openHaddocks :: !Bool
@@ -111,4 +111,5 @@ buildOptsInstallExesL =
   lens (.installExes) (\bopts t -> bopts {installExes = t})
 
 buildOptsHaddockL :: Lens' BuildOpts Bool
-buildOptsHaddockL = lens (.haddock) (\bopts t -> bopts {haddock = t})
+buildOptsHaddockL =
+  lens (.buildHaddocks) (\bopts t -> bopts {buildHaddocks = t})

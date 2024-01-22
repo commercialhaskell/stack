@@ -695,10 +695,10 @@ cabalPackagesCheck cabaldirs = do
     -- Pantry's 'loadCabalFilePath' throws 'MismatchedCabalName' (error
     -- [S-910]) if the Cabal file name does not match the package it
     -- defines.
-    (gpdio, _name, cabalfp) <- loadCabalFilePath (Just stackProgName') dir
+    (gpdio, _name, cabalFP) <- loadCabalFilePath (Just stackProgName') dir
     eres <- liftIO $ try (gpdio YesPrintWarnings)
     case eres :: Either PantryException C.GenericPackageDescription of
-      Right gpd -> pure $ Right (cabalfp, gpd)
+      Right gpd -> pure $ Right (cabalFP, gpd)
       Left (MismatchedCabalName fp name) -> pure $ Left (fp, name)
       Left e -> throwIO e
   let (nameMismatchPkgs, packages) = partitionEithers ePackages
