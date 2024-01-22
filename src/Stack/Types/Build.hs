@@ -45,7 +45,6 @@ module Stack.Types.Build
 import           Data.Aeson ( ToJSON, FromJSON )
 import qualified Data.ByteString as S
 import           Data.List as L
-import qualified Data.Map as Map
 import qualified Data.Text as T
 import           Database.Persist.Sql
                    ( PersistField (..), PersistFieldSql (..)
@@ -59,7 +58,7 @@ import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), TestOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( BuildSubset (..), FileWatchOpts (..) )
-import           Stack.Types.ConfigureOpts ( ConfigureOpts, configureOpts )
+import           Stack.Types.ConfigureOpts ( ConfigureOpts, configureOpts, BaseConfigOpts, PackageConfigureOpts )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.Package
@@ -67,6 +66,7 @@ import           Stack.Types.Package
                    , LocalPackage (..), Package (..), PackageSource (..)
                    , packageIdentifier, psVersion
                    )
+import           Stack.Types.EnvConfig ( EnvConfig )
 
 -- | Package dependency oracle.
 newtype PkgDepsOracle
@@ -156,18 +156,18 @@ data Task = Task
 -- | Given the IDs of any missing packages, produce the configure options
 data TaskConfigOpts = TaskConfigOpts
   { missing :: !(Set PackageIdentifier)
-    -- ^ Dependencies for which we don't yet have an GhcPkgId
-  , opts    :: !(Map PackageIdentifier GhcPkgId -> ConfigureOpts)
-    -- ^ Produce the list of options given the missing @GhcPkgId@s
+    -- ^ Dependencies for which we don't yet have a 'GhcPkgId'
+  , envConfig :: !EnvConfig
+  , baseConfigOpts :: !BaseConfigOpts
+  , isLocalNonExtraDep :: !Bool
+  , isMutable :: !IsMutable
+  , pkgConfigOpts :: PackageConfigureOpts
   }
 
 instance Show TaskConfigOpts where
-  show (TaskConfigOpts missing f) = concat
-    [ "Missing: "
-    , show missing
-    , ". Without those: "
-    , show $ f Map.empty
-    ]
+  show tco =
+    "Missing: "
+    ++ show tco.missing
 
 -- | Type representing different types of task, depending on what is to be
 -- built.
