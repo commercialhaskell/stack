@@ -10,8 +10,8 @@ import           Stack.Prelude
 
 data ExtraDirs = ExtraDirs
   { bins :: ![Path Abs Dir]
-  , include :: ![Path Abs Dir]
-  , lib :: ![Path Abs Dir]
+  , includes :: ![Path Abs Dir]
+  , libs :: ![Path Abs Dir]
   }
   deriving (Show, Generic)
 

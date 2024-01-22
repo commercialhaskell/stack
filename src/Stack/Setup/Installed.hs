@@ -15,7 +15,7 @@ module Stack.Setup.Installed
   , toolNameString
   , parseToolText
   , filterTools
-  , extraDirs
+  , toolExtraDirs
   , installDir
   , tempInstallDir
   ) where
@@ -133,8 +133,8 @@ getCompilerVersion wc exe =
   isValid c = c == '.' || isDigit c
 
 -- | Binary directories for the given installed package
-extraDirs :: HasConfig env => Tool -> RIO env ExtraDirs
-extraDirs tool = do
+toolExtraDirs :: HasConfig env => Tool -> RIO env ExtraDirs
+toolExtraDirs tool = do
   config <- view configL
   dir <- installDir config.localPrograms tool
   case (config.platform, toolNameString tool) of
@@ -150,10 +150,10 @@ extraDirs tool = do
           , dir </> relDirUsr </> relDirBin
           , dir </> relDirUsr </> relDirLocal </> relDirBin
           ]
-      , include =
+      , includes =
           [ dir </> relDirMingw32 </> relDirInclude
           ]
-      , lib =
+      , libs =
           [ dir </> relDirMingw32 </> relDirLib
           , dir </> relDirMingw32 </> relDirBin
           ]
@@ -164,10 +164,10 @@ extraDirs tool = do
           , dir </> relDirUsr </> relDirBin
           , dir </> relDirUsr </> relDirLocal </> relDirBin
           ]
-      , include =
+      , includes =
           [ dir </> relDirMingw64 </> relDirInclude
           ]
-      , lib =
+      , libs =
           [ dir </> relDirMingw64 </> relDirLib
           , dir </> relDirMingw64 </> relDirBin
           ]

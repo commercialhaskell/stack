@@ -113,8 +113,8 @@ import           Stack.GhcPkg
                    , mkGhcPackagePath )
 import           Stack.Prelude
 import           Stack.Setup.Installed
-                   ( Tool (..), extraDirs, filterTools, getCompilerVersion
-                   , installDir, listInstalled, markInstalled, tempInstallDir
+                   ( Tool (..), filterTools, getCompilerVersion, installDir
+                   , listInstalled, markInstalled, tempInstallDir,toolExtraDirs
                    , toolString, unmarkInstalled
                    )
 import           Stack.SourceMap
@@ -984,11 +984,11 @@ withNewLocalBuildTargets targets f = do
 
 -- | Add the include and lib paths to the given Config
 addIncludeLib :: ExtraDirs -> Config -> Config
-addIncludeLib (ExtraDirs _bins includes libs) config = config
+addIncludeLib extraDirs config = config
   { extraIncludeDirs =
-      config.extraIncludeDirs ++ map toFilePathNoTrailingSep includes
+      config.extraIncludeDirs ++ map toFilePathNoTrailingSep extraDirs.includes
   , extraLibDirs =
-      config.extraLibDirs ++ map toFilePathNoTrailingSep libs
+      config.extraLibDirs ++ map toFilePathNoTrailingSep extraDirs.libs
   }
 
 -- | Ensure both the compiler and the msys toolchain are installed and
@@ -1000,7 +1000,7 @@ ensureCompilerAndMsys ::
 ensureCompilerAndMsys sopts = do
   getSetupInfo' <- memoizeRef getSetupInfo
   mmsys2Tool <- ensureMsys sopts getSetupInfo'
-  mmsysPaths <- maybe (pure Nothing) (fmap Just . extraDirs) mmsys2Tool
+  mmsysPaths <- maybe (pure Nothing) (fmap Just . toolExtraDirs) mmsys2Tool
   actual <- either throwIO pure $ wantedToActual sopts.wantedCompiler
   didWarn <- warnUnsupportedCompiler $ getGhcVersion actual
   -- Modify the initial environment to include the MSYS2 path, if MSYS2 is being
@@ -1259,8 +1259,8 @@ ensureCompiler sopts getSetupInfo' = do
     Just cp -> do
       let paths = ExtraDirs
             { bins = [parent cp.compiler]
-            , include = []
-            , lib = []
+            , includes = []
+            , libs = []
             }
       pure (cp, paths)
 
@@ -1348,7 +1348,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
          commitId
          flavour
      _ -> installGhcBindist sopts getSetupInfo' installed
-  paths <- extraDirs compilerTool
+  paths <- toolExtraDirs compilerTool
 
   wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
   menv0 <- view processContextL
