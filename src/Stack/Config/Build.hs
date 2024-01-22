@@ -11,28 +11,9 @@ module Stack.Config.Build
  ) where
 
 import           Distribution.Verbosity ( normal )
-import Stack.Prelude
-    ( ($),
-      Functor(fmap),
-      Semigroup((<>)),
-      Bool(False, True),
-      String,
-      Maybe(..),
-      not,
-      (&&),
-      catMaybes,
-      unwords,
-      (||),
-      Any(getAny),
-      First(getFirst),
-      fromMaybe,
-      fromFirst,
-      fromFirstFalse,
-      fromFirstTrue,
-      FirstFalse(FirstFalse),
-      FirstTrue(FirstTrue) )
 import           Stack.BuildOpts
                    ( defaultBenchmarkOpts, defaultHaddockOpts, defaultTestOpts )
+import           Stack.Prelude
 import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), HaddockOpts (..)
                    , TestOpts (..)
