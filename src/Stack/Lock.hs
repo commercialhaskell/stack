@@ -76,7 +76,7 @@ instance ( FromJSON (WithJSONWarnings (Unresolved a))
 -- serialization should not produce locations with multiple subdirs
 -- so we should be OK using just a head element
 newtype SingleRPLI
-  = SingleRPLI { unSingleRPLI :: RawPackageLocationImmutable}
+  = SingleRPLI { singleRPLI :: RawPackageLocationImmutable}
 
 instance FromJSON (WithJSONWarnings (Unresolved SingleRPLI)) where
   parseJSON v =
@@ -103,7 +103,7 @@ instance FromJSON (WithJSONWarnings (Unresolved Locked)) where
     snapshots <- jsonSubWarningsT $ o ..: "snapshots"
     packages <- jsonSubWarningsT $ o ..: "packages"
     let unwrap :: LockedLocation SingleRPLI b -> LockedLocation RawPackageLocationImmutable b
-        unwrap ll = ll { original = ll.original.unSingleRPLI }
+        unwrap ll = ll { original = ll.original.singleRPLI }
     pure $ Locked <$> sequenceA snapshots <*> (map unwrap <$> sequenceA packages)
 
 loadYamlThrow ::

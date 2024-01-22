@@ -238,7 +238,7 @@ parseConfigMonoidObject rootDir obj = do
   skipGHCCheck <- FirstFalse <$> obj ..:? configMonoidSkipGHCCheckName
   skipMsys <- FirstFalse <$> obj ..:? configMonoidSkipMsysName
   requireStackVersion <-
-    IntersectingVersionRange . (.unVersionRangeJSON) <$>
+    IntersectingVersionRange . (.versionRangeJSON) <$>
       ( obj ..:? configMonoidRequireStackVersionName
           ..!= VersionRangeJSON anyVersion
       )

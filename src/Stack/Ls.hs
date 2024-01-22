@@ -73,7 +73,7 @@ instance Exception LsException where
 
 -- | Type representing command line options for the @stack ls@ command.
 newtype LsCmdOpts
-  = LsCmdOpts { lsView :: LsCmds }
+  = LsCmdOpts { lsCmds :: LsCmds }
 
 -- | Type representing subcommands for the @stack ls@ command.
 data LsCmds
@@ -143,7 +143,7 @@ data ListStylesOpts = ListStylesOpts
 
 -- | Type representing command line options for the @stack ls tools@ command.
 newtype ListToolsOpts
-  = ListToolsOpts { toptFilter  :: String }
+  = ListToolsOpts { filter  :: String }
 
 data Snapshot = Snapshot
   { snapId :: Text
@@ -236,7 +236,7 @@ handleLocal lsOpts = do
         | otherwise   = parent parentInstRoot
   snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
   let snapData = L.sort snapData'
-  case lsOpts.lsView of
+  case lsOpts.lsCmds of
     LsSnapshot sopt ->
       case (sopt.ltsSnapView, sopt.nightlySnapView) of
         (True, False) ->
@@ -259,7 +259,7 @@ handleRemote lsOpts = do
   let req' = addRequestHeader hAccept "application/json" req
   result <- httpJSON req'
   let snapData = getResponseBody result
-  case lsOpts.lsView of
+  case lsOpts.lsCmds of
     LsSnapshot sopt ->
       case (sopt.ltsSnapView, sopt.nightlySnapView) of
         (True, False) ->
@@ -279,7 +279,7 @@ handleRemote lsOpts = do
 
 lsCmd :: LsCmdOpts -> RIO Runner ()
 lsCmd lsOpts =
-  case lsOpts.lsView of
+  case lsOpts.lsCmds of
     LsSnapshot sopt ->
       case sopt.viewType of
         Local -> handleLocal lsOpts
@@ -320,7 +320,7 @@ listToolsCmd :: ListToolsOpts -> RIO Config ()
 listToolsCmd opts = do
   localPrograms <- view $ configL . to (.localPrograms)
   installed <- sort <$> listInstalled localPrograms
-  let wanted = case opts.toptFilter of
+  let wanted = case opts.filter of
         [] -> installed
         "ghc-git" -> [t | t@(ToolGhcGit _ _) <- installed]
         pkgName -> filtered pkgName installed
