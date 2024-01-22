@@ -291,8 +291,8 @@ data LocalPackage = LocalPackage
   , testBench     :: !(Maybe Package)
     -- ^ This stores the 'Package' with tests and benchmarks enabled, if either
     -- is asked for by the user.
-  , cabalFile     :: !(Path Abs File)
-    -- ^ The Cabal file
+  , cabalFP     :: !(Path Abs File)
+    -- ^ Absolute path to the Cabal file.
   , buildHaddocks :: !Bool
     -- ^ Is Haddock documentation being built for this package?
   , forceDirty    :: !Bool

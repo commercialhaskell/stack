@@ -46,7 +46,7 @@ buildOptsFromMonoid buildMonoid = BuildOpts
       (  buildMonoid.exeStrip
       <> FirstTrue (if noStripping then Just False else Nothing)
       )
-  , haddock = fromFirstFalse buildMonoid.haddock
+  , buildHaddocks = fromFirstFalse buildMonoid.buildHaddocks
   , haddockOpts = haddockOptsFromMonoid buildMonoid.haddockOpts
   , openHaddocks =
          not isHaddockFromHackage

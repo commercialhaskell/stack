@@ -108,7 +108,8 @@ queryBuildInfo selectors0 =
 rawBuildInfo :: HasEnvConfig env => RIO env Value
 rawBuildInfo = do
   locals <- projectLocalPackages
-  wantedCompiler <- view $ wantedCompilerVersionL . to (utf8BuilderToText . display)
+  wantedCompiler <-
+    view $ wantedCompilerVersionL . to (utf8BuilderToText . display)
   actualCompiler <- view $ actualCompilerVersionL . to compilerVersionText
   pure $ object
     [ "locals" .= Object (KeyMap.fromList $ map localToPair locals)
@@ -124,5 +125,5 @@ rawBuildInfo = do
     p = lp.package
     value = object
       [ "version" .= CabalString p.version
-      , "path" .= toFilePath (parent lp.cabalFile)
+      , "path" .= toFilePath (parent lp.cabalFP)
       ]

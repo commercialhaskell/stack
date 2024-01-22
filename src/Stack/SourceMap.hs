@@ -60,20 +60,20 @@ mkProjectPackage ::
   -> Bool
      -- ^ Should Haddock documentation be built for the package?
   -> RIO env ProjectPackage
-mkProjectPackage printWarnings dir buildHaddocks = do
-  (gpd, name, cabalfp) <-
-    loadCabalFilePath (Just stackProgName') (resolvedAbsolute dir)
+mkProjectPackage printWarnings resolvedDir buildHaddocks = do
+  (gpd, name, cabalFP) <-
+    loadCabalFilePath (Just stackProgName') (resolvedAbsolute resolvedDir)
   pure ProjectPackage
-    { cabalFP = cabalfp
-    , resolvedDir = dir
+    { cabalFP
+    , resolvedDir
     , projectCommon =
         CommonPackage
           { gpd = gpd printWarnings
-          , name = name
+          , name
           , flags = mempty
           , ghcOptions = mempty
           , cabalConfigOpts = mempty
-          , haddocks = buildHaddocks
+          , buildHaddocks
           }
     }
 
@@ -85,29 +85,29 @@ additionalDepPackage ::
      -- ^ Should Haddock documentation be built for the package?
   -> PackageLocation
   -> RIO env DepPackage
-additionalDepPackage buildHaddocks pl = do
-  (name, gpdio) <-
-    case pl of
+additionalDepPackage buildHaddocks location = do
+  (name, gpd) <-
+    case location of
       PLMutable dir -> do
-        (gpdio, name, _cabalfp) <-
+        (gpd, name, _cabalfp) <-
           loadCabalFilePath (Just stackProgName') (resolvedAbsolute dir)
-        pure (name, gpdio NoPrintWarnings)
+        pure (name, gpd NoPrintWarnings)
       PLImmutable pli -> do
         let PackageIdentifier name _ = packageLocationIdent pli
         run <- askRunInIO
         pure (name, run $ loadCabalFileImmutable pli)
   pure DepPackage
-    { location = pl
+    { location
     , hidden = False
     , fromSnapshot = NotFromSnapshot
     , depCommon =
         CommonPackage
-          { gpd = gpdio
-          , name = name
+          { gpd
+          , name
           , flags = mempty
           , ghcOptions = mempty
           , cabalConfigOpts = mempty
-          , haddocks = buildHaddocks
+          , buildHaddocks
           }
     }
 
@@ -127,11 +127,11 @@ snapToDepPackage buildHaddocks name sp = do
     , depCommon =
         CommonPackage
           { gpd = run $ loadCabalFileImmutable sp.spLocation
-          , name = name
+          , name
           , flags = sp.spFlags
           , ghcOptions = sp.spGhcOptions
           , cabalConfigOpts = [] -- No spCabalConfigOpts, not present in snapshots
-          , haddocks = buildHaddocks
+          , buildHaddocks
           }
     }
 
@@ -178,14 +178,14 @@ actualFromGhc ::
   => SMWanted
   -> ActualCompiler
   -> RIO env (SMActual DumpedGlobalPackage)
-actualFromGhc smw ac = do
+actualFromGhc smw compiler = do
   globals <- view $ compilerPathsL . to (.globalDump)
   pure
     SMActual
-      { compiler = ac
+      { compiler
       , project = smw.project
       , deps = smw.deps
-      , global = globals
+      , globals
       }
 
 actualFromHints ::
@@ -193,14 +193,14 @@ actualFromHints ::
   => SMWanted
   -> ActualCompiler
   -> RIO env (SMActual GlobalPackageVersion)
-actualFromHints smw ac = do
-  globals <- globalsFromHints (actualToWanted ac)
+actualFromHints smw compiler = do
+  globals <- globalsFromHints (actualToWanted compiler)
   pure
     SMActual
-      { compiler = ac
+      { compiler
       , project = smw.project
       , deps = smw.deps
-      , global = Map.map GlobalPackageVersion globals
+      , globals = Map.map GlobalPackageVersion globals
       }
 
 -- | Simple cond check for boot packages - checks only OS and Arch
@@ -296,14 +296,14 @@ loadProjectSnapshotCandidate loc printWarnings buildHaddocks = do
   let wc = snapshotCompiler snapshot
   globals <- Map.map GlobalPackageVersion <$> globalsFromHints wc
   pure $ \projectPackages -> do
-    prjPkgs <- fmap Map.fromList . for projectPackages $ \resolved -> do
+    project <- fmap Map.fromList . for projectPackages $ \resolved -> do
       pp <- mkProjectPackage printWarnings resolved buildHaddocks
       pure (pp.projectCommon.name, pp)
     compiler <- either throwIO pure $ wantedToActual $ snapshotCompiler snapshot
     pure
       SMActual
-        { compiler = compiler
-        , project = prjPkgs
-        , deps = Map.difference deps prjPkgs
-        , global = globals
+        { compiler
+        , project
+        , deps = Map.difference deps project
+        , globals
         }

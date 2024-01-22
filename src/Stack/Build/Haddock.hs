@@ -110,12 +110,12 @@ shouldHaddockPackage ::
   -> Bool
 shouldHaddockPackage bopts wanted name =
   if Set.member name wanted
-    then bopts.haddock
+    then bopts.buildHaddocks
     else shouldHaddockDeps bopts
 
 -- | Determine whether to build haddocks for dependencies.
 shouldHaddockDeps :: BuildOpts -> Bool
-shouldHaddockDeps bopts = fromMaybe bopts.haddock bopts.haddockDeps
+shouldHaddockDeps bopts = fromMaybe bopts.buildHaddocks bopts.haddockDeps
 
 -- | Generate Haddock index and contents for local packages.
 generateLocalHaddockIndex ::
@@ -341,7 +341,7 @@ generateLocalHaddockForHackageArchives =
     ( \lp ->
         let pkg = lp.package
             pkgId = PackageIdentifier pkg.name pkg.version
-            pkgDir = parent lp.cabalFile
+            pkgDir = parent lp.cabalFP
         in generateLocalHaddockForHackageArchive pkgDir pkgId
     )
 

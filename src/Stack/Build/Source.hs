@@ -125,9 +125,9 @@ loadSourceMap targets boptsCli sma = do
                   ghcOptions ++ common.ghcOptions
               , cabalConfigOpts =
                   cabalConfigOpts ++ common.cabalConfigOpts
-              , haddocks =
+              , buildHaddocks =
                   if isTarget
-                    then bopts.haddock
+                    then bopts.buildHaddocks
                     else shouldHaddockDeps bopts
               }
       packageCliFlags = Map.fromList $
@@ -135,7 +135,7 @@ loadSourceMap targets boptsCli sma = do
         Map.toList boptsCli.flags
       maybeProjectFlags (ACFByName name, fs) = Just (name, fs)
       maybeProjectFlags _ = Nothing
-      globalPkgs = pruneGlobals sma.global (Map.keysSet deps)
+      globalPkgs = pruneGlobals sma.globals (Map.keysSet deps)
   logDebug "Checking flags"
   checkFlagsUsedThrowing packageCliFlags FSCommandLine project deps
   logDebug "SourceMap constructed"
@@ -200,7 +200,7 @@ depPackageHashableContent dp =
           flags = map flagToBs $ Map.toList dp.depCommon.flags
           ghcOptions = map display dp.depCommon.ghcOptions
           cabalConfigOpts = map display dp.depCommon.cabalConfigOpts
-          haddocks = if dp.depCommon.haddocks then "haddocks" else ""
+          haddocks = if dp.depCommon.buildHaddocks then "haddocks" else ""
           hash = immutableLocSha pli
       pure
         $  hash
@@ -409,11 +409,11 @@ loadLocalPackage pp = do
     { package = pkg
     , testBench = btpkg
     , componentFiles
-    , buildHaddocks = pp.projectCommon.haddocks
+    , buildHaddocks = pp.projectCommon.buildHaddocks
     , forceDirty = bopts.forceDirty
     , dirtyFiles
     , newBuildCaches
-    , cabalFile = pp.cabalFP
+    , cabalFP = pp.cabalFP
     , wanted = isWanted
     , components = nonLibComponents
       -- TODO: refactor this so that it's easier to be sure that these

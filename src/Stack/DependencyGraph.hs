@@ -116,7 +116,7 @@ withDotConfig opts inner =
           { compiler = actual
           , project = buildConfig.smWanted.project
           , deps =  buildConfig.smWanted.deps
-          , global = Map.mapWithKey toDump globals
+          , globals = Map.mapWithKey toDump globals
           }
         toDump :: PackageName -> Version -> DumpPackage
         toDump name version = DumpPackage
@@ -136,14 +136,14 @@ withDotConfig opts inner =
         actualPkgs =
           Map.keysSet smActual.deps <> Map.keysSet smActual.project
         prunedActual = smActual
-          { global = pruneGlobals smActual.global actualPkgs }
+          { globals = pruneGlobals smActual.globals actualPkgs }
     targets <- parseTargets NeedTargets False boptsCLI prunedActual
     logDebug "Loading source map"
     sourceMap <- loadSourceMap targets boptsCLI smActual
     let dc = DotConfig
                 { buildConfig
                 , sourceMap
-                , globalDump = toList smActual.global
+                , globalDump = toList smActual.globals
                 }
     logDebug "DotConfig fully loaded"
     runRIO dc inner
@@ -216,7 +216,7 @@ projectPackageDependencies ::
   -> [(PackageName, (Set PackageName, DotPayload))]
 projectPackageDependencies dotOpts locals =
   map (\lp -> let pkg = localPackageToPackage lp
-                  pkgDir = parent lp.cabalFile
+                  pkgDir = parent lp.cabalFP
                   packageDepsSet = setOfPackageDeps pkg
                   loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
               in  (pkg.name, (deps pkg packageDepsSet, lpPayload pkg loc)))

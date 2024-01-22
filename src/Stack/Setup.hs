@@ -684,7 +684,7 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
     let actualPkgs = Map.keysSet smActual.deps <>
                      Map.keysSet smActual.project
         prunedActual = smActual
-          { global = pruneGlobals smActual.global actualPkgs }
+          { globals = pruneGlobals smActual.globals actualPkgs }
         haddockDeps = shouldHaddockDeps config.build
     targets <- parseTargets needTargets haddockDeps buildOptsCLI prunedActual
     sourceMap <- loadSourceMap targets buildOptsCLI smActual
@@ -958,7 +958,7 @@ rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
     let actualPkgs =
           Map.keysSet smActual.deps <> Map.keysSet smActual.project
         prunedActual = smActual
-          { global = pruneGlobals smActual.global actualPkgs }
+          { globals = pruneGlobals smActual.globals actualPkgs }
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
     pure $ envConfig

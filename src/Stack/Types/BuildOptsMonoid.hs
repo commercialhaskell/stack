@@ -41,7 +41,7 @@ data BuildOptsMonoid = BuildOptsMonoid
   , exeProfile :: !FirstFalse
   , libStrip :: !FirstTrue
   , exeStrip :: !FirstTrue
-  , haddock :: !FirstFalse
+  , buildHaddocks :: !FirstFalse
   , haddockOpts :: !HaddockOptsMonoid
   , openHaddocks :: !FirstFalse
   , haddockDeps :: !(First Bool)
@@ -77,7 +77,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     exeProfile <-FirstFalse <$>  o ..:? exeProfileArgName
     libStrip <- FirstTrue <$> o ..:? libStripArgName
     exeStrip <-FirstTrue <$>  o ..:? exeStripArgName
-    haddock <- FirstFalse <$> o ..:? haddockArgName
+    buildHaddocks <- FirstFalse <$> o ..:? haddockArgName
     haddockOpts <- jsonSubWarnings (o ..:? haddockOptsArgName ..!= mempty)
     openHaddocks <- FirstFalse <$> o ..:? openHaddocksArgName
     haddockDeps <- First <$> o ..:? haddockDepsArgName
@@ -111,7 +111,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
       , exeProfile
       , libStrip
       , exeStrip
-      , haddock
+      , buildHaddocks
       , haddockOpts
       , openHaddocks
       , haddockDeps
@@ -355,8 +355,8 @@ instance Parsec CabalVerbosity where
 
 buildOptsMonoidHaddockL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidHaddockL =
-  lens (.haddock.getFirstFalse)
-    (\buildMonoid t -> buildMonoid {haddock = FirstFalse t})
+  lens (.buildHaddocks.getFirstFalse)
+    (\buildMonoid t -> buildMonoid {buildHaddocks = FirstFalse t})
 
 buildOptsMonoidTestsL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidTestsL =
