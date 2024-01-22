@@ -60,7 +60,7 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigureOpts
-                   ( BaseConfigOpts (..), packageConfigureOptsFromPackage )
+                   ( BaseConfigOpts (..) )
 import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
@@ -437,18 +437,18 @@ addFinal lp package isAllInOne buildHaddocks = do
   res <- case depsRes of
     Left e -> pure $ Left e
     Right (MissingPresentDeps missing present _minLoc) -> do
-      let packageConfigureOpt = packageConfigureOptsFromPackage package
+      let pkgConfigOpts = ConfigureOpts.packageConfigureOptsFromPackage package
       ctx <- ask
+      let configOpts = TaskConfigOpts
+            { missing = missing
+            , envConfig = ctx.ctxEnvConfig
+            , baseConfigOpts = ctx.baseConfigOpts
+            , isLocalNonExtraDep = True
+            , isMutable = Mutable
+            , pkgConfigOpts
+            }
       pure $ Right Task
-        { configOpts = TaskConfigOpts missing $ \missing' ->
-            let allDeps = Map.union present missing'
-            in  ConfigureOpts.configureOpts
-                  (view envConfigL ctx)
-                  ctx.baseConfigOpts
-                  allDeps
-                  True -- local
-                  Mutable
-                  packageConfigureOpt
+        { configOpts
         , buildHaddocks
         , present
         , taskType = TTLocalMutable lp
@@ -746,19 +746,19 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
       (Nothing, _) -> pure Nothing
     let loc = psLocation ps
         mutable = installLocationIsMutable loc <> minMutable
-    let packageConfigureOpt = packageConfigureOptsFromPackage package
+    let packageConfigureOpt = ConfigureOpts.packageConfigureOptsFromPackage package
+    let configOpts = TaskConfigOpts
+            { missing = missing
+            , envConfig = ctx.ctxEnvConfig
+            , baseConfigOpts = ctx.baseConfigOpts
+            , isLocalNonExtraDep = psLocal ps
+            , isMutable = mutable
+            , pkgConfigOpts = packageConfigureOpt
+            }
     pure $ case mRightVersionInstalled of
       Just installed -> ADRFound loc installed
       Nothing -> ADRToInstall Task
-        { configOpts = TaskConfigOpts missing $ \missing' ->
-            let allDeps = Map.union present missing'
-            in  ConfigureOpts.configureOpts
-                  (view envConfigL ctx)
-                  ctx.baseConfigOpts
-                  allDeps
-                  (psLocal ps)
-                  mutable
-                  packageConfigureOpt
+        { configOpts
         , buildHaddocks
         , present
         , taskType =

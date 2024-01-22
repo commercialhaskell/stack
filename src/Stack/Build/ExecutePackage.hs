@@ -114,7 +114,8 @@ import           Stack.Types.CompilerPaths
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigureOpts
-                   ( BaseConfigOpts (..), ConfigureOpts (..), renderConfigureOpts )
+                   ( BaseConfigOpts (..), ConfigureOpts (..) )
+import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
@@ -181,10 +182,17 @@ getConfigCache ee task installedMap enableTest enableBench = do
                   -> pure $ installedPackageToGhcPkgId ident installed
           Just installed -> pure $ installedPackageToGhcPkgId ident installed
           _ -> throwM $ PackageIdMissingBug ident
-  let TaskConfigOpts missing mkOpts = task.configOpts
-  missingMapList <- traverse getMissing $ toList missing
+  let cOpts = task.configOpts
+  missingMapList <- traverse getMissing $ toList cOpts.missing
+  let pcOpts = cOpts.pkgConfigOpts
   let missing' = Map.unions missingMapList
-      configureOpts' = mkOpts missing'
+      -- historically the leftermost was missing' for union preference in case of
+      -- collision for the return here. But unifying things with configureOpts
+      -- where it was the opposite resulted in this. It doesn't seem to make any
+      -- difference anyway.
+      allDepsMap = Map.union missing' task.present
+      configureOpts' = ConfigureOpts.configureOpts
+          cOpts.envConfig cOpts.baseConfigOpts allDepsMap cOpts.isLocalNonExtraDep cOpts.isMutable pcOpts
       configureOpts = configureOpts'
         { nonPathRelated = configureOpts'.nonPathRelated ++ map T.unpack extra }
       deps = Set.fromList $ Map.elems missing' ++ Map.elems task.present
@@ -200,7 +208,6 @@ getConfigCache ee task installedMap enableTest enableBench = do
         , pkgSrc = task.cachePkgSrc
         , pathEnvVar = ee.pathEnvVar
         }
-      allDepsMap = Map.union missing' task.present
   pure (allDepsMap, cache)
 
 -- | Ensure that the configuration for the package matches what is given
@@ -287,7 +294,7 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
       pure $ case mpath of
           Left _ -> []
           Right x -> pure $ concat ["--with-", name, "=", x]
-    let allOpts = concat exes ++ renderConfigureOpts newConfigCache.configureOpts
+    let allOpts = concat exes ++ ConfigureOpts.renderConfigureOpts newConfigCache.configureOpts
     -- Configure cabal with arguments determined by
     -- Stack.Types.Build.configureOpts
     cabal KeepTHLoading $ "configure" : allOpts
