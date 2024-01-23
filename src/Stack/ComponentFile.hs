@@ -55,7 +55,6 @@ import           Stack.Types.Component
                    ( StackBenchmark (..), StackBuildInfo (..)
                    , StackExecutable (..), StackLibrary (..)
                    , StackTestSuite (..), StackUnqualCompName (..)
-                   , sbiOtherModules
                    )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), prettyStackDevL )
@@ -86,7 +85,7 @@ stackBenchmarkFiles bench =
     case bench.interface of
       BenchmarkExeV10 _ fp -> [DotCabalMain fp]
       BenchmarkUnsupported _ -> []
-  bnames = map DotCabalModule build.sbiOtherModules
+  bnames = map DotCabalModule build.otherModules
   build = bench.buildInfo
 
 -- | Get all files referenced by the test.
@@ -102,7 +101,7 @@ stackTestSuiteFiles test =
       TestSuiteExeV10 _ fp -> [DotCabalMain fp]
       TestSuiteLibV09 _ mn -> [DotCabalModule mn]
       TestSuiteUnsupported _ -> []
-  bnames = map DotCabalModule build.sbiOtherModules
+  bnames = map DotCabalModule build.otherModules
   build = test.buildInfo
 
 -- | Get all files referenced by the executable.
@@ -114,7 +113,7 @@ stackExecutableFiles exe =
  where
   build = exe.buildInfo
   names =
-    map DotCabalModule build.sbiOtherModules ++ [DotCabalMain exe.modulePath]
+    map DotCabalModule build.otherModules ++ [DotCabalMain exe.modulePath]
 
 -- | Get all files referenced by the library. Handle all libraries (CLib and
 -- SubLib), based on empty name or not.
@@ -131,7 +130,7 @@ stackLibraryFiles lib =
   build = lib.buildInfo
   names = bnames ++ exposed
   exposed = map DotCabalModule lib.exposedModules
-  bnames = map DotCabalModule build.sbiOtherModules
+  bnames = map DotCabalModule build.otherModules
 
 -- | Get all files referenced by the component.
 resolveComponentFiles ::
