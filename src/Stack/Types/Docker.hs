@@ -354,7 +354,7 @@ instance FromJSON (WithJSONWarnings DockerOptsMonoid) where
     stackExe <- First <$> o ..:? dockerStackExeArgName
     setUser <- First <$> o ..:? dockerSetUserArgName
     requireDockerVersion <-
-      IntersectingVersionRange . (.unVersionRangeJSON) <$>
+      IntersectingVersionRange . (.versionRangeJSON) <$>
         ( o ..:? dockerRequireDockerVersionArgName
           ..!= VersionRangeJSON anyVersion
         )
@@ -444,7 +444,7 @@ data DockerMonoidRepoOrImage
 
 -- | Newtype for non-orphan FromJSON instance.
 newtype VersionRangeJSON =
-  VersionRangeJSON { unVersionRangeJSON :: VersionRange }
+  VersionRangeJSON { versionRangeJSON :: VersionRange }
 
 -- | Parse VersionRange.
 instance FromJSON VersionRangeJSON where

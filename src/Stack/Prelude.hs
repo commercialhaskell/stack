@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -272,7 +273,7 @@ promptBool txt = liftIO $ do
 
 -- | Like @First Bool@, but the default is @True@.
 newtype FirstTrue
-  = FirstTrue { getFirstTrue :: Maybe Bool }
+  = FirstTrue { firstTrue :: Maybe Bool }
   deriving (Eq, Ord, Show)
 
 instance Semigroup FirstTrue where
@@ -285,7 +286,7 @@ instance Monoid FirstTrue where
 
 -- | Get the 'Bool', defaulting to 'True'
 fromFirstTrue :: FirstTrue -> Bool
-fromFirstTrue = fromMaybe True . (.getFirstTrue)
+fromFirstTrue = fromMaybe True . (.firstTrue)
 
 -- | Helper for filling in default values
 defaultFirstTrue :: FirstTrue -> Bool
@@ -293,7 +294,7 @@ defaultFirstTrue _ = True
 
 -- | Like @First Bool@, but the default is @False@.
 newtype FirstFalse
-  = FirstFalse { getFirstFalse :: Maybe Bool }
+  = FirstFalse { firstFalse :: Maybe Bool }
   deriving (Eq, Ord, Show)
 
 instance Semigroup FirstFalse where
@@ -306,7 +307,7 @@ instance Monoid FirstFalse where
 
 -- | Get the 'Bool', defaulting to 'False'
 fromFirstFalse :: FirstFalse -> Bool
-fromFirstFalse = fromMaybe False . (.getFirstFalse)
+fromFirstFalse = fromMaybe False . (.firstFalse)
 
 -- | Helper for filling in default values
 defaultFirstFalse :: FirstFalse -> Bool
