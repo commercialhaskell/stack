@@ -649,7 +649,7 @@ mainLibraryHasExposedModules package =
 
 -- | Aggregate all unknown tools from all components. Mostly meant for
 -- build tools specified in the legacy manner (build-tools:) that failed the
--- hard-coded lookup. See 'Stack.Types.Component.sbiUnknownTools' for more
+-- hard-coded lookup. See 'Stack.Types.Component.unknownTools' for more
 -- information.
 packageUnknownTools :: Package -> Set Text
 packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
@@ -663,7 +663,7 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
   sublib = gatherUnknownTools pkg.subLibraries
   exe = gatherUnknownTools pkg.executables
   addUnknownTools :: HasBuildInfo x => x -> Set Text -> Set Text
-  addUnknownTools = (<>) . (.buildInfo.sbiUnknownTools)
+  addUnknownTools = (<>) . (.buildInfo.unknownTools)
   gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
   gatherUnknownTools = foldr' addUnknownTools mempty
 

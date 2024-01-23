@@ -106,7 +106,7 @@ stackTestFromCabal cabalTest = StackTestSuite
   }
 
 isComponentBuildable :: HasBuildInfo component => component -> Bool
-isComponentBuildable componentRec = componentRec.buildInfo.sbiBuildable
+isComponentBuildable componentRec = componentRec.buildInfo.buildable
 
 stackBuildInfoFromCabal :: BuildInfo -> StackBuildInfo
 stackBuildInfoFromCabal buildInfoV = gatherComponentToolsAndDepsFromCabal
@@ -114,13 +114,13 @@ stackBuildInfoFromCabal buildInfoV = gatherComponentToolsAndDepsFromCabal
   buildInfoV.buildToolDepends
   buildInfoV.targetBuildDepends
   StackBuildInfo
-    { sbiBuildable = buildInfoV.buildable
-    , sbiOtherModules = buildInfoV.otherModules
+    { buildable = buildInfoV.buildable
+    , otherModules = buildInfoV.otherModules
     , jsSources = buildInfoV.jsSources
     , hsSourceDirs = buildInfoV.hsSourceDirs
     , cSources = buildInfoV.cSources
-    , sbiDependency = mempty
-    , sbiUnknownTools = mempty
+    , dependency = mempty
+    , unknownTools = mempty
     , cppOptions = buildInfoV.cppOptions
     , targetBuildDepends = buildInfoV.targetBuildDepends
     , options = buildInfoV.options
@@ -171,23 +171,21 @@ gatherComponentToolsAndDepsFromCabal legacyBuildTools buildTools targetDeps =
           sbi
           (Cabal.ExeDependency pName (Cabal.mkUnqualComponentName exeName) range)
       Nothing -> sbi
-        {sbiUnknownTools = Set.insert (pack exeName) sbi.sbiUnknownTools}
+        { unknownTools = Set.insert (pack exeName) sbi.unknownTools }
   processExeDependency sbi exeDep@(Cabal.ExeDependency pName _ _)
     | isPreInstalledPackages pName = sbi
     | otherwise = sbi
-        { sbiDependency =
-            Map.insert pName (cabalExeToStackDep exeDep) sbi.sbiDependency
+        { dependency =
+            Map.insert pName (cabalExeToStackDep exeDep) sbi.dependency
         }
   processDependency sbi dep@(Cabal.Dependency pName _ _) = sbi
-    { sbiDependency =
-        Map.insert pName (cabalToStackDep dep) sbi.sbiDependency
-    }
+    { dependency = Map.insert pName (cabalToStackDep dep) sbi.dependency }
 
 componentDependencyMap ::
-     (HasField "buildInfo" r1 r2, HasField "sbiDependency" r2 a)
+     (HasField "buildInfo" r1 r2, HasField "dependency" r2 a)
   => r1
   -> a
-componentDependencyMap component = component.buildInfo.sbiDependency
+componentDependencyMap component = component.buildInfo.dependency
 
 -- | A hard-coded map for tool dependencies. If a dependency is within this map
 -- it's considered "known" (the exe will be found at the execution stage). The
@@ -201,7 +199,7 @@ isKnownLegacyExe input = case input of
   "greencard" -> justPck "greencard"
   "c2hs" -> justPck "c2hs"
   "hscolour" -> justPck "hscolour"
-  "hspec-iscover" -> justPck "hspec-discover"
+  "hspec-discover" -> justPck "hspec-discover"
   "hsx2hs" -> justPck "hsx2hs"
   "gtk2hsC2hs" -> justPck "gtk2hs-buildtools"
   "gtk2hsHookGenerator" -> justPck "gtk2hs-buildtools"

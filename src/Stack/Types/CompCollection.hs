@@ -121,7 +121,7 @@ foldAndMakeCollection mapFn = foldl' compIterator mempty
   compIterator existingCollection component =
     compCreator existingCollection (mapFn component)
   compCreator existingCollection component
-    | component.buildInfo.sbiBuildable = existingCollection
+    | component.buildInfo.buildable = existingCollection
         { buildableOnes =
             addComponent component existingCollection.buildableOnes
         }
