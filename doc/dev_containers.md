@@ -36,9 +36,9 @@ provided in the default Dev Container only.
     The PATH is
     `$HOME/.cabal/bin:$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`.
     Consequently, executables installed with Cabal (the tool) (at
-    `$HOME/.cabal/bin`) or Stack or Pip (at `$HOME/.local/bin`) take precedence
-    over the same executable installed at `/usr/local/sbin`, `/usr/local/bin`,
-    etc.
+    `$HOME/.cabal/bin` or `$HOME/.local/bin`) or Stack or Pip (at
+    `$HOME/.local/bin`) take precedence over the same executable installed at
+    `/usr/local/sbin`, `/usr/local/bin`, etc.
 
 [VS Code](https://code.visualstudio.com) is used as IDE, with the following
 extensions pre‑installed:

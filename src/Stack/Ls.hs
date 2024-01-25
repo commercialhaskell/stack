@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -72,7 +73,7 @@ instance Exception LsException where
 
 -- | Type representing command line options for the @stack ls@ command.
 newtype LsCmdOpts
-  = LsCmdOpts { lsView :: LsCmds }
+  = LsCmdOpts { lsCmds :: LsCmds }
 
 -- | Type representing subcommands for the @stack ls@ command.
 data LsCmds
@@ -84,9 +85,9 @@ data LsCmds
 -- | Type representing command line options for the @stack ls snapshots@
 -- command.
 data SnapshotOpts = SnapshotOpts
-  { soptViewType :: LsView
-  , soptLtsSnapView :: Bool
-  , soptNightlySnapView :: Bool
+  { viewType :: LsView
+  , ltsSnapView :: Bool
+  , nightlySnapView :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -105,9 +106,9 @@ data SnapshotType
   deriving (Eq, Ord, Show)
 
 data ListDepsOpts = ListDepsOpts
-  { listDepsFormat :: !ListDepsFormat
+  { format :: !ListDepsFormat
     -- ^ Format of printing dependencies
-  , listDepsDotOpts :: !DotOpts
+  , dotOpts :: !DotOpts
     -- ^ The normal dot options.
   }
 
@@ -118,9 +119,9 @@ data ListDepsFormat
   | ListDepsConstraints
 
 data ListDepsFormatOpts = ListDepsFormatOpts
-  { listDepsSep :: !Text
+  { sep :: !Text
     -- ^ Separator between the package name and details.
-  , listDepsLicense :: !Bool
+  , license :: !Bool
     -- ^ Print dependency licenses instead of versions.
   }
 
@@ -134,20 +135,20 @@ data ListDepsTextFilter
 -- | Type representing command line options for the @stack ls stack-colors@ and
 -- @stack ls stack-colours@ commands.
 data ListStylesOpts = ListStylesOpts
-  { coptBasic   :: Bool
-  , coptSGR     :: Bool
-  , coptExample :: Bool
+  { basic   :: Bool
+  , sgr     :: Bool
+  , example :: Bool
   }
   deriving (Eq, Ord, Show)
 
 -- | Type representing command line options for the @stack ls tools@ command.
 newtype ListToolsOpts
-  = ListToolsOpts { toptFilter  :: String }
+  = ListToolsOpts { filter  :: String }
 
 data Snapshot = Snapshot
   { snapId :: Text
-  , snapTitle :: Text
-  , snapTime :: Text
+  , title :: Text
+  , time :: Text
   }
   deriving (Eq, Ord, Show)
 
@@ -167,11 +168,11 @@ instance FromJSON SnapshotData where
   parseJSON _ = mempty
 
 toSnapshot :: [Value] -> Snapshot
-toSnapshot [String sid, String stitle, String stime] =
+toSnapshot [String snapId, String title, String time] =
   Snapshot
-    { snapId = sid
-    , snapTitle = stitle
-    , snapTime = stime
+    { snapId
+    , title
+    , time
     }
 toSnapshot val = impureThrow $ ParseFailure val
 
@@ -179,11 +180,11 @@ parseSnapshot :: Value -> A.Parser Snapshot
 parseSnapshot = A.withArray "array of snapshot" (pure . toSnapshot . V.toList)
 
 displayTime :: Snapshot -> [Text]
-displayTime snap = [snap.snapTime]
+displayTime snap = [snap.time]
 
 displaySnap :: Snapshot -> [Text]
 displaySnap snap =
-  ["Resolver name: " <> snap.snapId, "\n" <> snap.snapTitle <> "\n\n"]
+  ["Resolver name: " <> snap.snapId, "\n" <> snap.title <> "\n\n"]
 
 displaySingleSnap :: [Snapshot] -> Text
 displaySingleSnap snapshots =
@@ -235,9 +236,9 @@ handleLocal lsOpts = do
         | otherwise   = parent parentInstRoot
   snapData' <- liftIO $ listDirectory $ toFilePath snapRootDir
   let snapData = L.sort snapData'
-  case lsOpts.lsView of
+  case lsOpts.lsCmds of
     LsSnapshot sopt ->
-      case (sopt.soptLtsSnapView, sopt.soptNightlySnapView) of
+      case (sopt.ltsSnapView, sopt.nightlySnapView) of
         (True, False) ->
           liftIO $
           displayLocalSnapshot isStdoutTerminal $
@@ -258,9 +259,9 @@ handleRemote lsOpts = do
   let req' = addRequestHeader hAccept "application/json" req
   result <- httpJSON req'
   let snapData = getResponseBody result
-  case lsOpts.lsView of
+  case lsOpts.lsCmds of
     LsSnapshot sopt ->
-      case (sopt.soptLtsSnapView, sopt.soptNightlySnapView) of
+      case (sopt.ltsSnapView, sopt.nightlySnapView) of
         (True, False) ->
           liftIO $
           displaySnapshotData isStdoutTerminal $
@@ -278,9 +279,9 @@ handleRemote lsOpts = do
 
 lsCmd :: LsCmdOpts -> RIO Runner ()
 lsCmd lsOpts =
-  case lsOpts.lsView of
+  case lsOpts.lsCmds of
     LsSnapshot sopt ->
-      case sopt.soptViewType of
+      case sopt.viewType of
         Local -> handleLocal lsOpts
         Remote -> handleRemote lsOpts
     LsDependencies depOpts -> listDependencies depOpts
@@ -294,9 +295,9 @@ listStylesCmd opts = do
   -- This is the same test as is used in Stack.Types.Runner.withRunner
   let useColor = view useColorL lc
       styles = elems $ defaultStyles // stylesUpdate (view stylesUpdateL lc)
-      isComplex = not opts.coptBasic
-      showSGR = isComplex && opts.coptSGR
-      showExample = isComplex && opts.coptExample && useColor
+      isComplex = not opts.basic
+      showSGR = isComplex && opts.sgr
+      showExample = isComplex && opts.example && useColor
       styleReports = L.map (styleReport showSGR showExample) styles
   liftIO $
     T.putStrLn $ T.intercalate (if isComplex then "\n" else ":") styleReports
@@ -319,7 +320,7 @@ listToolsCmd :: ListToolsOpts -> RIO Config ()
 listToolsCmd opts = do
   localPrograms <- view $ configL . to (.localPrograms)
   installed <- sort <$> listInstalled localPrograms
-  let wanted = case opts.toptFilter of
+  let wanted = case opts.filter of
         [] -> installed
         "ghc-git" -> [t | t@(ToolGhcGit _ _) <- installed]
         pkgName -> filtered pkgName installed
@@ -330,9 +331,9 @@ listToolsCmd opts = do
 
 listDependencies :: ListDepsOpts -> RIO Runner ()
 listDependencies opts = do
-  let dotOpts = opts.listDepsDotOpts
+  let dotOpts = opts.dotOpts
   (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
-  liftIO $ case opts.listDepsFormat of
+  liftIO $ case opts.format of
     ListDepsTree treeOpts ->
       T.putStrLn "Packages"
       >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
@@ -362,7 +363,7 @@ listDependencies opts = do
 
 treeRoots :: ListDepsOpts -> Set PackageName -> Set PackageName
 treeRoots opts projectPackages' =
-  let targets = opts.listDepsDotOpts.dotTargets
+  let targets = opts.dotOpts.dotTargets
   in  if null targets
         then projectPackages'
         else Set.fromList $ map (mkPackageName . T.unpack) targets
@@ -420,12 +421,12 @@ treeNodePrefix t (_:ns) d remainingDepth = treeNodePrefix (t <> "│ ") ns d rem
 
 listDepsLine :: ListDepsFormatOpts -> PackageName -> DotPayload -> Text
 listDepsLine opts name payload =
-  T.pack (packageNameString name) <> opts.listDepsSep <>
+  T.pack (packageNameString name) <> opts.sep <>
   payloadText opts payload
 
 payloadText :: ListDepsFormatOpts -> DotPayload -> Text
 payloadText opts payload =
-  if opts.listDepsLicense
+  if opts.license
     then licenseText payload
     else versionText payload
 

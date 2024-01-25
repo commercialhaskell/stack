@@ -196,7 +196,7 @@ getConfigCache ee task installedMap enableTest enableBench = do
               TTLocalMutable lp ->
                 Set.map (encodeUtf8 . renderComponent) lp.components
               TTRemotePackage{} -> Set.empty
-        , haddock = task.buildHaddock
+        , haddock = task.buildHaddocks
         , pkgSrc = task.cachePkgSrc
         , pathEnvVar = ee.pathEnvVar
         }
@@ -213,9 +213,9 @@ ensureConfig :: HasEnvConfig env
              -> Path Abs File -- ^ Cabal file
              -> Task
              -> RIO env Bool
-ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalfp task = do
+ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
   newCabalMod <-
-    liftIO $ modificationTime <$> getFileStatus (toFilePath cabalfp)
+    liftIO $ modificationTime <$> getFileStatus (toFilePath cabalFP)
   setupConfigfp <- setupConfigFromDir pkgDir
   let getNewSetupConfigMod =
         liftIO $ either (const Nothing) (Just . modificationTime) <$>
@@ -373,8 +373,8 @@ singleBuild
       case mprecompiled of
         Just precompiled -> copyPreCompiled ee task pkgId precompiled
         Nothing -> do
-          mcurator <- view $ buildConfigL . to (.curator)
-          realConfigAndBuild isOldCabalCopy cache mcurator allDepsMap
+          curator <- view $ buildConfigL . to (.curator)
+          realConfigAndBuild isOldCabalCopy cache curator allDepsMap
     case minstalled of
       Nothing -> pure ()
       Just installed -> do
@@ -384,15 +384,15 @@ singleBuild
  where
   pkgId = taskProvides task
   PackageIdentifier pname _ = pkgId
-  doHaddock mcurator package =
-       task.buildHaddock
+  doHaddock curator package =
+       task.buildHaddocks
     && not isFinalBuild
        -- Works around haddock failing on bytestring-builder since it has no
        -- modules when bytestring is new enough.
     && mainLibraryHasExposedModules package
        -- Special help for the curator tool to avoid haddocks that are known
        -- to fail
-    && maybe True (Set.notMember pname . (.skipHaddock)) mcurator
+    && maybe True (Set.notMember pname . (.skipHaddock)) curator
 
   buildingFinals = isFinalBuild || task.allInOne
   enableTests = buildingFinals && any isCTest (taskComponents task)
@@ -421,7 +421,7 @@ singleBuild
 
   realConfigAndBuild isOldCabalCopy cache mcurator allDepsMap =
     withSingleContext ac ee task.taskType allDepsMap Nothing $
-      \package cabalfp pkgDir cabal0 announce _outputType -> do
+      \package cabalFP pkgDir cabal0 announce _outputType -> do
         let cabal = cabal0 CloseOnException
         executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
         when (  not (cabalIsSatisfied isOldCabalCopy executableBuildStatuses)
@@ -444,7 +444,7 @@ singleBuild
                 )
             )
             cabal
-            cabalfp
+            cabalFP
             task
         let installedMapHasThisPkg :: Bool
             installedMapHasThisPkg =
@@ -512,7 +512,7 @@ singleBuild
             TTLocalMutable lp -> do
                 warnings <- checkForUnlistedFiles task.taskType pkgDir
                 -- TODO: Perhaps only emit these warnings for non extra-dep?
-                pure (Just (lp.cabalFile, warnings))
+                pure (Just (lp.cabalFP, warnings))
             _ -> pure Nothing
           -- NOTE: once
           -- https://github.com/commercialhaskell/stack/issues/2649
@@ -528,11 +528,11 @@ singleBuild
                              (style Good . fromString . C.display)
                              modules
                          )
-          forM_ mlocalWarnings $ \(cabalfp, warnings) ->
+          forM_ mlocalWarnings $ \(cabalFP, warnings) ->
             unless (null warnings) $ prettyWarn $
                  flow "The following modules should be added to \
                       \exposed-modules or other-modules in" <+>
-                      pretty cabalfp
+                      pretty cabalFP
               <> ":"
               <> line
               <> indent 4 ( mconcat
@@ -915,7 +915,7 @@ checkForUnlistedFiles (TTLocalMutable lp) pkgDir = do
   (addBuildCache,warnings) <-
     addUnlistedToBuildCache
       lp.package
-      lp.cabalFile
+      lp.cabalFP
       lp.components
       caches
   forM_ (Map.toList addBuildCache) $ \(component, newToCache) -> do

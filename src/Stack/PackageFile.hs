@@ -117,15 +117,15 @@ getPackageFile ::
   => Package
   -> Path Abs File
   -> m PackageComponentFile
-getPackageFile pkg cabalfp =
-  debugBracket ("getPackageFiles" <+> pretty cabalfp) $ do
-    let pkgDir = parent cabalfp
+getPackageFile pkg cabalFP =
+  debugBracket ("getPackageFiles" <+> pretty cabalFP) $ do
+    let pkgDir = parent cabalFP
     distDir <- distDirFromDir pkgDir
     bc <- view buildConfigL
     cabalVer <- view cabalVersionL
     packageComponentFile <-
       runRIO
-        (GetPackageFileContext cabalfp distDir bc cabalVer)
+        (GetPackageFileContext cabalFP distDir bc cabalVer)
         (packageDescModulesAndFiles pkg)
     setupFiles <-
       if pkg.buildType == Cabal.Custom
@@ -141,7 +141,7 @@ getPackageFile pkg cabalfp =
                 then pure (S.singleton setupLhsPath)
                 else pure S.empty
         else pure S.empty
-    moreBuildFiles <- fmap (S.insert cabalfp . S.union setupFiles) $ do
+    moreBuildFiles <- fmap (S.insert cabalFP . S.union setupFiles) $ do
       let hpackPath = pkgDir </> relFileHpackPackageConfig
       hpackExists <- doesFileExist hpackPath
       pure $ if hpackExists then S.singleton hpackPath else S.empty

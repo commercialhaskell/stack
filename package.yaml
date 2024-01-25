@@ -279,7 +279,6 @@ library:
   - Stack.Types.BuildOpts
   - Stack.Types.BuildOptsCLI
   - Stack.Types.BuildOptsMonoid
-
   - Stack.Types.CabalConfigKey
   - Stack.Types.Cache
   - Stack.Types.Casa
@@ -299,6 +298,7 @@ library:
   - Stack.Types.DependencyTree
   - Stack.Types.Docker
   - Stack.Types.DockerEntrypoint
+  - Stack.Types.DotConfig
   - Stack.Types.DotOpts
   - Stack.Types.DownloadInfo
   - Stack.Types.DumpLogs

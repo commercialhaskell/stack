@@ -129,7 +129,7 @@ instance PersistFieldSql CachePkgSrc where
 
 toCachePkgSrc :: PackageSource -> CachePkgSrc
 toCachePkgSrc (PSFilePath lp) =
-  CacheSrcLocal (toFilePath (parent lp.cabalFile))
+  CacheSrcLocal (toFilePath (parent lp.cabalFP))
 toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 -- | A type representing tasks to perform when building.
@@ -140,7 +140,7 @@ data Task = Task
     -- ^ A set of the package identifiers of dependencies for which 'GhcPkgId'
     -- are missing and a function which yields configure options, given a
     -- dictionary of those identifiers and their 'GhcPkgId'.
-  , buildHaddock    :: !Bool
+  , buildHaddocks   :: !Bool
   , present         :: !(Map PackageIdentifier GhcPkgId)
     -- ^ A dictionary of the package identifiers of already-installed
     -- dependencies, and their 'GhcPkgId'.

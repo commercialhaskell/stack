@@ -114,21 +114,21 @@ newtype ExeName = ExeName Text
 -- dependencies, and Stack needs a Map and only a small subset of all the
 -- information in Cabal-syntax type.
 data StackBuildInfo = StackBuildInfo
-  { sbiBuildable :: !Bool
+  { buildable :: !Bool
     -- ^ Corresponding to Cabal-syntax's
     -- 'Distribution.Types.BuildInfo.buildable'. The component is buildable
     -- here.
-  , sbiDependency :: !(Map PackageName DepValue)
+  , dependency :: !(Map PackageName DepValue)
     -- ^ Corresponding to Cabal-syntax's
     -- 'Distribution.Types.BuildInfo.targetBuildDepends'. Dependencies specific
     -- to a library or executable target.
-  , sbiUnknownTools :: Set Text
+  , unknownTools :: Set Text
     -- ^ From Cabal-syntax's 'Distribution.Types.BuildInfo.buildTools'. We only
     -- keep the legacy build tool depends that we know (from a hardcoded list).
     -- We only use the deduplication aspect of the Set here, as this field is
     -- only used for error reporting in the end. This is lazy because it's an
     -- error reporting field only.
-  , sbiOtherModules :: [ModuleName]
+  , otherModules :: [ModuleName]
     -- ^ Only used in file gathering. See usage in "Stack.ComponentFile" module.
   , jsSources :: [FilePath]
     -- ^ Only used in file gathering. See usage in "Stack.ComponentFile" module.

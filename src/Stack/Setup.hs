@@ -113,8 +113,8 @@ import           Stack.GhcPkg
                    , mkGhcPackagePath )
 import           Stack.Prelude
 import           Stack.Setup.Installed
-                   ( Tool (..), extraDirs, filterTools, getCompilerVersion
-                   , installDir, listInstalled, markInstalled, tempInstallDir
+                   ( Tool (..), filterTools, getCompilerVersion, installDir
+                   , listInstalled, markInstalled, tempInstallDir,toolExtraDirs
                    , toolString, unmarkInstalled
                    )
 import           Stack.SourceMap
@@ -684,7 +684,7 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
     let actualPkgs = Map.keysSet smActual.deps <>
                      Map.keysSet smActual.project
         prunedActual = smActual
-          { global = pruneGlobals smActual.global actualPkgs }
+          { globals = pruneGlobals smActual.globals actualPkgs }
         haddockDeps = shouldHaddockDeps config.build
     targets <- parseTargets needTargets haddockDeps buildOptsCLI prunedActual
     sourceMap <- loadSourceMap targets buildOptsCLI smActual
@@ -958,7 +958,7 @@ rebuildEnv envConfig needTargets haddockDeps boptsCLI = do
     let actualPkgs =
           Map.keysSet smActual.deps <> Map.keysSet smActual.project
         prunedActual = smActual
-          { global = pruneGlobals smActual.global actualPkgs }
+          { globals = pruneGlobals smActual.globals actualPkgs }
     targets <- parseTargets needTargets haddockDeps boptsCLI prunedActual
     sourceMap <- loadSourceMap targets boptsCLI smActual
     pure $ envConfig
@@ -984,11 +984,11 @@ withNewLocalBuildTargets targets f = do
 
 -- | Add the include and lib paths to the given Config
 addIncludeLib :: ExtraDirs -> Config -> Config
-addIncludeLib (ExtraDirs _bins includes libs) config = config
+addIncludeLib extraDirs config = config
   { extraIncludeDirs =
-      config.extraIncludeDirs ++ map toFilePathNoTrailingSep includes
+      config.extraIncludeDirs ++ map toFilePathNoTrailingSep extraDirs.includes
   , extraLibDirs =
-      config.extraLibDirs ++ map toFilePathNoTrailingSep libs
+      config.extraLibDirs ++ map toFilePathNoTrailingSep extraDirs.libs
   }
 
 -- | Ensure both the compiler and the msys toolchain are installed and
@@ -1000,7 +1000,7 @@ ensureCompilerAndMsys ::
 ensureCompilerAndMsys sopts = do
   getSetupInfo' <- memoizeRef getSetupInfo
   mmsys2Tool <- ensureMsys sopts getSetupInfo'
-  mmsysPaths <- maybe (pure Nothing) (fmap Just . extraDirs) mmsys2Tool
+  mmsysPaths <- maybe (pure Nothing) (fmap Just . toolExtraDirs) mmsys2Tool
   actual <- either throwIO pure $ wantedToActual sopts.wantedCompiler
   didWarn <- warnUnsupportedCompiler $ getGhcVersion actual
   -- Modify the initial environment to include the MSYS2 path, if MSYS2 is being
@@ -1259,8 +1259,8 @@ ensureCompiler sopts getSetupInfo' = do
     Just cp -> do
       let paths = ExtraDirs
             { bins = [parent cp.compiler]
-            , include = []
-            , lib = []
+            , includes = []
+            , libs = []
             }
       pure (cp, paths)
 
@@ -1348,7 +1348,7 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
          commitId
          flavour
      _ -> installGhcBindist sopts getSetupInfo' installed
-  paths <- extraDirs compilerTool
+  paths <- toolExtraDirs compilerTool
 
   wc <- either throwIO (pure . whichCompiler) $ wantedToActual wanted
   menv0 <- view processContextL
@@ -2732,8 +2732,8 @@ data StackReleaseInfo
     -- ^ Information on the latest available binary for the current platforms.
 
 data HaskellStackOrg = HaskellStackOrg
-  { hsoUrl :: !Text
-  , hsoVersion :: !Version
+  { url :: !Text
+  , version :: !Version
   }
   deriving Show
 
@@ -2804,8 +2804,8 @@ downloadStackReleaseInfo Nothing Nothing Nothing = do
                   -- We found a valid URL, let's use it!
                   Right version -> do
                     let hso = HaskellStackOrg
-                                { hsoUrl = loc
-                                , hsoVersion = version
+                                { url = loc
+                                , version
                                 }
                     logDebug $
                          "Downloading from haskellstack.org: "
@@ -2960,7 +2960,7 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
         String url <- KeyMap.lookup "browser_download_url" o
         Just url
     findMatch _ _ = Nothing
-  findArchive (SRIHaskellStackOrg hso) _ = pure hso.hsoUrl
+  findArchive (SRIHaskellStackOrg hso) _ = pure hso.url
 
   handleTarball :: Path Abs File -> Bool -> T.Text -> IO ()
   handleTarball tmpFile isWindows url = do
@@ -3092,4 +3092,4 @@ getDownloadVersion (SRIGitHub val) = do
   String rawName <- KeyMap.lookup "name" o
   -- drop the "v" at the beginning of the name
   parseVersion $ T.unpack (T.drop 1 rawName)
-getDownloadVersion (SRIHaskellStackOrg hso) = Just hso.hsoVersion
+getDownloadVersion (SRIHaskellStackOrg hso) = Just hso.version

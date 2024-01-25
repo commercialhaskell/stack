@@ -59,10 +59,10 @@ instance Exception StoragePrettyException
 
 -- | A bit of type safety to ensure we're talking to the right database.
 newtype UserStorage = UserStorage
-  { unUserStorage :: Storage
+  { userStorage :: Storage
   }
 
 -- | A bit of type safety to ensure we're talking to the right database.
 newtype ProjectStorage = ProjectStorage
-  { unProjectStorage :: Storage
+  { projectStorage :: Storage
   }

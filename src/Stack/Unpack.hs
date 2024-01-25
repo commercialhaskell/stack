@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -75,11 +76,11 @@ type UnpackTarget = Either PackageName PackageIdentifierRevision
 
 -- | Type representing options for the @stack unpack@ command.
 data UnpackOpts = UnpackOpts
-  { upoptsTargets :: [UnpackTarget]
+  { targets :: [UnpackTarget]
     -- ^ The packages or package candidates to be unpacked.
-  , upoptsAreCandidates :: Bool
+  , areCandidates :: Bool
     -- ^ Whether the targets are Hackage package candidates.
-  , upoptsDest :: Maybe (SomeBase Dir)
+  , dest :: Maybe (SomeBase Dir)
     -- ^ The optional directory into which a target will be unpacked into a
     -- subdirectory.
   }

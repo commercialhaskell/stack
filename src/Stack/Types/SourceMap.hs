@@ -51,7 +51,7 @@ data CommonPackage = CommonPackage
   , ghcOptions :: ![Text]
     -- also lets us know if we're doing profiling
   , cabalConfigOpts :: ![Text]
-  , haddocks :: !Bool
+  , buildHaddocks :: !Bool
     -- ^ Should Haddock documentation be built for this package?
   }
 
@@ -117,7 +117,7 @@ data SMActual global = SMActual
   { compiler :: !ActualCompiler
   , project :: !(Map PackageName ProjectPackage)
   , deps :: !(Map PackageName DepPackage)
-  , global :: !(Map PackageName global)
+  , globals :: !(Map PackageName global)
   }
 
 newtype GlobalPackageVersion

@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
@@ -147,19 +148,19 @@ instance Exception GhciPrettyException
 -- | Typre respresenting command line options for the @stack ghci@ and
 -- @stack repl@ commands.
 data GhciOpts = GhciOpts
-  { ghciTargets            :: ![Text]
-  , ghciArgs               :: ![String]
-  , ghciGhcOptions         :: ![String]
-  , ghciFlags              :: !(Map ApplyCLIFlag (Map FlagName Bool))
-  , ghciGhcCommand         :: !(Maybe FilePath)
-  , ghciNoLoadModules      :: !Bool
-  , ghciAdditionalPackages :: ![String]
-  , ghciMainIs             :: !(Maybe Text)
-  , ghciLoadLocalDeps      :: !Bool
-  , ghciSkipIntermediate   :: !Bool
-  , ghciHidePackages       :: !(Maybe Bool)
-  , ghciNoBuild            :: !Bool
-  , ghciOnlyMain           :: !Bool
+  { targets            :: ![Text]
+  , args               :: ![String]
+  , ghcOptions         :: ![String]
+  , flags              :: !(Map ApplyCLIFlag (Map FlagName Bool))
+  , ghcCommand         :: !(Maybe FilePath)
+  , noLoadModules      :: !Bool
+  , additionalPackages :: ![String]
+  , mainIs             :: !(Maybe Text)
+  , loadLocalDeps      :: !Bool
+  , skipIntermediate   :: !Bool
+  , hidePackages       :: !(Maybe Bool)
+  , noBuild            :: !Bool
+  , onlyMain           :: !Bool
   }
   deriving Show
 
@@ -168,22 +169,22 @@ data GhciOpts = GhciOpts
 -- NOTE: GhciPkgInfo has paths as list instead of a Set to preserve files order
 -- as a workaround for bug https://ghc.haskell.org/trac/ghc/ticket/13786
 data GhciPkgInfo = GhciPkgInfo
-  { ghciPkgName :: !PackageName
-  , ghciPkgOpts :: ![(NamedComponent, BuildInfoOpts)]
-  , ghciPkgDir :: !(Path Abs Dir)
-  , ghciPkgModules :: !ModuleMap
-  , ghciPkgCFiles :: ![Path Abs File] -- ^ C files.
-  , ghciPkgMainIs :: !(Map NamedComponent [Path Abs File])
-  , ghciPkgTargetFiles :: !(Maybe [Path Abs File])
-  , ghciPkgPackage :: !Package
+  { name :: !PackageName
+  , opts :: ![(NamedComponent, BuildInfoOpts)]
+  , dir :: !(Path Abs Dir)
+  , modules :: !ModuleMap
+  , cFiles :: ![Path Abs File] -- ^ C files.
+  , mainIs :: !(Map NamedComponent [Path Abs File])
+  , targetFiles :: !(Maybe [Path Abs File])
+  , package :: !Package
   }
   deriving Show
 
 -- | Type representing loaded package description and related information.
 data GhciPkgDesc = GhciPkgDesc
-  { ghciDescPkg :: !Package
-  , ghciDescCabalFp :: !(Path Abs File)
-  , ghciDescTarget :: !Target
+  { package :: !Package
+  , cabalFP :: !(Path Abs File)
+  , target :: !Target
   }
 
 -- Mapping from a module name to a map with all of the paths that use that name.
@@ -202,10 +203,10 @@ ghciCmd :: GhciOpts -> RIO Runner ()
 ghciCmd ghciOpts =
   let boptsCLI = defaultBuildOptsCLI
         -- using only additional packages, targets then get overridden in `ghci`
-        { targetsCLI = map T.pack ghciOpts.ghciAdditionalPackages
+        { targetsCLI = map T.pack ghciOpts.additionalPackages
         , initialBuildSteps = True
-        , flags = ghciOpts.ghciFlags
-        , ghcOptions = map T.pack ghciOpts.ghciGhcOptions
+        , flags = ghciOpts.flags
+        , ghcOptions = map T.pack ghciOpts.ghcOptions
         }
   in  withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
         bopts <- view buildOptsL
@@ -224,7 +225,7 @@ ghci :: HasEnvConfig env => GhciOpts -> RIO env ()
 ghci opts = do
   let buildOptsCLI = defaultBuildOptsCLI
         { targetsCLI = []
-        , flags = opts.ghciFlags
+        , flags = opts.flags
         }
   sourceMap <- view $ envConfigL . to (.sourceMap)
   installMap <- toInstallMap sourceMap
@@ -237,12 +238,12 @@ ghci opts = do
         { compiler = sourceMap.compiler
         , project = sourceMap.project
         , deps = sourceMap.deps
-        , global = sourceMap.globalPkgs
+        , globals = sourceMap.globalPkgs
         }
   -- Parse --main-is argument.
-  mainIsTargets <- parseMainIsTargets buildOptsCLI sma opts.ghciMainIs
+  mainIsTargets <- parseMainIsTargets buildOptsCLI sma opts.mainIs
   -- Parse to either file targets or build targets
-  etargets <- preprocessTargets buildOptsCLI sma opts.ghciTargets
+  etargets <- preprocessTargets buildOptsCLI sma opts.targets
   (inputTargets, mfileTargets) <- case etargets of
     Right packageTargets -> pure (packageTargets, Nothing)
     Left rawFileTargets -> do
@@ -262,12 +263,12 @@ ghci opts = do
         M.intersectionWith getInternalDependencies inputTargets localMap
       relevantDependencies = M.filter (any isCSubLib) internalDependencies
   -- Check if additional package arguments are sensible.
-  addPkgs <- checkAdditionalPackages opts.ghciAdditionalPackages
+  addPkgs <- checkAdditionalPackages opts.additionalPackages
   -- Load package descriptions.
   pkgDescs <- loadGhciPkgDescs buildOptsCLI localTargets
   -- If necessary, ask user about which main module to load.
   bopts <- view buildOptsL
-  mainFile <- if opts.ghciNoLoadModules
+  mainFile <- if opts.noLoadModules
     then pure Nothing
     else do
       -- Figure out package files, in order to ask the user about which main
@@ -355,7 +356,7 @@ findFileTargets ::
   -> RIO env (Map PackageName Target, Map PackageName [Path Abs File], [Path Abs File])
 findFileTargets locals fileTargets = do
   filePackages <- forM locals $ \lp -> do
-    PackageComponentFile _ compFiles _ _ <- getPackageFile lp.package lp.cabalFile
+    PackageComponentFile _ compFiles _ _ <- getPackageFile lp.package lp.cabalFP
     pure (lp, M.map (map dotCabalGetPath) compFiles)
   let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
       foundFileTargetComponents =
@@ -429,15 +430,15 @@ getAllLocalTargets ghciOpts targets0 mainIsTargets localMap = do
                 Nothing -> Nothing
   -- Figure out
   let extraLoadDeps =
-        getExtraLoadDeps ghciOpts.ghciLoadLocalDeps localMap directlyWanted
-  if    (ghciOpts.ghciSkipIntermediate && not ghciOpts.ghciLoadLocalDeps)
+        getExtraLoadDeps ghciOpts.loadLocalDeps localMap directlyWanted
+  if    (ghciOpts.skipIntermediate && not ghciOpts.loadLocalDeps)
      || null extraLoadDeps
     then pure directlyWanted
     else do
       let extraList' =
             map (fromPackageName . fst) extraLoadDeps :: [StyleDoc]
           extraList = mkNarrativeList (Just Current) False extraList'
-      if ghciOpts.ghciLoadLocalDeps
+      if ghciOpts.loadLocalDeps
         then prettyInfo $
           fillSep $
                 [ flow "The following libraries will also be loaded into \
@@ -471,12 +472,12 @@ getAllNonLocalTargets targets = do
 
 buildDepsAndInitialSteps :: HasEnvConfig env => GhciOpts -> [Text] -> RIO env ()
 buildDepsAndInitialSteps ghciOpts localTargets = do
-  let targets = localTargets ++ map T.pack ghciOpts.ghciAdditionalPackages
+  let targets = localTargets ++ map T.pack ghciOpts.additionalPackages
   -- If necessary, do the build, for local packagee targets, only do
   -- 'initialBuildSteps'.
   case nonEmpty targets of
     -- only new local targets could appear here
-    Just nonEmptyTargets | not ghciOpts.ghciNoBuild -> do
+    Just nonEmptyTargets | not ghciOpts.noBuild -> do
       eres <- buildLocalTargets nonEmptyTargets
       case eres of
         Right () -> pure ()
@@ -519,7 +520,7 @@ runGhci
           pkgopts = hidePkgOpts ++ genOpts ++ ghcOpts
           shouldHidePackages = fromMaybe
             (not (null pkgs && null exposePackages))
-            ghciOpts.ghciHidePackages
+            ghciOpts.hidePackages
           hidePkgOpts =
             if shouldHidePackages
               then
@@ -538,14 +539,14 @@ runGhci
             | shouldHidePackages = bio.oneWordOpts ++ bio.packageFlags
             | otherwise = bio.oneWordOpts
           genOpts = nubOrd
-            (concatMap (concatMap (oneWordOpts . snd) . (.ghciPkgOpts)) pkgs)
+            (concatMap (concatMap (oneWordOpts . snd) . (.opts)) pkgs)
           (omittedOpts, ghcOpts) = L.partition badForGhci $
-               concatMap (concatMap ((.opts) . snd) . (.ghciPkgOpts)) pkgs
+               concatMap (concatMap ((.opts) . snd) . (.opts)) pkgs
             ++ map
                  T.unpack
                  (  fold config.ghcOptionsByCat
                     -- ^ include everything, locals, and targets
-                 ++ concatMap (getUserOptions . (.ghciPkgName)) pkgs
+                 ++ concatMap (getUserOptions . (.name)) pkgs
                  )
           getUserOptions pkg =
             M.findWithDefault [] pkg config.ghcOptionsByName
@@ -569,7 +570,7 @@ runGhci
       prettyInfoL
         ( flow "Configuring GHCi with the following packages:"
         : mkNarrativeList (Just Current) False
-            (map (fromPackageName . (.ghciPkgName)) pkgs :: [StyleDoc])
+            (map (fromPackageName . (.name)) pkgs :: [StyleDoc])
         )
       compilerExeName <-
         view $ compilerPathsL . to (.compiler) . to toFilePath
@@ -577,7 +578,7 @@ runGhci
             menv <-
               liftIO $ config.processContextSettings defaultEnvSettings
             withPackageWorkingDir $ withProcessContext menv $ exec
-              (fromMaybe compilerExeName ghciOpts.ghciGhcCommand)
+              (fromMaybe compilerExeName ghciOpts.ghcCommand)
               ( ("--interactive" : ) $
                 -- This initial "-i" resets the include directories to not
                 -- include CWD. If there aren't any packages, CWD is included.
@@ -585,12 +586,12 @@ runGhci
                      odir
                   <> pkgopts
                   <> extras
-                  <> ghciOpts.ghciGhcOptions
-                  <> ghciOpts.ghciArgs
+                  <> ghciOpts.ghcOptions
+                  <> ghciOpts.args
               )
           withPackageWorkingDir =
             case pkgs of
-              [pkg] -> withWorkingDir (toFilePath pkg.ghciPkgDir)
+              [pkg] -> withWorkingDir (toFilePath pkg.dir)
               _ -> id
       -- Since usage of 'exec' does not pure, we cannot do any cleanup on ghci
       -- exit. So, instead leave the generated files. To make this more
@@ -604,14 +605,14 @@ runGhci
       ensureDir ghciDir
       ensureDir tmpDirectory
       macrosOptions <- writeMacrosFile ghciDir pkgs
-      if ghciOpts.ghciNoLoadModules
+      if ghciOpts.noLoadModules
         then execGhci macrosOptions
         else do
           checkForDuplicateModules pkgs
           scriptOptions <-
             writeGhciScript
               tmpDirectory
-              (renderScript pkgs mainFile ghciOpts.ghciOnlyMain extraFiles)
+              (renderScript pkgs mainFile ghciOpts.onlyMain extraFiles)
           execGhci (macrosOptions ++ scriptOptions)
 
 writeMacrosFile ::
@@ -621,7 +622,7 @@ writeMacrosFile ::
   -> RIO env [String]
 writeMacrosFile outputDirectory pkgs = do
   fps <- fmap (nubOrd . catMaybes . concat) $
-    forM pkgs $ \pkg -> forM pkg.ghciPkgOpts $ \(_, bio) -> do
+    forM pkgs $ \pkg -> forM pkg.opts $ \(_, bio) -> do
       let cabalMacros = bio.cabalMacros
       exists <- liftIO $ doesFileExist cabalMacros
       if exists
@@ -670,7 +671,7 @@ renderScript pkgs mainFile onlyMain extraFiles = do
   let addPhase = cmdAdd $ S.fromList (map Left allModules ++ addMain)
       addMain = maybe [] (L.singleton . Right) mainFile
       modulePhase = cmdModule $ S.fromList allModules
-      allModules = nubOrd $ concatMap (M.keys . (.ghciPkgModules)) pkgs
+      allModules = nubOrd $ concatMap (M.keys . (.modules)) pkgs
   case getFileTargets pkgs <> extraFiles of
     [] ->
       if onlyMain
@@ -684,7 +685,7 @@ renderScript pkgs mainFile onlyMain extraFiles = do
 -- Hacky check if module / main phase should be omitted. This should be
 -- improved if / when we have a better per-component load.
 getFileTargets :: [GhciPkgInfo] -> [Path Abs File]
-getFileTargets = concatMap (concat . maybeToList . (.ghciPkgTargetFiles))
+getFileTargets = concatMap (concat . maybeToList . (.targetFiles))
 
 -- | Figure out the main-is file to load based on the targets. Asks the user for
 -- input if there is more than one candidate main-is file.
@@ -755,18 +756,18 @@ figureOutMainFile bopts mainIsTargets targets0 packages =
     mainIsTargets
   candidates = do
     pkg <- packages
-    case M.lookup pkg.ghciPkgName targets of
+    case M.lookup pkg.name targets of
       Nothing -> []
       Just target -> do
         (component,mains) <-
           M.toList $
           M.filterWithKey (\k _ -> k `S.member` wantedComponents)
-                          pkg.ghciPkgMainIs
+                          pkg.mainIs
         main <- mains
-        pure (pkg.ghciPkgName, component, main)
+        pure (pkg.name, component, main)
        where
         wantedComponents =
-          wantedPackageComponents bopts target pkg.ghciPkgPackage
+          wantedPackageComponents bopts target pkg.package
   renderCandidate c@(pkgName, namedComponent, mainIs) =
     let candidateIndex =
           fromString . show . (+1) . fromMaybe 0 . L.elemIndex c
@@ -830,8 +831,8 @@ loadGhciPkgDescs ::
   -> [(PackageName, (Path Abs File, Target))]
   -> RIO env [GhciPkgDesc]
 loadGhciPkgDescs buildOptsCLI localTargets =
-  forM localTargets $ \(name, (cabalfp, target)) ->
-    loadGhciPkgDesc buildOptsCLI name cabalfp target
+  forM localTargets $ \(name, (cabalFP, target)) ->
+    loadGhciPkgDesc buildOptsCLI name cabalFP target
 
 -- | Load package description information for a ghci target.
 loadGhciPkgDesc ::
@@ -841,7 +842,7 @@ loadGhciPkgDesc ::
   -> Path Abs File
   -> Target
   -> RIO env GhciPkgDesc
-loadGhciPkgDesc buildOptsCLI name cabalfp target = do
+loadGhciPkgDesc buildOptsCLI name cabalFP target = do
   econfig <- view envConfigL
   compilerVersion <- view actualCompilerVersionL
   let sm = econfig.sourceMap
@@ -867,29 +868,30 @@ loadGhciPkgDesc buildOptsCLI name cabalfp target = do
         , compilerVersion = compilerVersion
         , platform = view platformL econfig
         }
-  -- TODO we've already parsed this information, otherwise we
-  -- wouldn't have figured out the cabalfp already. In the future:
-  -- retain that GenericPackageDescription in the relevant data
-  -- structures to avoid reparsing.
-  (gpdio, _name, _cabalfp) <-
-    loadCabalFilePath (Just stackProgName') (parent cabalfp)
+  -- TODO we've already parsed this information, otherwise we wouldn't have
+  -- figured out the cabalFP already. In the future: retain that
+  -- GenericPackageDescription in the relevant data structures to avoid
+  -- reparsing.
+  (gpdio, _name, _cabalFP) <-
+    loadCabalFilePath (Just stackProgName') (parent cabalFP)
   gpkgdesc <- liftIO $ gpdio YesPrintWarnings
 
   -- Source the package's *.buildinfo file created by configure if any. See
   -- https://www.haskell.org/cabal/users-guide/developing-packages.html#system-dependent-parameters
   buildinfofp <- parseRelFile (packageNameString name ++ ".buildinfo")
-  hasDotBuildinfo <- doesFileExist (parent cabalfp </> buildinfofp)
+  hasDotBuildinfo <- doesFileExist (parent cabalFP </> buildinfofp)
   let mbuildinfofp
-        | hasDotBuildinfo = Just (parent cabalfp </> buildinfofp)
+        | hasDotBuildinfo = Just (parent cabalFP </> buildinfofp)
         | otherwise = Nothing
   mbuildinfo <- forM mbuildinfofp readDotBuildinfo
   let pdp = resolvePackageDescription config gpkgdesc
-      pkg = packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
-        maybe pdp (`C.updatePackageDescription` pdp) mbuildinfo
+      package =
+        packageFromPackageDescription config (C.genPackageFlags gpkgdesc) $
+          maybe pdp (`C.updatePackageDescription` pdp) mbuildinfo
   pure GhciPkgDesc
-    { ghciDescPkg = pkg
-    , ghciDescCabalFp = cabalfp
-    , ghciDescTarget = target
+    { package
+    , cabalFP
+    , target
     }
 
 getGhciPkgInfos ::
@@ -902,9 +904,9 @@ getGhciPkgInfos ::
 getGhciPkgInfos installMap addPkgs mfileTargets localTargets = do
   (installedMap, _, _, _) <- getInstalled installMap
   let localLibs =
-        [ desc.ghciDescPkg.name
+        [ desc.package.name
         | desc <- localTargets
-        , hasLocalComp isCLib desc.ghciDescTarget
+        , hasLocalComp isCLib desc.target
         ]
   forM localTargets $ \pkgDesc ->
     makeGhciPkgInfo installMap installedMap localLibs addPkgs mfileTargets pkgDesc
@@ -921,31 +923,31 @@ makeGhciPkgInfo ::
   -> RIO env GhciPkgInfo
 makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
   bopts <- view buildOptsL
-  let pkg = pkgDesc.ghciDescPkg
-      cabalfp = pkgDesc.ghciDescCabalFp
-      target = pkgDesc.ghciDescTarget
+  let pkg = pkgDesc.package
+      cabalFP = pkgDesc.cabalFP
+      target = pkgDesc.target
       name = pkg.name
   (mods, files, opts) <-
-    getPackageOpts pkg installMap installedMap locals addPkgs cabalfp
+    getPackageOpts pkg installMap installedMap locals addPkgs cabalFP
   let filteredOpts = filterWanted opts
       filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
       allWanted = wantedPackageComponents bopts target pkg
   pure GhciPkgInfo
-    { ghciPkgName = name
-    , ghciPkgOpts = M.toList filteredOpts
-    , ghciPkgDir = parent cabalfp
-    , ghciPkgModules = unionModuleMaps $
-      map
-        ( \(comp, mp) -> M.map
-            (\fp -> M.singleton fp (S.singleton (pkg.name, comp)))
-            mp
-        )
-        (M.toList (filterWanted mods))
-    , ghciPkgMainIs = M.map (mapMaybe dotCabalMainPath) files
-    , ghciPkgCFiles = mconcat
+    { name
+    , opts = M.toList filteredOpts
+    , dir = parent cabalFP
+    , modules = unionModuleMaps $
+        map
+          ( \(comp, mp) -> M.map
+              (\fp -> M.singleton fp (S.singleton (pkg.name, comp)))
+              mp
+          )
+          (M.toList (filterWanted mods))
+    , mainIs = M.map (mapMaybe dotCabalMainPath) files
+    , cFiles = mconcat
         (M.elems (filterWanted (M.map (mapMaybe dotCabalCFilePath) files)))
-    , ghciPkgTargetFiles = mfileTargets >>= M.lookup name
-    , ghciPkgPackage = pkg
+    , targetFiles = mfileTargets >>= M.lookup name
+    , package = pkg
     }
 
 -- NOTE: this should make the same choices as the components code in
@@ -1077,9 +1079,9 @@ checkForIssues pkgs =
   compsWithOpts = map (\(k, bio) ->
     (k, bio.oneWordOpts ++ bio.opts)) compsWithBios
   compsWithBios =
-    [ ((pkg.ghciPkgName, c), bio)
+    [ ((pkg.name, c), bio)
     | pkg <- pkgs
-    , (c, bio) <- pkg.ghciPkgOpts
+    , (c, bio) <- pkg.opts
     ]
 
 -- TODO: Should this also tell the user the filepaths, not just the
@@ -1101,7 +1103,7 @@ checkForDuplicateModules pkgs =
   duplicates =
     filter (\(_, mp) -> M.size mp > 1) $
     M.toList $
-    unionModuleMaps (map (.ghciPkgModules) pkgs)
+    unionModuleMaps (map (.modules) pkgs)
   prettyDuplicate ::
        (ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent)))
     -> StyleDoc
@@ -1209,7 +1211,7 @@ getExtraLoadDeps loadAllDeps localMap targets =
         shouldLoad <- or <$> mapM go deps
         if shouldLoad
           then do
-            modify (M.insert name (Just (lp.cabalFile, TargetComps (S.singleton CLib))))
+            modify (M.insert name (Just (lp.cabalFP, TargetComps (S.singleton CLib))))
             pure True
           else do
             modify (M.insert name Nothing)

@@ -19,7 +19,7 @@ import           Distribution.ModuleName ( ModuleName, components )
 import           Stack.Prelude
 import           System.IO ( hSetBinaryMode )
 
-newtype GhciScript = GhciScript { unGhciScript :: [GhciCommand] }
+newtype GhciScript = GhciScript { ghciScript :: [GhciCommand] }
 
 instance Semigroup GhciScript where
   GhciScript xs <> GhciScript ys = GhciScript (ys <> xs)
@@ -45,7 +45,7 @@ scriptToLazyByteString = toLazyByteString . scriptToBuilder
 scriptToBuilder :: GhciScript -> Builder
 scriptToBuilder backwardScript = mconcat $ fmap commandToBuilder script
  where
-  script = reverse backwardScript.unGhciScript
+  script = reverse backwardScript.ghciScript
 
 scriptToFile :: Path Abs File -> GhciScript -> IO ()
 scriptToFile path script =

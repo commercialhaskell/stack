@@ -1,6 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE NoFieldSelectors  #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Types.Project
   ( Project (..)
@@ -21,7 +22,7 @@ data Project = Project
   , packages :: ![RelFilePath]
     -- ^ Packages which are actually part of the project (as opposed
     -- to dependencies).
-  , dependencies :: ![RawPackageLocation]
+  , extraDeps :: ![RawPackageLocation]
     -- ^ Dependencies defined within the stack.yaml file, to be applied on top
     -- of the snapshot.
   , flagsByPkg :: !(Map PackageName (Map FlagName Bool))
@@ -42,16 +43,20 @@ data Project = Project
 
 instance ToJSON Project where
   -- Expanding the constructor fully to ensure we don't miss any fields.
-  toJSON (Project userMsg packages extraDeps flags resolver mcompiler extraPackageDBs mcurator drops) = object $ concat
-    [ maybe [] (\cv -> ["compiler" .= cv]) mcompiler
-    , maybe [] (\msg -> ["user-message" .= msg]) userMsg
-    , [ "extra-package-dbs" .= extraPackageDBs | not (null extraPackageDBs) ]
-    , [ "extra-deps" .= extraDeps | not (null extraDeps) ]
-    , [ "flags" .= fmap toCabalStringMap (toCabalStringMap flags)
-      | not (Map.null flags)
+  toJSON project = object $ concat
+    [ maybe [] (\cv -> ["compiler" .= cv]) project.compiler
+    , maybe [] (\msg -> ["user-message" .= msg]) project.userMsg
+    , [ "extra-package-dbs" .= project.extraPackageDBs
+      | not (null project.extraPackageDBs)
       ]
-    , ["packages" .= packages]
-    , ["resolver" .= resolver]
-    , maybe [] (\c -> ["curator" .= c]) mcurator
-    , [ "drop-packages" .= Set.map CabalString drops | not (Set.null drops) ]
+    , [ "extra-deps" .= project.extraDeps | not (null project.extraDeps) ]
+    , [ "flags" .= fmap toCabalStringMap (toCabalStringMap project.flagsByPkg)
+      | not (Map.null project.flagsByPkg)
+      ]
+    , ["packages" .= project.packages]
+    , ["resolver" .= project.resolver]
+    , maybe [] (\c -> ["curator" .= c]) project.curator
+    , [ "drop-packages" .= Set.map CabalString project.dropPackages
+      | not (Set.null project.dropPackages)
+      ]
     ]

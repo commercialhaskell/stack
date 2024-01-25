@@ -155,9 +155,9 @@ constructPlan
     econfig <- view envConfigL
     globalCabalVersion <- view $ compilerPathsL . to (.cabalVersion)
     sources <- getSources globalCabalVersion
-    mcur <- view $ buildConfigL . to (.curator)
-    pathEnvVar' <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
-    let ctx = mkCtx econfig globalCabalVersion sources mcur pathEnvVar'
+    curator <- view $ buildConfigL . to (.curator)
+    pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
+    let ctx = mkCtx econfig globalCabalVersion sources curator pathEnvVar
         targetPackageNames = Map.keys sourceMap.targets.targets
         -- Ignore the result of 'getCachedDepOrAddDep'.
         onTarget = void . getCachedDepOrAddDep
@@ -204,17 +204,17 @@ constructPlan
 
   hasBaseInDeps = Map.member (mkPackageName "base") sourceDeps
 
-  mkCtx econfig globalCabalVersion sources mcur pathEnvVar' = Ctx
+  mkCtx ctxEnvConfig globalCabalVersion sources curator pathEnvVar = Ctx
     { baseConfigOpts = baseConfigOpts0
-    , loadPackage = \w x y z -> runRIO econfig $
+    , loadPackage = \w x y z -> runRIO ctxEnvConfig $
         applyForceCustomBuild globalCabalVersion <$> loadPackage0 w x y z
     , combinedMap = combineMap sources installedMap
-    , ctxEnvConfig = econfig
+    , ctxEnvConfig
     , callStack = []
     , wanted = Map.keysSet sourceMap.targets.targets
     , localNames = Map.keysSet sourceProject
-    , mcurator = mcur
-    , pathEnvVar = pathEnvVar'
+    , curator
+    , pathEnvVar
     }
 
   toEither :: (k, Either e v) -> Either e (k, v)
@@ -447,11 +447,11 @@ addFinal lp package isAllInOne buildHaddocks = do
                   True -- local
                   Mutable
                   package
-        , buildHaddock = buildHaddocks
-        , present = present
+        , buildHaddocks
+        , present
         , taskType = TTLocalMutable lp
         , allInOne = isAllInOne
-        , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFile))
+        , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFP))
         , buildTypeConfig = packageBuildTypeConfig package
         }
   tell mempty { wFinals = Map.singleton package.name res }
@@ -632,7 +632,7 @@ installPackage name ps minstalled = do
         <> "."
       package <- ctx.loadPackage
         pkgLoc cp.flags cp.ghcOptions cp.cabalConfigOpts
-      resolveDepsAndInstall True cp.haddocks ps package minstalled
+      resolveDepsAndInstall True cp.buildHaddocks ps package minstalled
     PSFilePath lp -> do
       case lp.testBench of
         Nothing -> do
@@ -662,7 +662,7 @@ installPackage name ps minstalled = do
               -- test/benchmark failure could prevent library from being
               -- available to its dependencies but when it's already available
               -- it's OK to do that
-              splitRequired <- expectedTestOrBenchFailures <$> asks (.mcurator)
+              splitRequired <- expectedTestOrBenchFailures <$> asks (.curator)
               let isAllInOne = not splitRequired
               adr <- installPackageGivenDeps
                 isAllInOne lp.buildHaddocks ps tb minstalled deps
@@ -760,8 +760,8 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
                   (psLocal ps)
                   mutable
                   package
-        , buildHaddock = buildHaddocks
-        , present = present
+        , buildHaddocks
+        , present
         , taskType =
             case ps of
               PSFilePath lp ->

@@ -281,10 +281,10 @@ initProject currDir initOpts mresolver = do
     PLImmutable . cplComplete <$>
       completePackageLocation
         (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
-  let p = Project
+  let project = Project
         { userMsg = if userMsg == "" then Nothing else Just userMsg
         , packages = resolvedRelative <$> Map.elems rbundle
-        , dependencies = map toRawPL deps
+        , extraDeps = map toRawPL deps
         , flagsByPkg = removeSrcPkgDefaultFlags gpds flags
         , resolver = snapshotLoc
         , compiler = Nothing
@@ -336,7 +336,7 @@ initProject currDir initOpts mresolver = do
         else "Writing configuration to"
     , style File (fromString reldest) <> "."
     ]
-  writeBinaryFileAtomic dest $ renderStackYaml p
+  writeBinaryFileAtomic dest $ renderStackYaml project
     (Map.elems $ fmap (makeRelDir . parent . fst) ignored)
     (map (makeRelDir . parent) dupPkgs)
   prettyInfoS
@@ -695,10 +695,10 @@ cabalPackagesCheck cabaldirs = do
     -- Pantry's 'loadCabalFilePath' throws 'MismatchedCabalName' (error
     -- [S-910]) if the Cabal file name does not match the package it
     -- defines.
-    (gpdio, _name, cabalfp) <- loadCabalFilePath (Just stackProgName') dir
+    (gpdio, _name, cabalFP) <- loadCabalFilePath (Just stackProgName') dir
     eres <- liftIO $ try (gpdio YesPrintWarnings)
     case eres :: Either PantryException C.GenericPackageDescription of
-      Right gpd -> pure $ Right (cabalfp, gpd)
+      Right gpd -> pure $ Right (cabalFP, gpd)
       Left (MismatchedCabalName fp name) -> pure $ Left (fp, name)
       Left e -> throwIO e
   let (nameMismatchPkgs, packages) = partitionEithers ePackages

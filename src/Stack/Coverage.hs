@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE LambdaCase            #-}
+{-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
@@ -102,10 +103,10 @@ instance Exception CoveragePrettyException
 
 -- | Type representing command line options for the @stack hpc report@ command.
 data HpcReportOpts = HpcReportOpts
-  { hroptsInputs :: [Text]
-  , hroptsAll :: Bool
-  , hroptsDestDir :: Maybe String
-  , hroptsOpenBrowser :: Bool
+  { inputs :: [Text]
+  , all :: Bool
+  , destDir :: Maybe String
+  , openBrowser :: Bool
   }
   deriving Show
 
@@ -113,9 +114,9 @@ data HpcReportOpts = HpcReportOpts
 hpcReportCmd :: HpcReportOpts -> RIO Runner ()
 hpcReportCmd hropts = do
   let (tixFiles, targetNames) =
-        L.partition (".tix" `T.isSuffixOf`) hropts.hroptsInputs
+        L.partition (".tix" `T.isSuffixOf`) hropts.inputs
       boptsCLI = defaultBuildOptsCLI
-        { targetsCLI = if hropts.hroptsAll then [] else targetNames }
+        { targetsCLI = if hropts.all then [] else targetNames }
   withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $
     generateHpcReportForTargets hropts tixFiles targetNames
 
@@ -363,10 +364,10 @@ generateHpcReportForTargets opts tixFiles targetNames = do
   targetTixFiles <-
     -- When there aren't any package component arguments, and --all
     -- isn't passed, default to not considering any targets.
-    if not opts.hroptsAll && null targetNames
+    if not opts.all && null targetNames
     then pure []
     else do
-      when (opts.hroptsAll && not (null targetNames)) $
+      when (opts.all && not (null targetNames)) $
         prettyWarnL
           $ "Since"
           : style Shell "--all"
@@ -404,7 +405,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
     mapM (resolveFile' . T.unpack) tixFiles
   when (null tixPaths) $ prettyThrowIO NoTargetsOrTixSpecified
   outputDir <- hpcReportDir
-  reportDir <- case opts.hroptsDestDir of
+  reportDir <- case opts.destDir of
     Nothing -> pure (outputDir </> relDirCombined </> relDirCustom)
     Just destDir -> do
       dest <- resolveDir' destDir
@@ -414,7 +415,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
       reportHtml = "combined coverage report"
   mreportPath <- generateUnionReport report reportHtml reportDir tixPaths
   forM_ mreportPath $ \reportPath ->
-    if opts.hroptsOpenBrowser
+    if opts.openBrowser
       then do
         prettyInfo $ "Opening" <+> pretty reportPath <+> "in the browser."
         void $ liftIO $ openBrowser (toFilePath reportPath)

@@ -161,7 +161,7 @@ data Ctx = Ctx
   , callStack      :: ![PackageName]
   , wanted         :: !(Set PackageName)
   , localNames     :: !(Set PackageName)
-  , mcurator       :: !(Maybe Curator)
+  , curator       :: !(Maybe Curator)
   , pathEnvVar     :: !Text
   }
 

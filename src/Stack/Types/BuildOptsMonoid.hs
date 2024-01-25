@@ -41,7 +41,7 @@ data BuildOptsMonoid = BuildOptsMonoid
   , exeProfile :: !FirstFalse
   , libStrip :: !FirstTrue
   , exeStrip :: !FirstTrue
-  , haddock :: !FirstFalse
+  , buildHaddocks :: !FirstFalse
   , haddockOpts :: !HaddockOptsMonoid
   , openHaddocks :: !FirstFalse
   , haddockDeps :: !(First Bool)
@@ -77,7 +77,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     exeProfile <-FirstFalse <$>  o ..:? exeProfileArgName
     libStrip <- FirstTrue <$> o ..:? libStripArgName
     exeStrip <-FirstTrue <$>  o ..:? exeStripArgName
-    haddock <- FirstFalse <$> o ..:? haddockArgName
+    buildHaddocks <- FirstFalse <$> o ..:? haddockArgName
     haddockOpts <- jsonSubWarnings (o ..:? haddockOptsArgName ..!= mempty)
     openHaddocks <- FirstFalse <$> o ..:? openHaddocksArgName
     haddockDeps <- First <$> o ..:? haddockDepsArgName
@@ -111,7 +111,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
       , exeProfile
       , libStrip
       , exeStrip
-      , haddock
+      , buildHaddocks
       , haddockOpts
       , openHaddocks
       , haddockDeps
@@ -337,7 +337,7 @@ newtype CabalVerbosity
   deriving (Eq, Show)
 
 toFirstCabalVerbosity :: FirstFalse -> First CabalVerbosity
-toFirstCabalVerbosity vf = First $ vf.getFirstFalse <&> \p ->
+toFirstCabalVerbosity vf = First $ vf.firstFalse <&> \p ->
   if p then verboseLevel else normalLevel
  where
   verboseLevel = CabalVerbosity verbose
@@ -355,22 +355,22 @@ instance Parsec CabalVerbosity where
 
 buildOptsMonoidHaddockL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidHaddockL =
-  lens (.haddock.getFirstFalse)
-    (\buildMonoid t -> buildMonoid {haddock = FirstFalse t})
+  lens (.buildHaddocks.firstFalse)
+    (\buildMonoid t -> buildMonoid {buildHaddocks = FirstFalse t})
 
 buildOptsMonoidTestsL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidTestsL =
-  lens (.tests.getFirstFalse)
+  lens (.tests.firstFalse)
     (\buildMonoid t -> buildMonoid {tests = FirstFalse t})
 
 buildOptsMonoidBenchmarksL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidBenchmarksL =
-  lens (.benchmarks.getFirstFalse)
+  lens (.benchmarks.firstFalse)
     (\buildMonoid t -> buildMonoid {benchmarks = FirstFalse t})
 
 buildOptsMonoidInstallExesL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidInstallExesL =
-  lens (.installExes.getFirstFalse)
+  lens (.installExes.firstFalse)
     (\buildMonoid t -> buildMonoid {installExes = FirstFalse t})
 
 -- Type representing formats of Stack's progress bar when building.

@@ -833,7 +833,7 @@ withBuildConfig inner = do
     pure Project
       { userMsg = Nothing
       , packages = []
-      , dependencies = map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
+      , extraDeps = map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
       , flagsByPkg = mempty
       , resolver = r
       , compiler = Nothing
@@ -857,7 +857,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
   packages0 <- for project.packages $ \fp@(RelFilePath t) -> do
     abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
     let resolved = ResolvedPath fp abs'
-    pp <- mkProjectPackage YesPrintWarnings resolved bopts.haddock
+    pp <- mkProjectPackage YesPrintWarnings resolved bopts.buildHaddocks
     pure (pp.projectCommon.name, pp)
 
   -- prefetch git repos to avoid cloning per subdirectory
@@ -867,11 +867,11 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
             (RPLImmutable (RPLIRepo repo rpm)) -> Just (repo, rpm)
             _ -> Nothing
         )
-        project.dependencies
+        project.extraDeps
   logDebug ("Prefetching git repos: " <> display (T.pack (show gitRepos)))
   fetchReposRaw gitRepos
 
-  (deps0, mcompleted) <- fmap unzip . forM project.dependencies $ \rpl -> do
+  (deps0, mcompleted) <- fmap unzip . forM project.extraDeps $ \rpl -> do
     (pl, mCompleted) <- case rpl of
        RPLImmutable rpli -> do
          (compl, mcompl) <-

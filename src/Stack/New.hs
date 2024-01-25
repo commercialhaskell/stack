@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -214,15 +215,15 @@ instance Exception NewPrettyException
 -- | Type representing command line options for the @stack new@ command (other
 -- than those applicable also to the @stack init@ command).
 data NewOpts = NewOpts
-  { newOptsProjectName  :: PackageName
+  { projectName  :: PackageName
     -- ^ Name of the project to create.
-  , newOptsCreateBare   :: Bool
+  , createBare   :: Bool
     -- ^ Whether to create the project without a directory.
-  , newOptsInit         :: Bool
+  , init         :: Bool
     -- ^ Whether to initialise the project for use with Stack.
-  , newOptsTemplate     :: Maybe TemplateName
+  , template     :: Maybe TemplateName
     -- ^ Name of the template to use.
-  , newOptsNonceParams  :: Map Text Text
+  , nonceParams  :: Map Text Text
     -- ^ Nonce parameters specified just for this invocation.
   }
 
@@ -233,7 +234,7 @@ newCmd (newOpts, initOpts) =
   withGlobalProject $ withConfig YesReexec $ do
     dir <- new newOpts initOpts.forceOverwrite
     exists <- doesFileExist $ dir </> stackDotYaml
-    when (newOpts.newOptsInit && (initOpts.forceOverwrite || not exists)) $ do
+    when (newOpts.init && (initOpts.forceOverwrite || not exists)) $ do
       go <- view globalOptsL
       initProject dir initOpts go.resolver
 
@@ -260,7 +261,7 @@ new opts forceOverwrite = do
         applyTemplate
           project
           template
-          opts.newOptsNonceParams
+          opts.nonceParams
           absDir
           templateText
       when (not forceOverwrite && bare) $
@@ -269,10 +270,10 @@ new opts forceOverwrite = do
       runTemplateInits absDir
       pure absDir
  where
-  cliOptionTemplate = opts.newOptsTemplate
-  project = opts.newOptsProjectName
+  cliOptionTemplate = opts.template
+  project = opts.projectName
   projectName = packageNameString project
-  bare = opts.newOptsCreateBare
+  bare = opts.createBare
   logUsing absDir template templateFrom =
     let loading = case templateFrom of
                     LocalTemp -> flow "Loading local"
@@ -321,9 +322,9 @@ loadTemplate name logIt = do
             pure f)
         ( \(e :: PrettyException) -> do
             settings <- fromMaybe (throwM e) (relSettings rawParam)
-            let url = settings.tplDownloadUrl
-                mBasicAuth = settings.tplBasicAuth
-                extract = settings.tplExtract
+            let url = settings.downloadUrl
+                mBasicAuth = settings.basicAuth
+                extract = settings.extract
             downloadTemplate url mBasicAuth extract (templateDir </> relFile)
         )
     RepoPath rtp -> do
@@ -356,10 +357,10 @@ loadTemplate name logIt = do
 
   downloadFromUrl :: TemplateDownloadSettings -> Path Abs Dir -> RIO env Text
   downloadFromUrl settings templateDir = do
-    let url =  settings.tplDownloadUrl
-        mBasicAuth = settings.tplBasicAuth
+    let url =  settings.downloadUrl
+        mBasicAuth = settings.basicAuth
         rel = fromMaybe backupUrlRelPath (parseRelFile url)
-    downloadTemplate url mBasicAuth settings.tplExtract (templateDir </> rel)
+    downloadTemplate url mBasicAuth settings.extract (templateDir </> rel)
 
   downloadTemplate ::
        String
@@ -403,10 +404,10 @@ loadTemplate name logIt = do
 
 -- | Type representing settings for the download of Stack project templates.
 data TemplateDownloadSettings = TemplateDownloadSettings
-  { tplDownloadUrl :: String
-  , tplBasicAuth :: Maybe (ByteString, ByteString)
+  { downloadUrl :: String
+  , basicAuth :: Maybe (ByteString, ByteString)
     -- ^ Optional HTTP 'Basic' authentication (type, credentials)
-  , tplExtract :: ByteString -> Either String Text
+  , extract :: ByteString -> Either String Text
   }
 
 eitherByteStringToText :: ByteString -> Either String Text
@@ -414,9 +415,9 @@ eitherByteStringToText = mapLeft show . decodeUtf8'
 
 asIsFromUrl :: String -> TemplateDownloadSettings
 asIsFromUrl url = TemplateDownloadSettings
-  { tplDownloadUrl = url
-  , tplBasicAuth = Nothing
-  , tplExtract = eitherByteStringToText
+  { downloadUrl = url
+  , basicAuth = Nothing
+  , extract = eitherByteStringToText
   }
 
 -- | Construct settings for downloading a Stack project template from a
@@ -446,14 +447,14 @@ settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) = do
           pure $ Just (gitHubBasicAuthType, fromString wantAltGitHubToken)
         else pure Nothing
   pure TemplateDownloadSettings
-    { tplDownloadUrl = concat
+    { downloadUrl = concat
         [ "https://api.github.com/repos/"
         , T.unpack user
         , "/stack-templates/contents/"
         , T.unpack name
         ]
-    , tplBasicAuth = mBasicAuth
-    , tplExtract = \bs -> do
+    , basicAuth = mBasicAuth
+    , extract = \bs -> do
         decodedJson <- eitherDecode (LB.fromStrict bs)
         case decodedJson of
           Object o | Just (String content) <- KeyMap.lookup "content" o -> do

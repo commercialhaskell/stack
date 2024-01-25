@@ -11,28 +11,9 @@ module Stack.Config.Build
  ) where
 
 import           Distribution.Verbosity ( normal )
-import Stack.Prelude
-    ( ($),
-      Functor(fmap),
-      Semigroup((<>)),
-      Bool(False, True),
-      String,
-      Maybe(..),
-      not,
-      (&&),
-      catMaybes,
-      unwords,
-      (||),
-      Any(getAny),
-      First(getFirst),
-      fromMaybe,
-      fromFirst,
-      fromFirstFalse,
-      fromFirstTrue,
-      FirstFalse(FirstFalse),
-      FirstTrue(FirstTrue) )
 import           Stack.BuildOpts
                    ( defaultBenchmarkOpts, defaultHaddockOpts, defaultTestOpts )
+import           Stack.Prelude
 import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), HaddockOpts (..)
                    , TestOpts (..)
@@ -65,7 +46,7 @@ buildOptsFromMonoid buildMonoid = BuildOpts
       (  buildMonoid.exeStrip
       <> FirstTrue (if noStripping then Just False else Nothing)
       )
-  , haddock = fromFirstFalse buildMonoid.haddock
+  , buildHaddocks = fromFirstFalse buildMonoid.buildHaddocks
   , haddockOpts = haddockOptsFromMonoid buildMonoid.haddockOpts
   , openHaddocks =
          not isHaddockFromHackage
