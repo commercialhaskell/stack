@@ -347,7 +347,7 @@ getPrecompiledCacheKey ::
   -> ConfigureOpts
   -> Bool -- ^ build haddocks
   -> RIO env PrecompiledCacheKey
-getPrecompiledCacheKey loc copts buildHaddocks = do
+getPrecompiledCacheKey loc configureOpts buildHaddocks = do
   compiler <- view actualCompilerVersionL
   cabalVersion <- view cabalVersionL
 
@@ -361,8 +361,9 @@ getPrecompiledCacheKey loc copts buildHaddocks = do
   -- In Cabal versions 1.22 and later, the configure options contain the
   -- installed package IDs, which is what we need for a unique hash. See also
   -- issue: https://github.com/commercialhaskell/stack/issues/1103
-  let input = copts.noDirs
-      optionsHash = Mem.convert $ hashWith SHA256 $ encodeUtf8 $ tshow input
+  let optionsToHash = configureOpts.nonPathRelated
+      optionsHash =
+        Mem.convert $ hashWith SHA256 $ encodeUtf8 $ tshow optionsToHash
 
   pure $ precompiledCacheKey
     platformGhcDir compiler cabalVersion packageKey optionsHash buildHaddocks
