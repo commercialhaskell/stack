@@ -83,14 +83,14 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-tuE+RG-226:21"
+  id = "OBS-STAN-0203-tuE+RG-228:21"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecutePackage.hs
 #
-#   225 ┃
-#   226 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
-#   227 ┃                     ^^^^^^^
+#   227 ┃
+#   228 ┃   newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
+#   229 ┃                     ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]

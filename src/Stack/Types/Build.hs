@@ -84,8 +84,8 @@ instance NFData BuildCache
 
 -- | Stored on disk to know whether the flags have changed.
 data ConfigCache = ConfigCache
-  { opts :: !ConfigureOpts
-    -- ^ All options used for this package.
+  { configureOpts :: !ConfigureOpts
+    -- ^ All Cabal configure options used for this package.
   , deps :: !(Set GhcPkgId)
     -- ^ The GhcPkgIds of all of the dependencies. Since Cabal doesn't take
     -- the complete GhcPkgId (only a PackageIdentifier) in the configure
@@ -95,7 +95,7 @@ data ConfigCache = ConfigCache
     -- ^ The components to be built. It's a bit of a hack to include this in
     -- here, as it's not a configure option (just a build option), but this
     -- is a convenient way to force compilation when the components change.
-  , haddock :: !Bool
+  , buildHaddocks :: !Bool
     -- ^ Are haddocks to be built?
   , pkgSrc :: !CachePkgSrc
   , pathEnvVar :: !Text

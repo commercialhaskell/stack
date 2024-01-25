@@ -115,19 +115,19 @@ readConfigCache ::
   -> ReaderT SqlBackend (RIO env) ConfigCache
 readConfigCache (Entity parentId configCacheParent) = do
   let pkgSrc = configCacheParent.configCacheParentPkgSrc
-  dirs <-
+  pathRelated <-
     map ((.configCacheDirOptionValue) . entityVal) <$>
     selectList
       [ConfigCacheDirOptionParent ==. parentId]
       [Asc ConfigCacheDirOptionIndex]
-  noDirs <-
+  nonPathRelated <-
     map ((.configCacheNoDirOptionValue) . entityVal) <$>
     selectList
       [ConfigCacheNoDirOptionParent ==. parentId]
       [Asc ConfigCacheNoDirOptionIndex]
-  let opts = ConfigureOpts
-        { dirs
-        , noDirs
+  let configureOpts = ConfigureOpts
+        { pathRelated
+        , nonPathRelated
         }
   deps <-
     Set.fromList . map ((.configCacheDepValue) . entityVal) <$>
@@ -136,12 +136,12 @@ readConfigCache (Entity parentId configCacheParent) = do
     Set.fromList . map ((.configCacheComponentValue) . entityVal) <$>
     selectList [ConfigCacheComponentParent ==. parentId] []
   let pathEnvVar = configCacheParent.configCacheParentPathEnvVar
-  let haddock = configCacheParent.configCacheParentHaddock
+  let buildHaddocks = configCacheParent.configCacheParentHaddock
   pure ConfigCache
-    { opts
+    { configureOpts
     , deps
     , components
-    , haddock
+    , buildHaddocks
     , pkgSrc
     , pathEnvVar
     }
@@ -181,7 +181,7 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
               , configCacheParentPkgSrc = new.pkgSrc
               , configCacheParentActive = True
               , configCacheParentPathEnvVar = new.pathEnvVar
-              , configCacheParentHaddock = new.haddock
+              , configCacheParentHaddock = new.buildHaddocks
               }
         Just parentEntity@(Entity parentId _) -> do
           old <- readConfigCache parentEntity
@@ -197,15 +197,15 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
       ConfigCacheDirOptionParent
       parentId
       ConfigCacheDirOptionIndex
-      (maybe [] (.opts.dirs) mold)
-      new.opts.dirs
+      (maybe [] (.configureOpts.pathRelated) mold)
+      new.configureOpts.pathRelated
     updateList
       ConfigCacheNoDirOption
       ConfigCacheNoDirOptionParent
       parentId
       ConfigCacheNoDirOptionIndex
-      (maybe [] (.opts.noDirs) mold)
-      new.opts.noDirs
+      (maybe [] (.configureOpts.nonPathRelated) mold)
+      new.configureOpts.nonPathRelated
     updateSet
       ConfigCacheDep
       ConfigCacheDepParent

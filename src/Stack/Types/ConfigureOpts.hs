@@ -7,8 +7,8 @@ module Stack.Types.ConfigureOpts
   ( ConfigureOpts (..)
   , BaseConfigOpts (..)
   , configureOpts
-  , configureOptsDirs
-  , configureOptsNoDir
+  , configureOptsPathRelated
+  , configureOptsNonPathRelated
   ) where
 
 import qualified Data.Map as Map
@@ -50,24 +50,26 @@ data BaseConfigOpts = BaseConfigOpts
   deriving Show
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
-configureOpts :: EnvConfig
-              -> BaseConfigOpts
-              -> Map PackageIdentifier GhcPkgId -- ^ dependencies
-              -> Bool -- ^ local non-extra-dep?
-              -> IsMutable
-              -> Package
-              -> ConfigureOpts
+configureOpts ::
+     EnvConfig
+  -> BaseConfigOpts
+  -> Map PackageIdentifier GhcPkgId -- ^ dependencies
+  -> Bool -- ^ local non-extra-dep?
+  -> IsMutable
+  -> Package
+  -> ConfigureOpts
 configureOpts econfig bco deps isLocal isMutable package = ConfigureOpts
-  { dirs = configureOptsDirs bco isMutable package
-  , noDirs = configureOptsNoDir econfig bco deps isLocal package
+  { pathRelated = configureOptsPathRelated bco isMutable package
+  , nonPathRelated =
+      configureOptsNonPathRelated econfig bco deps isLocal package
   }
 
-
-configureOptsDirs :: BaseConfigOpts
-                  -> IsMutable
-                  -> Package
-                  -> [String]
-configureOptsDirs bco isMutable package = concat
+configureOptsPathRelated ::
+     BaseConfigOpts
+  -> IsMutable
+  -> Package
+  -> [String]
+configureOptsPathRelated bco isMutable package = concat
   [ ["--user", "--package-db=clear", "--package-db=global"]
   , map (("--package-db=" ++) . toFilePathNoTrailingSep) $ case isMutable of
       Immutable -> bco.extraDBs ++ [bco.snapDB]
@@ -97,14 +99,14 @@ configureOptsDirs bco isMutable package = concat
     )
 
 -- | Same as 'configureOpts', but does not include directory path options
-configureOptsNoDir ::
+configureOptsNonPathRelated ::
      EnvConfig
   -> BaseConfigOpts
   -> Map PackageIdentifier GhcPkgId -- ^ Dependencies.
   -> Bool -- ^ Is this a local, non-extra-dep?
   -> Package
   -> [String]
-configureOptsNoDir econfig bco deps isLocal package = concat
+configureOptsNonPathRelated econfig bco deps isLocal package = concat
   [ depOptions
   , [ "--enable-library-profiling"
     | bopts.libProfile || bopts.exeProfile
@@ -192,13 +194,14 @@ configureOptsNoDir econfig bco deps isLocal package = concat
       LSubLibName cn ->
         unPackageName subPkgName <> ":" <> unUnqualComponentName cn
 
--- | Configure options to be sent to Setup.hs configure
+-- | Configure options to be sent to Setup.hs configure.
 data ConfigureOpts = ConfigureOpts
-  { dirs :: ![String]
+  { pathRelated :: ![String]
     -- ^ Options related to various paths. We separate these out since they do
-    -- not have an impact on the contents of the compiled binary for checking
+    -- not have an effect on the contents of the compiled binary for checking
     -- if we can use an existing precompiled cache.
-  , noDirs :: ![String]
+  , nonPathRelated :: ![String]
+    -- ^ Options other than path-related options.
   }
   deriving (Data, Eq, Generic, Show, Typeable)
 

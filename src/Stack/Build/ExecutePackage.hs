@@ -186,17 +186,19 @@ getConfigCache ee task installedMap enableTest enableBench = do
       TaskConfigOpts missing mkOpts = task.configOpts
   missingMapList <- traverse getMissing $ toList missing
   let missing' = Map.unions missingMapList
-      opts = mkOpts missing'
-      allDeps = Set.fromList $ Map.elems missing' ++ Map.elems task.present
+      configureOpts' = mkOpts missing'
+      configureOpts = configureOpts'
+        { nonPathRelated = configureOpts'.nonPathRelated ++ map T.unpack extra }
+      deps = Set.fromList $ Map.elems missing' ++ Map.elems task.present
+      components = case task.taskType of
+        TTLocalMutable lp ->
+          Set.map (encodeUtf8 . renderComponent) lp.components
+        TTRemotePackage{} -> Set.empty
       cache = ConfigCache
-        { opts = opts { noDirs = opts.noDirs ++ map T.unpack extra }
-        , deps = allDeps
-        , components =
-            case task.taskType of
-              TTLocalMutable lp ->
-                Set.map (encodeUtf8 . renderComponent) lp.components
-              TTRemotePackage{} -> Set.empty
-        , haddock = task.buildHaddocks
+        { configureOpts
+        , deps
+        , components
+        , buildHaddocks = task.buildHaddocks
         , pkgSrc = task.cachePkgSrc
         , pathEnvVar = ee.pathEnvVar
         }
@@ -264,7 +266,6 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
           || mOldCabalMod /= Just newCabalMod
           || mOldSetupConfigMod /= newSetupConfigMod
           || mOldProjectRoot /= Just newProjectRoot
-  let ConfigureOpts dirs nodirs = newConfigCache.opts
 
   when task.buildTypeConfig $
     -- When build-type is Configure, we need to have a configure script in the
@@ -292,8 +293,8 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
     -- Stack.Types.Build.ureOpts
     cabal KeepTHLoading $ "configure" : concat
       [ concat exes
-      , dirs
-      , nodirs
+      , newConfigCache.configureOpts.pathRelated
+      , newConfigCache.configureOpts.nonPathRelated
       ]
     -- Only write the cache for local packages.  Remote packages are built in a
     -- temporary directory so the cache would never be used anyway.
@@ -685,8 +686,8 @@ singleBuild
         writePrecompiledCache
           ee.baseConfigOpts
           loc
-          cache.opts
-          cache.haddock
+          cache.configureOpts
+          cache.buildHaddocks
           mpkgid
           subLibsPkgIds
           (buildableExes package)
@@ -762,8 +763,8 @@ getPrecompiled cache taskType bcoSnapInstallRoot =
     TTRemotePackage Immutable _ loc -> do
       mpc <- readPrecompiledCache
                 loc
-                cache.opts
-                cache.haddock
+                cache.configureOpts
+                cache.buildHaddocks
       case mpc of
         Nothing -> pure Nothing
         -- Only pay attention to precompiled caches that refer to packages

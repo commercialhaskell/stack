@@ -60,7 +60,8 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigureOpts
-                   ( BaseConfigOpts (..), ConfigureOpts (..), configureOpts )
+                   ( BaseConfigOpts (..), ConfigureOpts (..) )
+import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
 import           Stack.Types.DumpPackage ( DumpPackage (..), dpParentLibIdent )
@@ -440,7 +441,7 @@ addFinal lp package isAllInOne buildHaddocks = do
       pure $ Right Task
         { configOpts = TaskConfigOpts missing $ \missing' ->
             let allDeps = Map.union present missing'
-            in  configureOpts
+            in  ConfigureOpts.configureOpts
                   (view envConfigL ctx)
                   ctx.baseConfigOpts
                   allDeps
@@ -753,7 +754,7 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
       Nothing -> ADRToInstall Task
         { configOpts = TaskConfigOpts missing $ \missing' ->
             let allDeps = Map.union present missing'
-            in  configureOpts
+            in  ConfigureOpts.configureOpts
                   (view envConfigL ctx)
                   ctx.baseConfigOpts
                   allDeps
@@ -1009,22 +1010,22 @@ checkDirtiness ::
 checkDirtiness ps installed package present buildHaddocks = do
   ctx <- ask
   moldOpts <- runRIO ctx $ tryGetFlagCache installed
-  let configOpts = configureOpts
+  let configureOpts = ConfigureOpts.configureOpts
         (view envConfigL ctx)
         ctx.baseConfigOpts
         present
         (psLocal ps)
         (installLocationIsMutable $ psLocation ps) -- should be Local i.e. mutable always
         package
+      components = case ps of
+        PSFilePath lp ->
+          Set.map (encodeUtf8 . renderComponent) lp.components
+        PSRemote{} -> Set.empty
       wantConfigCache = ConfigCache
-        { opts = configOpts
+        { configureOpts
         , deps = Set.fromList $ Map.elems present
-        , components =
-            case ps of
-              PSFilePath lp ->
-                Set.map (encodeUtf8 . renderComponent) lp.components
-              PSRemote{} -> Set.empty
-        , haddock = buildHaddocks
+        , components
+        , buildHaddocks
         , pkgSrc = toCachePkgSrc ps
         , pathEnvVar = ctx.pathEnvVar
         }
@@ -1061,7 +1062,7 @@ describeConfigDiff config old new
   | not $ Set.null newComponents =
       Just $ "components added: " `T.append` T.intercalate ", "
           (map (decodeUtf8With lenientDecode) (Set.toList newComponents))
-  | not old.haddock && new.haddock =
+  | not old.buildHaddocks && new.buildHaddocks =
       Just "rebuilding with haddocks"
   | oldOpts /= newOpts = Just $ T.pack $ concat
       [ "flags changed from "
@@ -1099,7 +1100,7 @@ describeConfigDiff config old new
                 else stripGhcOptions)
            . map T.pack
            . (\(ConfigureOpts x y) -> x ++ y)
-           . (.opts)
+           . (.configureOpts)
    where
     -- options set by Stack
     isStackOpt :: Text -> Bool
