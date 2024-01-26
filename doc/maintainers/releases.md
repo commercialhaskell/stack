@@ -10,50 +10,51 @@
 ## Version scheme
 
 A Stack package or executable may have a version with three or four components:
-X.Y.Z or X.Y.Z.A.
+`X.Y.Z` or `X.Y.Z.A`.
 
 ### Development or stable versions
 
-* Versions with an _even_ 'Y' component are development versions (the `master`
+* Versions with an _even_ `Y` component are development versions (the `master`
   branch)
-* Versions with an _odd_ 'Y' component are stable versions (the `stable` branch,
+* Versions with an _odd_ `Y` component are stable versions (the `stable` branch,
   or in a `rc/vX.Y` release candidate branch for not-yet-released versions)
 
 ### Unreleased or released versions
 
-* Versions with an _even_ 'Z' component are unreleased versions (including
+* Versions with an _even_ `Z` component are unreleased versions (including
   release candidates)
-* Versions with an _odd_ 'Z' component are released versions
+* Versions with an _odd_ `Z` component are released versions
 * Except for the `release` branch (which matches exactly the most recent
-  release), all branches must have an even 'Z' component
+  release), all branches must have an even `Z` component
 * Branches other than `stable`, `release`, and a `rc/vX.Y` release candidate
-  will always have a `0` 'Z' component
+  will always have a `0` `Z` component
 
 ### Use of a fourth component
 
-* Release candidate binaries will be released with an odd 'A' component
-* Hackage-only dependency compatibility patch releases add a 'A' component
-  (e.g. v1.7.3.1, in the `release` branch)
-* Pre-release unstable binaries will be released with the date as the 'A'
-  component (e.g. 2.10.0.20220920)
+* Release candidate binaries will be released with an odd `A` component
+* Hackage-only dependency compatibility patch releases add a `A` component
+  (e.g. `v2.5.5.1`, in the `release` branch)
+* Pre-release unstable binaries will be released with the date as the `A`
+  component (e.g. `2.14.0.20240126`)
 
 Examples:
 
-* `1.7.0.0`: v1.7.x series pre-release branch (`v1.7` branch)
-* `1.7.0.1`: release candidate for first release of v1.7.x series (`v1.7`
-  branch)
-* `1.7.0.2`: continuing development on pre-release branch
-* `1.7.0.3`: second release candidate for first release of v1.7.x series (`v1.7`
-  branch)
-* `1.7.1`: first release of the 1.7.x series (`release` branch)
-* `1.7.2.0`: development for second release of 1.7.x series (`stable` branch)
-* `1.7.2.1`: release candidate for second release of 1.7.x series (`stable`
-  branch)
-* `1.7.3`: second release of 1.7.x series (`release` branch)
-* `1.7.3.1`: first Hackage-only patch of 1.7.3 (`release` branch)
-* `1.7.3.2`: second Hackage-only patch of 1.7.3 (`release` branch)
-* `1.8.0`: unstable development code (`master` branch)
-* `1.8.0.20181004`: pre-release snapshot of unstable version (`master` branch)
+* `2.15.0.0`: `v2.15.x` series pre-release branch (`rc/v2.15` branch)
+* `2.15.0.1`: first release candidate for first release of `v2.15.x` series
+  (`rc/v2.15` branch)
+* `2.15.0.2`: continuing development on pre-release branch
+* `2.15.0.3`: second release candidate for first release of `v2.15.x` series
+  (`rc/v2.15` branch)
+* `2.15.1`: first release of the `2.15.x` series (`release` branch)
+* `2.15.2`: development for second release of `2.15.x` series
+  (`stable` branch)
+* `2.15.2.1`: first release candidate for second release of `2.15.x` series
+  (`rc/v2.15` branch)
+* `2.15.3`: second release of `2.15.x` series (`release` branch)
+* `2.15.3.1`: first Hackage-only patch of `2.15.3` (`release` branch)
+* `2.15.3.2`: second Hackage-only patch of `2.15.3` (`release` branch)
+* `2.14.0`: unstable development code (`master` branch)
+* `2.14.0.20240126`: pre-release snapshot of unstable version (`master` branch)
 
 ## Pre-release checks
 
@@ -70,7 +71,7 @@ Examples:
     stackage snapshots and GHC versions (e.g.
     https://github.com/commercialhaskell/stack/pull/4565/files)
 
-6.  Update the `stack-*.yaml` that uses a `nightly` snapshot to the latest
+6.  Update any `stack-*.yaml` that uses a `nightly` snapshot to the latest
     nightly (go over the extra-deps too) and ensure the project builds and tests
     pass. For example, command:
 
@@ -97,7 +98,7 @@ Examples:
 
 * `package.yaml`: bump to the next release candidate version (bump the second
   component to the next odd number, ensure the third component is `0`, and add
-  patchlevel `0`; e.g. from `1.8.0` to `1.9.0.0`).
+  patchlevel `0`; e.g. from `2.14.0` to `2.15.0.0`).
 
     !!! attention
 
@@ -116,7 +117,7 @@ branch.
 
 1.  `package.yaml`: bump version to the next unstable version (bump the second
     component to the next even number, ensure the third component is `0`; e.g.
-    from `1.9.0` to `1.10.0`).
+    from `2.15.0` to `2.16.0`).
 
     !!! attention
 
@@ -125,7 +126,7 @@ branch.
 
 2.  `Changelog.md`:
     *   Change the title of the existing **Unreleased changes** section to what
-        will be the next final (non-RC) release (e.g. `v2.1.1`).
+        will be the next final (non-RC) release (e.g. `v2.15.1`).
     *   Add new "Unreleased changes" section:
 
         ~~~markdown
@@ -158,12 +159,6 @@ Review documentation for any changes that need to be made:
 * Search for old Stack version, unstable Stack version, and the next "obvious"
   possible versions in sequence, and `UNRELEASED` and replace with next release
   version (`X.Y.1`, where Y is odd).
-
-    !!! attention
-
-        Do **NOT** update the Dockerfiles in
-        [stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/)
-        yet. That step will come later.
 
     !!! attention
 
@@ -346,7 +341,7 @@ final release.
     In the `rc/vX.Y` branch:
 
     * `package.yaml`: bump the version number. Bump the fourth component to an
-       even number (e.g. from 1.7.0.1 to 1.7.0.2).
+       even number (e.g. from `2.15.0.1` to `2.15.0.2`).
 
         !!! attention
 
@@ -615,7 +610,7 @@ final release.
     In the `stable` branch:
 
     * `package.yaml`: bump the version number. Bump the third component to an
-      even number (e.g. from `1.6.1` to `1.6.2`).
+      even number (e.g. from `2.15.1` to `2.15.2`).
 
         !!! attention
 
@@ -691,36 +686,3 @@ final release.
     In the message, include:
 
     * the release description from Github.
-
-    ### K: Update Docker images
-
-    Docker Hub includes Docker images under
-    [`fpco/stack-build'](https://hub.docker.com/r/fpco/stack-build).
-
-    Update those images with a new version:
-
-    1.  Under
-        [commercialhaskell/stackage/automated/dockerfiles](https://github.com/commercialhaskell/stackage/tree/master/automated/dockerfiles/),
-        add `lts-X.Y/Dockerfile` (where `X.Y` is the latest Stackage Haskell LTS
-        version), containing (where `X.Z` is the previous Haskell LTS version,
-        and `X.Y.Z` is the newly released Stack version):
-
-        ~~~dockerfile
-        FROM $DOCKER_REPO:lts-X.Z
-        ARG STACK_VERSION=X.Y.Z
-        RUN wget -qO- https://github.com/commercialhaskell/stack/releases/download/v$STACK_VERSION/stack-$STACK_VERSION-linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C /usr/local/bin '*/stack'
-        ~~~
-
-    2.  Run `./build.sh lts-X.Y`. Then test that the new image has the new
-        version of Stack. For example, command:
-
-        ~~~text
-        docker run --rm fpco/stack-build:lts stack --version
-        ~~~
-
-    3.  Use the following commands to push the new image to the registry:
-
-        ~~~text
-        ./build.sh --push lts-X.Y
-        ./build.sh --push --small lts-X.Y
-        ~~~
