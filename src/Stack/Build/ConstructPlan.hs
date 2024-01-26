@@ -341,31 +341,31 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
     -- If any new packages were added to the unregister Map, we need to loop
     -- through the remaining packages again to detect if a transitive dependency
     -- is being unregistered.
-    | us.usAnyAdded = loop us.usToUnregister us.usKeep
+    | us.anyAdded = loop us.toUnregister us.toKeep
     -- Nothing added, so we've already caught them all. Return the Map we've
     -- already calculated.
-    | otherwise = us.usToUnregister
+    | otherwise = us.toUnregister
    where
     -- Run the unregister checking function on all packages we currently think
     -- we'll be keeping.
     us = execState (mapM_ go keep) initialUnregisterState
     initialUnregisterState = UnregisterState
-      { usToUnregister = toUnregister
-      , usKeep = []
-      , usAnyAdded = False
+      { toUnregister
+      , toKeep = []
+      , anyAdded = False
       }
 
   go :: DumpPackage -> State UnregisterState ()
   go dp = do
     us <- get
-    case maybeUnregisterReason us.usToUnregister ident mParentLibId deps of
+    case maybeUnregisterReason us.toUnregister ident mParentLibId deps of
       -- Not unregistering, add it to the keep list.
-      Nothing -> put us { usKeep = dp : us.usKeep }
+      Nothing -> put us { toKeep = dp : us.toKeep }
       -- Unregistering, add it to the unregister Map; and indicate that a
       -- package was in fact added to the unregister Map, so we loop again.
       Just reason -> put us
-        { usToUnregister = Map.insert gid (ident, reason) us.usToUnregister
-        , usAnyAdded = True
+        { toUnregister = Map.insert gid (ident, reason) us.toUnregister
+        , anyAdded = True
         }
    where
     gid = dp.ghcPkgId
