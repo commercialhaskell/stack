@@ -3,10 +3,11 @@
 # Developing on Windows #
 
 On Windows, Stack comes with an installation of [MSYS2](https://www.msys2.org/).
-MSYS2 will be used by Stack to provide a Unix-like shell and environment for
-Stack. This may be necessary for installing some Haskell packages, such as those
-which use `configure` scripts, or if your project needs some additional tools
-during the build phase.
+The MINGW64 (MINGW32 on 32-bit Windows) environment of MSYS2 will be used by
+Stack to provide a Unix-like shell and environment for Stack. This may be
+necessary for installing some Haskell packages, such as those which use
+`configure` scripts, or if your project needs some additional tools during the
+build phase.
 
 No matter which terminal software you choose (Windows Terminal, Console Windows
 Host, Command Prompt, PowerShell, Git bash or any other) you can use this
@@ -26,11 +27,18 @@ example, help about the operation `--sync` (or `-S`) can be obtained with
 `stack exec -- pacman -Sh`.
 
 Command `stack path --bin-path` to see the PATH in the Stack environment. On
-Windows, it includes the `\mingw64\bin`, `\usr\bin` and `\usr\local\bin`
-directories of the Stack-supplied MSYS2. If your executable depends on files
-(for example, dynamic-link libraries) in those directories and you want ro run
-it outside of the Stack environment, you will need to ensure copies of those
-files are on the PATH.
+Windows, it includes the `\mingw64\bin` (`\mingw32\bin` on 32-bit Windows),
+`\usr\bin` and `\usr\local\bin` directories of the Stack-supplied MSYS2. If your
+executable depends on files (for example, dynamic-link libraries) in those
+directories and you want to run it outside of the Stack environment, you will
+need to ensure copies of those files are on the PATH.
+
+Command `stack path --extra-include-dirs` and `stack path --extra-library-dirs`
+to see the extra directories searched for C header files or system libraries
+files in the Stack environment. On Windows, it includes the `\mingw64\include`
+(`mingw32\include` on 32-bit Windows) (include) and the `\mingw64\lib` and
+`\mingw64\bin` directories (`mingw32\lib` and `mingw32\bin` on 32-bit Windows)
+(library) of the Stack-supplied MSYS2.
 
 ## Updating the Stack-supplied MSYS2 ##
 
