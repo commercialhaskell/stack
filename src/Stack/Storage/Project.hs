@@ -33,7 +33,7 @@ import           Database.Persist.TH
 import           Pantry.SQLite ( initStorage, withStorage_ )
 import           Stack.Prelude
 import           Stack.Storage.Util
-                   ( handleMigrationException, updateList, updateSet )
+                   ( handleMigrationException, updateCollection, listUpdateDiff, setUpdateDiff )
 import           Stack.Types.Build ( CachePkgSrc, ConfigCache (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
@@ -192,32 +192,28 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
             , ConfigCacheParentPathEnvVar =. new.pathEnvVar
             ]
           pure (parentId, Just old)
-    updateList
-      ConfigCacheDirOption
-      ConfigCacheDirOptionParent
-      parentId
-      ConfigCacheDirOptionIndex
+    updateCollection
+      (listUpdateDiff ConfigCacheDirOptionIndex)
+      (uncurry $ ConfigCacheDirOption parentId)
+      [ConfigCacheDirOptionParent ==. parentId]
       (maybe [] (.configureOpts.pathRelated) mold)
       new.configureOpts.pathRelated
-    updateList
-      ConfigCacheNoDirOption
-      ConfigCacheNoDirOptionParent
-      parentId
-      ConfigCacheNoDirOptionIndex
+    updateCollection
+      (listUpdateDiff ConfigCacheNoDirOptionIndex)
+      (uncurry $ ConfigCacheNoDirOption parentId)
+      [ConfigCacheNoDirOptionParent ==. parentId]
       (maybe [] (.configureOpts.nonPathRelated) mold)
       new.configureOpts.nonPathRelated
-    updateSet
-      ConfigCacheDep
-      ConfigCacheDepParent
-      parentId
-      ConfigCacheDepValue
+    updateCollection
+      (setUpdateDiff ConfigCacheDepValue)
+      (ConfigCacheDep parentId)
+      [ConfigCacheDepParent ==. parentId]
       (maybe Set.empty (.deps) mold)
       new.deps
-    updateSet
-      ConfigCacheComponent
-      ConfigCacheComponentParent
-      parentId
-      ConfigCacheComponentValue
+    updateCollection
+      (setUpdateDiff ConfigCacheComponentValue)
+      (ConfigCacheComponent parentId)
+      [ConfigCacheComponentParent ==. parentId]
       (maybe Set.empty (.components) mold)
       new.components
 
