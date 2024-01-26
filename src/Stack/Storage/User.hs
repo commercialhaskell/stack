@@ -45,7 +45,7 @@ import           Path ( (</>), mkRelFile, parseRelFile )
 import           Path.IO ( resolveFile', resolveDir' )
 import qualified RIO.FilePath as FP
 import           Stack.Prelude
-import           Stack.Storage.Util ( handleMigrationException, updateSet )
+import           Stack.Storage.Util ( handleMigrationException, updateCollection, setUpdateDiff )
 import           Stack.Types.Build ( PrecompiledCache (..) )
 import           Stack.Types.Cache ( Action (..) )
 import           Stack.Types.Compiler ( ActualCompiler, compilerVersionText )
@@ -260,18 +260,16 @@ savePrecompiledCache
                 precompiledCacheParentLibrary
               ]
             pure (parentId, Just old)
-      updateSet
-        PrecompiledCacheSubLib
-        PrecompiledCacheSubLibParent
-        parentId
-        PrecompiledCacheSubLibValue
+      updateCollection
+        (setUpdateDiff PrecompiledCacheSubLibValue)
+        (PrecompiledCacheSubLib parentId)
+        [PrecompiledCacheSubLibParent ==. parentId]
         (maybe Set.empty (toFilePathSet . (.subLibs)) mold)
         (toFilePathSet new.subLibs)
-      updateSet
-        PrecompiledCacheExe
-        PrecompiledCacheExeParent
-        parentId
-        PrecompiledCacheExeValue
+      updateCollection
+        (setUpdateDiff PrecompiledCacheExeValue)
+        (PrecompiledCacheExe parentId)
+        [PrecompiledCacheExeParent ==. parentId]
         (maybe Set.empty (toFilePathSet . (.exes)) mold)
         (toFilePathSet new.exes)
  where

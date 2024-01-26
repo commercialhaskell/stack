@@ -5,75 +5,67 @@
 -- | Utils for the other Stack.Storage modules
 module Stack.Storage.Util
   ( handleMigrationException
-  , updateList
-  , updateSet
+  , updateCollection
+  , setUpdateDiff
+  , listUpdateDiff
   ) where
 
 import qualified Data.Set as Set
 import           Database.Persist
                    ( BaseBackend, EntityField, PersistEntity
                    , PersistEntityBackend, PersistField, PersistQueryWrite
-                   , SafeToInsert, (<-.), (==.), deleteWhere, insertMany_
+                   , SafeToInsert, (<-.), deleteWhere, insertMany_, Filter
                    )
 import           Stack.Prelude
 import           Stack.Types.Storage ( StoragePrettyException (..) )
 
--- | Efficiently update a set of values stored in a database table
-updateSet ::
+-- | Efficiently update a collection of values with a given diff function.
+updateCollection ::
      ( PersistEntityBackend record ~ BaseBackend backend
-     , PersistField parentid
+     , Eq (collection rawValue)
+     , PersistEntity record
      , PersistField value
-     , Ord value
-     , PersistEntity record
      , MonadIO m
      , PersistQueryWrite backend
      , SafeToInsert record
+     , Foldable collection
      )
-  => (parentid -> value -> record)
-  -> EntityField record parentid
-  -> parentid
-  -> EntityField record value
-  -> Set value
-  -> Set value
+  => (collection rawValue -> collection rawValue -> ([Filter record], [value]))
+  -> (value -> record)
+  -> [Filter record]
+  -> collection rawValue
+  -> collection rawValue
   -> ReaderT backend m ()
-updateSet recordCons parentFieldCons parentId valueFieldCons old new =
+updateCollection fnDiffer recordCons extra old new =
   when (old /= new) $ do
-    deleteWhere
-      [ parentFieldCons ==. parentId
-      , valueFieldCons <-. Set.toList (Set.difference old new)
-      ]
-    insertMany_ $
-      map (recordCons parentId) $ Set.toList (Set.difference new old)
+    let (oldMinusNewFilter, newMinusOld) = fnDiffer old new
+    unless (null oldMinusNewFilter) $ deleteWhere
+        (extra ++ oldMinusNewFilter)
+    unless (null newMinusOld) $ insertMany_ $
+      map recordCons $ toList newMinusOld
 
--- | Efficiently update a list of values stored in a database table.
-updateList ::
-     ( PersistEntityBackend record ~ BaseBackend backend
-     , PersistField parentid
-     , Ord value
-     , PersistEntity record
-     , MonadIO m
-     , PersistQueryWrite backend
-     , SafeToInsert record
-     )
-  => (parentid -> Int -> value -> record)
-  -> EntityField record parentid
-  -> parentid
-  -> EntityField record Int
+setUpdateDiff :: 
+  (Ord value, PersistField value)
+  => EntityField record value
+  -> Set value
+  -> Set value
+  -> ([Filter record], [value])
+setUpdateDiff indexFieldCons old new = 
+    let oldMinusNew = Set.difference old new
+    in ([indexFieldCons <-. toList oldMinusNew], toList $ Set.difference new old)
+
+listUpdateDiff ::
+  (Ord value)
+  => EntityField record Int
   -> [value]
   -> [value]
-  -> ReaderT backend m ()
-updateList recordCons parentFieldCons parentId indexFieldCons old new =
-  when (old /= new) $ do
+  -> ([Filter record], [(Int, value)])
+listUpdateDiff indexFieldCons old new =
     let oldSet = Set.fromList (zip [0 ..] old)
         newSet = Set.fromList (zip [0 ..] new)
-    deleteWhere
-      [ parentFieldCons ==. parentId
-      , indexFieldCons <-.
-        map fst (Set.toList $ Set.difference oldSet newSet)
-      ]
-    insertMany_ $
-      map (uncurry $ recordCons parentId) $
-      Set.toList (Set.difference newSet oldSet)
+        oldMinusNew = Set.difference oldSet newSet
+        indexList = map fst (Set.toList oldMinusNew)
+    in ([indexFieldCons <-. indexList], toList $ Set.difference newSet oldSet)
 
 handleMigrationException :: HasLogFunc env => RIO env a -> RIO env a
 handleMigrationException inner = do
