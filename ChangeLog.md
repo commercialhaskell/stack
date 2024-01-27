@@ -4,8 +4,22 @@
 
 Release notes:
 
+**Changes since v2.15.1:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+## v2.15.1
+
+Release notes:
+
 * After an upgrade from an earlier version of Stack, on first use only,
-  Stack 2.14.0 may warn that it had trouble loading the CompilerPaths cache.
+  Stack 2.15.1 may warn that it had trouble loading the CompilerPaths cache.
 * The hash used as a key for Stack's pre-compiled package cache has changed,
   following the dropping of support for Cabal versions older than `1.24.0.0`.
 
