@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased changes
+## v2.15.0.1 (release candidate) - 2024-01-27
 
 Release notes:
 
@@ -10,8 +10,6 @@ Release notes:
   following the dropping of support for Cabal versions older than `1.24.0.0`.
 
 **Changes since v2.13.1:**
-
-Major changes:
 
 Behavior changes:
 
