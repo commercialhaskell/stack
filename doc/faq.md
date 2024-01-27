@@ -371,7 +371,7 @@ Windows is not able to find the necessary C++ libraries from the standard
 prompt because they're not in the PATH environment variable. `stack exec` works
 because it's modifying PATH to include extra things.
 
-Those libraries are shipped with GHC (and, theoretically in some cases, MSYS).
+Those libraries are shipped with GHC (and, theoretically in some cases, MSYS2).
 The easiest way to find them is `stack exec which`. For example, command:
 
 ~~~text
