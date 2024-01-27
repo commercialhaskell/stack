@@ -254,7 +254,7 @@ Unset the flag to disable building Haddock documentation for dependencies.
 
 :octicons-beaker-24: Experimental
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 Default: Disabled
 

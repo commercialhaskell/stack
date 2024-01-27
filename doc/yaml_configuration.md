@@ -539,7 +539,7 @@ build:
   haddock-deps: false
 
   # If specified, implies haddock-internal: false and
-  # haddock-hyperlink-source: true. Since Stack UNRELEASED.
+  # haddock-hyperlink-source: true. Since Stack 2.15.1.
   haddock-for-hackage: false
 
   # The configuration is ignored, if haddock-for-hackage: true.
@@ -1255,7 +1255,7 @@ For further information, see the
 
 ### notify-if-arch-unknown
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 Default: `true`
 
@@ -1264,7 +1264,7 @@ should Stack notify the user of that?
 
 ### notify-if-cabal-untested
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 Default: `true`
 
@@ -1273,7 +1273,7 @@ been found, should Stack notify the user of that?
 
 ### notify-if-ghc-untested
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 Default: `true`
 
@@ -1282,7 +1282,7 @@ Stack notify the user of that?
 
 ### notify-if-nix-on-path
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 Default: `true`
 
@@ -1521,7 +1521,7 @@ setup-info:
 
 'Platforms' are pairs of an operating system and a machine architecture (for
 example, 32-bit i386 or 64-bit x86-64) (represented by the
-`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.13.1)
+`Cabal.Distribution.Systems.Platform` type). Stack currently (version 2.15.1)
 supports the following pairs in the format of the `setup-info` key:
 
 |Operating system|I386 arch|X86_64 arch|Other machine architectures                                 |

@@ -79,7 +79,7 @@ When compiling from source code, by default:
   `my-stack upgrade --no-only-local-bin` seeks also to upgrade `my-stack` to the
   latest version of Stack available.
 
-* `stack upgrade --binary-version 2.13.1` seeks an upgrade to Stack 2.13.1 if
+* `stack upgrade --binary-version 2.15.1` seeks an upgrade to Stack 2.15.1 if
   available as a binary distribution for the platform, even if not newer.
 
 * `stack upgrade --source-only` seeks an upgrade by building Stack with
