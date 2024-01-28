@@ -359,7 +359,16 @@ final release.
         Bug fixes:
         ~~~
 
-    ### F: Announce the release candidate
+    ### F: Request update of GHCup's metadata
+
+    Raise a pull request at the
+    [`haskell/ghcup-metadata`](https://github.com/haskell/ghcup-metadata) GitHub
+    repository to request an addition to GHCup's latest metadata configuration
+    file for prereleases, tagged as the latest prerelease. In the metadata,
+    change the tags for any past Stack prereleases to indicate that they are no
+    longer the latest prerelease.
+
+    ### G: Announce the release candidate
 
     Announce the release candidate to the following mailing lists
 
@@ -633,7 +642,17 @@ final release.
     The repository's issue and pull request templates are the `.github`
     directory. Update them to refer to the new release version (`X.Y.Z`).
 
-    ### J: Announce the release
+    ### J: Request update of GHCup's metadata
+
+    Raise a pull request at the
+    [`haskell/ghcup-metadata`](https://github.com/haskell/ghcup-metadata) GitHub
+    repository to request an addition to GHCup's latest metadata configuration
+    files for releases and 'vanilla' releases, tagged as the latest release.
+    (The GHCup project will decide whether, and when, to recommend the release.)
+    In the metadata, change the tags for any past Stack releases to indicate
+    that they are no longer the latest release.
+
+    ### K: Announce the release
 
     Announce the release to the following mailing lists
 
