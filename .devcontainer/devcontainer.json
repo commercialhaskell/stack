@@ -58,8 +58,8 @@
   //   // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-default-root,target=/root,type=bind"
   // ],
 
-  // Pip: Install packages to the user site
   "remoteEnv": {
+    // Pip: Install packages to the user site
     "PIP_USER": "1"
   }
 }

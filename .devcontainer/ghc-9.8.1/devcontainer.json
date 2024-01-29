@@ -56,8 +56,8 @@
   //   // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.8.1-root,target=/root,type=bind"
   // ],
 
-  // Pip: Install packages to the user site
   "remoteEnv": {
+    // Pip: Install packages to the user site
     "PIP_USER": "1"
   }
 }
