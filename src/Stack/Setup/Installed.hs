@@ -32,14 +32,16 @@ import           Path ( (</>), filename, parseRelDir, parseRelFile )
 import           Path.IO ( doesDirExist, ignoringAbsence, listDir, removeFile )
 import           RIO.Process ( HasProcessContext, proc, readProcess_ )
 import           Stack.Constants
-                   ( relDirBin, relDirInclude, relDirLib, relDirLocal, relDirMingw
-                   , relDirMingw32, relDirMingw64, relDirUsr
+                   ( relDirBin, relDirInclude, relDirLib, relDirLocal
+                   , relDirMingw, relDirUsr
                    )
 import           Stack.Prelude
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.Config.Exception ( ConfigPrettyException (..) )
 import           Stack.Types.ExtraDirs ( ExtraDirs (..) )
+import           Stack.Types.MsysEnvironment ( relDirMsysEnv )
 
 data Tool
   = Tool PackageIdentifier -- ^ e.g. ghc-7.8.4, msys2-20150512
@@ -144,34 +146,24 @@ toolExtraDirs tool = do
           , dir </> relDirMingw </> relDirBin
           ]
       }
-    (Platform Cabal.I386 Cabal.Windows, "msys2") -> pure mempty
-      { bins =
-          [ dir </> relDirMingw32 </> relDirBin
-          , dir </> relDirUsr </> relDirBin
-          , dir </> relDirUsr </> relDirLocal </> relDirBin
-          ]
-      , includes =
-          [ dir </> relDirMingw32 </> relDirInclude
-          ]
-      , libs =
-          [ dir </> relDirMingw32 </> relDirLib
-          , dir </> relDirMingw32 </> relDirBin
-          ]
-      }
-    (Platform Cabal.X86_64 Cabal.Windows, "msys2") -> pure mempty
-      { bins =
-          [ dir </> relDirMingw64 </> relDirBin
-          , dir </> relDirUsr </> relDirBin
-          , dir </> relDirUsr </> relDirLocal </> relDirBin
-          ]
-      , includes =
-          [ dir </> relDirMingw64 </> relDirInclude
-          ]
-      , libs =
-          [ dir </> relDirMingw64 </> relDirLib
-          , dir </> relDirMingw64 </> relDirBin
-          ]
-      }
+    (Platform _ Cabal.Windows, "msys2") -> do
+      relDirMsysEnvPrefix <- case config.msysEnvironment of
+        Just msysEnv -> pure $ relDirMsysEnv msysEnv
+        Nothing -> throwM NoMsysEnvironmentBug
+      pure mempty
+        { bins =
+            [ dir </> relDirMsysEnvPrefix </> relDirBin
+            , dir </> relDirUsr </> relDirBin
+            , dir </> relDirUsr </> relDirLocal </> relDirBin
+            ]
+        , includes =
+            [ dir </> relDirMsysEnvPrefix </> relDirInclude
+            ]
+        , libs =
+            [ dir </> relDirMsysEnvPrefix </> relDirLib
+            , dir </> relDirMsysEnvPrefix </> relDirBin
+            ]
+        }
     (_, isGHC -> True) -> pure mempty
       { bins =
           [ dir </> relDirBin

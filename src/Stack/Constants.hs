@@ -89,6 +89,10 @@ module Stack.Constants
   , relDirMingw
   , relDirMingw32
   , relDirMingw64
+  , relDirClang32
+  , relDirClang64
+  , relDirClangArm64
+  , relDirUcrt64
   , relDirLocal
   , relDirUsr
   , relDirInclude
@@ -512,6 +516,18 @@ relDirMingw32 = $(mkRelDir "mingw32")
 
 relDirMingw64 :: Path Rel Dir
 relDirMingw64 = $(mkRelDir "mingw64")
+
+relDirClang32 :: Path Rel Dir
+relDirClang32 = $(mkRelDir "clang32")
+
+relDirClang64 :: Path Rel Dir
+relDirClang64 = $(mkRelDir "clang64")
+
+relDirClangArm64 :: Path Rel Dir
+relDirClangArm64 = $(mkRelDir "clangarm64")
+
+relDirUcrt64 :: Path Rel Dir
+relDirUcrt64 = $(mkRelDir "ucrt64")
 
 relDirLocal :: Path Rel Dir
 relDirLocal = $(mkRelDir "local")

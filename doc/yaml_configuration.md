@@ -1247,6 +1247,18 @@ Whether to modify the code page for UTF-8 output.
 modify-code-page: false
 ~~~
 
+### msys-environment
+
+:octicons-tag-24: UNRELEASED
+
+Restrictions: Windows systems only.
+
+Default: `MINGW64` (64-bit Windows) or `MINGW32` (32-bit Windows)
+
+The name of the MSYS2 environment (case-sensitive) used in the Stack
+environment. Valid environments are `CLANG32`, `CLANG64`, `CLANGARM64`,
+`MINGW32`, `MINGW64`, and `UCRT64`.
+
 ### nix
 
 [:octicons-tag-24: 0.1.10.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.10.0)

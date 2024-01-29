@@ -177,16 +177,16 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-5rtOmw-482:33"
+  id = "OBS-STAN-0212-5rtOmw-486:33"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\Constants.hs
 #
-#  481 ┃
-#  482 ┃ setupGhciShimCode = byteString $(do
-#  483 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
-#  484 ┃     embedFile path)
 #  485 ┃
+#  486 ┃ setupGhciShimCode = byteString $(do
+#  487 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
+#  488 ┃     embedFile path)
+#  489 ┃
 
 # Anti-pattern: unsafe functions
 [[ignore]]
