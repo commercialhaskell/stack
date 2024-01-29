@@ -7,8 +7,13 @@
 !/backups/
 !/bind-mounts/
 !/conf/
-!/conf/etc/
-!/conf/etc/stack/
+!/conf/shell/
+!/conf/shell/var/
+!/conf/shell/var/tmp/
+!/conf/shell/var/tmp/snippets/
+!/conf/stack/
+!/conf/stack/etc/
+!/conf/stack/etc/stack/
 !/ghc-*/
 !/scripts/
 !/scripts/usr/
@@ -17,7 +22,8 @@
 
 !/assets/cradles/cabal/hie.yaml
 !/assets/cradles/stack/hie.yaml
-!/conf/etc/stack/config.yaml
+!/conf/shell/var/tmp/snippets/*.sh
+!/conf/stack/etc/stack/config.yaml
 !/ghc-*/devcontainer.json
 !/scripts/usr/local/bin/*.sh
 

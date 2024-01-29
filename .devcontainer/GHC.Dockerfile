@@ -12,7 +12,8 @@ FROM ${BUILD_ON_IMAGE}:${GHC_VERSION} as files
 
 RUN mkdir /files
 
-COPY conf /files
+COPY conf/shell /files
+COPY conf/stack /files
 COPY scripts /files
 
 ## Ensure file modes are correct
