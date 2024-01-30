@@ -15,6 +15,8 @@ Behavior changes:
   came with versions of GHC before 8.4.
 * `stack path --global-config`, `--programs`, and `--local-bin` no longer set
   up Stack's environment.
+* The `init` command initialises `stack.yaml` with a `snapshot` key rather than
+  a `resolver` key.
 
 Other enhancements:
 
