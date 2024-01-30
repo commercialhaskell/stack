@@ -181,8 +181,8 @@ resolveOptions =
            ]
        , fillSep
            [ "Using"
-           , style Shell "--resolver"
-           , "to specify a matching snapshot/resolver."
+           , style Shell "--snapshot"
+           , "to specify a matching snapshot."
            ]
        ]
 
@@ -383,7 +383,7 @@ renderStackYaml p ignoredPackages dupPackages =
   commentedPackages =
     let ignoredComment = commentHelp
           [ "The following packages have been ignored due to incompatibility with the"
-          , "resolver compiler, dependency conflicts with other packages"
+          , "snapshot compiler, dependency conflicts with other packages"
           , "or unsatisfied dependencies."
           ]
         dupComment = commentHelp
