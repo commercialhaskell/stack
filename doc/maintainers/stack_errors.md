@@ -63,7 +63,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         ~~~haskell
         [S-7571] = UnknownPackages (Path Abs File) (Map PackageName (Maybe Version, Set PackageName)) (Map PackageName (Set PackageIdentifier))
         [S-2045] | SnapshotNotFound SnapName
-        [S-8559] | NeitherCompilerOrResolverSpecified Text
+        [S-8559] | NeitherCompilerOrSnapshotSpecified Text
         [S-5743] | DuplicatePackagesBug
         ~~~
 
@@ -83,7 +83,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Stack.Config.Docker.ConfigDockerException`
 
         ~~~haskell
-        [S-8575] = ResolverNotSupportedException (Maybe Project) (Maybe AbstractResolver)
+        [S-8575] = SnapshotNotSupportedException (Maybe Project) (Maybe AbstractSnapshot)
         ~~~
 
     -   `Stack.Config.Nix.ConfigNixException`
@@ -182,8 +182,8 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-8009] | ConfigFileAlreadyExists FilePath
         [S-5267] | PackageNameInvalid [FilePath]
         [S-1833] | NoMatchingSnapshot (NonEmpty SnapName)
-        [S-6395] | ResolverMismatch RawSnapshotLocation String
-        [S-2422] | ResolverPartial RawSnapshotLocation String
+        [S-6395] | SnapshotMismatch RawSnapshotLocation String
+        [S-2422] | SnapshotPartial RawSnapshotLocation String
         ~~~
 
     -   `Stack.List.ListPrettyException`
@@ -408,7 +408,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-8707] | UserDoesn'tOwnDirectory (Path Abs Dir)
         [S-3605] | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
         [S-6816] | NixRequiresSystemGhc
-        [S-5027] | NoResolverWhenUsingNoProject
+        [S-5027] | NoSnapshotWhenUsingNoProject
         [S-3803] | NoLTSWithMajorVersion Int
         [S-5472] | NoLTSFound
         ~~~
@@ -469,10 +469,10 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-4623] | ComponentNotParsedBug
         ~~~
 
-    -   `Stack.Types.Resolver.TypesResolverException`
+    -   `Stack.Types.Snapshot.TypesSnapshotException`
 
         ~~~haskell
-        [S-8787] = ParseResolverException Text
+        [S-8787] = ParseSnapshotException Text
         [S-4865] | FilepathInDownloadedSnapshot Text
         ~~~
 
@@ -498,7 +498,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Stack.Upgrade.UpgradePrettyException`
 
         ~~~haskell
-        [S-8761] = ResolverOptionInvalid
+        [S-8761] = SnapshotOptionInvalid
         [S-3642] | NeitherBinaryOrSourceSpecified
         [S-8716] | ExecutableFailure
         [S-7114] | CommitsNotFound String String

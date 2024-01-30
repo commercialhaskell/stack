@@ -418,7 +418,7 @@ instance Pretty BuildPrettyException where
                     , case mstack of
                         Nothing -> flow "command line arguments"
                         Just stack -> fillSep
-                          [ flow "resolver setting in"
+                          [ flow "snapshot setting in"
                           , pretty stack
                           ]
                     ]

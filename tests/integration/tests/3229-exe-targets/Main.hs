@@ -16,7 +16,7 @@ main :: IO ()
 main = do
     removeDirIgnore ".stack-work"
     removeFileIgnore "stack.yaml"
-    stack [defaultResolverArg, "init"]
+    stack [defaultSnapshotArg, "init"]
     stack ["build", ":alpha"]
     bracket
         (S.readFile alphaFile)

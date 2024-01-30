@@ -242,10 +242,10 @@ library:
   - Stack.Options.NixParser
   - Stack.Options.PackageParser
   - Stack.Options.PathParser
-  - Stack.Options.ResolverParser
   - Stack.Options.SDistParser
   - Stack.Options.ScriptParser
   - Stack.Options.SetupParser
+  - Stack.Options.SnapshotParser
   - Stack.Options.TestParser
   - Stack.Options.UnpackParser
   - Stack.Options.UpgradeParser
@@ -329,10 +329,10 @@ library:
   - Stack.Types.ProjectAndConfigMonoid
   - Stack.Types.ProjectConfig
   - Stack.Types.PvpBounds
-  - Stack.Types.Resolver
   - Stack.Types.Runner
   - Stack.Types.SCM
   - Stack.Types.SetupInfo
+  - Stack.Types.Snapshot
   - Stack.Types.SourceMap
   - Stack.Types.StackYamlLoc
   - Stack.Types.Storage

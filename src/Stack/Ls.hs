@@ -185,7 +185,7 @@ displayTime snap = [snap.time]
 
 displaySnap :: Snapshot -> [Text]
 displaySnap snap =
-  ["Resolver name: " <> snap.snapId, "\n" <> snap.title <> "\n\n"]
+  ["Snapshot name: " <> snap.snapId, "\n" <> snap.title <> "\n\n"]
 
 displaySingleSnap :: [Snapshot] -> Text
 displaySingleSnap snapshots =

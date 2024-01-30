@@ -12,7 +12,7 @@
 --
 -- There are two relevant data sources for performing this parsing: the project
 -- configuration, and command line arguments. Project configurations includes
--- the resolver (defining a LoadedSnapshot of global and snapshot packages),
+-- the snapshot (defining a LoadedSnapshot of global and snapshot packages),
 -- local dependencies, and project packages. It also defines local flag
 -- overrides.
 --

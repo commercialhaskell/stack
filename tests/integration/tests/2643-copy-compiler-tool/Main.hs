@@ -7,7 +7,7 @@ main = do
   -- init
   removeFileIgnore "stack.yaml"
   removeDirIgnore ".stack-work"
-  stack ["init", defaultResolverArg]
+  stack ["init", defaultSnapshotArg]
 
   -- place to throw some exes
   removeDirIgnore "binny"

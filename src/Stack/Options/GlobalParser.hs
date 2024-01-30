@@ -22,8 +22,8 @@ import qualified Stack.Docker as Docker
 import           Stack.Prelude
 import           Stack.Options.ConfigParser ( configOptsParser )
 import           Stack.Options.LogLevelParser ( logLevelOptsParser )
-import           Stack.Options.ResolverParser
-                   ( abstractResolverOptsParser, compilerOptsParser )
+import           Stack.Options.SnapshotParser
+                   ( abstractSnapshotOptsParser, compilerOptsParser )
 import           Stack.Options.Utils ( GlobalOptsContext (..), hideMods )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.GlobalOptsMonoid ( GlobalOptsMonoid (..) )
@@ -63,10 +63,10 @@ globalOptsParser currentDir kind = GlobalOptsMonoid
         "inclusion of information about build plan construction in logs."
         hide
   <*> configOptsParser currentDir kind
-  <*> optionalFirst (abstractResolverOptsParser hide0)
+  <*> optionalFirst (abstractSnapshotOptsParser hide0)
   <*> pure (First Nothing)
   <*> optionalFirst (compilerOptsParser hide0)
-      -- resolver root is only set via the script command
+      -- snapshot root is only set via the script command
   <*> firstBoolFlagsNoDefault
         "terminal"
         "overriding terminal detection in the case of running in a false \
@@ -104,7 +104,7 @@ globalOptsParser currentDir kind = GlobalOptsMonoid
   <*> optionalFirst (option readLockFileBehavior
         (  long "lock-file"
         <> help "Specify how to interact with lock files. (default: if \
-                \resolver is overridden: read-only; otherwise: read/write)"
+                \snapshot is overridden: read-only; otherwise: read/write)"
         <> hide
         ))
  where
@@ -118,19 +118,19 @@ globalOptsFromMonoid ::
   -> GlobalOptsMonoid
   -> m GlobalOpts
 globalOptsFromMonoid defaultTerminal globalMonoid = do
-  resolver <- for (getFirst globalMonoid.resolver) $ \ur -> do
+  snapshot <- for (getFirst globalMonoid.snapshot) $ \us -> do
     root <-
-      case globalMonoid.resolverRoot of
+      case globalMonoid.snapshotRoot of
         First Nothing -> getCurrentDir
         First (Just dir) -> resolveDir' dir
-    resolvePaths (Just root) ur
+    resolvePaths (Just root) us
   stackYaml <-
     case getFirst globalMonoid.stackYaml of
       Nothing -> pure SYLDefault
       Just fp -> SYLOverride <$> resolveFile' fp
   let lockFileBehavior =
         let defLFB =
-              case getFirst globalMonoid.resolver of
+              case getFirst globalMonoid.snapshot of
                 Nothing -> LFBReadWrite
                 _ -> LFBReadOnly
         in  fromFirst defLFB globalMonoid.lockFileBehavior
@@ -142,7 +142,7 @@ globalOptsFromMonoid defaultTerminal globalMonoid = do
     , rslInLog = fromFirstFalse globalMonoid.rslInLog
     , planInLog = fromFirstFalse globalMonoid.planInLog
     , configMonoid = globalMonoid.configMonoid
-    , resolver
+    , snapshot
     , compiler = getFirst globalMonoid.compiler
     , terminal = fromFirst defaultTerminal globalMonoid.terminal
     , stylesUpdate = globalMonoid.styles

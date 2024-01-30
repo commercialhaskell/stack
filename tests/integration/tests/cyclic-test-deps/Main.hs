@@ -6,5 +6,5 @@ main = do
     stack ["unpack", "text-2.0.2"]
     stack ["unpack", "QuickCheck-2.14.3"]
     removeFileIgnore "stack.yaml"
-    stack ["init", defaultResolverArg]
+    stack ["init", defaultSnapshotArg]
     stack ["test", "--dry-run"]

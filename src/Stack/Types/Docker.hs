@@ -149,7 +149,7 @@ instance Exception DockerException where
     [ "Error: [S-6092]\n"
     , "Could not pull Docker image:\n    "
     , image
-    , "\nThere may not be an image on the registry for your resolver's LTS \
+    , "\nThere may not be an image on the registry for your snapshot's LTS \
       \version in\n"
     , "your configuration file."
     ]

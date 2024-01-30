@@ -12,8 +12,8 @@ import          Stack.Types.BuildOptsMonoid ( BuildOptsMonoid )
 import          Stack.Types.ConfigMonoid ( ConfigMonoid (..) )
 import          Stack.Types.DockerEntrypoint ( DockerEntrypoint )
 import          Stack.Types.LockFileBehavior ( LockFileBehavior )
-import          Stack.Types.Resolver ( AbstractResolver )
 import          Stack.Types.StackYamlLoc ( StackYamlLoc )
+import          Stack.Types.Snapshot ( AbstractSnapshot )
 
 -- | Parsed global command-line options.
 data GlobalOpts = GlobalOpts
@@ -31,7 +31,7 @@ data GlobalOpts = GlobalOpts
     -- build plan in logs.
   , configMonoid :: !ConfigMonoid
     -- ^ Config monoid, for passing into 'loadConfig'
-  , resolver     :: !(Maybe AbstractResolver) -- ^ Resolver override
+  , snapshot     :: !(Maybe AbstractSnapshot) -- ^ Snapshot override
   , compiler     :: !(Maybe WantedCompiler) -- ^ Compiler override
   , terminal     :: !Bool -- ^ We're in a terminal?
   , stylesUpdate :: !StylesUpdate -- ^ SGR (Ansi) codes for styles

@@ -41,7 +41,7 @@ module StackTest
   , isARM
   , isAarch64
   , isMacOSX
-  , defaultResolverArg
+  , defaultSnapshotArg
   , removeFileIgnore
   , removeDirIgnore
   , withCwd
@@ -361,8 +361,8 @@ isMacOSX = os == "darwin"
 -- a global context. The LTS major version here should match that of
 -- the main @stack.yaml@.
 --
-defaultResolverArg :: String
-defaultResolverArg = "--snapshot=lts-22.7"
+defaultSnapshotArg :: String
+defaultSnapshotArg = "--snapshot=lts-22.7"
 
 -- | Remove a file and ignore any warnings about missing files.
 removeFileIgnore :: HasCallStack => FilePath -> IO ()

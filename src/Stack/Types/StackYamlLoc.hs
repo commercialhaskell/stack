@@ -15,7 +15,7 @@ data StackYamlLoc
     -- ^ Use a specific stack.yaml file provided
   | SYLNoProject ![PackageIdentifierRevision]
     -- ^ Do not load up a project, just user configuration. Include
-    -- the given extra dependencies with the resolver.
+    -- the given extra dependencies with the snapshot.
   | SYLGlobalProject
     -- ^ Do not look for a project configuration, and use the implicit global.
   deriving Show

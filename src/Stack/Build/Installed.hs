@@ -158,7 +158,7 @@ loadDatabase installMap db lhs0 = do
            UserPkgDb loc fp -> ", from " <> displayShow (loc, fp) <> ","
       <> " due to"
       <> case reason of
-           UnknownPkg -> " it being unknown to the resolver / extra-deps."
+           UnknownPkg -> " it being unknown to the snapshot or extra-deps."
            WrongLocation db' loc ->
              " wrong location: " <> displayShow (db', loc)
            WrongVersion actual wanted ->

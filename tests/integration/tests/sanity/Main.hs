@@ -21,5 +21,5 @@ main = do
     doesNotExist "stack.yaml"
 
     if isWindows
-        then stack [defaultResolverArg, "exec", "./foo.bat"]
-        else stack [defaultResolverArg, "exec", "./foo.sh"]
+        then stack [defaultSnapshotArg, "exec", "./foo.bat"]
+        else stack [defaultSnapshotArg, "exec", "./foo.sh"]

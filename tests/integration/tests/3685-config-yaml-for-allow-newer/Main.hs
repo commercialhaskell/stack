@@ -9,7 +9,7 @@ planRecommendation = "To ignore all version constraints"
 main :: IO ()
 main = do
   removeFileIgnore "stack.yaml"
-  stack ["init", defaultResolverArg]
+  stack ["init", defaultSnapshotArg]
   -- intero-0.1.23 chosen because it depends on ghc >=7.8 && <8.2.2.
   stackErrStderr ["install", "intero-0.1.23"] (expectMessage planRecommendation)
 

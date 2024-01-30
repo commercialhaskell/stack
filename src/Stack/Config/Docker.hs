@@ -19,28 +19,28 @@ import           Stack.Types.Docker
                    ( DockerOpts (..), DockerMonoidRepoOrImage (..)
                    , DockerOptsMonoid (..), dockerImageArgName
                    )
-import           Stack.Types.Resolver ( AbstractResolver (..) )
+import           Stack.Types.Snapshot ( AbstractSnapshot (..) )
 import           Stack.Types.Version ( IntersectingVersionRange (..) )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Config.Docker" module.
 data ConfigDockerException
-  = ResolverNotSupportedException !(Maybe Project) !(Maybe AbstractResolver)
-  -- ^ Only LTS resolvers are supported for default image tag.
+  = SnapshotNotSupportedException !(Maybe Project) !(Maybe AbstractSnapshot)
+  -- ^ Only LTS snapshots are supported for default image tag.
   deriving (Show, Typeable)
 
 instance Exception ConfigDockerException where
-  displayException (ResolverNotSupportedException mproject maresolver) =
+  displayException (SnapshotNotSupportedException mproject mASnapshot) =
     concat
       [ "Error: [S-8575]\n"
-      , "Resolver not supported for Docker images:\n    "
-      , case (mproject, maresolver) of
-          (Nothing, Nothing) -> "no resolver specified"
-          (_, Just aresolver) ->
-            T.unpack $ utf8BuilderToText $ display aresolver
+      , "Snapshot resolver not supported for Docker images:\n    "
+      , case (mproject, mASnapshot) of
+          (Nothing, Nothing) -> "no snapshot specified"
+          (_, Just aSnapshot) ->
+            T.unpack $ utf8BuilderToText $ display aSnapshot
           (Just project, Nothing) ->
-            T.unpack $ utf8BuilderToText $ display project.resolver
-      , "\nUse an LTS resolver, or set the '"
+            T.unpack $ utf8BuilderToText $ display project.snapshot
+      , "\nUse an LTS snapshot, or set the '"
       , T.unpack dockerImageArgName
       , "' explicitly, in your configuration file."]
 
@@ -49,15 +49,15 @@ addDefaultTag ::
      MonadThrow m
   => String -- ^ base
   -> Maybe Project
-  -> Maybe AbstractResolver
+  -> Maybe AbstractSnapshot
   -> m String
-addDefaultTag base mproject maresolver = do
-  let exc = throwM $ ResolverNotSupportedException mproject maresolver
-  lts <- case maresolver of
-    Just (ARResolver (RSLSynonym lts@(LTS _ _))) -> pure lts
-    Just _aresolver -> exc
+addDefaultTag base mproject mASnapshot = do
+  let exc = throwM $ SnapshotNotSupportedException mproject mASnapshot
+  lts <- case mASnapshot of
+    Just (ASSnapshot (RSLSynonym lts@(LTS _ _))) -> pure lts
+    Just _aSnapshot -> exc
     Nothing ->
-      case (.resolver) <$> mproject of
+      case (.snapshot) <$> mproject of
         Just (RSLSynonym lts@(LTS _ _)) -> pure lts
         _ -> exc
   pure $ base ++ ":" ++ show lts
@@ -66,17 +66,17 @@ addDefaultTag base mproject maresolver = do
 dockerOptsFromMonoid ::
      MonadThrow m
   => Maybe Project
-  -> Maybe AbstractResolver
+  -> Maybe AbstractSnapshot
   -> DockerOptsMonoid
   -> m DockerOpts
-dockerOptsFromMonoid mproject maresolver dockerMonoid = do
+dockerOptsFromMonoid mproject mASnapshot dockerMonoid = do
   let image =
         case getFirst dockerMonoid.repoOrImage of
-          Nothing -> addDefaultTag "fpco/stack-build" mproject maresolver
+          Nothing -> addDefaultTag "fpco/stack-build" mproject mASnapshot
           Just (DockerMonoidImage image') -> pure image'
           Just (DockerMonoidRepo repo) ->
             case find (`elem` (":@" :: String)) repo of
-              Nothing -> addDefaultTag repo mproject maresolver
+              Nothing -> addDefaultTag repo mproject mASnapshot
               -- Repo already specified a tag or digest, so don't append default
               Just _ -> pure repo
   let enable =

@@ -237,7 +237,7 @@ newCmd (newOpts, initOpts) =
     exists <- doesFileExist $ dir </> stackDotYaml
     when (newOpts.init && (initOpts.forceOverwrite || not exists)) $ do
       go <- view globalOptsL
-      initProject dir initOpts go.resolver
+      initProject dir initOpts go.snapshot
 
 -- | Create a new project with the given options.
 new :: HasConfig env => NewOpts -> Bool -> RIO env (Path Abs Dir)

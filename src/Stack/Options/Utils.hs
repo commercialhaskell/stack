@@ -14,8 +14,8 @@ hideMods hide = if hide then internal <> hidden else idm
 
 -- | Allows adjust global options depending on their context
 -- Note: This was being used to remove ambiguity between the local and global
--- implementation of stack init --resolver option. Now that stack init has no
--- local --resolver this is not being used anymore but the code is kept for any
+-- implementation of stack init --snapshot option. Now that stack init has no
+-- local --snapshot this is not being used anymore but the code is kept for any
 -- similar future use cases.
 data GlobalOptsContext
   = OuterGlobalOpts -- ^ Global options before subcommand name

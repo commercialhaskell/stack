@@ -22,7 +22,7 @@ import           Data.Aeson.WarningParser
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Stack.Prelude
 
--- | Nix configuration. Parameterize by resolver type to avoid cyclic
+-- | Nix configuration. Parameterize by snapshot type to avoid cyclic
 -- dependency.
 data NixOpts = NixOpts
   { enable :: !Bool

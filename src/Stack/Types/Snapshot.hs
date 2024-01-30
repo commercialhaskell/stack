@@ -6,9 +6,9 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Stack.Types.Resolver
-  ( AbstractResolver (..)
-  , readAbstractResolver
+module Stack.Types.Snapshot
+  ( AbstractSnapshot (..)
+  , readAbstractSnapshot
   , Snapshots (..)
   ) where
 
@@ -26,16 +26,16 @@ import qualified Options.Applicative.Types as OA
 import           Stack.Prelude
 
 -- | Type representing exceptions thrown by functions exported by the
--- "Stack.Types.Resolver" module.
-data TypesResolverException
-  = ParseResolverException !Text
+-- "Stack.Types.Snapshot" module.
+data TypesSnapshotException
+  = ParseSnapshotException !Text
   | FilepathInDownloadedSnapshot !Text
   deriving (Show, Typeable)
 
-instance Exception TypesResolverException where
-  displayException (ParseResolverException t) = concat
+instance Exception TypesSnapshotException where
+  displayException (ParseSnapshotException t) = concat
     [ "Error: [S-8787]\n"
-    , "Invalid resolver value: "
+    , "Invalid snapshot value: "
     , T.unpack t
     , ". Possible valid values include lts-2.12, nightly-YYYY-MM-DD, \
       \ghc-7.10.2, and ghcjs-0.1.0_ghc-7.10.2. See \
@@ -43,40 +43,40 @@ instance Exception TypesResolverException where
     ]
   displayException (FilepathInDownloadedSnapshot url) = unlines
     [ "Error: [S-4865]"
-    , "Downloaded snapshot specified a 'resolver: { location: filepath }' "
+    , "Downloaded snapshot specified a 'snapshot: { location: filepath }' "
     , "field, but filepaths are not allowed in downloaded snapshots.\n"
     , "Filepath specified: " ++ T.unpack url
     ]
 
--- | Either an actual resolver value, or an abstract description of one (e.g.,
+-- | Either an actual snapshot value, or an abstract description of one (e.g.,
 -- latest nightly).
-data AbstractResolver
-  = ARLatestNightly
-  | ARLatestLTS
-  | ARLatestLTSMajor !Int
-  | ARResolver !RawSnapshotLocation
-  | ARGlobal
+data AbstractSnapshot
+  = ASLatestNightly
+  | ASLatestLTS
+  | ASLatestLTSMajor !Int
+  | ASSnapshot !RawSnapshotLocation
+  | ASGlobal
 
-instance Show AbstractResolver where
+instance Show AbstractSnapshot where
   show = T.unpack . utf8BuilderToText . display
 
-instance Display AbstractResolver where
-  display ARLatestNightly = "nightly"
-  display ARLatestLTS = "lts"
-  display (ARLatestLTSMajor x) = "lts-" <> display x
-  display (ARResolver usl) = display usl
-  display ARGlobal = "global"
+instance Display AbstractSnapshot where
+  display ASLatestNightly = "nightly"
+  display ASLatestLTS = "lts"
+  display (ASLatestLTSMajor x) = "lts-" <> display x
+  display (ASSnapshot usl) = display usl
+  display ASGlobal = "global"
 
-readAbstractResolver :: ReadM (Unresolved AbstractResolver)
-readAbstractResolver = do
+readAbstractSnapshot :: ReadM (Unresolved AbstractSnapshot)
+readAbstractSnapshot = do
   s <- OA.readerAsk
   case s of
-    "global" -> pure $ pure ARGlobal
-    "nightly" -> pure $ pure ARLatestNightly
-    "lts" -> pure $ pure ARLatestLTS
+    "global" -> pure $ pure ASGlobal
+    "nightly" -> pure $ pure ASLatestNightly
+    "lts" -> pure $ pure ASLatestLTS
     'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
-        pure $ pure $ ARLatestLTSMajor x'
-    _ -> pure $ ARResolver <$> parseRawSnapshotLocation (T.pack s)
+        pure $ pure $ ASLatestLTSMajor x'
+    _ -> pure $ ASSnapshot <$> parseRawSnapshotLocation (T.pack s)
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots
