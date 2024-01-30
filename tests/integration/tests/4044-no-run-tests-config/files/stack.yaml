@@ -1,4 +1,5 @@
+snapshot: ghc-9.6.4
+
 build:
   test-arguments:
     no-run-tests: true
-resolver: ghc-9.6.4

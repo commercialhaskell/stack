@@ -1,15 +1,4 @@
-resolver: my-snapshot.yaml
-
-packages:
-- .
-
-extra-deps: []
-
-# Override default flag values for local packages and extra-deps
-flags: {}
-
-# Extra package databases containing global packages
-extra-package-dbs: []
+snapshot: my-snapshot.yaml
 
 package-indices:
 - name: CustomIndex

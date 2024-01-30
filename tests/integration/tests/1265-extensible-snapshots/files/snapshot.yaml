@@ -1,4 +1,4 @@
-resolver: snapshot-2.yaml
+snapshot: snapshot-2.yaml
 name: test-snapshot
 packages:
 - microlens-0.4.3.0

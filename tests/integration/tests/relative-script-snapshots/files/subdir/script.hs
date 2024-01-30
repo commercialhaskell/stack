@@ -1,5 +1,5 @@
 #!/usr/bin/env stack
--- stack --resolver snapshot.yaml script
+-- stack --snapshot snapshot.yaml script
 import Acme.Missiles
 
 main :: IO ()

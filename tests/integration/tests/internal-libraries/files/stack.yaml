@@ -1,4 +1,4 @@
-# This does not work on Windows with resolver: ghc-9.0.2. It fails with:
+# This does not work on Windows with snapshot: ghc-9.0.2. It fails with:
 #
 #   Building foreign library 'baz' for files-0.1.0.0..
 #   [1 of 1] Compiling Baz [flags changed]
@@ -13,8 +13,8 @@
 # refers to Cabal versions before 3.8.
 #
 # Also see https://github.com/haskell/cabal/issues/7763. On macOS (Apple
-# silicon), fails with resolver: ghc-8.10.7 with Cabal error:
+# silicon), fails with snapshot: ghc-8.10.7 with Cabal error:
 # "Cabal-simple_SvXsv1f__3.2.1.0_ghc-8.10.7: Cannot build some foreign libraries:
 # Building foreign libraries is currently only supported on OSX, Linux and
 # Windows"
-resolver: ghc-9.6.4
+snapshot: ghc-9.6.4

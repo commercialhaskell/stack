@@ -83,7 +83,7 @@ main = do
         runDockerContainerWithVolume imageTag volumeName "/app" $
           "stack"
           ++ " --stack-root " ++ "/app"
-          ++ " --resolver nightly-2018-06-05"
+          ++ " --snapshot nightly-2018-06-05"
           ++ " --no-terminal"
           ++ " --install-ghc"
           ++ " test")

@@ -1,6 +1,1 @@
-resolver: lts-22.7
-packages:
-- '.'
-extra-deps: []
-flags: {}
-extra-package-dbs: []
+snapshot: lts-22.7

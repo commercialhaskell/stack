@@ -6,7 +6,7 @@ main = superslow $ do
     -- cleanup previous failing test...
     removeDirIgnore "tmpPackage"
 
-    stack ["new", "--resolver=lts-13.11", "tmpPackage"]
+    stack ["new", "--snapshot=lts-13.11", "tmpPackage"]
 
     -- use a commit which is known to succeed with hadrian binary-dist
     let commitId = "be0dde8e3c27ca56477d1d1801bb77621f3618e1"

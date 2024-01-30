@@ -1,8 +1,6 @@
 # Update the resolver as necessary
-resolver: ghc-8.22
+snapshot: ghc-8.22
 # Do not use the system ghc, as ghc must not be available
 system-ghc: false
 # Do not install any other ghc, as ghc must not be available
 install-ghc: false
-packages:
-- '.'

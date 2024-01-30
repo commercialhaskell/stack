@@ -1,2 +1,2 @@
-resolver: snapshot-modify-lts.yaml
+snapshot: snapshot-modify-lts.yaml
 packages: []
