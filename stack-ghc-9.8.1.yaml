@@ -2,7 +2,7 @@
 # built with GHC 9.8.1.
 
 # GHC 9.8.1
-resolver: nightly-2024-01-26
+snapshot: nightly-2024-01-26
 
 docker:
   enable: false
