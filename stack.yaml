@@ -1,4 +1,4 @@
-resolver: lts-22.7 # GHC 9.6.4
+snapshot: lts-22.7 # GHC 9.6.4
 
 extra-deps:
 # Cabal is pruned because process is a GHC boot package, and has to be specified
