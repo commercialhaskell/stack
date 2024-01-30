@@ -1577,7 +1577,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
               -- apply it. This allows the resolver specified in Hadrian's
               -- stack.yaml file to be overridden.
               args' = maybe args addResolver config.resolver
-              addResolver resolver = "--resolver=" <> show resolver : args
+              addResolver resolver = "--snapshot=" <> show resolver : args
             happy = stack ["install", "happy"]
             alex = stack ["install", "alex"]
             -- Executed in the Stack environment, because GHC is required.
