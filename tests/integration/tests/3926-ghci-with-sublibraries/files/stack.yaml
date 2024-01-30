@@ -1,4 +1,4 @@
-resolver: ghc-9.6.4
+snapshot: ghc-9.6.4
 extra-deps:
 - stm-2.5.1.0
 - mtl-2.2.2

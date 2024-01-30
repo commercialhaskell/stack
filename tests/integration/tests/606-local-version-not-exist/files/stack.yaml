@@ -1,5 +1,1 @@
-flags: {}
-packages:
-- '.'
-extra-deps: []
-resolver: lts-22.7
+snapshot: lts-22.7

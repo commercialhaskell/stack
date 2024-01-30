@@ -16,7 +16,7 @@ main = when False $ do -- skip this test until we start using GHC 8.4.4 or later
         , "-"
         , ghcVer
         ]
-  writeFile "stack.yaml" $ "resolver: ghc-" ++ ghcVer
+  writeFile "stack.yaml" $ "snapshot: ghc-" ++ ghcVer
   bracket_
     (writeFile fp "This is an invalid GHC environment file")
     (removeFile fp) $ do

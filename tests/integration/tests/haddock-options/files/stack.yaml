@@ -1,8 +1,5 @@
-flags: {}
-packages:
-- '.'
-extra-deps: []
-resolver: lts-22.7
+snapshot: lts-22.7
+
 build:
   haddock-arguments:
     haddock-args:

@@ -1,10 +1,7 @@
-resolver: lts-22.7
+snapshot: lts-22.7
 packages:
 - package-with-th
 - package-with-working-th
 - package-with-failing-test
 - subdirs/dependent-on-failing-packages
 - subdirs/failing-in-subdir
-extra-deps: []
-flags: {}
-extra-package-dbs: []

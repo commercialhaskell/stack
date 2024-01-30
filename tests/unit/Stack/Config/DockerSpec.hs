@@ -14,7 +14,7 @@ import Stack.Config.Docker (addDefaultTag)
 spec :: Spec
 spec = do
   describe "addDefaultTag" $ do
-    it "succeeds fails no resolver" $ addDefaultTag "foo/bar" Nothing Nothing `shouldBe` Nothing
+    it "succeeds fails no snapshot resolver" $ addDefaultTag "foo/bar" Nothing Nothing `shouldBe` Nothing
     it "succeeds on LTS" $
       addDefaultTag
         "foo/bar"

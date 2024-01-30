@@ -48,7 +48,7 @@ decodeLocked bs = do
 
 spec :: Spec
 spec = do
-    it "parses lock file (empty with GHC resolver)" $ do
+    it "parses lock file (empty with GHC snapshot)" $ do
         let lockFile :: ByteString
             lockFile =
                 [r|#some
@@ -61,7 +61,7 @@ packages: []
 |]
         pkgImm <- (.pkgImmutableLocations) <$> decodeLocked lockFile
         pkgImm `shouldBe` []
-    it "parses lock file (empty with LTS resolver)" $ do
+    it "parses lock file (empty with LTS snapshot)" $ do
         let lockFile :: ByteString
             lockFile =
                 [r|#some

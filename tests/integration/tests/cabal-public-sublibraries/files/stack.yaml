@@ -1,6 +1,4 @@
-resolver: nightly-2020-01-17
-packages:
-- .
+snapshot: nightly-2020-01-17
 extra-deps:
 - github: snoyberg/filelock
   commit: 4f080496d8bf153fbe26e64d1f52cf73c7db25f6

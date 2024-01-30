@@ -1,4 +1,4 @@
-resolver: snapshot.yaml
+snapshot: snapshot.yaml
 extra-deps:
 # Include a package with a duplicated module name
 - acme-dont-copy

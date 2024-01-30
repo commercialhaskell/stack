@@ -1,4 +1,4 @@
-resolver: lts-10.10
+snapshot: lts-10.10
 
 package-indices:
 - name: Hackage00

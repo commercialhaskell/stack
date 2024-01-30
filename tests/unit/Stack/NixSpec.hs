@@ -32,7 +32,7 @@ import           Test.Hspec ( Spec, around_, beforeAll, describe, it, shouldBe )
 
 sampleConfigNixEnabled :: String
 sampleConfigNixEnabled =
-  "resolver: lts-19.22\n" ++
+  "snapshot: lts-19.22\n" ++
   "packages: ['.']\n" ++
   "system-ghc: true\n" ++
   "nix:\n" ++
@@ -41,7 +41,7 @@ sampleConfigNixEnabled =
 
 sampleConfigNixDisabled :: String
 sampleConfigNixDisabled =
-  "resolver: lts-19.22\n" ++
+  "snapshot: lts-19.22\n" ++
   "packages: ['.']\n" ++
   "nix:\n" ++
   "   enable: False"

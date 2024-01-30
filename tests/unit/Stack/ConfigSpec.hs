@@ -51,12 +51,12 @@ import           Test.Hspec
 
 sampleConfig :: String
 sampleConfig =
-  "resolver: lts-19.22\n" ++
+  "snapshot: lts-19.22\n" ++
   "packages: ['.']\n"
 
 buildOptsConfig :: String
 buildOptsConfig =
-  "resolver: lts-19.22\n" ++
+  "snapshot: lts-19.22\n" ++
   "packages: ['.']\n" ++
   "build:\n" ++
   "  library-profiling: true\n" ++
@@ -83,7 +83,7 @@ buildOptsConfig =
 
 hpackConfig :: String
 hpackConfig =
-  "resolver: lts-19.22\n" ++
+  "snapshot: lts-19.22\n" ++
   "with-hpack: /usr/local/bin/hpack\n" ++
   "packages: ['.']\n"
 
@@ -150,11 +150,11 @@ spec = beforeAll setup $ do
 
     it "parses snapshot using 'resolver'" $ inTempDir $ do
       loadProject resolverConfig $ \project ->
-        project.resolver `shouldBe` RSLSynonym (LTS 19 22)
+        project.snapshot `shouldBe` RSLSynonym (LTS 19 22)
 
     it "parses snapshot using 'snapshot'" $ inTempDir $ do
       loadProject snapshotConfig $ \project ->
-        project.resolver `shouldBe` RSLSynonym (LTS 19 22)
+        project.snapshot `shouldBe` RSLSynonym (LTS 19 22)
 
     it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
       loadProject resolverSnapshotConfig (const (pure ()))
@@ -248,7 +248,7 @@ spec = beforeAll setup $ do
             packageYaml =
               childRel </> either impureThrow id (parseRelFile "package.yaml")
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
-        writeFile (toFilePath yamlAbs) "resolver: ghc-9.0"
+        writeFile (toFilePath yamlAbs) "snapshot: ghc-9.0"
         writeFile (toFilePath packageYaml) "name: foo"
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $
           loadConfig' $ \config -> liftIO $ do

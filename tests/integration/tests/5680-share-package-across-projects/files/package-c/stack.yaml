@@ -1,3 +1,1 @@
-resolver: lts-22.7
-packages:
-- .
+snapshot: lts-22.7

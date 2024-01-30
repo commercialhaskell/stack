@@ -1,4 +1,4 @@
 # As of 20 August 2023, there is no Nix package haskell.compiler.ghc946.
 # Available options include ghc92 (GHC 9.2.8), ghc926, ghc927,
 # ghc94 (GHC 9.4.5), ghc942, ghc943 or ghc944.
-resolver: lts-20.26 # GHC 9.2.8
+snapshot: lts-20.26 # GHC 9.2.8
