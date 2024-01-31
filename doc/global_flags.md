@@ -172,17 +172,8 @@ it, it is best omitted from the debug output.
 
 ## `--resolver` option
 
-Pass the option `--resolver <snapshot>` to specify the snapshot. For further
-information, see the
-[YAML configuration](yaml_configuration.md#snapshot) documentation.
-
-At the command line (only):
-
-*   `--resolver lts-<major_version>` specifies the latest Stackage LTS Haskell
-    snapshot with the specified major version;
-*   `--resolver lts` specifies, from those with the greatest major version, the
-    latest Stackage LTS Haskell snapshot; and
-*   `--resolver nightly` specifies the most recent Stackage Nightly snapshot.
+A synonym for the [`--snapshot` option](#snapshot-option) to specify the
+snapshot resolver.
 
 ## `--[no-]rsl-in-log` flag
 
@@ -222,6 +213,22 @@ Default: Disabled
 Enables/disables the skipping of installing MSYS2. For further information, see
 the documentation for the corresponding non-project specific configuration
 [option](yaml_configuration.md#skip-msys).
+
+## `--snapshot` option
+
+:octicons-tag-24: UNRELEASED
+
+Pass the option `--snapshot <snapshot>` to specify the snapshot. For further
+information, see the [YAML configuration](yaml_configuration.md#snapshot)
+documentation.
+
+At the command line (only):
+
+*   `--snapshot lts-<major_version>` specifies the latest Stackage LTS Haskell
+    snapshot with the specified major version;
+*   `--snapshot lts` specifies, from those with the greatest major version, the
+    latest Stackage LTS Haskell snapshot; and
+*   `--snapshot nightly` specifies the most recent Stackage Nightly snapshot.
 
 ## `--stack-colors` or `--stack-colours` options
 
