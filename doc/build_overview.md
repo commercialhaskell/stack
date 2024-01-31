@@ -59,7 +59,7 @@ Given these inputs, Stack attempts the following process when performing a build
 
 This file is parsed to provide the following config values:
 
-* `resolver` (required field)
+* `snapshot` (or, alternatively, `resolver`) (required field)
 * `compiler` (optional field)
 * `packages` (optional field, defaults to `["."]`)
 * `extra-deps` (optional field, defaults to `[]`)
@@ -72,10 +72,10 @@ in CLI).
 
 ## Wanted compiler, dependencies, and project packages
 
-* If the `--resolver` CLI is present, ignore the `resolver` and
+* If the `--resolver` CLI is present, ignore the `snapshot` (or `resolver`) and
   `compiler` config values
-* Load up the snapshot indicated by the `resolver` (either config
-  value or CLI arg). This will provide:
+* Load up the indicated snapshot (either config value or CLI arg). This will
+  provide:
     * A map from package name to package location, flags, GHC options,
       and if a package should be hidden. All package locations here
       are immutable.

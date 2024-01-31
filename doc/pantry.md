@@ -6,7 +6,9 @@
 
 This document describes:
 
-* the specification of a snapshot location (in the `resolver` key)
+* the specification of a snapshot location (in the
+  [`snapshot`](yaml_configuration.md#snapshot) or
+  [`resolver`](yaml_configuration.md#resolver) key)
 * the specification of a package location (in the `extra-deps` key and in a
   snapshot)
 
@@ -25,20 +27,20 @@ There are essentially four different ways of specifying a snapshot location:
     for example:
 
     ~~~yaml
-    resolver: ghc-8.6.5`
+    snapshot: ghc-8.6.5`
     ~~~
 
 2.  Via a URL pointing to a snapshot configuration file, for example:
 
     ~~~yaml
-    resolver: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2018/8/21.yaml`
+    snapshot: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2018/8/21.yaml`
     ~~~
 
 3.  Via a local file path pointing to a snapshot configuration file, for
     example:
 
     ~~~yaml
-    resolver: my-local-snapshot.yaml
+    snapshot: my-local-snapshot.yaml
     ~~~
 
 4.  Via a _convenience synonym_, which provides a short form for some common
@@ -74,7 +76,7 @@ For safer, more reproducible builds, you can optionally specify a URL
 together with a cryptographic hash of its content. For example:
 
 ~~~yaml
-resolver:
+snapshot:
   url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/12/0.yaml
   size: 499143
   sha256: 781ea577595dff08b9c8794761ba1321020e3e1ec3297fb833fe951cce1bee11

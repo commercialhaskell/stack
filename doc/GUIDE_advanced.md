@@ -59,7 +59,7 @@ Stack's commands are listed below, in alphabetical order.
 * [`repl`](ghci.md) - a synonym for `stack ghci`
 * [`run`](run_command.md) - build and run an executable
 * [`runghc`](runghc_command.md) - run `runghc`
-* [`runhaskell`](runghc_command.md) - a synoynm for `stack runghc`
+* [`runhaskell`](runghc_command.md) - a synonym for `stack runghc`
 * [`script`](script_command.md) - run a Haskell source file as a script
 * [`sdist`](sdist_command.md) - create an archive file for a package, in a form
   accepted by Hackage
