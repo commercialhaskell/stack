@@ -89,6 +89,7 @@ Other enhancements:
 * Add option `--filter <item>` to Stack's `ls dependencies text` command to
   filter out an item from the results, if present. The item can be `$locals` for
   all local packages.
+* Add option `--snapshot` as synonym for `--resolver`.
 
 Bug fixes:
 

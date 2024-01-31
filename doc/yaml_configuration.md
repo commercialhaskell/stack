@@ -95,7 +95,9 @@ snapshot.
 
 ### snapshot
 
-Command line equivalent (takes precedence): `--resolver` option
+Command line equivalent (takes precedence):
+[`--snapshot`](global_flags.md#snapshot-option) or
+[`--resolver`](global_flags.md#resolver-option) option
 
 The `snapshot` key specifies which snapshot is to be used for this project. A
 snapshot defines a GHC version, a number of packages available for installation,

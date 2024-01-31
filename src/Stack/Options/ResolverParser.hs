@@ -15,12 +15,13 @@ import           Stack.Options.Utils ( hideMods )
 import           Stack.Prelude
 import           Stack.Types.Resolver ( AbstractResolver, readAbstractResolver )
 
--- | Parser for the resolver
+-- | Parser for the snapshot
 abstractResolverOptsParser :: Bool -> Parser (Unresolved AbstractResolver)
 abstractResolverOptsParser hide = option readAbstractResolver
-  (  long "resolver"
-  <> metavar "RESOLVER"
-  <> help "Override resolver in project file."
+  (  long "snapshot"
+  <> long "resolver"
+  <> metavar "SNAPSHOT"
+  <> help "Override snapshot in the project configuration file."
   <> hideMods hide
   )
 
