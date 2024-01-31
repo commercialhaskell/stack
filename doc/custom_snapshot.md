@@ -6,8 +6,9 @@
 
 Snapshots provide a list of packages to use, along with flags, GHC options, and
 a few other settings. Snapshots may extend any other snapshot that can be
-specified in a `resolver` or `snapshot` key. The packages specified follow the
-same syntax for dependencies in Stack's project-level configuration files.
+specified in a [`snapshot`](yaml_configuration.md#snapshot) or
+[`resolver`](yaml_configuration.md#resolver) key. The packages specified follow
+the same syntax for dependencies in Stack's project-level configuration files.
 Unlike the `extra-deps` key, however, no support for local directories is
 available in snapshots to ensure reproducibility.
 
@@ -17,8 +18,8 @@ available in snapshots to ensure reproducibility.
     snapshot specification.
 
 ~~~yaml
-resolver: lts-22.7 # Inherits GHC version and package set
-compiler: ghc-9.6.3 # Overwrites GHC version in the resolver, optional
+snapshot: lts-22.7 # Inherits GHC version and package set
+compiler: ghc-9.6.3 # Overwrites GHC version in the snapshot, optional
 
 # Additional packages, follows extra-deps syntax
 packages:
@@ -50,7 +51,7 @@ If you put this in a `snapshot.yaml` file in the same directory as your project,
 you can now use the snapshot like this:
 
 ~~~yaml
-resolver: snapshot.yaml
+snapshot: snapshot.yaml
 ~~~
 
 This is an example of a custom snapshot stored in the filesystem. They are
@@ -65,7 +66,7 @@ The following snapshot specification will be identical to `lts-22.7`, but
 instead use `ghc-9.6.3` instead of `ghc-9.6.4`:
 
 ~~~yaml
-resolver: lts-22.7
+snapshot: lts-22.7
 compiler: ghc-9.6.3
 ~~~
 
@@ -77,7 +78,7 @@ the packages that depend on `text` to be unbuildable, but they will still be
 present in the snapshot.
 
 ~~~yaml
-resolver: lts-22.7
+snapshot: lts-22.7
 drop-packages:
 - text
 ~~~
@@ -89,7 +90,7 @@ The following snapshot specification will be identical to `lts-22.7`, but the
 the import parser in the script command.
 
 ~~~yaml
-resolver: lts-22.7
+snapshot: lts-22.7
 hidden:
 - text
 ~~~
@@ -103,7 +104,7 @@ The following snapshot specification will be identical to `lts-22.7`, but
 provides `-O1` as a ghc-option for `text`:
 
 ~~~yaml
-resolver: lts-22.7
+snapshot: lts-22.7
 packages:
 - text-2.0.2
 ghc-options:
@@ -126,7 +127,7 @@ following snapshot specification will be identical to `lts-22.7`, but
 it enables the `developer` Cabal flag:
 
 ~~~yaml
-resolver: lts-22.7
+snapshot: lts-22.7
 packages:
 - text-2.0.2
 flags:

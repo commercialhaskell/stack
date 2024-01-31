@@ -174,7 +174,7 @@ it, it is best omitted from the debug output.
 
 Pass the option `--resolver <snapshot>` to specify the snapshot. For further
 information, see the
-[YAML configuration](yaml_configuration.md#resolver-or-snapshot) documentation.
+[YAML configuration](yaml_configuration.md#snapshot) documentation.
 
 At the command line (only):
 

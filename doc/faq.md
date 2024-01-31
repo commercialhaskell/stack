@@ -9,11 +9,11 @@ here is to be as helpful and concise as possible.
 ## What version of GHC is used when I run something like `stack ghci`?
 
 The version of GHC, as well as which packages can be installed, are specified by
-the _resolver_. This may be something like `lts-22.7`, which is from
+the _snapshot_. This may be something like `lts-22.7`, which is from
 [Stackage](https://www.stackage.org/). The [user's guide](GUIDE.md) discusses
-the resolver in more detail.
+the snapshot in more detail.
 
-The resolver is determined by finding the relevant project-level configuration
+The snapshot is determined by finding the relevant project-level configuration
 file (`stack.yaml`) for the directory you're running the command from. This
 essentially works by:
 
@@ -76,7 +76,7 @@ You can make tweaks to a snapshot by modifying the `extra-deps` configuration
 value in your `stack.yaml` file, e.g.:
 
 ~~~yaml
-resolver: lts-22.7
+snapshot: lts-22.7
 packages:
 - .
 extra-deps:
@@ -91,7 +91,7 @@ Add it to the
 directory where your `stack.yaml` file lives, e.g.
 
 ~~~yaml
-resolver: lts-22.7
+snapshot: lts-22.7
 packages:
 - .
 extra-deps:
@@ -216,8 +216,9 @@ If you would like Stack to use your system GHC installation, use the
 suitable GHC by default.
 
 Stack can only use a system GHC installation if its version is compatible with
-the configuration of the current project, particularly the
-[`resolver` or `snapshot`](yaml_configuration.md#resolver-or-snapshot) setting.
+the configuration of the current project, particularly the snapshot specified by
+the [`snapshot`](yaml_configuration.md#snapshot) or
+[`resolver`](yaml_configuration.md#resolver) key.
 
 GHC installation doesn't work for all operating systems, so in some cases you
 will need to use `system-ghc` and install GHC yourself.
@@ -246,8 +247,8 @@ dependencies, in particular [Alex](https://hackage.haskell.org/package/alex) and
 
 !!! note
 
-    This works when using LTS or nightly resolvers, not with GHC or custom
-    resolvers. You can manually install build tools by running, e.g.,
+    This works when using LTS or nightly snapshots, not with GHC or custom
+    snapshots. You can manually install build tools by running, e.g.,
     `stack build alex happy`.
 
 ## How does Stack choose which snapshot to use when creating a new configuration file?
@@ -625,7 +626,7 @@ by modifying a global setting:
 ~~~
 
 **Note that we're fixing `ghc-8.2.2` in this case; repeat for other versions as necessary.**
-You should apply this fix for the version of GHC that matches your resolver.
+You should apply this fix for the version of GHC that matches your snapshot.
 
 Issue [#4009](https://github.com/commercialhaskell/stack/issues/4009) goes into
 further detail.

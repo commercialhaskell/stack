@@ -73,9 +73,9 @@ enabled). For further information about these options, see the `install-ghc`
 [documentation](yaml_configuration.md#install-ghc) and the `system-ghc`
 [documentation](yaml_configuration.md#system-ghc).
 
-For this workaround to work, each time that a resolver is used that references a
+For this workaround to work, each time that a snapshot is used that references a
 different version of GHC, then GHCup must be used to install it (if GHCup has
-not already installed that version). For example, to use `resolver: lts-22.7`
+not already installed that version). For example, to use `snapshot: lts-22.7`
 (GHC 9.6.4), the command `ghcup install ghc 9.6.4` must have been used to
 install GHC 9.6.4. That may be a minor inconvenience for some people, as one the
 primary benefits of Stack over other Haskell build tools has been that Stack

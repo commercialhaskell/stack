@@ -41,13 +41,14 @@ they are created and updated.
 Relevant to this discussion, Stack's project-level configuration file
 (`stack.yaml`) specifies:
 
-* the parent snapshot (`resolver` or `snapshot`)
+* the parent snapshot (the [`snapshot`](yaml_configuration.md#snapshot) or
+  [`resolver`](yaml_configuration.md#resolver) key)
 * extra-deps
 
 Some of this information can be incomplete. Consider this `stack.yaml` file:
 
 ~~~yaml
-resolver: lts-19.22
+snapshot: lts-19.22
 packages:
 - .
 extra-deps:
@@ -71,7 +72,7 @@ Haskell LTS snapshots never change, there's nothing that prohibits that from
 happening. Instead, the complete version of that key is:
 
 ~~~yaml
-resolver:
+snapshot:
 - url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/22.yaml
   size: 619399
   sha256: 5098594e71bdefe0c13e9e6236f12e3414ef91a2b89b029fd30e8fc8087f3a07

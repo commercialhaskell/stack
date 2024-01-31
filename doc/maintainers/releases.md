@@ -150,87 +150,79 @@ branch.
 
 ### D: In the release candidate branch
 
-Review documentation for any changes that need to be made:
+1.  Review documentation for any changes that need to be made:
 
-* Ensure all the documentation pages are listed in the `mkdocs.yaml` file. Use
-  `git diff --stat origin/stable..HEAD doc/` to look for new or deleted files.
-* Any new documentation pages should have the "may not be correct for
-  the released version of Stack" warning at the top.
-* Search for old Stack version, unstable Stack version, and the next "obvious"
-  possible versions in sequence, and `UNRELEASED` and replace with next release
-  version (`X.Y.1`, where Y is odd).
+    *   Ensure all the documentation pages are listed in the `mkdocs.yaml` file.
+        Use `git diff --stat origin/stable..HEAD doc/` to look for new or
+        deleted files.
+    *   Any new documentation pages should have the "may not be correct for the
+        released version of Stack" warning at the top.
+    *   Search for old Stack version, unstable Stack version, and the next
+        "obvious" possible versions in sequence, and `UNRELEASED` and replace
+        with next release version (`X.Y.1`, where Y is odd).
 
-    !!! attention
+        !!! attention
 
-        Do **NOT** update the repository's issue and pull request templates (in
-        the `.github` directory)to point at the new release version yet!
+            Do **NOT** update the repository's issue and pull request templates
+            (in the `.github` directory) to point at the new release version
+            yet!
 
-* Search for old resolvers, set to latest resolver (e.g. in `doc/GUIDE.md` where
-  it references the "currently the latest LTS")
-* Look for any links to "latest" (`latest/`) documentation, replace with
-  version tag
+    *   Search for old snapshot resolvers, set to latest snapshot (e.g. in
+        `doc/GUIDE.md` where it references the "currently the latest LTS")
+    *   Look for any links to "latest" (`latest/`) documentation, replace with
+        version tag
 
-Check for any platform entries that need to be added to (or removed from):
+2.  Check for any platform entries that need to be added to (or removed from):
 
-* [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
-* [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
-* [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh),
-* [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md),
-  and
-* `get.haskellstack.org` redirects.
+    * [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
+    * [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
+    * [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh),
+    * [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md),
+      and
+    * `get.haskellstack.org` redirects.
 
-### E: For the first release candidate
+3.  Re-do the pre-release checks (see the section above).
 
-1.  Re-do the pre-release checks (see the section above).
-2.  `package.yaml`: bump to first odd patchlevel version (e.g. `X.Y.0.1`).
+4.  Update `package.yaml` and `ChangeLog.md`. This step differs between a first,
+    second etc release candidate and a final release.
 
-    !!! attention
+    === "First RC"
 
-        Be sure to update also `stack.cabal` (for example by using
-        `stack build --dry-run`).
+        *   `package.yaml`: bump to first odd patchlevel version (e.g.
+            `X.Y.0.1`).
 
-3.  `ChangeLog.md`: Rename the “Unreleased changes” section to the same version
-    as `package.yaml`, and mark it clearly as a release candidate (e.g.
-    `vX.Y.0.1 (release candidate)`). Remove any empty sections.
-4.  Ensure the `stack` constraint in `cabal.config` is set to `==X.Y.0.1`.
-5.  Follow the steps in the *Release process* section below that apply to a
-    release candidate.
+        *   `ChangeLog.md`: Rename the “Unreleased changes” section to the same
+            version as `package.yaml`, and mark it clearly as a release
+            candidate (e.g. `vX.Y.0.1 (release candidate)`). Remove any empty
+            sections.
 
-### F: For any subsequent release candidates
+    === "Second, third etc RC"
 
-1.  Re-do the pre-release checks (see the section above).
-2.  `package.yaml`: bump to next odd patchlevel version (e.g. `X.Y.0.3`).
+        *   `package.yaml`: bump to next odd patchlevel version (e.g.
+            `X.Y.0.3`).
 
-    !!! attention
+        *   `ChangeLog.md`: Rename the “Unreleased changes” section to the same
+            version as `package.yaml`, and mark it clearly as a release
+            candidate (e.g. `vX.Y.0.3 (release candidate)`). Remove any empty
+            sections.
 
-        Be sure to update also `stack.cabal` (for example by using
-        `stack build --dry-run`).
+    === "Final Release"
 
-3.  `ChangeLog.md`: Rename the "Unreleased changes" section to the new version,
-    clearly marked as a release candidate (e.g. `vX.Y.0.3 (release candidate)`).
-    Remove any empty sections.
-4.  Ensure the `stack` constraint in `cabal.config` is set to the same version
-    as in `package.yaml`.
-5.  Follow the steps in the *Release process* section below that apply to a
-    release candidate.
+        *   `package.yaml`: bump version to odd last component and no patchlevel
+            (e.g. from `X.Y.0.2` to `X.Y.1`).
 
-### G: For the final release
-
-1.  Re-do the pre-release checks (see the section above).
-2.  `package.yaml`: bump version to odd last component and no patchlevel
-    (e.g. from `X.Y.0.2` to `X.Y.1`).
+        *   `ChangeLog.md`: consolidate all the release candidate changes into a
+            single section for the final release version.
 
     !!! attention
 
-        Be sure to update also `stack.cabal` (for example by using
-        `stack build --dry-run`).
+        After updating `package.yaml`, be sure to update also `stack.cabal` (for
+        example by using `stack build --dry-run`).
 
-3.  `ChangeLog.md`: consolidate all the release candidate changes into a single
-    section for the final release version.
-4.  Ensure the `stack` constraint in `cabal.config` is set to the same version
-    as in `package.yaml` (e.g. to `==X.Y.1`).
-5.  Follow all of the steps in the *Release process* section below that apply to
-    a final release.
+5.  Ensure the `stack ==` constraint in `cabal.config` is set to be equal to the
+    same version as `package.yaml`.
+
+6.  Follow the steps in the *Release process* section below that apply.
 
 ## Release process
 
@@ -367,7 +359,16 @@ final release.
         Bug fixes:
         ~~~
 
-    ### F: Announce the release candidate
+    ### F: Request update of GHCup's metadata
+
+    Raise a pull request at the
+    [`haskell/ghcup-metadata`](https://github.com/haskell/ghcup-metadata) GitHub
+    repository to request an addition to GHCup's latest metadata configuration
+    file for prereleases, tagged as the latest prerelease. In the metadata,
+    change the tags for any past Stack prereleases to indicate that they are no
+    longer the latest prerelease.
+
+    ### G: Announce the release candidate
 
     Announce the release candidate to the following mailing lists
 
@@ -641,7 +642,17 @@ final release.
     The repository's issue and pull request templates are the `.github`
     directory. Update them to refer to the new release version (`X.Y.Z`).
 
-    ### J: Announce the release
+    ### J: Request update of GHCup's metadata
+
+    Raise a pull request at the
+    [`haskell/ghcup-metadata`](https://github.com/haskell/ghcup-metadata) GitHub
+    repository to request an addition to GHCup's latest metadata configuration
+    files for releases and 'vanilla' releases, tagged as the latest release.
+    (The GHCup project will decide whether, and when, to recommend the release.)
+    In the metadata, change the tags for any past Stack releases to indicate
+    that they are no longer the latest release.
+
+    ### K: Announce the release
 
     Announce the release to the following mailing lists
 
