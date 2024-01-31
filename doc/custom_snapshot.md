@@ -14,8 +14,8 @@ available in snapshots to ensure reproducibility.
 
 !!! info
 
-    Stack uses the [Pantry](https://hackage.haskell.org/package/pantry) for
-    snapshot specification.
+    Stack uses the [Pantry](https://hackage.haskell.org/package/pantry) library
+    for snapshot specification.
 
 ~~~yaml
 snapshot: lts-22.7 # Inherits GHC version and package set
