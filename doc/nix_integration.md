@@ -122,7 +122,7 @@ above to use Nix flakes. The `flake.nix` file is:
 
         hPkgs =
           pkgs.haskell.packages."ghc8107"; # need to match Stackage LTS version
-                                           # from stack.yaml resolver
+                                           # from stack.yaml snapshot resolver
 
         myDevTools = [
           hPkgs.ghc # GHC compiler in the desired version (will be available on PATH)
@@ -180,8 +180,8 @@ precisely the same package set.
 Nix integration will instruct Stack to build inside a local build environment.
 That environment will also download and use a
 [GHC Nix package](https://search.nixos.org/packages?query=haskell.compiler.ghc)
-matching the required version of the configured
-[Stack resolver](yaml_configuration.md#resolver-or-snapshot).
+matching the required version of the configured Stack
+[snapshot](yaml_configuration.md#snapshot).
 
 Enabling Nix integration means that packages will always be built using the
 local GHC from Nix inside your shell, rather than your globally installed system

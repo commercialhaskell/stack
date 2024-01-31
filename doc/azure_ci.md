@@ -28,7 +28,7 @@ We provide two fully baked configuration ready to be used on your projects:
 * The complex Azure configuration is intended for projects that need to support
   multiple GHC versions and multiple operating systems, such as open source
   libraries to be released to Hackage. It tests against Stack for different
-  resolvers on Linux, macOS and Windows. These are the files for the complex
+  snapshots on Linux, macOS and Windows. These are the files for the complex
   configuration:
   - [azure-pipelines.yml](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/azure/azure-pipelines.yml)
     : This is the starter file used by the Azure CI.
@@ -132,7 +132,7 @@ But we only use the first method of using Stack to download GHC.
 
 For different GHC versions, you probably want to use different project-level
 configuration files (`stack.yaml`). If you don't want to put a specific
-`stack.yaml` for a particular resolver and still want to test it, you have
+`stack.yaml` for a particular snapshot and still want to test it, you have
 specify your resolver argument in `ARGS` environment variable (you will see an
 example below).
 

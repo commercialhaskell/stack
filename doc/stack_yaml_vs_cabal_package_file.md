@@ -43,7 +43,7 @@ There is a one-to-one correspondence between a package and a Cabal file.
 
 Stack defines a new concept called a _project_. A project has:
 
-* A _resolver_, which tells it about a snapshot (more on this later)
+* A snapshot _resolver_ (more on this later)
 * Extra dependencies on top of the snapshot
 * Optionally, one or more local Cabal packages
 * Flag and GHC options configurations
@@ -55,7 +55,7 @@ confusion can be why you need to specify it both in the `stack.yaml` file _and_
 in the Cabal file. To explain, let's take a quick detour to talk about snapshots
 and how Stack resolves dependencies.
 
-## Resolvers and snapshots
+## Snapshots and resolvers
 
 Stack follows a rule that says, for any projects, there is precisely one version
 of each package available. Obviously, for many packages there are _many_
@@ -65,16 +65,18 @@ requires that you have chosen a specific version for each package available.
 The most common means by which this set of packages is defined is via a
 snapshot provided by Stackage. For example, if you go to the page
 <https://www.stackage.org/lts-21.13>, you will see a list of 3,010 packages at
-specific version numbers. When you then specify `resolver: lts-21.13`, you're
-telling Stack to use those package versions in resolving dependencies down to
-specific versions of packages.
+specific version numbers. When you then specify `snapshot: lts-21.13` or,
+alternatively, `resolver: lts-21.13`, you're telling Stack to use those package
+versions in resolving dependencies down to specific versions of packages.
 
 Sometimes a snapshot doesn't have all of the packages that you want. Or you want
 a different version of a package. Or you want to work on a local modification of
 a package. In all of those cases, you can add more configuration data to your
-`stack.yaml` file to override the values it received from your `resolver`
-setting. At the end of the day, each of your projects will end up with some way
-of resolving a package name into a specific version of that package.
+`stack.yaml` file to override the values it received from your
+[`snapshot`](yaml_configuration.md#snapshot) or
+[`resolver`](yaml_configuration.md#resolver) setting. At the end of the day,
+each of your projects will end up with some way of resolving a package name into
+a specific version of that package.
 
 ## Why specify dependencies twice?
 

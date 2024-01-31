@@ -105,7 +105,7 @@ container).
 
 The first time you run a command with a new image, you will be prompted to run
 `stack docker pull` to pull the image first. This will pull a Docker
-image with a tag that matches your resolver. Only LTS resolvers are supported
+image with a tag that matches your snapshot. Only LTS snapshots are supported
 (we do not generate images for nightly snapshots).  Not every LTS version is
 guaranteed to have an image existing, and new LTS images tend to lag behind
 the LTS snapshot being published on stackage.org.  Be warned: these images are

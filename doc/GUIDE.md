@@ -37,8 +37,8 @@ learning style.
 
 To build your project, Stack uses a project-level configuration file, named
 `stack.yaml`, in the root directory of your project as a sort of blueprint. That
-file contains a reference, called a __resolver__, to the snapshot which your
-package will be built against.
+file contains a reference to the snapshot (also known as a __resolver__) which
+your package will be built against.
 
 Finally, Stack is __isolated__: it will not make changes outside of specific
 Stack directories. Stack-built files generally go in either the Stack root
@@ -253,12 +253,13 @@ packages:
 - .
 ~~~
 
-The value of the `resolver` key tells Stack *how* to build your package: which
-GHC version to use, versions of package dependencies, and so on. Our value here
-says to use [LTS Haskell 21.13](https://www.stackage.org/lts-21.13), which
-implies GHC 9.4.7 (which is why `stack build` installs that version of GHC if it
-is not already available to Stack). There are a number of values you can use for
-`resolver`, which we'll cover later.
+The value of the [`resolver`](yaml_configuration.md#resolver) key tells Stack
+*how* to build your package: which GHC version to use, versions of package
+dependencies, and so on. Our value here says to use
+[LTS Haskell 21.13](https://www.stackage.org/lts-21.13), which implies GHC 9.4.7
+(which is why `stack build` installs that version of GHC if it is not already
+available to Stack). There are a number of values you can use for `resolver`,
+which we'll cover later.
 
 The value of the `packages` key tells Stack which local packages to build. In
 our simple example, we have only a single package in our project, located in the
@@ -479,7 +480,7 @@ This brings us to the next major topic in using Stack.
 ## Curated package sets
 
 Remember above when `stack new` selected some
-[LTS resolver](https://github.com/commercialhaskell/lts-haskell#readme) for us?
+[LTS snapshot](https://github.com/commercialhaskell/lts-haskell#readme) for us?
 That defined our build plan and available packages. When we tried using the
 `text` package, it just worked, because it was part of the LTS *package set*.
 
@@ -489,22 +490,21 @@ failed.
 
 To add `acme-missiles` to the available packages, we'll use the `extra-deps` key
 in the `stack.yaml` file. That key defines extra packages, not present in the
-resolver, that will be needed as dependencies. You can add this like so:
+snapshot, that will be needed as dependencies. You can add this like so:
 
 ~~~yaml
 extra-deps:
-- acme-missiles-0.3 # not in the LTS resolver
+- acme-missiles-0.3 # not in the LTS snapshot
 ~~~
 
 Now `stack build` will succeed.
 
 With that out of the way, let's dig a little bit more into these package sets,
-also known as *snapshots*. We mentioned the LTS resolvers, and you can get quite
+also known as *snapshots*. We mentioned the LTS snapshots, and you can get quite
 a bit of information about it at
 [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate resolver value (`resolver: lts-21.13`, as is currently the
-  latest LTS)
+* The appropriate value (`lts-21.13`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -520,12 +520,12 @@ about them on the
 If you're not sure which to use, start with LTS Haskell (which Stack will lean
 towards by default as well).
 
-## Resolvers and changing your compiler version
+## Snapshots and changing your compiler version
 
 Let's explore package sets a bit further. Instead of `lts-21.13`, let's change
 our `stack.yaml` file to use the
 [latest nightly](https://www.stackage.org/nightly). Right now, this is currently
-2023-09-24 - please see the resolver from the link above to get the latest.
+2023-09-24 - please see the snapshot from the link above to get the latest.
 
 Then, commanding `stack build` again will produce:
 
@@ -535,7 +535,7 @@ stack build
 # build output ...
 ~~~
 
-We can also change resolvers on the command line, which can be useful in a
+We can also change snapshots on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example, command:
 
 ~~~text
@@ -545,7 +545,7 @@ stack --resolver lts-20.26 build
 ~~~
 
 When passed on the command line, you also get some additional "short-cut"
-versions of resolvers: `--resolver nightly` will use the newest Nightly resolver
+versions of snapshots: `--resolver nightly` will use the newest Nightly snapshot
 available, `--resolver lts` will use the newest LTS, and `--resolver lts-21`
 will use the newest LTS in the 21.x series. The reason these are only available
 on the command line and not in your `stack.yaml` file is that using them:
@@ -569,9 +569,9 @@ This succeeds, automatically installing the necessary GHC along the way. So, we
 see that different LTS versions use different GHC versions and Stack can handle
 that.
 
-### Other resolver values
+### Other snapshot values
 
-We've mentioned `nightly-YYYY-MM-DD` and `lts-X.Y` values for the resolver.
+We've mentioned `nightly-YYYY-MM-DD` and `lts-X.Y` values for the snapshot.
 There are actually other options available, and the list will grow over time.
 At the time of writing:
 
@@ -579,7 +579,7 @@ At the time of writing:
 * Experimental custom snapshot support
 
 The most up-to-date information can always be found in the
-[stack.yaml documentation](yaml_configuration.md#resolver).
+[stack.yaml documentation](yaml_configuration.md#snapshot).
 
 ## Existing projects
 
@@ -664,7 +664,7 @@ commented out under the `packages` field. In case wrong packages are excluded
 you can uncomment the right one and comment the other one.
 
 Packages may get excluded due to conflicting requirements among user packages or
-due to conflicting requirements between a user package and the resolver
+due to conflicting requirements between a user package and the snapshot
 compiler. If all of the packages have a conflict with the compiler then all of
 them may get commented out.
 
@@ -672,15 +672,15 @@ When packages are commented out you will see a warning every time you run a
 command which needs the configuration file. The warning can be disabled by
 editing the configuration file and removing it.
 
-#### Using a specific resolver
+#### Using a specific snapshot
 
-Sometimes you may want to use a specific resolver for your project instead of
+Sometimes you may want to use a specific snapshot for your project instead of
 `stack init` picking one for you. You can do that by using
-`stack init --resolver <resolver>`.
+`stack init --resolver <snapshot>`.
 
-You can also init with a compiler resolver if you do not want to use a snapshot.
-That will result in all of your project's dependencies being put under the
-`extra-deps` section.
+You can also init with a compiler snapshot if you do not want to use a
+Stackage snapshot. That will result in all of your project's dependencies being
+put under the `extra-deps` section.
 
 #### Installing the compiler
 
@@ -1416,8 +1416,7 @@ specified locations, the *implicit global* logic kicks in. You've probably
 noticed that phrase a few times in the output from commands above. Implicit
 global is essentially a hack to allow Stack to be useful in a non-project
 setting. When no implicit global configuration file exists, Stack creates one
-for you with the latest LTS snapshot as the resolver. This allows you to do
-things like:
+for you with the latest LTS snapshot. This allows you to do things like:
 
 * compile individual files easily with `stack ghc`
 * build executables without starting a project, e.g. `stack install pandoc`

@@ -91,34 +91,36 @@ Shadowing semantics, described
 applied to your configuration. So, if you add a package to your `packages` list,
 it will be used even if you're using a snapshot that specifies a particular
 version. Similarly, `extra-deps` will shadow the version specified in the
-resolver.
+snapshot.
 
-### resolver or snapshot
+### snapshot
 
 Command line equivalent (takes precedence): `--resolver` option
 
-`resolver` and `snapshot` are synonyms. Only one of these keys is permitted, not
-both.
+The `snapshot` key specifies which snapshot is to be used for this project. A
+snapshot defines a GHC version, a number of packages available for installation,
+and various settings like build flags. It is also called a resolver since a
+snapshot states how dependencies are resolved. There are currently four snapshot
+types:
 
-The `resolver` or `snapshot` key specifies which snapshot is to be used for this
-project. A snapshot defines a GHC version, a number of packages available for
-installation, and various settings like build flags. It is called a resolver
-since a snapshot states how dependencies are resolved. There are currently
-four resolver types:
-
-* LTS Haskell snapshots, e.g. `resolver: lts-21.13`
-* Stackage Nightly snapshots, e.g. `resolver: nightly-2023-09-24`
+* LTS Haskell snapshots, e.g. `snapshot: lts-21.13`
+* Stackage Nightly snapshots, e.g. `snapshot: nightly-2023-09-24`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
-  like `resolver: ghc-9.6.2`
+  like `snapshot: ghc-9.6.2`
 * Custom snapshot, via a URL or relative file path. For further information, see
-  the [Pantry](pantry.md) documentation.
+  the [snapshot and package location](pantry.md) documentation.
 
-Each of these resolvers will also determine what constraints are placed on the
+Each of these snapshots will also determine what constraints are placed on the
 compiler version. See the [compiler-check](#compiler-check) option for some
 additional control over compiler version.
 
-The `resolver` key corresponds to a Pantry snapshot location. For further
-information, see the [Pantry](pantry.md) documentation.
+The `snapshot` key specifies a snapshot location. For further information, see
+the [snapshot and package location](pantry.md) documentation.
+
+### resolver
+
+`resolver` and [`snapshot`](#snapshot) are synonyms. Only one of these keys is
+permitted, not both.
 
 ### packages
 
@@ -152,7 +154,7 @@ searched for Cabal files. A subdirectory has to be specified as an independent
 item in the list of packages.
 
 A project package is different from a dependency, both a snapshot dependency
-(via the [`resolver` or `snapshot`](#resolver-or-snapshot) key) and an
+(via the [`snapshot`](#snapshot) or [`resolver`](#resolver) key) and an
 extra-deps dependency (via the [`extra-deps`](#extra-deps) key). For example:
 
 * a project package will be built by default by commanding
@@ -166,9 +168,9 @@ extra-deps dependency (via the [`extra-deps`](#extra-deps) key). For example:
 Default: `[]`
 
 The `extra-deps` key specifies a list of extra dependencies on top of what is
-defined in the snapshot (specified by the
-[`resolver` or `snapshot`](#resolver-or-snapshot) key). A dependency may come
-from either a Pantry package location or a local file path.
+defined in the snapshot (specified by the [`snapshot`](#snapshot) or
+[`resolver`](#resolver) key). A dependency may come from either a Pantry package
+location or a local file path.
 
 A Pantry package location is one or three different kinds of sources:
 
@@ -259,8 +261,9 @@ then the snapshot package will automatically be promoted to be an extra-dep.
 
 Default: `[]`
 
-Packages which, when present in the snapshot specified in `resolver`, should not
-be included in our package. This can be used for a few different purposes, e.g.:
+Packages which, when present in the snapshot specified in the
+[`snapshot`](#snapshot) or [`resolver`](#resolver) key, should not be included
+in our package. This can be used for a few different purposes, e.g.:
 
 * Ensure that packages you don't want used in your project cannot be used in a
   `package.yaml` file (e.g., for license reasons)
@@ -619,13 +622,13 @@ files, the American spelling is the alternative that has priority.)
 
 Command line equivalent (takes precedence): `--compiler` option
 
-Overrides the compiler version in the resolver. Note that the `compiler-check`
+Overrides the compiler version in the snapshot. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
 resolvers like `ghc-9.6.2`. This can be used to override the
 compiler for a Stackage snapshot, like this:
 
 ~~~yaml
-resolver: lts-21.13
+snapshot: lts-21.13
 compiler: ghc-9.6.2
 compiler-check: match-exact
 ~~~
@@ -677,7 +680,7 @@ fully managed by Stack.
 
 !!! note
 
-    For some commit IDs, the resolver specified in `hadrian/stack.yaml`
+    For some commit IDs, the snapshot specified in `hadrian/stack.yaml`
     specifies a version of GHC that cannot be used to build GHC. This results in
     GHC's `configure` script reporting messages similar to the following before
     aborting:
@@ -687,11 +690,11 @@ fully managed by Stack.
     configure: error: GHC version 9.2 or later is required to compile GHC.
     ~~~
 
-    The resolution is: (1) to specify an alternative resolver (one that
+    The resolution is: (1) to specify an alternative snapshot (one that
     specifies a sufficiently recent version of GHC) on the command line, using
-    Stack's option `--resolver <resolver>`. Stack will use that resolver when
+    Stack's option `--resolver <snapshot>`. Stack will use that snapshot when
     running GHC's `configure` script; and (2) to set the contents of the `STACK`
-    environment variable to be `stack --resolver <resolver>`. Hadrian's
+    environment variable to be `stack --resolver <snapshot>`. Hadrian's
     `build-stack` script wil refer to that environment variable for the Stack
     command it uses.
 
@@ -765,7 +768,7 @@ be able to find versions of those packages (on Hackage, etc.) that are
 compatible with the compiler.
 
 The easiest way to deal with this issue is to drop the offending packages as
-follows. Instead of using the packages specified in the resolver, the global
+follows. Instead of using the packages specified in the snapshot, the global
 packages bundled with GHC will be used.
 
 ~~~yaml
@@ -793,14 +796,14 @@ extra-deps:
 
 Default: `match-minor`
 
-Specifies how the compiler version in the resolver is matched against concrete
+Specifies how the compiler version in the snapshot is matched against concrete
 versions. Valid values:
 
 * `match-minor`: make sure that the first three components match, but allow
   patch-level differences. For example< 7.8.4.1 and 7.8.4.2 would both match
   7.8.4. This is useful to allow for custom patch levels of a compiler.
 * `match-exact`: the entire version number must match precisely
-* `newer-minor`: the third component can be increased, e.g. if your resolver is
+* `newer-minor`: the third component can be increased, e.g. if your snapshot is
   `ghc-7.10.1`, then 7.10.2 will also be allowed. This was the default up
   through Stack 0.1.3
 
