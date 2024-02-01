@@ -95,7 +95,7 @@ Known bug:
 
 ## The `stack config set snapshot` command
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 ~~~text
 stack config set snapshot SNAPSHOT
