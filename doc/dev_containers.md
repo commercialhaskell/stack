@@ -90,24 +90,6 @@ repository to develop online.
     For use with GitHub Codespaces, follow the instructions at
     [Creating a codespace for a repository](https://docs.github.com/en/codespaces/developing-in-codespaces/creating-a-codespace-for-a-repository#creating-a-codespace-for-a-repository).
 
-### Persistence
-
-Data in the following locations is persisted:
-
-1. The user's home directory (`/home/vscode` or, for the root user, `/root`).
-   Use with Docker/Podman in *rootless mode*.
-2. The Dev Container's workspace (`/workspaces`)
-
-This is accomplished via either a *volume* or *bind mount* (or *loop device*
-on Codespaces) and is preconfigured.
-
-!!! info
-
-    The VS Code Command Palette command
-    ['Codespaces: Full Rebuild Container'](https://docs.github.com/en/codespaces/developing-in-codespaces/rebuilding-the-container-in-a-codespace#rebuilding-a-container)
-    resets the home directory. This is never necessary unless you want exactly
-    that.
-
 ## Build Stack
 
 Stack can be built with Stack (which is recommended) or with Cabal (the tool).
