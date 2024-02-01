@@ -45,16 +45,6 @@
 
   // Set 'remoteUser' to 'root' to connect as root instead.
   "remoteUser": "vscode",
-  "mounts": [
-    "source=stack-ghc-9.8.1-home-vscode,target=/home/vscode,type=volume"
-    // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.8.1-home-vscode,target=/home/vscode,type=bind"
-  ],
-
-  // "remoteUser": "root",
-  // "mounts": [
-  //   "source=stack-ghc-9.8.1-root,target=/root,type=volume"
-  //   // "source=${localWorkspaceFolder}/.devcontainer/bind-mounts/stack-ghc-9.8.1-root,target=/root,type=bind"
-  // ],
 
   "remoteEnv": {
     // Pip: Install packages to the user site
