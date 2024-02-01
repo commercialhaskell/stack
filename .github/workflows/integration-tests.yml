@@ -16,7 +16,7 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 16 December 2023, ubuntu-latest, windows-latest and macos-latest come
+# As of 1 February 2024, ubuntu-latest, windows-latest and macos-latest come
 # with Stack 2.13.1 and GHC 9.8.1. windows-latest comes with NSIS 3.08, for
 # which the default value of the 'Unicode' installer attribute is 'true'.
 # However, that is not the 'large strings' build of NSIS and creates installers
@@ -42,16 +42,16 @@ jobs:
           cache-bust: "2024-01-20"
     steps:
     - name: Clone project
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Cache dependencies on Unix-like OS
       if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
     - name: Cache dependencies on Windows
       if: startsWith(runner.os, 'Windows')
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~\AppData\Roaming\stack
@@ -144,7 +144,7 @@ jobs:
         stack etc/scripts/release.hs build ${{ matrix.release-args }}
 
     - name: Upload bindist
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ runner.os }}
         path: _release/stack-*
@@ -186,7 +186,7 @@ jobs:
         echo '::notice title=ARM64 skipped::To build ARM64, a self-hosted runner needs to be configured and the SELF_HOSTED_RUNNERS secret must contain arm64'
     - name: Clone project
       if: needs.configuration.outputs.test-arm64 == 'true'
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Install deps
       shell: bash
       run: |
@@ -217,7 +217,7 @@ jobs:
 
     - name: Upload bindist
       if: needs.configuration.outputs.test-arm64 == 'true'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Linux-ARM64
         path: _release/stack-*
@@ -234,23 +234,23 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
     - name: Download Linux artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: Linux
         path: _release
     - name: Download macOS artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: macOS
         path: _release
     - name: Download Windows artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: Windows
         path: _release
     - name: Download Linux-ARM64 artifact
       if: needs.configuration.outputs.test-arm64 == 'true'
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: Linux-ARM64
         path: _release
@@ -270,7 +270,7 @@ jobs:
     - name: Create GitHub release (final)
       id: github_release_final
       if: "!startsWith(github.ref, 'refs/tags/rc/')"
-      uses: ncipollo/release-action@v1.10.0
+      uses: ncipollo/release-action@v1.13.0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -289,7 +289,7 @@ jobs:
     - name: Create GitHub release (release candidate)
       id: github_release_rc
       if: "startsWith(github.ref, 'refs/tags/rc/')"
-      uses: ncipollo/release-action@v1.10.0
+      uses: ncipollo/release-action@v1.13.0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:

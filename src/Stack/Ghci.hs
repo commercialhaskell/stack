@@ -621,7 +621,7 @@ writeMacrosFile ::
   -> [GhciPkgInfo]
   -> RIO env [String]
 writeMacrosFile outputDirectory pkgs = do
-  fps <- fmap (nubOrd . catMaybes . concat) $
+  fps <- fmap (nubOrd . concatMap catMaybes) $
     forM pkgs $ \pkg -> forM pkg.opts $ \(_, bio) -> do
       let cabalMacros = bio.cabalMacros
       exists <- liftIO $ doesFileExist cabalMacros

@@ -11,10 +11,10 @@ jobs:
 
     steps:
     - name: Clone project
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
@@ -23,7 +23,7 @@ jobs:
       run: |
         git clone https://github.com/kowainik/stan.git
         cd stan
-        stack --compiler ghc-9.6.4 --local-bin-path ../.bin install
+        stack --local-bin-path ../.bin install
         cd ..
 
     - name: Generate .hie for analysis
@@ -33,7 +33,7 @@ jobs:
       run: .bin/stan report --cabal-file-path=stack.cabal
 
     - name: Upload HTML report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Stan_report
         path: stan.html
