@@ -83,7 +83,7 @@ resolveGlobFiles ::
   -> [String]
   -> RIO GetPackageFileContext (Set (Path Abs File))
 resolveGlobFiles cabalFileVersion =
-  fmap (S.fromList . catMaybes . concat) . mapM resolve
+  fmap (S.fromList . concatMap catMaybes) . mapM resolve
  where
   resolve name =
     if '*' `elem` name

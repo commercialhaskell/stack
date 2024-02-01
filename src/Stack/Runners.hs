@@ -255,7 +255,7 @@ shouldUpgradeCheck = do
   config <- ask
   when config.recommendUpgrade $ do
     now <- getCurrentTime
-    let yesterday = addUTCTime (-24 * 60 * 60) now
+    let yesterday = addUTCTime (-(24 * 60 * 60)) now
     checks <- upgradeChecksSince yesterday
     when (checks == 0) $ do
       mversion <- getLatestHackageVersion NoRequireHackageIndex "stack" UsePreferredVersions

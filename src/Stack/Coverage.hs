@@ -524,7 +524,7 @@ generateHpcMarkupIndex = do
   let outputFile = outputDir </> relFileIndexHtml
   ensureDir outputDir
   (dirs, _) <- listDir outputDir
-  rows <- fmap (catMaybes . concat) $ forM dirs $ \dir -> do
+  rows <- fmap (concatMap catMaybes) $ forM dirs $ \dir -> do
     (subdirs, _) <- listDir dir
     forM subdirs $ \subdir -> do
       let indexPath = subdir </> relFileHpcIndexHtml
