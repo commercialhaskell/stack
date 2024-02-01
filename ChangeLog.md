@@ -92,6 +92,8 @@ Other enhancements:
   filter out an item from the results, if present. The item can be `$locals` for
   all local packages.
 * Add option `--snapshot` as synonym for `--resolver`.
+* Add the `config set snapshot` command, corresponding to the
+  `config set resolver` command.
 
 Bug fixes:
 

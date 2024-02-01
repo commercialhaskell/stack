@@ -64,7 +64,8 @@ instance Exception ConfigCmdException where
     ++ "'config' command used when no project configuration available."
 
 data ConfigCmdSet
-  = ConfigCmdSetResolver !(Unresolved AbstractResolver)
+  = ConfigCmdSetSnapshot !(Unresolved AbstractResolver)
+  | ConfigCmdSetResolver !(Unresolved AbstractResolver)
   | ConfigCmdSetSystemGhc !CommandScope !Bool
   | ConfigCmdSetInstallGhc !CommandScope !Bool
   | ConfigCmdSetDownloadPrefix !CommandScope !Text
@@ -77,6 +78,7 @@ data CommandScope
     -- ^ Apply changes to the project @stack.yaml@.
 
 configCmdSetScope :: ConfigCmdSet -> CommandScope
+configCmdSetScope (ConfigCmdSetSnapshot _) = CommandScopeProject
 configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
 configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
@@ -224,18 +226,27 @@ cfgCmdSetValue ::
      (HasConfig env, HasGHCVariant env)
   => Path Abs Dir -- ^ root directory of project
   -> ConfigCmdSet -> RIO env Yaml.Value
-cfgCmdSetValue root (ConfigCmdSetResolver newResolver) = do
-  newResolver' <- resolvePaths (Just root) newResolver
-  concreteResolver <- makeConcreteResolver newResolver'
-  -- Check that the snapshot actually exists
-  void $ loadSnapshot =<< completeSnapshotLocation concreteResolver
-  pure (Yaml.toJSON concreteResolver)
+cfgCmdSetValue root (ConfigCmdSetSnapshot newSnapshot) =
+  snapshotValue root newSnapshot
+cfgCmdSetValue root (ConfigCmdSetResolver newSnapshot) =
+  snapshotValue root newSnapshot
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') = pure $ Yaml.Bool bool'
 cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool') = pure $ Yaml.Bool bool'
 cfgCmdSetValue _ (ConfigCmdSetDownloadPrefix _ url) = pure $ Yaml.String url
 
+snapshotValue ::
+     HasConfig env
+  => Path Abs Dir -- ^ root directory of project
+  -> Unresolved AbstractResolver -> RIO env Yaml.Value
+snapshotValue root snapshot = do
+  snapshot' <- resolvePaths (Just root) snapshot
+  concreteSnapshot <- makeConcreteResolver snapshot'
+  -- Check that the snapshot actually exists
+  void $ loadSnapshot =<< completeSnapshotLocation concreteSnapshot
+  pure (Yaml.toJSON concreteSnapshot)
 
 cfgCmdSetKeys :: ConfigCmdSet -> NonEmpty Text
+cfgCmdSetKeys (ConfigCmdSetSnapshot _) = ["snapshot"]
 cfgCmdSetKeys (ConfigCmdSetResolver _) = ["resolver"]
 cfgCmdSetKeys (ConfigCmdSetSystemGhc _ _) = [configMonoidSystemGHCName]
 cfgCmdSetKeys (ConfigCmdSetInstallGhc _ _) = [configMonoidInstallGHCName]
@@ -255,15 +266,24 @@ configCmdSetParser :: OA.Parser ConfigCmdSet
 configCmdSetParser =
   OA.hsubparser $
     mconcat
-      [ OA.command "resolver"
+      [ OA.command "snapshot"
+          ( OA.info
+              (   ConfigCmdSetSnapshot
+              <$> OA.argument
+                    readAbstractResolver
+                    (  OA.metavar "SNAPSHOT"
+                    <> OA.help "E.g. \"nightly\" or \"lts-22.8\"" ))
+              ( OA.progDesc
+                  "Change the snapshot of the current project." ))
+      , OA.command "resolver"
           ( OA.info
               (   ConfigCmdSetResolver
               <$> OA.argument
                     readAbstractResolver
                     (  OA.metavar "SNAPSHOT"
-                    <> OA.help "E.g. \"nightly\" or \"lts-7.2\"" ))
+                    <> OA.help "E.g. \"nightly\" or \"lts-22.8\"" ))
               ( OA.progDesc
-                  "Change the resolver of the current project." ))
+                  "Change the resolver key of the current project." ))
       , OA.command (T.unpack configMonoidSystemGHCName)
           ( OA.info
               (   ConfigCmdSetSystemGhc
