@@ -72,7 +72,7 @@
     - MultiWayIf
     - NoFieldSelectors
     - OverloadedLists
-      # Provided from GHC 9.2.1 (base-4.16.0.0):
+    # Provided from GHC 9.2.1 (base-4.16.0.0):
     - OverloadedRecordDot
     - OverloadedStrings
     - QuasiQuotes
