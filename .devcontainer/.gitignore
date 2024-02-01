@@ -4,8 +4,6 @@
 !/assets/cradles/
 !/assets/cradles/cabal/
 !/assets/cradles/stack/
-!/backups/
-!/bind-mounts/
 !/conf/
 !/conf/shell/
 !/conf/shell/var/
@@ -33,4 +31,3 @@
 !/README.md
 
 !.gitignore
-!.keep
