@@ -11,7 +11,7 @@ main = do
   for_ ["lts-20.26", "lts-22.7"] $ \snapshot -> do
     stack ["init", "--force", "--snapshot", snapshot]
     str <- readFile "stack.yaml"
-    case mapMaybe (stripPrefix "snapshot: ") $ lines str of
+    case mapMaybe (stripPrefix "resolver: ") $ lines str of
       [x] ->
         if filter (/= '\r') x == snapshot
           then pure ()
