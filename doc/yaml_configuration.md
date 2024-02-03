@@ -518,10 +518,8 @@ Default:
 build:
   library-profiling: false
   executable-profiling: false
-  copy-bins: false
-  prefetch: false
-  keep-going: false
-  keep-tmp-files: false
+  library-stripping: true
+  executable-stripping: true
   # NOTE: global usage of haddock can cause build failures when documentation is
   # incorrectly formatted.  This could also affect scripts which use Stack.
   haddock: false
@@ -532,9 +530,15 @@ build:
   open-haddocks: false # --open
   haddock-deps: false # if unspecified, defaults to true if haddock is set
   haddock-internal: false
+  copy-bins: false
+  copy-compiler-tool: false
+  prefetch: false
+  keep-going: false
+  keep-tmp-files: false
 
   # These are inadvisable to use in your global configuration, as they make the
   # Stack build command line behave quite differently.
+  force-dirty: false
   test: false
   test-arguments:
     rerun-tests: true   # Rerun successful tests
@@ -548,10 +552,11 @@ build:
     benchmark-arguments: ""
     # benchmark-arguments: "--csv bench.csv"
     no-run-benchmarks: false
-  force-dirty: false
   reconfigure: false
+  cabal-verbosity: normal
   cabal-verbose: false
   split-objs: false
+  skip-components: [] # --skip
 
   # Since 1.8. Starting with 2.0, the default is true
   interleaved-output: true
