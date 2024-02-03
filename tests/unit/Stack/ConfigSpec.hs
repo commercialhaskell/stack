@@ -29,8 +29,10 @@ import           Stack.Prelude
 import           Stack.Runners ( withBuildConfig, withRunnerGlobal )
 import           Stack.Types.BuildConfig ( BuildConfig (..), projectRootL )
 import           Stack.Types.BuildOpts
-                   ( BenchmarkOpts (..), BuildOpts (..), TestOpts (..) )
-import           Stack.Types.BuildOptsMonoid ( CabalVerbosity (..) )
+                   ( BenchmarkOpts (..), BuildOpts (..), HaddockOpts (..)
+                   , TestOpts (..)
+                   )
+import           Stack.Types.BuildOptsMonoid ( CabalVerbosity (..), ProgressBarFormat (NoBar) )
 import           Stack.Types.Config ( Config (..) )
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )
@@ -51,23 +53,33 @@ import           Test.Hspec
 
 sampleConfig :: String
 sampleConfig =
-  "snapshot: lts-19.22\n" ++
+  "snapshot: lts-22.7\n" ++
   "packages: ['.']\n"
 
 buildOptsConfig :: String
 buildOptsConfig =
-  "snapshot: lts-19.22\n" ++
+  "snapshot: lts-22.7\n" ++
   "packages: ['.']\n" ++
   "build:\n" ++
   "  library-profiling: true\n" ++
   "  executable-profiling: true\n" ++
+  "  library-stripping: false\n" ++
+  "  executable-stripping: false\n" ++
   "  haddock: true\n" ++
+  "  haddock-arguments:\n" ++
+  "    haddock-args:\n" ++
+  "    - \"--css=/home/user/my-css\"\n" ++
+  "  open-haddocks: true\n" ++
   "  haddock-deps: true\n" ++
+  "  haddock-internal: true\n" ++
+  "  haddock-hyperlink-source: false\n" ++
+  "  haddock-for-hackage: false\n" ++
   "  copy-bins: true\n" ++
+  "  copy-compiler-tool: true\n" ++
   "  prefetch: true\n" ++
-  "  force-dirty: true\n" ++
   "  keep-going: true\n" ++
   "  keep-tmp-files: true\n" ++
+  "  force-dirty: true\n" ++
   "  test: true\n" ++
   "  test-arguments:\n" ++
   "    rerun-tests: true\n" ++
@@ -79,28 +91,47 @@ buildOptsConfig =
   "    benchmark-arguments: -O2\n" ++
   "    no-run-benchmarks: true\n" ++
   "  reconfigure: true\n" ++
-  "  cabal-verbose: true\n"
+  "  cabal-verbosity: verbose\n" ++
+  "  cabal-verbose: true\n" ++
+  "  split-objs: true\n" ++
+  "  skip-components: ['my-test']\n" ++
+  "  interleaved-output: false\n" ++
+  "  progress-bar: none\n" ++
+  "  ddump-dir: my-ddump-dir\n"
+
+buildOptsHaddockForHackageConfig :: String
+buildOptsHaddockForHackageConfig =
+  "snapshot: lts-22.7\n" ++
+  "packages: ['.']\n" ++
+  "build:\n" ++
+  "  haddock: true\n" ++
+  "  open-haddocks: true\n" ++
+  "  haddock-deps: true\n" ++
+  "  haddock-internal: true\n" ++
+  "  haddock-hyperlink-source: false\n" ++
+  "  haddock-for-hackage: true\n" ++
+  "  force-dirty: false\n"
 
 hpackConfig :: String
 hpackConfig =
-  "snapshot: lts-19.22\n" ++
+  "snapshot: lts-22.7\n" ++
   "with-hpack: /usr/local/bin/hpack\n" ++
   "packages: ['.']\n"
 
 resolverConfig :: String
 resolverConfig =
-  "resolver: lts-19.22\n" ++
+  "resolver: lts-22.7\n" ++
   "packages: ['.']\n"
 
 snapshotConfig :: String
 snapshotConfig =
-  "snapshot: lts-19.22\n" ++
+  "snapshot: lts-22.7\n" ++
   "packages: ['.']\n"
 
 resolverSnapshotConfig :: String
 resolverSnapshotConfig =
-  "resolver: lts-19.22\n" ++
-  "snapshot: lts-19.22\n" ++
+  "resolver: lts-22.7\n" ++
+  "snapshot: lts-22.7\n" ++
   "packages: ['.']\n"
 
 stackDotYaml :: Path Rel File
@@ -150,11 +181,11 @@ spec = beforeAll setup $ do
 
     it "parses snapshot using 'resolver'" $ inTempDir $ do
       loadProject resolverConfig $ \project ->
-        project.resolver `shouldBe` RSLSynonym (LTS 19 22)
+        project.resolver `shouldBe` RSLSynonym (LTS 22 7)
 
     it "parses snapshot using 'snapshot'" $ inTempDir $ do
       loadProject snapshotConfig $ \project ->
-        project.resolver `shouldBe` RSLSynonym (LTS 19 22)
+        project.resolver `shouldBe` RSLSynonym (LTS 22 7)
 
     it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
       loadProject resolverSnapshotConfig (const (pure ()))
@@ -188,34 +219,61 @@ spec = beforeAll setup $ do
         liftIO $ configOverrideHpack config `shouldBe` HpackBundled
 
     it "parses build config options" $ inTempDir $ do
-     writeFile (toFilePath stackDotYaml) buildOptsConfig
-     loadConfig' $ \config -> liftIO $ do
-      let bopts = config.build
-      bopts.libProfile `shouldBe` True
-      bopts.exeProfile `shouldBe` True
-      bopts.buildHaddocks `shouldBe` True
-      bopts.haddockDeps `shouldBe` Just True
-      bopts.installExes `shouldBe` True
-      bopts.preFetch `shouldBe` True
-      bopts.keepGoing `shouldBe` Just True
-      bopts.keepTmpFiles `shouldBe` True
-      bopts.forceDirty `shouldBe` True
-      bopts.tests `shouldBe` True
-      bopts.testOpts `shouldBe` TestOpts
-        { rerunTests = True
-        , additionalArgs = ["-fprof"]
-        , coverage = True
-        , disableRun = True
-        , maximumTimeSeconds = Nothing
-        , allowStdin = True
-        }
-      bopts.benchmarks `shouldBe` True
-      bopts.benchmarkOpts `shouldBe` BenchmarkOpts
-         { additionalArgs = Just "-O2"
-         , disableRun = True
-         }
-      bopts.reconfigure `shouldBe` True
-      bopts.cabalVerbose `shouldBe` CabalVerbosity verbose
+      writeFile (toFilePath stackDotYaml) buildOptsConfig
+      loadConfig' $ \config -> liftIO $ do
+        let bopts = config.build
+        bopts.libProfile `shouldBe` True
+        bopts.exeProfile `shouldBe` True
+        bopts.libStrip `shouldBe` False
+        bopts.exeStrip `shouldBe` False
+        bopts.buildHaddocks `shouldBe` True
+        bopts.haddockOpts `shouldBe` HaddockOpts
+          { additionalArgs = ["--css=/home/user/my-css"]
+          }
+        bopts.openHaddocks `shouldBe` True
+        bopts.haddockDeps `shouldBe` Just True
+        bopts.haddockInternal `shouldBe` True
+        bopts.haddockHyperlinkSource `shouldBe` False
+        bopts.haddockForHackage `shouldBe` False
+        bopts.installExes `shouldBe` True
+        bopts.installCompilerTool `shouldBe` True
+        bopts.preFetch `shouldBe` True
+        bopts.keepGoing `shouldBe` Just True
+        bopts.keepTmpFiles `shouldBe` True
+        bopts.forceDirty `shouldBe` True
+        bopts.tests `shouldBe` True
+        bopts.testOpts `shouldBe` TestOpts
+          { rerunTests = True
+          , additionalArgs = ["-fprof"]
+          , coverage = True
+          , disableRun = True
+          , maximumTimeSeconds = Nothing
+          , allowStdin = True
+          }
+        bopts.benchmarks `shouldBe` True
+        bopts.benchmarkOpts `shouldBe` BenchmarkOpts
+           { additionalArgs = Just "-O2"
+           , disableRun = True
+           }
+        bopts.reconfigure `shouldBe` True
+        bopts.cabalVerbose `shouldBe` CabalVerbosity verbose
+        bopts.splitObjs `shouldBe` True
+        bopts.skipComponents `shouldBe` ["my-test"]
+        bopts.interleavedOutput `shouldBe` False
+        bopts.progressBar `shouldBe` NoBar
+        bopts.ddumpDir `shouldBe` Just "my-ddump-dir"
+
+    it "parses build config options with haddock-for-hackage" $ inTempDir $ do
+      writeFile (toFilePath stackDotYaml) buildOptsHaddockForHackageConfig
+      loadConfig' $ \config -> liftIO $ do
+        let bopts = config.build
+        bopts.buildHaddocks `shouldBe` True
+        bopts.openHaddocks `shouldBe` False
+        bopts.haddockDeps `shouldBe` Nothing
+        bopts.haddockInternal `shouldBe` False
+        bopts.haddockHyperlinkSource `shouldBe` True
+        bopts.haddockForHackage `shouldBe` True
+        bopts.forceDirty `shouldBe` True
 
     it "finds the config file in a parent directory" $ inTempDir $ do
       writeFile "package.yaml" "name: foo"
@@ -248,7 +306,7 @@ spec = beforeAll setup $ do
             packageYaml =
               childRel </> either impureThrow id (parseRelFile "package.yaml")
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
-        writeFile (toFilePath yamlAbs) "snapshot: ghc-9.0"
+        writeFile (toFilePath yamlAbs) "snapshot: ghc-9.6.4"
         writeFile (toFilePath packageYaml) "name: foo"
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $
           loadConfig' $ \config -> liftIO $ do
