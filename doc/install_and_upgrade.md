@@ -4,7 +4,10 @@
 
 ## Install Stack
 
-Stack can be installed on most Linux distributions, macOS and Windows.
+Stack can be installed on most Linux distributions, macOS and Windows. It will
+require at least about 5 GB of disk space, of which about 3 GB is for a single
+version of GHC and about 2 GB is for Stack's local copy of the Hackage package
+index.
 
 Stack is open to supporting more operating systems. To request support for an
 operating system, please submit an

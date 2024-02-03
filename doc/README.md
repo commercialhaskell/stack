@@ -21,7 +21,8 @@ Stack features:
 ## How to install Stack
 
 Stack can be installed on most Unix-like operating systems (including macOS) and
-Windows.
+Windows. It will require at least about 5 GB of disk space, for use with one
+version of GHC.
 
 !!! info
 
