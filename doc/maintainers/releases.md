@@ -272,14 +272,13 @@ final release.
     The
     [Integration Tests workflow](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22)
     is limited to the platforms supported by the GitHub-hosted runners
-    (currently, only x86_64) and any self-hosted runners (currently, only
-    Linux/AArch64). However, it is possible to edit the GitHub release to
-    include binary distributions for other platforms (for example,
-    macOS/AArch64). The prerequisites are:
+    (currently, x86_64 and macOS/AArch64) and any self-hosted runners
+    (currently, only Linux/AArch64). However, it is possible to edit the GitHub
+    release to include binary distributions for other platforms. The
+    prerequisites are:
 
     * a computer with that platform (operating system, machine architecture);
-    * a sufficiently-recent existing version of Stack for that platform (for
-      example, GHCup has published versions of Stack for macOS/AArch64);
+    * a sufficiently-recent existing version of Stack for that platform;
     * a tool to print SHA checksums, such as `shasum` on Linux and macOS; and
     * the GNU Privacy Guard tool (`gpg`), which has had imported the private key
       used to sign Stack executables (see further below).
@@ -474,14 +473,13 @@ final release.
     The
     [Integration Tests workflow](https://github.com/commercialhaskell/stack/actions?query=workflow%3A%22Integration+tests%22)
     is limited to the platforms supported by the GitHub-hosted runners
-    (currently, only x86_64) and any self-hosted runners (currently, only
-    Linux/AArch64). However, it is possible to edit the GitHub release to
-    include binary distributions for other platforms (for example,
-    macOS/AArch64). The prerequisites are:
+    (currently, x86_64 and macOS/AArch64) and any self-hosted runners
+    (currently, only Linux/AArch64). However, it is possible to edit the GitHub
+    release to include binary distributions for other platforms. The
+    prerequisites are:
 
     * a computer with that platform (operating system, machine architecture);
-    * a sufficiently-recent existing version of Stack for that platform (for
-      example, GHCup has published versions of Stack for macOS/AArch64);
+    * a sufficiently-recent existing version of Stack for that platform;
     * a tool to print SHA checksums, such as `shasum` on Linux and macOS; and
     * the GNU Privacy Guard tool (`gpg`), which has had imported the private key
       used to sign Stack executables (see further below).
