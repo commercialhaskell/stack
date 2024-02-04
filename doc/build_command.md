@@ -230,6 +230,19 @@ sets this flag.
 Stack applies Haddock's `--gen-contents` and `--gen-index` flags to generate a
 single HTML contents and index for multiple sets of Haddock documentation.
 
+!!! warning
+
+    On Windows, the values for the `haddock-interfaces` and `haddock-html` keys
+    in the `*.conf` files for boot packages provided with certain versions of
+    GHC (in its `lib\package.conf.d` directory) can be corrupt and refer to
+    non-existent files and directories. For example, in the case of GHC 9.0.1
+    to GHC 9.8.1 the references are to
+    `${pkgroot}/../../docs/html/libraries/...` or
+    `${pkgroot}/../../doc/html/libraries/...` instead of
+    `${pkgroot}/../docs/html/libraries/...` or
+    `${pkgroot}/../doc/html/libraries/...`. Until those values are corrected,
+    Haddock documentation will be missing links to what those packages expose.
+
 ### `--haddock-arguments` option
 
 `stack haddock --haddock-arguments <haddock_argument(s)>` passes the specified
