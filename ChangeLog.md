@@ -70,8 +70,9 @@ Other enhancements:
   `1.24.0.0`.
 * Experimental: Add flag `--haddock-for-hackage` to Stack's `build` command
   (including the `haddock` synonym for `build --haddock`) to enable building
-  with flags to generate Haddock documentation, and an archive file, suitable
-  for upload to Hackage.
+  local packages with flags to generate Haddock documentation, and an archive
+  file, suitable for upload to Hackage. The form of the Haddock documentation
+  generated for other packages is unaffected.
 * Experimental: Add flag `--documentation` (`-d` for short) to Stack's `upload`
   command to allow uploading of documentation for packages to Hackage.
 * `stack new` no longer rejects project templates that specify a `package.yaml`
