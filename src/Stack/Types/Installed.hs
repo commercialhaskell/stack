@@ -17,7 +17,6 @@ module Stack.Types.Installed
   , simpleInstalledLib
   , installedToPackageIdOpt
   , installedPackageIdentifier
-  , installedGhcPkgId
   , installedVersion
   , foldOnGhcPkgId'
   ) where
@@ -134,10 +133,6 @@ installedToPackageIdOpt libInfo =
 installedPackageIdentifier :: Installed -> PackageIdentifier
 installedPackageIdentifier (Library pid _) = pid
 installedPackageIdentifier (Executable pid) = pid
-
-installedGhcPkgId :: Installed -> Maybe GhcPkgId
-installedGhcPkgId (Library _ libInfo) = Just libInfo.ghcPkgId
-installedGhcPkgId (Executable _) = Nothing
 
 -- | A strict fold over the @GhcPkgId@ of the given installed package.
 -- This will iterate on both sub and main librarie(s) if any.
