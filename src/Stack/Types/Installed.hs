@@ -19,6 +19,7 @@ module Stack.Types.Installed
   , installedPackageIdentifier
   , installedGhcPkgId
   , installedVersion
+  , foldOnGhcPkgId'
   ) where
 
 import qualified Data.Map as M
@@ -137,6 +138,13 @@ installedPackageIdentifier (Executable pid) = pid
 installedGhcPkgId :: Installed -> Maybe GhcPkgId
 installedGhcPkgId (Library _ libInfo) = Just libInfo.ghcPkgId
 installedGhcPkgId (Executable _) = Nothing
+
+-- | A strict fold over the @GhcPkgId@ of the given installed package.
+-- This will iterate on both sub and main librarie(s) if any.
+foldOnGhcPkgId' :: (Maybe StackUnqualCompName -> GhcPkgId -> resT -> resT) -> Installed -> resT -> resT
+foldOnGhcPkgId' _ Executable{} res = res
+foldOnGhcPkgId' fn (Library _ libInfo) res = M.foldrWithKey' (fn . Just) (base res) libInfo.subLib
+  where base = fn Nothing libInfo.ghcPkgId
 
 -- | Get the installed Version.
 installedVersion :: Installed -> Version
