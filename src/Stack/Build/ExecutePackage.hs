@@ -86,7 +86,7 @@ import           Stack.Types.Build
                    ( ConfigCache (..), PrecompiledCache (..), Task (..)
                    , TaskConfigOpts (..), TaskType (..), taskAnyMissing
                    , taskIsTarget, taskLocation, taskProvides
-                   , taskTypePackageIdentifier
+                   , taskTargetIsMutable, taskTypePackageIdentifier
                    )
 import qualified Stack.Types.Build as ConfigCache ( ConfigCache (..) )
 import           Stack.Types.Build.Exception
@@ -579,7 +579,9 @@ singleBuild
 
     mcurator <- view $ buildConfigL . to (.curator)
     when (doHaddock mcurator package) $ do
-      let isHaddockForHackage = ee.buildOpts.haddockForHackage
+      let isTaskTargetMutable = taskTargetIsMutable task == Mutable
+          isHaddockForHackage =
+            ee.buildOpts.haddockForHackage && isTaskTargetMutable
       announce $ if isHaddockForHackage
         then "haddock for Hackage"
         else "haddock"
