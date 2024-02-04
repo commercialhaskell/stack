@@ -648,7 +648,7 @@ singleBuild
     let ident = PackageIdentifier package.name package.version
     -- only pure the sub-libraries to cache them if we also cache the main
     -- library (that is, if it exists)
-    (mpkgid, subLibsPkgIds) <- if hasBuildableMainLibrary package
+    mpkgid <- if hasBuildableMainLibrary package
       then do
         subLibsPkgIds' <- fmap catMaybes $
           forM (getBuildableListAs id package.subLibraries) $ \subLib -> do
@@ -658,7 +658,6 @@ singleBuild
               installedDumpPkgsTVar
               (encodeCompatPackageName subLibName)
             pure $ (subLib, ) <$> maybeGhcpkgId
-        let subLibsPkgIds = snd <$> subLibsPkgIds'
         mpkgid <- loadInstalledPkg
                     [installedPkgDb]
                     installedDumpPkgsTVar
@@ -667,11 +666,11 @@ singleBuild
               simpleInstalledLib ident pkgid (Map.fromList subLibsPkgIds')
         case mpkgid of
           Nothing -> throwM $ Couldn'tFindPkgId package.name
-          Just pkgid -> pure (makeInstalledLib pkgid, subLibsPkgIds)
+          Just pkgid -> pure $ makeInstalledLib pkgid
       else do
         markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
                                                    -- with writeFlagCache?
-        pure (Executable ident, []) -- don't pure sublibs in this case
+        pure $ Executable ident
 
     case task.taskType of
       TTRemotePackage Immutable _ loc ->
@@ -681,7 +680,6 @@ singleBuild
           cache.configureOpts
           cache.buildHaddocks
           mpkgid
-          subLibsPkgIds
           (buildableExes package)
       _ -> pure ()
 
