@@ -635,28 +635,7 @@ singleBuild
         _ -> pure ()
       when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
-    -- copy ddump-* files
-    case T.unpack <$> ee.buildOpts.ddumpDir of
-      Just ddumpPath | buildingFinals && not (null ddumpPath) -> do
-        distDir <- distRelativeDir
-        ddumpDir <- parseRelDir ddumpPath
-
-        logDebug $ fromString ("ddump-dir: " <> toFilePath ddumpDir)
-        logDebug $ fromString ("dist-dir: " <> toFilePath distDir)
-
-        runConduitRes
-          $ CF.sourceDirectoryDeep False (toFilePath distDir)
-         .| CL.filter (L.isInfixOf ".dump-")
-         .| CL.mapM_ (\src -> liftIO $ do
-              parentDir <- parent <$> parseRelDir src
-              destBaseDir <-
-                (ddumpDir </>) <$> stripProperPrefix distDir parentDir
-              -- exclude .stack-work dir
-              unless (".stack-work" `L.isInfixOf` toFilePath destBaseDir) $ do
-                ensureDir destBaseDir
-                src' <- parseRelFile src
-                copyFile src' (destBaseDir </> filename src'))
-      _ -> pure ()
+    copyDdumpFilesIfNeeded ee.buildOpts.ddumpDir buildingFinals
 
     let (installedPkgDb, installedDumpPkgsTVar) =
           case taskLocation task of
@@ -719,6 +698,30 @@ singleBuild
       TTLocalMutable{} -> pure ()
 
     pure mpkgid
+
+-- | Copy ddump-* files, if the corresponding buildOption is active.
+copyDdumpFilesIfNeeded :: HasEnvConfig env => Maybe Text -> Bool -> RIO env ()
+copyDdumpFilesIfNeeded mDdumpPath buildingFinals = case T.unpack <$> mDdumpPath of
+  Just ddumpPath | buildingFinals && not (null ddumpPath) -> do
+    distDir <- distRelativeDir
+    ddumpRelDir <- parseRelDir ddumpPath
+
+    logDebug $ fromString ("ddump-dir: " <> toFilePath ddumpRelDir)
+    logDebug $ fromString ("dist-dir: " <> toFilePath distDir)
+
+    runConduitRes
+      $ CF.sourceDirectoryDeep False (toFilePath distDir)
+      .| CL.filter (L.isInfixOf ".dump-")
+      .| CL.mapM_ (\src -> liftIO $ do
+          parentDir <- parent <$> parseRelDir src
+          destBaseDir <-
+            (ddumpRelDir </>) <$> stripProperPrefix distDir parentDir
+          -- exclude .stack-work dir
+          unless (".stack-work" `L.isInfixOf` toFilePath destBaseDir) $ do
+            ensureDir destBaseDir
+            src' <- parseRelFile src
+            copyFile src' (destBaseDir </> filename src'))
+  _ -> pure ()
 
 -- | Get the build status of all the package executables. Do so by
 -- testing whether their expected output file exists, e.g.
