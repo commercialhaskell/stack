@@ -14,6 +14,7 @@ module Stack.Build.ExecutePackage
 
 import           Control.Concurrent.Execute
                    ( ActionContext (..), ActionId (..) )
+import           Control.Monad.Extra ( whenJust )
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
@@ -635,7 +636,7 @@ singleBuild
         _ -> pure ()
       when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
-    copyDdumpFilesIfNeeded ee.buildOpts.ddumpDir buildingFinals
+    copyDdumpFilesIfNeeded buildingFinals ee.buildOpts.ddumpDir
     installedPkg <- fetchAndMarkInstalledPackage ee (taskLocation task) package pkgId
     postProcessRemotePackage task.taskType ac cache ee installedPkg package pkgId pkgDir
     pure installedPkg
@@ -717,17 +718,21 @@ fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
                                                   -- with writeFlagCache?
       pure $ Executable pkgId
 
-
--- | Copy ddump-* files, if the corresponding buildOption is active.
-copyDdumpFilesIfNeeded :: HasEnvConfig env => Maybe Text -> Bool -> RIO env ()
-copyDdumpFilesIfNeeded mDdumpPath buildingFinals = case T.unpack <$> mDdumpPath of
-  Just ddumpPath | buildingFinals && not (null ddumpPath) -> do
+-- | Copy ddump-* files, if we are building finals and a non-empty ddump-dir
+-- has been specified.
+copyDdumpFilesIfNeeded :: HasEnvConfig env => Bool -> Maybe Text -> RIO env ()
+copyDdumpFilesIfNeeded buildingFinals mDdumpPath = when buildingFinals $
+  whenJust mDdumpPath $ \ddumpPath -> unless (T.null ddumpPath) $ do
     distDir <- distRelativeDir
-    ddumpRelDir <- parseRelDir ddumpPath
-
-    logDebug $ fromString ("ddump-dir: " <> toFilePath ddumpRelDir)
-    logDebug $ fromString ("dist-dir: " <> toFilePath distDir)
-
+    ddumpRelDir <- parseRelDir $ T.unpack ddumpPath
+    prettyDebugL
+      [ "ddump-dir:"
+      , pretty ddumpRelDir
+      ]
+    prettyDebugL
+      [ "dist-dir:"
+      , pretty distDir
+      ]
     runConduitRes
       $ CF.sourceDirectoryDeep False (toFilePath distDir)
       .| CL.filter (L.isInfixOf ".dump-")
@@ -740,7 +745,6 @@ copyDdumpFilesIfNeeded mDdumpPath buildingFinals = case T.unpack <$> mDdumpPath 
             ensureDir destBaseDir
             src' <- parseRelFile src
             copyFile src' (destBaseDir </> filename src'))
-  _ -> pure ()
 
 -- | Get the build status of all the package executables. Do so by
 -- testing whether their expected output file exists, e.g.
