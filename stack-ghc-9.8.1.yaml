@@ -6,7 +6,7 @@ snapshot: nightly-2024-01-26
 
 docker:
   enable: false
-  repo: glcr.b-data.ch/ghc/ghc-musl:9.8.1
+  repo: quay.io/benz0li/ghc-musl:9.8.1
 
 nix:
   # --nix on the command-line to enable.

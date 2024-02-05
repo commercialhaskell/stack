@@ -9,7 +9,7 @@ extra-deps:
 
 docker:
   enable: false
-  repo: glcr.b-data.ch/ghc/ghc-musl:9.6.4
+  repo: quay.io/benz0li/ghc-musl:9.6.4
 
 nix:
   # --nix on the command-line to enable.
