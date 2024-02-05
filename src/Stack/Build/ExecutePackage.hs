@@ -100,7 +100,7 @@ import           Stack.Types.BuildOpts
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
-                   , getBuildableListAs, getBuildableListText
+                   , getBuildableListText, foldComponentToAnotherCollection
                    )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..), getGhcVersion
@@ -636,42 +636,7 @@ singleBuild
       when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
     copyDdumpFilesIfNeeded ee.buildOpts.ddumpDir buildingFinals
-
-    let (installedPkgDb, installedDumpPkgsTVar) =
-          case taskLocation task of
-            Snap ->
-              ( ee.baseConfigOpts.snapDB
-              , ee.snapshotDumpPkgs )
-            Local ->
-              ( ee.baseConfigOpts.localDB
-              , ee.localDumpPkgs )
-    let ident = PackageIdentifier package.name package.version
-    -- only pure the sub-libraries to cache them if we also cache the main
-    -- library (that is, if it exists)
-    mpkgid <- if hasBuildableMainLibrary package
-      then do
-        subLibsPkgIds' <- fmap catMaybes $
-          forM (getBuildableListAs id package.subLibraries) $ \subLib -> do
-            let subLibName = toCabalMungedPackageName package.name subLib
-            maybeGhcpkgId <- loadInstalledPkg
-              [installedPkgDb]
-              installedDumpPkgsTVar
-              (encodeCompatPackageName subLibName)
-            pure $ (subLib, ) <$> maybeGhcpkgId
-        mpkgid <- loadInstalledPkg
-                    [installedPkgDb]
-                    installedDumpPkgsTVar
-                    package.name
-        let makeInstalledLib pkgid =
-              simpleInstalledLib ident pkgid (Map.fromList subLibsPkgIds')
-        case mpkgid of
-          Nothing -> throwM $ Couldn'tFindPkgId package.name
-          Just pkgid -> pure $ makeInstalledLib pkgid
-      else do
-        markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
-                                                   -- with writeFlagCache?
-        pure $ Executable ident
-
+    mpkgid <- fetchAndMarkInstalledPackage ee (taskLocation task) package pkgId
     case task.taskType of
       TTRemotePackage Immutable _ loc ->
         writePrecompiledCache
@@ -696,6 +661,54 @@ singleBuild
       TTLocalMutable{} -> pure ()
 
     pure mpkgid
+
+-- | Once all the cabal related tasks have run for a package, we should be able to gather
+-- the information needed to create an @Installed@ package value.
+-- For now, either there's a main library in which case we consider the package's libraries
+-- ghcPkgIds or we just consider it's an executable
+-- (and mark all the executables as installed, if any).
+--
+-- Note that this also modifies the installedDumpPkgsTVar which is used for generating Haddocks.
+--
+fetchAndMarkInstalledPackage ::
+  (HasTerm env, HasEnvConfig env)
+  => ExecuteEnv
+  -> InstallLocation
+  -> Package
+  -> PackageIdentifier
+  -> RIO env Installed
+fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
+  let baseConfigOpts = ee.baseConfigOpts
+  let (installedPkgDb, installedDumpPkgsTVar) =
+        case taskInstallLocation of
+          Snap ->
+            ( baseConfigOpts.snapDB
+            , ee.snapshotDumpPkgs )
+          Local ->
+            ( baseConfigOpts.localDB
+            , ee.localDumpPkgs )
+  -- let ident = PackageIdentifier package.name package.version
+  -- only pure the sub-libraries to cache them if we also cache the main
+  -- library (that is, if it exists)
+  if hasBuildableMainLibrary package
+    then do
+      let getAndStoreGhcPkgId = loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar
+      let foldSubLibToMap subLib mapInMonad = do
+            let mungedName = toCabalMungedPackageName package.name subLib.name
+            maybeGhcpkgId <- getAndStoreGhcPkgId (encodeCompatPackageName mungedName)
+            mapInMonad <&> case maybeGhcpkgId of
+              Just v -> Map.insert subLib.name v
+              _ -> id
+      subLibsPkgIds <- foldComponentToAnotherCollection package.subLibraries foldSubLibToMap mempty
+      mGhcPkgId <- getAndStoreGhcPkgId package.name
+      case mGhcPkgId of
+        Nothing -> throwM $ Couldn'tFindPkgId package.name
+        Just ghcPkgId -> pure $ simpleInstalledLib pkgId ghcPkgId subLibsPkgIds
+    else do
+      markExeInstalled taskInstallLocation pkgId -- TODO unify somehow
+                                                  -- with writeFlagCache?
+      pure $ Executable pkgId
+
 
 -- | Copy ddump-* files, if the corresponding buildOption is active.
 copyDdumpFilesIfNeeded :: HasEnvConfig env => Maybe Text -> Bool -> RIO env ()
