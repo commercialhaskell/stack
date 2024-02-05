@@ -134,12 +134,18 @@ installedPackageIdentifier :: Installed -> PackageIdentifier
 installedPackageIdentifier (Library pid _) = pid
 installedPackageIdentifier (Executable pid) = pid
 
--- | A strict fold over the @GhcPkgId@ of the given installed package.
--- This will iterate on both sub and main librarie(s) if any.
-foldOnGhcPkgId' :: (Maybe StackUnqualCompName -> GhcPkgId -> resT -> resT) -> Installed -> resT -> resT
+-- | A strict fold over the 'GhcPkgId' of the given installed package. This will
+-- iterate on both sub and main libraries, if any.
+foldOnGhcPkgId' ::
+     (Maybe StackUnqualCompName -> GhcPkgId -> resT -> resT)
+  -> Installed
+  -> resT
+  -> resT
 foldOnGhcPkgId' _ Executable{} res = res
-foldOnGhcPkgId' fn (Library _ libInfo) res = M.foldrWithKey' (fn . Just) (base res) libInfo.subLib
-  where base = fn Nothing libInfo.ghcPkgId
+foldOnGhcPkgId' fn (Library _ libInfo) res =
+  M.foldrWithKey' (fn . Just) (base res) libInfo.subLib
+ where
+  base = fn Nothing libInfo.ghcPkgId
 
 -- | Get the installed Version.
 installedVersion :: Installed -> Version

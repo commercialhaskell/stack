@@ -30,13 +30,13 @@ module Stack.Types.CompCollection
   , foldComponentToAnotherCollection
   ) where
 
+import qualified Data.Map as M
 import qualified Data.Set as Set
 import           Stack.Prelude
 import           Stack.Types.Component
                    ( HasBuildInfo, HasName, StackBuildInfo (..)
                    , StackUnqualCompName (..)
                    )
-import qualified Data.Map as M
 
 -- | A type representing collections of components, distinguishing buildable
 -- components and non-buildable components.
@@ -66,10 +66,11 @@ instance Foldable CompCollection where
   foldr' fn c collection = M.foldr' fn c collection.buildableOnes
   null = M.null . (.buildableOnes)
 
--- | While the @HashMap@ is a more suitable choice for @Text@ based keys in general 
--- (it scales better), constant factors are largely dominant for maps with less than
--- 1000 keys. Package with more than 100 components are extremely unlikely, so we keep
--- a simple @Map@.
+-- | The 'Data.HashMap.Strict.HashMap' type is a more suitable choice than 'Map'
+-- for 'Data.Text.Text' based keys in general (it scales better). However,
+-- constant factors are largely dominant for maps with less than 1000 keys.
+-- Packages with more than 100 components are extremely unlikely, so we use a
+-- 'Map'.
 type InnerCollection component = Map StackUnqualCompName component
 
 -- | A function to add a component to a collection of components. Ensures that

@@ -101,7 +101,7 @@ import           Stack.Types.BuildOpts
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
-                   , getBuildableListText, foldComponentToAnotherCollection
+                   , foldComponentToAnotherCollection, getBuildableListText
                    )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..), getGhcVersion
@@ -637,11 +637,22 @@ singleBuild
       when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
     copyDdumpFilesIfNeeded buildingFinals ee.buildOpts.ddumpDir
-    installedPkg <- fetchAndMarkInstalledPackage ee (taskLocation task) package pkgId
-    postProcessRemotePackage task.taskType ac cache ee installedPkg package pkgId pkgDir
+    installedPkg <-
+      fetchAndMarkInstalledPackage ee (taskLocation task) package pkgId
+    postProcessRemotePackage
+      task.taskType
+      ac
+      cache
+      ee
+      installedPkg
+      package
+      pkgId
+      pkgDir
     pure installedPkg
 
-postProcessRemotePackage :: (HasEnvConfig env)
+-- | Action in the case that the task relates to a remote package.
+postProcessRemotePackage ::
+     (HasEnvConfig env)
   => TaskType
   -> ActionContext
   -> ConfigCache
@@ -651,36 +662,45 @@ postProcessRemotePackage :: (HasEnvConfig env)
   -> PackageIdentifier
   -> Path b Dir
   -> RIO env ()
-postProcessRemotePackage taskType ac cache ee installedPackage package pkgId pkgDir = do
-  case taskType of
-    TTRemotePackage isMutable _ loc -> do
-      when (isMutable == Immutable) $ writePrecompiledCache
-        ee.baseConfigOpts
-        loc
-        cache.configureOpts
-        cache.buildHaddocks
-        installedPackage
-        (buildableExes package)
-      -- For packages from a package index, pkgDir is in the tmp directory. We
-      -- eagerly delete it if no other tasks require it, to reduce space usage
-      -- in tmp (#3018).
-      let remaining =
-            Set.filter
-              (\(ActionId x _) -> x == pkgId)
-              ac.remaining
-      when (null remaining) $ removeDirRecur pkgDir
-    _ -> pure ()
+postProcessRemotePackage
+    taskType
+    ac
+    cache
+    ee
+    installedPackage
+    package
+    pkgId
+    pkgDir
+  = case taskType of
+      TTRemotePackage isMutable _ loc -> do
+        when (isMutable == Immutable) $ writePrecompiledCache
+          ee.baseConfigOpts
+          loc
+          cache.configureOpts
+          cache.buildHaddocks
+          installedPackage
+          (buildableExes package)
+        -- For packages from a package index, pkgDir is in the tmp directory. We
+        -- eagerly delete it if no other tasks require it, to reduce space usage
+        -- in tmp (#3018).
+        let remaining =
+              Set.filter
+                (\(ActionId x _) -> x == pkgId)
+                ac.remaining
+        when (null remaining) $ removeDirRecur pkgDir
+      _ -> pure ()
 
--- | Once all the cabal related tasks have run for a package, we should be able to gather
--- the information needed to create an @Installed@ package value.
--- For now, either there's a main library in which case we consider the package's libraries
--- ghcPkgIds or we just consider it's an executable
+-- | Once all the Cabal-related tasks have run for a package, we should be able
+-- to gather the information needed to create an 'Installed' package value. For
+-- now, either there's a main library (in which case we consider the 'GhcPkgId'
+-- values of the package's libraries) or we just consider it's an executable
 -- (and mark all the executables as installed, if any).
 --
--- Note that this also modifies the installedDumpPkgsTVar which is used for generating Haddocks.
+-- Note that this also modifies the installedDumpPkgsTVar which is used for
+-- generating Haddocks.
 --
 fetchAndMarkInstalledPackage ::
-  (HasTerm env, HasEnvConfig env)
+     (HasTerm env, HasEnvConfig env)
   => ExecuteEnv
   -> InstallLocation
   -> Package
@@ -688,7 +708,7 @@ fetchAndMarkInstalledPackage ::
   -> RIO env Installed
 fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
   let baseConfigOpts = ee.baseConfigOpts
-  let (installedPkgDb, installedDumpPkgsTVar) =
+      (installedPkgDb, installedDumpPkgsTVar) =
         case taskInstallLocation of
           Snap ->
             ( baseConfigOpts.snapDB
@@ -696,19 +716,23 @@ fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
           Local ->
             ( baseConfigOpts.localDB
             , ee.localDumpPkgs )
-  -- let ident = PackageIdentifier package.name package.version
-  -- only pure the sub-libraries to cache them if we also cache the main
+  -- Only pure the sub-libraries to cache them if we also cache the main
   -- library (that is, if it exists)
   if hasBuildableMainLibrary package
     then do
-      let getAndStoreGhcPkgId = loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar
-      let foldSubLibToMap subLib mapInMonad = do
+      let getAndStoreGhcPkgId =
+            loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar
+          foldSubLibToMap subLib mapInMonad = do
             let mungedName = toCabalMungedPackageName package.name subLib.name
-            maybeGhcpkgId <- getAndStoreGhcPkgId (encodeCompatPackageName mungedName)
+            maybeGhcpkgId <-
+              getAndStoreGhcPkgId (encodeCompatPackageName mungedName)
             mapInMonad <&> case maybeGhcpkgId of
               Just v -> Map.insert subLib.name v
               _ -> id
-      subLibsPkgIds <- foldComponentToAnotherCollection package.subLibraries foldSubLibToMap mempty
+      subLibsPkgIds <- foldComponentToAnotherCollection
+        package.subLibraries
+        foldSubLibToMap
+        mempty
       mGhcPkgId <- getAndStoreGhcPkgId package.name
       case mGhcPkgId of
         Nothing -> throwM $ Couldn'tFindPkgId package.name
