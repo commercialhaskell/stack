@@ -397,13 +397,17 @@ writePrecompiledCache
             libPath <- pathFromPkgId stackRootRelative ghcPkgId
             pc <- pcAction
             pure $ case libName of
-              Nothing -> pc{library = Just libPath}
-              _ -> pc{subLibs = libPath : pc.subLibs}
-      precompiled <- foldOnGhcPkgId' installedLibToPath mghcPkgId (pure PrecompiledCache
+              Nothing -> pc { library = Just libPath }
+              _ -> pc { subLibs = libPath : pc.subLibs }
+      precompiled <- foldOnGhcPkgId'
+        installedLibToPath
+        mghcPkgId
+        ( pure PrecompiledCache
             { library = Nothing
             , subLibs = []
             , exes = exes'
-            })
+            }
+        )
       savePrecompiledCache key precompiled
       -- reuse precompiled cache with haddocks also in case when haddocks are
       -- not required
