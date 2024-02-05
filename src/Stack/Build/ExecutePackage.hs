@@ -636,31 +636,39 @@ singleBuild
       when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
     copyDdumpFilesIfNeeded ee.buildOpts.ddumpDir buildingFinals
-    mpkgid <- fetchAndMarkInstalledPackage ee (taskLocation task) package pkgId
-    case task.taskType of
-      TTRemotePackage Immutable _ loc ->
-        writePrecompiledCache
-          ee.baseConfigOpts
-          loc
-          cache.configureOpts
-          cache.buildHaddocks
-          mpkgid
-          (buildableExes package)
-      _ -> pure ()
+    installedPkg <- fetchAndMarkInstalledPackage ee (taskLocation task) package pkgId
+    postProcessRemotePackage task.taskType ac cache ee installedPkg package pkgId pkgDir
+    pure installedPkg
 
-    case task.taskType of
+postProcessRemotePackage :: (HasEnvConfig env)
+  => TaskType
+  -> ActionContext
+  -> ConfigCache
+  -> ExecuteEnv
+  -> Installed
+  -> Package
+  -> PackageIdentifier
+  -> Path b Dir
+  -> RIO env ()
+postProcessRemotePackage taskType ac cache ee installedPackage package pkgId pkgDir = do
+  case taskType of
+    TTRemotePackage isMutable _ loc -> do
+      when (isMutable == Immutable) $ writePrecompiledCache
+        ee.baseConfigOpts
+        loc
+        cache.configureOpts
+        cache.buildHaddocks
+        installedPackage
+        (buildableExes package)
       -- For packages from a package index, pkgDir is in the tmp directory. We
       -- eagerly delete it if no other tasks require it, to reduce space usage
       -- in tmp (#3018).
-      TTRemotePackage{} -> do
-        let remaining =
-              filter
-                (\(ActionId x _) -> x == pkgId)
-                (Set.toList ac.remaining)
-        when (null remaining) $ removeDirRecur pkgDir
-      TTLocalMutable{} -> pure ()
-
-    pure mpkgid
+      let remaining =
+            Set.filter
+              (\(ActionId x _) -> x == pkgId)
+              ac.remaining
+      when (null remaining) $ removeDirRecur pkgDir
+    _ -> pure ()
 
 -- | Once all the cabal related tasks have run for a package, we should be able to gather
 -- the information needed to create an @Installed@ package value.
