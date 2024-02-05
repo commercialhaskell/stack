@@ -30,7 +30,7 @@ module Stack.Types.CompCollection
   , foldComponentToAnotherCollection
   ) where
 
-import qualified Data.HashMap.Strict as HM
+import qualified Data.Map as M
 import qualified Data.Set as Set
 import           Stack.Prelude
 import           Stack.Types.Component
@@ -62,33 +62,16 @@ instance Monoid (CompCollection component) where
     }
 
 instance Foldable CompCollection where
-  foldMap fn collection = foldMap fn collection.buildableOnes.asNameMap
-  foldr' fn c collection = HM.foldr' fn c collection.buildableOnes.asNameMap
-  null = HM.null . (.buildableOnes.asNameMap)
+  foldMap fn collection = foldMap fn collection.buildableOnes
+  foldr' fn c collection = M.foldr' fn c collection.buildableOnes
+  null = M.null . (.buildableOnes)
 
--- | A type representing a collection of components, including a cache of
--- the components' names.
-data InnerCollection component = InnerCollection
-  { asNameMap :: !(HashMap StackUnqualCompName component)
-  , asNameSet :: !(Set StackUnqualCompName)
-    -- ^ Strictly, this field is redundant. It is provided as a cache for speed.
-    -- It is assumed, but not checked, that 'asNameSet' is always equal to
-    -- @keySet . asNameMap@. It takes O(n) to compute it from 'asNameMap'.
-    -- 'addComponent' should be used to add new members to the collection.
-  }
-  deriving (Show)
-
-instance Semigroup (InnerCollection component) where
-  a <> b = InnerCollection
-    { asNameMap = a.asNameMap <> b.asNameMap
-    , asNameSet = a.asNameSet <> b.asNameSet
-    }
-
-instance Monoid (InnerCollection component) where
-  mempty = InnerCollection
-    { asNameMap = mempty
-    , asNameSet = mempty
-    }
+-- | The 'Data.HashMap.Strict.HashMap' type is a more suitable choice than 'Map'
+-- for 'Data.Text.Text' based keys in general (it scales better). However,
+-- constant factors are largely dominant for maps with less than 1000 keys.
+-- Packages with more than 100 components are extremely unlikely, so we use a
+-- 'Map'.
+type InnerCollection component = Map StackUnqualCompName component
 
 -- | A function to add a component to a collection of components. Ensures that
 -- both 'asNameMap' and 'asNameSet' are updated consistently.
@@ -99,12 +82,7 @@ addComponent ::
   -> InnerCollection component
      -- ^ Existing collection of components.
   -> InnerCollection component
-addComponent componentV collection =
-  let nameV = componentV.name
-  in  collection
-        { asNameMap=HM.insert nameV componentV collection.asNameMap
-        , asNameSet=Set.insert nameV collection.asNameSet
-        }
+addComponent component = M.insert component.name component
 
 -- | For the given function and foldable data structure of components of type
 -- @compA@, iterates on the elements of that structure and maps each element to
@@ -133,7 +111,7 @@ foldAndMakeCollection mapFn = foldl' compIterator mempty
 -- | Get the names of the buildable components in the given collection, as a
 -- 'Set' of 'StackUnqualCompName'.
 getBuildableSet :: CompCollection component -> Set StackUnqualCompName
-getBuildableSet = (.buildableOnes.asNameSet)
+getBuildableSet = M.keysSet . (.buildableOnes)
 
 -- | Get the names of the buildable components in the given collection, as a
 -- 'Set' of 'Text'.
@@ -170,14 +148,14 @@ collectionLookup ::
      -- ^ Collection of components.
   -> Maybe component
 collectionLookup needle haystack =
-  HM.lookup (StackUnqualCompName needle) haystack.buildableOnes.asNameMap
+  M.lookup (StackUnqualCompName needle) haystack.buildableOnes
 
 -- | For a given collection of components, yields a list of pairs for buildable
 -- components of the name of the component and the component.
 collectionKeyValueList :: CompCollection component -> [(Text, component)]
 collectionKeyValueList haystack =
       (\(StackUnqualCompName k, !v) -> (k, v))
-  <$> HM.toList haystack.buildableOnes.asNameMap
+  <$> M.toList haystack.buildableOnes
 
 -- | Yields 'True' if, and only if, the given collection of components includes
 -- a buildable component with the given name.
@@ -202,4 +180,4 @@ foldComponentToAnotherCollection ::
      -- ^ Starting value.
   -> m a
 foldComponentToAnotherCollection collection fn initialValue =
-  HM.foldr' fn initialValue collection.buildableOnes.asNameMap
+  M.foldr' fn initialValue collection.buildableOnes

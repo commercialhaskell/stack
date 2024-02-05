@@ -14,6 +14,7 @@ module Stack.Build.ExecutePackage
 
 import           Control.Concurrent.Execute
                    ( ActionContext (..), ActionId (..) )
+import           Control.Monad.Extra ( whenJust )
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BL
@@ -100,7 +101,7 @@ import           Stack.Types.BuildOpts
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
-                   , getBuildableListAs, getBuildableListText
+                   , foldComponentToAnotherCollection, getBuildableListText
                    )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), WhichCompiler (..), getGhcVersion
@@ -635,90 +636,139 @@ singleBuild
         _ -> pure ()
       when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
-    -- copy ddump-* files
-    case T.unpack <$> ee.buildOpts.ddumpDir of
-      Just ddumpPath | buildingFinals && not (null ddumpPath) -> do
-        distDir <- distRelativeDir
-        ddumpDir <- parseRelDir ddumpPath
+    copyDdumpFilesIfNeeded buildingFinals ee.buildOpts.ddumpDir
+    installedPkg <-
+      fetchAndMarkInstalledPackage ee (taskLocation task) package pkgId
+    postProcessRemotePackage
+      task.taskType
+      ac
+      cache
+      ee
+      installedPkg
+      package
+      pkgId
+      pkgDir
+    pure installedPkg
 
-        logDebug $ fromString ("ddump-dir: " <> toFilePath ddumpDir)
-        logDebug $ fromString ("dist-dir: " <> toFilePath distDir)
-
-        runConduitRes
-          $ CF.sourceDirectoryDeep False (toFilePath distDir)
-         .| CL.filter (L.isInfixOf ".dump-")
-         .| CL.mapM_ (\src -> liftIO $ do
-              parentDir <- parent <$> parseRelDir src
-              destBaseDir <-
-                (ddumpDir </>) <$> stripProperPrefix distDir parentDir
-              -- exclude .stack-work dir
-              unless (".stack-work" `L.isInfixOf` toFilePath destBaseDir) $ do
-                ensureDir destBaseDir
-                src' <- parseRelFile src
-                copyFile src' (destBaseDir </> filename src'))
-      _ -> pure ()
-
-    let (installedPkgDb, installedDumpPkgsTVar) =
-          case taskLocation task of
-            Snap ->
-              ( ee.baseConfigOpts.snapDB
-              , ee.snapshotDumpPkgs )
-            Local ->
-              ( ee.baseConfigOpts.localDB
-              , ee.localDumpPkgs )
-    let ident = PackageIdentifier package.name package.version
-    -- only pure the sub-libraries to cache them if we also cache the main
-    -- library (that is, if it exists)
-    (mpkgid, subLibsPkgIds) <- if hasBuildableMainLibrary package
-      then do
-        subLibsPkgIds' <- fmap catMaybes $
-          forM (getBuildableListAs id package.subLibraries) $ \subLib -> do
-            let subLibName = toCabalMungedPackageName package.name subLib
-            maybeGhcpkgId <- loadInstalledPkg
-              [installedPkgDb]
-              installedDumpPkgsTVar
-              (encodeCompatPackageName subLibName)
-            pure $ (subLib, ) <$> maybeGhcpkgId
-        let subLibsPkgIds = snd <$> subLibsPkgIds'
-        mpkgid <- loadInstalledPkg
-                    [installedPkgDb]
-                    installedDumpPkgsTVar
-                    package.name
-        let makeInstalledLib pkgid =
-              simpleInstalledLib ident pkgid (Map.fromList subLibsPkgIds')
-        case mpkgid of
-          Nothing -> throwM $ Couldn'tFindPkgId package.name
-          Just pkgid -> pure (makeInstalledLib pkgid, subLibsPkgIds)
-      else do
-        markExeInstalled (taskLocation task) pkgId -- TODO unify somehow
-                                                   -- with writeFlagCache?
-        pure (Executable ident, []) -- don't pure sublibs in this case
-
-    case task.taskType of
-      TTRemotePackage Immutable _ loc ->
-        writePrecompiledCache
+-- | Action in the case that the task relates to a remote package.
+postProcessRemotePackage ::
+     (HasEnvConfig env)
+  => TaskType
+  -> ActionContext
+  -> ConfigCache
+  -> ExecuteEnv
+  -> Installed
+  -> Package
+  -> PackageIdentifier
+  -> Path b Dir
+  -> RIO env ()
+postProcessRemotePackage
+    taskType
+    ac
+    cache
+    ee
+    installedPackage
+    package
+    pkgId
+    pkgDir
+  = case taskType of
+      TTRemotePackage isMutable _ loc -> do
+        when (isMutable == Immutable) $ writePrecompiledCache
           ee.baseConfigOpts
           loc
           cache.configureOpts
           cache.buildHaddocks
-          mpkgid
-          subLibsPkgIds
+          installedPackage
           (buildableExes package)
+        -- For packages from a package index, pkgDir is in the tmp directory. We
+        -- eagerly delete it if no other tasks require it, to reduce space usage
+        -- in tmp (#3018).
+        let remaining =
+              Set.filter
+                (\(ActionId x _) -> x == pkgId)
+                ac.remaining
+        when (null remaining) $ removeDirRecur pkgDir
       _ -> pure ()
 
-    case task.taskType of
-      -- For packages from a package index, pkgDir is in the tmp directory. We
-      -- eagerly delete it if no other tasks require it, to reduce space usage
-      -- in tmp (#3018).
-      TTRemotePackage{} -> do
-        let remaining =
-              filter
-                (\(ActionId x _) -> x == pkgId)
-                (Set.toList ac.remaining)
-        when (null remaining) $ removeDirRecur pkgDir
-      TTLocalMutable{} -> pure ()
+-- | Once all the Cabal-related tasks have run for a package, we should be able
+-- to gather the information needed to create an 'Installed' package value. For
+-- now, either there's a main library (in which case we consider the 'GhcPkgId'
+-- values of the package's libraries) or we just consider it's an executable
+-- (and mark all the executables as installed, if any).
+--
+-- Note that this also modifies the installedDumpPkgsTVar which is used for
+-- generating Haddocks.
+--
+fetchAndMarkInstalledPackage ::
+     (HasTerm env, HasEnvConfig env)
+  => ExecuteEnv
+  -> InstallLocation
+  -> Package
+  -> PackageIdentifier
+  -> RIO env Installed
+fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
+  let baseConfigOpts = ee.baseConfigOpts
+      (installedPkgDb, installedDumpPkgsTVar) =
+        case taskInstallLocation of
+          Snap ->
+            ( baseConfigOpts.snapDB
+            , ee.snapshotDumpPkgs )
+          Local ->
+            ( baseConfigOpts.localDB
+            , ee.localDumpPkgs )
+  -- Only pure the sub-libraries to cache them if we also cache the main
+  -- library (that is, if it exists)
+  if hasBuildableMainLibrary package
+    then do
+      let getAndStoreGhcPkgId =
+            loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar
+          foldSubLibToMap subLib mapInMonad = do
+            let mungedName = toCabalMungedPackageName package.name subLib.name
+            maybeGhcpkgId <-
+              getAndStoreGhcPkgId (encodeCompatPackageName mungedName)
+            mapInMonad <&> case maybeGhcpkgId of
+              Just v -> Map.insert subLib.name v
+              _ -> id
+      subLibsPkgIds <- foldComponentToAnotherCollection
+        package.subLibraries
+        foldSubLibToMap
+        mempty
+      mGhcPkgId <- getAndStoreGhcPkgId package.name
+      case mGhcPkgId of
+        Nothing -> throwM $ Couldn'tFindPkgId package.name
+        Just ghcPkgId -> pure $ simpleInstalledLib pkgId ghcPkgId subLibsPkgIds
+    else do
+      markExeInstalled taskInstallLocation pkgId -- TODO unify somehow
+                                                  -- with writeFlagCache?
+      pure $ Executable pkgId
 
-    pure mpkgid
+-- | Copy ddump-* files, if we are building finals and a non-empty ddump-dir
+-- has been specified.
+copyDdumpFilesIfNeeded :: HasEnvConfig env => Bool -> Maybe Text -> RIO env ()
+copyDdumpFilesIfNeeded buildingFinals mDdumpPath = when buildingFinals $
+  whenJust mDdumpPath $ \ddumpPath -> unless (T.null ddumpPath) $ do
+    distDir <- distRelativeDir
+    ddumpRelDir <- parseRelDir $ T.unpack ddumpPath
+    prettyDebugL
+      [ "ddump-dir:"
+      , pretty ddumpRelDir
+      ]
+    prettyDebugL
+      [ "dist-dir:"
+      , pretty distDir
+      ]
+    runConduitRes
+      $ CF.sourceDirectoryDeep False (toFilePath distDir)
+      .| CL.filter (L.isInfixOf ".dump-")
+      .| CL.mapM_ (\src -> liftIO $ do
+          parentDir <- parent <$> parseRelDir src
+          destBaseDir <-
+            (ddumpRelDir </>) <$> stripProperPrefix distDir parentDir
+          -- exclude .stack-work dir
+          unless (".stack-work" `L.isInfixOf` toFilePath destBaseDir) $ do
+            ensureDir destBaseDir
+            src' <- parseRelFile src
+            copyFile src' (destBaseDir </> filename src'))
 
 -- | Get the build status of all the package executables. Do so by
 -- testing whether their expected output file exists, e.g.

@@ -71,9 +71,9 @@ import           Stack.Types.EnvConfig
                    , installationRootDeps, installationRootLocal
                    , platformGhcRelDir
                    )
-import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
+import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.Installed
-                   (InstalledLibraryInfo (..), installedGhcPkgId )
+                   (InstalledLibraryInfo (..), foldOnGhcPkgId' )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
@@ -376,7 +376,6 @@ writePrecompiledCache ::
   -> ConfigureOpts
   -> Bool -- ^ build haddocks
   -> Installed -- ^ library
-  -> [GhcPkgId] -- ^ sub-libraries, in the GhcPkgId format
   -> Set Text -- ^ executables
   -> RIO env ()
 writePrecompiledCache
@@ -385,24 +384,30 @@ writePrecompiledCache
     copts
     buildHaddocks
     mghcPkgId
-    subLibs
     exes
   = do
       key <- getPrecompiledCacheKey loc copts buildHaddocks
       ec <- view envConfigL
       let stackRootRelative = makeRelative (view stackRootL ec)
-      mlibpath <-
-        traverse (pathFromPkgId stackRootRelative) (installedGhcPkgId mghcPkgId)
-      subLibPaths <- mapM (pathFromPkgId stackRootRelative) subLibs
       exes' <- forM (Set.toList exes) $ \exe -> do
         name <- parseRelFile $ T.unpack exe
         stackRootRelative $
            baseConfigOpts.snapInstallRoot </> bindirSuffix </> name
-      let precompiled = PrecompiledCache
-            { library = mlibpath
-            , subLibs = subLibPaths
+      let installedLibToPath libName ghcPkgId pcAction = do
+            libPath <- pathFromPkgId stackRootRelative ghcPkgId
+            pc <- pcAction
+            pure $ case libName of
+              Nothing -> pc { library = Just libPath }
+              _ -> pc { subLibs = libPath : pc.subLibs }
+      precompiled <- foldOnGhcPkgId'
+        installedLibToPath
+        mghcPkgId
+        ( pure PrecompiledCache
+            { library = Nothing
+            , subLibs = []
             , exes = exes'
             }
+        )
       savePrecompiledCache key precompiled
       -- reuse precompiled cache with haddocks also in case when haddocks are
       -- not required
