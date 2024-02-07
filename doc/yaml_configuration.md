@@ -1003,7 +1003,10 @@ arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-libc6-pre232`,
 Default: `{}`
 
 Related command line (takes precedence):
-[`stack build --ghc-options`](build_command.md#ghc-options-option) option
+[`stack build --ghc-options`](build_command.md#-ghc-options-option) option
+
+Augment and, if applicable, override any GHC command line options specified in
+Cabal files (including those created from `package.yaml` files).
 
 `ghc-options` can specify GHC command line options for a named package, all
 local packages that are targets (using the `$targets` key), all local packages
@@ -1019,10 +1022,11 @@ ghc-options:
 ~~~
 
 GHC's command line options are _order-dependent_ and evaluated from left to
-right. Later options can override earlier options. Stack applies options (as
-applicable) in the order of `$everything`, `$locals`, `$targets`, and then those
-for the named package. Any existing GHC command line options of a package are
-applied after those specified in Stack's YAML configuration.
+right. Later options can override the effect of earlier ones. Stack applies
+options (as applicable) in the order of `$everything`, `$locals`, `$targets`,
+and then those for the named package. Any GHC command line options for a package
+specified at Stack's command line are applied after those specified in Stack's
+YAML configuration files.
 
 Since Stack 1.6.1, setting a GHC options for a specific package will
 automatically promote it to a local package (much like setting a custom package
