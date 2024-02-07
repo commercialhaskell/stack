@@ -492,15 +492,19 @@ The effect of `--fast` can be overriden with Stack's
 
 ### `--ghc-options` option
 
+Augment and, if applicable, override any GHC command line options specified in
+Cabal files (including those created from `package.yaml` files) or in Stack's
+YAML configuration files.
+
 `stack build --ghc-options <ghc_options>` passes the specified command line
 options to GHC, depending on Stack's
 [`apply-ghc-options`](yaml_configuration.md#apply-ghc-options) YAML
 configuration option. This option can be specified multiple times.
 
-GHC's command line options are evaluated from left to right. Later options can
-override the effect of earlier ones. Stack applies the options specified at the
-command line last. Any existing GHC command line options of a package are
-applied after those specified at the command line.
+GHC's command line options are _order-dependent_ and evaluated from left to
+right. Later options can override the effect of earlier ones. Any GHC command
+line options for a package specified at Stack's command line are applied after
+those specified in Stack's YAML configuration files.
 
 ### `--[no-]library-profiling` flag
 
