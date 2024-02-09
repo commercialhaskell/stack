@@ -216,7 +216,7 @@ the documentation for the corresponding non-project specific configuration
 
 ## `--snapshot` option
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 Pass the option `--snapshot <snapshot>` to specify the snapshot. For further
 information, see the [YAML configuration](yaml_configuration.md#snapshot)

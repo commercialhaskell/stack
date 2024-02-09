@@ -63,7 +63,7 @@ archive should be copied to the specified directory.
 
 :octicons-beaker-24: Experimental
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 Hackage accepts documentation for a package for uploading in a standard form and
 in a compressed archive ('tarball') in the `.tar.gz` format.

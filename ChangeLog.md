@@ -14,7 +14,7 @@ Other enhancements:
 
 Bug fixes:
 
-## v2.15.1
+## v2.15.1 - 2024-02-09
 
 Release notes:
 
@@ -24,8 +24,6 @@ Release notes:
   following the dropping of support for Cabal versions older than `1.24.0.0`.
 
 **Changes since v2.13.1:**
-
-Major changes:
 
 Behavior changes:
 
