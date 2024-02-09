@@ -729,24 +729,25 @@ installPackageGivenDeps ::
 installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
   (MissingPresentDeps missing present minMutable) = do
     let name = package.name
-    ctx <- ask
-    mRightVersionInstalled <- case (minstalled, Set.null missing) of
-      (Just installed, True) -> do
-        shouldInstall <-
-          checkDirtiness ps installed package present buildHaddocks
-        pure $ if shouldInstall then Nothing else Just installed
-      (Just _, False) -> do
-        let t = T.intercalate ", " $
-                  map (T.pack . packageNameString . pkgName) (Set.toList missing)
-        tell mempty
-          { wDirty =
-              Map.singleton name $ "missing dependencies: " <> addEllipsis t
-          }
-        pure Nothing
-      (Nothing, _) -> pure Nothing
+    mRightVersionInstalled <- case minstalled of
+      Just installed -> if Set.null missing
+        then do
+          shouldInstall <-
+            checkDirtiness ps installed package present buildHaddocks
+          pure $ if shouldInstall then Nothing else Just installed
+        else do
+          let packageNameText = T.pack . packageNameString . pkgName
+          let t = T.intercalate ", " $ map packageNameText (Set.toList missing)
+          tell mempty
+            { wDirty =
+                Map.singleton name $ "missing dependencies: " <> addEllipsis t
+            }
+          pure Nothing
+      Nothing -> pure Nothing
     let loc = psLocation ps
         mutable = installLocationIsMutable loc <> minMutable
     let packageConfigureOpt = ConfigureOpts.packageConfigureOptsFromPackage package
+    ctx <- ask
     let configOpts = TaskConfigOpts
             { missing = missing
             , envConfig = ctx.ctxEnvConfig
