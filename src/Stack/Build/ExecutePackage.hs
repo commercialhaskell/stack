@@ -708,25 +708,13 @@ fetchAndMarkInstalledPackage ::
   -> PackageIdentifier
   -> RIO env Installed
 fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
-  let baseConfigOpts = ee.baseConfigOpts
-      (installedPkgDb, installedDumpPkgsTVar) =
-        case taskInstallLocation of
-          Snap ->
-            ( baseConfigOpts.snapDB
-            , ee.snapshotDumpPkgs )
-          Local ->
-            ( baseConfigOpts.localDB
-            , ee.localDumpPkgs )
+  let ghcPkgIdLoader = fetchGhcPkgIdForLib ee taskInstallLocation package.name
   -- Only pure the sub-libraries to cache them if we also cache the main
   -- library (that is, if it exists)
   if hasBuildableMainLibrary package
     then do
-      let getAndStoreGhcPkgId =
-            loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar
-          foldSubLibToMap subLib mapInMonad = do
-            let mungedName = toCabalMungedPackageName package.name subLib.name
-            maybeGhcpkgId <-
-              getAndStoreGhcPkgId (encodeCompatPackageName mungedName)
+      let foldSubLibToMap subLib mapInMonad = do
+            maybeGhcpkgId <- ghcPkgIdLoader (Just subLib.name)
             mapInMonad <&> case maybeGhcpkgId of
               Just v -> Map.insert subLib.name v
               _ -> id
@@ -734,7 +722,7 @@ fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
         package.subLibraries
         foldSubLibToMap
         mempty
-      mGhcPkgId <- getAndStoreGhcPkgId package.name
+      mGhcPkgId <- ghcPkgIdLoader Nothing
       case mGhcPkgId of
         Nothing -> throwM $ Couldn'tFindPkgId package.name
         Just ghcPkgId -> pure $ simpleInstalledLib pkgId ghcPkgId subLibsPkgIds
@@ -742,6 +730,30 @@ fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
       markExeInstalled taskInstallLocation pkgId -- TODO unify somehow
                                                   -- with writeFlagCache?
       pure $ Executable pkgId
+
+fetchGhcPkgIdForLib :: 
+     (HasTerm env, HasEnvConfig env)
+  => ExecuteEnv
+  -> InstallLocation
+  -> PackageName
+  -> Maybe Component.StackUnqualCompName
+  -> RIO env (Maybe GhcPkgId)
+fetchGhcPkgIdForLib ee installLocation pkgName libName = do
+  let baseConfigOpts = ee.baseConfigOpts
+      (installedPkgDb, installedDumpPkgsTVar) =
+        case installLocation of
+          Snap ->
+            ( baseConfigOpts.snapDB
+            , ee.snapshotDumpPkgs )
+          Local ->
+            ( baseConfigOpts.localDB
+            , ee.localDumpPkgs )
+  let commonLoader = loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar
+  case libName of
+    Nothing -> commonLoader pkgName
+    Just v -> do
+      let mungedName = encodeCompatPackageName $ toCabalMungedPackageName pkgName v
+      commonLoader mungedName 
 
 -- | Copy ddump-* files, if we are building finals and a non-empty ddump-dir
 -- has been specified.
