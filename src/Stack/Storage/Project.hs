@@ -33,12 +33,15 @@ import           Database.Persist.TH
 import           Pantry.SQLite ( initStorage, withStorage_ )
 import           Stack.Prelude
 import           Stack.Storage.Util
-                   ( handleMigrationException, updateCollection, listUpdateDiff, setUpdateDiff )
+                   ( handleMigrationException, listUpdateDiff, setUpdateDiff
+                   , updateCollection
+                   )
 import           Stack.Types.Build ( CachePkgSrc, ConfigCache (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Cache ( ConfigCacheType )
-import           Stack.Types.ConfigureOpts  ( ConfigureOpts (..), configureOptsFromDb )
+import           Stack.Types.ConfigureOpts
+                   ( ConfigureOpts (..), configureOptsFromDb )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Storage ( ProjectStorage (..) )
 
@@ -212,10 +215,10 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
       (maybe Set.empty (.components) mold)
       new.components
 
--- | Mark 'ConfigCache' as inactive in the database.
--- We use a flag instead of deleting the records since, in most cases, the same
--- cache will be written again within in a few seconds (after
--- `cabal configure`), so this avoids unnecessary database churn.
+-- | Mark 'ConfigCache' as inactive in the database. We use a flag instead of
+-- deleting the records since, in most cases, the same cache will be written
+-- again within in a few seconds (after `cabal configure`), so this avoids
+-- unnecessary database churn.
 deactiveConfigCache :: HasBuildConfig env => ConfigCacheKey -> RIO env ()
 deactiveConfigCache (UniqueConfigCacheParent dir type_) =
   withProjectStorage $

@@ -12,9 +12,9 @@ module Stack.Storage.Util
 
 import qualified Data.Set as Set
 import           Database.Persist
-                   ( BaseBackend, EntityField, PersistEntity
+                   ( BaseBackend, EntityField, Filter, PersistEntity
                    , PersistEntityBackend, PersistField, PersistQueryWrite
-                   , SafeToInsert, (<-.), deleteWhere, insertMany_, Filter
+                   , SafeToInsert, (<-.), deleteWhere, insertMany_
                    )
 import           Stack.Prelude
 import           Stack.Types.Storage ( StoragePrettyException (..) )
@@ -40,32 +40,32 @@ updateCollection fnDiffer recordCons extra old new =
   when (old /= new) $ do
     let (oldMinusNewFilter, newMinusOld) = fnDiffer old new
     unless (null oldMinusNewFilter) $ deleteWhere
-        (extra ++ oldMinusNewFilter)
+      (extra ++ oldMinusNewFilter)
     unless (null newMinusOld) $ insertMany_ $
       map recordCons $ toList newMinusOld
 
-setUpdateDiff :: 
-  (Ord value, PersistField value)
+setUpdateDiff ::
+     (Ord value, PersistField value)
   => EntityField record value
   -> Set value
   -> Set value
   -> ([Filter record], [value])
-setUpdateDiff indexFieldCons old new = 
-    let oldMinusNew = Set.difference old new
-    in ([indexFieldCons <-. toList oldMinusNew], toList $ Set.difference new old)
+setUpdateDiff indexFieldCons old new =
+  let oldMinusNew = Set.difference old new
+  in  ([indexFieldCons <-. toList oldMinusNew], toList $ Set.difference new old)
 
 listUpdateDiff ::
-  (Ord value)
+     (Ord value)
   => EntityField record Int
   -> [value]
   -> [value]
   -> ([Filter record], [(Int, value)])
 listUpdateDiff indexFieldCons old new =
-    let oldSet = Set.fromList (zip [0 ..] old)
-        newSet = Set.fromList (zip [0 ..] new)
-        oldMinusNew = Set.difference oldSet newSet
-        indexList = map fst (Set.toList oldMinusNew)
-    in ([indexFieldCons <-. indexList], toList $ Set.difference newSet oldSet)
+  let oldSet = Set.fromList (zip [0 ..] old)
+      newSet = Set.fromList (zip [0 ..] new)
+      oldMinusNew = Set.difference oldSet newSet
+      indexList = map fst (Set.toList oldMinusNew)
+  in  ([indexFieldCons <-. indexList], toList $ Set.difference newSet oldSet)
 
 handleMigrationException :: HasLogFunc env => RIO env a -> RIO env a
 handleMigrationException inner = do

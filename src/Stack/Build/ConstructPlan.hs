@@ -41,9 +41,10 @@ import           Stack.Types.Build
                    , taskProvides, taskTargetIsMutable, toCachePkgSrc
                    )
 import           Stack.Types.Build.ConstructPlan
-                   ( AddDepRes (..), CombinedMap, Ctx (..), M, PackageInfo (..)
-                   , ToolWarning(..), UnregisterState (..), W (..), MissingPresentDeps (..)
-                   , adrHasLibrary, adrVersion, toTask, isAdrToInstall
+                   ( AddDepRes (..), CombinedMap, Ctx (..), M
+                   , MissingPresentDeps (..), PackageInfo (..), ToolWarning(..)
+                   , UnregisterState (..), W (..), adrHasLibrary, adrVersion
+                   , isAdrToInstall, toTask
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -59,8 +60,7 @@ import           Stack.Types.Compiler ( WhichCompiler (..) )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
-import           Stack.Types.ConfigureOpts
-                   ( BaseConfigOpts (..) )
+import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
@@ -432,7 +432,7 @@ addFinal ::
   -> Bool
      -- ^ Should Haddock documentation be built?
   -> M ()
-addFinal lp package isAllInOne buildHaddocks = do
+addFinal lp package allInOne buildHaddocks = do
   depsRes <- addPackageDeps package
   res <- case depsRes of
     Left e -> pure $ Left e
@@ -440,7 +440,7 @@ addFinal lp package isAllInOne buildHaddocks = do
       let pkgConfigOpts = ConfigureOpts.packageConfigureOptsFromPackage package
       ctx <- ask
       let configOpts = TaskConfigOpts
-            { missing = missing
+            { missing
             , envConfig = ctx.ctxEnvConfig
             , baseConfigOpts = ctx.baseConfigOpts
             , isLocalNonExtraDep = True
@@ -452,7 +452,7 @@ addFinal lp package isAllInOne buildHaddocks = do
         , buildHaddocks
         , present
         , taskType = TTLocalMutable lp
-        , allInOne = isAllInOne
+        , allInOne
         , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFP))
         , buildTypeConfig = packageBuildTypeConfig package
         }
@@ -713,9 +713,9 @@ resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
         installPackageGivenDeps
           isAllInOne buildHaddocks ps package minstalled deps
 
--- | Checks if we need to install the given 'Package', given the results
--- of 'addPackageDeps'. If dependencies are missing, the package is dirty, or
--- it's not installed, then it needs to be installed.
+-- | Checks if we need to install the given 'Package', given the results of
+-- 'addPackageDeps'. If dependencies are missing, the package is dirty, or it is
+-- not installed, then it needs to be installed.
 installPackageGivenDeps ::
      Bool
      -- ^ will the build step also build any tests?
@@ -726,7 +726,7 @@ installPackageGivenDeps ::
   -> Maybe Installed
   -> MissingPresentDeps
   -> M AddDepRes
-installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
+installPackageGivenDeps allInOne buildHaddocks ps package minstalled
   (MissingPresentDeps missing present minMutable) = do
     let name = package.name
     mRightVersionInstalled <- case minstalled of
@@ -737,24 +737,24 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
           pure $ if shouldInstall then Nothing else Just installed
         else do
           let packageNameText = T.pack . packageNameString . pkgName
-          let t = T.intercalate ", " $ map packageNameText (Set.toList missing)
+              t = T.intercalate ", " $ map packageNameText (Set.toList missing)
           tell mempty
             { wDirty =
                 Map.singleton name $ "missing dependencies: " <> addEllipsis t
             }
           pure Nothing
       Nothing -> pure Nothing
-    let loc = psLocation ps
-        mutable = installLocationIsMutable loc <> minMutable
-    let packageConfigureOpt = ConfigureOpts.packageConfigureOptsFromPackage package
     ctx <- ask
-    let configOpts = TaskConfigOpts
-            { missing = missing
+    let loc = psLocation ps
+        isMutable = installLocationIsMutable loc <> minMutable
+        pkgConfigOpts = ConfigureOpts.packageConfigureOptsFromPackage package
+        configOpts = TaskConfigOpts
+            { missing
             , envConfig = ctx.ctxEnvConfig
             , baseConfigOpts = ctx.baseConfigOpts
             , isLocalNonExtraDep = psLocal ps
-            , isMutable = mutable
-            , pkgConfigOpts = packageConfigureOpt
+            , isMutable
+            , pkgConfigOpts
             }
     pure $ case mRightVersionInstalled of
       Just installed -> ADRFound loc installed
@@ -767,8 +767,8 @@ installPackageGivenDeps isAllInOne buildHaddocks ps package minstalled
               PSFilePath lp ->
                 TTLocalMutable lp
               PSRemote pkgLoc _version _fromSnapshot _cp ->
-                TTRemotePackage mutable package pkgLoc
-        , allInOne = isAllInOne
+                TTRemotePackage isMutable package pkgLoc
+        , allInOne
         , cachePkgSrc = toCachePkgSrc ps
         , buildTypeConfig = packageBuildTypeConfig package
         }
@@ -797,10 +797,7 @@ addEllipsis t
 -- (3) whether the package itself is mutable or immutable.
 addPackageDeps ::
      Package
-  -> M ( Either
-           ConstructPlanException
-           MissingPresentDeps
-       )
+  -> M (Either ConstructPlanException MissingPresentDeps)
 addPackageDeps package = do
   checkAndWarnForUnknownTools package
   let pkgId = packageIdentifier package
@@ -825,24 +822,26 @@ processDep ::
   -> DepValue
      -- ^ The version range and dependency type of the dependency.
   -> M ( Either
-           (Map PackageName
-            (VersionRange, Maybe (Version, BlobKey), BadDependency)
+           ( Map
+               PackageName
+               (VersionRange, Maybe (Version, BlobKey), BadDependency)
            )
            MissingPresentDeps
        )
 processDep pkgId name value = do
   mLatestApplicable <- getLatestApplicableVersionAndRev name range
   eRes <- getCachedDepOrAddDep name
-  let failure mLatestApp err = Left $ Map.singleton name (range, mLatestApp, err)
+  let failure mLatestApp err =
+        Left $ Map.singleton name (range, mLatestApp, err)
   case eRes of
     Left e -> do
       addParent
       let bd = case e of
             UnknownPackage name' -> assert (name' == name) NotInBuildPlan
             DependencyCycleDetected names -> BDDependencyCycleDetected names
-            -- ultimately we won't show any information on this to the user,
+            -- Ultimately we won't show any information on this to the user;
             -- we'll allow the dependency failures alone to display to avoid
-            -- spamming the user too much
+            -- spamming the user too much.
             DependencyPlanFailures _ _  ->
               Couldn'tResolveItsDependencies version
       pure $ failure mLatestApplicable bd
@@ -855,7 +854,7 @@ processDep pkgId name value = do
       pure $ if inRange
         then Right $ processAdr adr
         else failure mLatestApplicable (DependencyMismatch $ adrVersion adr)
-          
+
  where
   range = value.versionRange
   version = pkgVersion pkgId
@@ -993,10 +992,10 @@ processAdr adr = case adr of
       , presentPackages = presentPackagesV
       , isMutable = installLocationIsMutable loc
       }
-    where
-      presentPackagesV = case installed of
-        Library ident installedInfo -> installedMapGhcPkgId ident installedInfo
-        _ -> Map.empty
+   where
+    presentPackagesV = case installed of
+      Library ident installedInfo -> installedMapGhcPkgId ident installedInfo
+      _ -> Map.empty
 
 checkDirtiness ::
      PackageSource
@@ -1009,8 +1008,9 @@ checkDirtiness ::
 checkDirtiness ps installed package present buildHaddocks = do
   ctx <- ask
   moldOpts <- runRIO ctx $ tryGetFlagCache installed
-  let packageConfigureOpt = ConfigureOpts.packageConfigureOptsFromPackage package
-  let configureOpts = ConfigureOpts.configureOpts
+  let packageConfigureOpt =
+        ConfigureOpts.packageConfigureOptsFromPackage package
+      configureOpts = ConfigureOpts.configureOpts
         (view envConfigL ctx)
         ctx.baseConfigOpts
         present

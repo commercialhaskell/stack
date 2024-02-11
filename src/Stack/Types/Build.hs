@@ -58,7 +58,10 @@ import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), TestOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( BuildSubset (..), FileWatchOpts (..) )
-import           Stack.Types.ConfigureOpts ( ConfigureOpts, configureOpts, BaseConfigOpts, PackageConfigureOpts )
+import           Stack.Types.ConfigureOpts
+                   ( BaseConfigOpts, ConfigureOpts, PackageConfigureOpts
+                   , configureOpts
+                   )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.Package
@@ -165,9 +168,7 @@ data TaskConfigOpts = TaskConfigOpts
   }
 
 instance Show TaskConfigOpts where
-  show tco =
-    "Missing: "
-    ++ show tco.missing
+  show tco = "Missing: " ++ show tco.missing
 
 -- | Type representing different types of task, depending on what is to be
 -- built.

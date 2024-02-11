@@ -41,6 +41,7 @@ import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.Installed
                    ( InstallLocation, Installed (..), installedVersion )
+import           Stack.Types.IsMutable ( IsMutable )
 import           Stack.Types.Package
                    ( ExeName (..), LocalPackage (..), Package (..)
                    , PackageSource (..)
@@ -48,7 +49,6 @@ import           Stack.Types.Package
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
-import Stack.Types.IsMutable (IsMutable)
 
 -- | Type representing information about packages, namely information about
 -- whether or not a package is already installed and, unless the package is not
@@ -151,6 +151,7 @@ data MissingPresentDeps = MissingPresentDeps
   , isMutable :: !IsMutable
   }
   deriving (Show)
+
 instance Semigroup MissingPresentDeps where
   (<>) a b = MissingPresentDeps
     { missingPackages = missingPackages a <> missingPackages b

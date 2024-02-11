@@ -419,7 +419,10 @@ installedMapGhcPkgId pkgId@(PackageIdentifier pkgName version) installedLib =
       (toCabalMungedPackageIdentifier pkgName version)
       installedLib.subLib
 
-installedPackageToGhcPkgId :: PackageIdentifier -> Installed -> Map PackageIdentifier GhcPkgId
+installedPackageToGhcPkgId ::
+     PackageIdentifier
+  -> Installed
+  -> Map PackageIdentifier GhcPkgId
 installedPackageToGhcPkgId ident (Library ident' libInfo) =
   assert (ident == ident') (installedMapGhcPkgId ident libInfo)
 installedPackageToGhcPkgId _ (Executable _) = mempty

@@ -1,8 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE DataKinds           #-}
 
 module Stack.Types.ConfigureOpts
   ( ConfigureOpts (..)
@@ -16,12 +16,14 @@ module Stack.Types.ConfigureOpts
 
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import           Database.Persist ( Entity, entityVal )
 import           Distribution.Types.MungedPackageName
                    ( decodeCompatPackageName )
 import           Distribution.Types.PackageName ( unPackageName )
 import           Distribution.Types.UnqualComponentName
                    ( unUnqualComponentName )
 import qualified Distribution.Version as C
+import           GHC.Records ( HasField )
 import           Path ( (</>), parseRelDir )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Stack.Constants
@@ -32,15 +34,12 @@ import           Stack.Prelude
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI )
 import           Stack.Types.Compiler ( getGhcVersion, whichCompiler )
-import           Stack.Types.Config
-                   ( Config (..), HasConfig (..) )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( EnvConfig, actualCompilerVersionL )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.IsMutable ( IsMutable (..) )
-import           System.FilePath ( pathSeparator )
-import           Database.Persist (entityVal, Entity)
-import           GHC.Records ( HasField )
 import           Stack.Types.Package ( Package(..), packageIdentifier )
+import           System.FilePath ( pathSeparator )
 
 -- | Basic information used to calculate what the configure options are
 data BaseConfigOpts = BaseConfigOpts
@@ -54,8 +53,8 @@ data BaseConfigOpts = BaseConfigOpts
   }
   deriving Show
 
--- | All these fields come from the "Package" data type but bringing the whole Package
--- is way too much, hence this datatype.
+-- | All these fields come from the 'Package' data type but bringing the whole
+-- Package is way too much, hence this datatype.
 data PackageConfigureOpts = PackageConfigureOpts
   { pkgCabalConfigOpts :: [Text]
   , pkgGhcOptions :: [Text]
@@ -66,7 +65,7 @@ data PackageConfigureOpts = PackageConfigureOpts
   deriving Show
 
 packageConfigureOptsFromPackage ::
-  Package
+     Package
   -> PackageConfigureOpts
 packageConfigureOptsFromPackage pkg = PackageConfigureOpts
   { pkgCabalConfigOpts = pkg.cabalConfigOpts
@@ -77,14 +76,16 @@ packageConfigureOptsFromPackage pkg = PackageConfigureOpts
   }
 
 configureOptsFromDb ::
-  (HasField "configCacheDirOptionValue" b1 String, HasField "configCacheNoDirOptionValue" b2 String)
+     ( HasField "configCacheDirOptionValue" b1 String
+     , HasField "configCacheNoDirOptionValue" b2 String
+     )
   => [Entity b1]
   -> [Entity b2]
   -> ConfigureOpts
 configureOptsFromDb x y = ConfigureOpts
-    { pathRelated = map ((.configCacheDirOptionValue) . entityVal) x
-    , nonPathRelated = map ((.configCacheNoDirOptionValue) . entityVal) y
-    }
+  { pathRelated = map ((.configCacheDirOptionValue) . entityVal) x
+  , nonPathRelated = map ((.configCacheNoDirOptionValue) . entityVal) y
+  }
 
 -- | Render a @BaseConfigOpts@ to an actual list of options
 configureOpts ::
@@ -207,12 +208,14 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
   mapAndAppend fn = Map.foldrWithKey' (fmap (:) . fn)
   -- Unioning atop defaults is needed so that all flags are specified with
   -- --exact-configuration.
-  flags = mapAndAppend renderFlags [] (package.pkgFlags `Map.union` package.pkgDefaultFlags)
-  renderFlags name enabled = "-f" <>
-                     (if enabled
-                        then ""
-                        else "-") <>
-                     flagNameString name
+  flags = mapAndAppend
+    renderFlags
+    []
+    (package.pkgFlags `Map.union` package.pkgDefaultFlags)
+  renderFlags name enabled =
+       "-f"
+    <> (if enabled then "" else "-")
+    <> flagNameString name
 
   depOptions = mapAndAppend toDepOption [] deps
 

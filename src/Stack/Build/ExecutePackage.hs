@@ -185,14 +185,19 @@ getConfigCache ee task installedMap enableTest enableBench = do
   let cOpts = task.configOpts
   missingMapList <- traverse getMissing $ toList cOpts.missing
   let pcOpts = cOpts.pkgConfigOpts
-  let missing' = Map.unions missingMapList
-      -- historically the leftermost was missing' for union preference in case of
+      missing' = Map.unions missingMapList
+      -- Historically the leftermost was missing' for union preference in case of
       -- collision for the return here. But unifying things with configureOpts
       -- where it was the opposite resulted in this. It doesn't seem to make any
       -- difference anyway.
       allDepsMap = Map.union missing' task.present
       configureOpts' = ConfigureOpts.configureOpts
-          cOpts.envConfig cOpts.baseConfigOpts allDepsMap cOpts.isLocalNonExtraDep cOpts.isMutable pcOpts
+        cOpts.envConfig
+        cOpts.baseConfigOpts
+        allDepsMap
+        cOpts.isLocalNonExtraDep
+        cOpts.isMutable
+        pcOpts
       configureOpts = configureOpts'
         { nonPathRelated = configureOpts'.nonPathRelated ++ map T.unpack extra }
       deps = Set.fromList $ Map.elems missing' ++ Map.elems task.present
@@ -292,9 +297,11 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
     exes <- forM programNames $ \(name, file) -> do
       mpath <- findExecutable file
       pure $ case mpath of
-          Left _ -> []
-          Right x -> pure $ concat ["--with-", name, "=", x]
-    let allOpts = concat exes ++ ConfigureOpts.renderConfigureOpts newConfigCache.configureOpts
+        Left _ -> []
+        Right x -> pure $ concat ["--with-", name, "=", x]
+    let allOpts =
+             concat exes
+          <> ConfigureOpts.renderConfigureOpts newConfigCache.configureOpts
     -- Configure cabal with arguments determined by
     -- Stack.Types.Build.configureOpts
     cabal KeepTHLoading $ "configure" : allOpts
@@ -377,7 +384,17 @@ singleBuild
         Just precompiled -> copyPreCompiled ee task pkgId precompiled
         Nothing -> do
           curator <- view $ buildConfigL . to (.curator)
-          realConfigAndBuild isOldCabalCopy ac ee task installedMap (enableTests, enableBenchmarks) (isFinalBuild, buildingFinals) cache curator allDepsMap
+          realConfigAndBuild
+            isOldCabalCopy
+            ac
+            ee
+            task
+            installedMap
+            (enableTests, enableBenchmarks)
+            (isFinalBuild, buildingFinals)
+            cache
+            curator
+            allDepsMap
     case minstalled of
       Nothing -> pure ()
       Just installed -> do
@@ -391,75 +408,84 @@ singleBuild
   enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
 
 realConfigAndBuild ::
-  forall env a.
-  HasEnvConfig env
+     forall env a. HasEnvConfig env
   => Bool
-  -- ^ is cabal older than 2.0
+     -- ^ is cabal older than 2.0
   -> ActionContext
   -> ExecuteEnv
   -> Task
   -> Map PackageName (a, Installed)
   -> (Bool, Bool)
-   -- ^ (enableTests, enableBenchmarks)
+     -- ^ (enableTests, enableBenchmarks)
   -> (Bool, Bool)
-   -- ^ (isFinalBuild, buildingFinals)
+     -- ^ (isFinalBuild, buildingFinals)
   -> ConfigCache
   -> Maybe Curator
   -> Map PackageIdentifier GhcPkgId
   -> RIO env (Maybe Installed)
-realConfigAndBuild isOldCabalCopy ac ee task installedMap (enableTests, enableBenchmarks) (isFinalBuild, buildingFinals) cache mcurator0 allDepsMap =
-  withSingleContext ac ee task.taskType allDepsMap Nothing $
-    \package cabalFP pkgDir cabal0 announce _outputType -> do
-      let cabal = cabal0 CloseOnException
-      executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
-      when (  not (cabalIsSatisfied isOldCabalCopy executableBuildStatuses)
-            && taskIsTarget task
-            ) $
-        prettyInfoL
-          [ flow "Building all executables for"
-          , style Current (fromPackageName package.name)
-          , flow "once. After a successful build of all of them, only \
-                  \specified executables will be rebuilt."
-          ]
-      _neededConfig <-
-        ensureConfig
-          cache
-          pkgDir
-          ee.buildOpts
-          ( announce
-              (  "configure"
-              <> display (annSuffix executableBuildStatuses)
-              )
-          )
-          cabal
-          cabalFP
-          task
-      let installedMapHasThisPkg :: Bool
-          installedMapHasThisPkg =
-            case Map.lookup package.name installedMap of
-              Just (_, Library ident _) -> ident == pkgId
-              Just (_, Executable _) -> True
-              _ -> False
+realConfigAndBuild
+    isOldCabalCopy
+    ac
+    ee
+    task
+    installedMap
+    (enableTests, enableBenchmarks)
+    (isFinalBuild, buildingFinals)
+    cache
+    mcurator0
+    allDepsMap
+  = withSingleContext ac ee task.taskType allDepsMap Nothing $
+      \package cabalFP pkgDir cabal0 announce _outputType -> do
+        let cabal = cabal0 CloseOnException
+        executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
+        when (  not (cabalIsSatisfied isOldCabalCopy executableBuildStatuses)
+             && taskIsTarget task
+             ) $
+          prettyInfoL
+            [ flow "Building all executables for"
+            , style Current (fromPackageName package.name)
+            , flow "once. After a successful build of all of them, only \
+                    \specified executables will be rebuilt."
+            ]
+        _neededConfig <-
+          ensureConfig
+            cache
+            pkgDir
+            ee.buildOpts
+            ( announce
+                (  "configure"
+                <> display (annSuffix executableBuildStatuses)
+                )
+            )
+            cabal
+            cabalFP
+            task
+        let installedMapHasThisPkg :: Bool
+            installedMapHasThisPkg =
+              case Map.lookup package.name installedMap of
+                Just (_, Library ident _) -> ident == pkgId
+                Just (_, Executable _) -> True
+                _ -> False
 
-      case ( ee.buildOptsCLI.onlyConfigure
-            , ee.buildOptsCLI.initialBuildSteps && taskIsTarget task
-            ) of
-        -- A full build is done if there are downstream actions,
-        -- because their configure step will require that this
-        -- package is built. See
-        -- https://github.com/commercialhaskell/stack/issues/2787
-        (True, _) | null ac.downstream -> pure Nothing
-        (_, True) | null ac.downstream || installedMapHasThisPkg -> do
-          initialBuildSteps executableBuildStatuses cabal announce
-          pure Nothing
-        _ -> fulfillCuratorBuildExpectations
-                pname
-                mcurator0
-                enableTests
-                enableBenchmarks
-                Nothing
-                (Just <$>
-                  realBuild package pkgDir cabal0 announce executableBuildStatuses)
+        case ( ee.buildOptsCLI.onlyConfigure
+             , ee.buildOptsCLI.initialBuildSteps && taskIsTarget task
+             ) of
+          -- A full build is done if there are downstream actions,
+          -- because their configure step will require that this
+          -- package is built. See
+          -- https://github.com/commercialhaskell/stack/issues/2787
+          (True, _) | null ac.downstream -> pure Nothing
+          (_, True) | null ac.downstream || installedMapHasThisPkg -> do
+            initialBuildSteps executableBuildStatuses cabal announce
+            pure Nothing
+          _ -> fulfillCuratorBuildExpectations
+                  pname
+                  mcurator0
+                  enableTests
+                  enableBenchmarks
+                  Nothing
+                  (Just <$>
+                    realBuild package pkgDir cabal0 announce executableBuildStatuses)
  where
   pkgId = taskProvides task
   PackageIdentifier pname _ = pkgId
@@ -501,7 +527,7 @@ realConfigAndBuild isOldCabalCopy ac ee task installedMap (enableTests, enableBe
     cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
   realBuild ::
-    Package
+       Package
     -> Path Abs Dir
     -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
     -> (Utf8Builder -> RIO env ())
@@ -715,7 +741,7 @@ postProcessRemotePackage
 -- generating Haddocks.
 --
 fetchAndMarkInstalledPackage ::
-     (HasTerm env, HasEnvConfig env)
+     (HasEnvConfig env, HasTerm env)
   => ExecuteEnv
   -> InstallLocation
   -> Package
@@ -745,7 +771,7 @@ fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
                                                   -- with writeFlagCache?
       pure $ Executable pkgId
 
-fetchGhcPkgIdForLib :: 
+fetchGhcPkgIdForLib ::
      (HasTerm env, HasEnvConfig env)
   => ExecuteEnv
   -> InstallLocation
@@ -767,7 +793,7 @@ fetchGhcPkgIdForLib ee installLocation pkgName libName = do
     Nothing -> commonLoader pkgName
     Just v -> do
       let mungedName = encodeCompatPackageName $ toCabalMungedPackageName pkgName v
-      commonLoader mungedName 
+      commonLoader mungedName
 
 -- | Copy ddump-* files, if we are building finals and a non-empty ddump-dir
 -- has been specified.
@@ -1453,4 +1479,3 @@ fulfillCuratorBuildExpectations pname mcurator _ enableBench defValue action
           pure res
         Left _ -> pure defValue
 fulfillCuratorBuildExpectations _ _ _ _ _ action = action
-
