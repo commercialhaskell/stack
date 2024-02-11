@@ -43,24 +43,24 @@
 # Infinite: base/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-luLR/n-524:30"
+  id = "OBS-STAN-0102-luLR/n-525:30"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\New.hs
 #
-#  523 ┃
-#  524 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
-#  525 ┃                              ^^^^^^^^^^^^^^
+#  524 ┃
+#  525 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
+#  526 ┃                              ^^^^^^^^^^^^^^
 
 # Infinite: base/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-luLR/n-524:65"
+  id = "OBS-STAN-0102-luLR/n-525:65"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\New.hs
 #
-#  523 ┃
-#  524 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
-#  525 ┃                                                                 ^^^^^^^^^^^^^^
+#  524 ┃
+#  525 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
+#  526 ┃                                                                 ^^^^^^^^^^^^^^
 
 # Infinite: base/length
 # Usage of the 'length' function that hangs on infinite lists
@@ -72,14 +72,14 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-erw24B-1029:3"
+  id = "OBS-STAN-0203-erw24B-1028:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecuteEnv.hs
 #
-#  1028 ┃
-#  1029 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  1030 ┃   ^^^^^^^
+#  1027 ┃
+#  1028 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+#  1029 ┃   ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
@@ -116,14 +116,14 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-axv1UG-354:32"
+  id = "OBS-STAN-0203-axv1UG-355:32"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Docker.hs
 #
-#  353 ┃
-#  354 ┃     hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
-#  355 ┃                                ^^^^^^^
+#  354 ┃
+#  355 ┃     hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
+#  356 ┃                                ^^^^^^^
 
 # Data types with non-strict fields
 # Defining lazy fields in data types can lead to unexpected space leaks
