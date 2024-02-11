@@ -29,6 +29,7 @@ module Stack.Types.Package
   , dotCabalModule
   , dotCabalModulePath
   , installedMapGhcPkgId
+  , installedPackageToGhcPkgId
   , lpFiles
   , lpFilesForComponents
   , memoizeRefWith
@@ -417,6 +418,14 @@ installedMapGhcPkgId pkgId@(PackageIdentifier pkgName version) installedLib =
     M.mapKeysMonotonic
       (toCabalMungedPackageIdentifier pkgName version)
       installedLib.subLib
+
+installedPackageToGhcPkgId ::
+     PackageIdentifier
+  -> Installed
+  -> Map PackageIdentifier GhcPkgId
+installedPackageToGhcPkgId ident (Library ident' libInfo) =
+  assert (ident == ident') (installedMapGhcPkgId ident libInfo)
+installedPackageToGhcPkgId _ (Executable _) = mempty
 
 -- | Creates a 'MungedPackageName' identifier.
 toCabalMungedPackageIdentifier ::

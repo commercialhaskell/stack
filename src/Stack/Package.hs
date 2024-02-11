@@ -27,7 +27,7 @@ module Stack.Package
   , buildableTestSuites
   , buildableBenchmarks
   , getPackageOpts
-  , processPackageDepsToList
+  , processPackageDepsEither
   , listOfPackageDeps
   , setOfPackageDeps
   , topSortPackageComponent
@@ -737,12 +737,12 @@ processPackageMapDeps pkg fn = do
 -- | This is a function to iterate in a monad over all of a package component's
 -- dependencies, and yield a collection of results.
 processPackageDeps ::
-     (Monad m, Monoid (targetedCollection resT))
+     (Monad m)
   => Package
-  -> (resT -> targetedCollection resT -> targetedCollection resT)
-  -> (PackageName -> DepValue -> m resT)
-  -> m (targetedCollection resT)
-  -> m (targetedCollection resT)
+  -> (smallResT -> resT -> resT)
+  -> (PackageName -> DepValue -> m smallResT)
+  -> m resT
+  -> m resT
 processPackageDeps pkg combineResults fn = do
   let asPackageNameSet accessor =
         S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
@@ -772,6 +772,21 @@ processPackageDepsToList ::
   -> m [resT]
 processPackageDepsToList pkg fn = processPackageDeps pkg (:) fn (pure [])
 
+-- | Iterate/fold on all the package dependencies, components, setup deps and
+-- all.
+processPackageDepsEither ::
+     (Monad m, Monoid a, Monoid b)
+  => Package
+  -> (PackageName -> DepValue -> m (Either a b))
+  -> m (Either a b)
+processPackageDepsEither pkg fn =
+  processPackageDeps pkg combineRes fn (pure (Right mempty))
+ where
+  combineRes (Left err) (Left errs) = Left (errs <> err)
+  combineRes _ (Left b) = Left b
+  combineRes (Left err) _ = Left err
+  combineRes (Right a) (Right b) = Right $ a <> b
+
 -- | List all package's dependencies in a "free" context through the identity
 -- monad.
 listOfPackageDeps :: Package -> [PackageName]
@@ -784,20 +799,20 @@ setOfPackageDeps pkg =
   runIdentity $ processPackageDeps pkg S.insert (\pn _ -> pure pn) (pure mempty)
 
 -- | This implements a topological sort on all targeted components for the build
--- and their dependencies. It's only targeting internal dependencies, so it's doing
--- a topological sort on a subset of a package's components.
+-- and their dependencies. It's only targeting internal dependencies, so it's
+-- doing a topological sort on a subset of a package's components.
 --
--- Note that in Cabal they use the Data.Graph struct to pursue the same goal. But dong this here
--- would require a large number intermediate data structure.
--- This is needed because we need to get the right GhcPkgId of the relevant internal dependencies
--- of a component before building it as a component.
+-- Note that in Cabal they use the Data.Graph struct to pursue the same goal.
+-- But dong this here would require a large number intermediate data structure.
+-- This is needed because we need to get the right GhcPkgId of the relevant
+-- internal dependencies of a component before building it as a component.
 topSortPackageComponent ::
      Package
   -> Target
   -> Bool
-   -- ^ Include directTarget or not. False here means we won't
-   -- include the actual targets in the result, only their deps.
-   -- Using it with False here only in GHCi
+     -- ^ Include directTarget or not. False here means we won't include the
+     -- actual targets in the result, only their deps. Using it with False here
+     -- only in GHCi
   -> Seq NamedComponent
 topSortPackageComponent package target includeDirectTarget = runST $ do
   alreadyProcessedRef <- newSTRef (mempty :: Set NamedComponent)
@@ -807,48 +822,48 @@ topSortPackageComponent package target includeDirectTarget = runST $ do
           then processComponent includeDirectTarget alreadyProcessedRef c
           else id
   processPackageComponent package processInitialComponents (pure mempty)
-  where
-    processComponent :: forall s component. HasComponentInfo component
-      => Bool
+ where
+  processComponent :: forall s component. HasComponentInfo component
+    => Bool
        -- ^ Finally add this component in the seq
-      -> STRef s (Set NamedComponent)
-      -> component
-      -> ST s (Seq NamedComponent)
-      -> ST s (Seq NamedComponent)
-    processComponent finallyAddComponent alreadyProcessedRef component res = do
-      let depMap = componentDependencyMap component
-          internalDep = M.lookup package.name depMap
-          processSubDep = processOneDep alreadyProcessedRef internalDep res
-          qualName = component.qualifiedName
-          processSubDepSaveName
-            | finallyAddComponent = (|> qualName) <$> processSubDep
-            | otherwise = processSubDep
-      -- This is an optimization, the only components we are likely to process
-      -- multiple times are the ones we can find in dependencies, otherwise we
-      -- only fold on a single version of each component by design.
-      if isPotentialDependency qualName
-        then do
-          alreadyProcessed <- readSTRef alreadyProcessedRef
-          if S.member qualName alreadyProcessed
-            then res
-            else modifySTRef' alreadyProcessedRef (S.insert qualName)
-                   >> processSubDepSaveName
-        else processSubDepSaveName
-    lookupLibName isMain name = if isMain
-      then package.library
-      else collectionLookup name package.subLibraries
-    processOneDep alreadyProcessed mDependency res =
-      case (.depType) <$> mDependency of
-        Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
-          let processMainLibDep =
-                case (mainLibDep, lookupLibName True mempty) of
-                  (True, Just mainLib) ->
-                    processComponent True alreadyProcessed mainLib
-                  _ -> id
-              processSingleSubLib name =
-                case lookupLibName False name.unqualCompToText of
-                  Just lib -> processComponent True alreadyProcessed lib
-                  Nothing -> id
-              processSubLibDep r = foldr' processSingleSubLib r subLibDeps
-          processSubLibDep (processMainLibDep res)
-        _ -> res
+    -> STRef s (Set NamedComponent)
+    -> component
+    -> ST s (Seq NamedComponent)
+    -> ST s (Seq NamedComponent)
+  processComponent finallyAddComponent alreadyProcessedRef component res = do
+    let depMap = componentDependencyMap component
+        internalDep = M.lookup package.name depMap
+        processSubDep = processOneDep alreadyProcessedRef internalDep res
+        qualName = component.qualifiedName
+        processSubDepSaveName
+          | finallyAddComponent = (|> qualName) <$> processSubDep
+          | otherwise = processSubDep
+    -- This is an optimization, the only components we are likely to process
+    -- multiple times are the ones we can find in dependencies, otherwise we
+    -- only fold on a single version of each component by design.
+    if isPotentialDependency qualName
+      then do
+        alreadyProcessed <- readSTRef alreadyProcessedRef
+        if S.member qualName alreadyProcessed
+          then res
+          else modifySTRef' alreadyProcessedRef (S.insert qualName)
+                 >> processSubDepSaveName
+      else processSubDepSaveName
+  lookupLibName isMain name = if isMain
+    then package.library
+    else collectionLookup name package.subLibraries
+  processOneDep alreadyProcessed mDependency res =
+    case (.depType) <$> mDependency of
+      Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
+        let processMainLibDep =
+              case (mainLibDep, lookupLibName True mempty) of
+                (True, Just mainLib) ->
+                  processComponent True alreadyProcessed mainLib
+                _ -> id
+            processSingleSubLib name =
+              case lookupLibName False name.unqualCompToText of
+                Just lib -> processComponent True alreadyProcessed lib
+                Nothing -> id
+            processSubLibDep r = foldr' processSingleSubLib r subLibDeps
+        processSubLibDep (processMainLibDep res)
+      _ -> res

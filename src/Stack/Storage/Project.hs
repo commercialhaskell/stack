@@ -33,12 +33,15 @@ import           Database.Persist.TH
 import           Pantry.SQLite ( initStorage, withStorage_ )
 import           Stack.Prelude
 import           Stack.Storage.Util
-                   ( handleMigrationException, updateList, updateSet )
+                   ( handleMigrationException, listUpdateDiff, setUpdateDiff
+                   , updateCollection
+                   )
 import           Stack.Types.Build ( CachePkgSrc, ConfigCache (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Cache ( ConfigCacheType )
-import           Stack.Types.ConfigureOpts  ( ConfigureOpts (..) )
+import           Stack.Types.ConfigureOpts
+                   ( ConfigureOpts (..), configureOptsFromDb )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Storage ( ProjectStorage (..) )
 
@@ -115,20 +118,15 @@ readConfigCache ::
   -> ReaderT SqlBackend (RIO env) ConfigCache
 readConfigCache (Entity parentId configCacheParent) = do
   let pkgSrc = configCacheParent.configCacheParentPkgSrc
-  pathRelated <-
-    map ((.configCacheDirOptionValue) . entityVal) <$>
+  pathRelatedInfo <-
     selectList
       [ConfigCacheDirOptionParent ==. parentId]
       [Asc ConfigCacheDirOptionIndex]
-  nonPathRelated <-
-    map ((.configCacheNoDirOptionValue) . entityVal) <$>
+  nonPathRelatedInfo <-
     selectList
       [ConfigCacheNoDirOptionParent ==. parentId]
       [Asc ConfigCacheNoDirOptionIndex]
-  let configureOpts = ConfigureOpts
-        { pathRelated
-        , nonPathRelated
-        }
+  let configureOpts = configureOptsFromDb pathRelatedInfo nonPathRelatedInfo
   deps <-
     Set.fromList . map ((.configCacheDepValue) . entityVal) <$>
     selectList [ConfigCacheDepParent ==. parentId] []
@@ -192,39 +190,35 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
             , ConfigCacheParentPathEnvVar =. new.pathEnvVar
             ]
           pure (parentId, Just old)
-    updateList
-      ConfigCacheDirOption
-      ConfigCacheDirOptionParent
-      parentId
-      ConfigCacheDirOptionIndex
+    updateCollection
+      (listUpdateDiff ConfigCacheDirOptionIndex)
+      (uncurry $ ConfigCacheDirOption parentId)
+      [ConfigCacheDirOptionParent ==. parentId]
       (maybe [] (.configureOpts.pathRelated) mold)
       new.configureOpts.pathRelated
-    updateList
-      ConfigCacheNoDirOption
-      ConfigCacheNoDirOptionParent
-      parentId
-      ConfigCacheNoDirOptionIndex
+    updateCollection
+      (listUpdateDiff ConfigCacheNoDirOptionIndex)
+      (uncurry $ ConfigCacheNoDirOption parentId)
+      [ConfigCacheNoDirOptionParent ==. parentId]
       (maybe [] (.configureOpts.nonPathRelated) mold)
       new.configureOpts.nonPathRelated
-    updateSet
-      ConfigCacheDep
-      ConfigCacheDepParent
-      parentId
-      ConfigCacheDepValue
+    updateCollection
+      (setUpdateDiff ConfigCacheDepValue)
+      (ConfigCacheDep parentId)
+      [ConfigCacheDepParent ==. parentId]
       (maybe Set.empty (.deps) mold)
       new.deps
-    updateSet
-      ConfigCacheComponent
-      ConfigCacheComponentParent
-      parentId
-      ConfigCacheComponentValue
+    updateCollection
+      (setUpdateDiff ConfigCacheComponentValue)
+      (ConfigCacheComponent parentId)
+      [ConfigCacheComponentParent ==. parentId]
       (maybe Set.empty (.components) mold)
       new.components
 
--- | Mark 'ConfigCache' as inactive in the database.
--- We use a flag instead of deleting the records since, in most cases, the same
--- cache will be written again within in a few seconds (after
--- `cabal configure`), so this avoids unnecessary database churn.
+-- | Mark 'ConfigCache' as inactive in the database. We use a flag instead of
+-- deleting the records since, in most cases, the same cache will be written
+-- again within in a few seconds (after `cabal configure`), so this avoids
+-- unnecessary database churn.
 deactiveConfigCache :: HasBuildConfig env => ConfigCacheKey -> RIO env ()
 deactiveConfigCache (UniqueConfigCacheParent dir type_) =
   withProjectStorage $

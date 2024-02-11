@@ -12,9 +12,11 @@ module Stack.Types.Build.ConstructPlan
   , toTask
   , adrVersion
   , adrHasLibrary
+  , isAdrToInstall
   , Ctx (..)
   , UnregisterState (..)
   , ToolWarning (..)
+  , MissingPresentDeps (..)
   ) where
 
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
@@ -39,6 +41,7 @@ import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.Installed
                    ( InstallLocation, Installed (..), installedVersion )
+import           Stack.Types.IsMutable ( IsMutable )
 import           Stack.Types.Package
                    ( ExeName (..), LocalPackage (..), Package (..)
                    , PackageSource (..)
@@ -118,6 +121,10 @@ data AddDepRes
     -- ^ An existing installation provides the package name.
   deriving Show
 
+isAdrToInstall :: AddDepRes -> Bool
+isAdrToInstall ADRToInstall{} = True
+isAdrToInstall _ = False
+
 toTask :: AddDepRes -> Maybe Task
 toTask (ADRToInstall task) = Just task
 toTask (ADRFound _ _) = Nothing
@@ -137,6 +144,23 @@ adrHasLibrary (ADRToInstall task) = case task.taskType of
     hasBuildableMainLibrary p || not (null p.subLibraries)
 adrHasLibrary (ADRFound _ Library{}) = True
 adrHasLibrary (ADRFound _ Executable{}) = False
+
+data MissingPresentDeps = MissingPresentDeps
+  { missingPackages :: !(Set PackageIdentifier)
+  , presentPackages :: !(Map PackageIdentifier GhcPkgId)
+  , isMutable :: !IsMutable
+  }
+  deriving (Show)
+
+instance Semigroup MissingPresentDeps where
+  (<>) a b = MissingPresentDeps
+    { missingPackages = missingPackages a <> missingPackages b
+    , presentPackages = presentPackages a <> presentPackages b
+    , isMutable = isMutable a <> isMutable b
+    }
+
+instance Monoid MissingPresentDeps where
+  mempty = MissingPresentDeps mempty mempty mempty
 
 -- | Type representing values used as the environment to be read from during the
 -- construction of a build plan (the \'context\').
