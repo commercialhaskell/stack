@@ -596,20 +596,21 @@ singleBuild
 
       fulfillHaddockExpectations pname mcurator $ \keep -> do
         let args = concat
-              (  if isHaddockForHackage
-                   then
-                     [ [ "--for-hackage" ] ]
-                   else
-                     [ [ "--html"
-                       , "--hoogle"
-                       , "--html-location=../$pkg-$version/"
-                       ]
-                     , [ "--haddock-option=--hyperlinked-source"
-                       | ee.buildOpts.haddockHyperlinkSource
-                       ]
-                     , [ "--internal" | ee.buildOpts.haddockInternal  ]
-                     , quickjump
-                     ]
+              (  ( if isHaddockForHackage
+                    then
+                      [ [ "--for-hackage" ] ]
+                    else
+                      [ [ "--html"
+                        , "--hoogle"
+                        , "--html-location=../$pkg-$version/"
+                        ]
+                      , [ "--haddock-option=--hyperlinked-source"
+                        | ee.buildOpts.haddockHyperlinkSource
+                        ]
+                      , [ "--internal" | ee.buildOpts.haddockInternal  ]
+                      , quickjump
+                      ]
+                 )
               <> [ [ "--haddock-option=" <> opt
                    | opt <- ee.buildOpts.haddockOpts.additionalArgs
                    ]
