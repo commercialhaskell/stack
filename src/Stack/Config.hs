@@ -122,6 +122,8 @@ import           Stack.Types.Casa ( CasaOptsMonoid (..) )
 import           Stack.Types.Docker ( DockerOpts (..), DockerOptsMonoid (..) )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.GlobalOpts (  GlobalOpts (..) )
+import           Stack.Types.MsysEnvironment
+                   ( MsysEnvironment (..), msysEnvArch )
 import           Stack.Types.Nix ( NixOpts (..) )
 import           Stack.Types.Platform
                    ( PlatformVariant (..), platformOnlyRelDir )
@@ -311,6 +313,10 @@ configFromConfigMonoid
         installGHC = fromFirstTrue configMonoid.installGHC
         skipGHCCheck = fromFirstFalse configMonoid.skipGHCCheck
         skipMsys = fromFirstFalse configMonoid.skipMsys
+        defMsysEnvironment = case platform of
+          Platform I386 Windows -> Just MINGW32
+          Platform X86_64 Windows -> Just MINGW64
+          _ -> Nothing
         extraIncludeDirs = configMonoid.extraIncludeDirs
         extraLibDirs = configMonoid.extraLibDirs
         customPreprocessorExts = configMonoid.customPreprocessorExts
@@ -325,6 +331,15 @@ configFromConfigMonoid
         requireStackVersion = simplifyVersionRange
           configMonoid.requireStackVersion.intersectingVersionRange
         compilerCheck = fromFirst MatchMinor configMonoid.compilerCheck
+    msysEnvironment <- case defMsysEnvironment of
+      -- Ignore the configuration setting if there is no default for the
+      -- platform.
+      Nothing -> pure Nothing
+      Just defMsysEnv -> do
+        let msysEnv = fromFirst defMsysEnv configMonoid.msysEnvironment
+        if msysEnvArch msysEnv == arch
+          then pure $ Just msysEnv
+          else prettyThrowM $ BadMsysEnvironment msysEnv arch
     platformVariant <- liftIO $
       maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
     let build = buildOptsFromMonoid configMonoid.buildOpts
@@ -541,6 +556,7 @@ configFromConfigMonoid
                 , installGHC
                 , skipGHCCheck
                 , skipMsys
+                , msysEnvironment
                 , compilerCheck
                 , compilerRepository
                 , localBin

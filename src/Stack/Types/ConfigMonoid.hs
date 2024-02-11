@@ -45,6 +45,7 @@ import           Stack.Types.DumpLogs ( DumpLogs )
 import           Stack.Types.GhcOptionKey ( GhcOptionKey (..) )
 import           Stack.Types.GhcOptions ( GhcOptions (..) )
 import           Stack.Types.GHCVariant ( GHCVariant )
+import           Stack.Types.MsysEnvironment ( MsysEnvironment )
 import           Stack.Types.Nix ( NixOptsMonoid )
 import           Stack.Types.PvpBounds ( PvpBounds )
 import           Stack.Types.SCM ( SCM )
@@ -54,8 +55,8 @@ import           Stack.Types.Version
                    ( IntersectingVersionRange (..), VersionCheck )
 import qualified System.FilePath as FilePath
 
--- | An uninterpreted representation of configuration options.
--- Configurations may be "cascaded" using mappend (left-biased).
+-- | An uninterpreted representation of configuration options. Configurations
+-- may be "cascaded" using mappend (left-biased).
 data ConfigMonoid = ConfigMonoid
   { stackRoot          :: !(First (Path Abs Dir))
     -- ^ See: 'clStackRoot'
@@ -87,6 +88,8 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See: 'configSkipGHCCheck'
   , skipMsys            :: !FirstFalse
     -- ^ See: 'configSkipMsys'
+  , msysEnvironment     :: !(First MsysEnvironment)
+    -- ^ See: 'configMsysEnvironment'
   , compilerCheck       :: !(First VersionCheck)
     -- ^ See: 'configCompilerCheck'
   , compilerRepository  :: !(First CompilerRepository)
@@ -237,6 +240,7 @@ parseConfigMonoidObject rootDir obj = do
   installGHC <- FirstTrue <$> obj ..:? configMonoidInstallGHCName
   skipGHCCheck <- FirstFalse <$> obj ..:? configMonoidSkipGHCCheckName
   skipMsys <- FirstFalse <$> obj ..:? configMonoidSkipMsysName
+  msysEnvironment <- First <$> obj ..:? configMonoidMsysEnvironmentName
   requireStackVersion <-
     IntersectingVersionRange . (.versionRangeJSON) <$>
       ( obj ..:? configMonoidRequireStackVersionName
@@ -345,6 +349,7 @@ parseConfigMonoidObject rootDir obj = do
     , installGHC
     , skipGHCCheck
     , skipMsys
+    , msysEnvironment
     , compilerCheck
     , compilerRepository
     , requireStackVersion
@@ -440,6 +445,9 @@ configMonoidSkipGHCCheckName = "skip-ghc-check"
 
 configMonoidSkipMsysName :: Text
 configMonoidSkipMsysName = "skip-msys"
+
+configMonoidMsysEnvironmentName :: Text
+configMonoidMsysEnvironmentName = "msys-environment"
 
 configMonoidRequireStackVersionName :: Text
 configMonoidRequireStackVersionName = "require-stack-version"

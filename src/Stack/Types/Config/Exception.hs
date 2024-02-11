@@ -14,12 +14,14 @@ module Stack.Types.Config.Exception
 import qualified Data.Text as T
 import           Data.Yaml ( ParseException )
 import qualified Data.Yaml as Yaml
+import           Distribution.System ( Arch )
 import           Path( dirname, filename )
 import           Stack.Prelude
 import           Stack.Types.ConfigMonoid
                    ( configMonoidAllowDifferentUserName
                    , configMonoidGHCVariantName, configMonoidSystemGHCName
                    )
+import           Stack.Types.MsysEnvironment ( MsysEnvironment )
 import           Stack.Types.Version
                    ( VersionRange, stackVersion, versionRangeText )
 
@@ -159,6 +161,8 @@ data ConfigPrettyException
   | StackWorkEnvNotRelativeDir !String
   | MultiplePackageIndices [PackageIndexConfig]
   | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
+  | BadMsysEnvironment !MsysEnvironment !Arch
+  | NoMsysEnvironmentBug
   deriving (Show, Typeable)
 
 instance Pretty ConfigPrettyException where
@@ -214,9 +218,10 @@ instance Pretty ConfigPrettyException where
     "[S-5470]"
     <> line
     <> fillSep
-        [ flow "The same package name is used in more than one local package or"
-        , style Shell "extra-deps" <> "."
-        ]
+         [ flow "The same package name is used in more than one local package \
+                \or"
+         , style Shell "extra-deps" <> "."
+         ]
     <> mconcat (map go pairs)
    where
     go (name, dirs) =
@@ -227,6 +232,17 @@ instance Pretty ConfigPrettyException where
            ]
       <> line
       <> bulletedList (map (fromString . T.unpack . textDisplay) dirs)
+  pretty (BadMsysEnvironment msysEnv arch) =
+    "[S-6854]"
+    <> line
+    <> fillSep
+         [ flow "The specified MSYS2 environment"
+         , style Error (fromString $ show msysEnv)
+         , flow "is not consistent with the architecture"
+         , fromString (show arch) <> "."
+         ]
+  pretty NoMsysEnvironmentBug = bugPrettyReport "[S-5006]" $
+    flow "No default MSYS2 environment."
 
 instance Exception ConfigPrettyException
 

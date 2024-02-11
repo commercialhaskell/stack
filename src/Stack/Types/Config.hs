@@ -43,6 +43,7 @@ import           Stack.Types.Docker ( DockerOpts )
 import           Stack.Types.DumpLogs ( DumpLogs )
 import           Stack.Types.EnvSettings ( EnvSettings )
 import           Stack.Types.GHCVariant ( GHCVariant (..), HasGHCVariant (..) )
+import           Stack.Types.MsysEnvironment ( MsysEnvironment )
 import           Stack.Types.Nix ( NixOpts )
 import           Stack.Types.Platform ( HasPlatform (..), PlatformVariant )
 import           Stack.Types.Project ( Project (..) )
@@ -100,6 +101,9 @@ data Config = Config
     -- ^ Don't bother checking the GHC version or architecture.
   , skipMsys               :: !Bool
     -- ^ On Windows: don't use a sandboxed MSYS
+  , msysEnvironment        :: !(Maybe MsysEnvironment)
+    -- ^ On Windows: what MSYS2 environment to apply. Nothing on other operating
+    -- systems.
   , compilerCheck          :: !VersionCheck
     -- ^ Specifies which versions of the compiler are acceptable.
   , compilerRepository     :: !CompilerRepository

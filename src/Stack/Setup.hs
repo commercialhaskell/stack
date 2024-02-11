@@ -727,7 +727,8 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
   mGhcRtsEnvVar <- liftIO $ lookupEnv "GHCRTS"
 
   envRef <- liftIO $ newIORef Map.empty
-  let getProcessContext' es = do
+  let msysEnv = maybe "" (T.pack . show) config.msysEnvironment
+      getProcessContext' es = do
         m <- readIORef envRef
         case Map.lookup es m of
           Just eo -> pure eo
@@ -753,9 +754,9 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
 
               $ case (sopts.skipMsys, platform) of
                   (False, Platform Cabal.I386   Cabal.Windows) ->
-                    Map.insert "MSYSTEM" "MINGW32"
+                    Map.insert "MSYSTEM" msysEnv
                   (False, Platform Cabal.X86_64 Cabal.Windows) ->
-                    Map.insert "MSYSTEM" "MINGW64"
+                    Map.insert "MSYSTEM" msysEnv
                   _ -> id
 
               -- See https://github.com/commercialhaskell/stack/issues/3444
