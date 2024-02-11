@@ -104,26 +104,24 @@ hoogleCmd (args, setup, rebuild, startServer) =
   generateDbIfNeeded :: Path Abs File -> RIO EnvConfig ()
   generateDbIfNeeded hooglePath = do
     databaseExists <- checkDatabaseExists
-    if databaseExists && not rebuild
-      then pure ()
-      else
-        if setup || rebuild
-          then do
-            prettyWarn $
-              if rebuild
-                then flow "Rebuilding database ..."
-                else
-                  fillSep
-                    [ flow "No Hoogle database yet. Automatically building \
-                           \Haddock documentation and Hoogle database (use"
-                    , style Shell "--no-setup"
-                    , flow "to disable) ..."
-                    ]
-            buildHaddocks
-            prettyInfoS "Built Haddock documentation."
-            generateDb hooglePath
-            prettyInfoS "Generated Hoogle database."
-          else prettyThrowIO HoogleDatabaseNotFound
+    unless (databaseExists && not rebuild) $
+      if setup || rebuild
+        then do
+          prettyWarnL $
+            if rebuild
+              then
+                [ flow "Rebuilding database ..." ]
+              else
+                [ flow "No Hoogle database yet. Automatically building \
+                       \Haddock documentation and Hoogle database (use"
+                , style Shell "--no-setup"
+                , flow "to disable) ..."
+                ]
+          buildHaddocks
+          prettyInfoS "Built Haddock documentation."
+          generateDb hooglePath
+          prettyInfoS "Generated Hoogle database."
+        else prettyThrowIO HoogleDatabaseNotFound
 
   generateDb :: Path Abs File -> RIO EnvConfig ()
   generateDb hooglePath = do

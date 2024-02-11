@@ -18,6 +18,7 @@ module Stack.Ls
   , lsCmd
   ) where
 
+import           Control.Monad.Extra ( whenJust )
 import           Data.Aeson ( FromJSON, Value (..), (.:), encode )
 import           Data.Array.IArray ( (//), elems )
 import qualified Data.ByteString.Lazy.Char8 as LBC8
@@ -382,15 +383,17 @@ printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
   toSeq = Seq.fromList . Set.toList
   go index name =
     let newDepsCounts = remainingDepsCounts ++ [Set.size packages - index - 1]
-    in  case Map.lookup name dependencyMap of
-          Just (deps, payload) -> do
-            printTreeNode opts dotOpts depth newDepsCounts deps payload name
-            if Just depth == dotOpts.dependencyDepth
-              then pure ()
-              else printTree opts dotOpts (depth + 1) newDepsCounts deps
-                     dependencyMap
-          -- TODO: Define this behaviour, maybe pure an error?
-          Nothing -> pure ()
+        -- TODO: Define the 'Nothing' behaviour, maybe pure an error?
+    in  whenJust (Map.lookup name dependencyMap) $ \(deps, payload) -> do
+          printTreeNode opts dotOpts depth newDepsCounts deps payload name
+          unless (Just depth == dotOpts.dependencyDepth) $
+            printTree
+              opts
+              dotOpts
+              (depth + 1)
+              newDepsCounts
+              deps
+              dependencyMap
 
 printTreeNode ::
      ListDepsFormatOpts

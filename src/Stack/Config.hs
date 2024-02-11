@@ -33,7 +33,7 @@ module Stack.Config
   , determineStackRootAndOwnership
   ) where
 
-import           Control.Monad.Extra ( firstJustM )
+import           Control.Monad.Extra ( firstJustM, whenJust )
 import           Data.Aeson.Types ( Value )
 import           Data.Aeson.WarningParser
                     ( WithJSONWarnings (..), logJSONWarnings )
@@ -175,18 +175,16 @@ tryDeprecatedPath mWarningDesc exists new old = do
       oldExists <- exists old
       if oldExists
         then do
-          case mWarningDesc of
-            Nothing -> pure ()
-            Just desc ->
-              prettyWarnL
-                [ flow "Location of"
-                , flow (T.unpack desc)
-                , "at"
-                , style Dir (fromString $ toFilePath old)
-                , flow "is deprecated; rename it to"
-                , style Dir (fromString $ toFilePath new)
-                , "instead."
-                ]
+          whenJust mWarningDesc $ \desc ->
+            prettyWarnL
+              [ flow "Location of"
+              , flow (T.unpack desc)
+              , "at"
+              , style Dir (fromString $ toFilePath old)
+              , flow "is deprecated; rename it to"
+              , style Dir (fromString $ toFilePath new)
+              , "instead."
+              ]
           pure (old, True)
         else pure (new, False)
 

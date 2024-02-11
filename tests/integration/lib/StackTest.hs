@@ -163,8 +163,7 @@ nextPrompt = do
   if c == '>'
     then do
       -- Skip next character
-      _ <- liftIO $ hGetChar replStdoutHandle
-      pure ()
+      void $ liftIO $ hGetChar replStdoutHandle
     else nextPrompt
 
 replCommand :: String -> Repl ()

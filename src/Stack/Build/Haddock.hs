@@ -97,8 +97,7 @@ openHaddocksInBrowser bco pkgLocations buildTargets = do
               getDocIndex
       _ -> getDocIndex
   prettyInfo $ "Opening" <+> pretty docFile <+> "in the browser."
-  _ <- liftIO $ openBrowser (toFilePath docFile)
-  pure ()
+  void $ liftIO $ openBrowser (toFilePath docFile)
 
 -- | Determine whether we should haddock for a package.
 shouldHaddockPackage ::

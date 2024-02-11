@@ -56,7 +56,6 @@ pageWriter writer = do
          case exit of
            ExitSuccess -> pure ()
            ExitFailure n -> throwIO (PagerExitFailure (cmdspec pager) n)
-         pure ()
     Nothing -> writer stdout
  where
   cmdspecFromEnvVar = shell <$> MaybeT (lookupEnv "PAGER")

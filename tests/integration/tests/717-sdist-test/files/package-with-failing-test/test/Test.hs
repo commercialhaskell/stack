@@ -1,4 +1,4 @@
+import Data.Functor ( void )
+
 main :: IO ()
-main = do
-  readFile "files/file.txt"
-  pure ()
+main = void $ readFile "files/file.txt"

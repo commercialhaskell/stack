@@ -14,6 +14,7 @@ module Stack.PackageDump
   , pruneDeps
   ) where
 
+import           Control.Monad.Extra ( whenJust )
 import           Data.Attoparsec.Args ( EscapingMode (..), argsParser )
 import           Data.Attoparsec.Text as P
 import           Data.Conduit ( await, leftover, toConsumer, yield )
@@ -321,15 +322,13 @@ eachPair inner = start
 
   noIndent = do
     mx <- await
-    case mx of
-      Nothing -> pure ()
-      Just bs -> do
-        let (spaces, val) = T.span (== ' ') bs
-        if T.length spaces == 0
-          then leftover val
-          else do
-            yield val
-            loopIndent (T.length spaces)
+    whenJust mx $ \bs -> do
+      let (spaces, val) = T.span (== ' ') bs
+      if T.length spaces == 0
+        then leftover val
+        else do
+          yield val
+          loopIndent (T.length spaces)
 
   loopIndent i = loop
    where

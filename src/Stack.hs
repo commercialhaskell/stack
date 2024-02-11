@@ -9,6 +9,7 @@ module Stack
   ( main
   ) where
 
+import           Control.Monad.Extra ( whenJust )
 import           GHC.IO.Encoding ( mkTextEncoding, textEncodingName )
 import           Options.Applicative.Builder.Extra ( execExtraHelp )
 import           Stack.BuildInfo ( versionString' )
@@ -80,13 +81,10 @@ main = do
       global <- globalOptsFromMonoid isTerminal globalMonoid
       when (global.logLevel == LevelDebug) $
         hPutStrLn stderr versionString'
-      case global.reExecVersion of
-        Just expectVersion -> do
-          expectVersion' <- parseVersionThrowing expectVersion
-          unless (checkVersion MatchMinor expectVersion' stackVersion) $
-            throwIO $
-              InvalidReExecVersion expectVersion showStackVersion
-        _ -> pure ()
+      whenJust global.reExecVersion $ \expectVersion -> do
+        expectVersion' <- parseVersionThrowing expectVersion
+        unless (checkVersion MatchMinor expectVersion' stackVersion) $
+          throwIO $ InvalidReExecVersion expectVersion showStackVersion
       withRunnerGlobal global $ run `catches`
         [ Handler handleExitCode
         , Handler handlePrettyException
@@ -99,12 +97,10 @@ main = do
 hSetTranslit :: Handle -> IO ()
 hSetTranslit h = do
   menc <- hGetEncoding h
-  case fmap textEncodingName menc of
-    Just name
-      | '/' `notElem` name -> do
-          enc' <- mkTextEncoding $ name ++ "//TRANSLIT"
-          hSetEncoding h enc'
-    _ -> pure ()
+  whenJust (fmap textEncodingName menc) $ \name ->
+    unless ('/' `elem` name) $ do
+      enc' <- mkTextEncoding $ name ++ "//TRANSLIT"
+      hSetEncoding h enc'
 
 -- | Handle ExitCode exceptions.
 handleExitCode :: ExitCode -> RIO Runner a
