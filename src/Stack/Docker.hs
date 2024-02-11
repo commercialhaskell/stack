@@ -18,6 +18,7 @@ module Stack.Docker
   , runContainerAndExit
   ) where
 
+import           Control.Monad.Extra ( whenJust )
 import qualified Crypto.Hash as Hash ( Digest, MD5, hash )
 import           Data.Aeson ( eitherDecode )
 import           Data.Aeson.Types ( FromJSON (..), (.!=) )
@@ -499,10 +500,9 @@ entrypoint config@Config{} de = do
       estackUserEntry0 <- liftIO $ tryJust (guard . isDoesNotExistError) $
         User.getUserEntryForName stackUserName
       -- Switch UID/GID if needed, and update user's home directory
-      case de.user of
-        Nothing -> pure ()
-        Just (DockerUser 0 _ _ _) -> pure ()
-        Just du -> withProcessContext envOverride $
+      whenJust de.user $ \du -> case du of
+        DockerUser 0 _ _ _ -> pure ()
+        _ -> withProcessContext envOverride $
           updateOrCreateStackUser estackUserEntry0 homeDir du
       case estackUserEntry0 of
         Left _ -> pure ()
@@ -566,8 +566,7 @@ entrypoint config@Config{} de = do
       User.setGroupID du.gid
       handleSetGroups du.groups
       User.setUserID du.uid
-      _ <- Files.setFileCreationMask du.umask
-      pure ()
+      void $ Files.setFileCreationMask du.umask
   stackUserName = "stack" :: String
 
 -- | Remove the contents of a directory, without removing the directory itself.

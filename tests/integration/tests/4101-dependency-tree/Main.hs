@@ -4,11 +4,7 @@ import System.Directory (getCurrentDirectory)
 import Data.List (isPrefixOf)
 
 main :: IO ()
-main =
-  if isWindows
-  then do pure ()
-  else do
-
+main = unless isWindows $ do
   stackCheckStdout ["ls", "dependencies", "tree"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "├─┬ files 0.1.0.0"
@@ -46,6 +42,7 @@ main =
 
   stackCheckStdout ["ls", "dependencies", "json"] $ \stdOut -> do
     currdir <- getCurrentDirectory
-    let expected = "[{\"dependencies\":[\"base\",\"bytestring\",\"filepath\",\"time\"]"
+    let expected =
+          "[{\"dependencies\":[\"base\",\"bytestring\",\"filepath\",\"time\"]"
     unless (expected `isPrefixOf` stdOut) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]

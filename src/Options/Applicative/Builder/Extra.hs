@@ -224,8 +224,8 @@ execExtraHelp ::
   -> IO ()
 execExtraHelp args helpOpt parser pd =
   when (args == ["--" ++ helpOpt]) $
-    withArgs ["--help"] $ do
-      _ <- execParser (info
+    withArgs ["--help"] $
+      void $ execParser (info
              (   hiddenHelper
              <*> ( (,)
                      <$> parser
@@ -234,7 +234,6 @@ execExtraHelp args helpOpt parser pd =
                  )
              )
             (fullDesc <> progDesc pd))
-      pure ()
  where
   hiddenHelper = abortOption showHelpText (long "help" <> hidden <> internal)
 

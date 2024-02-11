@@ -21,6 +21,7 @@ import qualified Codec.Compression.GZip as GZip
 import           Conduit ( runConduitRes, sourceLazy, sinkFileCautious )
 import           Control.Concurrent.Execute
                    ( ActionContext (..), Concurrency (..) )
+import           Control.Monad.Extra ( whenJust )
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
@@ -600,9 +601,7 @@ checkPackageInExtractedTarball pkgDir = do
          flow "Package check reported the following warnings:"
       <> line
       <> bulletedList (map (fromString . show) warnings)
-  case nonEmpty errors of
-    Nothing -> pure ()
-    Just ne -> prettyThrowM $ CheckException ne
+  whenJust (nonEmpty errors) $ \ne -> prettyThrowM $ CheckException ne
 
 buildExtractedTarball :: HasEnvConfig env => ResolvedPath Dir -> RIO env ()
 buildExtractedTarball pkgDir = do

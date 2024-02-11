@@ -11,6 +11,7 @@ module Stack.New
   , new
   ) where
 
+import           Control.Monad.Extra ( whenJust )
 import           Control.Monad.Trans.Writer.Strict ( execWriterT )
 import           Data.Aeson as A
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -660,17 +661,15 @@ writeTemplateFiles files =
 runTemplateInits :: HasConfig env => Path Abs Dir -> RIO env ()
 runTemplateInits dir = do
   config <- view configL
-  case config.scmInit of
-    Nothing -> pure ()
-    Just Git -> withWorkingDir (toFilePath dir) $
+  whenJust config.scmInit $ \Git ->
+    withWorkingDir (toFilePath dir) $
       catchAny
         (proc "git" ["init"] runProcess_)
-        ( \_ -> prettyWarn $
-                  fillSep
-                    [ flow "Stack failed to run a"
-                    , style Shell (flow "git init")
-                    , flow "command. Ignoring..."
-                    ]
+        ( \_ -> prettyWarnL
+            [ flow "Stack failed to run a"
+            , style Shell (flow "git init")
+            , flow "command. Ignoring..."
+            ]
         )
 
 --------------------------------------------------------------------------------

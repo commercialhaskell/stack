@@ -19,6 +19,7 @@ import           Control.Concurrent.Execute
                    , Concurrency (..), runActions
                    )
 import           Control.Concurrent.STM ( check )
+import           Control.Monad.Extra ( whenJust )
 import qualified Data.List as L
 import           Data.List.Split ( chunksOf )
 import qualified Data.Map.Merge.Strict as Map
@@ -346,11 +347,9 @@ executePlan' installedMap0 targets plan ee = do
   let !testOpts = buildOpts.testOpts
   when testOpts.coverage deleteHpcReports
   cv <- view actualCompilerVersionL
-  case nonEmpty $ Map.toList plan.unregisterLocal of
-    Nothing -> pure ()
-    Just ids -> do
-      localDB <- packageDatabaseLocal
-      unregisterPackages cv localDB ids
+  whenJust (nonEmpty $ Map.toList plan.unregisterLocal) $ \ids -> do
+    localDB <- packageDatabaseLocal
+    unregisterPackages cv localDB ids
 
   liftIO $ atomically $ modifyTVar' ee.localDumpPkgs $ \initMap ->
     foldl' (flip Map.delete) initMap $ Map.keys plan.unregisterLocal

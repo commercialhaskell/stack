@@ -14,6 +14,7 @@ module Stack.Ghci
   , ghci
   ) where
 
+import           Control.Monad.Extra ( whenJust )
 import           Control.Monad.State.Strict ( State, execState, get, modify )
 import           Data.ByteString.Builder ( byteString )
 import qualified Data.ByteString.Char8 as S8
@@ -247,9 +248,7 @@ ghci opts = do
   (inputTargets, mfileTargets) <- case etargets of
     Right packageTargets -> pure (packageTargets, Nothing)
     Left rawFileTargets -> do
-      case mainIsTargets of
-        Nothing -> pure ()
-        Just _ -> throwM Can'tSpecifyFilesAndMainIs
+      whenJust mainIsTargets $ \_ -> throwM Can'tSpecifyFilesAndMainIs
       -- Figure out targets based on filepath targets
       (targetMap, fileInfo, extraFiles) <- findFileTargets locals rawFileTargets
       pure (targetMap, Just (fileInfo, extraFiles))
@@ -475,9 +474,9 @@ buildDepsAndInitialSteps ghciOpts localTargets = do
   let targets = localTargets ++ map T.pack ghciOpts.additionalPackages
   -- If necessary, do the build, for local packagee targets, only do
   -- 'initialBuildSteps'.
-  case nonEmpty targets of
-    -- only new local targets could appear here
-    Just nonEmptyTargets | not ghciOpts.noBuild -> do
+  whenJust (nonEmpty targets) $ \nonEmptyTargets ->
+    unless ghciOpts.noBuild $ do
+      -- only new local targets could appear here
       eres <- buildLocalTargets nonEmptyTargets
       case eres of
         Right () -> pure ()
@@ -486,8 +485,6 @@ buildDepsAndInitialSteps ghciOpts localTargets = do
             Just (PrettyException prettyErr) -> prettyError $ pretty prettyErr
             Nothing -> prettyError $ fromString (displayException err)
           prettyWarn "Build failed, but trying to launch GHCi anyway"
-    _ ->
-      pure ()
 
 checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do

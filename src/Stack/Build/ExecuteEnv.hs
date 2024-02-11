@@ -21,6 +21,7 @@ module Stack.Build.ExecuteEnv
 import           Control.Concurrent.Companion ( Companion, withCompanion )
 import           Control.Concurrent.Execute
                    ( ActionContext (..), ActionId (..), Concurrency (..) )
+import           Control.Monad.Extra ( whenJust )
 import           Crypto.Hash ( SHA256 (..), hashWith )
 import           Data.Attoparsec.Text ( char, choice, digit, parseOnly )
 import qualified Data.Attoparsec.Text as P ( string )
@@ -450,13 +451,11 @@ withExecuteEnv
     noColors = do
       CB.takeWhile (/= 27) -- ESC
       mnext <- CB.head
-      case mnext of
-        Nothing -> pure ()
-        Just x -> assert (x == 27) $ do
-          -- Color sequences always end with an m
-          CB.dropWhile (/= 109) -- m
-          CB.drop 1 -- drop the m itself
-          noColors
+      whenJust mnext $ \x -> assert (x == 27) $ do
+        -- Color sequences always end with an m
+        CB.dropWhile (/= 109) -- m
+        CB.drop 1 -- drop the m itself
+        noColors
 
 -- | Make a padded prefix for log messages
 packageNamePrefix :: ExecuteEnv -> PackageName -> String

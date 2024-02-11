@@ -1169,7 +1169,6 @@ checkAndWarnForUnknownTools p = do
     fmap catMaybes $ forM unknownTools $ \toolName ->
       runMaybeT $ notOnPath toolName *> notPackageExe toolName *> warn toolName
   tell mempty { wWarnings = (map toolWarningText warnings ++) }
-  pure ()
  where
   -- From Cabal 2.0, build-tools can specify a pre-built executable that should
   -- already be on the PATH.

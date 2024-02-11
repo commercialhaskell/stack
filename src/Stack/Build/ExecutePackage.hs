@@ -395,12 +395,9 @@ singleBuild
             cache
             curator
             allDepsMap
-    case minstalled of
-      Nothing -> pure ()
-      Just installed -> do
-        writeFlagCache installed cache
-        liftIO $ atomically $
-          modifyTVar ee.ghcPkgIds $ Map.insert pkgId installed
+    whenJust minstalled $ \installed -> do
+      writeFlagCache installed cache
+      liftIO $ atomically $ modifyTVar ee.ghcPkgIds $ Map.insert pkgId installed
  where
   pkgId = taskProvides task
   buildingFinals = isFinalBuild || task.allInOne
@@ -944,11 +941,9 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
       let pkgDb = ee.baseConfigOpts.snapDB
       ghcPkgExe <- getGhcPkgExe
       -- First unregister, silently, everything that needs to be unregistered.
-      case nonEmpty allToUnregister of
-        Nothing -> pure ()
-        Just allToUnregister' -> catchAny
-          (unregisterGhcPkgIds False ghcPkgExe pkgDb allToUnregister')
-          (const (pure ()))
+      whenJust (nonEmpty allToUnregister) $ \allToUnregister' -> catchAny
+        (unregisterGhcPkgIds False ghcPkgExe pkgDb allToUnregister')
+        (const (pure ()))
       -- Now, register the cached conf files.
       forM_ allToRegister $ \libpath ->
         ghcPkg ghcPkgExe [pkgDb] ["register", "--force", toFilePath libpath]
