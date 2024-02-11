@@ -14,6 +14,8 @@ Other enhancements:
 
 Bug fixes:
 
+* `--haddock-for-hackage` does not ignore `--haddock-arguments`.
+
 ## v2.15.1 - 2024-02-09
 
 Release notes:
