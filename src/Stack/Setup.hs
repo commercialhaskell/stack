@@ -1056,24 +1056,21 @@ warnUnsupportedCompilerCabal cp didWarn = do
   let cabalVersion = cp.cabalVersion
   notifyIfCabalUntested <- view $ configL . to (.notifyIfCabalUntested)
   if
-    | cabalVersion < mkVersion [1, 24, 0] -> do
+    | cabalVersion < mkVersion [2, 2] -> do
         prettyWarnL
-          [ flow "Stack no longer supports Cabal versions below 1.24.0.0, but \
-                 \version"
+          [ flow "Stack uses the version of the Cabal package that comes with \
+                 \the specified version of GHC. However, Stack no longer \
+                 \supports such Cabal versions before 2.2. Version"
           , fromString (versionString cabalVersion)
-          , flow "was found. This invocation will most likely fail. To fix \
-                 \this, either use an older version of Stack or a newer \
-                 \resolver. Acceptable resolvers: lts-7.0/nightly-2016-05-26 \
-                 \or later."
-          ]
-    | cabalVersion < mkVersion [2, 2, 0] -> do
-        prettyWarnL
-          [ flow "Stack's support of Cabal versions below 2.2.0.0 is \
-                 \deprecated and may be removed from the next version of \
-                 \ Stack. Cabal version"
-          , fromString (versionString cabalVersion)
-          , flow "was found. Consider using a resolver that is \
-                 \lts-12.0 or later or nightly-2018-03-13 or later."
+          , flow "was found. This invocation of Stack may fail. To fix this, \
+                 \either use Stack 2.15.1 or earlier or use a snapshot that \
+                 \specifies a version of GHC that is 8.4 or later. Stackage \
+                 \LTS Haskell 12.0 or later and Nightly 2018-03-13 or later. \
+                 \Stackage LTS Haskell 12.0"
+          , parens (style Shell "lts-12.0")
+          , flow "or later or Nightly 2018-03-13"
+          , parens (style Shell "nightly-2018-03-13")
+          , flow "or later specify such GHC versions."
           ]
     | cabalVersion >= mkVersion [3, 11] && notifyIfCabalUntested ->
         prettyWarnL

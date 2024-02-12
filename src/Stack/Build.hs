@@ -83,14 +83,17 @@ instance Pretty CabalVersionPrettyException where
     "[S-5973]"
     <> line
     <> fillSep
-         [ flow "Stack does not support Cabal versions before 1.24, but \
-                \version"
+         [ flow "Stack builds with the version of the Cabal package that comes \
+                \with the specified version of GHC. However, Stack no longer \
+                \supports such Cabal versions before 2.2. Version"
          , fromString $ versionString cabalVer
-         , flow "was found. To fix this, consider updating the snapshot to"
-         , style Shell "lts-7.0"
-         , flow "or later or to"
-         , style Shell "nightly-2016-05-26"
-         , flow "or later."
+         , flow "was found. To fix this, either use Stack 2.15.1 or earlier or \
+                \use a snapshot that specifies a version of GHC that is 8.4 or \
+                \later. Stackage LTS Haskell 12.0"
+         , parens (style Shell "lts-12.0")
+         , flow "or later or Nightly 2018-03-13"
+         , parens (style Shell "nightly-2018-03-13")
+         , flow "or later specify such GHC versions."
          ]
 
 instance Exception CabalVersionPrettyException
@@ -221,7 +224,7 @@ justLocals =
 checkCabalVersion :: HasEnvConfig env => RIO env ()
 checkCabalVersion = do
   cabalVer <- view cabalVersionL
-  when (cabalVer < mkVersion [1, 24]) $
+  when (cabalVer < mkVersion [2, 2]) $
     prettyThrowM $ CabalVersionNotSupported cabalVer
 
 -- | See https://github.com/commercialhaskell/stack/issues/1198.
