@@ -330,7 +330,7 @@ generateBuildInfoOpts bi =
   srcOpts =
     map (("-i" <>) . toFilePathNoTrailingSep)
       (concat
-        [ [ componentBuildDir bi.cabalVersion bi.componentName bi.distDir ]
+        [ [ componentBuildDir bi.componentName bi.distDir ]
         , [ bi.cabalDir
           | null bi.buildInfo.hsSourceDirs
           ]
@@ -338,12 +338,11 @@ generateBuildInfoOpts bi =
             (toIncludeDir . getSymbolicPath)
             bi.buildInfo.hsSourceDirs
         , [ componentAutogen ]
-        , maybeToList (packageAutogenDir bi.cabalVersion bi.distDir)
+        , [ packageAutogenDir bi.distDir ]
         , [ componentOutputDir bi.componentName bi.distDir ]
         ]) ++
     [ "-stubdir=" ++ toFilePathNoTrailingSep (buildDir bi.distDir) ]
-  componentAutogen =
-    componentAutogenDir bi.cabalVersion bi.componentName bi.distDir
+  componentAutogen = componentAutogenDir bi.componentName bi.distDir
   toIncludeDir "." = Just bi.cabalDir
   toIncludeDir relDir = concatAndCollapseAbsDir bi.cabalDir relDir
   includeOpts =

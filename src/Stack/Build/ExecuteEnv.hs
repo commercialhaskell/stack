@@ -14,7 +14,6 @@ module Stack.Build.ExecuteEnv
   , withSingleContext
   , ExcludeTHLoading (..)
   , KeepOutputOpen (..)
-  , ExecutableBuildStatus (..)
   , OutputType (..)
   ) where
 
@@ -112,12 +111,6 @@ import qualified System.Directory as D
 import           System.Environment ( lookupEnv )
 import           System.FileLock
                    ( SharedExclusive (..), withFileLock, withTryFileLock )
-
--- | Has an executable been built or not?
-data ExecutableBuildStatus
-  = ExecutableBuilt
-  | ExecutableNotBuilt
-  deriving (Eq, Ord, Show)
 
 data ExecuteEnv = ExecuteEnv
   { installLock    :: !(MVar ())

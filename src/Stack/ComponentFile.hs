@@ -33,7 +33,6 @@ import           Distribution.PackageDescription
 import           Distribution.Text ( display )
 import           Distribution.Utils.Path
                    ( PackageDir, SourceDir, SymbolicPath, getSymbolicPath )
-import           Distribution.Version ( mkVersion )
 import           GHC.Records ( HasField )
 import qualified HiFileParser as Iface
 import           Path
@@ -154,10 +153,9 @@ resolveComponentFiles component build names = do
   pure (component, ComponentFile modules (files <> cfiles) warnings)
  where
   autogenDirs = do
-    cabalVer <- asks (.cabalVer)
     distDir <- asks (.distDir)
-    let compDir = componentAutogenDir cabalVer component distDir
-        pkgDir = maybeToList $ packageAutogenDir cabalVer distDir
+    let compDir = componentAutogenDir component distDir
+        pkgDir = [packageAutogenDir distDir]
     filterM doesDirExist $ compDir : pkgDir
 
 -- | Try to resolve the list of base names in the given directory by looking for
@@ -532,15 +530,13 @@ resolveDirOrWarn = resolveOrWarn "Directory" f
   f p x = forgivingResolveDir p x >>= rejectMissingDir
 
 -- | Make the global autogen dir if Cabal version is new enough.
-packageAutogenDir :: Version -> Path Abs Dir -> Maybe (Path Abs Dir)
-packageAutogenDir cabalVer distDir
-  | cabalVer < mkVersion [2, 0] = Nothing
-  | otherwise = Just $ buildDir distDir </> relDirGlobalAutogen
+packageAutogenDir :: Path Abs Dir -> Path Abs Dir
+packageAutogenDir distDir = buildDir distDir </> relDirGlobalAutogen
 
 -- | Make the autogen dir.
-componentAutogenDir :: Version -> NamedComponent -> Path Abs Dir -> Path Abs Dir
-componentAutogenDir cabalVer component distDir =
-  componentBuildDir cabalVer component distDir </> relDirAutogen
+componentAutogenDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir
+componentAutogenDir component distDir =
+  componentBuildDir component distDir </> relDirAutogen
 
 -- | Make the build dir. Note that Cabal >= 2.0 uses the
 -- 'componentBuildDir' above for some things.
@@ -555,17 +551,14 @@ componentNameToDir name =
   where sName = T.unpack name
 
 -- | See 'Distribution.Simple.LocalBuildInfo.componentBuildDir'
-componentBuildDir :: Version -> NamedComponent -> Path Abs Dir -> Path Abs Dir
-componentBuildDir cabalVer component distDir
-  | cabalVer < mkVersion [2, 0] = buildDir distDir
-  | otherwise =
-      case component of
-        CLib -> buildDir distDir
-        CSubLib name -> buildDir distDir </> componentNameToDir name
-        CFlib name -> buildDir distDir </> componentNameToDir name
-        CExe name -> buildDir distDir </> componentNameToDir name
-        CTest name -> buildDir distDir </> componentNameToDir name
-        CBench name -> buildDir distDir </> componentNameToDir name
+componentBuildDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir
+componentBuildDir component distDir = case component of
+  CLib -> buildDir distDir
+  CSubLib name -> buildDir distDir </> componentNameToDir name
+  CFlib name -> buildDir distDir </> componentNameToDir name
+  CExe name -> buildDir distDir </> componentNameToDir name
+  CTest name -> buildDir distDir </> componentNameToDir name
+  CBench name -> buildDir distDir </> componentNameToDir name
 
 -- Internal helper to define resolveFileOrWarn and resolveDirOrWarn
 resolveOrWarn ::

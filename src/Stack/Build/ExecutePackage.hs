@@ -61,16 +61,13 @@ import           Stack.Build.Cache
                    , writePackageProjectRoot, writeSetupConfigMod
                    )
 import           Stack.Build.ExecuteEnv
-                   ( ExcludeTHLoading (..), ExecutableBuildStatus (..)
-                   , ExecuteEnv (..), KeepOutputOpen (..), OutputType (..)
-                   , withSingleContext
+                   ( ExcludeTHLoading (..), ExecuteEnv (..), KeepOutputOpen (..)
+                   , OutputType (..), withSingleContext
                    )
 import           Stack.Build.Source ( addUnlistedToBuildCache )
 import           Stack.Config.ConfigureScript ( ensureConfigureScript )
 import           Stack.Constants
-                   ( bindirSuffix, compilerOptionsCabalFlag, relDirBuild
-                   , testGhcEnvRelFile
-                   )
+                   ( bindirSuffix, compilerOptionsCabalFlag, testGhcEnvRelFile )
 import           Stack.Constants.Config
                    ( distDirFromDir, distRelativeDir, hpcDirFromDir
                    , hpcRelativeDir, setupConfigFromDir
@@ -119,7 +116,7 @@ import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
-                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
+                   ( HasEnvConfig (..), actualCompilerVersionL
                    , appropriateGhcColorFlag
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
@@ -140,7 +137,6 @@ import           Stack.Types.Package
                    , toCabalMungedPackageName
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
-import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner, globalOptsL )
 import           System.IO.Error ( isDoesNotExistError )
 import           System.PosixCompat.Files
@@ -371,10 +367,6 @@ singleBuild
     installedMap
     isFinalBuild
   = do
-    cabalVersion <- view $ envConfigL . to (.compilerPaths.cabalVersion)
-    -- The old version of Cabal (the library) copy did not allow the components
-    -- to be copied to be specified.
-    let isOldCabalCopy = cabalVersion < mkVersion [2, 0]
     (allDepsMap, cache) <-
       getConfigCache ee task installedMap enableTests enableBenchmarks
     let bcoSnapInstallRoot = ee.baseConfigOpts.snapInstallRoot
@@ -385,7 +377,6 @@ singleBuild
         Nothing -> do
           curator <- view $ buildConfigL . to (.curator)
           realConfigAndBuild
-            isOldCabalCopy
             ac
             ee
             task
@@ -406,9 +397,7 @@ singleBuild
 
 realConfigAndBuild ::
      forall env a. HasEnvConfig env
-  => Bool
-     -- ^ is cabal older than 2.0
-  -> ActionContext
+  => ActionContext
   -> ExecuteEnv
   -> Task
   -> Map PackageName (a, Installed)
@@ -421,7 +410,6 @@ realConfigAndBuild ::
   -> Map PackageIdentifier GhcPkgId
   -> RIO env (Maybe Installed)
 realConfigAndBuild
-    isOldCabalCopy
     ac
     ee
     task
@@ -434,26 +422,12 @@ realConfigAndBuild
   = withSingleContext ac ee task.taskType allDepsMap Nothing $
       \package cabalFP pkgDir cabal0 announce _outputType -> do
         let cabal = cabal0 CloseOnException
-        executableBuildStatuses <- getExecutableBuildStatuses package pkgDir
-        when (  not (cabalIsSatisfied isOldCabalCopy executableBuildStatuses)
-             && taskIsTarget task
-             ) $
-          prettyInfoL
-            [ flow "Building all executables for"
-            , style Current (fromPackageName package.name)
-            , flow "once. After a successful build of all of them, only \
-                    \specified executables will be rebuilt."
-            ]
         _neededConfig <-
           ensureConfig
             cache
             pkgDir
             ee.buildOpts
-            ( announce
-                (  "configure"
-                <> display (annSuffix executableBuildStatuses)
-                )
-            )
+            (announce ("configure" <> display annSuffix))
             cabal
             cabalFP
             task
@@ -473,16 +447,15 @@ realConfigAndBuild
           -- https://github.com/commercialhaskell/stack/issues/2787
           (True, _) | null ac.downstream -> pure Nothing
           (_, True) | null ac.downstream || installedMapHasThisPkg -> do
-            initialBuildSteps executableBuildStatuses cabal announce
+            initialBuildSteps cabal announce
             pure Nothing
           _ -> fulfillCuratorBuildExpectations
-                  pname
-                  mcurator0
-                  enableTests
-                  enableBenchmarks
-                  Nothing
-                  (Just <$>
-                    realBuild package pkgDir cabal0 announce executableBuildStatuses)
+                 pname
+                 mcurator0
+                 enableTests
+                 enableBenchmarks
+                 Nothing
+                 (Just <$> realBuild package pkgDir cabal0 announce)
  where
   pkgId = taskProvides task
   PackageIdentifier pname _ = pkgId
@@ -496,8 +469,7 @@ realConfigAndBuild
        -- to fail
     && maybe True (Set.notMember pname . (.skipHaddock)) curator
 
-  annSuffix executableBuildStatuses =
-    if result == "" then "" else " (" <> result <> ")"
+  annSuffix = if result == "" then "" else " (" <> result <> ")"
    where
     result = T.intercalate " + " $ concat
       [ ["lib" | task.allInOne && hasLib]
@@ -511,16 +483,12 @@ realConfigAndBuild
         let package = lp.package
             hasLibrary = hasBuildableMainLibrary package
             hasSubLibraries = not $ null package.subLibraries
-            hasExecutables = not . Set.null $
-              exesToBuild isOldCabalCopy executableBuildStatuses lp
+            hasExecutables = not . Set.null $ exesToBuild lp
         in  (hasLibrary, hasSubLibraries, hasExecutables)
       -- This isn't true, but we don't want to have this info for upstream deps.
       _ -> (False, False, False)
-  initialBuildSteps executableBuildStatuses cabal announce = do
-    announce
-      (  "initial-build-steps"
-      <> display (annSuffix executableBuildStatuses)
-      )
+  initialBuildSteps cabal announce = do
+    announce ("initial-build-steps" <> display annSuffix)
     cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
   realBuild ::
@@ -529,9 +497,8 @@ realConfigAndBuild
     -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
     -> (Utf8Builder -> RIO env ())
        -- ^ A plain 'announce' function
-    -> Map Text ExecutableBuildStatus
     -> RIO env Installed
-  realBuild package pkgDir cabal0 announce executableBuildStatuses = do
+  realBuild package pkgDir cabal0 announce = do
     let cabal = cabal0 CloseOnException
     wc <- view $ actualCompilerVersionL . whichCompilerL
 
@@ -586,7 +553,7 @@ realConfigAndBuild
     actualCompiler <- view actualCompilerVersionL
     () <- announce
       (  "build"
-      <> display (annSuffix executableBuildStatuses)
+      <> display annSuffix
       <> " with "
       <> display actualCompiler
       )
@@ -599,13 +566,11 @@ realConfigAndBuild
       case (task.taskType, task.allInOne, isFinalBuild) of
         (_, True, True) -> throwM AllInOneBuildBug
         (TTLocalMutable lp, False, False) ->
-          let componentOpts =
-                primaryComponentOptions isOldCabalCopy executableBuildStatuses lp
+          let componentOpts = primaryComponentOptions lp
           in  pure (componentOpts, componentOpts)
         (TTLocalMutable lp, False, True) -> pure (finalComponentOptions lp, [])
         (TTLocalMutable lp, True, False) ->
-          let componentOpts =
-                primaryComponentOptions isOldCabalCopy executableBuildStatuses lp
+          let componentOpts = primaryComponentOptions lp
           in pure (componentOpts <> finalComponentOptions lp, componentOpts)
         (TTRemotePackage{}, _, _) -> pure ([], [])
     cabal stripTHLoading ("build" : buildOpts <> extraOpts)
@@ -664,8 +629,7 @@ realConfigAndBuild
           && (hasLibrary || hasSubLibraries || hasExecutables)
     when shouldCopy $ withMVar ee.installLock $ \() -> do
       announce "copy/register"
-      let copyArgs = "copy" : if isOldCabalCopy then [] else copyOpts
-      eres <- try $ cabal KeepTHLoading copyArgs
+      eres <- try $ cabal KeepTHLoading $ "copy" : copyOpts
       case eres of
         Left err@CabalExitedUnsuccessfully{} ->
           throwM $ CabalCopyFailed
@@ -820,53 +784,8 @@ copyDdumpFilesIfNeeded buildingFinals mDdumpPath = when buildingFinals $
             src' <- parseRelFile src
             copyFile src' (destBaseDir </> filename src'))
 
--- | Get the build status of all the package executables. Do so by
--- testing whether their expected output file exists, e.g.
---
--- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha
--- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha.exe
--- .stack-work/dist/x86_64-osx/Cabal-1.22.4.0/build/alpha/alpha.jsexe/ (NOTE: a dir)
-getExecutableBuildStatuses ::
-     HasEnvConfig env
-  => Package
-  -> Path Abs Dir
-  -> RIO env (Map Text ExecutableBuildStatus)
-getExecutableBuildStatuses package pkgDir = do
-  distDir <- distDirFromDir pkgDir
-  platform <- view platformL
-  fmap
-    Map.fromList
-    (mapM (checkExeStatus platform distDir) (Set.toList (buildableExes package)))
-
--- | Check whether the given executable is defined in the given dist directory.
-checkExeStatus ::
-     HasLogFunc env
-  => Platform
-  -> Path b Dir
-  -> Text
-  -> RIO env (Text, ExecutableBuildStatus)
-checkExeStatus platform distDir name = do
-  exename <- parseRelDir (T.unpack name)
-  exists <- checkPath (distDir </> relDirBuild </> exename)
-  pure
-    ( name
-    , if exists
-        then ExecutableBuilt
-        else ExecutableNotBuilt)
- where
-  checkPath base =
-    case platform of
-      Platform _ Windows -> do
-        fileandext <- parseRelFile (file ++ ".exe")
-        doesFileExist (base </> fileandext)
-      _ -> do
-        fileandext <- parseRelFile file
-        doesFileExist (base </> fileandext)
-   where
-    file = T.unpack name
-
 getPrecompiled ::
-  (HasEnvConfig env)
+     HasEnvConfig env
   => ConfigCache
   -> TaskType
   -> Path Abs Dir
@@ -902,8 +821,13 @@ getPrecompiled cache taskType bcoSnapInstallRoot =
     _ -> pure Nothing
 
 copyPreCompiled ::
-  (HasLogFunc env, HasCompiler env, HasTerm env, HasProcessContext env, HasEnvConfig env) =>
-  ExecuteEnv
+     ( HasLogFunc env
+     , HasCompiler env
+     , HasTerm env
+     , HasProcessContext env
+     , HasEnvConfig env
+     )
+  => ExecuteEnv
   -> Task
   -> PackageIdentifier
   -> PrecompiledCache b0
@@ -972,7 +896,7 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
     bindir = ee.baseConfigOpts.snapInstallRoot </> bindirSuffix
 
 loadInstalledPkg ::
-  ( HasCompiler env, HasProcessContext env, HasTerm env )
+     (HasCompiler env, HasProcessContext env, HasTerm env)
   => [Path Abs Dir]
   -> TVar (Map GhcPkgId DumpPackage)
   -> PackageName
@@ -987,7 +911,8 @@ loadInstalledPkg pkgDbs tvar name = do
       pure $ Just dp.ghcPkgId
     _ -> throwM $ MultipleResultsBug name dps
 
-fulfillHaddockExpectations :: (MonadUnliftIO m, HasTerm env, MonadReader env m)
+fulfillHaddockExpectations ::
+     (MonadUnliftIO m, HasTerm env, MonadReader env m)
   => PackageName
   -> Maybe Curator
   -> (KeepOutputOpen -> m ())
@@ -1345,8 +1270,11 @@ singleBench beopts benchesToRun ac ee task installedMap = do
 -- Do not pass `-hpcdir` as GHC option if the coverage is not enabled.
 -- This helps running stack-compiled programs with dynamic interpreters like
 -- `hint`. Cfr: https://github.com/commercialhaskell/stack/issues/997
-extraBuildOptions :: (HasEnvConfig env, HasRunner env)
-                  => WhichCompiler -> BuildOpts -> RIO env [String]
+extraBuildOptions ::
+     (HasEnvConfig env, HasRunner env)
+  => WhichCompiler
+  -> BuildOpts
+  -> RIO env [String]
 extraBuildOptions wc bopts = do
   colorOpt <- appropriateGhcColorFlag
   let optsFlag = compilerOptionsCabalFlag wc
@@ -1359,13 +1287,8 @@ extraBuildOptions wc bopts = do
       pure [optsFlag, baseOpts]
 
 -- Library, sub-library, foreign library and executable build components.
-primaryComponentOptions ::
-     Bool
-     -- ^ Is Cabal copy limited to all libraries and executables?
-  -> Map Text ExecutableBuildStatus
-  -> LocalPackage
-  -> [String]
-primaryComponentOptions isOldCabalCopy executableBuildStatuses lp =
+primaryComponentOptions :: LocalPackage -> [String]
+primaryComponentOptions lp =
   -- TODO: get this information from target parsing instead, which will allow
   -- users to turn off library building if desired
      ( if hasBuildableMainLibrary package
@@ -1381,45 +1304,16 @@ primaryComponentOptions isOldCabalCopy executableBuildStatuses lp =
        (getBuildableListText package.subLibraries)
   ++ map
        (T.unpack . T.append "exe:")
-       (Set.toList $ exesToBuild isOldCabalCopy executableBuildStatuses lp)
+       (Set.toList $ exesToBuild lp)
  where
   package = lp.package
 
--- | History of this function:
---
--- * Normally it would do either all executables or if the user specified
---   requested components, just build them. Afterwards, due to this Cabal bug
---   <https://github.com/haskell/cabal/issues/2780>, we had to make Stack build
---   all executables every time.
---
--- * In <https://github.com/commercialhaskell/stack/issues/3229> this was
---   flagged up as very undesirable behavior on a large project, hence the
---   behavior below that we build all executables once (modulo success), and
---   thereafter pay attention to user-wanted components.
---
--- * The Cabal bug was fixed, in that the copy command of later Cabal versions
---   allowed components to be specified. Consequently, Cabal may be satisified,
---   even if all of a package's executables have not yet been built.
-exesToBuild ::
-     Bool
-     -- ^ Is Cabal copy limited to all libraries and executables?
-  -> Map Text ExecutableBuildStatus
-  -> LocalPackage
-  -> Set Text
-exesToBuild isOldCabalCopy executableBuildStatuses lp =
-  if cabalIsSatisfied isOldCabalCopy executableBuildStatuses && lp.wanted
-    then exeComponents lp.components
-    else buildableExes lp.package
-
--- | Do the current executables satisfy Cabal's requirements?
-cabalIsSatisfied ::
-     Bool
-     -- ^ Is Cabal copy limited to all libraries and executables?
-  -> Map k ExecutableBuildStatus
-  -> Bool
-cabalIsSatisfied False _ = True
-cabalIsSatisfied True executableBuildStatuses =
-  all (== ExecutableBuilt) $ Map.elems executableBuildStatuses
+-- | Either build all executables or, if the user specifies requested
+-- components, just build them.
+exesToBuild :: LocalPackage -> Set Text
+exesToBuild lp = if lp.wanted
+  then exeComponents lp.components
+  else buildableExes lp.package
 
 -- Test-suite and benchmark build components.
 finalComponentOptions :: LocalPackage -> [String]
