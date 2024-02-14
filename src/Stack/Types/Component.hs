@@ -181,7 +181,7 @@ instance HasField "qualifiedName" StackTestSuite NamedComponent where
   getField = CTest . (.name.unqualCompToText)
 
 instance HasField "qualifiedName" StackBenchmark NamedComponent where
-  getField = CTest . (.name.unqualCompToText)
+  getField = CBench . (.name.unqualCompToText)
 
 -- | Type synonym for a 'HasField' constraint which represent a virtual field,
 -- computed from the type, the NamedComponent constructor and the name.
