@@ -54,7 +54,7 @@ instance ToJSON Project where
       | not (Map.null project.flagsByPkg)
       ]
     , ["packages" .= project.packages]
-    , ["resolver" .= project.resolver]
+    , ["snapshot" .= project.resolver]
     , maybe [] (\c -> ["curator" .= c]) project.curator
     , [ "drop-packages" .= Set.map CabalString project.dropPackages
       | not (Set.null project.dropPackages)

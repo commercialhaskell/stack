@@ -256,12 +256,12 @@ initProject currDir initOpts mresolver = do
       missingPkgMsg
         | Map.size ignored > 0 =
             "Warning (added by new or init): Some packages were found to be \
-            \incompatible with the resolver and have been left commented out \
+            \incompatible with the snapshot and have been left commented out \
             \in the packages section.\n"
         | otherwise = ""
       extraDepMsg
         | Map.size extraDeps > 0 =
-            "Warning (added by new or init): Specified resolver could not \
+            "Warning (added by new or init): Specified snapshot could not \
             \satisfy all dependencies. Some external packages have been added \
             \as dependencies.\n"
         | otherwise = ""
@@ -405,7 +405,7 @@ renderStackYaml p ignoredPackages dupPackages =
   -- Per Section Help
   comments =
     [ ("user-message"     , userMsgHelp)
-    , ("resolver"         , resolverHelp)
+    , ("snapshot"         , snapshotHelp)
     , ("packages"         , packageHelp)
     , ("extra-deps"       , extraDepsHelp)
     , ("flags"            , "# Override default flag values for local packages and extra-deps")
@@ -419,20 +419,20 @@ renderStackYaml p ignoredPackages dupPackages =
     , "For advanced use and comprehensive documentation of the format, please see:"
     , "https://docs.haskellstack.org/en/stable/yaml_configuration/"
     ]
-  resolverHelp = commentHelp
-    [ "Resolver to choose a 'specific' stackage snapshot or a compiler version."
+  snapshotHelp = commentHelp
+    [ "A 'specific' Stackage snapshot or a compiler version."
     , "A snapshot resolver dictates the compiler version and the set of packages"
     , "to be used for project dependencies. For example:"
     , ""
-    , "resolver: lts-22.7"
-    , "resolver: nightly-2024-01-20"
-    , "resolver: ghc-9.6.4"
+    , "snapshot: lts-22.7"
+    , "snapshot: nightly-2024-01-20"
+    , "snapshot: ghc-9.6.4"
     , ""
     , "The location of a snapshot can be provided as a file or url. Stack assumes"
     , "a snapshot provided as a file might change, whereas a url resource does not."
     , ""
-    , "resolver: ./custom-snapshot.yaml"
-    , "resolver: https://example.com/snapshots/2023-01-01.yaml"
+    , "snapshot: ./custom-snapshot.yaml"
+    , "snapshot: https://example.com/snapshots/2023-01-01.yaml"
     ]
   userMsgHelp = commentHelp
     [ "A warning or info to be displayed to the user on config load." ]
@@ -448,7 +448,7 @@ renderStackYaml p ignoredPackages dupPackages =
     , "  - wai"
     ]
   extraDepsHelp = commentHelp
-    [ "Dependency packages to be pulled from upstream that are not in the resolver."
+    [ "Dependency packages to be pulled from upstream that are not in the snapshot."
     , "These entries can reference officially published versions as well as"
     , "forks / in-progress versions pinned to a git hash. For example:"
     , ""
