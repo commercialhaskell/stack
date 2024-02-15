@@ -35,7 +35,6 @@ module Stack.Package
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import           Data.STRef ( STRef, modifySTRef', readSTRef, newSTRef )
 import qualified Data.Text as T
 import           Distribution.CabalSpecVersion ( cabalSpecToVersionDigits )
 import           Distribution.Compiler
@@ -112,7 +111,7 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.PackageFile
                    ( DotCabalPath, PackageComponentFile (..) )
-import           Stack.Types.SourceMap (Target(..))
+import           Stack.Types.SourceMap ( Target(..), PackageType (..) )
 import           Stack.Types.Version
                    ( VersionRange, intersectVersionRanges, withinRange )
 import           System.FilePath ( replaceExtension )
@@ -812,56 +811,70 @@ topSortPackageComponent ::
      -- actual targets in the result, only their deps. Using it with False here
      -- only in GHCi
   -> Seq NamedComponent
-topSortPackageComponent package target includeDirectTarget = runST $ do
-  alreadyProcessedRef <- newSTRef (mempty :: Set NamedComponent)
+topSortPackageComponent package target includeDirectTarget =
+  topProcessPackageComponent package target processor mempty
+  where
+    processor packageType component
+      | not includeDirectTarget && packageType == PTProject = id
+      | otherwise = \v -> v |> component.qualifiedName
+
+-- | Process a package's internal components in the order of their topological sort.
+-- The first iteration will effect the component depending on no other component etc,
+-- iterating by increasing amount of required dependencies.
+-- 'PackageType' with value 'PTProject' here means the component is a direct target
+-- and 'PTDependency' means it's a dependency of a direct target.
+topProcessPackageComponent :: forall b.
+     Package
+  -> Target
+  -> (forall component. (HasComponentInfo component) => PackageType -> component -> b -> b)
+  -> b
+  -> b
+topProcessPackageComponent package target fn res = do
+  let initialState = (mempty, res)
   let processInitialComponents c = case target of
-        TargetAll{} -> processComponent includeDirectTarget alreadyProcessedRef c
+        TargetAll{} -> processComponent PTProject c
         TargetComps targetSet -> if S.member c.qualifiedName targetSet
-          then processComponent includeDirectTarget alreadyProcessedRef c
+          then processComponent PTProject c
           else id
-  processPackageComponent package processInitialComponents (pure mempty)
+  snd $ processPackageComponent package processInitialComponents initialState
  where
-  processComponent :: forall s component. HasComponentInfo component
-    => Bool
+  processComponent :: HasComponentInfo component
+    => PackageType
        -- ^ Finally add this component in the seq
-    -> STRef s (Set NamedComponent)
     -> component
-    -> ST s (Seq NamedComponent)
-    -> ST s (Seq NamedComponent)
-  processComponent finallyAddComponent alreadyProcessedRef component res = do
+    -> (Set NamedComponent, b)
+    -> (Set NamedComponent, b)
+  processComponent packageType component currentRes@(_a, !_b) = do
     let depMap = componentDependencyMap component
         internalDep = M.lookup package.name depMap
-        processSubDep = processOneDep alreadyProcessedRef internalDep res
         qualName = component.qualifiedName
-        processSubDepSaveName
-          | finallyAddComponent = (|> qualName) <$> processSubDep
-          | otherwise = processSubDep
+        alreadyProcessed = fst currentRes
+        !appendToResult = fn packageType component
     -- This is an optimization, the only components we are likely to process
     -- multiple times are the ones we can find in dependencies, otherwise we
     -- only fold on a single version of each component by design.
+    let processedDeps = processOneDep internalDep currentRes
     if isPotentialDependency qualName
-      then do
-        alreadyProcessed <- readSTRef alreadyProcessedRef
+      then
         if S.member qualName alreadyProcessed
-          then res
-          else modifySTRef' alreadyProcessedRef (S.insert qualName)
-                 >> processSubDepSaveName
-      else processSubDepSaveName
+          then currentRes
+          else bimap (S.insert qualName) appendToResult processedDeps 
+      else second appendToResult processedDeps
   lookupLibName isMain name = if isMain
     then package.library
     else collectionLookup name package.subLibraries
-  processOneDep alreadyProcessed mDependency res =
+  processOneDep mDependency res' =
     case (.depType) <$> mDependency of
       Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
         let processMainLibDep =
               case (mainLibDep, lookupLibName True mempty) of
                 (True, Just mainLib) ->
-                  processComponent True alreadyProcessed mainLib
+                  processComponent PTDependency mainLib
                 _ -> id
             processSingleSubLib name =
               case lookupLibName False name.unqualCompToText of
-                Just lib -> processComponent True alreadyProcessed lib
+                Just lib -> processComponent PTDependency lib
                 Nothing -> id
             processSubLibDep r = foldr' processSingleSubLib r subLibDeps
-        processSubLibDep (processMainLibDep res)
-      _ -> res
+        processSubLibDep (processMainLibDep res')
+      _ -> res'
