@@ -6,9 +6,11 @@
 
 -- | Types and functions related to Stack's @path@ command.
 module Stack.Path
-  ( PathInfo
+  ( EnvConfigPathInfo
   , path
-  , paths
+  , pathsFromRunner
+  , pathsFromConfig
+  , pathsFromEnvConfig
   ) where
 
 import           Data.List ( intercalate )
@@ -35,8 +37,7 @@ import           Stack.Types.BuildOptsMonoid ( buildOptsMonoidHaddockL )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getCompilerPath )
 import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), stackGlobalConfigL, stackRootL
-                   )
+                   ( Config (..), HasConfig (..), stackGlobalConfigL )
 import           Stack.Types.EnvConfig
                    ( EnvConfig, HasEnvConfig (..), bindirCompilerTools
                    , hpcReportDir, installationRootDeps, installationRootLocal
@@ -54,48 +55,79 @@ import qualified System.FilePath as FP
 -- | Print out useful path information in a human-readable format (and support
 -- others later).
 path :: [Text] -> RIO Runner ()
--- Distinguish a request for only the Stack root, as such a request does not
--- require 'withDefaultEnvConfig'.
-path [key] | key == stackRootOptionName' = do
-  clArgs <- view $ globalOptsL . to (.configMonoid)
-  liftIO $ do
-    (_, stackRoot, _) <- determineStackRootAndOwnership clArgs
-    T.putStrLn $ T.pack $ toFilePathNoTrailingSep stackRoot
 path keys = do
   let -- filter the chosen paths in flags (keys), or show all of them if no
       -- specific paths chosen.
-      goodPaths = filter
-        ( \(_, key, _) -> null keys || elem key keys )
-        paths
-      singlePath = length goodPaths == 1
-      toEither (_, k, UseHaddocks p) = Left (k, p)
-      toEither (_, k, WithoutHaddocks p) = Right (k, p)
-      (with, without) = partitionEithers $ map toEither goodPaths
-  runHaddock True $ printKeys with singlePath
-  runHaddock False $ printKeys without singlePath
+      filterKeys (_, key, _) = null keys || elem key keys
+      goodPathsFromRunner = null keys || elem stackRootOptionName' keys
+      goodPathsFromConfig = filter filterKeys pathsFromConfig
+      goodPathsFromEnvConfig = filter filterKeys pathsFromEnvConfig
+      toKeyPath (_, key, p) = (key, p)
+      goodPathsFromConfig' = map toKeyPath goodPathsFromConfig
+      singlePath = (if goodPathsFromRunner then 1 else 0) +
+        length goodPathsFromConfig + length goodPathsFromEnvConfig == 1
+      toEither (_, k, UseHaddocks a) = Left (k, a)
+      toEither (_, k, WithoutHaddocks a) = Right (k, a)
+      (with, without) = partitionEithers $ map toEither goodPathsFromEnvConfig
+  when goodPathsFromRunner $ printKeysWithRunner singlePath
+  unless (null goodPathsFromConfig') $
+    runHaddockWithConfig $ printKeysWithConfig goodPathsFromConfig' singlePath
+  unless (null without) $
+    runHaddockWithEnvConfig False $ printKeysWithEnvConfig without singlePath
+  unless (null with) $
+    runHaddockWithEnvConfig True $ printKeysWithEnvConfig with singlePath
 
-printKeys ::
-     HasEnvConfig env
-  => [(Text, PathInfo -> Text)]
+printKeysWithRunner ::
+     Bool
+  -> RIO Runner ()
+printKeysWithRunner single = do
+  clArgs <- view $ globalOptsL . to (.configMonoid)
+  liftIO $ do
+    (_, stackRoot, _) <- determineStackRootAndOwnership clArgs
+    let prefix = if single then "" else stackRootOptionName' <> ": "
+    T.putStrLn $ prefix <> T.pack (toFilePathNoTrailingSep stackRoot)
+
+printKeysWithConfig ::
+     HasConfig env
+  => [(Text, Config -> Text)]
   -> Bool
   -> RIO env ()
-printKeys extractors single = do
-  pathInfo <- fillPathInfo
+printKeysWithConfig extractors single =
+  view configL >>= printKeys extractors single
+
+printKeysWithEnvConfig ::
+     HasEnvConfig env
+  => [(Text, EnvConfigPathInfo -> Text)]
+  -> Bool
+  -> RIO env ()
+printKeysWithEnvConfig extractors single =
+  fillEnvConfigPathInfo >>= printKeys extractors single
+
+printKeys ::
+     [(Text, info -> Text)]
+  -> Bool
+  -> info
+  -> RIO env ()
+printKeys extractors single info = do
   liftIO $ forM_ extractors $ \(key, extractPath) -> do
     let prefix = if single then "" else key <> ": "
-    T.putStrLn $ prefix <> extractPath pathInfo
+    T.putStrLn $ prefix <> extractPath info
 
-runHaddock :: Bool -> RIO EnvConfig () -> RIO Runner ()
-runHaddock x action = local modifyConfig $
-  withConfig YesReexec $
-    withDefaultEnvConfig action
+runHaddockWithEnvConfig :: Bool -> RIO EnvConfig () -> RIO Runner ()
+runHaddockWithEnvConfig x action = runHaddock x (withDefaultEnvConfig action)
+
+runHaddockWithConfig :: RIO Config () -> RIO Runner ()
+runHaddockWithConfig = runHaddock False
+
+runHaddock :: Bool -> RIO Config () -> RIO Runner ()
+runHaddock x action = local modifyConfig $ withConfig YesReexec action
  where
   modifyConfig = set
     (globalOptsL . globalOptsBuildOptsMonoidL . buildOptsMonoidHaddockL)
     (Just x)
 
-fillPathInfo :: HasEnvConfig env => RIO env PathInfo
-fillPathInfo = do
+fillEnvConfigPathInfo :: HasEnvConfig env => RIO env EnvConfigPathInfo
+fillEnvConfigPathInfo = do
   -- We must use a BuildConfig from an EnvConfig to ensure that it contains the
   -- full environment info including GHC paths etc.
   buildConfig <- view $ envConfigL . buildConfigL
@@ -115,7 +147,7 @@ fillPathInfo = do
   distDir <- distRelativeDir
   hpcDir <- hpcReportDir
   compiler <- getCompilerPath
-  pure PathInfo
+  pure EnvConfigPathInfo
     { buildConfig
     , snapDb
     , localDb
@@ -130,8 +162,7 @@ fillPathInfo = do
     , compiler
     }
 
--- | Type representing information passed to all the path printers.
-data PathInfo = PathInfo
+data EnvConfigPathInfo = EnvConfigPathInfo
   { buildConfig  :: !BuildConfig
   , snapDb       :: !(Path Abs Dir)
   , localDb      :: !(Path Abs Dir)
@@ -146,40 +177,40 @@ data PathInfo = PathInfo
   , compiler     :: !(Path Abs File)
   }
 
-instance HasPlatform PathInfo where
+instance HasPlatform EnvConfigPathInfo where
   platformL = configL . platformL
   {-# INLINE platformL #-}
   platformVariantL = configL . platformVariantL
   {-# INLINE platformVariantL #-}
 
-instance HasLogFunc PathInfo where
+instance HasLogFunc EnvConfigPathInfo where
   logFuncL = configL . logFuncL
 
-instance HasRunner PathInfo where
+instance HasRunner EnvConfigPathInfo where
   runnerL = configL . runnerL
 
-instance HasStylesUpdate PathInfo where
+instance HasStylesUpdate EnvConfigPathInfo where
   stylesUpdateL = runnerL . stylesUpdateL
 
-instance HasTerm PathInfo where
+instance HasTerm EnvConfigPathInfo where
   useColorL = runnerL . useColorL
   termWidthL = runnerL . termWidthL
 
-instance HasGHCVariant PathInfo where
+instance HasGHCVariant EnvConfigPathInfo where
   ghcVariantL = configL . ghcVariantL
   {-# INLINE ghcVariantL #-}
 
-instance HasConfig PathInfo where
+instance HasConfig EnvConfigPathInfo where
   configL = buildConfigL . lens (.config) (\x y -> x { config = y })
   {-# INLINE configL #-}
 
-instance HasPantryConfig PathInfo where
+instance HasPantryConfig EnvConfigPathInfo where
   pantryConfigL = configL . pantryConfigL
 
-instance HasProcessContext PathInfo where
+instance HasProcessContext EnvConfigPathInfo where
   processContextL = configL . processContextL
 
-instance HasBuildConfig PathInfo where
+instance HasBuildConfig EnvConfigPathInfo where
   buildConfigL =
     lens (.buildConfig) (\x y -> x { buildConfig = y }) . buildConfigL
 
@@ -187,68 +218,97 @@ data UseHaddocks a
   = UseHaddocks a
   | WithoutHaddocks a
 
--- | The paths of interest to a user. The first tuple string is used for a
--- description that the optparse flag uses, and the second string as a
--- machine-readable key and also for @--foo@ flags. The user can choose a
--- specific path to list like @--stack-root@. But really it's mainly for the
--- documentation aspect.
+-- | The paths of interest to a user which do require a 'Config' or 'EnvConfig'.
+-- The first tuple string is used for a description that the optparse flag uses,
+-- and the second string as a machine-readable key and also for @--foo@ flags.
+-- The user can choose a specific path to list like @--stack-root@. But really
+-- it's mainly for the documentation aspect.
+pathsFromRunner :: (String, Text)
+pathsFromRunner = ("Global Stack root directory", stackRootOptionName')
+
+-- | The paths of interest to a user which do require an 'EnvConfig'. The first
+-- tuple string is used for a description that the optparse flag uses, and the
+-- second string as a machine-readable key and also for @--foo@ flags. The user
+-- can choose a specific path to list like @--stack-root@. But really it's
+-- mainly for the documentation aspect.
 --
--- When printing output we generate @PathInfo@ and pass it to the function to
--- generate an appropriate string. Trailing slashes are removed, see #506.
-paths :: [(String, Text, UseHaddocks (PathInfo -> Text))]
-paths =
-  [ ( "Global Stack root directory"
-    , stackRootOptionName'
-    , WithoutHaddocks $
-        view (stackRootL . to toFilePathNoTrailingSep . to T.pack))
-  , ( "Global Stack configuration file"
+-- When printing output we generate @Config@ and pass it to the function
+-- to generate an appropriate string. Trailing slashes are removed, see #506.
+pathsFromConfig :: [(String, Text, Config -> Text)]
+pathsFromConfig =
+  [ ( "Global Stack configuration file"
     , T.pack stackGlobalConfigOptionName
-    , WithoutHaddocks $ view (stackGlobalConfigL . to toFilePath . to T.pack))
-  , ( "Project root (derived from stack.yaml file)"
+    , view (stackGlobalConfigL . to toFilePath . to T.pack)
+    )
+  , ( "Install location for GHC and other core tools (see 'stack ls tools' command)"
+    , "programs"
+    , view (configL . to (.localPrograms) . to toFilePathNoTrailingSep . to T.pack)
+    )
+  , ( "Directory where Stack installs executables (e.g. ~/.local/bin (Unix-like OSs) or %APPDATA%\\local\\bin (Windows))"
+    , "local-bin"
+    , view $ configL . to (.localBin) . to toFilePathNoTrailingSep . to T.pack
+    )
+  ]
+
+-- | The paths of interest to a user which require a 'EnvConfig'. The first
+-- tuple string is used for a description that the optparse flag uses, and the
+-- second string as a machine-readable key and also for @--foo@ flags. The user
+-- can choose a specific path to list like @--project-root@. But really it's
+-- mainly for the documentation aspect.
+--
+-- When printing output we generate @EnvConfigPathInfo@ and pass it to the
+-- function to generate an appropriate string. Trailing slashes are removed, see
+-- #506.
+pathsFromEnvConfig :: [(String, Text, UseHaddocks (EnvConfigPathInfo -> Text))]
+pathsFromEnvConfig =
+  [ ( "Project root (derived from stack.yaml file)"
     , "project-root"
     , WithoutHaddocks $
-        view (projectRootL . to toFilePathNoTrailingSep . to T.pack))
+        view (projectRootL . to toFilePathNoTrailingSep . to T.pack)
+    )
   , ( "Configuration location (where the stack.yaml file is)"
     , "config-location"
-    , WithoutHaddocks $ view (stackYamlL . to toFilePath . to T.pack))
+    , WithoutHaddocks $ view (stackYamlL . to toFilePath . to T.pack)
+    )
   , ( "PATH environment variable"
     , "bin-path"
     , WithoutHaddocks $
-        T.pack . intercalate [FP.searchPathSeparator] . view exeSearchPathL)
-  , ( "Install location for GHC and other core tools (see 'stack ls tools' command)"
-    , "programs"
-    , WithoutHaddocks $
-        view (configL . to (.localPrograms) . to toFilePathNoTrailingSep . to T.pack))
+        T.pack . intercalate [FP.searchPathSeparator] . view exeSearchPathL
+    )
   , ( "Compiler binary (e.g. ghc)"
     , "compiler-exe"
-    , WithoutHaddocks $ T.pack . toFilePath . (.compiler) )
+    , WithoutHaddocks $ T.pack . toFilePath . (.compiler)
+    )
   , ( "Directory containing the compiler binary (e.g. ghc)"
     , "compiler-bin"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . parent . (.compiler) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . parent . (.compiler)
+    )
   , ( "Directory containing binaries specific to a particular compiler"
     , "compiler-tools-bin"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.toolsDir) )
-  , ( "Directory where Stack installs executables (e.g. ~/.local/bin (Unix-like OSs) or %APPDATA%\\local\\bin (Windows))"
-    , "local-bin"
-    , WithoutHaddocks $
-        view $ configL . to (.localBin) . to toFilePathNoTrailingSep . to T.pack)
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.toolsDir)
+    )
   , ( "Extra include directories"
     , "extra-include-dirs"
     , WithoutHaddocks $
-        T.intercalate ", " . map T.pack . (.extraIncludeDirs) . view configL )
+        T.intercalate ", " . map T.pack . (.extraIncludeDirs) . view configL
+    )
   , ( "Extra library directories"
     , "extra-library-dirs"
     , WithoutHaddocks $
-        T.intercalate ", " . map T.pack . (.extraLibDirs) . view configL )
+        T.intercalate ", " . map T.pack . (.extraLibDirs) . view configL
+    )
   , ( "Snapshot package database"
     , "snapshot-pkg-db"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.snapDb) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.snapDb)
+    )
   , ( "Local project package database"
     , "local-pkg-db"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.localDb) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.localDb)
+    )
   , ( "Global package database"
     , "global-pkg-db"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.globalDb) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.globalDb)
+    )
   , ( "GHC_PACKAGE_PATH environment variable"
     , "ghc-package-path"
     , WithoutHaddocks $
@@ -261,11 +321,12 @@ paths =
     )
   , ( "Snapshot installation root"
     , "snapshot-install-root"
-    , WithoutHaddocks $
-        T.pack . toFilePathNoTrailingSep . (.snapRoot) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.snapRoot)
+    )
   , ( "Local project installation root"
     , "local-install-root"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.localRoot) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.localRoot)
+    )
   , ( "Snapshot documentation root"
     , "snapshot-doc-root"
     , UseHaddocks $
@@ -278,13 +339,16 @@ paths =
     )
   , ( "Local project documentation root"
     , "local-hoogle-root"
-    , UseHaddocks $ T.pack . toFilePathNoTrailingSep . (.hoogleRoot))
+    , UseHaddocks $ T.pack . toFilePathNoTrailingSep . (.hoogleRoot)
+    )
   , ( "Dist work directory, relative to package directory"
     , "dist-dir"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.distDir) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.distDir)
+    )
   , ( "Where HPC reports and tix files are stored"
     , "local-hpc-root"
-    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.hpcDir) )
+    , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.hpcDir)
+    )
   ]
 
 -- | 'Text' equivalent of 'stackRootOptionName'.
