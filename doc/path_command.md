@@ -3,9 +3,9 @@
 # The `stack path` command
 
 ~~~text
-stack path [--stack-root] [--global-config] [--project-root] [--config-location]
-           [--bin-path] [--programs] [--compiler-exe] [--compiler-bin]
-           [--compiler-tools-bin] [--local-bin] [--extra-include-dirs]
+stack path [--stack-root] [--global-config] [--programs] [--local-bin]
+           [--project-root] [--config-location] [--bin-path] [--compiler-exe]
+           [--compiler-bin] [--compiler-tools-bin] [--extra-include-dirs]
            [--extra-library-dirs] [--snapshot-pkg-db] [--local-pkg-db]
            [--global-pkg-db] [--ghc-package-path] [--snapshot-install-root]
            [--local-install-root] [--snapshot-doc-root] [--local-doc-root]

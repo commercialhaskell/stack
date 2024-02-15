@@ -7,15 +7,22 @@ module Stack.Options.PathParser
 
 import qualified Data.Text as T
 import           Options.Applicative ( Parser, flag, help, long )
-import           Stack.Path ( paths )
+import           Stack.Path
+                   ( pathsFromConfig, pathsFromEnvConfig, pathsFromRunner )
 import           Stack.Prelude
 
 -- | Parse command line arguments for Stack's @path@ command.
 pathParser :: Parser [Text]
 pathParser = mapMaybeA
-  ( \(desc, name, _) -> flag Nothing (Just name)
+  ( \(desc, name) -> flag Nothing (Just name)
       (  long (T.unpack name)
       <> help desc
       )
   )
   paths
+ where
+  toDescName (desc, name, _) = (desc, name)
+  paths =
+       pathsFromRunner
+    :  map toDescName pathsFromConfig
+    <> map toDescName pathsFromEnvConfig

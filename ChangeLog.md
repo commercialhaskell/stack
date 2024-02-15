@@ -10,6 +10,9 @@ Major changes:
 
 Behavior changes:
 
+* `stack path --global-config`, `--programs`, and `--local-bin` no longer set
+  up Stack's environment.
+
 Other enhancements:
 
 Bug fixes:
