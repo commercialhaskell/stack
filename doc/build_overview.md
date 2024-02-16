@@ -72,7 +72,7 @@ in CLI).
 
 ## Wanted compiler, dependencies, and project packages
 
-* If the `--resolver` CLI is present, ignore the `snapshot` (or `resolver`) and
+* If the `--snapshot` CLI is present, ignore the `snapshot` (or `resolver`) and
   `compiler` config values
 * Load up the indicated snapshot (either config value or CLI arg). This will
   provide:
@@ -81,7 +81,7 @@ in CLI).
       are immutable.
     * A wanted compiler version, e.g. `ghc-8.6.5`
 * If the `--compiler` CLI arg is set, or the `compiler` config value
-  is set (and `--resolver` CLI arg is not set), ignore the wanted
+  is set (and `--snapshot` CLI arg is not set), ignore the wanted
   compiler from the snapshot and use the specified wanted compiler
 * Parse `extra-deps` into a `Map PackageName PackageLocation`,
   containing both mutable and immutable package locations. Parse

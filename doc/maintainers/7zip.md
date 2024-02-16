@@ -79,7 +79,7 @@ need to be updated frequently. On 10 September 2022, it was updated from 7-Zip
     * executing the command:
 
         ~~~text
-        stack --resolver <snapshot> setup --setup-info-yaml <path to local copy of stack-setup-2.yaml>
+        stack --snapshot <snapshot> setup --setup-info-yaml <path to local copy of stack-setup-2.yaml>
         ~~~
 
       where `<snapshot>` requires the missing version of GHC.

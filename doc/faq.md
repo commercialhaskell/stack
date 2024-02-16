@@ -32,7 +32,7 @@ more recent LTS snapshot. You can do this using the following command from
 outside of a project:
 
 ~~~text
-stack config set resolver lts
+stack config set snapshot lts
 ~~~
 
 ## Where is Stack installed and will it interfere with the GHC (etc) I already have installed?
