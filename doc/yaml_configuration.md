@@ -1034,8 +1034,8 @@ Default: `{}`
 Related command line (takes precedence):
 [`stack build --ghc-options`](build_command.md#-ghc-options-option) option
 
-Augment and, if applicable, override any GHC command line options specified in
-Cabal files (including those created from `package.yaml` files).
+GHC command line options can be specified for a package in its Cabal file
+(including one created from a `package.yaml` file). This option augments and, if applicable (see below), overrides any such GHC command line options.
 
 `ghc-options` can specify GHC command line options for a named package, all
 local packages that are targets (using the `$targets` key), all local packages

@@ -492,9 +492,11 @@ The effect of `--fast` can be overriden with Stack's
 
 ### `--ghc-options` option
 
-Augment and, if applicable, override any GHC command line options specified in
-Cabal files (including those created from `package.yaml` files) or in Stack's
-YAML configuration files.
+GHC command line options can be specified for a package in its Cabal file
+(including one created from a `package.yaml` file). This option augments and, if
+applicable (see below), overrides any such GHC command line options and those
+specified in Stack's YAML configuration files - see the
+[`ghc-options`](yaml_configuration.md#ghc-options) configuration option.
 
 `stack build --ghc-options <ghc_options>` passes the specified command line
 options to GHC, depending on Stack's
