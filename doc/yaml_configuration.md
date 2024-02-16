@@ -658,8 +658,8 @@ Command line equivalent (takes precedence): `--compiler` option
 
 Overrides the compiler version in the snapshot. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
-resolvers like `ghc-9.6.3`. This can be used to override the
-compiler for a Stackage snapshot, like this:
+snapshots like `ghc-9.6.3`. This can be used to override the compiler for a
+Stackage snapshot, like this:
 
 ~~~yaml
 snapshot: lts-22.7
@@ -726,9 +726,9 @@ fully managed by Stack.
 
     The resolution is: (1) to specify an alternative snapshot (one that
     specifies a sufficiently recent version of GHC) on the command line, using
-    Stack's option `--resolver <snapshot>`. Stack will use that snapshot when
+    Stack's option `--snapshot <snapshot>`. Stack will use that snapshot when
     running GHC's `configure` script; and (2) to set the contents of the `STACK`
-    environment variable to be `stack --resolver <snapshot>`. Hadrian's
+    environment variable to be `stack --snapshot <snapshot>`. Hadrian's
     `build-stack` script wil refer to that environment variable for the Stack
     command it uses.
 

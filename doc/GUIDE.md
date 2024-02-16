@@ -247,18 +247,18 @@ settings. Ignoring comments beginning `#`, the contents will look something like
 this:
 
 ~~~yaml
-resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/8.yaml
+snapshot:
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/11.yaml
 packages:
 - .
 ~~~
 
-The value of the [`resolver`](yaml_configuration.md#resolver) key tells Stack
+The value of the [`snapshot`](yaml_configuration.md#snapshot) key tells Stack
 *how* to build your package: which GHC version to use, versions of package
 dependencies, and so on. Our value here says to use
-[LTS Haskell 22.7](https://www.stackage.org/lts-22.7), which implies GHC 9.6.4
+[LTS Haskell 22.11](https://www.stackage.org/lts-22.11), which implies GHC 9.6.4
 (which is why `stack build` installs that version of GHC if it is not already
-available to Stack). There are a number of values you can use for `resolver`,
+available to Stack). There are a number of values you can use for `snapshot`,
 which we'll cover later.
 
 The value of the `packages` key tells Stack which local packages to build. In
@@ -539,15 +539,15 @@ We can also change snapshots on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example, command:
 
 ~~~text
-stack --resolver lts-20.26 build
+stack --snapshot lts-20.26 build
 # Downloaded lts-20.26 build plan.
 # build output ...
 ~~~
 
 When passed on the command line, you also get some additional "short-cut"
-versions of snapshots: `--resolver nightly` will use the newest Nightly snapshot
-available, `--resolver lts` will use the newest LTS, and `--resolver lts-21`
-will use the newest LTS in the 21.x series. The reason these are only available
+versions of snapshots: `--snapshot nightly` will use the newest Nightly snapshot
+available, `--snapshot lts` will use the newest LTS, and `--snapshot lts-22`
+will use the newest LTS in the 22.x series. The reason these are only available
 on the command line and not in your `stack.yaml` file is that using them:
 
 1. Will slow down your build (since Stack then needs to download information on
@@ -557,11 +557,11 @@ on the command line and not in your `stack.yaml` file is that using them:
 
 ### Changing GHC versions
 
-Finally, let's try using an older LTS snapshot. We'll use the newest 19.x
+Finally, let's try using an older LTS snapshot. We'll use the newest 21.x
 snapshot with the command:
 
 ~~~text
-stack --resolver lts-19 build
+stack --snapshot lts-21 build
 # build output ...
 ~~~
 
@@ -676,7 +676,7 @@ editing the configuration file and removing it.
 
 Sometimes you may want to use a specific snapshot for your project instead of
 `stack init` picking one for you. You can do that by using
-`stack init --resolver <snapshot>`.
+`stack init --snapshot <snapshot>`.
 
 You can also init with a compiler snapshot if you do not want to use a
 Stackage snapshot. That will result in all of your project's dependencies being
@@ -714,8 +714,8 @@ it. You may see something like this:
 
 ~~~text
 stack build
-Warning: Some packages were found to be incompatible with the resolver and have been left commented out in the packages section.
-Warning: Specified resolver could not satisfy all dependencies. Some external packages have been added as dependencies.
+Warning: Some packages were found to be incompatible with the snapshot and have been left commented out in the packages section.
+Warning: Specified snapshot could not satisfy all dependencies. Some external packages have been added as dependencies.
 You can suppress this message by removing it from stack.yaml
 ~~~
 
@@ -1056,8 +1056,8 @@ Selecting the best among 18 snapshots...
 
 * Matches ...
 
-Selected resolver: ...
-Initialising configuration using resolver: ...
+Selected snapshot: ...
+Initialising configuration using snapshot: ...
 Total number of user packages considered: 2
 Writing configuration to file: stack.yaml
 stack build --haddock --test
@@ -1067,7 +1067,7 @@ stack build --haddock --test
 If you look at the `stack.yaml` file, you'll see exactly what you'd expect:
 
 ~~~yaml
-resolver:
+snapshot:
   url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/17.yaml
 packages:
 - wai-app-static-3.1.7.4
@@ -1296,9 +1296,9 @@ yields output like:
 
 ~~~text
 Run from outside a project, using implicit global project config
-Using latest snapshot resolver: lts-22.7
+Using latest snapshot snapshot: lts-22.7
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
-Note: You can change the snapshot via the resolver field there.
+Note: You can change the snapshot via the snapshot field there.
 I installed the stm package via --package stm
 ~~~
 

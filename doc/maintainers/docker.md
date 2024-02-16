@@ -67,7 +67,7 @@ with the previous minor LTS snapshot version.
 - Test the new image. For example, command:
 
     ~~~text
-    stack --resolver=lts-<N>.<M> new image-test
+    stack --snapshot=lts-<N>.<M> new image-test
     cd image-test
     stack --docker build
     ~~~
@@ -136,7 +136,7 @@ major LTS snapshot version.
 - Try building a test package with the new image. Command:
 
     ~~~text
-    stack --resolver=nightly new image-test`
+    stack --snapshot=nightly new image-test`
     cd image-test
     stack --docker --docker-image=local/stack-build build
     ~~~
@@ -152,7 +152,7 @@ major LTS snapshot version.
 - Try building a test package with the new small image. Command:
 
     ~~~text
-    stack --resolver=nightly new small-image-test
+    stack --snapshot=nightly new small-image-test
     cd small-image-test
     stack --docker --docker-image=local/stack-build-small build
     ~~~

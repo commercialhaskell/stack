@@ -40,7 +40,7 @@
   Before committing, test using a command like:
 
     ~~~text
-    stack --resolver=ghc-X.Y.Z setup --setup-info-yaml=path/to/stackage-content/stack/stack-setup-2.yaml
+    stack --snapshot=ghc-X.Y.Z setup --setup-info-yaml=path/to/stackage-content/stack/stack-setup-2.yaml
     ~~~
 
 * In [stackage-content](https://github.com/fpco/stackage-content), command:

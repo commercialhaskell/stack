@@ -809,7 +809,7 @@ Examples:
     the most recent Stackage Nightly snapshot:
 
     ~~~text
-    stack --resolver nightly install Agda-2.6.3
+    stack --snapshot nightly install Agda-2.6.3
     ~~~
 
     Alternatively, Stack can be used to unpack the package from the package

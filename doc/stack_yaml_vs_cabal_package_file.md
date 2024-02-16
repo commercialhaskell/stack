@@ -152,7 +152,7 @@ And a final note, in case it wasn't clear. The example above used
 `acme-missiles`, which is not in Stackage snapshots. If, however, you want to
 depend on a package already present in the snapshot you've selected, there's no
 need to add it explicitly to your `stack.yaml` file: it's already there
-implicitly via the `resolver` setting. This is what you do the majority of the
+implicitly via the `snapshot` setting. This is what you do the majority of the
 time, such as when you add `vector` or `mtl` as a `build-depends` value.
 
 ## Should I check-in automatically generated Cabal files?

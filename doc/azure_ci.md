@@ -133,24 +133,24 @@ But we only use the first method of using Stack to download GHC.
 For different GHC versions, you probably want to use different project-level
 configuration files (`stack.yaml`). If you don't want to put a specific
 `stack.yaml` for a particular snapshot and still want to test it, you have
-specify your resolver argument in `ARGS` environment variable (you will see an
+specify your snapshot argument in `ARGS` environment variable (you will see an
 example below).
 
 ~~~yaml
 strategy:
   matrix:
     GHC 8.0:
-      ARGS: "--resolver lts-9"
+      ARGS: "--snapshot lts-9"
     GHC 8.2:
-      ARGS: "--resolver lts-11"
+      ARGS: "--snapshot lts-11"
     GHC 8.4:
-      ARGS: "--resolver lts-12"
+      ARGS: "--snapshot lts-12"
     GHC 8.6:
-      ARGS: "--resolver lts-14"
+      ARGS: "--snapshot lts-14"
     GHC 8.8:
-      ARGS: "--resolver lts-15"
+      ARGS: "--snapsht lts-15"
     nightly:
-      ARGS: "--resolver nightly"
+      ARGS: "--snapshot nightly"
 ~~~
 
 ## Running tests

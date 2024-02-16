@@ -128,7 +128,7 @@ above to use Nix flakes. The `flake.nix` file is:
 
         hPkgs =
           pkgs.haskell.packages."ghc8107"; # need to match Stackage LTS version
-                                           # from stack.yaml snapshot resolver
+                                           # from stack.yaml snapshot
 
         myDevTools = [
           hPkgs.ghc # GHC compiler in the desired version (will be available on PATH)
@@ -310,7 +310,7 @@ The `buildStackProject` utility function is documented in the
 Stack expects the `shell.nix` file to define a function of with one argument
 called `ghc` (arguments are not positional), which you should give to
 function `buildStackProject`. This argument is a GHC Nix package in the
-version as defined in the resolver you set in Stack's project-level
+version as defined in the snapshot you set in Stack's project-level
 configuration file (`stack.yaml`).
 
 ### Pure and impure Nix shells

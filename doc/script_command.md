@@ -15,10 +15,10 @@ default, runs it.
 
 Unlike `stack ghc` and `stack runghc`, the command ignores all Stack YAML
 configuration files (global and project-level). A snapshot must be specified on
-the command line (with the `--resolver` option). For example:
+the command line (with the `--snapshot` option). For example:
 
 ~~~text
-stack script --resolver lts-22.7 MyScript.hs
+stack script --snapshot lts-22.7 MyScript.hs
 ~~~
 
 The `stack script` command behaves as if the `--install-ghc` flag had been
@@ -100,7 +100,7 @@ main = do
 can be compiled and run, with arguments, with:
 
 ~~~text
-stack --resolver lts-22.7 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
+stack --snapshot lts-22.7 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
 ~~~
 
 All the compilation outputs (like `Main.hi`, `Main.o`, and the executable
@@ -123,7 +123,7 @@ LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
 
     ~~~haskell
     {- stack script
-       --resolver lts-20.25
+       --snapshot lts-20.25
        --extra-dep acme-missiles-0.3
        --extra-dep directory-1.3.6.2
        --extra-dep process-1.6.16.0
@@ -156,7 +156,7 @@ LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
 
     ~~~haskell
     {- stack script
-       --resolver lts-20.25
+       --snapshot lts-20.25
        --extra-dep acme-missiles-0.3
     -}
 
