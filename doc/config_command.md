@@ -42,7 +42,8 @@ Available commands:
   install-ghc              Configure whether Stack should automatically install
                            GHC when necessary.
   package-index            Configure Stack's package index
-  resolver                 Change the resolver key of the current project.
+  resolver                 Change the snapshot of the current project, using the
+                           resolver key.
   snapshot                 Change the snapshot of the current project.
   system-ghc               Configure whether Stack should use a system GHC
                            installation or not.
@@ -82,16 +83,9 @@ file (`config.yaml`).
 stack config set resolver SNAPSHOT
 ~~~
 
-`stack config set resolver <snapshot>` sets the `resolver` key in the
-project-level configuration file (`stack.yaml`).
-
-A snapshot of `lts` or `nightly` will be translated into the most recent
-available. A snapshot of `lts-22` will be translated into the most recent
-available in the `lts-22` sequence.
-
-Known bug:
-
-* The command does not respect the presence of a `snapshot` key.
+A command corresponding to the
+[`stack config set snapshot` command](#the-stack-config-set-snapshot-command)
+but using the `resolver` key instead of the `snapshot` key.
 
 ## The `stack config set snapshot` command
 
@@ -102,15 +96,13 @@ stack config set snapshot SNAPSHOT
 ~~~
 
 `stack config set snapshot <snapshot>` sets the `snapshot` key in the
-project-level configuration file (`stack.yaml`).
+project-level configuration file (`stack.yaml`) to the specified snapshot.
 
 A snapshot of `lts` or `nightly` will be translated into the most recent
 available. A snapshot of `lts-22` will be translated into the most recent
 available in the `lts-22` sequence.
 
-Known bug:
-
-* The command does not respect the presence of a `resolver` key.
+If a `resolver` key is present, it will be replaced by a `snapshot` key.
 
 ## The `stack config set system-ghc` command
 
