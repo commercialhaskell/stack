@@ -25,7 +25,7 @@ main = when isLinux $ do
 
     withEmptyDir "tmpSubSubRepo" $ do
       gitInit
-      stack ["new", "pkg ", defaultResolverArg]
+      stack ["new", "pkg ", defaultSnapshotArg]
       runShell "git add pkg"
       runShell "git commit -m SubSubCommit"
 
@@ -40,7 +40,7 @@ main = when isLinux $ do
       runShell "git commit -a -m Commit"
 
     removeDirIgnore "tmpPackage"
-    stack ["new", defaultResolverArg, "tmpPackage"]
+    stack ["new", defaultSnapshotArg, "tmpPackage"]
 
     curDir <- getCurrentDirectory
     let tmpRepoDir = curDir </> "tmpRepo"

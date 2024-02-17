@@ -10,7 +10,7 @@ import           Stack.Prelude
 import           Stack.Types.ConfigMonoid ( ConfigMonoid )
 import           Stack.Types.DockerEntrypoint ( DockerEntrypoint )
 import           Stack.Types.LockFileBehavior ( LockFileBehavior )
-import           Stack.Types.Resolver ( AbstractResolver )
+import           Stack.Types.Snapshot ( AbstractSnapshot )
 
 -- | Parsed global command-line options monoid.
 data GlobalOptsMonoid = GlobalOptsMonoid
@@ -30,10 +30,10 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     -- build plan in logs.
   , configMonoid     :: !ConfigMonoid
     -- ^ Config monoid, for passing into 'loadConfig'
-  , resolver         :: !(First (Unresolved AbstractResolver))
-    -- ^ Resolver override
-  , resolverRoot     :: !(First FilePath)
-    -- ^ root directory for resolver relative path
+  , snapshot         :: !(First (Unresolved AbstractSnapshot))
+    -- ^ Snapshot override
+  , snapshotRoot     :: !(First FilePath)
+    -- ^ root directory for snapshot relative path
   , compiler         :: !(First WantedCompiler)
     -- ^ Compiler override
   , terminal         :: !(First Bool)

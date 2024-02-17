@@ -65,7 +65,7 @@ data BuildPlanException
       (Map PackageName (Maybe Version, Set PackageName)) -- truly unknown
       (Map PackageName (Set PackageIdentifier)) -- shadowed
   | SnapshotNotFound SnapName
-  | NeitherCompilerOrResolverSpecified T.Text
+  | NeitherCompilerOrSnapshotSpecified T.Text
   | DuplicatePackagesBug
   deriving (Show, Typeable)
 
@@ -73,7 +73,7 @@ instance Exception BuildPlanException where
   displayException (SnapshotNotFound snapName) = unlines
     [ "Error: [S-2045]"
     , "SnapshotNotFound " ++ snapName'
-    , "Non existing resolver: " ++ snapName' ++ "."
+    , "Non existing snapshot: " ++ snapName' ++ "."
     , "For a complete list of available snapshots see https://www.stackage.org/snapshots"
     ]
    where
@@ -146,11 +146,11 @@ instance Exception BuildPlanException where
                 $ Set.toList
                 $ Set.unions
                 $ Map.elems shadowed
-  displayException (NeitherCompilerOrResolverSpecified url) = concat
+  displayException (NeitherCompilerOrSnapshotSpecified url) = concat
     [ "Error: [S-8559]\n"
     , "Failed to load custom snapshot at "
     , T.unpack url
-    , ", because no 'compiler' or 'resolver' is specified."
+    , ", because no 'compiler' or 'snapshot' is specified."
     ]
   displayException DuplicatePackagesBug = bugReport "[S-5743]"
     "Duplicate packages are not expected here."

@@ -5,11 +5,11 @@ module Stack.Config.DockerSpec
   ( spec
   ) where
 
-import Test.Hspec
-import Stack.Prelude
-import Stack.Types.Resolver
-import RIO.Time (fromGregorian)
-import Stack.Config.Docker (addDefaultTag)
+import           RIO.Time ( fromGregorian )
+import           Stack.Config.Docker ( addDefaultTag )
+import           Stack.Prelude
+import           Stack.Types.Snapshot ( AbstractSnapshot (..) )
+import           Test.Hspec ( Spec, describe, it, shouldBe )
 
 spec :: Spec
 spec = do
@@ -19,11 +19,11 @@ spec = do
       addDefaultTag
         "foo/bar"
         Nothing
-        (Just $ ARResolver $ RSLSynonym $ LTS 1 2)
+        (Just $ ASSnapshot $ RSLSynonym $ LTS 1 2)
       `shouldBe` Just "foo/bar:lts-1.2"
     it "fails on nightly" $
       addDefaultTag
         "foo/bar"
         Nothing
-        (Just $ ARResolver $ RSLSynonym $ Nightly $ fromGregorian 2018 1 1)
+        (Just $ ASSnapshot $ RSLSynonym $ Nightly $ fromGregorian 2018 1 1)
       `shouldBe` Nothing

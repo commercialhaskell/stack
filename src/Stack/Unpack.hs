@@ -19,7 +19,7 @@ import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
 import qualified RIO.Set as Set
 import qualified RIO.Text as T
-import           Stack.Config ( makeConcreteResolver )
+import           Stack.Config ( makeConcreteSnapshot )
 import           Stack.Constants ( relDirRoot )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
@@ -94,9 +94,9 @@ unpackCmd (UnpackOpts targets areCandidates Nothing) =
   unpackCmd (UnpackOpts targets areCandidates (Just $ Rel relDirRoot))
 unpackCmd (UnpackOpts targets areCandidates (Just dstPath)) =
   withConfig NoReexec $ do
-    mresolver <- view $ globalOptsL . to (.resolver)
-    mSnapshot <- forM mresolver $ \resolver -> do
-      concrete <- makeConcreteResolver resolver
+    mASnapshot <- view $ globalOptsL . to (.snapshot)
+    mSnapshot <- forM mASnapshot $ \aSnapshot -> do
+      concrete <- makeConcreteSnapshot aSnapshot
       loc <- completeSnapshotLocation concrete
       loadSnapshot loc
     dstPath' <- case dstPath of

@@ -35,7 +35,7 @@ import           RIO.NonEmpty ( nonEmpty )
 import qualified RIO.NonEmpty as NE
 import           RIO.Process ( envVarsL )
 import           Stack.Config
-                   ( makeConcreteResolver, getProjectConfig
+                   ( makeConcreteSnapshot, getProjectConfig
                    , getImplicitGlobalProjectDir
                    )
 import           Stack.Constants ( stackDotYaml )
@@ -48,8 +48,8 @@ import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
-import           Stack.Types.Resolver ( AbstractResolver, readAbstractResolver )
 import           Stack.Types.Runner ( globalOptsL )
+import           Stack.Types.Snapshot ( AbstractSnapshot, readAbstractSnapshot )
 import           System.Environment ( getEnvironment )
 
 -- | Type repesenting exceptions thrown by functions exported by the
@@ -64,8 +64,8 @@ instance Exception ConfigCmdException where
     ++ "'config' command used when no project configuration available."
 
 data ConfigCmdSet
-  = ConfigCmdSetSnapshot !(Unresolved AbstractResolver)
-  | ConfigCmdSetResolver !(Unresolved AbstractResolver)
+  = ConfigCmdSetSnapshot !(Unresolved AbstractSnapshot)
+  | ConfigCmdSetResolver !(Unresolved AbstractSnapshot)
   | ConfigCmdSetSystemGhc !CommandScope !Bool
   | ConfigCmdSetInstallGhc !CommandScope !Bool
   | ConfigCmdSetDownloadPrefix !CommandScope !Text
@@ -237,10 +237,11 @@ cfgCmdSetValue _ (ConfigCmdSetDownloadPrefix _ url) = pure $ Yaml.String url
 snapshotValue ::
      HasConfig env
   => Path Abs Dir -- ^ root directory of project
-  -> Unresolved AbstractResolver -> RIO env Yaml.Value
+  -> Unresolved AbstractSnapshot
+  -> RIO env Yaml.Value
 snapshotValue root snapshot = do
   snapshot' <- resolvePaths (Just root) snapshot
-  concreteSnapshot <- makeConcreteResolver snapshot'
+  concreteSnapshot <- makeConcreteSnapshot snapshot'
   -- Check that the snapshot actually exists
   void $ loadSnapshot =<< completeSnapshotLocation concreteSnapshot
   pure (Yaml.toJSON concreteSnapshot)
@@ -270,7 +271,7 @@ configCmdSetParser =
           ( OA.info
               (   ConfigCmdSetSnapshot
               <$> OA.argument
-                    readAbstractResolver
+                    readAbstractSnapshot
                     (  OA.metavar "SNAPSHOT"
                     <> OA.help "E.g. \"nightly\" or \"lts-22.8\"" ))
               ( OA.progDesc
@@ -279,7 +280,7 @@ configCmdSetParser =
           ( OA.info
               (   ConfigCmdSetResolver
               <$> OA.argument
-                    readAbstractResolver
+                    readAbstractSnapshot
                     (  OA.metavar "SNAPSHOT"
                     <> OA.help "E.g. \"nightly\" or \"lts-22.8\"" ))
               ( OA.progDesc

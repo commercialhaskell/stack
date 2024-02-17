@@ -43,7 +43,7 @@ data ConfigException
   | UserDoesn'tOwnDirectory (Path Abs Dir)
   | ManualGHCVariantSettingsAreIncompatibleWithSystemGHC
   | NixRequiresSystemGhc
-  | NoResolverWhenUsingNoProject
+  | NoSnapshotWhenUsingNoProject
   | NoLTSWithMajorVersion Int
   | NoLTSFound
   deriving (Show, Typeable)
@@ -141,9 +141,9 @@ instance Exception ConfigException where
     , configMonoidSystemGHCName
     , "' or disable the Nix integration."
     ]
-  displayException NoResolverWhenUsingNoProject =
+  displayException NoSnapshotWhenUsingNoProject =
     "Error: [S-5027]\n"
-    ++ "When using the script command, you must provide a resolver argument"
+    ++ "When using the script command, you must provide a snapshot argument"
   displayException (NoLTSWithMajorVersion n) = concat
     [ "Error: [S-3803]\n"
     , "No LTS release found with major version "

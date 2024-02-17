@@ -1571,11 +1571,11 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
             stack args = proc "stack" args'' runProcess_
              where
               args'' = "--stack-yaml=" <> relFileHadrianStackDotYaml' : args'
-              -- If a resolver is specified on the command line, Stack will
-              -- apply it. This allows the resolver specified in Hadrian's
+              -- If a snapshot is specified on the command line, Stack will
+              -- apply it. This allows the snapshot specified in Hadrian's
               -- stack.yaml file to be overridden.
-              args' = maybe args addResolver config.resolver
-              addResolver resolver = "--snapshot=" <> show resolver : args
+              args' = maybe args addSnapshot config.snapshot
+              addSnapshot snapshot = "--snapshot=" <> show snapshot : args
             happy = stack ["install", "happy"]
             alex = stack ["install", "alex"]
             -- Executed in the Stack environment, because GHC is required.

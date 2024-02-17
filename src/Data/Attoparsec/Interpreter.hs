@@ -27,14 +27,14 @@
   Here is an example of a single line comment:
 
   > #!/usr/bin/env stack
-  > -- stack --resolver lts-3.14 --install-ghc runghc --package random
+  > -- stack --snapshot lts-3.14 --install-ghc runghc --package random
 
   Here is an example of a multi line block comment:
 
 @
   #!\/usr\/bin\/env stack
   {\- stack
-    --resolver lts-3.14
+    --snapshot lts-3.14
     --install-ghc
     runghc
     --package random

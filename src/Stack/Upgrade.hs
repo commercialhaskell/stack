@@ -39,7 +39,7 @@ import           System.Process ( rawSystem, readProcess )
 -- | Type representing \'pretty\' exceptions thrown by functions in the
 -- "Stack.Upgrade" module.
 data UpgradePrettyException
-  = ResolverOptionInvalid
+  = SnapshotOptionInvalid
   | NeitherBinaryOrSourceSpecified
   | ExecutableFailure
   | CommitsNotFound String String
@@ -48,12 +48,12 @@ data UpgradePrettyException
   deriving (Show, Typeable)
 
 instance Pretty UpgradePrettyException where
-  pretty ResolverOptionInvalid =
+  pretty SnapshotOptionInvalid =
     "[S-8761]"
     <> line
     <> fillSep
          [ "The"
-         , style Shell "--resolver"
+         , style Shell "--snapshot"
          , flow "option cannot be used with Stack's"
          , style Shell "upgrade"
          , "command."
@@ -118,8 +118,8 @@ data UpgradeOpts = UpgradeOpts
 upgradeCmd :: UpgradeOpts -> RIO Runner ()
 upgradeCmd upgradeOpts = do
   go <- view globalOptsL
-  case go.resolver of
-    Just _ -> prettyThrowIO ResolverOptionInvalid
+  case go.snapshot of
+    Just _ -> prettyThrowIO SnapshotOptionInvalid
     Nothing -> withGlobalProject $ upgrade maybeGitHash upgradeOpts
 
 upgrade ::
@@ -283,8 +283,8 @@ sourceUpgrade builtHash (SourceOpts gitRepo) =
                 pure $ Just dir
 
     let modifyGO dir go = go
-          { resolver = Nothing -- always use the resolver settings in the
-                                     -- stack.yaml file
+          { snapshot = Nothing -- always use the snapshot settings in the
+                               -- stack.yaml file
           , stackYaml = SYLOverride $ dir </> stackDotYaml
           }
         boptsCLI = defaultBuildOptsCLI { targetsCLI = ["stack"] }

@@ -167,7 +167,7 @@ branch.
             (in the `.github` directory) to point at the new release version
             yet!
 
-    *   Search for old snapshots, set to latest snapshot (e.g. in`doc/GUIDE.md`
+    *   Search for old snapshots, set to latest snapshot (e.g. in `doc/GUIDE.md`
         where it references the "currently the latest LTS")
     *   Look for any links to "latest" (`latest/`) documentation, replace with
         version tag

@@ -8,7 +8,7 @@ main = do
   -- install in relative path
   removeDirIgnore "bin"
   createDirectory "bin"
-  stack [defaultResolverArg, "--local-bin-path", "./bin", "install" , "happy"]
+  stack [defaultSnapshotArg, "--local-bin-path", "./bin", "install" , "happy"]
   doesExist ("./bin/happy" ++ exeExt)
 
   -- Default install
@@ -19,12 +19,12 @@ main = do
   -- doesExist (defaultDir ++ "/bin/happy" ++ exeExt)
 
   -- install in current dir
-  stack [defaultResolverArg, "--local-bin-path", ".", "install", "happy" ]
+  stack [defaultSnapshotArg, "--local-bin-path", ".", "install", "happy" ]
   doesExist ("happy" ++ exeExt)
 
   -- install in absolute path
   tmpDirectory <- fmap (</> "absolute-bin") getCurrentDirectory
   removeDirIgnore tmpDirectory
   createDirectory tmpDirectory
-  stack [defaultResolverArg, "--local-bin-path", tmpDirectory, "install", "happy" ]
+  stack [defaultSnapshotArg, "--local-bin-path", tmpDirectory, "install", "happy" ]
   doesExist (tmpDirectory </> ("happy" ++ exeExt))

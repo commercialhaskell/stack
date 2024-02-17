@@ -49,10 +49,10 @@ import           Stack.Types.Platform ( HasPlatform (..), PlatformVariant )
 import           Stack.Types.Project ( Project (..) )
 import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.PvpBounds ( PvpBounds )
-import           Stack.Types.Resolver ( AbstractResolver )
 import           Stack.Types.Runner ( HasRunner (..), Runner, globalOptsL )
 import           Stack.Types.SCM ( SCM )
 import           Stack.Types.SetupInfo ( SetupInfo )
+import           Stack.Types.Snapshot ( AbstractSnapshot )
 import           Stack.Types.Storage ( UserStorage )
 import           Stack.Types.TemplateName ( TemplateName )
 import           Stack.Types.Version ( VersionCheck (..), VersionRange )
@@ -176,8 +176,8 @@ data Config = Config
   , runner                 :: !Runner
   , pantryConfig           :: !PantryConfig
   , stackRoot              :: !(Path Abs Dir)
-  , resolver               :: !(Maybe AbstractResolver)
-    -- ^ Any resolver override from the command line
+  , snapshot               :: !(Maybe AbstractSnapshot)
+    -- ^ Any snapshot override from the command line
   , userStorage            :: !UserStorage
     -- ^ Database connection pool for user Stack database
   , hideSourcePaths        :: !Bool

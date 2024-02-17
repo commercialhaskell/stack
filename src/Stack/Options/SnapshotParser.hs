@@ -1,8 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds         #-}
 
-module Stack.Options.ResolverParser
-  ( abstractResolverOptsParser
+module Stack.Options.SnapshotParser
+  ( abstractSnapshotOptsParser
   , compilerOptsParser
   , readCompilerVersion
   ) where
@@ -13,11 +13,11 @@ import           Options.Applicative
 import           Options.Applicative.Types ( readerAsk )
 import           Stack.Options.Utils ( hideMods )
 import           Stack.Prelude
-import           Stack.Types.Resolver ( AbstractResolver, readAbstractResolver )
+import           Stack.Types.Snapshot ( AbstractSnapshot, readAbstractSnapshot )
 
 -- | Parser for the snapshot
-abstractResolverOptsParser :: Bool -> Parser (Unresolved AbstractResolver)
-abstractResolverOptsParser hide = option readAbstractResolver
+abstractSnapshotOptsParser :: Bool -> Parser (Unresolved AbstractSnapshot)
+abstractSnapshotOptsParser hide = option readAbstractSnapshot
   (  long "snapshot"
   <> long "resolver"
   <> metavar "SNAPSHOT"

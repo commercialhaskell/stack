@@ -132,7 +132,7 @@ lockCachedWanted ::
      -> RIO env ( SMWanted, [CompletedPLI])
      )
   -> RIO env SMWanted
-lockCachedWanted stackFile resolver fillWanted = do
+lockCachedWanted stackFile snapshot fillWanted = do
   lockFile <- liftIO $ addExtension ".lock" stackFile
   let getLockExists = doesFileExist lockFile
   lfb <- view lockFileBehaviorL
@@ -157,7 +157,7 @@ lockCachedWanted stackFile resolver fillWanted = do
       pkgLocCache = toMap locked.pkgImmutableLocations
   debugRSL <- view rslInLogL
   (snap, slocCompleted, pliCompleted) <-
-    loadAndCompleteSnapshotRaw' debugRSL resolver slocCache pkgLocCache
+    loadAndCompleteSnapshotRaw' debugRSL snapshot slocCache pkgLocCache
   let compiler = snapshotCompiler snap
       snPkgs = Map.mapWithKey
                  (\n p h -> snapToDepPackage h n p)

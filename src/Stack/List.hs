@@ -12,7 +12,7 @@ import           Pantry ( loadSnapshot )
 import qualified RIO.ByteString.Lazy as Lazy
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
-import           Stack.Config ( makeConcreteResolver )
+import           Stack.Config ( makeConcreteSnapshot )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
@@ -35,9 +35,9 @@ instance Exception ListPrettyException
 -- | Function underlying the @stack list@ command. List packages.
 listCmd :: [String] -> RIO Runner ()
 listCmd names = withConfig NoReexec $ do
-  mresolver <- view $ globalOptsL . to (.resolver)
-  mSnapshot <- forM mresolver $ \resolver -> do
-    concrete <- makeConcreteResolver resolver
+  mASnapshot <- view $ globalOptsL . to (.snapshot)
+  mSnapshot <- forM mASnapshot $ \aSnapshot -> do
+    concrete <- makeConcreteSnapshot aSnapshot
     loc <- completeSnapshotLocation concrete
     loadSnapshot loc
   listPackages mSnapshot names

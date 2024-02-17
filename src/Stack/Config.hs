@@ -6,23 +6,23 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
 
--- | The general Stack configuration that starts everything off. This should
--- be smart to fallback if there is no stack.yaml, instead relying on
--- whatever files are available.
+-- | The general Stack configuration that starts everything off. This should be
+-- smart to fallback if there is no stack.yaml, instead relying on whatever
+-- files are available.
 --
--- If there is no stack.yaml, and there is a cabal.config, we
--- read in those constraints, and if there's a cabal.sandbox.config,
--- we read any constraints from there and also find the package
--- database from there, etc. And if there's nothing, we should
--- probably default to behaving like cabal, possibly with spitting out
--- a warning that "you should run `stk init` to make things better".
+-- If there is no stack.yaml, and there is a cabal.config, we read in those
+-- constraints, and if there's a cabal.sandbox.config, we read any constraints
+-- from there and also find the package database from there, etc. And if there's
+-- nothing, we should probably default to behaving like cabal, possibly with
+-- spitting out a warning that "you should run `stk init` to make things
+-- better".
 module Stack.Config
   ( loadConfig
   , loadConfigYaml
   , packagesParser
   , getImplicitGlobalProjectDir
   , getSnapshots
-  , makeConcreteResolver
+  , makeConcreteSnapshot
   , checkOwnership
   , getInContainer
   , getInNixShell
@@ -133,9 +133,9 @@ import           Stack.Types.ProjectAndConfigMonoid
                    ( ProjectAndConfigMonoid (..), parseProjectAndConfigMonoid )
 import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
-import           Stack.Types.Resolver ( AbstractResolver (..), Snapshots (..) )
 import           Stack.Types.Runner
                    ( HasRunner (..), Runner (..), globalOptsL, terminalL )
+import           Stack.Types.Snapshot ( AbstractSnapshot (..), Snapshots (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
                    , SMWanted (..)
@@ -212,44 +212,44 @@ getSnapshots = do
   logDebug "Done downloading and parsing snapshot versions file"
   pure $ getResponseBody result
 
--- | Turn an 'AbstractResolver' into a 'Resolver'.
-makeConcreteResolver ::
+-- | Turn an 'AbstractSnapshot' into a 'RawSnapshotLocation'.
+makeConcreteSnapshot ::
      HasConfig env
-  => AbstractResolver
+  => AbstractSnapshot
   -> RIO env RawSnapshotLocation
-makeConcreteResolver (ARResolver r) = pure r
-makeConcreteResolver ar = do
-  r <-
-    case ar of
-      ARGlobal -> do
+makeConcreteSnapshot (ASSnapshot s) = pure s
+makeConcreteSnapshot as = do
+  s <-
+    case as of
+      ASGlobal -> do
         config <- view configL
         implicitGlobalDir <- getImplicitGlobalProjectDir config
         let fp = implicitGlobalDir </> stackDotYaml
         iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
         ProjectAndConfigMonoid project _ <- liftIO iopc
-        pure project.resolver
-      ARLatestNightly ->
+        pure project.snapshot
+      ASLatestNightly ->
         RSLSynonym . Nightly . (.nightly) <$> getSnapshots
-      ARLatestLTSMajor x -> do
+      ASLatestLTSMajor x -> do
         snapshots <- getSnapshots
         case IntMap.lookup x snapshots.lts of
           Nothing -> throwIO $ NoLTSWithMajorVersion x
           Just y -> pure $ RSLSynonym $ LTS x y
-      ARLatestLTS -> do
+      ASLatestLTS -> do
         snapshots <- getSnapshots
         if IntMap.null snapshots.lts
           then throwIO NoLTSFound
           else let (x, y) = IntMap.findMax snapshots.lts
                in  pure $ RSLSynonym $ LTS x y
   prettyInfoL
-    [ flow "Selected resolver:"
-    , style Current (fromString $ T.unpack $ textDisplay r) <> "."
+    [ flow "Selected snapshot:"
+    , style Current (fromString $ T.unpack $ textDisplay s) <> "."
     ]
-  pure r
+  pure s
 
--- | Get the latest snapshot resolver available.
-getLatestResolver :: HasConfig env => RIO env RawSnapshotLocation
-getLatestResolver = do
+-- | Get the latest snapshot available.
+getLatestSnapshot :: HasConfig env => RIO env RawSnapshotLocation
+getLatestSnapshot = do
   snapshots <- getSnapshots
   let mlts = uncurry LTS <$>
              listToMaybe (reverse (IntMap.toList snapshots.lts))
@@ -260,7 +260,7 @@ configFromConfigMonoid ::
      (HasRunner env, HasTerm env)
   => Path Abs Dir -- ^ Stack root, e.g. ~/.stack
   -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
-  -> Maybe AbstractResolver
+  -> Maybe AbstractSnapshot
   -> ProjectConfig (Project, Path Abs File)
   -> ConfigMonoid
   -> (Config -> RIO env a)
@@ -268,7 +268,7 @@ configFromConfigMonoid ::
 configFromConfigMonoid
   stackRoot
   userConfigPath
-  resolver
+  snapshot
   project
   configMonoid
   inner
@@ -342,7 +342,7 @@ configFromConfigMonoid
       maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
     let build = buildOptsFromMonoid configMonoid.buildOpts
     docker <-
-      dockerOptsFromMonoid (fmap fst mproject) resolver configMonoid.dockerOpts
+      dockerOptsFromMonoid (fmap fst mproject) snapshot configMonoid.dockerOpts
     nix <- nixOptsFromMonoid configMonoid.nixOpts os
     systemGHC <-
       case (getFirst configMonoid.systemGHC, nix.enable) of
@@ -589,7 +589,7 @@ configFromConfigMonoid
                 , runner
                 , pantryConfig
                 , stackRoot
-                , resolver
+                , snapshot
                 , userStorage
                 , hideSourcePaths
                 , recommendUpgrade
@@ -670,7 +670,7 @@ loadConfig ::
 loadConfig inner = do
   mstackYaml <- view $ globalOptsL . to (.stackYaml)
   mproject <- loadProjectConfig mstackYaml
-  mresolver <- view $ globalOptsL . to (.resolver)
+  mSnapshot <- view $ globalOptsL . to (.snapshot)
   configArgs <- view $ globalOptsL . to (.configMonoid)
   (configRoot, stackRoot, userOwnsStackRoot) <-
     determineStackRootAndOwnership configArgs
@@ -695,7 +695,7 @@ loadConfig inner = do
         configFromConfigMonoid
           stackRoot
           userConfigPath
-          mresolver
+          mSnapshot
           mproject'
           (mconcat $ configArgs : addConfigMonoid extraConfigs)
 
@@ -727,16 +727,19 @@ withBuildConfig :: RIO BuildConfig a -> RIO Config a
 withBuildConfig inner = do
   config <- ask
 
-  -- If provided, turn the AbstractResolver from the command line into a
-  -- Resolver that can be used below.
+  -- If provided, turn the AbstractSnapshot from the command line into a
+  -- snapshot that can be used below.
 
-  -- The configResolver and mcompiler are provided on the command line. In order
-  -- to properly deal with an AbstractResolver, we need a base directory (to
+  -- The snapshot and mcompiler are provided on the command line. In order
+  -- to properly deal with an AbstractSnapshot, we need a base directory (to
   -- deal with custom snapshot relative paths). We consider the current working
-  -- directory to be the correct base. Let's calculate the mresolver first.
-  mresolver <- forM config.resolver $ \aresolver -> do
-    logDebug ("Using resolver: " <> display aresolver <> " specified on command line")
-    makeConcreteResolver aresolver
+  -- directory to be the correct base. Let's calculate the mSnapshot first.
+  mSnapshot <- forM config.snapshot $ \aSnapshot -> do
+    logDebug $
+          "Using snapshot: "
+       <> display aSnapshot
+       <> " specified on command line"
+    makeConcreteSnapshot aSnapshot
 
   (project', stackYaml) <- case config.project of
     PCProject (project, fp) -> do
@@ -744,9 +747,9 @@ withBuildConfig inner = do
       pure (project, fp)
     PCNoProject extraDeps -> do
       p <-
-        case mresolver of
-          Nothing -> throwIO NoResolverWhenUsingNoProject
-          Just _ -> getEmptyProject mresolver extraDeps
+        case mSnapshot of
+          Nothing -> throwIO NoSnapshotWhenUsingNoProject
+          Just _ -> getEmptyProject mSnapshot extraDeps
       pure (p, config.userConfigPath)
     PCGlobalProject -> do
       logDebug "Run from outside a project, using implicit global project config"
@@ -762,11 +765,11 @@ withBuildConfig inner = do
           iopc <- loadConfigYaml (parseProjectAndConfigMonoid destDir) dest
           ProjectAndConfigMonoid project _ <- liftIO iopc
           when (view terminalL config) $
-            case config.resolver of
+            case config.snapshot of
               Nothing ->
                 logDebug $
-                     "Using resolver: "
-                  <> display project.resolver
+                     "Using snapshot: "
+                  <> display project.snapshot
                   <> " from implicit global project's config file: "
                   <> fromString dest'
               Just _ -> pure ()
@@ -777,10 +780,10 @@ withBuildConfig inner = do
                    \global project to:"
             , pretty dest <> "."
             , flow "Note: You can change the snapshot via the"
-            , style Shell "resolver"
+            , style Shell "snapshot"
             , flow "field there."
             ]
-          p <- getEmptyProject mresolver []
+          p <- getEmptyProject mSnapshot []
           liftIO $ do
             writeBinaryFileAtomic dest $ byteString $ S.concat
               [ "# This is the implicit global project's config file, which is only used when\n"
@@ -801,11 +804,11 @@ withBuildConfig inner = do
   let project :: Project
       project = project'
         { Project.compiler = mcompiler <|> project'.compiler
-        , Project.resolver = fromMaybe project'.resolver mresolver
+        , Project.snapshot = fromMaybe project'.snapshot mSnapshot
         }
   extraPackageDBs <- mapM resolveDir' project.extraPackageDBs
 
-  smWanted <- lockCachedWanted stackYaml project.resolver $
+  smWanted <- lockCachedWanted stackYaml project.snapshot $
     fillProjectWanted stackYaml config project
 
   -- Unfortunately redoes getProjectWorkDir, since we don't have a BuildConfig
@@ -828,17 +831,17 @@ withBuildConfig inner = do
        Maybe RawSnapshotLocation
     -> [PackageIdentifierRevision]
     -> RIO Config Project
-  getEmptyProject mresolver extraDeps = do
-    r <- case mresolver of
-      Just resolver -> do
+  getEmptyProject mSnapshot extraDeps = do
+    snapshot <- case mSnapshot of
+      Just snapshot -> do
         prettyInfoL
           [ flow "Using the snapshot"
-          , style Current (fromString $ T.unpack $ textDisplay resolver)
+          , style Current (fromString $ T.unpack $ textDisplay snapshot)
           , flow "specified on the command line."
           ]
-        pure resolver
+        pure snapshot
       Nothing -> do
-        r'' <- getLatestResolver
+        r'' <- getLatestSnapshot
         prettyInfoL
           [ flow "Using the latest snapshot"
           , style Current (fromString $ T.unpack $ textDisplay r'') <> "."
@@ -849,7 +852,7 @@ withBuildConfig inner = do
       , packages = []
       , extraDeps = map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
       , flagsByPkg = mempty
-      , resolver = r
+      , snapshot
       , compiler = Nothing
       , extraPackageDBs = []
       , curator = Nothing
@@ -944,7 +947,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
         { compiler = fromMaybe snapCompiler project.compiler
         , project = packages
         , deps = deps
-        , snapshotLocation = project.resolver
+        , snapshotLocation = project.snapshot
         }
 
   pure (wanted, catMaybes mcompleted)
