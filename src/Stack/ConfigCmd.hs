@@ -109,14 +109,16 @@ cfgCmdSet cmd = do
       newValue' = T.stripEnd $
         decodeUtf8With lenientDecode $ Yaml.encode newValue  -- Text
       file = toFilePath configFilePath  -- String
-  newYamlLines <- case inConfig config cmdKeys of
-    Nothing -> do
+      hits = catMaybes $ NE.toList $ NE.map (inConfig config) cmdKeys
+      primaryCmdKey = NE.last $ NE.head cmdKeys
+  newYamlLines <- case hits of
+    [] -> do
       prettyInfoL
         [ pretty configFilePath
         , flow "has been extended."
         ]
-      pure $ writeLines yamlLines "" cmdKeys newValue'
-    Just oldValue -> if oldValue == newValue
+      pure $ writeLines yamlLines "" (NE.head cmdKeys) newValue'
+    [(cmdKey, oldValue)] -> if oldValue == newValue && cmdKey == primaryCmdKey
       then do
         prettyInfoL
           [ pretty configFilePath
@@ -124,7 +126,27 @@ cfgCmdSet cmd = do
                  \unchanged."
           ]
         pure yamlLines
-      else switchLine configFilePath (NE.last cmdKeys) newValue' [] yamlLines
+      else do
+        when (cmdKey /= primaryCmdKey) $
+          prettyWarn $
+               fillSep
+                 [ pretty configFilePath
+                 , flow "contained a synonym for"
+                 , style Target (fromString $ T.unpack primaryCmdKey)
+                 , parens (style Current (fromString $ T.unpack cmdKey))
+                 , flow "which has been replaced."
+                 ]
+            <> line
+        switchLine configFilePath cmdKey primaryCmdKey newValue' [] yamlLines
+    _ -> do
+      -- In practice, this warning should not be encountered because with
+      -- snapshot and resolver present, Stack will not parse the YAML file.
+      prettyWarnL
+        [ pretty configFilePath
+        , flow "contains more than one possible existing configuration and, \
+               \consequently, remains unchanged."
+        ]
+      pure yamlLines
   liftIO $ writeFileUtf8 file (T.unlines newYamlLines)
  where
   -- This assumes that if the key does not exist, the lines that can be
@@ -145,14 +167,15 @@ cfgCmdSet cmd = do
 
   inConfig v cmdKeys = case v of
     Yaml.Object obj ->
-      case KeyMap.lookup (Key.fromText (NE.head cmdKeys)) obj of
-        Nothing -> Nothing
-        Just v' -> case nonEmpty $ NE.tail cmdKeys of
-          Nothing -> Just v'
-          Just ks -> inConfig v' ks
+      let cmdKey = NE.head cmdKeys
+      in  case KeyMap.lookup (Key.fromText cmdKey) obj of
+            Nothing -> Nothing
+            Just v' -> case nonEmpty $ NE.tail cmdKeys of
+              Nothing -> Just (cmdKey, v')
+              Just ks -> inConfig v' ks
     _ -> Nothing
 
-  switchLine file cmdKey _ searched [] = do
+  switchLine file cmdKey _ _ searched [] = do
     prettyWarnL
       [ style Current (fromString $ T.unpack cmdKey)
       , flow "not found in YAML file"
@@ -161,11 +184,11 @@ cfgCmdSet cmd = do
              \supported."
       ]
     pure $ reverse searched
-  switchLine file cmdKey newValue searched (oldLine:rest) =
+  switchLine file cmdKey cmdKey' newValue searched (oldLine:rest) =
     case parseOnly (parseLine cmdKey) oldLine of
-      Left _ -> switchLine file cmdKey newValue (oldLine:searched) rest
+      Left _ -> switchLine file cmdKey cmdKey' newValue (oldLine:searched) rest
       Right (kt, spaces1, spaces2, spaces3, comment) -> do
-        let newLine = spaces1 <> renderKey cmdKey kt <> spaces2 <>
+        let newLine = spaces1 <> renderKey cmdKey' kt <> spaces2 <>
                 ":" <> spaces3 <> newValue <> comment
         prettyInfoL
           [ pretty file
@@ -246,13 +269,13 @@ snapshotValue root snapshot = do
   void $ loadSnapshot =<< completeSnapshotLocation concreteSnapshot
   pure (Yaml.toJSON concreteSnapshot)
 
-cfgCmdSetKeys :: ConfigCmdSet -> NonEmpty Text
-cfgCmdSetKeys (ConfigCmdSetSnapshot _) = ["snapshot"]
-cfgCmdSetKeys (ConfigCmdSetResolver _) = ["resolver"]
-cfgCmdSetKeys (ConfigCmdSetSystemGhc _ _) = [configMonoidSystemGHCName]
-cfgCmdSetKeys (ConfigCmdSetInstallGhc _ _) = [configMonoidInstallGHCName]
+cfgCmdSetKeys :: ConfigCmdSet -> NonEmpty (NonEmpty Text)
+cfgCmdSetKeys (ConfigCmdSetSnapshot _) = [["snapshot"], ["resolver"]]
+cfgCmdSetKeys (ConfigCmdSetResolver _) = [["resolver"], ["snapshot"]]
+cfgCmdSetKeys (ConfigCmdSetSystemGhc _ _) = [[configMonoidSystemGHCName]]
+cfgCmdSetKeys (ConfigCmdSetInstallGhc _ _) = [[configMonoidInstallGHCName]]
 cfgCmdSetKeys (ConfigCmdSetDownloadPrefix _ _) =
-  ["package-index", "download-prefix"]
+  [["package-index", "download-prefix"]]
 
 cfgCmdName :: String
 cfgCmdName = "config"
@@ -284,7 +307,8 @@ configCmdSetParser =
                     (  OA.metavar "SNAPSHOT"
                     <> OA.help "E.g. \"nightly\" or \"lts-22.8\"" ))
               ( OA.progDesc
-                  "Change the resolver key of the current project." ))
+                  "Change the snapshot of the current project, using the \
+                  \resolver key." ))
       , OA.command (T.unpack configMonoidSystemGHCName)
           ( OA.info
               (   ConfigCmdSetSystemGhc

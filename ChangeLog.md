@@ -28,6 +28,8 @@ Other enhancements:
 Bug fixes:
 
 * `--haddock-for-hackage` does not ignore `--haddock-arguments`.
+* The `config set snapshot` and `config set resolver` commands now respect the
+  presence of a synoymous key.
 
 ## v2.15.1 - 2024-02-09
 
