@@ -23,6 +23,7 @@ module Stack.Config
   , getImplicitGlobalProjectDir
   , getSnapshots
   , makeConcreteSnapshot
+  , getRawSnapshot
   , checkOwnership
   , getInContainer
   , getInNixShell
@@ -56,6 +57,7 @@ import           GHC.Conc ( getNumProcessors )
 import           Network.HTTP.StackClient
                    ( httpJSON, parseUrlThrow, getResponseBody )
 import           Options.Applicative ( Parser, help, long, metavar, strOption )
+import           Pantry ( loadSnapshot )
 import           Path
                    ( PathException (..), (</>), parent, parseAbsDir
                    , parseAbsFile, parseRelDir, stripProperPrefix
@@ -246,6 +248,15 @@ makeConcreteSnapshot as = do
     , style Current (fromString $ T.unpack $ textDisplay s) <> "."
     ]
   pure s
+
+-- | Get the raw snapshot from the global options.
+getRawSnapshot :: HasConfig env => RIO env (Maybe RawSnapshot)
+getRawSnapshot = do
+  mASnapshot <- view $ globalOptsL . to (.snapshot)
+  forM mASnapshot $ \aSnapshot -> do
+    concrete <- makeConcreteSnapshot aSnapshot
+    loc <- completeSnapshotLocation concrete
+    loadSnapshot loc
 
 -- | Get the latest snapshot available.
 getLatestSnapshot :: HasConfig env => RIO env RawSnapshotLocation
@@ -670,7 +681,7 @@ loadConfig ::
 loadConfig inner = do
   mstackYaml <- view $ globalOptsL . to (.stackYaml)
   mproject <- loadProjectConfig mstackYaml
-  mSnapshot <- view $ globalOptsL . to (.snapshot)
+  mASnapshot <- view $ globalOptsL . to (.snapshot)
   configArgs <- view $ globalOptsL . to (.configMonoid)
   (configRoot, stackRoot, userOwnsStackRoot) <-
     determineStackRootAndOwnership configArgs
@@ -695,7 +706,7 @@ loadConfig inner = do
         configFromConfigMonoid
           stackRoot
           userConfigPath
-          mSnapshot
+          mASnapshot
           mproject'
           (mconcat $ configArgs : addConfigMonoid extraConfigs)
 

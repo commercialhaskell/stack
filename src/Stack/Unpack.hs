@@ -14,18 +14,16 @@ module Stack.Unpack
 import           Data.List.Extra ( notNull )
 import           Path ( SomeBase (..), (</>), parseRelDir )
 import           Path.IO ( doesDirExist, getCurrentDir )
-import           Pantry ( loadSnapshot )
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
 import qualified RIO.Set as Set
 import qualified RIO.Text as T
-import           Stack.Config ( makeConcreteSnapshot )
+import           Stack.Config ( getRawSnapshot )
 import           Stack.Constants ( relDirRoot )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.Config ( Config (..), HasConfig, configL )
-import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
-import           Stack.Types.Runner ( Runner, globalOptsL )
+import           Stack.Types.Runner ( Runner )
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Unpack" module.
@@ -94,11 +92,7 @@ unpackCmd (UnpackOpts targets areCandidates Nothing) =
   unpackCmd (UnpackOpts targets areCandidates (Just $ Rel relDirRoot))
 unpackCmd (UnpackOpts targets areCandidates (Just dstPath)) =
   withConfig NoReexec $ do
-    mASnapshot <- view $ globalOptsL . to (.snapshot)
-    mSnapshot <- forM mASnapshot $ \aSnapshot -> do
-      concrete <- makeConcreteSnapshot aSnapshot
-      loc <- completeSnapshotLocation concrete
-      loadSnapshot loc
+    mSnapshot <- getRawSnapshot
     dstPath' <- case dstPath of
       Abs path -> pure path
       Rel path -> do
