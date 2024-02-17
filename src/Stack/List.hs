@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
 -- | Types and functions related to Stack's @list@ command.
@@ -8,15 +7,13 @@ module Stack.List
   , listPackages
   ) where
 
-import           Pantry ( loadSnapshot )
 import qualified RIO.ByteString.Lazy as Lazy
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
-import           Stack.Config ( makeConcreteSnapshot )
+import           Stack.Config ( getRawSnapshot )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
-import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
-import           Stack.Types.Runner ( Runner, globalOptsL )
+import           Stack.Types.Runner ( Runner )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.List" module.
@@ -35,11 +32,7 @@ instance Exception ListPrettyException
 -- | Function underlying the @stack list@ command. List packages.
 listCmd :: [String] -> RIO Runner ()
 listCmd names = withConfig NoReexec $ do
-  mASnapshot <- view $ globalOptsL . to (.snapshot)
-  mSnapshot <- forM mASnapshot $ \aSnapshot -> do
-    concrete <- makeConcreteSnapshot aSnapshot
-    loc <- completeSnapshotLocation concrete
-    loadSnapshot loc
+  mSnapshot <- getRawSnapshot
   listPackages mSnapshot names
 
 -- | Intended to work for the command line command.
