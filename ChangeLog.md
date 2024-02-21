@@ -46,6 +46,9 @@ Other enhancements:
   versions before 9.4.
 * Add flag `--[no-]save-hackage-creds` to Stack's `upload` command, which takes
   precedence over the existing `save-hackage-creds` configuration option.
+* In YAML configuration files, the `global-hints-location` key is introduced to
+  allow the location of the global hints YAML specification file to be
+  specified.
 
 Bug fixes:
 

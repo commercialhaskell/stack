@@ -1142,6 +1142,37 @@ See [`setup-info`](#setup-info).
 
 This option is incompatible with `system-ghc: true`.
 
+### global-hints-location
+
+:octicons-tag-24: UNRELEASED
+
+Default:
+
+~~~yaml
+global-hints-location:
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-content/master/stack/global-hints.yaml
+~~~
+
+(as set in the `pantry` library)
+
+Sets the location of the global hints YAML file. The location can be either a
+filepath of a local file or a URL. The filepath can be absolute or relative to
+the Stack root.
+
+For example:
+
+~~~yaml
+global-hints-location:
+  filepath: \pantry\global-hints.yaml
+~~~
+
+or:
+
+~~~yaml
+global-hints-location:
+  url: https://example.com/global-hints/location/global-hints.yaml
+~~~
+
 ### hackage-base-url
 
 [:octicons-tag-24: 1.9.1](https://github.com/commercialhaskell/stack/releases/tag/v1.9.1)
