@@ -27,7 +27,7 @@ There are essentially four different ways of specifying a snapshot location:
     for example:
 
     ~~~yaml
-    snapshot: ghc-8.6.5`
+    snapshot: ghc-8.6.5
     ~~~
 
 2.  Via a URL pointing to a snapshot configuration file, for example:
