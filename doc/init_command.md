@@ -27,7 +27,8 @@ By default:
 
 If a snapshot is specified at the command line, `stack init` will try to use it.
 For further information, see the documentation for the
-[`--resolver`](global_flags.md#-resolver-option) option.
+[`--snapshot`](global_flags.md#-snapshot-option) and
+[`--resolver`](global_flags.md#-resolver-option) options.
 
 Otherwise, `stack init` will try to use the following Stackage snapshots in
 order of preference, using the first that is compatable: the most recent LTS
