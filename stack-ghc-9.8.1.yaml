@@ -2,7 +2,10 @@
 # built with GHC 9.8.1.
 
 # GHC 9.8.1
-snapshot: nightly-2024-01-26
+snapshot: nightly-2024-02-24
+
+extra-deps:
+- pantry-0.9.3.2@sha256:336373d8cbb10505ff16ac6e35cb9d8a7f45293a908de1c00f55c133ee7dde86,7511
 
 docker:
   enable: false

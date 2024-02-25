@@ -4,6 +4,7 @@ extra-deps:
 # Cabal is pruned because process is a GHC boot package, and has to be specified
 # again.
 - Cabal-3.10.1.0@sha256:6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94,12316
+- pantry-0.9.3.2@sha256:336373d8cbb10505ff16ac6e35cb9d8a7f45293a908de1c00f55c133ee7dde86,7511
 # GHC 9.6.4 comes with process-1.6.17.0, which can segfault on macOS.
 - process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
 
