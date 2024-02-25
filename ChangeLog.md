@@ -18,6 +18,8 @@ Other enhancements:
 Bug fixes:
 
 * `--haddock-for-hackage` does not ignore `--haddock-arguments`.
+* On Windows, package locations that are Git repositories with submodules now
+  work as intended.
 
 ## v2.15.1 - 2024-02-09
 
