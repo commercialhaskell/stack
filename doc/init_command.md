@@ -24,3 +24,13 @@ By default:
 * Stack will not initialise if there are conflicting or incompatable user
   packages. Pass the flag `--omit-packages` to cause Stack to ignore such
   matters while initialising.
+
+If a snapshot is specified at the command line, `stack init` will try to use it.
+For further information, see the documentation for the
+[`--snapshot`](global_flags.md#-snapshot-option) and
+[`--resolver`](global_flags.md#-resolver-option) options.
+
+Otherwise, `stack init` will try to use the following Stackage snapshots in
+order of preference, using the first that is compatable: the most recent LTS
+Haskell, the most recent Stackage Nightly, and other LTS Haskell (most recent
+first).
