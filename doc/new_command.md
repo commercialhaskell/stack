@@ -13,10 +13,13 @@ stack new PACKAGE_NAME [--bare] [--[no-]init] [TEMPLATE_NAME]
 By default:
 
 * the project is created in a new directory named after the package. Pass the
-  `--bare` flag to create the project in the current directory; and
+  `--bare` flag to create the project in the current directory;
 
 * the project is initialised for use with Stack. Pass the `--no-init` flag to
-  skip such initialisation.
+  skip such initialisation; and
+
+* the project template is the one specified by the
+[default-template](yaml_configuration.md#default-template) option.
 
 A package name acceptable to Cabal comprises an alphanumeric 'word'; or two or
 more such words, with the words separated by a hyphen/minus character (`-`). A
