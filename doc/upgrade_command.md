@@ -16,7 +16,12 @@ or:
 stack upgrade [--source-only] [--git] [--git-repo ARG] [--git-branch ARG]
 ~~~
 
-`stack upgrade` will get a new version of Stack.
+`stack upgrade` will get a new version of Stack. It can also get a version
+before the current version (downgrade).
+
+!!! warning
+
+    If you use GHCup to install Stack, use only GHCup to upgrade Stack.
 
 By default:
 
@@ -64,6 +69,13 @@ When compiling from source code, by default:
     from the `master` branch of Stack's repository (pass the option
     `--git-branch <branch>` to specify a different branch and the option
     `--git-repo <repo_url>` to specify a different repository).
+
+!!! note
+
+    An earlier version of Stack could be inconsistent with some of the current
+    contents of the Stack root. For further information about the contents of
+    the Stack root and configuring its location, see the documentation about the
+    [Stack root](stack_root.md).
 
 ## Examples
 
