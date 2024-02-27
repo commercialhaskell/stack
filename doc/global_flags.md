@@ -227,8 +227,12 @@ At the command line (only):
 *   `--snapshot lts-<major_version>` specifies the latest Stackage LTS Haskell
     snapshot with the specified major version;
 *   `--snapshot lts` specifies, from those with the greatest major version, the
-    latest Stackage LTS Haskell snapshot; and
-*   `--snapshot nightly` specifies the most recent Stackage Nightly snapshot.
+    latest Stackage LTS Haskell snapshot;
+*   `--snapshot nightly` specifies the most recent Stackage Nightly snapshot;
+    and
+*   `--snapshot global` specifies the snapshot specified by the project-level
+    configuration file in the `global-project` directory in the
+    [Stack root](stack_root.md#global-project-directory).
 
 ## `--stack-colors` or `--stack-colours` options
 

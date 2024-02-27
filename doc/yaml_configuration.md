@@ -116,9 +116,6 @@ Each of these snapshots will also determine what constraints are placed on the
 compiler version. See the [compiler-check](#compiler-check) option for some
 additional control over compiler version.
 
-The `snapshot` key specifies a snapshot location. For further information, see
-the [snapshot and package location](pantry.md) documentation.
-
 ### resolver
 
 `resolver` and [`snapshot`](#snapshot) are synonyms. Only one of these keys is
