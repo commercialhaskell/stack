@@ -50,7 +50,7 @@ import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withGlobalProject )
 import           Stack.SourceMap
                    ( SnapshotCandidate, loadProjectSnapshotCandidate )
-import           Stack.Types.Config ( HasConfig )
+import           Stack.Types.Config ( HasConfig, Config (..), configL )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Project ( Project (..) )
@@ -244,8 +244,10 @@ initProject currDir initOpts mASnapshot = do
         let absDir = parent fp
         in  ResolvedPath (RelFilePath $ T.pack $ makeRelDir absDir) absDir
       pkgDirs = Map.map (fpToPkgDir . fst) bundle
+  defaultInitSnapshot <- view $ configL . to (.defaultInitSnapshot)
+  let mASnapshot' = getFirst $ First mASnapshot <> defaultInitSnapshot
   (snapshot, flags, extraDeps, rbundle) <-
-    getDefaultSnapshot initOpts mASnapshot pkgDirs
+    getDefaultSnapshot initOpts mASnapshot' pkgDirs
   let ignored = Map.difference bundle rbundle
       dupPkgMsg
         | dupPkgs /= [] =

@@ -39,7 +39,6 @@ data GlobalOpts = GlobalOpts
   , stackYaml    :: !StackYamlLoc -- ^ Override project stack.yaml
   , lockFileBehavior :: !LockFileBehavior
   }
-  deriving Show
 
 globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL =

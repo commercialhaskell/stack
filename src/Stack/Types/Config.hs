@@ -156,6 +156,9 @@ data Config = Config
   , allowNewerDeps         :: !(Maybe [PackageName])
     -- ^ Ignore dependency upper and lower bounds only for specified
     -- packages. No effect unless allow-newer is enabled.
+  , defaultInitSnapshot    :: !(First AbstractSnapshot)
+    -- ^ An optional default snapshot to use with @stack init@ when none is
+    -- specified at the command line.
   , defaultTemplate        :: !(Maybe TemplateName)
     -- ^ The default template to use when none is specified.
     -- (If Nothing, the 'default' default template is used.)

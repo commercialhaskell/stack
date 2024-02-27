@@ -894,6 +894,24 @@ Default: `8`
 
 Integer indicating how many simultaneous downloads are allowed to happen.
 
+### default-init-snapshot
+
+:octicons-tag-24: UNRELEASED
+
+Default: As for the [`stack init`](init_command.md) command when no snapshot is
+specified at the command line.
+
+Command line equivalent (takes precedence):
+[`--snapshot`](global_flags.md#snapshot-option) or
+[`--resolver`](global_flags.md#resolver-option) option
+
+This option specifies which snapshot to use with `stack init`, when none is
+specified at the command line.
+
+`default-init-snapshot: global` specifies the snapshot specified by the
+project-level configuration file in the `global-project` directory in the
+[Stack root](stack_root.md#global-project-directory).
+
 ### default-template
 
 Default: `new-template` in the
