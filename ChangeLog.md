@@ -25,6 +25,9 @@ Other enhancements:
   allow, on Windows, the MSYS2 environment to be specified. The default
   environment is still `MINGW64` on 64-bit Windows and `MINGW32` on 32-bit
   Windows.
+* In YAML configuration files, the `default-init-snapshot` key is introduced to
+  allow a default snapshot to be specified for use with the `stack init`
+  command, as if it had been specified at the command line.
 
 Bug fixes:
 

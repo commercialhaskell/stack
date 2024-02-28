@@ -54,6 +54,7 @@ import           Stack.Types.TemplateName ( TemplateName )
 import           Stack.Types.Version
                    ( IntersectingVersionRange (..), VersionCheck )
 import qualified System.FilePath as FilePath
+import Stack.Types.Snapshot (AbstractSnapshot)
 
 -- | An uninterpreted representation of configuration options. Configurations
 -- may be "cascaded" using mappend (left-biased).
@@ -154,6 +155,9 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See 'configMonoidAllowNewer'
   , allowNewerDeps      :: !(Maybe AllowNewerDeps)
     -- ^ See 'configMonoidAllowNewerDeps'
+  , defaultInitSnapshot :: !(First (Unresolved AbstractSnapshot))
+   -- ^ An optional default snapshot to use with @stack init@ when none is
+   -- specified.
   , defaultTemplate     :: !(First TemplateName)
    -- ^ The default template to use when none is specified.
    -- (If Nothing, the 'default' default template is used.)
@@ -192,7 +196,7 @@ data ConfigMonoid = ConfigMonoid
   , stackDeveloperMode :: !(First Bool)
     -- ^ See 'configStackDeveloperMode'
   }
-  deriving (Generic, Show)
+  deriving Generic
 
 instance Semigroup ConfigMonoid where
   (<>) = mappenddefault
@@ -308,6 +312,7 @@ parseConfigMonoidObject rootDir obj = do
   applyProgOptions <- First <$> obj ..:? configMonoidApplyProgOptionsName
   allowNewer <- First <$> obj ..:? configMonoidAllowNewerName
   allowNewerDeps <- obj ..:? configMonoidAllowNewerDepsName
+  defaultInitSnapshot <- First <$> obj ..:? configMonoidDefaultInitSnapshotName
   defaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
   allowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
   dumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
@@ -380,6 +385,7 @@ parseConfigMonoidObject rootDir obj = do
     , applyProgOptions
     , allowNewer
     , allowNewerDeps
+    , defaultInitSnapshot
     , defaultTemplate
     , allowDifferentUser
     , dumpLogs
@@ -532,6 +538,9 @@ configMonoidAllowNewerName = "allow-newer"
 
 configMonoidAllowNewerDepsName :: Text
 configMonoidAllowNewerDepsName = "allow-newer-deps"
+
+configMonoidDefaultInitSnapshotName :: Text
+configMonoidDefaultInitSnapshotName = "default-init-snapshot"
 
 configMonoidDefaultTemplateName :: Text
 configMonoidDefaultTemplateName = "default-template"

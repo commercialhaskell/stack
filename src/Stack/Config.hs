@@ -440,7 +440,11 @@ configFromConfigMonoid
           fromFirst APOLocals configMonoid.applyProgOptions
         allowNewer = fromFirst False configMonoid.allowNewer
         allowNewerDeps = coerce configMonoid.allowNewerDeps
-        defaultTemplate = getFirst configMonoid.defaultTemplate
+    defaultInitSnapshot <- do
+      root <- getCurrentDir
+      let resolve = (First <$>) . traverse (resolvePaths (Just root)) . getFirst
+      resolve configMonoid.defaultInitSnapshot
+    let defaultTemplate = getFirst configMonoid.defaultTemplate
         dumpLogs = fromFirst DumpWarningLogs configMonoid.dumpLogs
         saveHackageCreds =
           fromFirst True configMonoid.saveHackageCreds
@@ -590,6 +594,7 @@ configFromConfigMonoid
                 , applyProgOptions
                 , allowNewer
                 , allowNewerDeps
+                , defaultInitSnapshot
                 , defaultTemplate
                 , allowDifferentUser
                 , dumpLogs

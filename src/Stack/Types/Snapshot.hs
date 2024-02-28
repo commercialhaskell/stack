@@ -67,16 +67,21 @@ instance Display AbstractSnapshot where
   display (ASSnapshot usl) = display usl
   display ASGlobal = "global"
 
+instance FromJSON (Unresolved AbstractSnapshot) where
+  parseJSON = withText "Unresolved AbstractSnapshot" $ \t ->
+    pure $ parseAbstractSnapshot $ T.unpack t
+
 readAbstractSnapshot :: ReadM (Unresolved AbstractSnapshot)
-readAbstractSnapshot = do
-  s <- OA.readerAsk
-  case s of
-    "global" -> pure $ pure ASGlobal
-    "nightly" -> pure $ pure ASLatestNightly
-    "lts" -> pure $ pure ASLatestLTS
-    'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
-        pure $ pure $ ASLatestLTSMajor x'
-    _ -> pure $ ASSnapshot <$> parseRawSnapshotLocation (T.pack s)
+readAbstractSnapshot = parseAbstractSnapshot <$> OA.readerAsk
+
+parseAbstractSnapshot :: String -> Unresolved AbstractSnapshot
+parseAbstractSnapshot s = case s of
+  "global" -> pure ASGlobal
+  "nightly" -> pure ASLatestNightly
+  "lts" -> pure ASLatestLTS
+  'l':'t':'s':'-':x | Right (x', "") <- decimal $ T.pack x ->
+      pure $ ASLatestLTSMajor x'
+  _ ->ASSnapshot <$> parseRawSnapshotLocation (T.pack s)
 
 -- | Most recent Nightly and newest LTS version per major release.
 data Snapshots = Snapshots
