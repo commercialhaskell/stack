@@ -12,7 +12,8 @@ Behavior changes:
 
 * Stack uses the version of the Cabal package that comes with the specified
   version of GHC. Stack no longer supports such Cabal versions before 2.2, which
-  came with versions of GHC before 8.4. Due to a bug, Stack 2.15.1 did not
+  came with versions of GHC before 8.4. Consequently, the `init` command will
+  not try LTS Haskell before 12.0. Due to a bug, Stack 2.15.1 did not
   support versions of GHC before 8.2.
 * `stack path --global-config`, `--programs`, and `--local-bin` no longer set
   up Stack's environment.
