@@ -210,8 +210,10 @@ Restrictions: Windows systems only
 
 Default: Disabled
 
-Enables/disables the skipping of installing MSYS2. For further information, see
-the documentation for the corresponding non-project specific configuration
+Enables/disables the skipping of checking for the Stack-supplied MSYS2 (and
+installing that MSYS2, if it is not installed) when Stack is setting up the
+environment. For further information, see the documentation for the
+corresponding non-project specific configuration
 [option](yaml_configuration.md#skip-msys).
 
 ## `--snapshot` option
