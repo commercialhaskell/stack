@@ -358,6 +358,21 @@ GitHub repository.
 
         * Now you can run Stack from the command line in a terminal.
 
+        ### LLVM
+
+        The documentation for each version of GHC identifies the versions of
+        LLVM that are supported. That is summarised in the table below for
+        recent versions of GHC:
+
+        |GHC version|LLVM versions|
+        |-----------|-------------|
+        |9.8.2      |11 to 15     |
+        |9.6.4      |11 to 15     |
+        |9.4.8      |10 to 14     |
+        |9.2.8      |9 to 12      |
+        |9.0.2      |9, 10 or 12  |
+        |8.10.7     |9 to 12      |
+
     ### Using Homebrew
 
     [Homebrew](https://brew.sh/) is a popular package manager for macOS. If you
