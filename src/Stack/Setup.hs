@@ -1122,7 +1122,7 @@ ensureMsys sopts getSetupInfo' = do
                          tool
                          (installMsys2Windows si)
           | otherwise -> do
-              prettyWarnS "Continuing despite missing tool: MSYS2."
+              prettyWarnS "Stack is not using a Stack-supplied MSYS2."
               pure Nothing
     _ -> pure Nothing
 
