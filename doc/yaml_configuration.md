@@ -1678,15 +1678,20 @@ Restrictions: Windows systems only
 
 Default: `false`
 
-Command line equivalent (takes precedence): `--[no-]skip-msys` flag
+Command line equivalent (takes precedence):
+[`--[no-]skip-msys`](global_flags.md#-no-skip-msys-option) flag
 
-Skips checking for and installing MSYS2 when stack is Setting up the
-environment. This usually doesn't make sense in project-level configurations,
-just in `config.yaml`.
+Skips checking for the Stack-supplied MSYS2 (and installing that MSYS2, if it is
+not installed) when Stack is setting up the environment.
 
 ~~~yaml
 skip-msys: true
 ~~~
+
+!!! note
+
+    Usually, the use of this option does not make sense in project-level
+    configuration and it is used only in global configuration.
 
 ### snapshot-location-base
 
