@@ -67,8 +67,9 @@ execOptsExtraParser = ExecOptsExtra
   eoPackagesParser :: Parser [String]
   eoPackagesParser = many (strOption
     (  long "package"
-    <> metavar "PACKAGE"
-    <> help "Add a package (can be specified multiple times)."
+    <> metavar "PACKAGE(S)"
+    <> help "Add package(s) as a list of names or identifiers separated by \
+            \spaces (can be specified multiple times)."
     ))
 
   eoRtsOptionsParser :: Parser [String]

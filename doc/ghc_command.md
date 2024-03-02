@@ -12,8 +12,10 @@ stack ghc [-- ARGUMENT(S) (e.g. stack ghc -- X.hs -o x)]
 [`stack exec ghc`](exec_command.md), with the exception of the `--package`
 option.
 
-Pass the option `--package <package>` to add the initial GHC argument
+Pass the option `--package <package(s)>` to add the initial GHC argument
 `-package-id=<unit_id>`, where `<unit_id>` is the unit ID of the specified
-package in the installed package database. The option can be specified multiple
-times. The approach taken to these packages is the same as if they were
-specified as targets to [`stack build`](build_command.md#target-syntax).
+package in the installed package database. The option can be a list of package
+names or package identifiers separated by spaces. The option can also be
+specified multiple times. The approach taken to these packages is the same as if
+they were specified as targets to
+[`stack build`](build_command.md#target-syntax).

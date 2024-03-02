@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2024-01-29.
+`master` branch of the Stack repository. Last updated: 2024-03-02.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -133,6 +133,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-8251] = PackageIdNotFoundBug String
         [S-2483] | ExecutableToRunNotFound
         [S-8600] | NoPackageIdReportedBug
+        [S-7371] | InvalidExecTargets [Text]
         ~~~
 
     -   `Stack.GhcPkg`
