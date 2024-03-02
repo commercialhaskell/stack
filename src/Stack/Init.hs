@@ -410,7 +410,7 @@ renderStackYaml p ignoredPackages dupPackages =
     , ("snapshot"         , snapshotHelp)
     , ("packages"         , packageHelp)
     , ("extra-deps"       , extraDepsHelp)
-    , ("flags"            , "# Override default flag values for local packages and extra-deps")
+    , ("flags"            , "# Override default flag values for project packages and extra-deps")
     , ("extra-package-dbs", "# Extra package databases containing global packages")
     ]
   -- Help strings

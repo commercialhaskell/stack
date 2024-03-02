@@ -218,8 +218,8 @@ instance Pretty ConfigPrettyException where
     "[S-5470]"
     <> line
     <> fillSep
-         [ flow "The same package name is used in more than one local package \
-                \or"
+         [ flow "The same package name is used in more than one project \
+                \package or"
          , style Shell "extra-deps" <> "."
          ]
     <> mconcat (map go pairs)

@@ -144,7 +144,7 @@ textFilterParser = many (OA.option parseListDepsTextFilter
   (  OA.long "filter"
   <> OA.metavar "ITEM"
   <> OA.help "Item to be filtered out of the results, if present, being either \
-             \$locals (for all local packages) or a package name (can be \
+             \$locals (for all project packages) or a package name (can be \
              \specified multiple times)."
   ))
 

@@ -378,7 +378,7 @@ urlArgument = OA.strArgument
 
 configCmdEnvParser :: OA.Parser EnvSettings
 configCmdEnvParser = EnvSettings
-  <$> boolFlags True "locals" "include local package information" mempty
+  <$> boolFlags True "locals" "include information about local packages" mempty
   <*> boolFlags True
         "ghc-package-path" "set GHC_PACKAGE_PATH environment variable" mempty
   <*> boolFlags True "stack-exe" "set STACK_EXE environment variable" mempty

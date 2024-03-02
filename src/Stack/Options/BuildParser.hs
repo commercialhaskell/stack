@@ -121,7 +121,7 @@ targetsParser =
   many (textArgument
     (  metavar "TARGET"
     <> completer targetCompleter
-    <> help "If none specified, use all local packages. See \
+    <> help "If none specified, use all project packages. See \
             \https://docs.haskellstack.org/en/stable/build_command/#target-syntax \
             \for details."
     ))
@@ -132,7 +132,7 @@ flagsParser = Map.unionsWith Map.union
        (  long "flag"
        <> completer flagCompleter
        <> metavar "PACKAGE:[-]FLAG"
-       <> help "Override flags set in stack.yaml (applies to local packages \
+       <> help "Override flags set in stack.yaml (applies to project packages \
                \and extra-deps)."
        ))
 

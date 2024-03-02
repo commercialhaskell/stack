@@ -135,7 +135,7 @@ generateLocalHaddockIndex bco localDumpPkgs locals = do
           )
           locals
   generateHaddockIndex
-    "local packages"
+    "project packages"
     bco
     dumpPackages
     "."
@@ -160,7 +160,7 @@ generateDepsHaddockIndex bco globalDumpPkgs snapshotDumpPkgs localDumpPkgs local
              ) locals
       depDocDir = localDepsDocDir bco
   generateHaddockIndex
-    "local packages and dependencies"
+    "project packages and dependencies"
     bco
     deps
     ".."
