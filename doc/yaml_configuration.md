@@ -241,9 +241,10 @@ the configuration means "extra-deps packages in directories
 
 Default: `{}`
 
-Command line equivalent (takes precedence): `stack build --flag` option
+Command line equivalent (takes precedence):
+[`stack build --flag`](build_command.md#-flag-option) option
 
-Flags can be set for each package separately. For example:
+Cabal flags can be set for each package separately. For example:
 
 ~~~yaml
 flags:
@@ -251,8 +252,12 @@ flags:
     flag-name: true
 ~~~
 
-If a specified flag is different than the one specified for a snapshot package,
-then the snapshot package will automatically be promoted to be an extra-dep.
+If a specified Cabal flag for a package included directly in a snapshot is
+different to the Cabal flag specified for that package in the snapshot, then the
+package will automatically be promoted to be an extra-dep.
+
+In order to set a Cabal flag for a GHC boot package, the package must be
+specified as an extra-dep.
 
 ### drop-packages
 
