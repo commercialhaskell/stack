@@ -279,7 +279,7 @@ Bug fixes:
 Hackage-only release of the `stack` package:
 
 * Supports building against snapshot Stackage LTS Haskell 21.0 (GHC 9.4.5),
-  without extra deps.
+  without extra-deps.
 * Supports build with `persistent-2.14.5.0`, using CPP directives.
 * Supports build with `unix-compat-0.7`, by removing reliance on the module
   `System.PosixCompat.User` removed in that package.
@@ -1650,7 +1650,7 @@ Bug fixes:
 * `stack script` can now handle relative paths to source files.
   See [#3372](https://github.com/commercialhaskell/stack/issues/3372).
 * Fixes explanation of why a target is needed by the build plan, when the
-  target is an extra dependency from the commandline.
+  target is an extra-dep from the commandline.
   See [#3378](https://github.com/commercialhaskell/stack/issues/3378).
 * Previously, if you delete a yaml file from ~/.stack/build-plan, it would
   trust the etag and not re-download.  Fixed in this version.
@@ -2480,8 +2480,8 @@ Major changes:
     * Overall it should now be able to initialize almost all existing Cabal
       packages out of the box as long as the package itself is consistently
       defined.
-    * Choose the best possible snapshot and add extra dependencies on top
-      of a snapshot resolver rather than a compiler resolver -
+    * Choose the best possible snapshot and add extra-deps on top
+      of a snapshot other than a compiler snapshot -
       [#1583](https://github.com/commercialhaskell/stack/pull/1583)
     * Automatically omit a package (`--omit-packages`) when it is compiler
       incompatible or when there are packages with conflicting dependency
@@ -2948,7 +2948,7 @@ Bug fixes:
 
 * Hacky workaround for optparse-applicative issue with `stack exec --help`
   [#806](https://github.com/commercialhaskell/stack/issues/806)
-* Build executables for local extra deps
+* Build executables for local extra-deps
   [#920](https://github.com/commercialhaskell/stack/issues/920)
 * copyFile can't handle directories
   [#942](https://github.com/commercialhaskell/stack/pull/942)

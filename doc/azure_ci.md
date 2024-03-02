@@ -131,10 +131,10 @@ But we only use the first method of using Stack to download GHC.
 ### Multiple GHC - parametrised builds
 
 For different GHC versions, you probably want to use different project-level
-configuration files (`stack.yaml`). If you don't want to put a specific
-`stack.yaml` for a particular snapshot and still want to test it, you have
-specify your snapshot argument in `ARGS` environment variable (you will see an
-example below).
+configuration files (`stack.yaml`, by default). If you don't want to put a
+specific `stack.yaml` for a particular snapshot and still want to test it, you
+have specify your snapshot argument in `ARGS` environment variable (you will see
+an example below).
 
 ~~~yaml
 strategy:

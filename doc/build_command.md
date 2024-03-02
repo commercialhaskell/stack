@@ -67,7 +67,7 @@ This ability to specify a component applies only to a project package. With
 dependencies, Stack will *always* build the library (if present) and all
 executables (if any), and ignore test suites and benchmarks. If you want more
 control over a package, you must add it to your `packages` setting in your
-project-level configuration file (`stack.yaml`).
+project-level configuration file (`stack.yaml`, by default).
 
 ## Target syntax
 
@@ -76,9 +76,9 @@ supported syntaxes for targets are:
 
 *   *package*, e.g. `stack build foobar`, is the most commonly used target. It
     will try to find the package in the following locations: project packages,
-    extra deps, snapshots, and package index (e.g. Hackage). If it's found in
-    the package index, then the latest version of that package from the index is
-    implicitly added to your extra dependencies.
+    extra-deps, the snapshot, and the package index (e.g. Hackage). If it's
+    found in the package index, then the latest version of that package from the
+    index is implicitly added as an extra-dep.
 
     If the package is a project package, the library and executable components
     are selected to be built. If the `--test` and `--bench` flags are set, then
@@ -813,7 +813,7 @@ Examples:
     index into a local project directory named after the package identifier (for
     further infomation, see the [`stack unpack` command](unpack_command.md)
     documentation) and, if the package does not provide its own Stack
-    configuration file (`stack.yaml`), to attempt to initialise that
+    configuration file (`stack.yaml`, by default), to attempt to initialise that
     configuration (for further information, see the
     [`stack init` command](init_command.md) documentation). For example:
 

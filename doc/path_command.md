@@ -22,7 +22,7 @@ Pass the following flags for information about specific files or locations:
 |--compiler-bin         |The directory containing the GHC executable.          |
 |--compiler-exe         |The GHC executable.                                   |
 |--compiler-tools-bin   |The directory containing binaries specific to a particular compiler.|
-|--config-location      |Stack's project-level YAML configuration file (`stack.yaml`).|
+|--config-location      |Stack's project-level YAML configuration file (`stack.yaml`, by default).|
 |--dist-dir             |The dist work directory, relative to the package directory.|
 |--extra-include-dirs   |Extra include directories.                            |
 |--extra-library-dirs   |Extra library directories.                            |

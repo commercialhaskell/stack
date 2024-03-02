@@ -50,14 +50,14 @@ Stack defines a new concept called a _project_. A project has:
 * And a bunch more Stack configuration
 
 Often you will have a project that defines only one local Cabal package that you
-are working on. If you need to specify an extra dependency, a source of
-confusion can be why you need to specify it both in the `stack.yaml` file _and_
+are working on. If you need to specify a dependency, a source of confusion can
+be why you need to specify it both in the `stack.yaml` file _and_
 in the Cabal file. To explain, let's take a quick detour to talk about snapshots
 and how Stack resolves dependencies.
 
 ## Snapshots and resolvers
 
-Stack follows a rule that says, for any projects, there is precisely one version
+Stack follows a rule that says, for any project, there is precisely one version
 of each package available. Obviously, for many packages there are _many_
 versions available in the world. But when resolving a `stack.yaml` file, Stack
 requires that you have chosen a specific version for each package available.
