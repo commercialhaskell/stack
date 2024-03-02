@@ -1337,7 +1337,7 @@ followed by the module name.
 !!! note
 
     If you have added packages to your project please make sure to mark them as
-    extra deps for faster and reliable usage of `stack ghci`. Otherwise GHCi may
+    extra-deps for faster and reliable usage of `stack ghci`. Otherwise GHCi may
     have trouble due to conflicts of compilation flags or having to
     unnecessarily interpret too many modules. See Stack's project-level
     [configuration](yaml_configuration.md#extra-deps) to learn how to

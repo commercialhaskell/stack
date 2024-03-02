@@ -76,9 +76,9 @@ supported syntaxes for targets are:
 
 *   *package*, e.g. `stack build foobar`, is the most commonly used target. It
     will try to find the package in the following locations: project packages,
-    extra deps, snapshots, and package index (e.g. Hackage). If it's found in
-    the package index, then the latest version of that package from the index is
-    implicitly added to your extra dependencies.
+    extra-deps, the snapshot, and the package index (e.g. Hackage). If it's
+    found in the package index, then the latest version of that package from the
+    index is implicitly added as an extra-dep.
 
     If the package is a project package, the library and executable components
     are selected to be built. If the `--test` and `--bench` flags are set, then

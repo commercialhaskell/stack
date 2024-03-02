@@ -103,7 +103,7 @@ common case of no changes.
 
 The lock file contains the following information:
 
-* Completed package locations for extra deps and packages in snapshot files
+* Completed package locations for extra-deps and packages in snapshot files
 
     !!! note
 

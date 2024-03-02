@@ -15,7 +15,7 @@ The following terms are used in Stack's documentation.
 |dependency         |A Haskell package other than a project package and on which a project package depends (directly or indirectly), located locally or elsewhere.|
 |Docker             |A [platform](https://www.docker.com/) for developing,  shipping, and running applications. It can package and run an application in a loosely isolated environment called a _container_.|
 |Emacs              |[GNU Emacs](https://www.gnu.org/software/emacs/), an extensible, customisable text editor.|
-|extra-deps         |Packages (one version of each) that add to, or amend, those specified in a snapshot. Named after a key used in `stack.yaml` files.|
+|extra-deps         |Extra dependencies (one version of each) that add to, or shadow, those specified in a snapshot.|
 |FreeBSD            |A Unix-like operating system.                             |
 |GCC                |The [GNU Compiler Collection](https://gcc.gnu.org/) or its executable `gcc`.|
 |GHC                |The [Glasgow Haskell Compiler](https://www.haskell.org/ghc/).|

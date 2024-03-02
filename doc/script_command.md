@@ -138,17 +138,17 @@ LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
     ~~~
 
     `acme-missiles` is not in the snapshot and so needs to be specified as an
-    extra dep.
+    extra-dep.
 
     Stack can deduce that the module imports imply that the required packages
     are `acme-missiles`, `time` and `extra` (which is in the snapshot).
 
     `extra` depends on `directory` and `process`. If `directory` and `process`
-    are not specified as extra deps, Stack will complain that they have been
+    are not specified as extra-deps, Stack will complain that they have been
     'pruned'.
 
     `directory-1.3.6.2` depends on `time < 1.12`. If `time` is not specified as
-    an extra dep, Stack will try to construct a build plan based on the latest
+    an extra-dep, Stack will try to construct a build plan based on the latest
     version in the package index (which will fail, as the latest version is
     `>= 1.12`)
 
@@ -168,7 +168,7 @@ LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
     ~~~
 
     `acme-missiles` is not in the snapshot and so needs to be specified as an
-    extra dep.
+    extra-dep.
 
     Stack can deduce that the module imports imply that the required packages
     are `acme-missiles`, `time` and `extra` (which is in the snapshot).
