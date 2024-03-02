@@ -97,6 +97,24 @@ command:
 stack ghci --package lens
 ~~~
 
+## Specifying Cabal flags
+
+`--flag <package_name>:[-]<flag_name>` sets (or unsets) the specified Cabal flag
+for the specified package.
+
+This option can be specified multiple times to set (or unset) multiple Cabal
+flags.
+
+The same Cabal flag name can be set (or unset) for multiple packages with:
+
+~~~text
+--flag *:[-]<flag_name>
+~~~
+
+In order to set a Cabal flag for a GHC boot package, the package must either be
+an extra-dep or the package version must be specified with the `--package`
+option.
+
 ## Running plain GHCi
 
 `stack ghci` always runs GHCi configured to load code from packages in your

@@ -205,12 +205,8 @@ command line only) with:
 stack build --flag *:[-]<flag_name>
 ~~~
 
-!!! note
-
-    Currently you needs to list all of your modules that interpret flags in the
-    `other-modules` section of a Cabal file. Cabal (the tool) has a different
-    behavior currently and doesn't require that the modules be listed. This may
-    change in a future release.
+In order to set a Cabal flag for a GHC boot package, the package must be
+specified as an extra-dep.
 
 ### `--[no-]force-dirty` flag
 
