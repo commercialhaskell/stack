@@ -1424,10 +1424,10 @@ Cabal (the tool), and NixOS. In that sense, we're sharing the same ecosystem.
 ### Curation vs dependency solving
 
 * Stack uses 'curation' (snapshots and Stack's project-level configuration file
-  (`stack.yaml`) define precisely the set of packages available for a project).
-  The Stack team firmly believes that the majority of users want to simply
-  ignore dependency resolution nightmares and get a valid build plan from day
-  one. That's why we've made 'curation' the focus of Stack.
+  (`stack.yaml`, by default) define precisely the set of packages available for
+  a project). The Stack team firmly believes that the majority of users want to
+  simply ignore dependency resolution nightmares and get a valid build plan from
+  day one. That's why we've made 'curation' the focus of Stack.
 
 * Cabal (the tool) can use 'curation' too but its origins are in dependency
   solving.

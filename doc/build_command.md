@@ -67,7 +67,7 @@ This ability to specify a component applies only to a project package. With
 dependencies, Stack will *always* build the library (if present) and all
 executables (if any), and ignore test suites and benchmarks. If you want more
 control over a package, you must add it to your `packages` setting in your
-project-level configuration file (`stack.yaml`).
+project-level configuration file (`stack.yaml`, by default).
 
 ## Target syntax
 
@@ -813,7 +813,7 @@ Examples:
     index into a local project directory named after the package identifier (for
     further infomation, see the [`stack unpack` command](unpack_command.md)
     documentation) and, if the package does not provide its own Stack
-    configuration file (`stack.yaml`), to attempt to initialise that
+    configuration file (`stack.yaml`, by default), to attempt to initialise that
     configuration (for further information, see the
     [`stack init` command](init_command.md) documentation). For example:
 

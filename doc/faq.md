@@ -14,8 +14,8 @@ the _snapshot_. This may be something like `lts-22.7`, which is from
 the snapshot in more detail.
 
 The snapshot is determined by finding the relevant project-level configuration
-file (`stack.yaml`) for the directory you're running the command from. This
-essentially works by:
+file (`stack.yaml`, by default) for the directory you're running the command
+from. This essentially works by:
 
 1. Check for a `STACK_YAML` environment variable or the `--stack-yaml`
    command line argument
@@ -298,8 +298,8 @@ of those three. Updating the index will have no impact on Stack's behavior.
 
 ## I have a custom package index I'd like to use, how do I do so?
 
-You can configure this in your project-level configuration file (`stack.yaml`).
-See [YAML configuration](yaml_configuration.md).
+You can configure this in your project-level configuration file (`stack.yaml`,
+by default). See [YAML configuration](yaml_configuration.md).
 
 ## How can I make sure my project builds against multiple GHC versions?
 

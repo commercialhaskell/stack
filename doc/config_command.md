@@ -60,8 +60,8 @@ stack config set install-ghc [--global] true|false
 
 `stack config set install-ghc true` or `false` sets the `install-ghc` key in a
 YAML configuration file, accordingly. By default, the project-level
-configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
-user-specific global configuration file (`config.yaml`).
+configuration file (`stack.yaml`, by default) is altered. The `--global` flag
+specifies the user-specific global configuration file (`config.yaml`).
 
 ## The `stack config set package-index download-prefix` command
 
@@ -73,9 +73,9 @@ stack config set package-index download-prefix [--global] [URL]
 
 `stack config set package-index download-prefix <url>` sets the
 `download-prefix` key of the `package-index` key in a YAML configuration file,
-accordingly. By default, the project-level configuration file (`stack.yaml`) is
-altered. The `--global` flag specifies the user-specific global configuration
-file (`config.yaml`).
+accordingly. By default, the project-level configuration file (`stack.yaml`, by
+default) is altered. The `--global` flag specifies the user-specific global
+configuration file (`config.yaml`).
 
 ## The `stack config set resolver` command
 
@@ -84,7 +84,7 @@ stack config set resolver SNAPSHOT
 ~~~
 
 `stack config set resolver <snapshot>` sets the `resolver` key in the
-project-level configuration file (`stack.yaml`).
+project-level configuration file (`stack.yaml`, by default).
 
 A snapshot of `lts` or `nightly` will be translated into the most recent
 available. A snapshot of `lts-22` will be translated into the most recent
@@ -103,7 +103,7 @@ stack config set snapshot SNAPSHOT
 ~~~
 
 `stack config set snapshot <snapshot>` sets the `snapshot` key in the
-project-level configuration file (`stack.yaml`).
+project-level configuration file (`stack.yaml`, by default).
 
 A snapshot of `lts` or `nightly` will be translated into the most recent
 available. A snapshot of `lts-22` will be translated into the most recent
@@ -121,5 +121,5 @@ stack config set system-ghc [--global] true|false
 
 `stack config set system-ghc true` or `false` sets the `system-ghc` key in a
 YAML configuration file, accordingly. By default, the project-level
-configuration file (`stack.yaml`) is altered. The `--global` flag specifies the
-user-specific global configuration file (`config.yaml`).
+configuration file (`stack.yaml`, by default) is altered. The `--global` flag
+specifies the user-specific global configuration file (`config.yaml`).

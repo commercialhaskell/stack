@@ -9,8 +9,8 @@ development environment.
 
 Stack provides the following Dev Containers:
 
-* a default Dev Container, intended for use with Stack's project‑level
-  configuration (`stack.yaml`); and
+* a default Dev Container, intended for use with Stack's default project‑level
+  configuration file (`stack.yaml`); and
 * alternative Dev Containers, intended for use with Stack's experimental
   project‑level configurations (in anticipation of building Stack with more
   recent versions of GHC).

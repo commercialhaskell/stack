@@ -14,9 +14,9 @@ be customised by the use of scripts.
     or dependency located locally.
 
     A Stack project is a local directory that contains a Stack project-level
-    configuration file (`stack.yaml`). A project may relate to more than one
-    project package. A single-package project's directory will usually also be
-    the project package's root directory.
+    configuration file (`stack.yaml`, by default). A project may relate to more
+    than one project package. A single-package project's directory will usually
+    also be the project package's root directory.
 
 ## YAML configuration
 
@@ -405,7 +405,7 @@ curator:
 ## Non-project-specific configuration
 
 Non-project configuration options can be included in a project-level
-configuration file (`stack.yaml`) or in global configuration files
+configuration file (`stack.yaml`, by default) or in global configuration files
 (`config.yaml`). However, non-project-specific options in the project-level
 configuration file in the `global-project` directory are ignored by Stack. The
 options below are listed in alphabetic order.

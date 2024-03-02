@@ -549,8 +549,8 @@ The `pedantic` job runs on `ubuntu` only and builds Stack with the
 `--pedantic` flag.
 
 The `unit-tests` job runs on a matrix of operating systems and Stack
-project-level YAML configuration files (`stack.yaml`). It builds and tests Stack
-with the following flags: `--haddock --no-haddock-deps`.
+project-level YAML configuration files (`stack.yaml`, by default). It builds and
+tests Stack with the following flags: `--haddock --no-haddock-deps`.
 
 Its approach to creating a cache depends on the operating system. Its 'Cache
 dependencies on Unix-like OS' step caches the Stack root on Unix-like operating

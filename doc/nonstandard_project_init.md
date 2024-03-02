@@ -3,7 +3,8 @@
 # Non-standard project initialization
 
 You may need to configure Stack to work with an existing project that has one or
-more Cabal files but no Stack project-level configuration file (`stack.yaml`).
+more Cabal files but no Stack project-level configuration file (`stack.yaml`, by
+default).
 
 ## The `stack init` command
 

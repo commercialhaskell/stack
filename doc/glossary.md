@@ -41,7 +41,7 @@ The following terms are used in Stack's documentation.
 |`package.yaml`     |A file that describes a package in the Hpack format.      |
 |Pantry             |A library for content-addressable Haskell package management, provided by the [`pantry` package](https://hackage.haskell.org/package/pantry). A dependency of Stack.|
 |PATH               |The `PATH` environment variable, specifying a list of directories searched for executable files.|
-|project            |A Stack project is a local directory that contains a project-level configuration file (`stack.yaml`). A project may relate to more than one project package.|
+|project            |A Stack project is a local directory that contains a project-level configuration file (`stack.yaml`, by default). A project may relate to more than one project package.|
 |project package    |A Haskell package that is part of a project and located locally. Distinct from a dependency located locally.|
 |PVP                |The Haskell [Package Versioning Policy](https://pvp.haskell.org/), which tells developers of libraries how to set their version numbers.|
 |REPL               |An interactive (run-eval-print loop) programming environment.|

@@ -311,7 +311,7 @@ Stack expects the `shell.nix` file to define a function of with one argument
 called `ghc` (arguments are not positional), which you should give to
 function `buildStackProject`. This argument is a GHC Nix package in the
 version as defined in the snapshot you set in Stack's project-level
-configuration file (`stack.yaml`).
+configuration file (`stack.yaml`, by default).
 
 ### Pure and impure Nix shells
 
@@ -377,7 +377,8 @@ set.
 
 Below is a summary of the non-project specific configuration options and their
 default values. The options can be set in Stack's project-level configuration
-file (`stack.yaml`) or its global configuration file (`config.yaml`).
+file (`stack.yaml`, by default) or its global configuration file
+(`config.yaml`).
 
 ~~~yaml
 nix:
