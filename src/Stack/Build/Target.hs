@@ -394,10 +394,10 @@ resolveRawTarget sma allLocs (rawInput, rt) =
     | Map.member name locals = pure $ Left $
         fillSep
           [ style Target (fromPackageName name)
-          , flow "target has a specific version number, but it is a local \
+          , flow "target has a specific version number, but it is a project \
                  \package. To avoid confusion, we will not install the \
-                 \specified version or build the local one. To build the \
-                 \local package, specify the target without an explicit \
+                 \specified version or build the project package. To build the \
+                 \project package, specify the target without an explicit \
                  \version."
           ]
     | otherwise =
@@ -572,8 +572,8 @@ parseTargets needTargets haddockDeps boptscli smActual = do
             ]
       | null textTargets' && Map.null locals ->
           prettyThrowIO $ TargetParseException
-            [ flow "The project contains no local packages (packages not \
-                   \marked with 'extra-dep')."
+            [ flow "The project contains no project packages (packages other \
+                   \than extra-deps)."
             ]
       | otherwise -> prettyThrowIO $ TargetParseException
           [ flow "The specified targets matched no packages." ]

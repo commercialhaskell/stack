@@ -181,7 +181,7 @@ configOptsParser currentDir hide0 =
         hide
   <*> fmap toDumpLogs (firstBoolFlagsNoDefault
         "dump-logs"
-        "dump the build output logs for local packages to the console. \
+        "dump the build output logs for project packages to the console. \
         \(default: dump warning logs)"
         hide)
   <*> optionalFirst (option readColorWhen

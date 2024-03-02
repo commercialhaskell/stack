@@ -123,7 +123,7 @@ instance Exception BuildPlanException where
     shadowed'
       | Map.null shadowed = []
       | otherwise = concat
-          [ ["The following packages are shadowed by local packages:"]
+          [ ["The following packages are shadowed by project packages:"]
           , map go (Map.toList shadowed)
           , ["Recommended action: modify the extra-deps field of " ++
              toFilePath stackYaml ++

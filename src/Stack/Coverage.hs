@@ -94,7 +94,7 @@ instance Pretty CoveragePrettyException where
     "[S-9975]"
     <> line
     <> fillSep
-         [ flow "Expected a local package, but"
+         [ flow "Expected a project package, but"
          , style Target . fromPackageName $ name
          , flow "is either an extra-dep or in the snapshot."
          ]

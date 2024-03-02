@@ -149,7 +149,7 @@ instance Exception BuildException where
      -- Suppressing duplicate output
   displayException (LocalPackageDoesn'tMatchTarget name localV requestedV) = concat
     [ "Error: [S-5797]\n"
-    , "Version for local package "
+    , "Version for project package "
     , packageNameString name
     , " is "
     , versionString localV
