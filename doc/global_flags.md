@@ -54,9 +54,10 @@ further information see `stack --docker-help` or the
 
 Default: Dump warning logs
 
-Enables/disables the dumping of the build output logs for local packages to the
-console. For further information, see the documentation for the corresponding
-non-project specific configuration [option](yaml_configuration.md#dump-logs).
+Enables/disables the dumping of the build output logs for project packages to
+the console. For further information, see the documentation for the
+corresponding non-project specific configuration
+[option](yaml_configuration.md#dump-logs).
 
 ## `--extra-include-dirs` option
 

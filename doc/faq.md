@@ -427,10 +427,9 @@ doesn't lead to a rebuild, add the `-fforce-recomp` flag to your
 
 ## Why doesn't Stack apply my `--ghc-options` to my dependencies?
 
-By default, Stack applies command line GHC options only to local packages (these
-are all the packages that are specified in the `packages` section of your
-`stack.yaml` file). For an explanation of this choice see this discussion on
-issue
+By default, Stack applies command line GHC options only to
+[project packages](yaml_configuration.md#packages). For an explanation of this
+choice see this discussion on issue
 [#827](https://github.com/commercialhaskell/stack/issues/827#issuecomment-133263678).
 
 If you still want to set specific GHC options for a dependency, use the

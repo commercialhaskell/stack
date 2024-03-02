@@ -20,7 +20,7 @@ commands.
 stack ide packages [--stdout] [--cabal-files]
 ~~~
 
-`stack ide packages` lists all available local packages that are loadable.
+`stack ide packages` lists all available project packages that are loadable.
 
 By default:
 

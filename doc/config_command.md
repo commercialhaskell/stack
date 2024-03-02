@@ -23,7 +23,8 @@ stack config env [--[no-]locals] [--[no-]ghc-package-path] [--[no-]stack-exe]
 `stack config env` outputs a script that sets or unsets environment variables
 for a Stack environment. Flags modify the script that is output:
 
-* `--[no-]locals` (enabled by default) include/exclude local package information
+* `--[no-]locals` (enabled by default) include/exclude project package
+  information
 * `--[no-]ghc-package-path` (enabled by default) set `GHC_PACKAGE_PATH`
   environment variable or not
 * `--[no-]stack-exe` (enabled by default) set `STACK_EXE` environment variable

@@ -21,7 +21,7 @@ project, snapshot packages and snapshots themselves so that:
 
 * These files can be stored in source control
 * Users on other machines can reuse these lock files and get identical build
-  plans given that the used local packages and local snapshots are the same on
+  plans given that the used project packages and local snapshots are the same on
   those machines
 * Rerunning `stack build` in the future is deterministic in the build plan, not
   depending on mutable state in the world like Hackage revisions

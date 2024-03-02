@@ -90,7 +90,7 @@ This report will consider all test results as well as the newly generated
 
 `stack test --coverage` is quite streamlined for the following use-case:
 
-1.  You have test suites which exercise your local packages.
+1.  You have test suites which exercise your project packages.
 
 2.  These test suites link against your library, rather than building the
     library directly. Coverage information is only given for libraries, ignoring
@@ -119,12 +119,12 @@ When your project has these properties, you will get the following:
 Most users can get away with just understanding the above documentation.
 However, advanced users may want to understand exactly how `--coverage` works:
 
-1. The GHC option `-fhpc` gets passed to all local packages.  This tells GHC to
+1. The GHC option `-fhpc` gets passed to all project packages. This tells GHC to
    output executables that track coverage information and output them to `.tix`
    files. `the-exe-name.tix` files will get written to the working directory of
    the executable.
 
-   When switching on this flag, it will usually cause all local packages to be
+   When switching on this flag, it will usually cause all project packages to be
    rebuilt (see issue
    [#1940](https://github.com/commercialhaskell/stack/issues/1940)).
 
@@ -145,7 +145,7 @@ However, advanced users may want to understand exactly how `--coverage` works:
    the modules compiled in the `executable` or `test-suite` stanza of your Cabal
    file. This makes it possible to directly union multiple `*.tix` files from
    different executables (assuming they are using the exact same versions of the
-   local packages).
+   project packages).
 
    If there is enough popular demand, it may be possible in the future to give
    coverage information for modules that are compiled directly into the
