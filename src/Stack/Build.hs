@@ -272,11 +272,11 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
          | not (null otherLocals)
          ]
  where
-  -- Cases of several local packages having executables with the same name.
+  -- Cases of several project packages having executables with the same name.
   -- The Map entries have the following form:
   --
   --  executable name: ( package names for executables that are being built
-  --                   , package names for other local packages that have an
+  --                   , package names for other project packages that have an
   --                     executable with the same name
   --                   )
   warnings :: Map Text ([PackageName],[PackageName])
@@ -285,8 +285,8 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
       (\(pkgsToBuild, localPkgs) ->
         case (pkgsToBuild, NE.toList localPkgs \\ NE.toList pkgsToBuild) of
           (_ :| [], []) ->
-            -- We want to build the executable of single local package
-            -- and there are no other local packages with an executable of
+            -- We want to build the executable of single project package
+            -- and there are no other project packages with an executable of
             -- the same name. Nothing to warn about, ignore.
             Nothing
           (_, otherLocals) ->
@@ -294,7 +294,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
             -- 1) We are building two or more executables with the same
             --    name that will end up overwriting each other.
             -- 2) In addition to the executable(s) that we want to build
-            --    there are other local packages with an executable of the
+            --    there are other project packages with an executable of the
             --    same name that might get overwritten.
             -- Both cases warrant a warning.
             Just (NE.toList pkgsToBuild, otherLocals))

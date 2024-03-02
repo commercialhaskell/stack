@@ -10,9 +10,9 @@ import           Stack.Prelude
 
 -- | Which packages do ghc-options on the command line apply to?
 data ApplyGhcOptions
-  = AGOTargets -- ^ all local targets
-  | AGOLocals -- ^ all local packages, even non-targets
-  | AGOEverything -- ^ every package
+  = AGOTargets -- ^ All project packages that are targets.
+  | AGOLocals -- ^ All project packages, even non-targets.
+  | AGOEverything -- ^ All packages, project packages and dependencies.
   deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 instance FromJSON ApplyGhcOptions where

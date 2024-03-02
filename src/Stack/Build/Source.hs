@@ -209,7 +209,7 @@ depPackageHashableContent dp =
         <> getUtf8Builder (mconcat ghcOptions)
         <> getUtf8Builder (mconcat cabalConfigOpts)
 
--- | All flags for a local package.
+-- | All flags for a project package.
 getLocalFlags ::
      BuildOptsCLI
   -> PackageName

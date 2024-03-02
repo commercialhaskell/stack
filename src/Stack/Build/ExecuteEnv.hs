@@ -251,7 +251,7 @@ withExecuteEnv ::
   -> [LocalPackage]
   -> [DumpPackage] -- ^ global packages
   -> [DumpPackage] -- ^ snapshot packages
-  -> [DumpPackage] -- ^ local packages
+  -> [DumpPackage] -- ^ project packages and local extra-deps
   -> Maybe Int -- ^ largest package name, for nicer interleaved output
   -> (ExecuteEnv -> RIO env a)
   -> RIO env a

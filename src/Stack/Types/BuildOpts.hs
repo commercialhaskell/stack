@@ -52,7 +52,8 @@ data BuildOpts = BuildOpts
   , keepTmpFiles :: !Bool
     -- ^ Keep intermediate files and build directories
   , forceDirty :: !Bool
-    -- ^ Force treating all local packages as having dirty files
+    -- ^ Force treating all project packages and local extra-deps as having
+    -- dirty files.
   , tests :: !Bool
     -- ^ Turn on tests for local targets
   , testOpts :: !TestOpts

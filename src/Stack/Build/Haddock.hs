@@ -116,7 +116,7 @@ shouldHaddockPackage bopts wanted name =
 shouldHaddockDeps :: BuildOpts -> Bool
 shouldHaddockDeps bopts = fromMaybe bopts.buildHaddocks bopts.haddockDeps
 
--- | Generate Haddock index and contents for local packages.
+-- | Generate Haddock index and contents for project packages.
 generateLocalHaddockIndex ::
      (HasCompiler env, HasProcessContext env, HasTerm env)
   => BaseConfigOpts
@@ -141,7 +141,7 @@ generateLocalHaddockIndex bco localDumpPkgs locals = do
     "."
     (localDocDir bco)
 
--- | Generate Haddock index and contents for local packages and their
+-- | Generate Haddock index and contents for project packages and their
 -- dependencies.
 generateDepsHaddockIndex ::
      (HasCompiler env, HasProcessContext env, HasTerm env)
@@ -319,11 +319,11 @@ lookupDumpPackage ghcPkgId dumpPkgs =
 haddockIndexFile :: Path Abs Dir -> Path Abs File
 haddockIndexFile destDir = destDir </> relFileIndexHtml
 
--- | Path of local packages documentation directory.
+-- | Path of project packages documentation directory.
 localDocDir :: BaseConfigOpts -> Path Abs Dir
 localDocDir bco = bco.localInstallRoot </> docDirSuffix
 
--- | Path of documentation directory for the dependencies of local packages
+-- | Path of documentation directory for the dependencies of project packages
 localDepsDocDir :: BaseConfigOpts -> Path Abs Dir
 localDepsDocDir bco = localDocDir bco </> relDirAll
 

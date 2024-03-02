@@ -171,8 +171,8 @@ parseRawTargetDirs root locals ri =
             [] -> pure $ Left $
               fillSep
                 [ style Dir (fromString $ T.unpack t)
-                , flow "is not a local package directory and it is not a \
-                       \parent directory of any local package directory."
+                , flow "is not a local directory for a package and it is not a \
+                       \parent directory of any such directory."
                 ]
             names -> pure $ Right $ map ((ri, ) . RTPackage) names
  where
@@ -316,7 +316,7 @@ resolveRawTarget sma allLocs (rawInput, rt) =
     case Map.lookup name locals of
       Nothing -> pure $ Left $
         fillSep
-          [ flow "Unknown local package:"
+          [ flow "Unknown project package:"
           , style Target (fromPackageName name) <> "."
           ]
       Just pp -> do

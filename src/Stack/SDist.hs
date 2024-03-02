@@ -186,7 +186,8 @@ sdistCmd sdistOpts =
     createDirectoryIfMissing True $ FP.takeDirectory targetTarPath
     copyFile (toFilePath tarPath) targetTarPath
 
--- | Given the path to a local package, creates its source distribution tarball.
+-- | Given the path to a package directory, creates a source distribution
+-- tarball for the package.
 --
 -- While this yields a 'FilePath', the name of the tarball, this tarball is not
 -- written to the disk and instead yielded as a lazy bytestring.
@@ -195,7 +196,7 @@ getSDistTarball ::
   => Maybe PvpBounds
      -- ^ Override Config value
   -> Path Abs Dir
-     -- ^ Path to local package
+     -- ^ Path to package directory
   -> RIO
        env
        ( FilePath

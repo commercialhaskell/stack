@@ -131,7 +131,7 @@ data ListDepsTextFilter
   = FilterPackage PackageName
     -- ^ Item is a package name.
   | FilterLocals
-    -- ^ Item represents all local packages.
+    -- ^ Item represents all project packages.
 
 -- | Type representing command line options for the @stack ls stack-colors@ and
 -- @stack ls stack-colours@ commands.

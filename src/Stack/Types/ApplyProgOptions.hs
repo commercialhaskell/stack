@@ -11,9 +11,9 @@ import           Stack.Prelude
 -- | Which packages do all and any --PROG-option options on the command line
 -- apply to?
 data ApplyProgOptions
-  = APOTargets -- ^ All local packages that are targets.
-  | APOLocals -- ^ All local packages (targets or otherwise).
-  | APOEverything -- ^ All packages (local or otherwise).
+  = APOTargets -- ^ All project packages that are targets.
+  | APOLocals -- ^ All project packages (targets or otherwise).
+  | APOEverything -- ^ All packages (project packages or dependencies).
   deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 instance FromJSON ApplyProgOptions where

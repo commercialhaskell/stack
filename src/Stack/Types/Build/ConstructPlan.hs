@@ -236,8 +236,8 @@ instance HasCompiler Ctx where
 instance HasEnvConfig Ctx where
   envConfigL = lens (.ctxEnvConfig) (\x y -> x { ctxEnvConfig = y })
 
--- | State to be maintained during the calculation of local packages to
--- unregister.
+-- | State to be maintained during the calculation of project packages and local
+-- extra-deps to unregister.
 data UnregisterState = UnregisterState
   { toUnregister :: !(Map GhcPkgId (PackageIdentifier, Text))
   , toKeep :: ![DumpPackage]
