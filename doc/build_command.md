@@ -63,7 +63,7 @@ run. The running behaviour can be disabled with the `--no-run-tests` flag.
 Similarly, if a benchmark component is targeted, it is built and run unless the
 running behaviour is disabled with the `--no-run-benchmarks` flag.
 
-This ability to specify a component applies only to a local package. With
+This ability to specify a component applies only to a project package. With
 dependencies, Stack will *always* build the library (if present) and all
 executables (if any), and ignore test suites and benchmarks. If you want more
 control over a package, you must add it to your `packages` setting in your
@@ -75,15 +75,15 @@ project-level configuration file (`stack.yaml`).
 supported syntaxes for targets are:
 
 *   *package*, e.g. `stack build foobar`, is the most commonly used target. It
-    will try to find the package in the following locations: local packages,
+    will try to find the package in the following locations: project packages,
     extra deps, snapshots, and package index (e.g. Hackage). If it's found in
     the package index, then the latest version of that package from the index is
     implicitly added to your extra dependencies.
 
-    If the package is a local package, the library and executable components are
-    selected to be built. If the `--test` and `--bench` flags are set, then all
-    of the test suite and benchmark components, respectively, are selected to be
-    built.
+    If the package is a project package, the library and executable components
+    are selected to be built. If the `--test` and `--bench` flags are set, then
+    all of the test suite and benchmark components, respectively, are selected
+    to be built.
 
     If *package* is a GHC boot package (packages that come with GHC and are
     included in GHC's global package database), the behaviour can be complex.
@@ -97,7 +97,7 @@ supported syntaxes for targets are:
     include directly most boot packages but some snapshots may include directly
     some boot packages. In particular, some snapshots include directly `Win32`
     (which is a boot package on Windows) while others do not. For example, if
-    `Cabal` (a boot package) is not a local package or an extra dep, then
+    `Cabal` (a boot package) is not a project package or an extra-dep, then
     `stack build Cabal` with Stackage snapshot LTS Haskell 20.25 will:
 
     * on Windows, try to build the latest version of `Cabal` in the package
@@ -109,7 +109,7 @@ supported syntaxes for targets are:
 *   *package identifier*, e.g. `stack build foobar-1.2.3`, is usually used to
     include specific package versions from the package index.
 
-    If the package name conflicts with that of a local package, then Stack
+    If the package name conflicts with that of a project package, then Stack
     fails with an error.
 
     Otherwise, this is the same as using `stack build foobar` (that is, ignoring
@@ -140,11 +140,11 @@ supported syntaxes for targets are:
          example, `stack build mypackage:mytestsuite`.
 
     *   `:<comp-name>` is a useful shortcut, saying "find the component
-        `<comp-name>` in all of the local packages". This will result in an
+        `<comp-name>` in all of the project packages". This will result in an
         error if more than one package has a component with the specified name.
         To continue the above example, `stack build :mytestsuite`.
 
-*   *directory*, e.g. `stack build foo/bar`, will find all local packages that
+*   *directory*, e.g. `stack build foo/bar`, will find all project packages that
     exist in the given directory hierarchy and then follow the same procedure as
     passing in package names as mentioned above. There's an important caveat
     here: if your directory name is parsed as one of the above target types, it
@@ -153,10 +153,10 @@ supported syntaxes for targets are:
 
     !!! note
 
-        `stack build .` will target local packages in the current working
+        `stack build .` will target project packages in the current working
         directory or its subdirectories.
 
-`stack build` with no targets specified will build all local packages.
+`stack build` with no targets specified will build all project packages.
 
 For further information about available targets, see the
 [`stack ide targets` command](ide_command.md).
@@ -267,11 +267,11 @@ Unset the flag to disable building Haddock documentation for dependencies.
 
 Default: Disabled
 
-Set the flag to build local packages with flags to generate Haddock
+Set the flag to build project packages with flags to generate Haddock
 documentation suitable for upload to Hackage. The form of the Haddock
 documentation generated for other packages is unaffected.
 
-For each local package:
+For each project package:
 
 * the generated Haddock documentation files are in directory
   `doc\html\<package_version>-docs\`, relative to Stack's dist work directory
@@ -383,7 +383,7 @@ particular when they depend on external data files.
 ### `--skip` option
 
 `stack build --skip <component>` skips building the specified components of a
-local package. It allows you to skip test suites and benchmark without
+project package. It allows you to skip test suites and benchmark without
 specifying other components (e.g. `stack test --skip long-test-suite` will run
 the tests without the `long-test-suite` test suite). Be aware that skipping
 executables won't work the first time the package is built due to an issue in
@@ -414,7 +414,8 @@ using events to determine if a file has changed.
 [:octicons-tag-24: 2.5.1](https://github.com/commercialhaskell/stack/releases/tag/v2.5.1)
 
 Pass the flag to rebuild your project every time any local file changes (from
-project packages or from local dependencies). See also the `--file-watch` flag.
+project packages or from dependencies located locally). See also the
+`--file-watch` flag.
 
 ## Controlling what happens after building
 
@@ -574,7 +575,7 @@ used by Cabal during the configuration step, you could command
 to `happy` its `--ghc` flag.
 
 By default, all and any `--PROG-option` options on Stack's command line are
-applied to all local packages (targets or otherwise). This behaviour can be
+applied to all project packages (targets or otherwise). This behaviour can be
 changed. See the
 [`apply-prog-options`](yaml_configuration.md#apply-prog-options) configuration
 option.

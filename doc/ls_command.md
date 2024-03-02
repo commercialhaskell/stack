@@ -40,7 +40,7 @@ stack ls dependencies [--separator SEP] [--[no-]license] [--filter ITEM]
 ~~~
 
 `stack ls dependencies` lists all of the packages and versions used for a
-project. All local packages are considered by default, but a target can be
+project. All project packages are considered by default, but a target can be
 specified as an argument. For further information, see the
 [target syntax](build_command.md#target-syntax) documentation.
 
@@ -144,7 +144,7 @@ is accepted.)
 
 The `--filter` option, with the `text` subcommand, specifies an item to be
 filtered out from the results, if present. An item can be `$locals` (for all
-local packages) or a package name. It can be specified multiple times.
+project packages) or a package name. It can be specified multiple times.
 
 !!! note
 

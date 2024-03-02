@@ -12,7 +12,7 @@ stack query [SELECTOR...]
 
 `stack query` outputs certain build information. For example, for a
 multi-package project `multi` specifying snapshot `lts-19.25` (GHC 9.0.2) and
-with two local packages, `my-package-A` (version 0.1.0.0) and `my-package-B`
+with two project packages, `my-package-A` (version 0.1.0.0) and `my-package-B`
 (version 0.2.0.0), command `stack query` outputs:
 
 ~~~text

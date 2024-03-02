@@ -92,7 +92,7 @@ Other enhancements:
   `1.24.0.0`.
 * Experimental: Add flag `--haddock-for-hackage` to Stack's `build` command
   (including the `haddock` synonym for `build --haddock`) to enable building
-  local packages with flags to generate Haddock documentation, and an archive
+  project packages with flags to generate Haddock documentation, and an archive
   file, suitable for upload to Hackage. The form of the Haddock documentation
   generated for other packages is unaffected.
 * Experimental: Add flag `--documentation` (`-d` for short) to Stack's `upload`
@@ -113,7 +113,7 @@ Other enhancements:
   key is introduced, to allow the notification to be muted if unwanted.
 * Add option `--filter <item>` to Stack's `ls dependencies text` command to
   filter out an item from the results, if present. The item can be `$locals` for
-  all local packages.
+  all project packages.
 * Add option `--snapshot` as synonym for `--resolver`.
 * Add the `config set snapshot` command, corresponding to the
   `config set resolver` command.
@@ -246,8 +246,9 @@ Other enhancements:
   `c2hs`, `cpphs`, `gcc`, `greencard`, `happy`, `hsc2hs`, `hscolour`, `ld`,
   `pkg-config`, `strip` and `tar`. If Cabal uses the program during the
   configuration step, the argument is passed to it.
-* By default all `--PROG-option` options are applied to all local packages. This
-  behaviour can be changed with new configuration option `apply-prog-options`.
+* By default all `--PROG-option` options are applied to all project packages.
+  This behaviour can be changed with new configuration option
+  `apply-prog-options`.
 * Add flag `--[no-]use-root` to `stack script` (default disabled). Used with
   `--compile` or `--optimize`, when enabled all compilation outputs (including
   the executable) are written to a script-specific location in the `scripts`
@@ -267,8 +268,8 @@ Bug fixes:
 * `stack build` with `--file-watch` or `--file-watch-poll` outputs 'pretty'
   error messages, as intended. See
   [#5978](https://github.com/commercialhaskell/stack/issues/5978).
-* `stack build` unregisters any local packages for the sub libraries of a local
-  package that is to be unregistered. See
+* `stack build` unregisters any project packages for the sub libraries of a
+  project package that is to be unregistered. See
   [#6046](https://github.com/commercialhaskell/stack/issues/6046).
 * The warning that sublibrary dependency is not supported is no longer triggered
   by internal libraries.
@@ -755,7 +756,7 @@ Other enhancements:
   affect the Stackage Curator use case, but there is now an additional message
   letting the user know when a previously-failed test case is being rerun.
 
-* Move configure information for local packages back to .stack-work to improve
+* Move configure information for project packages back to .stack-work to improve
   caching. See
   [#4893](https://github.com/commercialhaskell/stack/issues/4893).
 
@@ -941,7 +942,7 @@ Other enhancements:
 
 * Support MX Linux in get-stack.sh. Fixes
   [#4769](https://github.com/commercialhaskell/stack/issues/4769).
-* Defer loading up of files for local packages. This allows us to get
+* Defer loading up of files for project packages. This allows us to get
   plan construction errors much faster, and avoid some unnecessary
   work when only building a subset of packages. This is especially
   useful for the curator use case.

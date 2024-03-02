@@ -10,21 +10,23 @@ be customised by the use of scripts.
     A Haskell package is an organised collection of Haskell code and related
     files. It is described by a Cabal file or a `package.yaml` file (which can
     be used to generate a Cabal file). The package description is itself part of
-    the package. Its file is located in the root directory of a local package.
+    the package. Its file is located in the root directory of a project package
+    or dependency located locally.
 
     A Stack project is a local directory that contains a Stack project-level
     configuration file (`stack.yaml`). A project may relate to more than one
-    local package. A single-package project's directory will usually also be the
-    package's root directory.
+    project package. A single-package project's directory will usually also be
+    the project package's root directory.
 
 ## YAML configuration
 
 Stack's YAML configuration options break down into
 [project-specific](#project-specific-configuration) options and
-[non-project-specific](#non-project-specific-configuration) options. They are
-configured at the project-level or globally.
+[non-project-specific](#non-project-specific-configuration) options. The former
+are configured at the project level. The latter are configured at the project
+level or globally.
 
-The **project-level** configuration file (`stack.yaml`) contains
+The **project-level** configuration file (`stack.yaml`, by default) contains
 project-specific options and may contain non-project-specific options. However,
 non-project-specific options in the project-level configuration file in the
 `global-project` directory (see below) are ignored by Stack.
@@ -39,11 +41,9 @@ preference):
    [Stack root](stack_root.md).
 
 The **global** configuration file (`config.yaml`) contains only
-non-project-specific options.
-
-Stack obtains global configuration from a file named `config.yaml`. The location
-of this file depends on the operating system and whether Stack is configured to
-use the XDG Base Directory Specification.
+non-project-specific options. The location of this file depends on the operating
+system and whether Stack is configured to use the XDG Base Directory
+Specification.
 
 === "Unix-like"
 
@@ -79,19 +79,29 @@ Cabal file (named `<package_name>.cabal`), see the
 ## Project-specific configuration
 
 Project-specific configuration options are valid only in a project-level
-configuration file (`stack.yaml`).
+configuration file (`stack.yaml`, by default).
 
-In your project-specific options, you specify both **which local packages** to
-build and **which dependencies to use** when building these packages. Unlike the
-user's local packages, these dependencies aren't built by default. They only get
-built when needed.
+Each of the Haskell packages to which a Stack project relates is either a
+**project package** that is part of the project and located locally or a package
+on which one or more of the project packages depends (directly or indirectly).
+The latter is referred to as a **dependency** and it may be located locally or
+elsewhere.
 
-Shadowing semantics, described
-[here](https://docs.haskellstack.org/en/v1.5.1/architecture/#shadowing), are
-applied to your configuration. So, if you add a package to your `packages` list,
-it will be used even if you're using a snapshot that specifies a particular
-version. Similarly, `extra-deps` will shadow the version specified in the
-snapshot.
+!!! info
+
+    Project packages are built by default. Dependencies are only built when
+    needed. Building can target individual components of a project package. The
+    individual components of dependencies cannot be targeted. Test suite and
+    benchmark components of a project package can be built and run. The library
+    and executable components of a dependency, and only those components, are
+    built when the dependency is needed.
+
+In your project-specific options, you specify both **which project packages** to
+build and **which dependencies to use** when building these packages.
+
+A dependency specified as an [extra-dep](#extra-deps) will shadow a package of
+the same name specified in a [snapshot](#snapshot). A project package will
+shadow a dependency of the same name.
 
 ### snapshot
 
@@ -100,10 +110,10 @@ Command line equivalent (takes precedence):
 [`--resolver`](global_flags.md#resolver-option) option
 
 The `snapshot` key specifies which snapshot is to be used for this project. A
-snapshot defines a GHC version, a number of packages available for installation,
-and various settings like build flags. It is also called a resolver since a
-snapshot states how dependencies are resolved. There are currently four snapshot
-types:
+snapshot defines a GHC version, the package version of packages available for
+installation, and various settings like build flags. It is also called a
+resolver since a snapshot states how dependencies are resolved. There are
+currently four snapshot types:
 
 * LTS Haskell snapshots, e.g. `snapshot: lts-22.7`
 * Stackage Nightly snapshots, e.g. `snapshot: nightly-2023-12-16`
@@ -115,6 +125,10 @@ types:
 Each of these snapshots will also determine what constraints are placed on the
 compiler version. See the [compiler-check](#compiler-check) option for some
 additional control over compiler version.
+
+A package version specified in a snapshot can be shadowed by an
+[extra-dep](#extra-deps) of the same name or a [project package](#packages) of
+the same name.
 
 ### resolver
 
@@ -130,10 +144,11 @@ packages:
 - .
 ~~~
 
-The `packages` key specifies a list of packages that are part of your local
-project. These are specified via paths to local directories. A path is
-considered relative to the directory containing the `stack.yaml` file. For
-example, if the `stack.yaml` is located at `/dir1/dir2/stack.yaml`, and has:
+The `packages` key specifies a list of the project packages that are part of
+your project. These are specified via paths to local directories. A path is
+considered relative to the directory containing the project-level configuration
+file (`stack.yaml`, by default). For example, if the `stack.yaml` file is
+located at `/dir1/dir2/stack.yaml`, and has:
 
 ~~~yaml
 packages:
@@ -145,31 +160,36 @@ the configuration means "project packages in directories `/dir1/dir2/my-package`
 and `/dir1/dir2/dir3/my-other-package`".
 
 The `packages` key is optional. The default value, '`.`', means that the
-project has a single package located in the current directory.
+project has a single project package located in the current directory.
 
-Each specified package directory must have a valid Cabal file or Hpack
+A project package will shaddow a dependency of the same name.
+
+A package version specified in a snapshot can be shadowed by an
+[extra-dep](#extra-deps) of the same name or a [project package](#packages) of
+the same name.
+
+Each specified project package directory must have a valid Cabal file or Hpack
 `package.yaml` file present. Any subdirectories of the directory are not
 searched for Cabal files. A subdirectory has to be specified as an independent
-item in the list of packages.
+item in the list of project packages.
 
-A project package is different from a dependency, both a snapshot dependency
-(via the [`snapshot`](#snapshot) or [`resolver`](#resolver) key) and an
-extra-deps dependency (via the [`extra-deps`](#extra-deps) key). For example:
+A project package is different from a dependency (located locally or elsewhere)
+specified as an [extra-dep](#extra-deps) or via a [snapshot](#snapshot). For
+example:
 
 * a project package will be built by default by commanding
   [`stack build`](build_command.md) without specific targets. A dependency will
-  only be built if it is depended upon; and
-* test suites and benchmarks may be run for a project package. They are never
-  run for a dependency.
+  only be built if it is needed; and
+* test suites and benchmarks may be built and run for a project package. They
+  are never run for a dependency.
 
 ### extra-deps
 
 Default: `[]`
 
 The `extra-deps` key specifies a list of extra dependencies on top of what is
-defined in the snapshot (specified by the [`snapshot`](#snapshot) or
-[`resolver`](#resolver) key). A dependency may come from either a Pantry package
-location or a local file path.
+defined in the [snapshot](#snapshot). A dependency may come from either a Pantry
+package location or a local file path.
 
 A Pantry package location is one or three different kinds of sources:
 
@@ -237,6 +257,10 @@ the configuration means "extra-deps packages in directories
     package location (for example, a reference to a package on Hackage that
     omits the package's version) will be interpreted as a local file path.
 
+An extra-dep will shadow a dependency specified in a [snapshot](#snapshot) of
+the same name. An extra-dep can be shadowed by a [project package](#packages) of
+the same name.
+
 ### flags
 
 Default: `{}`
@@ -254,10 +278,10 @@ flags:
 
 If a specified Cabal flag for a package included directly in a snapshot is
 different to the Cabal flag specified for that package in the snapshot, then the
-package will automatically be promoted to be an extra-dep.
+package will automatically be promoted to be an [extra-dep](#extra-deps).
 
 In order to set a Cabal flag for a GHC boot package, the package must be
-specified as an extra-dep.
+specified as an [extra-dep](#extra-deps).
 
 ### drop-packages
 
@@ -267,7 +291,7 @@ Default: `[]`
 
 Packages which, when present in the snapshot specified in the
 [`snapshot`](#snapshot) or [`resolver`](#resolver) key, should not be included
-in our package. This can be used for a few different purposes, e.g.:
+in our project. This can be used for a few different purposes, e.g.:
 
 * Ensure that packages you don't want used in your project cannot be used in a
   `package.yaml` file (e.g., for license reasons)
@@ -450,9 +474,9 @@ Related command line:
 [`stack build --ghc-options`](build_command.md#-ghc-options-option) option
 
 Determines to which packages any GHC command line options specified on the
-command line are applied. Possible values are: `everything` (all packages, local
-or otherwise), `locals` (all local packages, targets or otherwise), and
-`targets` (all local packages that are targets).
+command line are applied. Possible values are: `everything` (all packages,
+project packages or otherwise), `locals` (all project packages, targets or
+otherwise), and `targets` (all project packages that are targets).
 
 !!! note
 
@@ -473,8 +497,8 @@ Related command line:
 
 Determines to which packages all and any `--PROG-option` command line options
 specified on the command line are applied. Possible values are: `everything`
-(all packages, local or otherwise), `locals` (all local packages, targets or
-otherwise), and `targets` (all local packages that are targets).
+(all packages, project packages or otherwise), `locals` (all project packages,
+targets or otherwise), and `targets` (all project packages that are targets).
 
 !!! note
 
@@ -868,10 +892,10 @@ Related command line (takes precedence):
 
 `configure-options` can specify Cabal (the library) options (including
 `--PROG-option` or `--PROG-options` options) for the configure step of the Cabal
-build process for a named package, all local packages that are targets (using
-the `$targets` key), all local packages (targets or otherwise) (using the
-`$locals` key), or all packages (local or otherwise) (using the `$everything`
-key).
+build process for a named package, all project packages that are targets (using
+the `$targets` key), all project packages (targets or otherwise) (using the
+`$locals` key), or all packages (project packages or otherwise) (using the
+`$everything` key).
 
 ~~~yaml
 configure-options:
@@ -1058,9 +1082,9 @@ GHC command line options can be specified for a package in its Cabal file
 (including one created from a `package.yaml` file). This option augments and, if applicable (see below), overrides any such GHC command line options.
 
 `ghc-options` can specify GHC command line options for a named package, all
-local packages that are targets (using the `$targets` key), all local packages
-(targets or otherwise) (using the `$locals` key), or all packages (local or
-otherwise) (using the `$everything` key).
+project packages that are targets (using the `$targets` key), all project
+packages (targets or otherwise) (using the `$locals` key), or all packages
+(project packages or otherwise) (using the `$everything` key).
 
 ~~~yaml
 ghc-options:
@@ -1078,9 +1102,9 @@ specified at Stack's command line are applied after those specified in Stack's
 YAML configuration files.
 
 Since Stack 1.6.1, setting a GHC options for a specific package will
-automatically promote it to a local package (much like setting a custom package
-flag). However, setting options via `$everything` on all flags will not do so
-(see
+automatically promote it to a project package (much like setting a custom
+package flag). However, setting options via `$everything` on all flags will not
+do so (see
 [GitHub discussion](https://github.com/commercialhaskell/stack/issues/849#issuecomment-320892095)
 for reasoning). This can lead to unpredictable behavior by affecting your
 snapshot packages.

@@ -261,10 +261,11 @@ dependencies, and so on. Our value here says to use
 available to Stack). There are a number of values you can use for `resolver`,
 which we'll cover later.
 
-The value of the `packages` key tells Stack which local packages to build. In
-our simple example, we have only a single package in our project, located in the
-same directory, so '`.`' suffices. However, Stack has powerful support for
-multi-package projects, which we'll elaborate on as this guide progresses.
+The value of the `packages` key tells Stack which project packages, located
+locally, to build. In our simple example, we have only a single project package,
+located in the same directory, so '`.`' suffices. However, Stack has powerful
+support for multi-package projects, which we'll elaborate on as this guide
+progresses.
 
 Another file important to the build is `package.yaml`.
 
@@ -404,9 +405,9 @@ stack build
 ~~~
 
 This output means that the `text` package was downloaded, configured, built, and
-locally installed. Once that was done, we moved on to building our local package
-(`helloworld`). At no point did we need to ask Stack to build dependencies — it
-does so automatically.
+locally installed. Once that was done, we moved on to building our project
+package (`helloworld`). At no point did we need to ask Stack to build
+dependencies — it does so automatically.
 
 ### Listing Dependencies
 
@@ -943,7 +944,7 @@ different types of arguments:
   version, e.g. `stack build yesod-bin-1.4.14`.
     * This is almost identical to specifying a package name, except it will (1)
       choose the given version instead of latest, and (2) error out if the given
-      version conflicts with the version of a local package.
+      version conflicts with the version of a project package.
 * The most flexibility comes from specifying individual *components*, e.g.
   `stack build helloworld:test:helloworld-test` says "build the test suite
   component named helloworld-test from the helloworld package."
@@ -951,10 +952,10 @@ different types of arguments:
       type of component it is, e.g. `stack build helloworld:helloworld-test`, or
       even skip the package name entirely, e.g. `stack build :helloworld-test`.
 * Finally, you can specify individual *directories* to build to trigger building
-  of any local packages included in those directories or subdirectories.
+  of any project packages included in those directories or subdirectories.
 
 When you give no specific arguments on the command line (e.g., `stack build`),
-it's the same as specifying the names of all of your local packages. If you
+it's the same as specifying the names of all of your project packages. If you
 just want to build the package for the directory you're currently in, you can
 use `stack build .`.
 
@@ -1083,9 +1084,10 @@ modified version of a dependency that hasn't yet been released upstream.
 !!! note
 
     When adding upstream packages directly to your project it is important to
-    distinguish _local packages_ from the upstream _dependency packages_.
-    Otherwise you may have trouble running `stack ghci`. See
-    [stack.yaml documentation](yaml_configuration.md#packages) for more details.
+    distinguish _project packages_ located locally from the upstream
+    _dependency packages_. Otherwise you may have trouble running `stack ghci`.
+    See [stack.yaml documentation](yaml_configuration.md#packages) for more
+    details.
 
 ## Flags and GHC options
 
