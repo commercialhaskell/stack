@@ -49,8 +49,8 @@ instance Exception CleanException where
 data CleanOpts
   = CleanShallow [PackageName]
     -- ^ Delete the "dist directories" as defined in
-    -- 'Stack.Constants.Config.distRelativeDir' for the given local packages. If
-    -- no packages are given, all project packages should be cleaned.
+    -- 'Stack.Constants.Config.distRelativeDir' for the given project packages.
+    -- If no project packages are given, all project packages should be cleaned.
   | CleanFull
     -- ^ Delete all work directories in the project.
 

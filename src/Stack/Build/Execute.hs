@@ -210,7 +210,7 @@ executePlan :: HasEnvConfig env
             -> [LocalPackage]
             -> [DumpPackage] -- ^ global packages
             -> [DumpPackage] -- ^ snapshot packages
-            -> [DumpPackage] -- ^ local packages
+            -> [DumpPackage] -- ^ project packages and local extra-deps
             -> InstalledMap
             -> Map PackageName Target
             -> Plan

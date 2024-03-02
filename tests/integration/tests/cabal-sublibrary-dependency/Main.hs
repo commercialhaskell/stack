@@ -2,7 +2,7 @@ import Control.Monad (unless)
 import Data.List (isInfixOf)
 import StackTest
 
--- This tests building two local packages, one of which depends on the other
+-- This tests building two project packages, one of which depends on the other
 -- (subproject). The dependency has a library and a visible sub-library named
 -- sub, each of which exposes a module that exports a function.
 

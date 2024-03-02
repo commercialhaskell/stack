@@ -231,7 +231,7 @@ packageDatabaseDeps = do
   root <- installationRootDeps
   pure $ root </> relDirPkgdb
 
--- | Package database for installing local packages into
+-- | Package database for installing project packages and local extra-deps into.
 packageDatabaseLocal :: HasEnvConfig env => RIO env (Path Abs Dir)
 packageDatabaseLocal = do
   root <- installationRootLocal

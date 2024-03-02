@@ -13,7 +13,7 @@ import           Stack.Prelude
 -- | Controls which version of the environment is used
 data EnvSettings = EnvSettings
   { includeLocals :: !Bool
-  -- ^ include local project bin directory, GHC_PACKAGE_PATH, etc
+  -- ^ include project's local bin directory, GHC_PACKAGE_PATH, etc
   , includeGhcPackagePath :: !Bool
   -- ^ include the GHC_PACKAGE_PATH variable
   , stackExe :: !Bool

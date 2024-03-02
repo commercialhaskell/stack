@@ -671,8 +671,8 @@ cabalPackagesCheck cabaldirs = do
   when (null cabaldirs) $
     prettyWarn $
          fillSep
-           [ flow "Stack did not find any local package directories. You may \
-                  \want to create a package with"
+           [ flow "Stack did not find any local directories containing a \
+                  \package description. You may want to create a package with"
            , style Shell (flow "stack new")
            , flow "instead."
            ]

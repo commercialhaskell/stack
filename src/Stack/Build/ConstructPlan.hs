@@ -97,7 +97,7 @@ import           System.Environment ( lookupEnv )
 -- and the interdependencies among the build 'Task's. In particular:
 --
 -- 1) It determines which packages need to be built, based on the transitive
--- deps of the current targets. For local packages, this is indicated by the
+-- deps of the current targets. For project packages, this is indicated by the
 -- 'lpWanted' boolean. For extra packages to build, this comes from the
 -- @extraToBuild0@ argument of type @Set PackageName@. These are usually
 -- packages that have been specified on the command line.
@@ -312,7 +312,7 @@ constructPlan
     pure $ pPackages <> deps
 
 -- | Determine which packages to unregister based on the given tasks and
--- already registered local packages.
+-- already registered project packages and local extra-deps.
 mkUnregisterLocal ::
      Map PackageName Task
      -- ^ Tasks

@@ -219,9 +219,8 @@ ghciCmd ghciOpts =
               }
         local (set buildOptsL boptsLocal) (ghci ghciOpts)
 
--- | Launch a GHCi session for the given local package targets with the
--- given options and configure it with the load paths and extensions
--- of those targets.
+-- | Launch a GHCi session for the given project package targets with the given
+-- options and configure it with the load paths and extensions of those targets.
 ghci :: HasEnvConfig env => GhciOpts -> RIO env ()
 ghci opts = do
   let buildOptsCLI = defaultBuildOptsCLI
@@ -280,7 +279,7 @@ ghci opts = do
         case targets of
           TargetAll _  -> [T.pack (packageNameString pn)]
           TargetComps comps -> [renderPkgComponent (pn, c) | c <- toList comps]
-  -- Build required dependencies and setup local packages.
+  -- Build required dependencies and setup project packages.
   buildDepsAndInitialSteps opts $
     concatMap (\(pn, (_, t)) -> pkgTargets pn t) localTargets
   targetWarnings localTargets nonLocalTargets mfileTargets
@@ -472,11 +471,11 @@ getAllNonLocalTargets targets = do
 buildDepsAndInitialSteps :: HasEnvConfig env => GhciOpts -> [Text] -> RIO env ()
 buildDepsAndInitialSteps ghciOpts localTargets = do
   let targets = localTargets ++ map T.pack ghciOpts.additionalPackages
-  -- If necessary, do the build, for local packagee targets, only do
+  -- If necessary, do the build, for project packagee targets, only do
   -- 'initialBuildSteps'.
   whenJust (nonEmpty targets) $ \nonEmptyTargets ->
     unless ghciOpts.noBuild $ do
-      -- only new local targets could appear here
+      -- only new project package targets could appear here
       eres <- buildLocalTargets nonEmptyTargets
       case eres of
         Right () -> pure ()
@@ -1133,19 +1132,20 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
       , parens $ fillSep $ punctuate "," $ map
           (style Good . fromPackageName)
           nonLocalTargets
-      , flow "are not local packages, and so cannot be directly loaded. In \
+      , flow "are not project packages, and so cannot be directly loaded. In \
              \future versions of Stack, this might be supported - see"
-      , style Url "https://github.com/commercialhaskell/stack/issues/1441"
-      , "."
+      , style Url "https://github.com/commercialhaskell/stack/issues/1441" <> "."
       , flow "It can still be useful to specify these, as they will be passed \
-             \to ghci via -package flags."
+             \to ghci via"
+      , style Shell "-package"
+      , "flags."
       ]
   when (null localTargets && isNothing mfileTargets) $ do
     smWanted <- view $ buildConfigL . to (.smWanted)
     stackYaml <- view stackYamlL
     prettyNote $ vsep
-      [ flow "No local targets specified, so a plain ghci will be started with \
-             \no package hiding or package options."
+      [ flow "No project package targets specified, so a plain ghci will be \
+             \started with no package hiding or package options."
       , ""
       , flow $ T.unpack $ utf8BuilderToText $
                "You are using snapshot: " <>

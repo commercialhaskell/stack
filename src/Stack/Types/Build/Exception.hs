@@ -456,9 +456,8 @@ pprintTargetParseErrors errs =
        , style Shell "my-package-0.1.2.3" <> "),"
        , flow "a package component (e.g."
        , style Shell "my-package:test:my-test-suite" <> "),"
-       , flow "or, failing that, a relative path to a directory that is a \
-              \local package directory or a parent directory of one or more \
-              \local package directories."
+       , flow "or, failing that, a relative path to a local directory for a \
+              \package or a parent directory of one or more such directories."
        ]
 
 pprintExceptions ::
