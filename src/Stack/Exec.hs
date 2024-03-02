@@ -15,13 +15,14 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import           Distribution.Types.PackageName ( unPackageName )
 import           RIO.NonEmpty ( head, nonEmpty )
 import           RIO.Process ( exec )
 import           Stack.Build ( build )
-import           Stack.Build.Target ( NeedTargets (..) )
+import           Stack.Build.Target
+                   ( NeedTargets (..), RawTarget (..), parseRawTarget )
 import           Stack.GhcPkg ( findGhcPkgField )
 import           Stack.Setup ( withNewLocalBuildTargets )
-import           Stack.Types.NamedComponent ( NamedComponent (..), isCExe )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
@@ -33,6 +34,7 @@ import           Stack.Types.CompilerPaths
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
+import           Stack.Types.NamedComponent ( NamedComponent (..), isCExe )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap ( SMWanted (..), ppComponents )
 import           System.Directory ( withCurrentDirectory )
@@ -58,6 +60,7 @@ data ExecPrettyException
   = PackageIdNotFoundBug !String
   | ExecutableToRunNotFound
   | NoPackageIdReportedBug
+  | InvalidExecTargets ![Text]
   deriving (Show, Typeable)
 
 instance Pretty ExecPrettyException where
@@ -72,6 +75,20 @@ instance Pretty ExecPrettyException where
     <> flow "No executables found."
   pretty NoPackageIdReportedBug = bugPrettyReport "S-8600" $
     flow "execCmd: findGhcPkgField returned Just \"\"."
+  pretty (InvalidExecTargets targets) =
+       "[S-7371]"
+    <> line
+    <> fillSep
+         [ flow "The following are invalid"
+         , style Shell "--package"
+         , "values for"
+         , style Shell (flow "stack ghc") <> ","
+         , style Shell (flow "stack runghc") <> ","
+         , "or"
+         , style Shell (flow "stack runhaskell") <> ":"
+         ]
+    <> line
+    <> bulletedList (map (style Target . string . T.unpack) targets )
 
 instance Exception ExecPrettyException
 
@@ -99,12 +116,17 @@ data ExecOpts = ExecOpts
   }
   deriving Show
 
+-- Type representing valid targets for --package option.
+data ExecTarget = ExecTarget PackageName (Maybe Version)
+
 -- | The function underlying Stack's @exec@, @ghc@, @run@, @runghc@ and
 -- @runhaskell@ commands. Execute a command.
 execCmd :: ExecOpts -> RIO Runner ()
 execCmd opts =
   withConfig YesReexec $ withEnvConfig AllowNoTargets boptsCLI $ do
-    unless (null targets) $ build Nothing
+    let (errs, execTargets) = partitionEithers $ map fromTarget targets
+    unless (null errs) $ prettyThrowM $ InvalidExecTargets errs
+    unless (null execTargets) $ build Nothing
 
     config <- view configL
     menv <- liftIO $ config.processContextSettings eo.envSettings
@@ -116,18 +138,32 @@ execCmd opts =
       (cmd, args) <- case (opts.cmd, argsWithRts opts.args) of
         (ExecCmd cmd, args) -> pure (cmd, args)
         (ExecRun, args) -> getRunCmd args
-        (ExecGhc, args) -> getGhcCmd eo.packages args
-        (ExecRunGhc, args) -> getRunGhcCmd eo.packages args
+        (ExecGhc, args) -> getGhcCmd execTargets args
+        (ExecRunGhc, args) -> getRunGhcCmd execTargets args
 
       runWithPath eo.cwd $ exec cmd args
  where
   eo = opts.extra
 
-  targets = concatMap words eo.packages
-  boptsCLI = defaultBuildOptsCLI { targetsCLI = map T.pack targets }
+  targets = concatMap (T.words . T.pack) eo.packages
+  boptsCLI = defaultBuildOptsCLI { targetsCLI = targets }
+
+  fromTarget :: Text -> Either Text ExecTarget
+  fromTarget target =
+    case parseRawTarget target >>= toExecTarget of
+      Nothing -> Left target
+      Just execTarget -> Right execTarget
+
+  toExecTarget :: RawTarget -> Maybe ExecTarget
+  toExecTarget (RTPackageComponent _ _) = Nothing
+  toExecTarget (RTComponent _) = Nothing
+  toExecTarget (RTPackage name) = Just $ ExecTarget name Nothing
+  toExecTarget (RTPackageIdentifier (PackageIdentifier name pkgId)) =
+    Just $ ExecTarget name (Just pkgId)
 
   -- return the package-id of the first package in GHC_PACKAGE_PATH
-  getPkgId name = do
+  getPkgId (ExecTarget pkgName _) = do
+    let name = unPackageName pkgName
     pkg <- getGhcPkgExe
     mId <- findGhcPkgField pkg [] name "id"
     case mId of
