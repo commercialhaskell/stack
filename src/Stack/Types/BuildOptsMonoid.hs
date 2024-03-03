@@ -45,6 +45,7 @@ data BuildOptsMonoid = BuildOptsMonoid
   , haddockOpts :: !HaddockOptsMonoid
   , openHaddocks :: !FirstFalse
   , haddockDeps :: !(First Bool)
+  , haddockExecutables :: !FirstFalse
   , haddockInternal :: !FirstFalse
   , haddockHyperlinkSource :: !FirstTrue
   , haddockForHackage :: !FirstFalse
@@ -81,6 +82,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     haddockOpts <- jsonSubWarnings (o ..:? haddockOptsArgName ..!= mempty)
     openHaddocks <- FirstFalse <$> o ..:? openHaddocksArgName
     haddockDeps <- First <$> o ..:? haddockDepsArgName
+    haddockExecutables <- FirstFalse <$> o ..:? haddockExecutablesArgName
     haddockInternal <- FirstFalse <$> o ..:? haddockInternalArgName
     haddockHyperlinkSource <- FirstTrue <$> o ..:? haddockHyperlinkSourceArgName
     haddockForHackage <-  FirstFalse <$> o ..:? haddockForHackageArgName
@@ -115,6 +117,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
       , haddockOpts
       , openHaddocks
       , haddockDeps
+      , haddockExecutables
       , haddockInternal
       , haddockHyperlinkSource
       , haddockForHackage
@@ -160,6 +163,9 @@ openHaddocksArgName = "open-haddocks"
 
 haddockDepsArgName :: Text
 haddockDepsArgName = "haddock-deps"
+
+haddockExecutablesArgName :: Text
+haddockExecutablesArgName = "haddock-executables"
 
 haddockInternalArgName :: Text
 haddockInternalArgName = "haddock-internal"

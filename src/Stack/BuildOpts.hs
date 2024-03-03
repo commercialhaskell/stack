@@ -31,6 +31,7 @@ defaultBuildOpts = BuildOpts
   , haddockOpts = defaultHaddockOpts
   , openHaddocks = defaultFirstFalse buildMonoid.openHaddocks
   , haddockDeps = Nothing
+  , haddockExecutables = defaultFirstFalse buildMonoid.haddockExecutables
   , haddockInternal = defaultFirstFalse buildMonoid.haddockInternal
   , haddockHyperlinkSource = defaultFirstTrue buildMonoid.haddockHyperlinkSource
   , haddockForHackage = defaultFirstFalse buildMonoid.haddockForHackage

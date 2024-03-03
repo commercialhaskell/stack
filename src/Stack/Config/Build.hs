@@ -54,6 +54,9 @@ buildOptsFromMonoid buildMonoid = BuildOpts
   , haddockDeps = if isHaddockFromHackage
       then Nothing
       else getFirst buildMonoid.haddockDeps
+  , haddockExecutables =
+         not isHaddockFromHackage
+      && fromFirstFalse buildMonoid.haddockExecutables
   , haddockInternal =
          not isHaddockFromHackage
       && fromFirstFalse buildMonoid.haddockInternal

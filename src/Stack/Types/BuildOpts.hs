@@ -32,6 +32,9 @@ data BuildOpts = BuildOpts
     -- ^ Open haddocks in the browser?
   , haddockDeps :: !(Maybe Bool)
     -- ^ Build haddocks for dependencies?
+  , haddockExecutables :: !Bool
+    -- ^ Also build Haddock documentation for all executable components, like
+    -- @runghc Setup.hs haddock --executables@.
   , haddockInternal :: !Bool
     -- ^ Build haddocks for all symbols and packages, like
     -- @cabal haddock --internal@
