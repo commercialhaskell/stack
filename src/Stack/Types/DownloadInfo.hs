@@ -14,7 +14,6 @@ import           Data.Aeson.WarningParser
                    )
 import           Stack.Prelude
 
--- | Build of the compiler distribution (e.g. standard, gmp4, tinfo6)
 -- | Information for a file to download.
 data DownloadInfo = DownloadInfo
   { url :: Text
