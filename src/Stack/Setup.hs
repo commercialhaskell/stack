@@ -78,7 +78,8 @@ import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
                    ( canonicalizePath, doesFileExist, ensureDir, executable
                    , getPermissions, ignoringAbsence, listDir, removeDirRecur
-                   , renameDir, renameFile, resolveFile', withTempDir
+                   , removeFile, renameDir, renameFile, resolveFile'
+                   , withTempDir
                    )
 import           RIO.List
                    ( headMaybe, intercalate, intersperse, isPrefixOf
@@ -1934,17 +1935,28 @@ getInstalledTool ::
 getInstalledTool installed name goodVersion = Tool <$>
   maximumByMaybe (comparing pkgVersion) (filterTools name goodVersion installed)
 
+-- | Obtain and install the specified tool, using the specified download
+-- information and installer. Also deletes the archive file for the tool after
+-- installation.
 downloadAndInstallTool ::
      (HasTerm env, HasBuildConfig env)
   => Path Abs Dir
+     -- ^ Location of the directory for tools.
   -> DownloadInfo
+     -- ^ Information about the file to obtain.
   -> Tool
+     -- ^ The tool in question.
   -> (  Path Abs File
+        -- Location of archive file.
      -> ArchiveType
+        -- Type of archive file.
      -> Path Abs Dir
+        -- Tempory directory to use.
      -> Path Abs Dir
+        -- Destination directory for installed tool.
      -> RIO env ()
      )
+     -- ^ Installer.
   -> RIO env Tool
 downloadAndInstallTool programsDir downloadInfo tool installer = do
   ensureDir programsDir
@@ -1957,6 +1969,7 @@ downloadAndInstallTool programsDir downloadInfo tool installer = do
   installer file at tempDir dir
   markInstalled programsDir tool
   liftIO $ ignoringAbsence (removeDirRecur tempDir)
+  liftIO $ ignoringAbsence (removeFile file)
   pure tool
 
 -- Exceptions thrown by this function are caught by

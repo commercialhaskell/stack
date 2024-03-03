@@ -19,6 +19,8 @@ Behavior changes:
   up Stack's environment.
 * The `init` command initialises `stack.yaml` with a `snapshot` key rather than
   a `resolver` key.
+* After installing GHC or another tool, Stack deletes the archive file which
+  provided the tool.
 
 Other enhancements:
 
