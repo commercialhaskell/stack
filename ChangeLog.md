@@ -37,6 +37,10 @@ Bug fixes:
   presence of a synoymous key.
 * On Windows, package locations that are Git repositories with submodules now
   work as intended.
+* The `ghc`, `runghc` and `runhaskell` commands accept `--package` values that
+  are a list of package names or package identifiers separated by spaces and, in
+  the case of package identifiers, in the same way as if they were specified as
+  targets to `stack build`.
 
 ## v2.15.1 - 2024-02-09
 
