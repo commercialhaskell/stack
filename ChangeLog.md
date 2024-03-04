@@ -30,8 +30,8 @@ Other enhancements:
   command, as if it had been specified at the command line.
 * Add flag `--haddock-executables` to Stack's `build` command (including the
   `haddock` synonym for `build --haddock`) to enable also building Haddock
-  documentation for executables. Will fail for GHC versions before 9.4 due to a
-  bug in Cabal (the library).
+  documentation for executables. Due to a bug in Cabal (the library), Stack will
+  ignore the flag with a warning for GHC versions before 9.4.
 
 Bug fixes:
 

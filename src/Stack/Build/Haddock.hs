@@ -258,18 +258,18 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
   toInterfaceOpt ::
        DumpPackage
     -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
-  toInterfaceOpt DumpPackage {haddockInterfaces, packageIdent, haddockHtml} =
-    case haddockInterfaces of
+  toInterfaceOpt dp =
+    case dp.haddockInterfaces of
       [] -> pure Nothing
       srcInterfaceFP:_ -> do
         srcInterfaceAbsFile <- parseCollapsedAbsFile srcInterfaceFP
-        let (PackageIdentifier name _) = packageIdent
+        let (PackageIdentifier name _) = dp.packageIdent
             destInterfaceRelFP =
               docRelFP FP.</>
-              packageIdentifierString packageIdent FP.</>
+              packageIdentifierString dp.packageIdent FP.</>
               (packageNameString name FP.<.> "haddock")
             docPathRelFP =
-              fmap ((docRelFP FP.</>) . FP.takeFileName) haddockHtml
+              fmap ((docRelFP FP.</>) . FP.takeFileName) dp.haddockHtml
             interfaces = intercalate "," $ mcons docPathRelFP [srcInterfaceFP]
 
         destInterfaceAbsFile <-
