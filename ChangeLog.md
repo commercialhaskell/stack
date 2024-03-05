@@ -17,6 +17,8 @@ Other enhancements:
 
 Bug fixes:
 
+* Due to a bug, Stack 2.15.1 did not support versions of GHC before 8.2. Stack
+  now supports GHC versions from 8.0.
 * `--haddock-for-hackage` does not ignore `--haddock-arguments`.
 * On Windows, package locations that are Git repositories with submodules now
   work as intended.
