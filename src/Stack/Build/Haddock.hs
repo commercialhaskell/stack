@@ -20,7 +20,6 @@ import qualified Data.HashSet as HS
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Data.Time ( UTCTime )
 import           Distribution.Text ( display )
 import           Path
                    ( (</>), addExtension, fromAbsDir, fromAbsFile, fromRelDir
@@ -50,6 +49,7 @@ import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig ( HasEnvConfig (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           Stack.Types.InterfaceOpt ( InterfaceOpt (..) )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..) )
 import qualified System.FilePath as FP
@@ -222,7 +222,9 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
           case eindexModTime of
             Left _ -> True
             Right indexModTime ->
-              or [mt > indexModTime | (_, mt, _, _) <- interfaceOpts]
+              or [ mt > indexModTime
+                 | mt <- map (.srcInterfaceFileModTime) interfaceOpts
+                 ]
         prettyDescr = style Current (fromString $ T.unpack descr)
     if needUpdate
       then do
@@ -243,7 +245,7 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
                  [bco.snapDB, bco.localDB]
               ++ bco.buildOpts.haddockOpts.additionalArgs
               ++ ["--gen-contents", "--gen-index"]
-              ++ [x | (xs, _, _, _) <- interfaceOpts, x <- xs]
+              ++ [x | xs <- map (.readInterfaceArgs) interfaceOpts, x <- xs]
           )
       else
         prettyInfo $
@@ -257,12 +259,12 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
  where
   toInterfaceOpt ::
        DumpPackage
-    -> IO (Maybe ([String], UTCTime, Path Abs File, Path Abs File))
+    -> IO (Maybe InterfaceOpt)
   toInterfaceOpt dp =
     case dp.haddockInterfaces of
       [] -> pure Nothing
       srcInterfaceFP:_ -> do
-        srcInterfaceAbsFile <- parseCollapsedAbsFile srcInterfaceFP
+        srcInterfaceFile <- parseCollapsedAbsFile srcInterfaceFP
         let (PackageIdentifier name _) = dp.packageIdent
             destInterfaceRelFP =
               docRelFP FP.</>
@@ -271,42 +273,43 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
             docPathRelFP =
               fmap ((docRelFP FP.</>) . FP.takeFileName) dp.haddockHtml
             interfaces = intercalate "," $ mcons docPathRelFP [srcInterfaceFP]
+            readInterfaceArgs = [ "-i", interfaces ]
 
-        destInterfaceAbsFile <-
+        destInterfaceFile <-
           parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
-        esrcInterfaceModTime <- tryGetModificationTime srcInterfaceAbsFile
+        eSrcInterfaceFileModTime <- tryGetModificationTime srcInterfaceFile
         pure $
-          case esrcInterfaceModTime of
+          case eSrcInterfaceFileModTime of
             Left _ -> Nothing
-            Right srcInterfaceModTime ->
-              Just
-                ( [ "-i", interfaces ]
-                , srcInterfaceModTime
-                , srcInterfaceAbsFile
-                , destInterfaceAbsFile
-                )
-  copyPkgDocs :: (a, UTCTime, Path Abs File, Path Abs File) -> IO ()
-  copyPkgDocs (_, srcInterfaceModTime, srcInterfaceAbsFile, destInterfaceAbsFile) = do
+            Right srcInterfaceFileModTime ->
+              Just InterfaceOpt
+                { readInterfaceArgs
+                , srcInterfaceFileModTime
+                , srcInterfaceFile
+                , destInterfaceFile
+                }
+  copyPkgDocs :: InterfaceOpt -> IO ()
+  copyPkgDocs opts = do
   -- Copy dependencies' haddocks to documentation directory.  This way,
   -- relative @../$pkg-$ver@ links work and it's easy to upload docs to a web
   -- server or otherwise view them in a non-local-filesystem context. We copy
   -- instead of symlink for two reasons: (1) symlinks aren't reliably supported
   -- on Windows, and (2) the filesystem containing dependencies' docs may not be
   -- available where viewing the docs (e.g. if building in a Docker container).
-    edestInterfaceModTime <- tryGetModificationTime destInterfaceAbsFile
+    edestInterfaceModTime <- tryGetModificationTime opts.destInterfaceFile
     case edestInterfaceModTime of
       Left _ -> doCopy
       Right destInterfaceModTime
-        | destInterfaceModTime < srcInterfaceModTime -> doCopy
+        | destInterfaceModTime < opts.srcInterfaceFileModTime -> doCopy
         | otherwise -> pure ()
    where
     doCopy = do
       ignoringAbsence (removeDirRecur destHtmlAbsDir)
       ensureDir destHtmlAbsDir
       onException
-        (copyDirRecur' (parent srcInterfaceAbsFile) destHtmlAbsDir)
+        (copyDirRecur' (parent opts.srcInterfaceFile) destHtmlAbsDir)
         (ignoringAbsence (removeDirRecur destHtmlAbsDir))
-    destHtmlAbsDir = parent destInterfaceAbsFile
+    destHtmlAbsDir = parent opts.destInterfaceFile
 
 -- | Find first DumpPackage matching the GhcPkgId
 lookupDumpPackage :: GhcPkgId
