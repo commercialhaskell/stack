@@ -1,19 +1,17 @@
 # Changelog
 
-## Unreleased changes
+## v2.15.3 - 2024-03-06
 
 Release notes:
 
-**Changes since v2.15.1:**
+* With one exception, this release fixes bugs.
 
-Major changes:
+**Changes since v2.15.1:**
 
 Behavior changes:
 
 * `stack path --global-config`, `--programs`, and `--local-bin` no longer set
   up Stack's environment.
-
-Other enhancements:
 
 Bug fixes:
 
