@@ -4,19 +4,17 @@
 
 Release notes:
 
-**Changes since v2.15.1:**
+** Changes since v2.15.3:**
 
 Major changes:
 
-Behavior changes:
+Behaviour changes:
 
 * Stack uses the version of the Cabal package that comes with the specified
   version of GHC. Stack no longer supports such Cabal versions before 2.2, which
   came with versions of GHC before 8.4. Consequently, the `init` command will
   not try LTS Haskell before 12.0. Due to a bug, Stack 2.15.1 did not
   support versions of GHC before 8.2.
-* `stack path --global-config`, `--programs`, and `--local-bin` no longer set
-  up Stack's environment.
 * The `init` command initialises `stack.yaml` with a `snapshot` key rather than
   a `resolver` key.
 * After installing GHC or another tool, Stack deletes the archive file which
@@ -34,9 +32,27 @@ Other enhancements:
 
 Bug fixes:
 
-* `--haddock-for-hackage` does not ignore `--haddock-arguments`.
 * The `config set snapshot` and `config set resolver` commands now respect the
   presence of a synoymous key.
+
+## v2.15.3 - 2024-03-07
+
+Release notes:
+
+* With one exception, this release fixes bugs.
+
+**Changes since v2.15.1:**
+
+Behavior changes:
+
+* `stack path --global-config`, `--programs`, and `--local-bin` no longer set
+  up Stack's environment.
+
+Bug fixes:
+
+* Due to a bug, Stack 2.15.1 did not support versions of GHC before 8.2. Stack
+  now supports GHC versions from 8.0.
+* `--haddock-for-hackage` does not ignore `--haddock-arguments`.
 * On Windows, package locations that are Git repositories with submodules now
   work as intended.
 * The `ghc`, `runghc` and `runhaskell` commands accept `--package` values that

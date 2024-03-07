@@ -224,12 +224,6 @@ getSetupExe setupHs setupShimHs tmpdir = do
             , toFilePath setupShimHs
             , "-o"
             , toFilePath tmpOutputPath
-              -- See https://github.com/commercialhaskell/stack/issues/6267. As
-              -- corrupt *.hi and/or *.o files can be problematic, we aim to
-              -- to leave none behind. This can be dropped when Stack drops
-              -- support for the problematic versions of GHC.
-            , "-no-keep-hi-files"
-            , "-no-keep-o-files"
             ]
       compilerPath <- getCompilerPath
       withWorkingDir (toFilePath tmpdir) $
