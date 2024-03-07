@@ -46,8 +46,8 @@
   // Set 'remoteUser' to 'root' to connect as root instead.
   "remoteUser": "vscode",
 
-  // Pip: Install packages to the user site
   "remoteEnv": {
+    // Pip: Install packages to the user site
     "PIP_USER": "1"
   }
 }
