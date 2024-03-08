@@ -41,6 +41,7 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
   <*> haddockOptsParser hideBool
   <*> openHaddocks
   <*> haddockDeps
+  <*> haddockExecutables
   <*> haddockInternal
   <*> haddockHyperlinkSource
   <*> haddockForHackage
@@ -132,6 +133,11 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
     "haddock-deps"
     "building Haddock documentation for dependencies. (default: if building \
     \Haddock documentation, true; otherwise, false)"
+    hide
+  haddockExecutables = firstBoolFlagsFalse
+    "haddock-executables"
+    "also building Haddock documentation for all executables (like \
+    \'cabal haddock --executables')."
     hide
   haddockInternal = firstBoolFlagsFalse
     "haddock-internal"
