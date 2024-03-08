@@ -87,7 +87,7 @@ instance Pretty CabalVersionPrettyException where
                 \with the specified version of GHC. However, Stack no longer \
                 \supports such Cabal versions before 2.2. Version"
          , fromString $ versionString cabalVer
-         , flow "was found. To fix this, either use"
+         , flow "was found. To fix this, either use Stack"
          , downgradeRecommendation
          , flow "or earlier or use a snapshot that specifies a version of GHC \
                 \that is 8.4 or later. Stackage LTS Haskell 12.0"
@@ -99,8 +99,8 @@ instance Pretty CabalVersionPrettyException where
    where
     -- Due to a bug, Stack 2.15.1 does not support Cabal < 2.
     downgradeRecommendation = if cabalVer < mkVersion [2]
-      then "Stack 2.15.3 or 2.13.1"
-      else "Stack 2.15.3"
+      then "2.15.3 or 2.13.1"
+      else "2.15.3"
 
 instance Exception CabalVersionPrettyException
 
