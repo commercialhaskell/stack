@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
@@ -22,19 +23,19 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Text ( display )
 import           Path
-                   ( (</>), addExtension, fromAbsDir, fromAbsFile, fromRelDir
-                   , parent, parseRelDir, parseRelFile
+                   ( (</>), addExtension, dirname, fileExtension, fromAbsDir
+                   , fromAbsFile, fromRelDir, parent, parseRelDir, parseRelFile
                    )
 import           Path.Extra
                    ( parseCollapsedAbsFile, toFilePathNoTrailingSep
                    , tryGetModificationTime
                    )
 import           Path.IO
-                   ( copyDirRecur', doesFileExist, ensureDir, ignoringAbsence
-                   , removeDirRecur
+                   ( copyDirRecur', doesDirExist, doesFileExist, ensureDir
+                   , ignoringAbsence, listDir, removeDirRecur
                    )
 import qualified RIO.ByteString.Lazy as BL
-import           RIO.List ( intercalate )
+import           RIO.List ( intercalate, intersperse )
 import           RIO.Process ( HasProcessContext, withWorkingDir )
 import           Stack.Constants
                    ( docDirSuffix, htmlDirSuffix, relDirAll, relFileIndexHtml )
@@ -266,15 +267,49 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
       srcInterfaceFP:_ -> do
         srcInterfaceFile <- parseCollapsedAbsFile srcInterfaceFP
         let (PackageIdentifier name _) = dp.packageIdent
-            destInterfaceRelFP =
+            srcInterfaceDir = parent srcInterfaceFile
+        -- It is possible that the *.haddock file specified by the
+        -- haddock-interfaces key for an installed package may not exist. For
+        -- example, with GHC 9.6.4 on Windows, there is no
+        --
+        -- ${pkgroot}/../doc/html/libraries/rts-1.0.2\rts.haddock
+        (srcInterfaceSubDirs, _) <- doesDirExist srcInterfaceDir >>= \case
+          True -> listDir srcInterfaceDir
+          False -> pure ([], [])
+        let destInterfaceRelFP =
               docRelFP FP.</>
               packageIdentifierString dp.packageIdent FP.</>
               (packageNameString name FP.<.> "haddock")
             docPathRelFP =
               fmap ((docRelFP FP.</>) . FP.takeFileName) dp.haddockHtml
-            interfaces = intercalate "," $ mcons docPathRelFP [srcInterfaceFP]
-            readInterfaceArgs = [ "-i", interfaces ]
-
+            mkInterface :: Maybe FilePath -> FilePath -> String
+            mkInterface mDocPath file =
+              intercalate "," $ mcons mDocPath [file]
+            -- This assumes that Cabal (the library) `haddock --executables` for
+            -- component my-component of package my-package puts one *.haddock
+            -- file and associated files in directory:
+            --
+            -- my-package/my-component
+            --
+            -- Not all directories in directory my-package relate to components.
+            -- For example, my-package/src relates to the files for the
+            -- colourised code of the main library of package my-package.
+            compInterface :: Path Abs Dir -> IO (Maybe String)
+            compInterface dir = do
+              (_, files) <- listDir dir
+              pure $ toInterface <$> F.find isInterface files
+             where
+              toInterface file =
+                mkInterface compDocPathRelFP compSrcInterfaceFP
+               where
+                componentName = toFilePath $ dirname dir
+                compDocPathRelFP = (FP.</> componentName) <$> docPathRelFP
+                compSrcInterfaceFP = toFilePath file
+              isInterface file = fileExtension file == Just ".haddock"
+            interfaces = mkInterface docPathRelFP srcInterfaceFP
+        compInterfaces <- catMaybes <$> forM srcInterfaceSubDirs compInterface
+        let readInterfaceArgs =
+              "-i" : intersperse "-i" (interfaces : compInterfaces)
         destInterfaceFile <-
           parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
         eSrcInterfaceFileModTime <- tryGetModificationTime srcInterfaceFile
