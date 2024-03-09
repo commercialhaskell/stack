@@ -319,6 +319,23 @@ Unset the flag to disable building building hyperlinked source for Haddock.
 If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
 this flag is ignored.
 
+### `--[no-]haddock-executables` flag
+
+Default: Disabled
+
+Set the flag to enable building Haddock documentation for executable components
+of packages.
+
+If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+this flag is ignored.
+
+!!! warning
+
+    Due to a bug, if there is more than one executable in a project package or
+    more than one project package with an executable, the Haddock documentation
+    for the `Main` module of one executable will overwrite the Haddock
+    documentation for others.
+
 ### `--[no-]haddock-internal` flag
 
 Default: Disabled
