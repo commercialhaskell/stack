@@ -72,6 +72,8 @@ buildOptsConfig =
   "  open-haddocks: true\n" ++
   "  haddock-deps: true\n" ++
   "  haddock-executables: true\n" ++
+  "  haddock-tests: true\n" ++
+  "  haddock-benchmarks: true\n" ++
   "  haddock-internal: true\n" ++
   "  haddock-hyperlink-source: false\n" ++
   "  haddock-for-hackage: false\n" ++
@@ -109,6 +111,8 @@ buildOptsHaddockForHackageConfig =
   "  open-haddocks: true\n" ++
   "  haddock-deps: true\n" ++
   "  haddock-executables: true\n" ++
+  "  haddock-tests: true\n" ++
+  "  haddock-benchmarks: true\n" ++
   "  haddock-internal: true\n" ++
   "  haddock-hyperlink-source: false\n" ++
   "  haddock-for-hackage: true\n" ++
@@ -235,6 +239,8 @@ spec = beforeAll setup $ do
         bopts.openHaddocks `shouldBe` True
         bopts.haddockDeps `shouldBe` Just True
         bopts.haddockExecutables `shouldBe` True
+        bopts.haddockTests `shouldBe` True
+        bopts.haddockBenchmarks `shouldBe` True
         bopts.haddockInternal `shouldBe` True
         bopts.haddockHyperlinkSource `shouldBe` False
         bopts.haddockForHackage `shouldBe` False

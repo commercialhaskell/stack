@@ -35,6 +35,12 @@ data BuildOpts = BuildOpts
   , haddockExecutables :: !Bool
     -- ^ Also build Haddock documentation for all executable components, like
     -- @runghc Setup.hs haddock --executables@.
+  , haddockTests :: !Bool
+    -- ^ Also build Haddock documentation for all test suite components, like
+    -- @runghc Setup.hs haddock --tests@.
+  , haddockBenchmarks :: !Bool
+    -- ^ Also build Haddock documentation for all benchmark components, like
+    -- @runghc Setup.hs haddock --benchmarks@.
   , haddockInternal :: !Bool
     -- ^ Build haddocks for all symbols and packages, like
     -- @cabal haddock --internal@

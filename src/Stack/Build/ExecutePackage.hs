@@ -610,6 +610,8 @@ realConfigAndBuild
                         | ee.buildOpts.haddockHyperlinkSource
                         ]
                       , [ "--executables" | ee.buildOpts.haddockExecutables ]
+                      , [ "--tests" | ee.buildOpts.haddockTests ]
+                      , [ "--benchmarks" | ee.buildOpts.haddockBenchmarks ]
                       , [ "--internal" | ee.buildOpts.haddockInternal  ]
                       , quickjump
                       ]
