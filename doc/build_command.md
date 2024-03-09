@@ -319,6 +319,23 @@ Unset the flag to disable building building hyperlinked source for Haddock.
 If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
 this flag is ignored.
 
+### `--[no-]haddock-benchmarks` flag
+
+Default: Disabled
+
+Set the flag to enable building Haddock documentation for benchmark components
+of packages.
+
+If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+this flag is ignored.
+
+!!! warning
+
+    Due to a bug, if there is more than one executable (including test suites
+    and benchmarks) in a project package or more than one project package with
+    an executable, the Haddock documentation for the `Main` module of one
+    executable will overwrite the Haddock documentation for others.
+
 ### `--[no-]haddock-executables` flag
 
 Default: Disabled
@@ -331,10 +348,10 @@ this flag is ignored.
 
 !!! warning
 
-    Due to a bug, if there is more than one executable in a project package or
-    more than one project package with an executable, the Haddock documentation
-    for the `Main` module of one executable will overwrite the Haddock
-    documentation for others.
+    Due to a bug, if there is more than one executable (including test suites
+    and benchmarks) in a project package or more than one project package with
+    an executable, the Haddock documentation for the `Main` module of one
+    executable will overwrite the Haddock documentation for others.
 
 ### `--[no-]haddock-internal` flag
 
@@ -344,6 +361,23 @@ Set the flag to enable building Haddock documentation for internal modules.
 
 If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
 this flag is ignored.
+
+### `--[no-]haddock-tests` flag
+
+Default: Disabled
+
+Set the flag to enable building Haddock documentation for test suite components
+of packages.
+
+If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+this flag is ignored.
+
+!!! warning
+
+    Due to a bug, if there is more than one executable (including test suites
+    and benchmarks) in a project package or more than one project package with
+    an executable, the Haddock documentation for the `Main` module of one
+    executable will overwrite the Haddock documentation for others.
 
 ### `--[no-]keep-going` flag
 

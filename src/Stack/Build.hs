@@ -194,12 +194,17 @@ build msetLocalFiles = do
       localsIdents -> throwM $ LocalPackagesPresent localsIdents
 
     checkCabalVersion
-    haddockExecutablesSupported <- warnAboutHaddockExecutables bopts
-    let disableHaddockExecutables =
-          local $ over buildOptsL $ \bo -> bo { haddockExecutables = False }
-        withHaddockExecutablesGuarded = if haddockExecutablesSupported
+    haddockCompsSupported <- warnAboutHaddockComps bopts
+    let disableHaddockComps =
+          local $ over buildOptsL $ \bo ->
+            bo
+              { haddockExecutables = False
+              , haddockTests = False
+              , haddockBenchmarks = False
+              }
+        withHaddockCompsGuarded = if haddockCompsSupported
           then id
-          else disableHaddockExecutables
+          else disableHaddockComps
     warnAboutSplitObjs bopts
     warnIfExecutablesWithSameNameCouldBeOverwritten locals plan
 
@@ -210,7 +215,7 @@ build msetLocalFiles = do
       then
         printPlan plan
       else
-        withHaddockExecutablesGuarded $ executePlan
+        withHaddockCompsGuarded $ executePlan
           boptsCli
           baseConfigOpts
           locals
@@ -325,13 +330,17 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   collect :: Ord k => [(k, v)] -> Map k (NonEmpty v)
   collect = Map.mapMaybe nonEmpty . Map.fromDistinctAscList . groupSort
 
-warnAboutHaddockExecutables ::
+warnAboutHaddockComps ::
      (HasCompiler env, HasTerm env)
   => BuildOpts
   -> RIO env Bool
-warnAboutHaddockExecutables bopts = do
+warnAboutHaddockComps bopts = do
+  let haddockCompsWanted =
+           bopts.haddockExecutables
+        || bopts.haddockTests
+        || bopts.haddockBenchmarks
   cabalVer <- view cabalVersionL
-  if cabalVer < mkVersion [3, 8, 1]
+  if haddockCompsWanted && cabalVer < mkVersion [3, 8, 1]
     then do
       prettyWarnL
         [ flow "Stack builds Haddock documentation with the version of the \
@@ -339,18 +348,17 @@ warnAboutHaddockExecutables bopts = do
                \Version"
         , fromString $ versionString cabalVer
         , flow "was found, which does not support the building of \
-               \documentation for executables. The option to build such \
-               \documentation will be ignored. To use the option, use a \
-               \snapshot that specifies a version of GHC that is 9.4 or later. \
-               \Stackage LTS Haskell 21.0"
+               \documentation for executables, test suites or benchmarks. \
+               \Options to build such documentation will be ignored. To use \
+               \the options, use a snapshot that specifies a version of GHC \
+               \that is 9.4 or later. Stackage LTS Haskell 21.0"
         , parens (style Shell "lts-21.0")
         , flow "or later or Nightly 2022-11-19"
         , parens (style Shell "nightly-2022-11-19")
         , flow "or later specify such GHC versions."
         ]
       pure False
-    else
-      pure bopts.haddockExecutables
+    else pure haddockCompsWanted
 
 warnAboutSplitObjs :: HasTerm env => BuildOpts -> RIO env ()
 warnAboutSplitObjs bopts |  bopts.splitObjs =

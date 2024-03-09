@@ -42,6 +42,8 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
   <*> openHaddocks
   <*> haddockDeps
   <*> haddockExecutables
+  <*> haddockTests
+  <*> haddockBenchmarks
   <*> haddockInternal
   <*> haddockHyperlinkSource
   <*> haddockForHackage
@@ -138,6 +140,16 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
     "haddock-executables"
     "also building Haddock documentation for all executables (like \
     \'cabal haddock --executables')."
+    hide
+  haddockTests = firstBoolFlagsFalse
+    "haddock-tests"
+    "also building Haddock documentation for all test suites (like \
+    \'cabal haddock --tests')."
+    hide
+  haddockBenchmarks = firstBoolFlagsFalse
+    "haddock-benchmarks"
+    "also building Haddock documentation for all benchmarks (like \
+    \'cabal haddock --benchmarks')."
     hide
   haddockInternal = firstBoolFlagsFalse
     "haddock-internal"
