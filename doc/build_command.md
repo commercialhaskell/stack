@@ -72,94 +72,138 @@ project-level configuration file (`stack.yaml`, by default).
 ## Target syntax
 
 `stack build` takes a list of one or more optional *targets* to be built. The
-supported syntaxes for targets are:
+supported syntaxes for targets are as follows:
 
-*   *package*, e.g. `stack build foobar`, is the most commonly used target. It
-    will try to find the package in the following locations: project packages,
-    extra-deps, the snapshot, and the package index (e.g. Hackage). If it's
-    found in the package index, then the latest version of that package from the
-    index is implicitly added as an extra-dep.
+* no targets specified
+* *package*
+* *package identifier*
+* project package *component*
+* *local directory*
 
-    If the package is a project package, the library and executable components
-    are selected to be built. If the `--test` and `--bench` flags are set, then
-    all of the test suite and benchmark components, respectively, are selected
-    to be built.
+### No targets specified
 
-    If *package* is a GHC boot package (packages that come with GHC and are
-    included in GHC's global package database), the behaviour can be complex.
-    If the boot package has not been 'replaced', then `stack build` will,
-    effectively, do nothing. However, if the boot package has been 'replaced'
-    then `stack build` will specify the latest version of that package in the
-    package index, which may differ from the version provided by the version of
-    GHC specified by the snapshot. A boot package will be treated as 'replaced'
-    if the package is included directly in the Stackage snapshot or it depends
-    on a package included directly in the snapshot. Stackage snapshots do not
-    include directly most boot packages but some snapshots may include directly
-    some boot packages. In particular, some snapshots include directly `Win32`
-    (which is a boot package on Windows) while others do not. For example, if
-    `Cabal` (a boot package) is not a project package or an extra-dep, then
-    `stack build Cabal` with Stackage snapshot LTS Haskell 20.25 will:
-
-    * on Windows, try to build the latest version of `Cabal` in the package
-      index (because that snapshot includes `Win32` directly, and `Cabal`
-      depends on `Win32` and so is treated as 'replaced'); and
-    * on non-Windows, effectively, do nothing (because `Cabal` is not
-      'replaced').
-
-*   *package identifier*, e.g. `stack build foobar-1.2.3`, is usually used to
-    include specific package versions from the package index.
-
-    If the package name conflicts with that of a project package, then Stack
-    fails with an error.
-
-    Otherwise, this is the same as using `stack build foobar` (that is, ignoring
-    the specified version), unless the specified version exists in the package
-    index. If it exists, then the latest revision of that version from the
-    package index is used.
-
-*   *component*. Instead of referring to an entire package and letting Stack
-    decide which components to build, you select individual components from
-    inside a package. This can be done for more fine-grained control over which
-    test suites to run, or to have a faster compilation cycle. There are
-    multiple ways to refer to a specific component (provided for convenience):
-
-    *   `<package-name>:lib` or `<package-name>:<comp-type>:<comp-name>` (where
-        the component type, `<comp-type>`, is one of `exe`, `test`, or `bench`)
-        is the most explicit. The library component type (`lib`) does not have
-        an associated component name, `<comp-name>`.
-
-        !!! note
-
-            When any `exe` component is specified, all of the package's
-            executable components will be built. This is due to limitations in
-            all currently released versions of Cabal. See
-            [issue#1046](https://github.com/commercialhaskell/stack/issues/1406)
-
-    *   `<package-name>:<comp-name>` allows you to leave out the component type,
-         as that will often be unique for a given component name. For
-         example, `stack build mypackage:mytestsuite`.
-
-    *   `:<comp-name>` is a useful shortcut, saying "find the component
-        `<comp-name>` in all of the project packages". This will result in an
-        error if more than one package has a component with the specified name.
-        To continue the above example, `stack build :mytestsuite`.
-
-*   *directory*, e.g. `stack build foo/bar`, will find all project packages that
-    exist in the given directory hierarchy and then follow the same procedure as
-    passing in package names as mentioned above. There's an important caveat
-    here: if your directory name is parsed as one of the above target types, it
-    will be treated as that. Explicitly starting your target with `./` can be a
-    good way to avoid that, e.g. `stack build ./foo`.
-
-    !!! note
-
-        `stack build .` will target project packages in the current working
-        directory or its subdirectories.
+Example: `stack build`
 
 `stack build` with no targets specified will build all project packages.
 
+### Target: *package*
+
+Example: `stack build foobar`
+
+Stack will try to find the package in the following locations:
+
+* project packages,
+* extra-deps,
+* the snapshot, and
+* the package index (e.g. Hackage).
+
+If the package is found in the package index, then the latest version of that
+package from the index is implicitly added as an extra-dep.
+
+If the package is a project package, the library and executable components are
+selected to be built. If the `--test` and `--bench` flags are set, then all of
+the test suite and benchmark components, respectively, are selected to be built.
+
+If *package* is a GHC boot package (packages that come with GHC and are included
+in GHC's global package database), the behaviour can be complex:
+
+* If the boot package has not been 'replaced', then `stack build` will,
+  effectively, do nothing.
+
+* If the boot package has been 'replaced' then `stack build` will specify the
+  latest version of that package in the package index, which may differ from the
+  version provided by the version of GHC specified by the snapshot.
+
+A boot package will be treated as 'replaced' if the package is included directly
+in the Stackage snapshot or it depends on a package included directly in the
+snapshot.
+
+!!! note
+
+    Stackage snapshots do not include directly most boot packages but some
+    snapshots may include directly some boot packages. In particular, some
+    snapshots include directly `Win32` (which is a boot package on Windows)
+    while others do not.
+
+    For example, if `Cabal` (a boot package) is not a project package or an
+    extra-dep, then `stack build Cabal` with Stackage snapshot LTS Haskell 20.25
+    will:
+
+    *   on Windows, try to build the latest version of `Cabal` in the package
+        index (because that snapshot includes `Win32` directly, and `Cabal`
+        depends on `Win32` and so is treated as 'replaced'); and
+    *   on non-Windows, effectively, do nothing (because `Cabal` is not
+        'replaced').
+
+### Target: *package identifier*
+
+Example: `stack build foobar-1.2.3`
+
+If the package name is that of a project package, then Stack fails with an
+error.
+
+If the package version is in the package index (e.g. Hackage) then Stack will
+use the latest revision of that version from the package index.
+
+If the package is an extra-dep or in the snapshot, Stack will behave as if only
+the package name had been specified as the target (that is, ignoring the
+specified version).
+
+Otherwise, Stack will fail with an error, reporting that the package name is
+unknown.
+
+### Target: project package *component*
+
+Examples:
+
+* `stack build my-package:lib`
+* `stack build my-package:exe:my-executable`
+* `stack build my-package:test:my-test-suite`
+* `stack build my-package:bench:my-benchmark`
+* `stack build my-package:my-test-suite`
+* `stack build :my-test-suite`
+
+You can select individual components from inside a project package to be built.
+This can be done for more fine-grained control over which test suites to run, or
+to have a faster compilation cycle.
+
+There are multiple ways to refer to a specific component:
+
+*   `<package-name>:lib` or `<package-name>:<comp-type>:<comp-name>` (where the
+    component type, `<comp-type>`, is one of `exe`, `test`, or `bench`) is the
+    most explicit. The library component type (`lib`) does not have an
+    associated component name, `<comp-name>`.
+
+*   `<package-name>:<comp-name>` allows you to leave out the component type, as
+    that will often be unique for a given component name.
+
+*   `:<comp-name>` is a useful shortcut, saying "find the component`<comp-name>`
+    in all of the project packages". This will result in an error if more than
+    one package has a component with the specified name.
+
 For further information about available targets, see the
 [`stack ide targets` command](ide_command.md).
+
+### Target: *local directory*
+
+Examples:
+
+* `stack build foo/bar`
+* `stack build ./foo`
+* `stack build .`
+
+Stack will find all project packages that exist in the given directory hierarchy
+and then follow the same procedure as passing in package names as mentioned
+above.
+
+`stack build .` will target project packages in the current working directory or
+its subdirectories.
+
+!!! note
+
+    If the directory name is parsed as one of the other target types, it will
+    be treated as that. Explicitly starting the target with `./` can avoid that.
+    For example, `stack build ./foo`.
 
 ## Controlling what gets built
 
