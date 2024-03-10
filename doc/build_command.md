@@ -160,12 +160,8 @@ Examples:
 * `stack build my-package:exe:my-executable`
 * `stack build my-package:test:my-test-suite`
 * `stack build my-package:bench:my-benchmark`
-* `stack build my-package:my-executable`
 * `stack build my-package:my-test-suite`
-* `stack build my-package:my-benchmark`
-* `stack build :my-executable`
 * `stack build :my-test-suite`
-* `stack build :my-benchmark`
 
 You can select individual components from inside a project package to be built.
 This can be done for more fine-grained control over which test suites to run, or
@@ -179,13 +175,11 @@ There are multiple ways to refer to a specific component:
     associated component name, `<comp-name>`.
 
 *   `<package-name>:<comp-name>` allows you to leave out the component type, as
-    that will often be unique for a given component name. For example,
-    `stack build mypackage:my-test-suite`.
+    that will often be unique for a given component name.
 
 *   `:<comp-name>` is a useful shortcut, saying "find the component`<comp-name>`
     in all of the project packages". This will result in an error if more than
-    one package has a component with the specified name. For example,
-    `stack build :my-test-suite`.
+    one package has a component with the specified name.
 
 For further information about available targets, see the
 [`stack ide targets` command](ide_command.md).
