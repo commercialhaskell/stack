@@ -74,6 +74,12 @@ project-level configuration file (`stack.yaml`, by default).
 `stack build` takes a list of one or more optional *targets* to be built. The
 supported syntaxes for targets are as follows:
 
+* no targets specified
+* *package*
+* *package identifier*
+* project package *component*
+* *local directory*
+
 ### No targets specified
 
 Example: `stack build`
@@ -149,6 +155,7 @@ unknown.
 ### Target: project package *component*
 
 Examples:
+
 * `stack build my-package:lib`
 * `stack build my-package:exe:my-executable`
 * `stack build my-package:test:my-test-suite`
@@ -186,6 +193,7 @@ For further information about available targets, see the
 ### Target: *local directory*
 
 Examples:
+
 * `stack build foo/bar`
 * `stack build ./foo`
 * `stack build .`
@@ -194,16 +202,14 @@ Stack will find all project packages that exist in the given directory hierarchy
 and then follow the same procedure as passing in package names as mentioned
 above.
 
+`stack build .` will target project packages in the current working directory or
+its subdirectories.
+
 !!! note
 
-    If the directory name is parsed as one of the above target types, it will
+    If the directory name is parsed as one of the other target types, it will
     be treated as that. Explicitly starting the target with `./` can avoid that.
     For example, `stack build ./foo`.
-
-!!! note
-
-    `stack build .` will target project packages in the current working
-    directory or its subdirectories.
 
 ## Controlling what gets built
 
