@@ -333,6 +333,7 @@ library
       Stack.Types.Storage
       Stack.Types.TemplateName
       Stack.Types.UnusedFlags
+      Stack.Types.UploadOpts
       Stack.Types.Version
       Stack.Types.VersionedDownloadInfo
       Stack.Uninstall

@@ -11,7 +11,8 @@ import           Options.Applicative
                    , metavar, option, readerError, short, strArgument, strOption
                    , switch
                    )
-import           Options.Applicative.Builder.Extra ( boolFlags, dirCompleter )
+import           Options.Applicative.Builder.Extra
+                   ( boolFlags, dirCompleter, firstBoolFlagsTrue )
 import           Options.Applicative.Types ( readerAsk )
 import           Stack.Prelude
 import           Stack.Upload ( UploadOpts (..), UploadVariant (..) )
@@ -27,6 +28,7 @@ uploadOptsParser = UploadOpts
   <*> buildPackageOption
   <*> tarDirParser
   <*> uploadVariantParser
+  <*> saveHackageCredsOption
  where
   itemsToWorkWithParser = many (strArgument
     (  metavar "ITEM"
@@ -70,3 +72,7 @@ uploadOptsParser = UploadOpts
     (  long "candidate"
     <> help "Upload as, or for, a package candidate."
     )
+  saveHackageCredsOption = firstBoolFlagsTrue
+      "save-hackage-creds"
+      "saving user's Hackage username and password in a local file."
+      idm

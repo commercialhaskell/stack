@@ -172,7 +172,7 @@ data Config = Config
   , allowLocals            :: !Bool
     -- ^ Are we allowed to build local packages? The script
     -- command disallows this.
-  , saveHackageCreds       :: !Bool
+  , saveHackageCreds       :: !FirstTrue
     -- ^ Should we save Hackage credentials to a file?
   , hackageBaseUrl         :: !Text
     -- ^ Hackage base URL used when uploading packages

@@ -5,19 +5,22 @@
 ~~~text
 stack upload [ITEM] [-d|--documentation] [--pvp-bounds PVP-BOUNDS]
              [--ignore-check] [--[no-]test-tarball] [--tar-dir ARG]
-             [--candidate] [--setup-info-yaml URL]
+             [--candidate] [--[no-]save-hackage-creds] [--setup-info-yaml URL]
              [--snapshot-location-base URL]
 ~~~
 
 By default:
 
 * the command uploads one or more packages. Pass the flag `--documentation`
-  (`-d` for short) to upload documentation for one or more packages; and
+  (`-d` for short) to upload documentation for one or more packages;
 
 * the upload is a package to be published or documentation for a published
   package. Pass the flag `--candidate` to upload a
   [package candidate](http://hackage.haskell.org/upload#candidates) or
-  documentation for a package candidate.
+  documentation for a package candidate; and
+
+* the command prompts to save the user's Hackage username and password in a
+  local file. Pass the flag `--no-save-hackage-creds` to avoid the prompt.
 
 At least one `ITEM` must be specified. For example, if the current working
 directory is a package directory:
