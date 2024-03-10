@@ -329,11 +329,17 @@ of packages.
 If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
 this flag is ignored.
 
+!!! note
+
+    This feature is not supported by versions of Cabal (the library) provided
+    with GHC 9.2.8 and earlier.
+
 !!! warning
 
-    Due to a bug, if there is more than one executable (including test suites
-    and benchmarks) in a project package or more than one project package with
-    an executable, the Haddock documentation for the `Main` module of one
+    Due to a bug in versions of Cabal (the library) provided with GHC 9.8.2 and
+    earlier, if there is more than one executable (including test suites and
+    benchmarks) in a project package or more than one project package with an
+    executable, the Haddock documentation for the `Main` module of one
     executable will overwrite the Haddock documentation for others.
 
 ### `--[no-]haddock-executables` flag
@@ -346,11 +352,17 @@ of packages.
 If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
 this flag is ignored.
 
+!!! note
+
+    This feature is not supported by versions of Cabal (the library) provided
+    with GHC 9.2.8 and earlier.
+
 !!! warning
 
-    Due to a bug, if there is more than one executable (including test suites
-    and benchmarks) in a project package or more than one project package with
-    an executable, the Haddock documentation for the `Main` module of one
+    Due to a bug in versions of Cabal (the library) provided with GHC 9.8.2 and
+    earlier, if there is more than one executable (including test suites and
+    benchmarks) in a project package or more than one project package with an
+    executable, the Haddock documentation for the `Main` module of one
     executable will overwrite the Haddock documentation for others.
 
 ### `--[no-]haddock-internal` flag
@@ -372,11 +384,17 @@ of packages.
 If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
 this flag is ignored.
 
+!!! note
+
+    This feature is not supported by versions of Cabal (the library) provided
+    with GHC 9.2.8 and earlier.
+
 !!! warning
 
-    Due to a bug, if there is more than one executable (including test suites
-    and benchmarks) in a project package or more than one project package with
-    an executable, the Haddock documentation for the `Main` module of one
+    Due to a bug in versions of Cabal (the library) provided with GHC 9.8.2 and
+    earlier, if there is more than one executable (including test suites and
+    benchmarks) in a project package or more than one project package with an
+    executable, the Haddock documentation for the `Main` module of one
     executable will overwrite the Haddock documentation for others.
 
 ### `--[no-]keep-going` flag
