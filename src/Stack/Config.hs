@@ -446,8 +446,7 @@ configFromConfigMonoid
       resolve configMonoid.defaultInitSnapshot
     let defaultTemplate = getFirst configMonoid.defaultTemplate
         dumpLogs = fromFirst DumpWarningLogs configMonoid.dumpLogs
-        saveHackageCreds =
-          fromFirst True configMonoid.saveHackageCreds
+        saveHackageCreds = configMonoid.saveHackageCreds
         hackageBaseUrl =
           fromFirst Constants.hackageBaseUrl configMonoid.hackageBaseUrl
         hideSourcePaths = fromFirstTrue configMonoid.hideSourcePaths

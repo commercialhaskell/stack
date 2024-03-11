@@ -166,7 +166,7 @@ data ConfigMonoid = ConfigMonoid
    -- installation.
   , dumpLogs           :: !(First DumpLogs)
     -- ^ See 'configDumpLogs'
-  , saveHackageCreds   :: !(First Bool)
+  , saveHackageCreds   :: !FirstTrue
     -- ^ See 'configSaveHackageCreds'
   , hackageBaseUrl     :: !(First Text)
     -- ^ See 'configHackageBaseUrl'
@@ -316,7 +316,7 @@ parseConfigMonoidObject rootDir obj = do
   defaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
   allowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
   dumpLogs <- First <$> obj ..:? configMonoidDumpLogsName
-  saveHackageCreds <- First <$> obj ..:? configMonoidSaveHackageCredsName
+  saveHackageCreds <- FirstTrue <$> obj ..:? configMonoidSaveHackageCredsName
   hackageBaseUrl <- First <$> obj ..:? configMonoidHackageBaseUrlName
   configMonoidColorWhenUS <- obj ..:? configMonoidColorWhenUSName
   configMonoidColorWhenGB <- obj ..:? configMonoidColorWhenGBName

@@ -34,6 +34,8 @@ Other enhancements:
   documentation for executables, test suites and benchmarks. Due to a bug in
   Cabal (the library), Stack will ignore the flags with a warning for GHC
   versions before 9.4.
+* Add flag `--[no-]save-hackage-creds` to Stack's `upload` command, which takes
+  precedence over the existing `save-hackage-creds` configuration option.
 
 Bug fixes:
 

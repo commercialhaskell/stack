@@ -56,10 +56,11 @@ import           Stack.SDist
                    , getSDistTarball, readLocalPackage
                    )
 import           Stack.Types.Config ( Config (..), configL, stackRootL )
+import qualified Stack.Types.Config as Config
 import           Stack.Types.EnvConfig ( HasEnvConfig )
 import           Stack.Types.Package ( LocalPackage (..), packageIdentifier )
-import           Stack.Types.PvpBounds (PvpBounds)
 import           Stack.Types.Runner ( Runner )
+import           Stack.Types.UploadOpts ( UploadOpts (..), UploadVariant (..) )
 import           System.Directory
                    ( createDirectoryIfMissing, doesDirectoryExist, doesFileExist
                    , removeFile, renameFile
@@ -159,94 +160,78 @@ data UploadContent
   | DocArchive
     -- ^ Content in the form of an archive file of package documentation.
 
--- | Type representing variants for uploading to Hackage.
-data UploadVariant
-  = Publishing
-    -- ^ Publish the package/a published package.
-  | Candidate
-    -- ^ Create a package candidate/a package candidate.
-
--- | Type representing command line options for the @stack upload@ command.
-data UploadOpts = UploadOpts
-  { itemsToWorkWith :: ![String]
-    -- ^ The items to work with.
-  , documentation :: !Bool
-    -- ^ Uploading documentation for packages?
-  , pvpBounds :: !(Maybe PvpBounds)
-  , check :: !Bool
-  , buildPackage :: !Bool
-  , tarPath :: !(Maybe FilePath)
-  , uploadVariant :: !UploadVariant
-  }
-
 -- | Function underlying the @stack upload@ command. Upload to Hackage.
 uploadCmd :: UploadOpts -> RIO Runner ()
-uploadCmd (UploadOpts [] uoDocumentation _ _ _ _ _) = do
+uploadCmd (UploadOpts [] uoDocumentation _ _ _ _ _ _) = do
   let subject = if uoDocumentation
         then "documentation for the current package,"
         else "the current package,"
   prettyThrowIO $ NoItemSpecified subject
-uploadCmd uo = withConfig YesReexec $ withDefaultEnvConfig $ do
-  config <- view configL
-  let hackageUrl = T.unpack config.hackageBaseUrl
-  if uo.documentation
-    then do
-      (dirs, invalid) <-
-        liftIO $ partitionM doesDirectoryExist uo.itemsToWorkWith
-      unless (null invalid) $
-        prettyThrowIO $ PackageDirectoryInvalid invalid
-      (failed, items) <- partitionEithers <$> forM dirs checkDocsTarball
-      unless (null failed) $ do
-        prettyThrowIO $ DocsTarballInvalid failed
-      getCreds <- memoizeRef $ loadAuth config
-      forM_ items $ \(pkgIdName, tarGzFile) -> do
-        creds <- runMemoized getCreds
-        upload
-          hackageUrl
-          creds
-          DocArchive
-          (Just pkgIdName)
-          (toFilePath tarGzFile)
-          uo.uploadVariant
-    else do
-      (files, nonFiles) <-
-        liftIO $ partitionM doesFileExist uo.itemsToWorkWith
-      (dirs, invalid) <- liftIO $ partitionM doesDirectoryExist nonFiles
-      unless (null invalid) $ do
-        prettyThrowIO $ ItemsInvalid invalid
-      let sdistOpts = SDistOpts
-            uo.itemsToWorkWith
-            uo.pvpBounds
-            uo.check
-            uo.buildPackage
-            uo.tarPath
-      getCreds <- memoizeRef $ loadAuth config
-      mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
-      forM_ files $ \file -> do
-        tarFile <- resolveFile' file
-        creds <- runMemoized getCreds
-        upload
-          hackageUrl
-          creds
-          SDist
-          Nothing
-          (toFilePath tarFile)
-          uo.uploadVariant
-      forM_ dirs $ \dir -> do
-        pkgDir <- resolveDir' dir
-        (tarName, tarBytes, mcabalRevision) <-
-          getSDistTarball uo.pvpBounds pkgDir
-        checkSDistTarball' sdistOpts tarName tarBytes
-        creds <- runMemoized getCreds
-        uploadBytes
-          hackageUrl
-          creds
-          SDist
-          Nothing
-          tarName
-          uo.uploadVariant
-          tarBytes
-        forM_ mcabalRevision $ uncurry $ uploadRevision hackageUrl creds
+uploadCmd uo = do
+  let setSaveHackageCreds config =
+        let saveHackageCreds = config.saveHackageCreds <> uo.saveHackageCreds
+        in config { Config.saveHackageCreds = saveHackageCreds }
+  withConfig YesReexec $ local setSaveHackageCreds $ withDefaultEnvConfig $ do
+    config <- view configL
+    let hackageUrl = T.unpack config.hackageBaseUrl
+    if uo.documentation
+      then do
+        (dirs, invalid) <-
+          liftIO $ partitionM doesDirectoryExist uo.itemsToWorkWith
+        unless (null invalid) $
+          prettyThrowIO $ PackageDirectoryInvalid invalid
+        (failed, items) <- partitionEithers <$> forM dirs checkDocsTarball
+        unless (null failed) $ do
+          prettyThrowIO $ DocsTarballInvalid failed
+        getCreds <- memoizeRef $ loadAuth config
+        forM_ items $ \(pkgIdName, tarGzFile) -> do
+          creds <- runMemoized getCreds
+          upload
+            hackageUrl
+            creds
+            DocArchive
+            (Just pkgIdName)
+            (toFilePath tarGzFile)
+            uo.uploadVariant
+      else do
+        (files, nonFiles) <-
+          liftIO $ partitionM doesFileExist uo.itemsToWorkWith
+        (dirs, invalid) <- liftIO $ partitionM doesDirectoryExist nonFiles
+        unless (null invalid) $ do
+          prettyThrowIO $ ItemsInvalid invalid
+        let sdistOpts = SDistOpts
+              uo.itemsToWorkWith
+              uo.pvpBounds
+              uo.check
+              uo.buildPackage
+              uo.tarPath
+        getCreds <- memoizeRef $ loadAuth config
+        mapM_ (resolveFile' >=> checkSDistTarball sdistOpts) files
+        forM_ files $ \file -> do
+          tarFile <- resolveFile' file
+          creds <- runMemoized getCreds
+          upload
+            hackageUrl
+            creds
+            SDist
+            Nothing
+            (toFilePath tarFile)
+            uo.uploadVariant
+        forM_ dirs $ \dir -> do
+          pkgDir <- resolveDir' dir
+          (tarName, tarBytes, mcabalRevision) <-
+            getSDistTarball uo.pvpBounds pkgDir
+          checkSDistTarball' sdistOpts tarName tarBytes
+          creds <- runMemoized getCreds
+          uploadBytes
+            hackageUrl
+            creds
+            SDist
+            Nothing
+            tarName
+            uo.uploadVariant
+            tarBytes
+          forM_ mcabalRevision $ uncurry $ uploadRevision hackageUrl creds
    where
     checkDocsTarball ::
          HasEnvConfig env
@@ -336,7 +321,7 @@ loadUserAndPassword config = do
       -- didn't do this
       writeFilePrivate fp $ lazyByteString lbs
 
-      unless config.saveHackageCreds $ do
+      unless (fromFirstTrue config.saveHackageCreds) $ do
         prettyWarnL
           [ flow "You've set"
           , style Shell "save-hackage-creds"
@@ -357,7 +342,7 @@ loadUserAndPassword config = do
           , credsFile = fp
           }
 
-    when config.saveHackageCreds $ do
+    when (fromFirstTrue config.saveHackageCreds) $ do
       shouldSave <- promptBool $ T.pack $
         "Save Hackage credentials to file at " ++ fp ++ " [y/n]? "
       prettyNoteL
