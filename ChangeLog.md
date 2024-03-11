@@ -8,7 +8,11 @@ Release notes:
 
 Major changes:
 
-Behavior changes:
+Behaviour changes:
+
+* Following the handover of the Stackage project to the Haskell Foundation, the
+  default value of the `urls` key is
+  `latest-snapshot: https://stackage-haddock.haskell.org/snapshots.json`.
 
 Other enhancements:
 
