@@ -21,6 +21,8 @@ Behaviour changes:
 * Following the handover of the Stackage project to the Haskell Foundation, the
   default value of the `urls` key is
   `latest-snapshot: https://stackage-haddock.haskell.org/snapshots.json`.
+* Remove hidden flag `--skip-intermediate-deps`, effectively deprecated since
+  Stack 1.3.0, from `ghci` and `repl` commands.
 
 Other enhancements:
 

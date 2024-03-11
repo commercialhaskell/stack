@@ -158,7 +158,6 @@ data GhciOpts = GhciOpts
   , additionalPackages :: ![String]
   , mainIs             :: !(Maybe Text)
   , loadLocalDeps      :: !Bool
-  , skipIntermediate   :: !Bool
   , hidePackages       :: !(Maybe Bool)
   , noBuild            :: !Bool
   , onlyMain           :: !Bool
@@ -429,8 +428,7 @@ getAllLocalTargets ghciOpts targets0 mainIsTargets localMap = do
   -- Figure out
   let extraLoadDeps =
         getExtraLoadDeps ghciOpts.loadLocalDeps localMap directlyWanted
-  if    (ghciOpts.skipIntermediate && not ghciOpts.loadLocalDeps)
-     || null extraLoadDeps
+  if null extraLoadDeps
     then pure directlyWanted
     else do
       let extraList' =
@@ -452,12 +450,6 @@ getAllLocalTargets ghciOpts targets0 mainIsTargets localMap = do
                       \your targets:"
                : extraList
                )
-          <> line
-          <> fillSep
-               [ "(Use"
-               , style Shell "--skip-intermediate-deps"
-               , flow "to omit these.)"
-               ]
       pure (directlyWanted ++ extraLoadDeps)
 
 getAllNonLocalTargets ::
