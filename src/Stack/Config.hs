@@ -308,8 +308,19 @@ configFromConfigMonoid
               )
       in  maybe (pure relDirStackWork) (liftIO . parseStackWorkEnv) mstackWorkEnv
     let workDir = fromFirst configWorkDir0 configMonoid.workDir
+        -- The history of the URL below is as follows:
+        --
+        -- * Before Stack 1.3.0 it was
+        --   https://www.stackage.org/download/snapshots.json.
+        -- * From Stack 1.3.0 to 2.15.3 it was
+        --   https://s3.amazonaws.com/haddock.stackage.org/snapshots.json. The
+        --   change was made because S3 was expected to have greater uptime than
+        --   stackage.org.
+        -- * In early 2024, the Stackage project was handed over to the Haskell
+        --   Foundation. Following that handover, the URL below was considered
+        --   the most reliable source of the file in question.
         latestSnapshot = fromFirst
-          "https://s3.amazonaws.com/haddock.stackage.org/snapshots.json"
+          "https://stackage-haddock.haskell.org/snapshots.json"
           configMonoid.latestSnapshot
         clConnectionCount = fromFirst 8 configMonoid.connectionCount
         hideTHLoading = fromFirstTrue configMonoid.hideTHLoading
