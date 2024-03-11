@@ -18,6 +18,9 @@ Behaviour changes:
   a `resolver` key.
 * After installing GHC or another tool, Stack deletes the archive file which
   provided the tool.
+* Following the handover of the Stackage project to the Haskell Foundation, the
+  default value of the `urls` key is
+  `latest-snapshot: https://stackage-haddock.haskell.org/snapshots.json`.
 
 Other enhancements:
 
