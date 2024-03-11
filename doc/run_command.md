@@ -13,6 +13,13 @@ argument and it is recognised as an executable target then that is built.
 Otherwise, the project's first executable is built. If the project has no
 executables Stack reports no executables found as an error.
 
+!!! note
+
+    To identify a project's first executable, Stack lists the executable
+    components, in order, for each package, listed in order. For example:
+
+    `packageA:a-exe` < `packageA:b-exe` < `packageB:a-exe` < `packageB:b-exe`
+
 Everything after `--` on the command line is interpreted as a command line
 argument to be passed to what is run, other than a first argument recognised as
 an executable target.
