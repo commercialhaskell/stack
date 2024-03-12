@@ -286,7 +286,7 @@ language pragmas, and so on.
 In this guide, we'll discuss the bare minimum necessary to understand how to
 modify a `package.yaml` file. You can see a full list of the available options
 at the [Hpack documentation](https://github.com/sol/hpack#quick-reference). The
-Cabal User Guide the definitive reference for the
+Cabal User Guide is the definitive reference for the
 [Cabal file format](https://cabal.readthedocs.io/en/stable/cabal-package.html).
 
 ### The location of GHC
