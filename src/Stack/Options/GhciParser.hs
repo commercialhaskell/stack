@@ -80,12 +80,6 @@ ghciOptsParser = GhciOpts
         (  long "load-local-deps"
         <> help "Load all local dependencies of your targets."
         )
-  -- TODO: deprecate this? probably useless.
-  <*> switch
-        (  long "skip-intermediate-deps"
-        <> help "Skip loading intermediate target dependencies."
-        <> internal
-        )
   <*> optional (boolFlagsNoDefault
         "package-hiding"
         "package hiding"
