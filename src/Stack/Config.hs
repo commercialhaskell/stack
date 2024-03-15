@@ -53,6 +53,7 @@ import           Distribution.System
                    ( Arch (..), OS (..), Platform (..), buildPlatform )
 import qualified Distribution.Text ( simpleParse )
 import           Distribution.Version ( simplifyVersionRange )
+import qualified Hpack
 import           GHC.Conc ( getNumProcessors )
 import           Network.HTTP.StackClient
                    ( httpJSON, parseUrlThrow, getResponseBody )
@@ -534,6 +535,9 @@ configFromConfigMonoid
     let stackDeveloperMode = fromFirst
           stackDeveloperModeDefault
           configMonoid.stackDeveloperMode
+        hpackForce = if fromFirstFalse configMonoid.hpackForce
+          then Hpack.Force
+          else Hpack.NoForce
         casa =
           if fromFirstTrue configMonoid.casaOpts.enable
             then
@@ -560,6 +564,7 @@ configFromConfigMonoid
           pantryRoot
           pic
           (maybe HpackBundled HpackCommand $ getFirst configMonoid.overrideHpack)
+          hpackForce
           clConnectionCount
           casa
           snapLoc

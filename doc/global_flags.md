@@ -85,6 +85,16 @@ Pass the option `--ghc-variant <variant>` to specify the relevant GHC variant.
 For further information, see the documentation for the corresponding non-project
 specific configuration [option](yaml_configuration.md#ghc-variant).
 
+## `--[no-]hpack-force` flag
+
+:octicons-tag-24: UNRELEASED
+
+Default: Disabled
+
+By default, Hpack 0.20.0 or later will decline to overwrite a Cabal file that
+has been modified manually. Pass the flag `--hpack-force` to allow Hpack to
+overwrite such a Cabal file.
+
 ## `--hpack-numeric-version` flag
 
 Pass the flag `--hpack-numeric-version` to cause Stack to report the numeric

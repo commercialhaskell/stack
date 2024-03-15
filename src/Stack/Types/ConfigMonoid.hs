@@ -111,10 +111,12 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See: 'configExtraLibDirs'
   , customPreprocessorExts :: ![Text]
     -- ^ See: 'configCustomPreprocessorExts'
-  , overrideGccPath    :: !(First (Path Abs File))
+  , overrideGccPath     :: !(First (Path Abs File))
     -- ^ Allow users to override the path to gcc
   , overrideHpack       :: !(First FilePath)
     -- ^ Use Hpack executable (overrides bundled Hpack)
+  , hpackForce          :: !FirstFalse
+    -- ^ Pass --force to Hpack to always overwrite Cabal file
   , concurrentTests     :: !(First Bool)
     -- ^ See: 'configConcurrentTests'
   , localBinPath        :: !(First FilePath)
@@ -264,6 +266,7 @@ parseConfigMonoidObject rootDir obj = do
     obj ..:?  configMonoidCustomPreprocessorExtsName ..!= []
   overrideGccPath <- First <$> obj ..:? configMonoidOverrideGccPathName
   overrideHpack <- First <$> obj ..:? configMonoidOverrideHpackName
+  hpackForce <- FirstFalse <$> obj ..:? configMonoidHpackForceName
   concurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
   localBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
   templates <- obj ..:? "templates"
@@ -371,6 +374,7 @@ parseConfigMonoidObject rootDir obj = do
     , customPreprocessorExts
     , overrideGccPath
     , overrideHpack
+    , hpackForce
     , concurrentTests
     , localBinPath
     , templateParameters
@@ -489,6 +493,9 @@ configMonoidOverrideGccPathName = "with-gcc"
 
 configMonoidOverrideHpackName :: Text
 configMonoidOverrideHpackName = "with-hpack"
+
+configMonoidHpackForceName :: Text
+configMonoidHpackForceName = "hpack-force"
 
 configMonoidConcurrentTestsName :: Text
 configMonoidConcurrentTestsName = "concurrent-tests"

@@ -1220,6 +1220,19 @@ Default: `true`
 Strip out the "Loading ..." lines from GHC build output, produced when using
 Template Haskell.
 
+### hpack-force
+
+:octicons-tag-24: UNRELEASED
+
+Default: `false`
+
+Command line equivalent (takes precedence):
+[`--hpack-force` option](global_flags.md#-no-hpack-force-flag)
+
+Whether or not to allow Hpack to overwrite a Cabal file that has been modified
+manually. By default, Hpack 0.20.0 or later will decline to overwrite such a
+Cabal file.
+
 ### ignore-revision-mismatch
 
 (Removed 1.11)
