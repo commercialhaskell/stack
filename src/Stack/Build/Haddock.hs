@@ -47,9 +47,9 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import           Stack.Types.BuildOpts ( BuildOpts (..), HaddockOpts (..) )
-import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..), BuildSubset (BSOnlyDependencies, BSOnlySnapshot) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
-import           Stack.Types.EnvConfig ( HasEnvConfig (..) )
+import           Stack.Types.EnvConfig ( EnvConfig (..), HasEnvConfig (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.InterfaceOpt ( InterfaceOpt (..) )
 import           Stack.Types.Package
@@ -397,14 +397,17 @@ generateLocalHaddockForHackageArchives ::
      (HasEnvConfig env, HasTerm env)
   => [LocalPackage]
   -> RIO env ()
-generateLocalHaddockForHackageArchives =
-  mapM_
-    ( \lp ->
-        let pkg = lp.package
-            pkgId = PackageIdentifier pkg.name pkg.version
-            pkgDir = parent lp.cabalFP
-        in generateLocalHaddockForHackageArchive pkgDir pkgId
-    )
+generateLocalHaddockForHackageArchives lps = do
+  buildSubset <- view $ envConfigL . to (.buildOptsCLI.buildSubset)
+  let localsExcluded =
+        buildSubset == BSOnlyDependencies || buildSubset == BSOnlySnapshot
+  unless localsExcluded $
+    forM_ lps $ \lp ->
+      let pkg = lp.package
+          pkgId = PackageIdentifier pkg.name pkg.version
+          pkgDir = parent lp.cabalFP
+      in  when lp.wanted $
+            generateLocalHaddockForHackageArchive pkgDir pkgId
 
 -- | Generate an archive file containing local Haddock documentation for
 -- Hackage, in a form accepted by Hackage.
@@ -428,15 +431,22 @@ generateLocalHaddockForHackageArchive pkgDir pkgId = do
         )
       tarGzFile = distDir </> tarGzFileName
       docDir = distDir </> docDirSuffix </> htmlDirSuffix
-  createTarGzFile tarGzFile docDir nameRelDir
-  prettyInfo $
-       fillSep
-         [ flow "Archive of Haddock documentation for Hackage for"
-         , style Current (fromString pkgIdName)
-         , flow "created at:"
-         ]
-    <> line
-    <> pretty tarGzFile
+  tarGzFileCreated <- createTarGzFile tarGzFile docDir nameRelDir
+  if tarGzFileCreated
+    then
+      prettyInfo $
+           fillSep
+             [ flow "Archive of Haddock documentation for Hackage for"
+             , style Current (fromString pkgIdName)
+             , flow "created at:"
+             ]
+        <> line
+        <> pretty tarGzFile
+    else
+      prettyWarnL
+        [ flow "No Haddock documentation for Hackage available for"
+        , style Error (fromString pkgIdName) <> "."
+        ]
 
 createTarGzFile ::
      Path Abs File
@@ -445,10 +455,19 @@ createTarGzFile ::
      -- ^ Base directory
   -> Path Rel Dir
      -- ^ Directory to archive, relative to base directory
-  -> RIO env ()
+  -> RIO env Bool
 createTarGzFile tar base dir = do
-   entries <- liftIO $ Tar.pack base' [dir']
-   BL.writeFile tar' $ GZip.compress $ Tar.write entries
+  dirExists <- doesDirExist $ base </> dir
+  if dirExists
+    then do
+      entries <- liftIO $ Tar.pack base' [dir']
+      if null entries
+        then pure False
+        else do
+          ensureDir $ parent tar
+          BL.writeFile tar' $ GZip.compress $ Tar.write entries
+          pure True
+    else pure False
  where
   base' = fromAbsDir base
   dir' = fromRelDir dir
