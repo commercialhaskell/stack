@@ -23,6 +23,9 @@ Behaviour changes:
   `latest-snapshot: https://stackage-haddock.haskell.org/snapshots.json`.
 * Remove hidden flag `--skip-intermediate-deps`, effectively deprecated since
   Stack 1.3.0, from `ghci` and `repl` commands.
+* The `haddock --haddock-for-hackage` command only seeks to create an archive of
+  the `<package_version>-docs` directory for build targets and if flags
+  excluding the building of project packages are not set.
 
 Other enhancements:
 

@@ -315,13 +315,17 @@ Set the flag to build project packages with flags to generate Haddock
 documentation suitable for upload to Hackage. The form of the Haddock
 documentation generated for other packages is unaffected.
 
-For each project package:
+For each project package, the generated Haddock documentation files are in
+directory `doc\html\<package_version>-docs\`, relative to Stack's dist work
+directory (see [`stack path --dist-dir`](path_command.md)).
 
-* the generated Haddock documentation files are in directory
-  `doc\html\<package_version>-docs\`, relative to Stack's dist work directory
-  (see [`stack path --dist-dir`](path_command.md)); and
-* an archive of the `<package_version>-docs` directory and its contents is in
-  Stack's dist work directory.
+Unless flags are set to exclude the building of project packages, for each
+targetted project package with generated documentation, an archive of the
+`<package_version>-docs` directory and its contents is in Stack's dist work
+directory. (The flags that exclude project packages are
+[`--only-dependencies`](#-only-dependencies-flag),
+[`--dependencies-only`](#-dependencies-only-flag), or
+[`--only-snapshot`](#-only-snapshot-flag).)
 
 If the flag is set:
 
