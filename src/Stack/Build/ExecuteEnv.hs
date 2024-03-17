@@ -793,20 +793,30 @@ withSingleContext
               -- explicitly requested in the stack.yaml file.
               Nothing -> do
                 warnCustomNoDeps
-                pure $
-                     cabalPackageArg
+                let packageDBArgs' = case package.buildType of
+                      -- The Configure build type is very similar to Simple. As
+                      -- such, Stack builds the setup executable in much the
+                      -- same way as it would in the case of Simple.
+                      C.Configure ->
+                        [ "-hide-all-packages"
+                        , "-package base"
+                        ]
                       -- NOTE: This is different from packageDBArgs above in
                       -- that it does not include the local database and does
                       -- not pass in the -hide-all-packages argument
-                  <> (  "-clear-package-db"
-                     :  "-global-package-db"
-                     :  map
-                          (("-package-db=" ++) . toFilePathNoTrailingSep)
-                          ee.baseConfigOpts.extraDBs
-                     <> [    "-package-db="
-                          <> toFilePathNoTrailingSep ee.baseConfigOpts.snapDB
-                        ]
-                     )
+                      _ ->
+                           map
+                             (("-package-db=" ++) . toFilePathNoTrailingSep)
+                             ee.baseConfigOpts.extraDBs
+                        <> [    "-package-db="
+                             <> toFilePathNoTrailingSep ee.baseConfigOpts.snapDB
+                           ]
+                pure $
+                     [ "-clear-package-db"
+                     , "-global-package-db"
+                     ]
+                  <> packageDBArgs'
+                  <> cabalPackageArg
 
           setupArgs =
             ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args

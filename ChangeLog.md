@@ -26,6 +26,8 @@ Behaviour changes:
 * The `haddock --haddock-for-hackage` command only seeks to create an archive of
   the `<package_version>-docs` directory for build targets and if flags
   excluding the building of project packages are not set.
+* Stack no longer includes the snapshot package database when compiling the
+  setup executable for a package with `build-type: Configure`.
 
 Other enhancements:
 
