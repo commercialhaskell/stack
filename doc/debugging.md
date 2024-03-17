@@ -2,10 +2,18 @@
 
 # Debugging
 
-To profile a component of the current project, simply pass the `--profile`
-flag to `stack`. The `--profile` flag turns on the `--enable-library-profiling`
-and `--enable-executable-profiling` Cabal options _and_ passes the `+RTS -p`
-runtime options to any testsuites and benchmarks.
+To profile a component of the current project, pass the
+[`--profile` flag](build_command.md#-profile-flag) to `stack build`.
+
+The flag:
+
+* for project packages, turns on the Cabal flag
+  [`--enable-profiling`](https://cabal.readthedocs.io/en/stable/setup-commands.html#cmdoption-runhaskell-Setup.hs-configure-enable-profiling);
+* turns on the Cabal flag
+  [`--enable-library-profiling`](https://cabal.readthedocs.io/en/stable/setup-commands.html#cmdoption-runhaskell-Setup.hs-configure-enable-library-profiling); and
+* passes GHC's
+  [`+RTS -p` runtime options](https://downloads.haskell.org/ghc/latest/docs/users_guide/profiling.html#rts-flag--p)
+  to any test suites and benchmarks.
 
 For example the following command will build the `my-tests` testsuite with
 profiling options and create a `my-tests.prof` file in the current directory
@@ -24,13 +32,29 @@ stack exec --profile -- my-exe +RTS -p
 ~~~
 
 For more fine-grained control of compilation options there are the
-`--library-profiling` and `--executable-profiling` flags which will turn on the
-`--enable-library-profiling` and `--enable-executable-profiling` Cabal
-options respectively. Custom GHC options can be passed in with
-`--ghc-options "more options here"`.
+[`--library-profiling` flag](build_command.md#-no-library-profiling-flag) and
+[`--executable-profiling` flag](build_command.md#-no-executable-profiling-flag).
+
+The `--library-profiling` flag:
+
+* turns on the Cabal flag
+  [`--enable-library-profiling`](https://cabal.readthedocs.io/en/stable/setup-commands.html#cmdoption-runhaskell-Setup.hs-configure-enable-library-profiling); and
+* passes GHC's
+  [`+RTS -p` runtime options](https://downloads.haskell.org/ghc/latest/docs/users_guide/profiling.html#rts-flag--p)
+  to any test suites and benchmarks.
+
+The `--executable-profiling` flag:
+
+* for project packages, turns on the Cabal flag
+  [`--enable-profiling`](https://cabal.readthedocs.io/en/stable/setup-commands.html#cmdoption-runhaskell-Setup.hs-configure-enable-profiling);
+* turns on the Cabal flag
+  [`--enable-library-profiling`](https://cabal.readthedocs.io/en/stable/setup-commands.html#cmdoption-runhaskell-Setup.hs-configure-enable-library-profiling); and
+* passes GHC's
+  [`+RTS -p` runtime options](https://downloads.haskell.org/ghc/latest/docs/users_guide/profiling.html#rts-flag--p)
+  to any test suites and benchmarks.
 
 To enable compilation with profiling options by default you can add the
-following snippet to your `stack.yaml` or `~/.stack/config.yaml`:
+following to a project-level or global YAML configuration file:
 
 ~~~yaml
 build:
