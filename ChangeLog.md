@@ -13,6 +13,8 @@ Behaviour changes:
 * Following the handover of the Stackage project to the Haskell Foundation, the
   default value of the `urls` key is
   `latest-snapshot: https://stackage-haddock.haskell.org/snapshots.json`.
+* Stack no longer includes the snapshot package database when compiling the
+  setup executable for a package with `build-type: Configure`.
 
 Other enhancements:
 
