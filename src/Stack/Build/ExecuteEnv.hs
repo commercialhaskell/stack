@@ -126,6 +126,7 @@ data ExecuteEnv = ExecuteEnv
   , setupExe       :: !(Maybe (Path Abs File))
     -- ^ Compiled version of eeSetupHs
   , cabalPkgVer    :: !Version
+    -- ^ The version of the compiler's Cabal boot package.
   , totalWanted    :: !Int
   , locals         :: ![LocalPackage]
   , globalDB       :: !(Path Abs Dir)
@@ -141,6 +142,15 @@ data ExecuteEnv = ExecuteEnv
   , pathEnvVar :: !Text
     -- ^ Value of the PATH environment variable
   }
+
+-- | Type representing setup executable circumstances.
+data SetupExe
+  = SimpleSetupExe !(Path Abs File)
+    -- ^ The build type is Simple and there is a path to an existing setup
+    -- executable.
+  | OtherSetupHs !(Path Abs File)
+    -- ^ Other circumstances with a path to the source code for the setup
+    -- executable.
 
 buildSetupArgs :: [String]
 buildSetupArgs =
@@ -669,13 +679,13 @@ withSingleContext
           }
     menv <- liftIO $ config.processContextSettings envSettings
     distRelativeDir' <- distRelativeDir
-    esetupexehs <-
+    setupexehs <-
       -- Avoid broken Setup.hs files causing problems for simple build
       -- types, see:
       -- https://github.com/commercialhaskell/stack/issues/370
       case (package.buildType, ee.setupExe) of
-        (C.Simple, Just setupExe) -> pure $ Left setupExe
-        _ -> liftIO $ Right <$> getSetupHs pkgDir
+        (C.Simple, Just setupExe) -> pure $ SimpleSetupExe setupExe
+        _ -> liftIO $ OtherSetupHs <$> getSetupHs pkgDir
     inner $ \keepOutputOpen stripTHLoading args -> do
       let cabalPackageArg
             -- Omit cabal package dependency when building
@@ -717,11 +727,10 @@ withSingleContext
           getPackageArgs :: Path Abs Dir -> RIO env [String]
           getPackageArgs setupDir =
             case package.setupDeps of
-              -- The package is using the Cabal custom-setup
-              -- configuration introduced in Cabal 1.24. In
-              -- this case, the package is providing an
-              -- explicit list of dependencies, and we
-              -- should simply use all of them.
+              -- The package is using the Cabal custom-setup configuration
+              -- introduced in Cabal 1.24. In this case, the package is
+              -- providing an explicit list of dependencies, and we should
+              -- simply use all of them.
               Just customSetupDeps -> do
                 unless (Map.member (mkPackageName "Cabal") customSetupDeps) $
                   prettyWarnL
@@ -789,13 +798,13 @@ withSingleContext
                       -- NOTE: This is different from packageDBArgs above in
                       -- that it does not include the local database and does
                       -- not pass in the -hide-all-packages argument
-                  ++ ( "-clear-package-db"
-                     : "-global-package-db"
-                     : map
-                         (("-package-db=" ++) . toFilePathNoTrailingSep)
-                         ee.baseConfigOpts.extraDBs
-                     ++ [    "-package-db="
-                          ++ toFilePathNoTrailingSep ee.baseConfigOpts.snapDB
+                  <> (  "-clear-package-db"
+                     :  "-global-package-db"
+                     :  map
+                          (("-package-db=" ++) . toFilePathNoTrailingSep)
+                          ee.baseConfigOpts.extraDBs
+                     <> [    "-package-db="
+                          <> toFilePathNoTrailingSep ee.baseConfigOpts.snapDB
                         ]
                      )
 
@@ -861,9 +870,9 @@ withSingleContext
               ExcludeTHLoading -> ConvertPathsToAbsolute
               KeepTHLoading    -> KeepPathsAsIs
 
-      exeName <- case esetupexehs of
-        Left setupExe -> pure setupExe
-        Right setuphs -> do
+      exeName <- case setupexehs of
+        SimpleSetupExe setupExe -> pure setupExe
+        OtherSetupHs setuphs -> do
           distDir <- distDirFromDir pkgDir
           let setupDir = distDir </> relDirSetup
               outputFile = setupDir </> relFileSetupLower
@@ -875,32 +884,32 @@ withSingleContext
               compilerPath <- view $ compilerPathsL . to (.compiler)
               packageArgs <- getPackageArgs setupDir
               runExe compilerPath $
-                [ "--make"
-                , "-odir", toFilePathNoTrailingSep setupDir
-                , "-hidir", toFilePathNoTrailingSep setupDir
-                , "-i", "-i."
-                ] ++ packageArgs ++
-                [ toFilePath setuphs
-                , toFilePath ee.setupShimHs
-                , "-main-is"
-                , "StackSetupShim.mainOverride"
-                , "-o", toFilePath outputFile
-                , "-threaded"
-                ] ++
-
+                   [ "--make"
+                   , "-odir", toFilePathNoTrailingSep setupDir
+                   , "-hidir", toFilePathNoTrailingSep setupDir
+                   , "-i", "-i."
+                   ]
+                <> packageArgs
+                <> [ toFilePath setuphs
+                   , toFilePath ee.setupShimHs
+                   , "-main-is"
+                   , "StackSetupShim.mainOverride"
+                   , "-o", toFilePath outputFile
+                   , "-threaded"
+                   ]
                 -- Apply GHC options
                 -- https://github.com/commercialhaskell/stack/issues/4526
-                map
-                  T.unpack
-                  ( Map.findWithDefault
-                      []
-                      AGOEverything
-                      config.ghcOptionsByCat
-                  ++ case config.applyGhcOptions of
-                       AGOEverything -> ee.buildOptsCLI.ghcOptions
-                       AGOTargets -> []
-                       AGOLocals -> []
-                  )
+                <> map
+                     T.unpack
+                     (  Map.findWithDefault
+                          []
+                          AGOEverything
+                          config.ghcOptionsByCat
+                     <> case config.applyGhcOptions of
+                          AGOEverything -> ee.buildOptsCLI.ghcOptions
+                          AGOTargets -> []
+                          AGOLocals -> []
+                     )
 
               liftIO $ atomicModifyIORef' ee.customBuilt $
                 \oldCustomBuilt ->
