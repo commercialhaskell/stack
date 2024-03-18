@@ -47,6 +47,11 @@ The arguments specifying directories and the `--ignore-subdirs`, `--force` and
 `--omit-packages` flags are as for the [`stack init` command](init_command.md).
 These arguments are ignored if the `--no-init` flag is passed.
 
+If a snapshot is specified at the command line and the project is initialised
+for use with Stack, `stack new` will try to use it. For further information, see
+the documentation for the [`--snapshot`](global_flags.md#-snapshot-option) and
+[`--resolver`](global_flags.md#-resolver-option) options.
+
 ## Project templates
 
 A project template file can be located in a repository named `stack-templates`
