@@ -373,7 +373,8 @@ commandLineHandler currentDir progName isInterpreter =
   init = addCommand'
     "init"
     "Create Stack project configuration from Cabal or Hpack package \
-    \specifications."
+    \specifications. If a snapshot is specified at the command line, the \
+    \command will try to use it."
     initCmd
     initOptsParser
 
@@ -399,9 +400,10 @@ commandLineHandler currentDir progName isInterpreter =
   new = addCommand'
     "new"
     "Create a new project from a template. Run 'stack templates' to see \
-    \available templates. Will also initialise if there is no stack.yaml \
-    \file. Note: you can also specify a local file or a remote URL as a \
-    \template; or force an initialisation."
+    \available templates. A local file or a remote URL can be specified as a \
+    \template. Will initialise if there is no stack.yaml file. Initialisation \
+    \may be forced. If a snapshot is specified at the command line, \
+    \initialisation will try to use it."
     newCmd
     newOptsParser
 
