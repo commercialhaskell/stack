@@ -70,7 +70,7 @@ in a compressed archive ('tarball') in the `.tar.gz` format.
 
 For further information about how to create such an archive file, see the
 documentation for the
-[`stack haddock --haddock-for-hackage`](build_command.md#-no-haddock-for-haddock-flag)
+[`stack haddock --haddock-for-hackage`](build_command.md#-no-haddock-for-hackage-flag)
 command.
 
 If `ITEM` is a relative path to a package directory,
