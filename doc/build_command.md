@@ -374,7 +374,7 @@ Default: Disabled
 Set the flag to enable building Haddock documentation for benchmark components
 of packages.
 
-If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
 
 !!! note
@@ -397,7 +397,7 @@ Default: Disabled
 Set the flag to enable building Haddock documentation for executable components
 of packages.
 
-If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
 
 !!! note
@@ -429,7 +429,7 @@ Default: Disabled
 Set the flag to enable building Haddock documentation for test suite components
 of packages.
 
-If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
 
 !!! note
