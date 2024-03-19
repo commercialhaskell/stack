@@ -38,3 +38,29 @@ Specified GHC RTS flags and options are separated by spaces. Items can be
 unquoted (if they do not contain space or `"` characters) or quoted (`""`).
 Quoted items can include 'escaped' characters, escaped with an initial `\`
 character.
+
+Account may need to be taken of the shell's approach to the processing of
+command line arguments. For example, to pass `'a single quoted string'`:
+
+=== "Unix-like (Bash or Zsh)"
+
+    In Bash, or Zsh (if `RC_QUOTES` option not set):
+
+    `stack exec <command> -- \''a single quoted string'\'`
+
+    Outside of single quotes, `\'` escapes a single quote. The content of single
+    quotes is taken literally, but cannot contain a single quote.
+
+    In Zsh (if `RC_QUOTES` option set):
+
+    `stack exec <command> -- '''a single quoted string'''`
+
+    The content of single quotes is taken literally. Within single quotes, `''`
+    escapes a single quote.
+
+=== "Windows (PowerShell)"
+
+    `stack exec <command> -- '''a single quoted string'''`
+
+    The content of single quotes is taken literally. Within single quotes, `''`
+    escapes a single quote.
