@@ -303,7 +303,7 @@ Default: Enabled (if building Haddock documnentation)
 
 Unset the flag to disable building Haddock documentation for dependencies.
 
-### `--[no-]haddock-for-haddock` flag
+### `--[no-]haddock-for-hackage` flag
 
 :octicons-beaker-24: Experimental
 
@@ -364,7 +364,7 @@ Default: Enabled
 
 Unset the flag to disable building building hyperlinked source for Haddock.
 
-If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
 
 ### `--[no-]haddock-benchmarks` flag
@@ -419,7 +419,7 @@ Default: Disabled
 
 Set the flag to enable building Haddock documentation for internal modules.
 
-If the [`--haddock-for-hackage`](#-no-haddock-for-haddock-flag) flag is passed,
+If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
 
 ### `--[no-]haddock-tests` flag
