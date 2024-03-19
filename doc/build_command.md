@@ -472,14 +472,68 @@ Specified arguments are separated by spaces. Arguments can be unquoted (if they
 do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
 include 'escaped' characters, escaped with an initial `\` character.
 
+Account may need to be taken of the shell's approach to the processing of
+command line arguments. For example, to pass `'a single quoted string'`:
+
+=== "Unix-like (Bash or Zsh)"
+
+    In Bash, or Zsh (if `RC_QUOTES` option not set):
+
+    `stack bench --benchmark-arguments \"\''a single quoted string'\'\"`
+
+    Outside of single quotes, `\"` escapes a double quote and `\'` escapes a
+    single quote. The content of single quotes is taken literally, but cannot
+    contain a single quote.
+
+    In Zsh (if `RC_QUOTES` option set):
+
+    `stack bench --benchmark-arguments '"''a single quoted string''"'`
+
+    The content of single quotes is taken literally. Within single quotes, `''`
+    escapes a single quote.
+
+=== "Windows (PowerShell)"
+
+    `stack bench --benchmark-arguments '"''a single quoted string''"'`
+
+    The content of single quotes is taken literally. Within single quotes, `''`
+    escapes a single quote.
+
 ### `--exec` option
 
-`stack build --exec "<command> [<argument(s)>]"` will run the specified command
+`stack build --exec '<command> [<argument(s)>]'` will run the specified command
 after a successful build.
 
 Specified arguments are separated by spaces. Arguments can be unquoted (if they
 do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
 include 'escaped' characters, escaped with an initial `\` character.
+
+Account may need to be taken of the shell's approach to the processing of
+command line arguments. For example, to pass `'a single quoted string'`:
+
+=== "Unix-like (Bash or Zsh)"
+
+    In Bash, or Zsh (if `RC_QUOTES` option not set):
+
+    `stack build --exec '<command> '\"\''a single quoted string'\'\"`
+
+    Outside of single quotes, `\"` escapes a double quote and `\'` escapes a
+    single quote. The content of single quotes is taken literally, but cannot
+    contain a single quote.
+
+    In Zsh (if `RC_QUOTES` option set):
+
+    `stack build --exec '<command> "''a single quoted string''"'`
+
+    The content of single quotes is taken literally. Within single quotes, `''`
+    escapes a single quote.
+
+=== "Windows (PowerShell)"
+
+    `stack build --exec '<command> "''a single quoted string''"'`
+
+    The content of single quotes is taken literally. Within single quotes, `''`
+    escapes a single quote.
 
 ### `--test-arguments`, `--ta` option
 
@@ -490,6 +544,33 @@ specified multiple times.
 Specified arguments are separated by spaces. Arguments can be unquoted (if they
 do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
 include 'escaped' characters, escaped with an initial `\` character.
+
+Account may need to be taken of the shell's approach to the processing of
+command line arguments. For example, to pass `'a single quoted string'`:
+
+=== "Unix-like (Bash or Zsh)"
+
+    In Bash, or Zsh (if `RC_QUOTES` option not set):
+
+    `stack test --test-arguments \"\''a single quoted string'\'\"`
+
+    Outside of single quotes, `\"` escapes a double quote and `\'` escapes a
+    single quote. The content of single quotes is taken literally, but cannot
+    contain a single quote.
+
+    In Zsh (if `RC_QUOTES` option set):
+
+    `stack bench --benchmark-arguments '"''a single quoted string''"'`
+
+    The content of single quotes is taken literally. Within single quotes, `''`
+    escapes a single quote.
+
+=== "Windows (PowerShell)"
+
+    `stack test --test-arguments '"''a single quoted string''"'`
+
+    The content of single quotes is taken literally. Within single quotes, `''`
+    escapes a single quote.
 
 ## Flags affecting GHC's behaviour
 
