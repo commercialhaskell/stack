@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased changes
+##  v2.15.4.1 (release candidate) - 2024-03-20
 
 Release notes:
 
-**Changes since v2.15.3:**
+* This release fixes potential bugs.
 
-Major changes:
+**Changes since v2.15.3:**
 
 Behaviour changes:
 
@@ -15,10 +15,6 @@ Behaviour changes:
   `latest-snapshot: https://stackage-haddock.haskell.org/snapshots.json`.
 * Stack no longer includes the snapshot package database when compiling the
   setup executable for a package with `build-type: Configure`.
-
-Other enhancements:
-
-Bug fixes:
 
 ## v2.15.3 - 2024-03-07
 
