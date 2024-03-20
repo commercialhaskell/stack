@@ -202,6 +202,7 @@ jobs:
       run: |
         set -ex
 
+        which stack
         # As of 19 August 2023, the self-hosted runner comes with Stack 2.11.1,
         # but it is not on the PATH. Logging the version for information.
         /usr/local/bin/stack --version
