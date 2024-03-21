@@ -9,20 +9,22 @@ stack run [-- ARGUMENT(S) (e.g. stack run -- file.txt)]
 ~~~
 
 `stack run` builds a project executable and runs it. If the command has a first
-argument and it is recognised as an executable target then that is built.
-Otherwise, the project's first executable is built. If the project has no
-executables Stack reports no executables found as an error.
+argument and it is recognised as the name of an executable component of a
+project package then that is built. Otherwise, the project's first executable is
+built. If the project has no executables Stack reports no executables found as
+an error.
 
 !!! note
 
-    To identify a project's first executable, Stack lists the executable
-    components, in order, for each package, listed in order. For example:
+    To identify a project's first executable, and search for the name of an
+    executable component, Stack lists the executable components, in order, for
+    each package, listed in order. For example:
 
     `packageA:a-exe` < `packageA:b-exe` < `packageB:a-exe` < `packageB:b-exe`
 
 Everything after `--` on the command line is interpreted as a command line
 argument to be passed to what is run, other than a first argument recognised as
-an executable target.
+the name of an executable component of a project package.
 
 By default:
 
