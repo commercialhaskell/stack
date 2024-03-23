@@ -159,68 +159,50 @@ jobs:
         name: ${{ runner.os }}-${{ runner.arch }}
         path: _release/stack-*
 
-  configuration:
-    name: Check for self-hosted runners
-    runs-on: ubuntu-latest
-    env:
-      CAN_SIGN: ${{ secrets.RELEASE_SIGNING_KEY != '' }}
-    outputs:
-      arm64-runner: ${{ steps.runners.outputs.arm64 }}
-      can-sign: ${{ env.CAN_SIGN }}
-      test-arm64: ${{ steps.runners.outputs.test-arm64 }}
-    steps:
-    - name: Check for hosted runners
-      id: runners
-      shell: bash
-      env:
-        SELF_HOSTED_RUNNERS: ${{ secrets.SELF_HOSTED_RUNNERS || (github.repository_owner == 'commercialhaskell' && 'arm64') }}
-      run: |
-        echo "runners=$SELF_HOSTED_RUNNERS" >> $GITHUB_OUTPUT
-        if echo "$SELF_HOSTED_RUNNERS" | grep -q 'arm64'; then
-          echo "arm64=['self-hosted', 'linux', 'ARM64']" >> $GITHUB_OUTPUT
-          echo "test-arm64=true" >> $GITHUB_OUTPUT
-        else
-          echo "arm64='ubuntu-latest'" >> $GITHUB_OUTPUT
-          echo "test-arm64=false" >> $GITHUB_OUTPUT
-        fi
-
   linux-arm64:
     name: Linux ARM64
-    runs-on: ${{ fromJSON(needs.configuration.outputs.arm64-runner) }}
-    needs: configuration
+    runs-on: macos-14
     steps:
-    - name: Skipping ARM64
-      if: needs.configuration.outputs.test-arm64 == 'false'
-      shell: bash
-      run: |
-        echo '::notice title=ARM64 skipped::To build ARM64, a self-hosted runner needs to be configured and the SELF_HOSTED_RUNNERS secret must contain arm64'
     - name: Clone project
-      if: needs.configuration.outputs.test-arm64 == 'true'
       uses: actions/checkout@v4
     - name: Install deps
       shell: bash
       run: |
         set -ex
 
-        # As of 19 August 2023, the self-hosted runner comes with Stack 2.11.1,
-        # but it is not on the PATH. Logging the version for information.
+        # macos-14 does not include Docker as at 2024-03-23.
+        brew install docker
+
+        # macos-14 does not include Haskell tools as at 2024-03-23.
+        curl -sSL https://get.haskellstack.org/ | sh
+
+        # Copying this from Linux/x86_64
+        mkdir -p ~/.stack
+        touch ~/.stack/config.yaml
+        cat > ~/.stack/config.yaml <<EOF
+        extra-include-dirs:
+        - /usr/include
+        extra-lib-dirs:
+        - /lib
+        - /usr/lib
+        EOF
+
+        # Logging the version for information.
         /usr/local/bin/stack --version
 
         set +ex
     - name: Build bindist
-      if: needs.configuration.outputs.test-arm64 == 'true'
       shell: bash
       run: |
         # Stack's project-level configuration (stack.yaml) specifies the
         # multi-architecture (including Linux/Aarch64) Docker image published by
-        # Oliver Benz (@benz0li, on GitHub). That image comes with Stack 2.11.1.
+        # Oliver Benz (@benz0li, on GitHub). That image comes with Stack 2.15.3.
         # (Note that the online documentation for '--docker-stack-exe image'
         # specifies that the host Stack and image Stack must have the same
         # version number.)
         /usr/local/bin/stack etc/scripts/release.hs build --alpine --build-args --docker-stack-exe=image
 
     - name: Upload bindist
-      if: needs.configuration.outputs.test-arm64 == 'true'
       uses: actions/upload-artifact@v4
       with:
         name: Linux-ARM64
@@ -231,7 +213,6 @@ jobs:
     permissions:
       contents: write
     needs:
-    - configuration
     - integration-tests
     - linux-arm64
     runs-on: ubuntu-latest
@@ -258,13 +239,11 @@ jobs:
         name: Windows-X64
         path: _release
     - name: Download Linux/AArch64 artifact
-      if: needs.configuration.outputs.test-arm64 == 'true'
       uses: actions/download-artifact@v4
       with:
         name: Linux-ARM64
         path: _release
     - name: Hash and sign assets
-      if: needs.configuration.outputs.can-sign == 'true'
       shell: bash
       env:
         RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
