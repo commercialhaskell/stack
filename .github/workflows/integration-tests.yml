@@ -173,7 +173,19 @@ jobs:
         # macos-14 does not include Docker as at 2024-03-23.
         brew install docker
 
-        ## Logging the version for information
+        # The following is based on this blog post:
+        # https://dev.to/elliotalexander/how-to-use-docker-without-docker-desktop-on-macos-217m
+
+        # Install colima
+        # https://github.com/abiosoft/colima
+        brew install colima
+
+        # Start colima
+        # colimna's guide states that you can use the docker client on macOS
+        # after colima start with no additional setup.
+        colima start
+
+        # Logging the version for information
         docker version
 
         # macos-14 does not include Haskell tools as at 2024-03-23.
