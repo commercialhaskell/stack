@@ -173,6 +173,9 @@ jobs:
         # macos-14 does not include Docker as at 2024-03-23.
         brew install docker
 
+        ## Logging the version for information
+        docker version
+
         # macos-14 does not include Haskell tools as at 2024-03-23.
         curl -sSL https://get.haskellstack.org/ | sh
 
