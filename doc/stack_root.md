@@ -166,9 +166,18 @@ it, Stack will recreate the contents of the directory.
 
 ### `pantry\hackage` directory
 
-This contains the package index. If the contents of the directory are deleted,
-and Stack needs to consult the package index, Stack will seek to download the
-latest package index.
+This contains a local cache of the package index. If the contents of the
+directory are deleted, and Stack needs to consult the package index, Stack will
+seek to download the latest package index.
+
+!!! info
+
+    Stack depends on package `pantry` which, in turn, depends on package
+    `hackage-security`. The latter handles the local cache of the package index.
+    The type `CacheLayout` represents the location of the files that are cached.
+    `pantry` uses `cabalCacheLayout :: CacheLayout`, the layout that Cabal (the
+    tool) uses. That is what specifies the names of the files used to cache the
+    package index, including `00-index.tar` and `00-index.tar.gz`.
 
 ### `pantry` directory
 
