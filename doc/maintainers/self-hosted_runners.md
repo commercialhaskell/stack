@@ -52,3 +52,7 @@ virtual machine.
 
 However, this solution can be applied locally and the build outputs for the
 Linux/AArch64 platform added manually to the result of the GitHub workflow.
+
+The experimental Haskell script `etc/scripts/release-linux-aarch64.hs` is
+intended to facilitate the building of statically-linked Stack executables for
+Linux/AArch64 on macOS/AArch64.
