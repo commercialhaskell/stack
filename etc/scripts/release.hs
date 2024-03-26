@@ -72,6 +72,7 @@ main = shakeArgsWith
     let gAllowDirty = False
         Platform arch _ = buildPlatform
         gArch = arch
+        gTargetOS = platformOS
         gBinarySuffix = ""
         gTestHaddocks = True
         gProjectRoot = "" -- Set to real value below.
@@ -88,6 +89,7 @@ main = shakeArgsWith
             , gProjectRoot
             , gHomeDir
             , gArch
+            , gTargetOS
             , gBinarySuffix
             , gTestHaddocks
             , gBuildArgs
@@ -140,6 +142,7 @@ options =
                    , "--system-ghc"
                    , "--no-install-ghc"
                    ]
+            , gTargetOS = Linux
             }
       )
       "Build a statically-linked binary using an Alpine Linux Docker image."
@@ -355,7 +358,7 @@ rules global args = do
   releaseBinDir = releaseDir </> "bin"
 
   binaryPkgFileNames =
-    case platformOS of
+    case global.gTargetOS of
       Windows ->
         [ binaryExeFileName
         , binaryPkgZipFileName
@@ -376,7 +379,7 @@ rules global args = do
     , "-"
     , stackVersionStr global
     , "-"
-    , display platformOS
+    , display global.gTargetOS
     , "-"
     , display global.gArch
     , if null global.gBinarySuffix then "" else "-" ++ global.gBinarySuffix
@@ -492,6 +495,7 @@ data Global = Global
   , gProjectRoot :: !FilePath
   , gHomeDir :: !FilePath
   , gArch :: !Arch
+  , gTargetOS :: !OS
   , gBinarySuffix :: !String
   , gTestHaddocks :: !Bool
   , gBuildArgs :: [String]
