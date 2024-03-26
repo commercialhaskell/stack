@@ -76,6 +76,7 @@ main = shakeArgsWith
         gTestHaddocks = True
         gProjectRoot = "" -- Set to real value below.
         gBuildArgs = ["--flag", "stack:-developer-mode"]
+        gStackArgs = []
         gCertificateName = Nothing
         global0 = foldl
           (flip id)
@@ -90,6 +91,7 @@ main = shakeArgsWith
             , gBinarySuffix
             , gTestHaddocks
             , gBuildArgs
+            , gStackArgs
             , gCertificateName
             }
           flags
@@ -131,13 +133,22 @@ options =
           g { gBuildArgs =
                    gBuildArgs g
                 ++ [ "--flag=stack:static"
-                   , "--docker"
+                   ]
+            , gStackArgs =
+                   gStackArgs g
+                ++ [ "--docker"
                    , "--system-ghc"
                    , "--no-install-ghc"
                    ]
             }
       )
-      "Build a statically linked binary using an Alpine Docker image."
+      "Build a statically-linked binary using an Alpine Linux Docker image."
+  , Option "" [stackArgsOptName]
+      ( ReqArg
+          (\v -> Right $ \g -> g{gStackArgs = gStackArgs g ++ words v})
+          "\"ARG1 ARG2 ...\""
+      )
+      "Additional arguments to pass to 'stack'."
   , Option "" [buildArgsOptName]
       ( ReqArg
           (\v -> Right $ \g -> g{gBuildArgs = gBuildArgs g ++ words v})
@@ -234,7 +245,13 @@ rules global args = do
   releaseDir </> binaryExeFileName %> \out -> do
     need [releaseBinDir </> binaryName </> stackExeFileName]
     (Stdout versionOut) <-
-      cmd (releaseBinDir </> binaryName </> stackExeFileName) "--version"
+      cmd
+        stackProgName -- Use the platform's Stack
+        global.gStackArgs -- Possibly to set up a Docker container
+        ["exec"] -- To execute the target Stack and get its version info
+        (releaseBinDir </> binaryName </> stackExeFileName)
+        ["--"]
+        ["--version"]
     when (not global.gAllowDirty && "dirty" `isInfixOf` lower versionOut) $
       error
         (  "Refusing continue because 'stack --version' reports dirty.  Use --"
@@ -295,10 +312,12 @@ rules global args = do
   releaseBinDir </> binaryName </> stackExeFileName %> \out -> do
     alwaysRerun
     actionOnException
-      ( cmd stackProgName
+      ( cmd
+          stackProgName -- Use the platform's Stack
           (stackArgs global)
           ["--local-bin-path=" ++ takeDirectory out]
-          "install"
+          global.gStackArgs -- Possibly to set up a Docker container
+          "install" -- To build and install Stack to that local bin path
           global.gBuildArgs
           integrationTestFlagArgs
           "--pedantic"
@@ -438,6 +457,10 @@ binaryVariantOptName = "binary-variant"
 noTestHaddocksOptName :: String
 noTestHaddocksOptName = "no-test-haddocks"
 
+-- | @--stack-args@ command-line option name.
+stackArgsOptName :: String
+stackArgsOptName = "stack-args"
+
 -- | @--build-args@ command-line option name.
 buildArgsOptName :: String
 buildArgsOptName = "build-args"
@@ -472,6 +495,7 @@ data Global = Global
   , gBinarySuffix :: !String
   , gTestHaddocks :: !Bool
   , gBuildArgs :: [String]
+  , gStackArgs :: [String]
   , gCertificateName :: !(Maybe String)
   }
   deriving Show
