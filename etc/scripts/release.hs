@@ -28,7 +28,7 @@ import           Development.Shake
                    ( Action, Change (..), pattern Chatty, CmdOption (..), Rules
                    , ShakeOptions (..), Stdout (..), (%>), actionOnException
                    , alwaysRerun, cmd, command_, copyFileChanged
-                   , getDirectoryFiles, liftIO, need, phony, putNormal
+                   , getDirectoryFiles, liftIO, need, phony, putInfo
                    , removeFilesAfter, shakeArgsWith, shakeOptions, want
                    )
 import           Development.Shake.FilePath
@@ -202,7 +202,7 @@ rules global args = do
 
   releaseDir </> binaryPkgZipFileName %> \out -> do
     stageFiles <- getBinaryPkgStageFiles
-    putNormal $ "zip " ++ out
+    putInfo $ "zip " ++ out
     liftIO $ do
       entries <- forM stageFiles $ \stageFile -> do
         Zip.readEntry
