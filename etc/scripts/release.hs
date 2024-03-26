@@ -78,6 +78,7 @@ main = shakeArgsWith
         gProjectRoot = "" -- Set to real value below.
         gBuildArgs = ["--flag", "stack:-developer-mode"]
         gStackArgs = []
+        gCheckStackArgs = []
         gCertificateName = Nothing
         global0 = foldl
           (flip id)
@@ -94,6 +95,7 @@ main = shakeArgsWith
             , gTestHaddocks
             , gBuildArgs
             , gStackArgs
+            , gCheckStackArgs
             , gCertificateName
             }
           flags
@@ -140,6 +142,11 @@ options =
                    gStackArgs g
                 ++ [ "--docker"
                    , "--system-ghc"
+                   , "--no-install-ghc"
+                   ]
+            , gCheckStackArgs =
+                   gCheckStackArgs g
+                ++ [ "--system-ghc"
                    , "--no-install-ghc"
                    ]
             , gTargetOS = Linux
@@ -194,21 +201,25 @@ rules global args = do
         , show dirty
         ]
     () <- cmd
+      stackProgName -- Use the platform's Stack
+      global.gStackArgs -- Possibly to set up a Docker container
+      ["exec"] -- To execute the target Stack
       [ global.gProjectRoot </> releaseBinDir </> binaryName </>
           stackExeFileName
       ]
+      ["--"]
       (stackArgs global)
-      ["build"]
+      global.gCheckStackArgs -- Possible use the Docker image's GHC
+      ["build"] -- To build the target Stack (Stack builds Stack)
       global.gBuildArgs
       integrationTestFlagArgs
       ["--pedantic", "--no-haddock-deps", "--test"]
       ["--haddock" | global.gTestHaddocks]
       ["stack"]
     () <- cmd
-      [ global.gProjectRoot </> releaseBinDir </> binaryName </>
-          stackExeFileName
-      ]
-      ["exec"]
+      stackProgName -- Use the platform's Stack
+      global.gStackArgs -- Possibiy to set up a Docker container
+      ["exec"] -- To execute the target stack-integration-test
       [ global.gProjectRoot </> releaseBinDir </> binaryName </>
           "stack-integration-test"
       ]
@@ -500,6 +511,7 @@ data Global = Global
   , gTestHaddocks :: !Bool
   , gBuildArgs :: [String]
   , gStackArgs :: [String]
+  , gCheckStackArgs :: [String]
   , gCertificateName :: !(Maybe String)
   }
   deriving Show
