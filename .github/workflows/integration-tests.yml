@@ -217,7 +217,7 @@ jobs:
         # (Note that the online documentation for '--docker-stack-exe image'
         # specifies that the host Stack and image Stack must have the same
         # version number.)
-        /usr/local/bin/stack etc/scripts/release.hs build --alpine --build-args --docker-stack-exe=image
+        /usr/local/bin/stack etc/scripts/release.hs build --alpine --stack-args --docker-stack-exe=image
 
     - name: Upload bindist
       if: needs.configuration.outputs.test-arm64 == 'true'
