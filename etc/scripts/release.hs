@@ -11,6 +11,25 @@
 -- directly. As GHC 9.6.4 boot packages Cabal and Cabal-syntax expose modules
 -- with the same names, the language extension PackageImports is required.
 
+-- EXPERIMENTAL
+
+-- release.hs can be run on macOS/AArch64, using a Docker image for
+-- Alpine Linux/AArch64, in order to create a statically-linked Linux/AArch64
+-- version of Stack:
+--
+-- Install pre-requisites:
+--
+-- > brew install docker
+-- > brew install colima
+--
+-- Start colima (with sufficient memory for Stack's integration tests) and run
+-- script:
+--
+-- > colima start --memory 4 # The default 2 GB is likely insufficient
+-- > stack etc/scripts/release.hs check --alpine --stack-args=--docker-stack-exe=image
+-- > stack etc/scripts/release.hs build --alpine --stack-args=--docker-stack-exe=image
+-- > colima stop
+
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE PackageImports      #-}
 {-# LANGUAGE PatternSynonyms     #-}
