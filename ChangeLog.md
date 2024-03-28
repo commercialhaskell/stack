@@ -49,6 +49,10 @@ Other enhancements:
 * In YAML configuration files, the `global-hints-location` key is introduced to
   allow the location of the global hints YAML specification file to be
   specified.
+* By default, Hpack 0.20.0 or later will decline to overwrite a Cabal file that
+  was modified manually. In YAML configuration files, the `hpack-force` key is
+  introduced to allow Hpack to overwrite such a Cabal file. The corresponding
+  `--hpack-force` flag is also added.
 
 Bug fixes:
 

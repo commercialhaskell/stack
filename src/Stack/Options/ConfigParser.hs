@@ -35,7 +35,7 @@ configOptsParser :: FilePath -> GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser currentDir hide0 =
   ( \stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch
      ghcVariant ghcBuild jobs extraIncludeDirs extraLibDirs
-     customPreprocessorExts overrideGccPath overrideHpack skipGHCCheck skipMsys
+     customPreprocessorExts overrideGccPath overrideHpack hpackForce skipGHCCheck skipMsys
      localBinPath setupInfoLocations modifyCodePage allowDifferentUser dumpLogs
      colorWhen snapshotLocation noRunCompile -> mempty
        { stackRoot
@@ -55,6 +55,7 @@ configOptsParser currentDir hide0 =
        , customPreprocessorExts
        , overrideGccPath
        , overrideHpack
+       , hpackForce
        , skipMsys
        , localBinPath
        , setupInfoLocations
@@ -146,6 +147,10 @@ configOptsParser currentDir hide0 =
         <> help "Use HPACK executable (overrides bundled Hpack)."
         <> hide
         ))
+  <*> firstBoolFlagsFalse
+        "hpack-force"
+        "overwriting of Cabal files that have been modified manually."
+        hide
   <*> firstBoolFlagsFalse
         "skip-ghc-check"
         "skipping the GHC version and architecture check."
