@@ -505,7 +505,7 @@ also known as *snapshots*. We mentioned the LTS snapshots, and you can get quite
 a bit of information about it at
 [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate value (`lts-22.7`, as is currently the latest LTS)
+* The appropriate value (`lts-22.13`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -523,16 +523,16 @@ towards by default as well).
 
 ## Snapshots and changing your compiler version
 
-Let's explore package sets a bit further. Instead of `lts-22.7`, let's change
+Let's explore package sets a bit further. Instead of `lts-22.13`, let's change
 our `stack.yaml` file to use the
 [latest nightly](https://www.stackage.org/nightly). Right now, this is currently
-2023-09-24 - please see the snapshot from the link above to get the latest.
+2024-03-20 - please see the snapshot from the link above to get the latest.
 
 Then, commanding `stack build` again will produce:
 
 ~~~text
 stack build
-# Downloaded nightly-2023-09-24 build plan.
+# Downloaded nightly-2024-03-20 build plan.
 # build output ...
 ~~~
 
@@ -540,8 +540,8 @@ We can also change snapshots on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example, command:
 
 ~~~text
-stack --snapshot lts-20.26 build
-# Downloaded lts-20.26 build plan.
+stack --snapshot lts-21.25 build
+# Downloaded lts-21.25 build plan.
 # build output ...
 ~~~
 

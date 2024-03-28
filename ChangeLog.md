@@ -4,9 +4,7 @@
 
 Release notes:
 
-** Changes since v2.15.3:**
-
-Major changes:
+**Changes since v2.15.5:**
 
 Behaviour changes:
 
@@ -18,16 +16,11 @@ Behaviour changes:
   a `resolver` key.
 * After installing GHC or another tool, Stack deletes the archive file which
   provided the tool.
-* Following the handover of the Stackage project to the Haskell Foundation, the
-  default value of the `urls` key is
-  `latest-snapshot: https://stackage-haddock.haskell.org/snapshots.json`.
 * Remove hidden flag `--skip-intermediate-deps`, effectively deprecated since
   Stack 1.3.0, from `ghci` and `repl` commands.
 * The `haddock --haddock-for-hackage` command only seeks to create an archive of
   the `<package_version>-docs` directory for build targets and if flags
   excluding the building of project packages are not set.
-* Stack no longer includes the snapshot package database when compiling the
-  setup executable for a package with `build-type: Configure`.
 
 Other enhancements:
 
@@ -58,6 +51,22 @@ Bug fixes:
 
 * The `config set snapshot` and `config set resolver` commands now respect the
   presence of a synoymous key.
+
+## v2.15.5 - 2024-03-28
+
+Release notes:
+
+* This release fixes potential bugs.
+
+**Changes since v2.15.3:**
+
+Behaviour changes:
+
+* Following the handover of the Stackage project to the Haskell Foundation, the
+  default value of the `urls` key is
+  `latest-snapshot: https://stackage-haddock.haskell.org/snapshots.json`.
+* Stack no longer includes the snapshot package database when compiling the
+  setup executable for a package with `build-type: Configure`.
 
 ## v2.15.3 - 2024-03-07
 
