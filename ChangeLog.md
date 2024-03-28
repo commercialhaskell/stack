@@ -1,6 +1,6 @@
 # Changelog
 
-##  v2.15.4.1 (release candidate) - 2024-03-20
+##  v2.15.5 - 2024-03-28
 
 Release notes:
 
