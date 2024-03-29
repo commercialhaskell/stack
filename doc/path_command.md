@@ -41,3 +41,9 @@ Pass the following flags for information about specific files or locations:
 |--snapshot-install-root|The root directory for snapshot installation.         |
 |--snapshot-pkg-db      |The snapshot package database.                        |
 |--stack-root           |The Stack root.                                       |
+
+The command also accepts flags and options of the
+[`stack build`](build_command.md#flags-affecting-ghcs-behaviour) command that
+affect the location of the local project installation directory, such as
+`--profile` and `--no-strip`. For further information, see the documentation of
+the [project Stack work directory](stack_work.md#project-stack-work-directory).

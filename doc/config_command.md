@@ -34,6 +34,12 @@ for a Stack environment. Flags modify the script that is output:
 * `--[no-]keep-ghc-rts` (disabled by default) keep/discard any `GHCRTS`
   environment variable
 
+The command also accepts flags and options of the
+[`stack build`](build_command.md#flags-affecting-ghcs-behaviour) command that
+affect the location of the local project installation directory, such as
+`--profile` and `--no-strip`. For further information, see the documentation of
+the [project Stack work directory](stack_work.md#project-stack-work-directory).
+
 ## The `stack config set` commands
 
 ~~~text

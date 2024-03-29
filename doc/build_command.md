@@ -654,12 +654,18 @@ Default: Disabled
 Set the flag to enable executable profiling for TARGETs and all its
 dependencies.
 
+The flag affects the location of the local project installation directory. See
+the [`stack path --local-install-root`](path_command.md) command.
+
 ### `--[no-]executable-stripping` flag
 
 Default: Enabled
 
 Unset the flag to disable executable stripping for TARGETs and all its
 dependencies.
+
+The flag may affect the location of the local project installation directory.
+See the [`stack path --local-install-root`](path_command.md) command.
 
 ### `--fast` flag
 
@@ -709,12 +715,18 @@ Default: Disabled
 
 Set the flag to enable library profiling for TARGETs and all its dependencies.
 
+The flag affects the location of the local project installation directory. See
+the [`stack path --local-install-root`](path_command.md) command.
+
 ### `--[no-]library-stripping` flag
 
 Default: Enabled
 
 Unset the flag to disable library stripping for TARGETs and all its
 dependencies.
+
+The flag may affect the location of the local project installation directory.
+See the [`stack path --local-install-root`](path_command.md) command.
 
 ### `--pedantic` flag
 
@@ -726,6 +738,9 @@ Pass the flag to build your project with the GHC options `-Wall` and `-Werror`.
 
 Pass the flag to enable profiling in libraries, executables, etc. for all
 expressions, and generate a profiling report in tests or benchmarks.
+
+The flag affects the location of the local project installation directory. See
+the [`stack path --local-install-root`](path_command.md) command.
 
 ### `--[no-]split-objs` flag
 
@@ -750,10 +765,16 @@ executables, etc. for all expressions, producing larger executables but allowing
 the use of standard debuggers/profiling tools/other utilities that use debugging
 symbols.
 
+The flag affects the location of the local project installation directory. See
+the [`stack path --local-install-root`](path_command.md) command.
+
 ### `--trace` flag
 
 Pass the flag to enable profiling in libraries, executables, etc. for all
 expressions, and generate a backtrace on exception.
+
+The flag affects the location of the local project installation directory. See
+the [`stack path --local-install-root`](path_command.md) command.
 
 ## Flags affecting other tools' behaviour
 
