@@ -1426,8 +1426,6 @@ package-index:
     ignore-expiry: true
 ~~~
 
-Takes precedence over the `package-indices` key, which is deprecated.
-
 Specify the package index. The index must use the
 [Hackage Security](https://hackage.haskell.org/package/hackage-security) format.
 This setting is most useful for providing a mirror of the official Hackage
@@ -1456,43 +1454,11 @@ the package index for it to be considered valid.
 `ignore-expiry` specifies whether or not the expiration of timestamps should be
 ignored.
 
-### package-indices
-
-[:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
-
-Deprecated in favour of [`package-index`](#package-index), which takes
-precedence if present.
-
-Default:
-
-~~~yaml
-package-indices:
-- download-prefix: https://hackage.haskell.org/
-  hackage-security:
-    keyids:
-    - 0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d
-    - 1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42
-    - 2c6c3627bd6c982990239487f1abd02e08a02e6cf16edb105a8012d444d870c3
-    - 51f0161b906011b52c6613376b1ae937670da69322113a246a09f807c62f6921
-    - fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
-    key-threshold: 3
-    ignore-expiry: true
-~~~
-
 !!! info
 
     Before Stack 2.1.3, the default for `ignore-expiry` was `false`. For more
     information, see
     [issue #4928](https://github.com/commercialhaskell/stack/issues/4928).
-
-!!! info
-
-    Before Stack 2.1.1, Stack had a different approach to `package-indices`. For
-    more information, see
-    [issue #4137](https://github.com/commercialhaskell/stack/issues/4137).
-
-Specify the package index. For further information, see the `package-index`
-[documentation](#package-index).
 
 ### pvp-bounds
 

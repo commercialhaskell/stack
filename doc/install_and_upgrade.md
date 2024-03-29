@@ -575,7 +575,7 @@ setup-info-locations:
 urls:
   latest-snapshot: http://mirrors.tuna.tsinghua.edu.cn/stackage/snapshots.json
 
-package-indices:
+package-index:
 - download-prefix: http://mirrors.tuna.tsinghua.edu.cn/hackage/
 ~~~
 

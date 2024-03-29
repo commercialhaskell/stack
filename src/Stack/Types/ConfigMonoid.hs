@@ -17,8 +17,7 @@ module Stack.Types.ConfigMonoid
 import           Data.Aeson.Types ( Object, Value )
 import           Data.Aeson.WarningParser
                    ( WarningParser, WithJSONWarnings, (..:?), (..!=)
-                   , jsonSubWarnings, jsonSubWarningsT, jsonSubWarningsTT
-                   , withObjectWarnings
+                   , jsonSubWarnings, jsonSubWarningsT, withObjectWarnings
                    )
 import           Casa.Client ( CasaRepoPrefix )
 import           Control.Monad.Writer ( tell )
@@ -79,8 +78,6 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See: 'configLatestSnapshot'
   , packageIndex     :: !(First PackageIndexConfig)
     -- ^ See: 'withPantryConfig'
-  , packageIndices     :: !(First [PackageIndexConfig])
-    -- ^ Deprecated in favour of package-index
   , systemGHC          :: !(First Bool)
     -- ^ See: 'configSystemGHC'
   , installGHC          :: !FirstTrue
@@ -242,8 +239,6 @@ parseConfigMonoidObject rootDir obj = do
 
   packageIndex <-
     First <$> jsonSubWarningsT (obj ..:?  configMonoidPackageIndexName)
-  packageIndices <-
-    First <$> jsonSubWarningsTT (obj ..:?  configMonoidPackageIndicesName)
   systemGHC <- First <$> obj ..:? configMonoidSystemGHCName
   installGHC <- FirstTrue <$> obj ..:? configMonoidInstallGHCName
   skipGHCCheck <- FirstFalse <$> obj ..:? configMonoidSkipGHCCheckName
@@ -356,7 +351,6 @@ parseConfigMonoidObject rootDir obj = do
     , prefixTimestamps
     , latestSnapshot
     , packageIndex
-    , packageIndices
     , systemGHC
     , installGHC
     , skipGHCCheck
@@ -444,10 +438,6 @@ configMonoidUrlsName = "urls"
 
 configMonoidPackageIndexName :: Text
 configMonoidPackageIndexName = "package-index"
-
--- Deprecated in favour of package-index
-configMonoidPackageIndicesName :: Text
-configMonoidPackageIndicesName = "package-indices"
 
 configMonoidSystemGHCName :: Text
 configMonoidSystemGHCName = "system-ghc"

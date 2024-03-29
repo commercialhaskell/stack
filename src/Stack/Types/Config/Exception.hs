@@ -8,7 +8,6 @@ module Stack.Types.Config.Exception
   ( ConfigException (..)
   , ConfigPrettyException (..)
   , ParseAbsolutePathException (..)
-  , packageIndicesWarning
   ) where
 
 import qualified Data.Text as T
@@ -159,7 +158,6 @@ instance Exception ConfigException where
 data ConfigPrettyException
   = ParseConfigFileException !(Path Abs File) !ParseException
   | StackWorkEnvNotRelativeDir !String
-  | MultiplePackageIndices [PackageIndexConfig]
   | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
   | BadMsysEnvironment !MsysEnvironment !Arch
   | NoMsysEnvironmentBug
@@ -202,18 +200,6 @@ instance Pretty ConfigPrettyException where
                 \of the project or package. Stack encountered the value:"
          , style Error (fromString x) <> "."
          ]
-  pretty (MultiplePackageIndices pics) =
-    "[S-3251]"
-    <> line
-    <> fillSep
-         [ flow "When using the"
-         , style Shell "package-indices"
-         , flow "key to override the default package index, you must \
-                \provide exactly one value, received:"
-         , bulletedList (map (string . show) pics)
-         ]
-    <> blankLine
-    <> packageIndicesWarning
   pretty (DuplicateLocalPackageNames pairs) =
     "[S-5470]"
     <> line
@@ -257,13 +243,4 @@ instance Exception ParseAbsolutePathException where
     , envVar
     , " environment variable (expected absolute directory): "
     , dir
-    ]
-
-packageIndicesWarning :: StyleDoc
-packageIndicesWarning =
-  fillSep
-    [ "The"
-    , style Shell "package-indices"
-    , flow "key is deprecated in favour of"
-    , style Shell "package-index" <> "."
     ]
