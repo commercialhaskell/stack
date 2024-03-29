@@ -85,6 +85,7 @@ extra-source-files:
     doc/SIGNING_KEY.md
     doc/Stack_and_VS_Code.md
     doc/stack_root.md
+    doc/stack_work.md
     doc/stack_yaml_vs_cabal_package_file.md
     doc/templates_command.md
     doc/travis_ci.md
