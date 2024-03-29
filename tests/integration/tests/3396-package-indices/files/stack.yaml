@@ -1,6 +1,0 @@
-snapshot: my-snapshot.yaml
-
-package-indices:
-- name: CustomIndex
-  download-prefix: http://0.0.0.0:8080/
-  http: http://0.0.0.0:8080/custom.index.tar.gz

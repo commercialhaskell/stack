@@ -21,6 +21,8 @@ Behaviour changes:
 * The `haddock --haddock-for-hackage` command only seeks to create an archive of
   the `<package_version>-docs` directory for build targets and if flags
   excluding the building of project packages are not set.
+* The predecessor of configuration option `package-index`, `package-indices`
+  (deprecated in Stack 2.9.3) has been removed as an alternative option.
 
 Other enhancements:
 

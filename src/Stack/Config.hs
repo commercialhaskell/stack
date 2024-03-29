@@ -118,7 +118,8 @@ import           Stack.Types.Config
                    )
 import           Stack.Types.Config.Exception
                    ( ConfigException (..), ConfigPrettyException (..)
-                   , ParseAbsolutePathException (..), packageIndicesWarning )
+                   , ParseAbsolutePathException (..)
+                   )
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )
 import           Stack.Types.Casa ( CasaOptsMonoid (..) )
@@ -489,16 +490,7 @@ configFromConfigMonoid
           & stylesUpdateL .~ stylesUpdate'
           & useColorL .~ useColor''
         go = configRunner'.globalOpts
-    pic <-
-      case getFirst configMonoid.packageIndex of
-        Nothing ->
-          case getFirst configMonoid.packageIndices of
-            Nothing -> pure defaultPackageIndexConfig
-            Just [pic] -> do
-              prettyWarn packageIndicesWarning
-              pure pic
-            Just x -> prettyThrowIO $ MultiplePackageIndices x
-        Just pic -> pure pic
+        pic = fromFirst  defaultPackageIndexConfig configMonoid.packageIndex
     mpantryRoot <- liftIO $ lookupEnv pantryRootEnvVar
     pantryRoot <-
       case mpantryRoot of
