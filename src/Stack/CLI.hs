@@ -223,7 +223,7 @@ commandLineHandler currentDir progName isInterpreter =
               "Sets a key in YAML configuration file to value."
               (withConfig NoReexec . cfgCmdSet)
               configCmdSetParser
-            addCommand'
+            addCommandWithLocalInstallRootFooter
               ConfigCmd.cfgCmdEnvName
               "Print environment variables for use in a shell."
               (withConfig YesReexec . withDefaultEnvConfig . cfgCmdEnv)
@@ -263,7 +263,7 @@ commandLineHandler currentDir progName isInterpreter =
     evalCmd
     (evalOptsParser "CODE")
 
-  exec = addCommand'
+  exec = addCommandWithLocalInstallRootFooter
     "exec"
     "Execute a command. If the command is absent, the first of any arguments \
     \is taken as the command."
@@ -407,7 +407,7 @@ commandLineHandler currentDir progName isInterpreter =
     newCmd
     newOptsParser
 
-  path = addCommand'
+  path = addCommandWithLocalInstallRootFooter
     "path"
     "Print out handy path information."
     Stack.Path.path
@@ -561,6 +561,22 @@ commandLineHandler currentDir progName isInterpreter =
       constr
       (\_ gom -> gom)
       (globalOpts OtherCmdGlobalOpts)
+
+  -- addCommand with custom footer about options affecting the local install
+  --root and hiding global options
+  addCommandWithLocalInstallRootFooter ::
+       String
+    -> String
+    -> (a -> RIO Runner ())
+    -> Parser a
+    -> AddCommand
+  addCommandWithLocalInstallRootFooter cmd title constr =
+    addCommand''
+      cmd
+      title
+      constr
+      "This command also accepts 'stack build' flags and options that affect \
+      \the location of the local project installation root directory."
 
   addSubCommands' ::
        String
