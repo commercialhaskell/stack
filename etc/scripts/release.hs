@@ -11,6 +11,25 @@
 -- directly. As GHC 9.6.4 boot packages Cabal and Cabal-syntax expose modules
 -- with the same names, the language extension PackageImports is required.
 
+-- EXPERIMENTAL
+
+-- release.hs can be run on macOS/AArch64, using a Docker image for
+-- Alpine Linux/AArch64, in order to create a statically-linked Linux/AArch64
+-- version of Stack:
+--
+-- Install pre-requisites:
+--
+-- > brew install docker
+-- > brew install colima
+--
+-- Start colima (with sufficient memory for Stack's integration tests) and run
+-- script:
+--
+-- > colima start --memory 4 # The default 2 GB is likely insufficient
+-- > stack etc/scripts/release.hs check --alpine --stack-args=--docker-stack-exe=image
+-- > stack etc/scripts/release.hs build --alpine --stack-args=--docker-stack-exe=image
+-- > colima stop
+
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE PackageImports      #-}
 {-# LANGUAGE PatternSynonyms     #-}
@@ -28,7 +47,7 @@ import           Development.Shake
                    ( Action, Change (..), pattern Chatty, CmdOption (..), Rules
                    , ShakeOptions (..), Stdout (..), (%>), actionOnException
                    , alwaysRerun, cmd, command_, copyFileChanged
-                   , getDirectoryFiles, liftIO, need, phony, putNormal
+                   , getDirectoryFiles, liftIO, need, phony, putInfo
                    , removeFilesAfter, shakeArgsWith, shakeOptions, want
                    )
 import           Development.Shake.FilePath
@@ -72,10 +91,13 @@ main = shakeArgsWith
     let gAllowDirty = False
         Platform arch _ = buildPlatform
         gArch = arch
+        gTargetOS = platformOS
         gBinarySuffix = ""
         gTestHaddocks = True
         gProjectRoot = "" -- Set to real value below.
         gBuildArgs = ["--flag", "stack:-developer-mode"]
+        gStackArgs = []
+        gCheckStackArgs = []
         gCertificateName = Nothing
         global0 = foldl
           (flip id)
@@ -87,9 +109,12 @@ main = shakeArgsWith
             , gProjectRoot
             , gHomeDir
             , gArch
+            , gTargetOS
             , gBinarySuffix
             , gTestHaddocks
             , gBuildArgs
+            , gStackArgs
+            , gCheckStackArgs
             , gCertificateName
             }
           flags
@@ -131,13 +156,28 @@ options =
           g { gBuildArgs =
                    gBuildArgs g
                 ++ [ "--flag=stack:static"
-                   , "--docker"
+                   ]
+            , gStackArgs =
+                   gStackArgs g
+                ++ [ "--docker"
                    , "--system-ghc"
                    , "--no-install-ghc"
                    ]
+            , gCheckStackArgs =
+                   gCheckStackArgs g
+                ++ [ "--system-ghc"
+                   , "--no-install-ghc"
+                   ]
+            , gTargetOS = Linux
             }
       )
-      "Build a statically linked binary using an Alpine Docker image."
+      "Build a statically-linked binary using an Alpine Linux Docker image."
+  , Option "" [stackArgsOptName]
+      ( ReqArg
+          (\v -> Right $ \g -> g{gStackArgs = gStackArgs g ++ words v})
+          "\"ARG1 ARG2 ...\""
+      )
+      "Additional arguments to pass to 'stack'."
   , Option "" [buildArgsOptName]
       ( ReqArg
           (\v -> Right $ \g -> g{gBuildArgs = gBuildArgs g ++ words v})
@@ -180,21 +220,25 @@ rules global args = do
         , show dirty
         ]
     () <- cmd
+      stackProgName -- Use the platform's Stack
+      global.gStackArgs -- Possibly to set up a Docker container
+      ["exec"] -- To execute the target Stack
       [ global.gProjectRoot </> releaseBinDir </> binaryName </>
           stackExeFileName
       ]
+      ["--"]
       (stackArgs global)
-      ["build"]
+      global.gCheckStackArgs -- Possible use the Docker image's GHC
+      ["build"] -- To build the target Stack (Stack builds Stack)
       global.gBuildArgs
       integrationTestFlagArgs
       ["--pedantic", "--no-haddock-deps", "--test"]
       ["--haddock" | global.gTestHaddocks]
       ["stack"]
     () <- cmd
-      [ global.gProjectRoot </> releaseBinDir </> binaryName </>
-          stackExeFileName
-      ]
-      ["exec"]
+      stackProgName -- Use the platform's Stack
+      global.gStackArgs -- Possibiy to set up a Docker container
+      ["exec"] -- To execute the target stack-integration-test
       [ global.gProjectRoot </> releaseBinDir </> binaryName </>
           "stack-integration-test"
       ]
@@ -202,7 +246,7 @@ rules global args = do
 
   releaseDir </> binaryPkgZipFileName %> \out -> do
     stageFiles <- getBinaryPkgStageFiles
-    putNormal $ "zip " ++ out
+    putInfo $ "zip " ++ out
     liftIO $ do
       entries <- forM stageFiles $ \stageFile -> do
         Zip.readEntry
@@ -234,7 +278,13 @@ rules global args = do
   releaseDir </> binaryExeFileName %> \out -> do
     need [releaseBinDir </> binaryName </> stackExeFileName]
     (Stdout versionOut) <-
-      cmd (releaseBinDir </> binaryName </> stackExeFileName) "--version"
+      cmd
+        stackProgName -- Use the platform's Stack
+        global.gStackArgs -- Possibly to set up a Docker container
+        ["exec"] -- To execute the target Stack and get its version info
+        (releaseBinDir </> binaryName </> stackExeFileName)
+        ["--"]
+        ["--version"]
     when (not global.gAllowDirty && "dirty" `isInfixOf` lower versionOut) $
       error
         (  "Refusing continue because 'stack --version' reports dirty.  Use --"
@@ -295,10 +345,12 @@ rules global args = do
   releaseBinDir </> binaryName </> stackExeFileName %> \out -> do
     alwaysRerun
     actionOnException
-      ( cmd stackProgName
+      ( cmd
+          stackProgName -- Use the platform's Stack
           (stackArgs global)
           ["--local-bin-path=" ++ takeDirectory out]
-          "install"
+          global.gStackArgs -- Possibly to set up a Docker container
+          "install" -- To build and install Stack to that local bin path
           global.gBuildArgs
           integrationTestFlagArgs
           "--pedantic"
@@ -336,7 +388,7 @@ rules global args = do
   releaseBinDir = releaseDir </> "bin"
 
   binaryPkgFileNames =
-    case platformOS of
+    case global.gTargetOS of
       Windows ->
         [ binaryExeFileName
         , binaryPkgZipFileName
@@ -357,7 +409,7 @@ rules global args = do
     , "-"
     , stackVersionStr global
     , "-"
-    , display platformOS
+    , display global.gTargetOS
     , "-"
     , display global.gArch
     , if null global.gBinarySuffix then "" else "-" ++ global.gBinarySuffix
@@ -438,6 +490,10 @@ binaryVariantOptName = "binary-variant"
 noTestHaddocksOptName :: String
 noTestHaddocksOptName = "no-test-haddocks"
 
+-- | @--stack-args@ command-line option name.
+stackArgsOptName :: String
+stackArgsOptName = "stack-args"
+
 -- | @--build-args@ command-line option name.
 buildArgsOptName :: String
 buildArgsOptName = "build-args"
@@ -469,9 +525,12 @@ data Global = Global
   , gProjectRoot :: !FilePath
   , gHomeDir :: !FilePath
   , gArch :: !Arch
+  , gTargetOS :: !OS
   , gBinarySuffix :: !String
   , gTestHaddocks :: !Bool
   , gBuildArgs :: [String]
+  , gStackArgs :: [String]
+  , gCheckStackArgs :: [String]
   , gCertificateName :: !(Maybe String)
   }
   deriving Show
