@@ -23,6 +23,11 @@ Behaviour changes:
   excluding the building of project packages are not set.
 * The predecessor of configuration option `package-index`, `package-indices`
   (deprecated in Stack 2.9.3) has been removed as an alternative option.
+* If a build target is a package identifier, and the package version is not in
+  the snapshot or the package index, Stack will report an error when the target
+  is parsed. Previously, if another version of the package was in the snapshot,
+  Stack would construct the build plan with that other version or, if it was
+  not, Stack would defer an error to the construction of the build plan.
 
 Other enhancements:
 

@@ -393,12 +393,13 @@ resolveRawTarget sma allLocs (rawInput, rt) =
   go (RTPackageIdentifier ident@(PackageIdentifier name version))
     | Map.member name locals = pure $ Left $
         fillSep
-          [ style Target (fromPackageName name)
-          , flow "target has a specific version number, but it is a project \
-                 \package. To avoid confusion, we will not install the \
-                 \specified version or build the project package. To build the \
-                 \project package, specify the target without an explicit \
-                 \version."
+          [ style Target (fromPackageId ident)
+          , flow "is a specific package version, but"
+          , style Target (fromPackageName name)
+          , flow "is the name of a project package. To avoid confusion, Stack \
+                 \will not try to build the specified version or the project \
+                 \package. To build the project package, specify only"
+          , style Current (fromPackageName name) <> "."
           ]
     | otherwise =
         case Map.lookup name allLocs of
@@ -412,15 +413,13 @@ resolveRawTarget sma allLocs (rawInput, rt) =
             ) ->
               if version == versionLoc
                 then pure $ deferToConstructPlan name
-                else hackageLatestRevision name version
+                else hackageLatestRevision name version versionLoc
           -- The package was coming from something besides the index, so refuse
           -- to do the override
           Just loc' -> pure $ Left $
             fillSep
-              [ flow "Package with identifier was targeted on the command \
-                     \line:"
-              , style Target (fromPackageId ident) <> ","
-              , flow "but it was specified from a non-index location:"
+              [ style Target (fromPackageId ident)
+              , flow "was specified from a non-index location, namely:"
               , flow $ T.unpack $ textDisplay loc' <> "."
               , flow "Recommendation: add the correctly desired version to \
                      \extra-deps."
@@ -429,7 +428,14 @@ resolveRawTarget sma allLocs (rawInput, rt) =
           Nothing -> do
             mrev <- getLatestHackageRevision YesRequireHackageIndex name version
             pure $ case mrev of
-              Nothing -> deferToConstructPlan name
+              Nothing -> Left $
+                fillSep
+                  [ flow "Stack did not know the location of a package named"
+                  , style Target (fromPackageName name)
+                  , "and could not find"
+                  , style Target (fromPackageId ident)
+                  , flow "in the package index."
+                  ]
               Just (_rev, cfKey, treeKey) -> Right ResolveResult
                 { name
                 , rawInput
@@ -453,10 +459,20 @@ resolveRawTarget sma allLocs (rawInput, rt) =
           , packageType = PTDependency
           }
 
-  hackageLatestRevision name version = do
+  hackageLatestRevision name version versionLoc = do
     mrev <- getLatestHackageRevision YesRequireHackageIndex name version
     pure $ case mrev of
-      Nothing -> deferToConstructPlan name
+      Nothing ->  Left $
+        fillSep
+          [ flow "Stack knows the location of"
+          , style Current (fromPackageId pkgId')
+          , flow "but did not know the location of"
+          , style Target (fromPackageId pkgId) <>","
+          , flow "and did not find it in the package index."
+          ]
+       where
+        pkgId = PackageIdentifier name version
+        pkgId' = PackageIdentifier name versionLoc
       Just (_rev, cfKey, treeKey) -> Right ResolveResult
         { name
         , rawInput

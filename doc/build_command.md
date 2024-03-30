@@ -142,15 +142,13 @@ Example: `stack build foobar-1.2.3`
 If the package name is that of a project package, then Stack fails with an
 error.
 
+If the package version is an extra-dep or in the snapshot, then Stack will use
+that version.
+
 If the package version is in the package index (e.g. Hackage) then Stack will
 use the latest revision of that version from the package index.
 
-If the package is an extra-dep or in the snapshot, Stack will behave as if only
-the package name had been specified as the target (that is, ignoring the
-specified version).
-
-Otherwise, Stack will fail with an error, reporting that the package name is
-unknown.
+Otherwise, Stack will fail with an error.
 
 ### Target: project package *component*
 
