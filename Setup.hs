@@ -4,24 +4,24 @@ module Main
 
 import           Data.List ( nub, sortOn )
 import           Distribution.InstalledPackageInfo
-                   ( sourcePackageId, installedUnitId )
-import           Distribution.Package ( UnitId, packageVersion, packageName )
+                   ( installedUnitId, sourcePackageId )
+import           Distribution.Package ( UnitId, packageName, packageVersion )
 import           Distribution.PackageDescription
-                   ( PackageDescription (), Executable (..) )
+                   ( Executable (..), PackageDescription )
 import           Distribution.Pretty ( prettyShow )
 import           Distribution.Simple
-                   ( defaultMainWithHooks, UserHooks(..), simpleUserHooks )
+                   ( UserHooks(..), defaultMainWithHooks, simpleUserHooks )
 import           Distribution.Simple.BuildPaths ( autogenPackageModulesDir )
 import           Distribution.Simple.LocalBuildInfo
-                   ( installedPkgs, withLibLBI, withExeLBI, LocalBuildInfo ()
-                   , ComponentLocalBuildInfo (componentPackageDeps)
+                   ( ComponentLocalBuildInfo (..), LocalBuildInfo, installedPkgs
+                   , withExeLBI, withLibLBI
                    )
 import           Distribution.Simple.PackageIndex
                    ( allPackages, dependencyClosure )
 import           Distribution.Simple.Setup
                    ( BuildFlags (..), ReplFlags (..), fromFlag )
 import           Distribution.Simple.Utils
-                   ( rewriteFileEx, createDirectoryIfMissingVerbose )
+                   ( createDirectoryIfMissingVerbose, rewriteFileEx )
 import           Distribution.Types.PackageName ( unPackageName )
 import           Distribution.Types.UnqualComponentName
                    ( unUnqualComponentName )
@@ -41,7 +41,11 @@ main = defaultMainWithHooks simpleUserHooks
       replHook simpleUserHooks pkg lbi hooks flags args
   }
 
-generateBuildModule :: Verbosity -> PackageDescription -> LocalBuildInfo -> IO ()
+generateBuildModule ::
+     Verbosity
+  -> PackageDescription
+  -> LocalBuildInfo
+  -> IO ()
 generateBuildModule verbosity pkg lbi = do
   let dir = autogenPackageModulesDir lbi
   createDirectoryIfMissingVerbose verbosity True dir
@@ -60,17 +64,22 @@ generateBuildModule verbosity pkg lbi = do
     formatdeps = map formatone . sortOn unPackageName'
     formatone p = unPackageName' p ++ "-" ++ prettyShow (packageVersion p)
     unPackageName' = unPackageName . packageName
-    transDeps xs ys =
-      either (map sourcePackageId . allPackages) handleDepClosureFailure $ dependencyClosure allInstPkgsIdx availInstPkgIds
-      where
-        allInstPkgsIdx = installedPkgs lbi
-        allInstPkgIds = map installedUnitId $ allPackages allInstPkgsIdx
-        -- instPkgIds includes `stack-X.X.X`, which is not a dependency hence is missing from allInstPkgsIdx. Filter that out.
-        availInstPkgIds = filter (`elem` allInstPkgIds) $ testDeps xs ys
-        handleDepClosureFailure unsatisfied =
-          error $
-            "Computation of transitive dependencies failed." ++
-            if null unsatisfied then "" else " Unresolved dependencies: " ++ show unsatisfied
+    transDeps xs ys = either
+      (map sourcePackageId . allPackages)
+      handleDepClosureFailure $ dependencyClosure allInstPkgsIdx availInstPkgIds
+     where
+      allInstPkgsIdx = installedPkgs lbi
+      allInstPkgIds = map installedUnitId $ allPackages allInstPkgsIdx
+      -- instPkgIds includes `stack-X.X.X`, which is not a dependency hence is
+      -- missing from allInstPkgsIdx. Filter that out.
+      availInstPkgIds = filter (`elem` allInstPkgIds) $ testDeps xs ys
+      handleDepClosureFailure unsatisfied =
+        error $
+             "Computation of transitive dependencies failed."
+          ++ if null unsatisfied
+               then ""
+               else " Unresolved dependencies: " ++ show unsatisfied
 
 testDeps :: ComponentLocalBuildInfo -> ComponentLocalBuildInfo -> [UnitId]
-testDeps xs ys = map fst $ nub $ componentPackageDeps xs ++ componentPackageDeps ys
+testDeps xs ys =
+  map fst $ nub $ componentPackageDeps xs ++ componentPackageDeps ys
