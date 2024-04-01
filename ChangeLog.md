@@ -8,7 +8,11 @@ Release notes:
 
 Major changes:
 
-Behavior changes:
+Behaviour changes:
+
+* Stack's `StackSetupShim` executable, when called with `repl` and
+  `stack-initial-build-steps`, no longer uses Cabal's `replHook` to apply
+  `initialBuildSteps` but takes a more direct approach.
 
 Other enhancements:
 
