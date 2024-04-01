@@ -288,11 +288,6 @@ withExecuteEnv
           setupO =  setupSrcDir </> setupOName
       setupHsExists <- doesFileExist setupHs
       unless setupHsExists $ writeBinaryFileAtomic setupHs simpleSetupCode
-      -- See https://github.com/commercialhaskell/stack/issues/6267. Remove any
-      -- historical *.hi or *.o files. This can be dropped when Stack drops
-      -- support for the problematic versions of GHC.
-      ignoringAbsence (removeFile setupHi)
-      ignoringAbsence (removeFile setupO)
       let setupShimStub = "setup-shim-" ++ simpleSetupHash
       setupShimFileName <- parseRelFile (setupShimStub ++ ".hs")
       setupShimHiName <- parseRelFile (setupShimStub ++ ".hi")
@@ -303,12 +298,14 @@ withExecuteEnv
       setupShimHsExists <- doesFileExist setupShimHs
       unless setupShimHsExists $
         writeBinaryFileAtomic setupShimHs setupGhciShimCode
+      setupExe <- getSetupExe setupHs setupShimHs tempDir
       -- See https://github.com/commercialhaskell/stack/issues/6267. Remove any
       -- historical *.hi or *.o files. This can be dropped when Stack drops
       -- support for the problematic versions of GHC.
+      ignoringAbsence (removeFile setupHi)
+      ignoringAbsence (removeFile setupO)
       ignoringAbsence (removeFile setupShimHi)
       ignoringAbsence (removeFile setupShimO)
-      setupExe <- getSetupExe setupHs setupShimHs tempDir
       cabalPkgVer <- view cabalVersionL
       globalDB <- view $ compilerPathsL . to (.globalDB)
       let globalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
