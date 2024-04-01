@@ -12,6 +12,9 @@ Behaviour changes:
   version of GHC. Stack no longer supports such Cabal versions before 2.2, which
   came with versions of GHC before 8.4. Consequently, the `init` command will
   not try LTS Haskell before 12.0.
+* Stack's `StackSetupShim` executable, when called with `repl` and
+  `stack-initial-build-steps`, no longer uses Cabal's `replHook` to apply
+  `initialBuildSteps` but takes a more direct approach.
 * The `init` command initialises `stack.yaml` with a `snapshot` key rather than
   a `resolver` key.
 * After installing GHC or another tool, Stack deletes the archive file which
