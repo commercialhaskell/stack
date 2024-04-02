@@ -34,3 +34,9 @@ Otherwise, `stack init` will try to use the following Stackage snapshots in
 order of preference, using the first that is compatable: the most recent LTS
 Haskell, the most recent Stackage Nightly, and other LTS Haskell (most recent
 first).
+
+!!! note
+
+    If Cabal (the tool) has been used in the directory, consider commanding
+    `cabal clean` before applying `stack init`, in case Cabal has created any
+    unintended Cabal files.
