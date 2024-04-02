@@ -262,7 +262,7 @@ Image Repositories
 
 FP Complete provides the following public image repositories on Docker Hub:
 
-- [fpco/stack-build](https://registry.hub.docker.com/u/fpco/stack-build/) (the
+- [fpco/stack-build](https://registry.hub.docker.com/r/fpco/stack-build/) (the
   default) - GHC (patched), tools (Stack, Cabal (the tool), happy, alex, etc.),
   and system developer libraries required to build all Stackage packages.
 
