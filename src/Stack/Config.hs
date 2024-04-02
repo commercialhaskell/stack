@@ -463,7 +463,7 @@ configFromConfigMonoid
         hackageBaseUrl =
           fromFirst Constants.hackageBaseUrl configMonoid.hackageBaseUrl
         hideSourcePaths = fromFirstTrue configMonoid.hideSourcePaths
-        recommendUpgrade = fromFirstTrue configMonoid.recommendUpgrade
+        recommendStackUpgrade = fromFirstTrue configMonoid.recommendStackUpgrade
         notifyIfNixOnPath = fromFirstTrue configMonoid.notifyIfNixOnPath
         notifyIfGhcUntested = fromFirstTrue configMonoid.notifyIfGhcUntested
         notifyIfCabalUntested = fromFirstTrue configMonoid.notifyIfCabalUntested
@@ -622,7 +622,7 @@ configFromConfigMonoid
                 , snapshot
                 , userStorage
                 , hideSourcePaths
-                , recommendUpgrade
+                , recommendStackUpgrade
                 , notifyIfNixOnPath
                 , notifyIfGhcUntested
                 , notifyIfCabalUntested

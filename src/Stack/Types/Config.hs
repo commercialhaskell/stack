@@ -185,7 +185,7 @@ data Config = Config
     -- ^ Database connection pool for user Stack database
   , hideSourcePaths        :: !Bool
     -- ^ Enable GHC hiding source paths?
-  , recommendUpgrade       :: !Bool
+  , recommendStackUpgrade  :: !Bool
     -- ^ Recommend a Stack upgrade?
   , notifyIfNixOnPath      :: !Bool
     -- ^ Notify if the Nix package manager (nix) is on the PATH, but

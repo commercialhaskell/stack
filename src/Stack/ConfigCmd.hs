@@ -42,7 +42,10 @@ import           Stack.Constants ( stackDotYaml )
 import           Stack.Prelude
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigMonoid
-                   ( configMonoidInstallGHCName, configMonoidSystemGHCName )
+                   ( configMonoidInstallGHCName
+                   , configMonoidRecommendStackUpgradeName
+                   , configMonoidSystemGHCName
+                   )
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
@@ -68,6 +71,7 @@ data ConfigCmdSet
   | ConfigCmdSetResolver !(Unresolved AbstractSnapshot)
   | ConfigCmdSetSystemGhc !CommandScope !Bool
   | ConfigCmdSetInstallGhc !CommandScope !Bool
+  | ConfigCmdSetRecommendStackUpgrade !CommandScope !Bool
   | ConfigCmdSetDownloadPrefix !CommandScope !Text
 
 data CommandScope
@@ -82,6 +86,7 @@ configCmdSetScope (ConfigCmdSetSnapshot _) = CommandScopeProject
 configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
 configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
 configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
+configCmdSetScope (ConfigCmdSetRecommendStackUpgrade scope _) = scope
 configCmdSetScope (ConfigCmdSetDownloadPrefix scope _) = scope
 
 cfgCmdSet ::
@@ -255,6 +260,8 @@ cfgCmdSetValue root (ConfigCmdSetResolver newSnapshot) =
   snapshotValue root newSnapshot
 cfgCmdSetValue _ (ConfigCmdSetSystemGhc _ bool') = pure $ Yaml.Bool bool'
 cfgCmdSetValue _ (ConfigCmdSetInstallGhc _ bool') = pure $ Yaml.Bool bool'
+cfgCmdSetValue _ (ConfigCmdSetRecommendStackUpgrade _ bool') =
+  pure $ Yaml.Bool bool'
 cfgCmdSetValue _ (ConfigCmdSetDownloadPrefix _ url) = pure $ Yaml.String url
 
 snapshotValue ::
@@ -274,6 +281,8 @@ cfgCmdSetKeys (ConfigCmdSetSnapshot _) = [["snapshot"], ["resolver"]]
 cfgCmdSetKeys (ConfigCmdSetResolver _) = [["resolver"], ["snapshot"]]
 cfgCmdSetKeys (ConfigCmdSetSystemGhc _ _) = [[configMonoidSystemGHCName]]
 cfgCmdSetKeys (ConfigCmdSetInstallGhc _ _) = [[configMonoidInstallGHCName]]
+cfgCmdSetKeys (ConfigCmdSetRecommendStackUpgrade _ _) =
+  [[configMonoidRecommendStackUpgradeName]]
 cfgCmdSetKeys (ConfigCmdSetDownloadPrefix _ _) =
   [["package-index", "download-prefix"]]
 
@@ -312,26 +321,34 @@ configCmdSetParser =
       , OA.command (T.unpack configMonoidSystemGHCName)
           ( OA.info
               (   ConfigCmdSetSystemGhc
-              <$> scopeFlag
+              <$> globalScopeFlag
               <*> boolArgument )
               ( OA.progDesc
-                  "Configure whether Stack should use a system GHC \
-                  \installation or not." ))
+                  "Configure whether or not Stack should use a system GHC \
+                  \installation." ))
       , OA.command (T.unpack configMonoidInstallGHCName)
           ( OA.info
               (   ConfigCmdSetInstallGhc
-              <$> scopeFlag
+              <$> globalScopeFlag
               <*> boolArgument )
               ( OA.progDesc
-                  "Configure whether Stack should automatically install \
+                  "Configure whether or not Stack should automatically install \
                   \GHC when necessary." ))
+      , OA.command (T.unpack configMonoidRecommendStackUpgradeName)
+          ( OA.info
+              (   ConfigCmdSetRecommendStackUpgrade
+              <$> projectScopeFlag
+              <*> boolArgument )
+              ( OA.progDesc
+                  "Configure whether or not Stack should notify the user if it \
+                  \identifes a new version of Stack is available." ))
       , OA.command "package-index"
           ( OA.info
               ( OA.hsubparser $
                   OA.command "download-prefix"
                     ( OA.info
                         (   ConfigCmdSetDownloadPrefix
-                        <$> scopeFlag
+                        <$> globalScopeFlag
                         <*> urlArgument )
                         ( OA.progDesc
                             "Configure download prefix for Stack's package \
@@ -340,14 +357,24 @@ configCmdSetParser =
                   "Configure Stack's package index" ))
       ]
 
-scopeFlag :: OA.Parser CommandScope
-scopeFlag = OA.flag
+globalScopeFlag :: OA.Parser CommandScope
+globalScopeFlag = OA.flag
   CommandScopeProject
   CommandScopeGlobal
   (  OA.long "global"
   <> OA.help
        "Modify the user-specific global configuration file ('config.yaml') \
        \instead of the project-level configuration file ('stack.yaml')."
+  )
+
+projectScopeFlag :: OA.Parser CommandScope
+projectScopeFlag = OA.flag
+  CommandScopeGlobal
+  CommandScopeProject
+  (  OA.long "project"
+  <> OA.help
+       "Modify the project-level configuration file ('stack.yaml') instead of \
+       \the user-specific global configuration file ('config.yaml')."
   )
 
 readBool :: OA.ReadM Bool

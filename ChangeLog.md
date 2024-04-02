@@ -48,6 +48,9 @@ Other enhancements:
   was modified manually. In YAML configuration files, the `hpack-force` key is
   introduced to allow Hpack to overwrite such a Cabal file. The corresponding
   `--hpack-force` flag is also added.
+* Add the `stack config set recommend-stack-upgrade` command to configure
+  whether or not Stack should notify the user if it identifes a new version of
+  Stack is available in YAML configuration files.
 
 Bug fixes:
 
