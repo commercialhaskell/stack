@@ -11,6 +11,7 @@ module Stack.Types.ConfigMonoid
   , configMonoidAllowDifferentUserName
   , configMonoidGHCVariantName
   , configMonoidInstallGHCName
+  , configMonoidRecommendStackUpgradeName
   , configMonoidSystemGHCName
   ) where
 
@@ -174,8 +175,8 @@ data ConfigMonoid = ConfigMonoid
   , styles             :: !StylesUpdate
   , hideSourcePaths    :: !FirstTrue
     -- ^ See 'configHideSourcePaths'
-  , recommendUpgrade   :: !FirstTrue
-    -- ^ See 'configRecommendUpgrade'
+  , recommendStackUpgrade   :: !FirstTrue
+    -- ^ See 'configRecommendStackUpgrade'
   , notifyIfNixOnPath  :: !FirstTrue
     -- ^ See 'configNotifyIfNixOnPath'
   , notifyIfGhcUntested  :: !FirstTrue
@@ -325,7 +326,8 @@ parseConfigMonoidObject rootDir obj = do
   configMonoidStylesGB <- obj ..:? configMonoidStylesGBName
   let styles = fromMaybe mempty $ configMonoidStylesUS <|> configMonoidStylesGB
   hideSourcePaths <- FirstTrue <$> obj ..:? configMonoidHideSourcePathsName
-  recommendUpgrade <- FirstTrue <$> obj ..:? configMonoidRecommendUpgradeName
+  recommendStackUpgrade <-
+    FirstTrue <$> obj ..:? configMonoidRecommendStackUpgradeName
   notifyIfNixOnPath <- FirstTrue <$> obj ..:? configMonoidNotifyIfNixOnPathName
   notifyIfGhcUntested <-
     FirstTrue <$> obj ..:? configMonoidNotifyIfGhcUntestedName
@@ -396,7 +398,7 @@ parseConfigMonoidObject rootDir obj = do
     , colorWhen
     , styles
     , hideSourcePaths
-    , recommendUpgrade
+    , recommendStackUpgrade
     , notifyIfNixOnPath
     , notifyIfGhcUntested
     , notifyIfCabalUntested
@@ -574,8 +576,8 @@ configMonoidStylesGBName = "stack-colours"
 configMonoidHideSourcePathsName :: Text
 configMonoidHideSourcePathsName = "hide-source-paths"
 
-configMonoidRecommendUpgradeName :: Text
-configMonoidRecommendUpgradeName = "recommend-stack-upgrade"
+configMonoidRecommendStackUpgradeName :: Text
+configMonoidRecommendStackUpgradeName = "recommend-stack-upgrade"
 
 configMonoidNotifyIfNixOnPathName :: Text
 configMonoidNotifyIfNixOnPathName = "notify-if-nix-on-path"

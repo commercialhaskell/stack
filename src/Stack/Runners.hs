@@ -253,7 +253,7 @@ withRunnerGlobal go inner = do
 shouldUpgradeCheck :: RIO Config ()
 shouldUpgradeCheck = do
   config <- ask
-  when config.recommendUpgrade $ do
+  when config.recommendStackUpgrade $ do
     now <- getCurrentTime
     let yesterday = addUTCTime (-(24 * 60 * 60)) now
     checks <- upgradeChecksSince yesterday
