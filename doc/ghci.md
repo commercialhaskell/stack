@@ -58,9 +58,31 @@ By default:
     option with a file path to the executable to specify a different GHC
     executable;
 
+*   Stack performs an inital build step. Pass the `--no-build` flag to skip the
+    step. Pass the `--ghc-options` option to pass flags or options to GHC. Pass
+    the `--profile`, `--no-strip`, `--trace` flags for the same behaviour as in
+    the case of the `stack build` command.
+
+    !!! info
+
+        Not performing the initial build step speeds up the startup of GHCi. It
+        only works if the dependencies of the loaded packages have already been
+        built.
+
+*   Stack runs GHCi via `ghc --interactive`. Pass the `--ghc-options` option to
+    pass flags or options to GHC (during the initial build step) and to GHCi.
+    Pass the `--pedantic` flag to pass the GHC options `-Wall` and `-Werror` to
+    GHCi (only). Pass the `--ghci-options` option to pass flags or options to
+    GHCi (only).
+
+*   Stack does not configure GHCi to hide unnecessary packages, unless there are
+    no packages to expose. Pass the `--package-hiding` flag to hide unnecessary
+    packages or `--no-package-hiding` flag not to hide unnecessary packages.
+
 *   Stack loads and imports all of the modules for each target. Pass the
     `--no-load` flag to skip the loading of modules. Pass the `--only-main` flag
-    to skip the loading of modules other than the main module.
+    to skip the loading of modules other than the main module. Pass the
+    `--load-local-deps` flag to include all local dependencies of targets.
 
     !!! info
 
@@ -84,15 +106,6 @@ By default:
 *   If there are multiple definitions for the `Main` module, Stack will ask you
     to select one from a list of options. Pass the `--main-is <target>` option
     to specific which `Main` module to load.
-
-*   Stack performs an inital build step. Pass the `--no-build` flag to skip the
-    step.
-
-    !!! info
-
-        Not performing the initial build step speeds up the startup of GHCi. It
-        only works if the dependencies of the loaded packages have already been
-        built.
 
 Stack combines all of the GHC options of components.
 
