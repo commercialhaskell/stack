@@ -409,7 +409,7 @@ library
     , rio-prettyprint >=0.1.8.0
     , split
     , stm
-    , tar
+    , tar >=0.5.1.1 && <0.6.0.0
     , template-haskell
     , text
     , time
@@ -532,7 +532,7 @@ executable stack
     , split
     , stack
     , stm
-    , tar
+    , tar >=0.5.1.1 && <0.6.0.0
     , template-haskell
     , text
     , time
@@ -634,7 +634,7 @@ executable stack-integration-test
     , rio-prettyprint >=0.1.8.0
     , split
     , stm
-    , tar
+    , tar >=0.5.1.1 && <0.6.0.0
     , template-haskell
     , text
     , time
@@ -752,7 +752,7 @@ test-suite stack-unit-test
     , split
     , stack
     , stm
-    , tar
+    , tar >=0.5.1.1 && <0.6.0.0
     , template-haskell
     , text
     , time
