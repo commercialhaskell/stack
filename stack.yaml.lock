@@ -12,6 +12,13 @@ packages:
   original:
     hackage: Cabal-3.10.1.0@sha256:6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94,12316
 - completed:
+    hackage: os-string-2.0.2@sha256:32fa47f8345a2c0662fb602fc42e4b674e41ec48079b68bdecb4b6f68032c24e,3259
+    pantry-tree:
+      sha256: 5b1dbaf1663005907462032997264b7942befb9fc108491c1fdd5e488ac0817e
+      size: 2217
+  original:
+    hackage: os-string-2.0.2@sha256:32fa47f8345a2c0662fb602fc42e4b674e41ec48079b68bdecb4b6f68032c24e,3259
+- completed:
     hackage: pantry-0.10.0@sha256:6f99ee8d7cfeeb0e2513638618acf80c72d018e7f10120048fa120a409b9dcd2,7864
     pantry-tree:
       sha256: 780acb3eaec5c14b3905d5343a8b0152165643634741590a96a5b0d5904a9bcc
@@ -25,6 +32,13 @@ packages:
       size: 1675
   original:
     hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
+- completed:
+    hackage: tar-0.6.2.0@sha256:619828cae098a7b6deeb0316e12f55011101d88f756787ed024ceedb81cf1eba,4576
+    pantry-tree:
+      sha256: 1dde50961e9d1a6e6f820d918c0edbbd9673c83afdd300e0aae40a691e8151df
+      size: 2168
+  original:
+    hackage: tar-0.6.2.0@sha256:619828cae098a7b6deeb0316e12f55011101d88f756787ed024ceedb81cf1eba,4576
 snapshots:
 - completed:
     sha256: 7b975b104cb3dbf0c297dfd01f936a4d2ee523241dd0b1ae960522b833fe3027

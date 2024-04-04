@@ -15,7 +15,7 @@ module Stack.SDist
   , readLocalPackage
   ) where
 
-import qualified Codec.Archive.Tar.Utf8 as Tar
+import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Codec.Compression.GZip as GZip
 import           Conduit ( runConduitRes, sourceLazy, sinkFileCautious )
@@ -23,7 +23,6 @@ import           Control.Concurrent.Execute
                    ( ActionContext (..), Concurrency (..) )
 import           Control.Monad.Extra ( whenJust )
 import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as L
 import           Data.Char ( toLower )
 import           Data.Data ( cast )
@@ -252,13 +251,9 @@ getSDistTarball mpvpBounds pkgDir = do
   -- prone and more predictable to read everything in at once, so that's what
   -- we're doing for now:
   let tarPath isDir fp =
-        case Tar.toTarPath isDir (forceUtf8Enc (pkgIdName FP.</> fp)) of
+        case Tar.toTarPath isDir (pkgIdName FP.</> fp) of
           Left e -> prettyThrowIO $ ToTarPathException e
           Right tp -> pure tp
-      -- convert a String of proper characters to a String of bytes in UTF8
-      -- encoding masquerading as characters. This is necessary for tricking the
-      -- tar package into proper character encoding.
-      forceUtf8Enc = S8.unpack . T.encodeUtf8 . T.pack
       packWith f isDir fp = liftIO $ f (pkgFp FP.</> fp) =<< tarPath isDir fp
       packDir = packWith Tar.packDirectoryEntry True
       packFile fp
