@@ -1,12 +1,7 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.8.1.
+# built with GHC 9.8.2.
 
-# GHC 9.8.1
-snapshot: nightly-2024-02-24
-
-extra-deps:
-- git: https://github.com/commercialhaskell/pantry.git
-  commit: bd02f9177c3e0aff09236ad09e70ff52db009344
+snapshot: nightly-2024-04-04 # GHC 9.8.2
 
 docker:
   enable: false
