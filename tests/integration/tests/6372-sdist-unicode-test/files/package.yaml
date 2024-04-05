@@ -1,0 +1,8 @@
+name: test١٢٣
+version: 0.1.0.0
+license: BSD-3-Clause
+description: Test of Unicode characters in file names
+dependencies:
+- base < 5
+library:
+  source-dirs: src
