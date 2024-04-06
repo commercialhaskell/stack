@@ -829,7 +829,6 @@ processDep ::
            MissingPresentDeps
        )
 processDep pkgId name value = do
-  mLatestApplicable <- getLatestApplicableVersionAndRev name range
   eRes <- getCachedDepOrAddDep name
   let failure mLatestApp err =
         Left $ Map.singleton name (range, mLatestApp, err)
@@ -844,6 +843,7 @@ processDep pkgId name value = do
             -- spamming the user too much.
             DependencyPlanFailures _ _  ->
               Couldn'tResolveItsDependencies version
+      mLatestApplicable <- getLatestApplicableVersionAndRev name range
       pure $ failure mLatestApplicable bd
     Right adr
       | isDepTypeLibrary value.depType && not (adrHasLibrary adr) ->
@@ -851,10 +851,11 @@ processDep pkgId name value = do
     Right adr -> do
       addParent
       inRange <- adrInRange pkgId name range adr
-      pure $ if inRange
-        then Right $ processAdr adr
-        else failure mLatestApplicable (DependencyMismatch $ adrVersion adr)
-
+      if inRange
+        then pure $ Right $ processAdr adr
+        else do
+          mLatestApplicable <- getLatestApplicableVersionAndRev name range
+          pure $ failure mLatestApplicable (DependencyMismatch $ adrVersion adr)
  where
   range = value.versionRange
   version = pkgVersion pkgId
