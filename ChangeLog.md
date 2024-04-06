@@ -21,6 +21,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Fix a regression introduced in Stack 2.15.1 that caused a 'no operation'
+  `stack build` to be slower than previously.
+
 ##  v2.15.5 - 2024-03-28
 
 Release notes:

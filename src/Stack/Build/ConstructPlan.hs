@@ -835,7 +835,6 @@ processDep ::
            (Set PackageIdentifier, Map PackageIdentifier GhcPkgId, IsMutable)
        )
 processDep pkgId name value = do
-  mLatestApplicable <- getLatestApplicableVersionAndRev name range
   eRes <- getCachedDepOrAddDep name
   case eRes of
     Left e -> do
@@ -848,6 +847,7 @@ processDep pkgId name value = do
             -- spamming the user too much
             DependencyPlanFailures _ _  ->
               Couldn'tResolveItsDependencies version
+      mLatestApplicable <- getLatestApplicableVersionAndRev name range
       pure $ Left (name, (range, mLatestApplicable, bd))
     Right adr
       | isDepTypeLibrary value.depType && not (adrHasLibrary adr) ->
@@ -855,15 +855,17 @@ processDep pkgId name value = do
     Right adr -> do
       addParent
       inRange <- adrInRange pkgId name range adr
-      pure $ if inRange
-        then Right $ processAdr adr
-        else Left
-          ( name
-          , ( range
-            , mLatestApplicable
-            , DependencyMismatch $ adrVersion adr
+      if inRange
+        then pure $ Right $ processAdr adr
+        else do
+          mLatestApplicable <- getLatestApplicableVersionAndRev name range
+          pure $ Left
+            ( name
+            , ( range
+              , mLatestApplicable
+              , DependencyMismatch $ adrVersion adr
+              )
             )
-          )
  where
   range = value.versionRange
   version = pkgVersion pkgId
