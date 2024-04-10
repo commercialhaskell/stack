@@ -201,7 +201,8 @@ Other enhancements:
   precedence over the existing `casa-repo-prefix` key. The latter is deprecated.
   The new key also allows Stack's use of a Casa (content-addressable storage
   archive) server to be disabled and the maximum number of keys per request to
-  be configured. The defaults are unchanged.
+  be configured. The default Casa prefix references https://casa.stackage.org,
+  instead of https://casa.fpcomplete.com.
 * Add option `--progress-bar=<format>` to Stack's `build` command to configure
   the format of the progress bar, where `<format>` is one of `none`,
   `count-only` (only the package count), `capped` (capped to a length equal to

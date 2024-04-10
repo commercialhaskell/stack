@@ -639,7 +639,7 @@ Default:
 ~~~yaml
 casa:
   enable: true # Use a Casa server?
-  repo-prefix: https://casa.fpcomplete.com # Unless casa-repo-prefix is set.
+  repo-prefix: https://casa.stackage.org # Unless casa-repo-prefix is set.
   max-keys-per-request: 1280 # Maximum number of keys per request.
 ~~~
 
@@ -659,7 +659,7 @@ deprecated) and has precedence if both keys are set.
 
 Deprecated in favour of [`casa`](#casa), which takes precedence if present.
 
-Default: `https://casa.fpcomplete.com`
+Default: `https://casa.stackage.org`
 
 This option specifies the prefix for the URL used to pull information from the
 Casa server.
