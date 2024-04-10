@@ -15,105 +15,123 @@ them, and returns the result to the user. GHCi is GHC's interactive environment.
 The `stack ghci` or `stack repl` commands, which are equivalent, allow you to
 load components and files of your project into GHCi.
 
-The command uses the same TARGET syntax as `stack build`. It can also take flags
-like `--test` and `--bench` and options like `--flag`. Similarly to
-`stack build`, the default is to load up GHCi with all libraries and executables
-in the project.
+The command accepts the same TARGET syntax as
+[`stack build`](build_command.md#target-syntax). By default:
 
-In order to load multiple components, `stack ghci` combines all of the GHC
-options together. This doesn't work in the general case, but when the packages
-being loaded share similar conventions, it should work out. A common source of
-issues is when one component defines default extensions which aren't assumed by
-another component. For example, specifying `NoImplicitPrelude` in one component
-but not another is quite likely to cause failures. GHCi will be run with
-`-XNoImplicitPrelude`, but it is likely that modules in the other component
-assume that the `Prelude` is implicitly imported.
+* Stack loads up GHCi with all the library and executable components of all the
+  packages in the project. Pass the flag `--test` to include test suite
+  components (unlike `stack build`, test suites will not be run). Pass the flag
+  `--bench` to include benchmark components (unlike `stack build`, benchmarks
+  will not be run).
 
-`stack ghci` configures GHCi by using a GHCi script file. Such files are located
-in subdirectories of `<XDG_CACHE_HOME>/stack/ghci-script`, where
-`<XDG_CACHE_HOME>` refers to the
-[XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html)
-for user-specific non-essential (cached) data. On Unix-like operating systems,
-the default for `<XDG_CACHE_HOME>` is `$HOME/.cache`. On Windows, the default
-is `%LOCALAPPDATA%`.
-
-## Selecting Main module
-
-When loading multiple packages, there may be multiple definitions for the `Main`
-module. You can specify which `Main` module to load with the
-`--main-is <target>` option. If no selection is made and there are multiple
-`Main` modules, you will be asked to select from a list of options.
-
-## Speeding up initial load
-
-There are two ways to speed up the initial startup of GHCi:
-
-1.  Pass the `--no-build` flag, to skip an initial build step. This works only
-    if the dependencies have already been built.
-
-2.  Pass the `--no-load` flag, to skip loading all defined modules into GHCi.
-    You can then directly use `:load MyModule` in GHCi to load a specific module
-    in your project.
-
-## Loading just the main module
-
-By default, `stack ghci` loads and imports all of the modules in the package.
-This allows you to easily use anything exported by your package. This is usually
-quite convenient, but in some cases it makes sense to only load one module, or
-no modules at all. The `--only-main` flag allows this. It specifies that only
-the main module will be loaded, if any. This is particularly useful in the
-following circumstances:
-
-1. You're loading the project in order to run it in GHCi (e.g. via `main`), and
-   you intend to reload while developing. Without the `--only-main` flag, you
-   will need to quit and restart GHCi whenever a module gets deleted. With the
-   flag, reloading should work fine in this case.
-
-2. If many of your modules have exports named the same thing, then you'll need
-   to refer to them using qualified names. To avoid this, it may be easier to
-   use the `--only-main` flag to start with a blank slate and just import the
-   modules you are interested in.
-
-## Loading a filepath directly
-
-Instead of the `TARGET` syntax, it is also possible to command directly, for
-example:
+It is also possible to specify a module source code file. For example:
 
 ~~~text
 stack ghci src/MyFile.hs
 ~~~
 
-This will figure out which component the file is associated with, and use the
+Stack will identify which component the file is associated with, and use the
 options from that component.
 
-## Specifying extra packages to build or depend on
+Pass the `--package` option to load GHCi with an additional package that is not
+a direct dependency of your components. This option can be specified multiple
+times.
 
-Sometimes you want to load GHCi with an additional package, that isn't a direct
-dependency of your components. This can be achieved by using the `--package`
-option. For example, if I want to experiment with the `lens` library, I can
-command:
-
-~~~text
-stack ghci --package lens
-~~~
-
-## Specifying Cabal flags
-
-`--flag <package_name>:[-]<flag_name>` sets (or unsets) the specified Cabal flag
-for the specified package.
-
-This option can be specified multiple times to set (or unset) multiple Cabal
-flags.
-
-The same Cabal flag name can be set (or unset) for multiple packages with:
+Pass the option `--flag <package_name>:<flag_name>` or
+`--flag <package_name:-<flag_name>` to set or unset a Cabal flag. This option
+can be specified multiple times. The same Cabal flag name can be set (or unset)
+for multiple packages with:
 
 ~~~text
 --flag *:[-]<flag_name>
 ~~~
 
-In order to set a Cabal flag for a GHC boot package, the package must either be
-an extra-dep or the package version must be specified with the `--package`
-option.
+!!! note
+
+    In order to set a Cabal flag for a GHC boot package, the package must either
+    be an extra-dep or the package version must be specified with the
+    `--package` option.
+
+By default:
+
+*   Stack uses the GHC specified in Stack's configuration. Pass the `--with-ghc`
+    option with a file path to the executable to specify a different GHC
+    executable;
+
+*   Stack performs an inital build step. Pass the `--no-build` flag to skip the
+    step. Pass the `--ghc-options` option to pass flags or options to GHC. Pass
+    the `--profile`, `--no-strip`, `--trace` flags for the same behaviour as in
+    the case of the `stack build` command.
+
+    !!! info
+
+        Not performing the initial build step speeds up the startup of GHCi. It
+        only works if the dependencies of the loaded packages have already been
+        built.
+
+*   Stack runs GHCi via `ghc --interactive`. Pass the `--ghc-options` option to
+    pass flags or options to GHC (during the initial build step) and to GHCi.
+    Pass the `--pedantic` flag to pass the GHC options `-Wall` and `-Werror` to
+    GHCi (only). Pass the `--ghci-options` option to pass flags or options to
+    GHCi (only).
+
+*   Stack does not configure GHCi to hide unnecessary packages, unless there are
+    no packages to expose. Pass the `--package-hiding` flag to hide unnecessary
+    packages or `--no-package-hiding` flag not to hide unnecessary packages.
+
+*   Stack loads and imports all of the modules for each target. Pass the
+    `--no-load` flag to skip the loading of modules. Pass the `--only-main` flag
+    to skip the loading of modules other than the main module. Pass the
+    `--load-local-deps` flag to include all local dependencies of targets.
+
+    !!! info
+
+        Not loading modules speeds up the startup of GHCi. Once in GHCi, you can
+        use `:load myModule` to load a specific module in your project.
+
+    !!! info
+
+        The `--only-main` flag can be useful if:
+
+        1.  You're loading the project in order to run it in GHCi (e.g. via
+            `main`), and you intend to reload while developing. Without flag,
+            you will need to quit and restart GHCi whenever a module gets
+            deleted. With the flag, reloading should work fine in this case.
+
+        2.  If many of your modules have exports named the same thing, then
+            you'll need to refer to them using qualified names. To avoid this,
+            use the `--only-main` flag to start with a blank slate and just
+            import the modules you are interested in.
+
+*   If there are multiple definitions for the `Main` module, Stack will ask you
+    to select one from a list of options. Pass the `--main-is <target>` option
+    to specific which `Main` module to load.
+
+Stack combines all of the GHC options of components.
+
+!!! note
+
+    Combining GHC options should work out when packages share similar
+    conventions. However, conflicts may arise, such as when one component
+    defines default extensions which aren't assumed by another. For example,
+    specifying `NoImplicitPrelude` in one component but not another is likely to
+    cause failures. GHCi will be run with `-XNoImplicitPrelude`, but it is
+    likely that modules in the other component assume that the `Prelude` is
+    implicitly imported.
+
+`stack ghci` configures GHCi by using a GHCi script file. Such files are located
+in subdirectories of `<XDG_CACHE_HOME>/stack/ghci-script`, where
+`<XDG_CACHE_HOME>` refers to the
+[XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html)
+for user-specific non-essential (cached) data.
+
+=== "Unix-like"
+
+    The default for `<XDG_CACHE_HOME>` is `$HOME/.cache`.
+
+=== "Windows"
+
+     On Windows, the default for `<XDG_CACHE_HOME>` is `%LOCALAPPDATA%`.
 
 ## Running plain GHCi
 
