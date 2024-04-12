@@ -261,6 +261,37 @@ An extra-dep will shadow a dependency specified in a [snapshot](#snapshot) of
 the same name. An extra-dep can be shadowed by a [project package](#packages) of
 the same name.
 
+!!! info
+
+    Some Haskell packages published on Hackage, for example `base` and `ghc`,
+    are referred to as 'wired-in' to one or more versions of GHC or as 'magic'.
+    They can be distinguished from normal packages by the contents of their
+    Cabal files: GHC's `-this-unit-id` option is set as the name of the package
+    without a version. For example, the `base.cabal` for `base-4.19.1.0`
+    includes:
+
+    ~~~yaml
+    -- We need to set the unit id to base (without a version number)
+    -- as it's magic.
+    ghc-options: -this-unit-id base
+    ~~~
+
+    The GHC boot packages that are 'wired-in' cannot be shaddowed with different
+    versions of the same package. Given their dependencies, the use of these
+    boot packages in a build plan may limit what can be specified as an
+    extra-dep.
+
+    For example, GHC boot package `ghc-9.8.2` has a dependency on `process`. Its
+    `*.conf` file identifies the dependency as `process-1.6.18.0-4fb7`. If
+    package `ghc-9.8.2` is part of a build plan and a different version of
+    `process` is specified as an extra-dep, during a build, Stack will identify
+    that the build plan refers to two versions of `process` and warn that the
+    build is likely to fail.
+
+    Stack treats the following as the names of 'wired-in' packages: `base`,
+    `dph-par`, `dph-seq`, `ghc-bignum`, `ghc-prim`, `ghc`, `integer-gmp`,
+    `integer-simple`, `interactive`, `rts` and `template-haskell`.
+
 ### flags
 
 Default: `{}`
