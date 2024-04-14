@@ -75,9 +75,10 @@ By default:
     GHCi (only). Pass the `--ghci-options` option to pass flags or options to
     GHCi (only).
 
-*   Stack does not configure GHCi to hide unnecessary packages, unless there are
-    no packages to expose. Pass the `--package-hiding` flag to hide unnecessary
-    packages or `--no-package-hiding` flag not to hide unnecessary packages.
+*   Stack configures GHCi to hide unnecessary packages, unless no packages are
+    targetted and no additional packages are specified. Pass the
+    `--package-hiding` flag to hide unnecessary packages or
+    `--no-package-hiding` flag not to hide unnecessary packages.
 
 *   Stack loads and imports all of the modules for each target. Pass the
     `--no-load` flag to skip the loading of modules. Pass the `--only-main` flag
