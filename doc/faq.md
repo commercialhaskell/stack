@@ -349,7 +349,7 @@ is as follows:
 
 * The Stack command is run in a Docker container based on Alpine Linux. The
   relevant Docker image repository is set out in Stack's `stack.yaml` file. See
-  also https://gitlab.com/benz0li/ghc-musl.
+  also Olivier Benz's [GHC musl project](https://gitlab.com/benz0li/ghc-musl).
 
 * Stack's configuration includes:
 
