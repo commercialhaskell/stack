@@ -338,6 +338,35 @@ Yes, Stack supports using Docker with images that contain preinstalled Stackage
 packages and the tools. See [Docker integration](docker_integration.md) for
 details.
 
+## How do I build a statically-linked executable on Linux?
+
+The way that Stack itself builds statically-linked Stack executables for Linux
+is as follows:
+
+* In the Cabal file, the following
+  [`ld-options`](https://cabal.readthedocs.io/en/stable/cabal-package.html#pkg-field-ld-options)
+  are set: `-static` and `-pthread`.
+
+* The Stack command is run in a Docker container based on Alpine Linux. The
+  relevant Docker image repository is set out in Stack's `stack.yaml` file. See
+  also https://gitlab.com/benz0li/ghc-musl.
+
+* Stack's configuration includes:
+
+    ~~~yaml
+    extra-include-dirs:
+    - /usr/include
+    extra-lib-dirs:
+    - /lib
+    - /usr/lib
+    ~~~
+
+* The build command is `stack build --docker --system-ghc --no-install-ghc` (on
+  x86_64) or
+  `stack build --docker --docker-stack-exe=image --system-ghc --no-install-ghc`
+  (on AArch64; the host Stack and the image Stack must have the same version
+  number).
+
 ## How do I use this with Travis CI?
 
 See the [Travis CI instructions](travis_ci.md)
