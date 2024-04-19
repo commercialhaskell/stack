@@ -19,8 +19,8 @@ module Stack.ConfigCmd
 import qualified Data.Aeson.Key as Key
 import qualified Data.Aeson.KeyMap as KeyMap
 import           Data.Attoparsec.Text as P
-                   ( Parser, parseOnly, skip, skipWhile, string, takeText
-                   , takeWhile
+                   ( Parser, parseOnly, skip, string, takeText, takeWhile
+                   , takeWhile1
                    )
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Text as T
@@ -183,10 +183,14 @@ cfgCmdSet cmd = do
   switchLine file cmdKey _ _ searched [] = do
     prettyWarnL
       [ style Current (fromString $ T.unpack cmdKey)
-      , flow "not found in YAML file"
+      , flow "was not found in YAML file"
       , pretty file
-      , flow "as a single line. Multi-line key:value formats are not \
-             \supported."
+      , flow "in the form"
+      , style Shell "key: value"
+      , flow "on a single line. Multi-line formats for existing keys are not \
+             \supported by the"
+      , style Shell "config set"
+      , flow "commands. The file's contents have not been changed."
       ]
     pure $ reverse searched
   switchLine file cmdKey cmdKey' newValue searched (oldLine:rest) =
@@ -207,8 +211,12 @@ cfgCmdSet cmd = do
     kt <- parseKey key
     spaces2 <- P.takeWhile (== ' ')
     skip (== ':')
-    spaces3 <- P.takeWhile (== ' ')
-    skipWhile (/= ' ')
+    spaces3 <- P.takeWhile1 (== ' ')
+    -- This assumes that the existing value contains no space characters, which
+    -- is tolerable for current purposes.
+    void $ takeWhile1 (/= ' ')
+    -- This assumes that anything that follows the existing value is a comment,
+    -- which is tolerable for current purposes.
     comment <- takeText
     pure (kt, spaces1, spaces2, spaces3, comment)
 

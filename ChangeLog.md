@@ -64,6 +64,9 @@ Bug fixes:
 
 * The `config set snapshot` and `config set resolver` commands now respect the
   presence of a synoymous key.
+* The `config set` commands support existing keys only in the form `key: value`
+  on a single line. The commands now recognise that a line `key:` does not have
+  that form.
 * Fix a regression introduced in Stack 2.15.1 that caused a 'no operation'
   `stack build` to be slower than previously.
 
