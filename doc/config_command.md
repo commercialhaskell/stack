@@ -61,6 +61,11 @@ Available commands:
 The `stack config set` commands allow the values of keys in YAML configuration
 files to be set. See `stack config set` for the available keys.
 
+!!! note
+
+    The `config set` commands support an existing key only in the form
+    `key: value` on a single line.
+
 ## The `stack config set install-ghc` command
 
 ~~~text
