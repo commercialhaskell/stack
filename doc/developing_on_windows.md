@@ -64,8 +64,18 @@ The following lists MSYS2 packages known to allow the installation of some
 common Haskell packages on Windows. Feel free to submit additional entries via a
 pull request.
 
-* For [text-icu](https://github.com/bos/text-icu) install
-  `mingw64/mingw-w64-x86_64-icu`
+*   For [text-icu](https://hackage.haskell.org/package/text-icu) install
+    `mingw64/mingw-w64-x86_64-icu`.
+
+*   For [zlib >= 0.7](https://hackage.haskell.org/package/zlib) the default
+    Cabal flag `pkg-config` is `true` and requires executable `pkg-config` on
+    the PATH. MSYS2 [defaults](https://www.msys2.org/docs/pkgconfig/) to
+    [`pkgconf`](https://packages.msys2.org/package/pkgconf?repo=msys&variant=x86_64)
+    as its `pkg-config` implementation. Installation:
+
+        stack exec -- pacman -S pkgconf
+
+    Alternatively, build with `--flag zlib:-pkg-config`.
 
 ## CMake ##
 
