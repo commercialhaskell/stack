@@ -74,6 +74,12 @@ jobs:
       run: |
         set -ex
 
+        if [[ "${{ matrix.os }}" == "macos-latest" ]]
+        then
+          # macos-latest does not include Haskell tools as at 2024-04-25.
+          curl -sSL https://get.haskellstack.org/ | sh
+        fi
+
         if [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
         then
             mkdir -p ~/.stack
