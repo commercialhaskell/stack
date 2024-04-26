@@ -37,11 +37,11 @@ jobs:
         - os: windows-latest
           release-args: ""
           cache-bust: "2024-01-20"
-        - os: macos-latest
+        - os: macos-12
           release-args: ""
           cache-bust: "2024-01-20"
-        # macos-14 provides macOS/AArch64 (M1)
-        - os: macos-14
+        # macos-latest provides macOS/AArch64 (M1)
+        - os: macos-latest
           release-args: ""
           cache-bust: "2024-02-02"
     steps:
@@ -67,9 +67,9 @@ jobs:
       run: |
         set -ex
 
-        if [[ "${{ matrix.os }}" == "macos-14" ]]
+        if [[ "${{ matrix.os }}" == "macos-latest" ]]
         then
-          # macos-14 does not include Haskell tools as at 2024-02-02.
+          # macos-latest does not include Haskell tools as at 2024-04-25.
           curl -sSL https://get.haskellstack.org/ | sh
         fi
 
