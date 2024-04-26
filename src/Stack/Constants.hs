@@ -254,34 +254,30 @@ wiredInPackages = case mparsed of
   Nothing -> impureThrow WiredInPackagesNotParsedBug
  where
   mparsed = mapM parsePackageName
-    [ "ghc-prim"
+    [ "rts"
+      -- Said to be not a \'real\' package
+    , "ghc-prim"
+      -- A magic package
+    , "ghc-bignum"
       -- A magic package
     , "integer-gmp"
-      -- No longer magic > 1.0.3.0. With GHC 9.6.4 at least, there seems to be
-      -- no problem in using it.
+      -- No longer magic > 1.0.3.0 (GHC >= 9.0) and deprecated in favour of
+      -- ghc-bignum. With GHC 9.6.4 at least, there seems to be no problem in
+      -- using it.
     , "integer-simple"
       -- A magic package
     , "base"
       -- A magic package
-    , "rts"
-      -- Said to be not a \'real\' package
     , "template-haskell"
       -- A magic package
-    , "dph-seq"
-      -- Deprecated in favour of dph-prim-seq, which does not appear to be
-      -- magic. With GHC 9.6.4 at least, there seems to be no problem in using
-      -- it.
-    , "dph-par"
-      --  Deprecated in favour of dph-prim-par, which does not appear to be
-      -- magic. With GHC 9.6.4 at least, there seems to be no problem in using
-      -- it.
     , "ghc"
       -- A magic package
     , "interactive"
-      -- Could not identify information about this package name. With GHC 9.6.4
-      -- at least, there seems to be no problem in using it.
-    , "ghc-bignum"
-      -- A magic package
+      -- Type and class declarations at the GHCi command prompt are treated as
+      -- if they were defined in modules all sharing a common package
+      -- interactive. See 'Note [The interactive package]' at
+      -- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Runtime/Context.hs
+      -- With GHC 9.6.4 at least, there seems to be no problem in using it.
     ]
 
 -- | Just to avoid repetition and magic strings.
