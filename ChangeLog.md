@@ -8,6 +8,9 @@ Release notes:
 
 Major changes:
 
+* Stack 2.15.5 and earlier cannot build with Cabal (the library) version
+  `3.12.0.0`. Stack can now build with that Cabal version.
+
 Behaviour changes:
 
 * Stack's `StackSetupShim` executable, when called with `repl` and

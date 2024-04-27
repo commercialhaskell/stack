@@ -3,9 +3,9 @@
 
 module StackSetupShim where
 
--- | Stack no longer supports Cabal < 2.2 and, consequently, GHC versions before
--- GHC 8.4 or base < 4.11.0.0. Consequently, we do not need to test for the
--- existence of the MIN_VERSION_Cabal macro (provided from GHC 8.0).
+-- | Stack no longer supports Cabal < 1.24 and, consequently, GHC versions
+-- before GHC 8.0 or base < 4.9.0.0. Consequently, we do not need to test for
+-- the existence of the MIN_VERSION_Cabal macro (provided from GHC 8.0).
 
 import Data.List ( stripPrefix )
 import Distribution.ReadE ( ReadE (..) )
@@ -26,20 +26,32 @@ import Distribution.Simple.LocalBuildInfo
 #endif
 #if MIN_VERSION_Cabal(3,8,1)
 import Distribution.Simple.PackageDescription ( readGenericPackageDescription )
-#else
--- Avoid confusion with Cabal-syntax module of same name
+#elif MIN_VERSION_Cabal(2,2,0)
+-- Avoid confusion with Cabal-syntax module of same name.
+-- readGenericPackageDescription was exported from module
+-- Distribution.PackageDescription.Parsec in Cabal-2.2.0.0.
 import "Cabal" Distribution.PackageDescription.Parsec
          ( readGenericPackageDescription )
+#elif MIN_VERSION_Cabal(2,0,0)
+-- readPackageDescription was renamed readGenericPackageDescription in
+-- Cabal-2.0.0.2.
+import Distribution.PackageDescription.Parse ( readGenericPackageDescription )
+#else
+import Distribution.PackageDescription.Parse ( readPackageDescription )
 #endif
 import Distribution.Simple.Utils
          ( createDirectoryIfMissingVerbose, findPackageDesc )
 #if MIN_VERSION_Cabal(3,8,1)
 import Distribution.Types.GenericPackageDescription
          ( GenericPackageDescription (..) )
-#else
--- Avoid confusion with Cabal-syntax module of same name
+#elif MIN_VERSION_Cabal(2,0,0)
+-- Avoid confusion with Cabal-syntax module of same name.
+-- GenericPackageDescription was exported from module
+-- Distribution.Types.GenericPackageDescription in Cabal-2.0.0.2.
 import "Cabal" Distribution.Types.GenericPackageDescription
          ( GenericPackageDescription (..) )
+#else
+import Distribution.PackageDescription ( GenericPackageDescription (..) )
 #endif
 -- | Temporary, can be removed if initialBuildSteps restored to Cabal's API.
 #if MIN_VERSION_Cabal(3,11,0)
@@ -50,6 +62,10 @@ import Distribution.Verbosity ( Verbosity )
 #endif
 import Distribution.Verbosity ( flagToVerbosity )
 import Main
+-- Before base-4.11.0.0 (GHC 8.4.1), <> was not exported by Prelude.
+#if !MIN_VERSION_base(4,11,0)
+import Data.Semigroup ( (<>) )
+#endif
 import System.Environment ( getArgs )
 
 mainOverride :: IO ()
@@ -99,7 +115,12 @@ stackReplHook arg1 arg2 = do
                 msg2 = err
 #endif
               Right fp -> do
-                gpd <- readGenericPackageDescription verbosity fp
+                gpd <-
+#if MIN_VERSION_Cabal(2,0,0)
+                  readGenericPackageDescription verbosity fp
+#else
+                  readPackageDescription verbosity fp
+#endif
                 let pd = packageDescription gpd
                 lbi <- getPersistBuildConfig rawBuildDir
                 initialBuildSteps rawBuildDir pd lbi verbosity
