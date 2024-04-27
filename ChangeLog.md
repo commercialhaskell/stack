@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased changes
+## v2.15.6.1 (release candidate)
 
 Release notes:
+
+* This release fixes potential bugs.
 
 **Changes since v2.15.5:**
 
@@ -17,14 +19,12 @@ Behaviour changes:
   `stack-initial-build-steps`, no longer uses Cabal's `replHook` to apply
   `initialBuildSteps` but takes a more direct approach.
 
-Other enhancements:
-
 Bug fixes:
 
 * Fix a regression introduced in Stack 2.15.1 that caused a 'no operation'
   `stack build` to be slower than previously.
 
-##  v2.15.5 - 2024-03-28
+## v2.15.5 - 2024-03-28
 
 Release notes:
 
