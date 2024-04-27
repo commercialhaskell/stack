@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+**Changes since v2.15.6.1:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
 ## v2.15.6.1 (release candidate)
 
 Release notes:
@@ -13,7 +27,7 @@ Major changes:
 * Stack 2.15.5 and earlier cannot build with Cabal (the library) version
   `3.12.0.0`. Stack can now build with that Cabal version.
 
-Behaviour changes:
+Behavior changes:
 
 * Stack's `StackSetupShim` executable, when called with `repl` and
   `stack-initial-build-steps`, no longer uses Cabal's `replHook` to apply
@@ -32,7 +46,7 @@ Release notes:
 
 **Changes since v2.15.3:**
 
-Behaviour changes:
+Behavior changes:
 
 * Following the handover of the Stackage project to the Haskell Foundation, the
   default value of the `urls` key is
