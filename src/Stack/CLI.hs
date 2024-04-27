@@ -386,7 +386,8 @@ commandLineHandler currentDir progName isInterpreter =
 
   list = addCommand'
     "list"
-    "List package id's in snapshot (experimental)."
+    "List package versions included in the package index, or in a specified \
+    \snapshot (directly or indirectly)."
     listCmd
     (many $ strArgument $ metavar "PACKAGE")
 
