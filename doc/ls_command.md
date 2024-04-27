@@ -7,6 +7,7 @@ stack ls COMMAND
 
 Available commands:
   dependencies             View the dependencies
+  globals                  View global packages
   snapshots                View snapshots (local by default)
   stack-colors             View Stack's output styles
   stack-colours            View Stack's output styles (alias for 'stack-colors')
@@ -169,6 +170,26 @@ Pass the `--bench` flag to consider the dependencies of benchmark components.
 
 Pass the `--global-hints` flag to use a hints file for global packages. The
 command then does not require an installed GHC.
+
+## The `stack ls globals` command
+
+~~~text
+stack ls globals [--[no-]global-hints]
+~~~
+
+`stack ls globals` will list all the global packages in alphabetical order.
+
+By default:
+
+* the global packages are those for the version of GHC specified by the snapshot
+  according to a hints file. Pass the flag `--no-global-hints` to use the global
+  package database of an installed GHC.
+
+!!! note
+
+    For example, on Windows, `stack ls globals` will include a version of the
+    `Win32` and `unix` packages but `stack ls globals --no-global-hints` will
+    exclude the `unix` package - and vice versa on Unix-like operating systems.
 
 ## The `stack ls snapshots` command
 

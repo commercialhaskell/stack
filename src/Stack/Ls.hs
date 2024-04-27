@@ -13,6 +13,7 @@ module Stack.Ls
   , ListDepsFormat (..)
   , ListDepsFormatOpts (..)
   , ListDepsTextFilter (..)
+  , ListGlobalsOpts (..)
   , ListStylesOpts (..)
   , ListToolsOpts (..)
   , lsCmd
@@ -39,6 +40,8 @@ import           Network.HTTP.StackClient
                    )
 import           Path ( parent )
 import           RIO.List ( sort )
+import           Stack.Build.Installed ( getInstalled, toInstallMap )
+import           Stack.Config ( withBuildConfig )
 import           Stack.Constants ( osIsWindows )
 import           Stack.DependencyGraph ( createPrunedDependencyGraph )
 import           Stack.Prelude hiding ( Nightly, Snapshot )
@@ -46,14 +49,19 @@ import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Setup.Installed
                    ( Tool (..), filterTools, listInstalled, toolString )
+import           Stack.SourceMap ( globalsFromHints )
+import           Stack.Types.BuildConfig 
+                   ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.DependencyTree
                    ( DependencyTree (..), DotPayload (..), licenseText
                    , versionText
                    )
 import           Stack.Types.DotOpts ( DotOpts (..) )
-import           Stack.Types.EnvConfig ( installationRootDeps )
+import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.EnvConfig ( EnvConfig (..), installationRootDeps )
 import           Stack.Types.Runner ( HasRunner, Runner, terminalL )
+import           Stack.Types.SourceMap ( SMWanted (..) )
 import           System.Console.ANSI.Codes
                    ( SGR (Reset), setSGRCode, sgrToCode )
 import           System.Process.Pager ( pageText )
@@ -79,6 +87,7 @@ newtype LsCmdOpts
 -- | Type representing subcommands for the @stack ls@ command.
 data LsCmds
   = LsSnapshot SnapshotOpts
+  | LsGlobals ListGlobalsOpts
   | LsDependencies ListDepsOpts
   | LsStyles ListStylesOpts
   | LsTools ListToolsOpts
@@ -105,6 +114,11 @@ data SnapshotType
   | Nightly
     -- ^ Stackage Nightly
   deriving (Eq, Ord, Show)
+
+newtype ListGlobalsOpts = ListGlobalsOpts
+  { globalHints :: Bool
+    -- ^ Use global hints instead of relying on an actual GHC installation.
+  }
 
 data ListDepsOpts = ListDepsOpts
   { format :: !ListDepsFormat
@@ -249,6 +263,7 @@ handleLocal lsOpts = do
           displayLocalSnapshot isStdoutTerminal $
           L.filter (L.isPrefixOf "night") snapData
         _ -> liftIO $ displayLocalSnapshot isStdoutTerminal snapData
+    LsGlobals _ -> pure ()
     LsDependencies _ -> pure ()
     LsStyles _ -> pure ()
     LsTools _ -> pure ()
@@ -272,6 +287,7 @@ handleRemote lsOpts = do
           displaySnapshotData isStdoutTerminal $
           filterSnapshotData snapData Nightly
         _ -> liftIO $ displaySnapshotData isStdoutTerminal snapData
+    LsGlobals _ -> pure ()
     LsDependencies _ -> pure ()
     LsStyles _ -> pure ()
     LsTools _ -> pure ()
@@ -285,6 +301,7 @@ lsCmd lsOpts =
       case sopt.viewType of
         Local -> handleLocal lsOpts
         Remote -> handleRemote lsOpts
+    LsGlobals globalsOpts -> withConfig NoReexec $ listGlobalsCmd globalsOpts
     LsDependencies depOpts -> listDependencies depOpts
     LsStyles stylesOpts -> withConfig NoReexec $ listStylesCmd stylesOpts
     LsTools toolsOpts -> withConfig NoReexec $ listToolsCmd toolsOpts
@@ -329,6 +346,23 @@ listToolsCmd opts = do
  where
   filtered pkgName installed = Tool <$>
       filterTools (mkPackageName pkgName) (const True) installed
+
+listGlobalsCmd :: ListGlobalsOpts -> RIO Config ()
+listGlobalsCmd opts = do
+  idents <- if opts.globalHints
+    then
+      withBuildConfig $ do
+        buildConfig <- view buildConfigL
+        globals <- globalsFromHints buildConfig.smWanted.compiler
+        pure $ map (uncurry PackageIdentifier) (Map.toList globals)
+    else
+      withDefaultEnvConfig $ do
+        envConfig <- ask
+        installMap <- toInstallMap envConfig.sourceMap
+        (_, globalDump, _, _) <- getInstalled installMap
+        pure $ L.sort $ map (.packageIdent) globalDump
+  forM_ idents $ \ident ->
+    prettyInfo $ fromString $ packageIdentifierString ident
 
 listDependencies :: ListDepsOpts -> RIO Runner ()
 listDependencies opts = do

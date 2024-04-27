@@ -14,8 +14,9 @@ import           Stack.Constants ( globalFooter )
 import           Stack.Ls
                    ( ListDepsFormat (..), ListDepsFormatOpts (..)
                    , ListDepsOpts (..), ListDepsTextFilter (..)
-                   , ListStylesOpts (..), ListToolsOpts (..), LsCmdOpts (..)
-                   , LsCmds (..), LsView (..), SnapshotOpts (..)
+                   , ListGlobalsOpts (..), ListStylesOpts (..)
+                   , ListToolsOpts (..), LsCmdOpts (..), LsCmds (..)
+                   , LsView (..), SnapshotOpts (..), ListGlobalsOpts
                    )
 import           Stack.Options.DotParser ( dotOptsParser )
 import           Stack.Prelude
@@ -23,13 +24,25 @@ import           Stack.Prelude
 -- | Parse command line arguments for Stack's @ls@ command.
 lsOptsParser :: OA.Parser LsCmdOpts
 lsOptsParser = LsCmdOpts
-  <$> OA.hsubparser (lsSnapCmd <> lsDepsCmd <> lsStylesCmd <> lsToolsCmd)
+  <$> OA.hsubparser 
+        (  lsSnapCmd 
+        <> lsGlobalsCmd 
+        <> lsDepsCmd 
+        <> lsStylesCmd 
+        <> lsToolsCmd
+        )
 
 lsSnapCmd :: OA.Mod OA.CommandFields LsCmds
 lsSnapCmd = OA.command "snapshots" $
   OA.info lsCmdOptsParser $
        OA.progDesc "View snapshots. (default: local)"
     <> OA.footer localSnapshotMsg
+
+lsGlobalsCmd :: OA.Mod OA.CommandFields LsCmds
+lsGlobalsCmd = OA.command "globals" $
+  OA.info lsGlobalsOptsParser $
+       OA.progDesc "View global packages."
+    <> OA.footer globalFooter
 
 lsDepsCmd :: OA.Mod OA.CommandFields LsCmds
 lsDepsCmd = OA.command "dependencies" $
@@ -58,6 +71,9 @@ lsToolsCmd =
 
 lsCmdOptsParser :: OA.Parser LsCmds
 lsCmdOptsParser = LsSnapshot <$> lsViewSnapCmd
+
+lsGlobalsOptsParser :: OA.Parser LsCmds
+lsGlobalsOptsParser = LsGlobals <$> listGlobalsOptsParser
 
 lsDepOptsParser :: OA.Parser LsCmds
 lsDepOptsParser = LsDependencies <$> listDepsOptsParser
@@ -102,6 +118,15 @@ lsViewLocalCmd = OA.command "local" $
 localSnapshotMsg :: String
 localSnapshotMsg =
   "A local snapshot is identified by a hash code. " <> pagerMsg
+
+-- | Parser for arguments to `stack ls globals`.
+listGlobalsOptsParser :: OA.Parser ListGlobalsOpts
+listGlobalsOptsParser = ListGlobalsOpts <$> globalHints
+ where
+  globalHints = boolFlags True
+    "global-hints"
+    "use of a hints file for global packages, rather than an installed GHC"
+    idm
 
 -- | Parser for arguments to `stack ls dependencies`.
 listDepsOptsParser :: OA.Parser ListDepsOpts
