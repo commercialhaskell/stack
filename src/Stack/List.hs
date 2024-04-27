@@ -13,6 +13,7 @@ import           RIO.Process ( HasProcessContext )
 import           Stack.Config ( getRawSnapshot )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
+import           Stack.SourceMap ( globalsFromHints )
 import           Stack.Types.Runner ( Runner )
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -33,17 +34,21 @@ instance Exception ListPrettyException
 listCmd :: [String] -> RIO Runner ()
 listCmd names = withConfig NoReexec $ do
   mSnapshot <- getRawSnapshot
-  listPackages mSnapshot names
+  let mWc = rsCompiler <$> mSnapshot
+  mGlobals <- mapM globalsFromHints mWc
+  listPackages mSnapshot mGlobals names
 
 -- | Intended to work for the command line command.
 listPackages ::
      forall env. (HasPantryConfig env, HasProcessContext env, HasTerm env)
   => Maybe RawSnapshot
      -- ^ When looking up by name, take from this build plan.
+  -> Maybe (Map PackageName Version)
+     -- ^ Global hints for snapshot wanted compiler.
   -> [String]
      -- ^ Names or identifiers.
   -> RIO env ()
-listPackages mSnapshot input = do
+listPackages mSnapshot mGlobals input = do
   let (errs1, names) = case mSnapshot of
         Just snapshot | null input -> ([], Map.keys (rsPackages snapshot))
         _ -> partitionEithers $ map parse input
@@ -98,11 +103,15 @@ listPackages mSnapshot input = do
     -> RIO env (Either StyleDoc PackageIdentifier)
   toLocSnapshot snapshot name =
     case Map.lookup name (rsPackages snapshot) of
-      Nothing ->
-        pure $ Left $ fillSep
-          [ flow "Package does not appear in snapshot:"
-          , style Current (fromPackageName name) <> "."
-          ]
+      Nothing -> case Map.lookup name =<< mGlobals of
+        Nothing -> 
+          pure $ Left $ fillSep
+            [ flow "Package does not appear in snapshot (directly or \
+                   \indirectly):"
+            , style Current (fromPackageName name) <> "."
+            ]
+        Just version ->
+          pure $ Right $ PackageIdentifier name version
       Just sp -> do
         loc <- cplComplete <$> completePackageLocation (rspLocation sp)
         pure $ Right (packageLocationIdent loc)

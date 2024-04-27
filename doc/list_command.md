@@ -14,16 +14,17 @@ Hackage, even after updating the package index, suggestions (not  necessarily
 good ones) will be made about the intended package name.
 
 `stack --snapshot <snapshot> list <package_name>` will send to the standard
-output stream the version of the package in the specified snapshot, unless the
-package comes with GHC on Unix-like operating systems. If the package name
-cannot be found in the snapshot, the command will fail, identifying only the
-package(s) that did not appear in the snapshot.
+output stream the version of the package included in the specified snapshot
+(either directly or indirectly, if a boot package of the compiler specified by
+the snapshot). If the package name cannot be found in the snapshot, the command
+will fail, identifying only the package(s) that did not appear in the snapshot.
 
 More than one package name can be specified.
 
 `stack --snapshot <snapshot> list` will send to the standard output stream a
-list of all the packages in the specified snapshot, except those which come with
-GHC on Unix-like operating systems.
+list of all the packages included directly in the specified snapshot (that is,
+excluding those included only indirectly as a boot package of the compiler
+specified by the snapshot).
 
 For example:
 
@@ -46,12 +47,12 @@ Error: [S-4926]
 
 stack --snapshot lts-22.7 list base unix Win32 acme-missiles pantry
 Error: [S-4926]
-       * Package does not appear in snapshot: base.
-       * Package does not appear in snapshot: unix.
-       * Package does not appear in snapshot: Win32.
-       * Package does not appear in snapshot: acme-missiles.
+       * Package does not appear in snapshot (directly or indirectly): acme-missiles.
 
-stack --snapshot lts-22.7 list pantry
+stack --snapshot lts-22.7 list base unix Win32 pantry
+base-4.18.2.0
+unix-2.8.4.0
+Win32-2.13.3.0
 pantry-0.9.3.1
 
 stack --snapshot lts-22.7 list

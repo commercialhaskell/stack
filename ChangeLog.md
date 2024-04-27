@@ -31,6 +31,9 @@ Behaviour changes:
   is parsed. Previously, if another version of the package was in the snapshot,
   Stack would construct the build plan with that other version or, if it was
   not, Stack would defer an error to the construction of the build plan.
+* The `list` command, with a specified snapshot and package, also reports the
+  version of the package included indirectly in the snapshot (as a boot package
+  of the compiler specified by the snapshot).
 
 Other enhancements:
 
