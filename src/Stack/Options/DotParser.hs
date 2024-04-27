@@ -71,6 +71,6 @@ dotOptsParser externalDefault = DotOpts
 
   globalHints = switch
     (  long "global-hints"
-    <> help "Do not require an install GHC; instead, use a hints file for \
+    <> help "Do not require an installed GHC; instead, use a hints file for \
             \global packages."
     )

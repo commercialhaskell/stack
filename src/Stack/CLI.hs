@@ -393,8 +393,8 @@ commandLineHandler currentDir progName isInterpreter =
 
   ls = addCommand'
     "ls"
-    "List command. (Supports snapshots, dependencies, Stack's styles and \
-    \installed tools.)"
+    "List command. (Supports snapshots, global packages, dependencies, Stack's \
+    \styles and installed tools.)"
     lsCmd
     lsOptsParser
 

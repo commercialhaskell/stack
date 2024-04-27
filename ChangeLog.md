@@ -62,6 +62,8 @@ Other enhancements:
 * Add the `stack config set recommend-stack-upgrade` command to configure
   whether or not Stack should notify the user if it identifes a new version of
   Stack is available in YAML configuration files.
+* Add the `ls globals` command to list all global packages for the version of
+  GHC specified by the snapshot.
 
 Bug fixes:
 
