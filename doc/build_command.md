@@ -251,6 +251,8 @@ specified Cabal flag for the specified package. Stack will report an error if:
 
 This overrides:
 
+* any Cabal flag specifications for the package in the snapshot;
+
 * any Cabal flag specifications for the package in Stack's project-level
   configuration file (`stack.yaml`); and
 
@@ -260,8 +262,19 @@ This overrides:
 for all packages (project packages and dependencies) (whether or not a flag of
 that name is a flag of the package).
 
-This overrides any Cabal flag specifications for packages in Stack's
-project-level configuration file (`stack.yaml`).
+This overrides:
+
+* any Cabal flag specifications for packages in the snapshot; and
+
+* any Cabal flag specifications for packages in Stack's project-level
+  configuration file (`stack.yaml`).
+
+!!! note
+
+    For a package included directly in the snapshot, if the Cabal flag
+    specifications differ from the Cabal flag specifications (if any) in the
+    snapshot, then the package will automatically be promoted to be an
+    [extra-dep](#extra-deps).
 
 !!! note
 
@@ -271,9 +284,9 @@ project-level configuration file (`stack.yaml`).
 !!! warning
 
     Stack creates snapshots when building immutable dependencies of projects.
-    The names of Cabal flags that have been set manually as disabled distinguish
-    one such snapshot from another. However, the names of Cabal flags that have
-    been set manually as enabled do not do so.
+    The names of Cabal flags that have been unset manually distinguish one such
+    snapshot from another. However, the names of Cabal flags that have been set
+    manually do not do so.
 
 ### `--[no-]force-dirty` flag
 
