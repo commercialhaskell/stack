@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased changes
+## v2.15.6.3 (release candidate)
 
 Release notes:
+
+* This release fixes potential bugs.
 
 * The hash that Stack uses to distinguish one build plan from another has
   changed for plans that set (as opposed to unset) manually Cabal flags for
@@ -10,12 +12,6 @@ Release notes:
   plans.
 
 **Changes since v2.15.6.1:**
-
-Major changes:
-
-Behavior changes:
-
-Other enhancements:
 
 Bug fixes:
 
