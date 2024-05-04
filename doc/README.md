@@ -121,6 +121,10 @@ version of GHC.
     use GHCup) is to download and install the
     [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
 
+    !!! info
+
+        By default, the Windows installer will set the Stack root to `C:\sr`.
+
     !!! warning
 
         The Windows installer for Stack 2.9.1, 2.9.3 and 2.11.1 (only) will

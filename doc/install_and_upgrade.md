@@ -487,6 +487,11 @@ GitHub repository.
     use GHCup) is to download and use the
     [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
 
+    !!! info "Stack root"
+
+        By default, the Windows installer will set the Stack root by setting the
+        `STACK_ROOT` environment variable to `C:\sr`. 
+    
     !!! warning "Long user PATH environment variable"
 
         The Windows installer for Stack 2.9.1, 2.9.3 and 2.11.1 (only) will
