@@ -13,7 +13,6 @@ module Stack.SourceMap
   , DumpedGlobalPackage
   , actualFromGhc
   , actualFromHints
-  , checkFlagsUsedThrowing
   , globalCondCheck
   , pruneGlobals
   , globalsFromHints
@@ -32,18 +31,15 @@ import           Distribution.System ( Platform (..) )
 import qualified Pantry.SHA256 as SHA256
 import qualified RIO.Map as Map
 import           RIO.Process ( HasProcessContext )
-import qualified RIO.Set as Set
 import           Stack.Constants ( stackProgName' )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDump )
 import           Stack.Prelude
-import           Stack.Types.Build.Exception ( BuildPrettyException (..) )
 import           Stack.Types.Compiler
                    ( ActualCompiler, actualToWanted, wantedToActual )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe, HasCompiler (..) )
 import           Stack.Types.Config ( HasConfig )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
-import           Stack.Types.UnusedFlags ( FlagSource, UnusedFlags (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( rslInLogL )
 import           Stack.Types.SourceMap
@@ -214,46 +210,6 @@ globalCondCheck = do
       condCheck (PD.Arch arch') = pure $ arch' == arch
       condCheck c = Left c
   pure condCheck
-
-checkFlagsUsedThrowing ::
-     (MonadIO m, MonadThrow m)
-  => Map PackageName (Map FlagName Bool)
-  -> FlagSource
-  -> Map PackageName ProjectPackage
-  -> Map PackageName DepPackage
-  -> m ()
-checkFlagsUsedThrowing packageFlags source prjPackages deps = do
-  unusedFlags <-
-    forMaybeM (Map.toList packageFlags) $ \(pname, flags) ->
-      getUnusedPackageFlags (pname, flags) source prjPackages deps
-  unless (null unusedFlags) $
-    prettyThrowM $ InvalidFlagSpecification $ Set.fromList unusedFlags
-
-getUnusedPackageFlags ::
-     MonadIO m
-  => (PackageName, Map FlagName Bool)
-  -> FlagSource
-  -> Map PackageName ProjectPackage
-  -> Map PackageName DepPackage
-  -> m (Maybe UnusedFlags)
-getUnusedPackageFlags (name, userFlags) source prj deps =
-  let maybeCommon =     fmap (.projectCommon) (Map.lookup name prj)
-                    <|> fmap (.depCommon) (Map.lookup name deps)
-  in  case maybeCommon of
-        -- Package is not available as project or dependency
-        Nothing ->
-          pure $ Just $ UFNoPackage source name
-        -- Package exists, let's check if the flags are defined
-        Just common -> do
-          gpd <- liftIO common.gpd
-          let pname = pkgName $ PD.package $ PD.packageDescription gpd
-              pkgFlags = Set.fromList $ map PD.flagName $ PD.genPackageFlags gpd
-              unused = Map.keysSet $ Map.withoutKeys userFlags pkgFlags
-          if Set.null unused
-            -- All flags are defined, nothing to do
-            then pure Nothing
-            -- Error about the undefined flags
-            else pure $ Just $ UFFlagsNotDefined source pname pkgFlags unused
 
 pruneGlobals ::
      Map PackageName DumpedGlobalPackage

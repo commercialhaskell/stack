@@ -39,6 +39,8 @@ Behaviour changes:
 * The `list` command, with a specified snapshot and package, also reports the
   version of the package included indirectly in the snapshot (as a boot package
   of the compiler specified by the snapshot).
+* `stack build --flag *:[-]<flag_name>` now only applies the flag setting to
+  packages for which the Cabal flag is defined, as opposed to all packages.
 
 Other enhancements:
 

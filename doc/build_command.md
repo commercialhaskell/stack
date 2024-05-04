@@ -257,15 +257,21 @@ This overrides:
 * any use of `--flag *` (see below).
 
 `stack build --flag *:[-]<flag_name>` sets (or unsets) the specified Cabal flag
-for all packages (project packages and dependencies) (whether or not a flag of
-that name is a flag of the package).
+for all packages (project packages and dependencies) for which the flag is
+defined.
 
 This overrides:
 
-* any Cabal flag specifications for packages in the snapshot; and
+* any Cabal flag specifications for the relevant packages in the snapshot; and
 
-* any Cabal flag specifications for packages in Stack's project-level
-  configuration file (`stack.yaml`).
+* any Cabal flag specifications for the relevant packages in Stack's
+  project-level configuration file (`stack.yaml`).
+
+!!! info
+
+    `flag *:[-]<flag_name> inspects the Cabal file of each package in the
+    snapshot. Consequently, its use will add a few seconds to the duration of
+    a build.
 
 !!! note
 

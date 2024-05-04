@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2024-03-29.
+`master` branch of the Stack repository. Last updated: 2024-05-05.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -381,7 +381,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-6374] | SetupHsBuildFailure ExitCode (Maybe PackageIdentifier) (Path Abs File) [String] (Maybe (Path Abs File)) [Text]
         [S-8506] | TargetParseException [StyleDoc]
         [S-7086] | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
-        [S-8664] | InvalidFlagSpecification (Set UnusedFlags)
+        [S-8664] | InvalidFlagSpecification [UnusedFlags]
         [S-8100] | GHCProfOptionInvalid
         [S-1727] | NotOnlyLocal [PackageName] [Text]
         [S-6362] | CompilerVersionMismatch (Maybe (ActualCompiler, Arch)) (WantedCompiler, Arch) GHCVariant CompilerBuild VersionCheck (Maybe (Path Abs File)) Text

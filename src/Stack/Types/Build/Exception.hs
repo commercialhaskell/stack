@@ -248,7 +248,7 @@ data BuildPrettyException
       [Text]     -- log contents
   | TargetParseException [StyleDoc]
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
-  | InvalidFlagSpecification (Set UnusedFlags)
+  | InvalidFlagSpecification [UnusedFlags]
   | GHCProfOptionInvalid
   | NotOnlyLocal [PackageName] [Text]
   | CompilerVersionMismatch
@@ -310,7 +310,7 @@ instance Pretty BuildPrettyException where
     <> line
     <> flow "Invalid flag specification:"
     <> line
-    <> bulletedList (map go (Set.toList unused))
+    <> bulletedList (map go (L.sort unused))
    where
     showFlagSrc :: FlagSource -> StyleDoc
     showFlagSrc FSCommandLine = flow "(specified on the command line)"

@@ -21,6 +21,7 @@ import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.List as L
 import           Data.List.Extra ( (!?) )
+import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -33,8 +34,7 @@ import           RIO.NonEmpty ( nonEmpty )
 import           RIO.Process ( exec, withWorkingDir )
 import           Stack.Build ( buildLocalTargets )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
-import           Stack.Build.Source
-                   ( getLocalFlags, localDependencies, projectLocalPackages )
+import           Stack.Build.Source ( localDependencies, projectLocalPackages )
 import           Stack.Build.Target ( NeedTargets (..), parseTargets )
 import           Stack.Constants
                    ( relDirGhciScript, relDirStackProgName, relFileCabalMacrosH
@@ -62,7 +62,7 @@ import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import qualified Stack.Types.BuildOpts as BenchmarkOpts ( BenchmarkOpts (..) )
 import qualified Stack.Types.BuildOpts as TestOpts ( TestOpts (..) )
 import           Stack.Types.BuildOptsCLI
-                   ( ApplyCLIFlag, BuildOptsCLI (..), defaultBuildOptsCLI )
+                   ( ApplyCLIFlag (..), BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.CompCollection ( getBuildableListText )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
@@ -849,8 +849,7 @@ loadGhciPkgDesc buildOptsCLI name cabalFP target = do
       config = PackageConfig
         { enableTests = True
         , enableBenchmarks = True
-        , flags =
-            getLocalFlags buildOptsCLI name `M.union` sourceMapFlags
+        , flags = getCliFlags <> sourceMapFlags
         , ghcOptions = sourceMapGhcOptions
         , cabalConfigOpts = sourceMapCabalConfigOpts
         , compilerVersion = compilerVersion
@@ -881,6 +880,14 @@ loadGhciPkgDesc buildOptsCLI name cabalFP target = do
     , cabalFP
     , target
     }
+ where
+  cliFlags = buildOptsCLI.flags
+  -- | All CLI Cabal flags for a package.
+  getCliFlags :: Map FlagName Bool
+  getCliFlags = Map.unions
+    [ Map.findWithDefault Map.empty (ACFByName name) cliFlags
+    , Map.findWithDefault Map.empty ACFAllProjectPackages cliFlags
+    ]
 
 getGhciPkgInfos ::
      HasEnvConfig env
