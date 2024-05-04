@@ -132,8 +132,12 @@ flagsParser = Map.unionsWith Map.union
        (  long "flag"
        <> completer flagCompleter
        <> metavar "PACKAGE:[-]FLAG"
-       <> help "Override flags set in stack.yaml (applies to project packages \
-               \and extra-deps)."
+       <> help "Set (or unset) the Cabal flag for the package (or use '*' for \
+               \all packages) (can be specified multiple times). Applies to \
+               \project packages, packages included directly in the snapshot, \
+               \and extra-deps. Takes precedence over any Cabal flags \
+               \specified for the package in the snapshot or in the \
+               \project-level configuration file (stack.yaml)."
        ))
 
 progsOptionsParser :: Parser [(Text, [Text])]
