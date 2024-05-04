@@ -322,13 +322,6 @@ in the snapshot.
     In order to set a Cabal flag for a GHC boot package, the package must be
     specified as an [extra-dep](#extra-deps).
 
-!!! warning
-
-    Stack creates snapshots when building immutable dependencies of projects.
-    The names of Cabal flags that have been unset manually distinguish one such
-    snapshot from another. However, the names of Cabal flags that have been set
-    manually do not do so.
-
 ### drop-packages
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)

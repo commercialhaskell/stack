@@ -194,9 +194,7 @@ depPackageHashableContent dp =
     PLMutable _ -> pure ""
     PLImmutable pli -> do
       let flagToBs (f, enabled) =
-            if enabled
-              then ""
-              else "-" <> fromString (C.unFlagName f)
+            (if enabled then "" else "-") <> fromString (C.unFlagName f)
           flags = map flagToBs $ Map.toList dp.depCommon.flags
           ghcOptions = map display dp.depCommon.ghcOptions
           cabalConfigOpts = map display dp.depCommon.cabalConfigOpts
