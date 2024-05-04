@@ -775,7 +775,7 @@ the [`stack path --local-install-root`](path_command.md) command.
 
 Default: Disabled
 
-Set the flag to enable the GHC option `--split-objs`. This will reduce output
+Set the flag to enable the GHC option `-split-objs`. This will reduce output
 size (at the cost of build time).
 
 !!! note
@@ -784,6 +784,11 @@ size (at the cost of build time).
     clean your project's Stack working directory before use. If you want to
     compile all dependencies with split-objs, you will need to delete the
     snapshot (and all snapshots that could reference that snapshot).
+
+!!! note
+
+    GHC's `-split-objs` flag was deprecated in favour of `-split-sections` in
+    GHC 8.2.1 and was not supported by GHC on any platform from GHC 8.10.1.
 
 ### `--no-strip` flag
 
