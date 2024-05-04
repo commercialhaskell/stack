@@ -236,21 +236,57 @@ Set the flag to build nothing and output information about the build plan.
 
 ### `--flag` option
 
+The option can be specified multiple times. It has two forms:
+
+* `--flag <package_name>:[-]<flag_name>`; and
+
+* `--flag *:[-]<flag_name>`.
+
 `stack build --flag <package_name>:[-]<flag_name>` sets (or unsets) the
-specified Cabal flag for the specified package.
+specified Cabal flag for the specified package. Stack will report an error if:
 
-This option can be specified multiple times to set (or unset) multiple Cabal
-flags.
+* a package of that name is not known to Stack; or
 
-The same Cabal flag name can be set (or unset) for multiple packages (at the
-command line only) with:
+* a flag of that name is not a flag of that package.
 
-~~~text
-stack build --flag *:[-]<flag_name>
-~~~
+This overrides:
 
-In order to set a Cabal flag for a GHC boot package, the package must be
-specified as an extra-dep.
+* any Cabal flag specifications for the package in the snapshot;
+
+* any Cabal flag specifications for the package in Stack's project-level
+  configuration file (`stack.yaml`); and
+
+* any use of `--flag *` (see below).
+
+`stack build --flag *:[-]<flag_name>` sets (or unsets) the specified Cabal flag
+for all packages (project packages and dependencies) (whether or not a flag of
+that name is a flag of the package).
+
+This overrides:
+
+* any Cabal flag specifications for packages in the snapshot; and
+
+* any Cabal flag specifications for packages in Stack's project-level
+  configuration file (`stack.yaml`).
+
+!!! note
+
+    For a package included directly in the snapshot, if the Cabal flag
+    specifications differ from the Cabal flag specifications (if any) in the
+    snapshot, then the package will automatically be promoted to be an
+    [extra-dep](#extra-deps).
+
+!!! note
+
+    In order to set a Cabal flag for a GHC boot package, the package must be
+    specified as an [extra-dep](yaml_configuration.md#extra-deps).
+
+!!! warning
+
+    Stack creates snapshots when building immutable dependencies of projects.
+    The names of Cabal flags that have been unset manually distinguish one such
+    snapshot from another. However, the names of Cabal flags that have been set
+    manually do not do so.
 
 ### `--[no-]force-dirty` flag
 
@@ -675,7 +711,7 @@ the [`stack path --local-install-root`](path_command.md) command.
 
 Default: Disabled
 
-Set the flag to enable the GHC option `--split-objs`. This will reduce output
+Set the flag to enable the GHC option `-split-objs`. This will reduce output
 size (at the cost of build time).
 
 !!! note
@@ -684,6 +720,11 @@ size (at the cost of build time).
     clean your project's Stack working directory before use. If you want to
     compile all dependencies with split-objs, you will need to delete the
     snapshot (and all snapshots that could reference that snapshot).
+
+!!! note
+
+    GHC's `-split-objs` flag was deprecated in favour of `-split-sections` in
+    GHC 8.2.1 and was not supported by GHC on any platform from GHC 8.10.1.
 
 ### `--no-strip` flag
 
