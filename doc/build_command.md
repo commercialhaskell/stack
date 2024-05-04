@@ -271,9 +271,9 @@ project-level configuration file (`stack.yaml`).
 !!! warning
 
     Stack creates snapshots when building immutable dependencies of projects.
-    The names of Cabal flags that have been manually set as disabled distinguish
+    The names of Cabal flags that have been set manually as disabled distinguish
     one such snapshot from another. However, the names of Cabal flags that have
-    been set as enabled do not do so.
+    been set manually as enabled do not do so.
 
 ### `--[no-]force-dirty` flag
 
