@@ -47,8 +47,10 @@ import qualified Data.Map as Map
 import qualified Data.Map.Merge.Strict as MS
 import qualified Data.Monoid
 import           Data.Monoid.Map ( MonoidMap (..) )
+import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
+import qualified Distribution.PackageDescription as PD
 import           Distribution.System
                    ( Arch (..), OS (..), Platform (..), buildPlatform )
 import qualified Distribution.Text ( simpleParse )
@@ -97,17 +99,15 @@ import           Stack.Constants
 import qualified Stack.Constants as Constants
 import           Stack.Lock ( lockCachedWanted )
 import           Stack.Prelude
-import           Stack.SourceMap
-                   ( additionalDepPackage, checkFlagsUsedThrowing
-                   , mkProjectPackage
-                   )
+import           Stack.SourceMap ( additionalDepPackage, mkProjectPackage )
 import           Stack.Storage.Project ( initProjectStorage )
 import           Stack.Storage.User ( initUserStorage )
 import           Stack.Storage.Util ( handleMigrationException )
 import           Stack.Types.AllowNewerDeps ( AllowNewerDeps (..) )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
-import           Stack.Types.Build.Exception ( BuildException (..) )
+import           Stack.Types.Build.Exception
+                   ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig ( BuildConfig (..) )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.ColorWhen ( ColorWhen (..) )
@@ -145,7 +145,7 @@ import           Stack.Types.SourceMap
                    , SMWanted (..)
                    )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
-import           Stack.Types.UnusedFlags ( FlagSource (..) )
+import           Stack.Types.UnusedFlags ( FlagSource (..), UnusedFlags (..) )
 import           Stack.Types.Version
                    ( IntersectingVersionRange (..), VersionCheck (..)
                    , stackVersion, withinRange
@@ -959,7 +959,7 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
       deps2 = mergeApply deps1 pFlags $ \_ d flags ->
         d { depCommon = d.depCommon { flags = flags } }
 
-  checkFlagsUsedThrowing pFlags FSStackYaml packages1 deps1
+  checkFlagsUsedThrowing pFlags packages1 deps1
 
   let pkgGhcOptions = config.ghcOptionsByName
       deps = mergeApply deps2 pkgGhcOptions $ \_ d options ->
@@ -982,6 +982,39 @@ fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages 
 
   pure (wanted, catMaybes mcompleted)
 
+-- | Check if a package is a project package or a dependency and, if it is,
+-- if all the specified flags are defined in the package's Cabal file.
+checkFlagsUsedThrowing ::
+     forall m. (MonadIO m, MonadThrow m)
+  => Map PackageName (Map FlagName Bool)
+  -> Map PackageName ProjectPackage
+  -> Map PackageName DepPackage
+  -> m ()
+checkFlagsUsedThrowing packageFlags projectPackages deps = do
+  unusedFlags <- forMaybeM (Map.toList packageFlags) getUnusedPackageFlags
+  unless (null unusedFlags) $
+    prettyThrowM $ InvalidFlagSpecification unusedFlags
+ where
+  getUnusedPackageFlags ::
+       (PackageName, Map FlagName Bool)
+    -> m (Maybe UnusedFlags)
+  getUnusedPackageFlags (name, userFlags) = case maybeCommon of
+    -- Package is not available as project or dependency
+    Nothing -> pure $ Just $ UFNoPackage FSStackYaml name
+    -- Package exists, let's check if the flags are defined
+    Just common -> do
+      gpd <- liftIO common.gpd
+      let pname = pkgName $ PD.package $ PD.packageDescription gpd
+          pkgFlags = Set.fromList $ map PD.flagName $ PD.genPackageFlags gpd
+          unused = Map.keysSet $ Map.withoutKeys userFlags pkgFlags
+      pure $ if Set.null unused
+        -- All flags are defined, nothing to do
+        then Nothing
+        -- Error about the undefined flags
+        else Just $ UFFlagsNotDefined FSStackYaml pname pkgFlags unused
+   where
+    maybeCommon =     fmap (.projectCommon) (Map.lookup name projectPackages)
+                  <|> fmap (.depCommon) (Map.lookup name deps)
 
 -- | Check if there are any duplicate package names and, if so, throw an
 -- exception.
@@ -993,7 +1026,6 @@ checkDuplicateNames locals =
  where
   hasMultiples (_, _:_:_) = True
   hasMultiples _ = False
-
 
 -- | Get the Stack root, e.g. @~/.stack@, and determine whether the user owns it.
 --
