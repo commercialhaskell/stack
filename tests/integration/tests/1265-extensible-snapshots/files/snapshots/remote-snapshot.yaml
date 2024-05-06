@@ -1,4 +1,4 @@
-snapshot: lts-22.7
+snapshot: lts-22.21
 name: remote-snapshot
 packages:
 - archive: https://s3.amazonaws.com/hackage.fpcomplete.com/package/acme-missiles-0.3.tar.gz

@@ -53,12 +53,12 @@ import           Test.Hspec
 
 sampleConfig :: String
 sampleConfig =
-  "snapshot: lts-22.7\n" ++
+  "snapshot: lts-22.21\n" ++
   "packages: ['.']\n"
 
 buildOptsConfig :: String
 buildOptsConfig =
-  "snapshot: lts-22.7\n" ++
+  "snapshot: lts-22.21\n" ++
   "packages: ['.']\n" ++
   "build:\n" ++
   "  library-profiling: true\n" ++
@@ -104,7 +104,7 @@ buildOptsConfig =
 
 buildOptsHaddockForHackageConfig :: String
 buildOptsHaddockForHackageConfig =
-  "snapshot: lts-22.7\n" ++
+  "snapshot: lts-22.21\n" ++
   "packages: ['.']\n" ++
   "build:\n" ++
   "  haddock: true\n" ++
@@ -120,24 +120,24 @@ buildOptsHaddockForHackageConfig =
 
 hpackConfig :: String
 hpackConfig =
-  "snapshot: lts-22.7\n" ++
+  "snapshot: lts-22.21\n" ++
   "with-hpack: /usr/local/bin/hpack\n" ++
   "packages: ['.']\n"
 
 resolverConfig :: String
 resolverConfig =
-  "resolver: lts-22.7\n" ++
+  "resolver: lts-22.21\n" ++
   "packages: ['.']\n"
 
 snapshotConfig :: String
 snapshotConfig =
-  "snapshot: lts-22.7\n" ++
+  "snapshot: lts-22.21\n" ++
   "packages: ['.']\n"
 
 resolverSnapshotConfig :: String
 resolverSnapshotConfig =
-  "resolver: lts-22.7\n" ++
-  "snapshot: lts-22.7\n" ++
+  "resolver: lts-22.21\n" ++
+  "snapshot: lts-22.21\n" ++
   "packages: ['.']\n"
 
 stackDotYaml :: Path Rel File
@@ -187,11 +187,11 @@ spec = beforeAll setup $ do
 
     it "parses snapshot using 'resolver'" $ inTempDir $ do
       loadProject resolverConfig $ \project ->
-        project.snapshot `shouldBe` RSLSynonym (LTS 22 7)
+        project.snapshot `shouldBe` RSLSynonym (LTS 22 21)
 
     it "parses snapshot using 'snapshot'" $ inTempDir $ do
       loadProject snapshotConfig $ \project ->
-        project.snapshot `shouldBe` RSLSynonym (LTS 22 7)
+        project.snapshot `shouldBe` RSLSynonym (LTS 22 21)
 
     it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
       loadProject resolverSnapshotConfig (const (pure ()))
@@ -315,7 +315,7 @@ spec = beforeAll setup $ do
             packageYaml =
               childRel </> either impureThrow id (parseRelFile "package.yaml")
         createDirectoryIfMissing True $ toFilePath $ parent yamlAbs
-        writeFile (toFilePath yamlAbs) "snapshot: ghc-9.6.4"
+        writeFile (toFilePath yamlAbs) "snapshot: ghc-9.6.5"
         writeFile (toFilePath packageYaml) "name: foo"
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $
           loadConfig' $ \config -> liftIO $ do

@@ -1,4 +1,4 @@
-snapshot: ghc-9.6.4
+snapshot: ghc-9.6.5
 extra-deps:
 - stm-2.4.4.1
 - mtl-2.2.1
