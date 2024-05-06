@@ -3,31 +3,10 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages:
-- completed:
-    hackage: Cabal-3.10.1.0@sha256:6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94,12316
-    pantry-tree:
-      sha256: 3d175ab2e29f17494599bf5844d0037d01fd04287ac5d50c5c788b0633a8ee6f
-      size: 9223
-  original:
-    hackage: Cabal-3.10.1.0@sha256:6d11adf7847d9734e7b02785ff831b5a0d11536bfbcefd6634b2b08411c63c94,12316
-- completed:
-    hackage: pantry-0.9.3.2@sha256:336373d8cbb10505ff16ac6e35cb9d8a7f45293a908de1c00f55c133ee7dde86,7511
-    pantry-tree:
-      sha256: 820f4442ca96663fa57405f22385d216fbc1a28b9f49c7c82ad2a391803abe51
-      size: 2722
-  original:
-    hackage: pantry-0.9.3.2@sha256:336373d8cbb10505ff16ac6e35cb9d8a7f45293a908de1c00f55c133ee7dde86,7511
-- completed:
-    hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
-    pantry-tree:
-      sha256: 3f9fef1f9a6ed1a6923578ada0bc8c16d016344cc67614473384524334463cc2
-      size: 1675
-  original:
-    hackage: process-1.6.18.0@sha256:cd0a3e0376b5a8525983d3131a31e52f9ffefc278ce635eec45a9d3987b8be3e,3025
+packages: []
 snapshots:
 - completed:
-    sha256: 7b975b104cb3dbf0c297dfd01f936a4d2ee523241dd0b1ae960522b833fe3027
-    size: 714096
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/7.yaml
-  original: lts-22.7
+    sha256: b146f371d1a90abbd2aeae1da10f776951046be50eae55a6fe93548a74fcc0dd
+    size: 713338
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/21.yaml
+  original: lts-22.21

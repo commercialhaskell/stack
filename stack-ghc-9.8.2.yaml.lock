@@ -11,9 +11,16 @@ packages:
       size: 2722
   original:
     hackage: pantry-0.9.3.2@sha256:336373d8cbb10505ff16ac6e35cb9d8a7f45293a908de1c00f55c133ee7dde86,7511
+- completed:
+    hackage: tar-0.5.1.1@sha256:aaf5dd3ef327aaf203b1cb199760efd463fac2256453dd0e05d5cd707cdbd6e1,5460
+    pantry-tree:
+      sha256: 95580f5df2df9c04f17dc31d97085c0b8d50355f1e0f05f2f8efefe28ab4a462
+      size: 1069
+  original:
+    hackage: tar-0.5.1.1@sha256:aaf5dd3ef327aaf203b1cb199760efd463fac2256453dd0e05d5cd707cdbd6e1,5460
 snapshots:
 - completed:
-    sha256: 1d712c7dff52b68376c61a25d9fd642d0bca4498f0d5affb4086f6ea076b3930
-    size: 604414
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/2/24.yaml
-  original: nightly-2024-02-24
+    sha256: b66176d92f4e55079a946948d23fc80bf68fb328e23d1066ed9f73a609a3d8b8
+    size: 631258
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/5/6.yaml
+  original: nightly-2024-05-06

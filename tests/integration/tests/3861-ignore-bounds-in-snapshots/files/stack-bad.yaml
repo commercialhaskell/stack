@@ -1,4 +1,4 @@
-snapshot: ghc-9.6.4
+snapshot: ghc-9.6.5
 extra-deps:
 - ./bad-bounds.tar
 

@@ -410,11 +410,14 @@ GitHub repository.
         |GHC version|LLVM versions|
         |-----------|-------------|
         |9.8.2      |11 to 15     |
-        |9.6.4      |11 to 15     |
+        |9.6.5      |11 to 15     |
         |9.4.8      |10 to 14     |
         |9.2.8      |9 to 12      |
         |9.0.2      |9, 10 or 12  |
         |8.10.7     |9 to 12      |
+        |8.8.4      |7            |
+        |8.6.5      |6            |
+        |8.4.4      |5            |
 
     ### Using Homebrew
 
@@ -490,8 +493,8 @@ GitHub repository.
     !!! info "Stack root"
 
         By default, the Windows installer will set the Stack root by setting the
-        `STACK_ROOT` environment variable to `C:\sr`. 
-    
+        `STACK_ROOT` environment variable to `C:\sr`.
+
     !!! warning "Long user PATH environment variable"
 
         The Windows installer for Stack 2.9.1, 2.9.3 and 2.11.1 (only) will

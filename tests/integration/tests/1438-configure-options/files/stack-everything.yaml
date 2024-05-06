@@ -1,4 +1,4 @@
-snapshot: ghc-9.6.4
+snapshot: ghc-9.6.5
 
 extra-deps:
 - acme-dont-1.1@rev:0
