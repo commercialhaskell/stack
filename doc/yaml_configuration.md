@@ -115,10 +115,10 @@ installation, and various settings like build flags. It is also called a
 resolver since a snapshot states how dependencies are resolved. There are
 currently four snapshot types:
 
-* LTS Haskell snapshots, e.g. `snapshot: lts-22.7`
-* Stackage Nightly snapshots, e.g. `snapshot: nightly-2023-12-16`
+* LTS Haskell snapshots, e.g. `snapshot: lts-22.21`
+* Stackage Nightly snapshots, e.g. `snapshot: nightly-2024-05-06`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
-  like `snapshot: ghc-9.6.4`
+  like `snapshot: ghc-9.6.5`
 * Custom snapshot, via a URL or relative file path. For further information, see
   the [snapshot and package location](pantry.md) documentation.
 
@@ -723,12 +723,12 @@ Command line equivalent (takes precedence): `--compiler` option
 
 Overrides the compiler version in the snapshot. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
-snapshots like `ghc-9.6.3`. This can be used to override the compiler for a
+snapshots like `ghc-9.6.5`. This can be used to override the compiler for a
 Stackage snapshot, like this:
 
 ~~~yaml
-snapshot: lts-22.7
-compiler: ghc-9.6.3
+snapshot: lts-22.21
+compiler: ghc-9.6.4
 compiler-check: match-exact
 ~~~
 

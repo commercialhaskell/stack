@@ -1,11 +1,11 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.8.2.
 
-snapshot: nightly-2024-04-20 # GHC 9.8.2
+snapshot: nightly-2024-05-06 # GHC 9.8.2
 
 docker:
   enable: false
-  repo: quay.io/benz0li/ghc-musl:9.8.1
+  repo: quay.io/benz0li/ghc-musl:9.8.2
 
 nix:
   # --nix on the command-line to enable.
@@ -14,12 +14,5 @@ nix:
   - unzip
 
 flags:
-  hackage-security:
-    cabal-syntax: true
   stack:
     developer-mode: true
-  zlib:
-    # On Windows, pkg-config.exe is not provided with MSYS2 'out of the box',
-    # although it can be installed with pacman
-    # (https://packages.msys2.org/base/pkgconf)
-    pkg-config: false

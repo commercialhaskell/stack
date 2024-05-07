@@ -248,7 +248,7 @@ this:
 
 ~~~yaml
 resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/11.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/21.yaml
 packages:
 - .
 ~~~
@@ -256,7 +256,7 @@ packages:
 The value of the [`resolver`](yaml_configuration.md#resolver) key tells Stack
 *how* to build your package: which GHC version to use, versions of package
 dependencies, and so on. Our value here says to use
-[LTS Haskell 22.11](https://www.stackage.org/lts-22.11), which implies GHC 9.6.4
+[LTS Haskell 22.21](https://www.stackage.org/lts-22.21), which implies GHC 9.6.5
 (which is why `stack build` installs that version of GHC if it is not already
 available to Stack). There are a number of values you can use for `resolver`,
 which we'll cover later.
@@ -980,7 +980,7 @@ stack purge
 stack build :helloworld-test
 helloworld> configure (lib + test)
 Configuring helloworld-0.1.0.0...
-helloworld> build (lib + test) with ghc-9.6.4
+helloworld> build (lib + test) with ghc-9.6.5
 Preprocessing library for helloworld-0.1.0.0..
 Building library for helloworld-0.1.0.0..
 [1 of 2] Compiling Lib
@@ -1298,7 +1298,7 @@ yields output like:
 
 ~~~text
 Run from outside a project, using implicit global project config
-Using latest snapshot resolver: lts-22.7
+Using latest snapshot resolver: lts-22.21
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
 Note: You can change the snapshot via the resolver field there.
 I installed the stm package via --package stm
