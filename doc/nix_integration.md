@@ -431,7 +431,7 @@ those libraries and, therefore, can't build most projects. However, GHC provided
 through Nix can be modified to find the external C libraries provided through
 Nix.
 
-[nix-language]: https://nixos.wiki/wiki/Overview_of_the_Nix_Language
+[nix-language]: https://wiki.nixos.org/wiki/Overview_of_the_Nix_Language
 [nix-manual-exprs]: http://nixos.org/manual/nix/stable/expressions/writing-nix-expressions.html
 [nix-search-packages]: https://search.nixos.org/packages
 [nixpkgs-manual-haskell]: https://haskell4nix.readthedocs.io/nixpkgs-users-guide.html?highlight=buildStackProject#how-to-build-a-haskell-project-using-stack
