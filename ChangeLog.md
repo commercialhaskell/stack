@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+**Changes since v2.15.7:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
 ## v2.15.7 - 2024-05-12
 
 Release notes:
