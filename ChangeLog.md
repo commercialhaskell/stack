@@ -4,22 +4,14 @@
 
 Release notes:
 
-* The hash that Stack uses to distinguish one build plan from another has
-  changed for plans that set (as opposed to unset) manually Cabal flags for
-  immutable dependencies. This will cause Stack to rebuild dependencies for such
-  plans.
+**Changes since v2.15.7:**
 
-**Changes since v2.15.5:**
-
-Behaviour changes:
+Behavior changes:
 
 * Stack uses the version of the Cabal package that comes with the specified
   version of GHC. Stack no longer supports such Cabal versions before 2.2, which
   came with versions of GHC before 8.4. Consequently, the `init` command will
   not try LTS Haskell before 12.0.
-* Stack's `StackSetupShim` executable, when called with `repl` and
-  `stack-initial-build-steps`, no longer uses Cabal's `replHook` to apply
-  `initialBuildSteps` but takes a more direct approach.
 * The `init` command initialises `stack.yaml` with a `snapshot` key rather than
   a `resolver` key.
 * After installing GHC or another tool, Stack deletes the archive file which
@@ -79,6 +71,32 @@ Bug fixes:
 * The `config set` commands support existing keys only in the form `key: value`
   on a single line. The commands now recognise that a line `key:` does not have
   that form.
+
+## v2.15.7 - 2024-05-12
+
+Release notes:
+
+* This release fixes potential bugs.
+* The hash that Stack uses to distinguish one build plan from another has
+  changed for plans that set (as opposed to unset) manually Cabal flags for
+  immutable dependencies. This will cause Stack to rebuild dependencies for such
+  plans.
+
+**Changes since v2.15.5:**
+
+Major changes:
+
+* Stack 2.15.5 and earlier cannot build with Cabal (the library) version
+  `3.12.0.0`. Stack can now build with that Cabal version.
+
+Behavior changes:
+
+* Stack's `StackSetupShim` executable, when called with `repl` and
+  `stack-initial-build-steps`, no longer uses Cabal's `replHook` to apply
+  `initialBuildSteps` but takes a more direct approach.
+
+Bug fixes:
+
 * Fix a regression introduced in Stack 2.15.1 that caused a 'no operation'
   `stack build` to be slower than previously.
 * The hashes that Stack uses to distinguish one build plan from another now
@@ -93,7 +111,7 @@ Release notes:
 
 **Changes since v2.15.3:**
 
-Behaviour changes:
+Behavior changes:
 
 * Following the handover of the Stackage project to the Haskell Foundation, the
   default value of the `urls` key is
