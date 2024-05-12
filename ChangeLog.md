@@ -1,29 +1,14 @@
 # Changelog
 
-## v2.15.6.3 (release candidate)
+## v2.15.7 - 2024-05-12
 
 Release notes:
 
 * This release fixes potential bugs.
-
 * The hash that Stack uses to distinguish one build plan from another has
   changed for plans that set (as opposed to unset) manually Cabal flags for
   immutable dependencies. This will cause Stack to rebuild dependencies for such
   plans.
-
-**Changes since v2.15.6.1:**
-
-Bug fixes:
-
-* The hashes that Stack uses to distinguish one build plan from another now
-  include the Cabal flags for immutable dependencies set manually. Previously,
-  in error, only such flags that were unset manually were included.
-
-## v2.15.6.1 (release candidate)
-
-Release notes:
-
-* This release fixes potential bugs.
 
 **Changes since v2.15.5:**
 
@@ -42,6 +27,9 @@ Bug fixes:
 
 * Fix a regression introduced in Stack 2.15.1 that caused a 'no operation'
   `stack build` to be slower than previously.
+* The hashes that Stack uses to distinguish one build plan from another now
+  include the Cabal flags for immutable dependencies set manually. Previously,
+  in error, only such flags that were unset manually were included.
 
 ## v2.15.5 - 2024-03-28
 
