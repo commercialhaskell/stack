@@ -18,14 +18,18 @@ module Stack.Coverage
   ) where
 
 import qualified Data.ByteString.Lazy.Char8 as L8
+import           Data.Conduit ( await )
 import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as LT
+import           Distribution.Types.MungedPackageId ( computeCompatPackageId )
+import           Distribution.Types.UnqualComponentName
+                   ( mkUnqualComponentName )
 import           Distribution.Version ( mkVersion )
 import           Path
-                   ( (</>), dirname, filename, parent, parseAbsFile, parseRelDir
+                   ( (</>), dirname, parent, parseAbsFile, parseRelDir
                    , parseRelFile, stripProperPrefix
                    )
 import           Path.Extra ( toFilePathNoTrailingSep )
@@ -35,7 +39,8 @@ import           Path.IO
                    , resolveDir', resolveFile'
                    )
 import           RIO.ByteString.Lazy ( putStrLn )
-import           RIO.Process ( ProcessException, proc, readProcess_ )
+import           RIO.Process
+                   ( ExitCodeException, ProcessException, proc, readProcess_ )
 import           Stack.Build.Target ( NeedTargets (..) )
 import           Stack.Constants
                    ( relDirAll, relDirCombined, relDirCustom
@@ -44,11 +49,13 @@ import           Stack.Constants
                    )
 import           Stack.Constants.Config ( distDirFromDir, hpcRelativeDir )
 import           Stack.Package ( hasBuildableMainLibrary )
+import           Stack.PackageDump ( ghcPkgField )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Compiler ( getGhcVersion )
+import           Stack.Types.CompilerPaths ( getGhcPkgExe )
 import           Stack.Types.CompCollection ( getBuildableSetText )
 import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), defaultBuildOptsCLI )
@@ -609,61 +616,35 @@ findPackageFieldForBuiltPackage ::
   => Path Abs Dir -> PackageIdentifier -> Set.Set Text -> Text
   -> RIO env (Either Text [Text])
 findPackageFieldForBuiltPackage pkgDir pkgId subLibs field = do
+  let subLibNames =
+        Set.map (LSubLibName . mkUnqualComponentName . T.unpack) subLibs
+      libraryNames = Set.insert LMainLibName subLibNames
+      mungedPackageIds = Set.map (computeCompatPackageId pkgId) libraryNames 
   distDir <- distDirFromDir pkgDir
+  ghcPkgExe <- getGhcPkgExe
   let inplaceDir = distDir </> relDirPackageConfInplace
       pkgIdStr = packageIdentifierString pkgId
       notFoundErr = pure $
         Left $ "Failed to find package key for " <> T.pack pkgIdStr
-      extractField path = do
-        contents <- readFileUtf8 (toFilePath path)
-        case asum (map (T.stripPrefix (field <> ": ")) (T.lines contents)) of
+      extractField mungedPkgId = do
+        mContents <- catch
+          (ghcPkgField ghcPkgExe inplaceDir mungedPkgId (T.unpack field) await)
+          -- A .conf file may not exist in the package database for a library or
+          -- sub-library, if that component has not been built yet.
+          (\(_ :: ExitCodeException) -> pure Nothing)
+        case mContents of
           Just result -> pure $ Right $ T.strip result
           Nothing -> notFoundErr
   logDebug $
        "Scanning "
     <> fromString (toFilePath inplaceDir)
-    <> " for files matching "
+    <> " for munged packages matching "
     <> fromString pkgIdStr
-  (_, files) <- handleIO (const $ pure ([], [])) $ listDir inplaceDir
-  logDebug $ displayShow files
-  -- From all the files obtained from the scanning process above, we need to
-  -- identify which are .conf files and then ensure that there is at most one
-  -- .conf file for each library and sub-library (some might be missing if that
-  -- component has not been built yet). We should error if there are more than
-  -- one .conf file for a component or if there are no .conf files at all in the
-  -- searched location.
-  let toFilename = T.pack . toFilePath . filename
-      -- strip known prefix and suffix from the found files to determine only
-      -- the .conf files
-      stripKnown =
-        T.stripSuffix ".conf" <=< T.stripPrefix (T.pack (pkgIdStr ++ "-"))
-      stripped =
-        mapMaybe (\file -> fmap (,file) . stripKnown . toFilename $ file) files
-      -- which component could have generated each of these conf files
-      stripHash n =
-        let z = T.dropWhile (/= '-') n
-        in  if T.null z then "" else T.tail z
-      matchedComponents = map (\(n, f) -> (stripHash n, [f])) stripped
-      byComponents =
-        Map.restrictKeys (Map.fromListWith (++) matchedComponents) $ Set.insert "" subLibs
-  logDebug $ displayShow byComponents
-  if Map.null $ Map.filter (\fs -> length fs > 1) byComponents
-    then case concat $ Map.elems byComponents of
-      [] -> notFoundErr
-      -- for each of these files, we need to extract the requested field
-      paths -> do
-        (errors, keys) <-  partitionEithers <$> traverse extractField paths
-        case errors of
-          (a:_) -> pure $ Left a -- the first error only, since they're repeated anyway
-          [] -> pure $ Right keys
-    else
-      pure
-        $ Left
-        $    "Multiple files matching "
-          <> T.pack (pkgIdStr ++ "-*.conf")
-          <> " found in "
-          <> T.pack (toFilePath inplaceDir)
-          <> ". Maybe try 'stack clean' on this package?"
+  (errors, keys) <-  
+    partitionEithers <$> traverse extractField (Set.toList mungedPackageIds)
+  case errors of
+    (a:_) -> pure $ Left a -- the first error only, since they're repeated anyway
+    [] -> pure $ Right keys
 
 displayReportPath ::
      HasTerm env

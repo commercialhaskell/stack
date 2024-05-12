@@ -10,6 +10,7 @@ module Stack.PackageDump
   , conduitDumpPackage
   , ghcPkgDump
   , ghcPkgDescribe
+  , ghcPkgField
   , sinkMatching
   , pruneDeps
   ) where
@@ -22,6 +23,7 @@ import qualified Data.Conduit.List as CL
 import qualified Data.Conduit.Text as CT
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Distribution.Pretty as C
 import qualified Distribution.Text as C
 import           Distribution.Types.MungedPackageName
                    ( decodeCompatPackageName )
@@ -90,6 +92,27 @@ ghcPkgDescribe ::
 ghcPkgDescribe pkgexe pkgName' = ghcPkgCmdArgs
   pkgexe
   ["describe", "--simple-output", packageNameString pkgName']
+
+-- | Call @ghc-pkg field@ with appropriate flags and stream to the given
+-- sink, using the given package database. Throws 'ExitCodeException' if the
+-- process fails (for example, if the package is not found in the package
+-- database or the field is not found in the package's *.conf file).
+ghcPkgField ::
+     (HasCompiler env, HasProcessContext env, HasTerm env)
+  => GhcPkgExe
+  -> Path Abs Dir
+     -- ^ A package database.
+  -> MungedPackageId
+     -- ^ A munged package identifier.
+  -> String
+     -- ^ A field name.
+  -> ConduitM Text Void (RIO env) a
+     -- ^ Sink.
+  -> RIO env a
+ghcPkgField pkgexe pkgDb mungedPkgId fieldName = ghcPkgCmdArgs
+  pkgexe
+  ["field", C.prettyShow mungedPkgId, fieldName, "--simple-output" ]
+  [pkgDb]
 
 -- | Call @ghc-pkg@ and stream to the given sink, using the either the global
 -- package database or the given package databases.
