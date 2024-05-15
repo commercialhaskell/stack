@@ -71,6 +71,8 @@ Bug fixes:
 * The `config set` commands support existing keys only in the form `key: value`
   on a single line. The commands now recognise that a line `key:` does not have
   that form.
+* On Unix-like operating systems, the `test --coverage` command now finds
+  package keys even for very long package names.
 
 ## v2.15.7 - 2024-05-12
 
