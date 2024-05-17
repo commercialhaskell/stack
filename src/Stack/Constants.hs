@@ -701,7 +701,8 @@ isStackUploadDisabled = STACK_DISABLE_STACK_UPLOAD
 -- | The footer to the help for Stack's subcommands
 globalFooter :: String
 globalFooter =
-  "Command 'stack --help' for global options that apply to all subcommands."
+     "Command 'stack --help' (or '-h') for global options that apply to all "
+  <> "subcommands."
 
 -- | The type for GitHub REST API HTTP \'Basic\' authentication.
 gitHubBasicAuthType :: ByteString

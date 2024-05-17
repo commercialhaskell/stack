@@ -31,8 +31,8 @@ package sets called __snapshots__.
 
 Stack has also been designed from the ground up to be user friendly, with an
 intuitive, discoverable command line interface. For many users, simply
-downloading Stack and reading `stack --help` will be enough to get up and
-running. This guide provides a more gradual tour for users who prefer that
+downloading Stack and reading `stack --help` (or `-h`) will be enough to get up
+and running. This guide provides a more gradual tour for users who prefer that
 learning style.
 
 To build your project, Stack uses a project-level configuration file, named
@@ -830,7 +830,7 @@ understand why rebuilding may occur at different points.
 
 ## The build synonyms
 
-Let's look at a subset of the `stack --help` output:
+Let's look at a subset of the `stack --help` (or `-h`) output:
 
 ~~~text
 build    Build the package(s) in this directory/configuration
