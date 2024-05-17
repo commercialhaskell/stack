@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2024-05-05.
+`master` branch of the Stack repository. Last updated: 2024-05-17.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -384,7 +384,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-8664] | InvalidFlagSpecification [UnusedFlags]
         [S-8100] | GHCProfOptionInvalid
         [S-1727] | NotOnlyLocal [PackageName] [Text]
-        [S-6362] | CompilerVersionMismatch (Maybe (ActualCompiler, Arch)) (WantedCompiler, Arch) GHCVariant CompilerBuild VersionCheck (Maybe (Path Abs File)) Text
+        [S-6362] | CompilerVersionMismatch (Maybe (ActualCompiler, Arch)) (WantedCompiler, Arch) GHCVariant CompilerBuild VersionCheck WantedCompilerSetter Text
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`

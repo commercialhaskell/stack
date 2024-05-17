@@ -158,10 +158,11 @@ import           Stack.Types.GHCVariant
                    ( GHCVariant (..), HasGHCVariant (..), ghcVariantName
                    , ghcVariantSuffix
                    )
+import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Platform
                    ( HasPlatform (..), PlatformVariant (..)
                    , platformOnlyRelDir )
-import           Stack.Types.Runner ( HasRunner (..) )
+import           Stack.Types.Runner ( HasRunner (..), Runner (..) )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
 import           Stack.Types.SourceMap
                    ( SMActual (..), SMWanted (..), SourceMap (..) )
@@ -169,6 +170,7 @@ import           Stack.Types.Version
                    ( VersionCheck, stackMinorVersion, stackVersion )
 import           Stack.Types.VersionedDownloadInfo
                    ( VersionedDownloadInfo (..) )
+import           Stack.Types.WantedCompilerSetter ( WantedCompilerSetter (..) )
 import qualified System.Directory as D
 import           System.Environment ( getExecutablePath, lookupEnv )
 import           System.IO.Error ( isPermissionError )
@@ -1156,6 +1158,11 @@ installGhcBindist sopts getSetupInfo' installed = do
             (Just tool, False) -> [(tool, compilerBuild)]
             _ -> [])
         possibleCompilers
+      globalOpts = config.runner.globalOpts
+      wantedCompilerSetter
+        | isJust globalOpts.compiler = CompilerAtCommandLine
+        | isJust globalOpts.snapshot = SnapshotAtCommandLine
+        | otherwise = YamlConfiguration sopts.stackYaml
   logDebug $
        "Found already installed GHC builds: "
     <> mconcat (intersperse ", " (map (fromString . compilerBuildName . snd) existingCompilers))
@@ -1200,7 +1207,7 @@ installGhcBindist sopts getSetupInfo' installed = do
               [] -> CompilerBuildStandard
               (_, compilerBuild):_ -> compilerBuild)
             sopts.compilerCheck
-            sopts.stackYaml
+            wantedCompilerSetter
             suggestion
 
 -- | Ensure compiler is installed.
