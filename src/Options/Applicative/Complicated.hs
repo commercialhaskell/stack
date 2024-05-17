@@ -20,9 +20,9 @@ import           Control.Monad.Trans.Writer ( runWriter, tell )
 import           Options.Applicative
                    ( Parser, ParserFailure, ParserHelp, ParserResult (..)
                    , abortOption, command, execParserPure, footer, fullDesc
-                   , handleParseResult, header, help, info, infoOption, long
-                   , metavar, noBacktrack, prefs, progDesc, showHelpOnEmpty
-                   , hsubparser
+                   , handleParseResult, header, help, hsubparser, info
+                   , infoOption, long, metavar, noBacktrack, prefs, progDesc
+                   , short, showHelpOnEmpty
                    )
 import           Options.Applicative.Builder.Extra ( showHelpText )
 import           Stack.Prelude
@@ -186,4 +186,5 @@ helpOption :: Parser (a -> a)
 helpOption =
   abortOption showHelpText $
        long "help"
+    <> short 'h'
     <> help "Show this help text."

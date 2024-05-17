@@ -34,17 +34,17 @@ jobs:
         include:
         - os: ubuntu-latest
           release-args: "--alpine"
-          cache-bust: "2024-01-20"
+          cache-bust: "2024-05-17"
         - os: windows-latest
           release-args: ""
-          cache-bust: "2024-01-20"
+          cache-bust: "2024-05-17"
         - os: macos-13
           release-args: ""
-          cache-bust: "2024-01-20"
+          cache-bust: "2024-05-17"
         # macos-latest provides macOS/AArch64 (M1)
         - os: macos-latest
           release-args: ""
-          cache-bust: "2024-02-02"
+          cache-bust: "2024-05-17"
     steps:
     - name: Clone project
       uses: actions/checkout@v4

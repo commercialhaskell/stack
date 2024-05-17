@@ -63,6 +63,7 @@ Other enhancements:
   Stack is available in YAML configuration files.
 * Add the `ls globals` command to list all global packages for the version of
   GHC specified by the snapshot.
+* Add `stack -h` (equivalent to `stack --help`).
 
 Bug fixes:
 
