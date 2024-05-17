@@ -649,10 +649,9 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
   let stackYaml = bc.stackYaml
   platform <- view platformL
   wcVersion <- view wantedCompilerVersionL
-  wanted <- view wantedCompilerVersionL
-  actual <- either throwIO pure $ wantedToActual wanted
+  actual <- either throwIO pure $ wantedToActual wcVersion
   let wc = actual^.whichCompilerL
-  let sopts = SetupOpts
+      sopts = SetupOpts
         { installIfMissing = config.installGHC
         , useSystem = config.systemGHC
         , wantedCompiler = wcVersion
