@@ -41,6 +41,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package ( Package (..), packageIdentifier )
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Version ( VersionCheck (..), VersionRange )
+import           Stack.Types.WantedCompilerSetter ( WantedCompilerSetter (..) )
 
 -- | Type representing exceptions thrown by functions exported by modules with
 -- names beginning @Stack.Build@.
@@ -257,7 +258,7 @@ data BuildPrettyException
       GHCVariant -- expected
       CompilerBuild -- expected
       VersionCheck
-      (Maybe (Path Abs File)) -- Path to the stack.yaml file
+      WantedCompilerSetter -- Way that the wanted compiler is set
       StyleDoc -- recommended resolution
   deriving (Show, Typeable)
 
@@ -390,7 +391,15 @@ instance Pretty BuildPrettyException where
                     (map (fromString . T.unpack) exes :: [StyleDoc])
                 )
            <> line
-  pretty (CompilerVersionMismatch mactual (expected, eArch) ghcVariant ghcBuild check mstack resolution) =
+  pretty ( CompilerVersionMismatch
+             mactual
+             (expected, eArch)
+             ghcVariant
+             ghcBuild
+             check
+             wantedCompilerSetter
+             resolution
+         ) =
     "[S-6362]"
     <> line
     <> fillSep
@@ -415,12 +424,25 @@ instance Pretty BuildPrettyException where
          ,    parens
                 ( fillSep
                     [ flow "based on"
-                    , case mstack of
-                        Nothing -> flow "command line arguments"
-                        Just stack -> fillSep
-                          [ flow "snapshot setting in"
-                          , pretty stack
+                    , case wantedCompilerSetter of
+                        CompilerAtCommandLine -> fillSep
+                          [ "the"
+                          , style Shell "--compiler"
+                          , "option"
                           ]
+                        SnapshotAtCommandLine -> fillSep
+                          [ "the"
+                          , style Shell "--snapshot" <> ","
+                          , "or"
+                          , style Shell "--resolver" <> ","
+                          , "option"
+                          ]
+                        YamlConfiguration mStack -> case mStack of
+                          Nothing -> flow "command line arguments"
+                          Just stack -> fillSep
+                            [ flow "the configuration in"
+                            , pretty stack
+                            ]
                     ]
                 )
           <> "."

@@ -341,6 +341,7 @@ library:
   - Stack.Types.UploadOpts
   - Stack.Types.Version
   - Stack.Types.VersionedDownloadInfo
+  - Stack.Types.WantedCompilerSetter
   - Stack.Uninstall
   - Stack.Unpack
   - Stack.Update

@@ -74,6 +74,8 @@ Bug fixes:
   that form.
 * On Unix-like operating systems, the `test --coverage` command now finds
   package keys even for very long package names.
+* The Error S-6362 message now acknowledges when the wanted compiler has been
+  specified at the command line.
 
 ## v2.15.7 - 2024-05-12
 
