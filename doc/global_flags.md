@@ -345,7 +345,7 @@ Default: `https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots
 The `--snapshot-location-base <url>` command option specifies the base location
 of snapshots.
 
-## `--help` command flag
+## `--help` or `-h` command flags
 
-If Stack is passed the `--help` command flag, it will output help for the
-command.
+If Stack is passed the `--help` (or `-h`) command flag, it will output help for
+the command.
