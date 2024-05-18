@@ -1993,9 +1993,17 @@ The script **must** return an exit code of `0` and the standard output **must**
 be the absolute path to the GHC binary that was installed. Otherwise Stack will
 ignore the script and possibly fall back to its own installation procedure.
 
-The script is not run when `system-ghc: true`.
+When `system-ghc: true`, the script is not run. That is because the two
+mechanisms reflect distinct concepts, namely:
 
-When `install-ghc: false`, the script is still run, which allows you to ensure
+* `system-ghc: true` causes Stack to search the PATH for a version of GHC; and
+
+* `hooks/ghc-install.sh` causes Stack to execute a script that is intended to
+  send to standard output a path to a version of GHC. The path in question may
+  or may not be in the PATH. The script may also do other things, including
+  installation.
+
+When `install-ghc: false`, the script is still run. That allows you to ensure
 that only your script will install GHC and Stack won't default to its own
 installation logic, even when the script fails.
 
