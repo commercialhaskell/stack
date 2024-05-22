@@ -41,9 +41,19 @@ stack ls dependencies [--separator SEP] [--[no-]license] [--filter ITEM]
 ~~~
 
 `stack ls dependencies` lists all of the packages and versions used for a
-project. All project packages are considered by default, but a target can be
-specified as an argument. For further information, see the
+project. All project packages are considered by default, but one or more targets
+can be specified as an argument. For further information, see the
 [target syntax](build_command.md#target-syntax) documentation.
+
+!!! note
+
+    If the first target is one of `cabal`, `json`, `text` and `tree`, then a
+    subcommand must be specified.
+
+!!! info
+
+    If a specified target is not a project package, then it will not contribute
+    packages to the command's output.
 
 Subcommands specify the format of the output, as follows:
 
