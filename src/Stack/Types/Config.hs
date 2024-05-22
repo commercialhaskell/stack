@@ -110,6 +110,9 @@ data Config = Config
     -- ^ Specifies the repository containing the compiler sources
   , localBin               :: !(Path Abs Dir)
     -- ^ Directory we should install executables into
+  , fileWatchHook          :: !(Maybe (Path Abs File))
+    -- ^ Optional path of executable used to override --file-watch
+    -- post-processing.
   , requireStackVersion    :: !VersionRange
     -- ^ Require a version of Stack within this range.
   , jobs                   :: !Int

@@ -119,6 +119,8 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See: 'configConcurrentTests'
   , localBinPath        :: !(First FilePath)
     -- ^ Used to override the binary installation dir
+  , fileWatchHook       :: !(First FilePath)
+    -- ^ Path to executable used to override --file-watch post-processing.
   , templateParameters  :: !(Map Text Text)
     -- ^ Template parameters.
   , scmInit             :: !(First SCM)
@@ -265,6 +267,7 @@ parseConfigMonoidObject rootDir obj = do
   hpackForce <- FirstFalse <$> obj ..:? configMonoidHpackForceName
   concurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
   localBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
+  fileWatchHook <- First <$> obj ..:? configMonoidFileWatchHookName
   templates <- obj ..:? "templates"
   (scmInit, templateParameters) <-
     case templates of
@@ -373,6 +376,7 @@ parseConfigMonoidObject rootDir obj = do
     , hpackForce
     , concurrentTests
     , localBinPath
+    , fileWatchHook
     , templateParameters
     , scmInit
     , ghcOptionsByName
@@ -494,6 +498,9 @@ configMonoidConcurrentTestsName = "concurrent-tests"
 
 configMonoidLocalBinPathName :: Text
 configMonoidLocalBinPathName = "local-bin-path"
+
+configMonoidFileWatchHookName :: Text
+configMonoidFileWatchHookName = "file-watch-hook"
 
 configMonoidScmInitName :: Text
 configMonoidScmInitName = "scm-init"
