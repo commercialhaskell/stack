@@ -24,11 +24,11 @@ import           Stack.Prelude
 -- | Parse command line arguments for Stack's @ls@ command.
 lsOptsParser :: OA.Parser LsCmdOpts
 lsOptsParser = LsCmdOpts
-  <$> OA.hsubparser 
-        (  lsSnapCmd 
-        <> lsGlobalsCmd 
-        <> lsDepsCmd 
-        <> lsStylesCmd 
+  <$> OA.hsubparser
+        (  lsSnapCmd
+        <> lsGlobalsCmd
+        <> lsDepsCmd
+        <> lsStylesCmd
         <> lsToolsCmd
         )
 
@@ -47,7 +47,10 @@ lsGlobalsCmd = OA.command "globals" $
 lsDepsCmd :: OA.Mod OA.CommandFields LsCmds
 lsDepsCmd = OA.command "dependencies" $
   OA.info lsDepOptsParser $
-       OA.progDesc "View the dependencies."
+       OA.progDesc
+         "View the packages and versions used for a project. Use a command if \
+         \the first target specified has the name of a command. Targets other \
+         \than project packages are ignored."
     <> OA.footer globalFooter
 
 lsStylesCmd :: OA.Mod OA.CommandFields LsCmds
