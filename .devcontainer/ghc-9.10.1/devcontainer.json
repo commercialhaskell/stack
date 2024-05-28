@@ -1,0 +1,53 @@
+{
+  "name": "GHC 9.10.1",
+  "build": {
+    "dockerfile": "../GHC.Dockerfile",
+    "context": "..",
+    "args": {
+      "GHC_VERSION": "9.10.1",
+      "USE_ZSH_FOR_ROOT": "unset-to-use-ash",
+      "SET_LANG": "C.UTF-8",
+      "SET_TZ": ""
+    }
+  },
+
+  "onCreateCommand": "onCreateCommand.sh",
+  "postCreateCommand": "cabal update",
+
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "configureZshAsDefaultShell": true,
+      "upgradePackages": false,
+      "username": "vscode",
+      "userUid": "automatic",
+      "userGid": "automatic"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "eamodio.gitlens@11.7.0",
+        "exiasr.hadolint",
+        "GitHub.vscode-pull-request-github",
+        "mhutchie.git-graph",
+        "mutantdino.resourcemonitor",
+        "timonwong.shellcheck"
+      ],
+      "settings": {
+        "gitlens.showWelcomeOnInstall": false,
+        "gitlens.showWhatsNewAfterUpgrades": false,
+        "resmon.show.battery": false,
+        "resmon.show.cpufreq": false
+      }
+    }
+  },
+
+  // Set 'remoteUser' to 'root' to connect as root instead.
+  "remoteUser": "vscode",
+
+  "remoteEnv": {
+    // Pip: Install packages to the user site
+    "PIP_USER": "1"
+  }
+}
