@@ -1,4 +1,4 @@
-ARG BUILD_ON_IMAGE=glcr.b-data.ch/ghc/ghc-musl
+ARG BUILD_ON_IMAGE=quay.io/benz0li/ghc-musl
 ARG GHC_VERSION=latest
 ARG HLS_VERSION
 ARG STACK_VERSION
@@ -21,7 +21,7 @@ RUN find /files -type d -exec chmod 755 {} \; \
   && find /files -type f -exec chmod 644 {} \; \
   && find /files/usr/local/bin -type f -exec chmod 755 {} \;
 
-FROM ${BUILD_ON_IMAGE}${HLS_SFX} as hls
+FROM glcr.b-data.ch/ghc/ghc-musl${HLS_SFX} as hls
 
 FROM glcr.b-data.ch/ndmitchell/hlsi:latest as hlsi
 
