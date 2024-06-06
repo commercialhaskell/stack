@@ -133,6 +133,9 @@ directory of the repository. They are formatted in the
 [Markdown syntax](https://daringfireball.net/projects/markdown/), with some
 extensions.
 
+The docs can be previewed locally with `make docs-serve` and can be built with
+`make _site/index.html`.
+
 Those files are rendered on [haskellstack.org](http://haskellstack.org) by
 [Read the Docs](https://readthedocs.org/) using
 [MkDocs](https://www.mkdocs.org/) and the
