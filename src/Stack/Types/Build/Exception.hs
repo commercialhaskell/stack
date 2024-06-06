@@ -516,6 +516,10 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
          <> blankLine
          <> indent 2 (spacedBulletedList recommendations)
  where
+  prettyUserConfig = pretty (defaultUserConfigPath stackRoot)
+  prettyStackYaml = pretty stackYaml
+  isScript = show prettyUserConfig == show prettyStackYaml
+
   exceptions' = {- should we dedupe these somehow? nubOrd -} exceptions
 
   recommendations =
@@ -539,17 +543,17 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
           else
             [ fillSep
                 $  [ "in"
-                   , pretty (defaultUserConfigPath stackRoot)
+                   , prettyUserConfig
                    , flow
                        (  "(global configuration)"
                        <> if isImplicitGlobal then "," else mempty
                        )
                    ]
-                <> ( if isImplicitGlobal
+                <> ( if isImplicitGlobal || isScript
                        then []
                        else
                          [ "or"
-                         , pretty stackYaml
+                         , prettyStackYaml
                          , flow "(project-level configuration),"
                          ]
                    )
@@ -573,18 +577,19 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
             , style Current "base"<> "."
             ]
         ]
-    | otherwise =
+    | not isScript =
         [   fillSep
               [ style Recommendation (flow "Recommended action:")
               , flow "try adding the following to your"
               , style Shell "extra-deps"
               , "in"
-              , pretty stackYaml
+              , prettyStackYaml
               , "(project-level configuration):"
               ]
           <> blankLine
           <> vsep (map pprintExtra (Map.toList extras))
         ]
+    | otherwise = []
 
   pprintExtra (name, (version, BlobKey cabalHash cabalSize)) =
     let cfInfo = CFIHash cabalHash (Just cabalSize)
@@ -750,7 +755,7 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
     latestApplicable mversion =
       case mlatestApplicable of
         Nothing
-          | isNothing mversion -> fillSep
+          | isNothing mversion -> fillSep $
               [ flow "(no matching package and version found. Perhaps there is \
                      \an error in the specification of a package's"
               , style Shell "dependencies"
@@ -765,7 +770,9 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
               , flow "or an omission from the"
               , style Shell "packages"
               , flow "list in"
-              , pretty stackYaml
+              ]
+              ++ if isScript then [] else
+              [ prettyStackYaml
               , flow "(project-level configuration).)"
               ]
           | otherwise -> ""
