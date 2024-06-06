@@ -76,6 +76,8 @@ Bug fixes:
   package keys even for very long package names.
 * The Error S-6362 message now acknowledges when the wanted compiler has been
   specified at the command line.
+* Fix a regression, introduced in Stack 2.11.1, that caused the `script` command
+  to parse an (otherwise ignored) project-level configuration file.
 
 ## v2.15.7 - 2024-05-12
 

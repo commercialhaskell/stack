@@ -164,9 +164,10 @@ scriptCmd opts = do
         then (NoRun, SECompile)
         else (opts.shouldRun, opts.compile)
 
-  root <- withConfig NoReexec $ view stackRootL
   outputDir <- if opts.useRoot
     then do
+      root <- local (over globalOptsL modifyGO) $
+        withConfig NoReexec $ view stackRootL
       scriptFileAsDir <- maybe
         (throwIO $ FailedToParseScriptFileAsDirBug scriptFile)
         pure
