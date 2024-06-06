@@ -14,6 +14,16 @@ is most often `stack script` but it can be, for example, `stack runghc`. If
 there is no Stack interpreter options comment, Stack will warn that one was
 expected.
 
+!!! warning
+
+    No project-level configuration is available for scripts and scripts will
+    ignore any supplied `--stack-yaml=<project-level-config-file>`. As some
+    settings don't have a command line equivalent and can only be set via YAML,
+    such as `extra-deps`, `allow-newer` and `allow-newer-deps`, if a script
+    would need these options to build then your only choices are to edit the
+    global configuration or to limit package dependencies of scripts to those
+    included with a given resolver.
+
 An example will be easiest to understand. Consider the Haskell source file
 `turtle-example.hs` with contents:
 
