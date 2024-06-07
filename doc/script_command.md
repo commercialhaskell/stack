@@ -13,13 +13,22 @@ The `stack script` command either runs a specified Haskell source file (using
 GHC's `runghc`) or, optionally, compiles such a file (using GHC) and, by
 default, runs it.
 
-Unlike `stack ghc` and `stack runghc`, the command ignores all Stack YAML
-configuration files (global and project-level). A snapshot must be specified on
-the command line (with the `--snapshot` option). For example:
+Unlike [`stack ghc`](ghc_command.md) and [`stack runghc`](runghc_command.md),
+the command ignores any project-level configuration file (`stack.yaml`, by
+default) (including in the `global-project` directory in the Stack root). A
+snapshot must be specified on the command line (with the `--snapshot` option).
+For example:
 
 ~~~text
 stack script --snapshot lts-22.21 MyScript.hs
 ~~~
+
+!!! info
+
+    Non-project level configuration options in global configuration files
+    (`config.yaml`), are not ignored. Such options may be useful if
+    [`allow-newer`](yaml_configuration.md#allow-newer) and/or
+    [`allow-newer-deps`](yaml_configuration.md#allow-newer-deps) are required.
 
 The `stack script` command behaves as if the `--install-ghc` flag had been
 passed at the command line.
