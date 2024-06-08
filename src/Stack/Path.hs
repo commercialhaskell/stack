@@ -13,6 +13,7 @@ module Stack.Path
   , pathsFromEnvConfig
   ) where
 
+import           Control.Exception ( throw )
 import           Data.List ( intercalate )
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -30,14 +31,13 @@ import           Stack.Prelude hiding ( pi )
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.Types.BuildConfig
-                   ( BuildConfig (..), HasBuildConfig (..), projectRootL
-                   , stackYamlL
-                   )
+                   ( BuildConfig (..), HasBuildConfig (..), configFileL )
 import           Stack.Types.BuildOptsMonoid ( buildOptsMonoidHaddockL )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getCompilerPath )
 import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), stackGlobalConfigL )
+                   ( Config (..), HasConfig (..), userGlobalConfigFileL )
+import           Stack.Types.Config.Exception ( ConfigPrettyException (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig, HasEnvConfig (..), bindirCompilerTools
                    , hpcReportDir, installationRootDeps, installationRootLocal
@@ -236,9 +236,9 @@ pathsFromRunner = ("Global Stack root directory", stackRootOptionName')
 -- to generate an appropriate string. Trailing slashes are removed, see #506.
 pathsFromConfig :: [(String, Text, Config -> Text)]
 pathsFromConfig =
-  [ ( "Global Stack configuration file"
+  [ ( "User-specific global configuration file"
     , T.pack stackGlobalConfigOptionName
-    , view (stackGlobalConfigL . to toFilePath . to T.pack)
+    , view (userGlobalConfigFileL . to toFilePath . to T.pack)
     )
   , ( "Install location for GHC and other core tools (see 'stack ls tools' command)"
     , "programs"
@@ -261,14 +261,14 @@ pathsFromConfig =
 -- #506.
 pathsFromEnvConfig :: [(String, Text, UseHaddocks (EnvConfigPathInfo -> Text))]
 pathsFromEnvConfig =
-  [ ( "Project root (derived from stack.yaml file)"
+  [ ( "Project root (derived from the project-level configuration file; \
+      \stack.yaml, by default)"
     , "project-root"
-    , WithoutHaddocks $
-        view (projectRootL . to toFilePathNoTrailingSep . to T.pack)
+    , WithoutHaddocks $ view (configFileL . to toProjectConfigFileRootPath)
     )
-  , ( "Configuration location (where the stack.yaml file is)"
+  , ( "Project-level configuration file (stack.yaml, by default)"
     , "config-location"
-    , WithoutHaddocks $ view (stackYamlL . to toFilePath . to T.pack)
+    , WithoutHaddocks $ view (configFileL . to toProjectConfigFilePath)
     )
   , ( "PATH environment variable"
     , "bin-path"
@@ -350,6 +350,17 @@ pathsFromEnvConfig =
     , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.hpcDir)
     )
   ]
+ where
+  toProjectConfigFileRootPath :: Either (Path Abs File) (Path Abs File) -> Text
+  toProjectConfigFileRootPath (Left _) =
+    throw $ PrettyException ConfigFileNotProjectLevelBug
+  toProjectConfigFileRootPath (Right projectConfigFile) =
+    T.pack $ toFilePathNoTrailingSep $ parent projectConfigFile
+  toProjectConfigFilePath :: Either (Path Abs File) (Path Abs File) -> Text
+  toProjectConfigFilePath (Left _) =
+    throw $ PrettyException ConfigFileNotProjectLevelBug
+  toProjectConfigFilePath (Right projectConfigFile) =
+    T.pack $ toFilePath projectConfigFile
 
 -- | 'Text' equivalent of 'stackRootOptionName'.
 stackRootOptionName' :: Text

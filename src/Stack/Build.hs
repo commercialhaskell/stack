@@ -15,6 +15,7 @@ module Stack.Build
   ) where
 
 import           Data.Attoparsec.Args ( EscapingMode (Escaping), parseArgs )
+import qualified Data.Either.Extra as EE
 import           Data.List ( (\\) )
 import           Data.List.Extra ( groupSort )
 import qualified Data.Map as Map
@@ -41,7 +42,7 @@ import           Stack.Types.Build
                    )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
-import           Stack.Types.BuildConfig ( HasBuildConfig, stackYamlL )
+import           Stack.Types.BuildConfig ( HasBuildConfig, configFileL )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( BuildCommand (..), BuildOptsCLI (..), FileWatchOpts (..) )
@@ -153,11 +154,13 @@ build msetLocalFiles = do
     sourceMap <- view $ envConfigL . to (.sourceMap)
     locals <- projectLocalPackages
     depsLocals <- localDependencies
-    let allLocals = locals <> depsLocals
-
     boptsCli <- view $ envConfigL . to (.buildOptsCLI)
     -- Set local files, necessary for file watching
-    stackYaml <- view stackYamlL
+    configFile <- view configFileL
+    let allLocals = locals <> depsLocals
+        -- We are indifferent as to whether the configuration file is a
+        -- user-specifc global or a project-level one.
+        eitherConfigFile = EE.fromEither configFile
     for_ msetLocalFiles $ \setLocalFiles -> do
       files <-
         if boptsCli.watchAll
@@ -171,7 +174,7 @@ build msetLocalFiles = do
               lpFiles lp
             Just (TargetComps components) ->
               lpFilesForComponents components lp
-      liftIO $ setLocalFiles $ Set.insert stackYaml $ Set.unions files
+      liftIO $ setLocalFiles $ Set.insert eitherConfigFile $ Set.unions files
 
     checkComponentsBuildable allLocals
 

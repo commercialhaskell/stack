@@ -8,12 +8,13 @@
 module Stack.Types.BuildConfig
   ( BuildConfig (..)
   , HasBuildConfig (..)
-  , stackYamlL
-  , projectRootL
-  , getProjectWorkDir
+  , configFileL
+  , configFileRootL
+  , getWorkDir
   , wantedCompilerVersionL
   ) where
 
+import qualified Data.Either.Extra as EE
 import           Path ( (</>), parent )
 import           RIO.Process ( HasProcessContext (..) )
 import           Stack.Prelude
@@ -35,12 +36,14 @@ data BuildConfig = BuildConfig
   , smWanted :: !SMWanted
   , extraPackageDBs :: ![Path Abs Dir]
     -- ^ Extra package databases
-  , stackYaml  :: !(Path Abs File)
-    -- ^ Location of the stack.yaml file.
+  , configFile :: !(Either (Path Abs File) (Path Abs File))
+    -- ^ Either (Left) the location of the user-specific global configuration
+    -- file or, in most cases, (Right) the location of the project-level
+    -- coniguration file (stack.yaml, by default).
     --
-    -- Note: if the STACK_YAML environment variable is used, this may be
-    -- different from projectRootL </> "stack.yaml" if a different file
-    -- name is used.
+    -- Note: if the STACK_YAML environment variable is used, the location of the
+    -- project-level configuration file may be different from
+    -- projectRootL </> "stack.yaml" if a different file name is used.
   , projectStorage :: !ProjectStorage
   -- ^ Database connection pool for project Stack database
   , curator :: !(Maybe Curator)
@@ -85,19 +88,22 @@ instance HasBuildConfig BuildConfig where
   buildConfigL = id
   {-# INLINE buildConfigL #-}
 
-stackYamlL :: HasBuildConfig env => Lens' env (Path Abs File)
-stackYamlL = buildConfigL . lens (.stackYaml) (\x y -> x { stackYaml = y })
+configFileL ::
+     HasBuildConfig env
+  => Lens' env (Either (Path Abs File) (Path Abs File))
+configFileL = buildConfigL . lens (.configFile) (\x y -> x { configFile = y })
 
--- | Directory containing the project's stack.yaml file
-projectRootL :: HasBuildConfig env => Getting r env (Path Abs Dir)
-projectRootL = stackYamlL . to parent
+-- | Directory containing the configuration file.
+configFileRootL :: HasBuildConfig env => Getting r env (Path Abs Dir)
+configFileRootL = configFileL . to EE.fromEither . to parent
 
--- | Per-project work dir
-getProjectWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
-getProjectWorkDir = do
-  root    <- view projectRootL
+-- | Work directory in the directory of the configuration file (global or
+-- project-level).
+getWorkDir :: (HasBuildConfig env, MonadReader env m) => m (Path Abs Dir)
+getWorkDir = do
+  configFileRoot <- view configFileRootL
   workDir <- view workDirL
-  pure (root </> workDir)
+  pure (configFileRoot </> workDir)
 
 -- | The compiler specified by the @SnapshotDef@. This may be different from the
 -- actual compiler used!

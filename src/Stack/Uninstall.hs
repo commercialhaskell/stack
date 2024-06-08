@@ -11,7 +11,7 @@ import           Stack.Constants ( osIsWindows )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.Config
-                   ( Config (..), configL, stackGlobalConfigL, stackRootL )
+                   ( Config (..), configL, stackRootL, userGlobalConfigFileL )
 import           Stack.Types.Runner ( Runner )
 
 -- | Function underlying the @stack uninstall@ command. Display help for the
@@ -19,12 +19,12 @@ import           Stack.Types.Runner ( Runner )
 uninstallCmd :: () -> RIO Runner ()
 uninstallCmd () = withConfig NoReexec $ do
   stackRoot <- view stackRootL
-  globalConfig <- view stackGlobalConfigL
+  userGlobalConfigFile <- view userGlobalConfigFileL
   programsDir <- view $ configL . to (.localProgramsBase)
   localBinDir <- view $ configL . to (.localBin)
   let toStyleDoc = style Dir . fromString . toFilePath
       stackRoot' = toStyleDoc stackRoot
-      globalConfig' = toStyleDoc globalConfig
+      userGlobalConfigFile' = toStyleDoc userGlobalConfigFile
       programsDir' = toStyleDoc programsDir
       localBinDir' = toStyleDoc localBinDir
   putUtf8Builder =<< displayWithColor
@@ -40,8 +40,8 @@ uninstallCmd () = withConfig NoReexec $ do
              ]
          , hang 4 $ fillSep
              [ flow "(3) if different, the directory containing "
-             , flow "Stack's global YAML configuration file"
-             , parens globalConfig' <> ";"
+             , flow "Stack's user-specific global YAML configuration file"
+             , parens userGlobalConfigFile' <> ";"
              , "and"
              ]
          , hang 4 $ fillSep

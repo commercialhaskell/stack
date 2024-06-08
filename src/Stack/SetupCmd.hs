@@ -12,12 +12,13 @@ module Stack.SetupCmd
   , setup
   ) where
 
+import qualified Data.Either.Extra as EE
 import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withBuildConfig, withConfig )
 import           Stack.Setup ( SetupOpts (..), ensureCompilerAndMsys )
 import           Stack.Types.BuildConfig
-                   ( HasBuildConfig, stackYamlL, wantedCompilerVersionL )
+                   ( HasBuildConfig, configFileL, wantedCompilerVersionL )
 import           Stack.Types.CompilerPaths ( CompilerPaths (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
@@ -40,14 +41,22 @@ setupCmd sco = withConfig YesReexec $ do
   if installGHC
     then
        withBuildConfig $ do
-       (wantedCompiler, compilerCheck, mstack) <-
+       (wantedCompiler, compilerCheck, mConfigFile) <-
          case sco.compilerVersion of
            Just v -> pure (v, MatchMinor, Nothing)
-           Nothing -> (,,)
-             <$> view wantedCompilerVersionL
-             <*> view (configL . to (.compilerCheck))
-             <*> (Just <$> view stackYamlL)
-       setup sco wantedCompiler compilerCheck mstack
+           Nothing -> do
+            wantedCompilerVersion <- view wantedCompilerVersionL
+            compilerCheck <- view (configL . to (.compilerCheck))
+            configFile <- view configFileL
+            -- We are indifferent as to whether the configuration file is a
+            -- user-specific global or a project-level one.
+            let eitherConfigFile = EE.fromEither configFile
+            pure
+              ( wantedCompilerVersion
+              , compilerCheck
+              , Just eitherConfigFile
+              )
+       setup sco wantedCompiler compilerCheck mConfigFile
     else
       prettyWarnL
         [ "The"
@@ -63,15 +72,17 @@ setup ::
   -> WantedCompiler
   -> VersionCheck
   -> Maybe (Path Abs File)
+     -- ^ If we got the desired GHC version from that configuration file, which
+     -- may be either a user-specific global or a project-level one.
   -> RIO env ()
-setup sco wantedCompiler compilerCheck stackYaml = do
+setup sco wantedCompiler compilerCheck configFile = do
   config <- view configL
   sandboxedGhc <- (.sandboxed) . fst <$> ensureCompilerAndMsys SetupOpts
     { installIfMissing = True
     , useSystem = config.systemGHC && not sco.forceReinstall
     , wantedCompiler
     , compilerCheck
-    , stackYaml
+    , configFile
     , forceReinstall = sco.forceReinstall
     , sanityCheck = True
     , skipGhcCheck = False

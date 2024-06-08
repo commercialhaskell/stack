@@ -161,6 +161,7 @@ data ConfigPrettyException
   | DuplicateLocalPackageNames ![(PackageName, [PackageLocation])]
   | BadMsysEnvironment !MsysEnvironment !Arch
   | NoMsysEnvironmentBug
+  | ConfigFileNotProjectLevelBug
   deriving (Show, Typeable)
 
 instance Pretty ConfigPrettyException where
@@ -229,6 +230,8 @@ instance Pretty ConfigPrettyException where
          ]
   pretty NoMsysEnvironmentBug = bugPrettyReport "[S-5006]" $
     flow "No default MSYS2 environment."
+  pretty ConfigFileNotProjectLevelBug = bugPrettyReport "[S-8398]" $
+    flow "The configuration file is not a project-level one."
 
 instance Exception ConfigPrettyException
 

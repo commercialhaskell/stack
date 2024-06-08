@@ -26,6 +26,7 @@ import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 import           Data.Char ( toLower )
 import           Data.Data ( cast )
+import qualified Data.Either.Extra as EE
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -65,7 +66,7 @@ import           Stack.Runners
 import           Stack.SourceMap ( mkProjectPackage )
 import           Stack.Types.Build ( TaskType (..) )
 import           Stack.Types.BuildConfig
-                   ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
+                   ( BuildConfig (..), HasBuildConfig (..), configFileL )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI ( defaultBuildOptsCLI )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
@@ -152,12 +153,15 @@ sdistCmd sdistOpts =
         dirs <- view $
           buildConfigL . to (map ppRoot . Map.elems . (.smWanted.project))
         when (null dirs) $ do
-          stackYaml <- view stackYamlL
+          configFile <- view configFileL
+          -- We are indifferent as to whether the configuration file is a
+          -- user-specific global or a project-level one.
+          let eitherConfigFile = EE.fromEither configFile
           prettyErrorL
             [ style Shell "stack sdist"
             , flow "expects a list of targets, and otherwise defaults to all \
                    \of the project's packages. However, the configuration at"
-            , pretty stackYaml
+            , pretty eitherConfigFile
             , flow "contains no packages, so no sdist tarballs will be \
                    \generated."
             ]

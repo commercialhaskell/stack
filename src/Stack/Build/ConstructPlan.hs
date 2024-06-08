@@ -51,7 +51,7 @@ import           Stack.Types.Build.Exception
                    , BuildPrettyException (..), ConstructPlanException (..)
                    )
 import           Stack.Types.BuildConfig
-                   ( BuildConfig (..), HasBuildConfig (..), stackYamlL )
+                   ( BuildConfig (..), HasBuildConfig (..), configFileL )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), BuildSubset (..) )
@@ -187,13 +187,13 @@ constructPlan
                 else Map.empty
           }
       else do
-        stackYaml <- view stackYamlL
+        configFile <- view configFileL
         stackRoot <- view stackRootL
         isImplicitGlobal <-
           view $ configL . to (isPCGlobalProject . (.project))
         prettyThrowM $ ConstructPlanFailed
           errs
-          stackYaml
+          configFile
           stackRoot
           isImplicitGlobal
           parents

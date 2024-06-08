@@ -44,6 +44,7 @@ import           Data.Conduit.Lazy ( lazyConsume )
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed ( createSource )
 import           Data.Conduit.Zlib ( ungzip )
+import qualified Data.Either.Extra as EE
 import           Data.List.Split ( splitOn )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -123,7 +124,7 @@ import           Stack.SourceMap
 import           Stack.Storage.User ( loadCompilerPaths, saveCompilerPaths )
 import           Stack.Types.Build.Exception ( BuildPrettyException (..) )
 import           Stack.Types.BuildConfig
-                   ( BuildConfig (..), HasBuildConfig (..), projectRootL
+                   ( BuildConfig (..), HasBuildConfig (..), configFileRootL
                    , wantedCompilerVersionL
                    )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
@@ -621,8 +622,9 @@ data SetupOpts = SetupOpts
     -- ^ Should we use a system compiler installation, if available?
   , wantedCompiler :: !WantedCompiler
   , compilerCheck :: !VersionCheck
-  , stackYaml :: !(Maybe (Path Abs File))
-    -- ^ If we got the desired GHC version from that file
+  , configFile :: !(Maybe (Path Abs File))
+    -- ^ If we got the desired GHC version from that configuration file, which
+    -- may be either a user-specific global or a project-level one.
   , forceReinstall :: !Bool
   , sanityCheck :: !Bool
     -- ^ Run a sanity check on the selected GHC
@@ -648,7 +650,9 @@ setupEnv ::
 setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
   config <- view configL
   bc <- view buildConfigL
-  let stackYaml = bc.stackYaml
+  -- We are indifferent as to whether the configuration file is a
+  -- user-specific global or a project-level one.
+  let eitherConfigFile = EE.fromEither bc.configFile
   platform <- view platformL
   wcVersion <- view wantedCompilerVersionL
   actual <- either throwIO pure $ wantedToActual wcVersion
@@ -658,7 +662,7 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
         , useSystem = config.systemGHC
         , wantedCompiler = wcVersion
         , compilerCheck = config.compilerCheck
-        , stackYaml = Just stackYaml
+        , configFile = Just eitherConfigFile
         , forceReinstall = False
         , sanityCheck = False
         , skipGhcCheck = config.skipGHCCheck
@@ -1162,7 +1166,7 @@ installGhcBindist sopts getSetupInfo' installed = do
       wantedCompilerSetter
         | isJust globalOpts.compiler = CompilerAtCommandLine
         | isJust globalOpts.snapshot = SnapshotAtCommandLine
-        | otherwise = YamlConfiguration sopts.stackYaml
+        | otherwise = YamlConfiguration sopts.configFile
   logDebug $
        "Found already installed GHC builds: "
     <> mconcat (intersperse ", " (map (fromString . compilerBuildName . snd) existingCompilers))
@@ -2179,8 +2183,8 @@ downloadOrUseLocal downloadLabel downloadInfo destination =
       pure path
     (parseRelFile -> Just path) -> do
       warnOnIgnoredChecks
-      root <- view projectRootL
-      pure (root </> path)
+      configFileRoot <- view configFileRootL
+      pure (configFileRoot </> path)
     _ -> prettyThrowIO $ URLInvalid url
  where
   url = T.unpack downloadInfo.url

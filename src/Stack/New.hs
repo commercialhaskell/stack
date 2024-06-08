@@ -571,7 +571,7 @@ applyTemplate project template nonceParams dir templateText = do
     prettyNote $
       missingParameters
         missingKeys
-        config.userConfigPath
+        config.userGlobalConfigFile
   pure $ M.fromList results
  where
   onlyMissingKeys (Mustache.VariableNotFound ks) = map T.unpack ks

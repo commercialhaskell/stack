@@ -18,7 +18,7 @@ import           Stack.Constants.Config ( rootDistDirFromDir, workDirFromDir )
 import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig )
 import           Stack.Types.BuildConfig
-                   ( BuildConfig (..), HasBuildConfig (..), getProjectWorkDir )
+                   ( BuildConfig (..), HasBuildConfig (..), getWorkDir )
 import           Stack.Types.Config ( Config )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap ( SMWanted (..), ppRoot )
@@ -94,5 +94,5 @@ dirsToDelete cleanOpts = do
         xs -> throwM (NonLocalPackages xs)
     CleanFull -> do
       pkgWorkDirs <- mapM (workDirFromDir . ppRoot) $ Map.elems packages
-      projectWorkDir <- getProjectWorkDir
+      projectWorkDir <- getWorkDir
       pure (projectWorkDir : pkgWorkDirs)

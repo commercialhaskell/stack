@@ -78,6 +78,8 @@ Bug fixes:
   specified at the command line.
 * Fix a regression, introduced in Stack 2.11.1, that caused the `script` command
   to parse an (otherwise ignored) project-level configuration file.
+* Stack no longer makes recommendations about a project-level configuration file
+  when only a global configuration file is in use.
 
 ## v2.15.7 - 2024-05-12
 

@@ -42,6 +42,7 @@ import           Data.Array.IArray ( (!), (//) )
 import qualified Data.ByteString as S
 import           Data.ByteString.Builder ( byteString )
 import           Data.Coerce ( coerce )
+import qualified Data.Either.Extra as EE
 import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import qualified Data.Map.Merge.Strict as MS
@@ -272,7 +273,8 @@ getLatestSnapshot = do
 configFromConfigMonoid ::
      (HasRunner env, HasTerm env)
   => Path Abs Dir -- ^ Stack root, e.g. ~/.stack
-  -> Path Abs File -- ^ user config file path, e.g. ~/.stack/config.yaml
+  -> Path Abs File
+     -- ^ User-specific global configuration file.
   -> Maybe AbstractSnapshot
   -> ProjectConfig (Project, Path Abs File)
   -> ConfigMonoid
@@ -280,7 +282,7 @@ configFromConfigMonoid ::
   -> RIO env a
 configFromConfigMonoid
   stackRoot
-  userConfigPath
+  userGlobalConfigFile
   snapshot
   project
   configMonoid
@@ -565,7 +567,7 @@ configFromConfigMonoid
             (stackRoot </> relFileStorage)
             ( \userStorage -> inner Config
                 { workDir
-                , userConfigPath
+                , userGlobalConfigFile
                 , build
                 , docker
                 , nix
@@ -771,16 +773,16 @@ withBuildConfig inner = do
        <> " specified on command line"
     makeConcreteSnapshot aSnapshot
 
-  (project', stackYaml) <- case config.project of
+  (project', configFile) <- case config.project of
     PCProject (project, fp) -> do
       forM_ project.userMsg prettyWarnS
-      pure (project, fp)
+      pure (project, Right fp)
     PCNoProject extraDeps -> do
       p <-
         case mSnapshot of
           Nothing -> throwIO NoSnapshotWhenUsingNoProject
           Just _ -> getEmptyProject mSnapshot extraDeps
-      pure (p, config.userConfigPath)
+      pure (p, Left config.userGlobalConfigFile)
     PCGlobalProject -> do
       logDebug "Run from outside a project, using implicit global project config"
       destDir <- getImplicitGlobalProjectDir config
@@ -803,7 +805,7 @@ withBuildConfig inner = do
                   <> " from implicit global project's config file: "
                   <> fromString dest'
               Just _ -> pure ()
-          pure (project, dest)
+          pure (project, Right dest)
         else do
           prettyInfoL
             [ flow "Writing the configuration file for the implicit \
@@ -816,10 +818,10 @@ withBuildConfig inner = do
           p <- getEmptyProject mSnapshot []
           liftIO $ do
             writeBinaryFileAtomic dest $ byteString $ S.concat
-              [ "# This is the implicit global project's config file, which is only used when\n"
-              , "# 'stack' is run outside of a real project. Settings here do _not_ act as\n"
+              [ "# This is the implicit global project's configuration file, which is only used\n"
+              , "# when 'stack' is run outside of a real project. Settings here do _not_ act as\n"
               , "# defaults for all projects. To change Stack's default settings, edit\n"
-              , "# '", encodeUtf8 (T.pack $ toFilePath config.userConfigPath), "' instead.\n"
+              , "# '", encodeUtf8 (T.pack $ toFilePath config.userGlobalConfigFile), "' instead.\n"
               , "#\n"
               , "# For more information about Stack's configuration, see\n"
               , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
@@ -829,29 +831,31 @@ withBuildConfig inner = do
               "This is the implicit global project, which is " <>
               "used only when 'stack' is run\noutside of a " <>
               "real project.\n"
-          pure (p, dest)
+          pure (p, Right dest)
   mcompiler <- view $ globalOptsL . to (.compiler)
   let project :: Project
       project = project'
         { Project.compiler = mcompiler <|> project'.compiler
         , Project.snapshot = fromMaybe project'.snapshot mSnapshot
         }
+      -- We are indifferent as to whether the configuration file is a
+      -- user-specific global or a project-level one.
+      eitherConfigFile = EE.fromEither configFile
   extraPackageDBs <- mapM resolveDir' project.extraPackageDBs
 
-  smWanted <- lockCachedWanted stackYaml project.snapshot $
-    fillProjectWanted stackYaml config project
+  smWanted <- lockCachedWanted eitherConfigFile project.snapshot $
+    fillProjectWanted eitherConfigFile config project
 
-  -- Unfortunately redoes getProjectWorkDir, since we don't have a BuildConfig
-  -- yet
+  -- Unfortunately redoes getWorkDir, since we don't have a BuildConfig yet
   workDir <- view workDirL
-  let projectStorageFile = parent stackYaml </> workDir </> relFileStorage
+  let projectStorageFile = parent eitherConfigFile </> workDir </> relFileStorage
 
   initProjectStorage projectStorageFile $ \projectStorage -> do
     let bc = BuildConfig
           { config
           , smWanted
           , extraPackageDBs
-          , stackYaml
+          , configFile
           , curator = project.curator
           , projectStorage
           }
@@ -891,18 +895,20 @@ withBuildConfig inner = do
 
 fillProjectWanted ::
      (HasLogFunc env, HasPantryConfig env, HasProcessContext env)
-  => Path Abs t
+  => Path Abs File
+     -- ^ Location of the configuration file, which may be either a
+     -- user-specific global or a project-level one.
   -> Config
   -> Project
   -> Map RawPackageLocationImmutable PackageLocationImmutable
   -> WantedCompiler
   -> Map PackageName (Bool -> RIO env DepPackage)
   -> RIO env (SMWanted, [CompletedPLI])
-fillProjectWanted stackYamlFP config project locCache snapCompiler snapPackages = do
+fillProjectWanted configFile config project locCache snapCompiler snapPackages = do
   let bopts = config.build
 
   packages0 <- for project.packages $ \fp@(RelFilePath t) -> do
-    abs' <- resolveDir (parent stackYamlFP) (T.unpack t)
+    abs' <- resolveDir (parent configFile) (T.unpack t)
     let resolved = ResolvedPath fp abs'
     pp <- mkProjectPackage YesPrintWarnings resolved bopts.buildHaddocks
     pure (pp.projectCommon.name, pp)
