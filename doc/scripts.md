@@ -170,20 +170,24 @@ providing a comma or space separated list. For example:
 
 ## Stack configuration for scripts
 
-As with using [`stack script`](script_command.md) at the command line, any
-project-level configuration file (`stack.yaml`, by default) (including in the
-`global-project` directory in the Stack root) is ignored.
+When using the [`stack script`](script_command.md) command, as when using it at
+the command line, any project-level configuration file (`stack.yaml`, by
+default) (including in the `global-project` directory in the Stack root),
+including any specified by the options to the `stack script` command itself, is
+ignored.
 
 !!! info
 
     Non-project level configuration options in global configuration files
-    (`config.yaml`), are not ignored.
+    (`config.yaml`), are not ignored by the [`stack script`](script_command.md)
+    command. Such options may be useful if
+    [`allow-newer`](yaml_configuration.md#allow-newer) and/or
+    [`allow-newer-deps`](yaml_configuration.md#allow-newer-deps) are required.
 
-With the [`stack runghc`](runghc_command.md) command, if the current working
-directory is inside a project then that project's Stack project-level
-configuration file is effective when running the script. Otherwise the script
-uses the project-level configuration file in the `global-project` directory of
-the Stack root.
+When using the  [`stack runghc`](runghc_command.md) command, as when using it at
+the command line, if the current working directory is inside a project, then
+that project's project-level configuration file is effective when running the script. Otherwise the script uses the project-level configuration file in the
+`global-project` directory in the Stack root.
 
 ## Testing scripts
 
