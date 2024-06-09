@@ -40,19 +40,39 @@ preference):
 4. A file name `stack.yaml` in the `global-project` directory in the
    [Stack root](stack_root.md).
 
-The **global** configuration file (`config.yaml`) contains only
-non-project-specific options. The location of this file depends on the operating
-system and whether Stack is configured to use the XDG Base Directory
-Specification.
+The **global** configuration files (`config.yaml`) contain only
+non-project-specific options. There is a user-specific global confguration file
+and there may be an optional system-wide global configuration file. If a
+user-specific global configuration file does not exist, then Stack will create
+one. An option set in the user-specific file will override a corresponding
+option set in the system-wide file (if it exists).
+
+The default location of these files depends on the operating system and, in the
+case of the user-specific file, whether Stack is configured to use the XDG Base
+Directory Specification. An absolute path to these files can be specified by the
+[`STACK_CONFIG`](environment_variables.md#stack_config) and
+[`STACK_GLOBAL_CONFIG`](environment_variables.md#stack_config) environment
+variables, respectively.
 
 === "Unix-like"
 
-    `config.yaml` is located in `/etc/stack` (for system-wide options); and/or
-    in the [Stack root](stack_root.md) (for user-specific options).
+    The default locations are:
+
+    * system-wide: `/etc/stack/config.yaml`; and
+    * user-specific: `config.yaml` in the [Stack root](stack_root.md).
+
+    !!! note
+
+        For compatibility with Stack 0.1.5.0 and earlier, if deprecated file
+        `/etc/stack/config` exists, then Stack will use it instead of
+        `/etc/stack/config.yaml`.
 
 === "Windows"
 
-    `config.yaml` is located in the [Stack root](stack_root.md).
+    The default locations are:
+
+    * system-wide: none; and
+    * user-specific: `config.yaml` in the [Stack root](stack_root.md).
 
 === "XDG Base Directory Specification"
 
