@@ -1,6 +1,7 @@
-# This file allows users of the 'make' tool to automate the use of the 'mkdocs'
-# tool to preview or build Stack's online documentation. See the file 'Makefile'
-# in Stack's project directory for more information.
+# With the necessary prerequisites, this file allows users of the 'make' tool to
+# automate the use of the 'mkdocs' tool to preview or build Stack's online
+# documentation. See CONTRIBUTING.md and the file 'Makefile' in Stack's project
+# directory for more information.
 
 PYTHON_VIRTUALENV:=.python-doc-virtualenv
 MK_DOCS_CMD:=$(PYTHON_VIRTUALENV)/bin/mkdocs

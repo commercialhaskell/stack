@@ -245,7 +245,7 @@ Command `mkdocs build` to build the documentation.
     the MSYS2 environment:
 
     ~~~text
-    stack exec -- pacman --sync python libxml2-devel libxslt-devel
+    stack exec -- pacman --sync python make libxml2-devel libxslt-devel
     ~~~
 
     !!! note

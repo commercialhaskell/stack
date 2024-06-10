@@ -1,5 +1,6 @@
-# This file allows users of the 'make' tool to automate the use of the 'mkdocs'
-# tool to preview or build Stack's online documentation.
+# With the other prerequisites, this file allows users of the 'make' tool to
+# automate the use of the 'mkdocs' tool to preview or build Stack's online
+# documentation. See CONTRIBUTING.md for more information.
 
 # Preview Stack's online documentation with `make docs-serve`:
 .PHONY: docs-serve
