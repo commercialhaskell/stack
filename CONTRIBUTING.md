@@ -133,9 +133,6 @@ directory of the repository. They are formatted in the
 [Markdown syntax](https://daringfireball.net/projects/markdown/), with some
 extensions.
 
-The docs can be previewed locally with `make docs-serve` and can be built with
-`make _site/index.html`.
-
 Those files are rendered on [haskellstack.org](http://haskellstack.org) by
 [Read the Docs](https://readthedocs.org/) using
 [MkDocs](https://www.mkdocs.org/) and the
@@ -211,6 +208,62 @@ If `git config --show-scope --show-origin core.symlinks` is `false` in a local
 repository on Windows, then the files will be checked out as small plain files
 that contain the link text  See the
 [Git documentation](https://git-scm.com/docs/git-config#Documentation/git-config.txt-coresymlinks).
+
+The online documentation can be previewed using the `mkdocs` tool, as described
+in [Getting Started with MkDocs](https://www.mkdocs.org/getting-started/). The
+prerequisites are:
+
+*   [Python](https://www.python.org/); and
+*   the required Python packages set out in `doc/requirements.txt`. They can be
+    installed using Python's package manager `pip` with:
+
+    ~~~text
+    pip install --requirement doc/requirements.txt
+    ~~~
+
+Once the required version of `mkdocs` is installed, command `mkdocs serve` in
+the same directory as the `mkdocs.yml` file to start a web server. The command
+will, eventually, output the URL at which the documentation is being served.
+
+Command `mkdocs build` to build the documentation.
+
+=== "Windows"
+
+    With the correct prerequisites (see further below), users of the `make` tool
+    in the Stack-supplied MSYS2 environment can automate some of these steps
+    from Stack's project directory with:
+
+    * preview: `stack exec -- make docs-serve`; and
+    * build: `stack exec -- make _site/index.html`.
+
+    However, Windows and the Stack-supplied MSYS2 environment do not come with
+    Python or `make` by default. Further, Python on Windows does not use the
+    `python3` command (used on Unix-like operating systems) to invoke Python.
+    Further still, in the MSYS2 environment, development versions of packages
+    `libxml2` and `libxslt` are necessary dependencies. Consequently, the
+    automation requires the following command to install requirements into the
+    the MSYS2 environment:
+
+    ~~~text
+    stack exec -- pacman --sync python libxml2-devel libxslt-devel
+    ~~~
+
+    !!! note
+
+        If the automation fails before the `mkdocs` tool etc is installed, the
+        directory `.python-doc-virtualenv` created by the automation will need
+        to be deleted before the automation will work again.
+
+    For most users, the automation will be less convenient than simply using the
+    `mkdocs serve` command directly.
+
+=== "Unix-like"
+
+    With `python3` and `make` available on the PATH, users of the `make` tool
+    can automate some of these steps from Stack's project directory with:
+
+    * preview: `make docs-serve`; and
+    * build: `make _site/index.html`.
 
 ## Error messages
 
