@@ -38,6 +38,13 @@ GitHub repository.
     `https://get.haskellstack.org/stable/<PLATFORM>.<EXTENSION>` point to the
     latest stable release. See the manual download links for examples.
 
+!!! info "`sh` script flags and options"
+
+    The `sh` installation script recognises the following optional flags and
+    options: `-q` suppresses output and specifies non-intervention (likely a
+    prerequisite for the use of the script in CI environments); `-f forces installation, even if an existing Stack executable is detected; and
+    `-d <directory>` specifies a destination directory for the Stack executable.
+
 === "Linux"
 
     For most Linux distributions, the easiest way to install Stack directly
