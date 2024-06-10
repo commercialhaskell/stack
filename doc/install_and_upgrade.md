@@ -42,7 +42,7 @@ GitHub repository.
 
     The `sh` installation script recognises the following optional flags and
     options: `-q` suppresses output and specifies non-intervention (likely a
-    prerequisite for the use of the script in CI environments); `-f forces installation, even if an existing Stack executable is detected; and
+    prerequisite for the use of the script in CI environments); `-f` forces installation, even if an existing Stack executable is detected; and
     `-d <directory>` specifies a destination directory for the Stack executable.
 
 === "Linux"
