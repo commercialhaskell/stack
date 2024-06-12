@@ -745,14 +745,91 @@ on_path() {
   echo ":$PATH:" | grep -q :"$1":
 }
 
+# Check whether the script may be running in well-known CI environments
+has_ci_environment() {
+  if [ -n "$CI" ]; then
+    # GitHub Actions, GitLab CI, Travis, CircleCI and Bitbucket Pipelines all
+    # set CI.
+    return 0
+  elif [ -n "$TR_BUILD" ]; then
+    # Azure Pipelines sets TR_BUILD.
+    return 0
+  elif [ -n "$JENKINS_HOME" ]; then
+    # Jenkins sets JENKINS_HOME.
+    return 0
+  else
+    return 1
+  fi
+}
+
 # Check whether ~/.local/bin is on the PATH, and print a warning if not.
 check_home_local_bin_on_path() {
   if ! on_path "$HOME_LOCAL_BIN" ; then
-    #TODO: offer to add it for the user (pull requests welcome!)
     info "WARNING: '$HOME_LOCAL_BIN' is not on your PATH."
     info "    Stack will place the binaries it builds in '$HOME_LOCAL_BIN' so"
     info "    for best results, please add it to the beginning of PATH in your profile."
     info ""
+    # detect which profile file to use, then print a message about updating it
+    if [ -n "$BASH_VERSION" ]; then
+      if [ -f "$HOME/.bash_profile" ]; then
+        profile_file="$HOME/.bash_profile"
+      else
+        profile_file="$HOME/.bashrc"
+      fi
+    elif [ -n "$ZSH_VERSION" ]; then
+      profile_file="$HOME/.zshrc"
+    elif [ -n "$FISH_VERSION" ]; then
+      profile_file="$HOME/.config/fish/config.fish"
+    elif [ -n "$PROFILE" ]; then
+      profile_file="$PROFILE"
+    elif [ -f "$HOME/.bash_profile" ]; then
+      profile_file="$HOME/.bash_profile"
+    elif [ -f "$HOME/.bashrc" ]; then
+      profile_file="$HOME/.bashrc"
+    elif [ -f "$HOME/.zshrc" ]; then
+      profile_file="$HOME/.zshrc"
+    elif [ -f "$HOME/.config/fish/config.fish" ]; then
+      profile_file="$HOME/.config/fish/config.fish"
+    elif [ -f "$HOME/.profile" ]; then
+      profile_file="$HOME/.profile"
+    else
+      info "    (profile not found; please add it to your PATH manually)"
+    fi
+
+    # print a message about updating profile (if found)
+    if [ -n "$profile_file" ]; then
+      info "    You can do this by running the following command:"
+      info "    echo 'export PATH=\"$HOME_LOCAL_BIN:\$PATH\"' >> \"$profile_file\""
+      info "    (You may need to restart your shell for this to take effect.)"
+      info ""
+
+      # prompt to update it on their behalf, unless QUIET is set.
+      if [ -z "$QUIET" ] && ! has_ci_environment ; then
+        while true; do
+          info "Would you like this installer to add it to your PATH in '$profile_file'?"
+          info "    (This will be done by adding export PATH=\"$HOME_LOCAL_BIN:\$PATH\" to it."
+          info "    You may need to restart your shell for this to take effect.)"
+          info "    [y] Yes, prepend  [n] No (default)"
+          read -p "" yesno
+          # default to no.
+          yesno=${yesno:-n}
+          case $yesno in
+            [Yy]* )
+              echo "export PATH=\"$HOME_LOCAL_BIN:\$PATH\"" >> "$profile_file"
+              info "PATH updated in '$profile_file'"
+              break
+              ;;
+            [Nn]* )
+              info "Not updating PATH in '$profile_file'"
+              break
+              ;;
+            * )
+              info "Please answer 'y' or 'n'"
+              ;;
+          esac
+        done
+      fi
+    fi
   fi
 }
 
