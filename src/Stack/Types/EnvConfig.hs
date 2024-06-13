@@ -40,13 +40,13 @@ import           Path
                    )
 import           RIO.Process ( HasProcessContext (..) )
 import           Stack.Constants
-                   ( bindirSuffix, ghcColorForceFlag, osIsWindows, relDirCompilerTools
-                   , relDirHoogle, relDirHpc, relDirInstall, relDirPkgdb
-                   , relDirSnapshots, relFileDatabaseHoo
+                   ( bindirSuffix, ghcColorForceFlag, osIsWindows
+                   , relDirCompilerTools, relDirHoogle, relDirHpc, relDirInstall
+                   , relDirPkgdb, relDirSnapshots, relFileDatabaseHoo
                    )
 import           Stack.Prelude
 import           Stack.Types.BuildConfig
-                    ( BuildConfig (..), HasBuildConfig (..), getProjectWorkDir )
+                    ( BuildConfig (..), HasBuildConfig (..), getWorkDir )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI )
 import           Stack.Types.Compiler
                    ( ActualCompiler (..), compilerVersionString, getGhcVersion )
@@ -163,7 +163,7 @@ installationRootDeps = do
 -- | Installation root for locals
 installationRootLocal :: HasEnvConfig env => RIO env (Path Abs Dir)
 installationRootLocal = do
-  workDir <- getProjectWorkDir
+  workDir <- getWorkDir
   psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
   pure $ workDir </> relDirInstall </> psc
 
@@ -212,7 +212,7 @@ bindirCompilerTools = do
 -- | Hoogle directory.
 hoogleRoot :: HasEnvConfig env => RIO env (Path Abs Dir)
 hoogleRoot = do
-  workDir <- getProjectWorkDir
+  workDir <- getWorkDir
   psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
   pure $ workDir </> relDirHoogle </> psc
 

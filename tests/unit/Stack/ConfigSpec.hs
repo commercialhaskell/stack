@@ -27,7 +27,7 @@ import           Stack.Config (defaultConfigYaml, loadConfig, loadConfigYaml )
 import           Stack.Options.GlobalParser ( globalOptsFromMonoid )
 import           Stack.Prelude
 import           Stack.Runners ( withBuildConfig, withRunnerGlobal )
-import           Stack.Types.BuildConfig ( BuildConfig (..), projectRootL )
+import           Stack.Types.BuildConfig ( BuildConfig (..), configFileRootL )
 import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), HaddockOpts (..)
                    , TestOpts (..)
@@ -293,7 +293,7 @@ spec = beforeAll setup $ do
       setCurrentDirectory childDir
       loadConfig' $ \config -> liftIO $ do
         bc <- runRIO config $ withBuildConfig ask
-        view projectRootL bc `shouldBe` parentDir
+        view configFileRootL bc `shouldBe` parentDir
 
     it "respects the STACK_YAML env variable" $ inTempDir $ do
       withSystemTempDir "config-is-here" $ \dir -> do
@@ -303,8 +303,7 @@ spec = beforeAll setup $ do
         withEnvVar "STACK_YAML" stackYamlFp $
           loadConfig' $ \config -> liftIO $ do
             bc <- runRIO config $ withBuildConfig ask
-            bc.stackYaml `shouldBe` dir </> stackDotYaml
-            parent bc.stackYaml `shouldBe` dir
+            bc.configFile `shouldBe` Right (dir </> stackDotYaml)
 
     it "STACK_YAML can be relative" $ inTempDir $ do
         parentDir <- getCurrentDirectory >>= parseAbsDir
@@ -320,7 +319,7 @@ spec = beforeAll setup $ do
         withEnvVar "STACK_YAML" (toFilePath yamlRel) $
           loadConfig' $ \config -> liftIO $ do
             bc <- runRIO config $ withBuildConfig ask
-            bc.stackYaml `shouldBe` yamlAbs
+            bc.configFile `shouldBe` Right yamlAbs
 
   describe "defaultConfigYaml" $
     it "is parseable" $ \_ -> do

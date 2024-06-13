@@ -225,7 +225,7 @@ instance Exception BuildException where
 data BuildPrettyException
   = ConstructPlanFailed
       [ConstructPlanException]
-      (Path Abs File)
+      (Either (Path Abs File) (Path Abs File))
       (Path Abs Dir)
       Bool -- Is the project the implicit global project?
       ParentMap
@@ -263,13 +263,13 @@ data BuildPrettyException
   deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
-  pretty ( ConstructPlanFailed errs stackYaml stackRoot isImplicitGlobal parents wanted prunedGlobalDeps ) =
+  pretty ( ConstructPlanFailed errs configFile stackRoot isImplicitGlobal parents wanted prunedGlobalDeps ) =
     "[S-4804]"
     <> line
     <> flow "Stack failed to construct a build plan."
     <> blankLine
     <> pprintExceptions
-         errs stackYaml stackRoot isImplicitGlobal parents wanted prunedGlobalDeps
+         errs configFile stackRoot isImplicitGlobal parents wanted prunedGlobalDeps
   pretty (ExecutionFailure es) =
     "[S-7282]"
     <> line
@@ -437,11 +437,11 @@ instance Pretty BuildPrettyException where
                           , style Shell "--resolver" <> ","
                           , "option"
                           ]
-                        YamlConfiguration mStack -> case mStack of
+                        YamlConfiguration mConfigFile -> case mConfigFile of
                           Nothing -> flow "command line arguments"
-                          Just stack -> fillSep
+                          Just configFile -> fillSep
                             [ flow "the configuration in"
-                            , pretty stack
+                            , pretty configFile
                             ]
                     ]
                 )
@@ -484,14 +484,16 @@ pprintTargetParseErrors errs =
 
 pprintExceptions ::
      [ConstructPlanException]
-  -> Path Abs File
+  -> Either (Path Abs File) (Path Abs File)
+     -- ^ The configuration file, which may be either (Left) a user-specific
+     -- global one or (Right) a project-level one.
   -> Path Abs Dir
   -> Bool
   -> ParentMap
   -> Set PackageName
   -> Map PackageName [PackageName]
   -> StyleDoc
-pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wanted' prunedGlobalDeps =
+pprintExceptions exceptions configFile stackRoot isImplicitGlobal parentMap wanted' prunedGlobalDeps =
      fillSep
        [ flow
            (  "While constructing the build plan, Stack encountered the \
@@ -545,13 +547,15 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
                        <> if isImplicitGlobal then "," else mempty
                        )
                    ]
-                <> ( if isImplicitGlobal
-                       then []
-                       else
-                         [ "or"
-                         , pretty stackYaml
-                         , flow "(project-level configuration),"
-                         ]
+                <> ( case configFile of
+                      Left _ -> []
+                      Right projectConfigFile -> if isImplicitGlobal
+                        then []
+                        else
+                          [ "or"
+                          , pretty projectConfigFile
+                          , flow "(project-level configuration),"
+                          ]
                    )
                 <> [ "set"
                    ,    style Shell (flow "allow-newer: true")
@@ -574,14 +578,23 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
             ]
         ]
     | otherwise =
-        [   fillSep
-              [ style Recommendation (flow "Recommended action:")
-              , flow "try adding the following to your"
-              , style Shell "extra-deps"
-              , "in"
-              , pretty stackYaml
-              , "(project-level configuration):"
-              ]
+        [    fillSep
+               [ style Recommendation (flow "Recommended action:")
+               , flow "try adding the following to your"
+               , case configFile of
+                   Left _ -> fillSep
+                     [ style Shell "--extra-dep"
+                     , flow "options of the"
+                     , style Shell (flow "stack script")
+                     , "command:"
+                     ]
+                   Right projectConfigFile -> fillSep
+                     [ style Shell "extra-deps"
+                     , "in"
+                     , pretty projectConfigFile
+                     , "(project-level configuration):"
+                     ]
+               ]
           <> blankLine
           <> vsep (map pprintExtra (Map.toList extras))
         ]
@@ -761,12 +774,15 @@ pprintExceptions exceptions stackYaml stackRoot isImplicitGlobal parentMap wante
               , style Shell "build-tools"
               , "or"
               , style Shell "build-tool-depends"
-              , flow "(Cabal file)"
-              , flow "or an omission from the"
-              , style Shell "packages"
-              , flow "list in"
-              , pretty stackYaml
-              , flow "(project-level configuration).)"
+              , case configFile of
+                  Left _ -> flow "(Cabal file)."
+                  Right projectConfigFile -> fillSep
+                    [ flow "(Cabal file) or an omission from the"
+                    , style Shell "packages"
+                    , flow "list in"
+                    , pretty projectConfigFile
+                    , flow "(project-level configuration).)"
+                    ]
               ]
           | otherwise -> ""
         Just (laVer, _)

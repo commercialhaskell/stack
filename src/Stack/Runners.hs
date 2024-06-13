@@ -281,7 +281,7 @@ shouldUpgradeCheck = do
                  [ flow "Tired of seeing this? Add"
                  , style Shell (flow "recommend-stack-upgrade: false")
                  , "to"
-                 , pretty config.userConfigPath <> "."
+                 , pretty config.userGlobalConfigFile <> "."
                  ]
             <> blankLine
         _ -> pure ()

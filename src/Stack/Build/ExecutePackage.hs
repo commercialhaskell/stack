@@ -90,7 +90,7 @@ import qualified Stack.Types.Build as ConfigCache ( ConfigCache (..) )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig
-                   ( BuildConfig (..), HasBuildConfig (..), projectRootL )
+                   ( BuildConfig (..), HasBuildConfig (..), configFileRootL )
 import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), HaddockOpts (..)
                    , TestOpts (..)
@@ -231,7 +231,7 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
           (guard . isDoesNotExistError)
           (getFileStatus (toFilePath setupConfigfp))
   newSetupConfigMod <- getNewSetupConfigMod
-  newProjectRoot <- S8.pack . toFilePath <$> view projectRootL
+  newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
   -- See https://github.com/commercialhaskell/stack/issues/3554. This can be
   -- dropped when Stack drops support for GHC < 8.4.
   taskAnyMissingHackEnabled <-
@@ -271,7 +271,7 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
              /= Just (ignoreComponents newConfigCache)
           || mOldCabalMod /= Just newCabalMod
           || mOldSetupConfigMod /= newSetupConfigMod
-          || mOldProjectRoot /= Just newProjectRoot
+          || mOldProjectRoot /= Just newConfigFileRoot
 
   when task.buildTypeConfig $
     -- When build-type is Configure, we need to have a configure script in the
@@ -312,7 +312,7 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
     -- our config mod file is newer than the file above, but this seems
     -- reasonable too.
     getNewSetupConfigMod >>= writeSetupConfigMod pkgDir
-    writePackageProjectRoot pkgDir newProjectRoot
+    writePackageProjectRoot pkgDir newConfigFileRoot
   pure needConfig
 
 -- | Make a padded prefix for log messages

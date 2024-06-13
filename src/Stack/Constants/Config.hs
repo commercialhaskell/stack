@@ -26,7 +26,7 @@ module Stack.Constants.Config
 import           Path ( (</>), mkRelDir, mkRelFile, parseRelDir )
 import           Stack.Constants ( relDirDist, relDirGhci, relDirHpc )
 import           Stack.Prelude
-import           Stack.Types.BuildConfig ( HasBuildConfig, projectRootL )
+import           Stack.Types.BuildConfig ( HasBuildConfig, configFileRootL )
 import           Stack.Types.Compiler ( compilerVersionString )
 import           Stack.Types.CompilerPaths ( compilerVersionL )
 import           Stack.Types.Config ( Config, HasConfig, stackRootL, workDirL )
@@ -37,15 +37,15 @@ import           Stack.Types.EnvConfig
 objectInterfaceDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)
 objectInterfaceDirL = to $ \env -> -- FIXME is this idiomatic lens code?
   let workDir = view workDirL env
-      root = view projectRootL env
-  in  root </> workDir </> $(mkRelDir "odir/")
+      configFileRoot = view configFileRootL env
+  in  configFileRoot </> workDir </> $(mkRelDir "odir/")
 
 -- | GHCi files directory.
 ghciDirL :: HasBuildConfig env => Getting r env (Path Abs Dir)
 ghciDirL = to $ \env -> -- FIXME is this idiomatic lens code?
   let workDir = view workDirL env
-      root = view projectRootL env
-  in  root </> workDir </> relDirGhci
+      configFileRoot = view configFileRootL env
+  in  configFileRoot </> workDir </> relDirGhci
 
 -- | The directory containing the files used for dirtiness check of source
 -- files.

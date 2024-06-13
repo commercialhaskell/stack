@@ -422,6 +422,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-5470] | DuplicateLocalPackageNames [(PackageName, [PackageLocation])]
         [S-6854] | BadMsysEnvironment MsysEnvironment Arch
         [S-5006] | NoDefaultMsysEnvironmentBug
+        [S-8398] | ConfigFileNotProjectLevelBug
         ~~~
 
     -   `Stack.Types.Config.ParseAbsolutePathException`

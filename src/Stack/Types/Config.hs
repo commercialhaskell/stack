@@ -21,7 +21,7 @@ module Stack.Types.Config
   , buildOptsL
   , envOverrideSettingsL
   , globalOptsL
-  , stackGlobalConfigL
+  , userGlobalConfigFileL
   , stackRootL
   , workDirL
   -- * Helper logging functions
@@ -61,8 +61,8 @@ import           Stack.Types.Version ( VersionCheck (..), VersionRange )
 data Config = Config
   { workDir                :: !(Path Rel Dir)
     -- ^ this allows to override .stack-work directory
-  , userConfigPath         :: !(Path Abs File)
-    -- ^ Path to user configuration file (usually ~/.stack/config.yaml)
+  , userGlobalConfigFile   :: !(Path Abs File)
+    -- ^ The user-specific global configuration file.
   , build                  :: !BuildOpts
     -- ^ Build configuration
   , docker                 :: !DockerOpts
@@ -288,10 +288,10 @@ stackRootL :: HasConfig s => Lens' s (Path Abs Dir)
 stackRootL =
   configL . lens (.stackRoot) (\x y -> x { stackRoot = y })
 
-stackGlobalConfigL :: HasConfig s => Lens' s (Path Abs File)
-stackGlobalConfigL = configL . lens
-  (.userConfigPath)
-  (\x y -> x { userConfigPath = y })
+userGlobalConfigFileL :: HasConfig s => Lens' s (Path Abs File)
+userGlobalConfigFileL = configL . lens
+  (.userGlobalConfigFile)
+  (\x y -> x { userGlobalConfigFile = y })
 
 buildOptsL :: HasConfig s => Lens' s BuildOpts
 buildOptsL = configL . lens (.build) (\x y -> x { build = y })

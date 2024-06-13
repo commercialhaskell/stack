@@ -81,8 +81,7 @@ import           Stack.Constants (relFileCabalMacrosH, relDirLogs)
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.PackageFile ( getPackageFile, stackPackageFileFromCabal )
 import           Stack.Prelude hiding ( Display (..) )
-import           Stack.Types.BuildConfig
-                   ( HasBuildConfig (..), getProjectWorkDir )
+import           Stack.Types.BuildConfig ( HasBuildConfig (..), getWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, collectionLookup, foldAndMakeCollection
                    , foldComponentToAnotherCollection, getBuildableSetText
@@ -564,11 +563,11 @@ buildLogPath ::
   -> m (Path Abs File)
 buildLogPath package' msuffix = do
   env <- ask
-  let stack = getProjectWorkDir env
+  let workDir = getWorkDir env
   fp <- parseRelFile $ concat $
     packageIdentifierString (packageIdentifier package') :
     maybe id (\suffix -> ("-" :) . (suffix :)) msuffix [".log"]
-  pure $ stack </> relDirLogs </> fp
+  pure $ workDir </> relDirLogs </> fp
 
     {- FIXME
 -- | Create a 'ProjectPackage' from a directory containing a package.
