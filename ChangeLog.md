@@ -1235,9 +1235,9 @@ Behavior changes:
   [help file](https://github.com/commercialhaskell/stack-templates/blob/master/STACK_HELP.md)
   with more information on how to discover templates. See:
   [#4039](https://github.com/commercialhaskell/stack/issues/4039)
-* Build tools are now handled in a similar way to `cabal-install`. In
-  particular, for legacy `build-tools` fields, we use a hard-coded
-  list of build tools in place of looking up build tool packages in a
+* Tools used during building ('build tools') are now handled in a similar way to
+  `cabal-install`. In particular, for legacy `build-tools` fields, we use a
+  hard-coded list of build tools in place of looking up build tool packages in a
   tool map. This both brings Stack's behavior closer into line with
   `cabal-install`, avoids some bugs, and opens up some possible
   optimizations/laziness. See:

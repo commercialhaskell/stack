@@ -22,13 +22,13 @@ extension's settings (under 'Haskell: Manage HLS') allow a user to specify
 that the extension should use a separate application,
 [GHCup](https://www.haskell.org/ghcup/), to download and install the versions of
 HLS that it needs. GHCup can download and install things other than HLS,
-including GHC, MSYS2 (on Windows), Cabal (a build tool), and Stack itself. GHCup
-can also update itself. On Windows, GHCup has the capability of using the
-Stack-supplied MSYS2 rather than installing a duplicate copy. Cabal (the build
-tool), like Stack, depends on the Cabal (the library). Cabal (the tool), unlike
-Stack, does not have the capability to automatically install necessary versions
-of GHC, and (as well as supporting the extension) GHCup fills a important gap
-for users of the Cabal tool.
+including GHC, MSYS2 (on Windows), Cabal (a tool for building Haskell code), and
+Stack itself. GHCup can also update itself. On Windows, GHCup has the capability
+of using the Stack-supplied MSYS2 rather than installing a duplicate copy. Cabal
+(the tool), like Stack, depends on the Cabal (the library). Cabal (the tool),
+unlike Stack, does not have the capability to automatically install necessary
+versions of GHC, and (as well as supporting the extension) GHCup fills a
+important gap for users of the Cabal tool.
 
 If the VS Code extension is set not to use GHCup, its user needs to ensure that
 each version of HLS that the extension needs is on the PATH.
@@ -78,8 +78,8 @@ different version of GHC, then GHCup must be used to install it (if GHCup has
 not already installed that version). For example, to use `snapshot: lts-22.21`
 (GHC 9.6.5), the command `ghcup install ghc 9.6.5` must have been used to
 install GHC 9.6.5. That may be a minor inconvenience for some people, as one the
-primary benefits of Stack over other Haskell build tools has been that Stack
-automatically ensures that the necessary version of GHC is available.
+primary benefits of Stack over other tools for building Haskell code has been
+that Stack automatically ensures that the necessary version of GHC is available.
 
 ### Workaround #2
 

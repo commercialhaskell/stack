@@ -277,11 +277,11 @@ explained in the [glossary](glossary.md).
 
 ## Why Stack?
 
-Stack is a build tool for Haskell designed to answer the needs of Haskell users,
-both new and experienced. It has a strong focus on reproducible build plans,
-multi-package projects, and a consistent, easy-to-learn set of Stack commands.
-It also aims to provide the customizability and power that experienced
-developers need.
+Stack is a tool for building Haskell code designed to answer the needs of
+Haskell users, both new and experienced. It has a strong focus on reproducible
+build plans, multi-package projects, and a consistent, easy-to-learn set of
+Stack commands. It also aims to provide the customizability and power that
+experienced developers need.
 
 Stack does not stand alone. It is built on the great work provided by:
 
@@ -294,9 +294,9 @@ Stack does not stand alone. It is built on the great work provided by:
 
     !!! info
 
-        Cabal is also the name of another build tool, provided by the
-        `cabal-install` package. This guide distinguishes between them by Cabal
-        (the library) and Cabal (the tool).
+        Cabal is also the name of another tool used for building Haskell code,
+        provided by the `cabal-install` package. This guide distinguishes
+        between them by Cabal (the library) and Cabal (the tool).
 
 * The __Hackage Haskell Package Repository__, a
   [repository](https://hackage.haskell.org/) of Haskell packages providing

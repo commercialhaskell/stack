@@ -29,8 +29,8 @@ file and a package description file.
 
 ## Package versus project
 
-Stack is a build tool and it uses Cabal, a build system. Cabal defines the
-concept of a _package_. A package has:
+Stack is a tool for building Haskell code and it uses Cabal, a build system.
+Cabal defines the concept of a _package_. A package has:
 
 * A name and version
 * optionally, one library

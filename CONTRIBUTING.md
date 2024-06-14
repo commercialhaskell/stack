@@ -735,7 +735,7 @@ Stack can be built with Stack (which is recommended) or with Cabal (the tool).
     ~~~
 
 A cradle is not committed to Stack's repository because it imposes a choice of
-build tool.
+tool used for building.
 
 ## Dev Containers
 
