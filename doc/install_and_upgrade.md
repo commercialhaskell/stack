@@ -20,11 +20,11 @@ GitHub repository.
     using the separate [GHCup](https://www.haskell.org/ghcup/) installer for
     Haskell-related tools. GHCup provides Stack for some combinations of machine
     architecture and operating system not provided elsewhere. Unlike Stack,
-    other build tools do not automatically install GHC. GHCup can be used to
-    install GHC for those other tools. By default, the script to install GHCup
-    (which can be run more than once) also configures Stack so that if Stack
-    needs a version of GHC, GHCup takes over obtaining and installing that
-    version.
+    other tools used for building Haskell code do not automatically install GHC.
+    GHCup can be used to install GHC for those other tools. By default, the
+    script to install GHCup (which can be run more than once) also configures
+    Stack so that if Stack needs a version of GHC, GHCup takes over obtaining
+    and installing that version.
 
 !!! info "Releases on GitHub"
 

@@ -239,17 +239,18 @@ with the various requirements (version, architecture) that your project needs.
 See issue [#420](https://github.com/commercialhaskell/stack/issues/420) for a
 detailed discussion of Stack's behavior when `system-ghc` is enabled.
 
-## How do I get extra build tools?
+## How do I get extra tools used during building?
 
-Stack will automatically install build tools required by your packages or their
-dependencies, in particular [Alex](https://hackage.haskell.org/package/alex) and
+Stack will automatically install tools used during building required by your
+packages or their dependencies, in particular
+[Alex](https://hackage.haskell.org/package/alex) and
 [Happy](https://hackage.haskell.org/package/happy).
 
 !!! note
 
     This works when using LTS or nightly snapshots, not with GHC or custom
-    snapshots. You can manually install build tools by running, e.g.,
-    `stack build alex happy`.
+    snapshots. You can manually install tools used during building by running,
+    e.g., `stack build alex happy`.
 
 ## How does Stack choose which snapshot to use when creating a new configuration file?
 

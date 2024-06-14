@@ -124,8 +124,8 @@ The
 and the
 [Haskell extension](https://marketplace.visualstudio.com/items?itemName=haskell.haskell)
 are only available in the default Dev Container. In order to use the Haskell
-extension, you must first configure the project for the build tool of your
-choice.
+extension, you must first configure the project for the tool used for building
+of your choice.
 
 <!--
 **Stack**

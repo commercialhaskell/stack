@@ -230,8 +230,9 @@ installed in this database will never need to be rebuilt.
 * Apply flags, platform, and actual GHC version to resolve
   dependencies in any package analyzed
 * Include all library dependencies for all enabled components
-* Include all build tool dependencies for all enabled components
-  (using the fun backwards compat logic for `build-tools`)
+* Include all dependencies for tools used during building ('build tools') for
+  all enabled components (using the fun backwards compat logic for
+  `build-tools`)
 * Apply the logic recursively to come up with a full build plan
 * If a task depends exclusively on immutable packages, mark it as
   immutable. Otherwise, it's mutable. The former go into the snapshot

@@ -233,7 +233,7 @@ Now continue to the **General Windows setup** subsection below.
    git config --global user.name "Emanuel Borsboom"
    ~~~
 
-10. Install build tools and dependencies packages
+10. Install tools used during building and dependencies packages
 
     ~~~text
     sudo apt-get install -y g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg

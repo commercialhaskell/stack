@@ -2,12 +2,13 @@
 
 # User guide (introductory)
 
-Stack is a modern, cross-platform build tool for Haskell code.
+Stack is a modern, cross-platform tool for building Haskell code.
 
 This introductory guide takes a new Stack user through the typical workflows.
 This guide will not teach Haskell or involve much code, and it requires no prior
-experience with the Haskell packaging system or other build tools. Terms used in
-the guide are defined in the [glossary](glossary.md).
+experience with the Haskell packaging system or other tools used for, or during,
+building Haskell code. Terms used in the guide are defined in the
+[glossary](glossary.md).
 
 Some of Stack's features will not be needed regularly or by all users. See the
 [advanced user's guide](GUIDE_advanced.md) for information about those features.
@@ -16,9 +17,10 @@ Some of Stack's features will not be needed regularly or by all users. See the
 
 Stack handles the management of your toolchain (including GHC — the Glasgow
 Haskell Compiler — and, for Windows users, MSYS2), building and registering
-libraries, building build tool dependencies, and more. While it can use existing
-tools on your system, Stack has the capacity to be your one-stop shop for all
-Haskell tooling you need. This guide will follow that Stack-centric approach.
+libraries, building dependencies on tools used during building, and more. While
+it can use existing tools on your system, Stack has the capacity to be your
+one-stop shop for all Haskell tooling you need. This guide will follow that
+Stack-centric approach.
 
 ### What makes Stack special?
 
@@ -45,8 +47,8 @@ Stack directories. Stack-built files generally go in either the Stack root
 directory or `./.stack-work` directories local to each project. The
 [Stack root](stack_root.md) directory holds packages belonging to snapshots and
 any Stack-installed versions of GHC. Stack will not tamper with any system
-version of GHC or interfere with packages installed by other build tools, such
-as Cabal (the tool).
+version of GHC or interfere with packages installed by other tools used for
+building Haskell code, such as Cabal (the tool).
 
 ## Downloading and Installation
 
