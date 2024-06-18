@@ -1,0 +1,56 @@
+# This is an experimental project-level configuration, to see if Stack can be
+# built with GHC 9.10.1.
+#
+# Currently, Stack cannot be built with GHC 9.10.1 because Cabal-3.12.0.0 has
+# changed the type of Distribution.PackageDescription.Check.checkPackage.
+
+snapshot: nightly-2024-06-17 # GHC 9.8.2
+compiler: ghc-9.10.1
+
+extra-deps:
+- Cabal-3.12.0.0
+- Cabal-syntax-3.12.0.0
+- Win32-2.14.0.0
+- directory-1.3.8.3
+- filepath-1.5.2.0
+- ghc-boot-9.10.1
+# hpack-0.36.0 does not work
+- git: https://github.com/sol/hpack.git
+  commit: 79a134f4de8117218be404dec3474e5a8cd1216b
+- hpc-0.7.0.1
+- http-api-data-0.6.1
+- process-1.6.19.0
+- time-1.12.2
+- uuid-types-1.0.6
+
+allow-newer: true
+allow-newer-deps:
+- directory
+- ghc-boot
+- hackage-security
+- hpack
+- hpc
+- pantry
+- persistent
+- process
+# Added to ignore upper bound on Cabal.
+- stack
+- unix-compat
+
+docker:
+  enable: false
+  repo: quay.io/benz0li/ghc-musl:9.10.1
+
+nix:
+  # --nix on the command-line to enable.
+  packages:
+  - zlib
+  - unzip
+
+flags:
+  Win32:
+    os-string: true
+  directory:
+    os-string: true
+  stack:
+    developer-mode: true
