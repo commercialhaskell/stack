@@ -47,17 +47,6 @@ packages:
   original:
     hackage: ghc-boot-9.10.1
 - completed:
-    commit: 79a134f4de8117218be404dec3474e5a8cd1216b
-    git: https://github.com/sol/hpack.git
-    name: hpack
-    pantry-tree:
-      sha256: 34cc54b05c47f2a72b3c6dd7abd4d127035d2b5685d0e2543693337d361e453f
-      size: 4492
-    version: 0.36.0
-  original:
-    commit: 79a134f4de8117218be404dec3474e5a8cd1216b
-    git: https://github.com/sol/hpack.git
-- completed:
     hackage: hpc-0.7.0.1@sha256:fd252a48d10dbe324d502bc666b4672e6a0b64c413f7040305794244d84e06b5,1113
     pantry-tree:
       sha256: fb98280d506624c472143c6cbb930b5ed1df143312eca46e0599f6b30d783a91
@@ -94,7 +83,7 @@ packages:
     hackage: uuid-types-1.0.6
 snapshots:
 - completed:
-    sha256: b054a0443c25ebb957db8d9a896d557bef789894c3531a4c2ade862cc9c2a3cd
+    sha256: dd0dcdf9b4fda44e744450d614161f783165ccbf1ec1e4371ee646830b701c85
     size: 650422
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/6/17.yaml
-  original: nightly-2024-06-17
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/6/20.yaml
+  original: nightly-2024-06-20
