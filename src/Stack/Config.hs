@@ -34,7 +34,7 @@ module Stack.Config
   , determineStackRootAndOwnership
   ) where
 
-import           Control.Monad.Extra ( firstJustM, whenJust )
+import           Control.Monad.Extra ( firstJustM )
 import           Data.Aeson.Types ( Value )
 import           Data.Aeson.WarningParser
                     ( WithJSONWarnings (..), logJSONWarnings )
@@ -69,10 +69,10 @@ import           Path
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.Find ( findInParents )
 import           Path.IO
-                   ( XdgDirectory (..), canonicalizePath, doesDirExist
-                   , doesFileExist, ensureDir, forgivingAbsence
-                   , getAppUserDataDir, getCurrentDir, getXdgDir, resolveDir
-                   , resolveDir', resolveFile'
+                   ( XdgDirectory (..), canonicalizePath, doesFileExist
+                   , ensureDir, forgivingAbsence, getAppUserDataDir
+                   , getCurrentDir, getXdgDir, resolveDir, resolveDir'
+                   , resolveFile'
                    )
 import           RIO.List ( unzip )
 import           RIO.Process
@@ -86,10 +86,8 @@ import           Stack.Config.Build ( buildOptsFromMonoid )
 import           Stack.Config.Docker ( dockerOptsFromMonoid )
 import           Stack.Config.Nix ( nixOptsFromMonoid )
 import           Stack.Constants
-                   ( defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated
-                   , defaultUserConfigPath, defaultUserConfigPathDeprecated
-                   , implicitGlobalProjectDir
-                   , implicitGlobalProjectDirDeprecated, inContainerEnvVar
+                   ( defaultGlobalConfigPath, defaultUserConfigPath
+                   , implicitGlobalProjectDir, inContainerEnvVar
                    , inNixShellEnvVar, osIsWindows, pantryRootEnvVar
                    , platformVariantEnvVar, relDirBin, relDirStackWork
                    , relFileReadmeTxt, relFileStorage, relDirPantry
@@ -157,55 +155,9 @@ import           System.Info.ShortPathName ( getShortPathName )
 import           System.PosixCompat.Files ( fileOwner, getFileStatus )
 import           System.Posix.User ( getEffectiveUserID )
 
--- | If deprecated path exists, use it and print a warning. Otherwise, return
--- the new path.
-tryDeprecatedPath ::
-     HasTerm env
-  => Maybe T.Text
-     -- ^ Description of file for warning (if Nothing, no deprecation warning is
-     -- displayed)
-  -> (Path Abs a -> RIO env Bool)
-     -- ^ Test for existence
-  -> Path Abs a
-     -- ^ New path
-  -> Path Abs a
-     -- ^ Deprecated path
-  -> RIO env (Path Abs a, Bool)
-     -- ^ (Path to use, whether it already exists)
-tryDeprecatedPath mWarningDesc exists new old = do
-  newExists <- exists new
-  if newExists
-    then pure (new, True)
-    else do
-      oldExists <- exists old
-      if oldExists
-        then do
-          whenJust mWarningDesc $ \desc ->
-            prettyWarnL
-              [ flow "Location of"
-              , flow (T.unpack desc)
-              , "at"
-              , style Dir (fromString $ toFilePath old)
-              , flow "is deprecated; rename it to"
-              , style Dir (fromString $ toFilePath new)
-              , "instead."
-              ]
-          pure (old, True)
-        else pure (new, False)
-
--- | Get the location of the implicit global project directory. If the directory
--- already exists at the deprecated location, its location is returned.
--- Otherwise, the new location is returned.
-getImplicitGlobalProjectDir ::HasTerm env => Config -> RIO env (Path Abs Dir)
-getImplicitGlobalProjectDir config =
-  --TEST no warning printed
-  fst <$> tryDeprecatedPath
-    Nothing
-    doesDirExist
-    (implicitGlobalProjectDir stackRoot)
-    (implicitGlobalProjectDirDeprecated stackRoot)
- where
-  stackRoot = view stackRootL config
+-- | Get the location of the implicit global project directory.
+getImplicitGlobalProjectDir :: HasConfig env => RIO env (Path Abs Dir)
+getImplicitGlobalProjectDir = view $ stackRootL . to implicitGlobalProjectDir
 
 -- | Download the 'Snapshots' value from stackage.org.
 getSnapshots :: HasConfig env => RIO env Snapshots
@@ -227,9 +179,7 @@ makeConcreteSnapshot as = do
   s <-
     case as of
       ASGlobal -> do
-        config <- view configL
-        implicitGlobalDir <- getImplicitGlobalProjectDir config
-        let fp = implicitGlobalDir </> stackDotYaml
+        fp <- getImplicitGlobalProjectDir <&> (</> stackDotYaml)
         iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp
         ProjectAndConfigMonoid project _ <- liftIO iopc
         pure project.snapshot
@@ -785,7 +735,7 @@ withBuildConfig inner = do
       pure (p, Left config.userGlobalConfigFile)
     PCGlobalProject -> do
       logDebug "Run from outside a project, using implicit global project config"
-      destDir <- getImplicitGlobalProjectDir config
+      destDir <- getImplicitGlobalProjectDir
       let dest :: Path Abs File
           dest = destDir </> stackDotYaml
           dest' :: FilePath
@@ -1134,19 +1084,17 @@ getInNixShell = liftIO (isJust <$> lookupEnv inNixShellEnvVar)
 getExtraConfigs :: HasTerm env
                 => Path Abs File -- ^ use config path
                 -> RIO env [Path Abs File]
-getExtraConfigs userConfigPath = do
-  defaultStackGlobalConfigPath <- getDefaultGlobalConfigPath
-  liftIO $ do
-    env <- getEnvironment
-    mstackConfig <-
-        maybe (pure Nothing) (fmap Just . parseAbsFile)
-      $ lookup "STACK_CONFIG" env
-    mstackGlobalConfig <-
-        maybe (pure Nothing) (fmap Just . parseAbsFile)
-      $ lookup "STACK_GLOBAL_CONFIG" env
-    filterM doesFileExist
-        $ fromMaybe userConfigPath mstackConfig
-        : maybe [] pure (mstackGlobalConfig <|> defaultStackGlobalConfigPath)
+getExtraConfigs userConfigPath = liftIO $ do
+  env <- getEnvironment
+  mstackConfig <-
+      maybe (pure Nothing) (fmap Just . parseAbsFile)
+    $ lookup "STACK_CONFIG" env
+  mstackGlobalConfig <-
+      maybe (pure Nothing) (fmap Just . parseAbsFile)
+    $ lookup "STACK_GLOBAL_CONFIG" env
+  filterM doesFileExist
+    $ fromMaybe userConfigPath mstackConfig
+    : maybe [] pure (mstackGlobalConfig <|> defaultGlobalConfigPath)
 
 -- | Load and parse YAML from the given config file. Throws
 -- 'ParseConfigFileException' when there's a decoding error.
@@ -1234,41 +1182,18 @@ loadProjectConfig mstackYaml = do
     ProjectAndConfigMonoid project config <- liftIO iopc
     pure (project, fp, config)
 
--- | Get the location of the default Stack configuration file. If a file already
--- exists at the deprecated location, its location is returned. Otherwise, the
--- new location is returned.
-getDefaultGlobalConfigPath ::
-     HasTerm env
-  => RIO env (Maybe (Path Abs File))
-getDefaultGlobalConfigPath =
-  case (defaultGlobalConfigPath, defaultGlobalConfigPathDeprecated) of
-    (Just new, Just old) ->
-      Just . fst <$>
-        tryDeprecatedPath
-          (Just "non-project global configuration file")
-          doesFileExist
-          new
-          old
-    (Just new,Nothing) -> pure (Just new)
-    _ -> pure Nothing
-
--- | Get the location of the default user configuration file. If a file already
--- exists at the deprecated location, its location is returned. Otherwise, the
--- new location is returned.
+-- | Get the location of the default user global configuration file.
 getDefaultUserConfigPath ::
      HasTerm env
   => Path Abs Dir
   -> RIO env (Path Abs File)
-getDefaultUserConfigPath stackRoot = do
-  (path, exists) <- tryDeprecatedPath
-    (Just "non-project configuration file")
-    doesFileExist
-    (defaultUserConfigPath stackRoot)
-    (defaultUserConfigPathDeprecated stackRoot)
-  unless exists $ do
-    ensureDir (parent path)
-    liftIO $ writeBinaryFileAtomic path defaultConfigYaml
-  pure path
+getDefaultUserConfigPath configRoot = do
+  let userConfigPath = defaultUserConfigPath configRoot
+  userConfigExists <- doesFileExist userConfigPath
+  unless userConfigExists $ do
+    ensureDir (parent userConfigPath)
+    liftIO $ writeBinaryFileAtomic userConfigPath defaultConfigYaml
+  pure userConfigPath
 
 packagesParser :: Parser [String]
 packagesParser = many (strOption

@@ -33,6 +33,10 @@ Behavior changes:
   of the compiler specified by the snapshot).
 * `stack build --flag *:[-]<flag_name>` now only applies the flag setting to
   packages for which the Cabal flag is defined, as opposed to all packages.
+* On Unix-like operating systems, drop support for `/etc/stack/config`,
+  deprecated in Stack 0.1.6.0.
+* Drop support for, in the Stack root, directory `global` and file `stack.yaml`,
+  both deprecated in Stack 0.1.6.0.
 
 Other enhancements:
 

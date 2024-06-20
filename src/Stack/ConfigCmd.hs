@@ -101,8 +101,7 @@ cfgCmdSet cmd = do
         mstackYaml <- getProjectConfig mstackYamlOption
         case mstackYaml of
           PCProject stackYaml -> pure stackYaml
-          PCGlobalProject ->
-            fmap (</> stackDotYaml) (getImplicitGlobalProjectDir conf)
+          PCGlobalProject -> getImplicitGlobalProjectDir <&> (</> stackDotYaml)
           PCNoProject _extraDeps -> throwIO NoProjectConfigAvailable
           -- maybe modify the ~/.stack/config.yaml file instead?
       CommandScopeGlobal -> pure conf.userGlobalConfigFile
