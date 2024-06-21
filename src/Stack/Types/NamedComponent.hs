@@ -71,10 +71,10 @@ renderPkgComponent :: (PackageName, NamedComponent) -> Text
 renderPkgComponent (pkg, comp) =
   fromPackageName pkg <> ":" <> renderComponent comp
 
-exeComponents :: Set NamedComponent -> Set Text
+exeComponents :: Set NamedComponent -> Set StackUnqualCompName
 exeComponents = Set.fromList . mapMaybe mExeName . Set.toList
  where
-  mExeName (CExe name) = Just $ unqualCompToText name
+  mExeName (CExe name) = Just name
   mExeName _ = Nothing
 
 testComponents :: Set NamedComponent -> Set StackUnqualCompName
@@ -83,16 +83,16 @@ testComponents = Set.fromList . mapMaybe mTestName . Set.toList
   mTestName (CTest name) = Just name
   mTestName _ = Nothing
 
-benchComponents :: Set NamedComponent -> Set Text
+benchComponents :: Set NamedComponent -> Set StackUnqualCompName
 benchComponents = Set.fromList . mapMaybe mBenchName . Set.toList
  where
-  mBenchName (CBench name) = Just $ unqualCompToText name
+  mBenchName (CBench name) = Just name
   mBenchName _ = Nothing
 
-subLibComponents :: Set NamedComponent -> Set Text
+subLibComponents :: Set NamedComponent -> Set StackUnqualCompName
 subLibComponents = Set.fromList . mapMaybe mSubLibName . Set.toList
  where
-  mSubLibName (CSubLib name) = Just $ unqualCompToText name
+  mSubLibName (CSubLib name) = Just name
   mSubLibName _ = Nothing
 
 isCLib :: NamedComponent -> Bool

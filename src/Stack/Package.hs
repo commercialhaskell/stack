@@ -22,15 +22,10 @@ module Stack.Package
   , mainLibraryHasExposedModules
   , packageUnknownTools
   , buildableForeignLibs
-  , buildableForeignLibsComp
   , buildableSubLibs
-  , buildableSubLibsComp
   , buildableExes
-  , buildableExesComp
   , buildableTestSuites
-  , buildableTestSuitesComp
   , buildableBenchmarks
-  , buildableBenchmarksComp
   , getPackageOpts
   , processPackageDepsEither
   , listOfPackageDeps
@@ -53,7 +48,7 @@ import           Distribution.PackageDescription
                    , GenericPackageDescription (..), HookedBuildInfo
                    , Library (..), PackageDescription (..), PackageFlag (..)
                    , SetupBuildInfo (..), TestSuite (..), allLibraries
-                   , buildType, depPkgName, depVerRange
+                   , buildType, depPkgName, depVerRange, unqualComponentNameToPackageName
                    )
 import qualified Distribution.PackageDescription as Executable
                    ( Executable (..) )
@@ -94,7 +89,7 @@ import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Component
                    ( HasBuildInfo, HasComponentInfo, StackUnqualCompName (..) )
-import           Stack.Types.ComponentUtils ( emptyCompName )
+import           Stack.Types.ComponentUtils ( emptyCompName, toCabalName )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.Dependency
@@ -210,7 +205,7 @@ getPackageOpts
         getPackageFile stackPackage cabalFP
       let subLibs =
             S.toList $ subLibComponents $ M.keysSet componentsModules
-      excludedSubLibs <- mapM (parsePackageNameThrowing . T.unpack) subLibs
+      let excludedSubLibs = map (unqualComponentNameToPackageName . toCabalName) subLibs
       componentsOpts <- generatePkgDescOpts
         installMap
         installedMap
@@ -670,35 +665,20 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
   gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
   gatherUnknownTools = foldr' addUnknownTools mempty
 
-buildableForeignLibs :: Package -> Set Text
-buildableForeignLibs pkg = getBuildableSetText pkg.foreignLibraries
+buildableForeignLibs :: Package -> Set StackUnqualCompName
+buildableForeignLibs pkg = getBuildableSet pkg.foreignLibraries
 
-buildableForeignLibsComp :: Package -> Set StackUnqualCompName
-buildableForeignLibsComp pkg = getBuildableSet pkg.foreignLibraries
+buildableSubLibs :: Package -> Set StackUnqualCompName
+buildableSubLibs pkg = getBuildableSet pkg.subLibraries
 
-buildableSubLibs :: Package -> Set Text
-buildableSubLibs pkg = getBuildableSetText pkg.subLibraries
+buildableExes :: Package -> Set StackUnqualCompName
+buildableExes pkg = getBuildableSet pkg.executables
 
-buildableSubLibsComp :: Package -> Set StackUnqualCompName
-buildableSubLibsComp pkg = getBuildableSet pkg.subLibraries
+buildableTestSuites :: Package -> Set StackUnqualCompName
+buildableTestSuites pkg = getBuildableSet pkg.testSuites
 
-buildableExes :: Package -> Set Text
-buildableExes pkg = getBuildableSetText pkg.executables
-
-buildableExesComp :: Package -> Set StackUnqualCompName
-buildableExesComp pkg = getBuildableSet pkg.executables
-
-buildableTestSuites :: Package -> Set Text
-buildableTestSuites pkg = getBuildableSetText pkg.testSuites
-
-buildableTestSuitesComp :: Package -> Set StackUnqualCompName
-buildableTestSuitesComp pkg = getBuildableSet pkg.testSuites
-
-buildableBenchmarks :: Package -> Set Text
-buildableBenchmarks pkg = getBuildableSetText pkg.benchmarks
-
-buildableBenchmarksComp :: Package -> Set StackUnqualCompName
-buildableBenchmarksComp pkg = getBuildableSet pkg.benchmarks
+buildableBenchmarks :: Package -> Set StackUnqualCompName
+buildableBenchmarks pkg = getBuildableSet pkg.benchmarks
 
 -- | Apply a generic processing function in a Monad over all of the Package's
 -- components.

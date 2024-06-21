@@ -63,6 +63,7 @@ import           Stack.Types.Build
                    )
 import           Stack.Types.Cache ( ConfigCacheType (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
+import           Stack.Types.ComponentUtils ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.Config ( stackRootL )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
@@ -134,7 +135,6 @@ buildCacheFile dir component = do
   cachesDir <- buildCachesDir dir
   smh <- view $ envConfigL . to (.sourceMapHash)
   smDirName <- smRelDir smh
-  let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
   cacheFileName <- parseRelFile $ componentCachePath component
   pure $ cachesDir </> smDirName </> cacheFileName
 
@@ -370,7 +370,7 @@ writePrecompiledCache ::
   -> ConfigureOpts
   -> Bool -- ^ build haddocks
   -> Installed -- ^ library
-  -> Set Text -- ^ executables
+  -> Set StackUnqualCompName -- ^ executables
   -> RIO env ()
 writePrecompiledCache
     baseConfigOpts
@@ -384,7 +384,7 @@ writePrecompiledCache
       ec <- view envConfigL
       let stackRootRelative = makeRelative (view stackRootL ec)
       exes' <- forM (Set.toList exes) $ \exe -> do
-        name <- parseRelFile $ T.unpack exe
+        name <- parseRelFile $ unqualCompToString exe
         stackRootRelative $
            baseConfigOpts.snapInstallRoot </> bindirSuffix </> name
       let installedLibToPath libName ghcPkgId pcAction = do

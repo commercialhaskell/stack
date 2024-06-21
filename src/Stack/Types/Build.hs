@@ -58,6 +58,7 @@ import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), TestOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( BuildSubset (..), FileWatchOpts (..) )
+import           Stack.Types.ComponentUtils ( StackUnqualCompName )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts, ConfigureOpts, PackageConfigureOpts
                    , configureOpts
@@ -230,7 +231,7 @@ data Plan = Plan
     -- ^ Final actions to be taken (test, benchmark, etc)
   , unregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
     -- ^ Text is reason we're unregistering, for display only
-  , installExes :: !(Map Text InstallLocation)
+  , installExes :: !(Map StackUnqualCompName InstallLocation)
     -- ^ Executables that should be installed after successful building
   }
   deriving Show

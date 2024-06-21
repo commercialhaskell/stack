@@ -251,7 +251,7 @@ data BuildPrettyException
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   | InvalidFlagSpecification [UnusedFlags]
   | GHCProfOptionInvalid
-  | NotOnlyLocal [PackageName] [Text]
+  | NotOnlyLocal [PackageName] [StackUnqualCompName]
   | CompilerVersionMismatch
       (Maybe (ActualCompiler, Arch)) -- found
       (WantedCompiler, Arch) -- expected
@@ -388,7 +388,7 @@ instance Pretty BuildPrettyException where
               fillSep
                 ( "Executables:"
                 : mkNarrativeList Nothing False
-                    (map (fromString . T.unpack) exes :: [StyleDoc])
+                    (map (fromString . unqualCompToString) exes :: [StyleDoc])
                 )
            <> line
   pretty ( CompilerVersionMismatch

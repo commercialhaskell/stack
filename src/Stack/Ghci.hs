@@ -46,8 +46,8 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( buildableForeignLibsComp, buildableSubLibsComp, buildableExesComp
-                   , buildableTestSuitesComp, buildableBenchmarksComp, getPackageOpts
+                   ( buildableForeignLibs, buildableSubLibs, buildableExes
+                   , buildableTestSuites, buildableBenchmarks, getPackageOpts
                    , hasBuildableMainLibrary, listOfPackageDeps
                    , packageFromPackageDescription, readDotBuildinfo
                    , resolvePackageDescription, topSortPackageComponent
@@ -957,15 +957,15 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg =
          else S.empty
      )
   <> S.mapMonotonic CExe buildableExes'
-  <> S.mapMonotonic CSubLib buildableSubLibs
-  <> (if bopts.tests then S.mapMonotonic CTest buildableTestSuites else S.empty)
-  <> (if bopts.benchmarks then S.mapMonotonic CBench buildableBenchmarks else S.empty)
+  <> S.mapMonotonic CSubLib buildableSubLibs'
+  <> (if bopts.tests then S.mapMonotonic CTest buildableTestSuites' else S.empty)
+  <> (if bopts.benchmarks then S.mapMonotonic CBench buildableBenchmarks' else S.empty)
  where
-  buildableForeignLibs' = buildableForeignLibsComp pkg
-  buildableSubLibs = buildableSubLibsComp pkg
-  buildableExes' = buildableExesComp pkg
-  buildableTestSuites = buildableTestSuitesComp pkg
-  buildableBenchmarks = buildableBenchmarksComp pkg
+  buildableForeignLibs' = buildableForeignLibs pkg
+  buildableSubLibs' = buildableSubLibs pkg
+  buildableExes' = buildableExes pkg
+  buildableTestSuites' = buildableTestSuites pkg
+  buildableBenchmarks' = buildableBenchmarks pkg
 wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: HasTerm env => [GhciPkgInfo] -> RIO env ()

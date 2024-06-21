@@ -32,8 +32,6 @@ import           Distribution.System ( OS (..), Platform (..) )
 import qualified Distribution.Text as C
 import           Distribution.Types.MungedPackageName
                    ( encodeCompatPackageName )
-import           Distribution.Types.UnqualComponentName
-                   ( mkUnqualComponentName )
 import           Distribution.Version ( mkVersion )
 import           Path
                    ( (</>), addExtension, filename, isProperPrefixOf, parent
@@ -849,9 +847,9 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
     subLibNames = Set.toList $ buildableSubLibs $ case task.taskType of
       TTLocalMutable lp -> lp.package
       TTRemotePackage _ p _ -> p
-    toMungedPackageId :: Text -> MungedPackageId
+    toMungedPackageId :: StackUnqualCompName -> MungedPackageId
     toMungedPackageId subLib =
-      let subLibName = LSubLibName $ mkUnqualComponentName $ T.unpack subLib
+      let subLibName = LSubLibName $ toCabalName subLib
       in  MungedPackageId (MungedPackageName pname subLibName) pversion
     toPackageId :: MungedPackageId -> PackageIdentifier
     toPackageId (MungedPackageId n v) =
@@ -1247,7 +1245,7 @@ singleTest topts testsToRun ac ee task installedMap = do
 -- | Implements running a package's benchmarks.
 singleBench :: HasEnvConfig env
             => BenchmarkOpts
-            -> [Text]
+            -> [StackUnqualCompName]
             -> ActionContext
             -> ExecuteEnv
             -> Task
@@ -1257,7 +1255,7 @@ singleBench beopts benchesToRun ac ee task installedMap = do
   (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
   withSingleContext ac ee task.taskType allDepsMap (Just "bench") $
     \_package _cabalfp _pkgDir cabal announce _outputType -> do
-      let args = map T.unpack benchesToRun <> maybe []
+      let args = map unqualCompToString benchesToRun <> maybe []
                        ((:[]) . ("--benchmark-options=" <>))
                        beopts.additionalArgs
 
@@ -1307,15 +1305,13 @@ primaryComponentOptions lp =
   ++ map
        (T.unpack . T.append "lib:")
        (getBuildableListText package.subLibraries)
-  ++ map
-       (T.unpack . T.append "exe:")
-       (Set.toList $ exesToBuild lp)
+  ++ Set.toList (Set.mapMonotonic (\s -> "exe:" ++ unqualCompToString s) (exesToBuild lp))
  where
   package = lp.package
 
 -- | Either build all executables or, if the user specifies requested
 -- components, just build them.
-exesToBuild :: LocalPackage -> Set Text
+exesToBuild :: LocalPackage -> Set StackUnqualCompName
 exesToBuild lp = if lp.wanted
   then exeComponents lp.components
   else buildableExes lp.package

@@ -64,6 +64,7 @@ import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.BuildOptsMonoid ( ProgressBarFormat (..) )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler (..), getGhcPkgExe )
+import           Stack.Types.ComponentUtils ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.ConfigureOpts
@@ -162,7 +163,7 @@ printPlan plan = do
             <> line
     xs -> do
       let executableMsg (name, loc) = fillSep $
-              fromString (T.unpack name)
+              fromString (unqualCompToString name)
             : "from"
             : ( case loc of
                   Snap -> "snapshot" :: StyleDoc
@@ -260,7 +261,7 @@ executePlan
 
 copyExecutables ::
        HasEnvConfig env
-    => Map Text InstallLocation
+    => Map StackUnqualCompName InstallLocation
     -> RIO env ()
 copyExecutables exes | Map.null exes = pure ()
 copyExecutables exes = do
@@ -283,23 +284,24 @@ copyExecutables exes = do
   currExe <- liftIO getExecutablePath -- needed for windows, see below
 
   installed <- forMaybeM (Map.toList exes) $ \(name, loc) -> do
+    let strName = unqualCompToString name
     let bindir =
             case loc of
                 Snap -> snapBin
                 Local -> localBin
-    mfp <- forgivingResolveFile bindir (T.unpack name ++ ext)
+    mfp <- forgivingResolveFile bindir (strName ++ ext)
       >>= rejectMissingFile
     case mfp of
       Nothing -> do
         prettyWarnL
           [ flow "Couldn't find executable"
-          , style Current (fromString $ T.unpack name)
+          , style Current (fromString strName)
           , flow "in directory"
           , pretty bindir <> "."
           ]
         pure Nothing
       Just file -> do
-        let destFile = destDir' FP.</> T.unpack name ++ ext
+        let destFile = destDir' FP.</> strName ++ ext
         prettyInfoL
           [ flow "Copying from"
           , pretty file
@@ -311,7 +313,7 @@ copyExecutables exes = do
           Platform _ Windows | FP.equalFilePath destFile currExe ->
               windowsRenameCopy (toFilePath file) destFile
           _ -> D.copyFile (toFilePath file) destFile
-        pure $ Just (name <> T.pack ext)
+        pure $ Just (strName ++ ext)
 
   unless (null installed) $ do
     prettyInfo $
@@ -321,7 +323,7 @@ copyExecutables exes = do
            ]
       <> line
       <> bulletedList
-           (map (fromString . T.unpack . textDisplay) installed :: [StyleDoc])
+           (map fromString installed :: [StyleDoc])
   unless compilerSpecific $ warnInstallSearchPathIssues destDir' installed
 
 -- | Windows can't write over the current executable. Instead, we rename the
