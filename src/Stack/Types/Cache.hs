@@ -12,7 +12,7 @@ import           Database.Persist.Sql
                    , SqlType (..)
                    )
 import           Stack.Prelude
-import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId, unGhcPkgId )
+import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId, ghcPkgIdToText )
 
 -- | Type of config cache
 data ConfigCacheType
@@ -24,7 +24,7 @@ data ConfigCacheType
 instance PersistField ConfigCacheType where
   toPersistValue ConfigCacheTypeConfig = PersistText "config"
   toPersistValue (ConfigCacheTypeFlagLibrary v) =
-    PersistText $ "lib:" <> unGhcPkgId v
+    PersistText $ "lib:" <> ghcPkgIdToText v
   toPersistValue (ConfigCacheTypeFlagExecutable v) =
     PersistText $ "exe:" <> T.pack (packageIdentifierString v)
   fromPersistValue (PersistText t) =

@@ -120,7 +120,7 @@ import           Stack.Types.EnvConfig
                    , appropriateGhcColorFlag
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
-import           Stack.Types.GhcPkgId ( GhcPkgId, unGhcPkgId )
+import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdToText )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Installed
                    ( InstallLocation (..), Installed (..), InstalledMap
@@ -1077,7 +1077,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 <> foldMap
                      ( \ghcId ->
                             "package-id "
-                         <> display (unGhcPkgId ghcId)
+                         <> display (ghcPkgIdToText ghcId)
                          <> "\n"
                      )
                      (pkgGhcIdList ++ thGhcId:Map.elems allDepsMap)
