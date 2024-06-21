@@ -93,4 +93,4 @@ depValueToTarget dv = case dv.depType of
  where
   completeSet dlib =
     (if dlib.main then Set.insert CLib else id) $ sublibSet dlib
-  sublibSet dlib = Set.mapMonotonic (CSubLib . unqualCompToText) dlib.subLib
+  sublibSet dlib = Set.mapMonotonic CSubLib dlib.subLib

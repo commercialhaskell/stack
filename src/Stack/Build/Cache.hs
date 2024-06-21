@@ -74,7 +74,7 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.Installed
                    (InstalledLibraryInfo (..), foldOnGhcPkgId' )
-import           Stack.Types.NamedComponent ( NamedComponent (..) )
+import           Stack.Types.NamedComponent ( NamedComponent (..), componentCachePath )
 import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
                    ( modificationTime, getFileStatus, setFileTimes )
@@ -135,13 +135,7 @@ buildCacheFile dir component = do
   smh <- view $ envConfigL . to (.sourceMapHash)
   smDirName <- smRelDir smh
   let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
-  cacheFileName <- parseRelFile $ case component of
-    CLib -> "lib"
-    CSubLib name -> nonLibComponent "sub-lib" name
-    CFlib name -> nonLibComponent "flib" name
-    CExe name -> nonLibComponent "exe" name
-    CTest name -> nonLibComponent "test" name
-    CBench name -> nonLibComponent "bench" name
+  cacheFileName <- parseRelFile $ componentCachePath component
   pure $ cachesDir </> smDirName </> cacheFileName
 
 -- | Try to read the dirtiness cache for the given package directory.

@@ -39,6 +39,7 @@ import qualified Pantry.SHA256 as SHA256
 import           Path ( parent, parseRelDir )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( ActualCompiler )
+import           Stack.Types.ComponentUtils ( fromCabalName )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 
 -- | Settings common to dependency packages ('Stack.Types.SourceMap.DepPackage')
@@ -191,16 +192,10 @@ ppComponentsMaybe compType pp = do
   gpd <- ppGPD pp
   pure $ Set.fromList $ concat
     [ maybe [] (const $ catMaybes [compType CLib]) (C.condLibrary gpd)
-    , go (compType . CExe) (fst <$> C.condExecutables gpd)
-    , go (compType . CTest) (fst <$> C.condTestSuites gpd)
-    , go (compType . CBench) (fst <$> C.condBenchmarks gpd)
+    , mapMaybe ((compType . CExe . fromCabalName) . fst) (C.condExecutables gpd)
+    , mapMaybe ((compType . CTest . fromCabalName) . fst) (C.condTestSuites gpd)
+    , mapMaybe ((compType . CBench . fromCabalName) . fst) (C.condBenchmarks gpd)
     ]
- where
-  go ::
-       (T.Text -> Maybe NamedComponent)
-    -> [C.UnqualComponentName]
-    -> [NamedComponent]
-  go wrapper = mapMaybe (wrapper . T.pack . C.unUnqualComponentName)
 
 -- | Version for the given 'ProjectPackage
 ppVersion :: MonadIO m => ProjectPackage -> m Version

@@ -16,6 +16,7 @@ module Stack.Types.BuildOpts
 import           Stack.Prelude
 import           Stack.Types.BuildOptsMonoid
                    ( CabalVerbosity (..), ProgressBarFormat (..) )
+import           Stack.Types.Component ( StackUnqualCompName )
 
 -- | Build options that is interpreted by the build command. This is built up
 -- from BuildOptsCLI and BuildOptsMonoid
@@ -79,7 +80,7 @@ data BuildOpts = BuildOpts
     -- ^ Ask Cabal to be verbose in its builds
   , splitObjs :: !Bool
     -- ^ Whether to enable split-objs.
-  , skipComponents :: ![Text]
+  , skipComponents :: ![StackUnqualCompName]
     -- ^ Which components to skip when building
   , interleavedOutput :: !Bool
     -- ^ Should we use the interleaved GHC output when building

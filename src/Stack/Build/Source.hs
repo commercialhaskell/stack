@@ -25,7 +25,7 @@ import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Package
-                   ( buildableBenchmarks, buildableExes, buildableTestSuites
+                   ( buildableBenchmarksComp, buildableExesComp, buildableTestSuitesComp
                    , hasBuildableMainLibrary, resolvePackage
                    )
 import           Stack.PackageFile ( getPackageFile )
@@ -361,17 +361,17 @@ loadLocalPackage pp = do
             let (_s, e, t, b) = splitComponents $ Set.toList comps
             in  (e, t, b)
           Just (TargetAll _packageType) ->
-            ( buildableExes pkg
+            ( buildableExesComp pkg
             , if    bopts.tests
                  && maybe True (Set.notMember name . (.skipTest)) mcurator
-                then buildableTestSuites pkg
+                then buildableTestSuitesComp pkg
                 else Set.empty
             , if    bopts.benchmarks
                  && maybe
                       True
                       (Set.notMember name . (.skipBenchmark))
                       mcurator
-                then buildableBenchmarks pkg
+                then buildableBenchmarksComp pkg
                 else Set.empty
             )
           Nothing -> mempty
@@ -466,9 +466,9 @@ loadLocalPackage pp = do
       -- through component parsing, but the components aren't present, then they
       -- must not be buildable.
     , unbuildable = toComponents
-        (exes `Set.difference` buildableExes pkg)
-        (tests `Set.difference` buildableTestSuites pkg)
-        (benches `Set.difference` buildableBenchmarks pkg)
+        (exes `Set.difference` buildableExesComp pkg)
+        (tests `Set.difference` buildableTestSuitesComp pkg)
+        (benches `Set.difference` buildableBenchmarksComp pkg)
     }
 
 -- | Compare the current filesystem state to the cached information, and

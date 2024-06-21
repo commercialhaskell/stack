@@ -34,9 +34,8 @@ import qualified Data.Map as M
 import qualified Data.Set as Set
 import           Stack.Prelude
 import           Stack.Types.Component
-                   ( HasBuildInfo, HasName, StackBuildInfo (..)
-                   , StackUnqualCompName (..)
-                   )
+                   ( HasBuildInfo, HasName, StackBuildInfo (..) )
+import           Stack.Types.ComponentUtils ( StackUnqualCompName, unqualCompToText )
 
 -- | A type representing collections of components, distinguishing buildable
 -- components and non-buildable components.
@@ -116,12 +115,12 @@ getBuildableSet = M.keysSet . (.buildableOnes)
 -- | Get the names of the buildable components in the given collection, as a
 -- 'Set' of 'Text'.
 getBuildableSetText :: CompCollection component -> Set Text
-getBuildableSetText = Set.mapMonotonic (.unqualCompToText) . getBuildableSet
+getBuildableSetText = Set.mapMonotonic unqualCompToText . getBuildableSet
 
 -- | Get the names of the buildable components in the given collection, as a
 -- list of 'Text.
 getBuildableListText :: CompCollection component -> [Text]
-getBuildableListText = getBuildableListAs (.unqualCompToText)
+getBuildableListText = getBuildableListAs unqualCompToText
 
 -- | Apply the given function to the names of the buildable components in the
 -- given collection, yielding a list.
@@ -142,25 +141,24 @@ hasBuildableComponent = not . null . getBuildableSet
 -- components, yields 'Just' @component@ if the collection includes a buildable
 -- component of that name, and 'Nothing' otherwise.
 collectionLookup ::
-     Text
+     StackUnqualCompName
      -- ^ Name of the buildable component.
   -> CompCollection component
      -- ^ Collection of components.
   -> Maybe component
 collectionLookup needle haystack =
-  M.lookup (StackUnqualCompName needle) haystack.buildableOnes
+  M.lookup needle haystack.buildableOnes
 
 -- | For a given collection of components, yields a list of pairs for buildable
 -- components of the name of the component and the component.
-collectionKeyValueList :: CompCollection component -> [(Text, component)]
+collectionKeyValueList :: CompCollection component -> [(StackUnqualCompName, component)]
 collectionKeyValueList haystack =
-      (\(StackUnqualCompName k, !v) -> (k, v))
-  <$> M.toList haystack.buildableOnes
+      M.toList haystack.buildableOnes
 
 -- | Yields 'True' if, and only if, the given collection of components includes
 -- a buildable component with the given name.
 collectionMember ::
-     Text
+     StackUnqualCompName
      -- ^ Name of the buildable component.
   -> CompCollection component
      -- ^ Collection of components.

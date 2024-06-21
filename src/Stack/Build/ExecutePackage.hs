@@ -109,6 +109,8 @@ import           Stack.Types.CompilerPaths
                    , cpWhich, getGhcPkgExe
                    )
 import qualified Stack.Types.Component as Component
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToText, unqualCompToString, toCabalName )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
@@ -958,7 +960,7 @@ checkForUnlistedFiles TTRemotePackage{} _ = pure []
 -- coverage reports if coverage is enabled.
 singleTest :: HasEnvConfig env
            => TestOpts
-           -> [Text]
+           -> [StackUnqualCompName]
            -> ActionContext
            -> ExecuteEnv
            -> Task
@@ -1013,7 +1015,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 ]
 
         errs <- fmap Map.unions $ forM suitesToRun $ \(testName, suiteInterface) -> do
-          let stestName = T.unpack testName
+          let stestName = unqualCompToString testName
           (testName', isTestTypeLib) <-
             case suiteInterface of
               C.TestSuiteLibV09{} -> pure (stestName ++ "Stub", True)
@@ -1110,7 +1112,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                            <> T.intercalate " " (map showProcessArgDebug args)
                 announce $
                      "test (suite: "
-                  <> display testName
+                  <> display (unqualCompToText testName)
                   <> display argsDisplay
                   <> ")"
 
@@ -1153,7 +1155,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                             $ BL.fromStrict
                             $ encodeUtf8 $ fromString $
                             show ( logPath
-                                 , mkUnqualComponentName (T.unpack testName)
+                                 , toCabalName testName
                                  )
                         else do
                           isTerminal <- view $ globalOptsL . to (.terminal)
@@ -1186,7 +1188,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 let announceResult result =
                       announce $
                            "Test suite "
-                        <> display testName
+                        <> display (unqualCompToText testName)
                         <> " "
                         <> result
                 case mec of
@@ -1210,15 +1212,15 @@ singleTest topts testsToRun ac ee task installedMap = do
                       (package.buildType == C.Simple)
                       exeName
                       (packageNameString package.name)
-                      (T.unpack testName)
+                      (unqualCompToString testName)
                 pure emptyResult
 
         when needHpc $ do
           let testsToRun' = map f testsToRun
               f tName =
                 case (.interface) <$> mComponent of
-                  Just C.TestSuiteLibV09{} -> tName <> "Stub"
-                  _ -> tName
+                  Just C.TestSuiteLibV09{} -> unqualCompToText tName <> "Stub"
+                  _ -> unqualCompToText tName
                where
                 mComponent = collectionLookup tName package.testSuites
           generateHpcReport pkgDir package testsToRun'

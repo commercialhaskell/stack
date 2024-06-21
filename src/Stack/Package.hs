@@ -22,10 +22,15 @@ module Stack.Package
   , mainLibraryHasExposedModules
   , packageUnknownTools
   , buildableForeignLibs
+  , buildableForeignLibsComp
   , buildableSubLibs
+  , buildableSubLibsComp
   , buildableExes
+  , buildableExesComp
   , buildableTestSuites
+  , buildableTestSuitesComp
   , buildableBenchmarks
+  , buildableBenchmarksComp
   , getPackageOpts
   , processPackageDepsEither
   , listOfPackageDeps
@@ -70,7 +75,6 @@ import           Stack.Component
                    , isComponentBuildable, stackBenchmarkFromCabal
                    , stackExecutableFromCabal, stackForeignLibraryFromCabal
                    , stackLibraryFromCabal, stackTestFromCabal
-                   , stackUnqualToQual
                    )
 import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
@@ -84,11 +88,13 @@ import           Stack.Types.BuildConfig ( HasBuildConfig (..), getWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, collectionLookup, foldAndMakeCollection
                    , foldComponentToAnotherCollection, getBuildableSetText
+                   , getBuildableSet
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Component
                    ( HasBuildInfo, HasComponentInfo, StackUnqualCompName (..) )
+import           Stack.Types.ComponentUtils ( emptyCompName )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.Dependency
@@ -258,7 +264,7 @@ generatePkgDescOpts
             }
       let insertInMap name compVal = M.insert name (generate name compVal)
       let translatedInsertInMap constructor name =
-            insertInMap (stackUnqualToQual constructor name)
+            insertInMap (constructor name)
       let makeBuildInfoOpts selector constructor =
             foldOnNameAndBuildInfo
               (selector pkg)
@@ -667,17 +673,32 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
 buildableForeignLibs :: Package -> Set Text
 buildableForeignLibs pkg = getBuildableSetText pkg.foreignLibraries
 
+buildableForeignLibsComp :: Package -> Set StackUnqualCompName
+buildableForeignLibsComp pkg = getBuildableSet pkg.foreignLibraries
+
 buildableSubLibs :: Package -> Set Text
 buildableSubLibs pkg = getBuildableSetText pkg.subLibraries
+
+buildableSubLibsComp :: Package -> Set StackUnqualCompName
+buildableSubLibsComp pkg = getBuildableSet pkg.subLibraries
 
 buildableExes :: Package -> Set Text
 buildableExes pkg = getBuildableSetText pkg.executables
 
+buildableExesComp :: Package -> Set StackUnqualCompName
+buildableExesComp pkg = getBuildableSet pkg.executables
+
 buildableTestSuites :: Package -> Set Text
 buildableTestSuites pkg = getBuildableSetText pkg.testSuites
 
+buildableTestSuitesComp :: Package -> Set StackUnqualCompName
+buildableTestSuitesComp pkg = getBuildableSet pkg.testSuites
+
 buildableBenchmarks :: Package -> Set Text
 buildableBenchmarks pkg = getBuildableSetText pkg.benchmarks
+
+buildableBenchmarksComp :: Package -> Set StackUnqualCompName
+buildableBenchmarksComp pkg = getBuildableSet pkg.benchmarks
 
 -- | Apply a generic processing function in a Monad over all of the Package's
 -- components.
@@ -867,12 +888,12 @@ topProcessPackageComponent package target fn res = do
     case (.depType) <$> mDependency of
       Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
         let processMainLibDep =
-              case (mainLibDep, lookupLibName True mempty) of
+              case (mainLibDep, lookupLibName True emptyCompName) of
                 (True, Just mainLib) ->
                   processComponent PTDependency mainLib
                 _ -> id
             processSingleSubLib name =
-              case lookupLibName False name.unqualCompToText of
+              case lookupLibName False name of
                 Just lib -> processComponent PTDependency lib
                 Nothing -> id
             processSubLibDep r = foldr' processSingleSubLib r subLibDeps

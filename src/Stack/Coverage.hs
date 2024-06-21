@@ -57,6 +57,7 @@ import           Stack.Types.BuildConfig
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( getGhcPkgExe )
 import           Stack.Types.CompCollection ( getBuildableSetText )
+import           Stack.Types.ComponentUtils ( unqualCompToString )
 import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
@@ -392,11 +393,12 @@ generateHpcReportForTargets opts tixFiles targetNames = do
               \case
                 CTest testName -> (pkgPath </>) <$>
                   parseRelFile
-                    (  T.unpack testName
+                    (  testName'
                     ++ "/"
-                    ++ T.unpack testName
+                    ++ testName'
                     ++ ".tix"
                     )
+                  where testName' = unqualCompToString testName
                 _ -> prettyThrowIO $ NonTestSuiteTarget name
           TargetAll PTProject -> do
             pkgPath <- hpcPkgPath name

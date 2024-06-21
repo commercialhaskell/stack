@@ -31,6 +31,7 @@ import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getGhcPkgExe )
+import           Stack.Types.ComponentUtils ( unqualCompFromString, unqualCompToText )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
@@ -183,15 +184,16 @@ execCmd opts =
     let executables = concatMap (filter isCExe . Set.toList) pkgComponents
     let (exe, args') = case args of
           [] -> (firstExe, args)
-          x:xs -> case L.find (\y -> y == CExe (T.pack x)) executables of
+          x:xs -> case L.find (\y -> y == CExe (unqualCompFromString x)) executables of
             Nothing -> (firstExe, args)
             argExe -> (argExe, xs)
          where
           firstExe = listToMaybe executables
     case exe of
       Just (CExe exe') -> do
-        withNewLocalBuildTargets [T.cons ':' exe'] $ build Nothing
-        pure (T.unpack exe', args')
+        let textExeName = unqualCompToText exe'
+        withNewLocalBuildTargets [T.cons ':' textExeName] $ build Nothing
+        pure (T.unpack textExeName, args')
       _ -> prettyThrowIO ExecutableToRunNotFound
 
   getGhcCmd pkgs args = do
