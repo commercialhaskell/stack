@@ -1145,7 +1145,8 @@ main = do
   print $ c_max 10 100
 ~~~
 
-The package's `package.yaml` file (simplied) might look like this:
+The package's `package.yaml` file (simplied), used to create the package's
+Cabal file, might look like this:
 ~~~yaml
 spec-version: 0.36.0
 
