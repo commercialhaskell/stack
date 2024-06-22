@@ -12,7 +12,8 @@ import           Database.Persist.Sql
                    , SqlType (..)
                    )
 import           Stack.Prelude
-import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId, ghcPkgIdToText )
+import           Stack.Types.GhcPkgId
+                   ( GhcPkgId, ghcPkgIdToText, parseGhcPkgId )
 
 -- | Type of config cache
 data ConfigCacheType

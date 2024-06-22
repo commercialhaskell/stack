@@ -51,10 +51,10 @@ import           Stack.Types.BuildOptsMonoid
                    )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( HasCompiler, cabalVersionL )
-import           Stack.Types.ComponentUtils ( StackUnqualCompName, unqualCompToString )
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), buildOptsL
-                   )
+                   ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap

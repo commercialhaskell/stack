@@ -62,7 +62,8 @@ import           Stack.Types.Build
                    )
 import           Stack.Types.Cache ( ConfigCacheType (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
-import           Stack.Types.ComponentUtils ( StackUnqualCompName, unqualCompToString )
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.Config ( stackRootL )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
@@ -74,10 +75,11 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.Installed
                    (InstalledLibraryInfo (..), foldOnGhcPkgId' )
-import           Stack.Types.NamedComponent ( NamedComponent (..), componentCachePath )
+import           Stack.Types.NamedComponent
+                   ( NamedComponent (..), componentCachePath )
 import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
-                   ( modificationTime, getFileStatus, setFileTimes )
+                   ( getFileStatus, modificationTime, setFileTimes )
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (HasEnvConfig env)

@@ -21,13 +21,13 @@ module Stack.Types.ComponentUtils
   , toCabalName
   ) where
 
-import           Data.Aeson (FromJSON(..))
-import           Data.Hashable (Hashable(..))
+import           Data.Aeson ( FromJSON (..) )
+import           Data.Hashable ( Hashable (..) )
 import           Distribution.Compat.Binary ( decode, encode )
 import           Distribution.PackageDescription
-                  ( UnqualComponentName, unUnqualComponentNameST, mkUnqualComponentName
-                  , unUnqualComponentName
-                  )
+                   ( UnqualComponentName, mkUnqualComponentName
+                   , unUnqualComponentName, unUnqualComponentNameST
+                   )
 import           Stack.Prelude
 
 -- | Type representing the name of an \'unqualified\' component (that is, the

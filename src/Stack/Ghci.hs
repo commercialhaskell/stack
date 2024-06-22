@@ -46,7 +46,7 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( buildableForeignLibs, buildableSubLibs, buildableExes
+                   ( buildableExes, buildableForeignLibs, buildableSubLibs
                    , buildableTestSuites, buildableBenchmarks, getPackageOpts
                    , hasBuildableMainLibrary, listOfPackageDeps
                    , packageFromPackageDescription, readDotBuildinfo
@@ -958,8 +958,14 @@ wantedPackageComponents bopts (TargetAll PTProject) pkg =
      )
   <> S.mapMonotonic CExe buildableExes'
   <> S.mapMonotonic CSubLib buildableSubLibs'
-  <> (if bopts.tests then S.mapMonotonic CTest buildableTestSuites' else S.empty)
-  <> (if bopts.benchmarks then S.mapMonotonic CBench buildableBenchmarks' else S.empty)
+  <> ( if bopts.tests
+         then S.mapMonotonic CTest buildableTestSuites'
+         else S.empty
+     )
+  <> ( if bopts.benchmarks
+         then S.mapMonotonic CBench buildableBenchmarks'
+         else S.empty
+     )
  where
   buildableForeignLibs' = buildableForeignLibs pkg
   buildableSubLibs' = buildableSubLibs pkg

@@ -108,7 +108,9 @@ import           Stack.Types.CompilerPaths
                    )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.ComponentUtils
-                   ( StackUnqualCompName, unqualCompToText, unqualCompToString, toCabalName )
+                   ( StackUnqualCompName, toCabalName, unqualCompToString
+                   , unqualCompToText
+                   )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
@@ -1305,7 +1307,11 @@ primaryComponentOptions lp =
   ++ map
        (T.unpack . T.append "lib:")
        (getBuildableListText package.subLibraries)
-  ++ Set.toList (Set.mapMonotonic (\s -> "exe:" ++ unqualCompToString s) (exesToBuild lp))
+  ++ Set.toList
+       ( Set.mapMonotonic
+           (\s -> "exe:" ++ unqualCompToString s)
+           (exesToBuild lp)
+       )
  where
   package = lp.package
 

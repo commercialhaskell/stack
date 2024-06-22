@@ -35,7 +35,8 @@ import qualified Data.Set as Set
 import           Stack.Prelude
 import           Stack.Types.Component
                    ( HasBuildInfo, HasName, StackBuildInfo (..) )
-import           Stack.Types.ComponentUtils ( StackUnqualCompName, unqualCompToText )
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToText )
 
 -- | A type representing collections of components, distinguishing buildable
 -- components and non-buildable components.
@@ -146,14 +147,14 @@ collectionLookup ::
   -> CompCollection component
      -- ^ Collection of components.
   -> Maybe component
-collectionLookup needle haystack =
-  M.lookup needle haystack.buildableOnes
+collectionLookup needle haystack = M.lookup needle haystack.buildableOnes
 
 -- | For a given collection of components, yields a list of pairs for buildable
 -- components of the name of the component and the component.
-collectionKeyValueList :: CompCollection component -> [(StackUnqualCompName, component)]
-collectionKeyValueList haystack =
-      M.toList haystack.buildableOnes
+collectionKeyValueList ::
+     CompCollection component
+  -> [(StackUnqualCompName, component)]
+collectionKeyValueList haystack = M.toList haystack.buildableOnes
 
 -- | Yields 'True' if, and only if, the given collection of components includes
 -- a buildable component with the given name.

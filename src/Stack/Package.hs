@@ -48,7 +48,8 @@ import           Distribution.PackageDescription
                    , GenericPackageDescription (..), HookedBuildInfo
                    , Library (..), PackageDescription (..), PackageFlag (..)
                    , SetupBuildInfo (..), TestSuite (..), allLibraries
-                   , buildType, depPkgName, depVerRange, unqualComponentNameToPackageName
+                   , buildType, depPkgName, depVerRange
+                   , unqualComponentNameToPackageName
                    )
 import qualified Distribution.PackageDescription as Executable
                    ( Executable (..) )
@@ -75,15 +76,15 @@ import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
                    , componentOutputDir, packageAutogenDir
                    )
-import           Stack.Constants (relFileCabalMacrosH, relDirLogs)
+import           Stack.Constants ( relFileCabalMacrosH, relDirLogs )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.PackageFile ( getPackageFile, stackPackageFileFromCabal )
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.BuildConfig ( HasBuildConfig (..), getWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, collectionLookup, foldAndMakeCollection
-                   , foldComponentToAnotherCollection, getBuildableSetText
-                   , getBuildableSet
+                   , foldComponentToAnotherCollection, getBuildableSet
+                   , getBuildableSetText
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
@@ -205,7 +206,8 @@ getPackageOpts
         getPackageFile stackPackage cabalFP
       let subLibs =
             S.toList $ subLibComponents $ M.keysSet componentsModules
-      let excludedSubLibs = map (unqualComponentNameToPackageName . toCabalName) subLibs
+          excludedSubLibs =
+            map (unqualComponentNameToPackageName . toCabalName) subLibs
       componentsOpts <- generatePkgDescOpts
         installMap
         installedMap
@@ -814,10 +816,10 @@ topSortPackageComponent ::
   -> Seq NamedComponent
 topSortPackageComponent package target includeDirectTarget =
   topProcessPackageComponent package target processor mempty
-  where
-    processor packageType component
-      | not includeDirectTarget && packageType == PTProject = id
-      | otherwise = \v -> v |> component.qualifiedName
+ where
+  processor packageType component
+    | not includeDirectTarget && packageType == PTProject = id
+    | otherwise = \v -> v |> component.qualifiedName
 
 -- | Process a package's internal components in the order of their topological sort.
 -- The first iteration will effect the component depending on no other component etc,
@@ -827,12 +829,17 @@ topSortPackageComponent package target includeDirectTarget =
 topProcessPackageComponent :: forall b.
      Package
   -> Target
-  -> (forall component. (HasComponentInfo component) => PackageType -> component -> b -> b)
+  -> (    forall component. (HasComponentInfo component)
+       => PackageType
+       -> component
+       -> b
+       -> b
+     )
   -> b
   -> b
 topProcessPackageComponent package target fn res = do
   let initialState = (mempty, res)
-  let processInitialComponents c = case target of
+      processInitialComponents c = case target of
         TargetAll{} -> processComponent PTProject c
         TargetComps targetSet -> if S.member c.qualifiedName targetSet
           then processComponent PTProject c
@@ -851,15 +858,15 @@ topProcessPackageComponent package target fn res = do
         qualName = component.qualifiedName
         alreadyProcessed = fst currentRes
         !appendToResult = fn packageType component
-    -- This is an optimization, the only components we are likely to process
-    -- multiple times are the ones we can find in dependencies, otherwise we
-    -- only fold on a single version of each component by design.
-    let processedDeps = processOneDep internalDep currentRes
+        -- This is an optimization, the only components we are likely to process
+        -- multiple times are the ones we can find in dependencies, otherwise we
+        -- only fold on a single version of each component by design.
+        processedDeps = processOneDep internalDep currentRes
     if isPotentialDependency qualName
       then
         if S.member qualName alreadyProcessed
           then currentRes
-          else bimap (S.insert qualName) appendToResult processedDeps 
+          else bimap (S.insert qualName) appendToResult processedDeps
       else second appendToResult processedDeps
   lookupLibName isMain name = if isMain
     then package.library

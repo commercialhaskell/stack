@@ -194,7 +194,9 @@ ppComponentsMaybe compType pp = do
     [ maybe [] (const $ catMaybes [compType CLib]) (C.condLibrary gpd)
     , mapMaybe ((compType . CExe . fromCabalName) . fst) (C.condExecutables gpd)
     , mapMaybe ((compType . CTest . fromCabalName) . fst) (C.condTestSuites gpd)
-    , mapMaybe ((compType . CBench . fromCabalName) . fst) (C.condBenchmarks gpd)
+    , mapMaybe
+        ((compType . CBench . fromCabalName) . fst)
+        (C.condBenchmarks gpd)
     ]
 
 -- | Version for the given 'ProjectPackage

@@ -14,7 +14,11 @@ import qualified System.FilePath as FP
 -- | Checks if the installed executable will be available on the user's PATH.
 -- This doesn't use @envSearchPath menv@ because it includes paths only visible
 -- when running in the Stack environment.
-warnInstallSearchPathIssues :: HasConfig env => FilePath -> [String] -> RIO env ()
+warnInstallSearchPathIssues ::
+     HasConfig env
+  => FilePath
+  -> [String]
+  -> RIO env ()
 warnInstallSearchPathIssues destDir installed = do
   searchPath <- liftIO FP.getSearchPath
   destDirIsInPATH <- liftIO $

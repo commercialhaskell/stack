@@ -31,7 +31,8 @@ import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), getGhcPkgExe )
-import           Stack.Types.ComponentUtils ( unqualCompFromString, unqualCompToText )
+import           Stack.Types.ComponentUtils
+                   ( unqualCompFromString, unqualCompToText )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
@@ -182,11 +183,12 @@ execCmd opts =
     packages <- view $ buildConfigL . to (.smWanted.project)
     pkgComponents <- for (Map.elems packages) ppComponents
     let executables = concatMap (filter isCExe . Set.toList) pkgComponents
-    let (exe, args') = case args of
+        (exe, args') = case args of
           [] -> (firstExe, args)
-          x:xs -> case L.find (\y -> y == CExe (unqualCompFromString x)) executables of
-            Nothing -> (firstExe, args)
-            argExe -> (argExe, xs)
+          x:xs -> let matchesExecutable y = y == CExe (unqualCompFromString x)
+                  in  case L.find matchesExecutable executables of
+                        Nothing -> (firstExe, args)
+                        argExe -> (argExe, xs)
          where
           firstExe = listToMaybe executables
     case exe of

@@ -34,7 +34,8 @@ import           Distribution.Simple ( Extension, Language )
 import           Distribution.Utils.Path ( PackageDir, SourceDir, SymbolicPath )
 import           GHC.Records ( HasField (..) )
 import           Stack.Prelude
-import           Stack.Types.ComponentUtils ( StackUnqualCompName (..), emptyCompName )
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName (..), emptyCompName )
 import           Stack.Types.Dependency ( DepValue )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 

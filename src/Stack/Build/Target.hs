@@ -270,8 +270,8 @@ resolveRawTarget sma allLocs (rawInput, rt) =
     (CFlib t2') -> t1' == t2'
     (CTest t2') -> t1' == t2'
     (CBench t2') -> t1' == t2'
-    where t1' = unqualCompFromText t1
-
+   where
+    t1' = unqualCompFromText t1
 
   go (RTComponent cname) = do
     -- Associated list from component name to package that defines it. We use an

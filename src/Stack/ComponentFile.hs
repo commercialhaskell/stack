@@ -55,7 +55,8 @@ import           Stack.Types.Component
                    , StackExecutable (..), StackLibrary (..)
                    , StackTestSuite (..), StackUnqualCompName (..)
                    )
-import           Stack.Types.ComponentUtils ( unqualCompToString, emptyCompName )
+import           Stack.Types.ComponentUtils
+                   ( emptyCompName, unqualCompToString )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), prettyStackDevL )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
@@ -552,9 +553,9 @@ componentNameToDir = componentNameToDirNormOrTmp False
 componentNameToDirNormOrTmp :: Bool -> StackUnqualCompName -> Path Rel Dir
 componentNameToDirNormOrTmp isTemp name =
   fromMaybe (throw $ ComponentNotParsedBug sName) (parseRelDir fullName)
-  where
-    fullName = if isTemp then sName <> "/" <> sName <> "-tmp" else sName
-    sName = unqualCompToString name
+ where
+  fullName = if isTemp then sName <> "/" <> sName <> "-tmp" else sName
+  sName = unqualCompToString name
 
 -- | See 'Distribution.Simple.LocalBuildInfo.componentBuildDir'
 componentBuildDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir

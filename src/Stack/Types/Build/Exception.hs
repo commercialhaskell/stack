@@ -32,7 +32,8 @@ import           Stack.Prelude
 import           Stack.Types.Compiler ( ActualCompiler, compilerVersionString )
 import           Stack.Types.CompilerBuild
                    ( CompilerBuild, compilerBuildSuffix )
-import           Stack.Types.ComponentUtils ( StackUnqualCompName, unqualCompToString )
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.DumpPackage ( DumpPackage )
 import           Stack.Types.UnusedFlags ( FlagSource (..), UnusedFlags (..) )
 import           Stack.Types.GHCVariant ( GHCVariant, ghcVariantSuffix )

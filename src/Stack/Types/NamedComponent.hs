@@ -25,7 +25,9 @@ module Stack.Types.NamedComponent
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Stack.Prelude
-import           Stack.Types.ComponentUtils (StackUnqualCompName, unqualCompToText, unqualCompToString)
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToString, unqualCompToText
+                   )
 
 -- | Type representing components of a fully-resolved Cabal package.
 data NamedComponent

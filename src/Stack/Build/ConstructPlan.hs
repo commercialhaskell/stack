@@ -1183,7 +1183,8 @@ checkAndWarnForUnknownTools p = do
   -- From Cabal 1.12, build-tools can specify another executable in the same
   -- package.
   notPackageExe toolName =
-    MaybeT $ skipIf $ collectionMember (unqualCompFromText toolName) p.executables
+    MaybeT $ skipIf $
+      collectionMember (unqualCompFromText toolName) p.executables
   warn name = MaybeT . pure . Just $ ToolWarning (ExeName name) p.name
   skipIf p' = pure $ if p' then Nothing else Just ()
 

@@ -17,11 +17,12 @@ import           Data.Attoparsec.Text
                    )
 import           Data.Char ( isAlphaNum )
 import           Data.Hashable ( Hashable(..) )
-import           Database.Persist.Sql ( PersistField (..), PersistFieldSql (..) )
+import           Database.Persist.Sql
+                   ( PersistField (..), PersistFieldSql (..) )
 import           Distribution.Compat.Binary ( decode, encode )
+import           Distribution.Types.UnitId ( UnitId, mkUnitId, unUnitId )
 import           Stack.Prelude
 import           Text.Read ( Read (..) )
-import Distribution.Types.UnitId (UnitId, mkUnitId, unUnitId)
 
 -- | A parse fail.
 newtype GhcPkgIdParseFail

@@ -64,7 +64,8 @@ import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.BuildOptsMonoid ( ProgressBarFormat (..) )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler (..), getGhcPkgExe )
-import           Stack.Types.ComponentUtils ( StackUnqualCompName, unqualCompToString )
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.ConfigureOpts
@@ -285,7 +286,7 @@ copyExecutables exes = do
 
   installed <- forMaybeM (Map.toList exes) $ \(name, loc) -> do
     let strName = unqualCompToString name
-    let bindir =
+        bindir =
             case loc of
                 Snap -> snapBin
                 Local -> localBin
