@@ -55,6 +55,8 @@ import           Stack.Types.Component
                    , StackExecutable (..), StackLibrary (..)
                    , StackTestSuite (..), StackUnqualCompName (..)
                    )
+import           Stack.Types.ComponentUtils
+                   ( emptyCompName, unqualCompToString )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), prettyStackDevL )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
@@ -77,7 +79,7 @@ stackBenchmarkFiles ::
      StackBenchmark
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackBenchmarkFiles bench =
-  resolveComponentFiles (CBench bench.name.unqualCompToText) build names
+  resolveComponentFiles (CBench bench.name) build names
  where
   names = bnames <> exposed
   exposed =
@@ -92,7 +94,7 @@ stackTestSuiteFiles ::
      StackTestSuite
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackTestSuiteFiles test =
-  resolveComponentFiles (CTest test.name.unqualCompToText) build names
+  resolveComponentFiles (CTest test.name) build names
  where
   names = bnames <> exposed
   exposed =
@@ -108,7 +110,7 @@ stackExecutableFiles ::
      StackExecutable
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackExecutableFiles exe =
-  resolveComponentFiles (CExe exe.name.unqualCompToText) build names
+  resolveComponentFiles (CExe exe.name) build names
  where
   build = exe.buildInfo
   names =
@@ -122,9 +124,9 @@ stackLibraryFiles ::
 stackLibraryFiles lib =
   resolveComponentFiles componentName build names
  where
-  componentRawName = lib.name.unqualCompToText
+  componentRawName = lib.name
   componentName
-    | componentRawName == mempty = CLib
+    | componentRawName == emptyCompName = CLib
     | otherwise = CSubLib componentRawName
   build = lib.buildInfo
   names = bnames ++ exposed
@@ -341,7 +343,7 @@ componentOutputDir namedComponent distDir =
     CBench name -> makeTmp name
  where
   makeTmp name =
-    buildDir distDir </> componentNameToDir (name <> "/" <> name <> "-tmp")
+    buildDir distDir </> componentNameToDirNormOrTmp True name
 
 -- | Try to resolve the list of base names in the given directory by
 -- looking for unique instances of base names applied with the given
@@ -545,10 +547,15 @@ buildDir distDir = distDir </> relDirBuild
 
 -- NOTE: don't export this, only use it for valid paths based on
 -- component names.
-componentNameToDir :: Text -> Path Rel Dir
-componentNameToDir name =
-  fromMaybe (throw $ ComponentNotParsedBug sName) (parseRelDir sName)
-  where sName = T.unpack name
+componentNameToDir :: StackUnqualCompName -> Path Rel Dir
+componentNameToDir = componentNameToDirNormOrTmp False
+
+componentNameToDirNormOrTmp :: Bool -> StackUnqualCompName -> Path Rel Dir
+componentNameToDirNormOrTmp isTemp name =
+  fromMaybe (throw $ ComponentNotParsedBug sName) (parseRelDir fullName)
+ where
+  fullName = if isTemp then sName <> "/" <> sName <> "-tmp" else sName
+  sName = unqualCompToString name
 
 -- | See 'Distribution.Simple.LocalBuildInfo.componentBuildDir'
 componentBuildDir :: NamedComponent -> Path Abs Dir -> Path Abs Dir

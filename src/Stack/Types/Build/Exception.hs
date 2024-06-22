@@ -32,6 +32,8 @@ import           Stack.Prelude
 import           Stack.Types.Compiler ( ActualCompiler, compilerVersionString )
 import           Stack.Types.CompilerBuild
                    ( CompilerBuild, compilerBuildSuffix )
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.DumpPackage ( DumpPackage )
 import           Stack.Types.UnusedFlags ( FlagSource (..), UnusedFlags (..) )
 import           Stack.Types.GHCVariant ( GHCVariant, ghcVariantSuffix )
@@ -54,7 +56,7 @@ data BuildException
       (Path Abs File) -- stack.yaml
   | TestSuiteFailure
       PackageIdentifier
-      (Map Text (Maybe ExitCode))
+      (Map StackUnqualCompName (Maybe ExitCode))
       (Maybe (Path Abs File))
       S.ByteString
   | TestSuiteTypeUnsupported TestSuiteInterface
@@ -120,7 +122,7 @@ instance Exception BuildException where
         [ ["Test suite failure for package " ++ packageIdentifierString ident]
         , flip map (Map.toList codes) $ \(name, mcode) -> concat
             [ "    "
-            , T.unpack name
+            , unqualCompToString name
             , ": "
             , case mcode of
                 Nothing -> " executable not found"
@@ -250,7 +252,7 @@ data BuildPrettyException
   | SomeTargetsNotBuildable [(PackageName, NamedComponent)]
   | InvalidFlagSpecification [UnusedFlags]
   | GHCProfOptionInvalid
-  | NotOnlyLocal [PackageName] [Text]
+  | NotOnlyLocal [PackageName] [StackUnqualCompName]
   | CompilerVersionMismatch
       (Maybe (ActualCompiler, Arch)) -- found
       (WantedCompiler, Arch) -- expected
@@ -387,7 +389,7 @@ instance Pretty BuildPrettyException where
               fillSep
                 ( "Executables:"
                 : mkNarrativeList Nothing False
-                    (map (fromString . T.unpack) exes :: [StyleDoc])
+                    (map (fromString . unqualCompToString) exes :: [StyleDoc])
                 )
            <> line
   pretty ( CompilerVersionMismatch

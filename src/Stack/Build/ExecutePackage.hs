@@ -32,8 +32,6 @@ import           Distribution.System ( OS (..), Platform (..) )
 import qualified Distribution.Text as C
 import           Distribution.Types.MungedPackageName
                    ( encodeCompatPackageName )
-import           Distribution.Types.UnqualComponentName
-                   ( mkUnqualComponentName )
 import           Distribution.Version ( mkVersion )
 import           Path
                    ( (</>), addExtension, filename, isProperPrefixOf, parent
@@ -109,6 +107,10 @@ import           Stack.Types.CompilerPaths
                    , cpWhich, getGhcPkgExe
                    )
 import qualified Stack.Types.Component as Component
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, toCabalName, unqualCompToString
+                   , unqualCompToText
+                   )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
@@ -120,7 +122,7 @@ import           Stack.Types.EnvConfig
                    , appropriateGhcColorFlag
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
-import           Stack.Types.GhcPkgId ( GhcPkgId, unGhcPkgId )
+import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdToText )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Installed
                    ( InstallLocation (..), Installed (..), InstalledMap
@@ -847,9 +849,9 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
     subLibNames = Set.toList $ buildableSubLibs $ case task.taskType of
       TTLocalMutable lp -> lp.package
       TTRemotePackage _ p _ -> p
-    toMungedPackageId :: Text -> MungedPackageId
+    toMungedPackageId :: StackUnqualCompName -> MungedPackageId
     toMungedPackageId subLib =
-      let subLibName = LSubLibName $ mkUnqualComponentName $ T.unpack subLib
+      let subLibName = LSubLibName $ toCabalName subLib
       in  MungedPackageId (MungedPackageName pname subLibName) pversion
     toPackageId :: MungedPackageId -> PackageIdentifier
     toPackageId (MungedPackageId n v) =
@@ -958,7 +960,7 @@ checkForUnlistedFiles TTRemotePackage{} _ = pure []
 -- coverage reports if coverage is enabled.
 singleTest :: HasEnvConfig env
            => TestOpts
-           -> [Text]
+           -> [StackUnqualCompName]
            -> ActionContext
            -> ExecuteEnv
            -> Task
@@ -1013,7 +1015,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 ]
 
         errs <- fmap Map.unions $ forM suitesToRun $ \(testName, suiteInterface) -> do
-          let stestName = T.unpack testName
+          let stestName = unqualCompToString testName
           (testName', isTestTypeLib) <-
             case suiteInterface of
               C.TestSuiteLibV09{} -> pure (stestName ++ "Stub", True)
@@ -1077,7 +1079,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 <> foldMap
                      ( \ghcId ->
                             "package-id "
-                         <> display (unGhcPkgId ghcId)
+                         <> display (ghcPkgIdToText ghcId)
                          <> "\n"
                      )
                      (pkgGhcIdList ++ thGhcId:Map.elems allDepsMap)
@@ -1110,7 +1112,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                            <> T.intercalate " " (map showProcessArgDebug args)
                 announce $
                      "test (suite: "
-                  <> display testName
+                  <> display (unqualCompToText testName)
                   <> display argsDisplay
                   <> ")"
 
@@ -1153,7 +1155,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                             $ BL.fromStrict
                             $ encodeUtf8 $ fromString $
                             show ( logPath
-                                 , mkUnqualComponentName (T.unpack testName)
+                                 , toCabalName testName
                                  )
                         else do
                           isTerminal <- view $ globalOptsL . to (.terminal)
@@ -1186,7 +1188,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                 let announceResult result =
                       announce $
                            "Test suite "
-                        <> display testName
+                        <> display (unqualCompToText testName)
                         <> " "
                         <> result
                 case mec of
@@ -1210,15 +1212,15 @@ singleTest topts testsToRun ac ee task installedMap = do
                       (package.buildType == C.Simple)
                       exeName
                       (packageNameString package.name)
-                      (T.unpack testName)
+                      (unqualCompToString testName)
                 pure emptyResult
 
         when needHpc $ do
           let testsToRun' = map f testsToRun
               f tName =
                 case (.interface) <$> mComponent of
-                  Just C.TestSuiteLibV09{} -> tName <> "Stub"
-                  _ -> tName
+                  Just C.TestSuiteLibV09{} -> unqualCompToText tName <> "Stub"
+                  _ -> unqualCompToText tName
                where
                 mComponent = collectionLookup tName package.testSuites
           generateHpcReport pkgDir package testsToRun'
@@ -1245,7 +1247,7 @@ singleTest topts testsToRun ac ee task installedMap = do
 -- | Implements running a package's benchmarks.
 singleBench :: HasEnvConfig env
             => BenchmarkOpts
-            -> [Text]
+            -> [StackUnqualCompName]
             -> ActionContext
             -> ExecuteEnv
             -> Task
@@ -1255,7 +1257,7 @@ singleBench beopts benchesToRun ac ee task installedMap = do
   (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
   withSingleContext ac ee task.taskType allDepsMap (Just "bench") $
     \_package _cabalfp _pkgDir cabal announce _outputType -> do
-      let args = map T.unpack benchesToRun <> maybe []
+      let args = map unqualCompToString benchesToRun <> maybe []
                        ((:[]) . ("--benchmark-options=" <>))
                        beopts.additionalArgs
 
@@ -1305,15 +1307,17 @@ primaryComponentOptions lp =
   ++ map
        (T.unpack . T.append "lib:")
        (getBuildableListText package.subLibraries)
-  ++ map
-       (T.unpack . T.append "exe:")
-       (Set.toList $ exesToBuild lp)
+  ++ Set.toList
+       ( Set.mapMonotonic
+           (\s -> "exe:" ++ unqualCompToString s)
+           (exesToBuild lp)
+       )
  where
   package = lp.package
 
 -- | Either build all executables or, if the user specifies requested
 -- components, just build them.
-exesToBuild :: LocalPackage -> Set Text
+exesToBuild :: LocalPackage -> Set StackUnqualCompName
 exesToBuild lp = if lp.wanted
   then exeComponents lp.components
   else buildableExes lp.package

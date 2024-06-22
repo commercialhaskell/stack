@@ -57,6 +57,7 @@ import           Stack.Types.BuildConfig
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( getGhcPkgExe )
 import           Stack.Types.CompCollection ( getBuildableSetText )
+import           Stack.Types.ComponentUtils ( unqualCompToString )
 import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
@@ -392,11 +393,13 @@ generateHpcReportForTargets opts tixFiles targetNames = do
               \case
                 CTest testName -> (pkgPath </>) <$>
                   parseRelFile
-                    (  T.unpack testName
+                    (  testName'
                     ++ "/"
-                    ++ T.unpack testName
+                    ++ testName'
                     ++ ".tix"
                     )
+                 where
+                  testName' = unqualCompToString testName
                 _ -> prettyThrowIO $ NonTestSuiteTarget name
           TargetAll PTProject -> do
             pkgPath <- hpcPkgPath name
@@ -619,7 +622,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId subLibs field = do
   let subLibNames =
         Set.map (LSubLibName . mkUnqualComponentName . T.unpack) subLibs
       libraryNames = Set.insert LMainLibName subLibNames
-      mungedPackageIds = Set.map (computeCompatPackageId pkgId) libraryNames 
+      mungedPackageIds = Set.map (computeCompatPackageId pkgId) libraryNames
   distDir <- distDirFromDir pkgDir
   ghcPkgExe <- getGhcPkgExe
   let inplaceDir = distDir </> relDirPackageConfInplace
@@ -640,7 +643,7 @@ findPackageFieldForBuiltPackage pkgDir pkgId subLibs field = do
     <> fromString (toFilePath inplaceDir)
     <> " for munged packages matching "
     <> fromString pkgIdStr
-  (errors, keys) <-  
+  (errors, keys) <-
     partitionEithers <$> traverse extractField (Set.toList mungedPackageIds)
   case errors of
     (a:_) -> pure $ Left a -- the first error only, since they're repeated anyway

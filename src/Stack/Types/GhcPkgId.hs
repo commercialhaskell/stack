@@ -4,7 +4,7 @@
 
 module Stack.Types.GhcPkgId
   ( GhcPkgId
-  , unGhcPkgId
+  , ghcPkgIdToText
   , ghcPkgIdParser
   , parseGhcPkgId
   , ghcPkgIdString
@@ -16,8 +16,11 @@ import           Data.Attoparsec.Text
                    , satisfy
                    )
 import           Data.Char ( isAlphaNum )
-import qualified Data.Text as T
-import           Database.Persist.Sql ( PersistField, PersistFieldSql )
+import           Data.Hashable ( Hashable(..) )
+import           Database.Persist.Sql
+                   ( PersistField (..), PersistFieldSql (..) )
+import           Distribution.Compat.Binary ( decode, encode )
+import           Distribution.Types.UnitId ( UnitId, mkUnitId, unUnitId )
 import           Stack.Prelude
 import           Text.Read ( Read (..) )
 
@@ -35,10 +38,18 @@ instance Exception GhcPkgIdParseFail where
 
 -- | A ghc-pkg package identifier.
 newtype GhcPkgId
-  = GhcPkgId Text
-  deriving (Data, Eq, Generic, Ord, PersistField, PersistFieldSql, Typeable)
+  = GhcPkgId UnitId
+  deriving (Data, Eq, Generic, Ord, Typeable)
 
-instance Hashable GhcPkgId
+instance PersistField GhcPkgId where
+  toPersistValue = toPersistValue . ghcPkgIdToText
+  fromPersistValue = (fmap . fmap) ghcPkgIdFromText fromPersistValue
+
+instance PersistFieldSql GhcPkgId where
+  sqlType _ = sqlType @Text Proxy
+
+instance Hashable GhcPkgId where
+  hashWithSalt a (GhcPkgId v) = hashWithSalt a (encode v)
 
 instance NFData GhcPkgId
 
@@ -46,7 +57,7 @@ instance Show GhcPkgId where
   show = show . ghcPkgIdString
 
 instance Read GhcPkgId where
-  readsPrec i = map (first (GhcPkgId . T.pack)) . readsPrec i
+  readsPrec i = map (first (GhcPkgId . mkUnitId)) . readsPrec i
 
 instance FromJSON GhcPkgId where
   parseJSON = withText "GhcPkgId" $ \t ->
@@ -70,7 +81,7 @@ parseGhcPkgId x = go x
 ghcPkgIdParser :: Parser GhcPkgId
 ghcPkgIdParser =
   let elements = "_.-" :: String
-  in  GhcPkgId . T.pack <$>
+  in  GhcPkgId . mkUnitId <$>
         many1 (choice [alphaNum, satisfy (`elem` elements)])
 
 -- | Parse an alphanumerical character, as recognised by `isAlphaNum`.
@@ -80,8 +91,11 @@ alphaNum = satisfy isAlphaNum <?> "alphanumeric"
 
 -- | Get a string representation of GHC package id.
 ghcPkgIdString :: GhcPkgId -> String
-ghcPkgIdString (GhcPkgId x) = T.unpack x
+ghcPkgIdString (GhcPkgId x) = unUnitId x
 
--- | Get a text value of GHC package id
-unGhcPkgId :: GhcPkgId -> Text
-unGhcPkgId (GhcPkgId v) = v
+-- | Get a text value of GHC package id.
+ghcPkgIdToText :: GhcPkgId -> Text
+ghcPkgIdToText (GhcPkgId v) = decode . encode $ v
+-- | Create GhcPkgId from Text.
+ghcPkgIdFromText :: Text -> GhcPkgId
+ghcPkgIdFromText = GhcPkgId . decode . encode

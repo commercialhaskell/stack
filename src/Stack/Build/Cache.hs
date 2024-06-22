@@ -35,7 +35,6 @@ import qualified Data.ByteArray as Mem ( convert )
 import           Data.ByteString.Builder ( byteString )
 import qualified Data.Map as M
 import qualified Data.Set as Set
-import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import           Foreign.C.Types ( CTime )
 import           Path ( (</>), filename, parent, parseRelFile )
@@ -63,6 +62,8 @@ import           Stack.Types.Build
                    )
 import           Stack.Types.Cache ( ConfigCacheType (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.Config ( stackRootL )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
@@ -74,10 +75,11 @@ import           Stack.Types.EnvConfig
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.Installed
                    (InstalledLibraryInfo (..), foldOnGhcPkgId' )
-import           Stack.Types.NamedComponent ( NamedComponent (..) )
+import           Stack.Types.NamedComponent
+                   ( NamedComponent (..), componentCachePath )
 import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
-                   ( modificationTime, getFileStatus, setFileTimes )
+                   ( getFileStatus, modificationTime, setFileTimes )
 
 -- | Directory containing files to mark an executable as installed
 exeInstalledDir :: (HasEnvConfig env)
@@ -134,14 +136,7 @@ buildCacheFile dir component = do
   cachesDir <- buildCachesDir dir
   smh <- view $ envConfigL . to (.sourceMapHash)
   smDirName <- smRelDir smh
-  let nonLibComponent prefix name = prefix <> "-" <> T.unpack name
-  cacheFileName <- parseRelFile $ case component of
-    CLib -> "lib"
-    CSubLib name -> nonLibComponent "sub-lib" name
-    CFlib name -> nonLibComponent "flib" name
-    CExe name -> nonLibComponent "exe" name
-    CTest name -> nonLibComponent "test" name
-    CBench name -> nonLibComponent "bench" name
+  cacheFileName <- parseRelFile $ componentCachePath component
   pure $ cachesDir </> smDirName </> cacheFileName
 
 -- | Try to read the dirtiness cache for the given package directory.
@@ -376,7 +371,7 @@ writePrecompiledCache ::
   -> ConfigureOpts
   -> Bool -- ^ build haddocks
   -> Installed -- ^ library
-  -> Set Text -- ^ executables
+  -> Set StackUnqualCompName -- ^ executables
   -> RIO env ()
 writePrecompiledCache
     baseConfigOpts
@@ -390,7 +385,7 @@ writePrecompiledCache
       ec <- view envConfigL
       let stackRootRelative = makeRelative (view stackRootL ec)
       exes' <- forM (Set.toList exes) $ \exe -> do
-        name <- parseRelFile $ T.unpack exe
+        name <- parseRelFile $ unqualCompToString exe
         stackRootRelative $
            baseConfigOpts.snapInstallRoot </> bindirSuffix </> name
       let installedLibToPath libName ghcPkgId pcAction = do

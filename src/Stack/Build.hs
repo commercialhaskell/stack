@@ -20,7 +20,6 @@ import           Data.List ( (\\) )
 import           Data.List.Extra ( groupSort )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Data.Text as T
 -- import qualified Distribution.PackageDescription as C
 -- import           Distribution.Types.Dependency ( Dependency (..), depLibraries )
 import           Distribution.Version ( mkVersion )
@@ -52,9 +51,10 @@ import           Stack.Types.BuildOptsMonoid
                    )
 import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( HasCompiler, cabalVersionL )
+import           Stack.Types.ComponentUtils
+                   ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), buildOptsL
-                   )
+                   ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap
@@ -266,7 +266,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
             ","
             [ style
                 PkgComponent
-                (fromString $ packageNameString p <> ":" <> T.unpack exe)
+                (fromString $ packageNameString p <> ":" <> unqualCompToString exe)
             | p <- pkgs
             ]
     prettyWarnL $
@@ -295,7 +295,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   --                   , package names for other project packages that have an
   --                     executable with the same name
   --                   )
-  warnings :: Map Text ([PackageName],[PackageName])
+  warnings :: Map StackUnqualCompName ([PackageName],[PackageName])
   warnings =
     Map.mapMaybe
       (\(pkgsToBuild, localPkgs) ->
@@ -315,7 +315,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
             -- Both cases warrant a warning.
             Just (NE.toList pkgsToBuild, otherLocals))
       (Map.intersectionWith (,) exesToBuild localExes)
-  exesToBuild :: Map Text (NonEmpty PackageName)
+  exesToBuild :: Map StackUnqualCompName (NonEmpty PackageName)
   exesToBuild =
     collect
       [ (exe, pkgName')
@@ -323,7 +323,7 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
       , TTLocalMutable lp <- [task.taskType]
       , exe <- (Set.toList . exeComponents . (.components)) lp
       ]
-  localExes :: Map Text (NonEmpty PackageName)
+  localExes :: Map StackUnqualCompName (NonEmpty PackageName)
   localExes =
     collect
       [ (exe, pkg.name)

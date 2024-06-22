@@ -31,6 +31,7 @@ import           Distribution.Parsec ( Parsec (..), simpleParsec )
 import           Distribution.Verbosity ( Verbosity, normal, verbose )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Stack.Prelude hiding ( trace )
+import           Stack.Types.ComponentUtils ( StackUnqualCompName )
 
 -- | Build options that may be specified in the stack.yaml or from the CLI
 data BuildOptsMonoid = BuildOptsMonoid
@@ -64,7 +65,7 @@ data BuildOptsMonoid = BuildOptsMonoid
   , reconfigure :: !FirstFalse
   , cabalVerbose :: !(First CabalVerbosity)
   , splitObjs :: !FirstFalse
-  , skipComponents :: ![Text]
+  , skipComponents :: ![StackUnqualCompName]
   , interleavedOutput :: !FirstTrue
   , progressBar :: !(First ProgressBarFormat)
   , ddumpDir :: !(First Text)

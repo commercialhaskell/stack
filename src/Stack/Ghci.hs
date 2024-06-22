@@ -46,7 +46,8 @@ import           Stack.Ghci.Script
                    , scriptToLazyByteString
                    )
 import           Stack.Package
-                   ( buildableExes, buildableForeignLibs, getPackageOpts
+                   ( buildableExes, buildableForeignLibs, buildableSubLibs
+                   , buildableTestSuites, buildableBenchmarks, getPackageOpts
                    , hasBuildableMainLibrary, listOfPackageDeps
                    , packageFromPackageDescription, readDotBuildinfo
                    , resolvePackageDescription, topSortPackageComponent
@@ -63,7 +64,6 @@ import qualified Stack.Types.BuildOpts as BenchmarkOpts ( BenchmarkOpts (..) )
 import qualified Stack.Types.BuildOpts as TestOpts ( TestOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( ApplyCLIFlag (..), BuildOptsCLI (..), defaultBuildOptsCLI )
-import           Stack.Types.CompCollection ( getBuildableListText )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
@@ -951,21 +951,27 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
 -- (differently).
 wantedPackageComponents :: BuildOpts -> Target -> Package -> Set NamedComponent
 wantedPackageComponents _ (TargetComps cs) _ = cs
-wantedPackageComponents bopts (TargetAll PTProject) pkg = S.fromList $
+wantedPackageComponents bopts (TargetAll PTProject) pkg =
      ( if hasBuildableMainLibrary pkg
-         then CLib : map CSubLib buildableForeignLibs'
-         else []
+         then S.insert CLib (S.mapMonotonic CSubLib buildableForeignLibs')
+         else S.empty
      )
-  <> map CExe buildableExes'
-  <> map CSubLib buildableSubLibs
-  <> (if bopts.tests then map CTest buildableTestSuites else [])
-  <> (if bopts.benchmarks then map CBench buildableBenchmarks else [])
+  <> S.mapMonotonic CExe buildableExes'
+  <> S.mapMonotonic CSubLib buildableSubLibs'
+  <> ( if bopts.tests
+         then S.mapMonotonic CTest buildableTestSuites'
+         else S.empty
+     )
+  <> ( if bopts.benchmarks
+         then S.mapMonotonic CBench buildableBenchmarks'
+         else S.empty
+     )
  where
-  buildableForeignLibs' = S.toList $ buildableForeignLibs pkg
-  buildableSubLibs = getBuildableListText pkg.subLibraries
-  buildableExes' = S.toList $ buildableExes pkg
-  buildableTestSuites = getBuildableListText pkg.testSuites
-  buildableBenchmarks = getBuildableListText pkg.benchmarks
+  buildableForeignLibs' = buildableForeignLibs pkg
+  buildableSubLibs' = buildableSubLibs pkg
+  buildableExes' = buildableExes pkg
+  buildableTestSuites' = buildableTestSuites pkg
+  buildableBenchmarks' = buildableBenchmarks pkg
 wantedPackageComponents _ _ _ = S.empty
 
 checkForIssues :: HasTerm env => [GhciPkgInfo] -> RIO env ()

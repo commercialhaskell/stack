@@ -381,6 +381,7 @@ library
     , fsnotify >=0.4.1
     , generic-deriving
     , ghc-boot
+    , hashable
     , hi-file-parser >=0.1.6.0
     , hpack >=0.36.0
     , hpc
@@ -503,6 +504,7 @@ executable stack
     , fsnotify >=0.4.1
     , generic-deriving
     , ghc-boot
+    , hashable
     , hi-file-parser >=0.1.6.0
     , hpack >=0.36.0
     , hpc
@@ -604,6 +606,7 @@ executable stack-integration-test
     , fsnotify >=0.4.1
     , generic-deriving
     , ghc-boot
+    , hashable
     , hi-file-parser >=0.1.6.0
     , hpack >=0.36.0
     , hpc
@@ -721,6 +724,7 @@ test-suite stack-unit-test
     , fsnotify >=0.4.1
     , generic-deriving
     , ghc-boot
+    , hashable
     , hi-file-parser >=0.1.6.0
     , hpack >=0.36.0
     , hpc

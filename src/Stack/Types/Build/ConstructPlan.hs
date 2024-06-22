@@ -31,6 +31,7 @@ import           Stack.Types.Build.Exception ( ConstructPlanException )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig(..) )
 import           Stack.Types.CompilerPaths ( HasCompiler (..) )
+import           Stack.Types.ComponentUtils ( StackUnqualCompName )
 import           Stack.Types.Config ( HasConfig (..) )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts )
 import           Stack.Types.Curator ( Curator )
@@ -90,7 +91,7 @@ data W = W
   { wFinals :: !(Map PackageName (Either ConstructPlanException Task))
     -- ^ A dictionary of package names, and either a final task to perform when
     -- building the package or an exception.
-  , wInstall :: !(Map Text InstallLocation)
+  , wInstall :: !(Map StackUnqualCompName InstallLocation)
     -- ^ A dictionary of executables to be installed, and location where the
     -- executable's binary is placed.
   , wDirty :: !(Map PackageName Text)

@@ -35,7 +35,6 @@ module Stack.Package
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import           Data.STRef ( STRef, modifySTRef', readSTRef, newSTRef )
 import qualified Data.Text as T
 import           Distribution.CabalSpecVersion ( cabalSpecToVersionDigits )
 import           Distribution.Compiler
@@ -50,6 +49,7 @@ import           Distribution.PackageDescription
                    , Library (..), PackageDescription (..), PackageFlag (..)
                    , SetupBuildInfo (..), TestSuite (..), allLibraries
                    , buildType, depPkgName, depVerRange
+                   , unqualComponentNameToPackageName
                    )
 import qualified Distribution.PackageDescription as Executable
                    ( Executable (..) )
@@ -71,25 +71,26 @@ import           Stack.Component
                    , isComponentBuildable, stackBenchmarkFromCabal
                    , stackExecutableFromCabal, stackForeignLibraryFromCabal
                    , stackLibraryFromCabal, stackTestFromCabal
-                   , stackUnqualToQual
                    )
 import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
                    , componentOutputDir, packageAutogenDir
                    )
-import           Stack.Constants (relFileCabalMacrosH, relDirLogs)
+import           Stack.Constants ( relFileCabalMacrosH, relDirLogs )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.PackageFile ( getPackageFile, stackPackageFileFromCabal )
 import           Stack.Prelude hiding ( Display (..) )
 import           Stack.Types.BuildConfig ( HasBuildConfig (..), getWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, collectionLookup, foldAndMakeCollection
-                   , foldComponentToAnotherCollection, getBuildableSetText
+                   , foldComponentToAnotherCollection, getBuildableSet
+                   , getBuildableSetText
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Component
                    ( HasBuildInfo, HasComponentInfo, StackUnqualCompName (..) )
+import           Stack.Types.ComponentUtils ( emptyCompName, toCabalName )
 import qualified Stack.Types.Component as Component
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.Dependency
@@ -112,7 +113,7 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.PackageFile
                    ( DotCabalPath, PackageComponentFile (..) )
-import           Stack.Types.SourceMap (Target(..))
+import           Stack.Types.SourceMap ( Target(..), PackageType (..) )
 import           Stack.Types.Version
                    ( VersionRange, intersectVersionRanges, withinRange )
 import           System.FilePath ( replaceExtension )
@@ -205,7 +206,8 @@ getPackageOpts
         getPackageFile stackPackage cabalFP
       let subLibs =
             S.toList $ subLibComponents $ M.keysSet componentsModules
-      excludedSubLibs <- mapM (parsePackageNameThrowing . T.unpack) subLibs
+          excludedSubLibs =
+            map (unqualComponentNameToPackageName . toCabalName) subLibs
       componentsOpts <- generatePkgDescOpts
         installMap
         installedMap
@@ -259,7 +261,7 @@ generatePkgDescOpts
             }
       let insertInMap name compVal = M.insert name (generate name compVal)
       let translatedInsertInMap constructor name =
-            insertInMap (stackUnqualToQual constructor name)
+            insertInMap (constructor name)
       let makeBuildInfoOpts selector constructor =
             foldOnNameAndBuildInfo
               (selector pkg)
@@ -665,20 +667,20 @@ packageUnknownTools pkg = lib (bench <> tests <> flib <> sublib <> exe)
   gatherUnknownTools :: HasBuildInfo x => CompCollection x -> Set Text
   gatherUnknownTools = foldr' addUnknownTools mempty
 
-buildableForeignLibs :: Package -> Set Text
-buildableForeignLibs pkg = getBuildableSetText pkg.foreignLibraries
+buildableForeignLibs :: Package -> Set StackUnqualCompName
+buildableForeignLibs pkg = getBuildableSet pkg.foreignLibraries
 
-buildableSubLibs :: Package -> Set Text
-buildableSubLibs pkg = getBuildableSetText pkg.subLibraries
+buildableSubLibs :: Package -> Set StackUnqualCompName
+buildableSubLibs pkg = getBuildableSet pkg.subLibraries
 
-buildableExes :: Package -> Set Text
-buildableExes pkg = getBuildableSetText pkg.executables
+buildableExes :: Package -> Set StackUnqualCompName
+buildableExes pkg = getBuildableSet pkg.executables
 
-buildableTestSuites :: Package -> Set Text
-buildableTestSuites pkg = getBuildableSetText pkg.testSuites
+buildableTestSuites :: Package -> Set StackUnqualCompName
+buildableTestSuites pkg = getBuildableSet pkg.testSuites
 
-buildableBenchmarks :: Package -> Set Text
-buildableBenchmarks pkg = getBuildableSetText pkg.benchmarks
+buildableBenchmarks :: Package -> Set StackUnqualCompName
+buildableBenchmarks pkg = getBuildableSet pkg.benchmarks
 
 -- | Apply a generic processing function in a Monad over all of the Package's
 -- components.
@@ -812,56 +814,75 @@ topSortPackageComponent ::
      -- actual targets in the result, only their deps. Using it with False here
      -- only in GHCi
   -> Seq NamedComponent
-topSortPackageComponent package target includeDirectTarget = runST $ do
-  alreadyProcessedRef <- newSTRef (mempty :: Set NamedComponent)
-  let processInitialComponents c = case target of
-        TargetAll{} -> processComponent includeDirectTarget alreadyProcessedRef c
-        TargetComps targetSet -> if S.member c.qualifiedName targetSet
-          then processComponent includeDirectTarget alreadyProcessedRef c
-          else id
-  processPackageComponent package processInitialComponents (pure mempty)
+topSortPackageComponent package target includeDirectTarget =
+  topProcessPackageComponent package target processor mempty
  where
-  processComponent :: forall s component. HasComponentInfo component
-    => Bool
+  processor packageType component
+    | not includeDirectTarget && packageType == PTProject = id
+    | otherwise = \v -> v |> component.qualifiedName
+
+-- | Process a package's internal components in the order of their topological sort.
+-- The first iteration will effect the component depending on no other component etc,
+-- iterating by increasing amount of required dependencies.
+-- 'PackageType' with value 'PTProject' here means the component is a direct target
+-- and 'PTDependency' means it's a dependency of a direct target.
+topProcessPackageComponent :: forall b.
+     Package
+  -> Target
+  -> (    forall component. (HasComponentInfo component)
+       => PackageType
+       -> component
+       -> b
+       -> b
+     )
+  -> b
+  -> b
+topProcessPackageComponent package target fn res = do
+  let initialState = (mempty, res)
+      processInitialComponents c = case target of
+        TargetAll{} -> processComponent PTProject c
+        TargetComps targetSet -> if S.member c.qualifiedName targetSet
+          then processComponent PTProject c
+          else id
+  snd $ processPackageComponent package processInitialComponents initialState
+ where
+  processComponent :: HasComponentInfo component
+    => PackageType
        -- ^ Finally add this component in the seq
-    -> STRef s (Set NamedComponent)
     -> component
-    -> ST s (Seq NamedComponent)
-    -> ST s (Seq NamedComponent)
-  processComponent finallyAddComponent alreadyProcessedRef component res = do
+    -> (Set NamedComponent, b)
+    -> (Set NamedComponent, b)
+  processComponent packageType component currentRes@(_a, !_b) = do
     let depMap = componentDependencyMap component
         internalDep = M.lookup package.name depMap
-        processSubDep = processOneDep alreadyProcessedRef internalDep res
         qualName = component.qualifiedName
-        processSubDepSaveName
-          | finallyAddComponent = (|> qualName) <$> processSubDep
-          | otherwise = processSubDep
-    -- This is an optimization, the only components we are likely to process
-    -- multiple times are the ones we can find in dependencies, otherwise we
-    -- only fold on a single version of each component by design.
+        alreadyProcessed = fst currentRes
+        !appendToResult = fn packageType component
+        -- This is an optimization, the only components we are likely to process
+        -- multiple times are the ones we can find in dependencies, otherwise we
+        -- only fold on a single version of each component by design.
+        processedDeps = processOneDep internalDep currentRes
     if isPotentialDependency qualName
-      then do
-        alreadyProcessed <- readSTRef alreadyProcessedRef
+      then
         if S.member qualName alreadyProcessed
-          then res
-          else modifySTRef' alreadyProcessedRef (S.insert qualName)
-                 >> processSubDepSaveName
-      else processSubDepSaveName
+          then currentRes
+          else bimap (S.insert qualName) appendToResult processedDeps
+      else second appendToResult processedDeps
   lookupLibName isMain name = if isMain
     then package.library
     else collectionLookup name package.subLibraries
-  processOneDep alreadyProcessed mDependency res =
+  processOneDep mDependency res' =
     case (.depType) <$> mDependency of
       Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do
         let processMainLibDep =
-              case (mainLibDep, lookupLibName True mempty) of
+              case (mainLibDep, lookupLibName True emptyCompName) of
                 (True, Just mainLib) ->
-                  processComponent True alreadyProcessed mainLib
+                  processComponent PTDependency mainLib
                 _ -> id
             processSingleSubLib name =
-              case lookupLibName False name.unqualCompToText of
-                Just lib -> processComponent True alreadyProcessed lib
+              case lookupLibName False name of
+                Just lib -> processComponent PTDependency lib
                 Nothing -> id
             processSubLibDep r = foldr' processSingleSubLib r subLibDeps
-        processSubLibDep (processMainLibDep res)
-      _ -> res
+        processSubLibDep (processMainLibDep res')
+      _ -> res'

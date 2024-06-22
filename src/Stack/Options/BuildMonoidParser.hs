@@ -7,7 +7,6 @@ module Stack.Options.BuildMonoidParser
   , cabalVerbosityParser
   ) where
 
-import qualified Data.Text as T
 import           Distribution.Parsec ( eitherParsec )
 import           Options.Applicative
                    ( Parser, eitherReader, flag, help, long, metavar, option
@@ -27,6 +26,7 @@ import           Stack.Types.BuildOptsMonoid
                    ( BuildOptsMonoid (..), CabalVerbosity, readProgressBarFormat
                    , toFirstCabalVerbosity
                    )
+import           Stack.Types.ComponentUtils ( unqualCompFromString )
 
 buildOptsMonoidParser :: GlobalOptsContext -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 = BuildOptsMonoid
@@ -214,7 +214,7 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
     ++ splitObjsWarning
     )
     hide
-  skipComponents = many (fmap T.pack (strOption
+  skipComponents = many (fmap unqualCompFromString (strOption
     (  long "skip"
     <> help "Skip given component (can be specified multiple times)."
     <> hide

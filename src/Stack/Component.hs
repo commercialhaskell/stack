@@ -22,7 +22,6 @@ module Stack.Component
   , stackBenchmarkFromCabal
   , stackTestFromCabal
   , foldOnNameAndBuildInfo
-  , stackUnqualToQual
   , componentDependencyMap
   , fromCabalName
   ) where
@@ -47,13 +46,6 @@ import           Stack.Types.Component
                    )
 import           Stack.Types.ComponentUtils ( fromCabalName )
 import           Stack.Types.Dependency ( cabalExeToStackDep, cabalToStackDep )
-import           Stack.Types.NamedComponent ( NamedComponent )
-
-stackUnqualToQual ::
-     (Text -> NamedComponent)
-  -> StackUnqualCompName
-  -> NamedComponent
-stackUnqualToQual c (StackUnqualCompName n) = c n
 
 foldOnNameAndBuildInfo ::
      ( HasField "buildInfo" a StackBuildInfo
