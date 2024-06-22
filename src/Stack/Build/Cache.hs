@@ -35,7 +35,6 @@ import qualified Data.ByteArray as Mem ( convert )
 import           Data.ByteString.Builder ( byteString )
 import qualified Data.Map as M
 import qualified Data.Set as Set
-import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import           Foreign.C.Types ( CTime )
 import           Path ( (</>), filename, parent, parseRelFile )

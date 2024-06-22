@@ -34,7 +34,6 @@ import           Stack.Component ( fromCabalName )
 import           Stack.GhcPkg ( createDatabase )
 import           Stack.Prelude
 import           Stack.Types.CompilerPaths ( GhcPkgExe (..), HasCompiler (..) )
-import           Stack.Types.Component ( StackUnqualCompName(..) )
 import           Stack.Types.ComponentUtils ( unqualCompFromText )
 import           Stack.Types.DumpPackage ( DumpPackage (..), SublibDump (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId )
