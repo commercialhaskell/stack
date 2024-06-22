@@ -27,8 +27,7 @@ import           Distribution.Types.TestSuiteInterface ( TestSuiteInterface )
 import qualified Distribution.Version as C
 import           RIO.NonEmpty ( nonEmpty )
 import           RIO.Process ( showProcessArgDebug )
-import           Stack.Constants
-                   ( defaultUserConfigPath, wiredInPackages )
+import           Stack.Constants ( defaultUserConfigPath, wiredInPackages )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( ActualCompiler, compilerVersionString )
 import           Stack.Types.CompilerBuild

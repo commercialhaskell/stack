@@ -25,11 +25,8 @@ module Stack.Constants
   , stackProgNameUpper
   , wiredInPackages
   , cabalPackageName
-  , implicitGlobalProjectDirDeprecated
   , implicitGlobalProjectDir
-  , defaultUserConfigPathDeprecated
   , defaultUserConfigPath
-  , defaultGlobalConfigPathDeprecated
   , defaultGlobalConfigPath
   , platformVariantEnvVar
   , compilerOptionsCabalFlag
@@ -285,38 +282,19 @@ cabalPackageName :: PackageName
 cabalPackageName =
     mkPackageName "Cabal"
 
--- | Deprecated implicit global project directory used when outside of a project.
-implicitGlobalProjectDirDeprecated :: Path Abs Dir -- ^ Stack root.
-                                   -> Path Abs Dir
-implicitGlobalProjectDirDeprecated p =
-    p </>
-    $(mkRelDir "global")
-
 -- | Implicit global project directory used when outside of a project.
 -- Normally, @getImplicitGlobalProjectDir@ should be used instead.
-implicitGlobalProjectDir :: Path Abs Dir -- ^ Stack root.
-                         -> Path Abs Dir
-implicitGlobalProjectDir p =
-    p </>
-    $(mkRelDir "global-project")
+implicitGlobalProjectDir ::
+     Path Abs Dir -- ^ Stack root.
+  -> Path Abs Dir
+implicitGlobalProjectDir p = p </> $(mkRelDir "global-project")
 
--- | Deprecated default global config path.
-defaultUserConfigPathDeprecated :: Path Abs Dir -> Path Abs File
-defaultUserConfigPathDeprecated = (</> $(mkRelFile "stack.yaml"))
-
--- | Default global config path.
--- Normally, @getDefaultUserConfigPath@ should be used instead.
+-- | Default user global configuration path. Normally,
+-- @getDefaultUserConfigPath@ should be used instead.
 defaultUserConfigPath :: Path Abs Dir -> Path Abs File
 defaultUserConfigPath = (</> $(mkRelFile "config.yaml"))
 
--- | Deprecated default global config path.
--- Note that this will be @Nothing@ on Windows, which is by design.
-defaultGlobalConfigPathDeprecated :: Maybe (Path Abs File)
-defaultGlobalConfigPathDeprecated = parseAbsFile "/etc/stack/config"
-
--- | Default global config path.
--- Normally, @getDefaultGlobalConfigPath@ should be used instead.
--- Note that this will be @Nothing@ on Windows, which is by design.
+-- | Default global config path. On Windows, by design, this will be @Nothing@.
 defaultGlobalConfigPath :: Maybe (Path Abs File)
 defaultGlobalConfigPath = parseAbsFile "/etc/stack/config.yaml"
 
