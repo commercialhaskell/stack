@@ -31,6 +31,7 @@ import           RIO.Process
                    )
 import qualified RIO.Set as Set
 import qualified RIO.Text as T
+import           RIO.Time ( defaultTimeLocale, diffUTCTime, formatTime, getCurrentTime )
 import           System.Environment ( getExecutablePath, lookupEnv )
 import           System.Info ( os )
 import           System.PosixCompat.Files ( createSymbolicLink )
@@ -43,6 +44,7 @@ main = runSimpleApp $ do
   logInfo "Initiating Stack integration test running"
 
   options <- getRecord "Stack integration tests"
+  startTime <- getCurrentTime
   results <- runApp options $ do
     logInfo "Running with the following environment"
     proc "env" [] runProcess_
@@ -62,10 +64,12 @@ main = runSimpleApp $ do
               loop (idx + 1) rest' (res <> accum)
 
     loop (1 :: Int) (Set.toList tests) mempty
-
+  finalTime <- getCurrentTime
   let (successes, failures) = partition ((== ExitSuccess) . snd)
                             $ Map.toList results
-
+  let timeDiff = diffUTCTime finalTime startTime
+  let timeDiffStr = formatTime defaultTimeLocale "%H:%M:%S - total %s seconds" timeDiff
+  logInfo $ "Integration tests ran in : " <> fromString timeDiffStr
   unless (null successes) $ do
     logInfo "Successful tests:"
     for_ successes $ \(x, _) -> logInfo $ "- " <> display x
@@ -77,6 +81,7 @@ main = runSimpleApp $ do
       logInfo "Failed tests:"
       for_ failures $ \(x, ec) -> logInfo $ "- " <> display x <> " - " <> displayShow ec
       exitFailure
+
 
 data Options = Options
   { optSpeed :: Maybe Speed
