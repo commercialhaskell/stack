@@ -19,9 +19,9 @@ import           Data.Char ( isAlphaNum )
 import           Data.Hashable ( Hashable(..) )
 import           Database.Persist.Sql ( PersistField (..), PersistFieldSql (..) )
 import           Distribution.Compat.Binary ( decode, encode )
-import           Distribution.Utils.ShortText ( ShortText, toShortText, fromShortText )
 import           Stack.Prelude
 import           Text.Read ( Read (..) )
+import Distribution.Types.UnitId (UnitId, mkUnitId, unUnitId)
 
 -- | A parse fail.
 newtype GhcPkgIdParseFail
@@ -37,7 +37,7 @@ instance Exception GhcPkgIdParseFail where
 
 -- | A ghc-pkg package identifier.
 newtype GhcPkgId
-  = GhcPkgId ShortText
+  = GhcPkgId UnitId
   deriving (Data, Eq, Generic, Ord, Typeable)
 
 instance PersistField GhcPkgId where
@@ -56,7 +56,7 @@ instance Show GhcPkgId where
   show = show . ghcPkgIdString
 
 instance Read GhcPkgId where
-  readsPrec i = map (first (GhcPkgId . toShortText)) . readsPrec i
+  readsPrec i = map (first (GhcPkgId . mkUnitId)) . readsPrec i
 
 instance FromJSON GhcPkgId where
   parseJSON = withText "GhcPkgId" $ \t ->
@@ -80,7 +80,7 @@ parseGhcPkgId x = go x
 ghcPkgIdParser :: Parser GhcPkgId
 ghcPkgIdParser =
   let elements = "_.-" :: String
-  in  GhcPkgId . toShortText <$>
+  in  GhcPkgId . mkUnitId <$>
         many1 (choice [alphaNum, satisfy (`elem` elements)])
 
 -- | Parse an alphanumerical character, as recognised by `isAlphaNum`.
@@ -90,7 +90,7 @@ alphaNum = satisfy isAlphaNum <?> "alphanumeric"
 
 -- | Get a string representation of GHC package id.
 ghcPkgIdString :: GhcPkgId -> String
-ghcPkgIdString (GhcPkgId x) = fromShortText x
+ghcPkgIdString (GhcPkgId x) = unUnitId x
 
 -- | Get a text value of GHC package id.
 ghcPkgIdToText :: GhcPkgId -> Text
