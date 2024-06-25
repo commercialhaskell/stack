@@ -204,7 +204,7 @@ this example).
 
     If GHC's `-stubdir` option is omitted, GHC will put the generated C header
     file together with the other build artefacts for the module. However, that
-    location cannot be specified reliably using the `install-dirs` key.
+    location cannot be specified reliably using the `include-dirs` key.
 
 That generated C header file will have content like:
 ~~~c
