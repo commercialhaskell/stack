@@ -119,7 +119,8 @@ dependencies: base
 library:
   source-dirs: src
   # The Lib_stub.h header must be put by GHC somewhere where Cabal can find it.
-  # This tells GHC to put it in the stubs directory of the project directory.
+  # This tells GHC to put it in the autogen-stubs directory of the project
+  # directory.
   ghc-options:
   - -stubdir autogen-stubs
 
@@ -136,12 +137,13 @@ executables:
     main: main.c
     source-dirs: c-app
     ghc-options: -no-hs-main
-    # This specifies that directory stubs should be searched for header files.
+    # This specifies that directory autogen-stubs should be searched for header
+    # files.
     include-dirs: autogen-stubs
     dependencies: c-example
 ~~~
 
-A `Lib.hs` module in directory `src`:
+A Haskell module souce file named `Lib.hs` in directory `src`:
 ~~~haskell
 module Lib
   ( myMax -- Exported only for the use of the 'Haskell' executable
@@ -153,7 +155,7 @@ myMax x1 x2 = if x1 > x2 then x1 else x2
 foreign export ccall myMax :: Int -> Int -> Int
 ~~~
 
-A Haskell module `Main.hs` in directory `app`:
+A Haskell module source file named `Main.hs` in directory `app`:
 ~~~haskell
 module Main ( main ) where
 
@@ -163,7 +165,7 @@ main :: IO ()
 main = print $ myMax 10 100
 ~~~
 
-A C source file `main.c` in directory `c-app`:
+A C source file named `main.c` in directory `c-app`:
 ~~~c
 // Based in part on
 // https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/ffi.html#using-your-own-main
@@ -187,15 +189,22 @@ int main(int argc, char *argv[]) {
   // Use our foreign export from module Lib.hs ...
   printf("%lld\n", myMax(10,100));
 
-  // Deinitialise the Haskell system
+  // De-initialise the Haskell system
   hs_exit();
   return 0;
 }
 ~~~
 
-The `foreign export` declaration in Haskell module `Lib.hs` will cause GHC to
+The `foreign export` declaration in Haskell module `Lib` will cause GHC to
 generate a 'stub' C header file named `Lib_stub.h`. The GHC option `-stubdir`
-will cause GHC to put that file in the specified directory (`autogen-stubs`).
+will cause GHC to put that file in the specified directory (`autogen-stubs`, in
+this example).
+
+!!! info
+
+    If GHC's `-stubdir` option is omitted, GHC will put the generated C header
+    file together with the other build artefacts for the module. However, that
+    location cannot be specified reliably using the `install-dirs` key.
 
 That generated C header file will have content like:
 ~~~c
@@ -209,8 +218,8 @@ extern HsInt myMax(HsInt a1, HsInt a2);
 #endif
 ~~~
 
-The `include-dirs` key will cause the specified directory (`autogen-stubs`) to
-be searched for C header files.
+The `include-dirs` key will cause the specified directory (again,
+`autogen-stubs` in this example) to be searched for C header files.
 
 The project's `stack.yaml` file only needs to identify a snapshot:
 ~~~yaml
