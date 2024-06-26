@@ -58,6 +58,7 @@ extra-source-files:
     doc/glossary.md
     doc/GUIDE.md
     doc/GUIDE_advanced.md
+    doc/haskell_and_c_code.md
     doc/hoogle_command.md
     doc/hpc_command.md
     doc/ide_command.md

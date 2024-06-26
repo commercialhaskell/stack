@@ -29,31 +29,23 @@ int max(int x1, int x2) {
 }
 ~~~
 
-A different `src/Lib.hs` Haskell module, including a Haskell foreign import
-declaration making use of the C `max` function:
+A different Haskell module in source file `src/Lib.hs`, including a Haskell
+foreign import declaration making use of the C `max` function:
 ~~~haskell
-module Lib
-  ( someFunc
-  , c_max
-  ) where
-
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+module Lib ( c_max ) where
 
 foreign import ccall "max" c_max :: Int -> Int -> Int
 ~~~
 
-A different `app/Main.hs` Haskell module, making use of the Haskell `c_max`
-function now exported from module `Lib`:
+A different Haskell module in source file `app/Main.hs`, making use of the
+Haskell function `c_max` exported from module `Lib`:
 ~~~haskell
 module Main ( main ) where
 
-import Lib ( c_max, someFunc )
+import Lib ( c_max )
 
 main :: IO ()
-main = do
-  someFunc
-  print $ c_max 10 100
+main = print $ c_max 10 100
 ~~~
 
 The package's `package.yaml` file (simplied), used to create the package's
@@ -64,7 +56,6 @@ spec-version: 0.36.0
 name: c-example
 version: 0.1.0.0
 
-# Hpack 0.36.1 and earlier does not support Cabal's 'includes' field
 extra-source-files:
 - include/my-library.h
 
