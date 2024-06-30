@@ -89,6 +89,7 @@ nav:
     - Azure CI: azure_ci.md
     - Lock files: lock_files.md
     - Stack work directories: stack_work.md
+    - Haskell and C code: haskell_and_c_code.md
 - How Stack works (advanced):
   - Build overview: build_overview.md
 - Stack's code (advanced):
