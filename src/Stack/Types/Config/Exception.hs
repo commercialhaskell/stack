@@ -33,6 +33,7 @@ data ConfigException
   | UnableToExtractArchive Text (Path Abs File)
   | BadStackVersionException VersionRange
   | NoSuchDirectory FilePath
+  | NoSuchFile FilePath
   | ParseGHCVariantException String
   | BadStackRoot (Path Abs Dir)
   | Won'tCreateStackRootInDirectoryOwnedByDifferentUser
@@ -96,6 +97,11 @@ instance Exception ConfigException where
     [ "Error: [S-8773]\n"
     , "No directory could be located matching the supplied path: "
     , dir
+    ]
+  displayException (NoSuchFile file) = concat
+    [ "Error: [S-4335]\n"
+    , "No file could be located matching the supplied path: "
+    , file
     ]
   displayException (ParseGHCVariantException v) = concat
     [ "Error: [S-3938]\n"

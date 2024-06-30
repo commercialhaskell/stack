@@ -112,15 +112,20 @@ buildCmd opts = do
     prettyThrowIO GHCProfOptionInvalid
   local (over globalOptsL modifyGO) $
     case opts.fileWatch of
-      FileWatchPoll -> fileWatchPoll (inner . Just)
-      FileWatch -> fileWatch (inner . Just)
+      FileWatchPoll -> withFileWatchHook fileWatchPoll
+      FileWatch -> withFileWatchHook fileWatch
       NoFileWatch -> inner Nothing
  where
+  withFileWatchHook fileWatchAction =
+    -- This loads the full configuration in order to obtain the file-watch-hook
+    -- setting. That is likely not the most efficient approach.
+    withConfig YesReexec $ withEnvConfig NeedTargets opts $
+      fileWatchAction (inner . Just)
   inner ::
        Maybe (Set (Path Abs File) -> IO ())
     -> RIO Runner ()
   inner setLocalFiles = withConfig YesReexec $ withEnvConfig NeedTargets opts $
-      Stack.Build.build setLocalFiles
+    Stack.Build.build setLocalFiles
   -- Read the build command from the CLI and enable it to run
   modifyGO =
     case opts.command of

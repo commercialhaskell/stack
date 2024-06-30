@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2024-05-17.
+`master` branch of the Stack repository. Last updated: 2024-06-03.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -403,6 +403,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2040] | UnableToExtractArchive Text (Path Abs File)
         [S-1641] | BadStackVersionException VersionRange
         [S-8773] | NoSuchDirectory FilePath
+        [S-4335] | NoSuchFile FilePath
         [S-3938] | ParseGHCVariantException String
         [S-8530] | BadStackRoot (Path Abs Dir)
         [S-7613] | Won'tCreateStackRootInDirectoryOwnedByDifferentUser (Path Abs Dir) (Path Abs Dir)

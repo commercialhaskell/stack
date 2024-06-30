@@ -1111,6 +1111,21 @@ Other paths added by Stack - things like the project's binary directory and the
 compiler's binary directory - will take precedence over those specified here
 (the automatic paths get prepended).
 
+### file-watch-hook
+
+:octicons-tag-24: UNRELEASED
+
+Specifies the location of an executable or `sh` shell script to be run after
+each attempted build with
+[`build --file-watch`](build_command.md#-file-watch-flag). An absolute or
+relative path can be specified. Changes to the configuration after the
+initial `build --file-watch` command are ignored.
+
+If the project-level configuration is provided in the `global-project` directory
+in the [Stack root](stack_root.md), a relative path is assumed to be relative to
+the current directory. Otherwise, it is assumed to be relative to the directory
+of the project-level configuration file.
+
 ### ghc-build
 
 [:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0)
@@ -2137,4 +2152,35 @@ case $HOOK_GHC_TYPE in
         exit 2
         ;;
 esac
+~~~
+
+### `--file-watch` post-processing
+
+:octicons-tag-24: UNRELEASED
+
+On Unix-like operating systems and Windows, Stack's `build --file-watch`
+post-processing can be fully customised by specifying an executable or a `sh`
+shell script (a 'hook') using the [`file-watch-hook`](#file-watch-hook)
+configuration option. On Unix-like operating systems, the script file must be
+made executable. A script is run by the `sh` application (which is provided by
+MSYS2 on Windows).
+
+The following environment variables are always available to the executable or script:
+
+* `HOOK_FW_RESULT` (Equal to `""` if the build did not fail. Equal to the result
+  of `displayException e`, if exception `e` thown during the build.)
+
+An example script is:
+
+~~~sh
+#!/bin/sh
+
+set -eu
+
+if [ -z "$HOOK_FW_RESULT" ]; then
+  echo "Success! Waiting for next file change."
+else
+  echo "Build failed with exception:"
+  echo $HOOK_FW_RESULT
+fi
 ~~~

@@ -68,6 +68,9 @@ Other enhancements:
 * Add the `ls globals` command to list all global packages for the version of
   GHC specified by the snapshot.
 * Add `stack -h` (equivalent to `stack --help`).
+* In YAML configuration files, the `file-watch-hook` key is introduced to allow
+  `--file-watch` post-processing to be customised with a executable or `sh`
+  shell script.
 
 Bug fixes:
 

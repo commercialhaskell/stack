@@ -72,7 +72,7 @@ import           Path.IO
                    ( XdgDirectory (..), canonicalizePath, doesFileExist
                    , ensureDir, forgivingAbsence, getAppUserDataDir
                    , getCurrentDir, getXdgDir, resolveDir, resolveDir'
-                   , resolveFile'
+                   , resolveFile, resolveFile'
                    )
 import           RIO.List ( unzip )
 import           RIO.Process
@@ -381,6 +381,23 @@ configFromConfigMonoid
           -- resolveDirMaybe.
           `catchAny`
           const (throwIO (NoSuchDirectory userPath))
+    fileWatchHook <-
+      case getFirst configMonoid.fileWatchHook of
+        Nothing -> pure Nothing
+        Just userPath ->
+          ( case mproject of
+              -- Not in a project
+              Nothing -> Just <$> resolveFile' userPath
+              -- Resolves to the project dir and appends the user path if it is
+              -- relative
+              Just (_, configYaml) ->
+                Just <$> resolveFile (parent configYaml) userPath
+          )
+          -- TODO: Either catch specific exceptions or add a
+          -- parseRelAsAbsFileMaybe utility and use it along with
+          -- resolveFileMaybe.
+          `catchAny`
+          const (throwIO (NoSuchFile userPath))
     jobs <-
       case getFirst configMonoid.jobs of
         Nothing -> liftIO getNumProcessors
@@ -539,6 +556,7 @@ configFromConfigMonoid
                 , compilerCheck
                 , compilerRepository
                 , localBin
+                , fileWatchHook
                 , requireStackVersion
                 , jobs
                 , overrideGccPath
