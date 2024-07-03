@@ -169,17 +169,28 @@ fileWatchConf cfg inner = do
       case mHook of
         Nothing -> defaultAction
         Just hook -> do
-          hookIsExecutable <- handleIO (\_ -> pure False) $ if osIsWindows
-            then
-              -- can't really detect executable on windows, only file extension
-              doesFileExist hook
-            else executable <$> getPermissions hook
-          if hookIsExecutable
-            then runFileWatchHook eres hook
-            else do
-              prettyWarn $
-                flow "File watch hook not executable. Falling back on default."
-              defaultAction
+          hookExists <- handleIO (\_ -> pure False) $ doesFileExist hook
+          if hookExists
+            then do
+              hookIsExecutable <- handleIO (\_ -> pure False) $ if osIsWindows
+                then
+                  -- can't really detect executable on windows, only file extension
+                  pure hookExists
+                else executable <$> getPermissions hook
+              if hookIsExecutable
+                then runFileWatchHook eres hook
+                else defaultWithWarning "not executable"
+            else defaultWithWarning "not found"
+         where
+          defaultWithWarning reason = do
+            prettyWarnL
+              [ flow "File watch hook"
+              , pretty hook
+              , reason <> "."
+              , flow "Falling back on default."
+              ]
+            defaultAction
+
 
       prettyInfoL
         [ "Type"
