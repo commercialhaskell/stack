@@ -134,6 +134,12 @@ executables:
     dependencies: c-example
 ~~~
 
+!!! warning
+
+    `Cabal-3.12.0.0`, a boot package of GHC 9.10.1, ignores `source-dirs` when
+    the `main` file is not a Haskell source code file. This was a regression and
+    fixed in subsequent versions of Cabal (the library).
+
 A Haskell module souce file named `Lib.hs` in directory `src`:
 ~~~haskell
 module Lib
