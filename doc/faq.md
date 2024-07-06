@@ -9,7 +9,7 @@ here is to be as helpful and concise as possible.
 ## What version of GHC is used when I run something like `stack ghci`?
 
 The version of GHC, as well as which packages can be installed, are specified by
-the _snapshot_. This may be something like `lts-22.21`, which is from
+the _snapshot_. This may be something like `lts-22.28`, which is from
 [Stackage](https://www.stackage.org/). The [user's guide](GUIDE.md) discusses
 the snapshot in more detail.
 
@@ -76,7 +76,7 @@ You can make tweaks to a snapshot by modifying the `extra-deps` configuration
 value in your `stack.yaml` file, e.g.:
 
 ~~~yaml
-snapshot: lts-22.21
+snapshot: lts-22.28
 packages:
 - .
 extra-deps:
@@ -91,7 +91,7 @@ Add it to the
 directory where your `stack.yaml` file lives, e.g.
 
 ~~~yaml
-snapshot: lts-22.21
+snapshot: lts-22.28
 packages:
 - .
 extra-deps:

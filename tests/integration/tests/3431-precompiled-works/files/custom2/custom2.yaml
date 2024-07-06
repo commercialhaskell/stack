@@ -1,4 +1,4 @@
-snapshot: ghc-9.6.5
+snapshot: ghc-9.6.6
 name: custom2
 packages:
 - acme-missiles-0.2

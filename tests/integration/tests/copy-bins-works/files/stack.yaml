@@ -1,2 +1,2 @@
-snapshot: ghc-9.6.5
+snapshot: ghc-9.6.6
 copy-bins: true
