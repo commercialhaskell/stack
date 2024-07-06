@@ -40,6 +40,7 @@ Behavior changes:
 
 Other enhancements:
 
+* Bump to Hpack 0.37.0.
 * In YAML configuration files, the `msys-environment` key is introduced to
   allow, on Windows, the MSYS2 environment to be specified. The default
   environment is still `MINGW64` on 64-bit Windows and `MINGW32` on 32-bit

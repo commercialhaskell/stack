@@ -5,6 +5,8 @@ extra-deps:
 - pantry-0.10.0@sha256:6f99ee8d7cfeeb0e2513638618acf80c72d018e7f10120048fa120a409b9dcd2,7864
 # lts-22.21 provides tar-0.5.1.1, which does not support Unicode filenames:
 - tar-0.6.2.0@sha256:619828cae098a7b6deeb0316e12f55011101d88f756787ed024ceedb81cf1eba,4576
+# lts-22.21 provides hpack-0.36.0
+- hpack-0.37.0@sha256:b7c91b0416a55c134172a9fd9a02f3815ba68c4b92cca4e320c36906d5e970e0,5187
 
 docker:
   enable: false

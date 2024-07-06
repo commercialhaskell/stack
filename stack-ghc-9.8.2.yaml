@@ -1,7 +1,11 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.8.2.
 
-snapshot: nightly-2024-05-06 # GHC 9.8.2
+snapshot: nightly-2024-07-05 # GHC 9.8.2
+
+extra-deps:
+# nightly-2024-07-05 provides hpack-0.36.1
+- hpack-0.37.0@sha256:b7c91b0416a55c134172a9fd9a02f3815ba68c4b92cca4e320c36906d5e970e0,5187
 
 docker:
   enable: false
