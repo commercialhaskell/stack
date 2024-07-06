@@ -984,7 +984,7 @@ Integer indicating how many simultaneous downloads are allowed to happen.
 
 ### default-init-snapshot
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
 Default: As for the [`stack init`](init_command.md) command when no snapshot is
 specified at the command line.
@@ -1113,7 +1113,7 @@ compiler's binary directory - will take precedence over those specified here
 
 ### file-watch-hook
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
 Specifies the location of an executable or `sh` shell script to be run after
 each attempted build with
@@ -1218,7 +1218,7 @@ This option is incompatible with `system-ghc: true`.
 
 ### global-hints-location
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
 Default:
 
@@ -1296,7 +1296,7 @@ Template Haskell.
 
 ### hpack-force
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
 Default: `false`
 
@@ -1411,7 +1411,7 @@ modify-code-page: false
 
 ### msys-environment
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
 Restrictions: Windows systems only.
 
@@ -2156,7 +2156,7 @@ esac
 
 ### `--file-watch` post-processing
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
 On Unix-like operating systems and Windows, Stack's `build --file-watch`
 post-processing can be fully customised by specifying an executable or a `sh`

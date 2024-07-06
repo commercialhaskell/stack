@@ -87,7 +87,7 @@ specific configuration [option](yaml_configuration.md#ghc-variant).
 
 ## `--[no-]hpack-force` flag
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
 Default: Disabled
 

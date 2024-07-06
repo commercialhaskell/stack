@@ -638,7 +638,7 @@ getRecommendedSnapshots snapshots =
 -- |Yields the minimum LTS supported by Stack.
 minSupportedLts :: SnapName
 -- See https://github.com/commercialhaskell/stack/blob/master/ChangeLog.md
--- under Stack version UNRELEASED.
+-- under Stack version 3.1.1.
 minSupportedLts = LTS 12 0
 
 findCabalDirs ::

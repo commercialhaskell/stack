@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased changes
+## v3.1.0.1 (release candidate)
 
 Release notes:
+
+* The change in major version from 2.x to 3.1 marks the dropping of support for
+  versions of GHC before 8.4, deprecated in Stack 2.15.1.
 
 **Changes since v2.15.7:**
 
