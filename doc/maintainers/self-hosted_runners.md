@@ -23,8 +23,14 @@ Occasionally Oracle will turn off the machine because:
 
 ## Managing the `stack-github-action3` runner
 
-With the appropriate authority installed on the server, the runner can be
-managed remotely using SSH, with command `ssh ubuntu@arm-runner.stackage.org`.
+With the appropriate authority installed on the server, a maintainer can manage
+the runner remotely using SSH, with command
+`ssh ubuntu@arm-runner.stackage.org`.
+
+!!! info
+
+    The authority is the addition of the maintainer's SSH public key to the end
+    of file `~/.ssh/authorized_keys` on the server.
 
 This is best done using [`tmux`](https://github.com/tmux/tmux/wiki), a terminal
 multiplexer, as follows:
