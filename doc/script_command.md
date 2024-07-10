@@ -20,7 +20,7 @@ Stack root). Consequently, a snapshot must be specified on the command line
 (with the `--snapshot` option). For example:
 
 ~~~text
-stack script --snapshot lts-22.21 MyScript.hs
+stack script --snapshot lts-22.28 MyScript.hs
 ~~~
 
 !!! info
@@ -109,7 +109,7 @@ main = do
 can be compiled and run, with arguments, with:
 
 ~~~text
-stack --snapshot lts-22.21 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
+stack --snapshot lts-22.28 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
 ~~~
 
 All the compilation outputs (like `Main.hi`, `Main.o`, and the executable

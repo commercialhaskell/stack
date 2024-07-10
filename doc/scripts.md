@@ -19,7 +19,7 @@ An example will be easiest to understand. Consider the Haskell source file
 
 ~~~haskell
 #!/usr/bin/env stack
--- stack script --snapshot lts-22.21 --package turtle
+-- stack script --snapshot lts-22.28 --package turtle
 {-# LANGUAGE OverloadedStrings #-}
 import Turtle (echo)
 main = echo "Hello World!"
@@ -78,10 +78,10 @@ able to reuse everything already built).
 
 The second line of the source code is the Stack interpreter options comment. In
 this example, it specifies the [`stack script`](script_command.md) command with
-the options of a LTS Haskell 22.21 snapshot (`--snapshot lts-22.21`) and
+the options of a LTS Haskell 22.28 snapshot (`--snapshot lts-22.28`) and
 ensuring the [`turtle` package](https://hackage.haskell.org/package/turtle) is
 available (`--package turtle`). The version of the package will be that in the
-specified snapshot (`lts-22.21` provides `turtle-1.6.2`).
+specified snapshot (`lts-22.28` provides `turtle-1.6.2`).
 
 ## Arguments and interpreter options and arguments
 
@@ -116,7 +116,7 @@ For example, the command `stack MyScript.hs arg1 arg2` with `MyScript.hs`:
 ~~~haskell
 #!/usr/bin/env stack
 {- stack script
-   --snapshot lts-22.21
+   --snapshot lts-22.28
    --
    +RTS -s -RTS
 -}
@@ -132,7 +132,7 @@ main = do
 is equivalent to the following command at the command line:
 
 ~~~text
-stack script --snapshot lts-22.21 -- MyScript.hs arg1 arg2 +RTS -s -RTS
+stack script --snapshot lts-22.28 -- MyScript.hs arg1 arg2 +RTS -s -RTS
 ~~~
 
 where `+RTS -s -RTS` are some of GHC's
@@ -161,7 +161,7 @@ providing a comma or space separated list. For example:
 ~~~haskell
 #!/usr/bin/env stack
 {- stack script
-   --snapshot lts-22.21
+   --snapshot lts-22.28
    --package turtle
    --package "stm async"
    --package http-client,http-conduit
@@ -202,7 +202,7 @@ which makes use of the joke package
 
 ~~~haskell
 {- stack script
-   --snapshot lts-22.21
+   --snapshot lts-22.28
    --package acme-missiles
 -}
 import Acme.Missiles (launchMissiles)
@@ -213,7 +213,7 @@ main = launchMissiles
 
 The command `stack --script-no-run-compile Script.hs` then behaves as if the
 command
-`stack script --snapshot lts-22.21 --package acme-missiles --no-run --compile -- Script.hs`
+`stack script --snapshot lts-22.28 --package acme-missiles --no-run --compile -- Script.hs`
 had been given. `Script.hs` is compiled (without optimisation) and the resulting
 executable is not run: no missiles are launched in the process!
 
@@ -252,7 +252,7 @@ here is an example with [`stack runghc`](runghc_command.md):
 {- stack
   runghc
   --install-ghc
-  --snapshot lts-22.21
+  --snapshot lts-22.28
   --package base
   --package turtle
   --
@@ -276,7 +276,7 @@ it. Here is an example:
 {- stack
    exec ghci
    --install-ghc
-   --snapshot lts-22.21
+   --snapshot lts-22.28
    --package turtle
 -}
 ~~~

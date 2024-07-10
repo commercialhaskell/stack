@@ -1,7 +1,7 @@
 import StackTest
 import Control.Monad ( unless )
 
--- This does not work on Windows with snapshot: ghc-9.6.5 (Cabal-3.10.3.0). It
+-- This does not work on Windows with snapshot: ghc-9.6.6 (Cabal-3.10.3.0). It
 -- fails witb:
 --
 -- Preprocessing foreign library 'baz' for files-0.1.0.0..
@@ -12,7 +12,7 @@ import Control.Monad ( unless )
 -- lld: error: unknown argument: -rpath
 -- lld: error: unknown argument: -rpath
 -- clang: error: linker command failed with exit code 1 (use -v to see invocation)
--- ghc-9.6.5.exe: `clang.exe' failed in phase `Linker'. (Exit code: 1)
+-- ghc-9.6.6.exe: `clang.exe' failed in phase `Linker'. (Exit code: 1)
 --
 -- The above is a regression from snapshot: ghc-9.6.4 (Cabal-3.10.1.0). See
 -- https://github.com/haskell/cabal/issues/9982.

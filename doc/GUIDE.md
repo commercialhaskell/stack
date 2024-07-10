@@ -258,7 +258,7 @@ packages:
 The value of the [`resolver`](yaml_configuration.md#resolver) key tells Stack
 *how* to build your package: which GHC version to use, versions of package
 dependencies, and so on. Our value here says to use
-[LTS Haskell 22.21](https://www.stackage.org/lts-22.21), which implies GHC 9.6.5
+[LTS Haskell 22.28](https://www.stackage.org/lts-22.28), which implies GHC 9.6.6
 (which is why `stack build` installs that version of GHC if it is not already
 available to Stack). There are a number of values you can use for `resolver`,
 which we'll cover later.
@@ -528,13 +528,13 @@ towards by default as well).
 Let's explore package sets a bit further. Instead of `lts-22.13`, let's change
 our `stack.yaml` file to use the
 [latest nightly](https://www.stackage.org/nightly). Right now, this is currently
-2024-03-20 - please see the snapshot from the link above to get the latest.
+2024-07-05 - please see the snapshot from the link above to get the latest.
 
 Then, commanding `stack build` again will produce:
 
 ~~~text
 stack build
-# Downloaded nightly-2024-03-20 build plan.
+# Downloaded nightly-2024-07-05 build plan.
 # build output ...
 ~~~
 
@@ -542,8 +542,8 @@ We can also change snapshots on the command line, which can be useful in a
 Continuous Integration (CI) setting, like on Travis. For example, command:
 
 ~~~text
-stack --snapshot lts-21.25 build
-# Downloaded lts-21.25 build plan.
+stack --snapshot lts-22.27 build
+# Downloaded lts-22.27 build plan.
 # build output ...
 ~~~
 
@@ -982,7 +982,7 @@ stack purge
 stack build :helloworld-test
 helloworld> configure (lib + test)
 Configuring helloworld-0.1.0.0...
-helloworld> build (lib + test) with ghc-9.6.5
+helloworld> build (lib + test) with ghc-9.6.6
 Preprocessing library for helloworld-0.1.0.0..
 Building library for helloworld-0.1.0.0..
 [1 of 2] Compiling Lib
@@ -1300,7 +1300,7 @@ yields output like:
 
 ~~~text
 Run from outside a project, using implicit global project config
-Using latest snapshot resolver: lts-22.21
+Using latest snapshot resolver: lts-22.28
 Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
 Note: You can change the snapshot via the resolver field there.
 I installed the stm package via --package stm
