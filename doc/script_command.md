@@ -206,7 +206,7 @@ snapshot as an extra-dep. The `stack script` command is specified using Stack's
 
 ~~~haskell
 {- stack script
-   -- snapshot lts-22.21
+   -- snapshot lts-22.28
    -- extra-dep acme-missiles-0.2
    -- package acme-missiles
 -}
@@ -308,7 +308,7 @@ A Haskell source file `MyScript.hs`, as follows:
 
 ~~~haskell
 {- stack script
-   --snapshot lts-22.21
+   --snapshot lts-22.28
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
