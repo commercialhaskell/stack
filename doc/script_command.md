@@ -4,7 +4,7 @@
 
 ~~~text
 stack script [--package PACKAGE] FILE
-             [-- ARGUMENT(S) (e.g. stack script X.hs -- argument(s) to program)]
+             [-- ARGUMENT(S) (e.g. stack script X.hs -- argument(s) to program).]
              [--compile | --optimize] [--[no-]use-root] [--ghc-options OPTIONS]
              [--extra-dep PACKAGE-VERSION] [--no-run]
 ~~~
@@ -13,64 +13,132 @@ The `stack script` command either runs a specified Haskell source file (using
 GHC's `runghc`) or, optionally, compiles such a file (using GHC) and, by
 default, runs it.
 
-Unlike the [`stack ghc`](ghc_command.md) and [`stack runghc`](runghc_command.md)
-commands, the command ignores any project-level configuration file
-(`stack.yaml`, by default) (including in the `global-project` directory in the
-Stack root). Consequently, a snapshot must be specified on the command line
-(with the `--snapshot` option). For example:
+## Global configuration files
+
+Non-project level configuration options in global configuration files
+(`config.yaml`) are not ignored by the `stack script` command.
+
+!!! info
+
+    Non-project level configuration options may be useful if
+    [`allow-newer`](yaml_configuration.md#allow-newer) and/or
+    [`allow-newer-deps`](yaml_configuration.md#allow-newer-deps) are required.
+
+## Project-level configuration file
+
+The `stack script` command ignores any project-level configuration file
+(`stack.yaml`, by default), including in the `global-project` directory in the
+Stack root.
+
+!!! info
+
+    The `stack script` command can be contrasted with the
+    [`stack ghc`](ghc_command.md) and [`stack runghc`](runghc_command.md)
+    commands, which do not ignore any project-level configuration file.
+
+## GHC
+
+The `stack script` command behaves as if the
+[`--install-ghc`](global_flags.md#--no-install-ghc-flag) flag had been passed at
+the command line.
+
+## Snapshot and extra-deps
+
+A snapshot must be specified on the command line, using the `--snapshot` option.
+For example:
 
 ~~~text
 stack script --snapshot lts-22.28 MyScript.hs
 ~~~
 
-!!! info
-
-    Non-project level configuration options in global configuration files
-    (`config.yaml`), are not ignored by the `stack script` command. Such options
-    may be useful if [`allow-newer`](yaml_configuration.md#allow-newer) and/or
-    [`allow-newer-deps`](yaml_configuration.md#allow-newer-deps) are required.
-
-The `stack script` command behaves as if the `--install-ghc` flag had been
-passed at the command line.
-
-Everything after `--` on the command line is interpreted as a command line
-argument to be passed to what is run.
-
-A package can be added to the snapshot on the command line with the
+A package version can be added to the snapshot on the command line with the
 `--extra-dep` option (which can be specified multiple times).
 
-Each required package can be specified by name on the command line with the
-`--package` option (which can be specified multiple times). A single `--package`
-option can also refer to a list of package names, separated by a space or comma
-character. If the package is not in the snapshot, the most recent version in the
-package index (e.g. Hackage) will be obtained.
+GHC boot packages that have been 'replaced' (see further below) can be specified
+as an `--extra-dep`.
 
-If no packages are specified in that way, all the required packages that are in
-the snapshot or are a GHC boot package (packages that come with GHC and are
-included in GHC's global package database) will be deduced by reference to the
-`import` statements in the source file. The `base` package associated with the
-version of GHC specified by the snapshot is always available.
+## Required packages
+
+The names of required packages can be either deduced or specified.
+
+The `base` package associated with the version of GHC specified by the snapshot
+is always available.
+
+If no packages are specified, all the required packages that are in the snapshot
+or are a GHC boot package (packages that come with GHC and are included in GHC's
+global package database), will be deduced by reference to the `import`
+statements in the source file. In that regard, Stack assumes that:
+
+* a line that begins `import` is an `import` statement;
+* `import` may be followed by `qualified` on the same line;
+* consistent with GHC's
+  [`PackageImports`](https://downloads.haskell.org/ghc/latest/docs/users_guide/exts/package_qualified_imports.html)
+  language extension, that if `import` or `import qualified` is followed by
+  `"<name>"` on the same line, that `<name>` is the name of a required package;
+* otherwise, `import` or `import qualified` is followed by the module name on
+  the same line. Stack will not deduce the names of hidden packages from
+  module names or the names of blacklisted packages.
+
+!!! note
+
+    The first time that Stack deduces package names from module names can take
+    some time. Use the `--verbose` option to understand Stack's progress.
+
+!!! info
+
+    Certain packages are blacklisted because they expose one or more modules
+    with names that are the same as modules exposed by more popular packages.
+    The blacklisted packages are `Glob`, `HTF`, `async-dejafu`,
+    `binary-ieee754`, `cipher-aes`, `cipher-blowfish`, `cipher-camellia`,
+    `cipher-des`, `cipher-rc4`, `control-monad-free`, `courier`, `crypto-api`,
+    `crypto-cipher-types`, `crypto-numbers`, `crypto-pubkey`, `crypto-random`,
+    `cryptohash`, `cryptohash-conduit`, `cryptohash-md5`, `cryptohash-sha1`,
+    `cryptohash-sha256`, `fay-base`, `gl`, `gtk3`, `hashmap`, `hledger-web`,
+    `hxt-unicode`, `kawhi`, `language-c`, `log`, `monad-extras`, `monads-tf`,
+    `nanospec`, `newtype-generics`, `objective`, `plot-gtk3`, `prompt`,
+    `regex-compat-tdfa`, `regex-pcre-builtin`, `rerebase`, `svg-tree` and `zip`.
+
+Alternatively, each required package can be specified by name on the command
+line with the `--package` option (which can be specified multiple times). A
+single `--package` option can also refer to a list of package names, separated
+by a space or comma character. If the package is not in the snapshot, the most
+recent version in the package index (e.g. Hackage) will be obtained.
 
 If a required package is a GHC boot package, the behaviour can be complex. If
 the boot package has not been 'replaced', then it will be used in Stack's build
 plan. However, if the boot package has been 'replaced', the latest version of
 that package in the package index will be used in Stack's build plan, which may
 differ from the version provided by the version of GHC specified by the
-snapshot. A boot package will be treated as 'replaced' if the package i
+snapshot. A boot package will be treated as 'replaced' if the package is
 included directly in the Stackage snapshot or it depends on a package included
 directly in the snapshot. Stackage snapshots do not include directly most boot
 packages but some snapshots may include directly some boot packages. In
 particular, some snapshots include directly `Win32` (which is a boot package on
-Windows) while others do not. For example, if `Cabal` (a boot package) is a
-required package then, with Stackage snapshot LTS Haskell 20.25, Stack will:
+Windows) while others do not.
 
-* on Windows, try to construct a build plan based on the latest version of
-  `Cabal` in the package index (because that snapshot includes `Win32` directly,
-  and `Cabal` depends on `Win32` and so is treated as 'replaced'); and
-* on non-Windows, use the boot package in the build plan (because `Cabal` is not
-  'replaced').
+!!! warning
 
-Boot packages that have been 'replaced' can be specified as an `--extra-dep`.
+    GHC has the concept of 'installed packages' (which differ from 'Cabal
+    packages') in package databases. An installed package has a name. An
+    installed package corresponding to the main (unnamed) library of a Cabal
+    package has the same name as the Cabal package. An installed package
+    corresponding to a sub-library of a Cabal package has a 'munged' name that
+    reflects the name of the Cabal package and the name of the sub-library. An
+    installed package corresponding to a sub-library also has a `package-name`,
+    which is the name of the Cabal package.
+
+    The `--package` option of `stack script` makes use of GHC's `-package`
+    option to expose an installed package. Unfortunately, the latter treats
+    `package-name` (if it exists) as if it were also the name of the installed
+    package. That means, for a Cabal package with one or more sub-libraries, the
+    GHC option `-package=<name>` cannot distinguish between (a) the installed
+    package `<name>` corresponding to the main library of Cabal package `<name>`
+    and (b) an installed package corresponding to a sub-library of that Cabal
+    package. The installed package that GHC picks to expose is indeterminate.
+    This can cause GHC to pick the wrong installed package and to report that it
+    cannot load a module because it is a member of a hidden package.
+
+## Compilation
 
 The source file can be compiled by passing either the `--compile` flag (no
 optimization) or the `--optimize` flag (compilation with optimization). If the
@@ -83,11 +151,20 @@ outputs to a script-specific location in the `scripts` directory of the Stack
 root. The location reflects the absolute path to the source file, but ignoring
 the drive. This can avoid clutter in the source file directory.
 
+## GHC options
+
 Additional options can be passed to GHC using the `--ghc-options` option.
+
+## Script arguments
+
+Everything after `--` on the command line is interpreted as a command line
+argument to be passed to what is run.
 
 ## Examples
 
-For example, Haskell source file `MyScript.hs` at location
+### Example 1
+
+A Haskell source file `MyScript.hs` at location
 `<drive>Users/jane/my-project` (where `<drive>` could be `/` on Unix-like
 operating systems or `C:/` or similar on Windows):
 
@@ -112,6 +189,8 @@ can be compiled and run, with arguments, with:
 stack --snapshot lts-22.28 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
 ~~~
 
+`acme-missiles-0.3` (the most recent version in the package index) will be used.
+
 All the compilation outputs (like `Main.hi`, `Main.o`, and the executable
 `MyScript`) will be written to the `my-project` directory.
 
@@ -119,16 +198,54 @@ If compiled and run with the additional flag `--use-root`, all the compilation
 outputs will be written to a directory named `MyScript.hs` at
 `Users/jane/my-project/` in the `scripts` directory of the Stack root.
 
-For example, consider the following script extract, based on snapshot Stackage
-LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
+### Example 2
+
+As for Example 1, but `acme-missiles-0.2` is specified by adding it to the
+snapshot as an extra-dep. The `stack script` command is specified using Stack's
+[script interpreter](scripts.md).
+
+~~~haskell
+{- stack script
+   -- snapshot lts-22.21
+   -- extra-dep acme-missiles-0.2
+   -- package acme-missiles
+-}
+module Main (main) where
+
+import Data.List (intercalate)
+import System.Environment (getArgs)
+
+import Acme.Missiles (launchMissiles)
+
+main :: IO ()
+main = do
+  advices <- getArgs
+  launchMissiles
+  putStrLn $ intercalate "\n" advices
+~~~
+
+~~~text
+stack MyScript.hs "Don't panic!" "Duck and cover!"
+~~~
+
+### Example 3
+
+Stackage snapshot LTS Haskell 20.25 includes GHC boot package `Win32` directly.
+On Windows only, GHC boot packages `Cabal`, `directory`, `process` and `time`
+all depend on `Win32` and, consequently, are all treated as 'replaced'.
+Consequently, for example, Stack will:
+
+* on Windows, try to construct a build plan based on the latest version of
+  `Cabal` in the package index; and
+* on non-Windows, use the boot package in the build plan (because `Cabal` is not
+  'replaced').
+
+Consider also the following script extract, based on snapshot Stackage
+ LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
 `stack script` command is specified using Stack's
 [script interpreter](scripts.md).
 
 === "Windows"
-
-    The snapshot includes `Win32` directly. As a consequence, GHC boot packages
-    `directory`, `process` and `time` (which depend on `Win32`) are all treated
-    as 'replaced'.
 
     ~~~haskell
     {- stack script
@@ -184,3 +301,28 @@ LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
 
     All the other dependencies required are either GHC boot packages (which have
     not been 'replaced') or in the snapshot.
+
+### Example 4
+
+A Haskell source file `MyScript.hs`, as follows:
+
+~~~haskell
+{- stack script
+   --snapshot lts-22.21
+-}
+
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports    #-}
+
+module Main (main) where
+
+import "text" Data.Text (Text (..), unpack)
+
+main :: IO ()
+main = putStrLn $ unpack "This is text."
+~~~
+
+As module `Data.Text` is exposed by a number of packages that are included,
+directly or indirectly, in the specified snapshot (`incipit-base`,
+`incipit-core`, `relude` and `text`), `PackageImports` and `"text"` are required
+to specify which module is being imported.

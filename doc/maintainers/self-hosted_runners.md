@@ -21,6 +21,9 @@ Occasionally Oracle will turn off the machine because:
 * Oracle thinks it is not being used (because of the free tier); and/or
 * other things, like disk space filling up.
 
+The disk space can fill up due to obsolete Docker images, versions of GHC
+installed by Stack or obsolete snapshots created by Stack.
+
 ## Managing the `stack-github-action3` runner
 
 With the appropriate authority installed on the server, a maintainer can manage
