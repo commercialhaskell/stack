@@ -14,6 +14,10 @@ Other enhancements:
 
 Bug fixes:
 
+* Fix a regression, introduced in Stack 2.15.7, that caused GHC 8.10.7 or
+  earlier to fail to build a package with a `Custom` build type, if GHC option
+  `-haddock` was specified.
+
 ## v3.1.1 - 2024-07-05
 
 Release notes:

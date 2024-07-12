@@ -3,14 +3,14 @@
 
 module StackSetupShim where
 
--- | Stack no longer supports Cabal < 2.2 and, consequently, GHC versions before
+-- Stack no longer supports Cabal < 2.2 and, consequently, GHC versions before
 -- GHC 8.4 or base < 4.11.0.0. Consequently, we do not need to test for the
 -- existence of the MIN_VERSION_Cabal macro (provided from GHC 8.0).
 
 import Data.List ( stripPrefix )
 import Distribution.ReadE ( ReadE (..) )
 import Distribution.Simple.Configure ( getPersistBuildConfig )
--- | Temporary, can be removed if initialBuildSteps restored to Cabal's API.
+-- Temporary, can be removed if initialBuildSteps restored to Cabal's API.
 #if MIN_VERSION_Cabal(3,11,0)
 import Distribution.Simple.Build ( writeBuiltinAutogenFiles )
 #else
@@ -19,7 +19,7 @@ import Distribution.Simple.Build ( initialBuildSteps )
 #if MIN_VERSION_Cabal(3,11,0)
 import Distribution.Simple.Errors ( exceptionMessage )
 #endif
--- | Temporary, can be removed if initialBuildSteps restored to Cabal's API.
+-- Temporary, can be removed if initialBuildSteps restored to Cabal's API.
 #if MIN_VERSION_Cabal(3,11,0)
 import Distribution.Simple.LocalBuildInfo
          ( componentBuildDir, withAllComponentsInBuildOrder )
@@ -41,7 +41,7 @@ import Distribution.Types.GenericPackageDescription
 import "Cabal" Distribution.Types.GenericPackageDescription
          ( GenericPackageDescription (..) )
 #endif
--- | Temporary, can be removed if initialBuildSteps restored to Cabal's API.
+-- Temporary, can be removed if initialBuildSteps restored to Cabal's API.
 #if MIN_VERSION_Cabal(3,11,0)
 import Distribution.Types.ComponentLocalBuildInfo ( ComponentLocalBuildInfo )
 import Distribution.Types.LocalBuildInfo ( LocalBuildInfo )
