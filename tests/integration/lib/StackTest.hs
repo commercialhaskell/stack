@@ -362,7 +362,7 @@ isMacOSX = os == "darwin"
 -- the main @stack.yaml@.
 --
 defaultSnapshotArg :: String
-defaultSnapshotArg = "--snapshot=lts-22.21"
+defaultSnapshotArg = "--snapshot=lts-22.28"
 
 -- | Remove a file and ignore any warnings about missing files.
 removeFileIgnore :: HasCallStack => FilePath -> IO ()

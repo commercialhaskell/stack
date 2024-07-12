@@ -203,7 +203,7 @@ jobs:
       run: |
         set -ex
 
-        # As of 19 August 2023, the self-hosted runner comes with Stack 2.11.1,
+        # As of 11 July 2024, the self-hosted runner comes with Stack 2.15.7,
         # but it is not on the PATH. Logging the version for information.
         /usr/local/bin/stack --version
 
@@ -214,7 +214,7 @@ jobs:
       run: |
         # Stack's project-level configuration (stack.yaml) specifies the
         # multi-architecture (including Linux/Aarch64) Docker image published by
-        # Oliver Benz (@benz0li, on GitHub). That image comes with Stack 2.11.1.
+        # Oliver Benz (@benz0li, on GitHub). That image comes with Stack 2.15.7.
         # (Note that the online documentation for '--docker-stack-exe image'
         # specifies that the host Stack and image Stack must have the same
         # version number.)

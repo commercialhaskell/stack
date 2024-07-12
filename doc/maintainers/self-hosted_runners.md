@@ -21,10 +21,39 @@ Occasionally Oracle will turn off the machine because:
 * Oracle thinks it is not being used (because of the free tier); and/or
 * other things, like disk space filling up.
 
+The disk space can fill up due to obsolete Docker images, versions of GHC
+installed by Stack or obsolete snapshots created by Stack.
+
 ## Managing the `stack-github-action3` runner
 
-With the appropriate authority installed on the server, the runner can be
-managed remotely using SSH, with command `ssh ubuntu@arm-runner.stackage.org`.
+With the appropriate authority installed on the server, a maintainer can manage
+the runner remotely using SSH, with command
+`ssh ubuntu@arm-runner.stackage.org`.
+
+!!! info
+
+    The authority is the addition of the maintainer's SSH public key to the end
+    of file `~/.ssh/authorized_keys` on the server.
+
+This is best done using [`tmux`](https://github.com/tmux/tmux/wiki), a terminal
+multiplexer, as follows:
+~~~sh
+$ # In a shell, command tmux to create a new session with a single window with a
+$ # single pane (a pseudo terminal). The session will be displayed on the screen
+$ # by a client:
+$ tmux new-session
+$ # Send the following command to that pseudo terminal, to connect to the
+$ # remote host:
+$ ssh ubuntu@arm-runner.stackage.org
+$ # In the remote host, change to the actions-runner directory:
+$ cd actions-runner
+$ # In the remote host, start the runner:
+$ ./run.sh
+$ # Detach the current client from the session by the key combination of
+$ # 'C-b' 'd' (where 'C-b' is CTRL+b). The session will continue to run in the
+$ # background:
+$ C-b d
+~~~
 
 The available disk space can be queried with command `df -h`; the relevant entry
 is for filesystem `/dev/sda1`.

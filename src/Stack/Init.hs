@@ -426,15 +426,15 @@ renderStackYaml p ignoredPackages dupPackages =
     , "A snapshot resolver dictates the compiler version and the set of packages"
     , "to be used for project dependencies. For example:"
     , ""
-    , "snapshot: lts-22.21"
-    , "snapshot: nightly-2024-05-06"
-    , "snapshot: ghc-9.6.5"
+    , "snapshot: lts-22.28"
+    , "snapshot: nightly-2024-07-05"
+    , "snapshot: ghc-9.6.6"
     , ""
     , "The location of a snapshot can be provided as a file or url. Stack assumes"
     , "a snapshot provided as a file might change, whereas a url resource does not."
     , ""
     , "snapshot: ./custom-snapshot.yaml"
-    , "snapshot: https://example.com/snapshots/2023-01-01.yaml"
+    , "snapshot: https://example.com/snapshots/2024-01-01.yaml"
     ]
   userMsgHelp = commentHelp
     [ "A warning or info to be displayed to the user on config load." ]

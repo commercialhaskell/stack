@@ -3,8 +3,8 @@
   "build": {
     "dockerfile": "GHC.Dockerfile",
     "args": {
-      "GHC_VERSION": "9.6.5",
-      "HLS_VERSION": "2.8.0.0",
+      "GHC_VERSION": "9.6.6",
+      "HLS_VERSION": "2.9.0.1",
       "USE_ZSH_FOR_ROOT": "unset-to-use-ash",
       "SET_LANG": "C.UTF-8",
       "SET_TZ": ""
@@ -12,7 +12,7 @@
   },
 
   "onCreateCommand": "onCreateCommand.sh",
-  "postCreateCommand": "cabal update",
+  "postCreateCommand": "postCreateCommand.sh",
 
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
