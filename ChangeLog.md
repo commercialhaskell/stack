@@ -12,6 +12,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Add flag `--[no-]allow-newer` to Stack's `build` command, which takes
+  precedence over the existing `allow-newer` configuration option.
+
 Bug fixes:
 
 * Fix a regression, introduced in Stack 2.15.7, that caused GHC 8.10.7 or
