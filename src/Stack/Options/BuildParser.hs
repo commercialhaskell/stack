@@ -15,10 +15,12 @@ import           Options.Applicative
                    , metavar, option, strOption, switch, value
                    )
 import           Options.Applicative.Args ( cmdOption )
-import           Options.Applicative.Builder.Extra ( textArgument, textOption )
+import           Options.Applicative.Builder.Extra
+                   ( firstBoolFlagsNoDefault, textArgument, textOption )
 import           Stack.Options.Completion
                    ( flagCompleter, ghcOptsCompleter, targetCompleter )
 import           Stack.Options.PackageParser ( readFlag )
+import           Stack.Options.Utils ( hideMods )
 import           Stack.Prelude
 import           Stack.Types.BuildOptsCLI
                    ( ApplyCLIFlag, BuildCommand, BuildOptsCLI (..)
@@ -61,6 +63,10 @@ buildOptsParser cmd = BuildOptsCLI
       )
   <*> progsOptionsParser
   <*> flagsParser
+  <*> firstBoolFlagsNoDefault
+        "allow-newer"
+        "ignoring of lower and upper version bounds in Cabal files."
+        (hideMods False)
   <*> (   flag' BSOnlyDependencies
             (  long "dependencies-only"
             <> help "A synonym for --only-dependencies."

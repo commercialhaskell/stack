@@ -216,6 +216,21 @@ of the Cabal build process (for further information, see the documentation for
 the [configure-options](yaml_configuration.md#configure-options) configuration
 option).
 
+### `--[no-]allow-newer` flag
+
+:octicons-tag-24: UNRELEASED
+
+Overrides: [`allow-newer`](yaml_configuration.md#allow-newer) non-project
+specific configuration option
+
+Pass the flag to enable or disable the ignoring of lower and upper version
+bounds in Cabal files.
+
+!!! info
+
+    The name `allow-newer` was chosen to match a commonly-used Cabal option
+    which ignored only upper version bounds.
+
 ### `--bench` flag
 
 Pass the flag to add benchmark components to the targets, if specific components
