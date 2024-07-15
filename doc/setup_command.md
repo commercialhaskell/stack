@@ -43,7 +43,7 @@ command are inconsistent and take no action.
     required on Linux, Stack will refer to the presence or absence of certain
     libraries or the versions of those libraries.
 
-    For example, Stack 2.15.7 considers:
+    For example, Stack 3.1.1 considers:
 
     *   If `libc.musl-x86_64.so.1` is present. This file is provided by the
         [musl libc](https://musl.libc.org/).
@@ -67,7 +67,7 @@ command are inconsistent and take no action.
         provided by different versions of a shared low-level terminfo library
         for terminal handling.
 
-    Stack 2.15.7 uses `ghc-build`:
+    Stack 3.1.1 uses `ghc-build`:
 
     * `musl` to indicate `libc.musl-x86_64.so.1` is present and Stack should use
        the GHC binary distribution for Alpine Linux.
