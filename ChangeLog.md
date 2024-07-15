@@ -383,6 +383,11 @@ Behavior changes:
 * On Windows, `stack upgrade` does not offer `sudo` command alternatives if
   attempting to write to the original file name of the running Stack exectuable
   results in a 'Permission' error.
+* On Linux, Stack's `setup` command now distinguishes GHC build
+  `tinfo6-libc6-pre232` from existing `tinfo6`. The former refers to systems
+  where the version of `libc6` (the GNU C Library) is not compatible with
+  version 2.32. `tinfo6-libc6-pre232` is now a possible value for the
+  `ghc-build` configuration option.
 
 Other enhancements:
 
