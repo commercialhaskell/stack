@@ -14,13 +14,14 @@ extra-deps:
 - directory-1.3.8.3@rev:3
 - filepath-1.5.2.0
 - ghc-boot-9.10.1
+# nightly-2024-07-05 provides hpack-0.36.1
+- hpack-0.37.0@sha256:b7c91b0416a55c134172a9fd9a02f3815ba68c4b92cca4e320c36906d5e970e0,5187
 - hpc-0.7.0.1@rev:1
 - http-api-data-0.6.1
 - process-1.6.19.0@rev:1
 - time-1.12.2
+- unix-2.8.5.1
 - uuid-types-1.0.6
-# nightly-2024-07-05 provides hpack-0.36.1
-- hpack-0.37.0@sha256:b7c91b0416a55c134172a9fd9a02f3815ba68c4b92cca4e320c36906d5e970e0,5187
 
 allow-newer: true
 allow-newer-deps:
