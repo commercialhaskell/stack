@@ -49,3 +49,5 @@ flags:
     os-string: true
   stack:
     developer-mode: true
+  unix:
+    os-string: true
