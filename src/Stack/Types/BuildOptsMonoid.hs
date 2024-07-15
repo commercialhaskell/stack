@@ -33,11 +33,15 @@ import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Stack.Prelude hiding ( trace )
 import           Stack.Types.ComponentUtils ( StackUnqualCompName )
 
--- | Build options that may be specified in the stack.yaml or from the CLI
+-- | Build options that may be specified as non-project specific configuration
+-- options under the build key (with certain exceptions) or from the CLI.
 data BuildOptsMonoid = BuildOptsMonoid
   { trace :: !Any
+    -- ^ Cannot be specified under the build key
   , profile :: !Any
+    -- ^ Cannot be specified under the build key
   , noStrip :: !Any
+    -- ^ Cannot be specified under the build key
   , libProfile :: !FirstFalse
   , exeProfile :: !FirstFalse
   , libStrip :: !FirstTrue

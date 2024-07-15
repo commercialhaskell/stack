@@ -183,7 +183,7 @@ it, it is best omitted from the debug output.
 
 ## `--resolver` option
 
-A synonym for the [`--snapshot` option](#snapshot-option) to specify the
+A synonym for the [`--snapshot` option](#-snapshot-option) to specify the
 snapshot resolver.
 
 ## `--[no-]rsl-in-log` flag

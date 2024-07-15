@@ -420,7 +420,7 @@ configFromConfigMonoid
           fromFirst AGOLocals configMonoid.applyGhcOptions
         applyProgOptions =
           fromFirst APOLocals configMonoid.applyProgOptions
-        allowNewer = fromFirst False configMonoid.allowNewer
+        allowNewer = configMonoid.allowNewer
         allowNewerDeps = coerce configMonoid.allowNewerDeps
     defaultInitSnapshot <- do
       root <- getCurrentDir

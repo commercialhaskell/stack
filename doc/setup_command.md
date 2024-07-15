@@ -13,7 +13,7 @@ By default:
 
 * the version of GHC is the one required by the project. Specify the version of
   GHC as an argument to attempt to install a different version of GHC. For
-  example `stack setup 9.4.4` will attempt to install GHC 9.4.4; and
+  example `stack setup 9.6.6` will attempt to install GHC 9.6.6; and
 
 * an attempt to install is made only if the version of GHC is not already
   available to Stack. Pass the flag `--reinstall` (disabled by default) to
@@ -43,14 +43,18 @@ command are inconsistent and take no action.
     required on Linux, Stack will refer to the presence or absence of certain
     libraries or the versions of those libraries.
 
-    For example, Stack 2.15.1 considers:
+    For example, Stack 2.15.7 considers:
 
     *   If `libc.musl-x86_64.so.1` is present. This file is provided by the
         [musl libc](https://musl.libc.org/).
 
+        [:octicons-tag-24: 2.13.1](https://github.com/commercialhaskell/stack/releases/tag/v2.13.1)
+
     *   The version of `libc6` (if musl libc is not applicable), the
         [GNU C Library](https://www.gnu.org/software/libc/) (glibc), that is
         present. The GNU C Library is designed to be backwards compatible.
+
+        [:octicons-tag-24: 2.11.1](https://github.com/commercialhaskell/stack/releases/tag/v2.11.1)
 
     *   If `libgmp.so.3` or `libgmp.so.10` is present. These files are provided
         by different versions of the
@@ -63,7 +67,7 @@ command are inconsistent and take no action.
         provided by different versions of a shared low-level terminfo library
         for terminal handling.
 
-    Stack 2.15.1 uses `ghc-build`:
+    Stack 2.15.7 uses `ghc-build`:
 
     * `musl` to indicate `libc.musl-x86_64.so.1` is present and Stack should use
        the GHC binary distribution for Alpine Linux.
@@ -77,9 +81,14 @@ command are inconsistent and take no action.
     By default, Stack associates:
 
     * the `tinfo6` build with the 'Fedora 33' binary distribution of GHC 9.4.1
-      to 9.4.4. Those binary distributions require versions of `libc6` that are
-      compatible with `libc6` 2.32; and
+      to 9.4.3 and 9.6.1 and later. Those binary distributions require versions
+      of `libc6` that are compatible with `libc6` 2.32;
 
     * the `tinfo6-libc6-pre232` build with the 'Debian 10' binary distribution
-      of GHC 9.4.1 to 9.4.4. Those binary distributions require versions of
-      `libc6` that are compatible with `libc6` 2.28.
+      of GHC 9.4.1 to 9.4.3 and the 'Rocky 8' binary distribution of GHC 9.6.1
+      and later. Those binary distributions require versions of `libc6` that are
+      compatible with `libc6` 2.28; and
+
+    * the `tinfo6` and `tinfo6-libc6-pre232` builds with the 'Fedora 27' binary
+      distribution of GHC 9.4.4 to 9.4.8. Those binary distributions require
+      versions of `libc6` that are compatible with `libc6` 2.26.

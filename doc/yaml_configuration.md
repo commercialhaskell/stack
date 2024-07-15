@@ -498,9 +498,15 @@ process.
 
 Default: `false`
 
-Whether to ignore version bounds in Cabal files. This also ignores lower bounds.
-The name `allow-newer` is chosen to match the commonly-used Cabal option.
+Command line equivalent (takes precedence):
+[`stack build --[no-]allow-newer`](build_command.md#-allow-newer-flag) flag
 
+Whether to ignore lower and upper version bounds in Cabal files.
+
+!!! info
+
+    The name `allow-newer` was chosen to match a commonly-used Cabal option
+    which ignored only upper bounds.
 
 ~~~yaml
 allow-newer: true

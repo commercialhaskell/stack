@@ -153,7 +153,7 @@ data Config = Config
   , applyProgOptions       :: !ApplyProgOptions
     -- ^ Which packages do all and any --PROG-option options on the command line
     -- apply to?
-  , allowNewer             :: !Bool
+  , allowNewer             :: !(First Bool)
     -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
     -- match cabal.
   , allowNewerDeps         :: !(Maybe [PackageName])

@@ -896,8 +896,11 @@ adrInRange ::
 adrInRange pkgId name range adr = if adrVersion adr `withinRange` range
   then pure True
   else do
-    allowNewer <- view $ configL . to (.allowNewer)
-    allowNewerDeps <- view $ configL . to (.allowNewerDeps)
+    config <- view configL
+    allowNewerCLI <- view $ envConfigL . to (.buildOptsCLI) . to (.allowNewer)
+    let allowNewerConfig = config.allowNewer
+        allowNewer = fromFirst False $ allowNewerCLI <> allowNewerConfig
+        allowNewerDeps = config.allowNewerDeps
     if allowNewer
       then case allowNewerDeps of
         Nothing -> do

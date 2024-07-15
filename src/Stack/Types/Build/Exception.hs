@@ -541,7 +541,9 @@ pprintExceptions exceptions configFile stackRoot isImplicitGlobal parentMap want
           then ["also"]
           else
             [ fillSep
-                $  [ "in"
+                $  [ "pass"
+                   , style Shell "--allow-newer" <> ","
+                   , flow "or, in"
                    , pretty (defaultUserConfigPath stackRoot)
                    , flow
                        (  "(global configuration)"
