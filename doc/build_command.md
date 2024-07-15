@@ -218,7 +218,7 @@ option).
 
 ### `--[no-]allow-newer` flag
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
 Overrides: [`allow-newer`](yaml_configuration.md#allow-newer) non-project
 specific configuration option
