@@ -155,7 +155,7 @@ Stack can be installed directly or by using the GHCup tool.
         For other operating systems and direct downloads see the
         [install and upgrade guide](install_and_upgrade.md).
 
-=== GHCup
+=== "GHCup"
 
     The separate [GHCup](https://www.haskell.org/ghcup/) project provides a tool
     that can be used to install Stack and other Haskell-related tools, including
