@@ -22,6 +22,11 @@ Stack features include:
 * Benchmarking your project.
 * Using GHC interactively.
 
+Stack is used at the command line. You will need terminal software for your
+system (which will likely come with its operating system) and a program to edit
+code files. There are a number of freely-available and popular code editors that
+have Haskell extensions.
+
 ## How to install Stack
 
 Stack can be installed on most Unix-like operating systems (including macOS) and
@@ -160,8 +165,8 @@ Stack can be installed directly or by using the GHCup tool.
     The separate [GHCup](https://www.haskell.org/ghcup/) project provides a tool
     that can be used to install Stack and other Haskell-related tools, including
     GHC and
-    [Haskell Language Server](https://github.com/haskell/haskell-language-server)(HLS).
-    HLS is a program that is used by Haskell extensions for popular code
+    [Haskell Language Server](https://github.com/haskell/haskell-language-server)
+    (HLS). HLS is a program that is used by Haskell extensions for popular code
     editors.
 
     GHCup provides Stack for some combinations of machine architecture and
