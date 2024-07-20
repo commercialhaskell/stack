@@ -7,11 +7,11 @@ This page documents how to use Stack on
 familiarity with Travis. We provide two fully baked example files
 ready to be used on your projects:
 
-* [The simple Travis configuration](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/travis-simple.yml)
+* [The simple Travis configuration](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/resources/travis-simple.yml)
   is intended for applications that do not require multiple GHC
   support or cross-platform support. It builds and tests your project
   with just the settings present in your `stack.yaml` file.
-* [The complex Travis configuration](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/travis-complex.yml)
+* [The complex Travis configuration](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/resources/travis-complex.yml)
   is intended for projects that need to support multiple GHC versions
   and multiple OSes, such as open source libraries to be released to
   Hackage. It tests against cabal-install, as well as Stack on Linux
@@ -34,7 +34,7 @@ You may also be interested in using AppVeyor, which supports Windows
 builds, for more cross-platform testing. There's a
 [short blog post available on how to do this](http://www.snoyman.com/blog/2016/08/appveyor-haskell-windows-ci),
 or just copy in
-[the appveyor.yml file](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/appveyor.yml)
+[the appveyor.yml file](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/resources/appveyor.yml)
 
 The rest of this document explains the details of common Travis
 configurations for those of you who want to tweak the above

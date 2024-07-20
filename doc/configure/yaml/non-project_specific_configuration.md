@@ -1,467 +1,6 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# Configuration and customisation
-
-Stack is configured by the content of YAML files. Some Stack operations can also
-be customised by the use of scripts.
-
-!!! info
-
-    A Haskell package is an organised collection of Haskell code and related
-    files. It is described by a Cabal file or a `package.yaml` file (which can
-    be used to generate a Cabal file). The package description is itself part of
-    the package. Its file is located in the root directory of a project package
-    or dependency located locally.
-
-    A Stack project is a local directory that contains a Stack project-level
-    configuration file (`stack.yaml`, by default). A project may relate to more
-    than one project package. A single-package project's directory will usually
-    also be the project package's root directory.
-
-## YAML configuration
-
-Stack's YAML configuration options break down into
-[project-specific](#project-specific-configuration) options and
-[non-project-specific](#non-project-specific-configuration) options. The former
-are configured at the project level. The latter are configured at the project
-level or globally.
-
-The **project-level** configuration file (`stack.yaml`, by default) contains
-project-specific options and may contain non-project-specific options. However,
-non-project-specific options in the project-level configuration file in the
-`global-project` directory (see below) are ignored by Stack.
-
-Stack obtains project-level configuration from one of the following (in order of
-preference):
-
-1. A file specified by the `--stack-yaml` command line option.
-2. A file specified by the `STACK_YAML` environment variable.
-3. A file named `stack.yaml` in the current directory or an ancestor directory.
-4. A file name `stack.yaml` in the `global-project` directory in the
-   [Stack root](stack_root.md).
-
-The **global** configuration files (`config.yaml`) contain only
-non-project-specific options. There is a user-specific global confguration file
-and there may be an optional system-wide global configuration file. If a
-user-specific global configuration file does not exist, then Stack will create
-one. An option set in the user-specific file will override a corresponding
-option set in the system-wide file (if it exists).
-
-The default location of these files depends on the operating system and, in the
-case of the user-specific file, whether Stack is configured to use the XDG Base
-Directory Specification. An absolute path to these files can be specified by the
-[`STACK_CONFIG`](environment_variables.md#stack_config) and
-[`STACK_GLOBAL_CONFIG`](environment_variables.md#stack_config) environment
-variables, respectively.
-
-=== "Unix-like"
-
-    The default locations are:
-
-    * system-wide: `/etc/stack/config.yaml`; and
-    * user-specific: `config.yaml` in the [Stack root](stack_root.md).
-
-    !!! note
-
-        For compatibility with Stack 0.1.5.0 and earlier, if deprecated file
-        `/etc/stack/config` exists, then Stack will use it instead of
-        `/etc/stack/config.yaml`.
-
-=== "Windows"
-
-    The default locations are:
-
-    * system-wide: none; and
-    * user-specific: `config.yaml` in the [Stack root](stack_root.md).
-
-=== "XDG Base Directory Specification"
-
-    On Unix-like operating systems and Windows, Stack can be configured to
-    follow the XDG Base Directory Specification if the environment variable
-    `STACK_XDG` is set to any non-empty value. However, Stack will ignore that
-    configuration if the [Stack root](stack_root.md) location has been set on
-    the command line or the `STACK_ROOT` environment variable exists.
-
-    If Stack is following the XDG Base Directory Specification, the location of
-    `config.yaml` (for user-specific options) is `<XDG_CONFIG_HOME>/stack`. If
-    the `XDG_CONFIG_HOME` environment variable does not exist, the default is
-    `~/.config/stack` on Unix-like operating systems and `%APPDIR%\stack` on
-    Windows.
-
-This page is intended to document fully all YAML configuration options. If you
-identify any inaccuracies or incompleteness, please update the page, and if
-you're not sure how, open an issue labeled "question".
-
-If you wish to understand the difference between a `stack.yaml` files and a
-Cabal file (named `<package_name>.cabal`), see the
-[stack.yaml vs a Cabal file](stack_yaml_vs_cabal_package_file.md) documentation.
-
-## Project-specific configuration
-
-Project-specific configuration options are valid only in a project-level
-configuration file (`stack.yaml`, by default).
-
-Each of the Haskell packages to which a Stack project relates is either a
-**project package** that is part of the project and located locally or a package
-on which one or more of the project packages depends (directly or indirectly).
-The latter is referred to as a **dependency** and it may be located locally or
-elsewhere.
-
-!!! info
-
-    Project packages are built by default. Dependencies are only built when
-    needed. Building can target individual components of a project package. The
-    individual components of dependencies cannot be targeted. Test suite and
-    benchmark components of a project package can be built and run. The library
-    and executable components of a dependency, and only those components, are
-    built when the dependency is needed.
-
-In your project-specific options, you specify both **which project packages** to
-build and **which dependencies to use** when building these packages.
-
-A dependency specified as an [extra-dep](#extra-deps) will shadow a package of
-the same name specified in a [snapshot](#snapshot). A project package will
-shadow a dependency of the same name.
-
-### snapshot
-
-Command line equivalent (takes precedence):
-[`--snapshot`](global_flags.md#snapshot-option) or
-[`--resolver`](global_flags.md#resolver-option) option
-
-The `snapshot` key specifies which snapshot is to be used for this project. A
-snapshot defines a GHC version, the package version of packages available for
-installation, and various settings like build flags. It is also called a
-resolver since a snapshot states how dependencies are resolved. There are
-currently four snapshot types:
-
-* LTS Haskell snapshots, e.g. `snapshot: lts-22.28`
-* Stackage Nightly snapshots, e.g. `snapshot: nightly-2024-07-05`
-* No snapshot, just use packages shipped with the compiler. For GHC this looks
-  like `snapshot: ghc-9.6.6`
-* Custom snapshot, via a URL or relative file path. For further information, see
-  the [snapshot and package location](pantry.md) documentation.
-
-Each of these snapshots will also determine what constraints are placed on the
-compiler version. See the [compiler-check](#compiler-check) option for some
-additional control over compiler version.
-
-A package version specified in a snapshot can be shadowed by an
-[extra-dep](#extra-deps) of the same name or a [project package](#packages) of
-the same name.
-
-### resolver
-
-`resolver` and [`snapshot`](#snapshot) are synonyms. Only one of these keys is
-permitted, not both.
-
-### packages
-
-Default:
-
-~~~yaml
-packages:
-- .
-~~~
-
-The `packages` key specifies a list of the project packages that are part of
-your project. These are specified via paths to local directories. A path is
-considered relative to the directory containing the project-level configuration
-file (`stack.yaml`, by default). For example, if the `stack.yaml` file is
-located at `/dir1/dir2/stack.yaml`, and has:
-
-~~~yaml
-packages:
-- my-package
-- dir3/my-other-package
-~~~
-
-the configuration means "project packages in directories `/dir1/dir2/my-package`
-and `/dir1/dir2/dir3/my-other-package`".
-
-The `packages` key is optional. The default value, '`.`', means that the
-project has a single project package located in the current directory.
-
-A project package will shaddow a dependency of the same name.
-
-A package version specified in a snapshot can be shadowed by an
-[extra-dep](#extra-deps) of the same name or a [project package](#packages) of
-the same name.
-
-Each specified project package directory must have a valid Cabal file or Hpack
-`package.yaml` file present. Any subdirectories of the directory are not
-searched for Cabal files. A subdirectory has to be specified as an independent
-item in the list of project packages.
-
-A project package is different from a dependency (located locally or elsewhere)
-specified as an [extra-dep](#extra-deps) or via a [snapshot](#snapshot). For
-example:
-
-* a project package will be built by default by commanding
-  [`stack build`](build_command.md) without specific targets. A dependency will
-  only be built if it is needed; and
-* test suites and benchmarks may be built and run for a project package. They
-  are never run for a dependency.
-
-### extra-deps
-
-Default: `[]`
-
-The `extra-deps` key specifies a list of extra dependencies on top of what is
-defined in the [snapshot](#snapshot). A dependency may come from either a Pantry
-package location or a local file path.
-
-A Pantry package location is one or three different kinds of sources:
-
-* the package index (Hackage);
-* an archive (a tarball or zip file, either local or over HTTP or HTTPS); or
-* a Git or Mercurial repository.
-
-For further information on the format for specifying a Pantry package location,
-see the [Pantry](pantry.md) documentation. For example:
-
-~~~yaml
-extra-deps:
-# The latest revision of a package in the package index (Hackage):
-- acme-missiles-0.3
-# A specific revision of a package in the package index (Hackage):
-- acme-missiles-0.3@rev:0
-# An *.tar.gz archive file over HTTPS:
-- url: https://github.com/example-user/my-repo/archive/08c9b4cdf977d5bcd1baba046a007940c1940758.tar.gz
-  subdirs:
-  - my-package
-# A Git repository at a specific commit:
-- git: https://github.com/example-user/my-repo.git
-  commit: '08c9b4cdf977d5bcd1baba046a007940c1940758'
-# An archive of files at a point in the history of a GitHub repository
-# (identified by a specific commit):
-- github: example-user/my-repo
-  commit: '08c9b4cdf977d5bcd1baba046a007940c1940758'
-  subdirs:
-  - my-package
-~~~
-
-!!! note
-
-    GHC boot packages are special. An extra-dep with the same package name and
-    version as a GHC boot package will be ignored.
-
-!!! note
-
-    The `commit:` key expects a YAML string. A commit hash, or partial hash,
-    comprised only of digits represents a YAML number, unless it is enclosed in
-    quotation marks.
-
-For a local file path source, the path is considered relative to the directory
-containing the `stack.yaml` file. For example, if the `stack.yaml` is located
-at `/dir1/dir2/stack.yaml`, and has:
-
-~~~yaml
-extra-deps:
-- my-package
-- dir3/my-other-package
-~~~
-
-the configuration means "extra-deps packages in directories
-`/dir1/dir2/my-package` and `/dir1/dir2/dir3/my-other-package`".
-
-!!! note
-
-    A local file path that has the format of a package identifier will be
-    interpreted as a reference to a package on Hackage. Prefix it with `./` to
-    avoid that confusion.
-
-!!! note
-
-    A specified extra-dep that does not have the format of a valid Pantry
-    package location (for example, a reference to a package on Hackage that
-    omits the package's version) will be interpreted as a local file path.
-
-An extra-dep will shadow a dependency specified in a [snapshot](#snapshot) of
-the same name. An extra-dep can be shadowed by a [project package](#packages) of
-the same name.
-
-!!! info
-
-    Some Haskell packages published on Hackage, for example `base` and `ghc`,
-    are referred to as 'wired-in' to one or more versions of GHC or as 'magic'.
-    They can be distinguished from normal packages by the contents of their
-    Cabal files: GHC's `-this-unit-id` option is set as the name of the package
-    without a version. For example, the `base.cabal` for `base-4.19.1.0`
-    includes:
-
-    ~~~yaml
-    -- We need to set the unit id to base (without a version number)
-    -- as it's magic.
-    ghc-options: -this-unit-id base
-    ~~~
-
-    The GHC boot packages that are 'wired-in' cannot be shaddowed with different
-    versions of the same package. Given their dependencies, the use of these
-    boot packages in a build plan may limit what can be specified as an
-    extra-dep.
-
-    For example, GHC boot package `ghc-9.8.2` has a dependency on `process`. Its
-    `*.conf` file identifies the dependency as `process-1.6.18.0-4fb7`. If
-    package `ghc-9.8.2` is part of a build plan and a different version of
-    `process` is specified as an extra-dep, during a build, Stack will identify
-    that the build plan refers to two versions of `process` and warn that the
-    build is likely to fail.
-
-    Stack treats the following as the names of 'wired-in' packages: `base`,
-    `dph-par`, `dph-seq`, `ghc-bignum`, `ghc-prim`, `ghc`, `integer-gmp`,
-    `integer-simple`, `interactive`, `rts` and `template-haskell`.
-
-### flags
-
-Default: `{}`
-
-Command line equivalent (takes precedence):
-[`stack build --flag`](build_command.md#-flag-option) option
-
-Cabal flags can be set for each package separately. For example:
-
-~~~yaml
-flags:
-  package-name:
-    flag-name: true
-~~~
-
-This overrides all Cabal flag specifications (if any) for the specified packages
-in the snapshot.
-
-!!! note
-
-    For a package included directly in the snapshot, if the Cabal flag
-    specifications differ from the Cabal flag specifications (if any) in the
-    snapshot, then the package will automatically be promoted to be an
-    [extra-dep](#extra-deps).
-
-!!! note
-
-    In order to set a Cabal flag for a GHC boot package, the package must be
-    specified as an [extra-dep](#extra-deps).
-
-### drop-packages
-
-[:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
-
-Default: `[]`
-
-Packages which, when present in the snapshot specified in the
-[`snapshot`](#snapshot) or [`resolver`](#resolver) key, should not be included
-in our project. This can be used for a few different purposes, e.g.:
-
-* Ensure that packages you don't want used in your project cannot be used in a
-  `package.yaml` file (e.g., for license reasons)
-* When using a custom GHC build, avoid incompatible packages (see this
-  [comment](https://github.com/commercialhaskell/stack/pull/4655#issuecomment-477954429)).
-
-~~~yaml
-drop-packages:
-- buggy-package
-- package-with-unacceptable-license
-~~~
-
-!!! info
-
-    Stackage snapshots LTS Haskell 14.27 (GHC 8.6.5) and earlier, and Nightly
-    2022-02-08 (GHC 8.8.2) and earlier, included directly the `Cabal` package.
-    Later snapshots do not include directly that package (which is a GHC boot
-    package).
-
-    For the older Stackage snapshots, it could be handy to drop the
-    snapshot-specified `Cabal` package, to avoid building that version of the
-    package. For the later snapshots, there is no package version to drop.
-
-### user-message
-
-If present, specifies a message to be displayed every time the configuration is
-loaded by Stack. It can serve as a reminder for the user to review the
-configuration and make any changes if needed. The user can delete this message
-if the generated configuration is acceptable.
-
-For example, a user-message is inserted by `stack init` when it omits packages
-or adds external dependencies, namely:
-
-~~~yaml
-user-message: ! 'Warning: Some packages were found to be incompatible with the snapshot
-  and have been left commented out in the packages section.
-
-  Warning: Specified snapshot could not satisfy all dependencies. Some external packages
-  have been added as dependencies.
-
-  You can omit this message by removing it from stack.yaml
-
-'
-~~~
-
-### custom-preprocessor-extensions
-
-Default: `[]`
-
-Command line equivalent: `--customer-preprocessor-extensions` option
-
-In order for Stack to be aware of any custom preprocessors you are using, add
-their extensions here
-
-~~~yaml
-custom-preprocessor-extensions:
-- erb
-~~~
-
-TODO: Add a simple example of how to use custom preprocessors.
-
-### extra-package-dbs
-
-[:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
-
-Default: `[]`
-
-A list of relative or absolute paths to package databases. These databases will
-be added on top of GHC's global package database before the addition of other
-package databases.
-
-!!! warning
-
-    Use of this feature may result in builds that are not reproducible, as Stack
-    has no control over the contents of the extra package databases.
-
-### curator
-
-:octicons-beaker-24: Experimental
-
-[:octicons-tag-24: 2.1.0.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.0.1)
-
-Default: `{}`
-
-Configuration intended for use only by the
-[`curator` tool](https://github.com/commercialhaskell/curator), which uses Stack
-to build packages. For given package names (which need not exist in the
-project), Stack can be configured to ignore (skip) silently building test
-suites, building benchmarks and/or creating Haddock documentation or to expect
-that building test suites, building benchmarks and/or creating Haddock
-documentation will fail.
-
-For example:
-
-~~~yaml
-curator:
-  skip-test:
-  - my-package1
-  expect-test-failure:
-  - my-package2
-  skip-bench:
-  - my-package3
-  expect-benchmark-failure:
-  - my-package4
-  skip-haddock:
-  - my-package5
-  expect-haddock-failure:
-  - my-package6
-~~~
-
-## Non-project-specific configuration
+# Non-project-specific configuration
 
 Non-project configuration options can be included in a project-level
 configuration file (`stack.yaml`, by default) or in global configuration files
@@ -469,7 +8,7 @@ configuration file (`stack.yaml`, by default) or in global configuration files
 configuration file in the `global-project` directory are ignored by Stack. The
 options below are listed in alphabetic order.
 
-### allow-different-user
+## allow-different-user
 
 [:octicons-tag-24: 1.0.1.0](https://github.com/commercialhaskell/stack/releases/tag/v1.0.1.0)
 
@@ -492,7 +31,7 @@ as the result of a Stack command executed under `sudo`.
 The option is automatically enabled when Stack is re-spawned in a Docker
 process.
 
-### allow-newer
+## allow-newer
 
 [:octicons-tag-24: 0.1.8.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.8.0)
 
@@ -512,7 +51,7 @@ Whether to ignore lower and upper version bounds in Cabal files.
 allow-newer: true
 ~~~
 
-### allow-newer-deps
+## allow-newer-deps
 
 :octicons-beaker-24: Experimental
 
@@ -529,7 +68,7 @@ allow-newer-deps:
   - bar
 ~~~
 
-### apply-ghc-options
+## apply-ghc-options
 
 [:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
 
@@ -551,7 +90,7 @@ otherwise), and `targets` (all project packages that are targets).
 
     Before Stack 0.1.6.0, the default value was `targets`.
 
-### apply-prog-options
+## apply-prog-options
 
 [:octicons-tag-24: 2.11.1](https://github.com/commercialhaskell/stack/releases/tag/v2.11.1)
 
@@ -569,7 +108,7 @@ targets or otherwise), and `targets` (all project packages that are targets).
 
     The use of `everything` can break invariants about your snapshot database.
 
-### arch
+## arch
 
 Default: The machine architecture on which Stack is running.
 
@@ -602,7 +141,7 @@ unknown 'other' architecture. The warning can be muted; see
     `powerpc64` and `powerpc64le`, the latter can be specified in Stack's
     configuration as an 'other' architecture, such as `arch: ppc64le`.
 
-### build
+## build
 
 [:octicons-tag-24: 1.1.0](https://github.com/commercialhaskell/stack/releases/tag/v1.1.0)
 
@@ -695,7 +234,7 @@ of the same name. For further information, see the
 [`stack build` command](build_command.md) documentation and the
 [users guide](GUIDE.md#the-build-command).
 
-### casa
+## casa
 
 [:octicons-tag-24: 2.13.1](https://github.com/commercialhaskell/stack/releases/tag/v2.13.1)
 
@@ -718,7 +257,7 @@ information, see this blog post about
 `repo-prefix` replaces [`casa-repo-prefix`](#casa-repo-prefix) (which is
 deprecated) and has precedence if both keys are set.
 
-### casa-repo-prefix
+## casa-repo-prefix
 
 [:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
 
@@ -729,7 +268,7 @@ Default: `https://casa.stackage.org`
 This option specifies the prefix for the URL used to pull information from the
 Casa server.
 
-### color
+## color
 
 Command line equivalent (takes precedence): `--color` option
 
@@ -741,7 +280,7 @@ default is 'never'; color may work on terminals that support color codes.
 (The British English spelling (colour) is also accepted. In yaml configuration
 files, the American spelling is the alternative that has priority.)
 
-### compiler
+## compiler
 
 [:octicons-tag-24: 0.1.8.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.8.0)
 
@@ -758,7 +297,7 @@ compiler: ghc-9.6.5
 compiler-check: match-exact
 ~~~
 
-#### Building GHC from source
+### Building GHC from source
 
 :octicons-beaker-24: Experimental
 
@@ -796,7 +335,7 @@ enable any known workaround to make older compilers work.
 Building the compiler can take a very long time (more than one hour). For faster
 build times, use Hadrian flavours that disable documentation generation.
 
-#### Bootstrap compiler
+### Bootstrap compiler
 
 Building GHC from source requires a working GHC (known as the bootstrap
 compiler). As we use a Stack based version of Hadrian (`hadrian/build-stack` in
@@ -823,7 +362,7 @@ fully managed by Stack.
     `build-stack` script wil refer to that environment variable for the Stack
     command it uses.
 
-#### Hadrian prerequisites
+### Hadrian prerequisites
 
 The Hadrian build system has certain
 [prerequisites](https://gitlab.haskell.org/ghc/ghc/-/wikis/building/preparation).
@@ -884,7 +423,7 @@ Stack will build and install `happy` and `alex`, if not already on the PATH.
     Hadrian may require certain LaTeX packages and may prompt for these to be
     installed duing the build process.
 
-#### Global packages
+### Global packages
 
 The GHC compiler you build from sources may depend on unreleased versions of
 some global packages (e.g. Cabal). It may be an issue if a package you try to
@@ -915,7 +454,7 @@ extra-deps:
     - libraries/...
 ~~~
 
-### compiler-check
+## compiler-check
 
 [:octicons-tag-24: 0.1.4.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.4.0)
 
@@ -932,7 +471,7 @@ versions. Valid values:
   `ghc-7.10.1`, then 7.10.2 will also be allowed. This was the default up
   through Stack 0.1.3
 
-### concurrent-tests
+## concurrent-tests
 
 [:octicons-tag-24: 0.1.2.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.2.0)
 
@@ -948,7 +487,7 @@ then it makes sense to set this to `false`.
 concurrent-tests: false
 ~~~
 
-### configure-options
+## configure-options
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
@@ -982,7 +521,7 @@ currently excludes Windows), Cabal's `--enable-executable-dynamic` flag (which
 implies `--enable-shared`, unless `--disable-shared` is specified) links
 dependent Haskell libraries into executables dynamically.
 
-### connection-count
+## connection-count
 
 Default: `8`
 
@@ -1006,7 +545,7 @@ specified at the command line.
 project-level configuration file in the `global-project` directory in the
 [Stack root](stack_root.md#global-project-directory).
 
-### default-template
+## default-template
 
 Default: `new-template` in the
 [stack-templates](https://github.com/commercialhaskell/stack-templates/)
@@ -1017,7 +556,7 @@ specified. Other templates are listed in the
 [stack-templates](https://github.com/commercialhaskell/stack-templates/)
 repository. See the output of `stack templates`.
 
-### docker
+## docker
 
 Command line equivalents: `--docker-*` flags and options (see
 `stack --docker-help` for details).
@@ -1025,7 +564,7 @@ Command line equivalents: `--docker-*` flags and options (see
 For further information, see the
 [Docker integration](docker_integration.md#configuration) documentation.
 
-### dump-logs
+## dump-logs
 
 [:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0)
 
@@ -1061,7 +600,7 @@ example, for a file named `stderr.log`:
 stack --no-dump-logs --color always build --no-interleaved-output 2> stderr.log
 ~~~
 
-### extra-include-dirs
+## extra-include-dirs
 
 Default: `[]`
 
@@ -1080,7 +619,7 @@ specify these in your `config.yaml` file. If you control the build environment
 in your project's ``stack.yaml``, perhaps through docker or other means, then it
 may well make sense to include these there as well.
 
-### extra-lib-dirs
+## extra-lib-dirs
 
 Default: `[]`
 
@@ -1098,7 +637,7 @@ specify these in your `config.yaml` file. If you control the build environment
 in your project's ``stack.yaml``, perhaps through Docker or other means, then it
 may well make sense to include these there as well.
 
-### extra-path
+## extra-path
 
 [:octicons-tag-24: 0.1.4.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.4.0)
 
@@ -1117,7 +656,7 @@ Other paths added by Stack - things like the project's binary directory and the
 compiler's binary directory - will take precedence over those specified here
 (the automatic paths get prepended).
 
-### file-watch-hook
+## file-watch-hook
 
 :octicons-tag-24: UNRELEASED
 
@@ -1132,7 +671,7 @@ in the [Stack root](stack_root.md), a relative path is assumed to be relative to
 the current directory. Otherwise, it is assumed to be relative to the directory
 of the project-level configuration file.
 
-### ghc-build
+## ghc-build
 
 [:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0)
 
@@ -1149,7 +688,7 @@ Normally this is determined automatically, but it can be overridden. Possible
 arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-libc6-pre232`,
 `tinfo6-nopie`, `ncurses6`, `int-native` and `integersimple`.
 
-### ghc-options
+## ghc-options
 
 [:octicons-tag-24: 0.1.4.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.4.0)
 
@@ -1194,7 +733,7 @@ snapshot packages.
     Before Stack 1.6.1, the key `*` (then deprecated) had the same function as
     the key `$everything`.
 
-### ghc-variant
+## ghc-variant
 
 [:octicons-tag-24: 0.1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.5.0)
 
@@ -1222,7 +761,7 @@ See [`setup-info`](#setup-info).
 
 This option is incompatible with `system-ghc: true`.
 
-### global-hints-location
+## global-hints-location
 
 :octicons-tag-24: UNRELEASED
 
@@ -1253,7 +792,7 @@ global-hints-location:
   url: https://example.com/global-hints/location/global-hints.yaml
 ~~~
 
-### hackage-base-url
+## hackage-base-url
 
 [:octicons-tag-24: 1.9.1](https://github.com/commercialhaskell/stack/releases/tag/v1.9.1)
 
@@ -1265,7 +804,7 @@ Sets the address of the Hackage server to upload the package to.
 hackage-base-url: https://hackage.example.com/
 ~~~
 
-### hide-source-paths
+## hide-source-paths
 
 Default: `true`
 ([:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1))
@@ -1293,14 +832,14 @@ Build output when disabled:
 ...
 ~~~
 
-### hide-th-loading
+## hide-th-loading
 
 Default: `true`
 
 Strip out the "Loading ..." lines from GHC build output, produced when using
 Template Haskell.
 
-### hpack-force
+## hpack-force
 
 :octicons-tag-24: UNRELEASED
 
@@ -1313,14 +852,14 @@ Whether or not to allow Hpack to overwrite a Cabal file that has been modified
 manually. By default, Hpack 0.20.0 or later will decline to overwrite such a
 Cabal file.
 
-### ignore-revision-mismatch
+## ignore-revision-mismatch
 
 (Removed 1.11)
 
 This flag was introduced in Stack 1.6, and removed on the move to Pantry. You
 will receive a warning if this configuration value is set.
 
-### install-ghc
+## install-ghc
 
 Default: `true`
 ([:octicons-tag-24: 1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v1.5.0))
@@ -1329,7 +868,7 @@ Command line equivalent (takes precedence): `--[no-]install-ghc` flag
 
 Whether or not to automatically install GHC when necessary.
 
-### jobs
+## jobs
 
 Default: the number of CPUs (cores) that the machine has.
 
@@ -1348,7 +887,7 @@ during building. If those circumstances arise, specify `jobs: 1`.
 This configuration option is distinct from GHC's own `-j[<n>]` flag, which
 relates to parallel compilation of modules within a package.
 
-### local-bin-path
+## local-bin-path
 
 Default (on Unix-like operating systems): `~/.local/bin`
 
@@ -1365,7 +904,7 @@ in the [Stack root](stack_root.md), a relative path is assumed to be relative to
 the current directory. Otherwise, it is assumed to be relative to the directory
 of the project-level configuration file.
 
-### local-programs-path
+## local-programs-path
 
 [:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0)
 
@@ -1399,7 +938,7 @@ Stack's defaults differ between Unix-like operating systems and Windows.
         space characters. Examples of packages on Hackage that make use of
         `configure` are `network` and `process`.
 
-### modify-code-page
+## modify-code-page
 
 [:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
 
@@ -1415,7 +954,7 @@ Whether to modify the code page for UTF-8 output.
 modify-code-page: false
 ~~~
 
-### msys-environment
+## msys-environment
 
 :octicons-tag-24: UNRELEASED
 
@@ -1427,7 +966,7 @@ The name of the MSYS2 environment (case-sensitive) used in the Stack
 environment. Valid environments are `CLANG32`, `CLANG64`, `CLANGARM64`,
 `MINGW32`, `MINGW64`, and `UCRT64`.
 
-### nix
+## nix
 
 [:octicons-tag-24: 0.1.10.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.10.0)
 
@@ -1450,7 +989,7 @@ for details).
 For further information, see the
 [Nix integration](nix_integration.md#configuration) documentation.
 
-### notify-if-arch-unknown
+## notify-if-arch-unknown
 
 [:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
@@ -1459,7 +998,7 @@ Default: `true`
 If the specified machine architecture value is unknown to Cabal (the library),
 should Stack notify the user of that?
 
-### notify-if-cabal-untested
+## notify-if-cabal-untested
 
 [:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
@@ -1468,7 +1007,7 @@ Default: `true`
 If Stack has not been tested with the version of Cabal (the library) that has
 been found, should Stack notify the user of that?
 
-### notify-if-ghc-untested
+## notify-if-ghc-untested
 
 [:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
@@ -1477,7 +1016,7 @@ Default: `true`
 If Stack has not been tested with the version of GHC that is being used, should
 Stack notify the user of that?
 
-### notify-if-nix-on-path
+## notify-if-nix-on-path
 
 [:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
@@ -1486,7 +1025,7 @@ Default: `true`
 If Stack's integration with the Nix package manager is not enabled, should Stack
 notify the user if a `nix` executable is on the PATH?
 
-### package-index
+## package-index
 
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
@@ -1540,7 +1079,7 @@ ignored.
     information, see
     [issue #4928](https://github.com/commercialhaskell/stack/issues/4928).
 
-### pvp-bounds
+## pvp-bounds
 
 [:octicons-tag-24: 0.1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.5.0)
 
@@ -1561,7 +1100,7 @@ When using the `sdist` and `upload` commands, this setting determines whether
 the Cabal file's dependencies should be modified to reflect PVP lower and upper
 bounds.
 
-#### Basic use
+### Basic use
 
 Values are `none` (unchanged), `upper` (add upper bounds), `lower` (add
 lower bounds), and both (and upper and lower bounds). The algorithm Stack
@@ -1581,7 +1120,7 @@ pvp-bounds: none
 For further information, see the announcement
 [blog post](https://www.fpcomplete.com/blog/2015/09/stack-pvp).
 
-#### Use with Cabal file revisions
+### Use with Cabal file revisions
 
 [:octicons-tag-24: 1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v1.5.0)
 
@@ -1595,7 +1134,7 @@ This can be useful - especially combined with the
 as a method to ensure PVP compliance without having to proactively fix bounds
 issues for Stackage maintenance.
 
-### recommend-stack-upgrade
+## recommend-stack-upgrade
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
@@ -1604,7 +1143,7 @@ Default: `true`
 When Stack notices that a new version of Stack is available, should it notify
 the user?
 
-### rebuild-ghc-options
+## rebuild-ghc-options
 
 [:octicons-tag-24: 0.1.6.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.6.0)
 
@@ -1620,7 +1159,7 @@ modules.
 
     Before Stack 0.1.6.0, Stack rebuilt a package when its GHC options changed.
 
-### require-stack-version
+## require-stack-version
 
 Default: `"-any"`
 
@@ -1628,7 +1167,7 @@ Require a version of Stack within the specified range
 ([cabal-style](https://www.haskell.org/cabal/users-guide/developing-packages.html#build-information))
 to be used for this project. Example: `require-stack-version: "== 0.1.*"`
 
-### save-hackage-creds
+## save-hackage-creds
 
 [:octicons-tag-24: 1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v1.5.0)
 
@@ -1644,7 +1183,7 @@ password are stored in a local file.
 save-hackage-creds: true
 ~~~
 
-### setup-info
+## setup-info
 
 [:octicons-tag-24: 0.1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.5.0)
 
@@ -1730,7 +1269,7 @@ default `setup-info` dictionary, use the following:
 setup-info-locations: []
 ~~~
 
-### setup-info-locations
+## setup-info-locations
 
 [:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
 
@@ -1813,7 +1352,7 @@ ghc:
       url: "installs/ghc-9.2.3.tar.xz"
 ~~~
 
-### skip-ghc-check
+## skip-ghc-check
 
 Default: `false`
 
@@ -1822,7 +1361,7 @@ Command line equivalent (takes precedence): `--[no-]skip-ghc-check` flag
 Should we skip the check to confirm that your system GHC version (on the PATH)
 matches what your project expects?
 
-### skip-msys
+## skip-msys
 
 [:octicons-tag-24: 0.1.2.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.2.0)
 
@@ -1845,7 +1384,7 @@ skip-msys: true
     Usually, the use of this option does not make sense in project-level
     configuration and it is used only in global configuration.
 
-### snapshot-location-base
+## snapshot-location-base
 
 [:octicons-tag-24: 2.5.1](https://github.com/commercialhaskell/stack/releases/tag/v2.5.1)
 
@@ -1874,7 +1413,7 @@ environment to have general access to the internet, but not for testing/building
 environments. To avoid the firewall, one can run a local snapshots mirror and
 then use a custom `snapshot-location-base` in the closed environments only.
 
-### stack-colors
+## stack-colors
 
 Command line equivalent (takes precedence): `--stack-colors` option
 
@@ -1910,7 +1449,7 @@ the configuration file is processed.
 (The British English spelling (colour) is also accepted. In YAML configuration
 files, the American spelling is the alternative that has priority.)
 
-### stack-developer-mode
+## stack-developer-mode
 
 [:octicons-tag-24: 2.3.3](https://github.com/commercialhaskell/stack/releases/tag/v2.3.3)
 
@@ -1925,7 +1464,7 @@ level, especially useful for developers of Stack itself.
 stack-developer-mode: false
 ~~~
 
-### system-ghc
+## system-ghc
 
 Default: `false`, unless the [Docker](docker_integration.md) or
 [Nix](nix_integration.md) integration is enabled.
@@ -1943,7 +1482,7 @@ In a Nix-enabled configuration, Stack is incompatible with `system-ghc: false`.
 system-ghc: true
 ~~~
 
-### templates
+## templates
 
 Command line equivalent (takes precedence): `stack new --param <key>:<value>`
 (or `-p`) option
@@ -2003,7 +1542,7 @@ templates:
   scm-init: git
 ~~~
 
-### urls
+## urls
 
 Default:
 
@@ -2022,7 +1561,7 @@ Customize the URLs where Stack looks for snapshot build plans.
     early 2024, the file at that URL may not be up to date. Users of those
     versions of Stack should configure the URL to be the default above.
 
-### with-gcc
+## with-gcc
 
 Command line equivalent (takes precedence): `--with-gcc` option
 
@@ -2033,7 +1572,7 @@ resolution.
 with-gcc: /usr/local/bin/gcc-5
 ~~~
 
-### with-hpack
+## with-hpack
 
 Command line equivalent (takes precedence): `--with-hpack` option
 
@@ -2044,7 +1583,7 @@ in-built version of the Hpack functionality.
 with-hpack: /usr/local/bin/hpack
 ~~~
 
-### work-dir
+## work-dir
 
 [:octicons-tag-24: 0.1.10.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.10.0)
 
@@ -2060,133 +1599,3 @@ Environment variable alternative (lowest precedence):
 or package directory. The path must be a relative one, relative to the
 root directory of the project or package. The relative path cannot include a
 `..` (parent directory) component.
-
-## Customisation scripts
-
-### GHC installation customisation
-
-[:octicons-tag-24: 2.9.1](https://github.com/commercialhaskell/stack/releases/tag/v2.9.1)
-
-On Unix-like operating systems and Windows, Stack's installation procedure can
-be fully customised by placing a `sh` shell script (a 'hook') in the
-[Stack root](stack_root.md) directory at `hooks/ghc-install.sh`. On Unix-like
-operating systems, the script file must be made executable. The script is run by
-the `sh` application (which is provided by MSYS2 on Windows).
-
-The script **must** return an exit code of `0` and the standard output **must**
-be the absolute path to the GHC binary that was installed. Otherwise Stack will
-ignore the script and possibly fall back to its own installation procedure.
-
-When `system-ghc: true`, the script is not run. That is because the two
-mechanisms reflect distinct concepts, namely:
-
-* `system-ghc: true` causes Stack to search the PATH for a version of GHC; and
-
-* `hooks/ghc-install.sh` causes Stack to execute a script that is intended to
-  send to standard output a path to a version of GHC. The path in question may
-  or may not be in the PATH. The script may also do other things, including
-  installation.
-
-When `install-ghc: false`, the script is still run. That allows you to ensure
-that only your script will install GHC and Stack won't default to its own
-installation logic, even when the script fails.
-
-The following environment variables are always available to the script:
-
-* `HOOK_GHC_TYPE = "bindist" | "git" | "ghcjs"`
-
-For "bindist", additional variables are:
-
-* `HOOK_GHC_VERSION = <ver>`
-
-For "git", additional variables are:
-
-* `HOOK_GHC_COMMIT = <commit>`
-* `HOOK_GHC_FLAVOR = <flavor>`
-
-For "ghcjs", additional variables are:
-
-* `HOOK_GHC_VERSION = <ver>`
-* `HOOK_GHCJS_VERSION = <ver>`
-
-An example script is:
-
-~~~sh
-#!/bin/sh
-
-set -eu
-
-case $HOOK_GHC_TYPE in
-	bindist)
-		# install GHC here, not printing to stdout, e.g.:
-		#   command install $HOOK_GHC_VERSION >/dev/null
-		;;
-	git)
-		>&2 echo "Hook doesn't support installing from source"
-		exit 1
-		;;
-	*)
-		>&2 echo "Unsupported GHC installation type: $HOOK_GHC_TYPE"
-		exit 2
-		;;
-esac
-
-echo "location/to/ghc/executable"
-~~~
-
-If the following script is installed by GHCup, GHCup makes use of it, so that if
-Stack needs a version of GHC, GHCup takes over obtaining and installing that
-version:
-
-~~~sh
-#!/bin/sh
-
-set -eu
-
-case $HOOK_GHC_TYPE in
-    bindist)
-        ghcdir=$(ghcup whereis --directory ghc "$HOOK_GHC_VERSION" || ghcup run --ghc "$HOOK_GHC_VERSION" --install) || exit 3
-        printf "%s/ghc" "${ghcdir}"
-        ;;
-    git)
-        # TODO: should be somewhat possible
-        >&2 echo "Hook doesn't support installing from source"
-        exit 1
-        ;;
-    *)
-        >&2 echo "Unsupported GHC installation type: $HOOK_GHC_TYPE"
-        exit 2
-        ;;
-esac
-~~~
-
-### `--file-watch` post-processing
-
-:octicons-tag-24: UNRELEASED
-
-On Unix-like operating systems and Windows, Stack's `build --file-watch`
-post-processing can be fully customised by specifying an executable or a `sh`
-shell script (a 'hook') using the [`file-watch-hook`](#file-watch-hook)
-configuration option. On Unix-like operating systems, the script file must be
-made executable. A script is run by the `sh` application (which is provided by
-MSYS2 on Windows).
-
-The following environment variables are always available to the executable or script:
-
-* `HOOK_FW_RESULT` (Equal to `""` if the build did not fail. Equal to the result
-  of `displayException e`, if exception `e` thown during the build.)
-
-An example script is:
-
-~~~sh
-#!/bin/sh
-
-set -eu
-
-if [ -z "$HOOK_FW_RESULT" ]; then
-  echo "Success! Waiting for next file change."
-else
-  echo "Build failed with exception:"
-  echo $HOOK_FW_RESULT
-fi
-~~~
