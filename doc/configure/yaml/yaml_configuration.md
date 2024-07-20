@@ -20,10 +20,9 @@ Stack is configured by the content of YAML files.
 ## YAML configuration
 
 Stack's YAML configuration options break down into
-[project-specific](#project-specific-configuration) options and
-[non-project-specific](#non-project-specific-configuration) options. The former
-are configured at the project level. The latter are configured at the project
-level or globally.
+[project-specific](project.md) options and
+[non-project-specific](non-project.md) options. The former are configured at the
+project level. The latter are configured at the project level or globally.
 
 The **project-level** configuration file (`stack.yaml`, by default) contains
 project-specific options and may contain non-project-specific options. However,
@@ -49,8 +48,8 @@ option set in the system-wide file (if it exists).
 The default location of these files depends on the operating system and, in the
 case of the user-specific file, whether Stack is configured to use the XDG Base
 Directory Specification. An absolute path to these files can be specified by the
-[`STACK_CONFIG`](environment_variables.md#stack_config) and
-[`STACK_GLOBAL_CONFIG`](environment_variables.md#stack_config) environment
+[`STACK_CONFIG`](../environment_variables.md#stack_config) and
+[`STACK_GLOBAL_CONFIG`](../environment_variables.md#stack_config) environment
 variables, respectively.
 
 === "Unix-like"
@@ -96,4 +95,5 @@ you're not sure how, open an issue labeled "question".
 
 If you wish to understand the difference between a `stack.yaml` files and a
 Cabal file (named `<package_name>.cabal`), see the
-[stack.yaml vs a Cabal file](stack_yaml_vs_cabal_package_file.md) documentation.
+[stack.yaml vs a Cabal file](../../topics/stack_yaml_vs_cabal_package_file.md)
+documentation.

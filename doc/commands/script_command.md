@@ -203,7 +203,7 @@ outputs will be written to a directory named `MyScript.hs` at
 
 As for Example 1, but `acme-missiles-0.2` is specified by adding it to the
 snapshot as an extra-dep. The `stack script` command is specified using Stack's
-[script interpreter](scripts.md).
+[script interpreter](../topics/scripts.md).
 
 ~~~haskell
 {- stack script
@@ -244,7 +244,7 @@ Consequently, for example, Stack will:
 Consider also the following script extract, based on snapshot Stackage
  LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
 `stack script` command is specified using Stack's
-[script interpreter](scripts.md).
+[script interpreter](../topics/scripts.md).
 
 === "Windows"
 

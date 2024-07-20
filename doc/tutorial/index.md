@@ -54,9 +54,9 @@ used for building Haskell code, such as Cabal (the tool).
 
 ## Downloading and Installation
 
-The [documentation dedicated to downloading Stack](install_and_upgrade.md) has
-the most up-to-date information for a variety of operating systems. Instead of
-repeating that content here, please go check out that page and come back here
+The [documentation dedicated to downloading Stack](../install_and_upgrade.md)
+has the most up-to-date information for a variety of operating systems. Instead
+of repeating that content here, please go check out that page and come back here
 when you can successfully run `stack --version`.
 
 We also assume that the directory reported by `stack path --local-bin` has been

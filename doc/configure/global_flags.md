@@ -41,14 +41,14 @@ documentation.
 
 Pass the option `--custom-preprocessor-extensions <extension>` to specify an
 extension used for a custom preprocessor. For further information, see the
-documentation for the corresponding non-project specific configuration
+documentation for the corresponding project specific configuration
 [option](yaml/project.md#custom-preprocessor-extensions).
 
 ## `--docker*` flags and options
 
 Stack supports automatically performing builds inside a Docker container. For
 further information see `stack --docker-help` or the
-[Docker integratiom](docker_integration.md) documentation.
+[Docker integration](../topics/docker_integration.md) documentation.
 
 ## `--[no-]dump-logs` flag
 
@@ -154,7 +154,8 @@ see the documentation for the corresponding non-project specific configuration
 ## `--nix*` flags and options
 
 Stack can be configured to integrate with Nix. For further information, see
-`stack --nix-help` or the [Nix integration](nix_integration.md) documentation.
+`stack --nix-help` or the [Nix integration](../topics/nix_integration.md)
+documentation.
 
 ## `--numeric-version` flag
 
@@ -222,7 +223,7 @@ corresponding non-project specific configuration
 [:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 Pass the option `--snapshot <snapshot>` to specify the snapshot. For further
-information, see the [YAML configuration](yaml_configuration.md#snapshot)
+information, see the [YAML configuration](yaml/project.md#snapshot)
 documentation.
 
 At the command line (only):
@@ -322,7 +323,7 @@ non-project specific configuration [option](yaml/non-project.md#with-hpack).
 Default: `.stack-work`
 
 Overrides: [`STACK_WORK`](environment_variables.md#stack_work) environment
-variable, and [`work-dir`](yaml_configuration.md) non-project specific
+variable, and [`work-dir`](yaml/non-project.md#work-dir) non-project specific
 configuration option.
 
 Pass the option `--work-dir <relative_path_to_the_Stack_root>` to specify the

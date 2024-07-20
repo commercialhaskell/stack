@@ -91,9 +91,9 @@ of reproducible builds is - in the Stack maintainers' views - worth the
 confusion.
 
 Final point: if you have GHC options that you'll be regularly passing to your
-packages, you can add them to your `stack.yaml` file. See the
-[documentation section on ghc-options](yaml_configuration.md#ghc-options)
-for more information.
+packages, you can add them to your `stack.yaml` file. For more information, see
+the [ghc-options](../configure/yaml/non-project.md#ghc-options) non-project
+specific configuration option documentation.
 
 !!! note
 

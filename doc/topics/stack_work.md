@@ -15,7 +15,7 @@ By default, Stack work directories are named `.stack-work`. The name can be
 overidden by:
 
 * the use of the
-  [`STACK_WORK` environment variable](environment_variables.md#stack_work);
+  [`STACK_WORK` environment variable](../configure/environment_variables.md#stack_work);
 * the [`work-dir`](../configure/yaml/non-project.md#work-dir) non-project
   specific configuration option; or
 * the [`--work-dir`](../configure/global_flags.md#-work-dir-option) command line

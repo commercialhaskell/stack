@@ -44,7 +44,7 @@ currently four snapshot types:
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
   like `snapshot: ghc-9.6.5`
 * Custom snapshot, via a URL or relative file path. For further information, see
-  the [snapshot and package location](pantry.md) documentation.
+  the [snapshot and package location](../../topics/pantry.md) documentation.
 
 Each of these snapshots will also determine what constraints are placed on the
 compiler version. See the [compiler-check](non-project.md#compiler-check) option
@@ -122,7 +122,7 @@ A Pantry package location is one or three different kinds of sources:
 * a Git or Mercurial repository.
 
 For further information on the format for specifying a Pantry package location,
-see the [Pantry](pantry.md) documentation. For example:
+see the [Pantry](../../topics/pantry.md) documentation. For example:
 
 ~~~yaml
 extra-deps:

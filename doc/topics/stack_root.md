@@ -17,9 +17,10 @@ configured to use the XDG Base Directory Specification, and/or whether an
 alternative location to Stack's default 'programs' directory has been specified.
 
 The location of the Stack root can be configured by setting the
-[`STACK_ROOT`](environment_variables.md#stack_root) environment variable or
-using Stack's [`--stack-root`](../configure/global_flags.md#stack-root-option)
-option on the command line.
+[`STACK_ROOT`](../configure/environment_variables.md#stack_root) environment
+variable or using Stack's
+[`--stack-root`](../configure/global_flags.md#stack-root-option) option on the
+command line.
 
 === "Unix-like"
 

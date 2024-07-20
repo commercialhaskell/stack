@@ -90,7 +90,7 @@ The reason we have this structure is that:
 
 As you probably guessed, there can be multiple snapshot databases available. See
 the contents of the `snapshots` directory in the
-[Stack root](../../topics/stack_root.md).
+[Stack root](../topics/stack_root.md).
 
 * On Unix-like operating systems, each snapshot is in the last of a sequence of
   three subdirectories named after the platform, a 256-bit hash of the source

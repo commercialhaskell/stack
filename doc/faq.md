@@ -338,8 +338,8 @@ stack build
 ## I heard you can use this with Docker?
 
 Yes, Stack supports using Docker with images that contain preinstalled Stackage
-packages and the tools. See [Docker integration](docker_integration.md) for
-details.
+packages and the tools. See [Docker integration](topics/docker_integration.md)
+for details.
 
 ## How do I build a statically-linked executable on Linux?
 

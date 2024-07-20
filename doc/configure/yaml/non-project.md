@@ -539,7 +539,8 @@ Command line equivalents: `--docker-*` flags and options (see
 `stack --docker-help` for details).
 
 For further information, see the
-[Docker integration](docker_integration.md#configuration) documentation.
+[Docker integration](../../topics/docker_integration.md#configuration)
+documentation.
 
 ## dump-logs
 
@@ -896,7 +897,7 @@ Command line equivalents: `--nix-*` flags and options (see `stack --nix-help`
 for details).
 
 For further information, see the
-[Nix integration](nix_integration.md#configuration) documentation.
+[Nix integration](../../topics/nix_integration.md#configuration) documentation.
 
 ## notify-if-arch-unknown
 
@@ -1406,8 +1407,8 @@ stack-developer-mode: false
 
 ## system-ghc
 
-Default: `false`, unless the [Docker](docker_integration.md) or
-[Nix](nix_integration.md) integration is enabled.
+Default: `false`, unless the [Docker](../../topics/docker_integration.md) or
+[Nix](../../topics/nix_integration.md) integration is enabled.
 
 Command line equivalent (takes precedence): `--[no-]system-ghc` flag
 
@@ -1533,7 +1534,7 @@ Command line equivalent (takes precedence):
 [`--work-dir`](../global_flags.md#-work-dir-option) option
 
 Environment variable alternative (lowest precedence):
-[`STACK_WORK`](environment_variables.md#stack_work)
+[`STACK_WORK`](../environment_variables.md#stack_work)
 
 `work-dir` specifies the path of Stack's work directory, within a local project
 or package directory. The path must be a relative one, relative to the
