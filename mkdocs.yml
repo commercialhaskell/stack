@@ -29,7 +29,7 @@ extra_javascript:
 
 nav:
 - Welcome!: README.md
-- Setup: install_and_upgrade.md
+- Setting up: install_and_upgrade.md
 - Getting started: GUIDE.md
 - Commands:
   - commands/index.md
@@ -75,6 +75,7 @@ nav:
   - Configuration (project and global): configure/yaml_configuration.md
   - Global flags and options: configure/global_flags.md
 - Topics:
+  - topics/index.md
   - Stack root: topics/stack_root.md
   - Stack work directories: topics/stack_work.md
   - Snapshot and package location: topics/pantry.md
@@ -120,6 +121,7 @@ nav:
 markdown_extensions:
 - admonition
 - attr_list
+- def_list
 - footnotes
 - pymdownx.details
 - pymdownx.emoji:

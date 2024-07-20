@@ -34,15 +34,88 @@ extra-source-files:
     stack.yaml
     doc/build_overview.md
     doc/ChangeLog.md
+    doc/commands/bench_command.md
+    doc/commands/build_command.md
+    doc/commands/clean_command.md
+    doc/commands/config_command.md
+    doc/commands/docker_command.md
+    doc/commands/dot_command.md
+    doc/commands/eval_command.md
+    doc/commands/exec_command.md
+    doc/commands/ghc_command.md
+    doc/commands/ghci_command.md
+    doc/commands/haddock_command.md
+    doc/commands/hoogle_command.md
+    doc/commands/hpc_command.md
+    doc/commands/ide_command.md
+    doc/commands/index.md
+    doc/commands/init_command.md
+    doc/commands/install_command.md
+    doc/commands/list_command.md
+    doc/commands/ls_command.md
+    doc/commands/new_command.md
+    doc/commands/path_command.md
+    doc/commands/purge_command.md
+    doc/commands/query_command.md
+    doc/commands/repl_command.md
+    doc/commands/run_command.md
+    doc/commands/runghc_command.md
+    doc/commands/runhaskell_command.md
+    doc/commands/script_command.md
+    doc/commands/sdist_command.md
+    doc/commands/setup_command.md
+    doc/commands/templates_command.md
+    doc/commands/test_command.md
+    doc/commands/uninstall_command.md
+    doc/commands/unpack_command.md
+    doc/commands/update_command.md
+    doc/commands/upgrade_command.md
+    doc/commands/upload_command.md
+    doc/configure/environment_variables.md
+    doc/configure/global_flags.md
+    doc/configure/index.md
+    doc/configure/yaml_configuration.md
     doc/CONTRIBUTING.md
     doc/dev_containers.md
     doc/faq.md
     doc/glossary.md
     doc/GUIDE.md
     doc/install_and_upgrade.md
+    doc/maintainers/7zip.md
+    doc/maintainers/archive/README.md
+    doc/maintainers/archive/releases.md
+    doc/maintainers/docker.md
+    doc/maintainers/docker_images.md
+    doc/maintainers/ghc.md
+    doc/maintainers/haskellstack.org.md
+    doc/maintainers/msys.md
+    doc/maintainers/releases.md
+    doc/maintainers/self-hosted_runners.md
+    doc/maintainers/stack_errors.md
+    doc/maintainers/team_process.md
     doc/other_resources.md
     doc/README.md
     doc/SIGNING_KEY.md
+    doc/topics/azure_ci.md
+    doc/topics/CI.md
+    doc/topics/custom_snapshot.md
+    doc/topics/debugging.md
+    doc/topics/developing_on_windows.md
+    doc/topics/docker_integration.md
+    doc/topics/editor_integration.md
+    doc/topics/haskell_and_c_code.md
+    doc/topics/index.md
+    doc/topics/lock_files.md
+    doc/topics/nix_integration.md
+    doc/topics/nonstandard_project_init.md
+    doc/topics/pantry.md
+    doc/topics/scripts.md
+    doc/topics/shell_autocompletion.md
+    doc/topics/Stack_and_VS_Code.md
+    doc/topics/stack_root.md
+    doc/topics/stack_work.md
+    doc/topics/stack_yaml_vs_cabal_package_file.md
+    doc/topics/travis_ci.md
     src/setup-shim/StackSetupShim.hs
     tests/unit/package-dump/ghc-7.10.txt
     tests/unit/package-dump/ghc-7.8.4-osx.txt
