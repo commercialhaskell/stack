@@ -17,6 +17,7 @@ theme:
   - content.code.copy
   - content.code.select
   - content.tabs.link
+  - navigation.tabs
 extra_css:
 - css/extra.css
 extra_javascript:
@@ -27,76 +28,72 @@ extra_javascript:
 
 nav:
 - Welcome!: README.md
-- How to get & use Stack:
-  - General guidance:
-    - Install/upgrade: install_and_upgrade.md
-    - User's guide (introductory): GUIDE.md
-    - FAQ: faq.md
-    - Other resources: other_resources.md
-  - Reference (advanced):
-    - Introduction: GUIDE_advanced.md
-    - Environment variables: environment_variables.md
-    - Configuration (project and global): yaml_configuration.md
-    - Global flags and options: global_flags.md
-    - bench command: build_command.md
-    - build command: build_command.md
-    - clean command: clean_command.md
-    - config commands: config_command.md
-    - dot command: dot_command.md
-    - docker commands: docker_command.md
-    - eval command: eval_command.md
-    - exec command: exec_command.md
-    - ghc command: ghc_command.md
-    - ghci command: ghci.md
-    - haddock command: build_command.md
-    - hoogle command: hoogle_command.md
-    - hpc command: hpc_command.md
-    - ide command: ide_command.md
-    - init command: init_command.md
-    - install command: build_command.md
-    - list command: list_command.md
-    - ls command: ls_command.md
-    - new command: new_command.md
-    - path command: path_command.md
-    - purge command: purge_command.md
-    - query command: query_command.md
-    - repl command: ghci.md
-    - run command: run_command.md
-    - runghc command: runghc_command.md
-    - runhaskell command: runghc_command.md
-    - script command: script_command.md
-    - sdist command: sdist_command.md
-    - setup command: setup_command.md
-    - templates command: templates_command.md
-    - test command: build_command.md
-    - uninstall command: uninstall_command.md
-    - unpack command: unpack_command.md
-    - update command: update_command.md
-    - upgrade command: upgrade_command.md
-    - upload command: upload_command.md
-  - Specific topics:
-    - Stack root: stack_root.md
-    - Snapshot and package location: pantry.md
-    - Snapshot specification: custom_snapshot.md
-    - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
-    - Script interpreter: scripts.md
-    - Docker integration: docker_integration.md
-    - Nix integration: nix_integration.md
-    - Non-standard project initialization: nonstandard_project_init.md
-    - Debugging: debugging.md
-    - Editor integration: editor_integration.md
-    - Stack and Visual Studio Code: Stack_and_VS_Code.md
-    - Developing on Windows: developing_on_windows.md
-    - Shell auto-completion: shell_autocompletion.md
-    - CI: CI.md
-    - Travis CI: travis_ci.md
-    - Azure CI: azure_ci.md
-    - Lock files: lock_files.md
-    - Stack work directories: stack_work.md
-    - Haskell and C code: haskell_and_c_code.md
-- How Stack works (advanced):
-  - Build overview: build_overview.md
-- Stack's code (advanced):
+- Setup: install_and_upgrade.md
+- Getting started: GUIDE.md
+- Commands:
+  - commands/index.md
+  - bench command: commands/bench_command.md
+  - build command: commands/build_command.md
+  - clean command: commands/clean_command.md
+  - config commands: commands/config_command.md
+  - dot command: commands/dot_command.md
+  - docker commands: commands/docker_command.md
+  - eval command: commands/eval_command.md
+  - exec command: commands/exec_command.md
+  - ghc command: commands/ghc_command.md
+  - ghci command: commands/ghci_command.md
+  - haddock command: commands/build_command.md
+  - hoogle command: commands/hoogle_command.md
+  - hpc command: commands/hpc_command.md
+  - ide command: commands/ide_command.md
+  - init command: commands/init_command.md
+  - install command: commands/build_command.md
+  - list command: commands/list_command.md
+  - ls command: commands/ls_command.md
+  - new command: commands/new_command.md
+  - path command: commands/path_command.md
+  - purge command: commands/purge_command.md
+  - query command: commands/query_command.md
+  - repl command: commands/ghci_command.md
+  - run command: commands/run_command.md
+  - runghc command: commands/runghc_command.md
+  - runhaskell command: commands/runghc_command.md
+  - script command: commands/script_command.md
+  - sdist command: commands/sdist_command.md
+  - setup command: commands/setup_command.md
+  - templates command: commands/templates_command.md
+  - test command: commands/build_command.md
+  - uninstall command: commands/uninstall_command.md
+  - unpack command: commands/unpack_command.md
+  - update command: commands/update_command.md
+  - upgrade command: commands/upgrade_command.md
+  - upload command: commands/upload_command.md
+- Configure:
+  - configuration_introduction.md
+  - Environment variables: environment_variables.md
+  - Configuration (project and global): yaml_configuration.md
+  - Global flags and options: global_flags.md
+- Topics:
+  - Stack root: stack_root.md
+  - Stack work directories: stack_work.md
+  - Snapshot and package location: pantry.md
+  - Snapshot specification: custom_snapshot.md
+  - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
+  - Script interpreter: scripts.md
+  - Docker integration: docker_integration.md
+  - Nix integration: nix_integration.md
+  - Non-standard project initialization: nonstandard_project_init.md
+  - Debugging: debugging.md
+  - Editor integration: editor_integration.md
+  - Stack and Visual Studio Code: Stack_and_VS_Code.md
+  - Developing on Windows: developing_on_windows.md
+  - Shell auto-completion: shell_autocompletion.md
+  - CI: CI.md
+  - Travis CI: travis_ci.md
+  - Azure CI: azure_ci.md
+  - Lock files: lock_files.md
+  - Haskell and C code: haskell_and_c_code.md
+- Get involved:
   - Contributors:
     - Contributor's guide: CONTRIBUTING.md
     - Dev Containers: dev_containers.md
@@ -110,9 +107,14 @@ nav:
     - HaskellStack.org: maintainers/haskellstack.org.md
     - Self-hosted runners: maintainers/self-hosted_runners.md
     - Docker images: maintainers/docker_images.md
-- Signing key: SIGNING_KEY.md
+    - Signing key: SIGNING_KEY.md
+  - How Stack works:
+    - Build overview: build_overview.md
+- FAQ: faq.md
 - Glossary: glossary.md
-- Version history: ChangeLog.md
+- More:
+  - Other resoruces: other_resources.md
+  - Version history: ChangeLog.md
 
 markdown_extensions:
 - admonition

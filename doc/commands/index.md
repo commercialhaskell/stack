@@ -1,33 +1,14 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# User guide (advanced)
+# Commands (advanced)
 
 Some of Stack's features will not be needed regularly or by all users. This part
-of the guide provides information about those features, organised as a reference
+of the guide and the part on [configuration](configuration_introduction.md)
+provide information about somethose features, organised as a reference
 guide. Some of the features are complex and separate pages are dedicated to
 them.
 
-## Environment variables
-
-The existence or content of certain environment variables can affect how Stack
-behaves. For further information, see the
-[environment variables](environment_variables.md) documentation.
-
-## YAML configuration files
-
-Stack is configured by the content of YAML files. A global YAML configuration
-file contains non-project specific options. A project-level YAML configuration
-file contains project-specific options and may contain non-project specific
-options. For further information, see the
-[YAML configuration](yaml_configuration.md) documentation.
-
-## Global flags and options
-
-Stack can also be configured by flags and options on the command line. Global
-flags and options apply to all of Stack's commands. For further information, see
-the [global flags and options](global_flags.md) documentation.
-
-## Stack commands
+## Stack commands (alphabetical)
 
 Stack's commands are listed below, in alphabetical order.
 
@@ -44,7 +25,7 @@ Stack's commands are listed below, in alphabetical order.
 * [`hpc`](hpc_command.md) - generate Haskell Program Coverage (HPC) code coverage
   reports
 * [`ghc`](ghc_command.md) - run `ghc`
-* [`ghci`](ghci.md) - run GHCi, a REPL environment
+* [`ghci`](ghci_command.md) - run GHCi, a REPL environment
 * [`ide`](ide_command.md) - information for an integrated development
   environment (IDE)
 * [`init`](init_command.md) - initialise Stack's project-level YAML configuration file for an
@@ -56,7 +37,7 @@ Stack's commands are listed below, in alphabetical order.
 * [`path`](path_command.md) - information about locations used by Stack
 * [`purge`](purge_command.md) - delete the Stack working directories
 * [`query`](query_command.md) - information about the build
-* [`repl`](ghci.md) - a synonym for `stack ghci`
+* [`repl`](ghci_command.md) - a synonym for `stack ghci`
 * [`run`](run_command.md) - build and run an executable
 * [`runghc`](runghc_command.md) - run `runghc`
 * [`runhaskell`](runghc_command.md) - a synonym for `stack runghc`

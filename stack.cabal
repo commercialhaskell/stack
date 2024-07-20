@@ -33,68 +33,38 @@ extra-source-files:
     README.md
     stack.yaml
     doc/azure_ci.md
-    doc/build_command.md
     doc/build_overview.md
     doc/ChangeLog.md
     doc/CI.md
-    doc/clean_command.md
-    doc/config_command.md
+    doc/configuration_introduction.md
     doc/CONTRIBUTING.md
     doc/custom_snapshot.md
     doc/debugging.md
     doc/dev_containers.md
     doc/developing_on_windows.md
-    doc/docker_command.md
     doc/docker_integration.md
-    doc/dot_command.md
     doc/editor_integration.md
     doc/environment_variables.md
-    doc/eval_command.md
-    doc/exec_command.md
     doc/faq.md
-    doc/ghc_command.md
-    doc/ghci.md
     doc/global_flags.md
     doc/glossary.md
     doc/GUIDE.md
-    doc/GUIDE_advanced.md
     doc/haskell_and_c_code.md
-    doc/hoogle_command.md
-    doc/hpc_command.md
-    doc/ide_command.md
-    doc/init_command.md
     doc/install_and_upgrade.md
-    doc/list_command.md
     doc/lock_files.md
-    doc/ls_command.md
-    doc/new_command.md
     doc/nix_integration.md
     doc/nonstandard_project_init.md
     doc/other_resources.md
     doc/pantry.md
-    doc/path_command.md
-    doc/purge_command.md
-    doc/query_command.md
     doc/README.md
-    doc/run_command.md
-    doc/runghc_command.md
-    doc/script_command.md
     doc/scripts.md
-    doc/sdist_command.md
-    doc/setup_command.md
     doc/shell_autocompletion.md
     doc/SIGNING_KEY.md
     doc/Stack_and_VS_Code.md
     doc/stack_root.md
     doc/stack_work.md
     doc/stack_yaml_vs_cabal_package_file.md
-    doc/templates_command.md
     doc/travis_ci.md
-    doc/uninstall_command.md
-    doc/unpack_command.md
-    doc/update_command.md
-    doc/upgrade_command.md
-    doc/upload_command.md
     doc/yaml_configuration.md
     src/setup-shim/StackSetupShim.hs
     tests/unit/package-dump/ghc-7.10.txt

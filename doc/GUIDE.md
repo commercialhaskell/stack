@@ -10,8 +10,10 @@ experience with the Haskell packaging system or other tools used for, or during,
 building Haskell code. Terms used in the guide are defined in the
 [glossary](glossary.md).
 
-Some of Stack's features will not be needed regularly or by all users. See the
-[advanced user's guide](GUIDE_advanced.md) for information about those features.
+Some of Stack's features will not be needed regularly or by all users. See
+Stack's [commands](commands_introduction.md) and
+[configuration](configuration_introduction.md) for information about those
+features.
 
 ## Stack's functions
 
@@ -1345,7 +1347,8 @@ followed by the module name.
     [configuration](yaml_configuration.md#extra-deps) to learn how to
     configure a package as an extra-dep.
 
-For further information, see the [REPL environment](ghci.md) documentation.
+For further information, see the [REPL environment](ghci_command.md)
+documentation.
 
 ## The `stack ghc` and `stack runghc` commands
 
