@@ -594,13 +594,12 @@ Stack can be installed directly or by using the GHCup tool.
         GHCup puts executable files in the `bin` directory in the GHCup root
         directory.
 
-    ## China-based users
+    !!! note "China-based users"
 
-    If you're attempting to install Stack from within China, as of
-    24 February 2020, the download link has limited connectivity from
-    within mainland China. If this is the case, please proceed by manually
-    downloading (ideally via a VPN) and installing Stack per the instructions
-    found on this page pertinent to your operating system.
+        As of 24 February 2020, the download link has limited connectivity from
+        within mainland China. If you experience this, please proceed by
+        manually downloading (ideally via a VPN) and installing Stack following
+        the instructions on this page that apply to your operating system.
 
 === "GHCup"
 
@@ -618,7 +617,7 @@ Stack can be installed directly or by using the GHCup tool.
     also configures Stack so that if Stack needs a version of GHC, GHCup takes
     over obtaining and installing that version.
 
-## China-based users
+## China-based users: configuration
 
 After installation, your `config.yaml` file will need to be configured before
 Stack can download large files consistently from within China (without reliance
@@ -677,12 +676,12 @@ Stack or GHCup to manage versions of Stack.
     There are different approaches to upgrading Stack, which vary as between
     Unix-like operating systems (including macOS) and Windows.
 
-   !!! warning
+    !!! warning
 
-       If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack, you
-       should also use GHCup to upgrade Stack. GHCup uses an executable named
-       `stack` to manage versions of Stack, through a file `stack.shim`. Stack
-       will likely overwrite the executable on upgrade.
+        If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack,
+        you should also use GHCup to upgrade Stack. GHCup uses an executable
+        named `stack` to manage versions of Stack, through a file `stack.shim`.
+        Stack will likely overwrite the executable on upgrade.
 
     === "Unix-like"
 
@@ -724,7 +723,7 @@ Stack or GHCup to manage versions of Stack.
             ~~~
 
         4.  Manually follow the steps above to download the newest executable
-           from the GitHub releases page and replace the old executable.
+            from the GitHub releases page and replace the old executable.
 
     === "Windows"
 
