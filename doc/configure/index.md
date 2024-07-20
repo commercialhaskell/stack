@@ -8,7 +8,8 @@ provide information about those features, organised as a reference guide. Some
 of the features are complex and separate pages are dedicated to them.
 
 The behaviour of Stack is configurable using environment variables, YAML
-configuration files and global flags and options on the command line.
+configuration files, global flags and options on the command line and
+customisation scripts.
 
 ## Environment variables
 
@@ -29,3 +30,9 @@ options. For further information, see the
 Stack can also be configured by flags and options on the command line. Global
 flags and options apply to all of Stack's commands. For further information, see
 the [global flags and options](global_flags.md) documentation.
+
+## Customisation scripts
+
+Stack's behaviour can also be affected by customisation scripts. For further
+information, see the [customisation scripts](customisation_scripts.md)
+documentation.

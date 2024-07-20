@@ -19,6 +19,7 @@ theme:
   - content.tabs.link
   - navigation.indexes
   - navigation.tabs
+  - navigation.top
 extra_css:
 - css/extra.css
 extra_javascript:
@@ -44,7 +45,7 @@ nav:
   - 10. Executing commands: tutorial/executing_commands.md
   - 11. Using GHC interactively: tutorial/using_ghc_interactively.md
   - 12. Stack configuration: tutorial/stack_configuration.md
-  - 13. In conclusion: tutorial/conclusion.md
+  - 13. In conclusion: tutorial/tutorial_conclusion.md
 - Commands:
   - commands/index.md
   - bench: commands/bench_command.md
@@ -86,8 +87,12 @@ nav:
 - Configure:
   - configure/index.md
   - Environment variables: configure/environment_variables.md
-  - Configuration (project and global): configure/yaml_configuration.md
+  - Configuration:
+    - Introduction: configure/yaml/yaml_configuration.md
+    - Project-specific: configure/yaml/project-specific_configuration.md
+    - Non-project specific: configure/yaml/non-project_specific_configuration.md
   - Global flags and options: configure/global_flags.md
+  - Customisation scripts: customisation_scripts.md
 - Topics:
   - topics/index.md
   - Stack root: topics/stack_root.md
