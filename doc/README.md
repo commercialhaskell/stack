@@ -4,19 +4,28 @@
 
 Welcome to the [Haskell](https://www.haskell.org/) programming language and the
 Haskell Tool Stack (Stack)! Stack is a program for developing Haskell projects.
-It is aimed at Haskellers both new and experienced. It is cross-platform and
-aims to support fully users on Linux, macOS and Windows.
+It is aimed at new and experienced users of Haskell and seeks to support
+them fully on Linux, macOS and Windows.
+
+Haskell code is compiled by the
+[Glasgow Haskell Compiler](https://www.haskell.org/ghc/) (GHC), which can also
+be used interactively.
 
 <img src="https://i.imgur.com/WW69oTj.gif" width="50%" align="right">
 
-Stack features:
+Stack features include:
 
-* Installing the [Glasgow Haskell Compiler (GHC)](https://www.haskell.org/ghc/)
-  automatically, in an isolated location.
+* Installing GHC automatically.
 * Installing packages needed for your project.
 * Building your project.
 * Testing your project.
 * Benchmarking your project.
+* Using GHC interactively.
+
+Stack is used at the command line. You will need terminal software for your
+system (which will likely come with its operating system) and a program to edit
+code files. There are a number of freely-available and popular code editors that
+have Haskell extensions.
 
 ## How to install Stack
 
@@ -24,137 +33,172 @@ Stack can be installed on most Unix-like operating systems (including macOS) and
 Windows. It will require at least about 5 GB of disk space, for use with one
 version of GHC.
 
-!!! info
+Stack can be installed directly or by using the GHCup tool.
 
-    In addition to the methods described below, Stack can also be installed
-    using the separate [GHCup](https://www.haskell.org/ghcup/) installer for
-    Haskell-related tools. GHCup provides Stack for some combinations of machine
-    architecture and operating system not provided elsewhere. By default, the
-    script to install GHCup (which can be run more than once) also configures
-    Stack so that if Stack needs a version of GHC, GHCup takes over obtaining
-    and installing that version.
+=== "Directly"
 
-=== "Linux"
+    Stack can be installed directly on various operating systems.
 
-    For most Linux distributions, the easiest way to install Stack
-    directly (rather than use GHCup) is to command:
+    === "Linux"
 
-    ~~~text
-    curl -sSL https://get.haskellstack.org/ | sh
-    ~~~
+        For most Linux distributions, on x86_64 or AArch64 machine
+        architectures, the easiest way to install Stack is to command either:
 
-    or:
+        ~~~text
+        curl -sSL https://get.haskellstack.org/ | sh
+        ~~~
 
-    ~~~text
-    wget -qO- https://get.haskellstack.org/ | sh
-    ~~~
+        or:
 
-    !!! note
+        ~~~text
+        wget -qO- https://get.haskellstack.org/ | sh
+        ~~~
 
-        The script at [get.haskellstack.org](https://get.haskellstack.org/) will
-        ask for root access using `sudo`. It needs such access in order to use
-        your platform's package manager to install dependencies and to install
-        to `/usr/local/bin`. If you prefer more control, follow the manual
-        installation instructions in the
+        These commands download a script file and run it using `sh`.
+
+        !!! note
+
+            The script at [get.haskellstack.org](https://get.haskellstack.org/)
+            will ask for root access using `sudo`. It needs such access in order
+            to use your platform's package manager to install dependencies and
+            to install to `/usr/local/bin`. If you prefer more control, follow
+            the manual installation instructions in the
+            [install and upgrade guide](install_and_upgrade.md).
+
+    === "macOS"
+
+        From late 2020, Apple began a transition from Mac computers with Intel
+        processors (Intel-based Mac) to
+        [Mac computers with Apple silicon](https://support.apple.com/en-gb/HT211814).
+
+        === "Intel-based"
+
+            For most Intel-based Mac computers, the easiest way to install Stack
+            is to command either:
+
+            ~~~text
+            curl -sSL https://get.haskellstack.org/ | sh
+            ~~~
+
+            or:
+
+            ~~~text
+            wget -qO- https://get.haskellstack.org/ | sh
+            ~~~
+
+            These commands download a script file and run it using `sh`.
+
+            !!! note
+
+                The script at
+                [get.haskellstack.org](https://get.haskellstack.org/) will ask
+                for root access using `sudo`. It needs such access in order to
+                use your platform's package manager to install dependencies and
+                to install to `/usr/local/bin`. If you prefer more control,
+                follow the manual installation instructions in the
+                [install and upgrade guide](install_and_upgrade.md).
+
+        === "Apple silicon"
+
+            Mac computers with Apple silicon have an M series chip. These chips
+            use an architecture known as ARM64 or AArch64.
+
+            For Mac computers with Apple silicon, the easiest way to install
+            Stack is to command either:
+
+            ~~~text
+            curl -sSL https://get.haskellstack.org/ | sh
+            ~~~
+
+            or:
+
+            ~~~text
+            wget -qO- https://get.haskellstack.org/ | sh
+            ~~~
+
+            These commands download a script file and run it using `sh`.
+
+            !!! note
+
+                The script at
+                [get.haskellstack.org](https://get.haskellstack.org/) will ask
+                for root access using `sudo`. It needs such access in order to
+                use your platform's package manager to install dependencies and
+                to install to `/usr/local/bin`. If you prefer more control,
+                follow the manual installation instructions in the
+                [install and upgrade guide](install_and_upgrade.md).
+
+    === "Windows"
+
+        Most machines using the Windows operating system have a x86_64
+        architecture. More recently, Microsoft has provided Windows on Arm that
+        runs on other processors.
+
+        === "x86_64"
+
+            On 64-bit Windows, the easiest way to install Stack is to download
+            and install the
+            [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
+
+            !!! info
+
+                By default, the Windows installer will set the
+                [Stack root](stack_root.md) to `C:\sr`.
+
+            !!! note
+
+                Systems with antivirus software may need to add Stack to the
+                list of 'trusted' applications.
+
+        === "Windows on Arm"
+
+            The GHC project does not yet provide a version of GHC that runs on
+            Windows on Arm.
+
+    === "Other/direct downloads"
+
+        For other operating systems and direct downloads see the
         [install and upgrade guide](install_and_upgrade.md).
 
-=== "macOS"
+=== "GHCup"
 
-    From late 2020, Apple began a transition from Mac computers with Intel
-    processors (Intel-based Mac) to
-    [Mac computers with Apple silicon](https://support.apple.com/en-gb/HT211814).
+    The separate [GHCup](https://www.haskell.org/ghcup/) project provides a tool
+    that can be used to install Stack and other Haskell-related tools, including
+    GHC and
+    [Haskell Language Server](https://github.com/haskell/haskell-language-server)
+    (HLS). HLS is a program that is used by Haskell extensions for popular code
+    editors.
 
-    === "Intel-based"
+    GHCup provides Stack for some combinations of machine architecture and
+    operating system not provided elsewhere.
 
-        For most Intel-based Mac computers, the easiest way to install Stack
-        directly (rather than use GHCup) is to command:
-
-        ~~~text
-        curl -sSL https://get.haskellstack.org/ | sh
-        ~~~
-
-        or:
-
-        ~~~text
-        wget -qO- https://get.haskellstack.org/ | sh
-        ~~~
-
-        !!! note
-
-            The script at [get.haskellstack.org](https://get.haskellstack.org/)
-            will ask for root access using `sudo`. It needs such access in order
-            to use your platform's package manager to install dependencies and
-            to install to `/usr/local/bin`. If you prefer more control, follow
-            the manual installation instructions in the
-            [install and upgrade guide](install_and_upgrade.md).
-
-    === "Apple silicon"
-
-        Mac computers with Apple silicon have an M1, M1 Pro, M1 Max, M1 Ultra or
-        M2 chip. These chips use an architecture known as ARM64 or AArch64.
-
-        For Mac computers with Apple silicon, the easiest way to install Stack
-        directly (rather than use GHCup) is to command:
-
-        ~~~text
-        curl -sSL https://get.haskellstack.org/ | sh
-        ~~~
-
-        or:
-
-        ~~~text
-        wget -qO- https://get.haskellstack.org/ | sh
-        ~~~
-
-        !!! note
-
-            The script at [get.haskellstack.org](https://get.haskellstack.org/)
-            will ask for root access using `sudo`. It needs such access in order
-            to use your platform's package manager to install dependencies and
-            to install to `/usr/local/bin`. If you prefer more control, follow
-            the manual installation instructions in the
-            [install and upgrade guide](install_and_upgrade.md).
-
-=== "Windows"
-
-    On 64-bit Windows, the easiest way to install Stack directly (rather than
-    use GHCup) is to download and install the
-    [Windows installer](https://get.haskellstack.org/stable/windows-x86_64-installer.exe).
-
-    !!! info
-
-        By default, the Windows installer will set the Stack root to `C:\sr`.
-
-    !!! warning
-
-        The Windows installer for Stack 2.9.1, 2.9.3 and 2.11.1 (only) will
-        replace the user `PATH` environment variable (rather than append to it)
-        if a 1024 character limit is exceeded. If the content of your existing
-        user `PATH` is long, preserve it before running the installer.
-
-    !!! note
-
-        Systems with antivirus software may need to add Stack to the list of
-        'trusted' applications.
-
-=== "Other/direct downloads"
-
-    For other operating systems and direct downloads (rather than use GHCup),
-    see the [install and upgrade guide](install_and_upgrade.md).
+    By default, the script to install GHCup (which can be run more than once)
+    also configures Stack so that if Stack needs a version of GHC, GHCup takes
+    over obtaining and installing that version.
 
 ## How to upgrade Stack
 
-If Stack is already installed, you can upgrade it to the latest version by the
-command:
+If Stack is already installed, upgrading it depends on whether you are using
+Stack or GHCup to manage versions of Stack.
 
-~~~text
-stack upgrade
-~~~
+=== "Stack"
 
-!!! note
+    If Stack is already installed, you can upgrade it to the latest version by
+    the command:
 
-    If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack, you
-    should also use GHCup, and not Stack, to upgrade Stack.
+    ~~~text
+    stack upgrade
+    ~~~
+
+    !!! warning
+
+        If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack,
+        you should also use GHCup, and not Stack, to upgrade Stack.
+
+=== "GHCup"
+
+    The separate [GHCup](https://www.haskell.org/ghcup/) project provides
+    guidance about how to use GHCup to manage versions of tools such as Stack.
 
 ## Quick Start guide
 
@@ -163,27 +207,34 @@ first you need to follow the [guide to install Stack](#how-to-install-Stack).
 
 ### Step 1: Start your new project
 
-To start a new project named `my-project`, issue these four commands in a
-terminal:
+A complex project can have more than one package and each package can have more
+than one executable (program). However, to start a new single-package project
+named `my-project`, issue these four commands in a terminal:
 
-~~~text
-stack new my-project
-cd my-project
-stack build
-stack exec my-project-exe
-~~~
+1.  `stack new my-project`
 
-- The `stack new my-project` command will create a new directory, named
-  `my-project`. It contains all the files needed to start a project correctly,
-  using a default template.
-- The `cd my-project` command will change the current working directory to that
-  directory.
-- The `stack build` command will build the template project and create an
-  executable named `my-project-exe` (on Windows, `my-project-exe.exe`). First,
-  if necessary, Stack will download a version of GHC in an isolated location.
-  That won't interfere with other GHC installations on your system.
-- The `stack exec my-project-exe` command will run (execute) the built
-  executable, in Stack's environment.
+    This command will create a new directory, named `my-project`. It contains
+    all the files needed to start a project correctly, using a default template.
+
+2.  `cd my-project`
+
+    This command will change the current working directory to that directory.
+
+3.  `stack build`
+
+    This command will build the template project and create an executable named
+    `my-project-exe` (on Windows, `my-project-exe.exe`).
+
+    First, if necessary, Stack will download a version of GHC in an isolated
+    location. That won't interfere with other GHC installations on your system.
+    (On Windows, if necessary, Stack will also download
+    [MSYS2](https://www.msys2.org/). MSYS2 is a project that provides popular
+    tools for developers on Windows).
+
+4.  `stack exec my-project-exe`
+
+    This command will run (execute) the built executable, in Stack's
+    environment.
 
 For a complete list of Stack's commands, and flags and options common to those
 commands, simply command:
@@ -277,20 +328,19 @@ explained in the [glossary](glossary.md).
 
 ## Why Stack?
 
-Stack is a tool for building Haskell code designed to answer the needs of
-Haskell users, both new and experienced. It has a strong focus on reproducible
-build plans, multi-package projects, and a consistent, easy-to-learn set of
-Stack commands. It also aims to provide the customizability and power that
+Stack has a strong focus on plans for building that are reproducible; projects
+that have more than one package; and a consistent, easy-to-learn set of
+Stack commands. It also aims to provide the ability to customise and power that
 experienced developers need.
 
 Stack does not stand alone. It is built on the great work provided by:
 
-* The __Glasgow Haskell Compiler__ ([GHC](https://www.haskell.org/ghc/)), the
-  premier Haskell compiler. Stack will manage your GHC installations and
-  automatically select the appropriate version of GHC for your project.
-* The __Cabal build system__. Cabal is a specification for defining Haskell
-  packages and a [library](https://hackage.haskell.org/package/Cabal) for
-  performing builds.
+*   The __Glasgow Haskell Compiler__ ([GHC](https://www.haskell.org/ghc/)), the
+    premier Haskell compiler. Stack will manage your GHC installations and
+    automatically select the appropriate version of GHC for your project.
+*   The __Cabal build system__. Cabal is a specification for defining Haskell
+    packages and a [library](https://hackage.haskell.org/package/Cabal) for
+    performing builds.
 
     !!! info
 
@@ -309,9 +359,9 @@ Stack does not stand alone. It is built on the great work provided by:
 
 Stack is provided by a team of volunteers and companies under the auspices of
 the [Commercial Haskell](http://commercialhaskell.com/) group. The project was
-spearheaded by [FP Complete](https://www.fpcomplete.com/) to answer the needs of
-commercial Haskell users. It has since become a thriving open source project
-meeting the needs of Haskell users of all stripes.
+originally spearheaded by [FP Complete](https://www.fpcomplete.com/) to answer
+the needs of commercial Haskell users. It has since become a thriving open
+source project meeting the needs of Haskell users of all types.
 
 If you'd like to get involved with Stack, check out the
 [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
@@ -390,6 +440,8 @@ found in the current directory.
 
 ## How to uninstall
 
+The `stack uninstall` command provides information about how to uninstall Stack.
+
 To uninstall Stack, it should be sufficient to delete:
 
 1. the Stack root directory (see `stack path --stack-root`, before you
@@ -403,5 +455,4 @@ To uninstall Stack, it should be sufficient to delete:
    systems, or `where.exe stack`, on Windows).
 
 You may also want to delete ``.stack-work`` directories in any Haskell projects
-that you have built using Stack. The `stack uninstall` command provides
-information about how to uninstall Stack.
+that you have built using Stack.

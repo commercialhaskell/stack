@@ -13,6 +13,10 @@ theme:
     accent: 'deep purple'
   icon:
     logo: material/language-haskell
+  features:
+  - content.code.copy
+  - content.code.select
+  - content.tabs.link
 extra_css:
 - css/extra.css
 extra_javascript:
