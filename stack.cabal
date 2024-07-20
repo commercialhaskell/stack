@@ -79,7 +79,6 @@ extra-source-files:
     doc/dev_containers.md
     doc/faq.md
     doc/glossary.md
-    doc/GUIDE.md
     doc/install_and_upgrade.md
     doc/maintainers/7zip.md
     doc/maintainers/archive/README.md
@@ -116,6 +115,20 @@ extra-source-files:
     doc/topics/stack_work.md
     doc/topics/stack_yaml_vs_cabal_package_file.md
     doc/topics/travis_ci.md
+    doc/tutorial/building_existing_projects.md
+    doc/tutorial/building_your_project.md
+    doc/tutorial/cabal_flags_and_ghc_options.md
+    doc/tutorial/executing_commands.md
+    doc/tutorial/hello_world_example.md
+    doc/tutorial/index.md
+    doc/tutorial/installed_package_databases.md
+    "doc/tutorial/multi-package _projects.md"
+    doc/tutorial/paths_used_by_stack.md
+    doc/tutorial/stack_build_synoynms.md
+    doc/tutorial/stack_build_targets.md
+    doc/tutorial/stack_configuraton.md
+    doc/tutorial/summary_and_conclusion.md
+    doc/tutorial/using_ghc_interactively.md
     src/setup-shim/StackSetupShim.hs
     tests/unit/package-dump/ghc-7.10.txt
     tests/unit/package-dump/ghc-7.8.4-osx.txt

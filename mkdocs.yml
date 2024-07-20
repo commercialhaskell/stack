@@ -30,7 +30,21 @@ extra_javascript:
 nav:
 - Welcome!: README.md
 - Setting up: install_and_upgrade.md
-- Getting started: GUIDE.md
+- Getting started:
+  - tutorial/index.md
+  - 1. A Hello World example: tutorial/hello_world_example.md
+  - 2. Building your project: tutorial/building_your_project.md
+  - 3. Building existing projects: tutorial/building_existing_projects.md
+  - 4. Installed package databases: tutorial/installed_package_databases.md
+  - 5. stack build synonyms: tutorial/stack_build_synonyms.md
+  - 6. stack build targets: tutorial/stack_build_targets.md
+  - 7. Multi-package projects: tutorial/multi-package_projects.md
+  - 8. Cabal flags and GHC options: tutorial/cabal_flags_and_ghc_options.md
+  - 9. Locations used by Stack: tutorial/locations_used_by_stack.md
+  - 10. Executing commands: tutorial/executing_commands.md
+  - 11. Using GHC interactively: tutorial/using_ghc_interactively.md
+  - 12. Stack configuration: tutorial/stack_configuration.md
+  - 13. In conclusion: tutorial/conclusion.md
 - Commands:
   - commands/index.md
   - bench: commands/bench_command.md
