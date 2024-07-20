@@ -75,7 +75,7 @@ When compiling from source code, by default:
     An earlier version of Stack could be inconsistent with some of the current
     contents of the Stack root. For further information about the contents of
     the Stack root and configuring its location, see the documentation about the
-    [Stack root](stack_root.md).
+    [Stack root](../topics/stack_root.md).
 
 ## Examples
 

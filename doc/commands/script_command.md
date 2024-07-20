@@ -21,8 +21,9 @@ Non-project level configuration options in global configuration files
 !!! info
 
     Non-project level configuration options may be useful if
-    [`allow-newer`](yaml_configuration.md#allow-newer) and/or
-    [`allow-newer-deps`](yaml_configuration.md#allow-newer-deps) are required.
+    [`allow-newer`](../configure/yaml/non-project.md#allow-newer) and/or
+    [`allow-newer-deps`](../configure/yaml/non-project.md#allow-newer-deps) are
+    required.
 
 ## Project-level configuration file
 
@@ -39,8 +40,8 @@ Stack root.
 ## GHC
 
 The `stack script` command behaves as if the
-[`--install-ghc`](global_flags.md#--no-install-ghc-flag) flag had been passed at
-the command line.
+[`--install-ghc`](../configure/global_flags.md#--no-install-ghc-flag) flag had
+been passed at the command line.
 
 ## Snapshot and extra-deps
 

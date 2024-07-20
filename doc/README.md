@@ -143,7 +143,7 @@ Stack can be installed directly or by using the GHCup tool.
             !!! info
 
                 By default, the Windows installer will set the
-                [Stack root](stack_root.md) to `C:\sr`.
+                [Stack root](topics/stack_root.md) to `C:\sr`.
 
             !!! note
 
@@ -318,13 +318,13 @@ section.
 
 That was a really fast introduction on how to start to code in Haskell using
 Stack. If you want to go further, we highly recommend you read Stack's
-introductory [user's guide](GUIDE.md).
+introductory [user's guide](tutorial/index.md).
 
 ## Complete guide to Stack
 
-A complete [user's guide](GUIDE.md) to Stack is available, covering all of
-the most common ways to use Stack. Terms used in Stack's documentation are also
-explained in the [glossary](glossary.md).
+A complete [user's guide](tutorial/index.md) to Stack is available, covering all
+of the most common ways to use Stack. Terms used in Stack's documentation are
+also explained in the [glossary](glossary.md).
 
 ## Why Stack?
 

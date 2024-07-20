@@ -14,27 +14,27 @@ Restrictions: POSIX systems only
 Default: True, if inside Docker; false otherwise
 
 Enable/disable permitting users other than the owner of the
-[Stack root](stack_root.md) directory to use a Stack installation. For further
-information, see the documentation for the corresponding non-project specific
-configuration [option](yaml_configuration.md#allow-different-user).
+[Stack root](../topics/stack_root.md) directory to use a Stack installation. For
+further information, see the documentation for the corresponding non-project
+specific configuration [option](yaml/non-project.md#allow-different-user).
 
 ## `--arch` option
 
 Pass the option `--arch <architecture>` to specify the relevant machine
 architecture. For further information, see the documentation for the
 corresponding non-project specific configuration
-[option](yaml_configuration.md#arch).
+[option](yaml/non-project.md#arch).
 
 ## `--color` or `-colour` options
 
 Pass the option `stack --color <when>` to specify when to use color in output.
 For further information, see the documentation for the corresponding non-project
-specific configuration [option](yaml_configuration.md#color).
+specific configuration [option](yaml/non-project.md#color).
 
 ## `--compiler` option
 
 Pass the option `--compiler <compiler>` to specify the compiler. For further
-information, see the [YAML configuration](yaml_configuration.md#compiler)
+information, see the [YAML configuration](yaml/non-project.md#compiler)
 documentation.
 
 ## `--custom-preprocessor-extensions` option
@@ -42,7 +42,7 @@ documentation.
 Pass the option `--custom-preprocessor-extensions <extension>` to specify an
 extension used for a custom preprocessor. For further information, see the
 documentation for the corresponding non-project specific configuration
-[option](yaml_configuration.md#custom-preprocessor-extensions).
+[option](yaml/project.md#custom-preprocessor-extensions).
 
 ## `--docker*` flags and options
 
@@ -57,33 +57,33 @@ Default: Dump warning logs
 Enables/disables the dumping of the build output logs for project packages to
 the console. For further information, see the documentation for the
 corresponding non-project specific configuration
-[option](yaml_configuration.md#dump-logs).
+[option](yaml/non-project.md#dump-logs).
 
 ## `--extra-include-dirs` option
 
 Pass the option `--extra-include-dirs <director>` to specify an extra directory
 to check for C header files. The option can be specified multiple times. For
 further information, see the documentation for the corresponding non-project
-specific configuration [option](yaml_configuration.md#extra-include-dirs).
+specific configuration [option](yaml/non-project.md#extra-include-dirs).
 
 ## `--extra-lib-dirs` option
 
 Pass the option `--extra-lib-dirs <director>` to specify an extra directory
 to check for libraries. The option can be specified multiple times. For further
 information, see the documentation for the corresponding non-project specific
-configuration [option](yaml_configuration.md#extra-lib-dirs).
+configuration [option](yaml/non-project.md#extra-lib-dirs).
 
 ## `--ghc-build` option
 
 Pass the option `--ghc-build <build>` to specify the relevant specialised GHC
 build. For further information, see the documentation for the corresponding
-non-project specific configuration [option](yaml_configuration.md#ghc-build).
+non-project specific configuration [option](yaml/non-project.md#ghc-build).
 
 ## `--ghc-variant` option
 
 Pass the option `--ghc-variant <variant>` to specify the relevant GHC variant.
 For further information, see the documentation for the corresponding non-project
-specific configuration [option](yaml_configuration.md#ghc-variant).
+specific configuration [option](yaml/non-project.md#ghc-variant).
 
 ## `--hpack-numeric-version` flag
 
@@ -97,14 +97,14 @@ Default: Enabled
 
 Enables/disables the download and instalation of GHC if necessary. For further
 information, see the documentation for the corresponding non-project specific
-configuration [option](yaml_configuration.md#install-ghc).
+configuration [option](yaml/non-project.md#install-ghc).
 
 ## `--jobs` or `-j` option
 
 Pass the option `--jobs <number_of_jobs>` to specify the number of concurrent
 jobs (Stack actions during building) to run.
 
-When [building GHC from source](yaml_configuration.md#building-ghc-from-source),
+When [building GHC from source](yaml/non-project.md#building-ghc-from-source),
 specifies the `-j[<n>]` flag of GHC's Hadrian build system.
 
 By default, Stack specifies a number of concurrent jobs equal to the number of
@@ -116,17 +116,17 @@ This configuration option is distinct from GHC's own `-j[<n>]` flag, which
 relates to parallel compilation of modules within a package.
 
 For further information, see the documentation for the corresponding non-project
-specific configuration option: [`jobs`](yaml_configuration.md#jobs).
+specific configuration option: [`jobs`](yaml/non-project.md#jobs).
 
 ## `--local-bin-path` option
 
 Pass the option `--local-bin-path <directory>` to set the target directory for
-[`stack build --copy-bins`](build_command.md#-no-copy-bins-flag) and
+[`stack build --copy-bins`](../commands/build_command.md#-no-copy-bins-flag) and
 `stack install`. An absolute or relative path can be specified. A relative path
 at the command line is always assumed to be relative to the current directory.
 
 For further information, see the documentation for the corresponding non-project
-specific configuration [option](yaml_configuration.md#local-bin-path).
+specific configuration [option](yaml/non-project.md#local-bin-path).
 
 ## `--lock-file` option
 
@@ -149,7 +149,7 @@ Default: Enabled
 
 Enables/disables setting the codepage to support UTF-8. For further information,
 see the documentation for the corresponding non-project specific configuration
-[option](yaml_configuration.md#modify-code-page).
+[option](yaml/non-project.md#modify-code-page).
 
 ## `--nix*` flags and options
 
@@ -191,7 +191,7 @@ it is best omitted from the debug output.
 Default: Disabled
 
 Enables/disables the use of options `--no-run --compile` with the
-[`stack script` command](script_command.md).
+[`stack script` command](../commands/script_command.md).
 
 ## `--silent` flag
 
@@ -203,7 +203,7 @@ Default: Disabled
 
 Enables/disables the skipping of checking the GHC version and architecture. For
 further information, see the documentation for the corresponding non-project
-specific configuration [option](yaml_configuration.md#skip-ghc-check).
+specific configuration [option](yaml/non-project.md#skip-ghc-check).
 
 ## `--[no-]skip-msys` option
 
@@ -215,7 +215,7 @@ Enables/disables the skipping of checking for the Stack-supplied MSYS2 (and
 installing that MSYS2, if it is not installed) when Stack is setting up the
 environment. For further information, see the documentation for the
 corresponding non-project specific configuration
-[option](yaml_configuration.md#skip-msys).
+[option](yaml/non-project.md#skip-msys).
 
 ## `--snapshot` option
 
@@ -235,21 +235,21 @@ At the command line (only):
     and
 *   `--snapshot global` specifies the snapshot specified by the project-level
     configuration file in the `global-project` directory in the
-    [Stack root](stack_root.md#global-project-directory).
+    [Stack root](../topics/stack_root.md#global-project-directory).
 
 ## `--stack-colors` or `--stack-colours` options
 
 Pass the option `--stack-colors <styles>` to specify Stack's output styles. For
 further information, see the documentation for the corresponding non-project
-specific configuration [option](yaml_configuration.md#stack-colors).
+specific configuration [option](yaml/non-project.md#stack-colors).
 
 ## `--stack-root` option
 
 Overrides: `STACK_ROOT` environment variable
 
 Pass the option `--stack-root <absolute_path_to_the_Stack_root>` to specify the
-path to the [Stack root](stack_root.md) directory. The path must be an absolute
-one.
+path to the [Stack root](../topics/stack_root.md) directory. The path must be an
+absolute one.
 
 ## `--stack-yaml` option
 
@@ -309,13 +309,13 @@ the dependencies that Stack has been compiled with.
 
 Pass the option `--with-gcc <path_to_gcc>` to specify use of a GCC executable.
 For further information, see the documentation for the corresponding non-project
-specific configuration [option](yaml_configuration.md#with-gcc).
+specific configuration [option](yaml/non-project.md#with-gcc).
 
 ## `--with-hpack` option
 
 Pass the option `--with-hpack <hpack>` to specify use of an Hpack executable.
 For further information, see the documentation for the corresponding
-non-project specific configuration [option](yaml_configuration.md#with-hpack).
+non-project specific configuration [option](yaml/non-project.md#with-hpack).
 
 ## `--work-dir` option
 

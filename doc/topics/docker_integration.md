@@ -39,9 +39,9 @@ supported way to use Docker integration on macOS (the older Docker Machine
 with host volume mounting that make Stack nearly unusable for anything but the
 most trivial projects).
 
-Other Un*xen are not officially supported but there are ways to get them working.
-See [#194](https://github.com/commercialhaskell/stack/issues/194) for details
-and workarounds.
+Other Un*xen are not officially supported but there are ways to get them
+working. See [#194](https://github.com/commercialhaskell/stack/issues/194) for
+details and workarounds.
 
 Note: you may want to use set the `mount-mode` option to `delegated`, since
 this can dramatically improve performance on macOS (see
@@ -93,7 +93,7 @@ in the Docker container by default. To use a compiler installed by stack, add
 
     system-ghc: false
 
-(see [`system-ghc`](yaml_configuration.md#system-ghc)).
+(see [`system-ghc`](../configure/yaml/non-project.md#system-ghc)).
 
 ### Use stack as normal
 
@@ -369,9 +369,9 @@ deriving from, only with a different tag, to avoid recompilation):
     $ docker commit temp stack-build:custom
     $ docker rm temp
 
-Now you have a new Docker image named `stack-build:custom`. To use the new image, run
-a command such as the following or update the corresponding values in your
-`stack.yaml`:
+Now you have a new Docker image named `stack-build:custom`. To use the new
+image, run a command such as the following or update the corresponding values in
+your `stack.yaml`:
 
     stack --docker-image=stack-build:custom <COMMAND>
 
@@ -403,8 +403,8 @@ Troubleshooting
 ### "No Space Left on Device", but 'df' shows plenty of disk space
 
 This is likely due to the storage driver Docker is using, in combination with
-the large size and number of files in these images. Use `docker info|grep 'Storage Driver'`
-to determine the current storage driver.
+the large size and number of files in these images. Use
+`docker info|grep 'Storage Driver'` to determine the current storage driver.
 
 We recommend using either the `overlay` or `aufs` storage driver for stack, as
 they are least likely to give you trouble.  On Ubuntu, `aufs` is the default for

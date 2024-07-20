@@ -37,7 +37,7 @@ preference):
 2. A file specified by the `STACK_YAML` environment variable.
 3. A file named `stack.yaml` in the current directory or an ancestor directory.
 4. A file name `stack.yaml` in the `global-project` directory in the
-   [Stack root](stack_root.md).
+   [Stack root](../../topics/stack_root.md).
 
 The **global** configuration files (`config.yaml`) contain only
 non-project-specific options. There is a user-specific global confguration file
@@ -58,7 +58,8 @@ variables, respectively.
     The default locations are:
 
     * system-wide: `/etc/stack/config.yaml`; and
-    * user-specific: `config.yaml` in the [Stack root](stack_root.md).
+    * user-specific: `config.yaml` in the
+      [Stack root](../../topcis/stack_root.md).
 
     !!! note
 
@@ -71,15 +72,17 @@ variables, respectively.
     The default locations are:
 
     * system-wide: none; and
-    * user-specific: `config.yaml` in the [Stack root](stack_root.md).
+    * user-specific: `config.yaml` in the
+      [Stack root](../../topics/stack_root.md).
 
 === "XDG Base Directory Specification"
 
     On Unix-like operating systems and Windows, Stack can be configured to
     follow the XDG Base Directory Specification if the environment variable
     `STACK_XDG` is set to any non-empty value. However, Stack will ignore that
-    configuration if the [Stack root](stack_root.md) location has been set on
-    the command line or the `STACK_ROOT` environment variable exists.
+    configuration if the [Stack root](../../topics/stack_root.md) location has
+    been set on the command line or the `STACK_ROOT` environment variable
+    exists.
 
     If Stack is following the XDG Base Directory Specification, the location of
     `config.yaml` (for user-specific options) is `<XDG_CONFIG_HOME>/stack`. If

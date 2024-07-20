@@ -5,9 +5,9 @@
 Stack work directories are directories within a local project or package
 directory in which Stack stores files created during the build process. Stack
 can be used without an understanding of the content of those directories. In
-particular, the [`stack exec`](exec_command.md) command sets up an environment
-where relevant subdirectories of the project Stack work directory are on the
-PATH.
+particular, the [`stack exec`](../commands/exec_command.md) command sets up an
+environment where relevant subdirectories of the project Stack work directory
+are on the PATH.
 
 ## Naming
 
@@ -16,9 +16,10 @@ overidden by:
 
 * the use of the
   [`STACK_WORK` environment variable](environment_variables.md#stack_work);
-* the [`work-dir`](yaml_configuration.md#work-dir) non-project specific
-  configuration option; or
-* the [`--work-dir`](global_flags.md#-work-dir-option) command line option.
+* the [`work-dir`](../configure/yaml/non-project.md#work-dir) non-project
+  specific configuration option; or
+* the [`--work-dir`](../configure/global_flags.md#-work-dir-option) command line
+  option.
 
 Given the location of Stack work directories, the name of the work directories
 must be a relative path to a directory.
@@ -26,8 +27,8 @@ must be a relative path to a directory.
 ## Location
 
 If the work directory does not already exist, it will be created by the
-[`stack build`](build_command.md) command as a subdirectory of each project
-package directory and, if different, the project directory.
+[`stack build`](../commands/build_command.md) command as a subdirectory of each
+project package directory and, if different, the project directory.
 
 ## Project package Stack work directory
 
@@ -47,7 +48,8 @@ This directory will contain a path to a directory containing:
   modification time.
 
 The directory, relative to the project package directory or the project
-directory, is the one reported by [`stack path --dist-dir`](path_command.md).
+directory, is the one reported by
+[`stack path --dist-dir`](../commands/path_command.md).
 
 === "Unix-like"
 
@@ -67,18 +69,20 @@ This directory will contain a path to a directory containing:
 
 * a `bin` directory, containing built executable files;
 * a `doc` directory, containing a directory for each project package. This is
-  the directory reported by [`stack path --local-doc-root`](path_command.md);
+  the directory reported by
+  [`stack path --local-doc-root`](../commands/path_command.md);
 * if the [`stack hpc`](hpc_command.md) command is used, a `hpc` directory. This
-  is the directory reported by [`stack path --local-hpc-root`](path_command.md);
+  is the directory reported by
+  [`stack path --local-hpc-root`](../commands/path_command.md);
 * a `lib` directory, containing a directory named after the platform and the
   GHC version and, within that, a directory for each project package;
 * a `pkgdb` directory. This is the directory reported by
-  [`stack path --local-pkg-db`](path_command.md);
+  [`stack path --local-pkg-db`](../commands/path_command.md);
 * a `stack.sqlite3` file; and
 * a `stack.sqlite3.pantry-write-lock` file.
 
 The directory is the one reported by
-[`stack path --local-install-root`](path_command.md).
+[`stack path --local-install-root`](../commands/path_command.md).
 
 === "Unix-like"
 
@@ -106,14 +110,14 @@ The directory is the one reported by
     * the specification of
       [stripping](https://docs.haskellstack.org/en/stable/build_command/#flags-affecting-ghcs-behaviour); and
     * if
-      [`apply-ghc-options: everything`](yaml_configuration.md#apply-ghc-options)
+      [`apply-ghc-options: everything`](../configure/yaml/non-project.md#apply-ghc-options)
       is specified, any GHC command line options specified on the command line.
 
     !!! note
 
         As a consequence, the path reported by the following commands will
         differ (and similarly for the paths established by the
-        [`stack exec`](exec_command.md) command):
+        [`stack exec`](../commands/exec_command.md) command):
 
         ~~~text
         stack path --local-install-root
@@ -136,9 +140,9 @@ a project will contain a `ghci` directory. This directory will contain paths to
     Haskell Language Server makes use of the `stack ghci` command to obtain
     information.
 
-If the [`stack hoogle`](hoogle_command.md) command is used, the Stack work
-directory for a project will contain a `hoogle` directory. This directory will
-contain a directory being the one reported by
-[`stack path --local-hoogle-root`](path_command.md). The naming of the path to
-the directory is same as for the path to the directory in the `install`
-directory.
+If the [`stack hoogle`](../commands/hoogle_command.md) command is used, the
+Stack work directory for a project will contain a `hoogle` directory. This
+directory will contain a directory being the one reported by
+[`stack path --local-hoogle-root`](../commands/path_command.md). The naming of
+the path to the directory is same as for the path to the directory in the
+`install` directory.

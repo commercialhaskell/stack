@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.36.0.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -71,10 +71,13 @@ extra-source-files:
     doc/commands/update_command.md
     doc/commands/upgrade_command.md
     doc/commands/upload_command.md
+    doc/configure/customisation_scripts.md
     doc/configure/environment_variables.md
     doc/configure/global_flags.md
     doc/configure/index.md
-    doc/configure/yaml_configuration.md
+    doc/configure/yaml/non-project.md
+    doc/configure/yaml/project.md
+    doc/configure/yaml/yaml_configuration.md
     doc/CONTRIBUTING.md
     doc/dev_containers.md
     doc/faq.md
@@ -122,12 +125,12 @@ extra-source-files:
     doc/tutorial/hello_world_example.md
     doc/tutorial/index.md
     doc/tutorial/installed_package_databases.md
+    doc/tutorial/locations_used_by_stack.md
     "doc/tutorial/multi-package _projects.md"
-    doc/tutorial/paths_used_by_stack.md
     doc/tutorial/stack_build_synoynms.md
     doc/tutorial/stack_build_targets.md
-    doc/tutorial/stack_configuraton.md
-    doc/tutorial/summary_and_conclusion.md
+    doc/tutorial/stack_configuration.md
+    doc/tutorial/tutorial_conclusion.md
     doc/tutorial/using_ghc_interactively.md
     src/setup-shim/StackSetupShim.hs
     tests/unit/package-dump/ghc-7.10.txt

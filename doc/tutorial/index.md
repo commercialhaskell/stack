@@ -8,11 +8,11 @@ This introductory guide takes a new Stack user through the typical workflows.
 This guide will not teach Haskell or involve much code, and it requires no prior
 experience with the Haskell packaging system or other tools used for, or during,
 building Haskell code. Terms used in the guide are defined in the
-[glossary](glossary.md).
+[glossary](../glossary.md).
 
 Some of Stack's features will not be needed regularly or by all users. See
-Stack's [commands](commands/index.md) and
-[configuration](configure/index.md) for information about those
+Stack's [commands](../commands/index.md) and
+[configuration](../configure/index.md) for information about those
 features.
 
 ## Stack's functions
@@ -47,10 +47,10 @@ your package will be built against.
 Finally, Stack is __isolated__: it will not make changes outside of specific
 Stack directories. Stack-built files generally go in either the Stack root
 directory or `./.stack-work` directories local to each project. The
-[Stack root](stack_root.md) directory holds packages belonging to snapshots and
-any Stack-installed versions of GHC. Stack will not tamper with any system
-version of GHC or interfere with packages installed by other tools used for
-building Haskell code, such as Cabal (the tool).
+[Stack root](../topics/stack_root.md) directory holds packages belonging to
+snapshots and any Stack-installed versions of GHC. Stack will not tamper with
+any system version of GHC or interfere with packages installed by other tools
+used for building Haskell code, such as Cabal (the tool).
 
 ## Downloading and Installation
 

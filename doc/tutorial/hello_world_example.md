@@ -26,7 +26,7 @@ We'll call our project `helloworld`, and we'll use the `new-template` project
 template. This template is used by default, but in our example we will refer to
 it expressly. Other templates are available. For further information about
 templates, see the `stack templates` command
-[documentation](templates_command.md).
+[documentation](../commands/templates_command.md).
 
 From the root directory for all our Haskell projects, we command:
 
@@ -195,8 +195,8 @@ packages:
 - .
 ~~~
 
-The value of the [`resolver`](yaml_configuration.md#resolver) key tells Stack
-*how* to build your package: which GHC version to use, versions of package
+The value of the [`resolver`](../configure/yaml/project.md#resolver) key tells
+Stack *how* to build your package: which GHC version to use, versions of package
 dependencies, and so on. Our value here says to use
 [LTS Haskell 22.21](https://www.stackage.org/lts-22.21), which implies GHC 9.6.5
 (which is why `stack build` installs that version of GHC if it is not already

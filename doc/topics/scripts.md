@@ -10,9 +10,9 @@ that.
 You can use `stack <file_name>` to execute a Haskell source file. Usually, the
 Stack command to be applied is specified using a special Haskell comment (the
 Stack interpreter options comment) at the start of the source file. That command
-is most often [`stack script`](script_command.md) but it can be, for example,
-[`stack runghc`](runghc_command.md). If there is no Stack interpreter options
-comment, Stack will warn that one was expected.
+is most often [`stack script`](../commands/script_command.md) but it can be, for
+example, [`stack runghc`](../commands/runghc_command.md). If there is no Stack
+interpreter options comment, Stack will warn that one was expected.
 
 An example will be easiest to understand. Consider the Haskell source file
 `turtle-example.hs` with contents:
@@ -77,10 +77,11 @@ dependencies are built) and subsequent times more promptly (as the runs are
 able to reuse everything already built).
 
 The second line of the source code is the Stack interpreter options comment. In
-this example, it specifies the [`stack script`](script_command.md) command with
-the options of a LTS Haskell 22.21 snapshot (`--snapshot lts-22.21`) and
-ensuring the [`turtle` package](https://hackage.haskell.org/package/turtle) is
-available (`--package turtle`). The version of the package will be that in the
+this example, it specifies the [`stack script`](../commands/script_command.md)
+command with the options of a LTS Haskell 22.21 snapshot
+(`--snapshot lts-22.21`) and ensuring the
+[`turtle` package](https://hackage.haskell.org/package/turtle) is available
+(`--package turtle`). The version of the package will be that in the
 specified snapshot (`lts-22.21` provides `turtle-1.6.2`).
 
 ## Arguments and interpreter options and arguments
@@ -140,12 +141,12 @@ where `+RTS -s -RTS` are some of GHC's
 
 ## Just-in-time compilation
 
-As with using [`stack script`](script_command.md) at the command line, you can
-pass the `--compile` flag to make Stack compile the script, and then run the
-compiled executable. Compilation is done quickly, without optimization. To
-compile with optimization, pass the `--optimize` flag instead. Compilation is
-done only if needed; if the executable already exists, and is newer than the
-script, Stack just runs the executable directly.
+As with using [`stack script`](../commands/script_command.md) at the command
+line, you can pass the `--compile` flag to make Stack compile the script, and
+then run the compiled executable. Compilation is done quickly, without
+optimization. To compile with optimization, pass the `--optimize` flag instead.
+Compilation is done only if needed; if the executable already exists, and is
+newer than the script, Stack just runs the executable directly.
 
 This feature can be good for speed (your script runs faster) and also for
 durability (the executable remains runnable even if the script is disturbed, eg
@@ -154,9 +155,9 @@ git bisect, etc.)
 
 ## Using multiple packages
 
-As with using [`stack script`](script_command.md) at the command line, you can
-also specify multiple packages, either with multiple `--package` options, or by
-providing a comma or space separated list. For example:
+As with using [`stack script`](../commands/script_command.md) at the command
+line, you can also specify multiple packages, either with multiple `--package`
+options, or by providing a comma or space separated list. For example:
 
 ~~~haskell
 #!/usr/bin/env stack
@@ -170,31 +171,35 @@ providing a comma or space separated list. For example:
 
 ## Stack configuration for scripts
 
-When using the [`stack script`](script_command.md) command, as when using it at
-the command line, any project-level configuration file (`stack.yaml`, by
-default) (including in the `global-project` directory in the Stack root),
-including any specified by the options to the `stack script` command itself, is
-ignored.
+When using the [`stack script`](../commands/script_command.md) command, as when
+using it at the command line, any project-level configuration file
+(`stack.yaml`, by default) (including in the `global-project` directory in the
+Stack root), including any specified by the options to the `stack script`
+command itself, is ignored.
 
 !!! info
 
     Non-project level configuration options in global configuration files
-    (`config.yaml`), are not ignored by the [`stack script`](script_command.md)
-    command. Such options may be useful if
-    [`allow-newer`](yaml_configuration.md#allow-newer) and/or
-    [`allow-newer-deps`](yaml_configuration.md#allow-newer-deps) are required.
+    (`config.yaml`), are not ignored by the
+    [`stack script`](../commands/script_command.md) command. Such options may be
+    useful if [`allow-newer`](../configure/yaml/non-project.md#allow-newer)
+    and/or
+    [`allow-newer-deps`](../configure/yaml/non-project.md#allow-newer-deps)
+    are required.
 
-When using the  [`stack runghc`](runghc_command.md) command, as when using it at
-the command line, if the current working directory is inside a project, then
-that project's project-level configuration file is effective when running the script. Otherwise the script uses the project-level configuration file in the
-`global-project` directory in the Stack root.
+When using the  [`stack runghc`](../commands/runghc_command.md) command, as when
+using it at the command line, if the current working directory is inside a
+project, then that project's project-level configuration file is effective when
+running the script. Otherwise the script uses the project-level configuration
+file in the `global-project` directory in the Stack root.
 
 ## Testing scripts
 
 You can use the flag `--script-no-run-compile` on the command line to enable (it
 is disabled by default) the use of the `--no-run` option with
-[`stack script`](script_command.md) (and forcing the `--compile` option). The
-flag may help test that scripts compile in CI (continuous integration).
+[`stack script`](../commands/script_command.md) (and forcing the `--compile`
+option). The flag may help test that scripts compile in CI (continuous
+integration).
 
 For example, consider the following simple script, in a file named `Script.hs`,
 which makes use of the joke package
@@ -219,10 +224,11 @@ executable is not run: no missiles are launched in the process!
 
 ## Writing independent and reliable scripts
 
-The [`stack script`](script_command.md) command will automatically:
+The [`stack script`](../commands/script_command.md) command will automatically:
 
-* Install GHC and libraries, if missing. [`stack script`](script_command.md)
-  behaves as if the `--install-ghc` flag had been passed at the command line.
+* Install GHC and libraries, if missing.
+  [`stack script`](../commands/script_command.md) behaves as if the
+  `--install-ghc` flag had been passed at the command line.
 * Require that all packages used be explicitly stated on the command line.
 
 This ensures that your scripts are _independent_ of any prior deployment
@@ -230,9 +236,10 @@ specific configuration, and are _reliable_ by using exactly the same version of
 all packages every time it runs so that the script does not break by
 accidentally using incompatible package versions.
 
-In earlier versions of Stack, the [`stack runghc`](runghc_command.md) command
-was used for scripts and can still be used in that way. In order to achieve the
-same effect with the [`stack runghc`](runghc_command.md) command, you can do the
+In earlier versions of Stack, the
+[`stack runghc`](../commands/runghc_command.md) command was used for scripts and
+can still be used in that way. In order to achieve the same effect with the
+[`stack runghc`](../commands/runghc_command.md) command, you can do the
 following:
 
 1. Use the `--install-ghc` option to install the compiler automatically
@@ -243,9 +250,10 @@ following:
    package set is used.
 
 It is possible for a project-level configuration file to affect
-[`stack runghc`](runghc_command.md). For that reason,
-[`stack script`](script_command.md) is strongly recommended. For those curious,
-here is an example with [`stack runghc`](runghc_command.md):
+[`stack runghc`](../commands/runghc_command.md). For that reason,
+[`stack script`](../commands/script_command.md) is strongly recommended. For
+those curious, here is an example with
+[`stack runghc`](../commands/runghc_command.md):
 
 ~~~haskell
 #!/usr/bin/env stack
@@ -260,10 +268,10 @@ here is an example with [`stack runghc`](runghc_command.md):
   -}
 ~~~
 
-The [`stack runghc`](runghc_command.md) command is still useful, especially when
-you're working on a project and want to access the package databases and
-configurations used by that project. See the next section for more information
-on configuration files.
+The [`stack runghc`](../commands/runghc_command.md) command is still useful,
+especially when you're working on a project and want to access the package
+databases and configurations used by that project. See the next section for more
+information on configuration files.
 
 ## Loading scripts in GHCi
 

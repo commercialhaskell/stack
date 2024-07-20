@@ -61,7 +61,7 @@ GHC, GHCup takes over obtaining and installing that version. By default, the
 script to install GHCup (which can be run more than once) configures Stack in
 that way. For further information about how GHCup configures Stack, see the GHC
 installation customisation
-[documentation](yaml_configuration.md#ghc-installation-customisation).
+[documentation](../configure/yaml/non-project.md#ghc-installation-customisation).
 
 ### Workaround #1
 
@@ -70,8 +70,8 @@ to allow GHCup to install versions of GHC on the PATH and to cause Stack to use
 those versions of GHC, by making use of Stack's `install-ghc` option (which
 needs to be disabled) and Stack's `system-ghc` option (which needs to be
 enabled). For further information about these options, see the `install-ghc`
-[documentation](yaml_configuration.md#install-ghc) and the `system-ghc`
-[documentation](yaml_configuration.md#system-ghc).
+[documentation](../configure/yaml/non-project.md#install-ghc) and the `system-ghc`
+[documentation](../configure/yaml/non-project.md#system-ghc).
 
 For this workaround to work, each time that a snapshot is used that references a
 different version of GHC, then GHCup must be used to install it (if GHCup has

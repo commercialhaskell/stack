@@ -54,7 +54,7 @@ available modes for use with Cabal file revisions are `lower-revision`,
 `upper-revision` and `both-revision`.
 
 For futher information, see the
-[YAML configuration](yaml_configuration.md#pvp-bounds) documentation.
+[YAML configuration](../configure/yaml/non-project.md#pvp-bounds) documentation.
 
 The `--tar-dir <path_to_directory>` option determines whether the package
 archive should be copied to the specified directory.

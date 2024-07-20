@@ -30,8 +30,8 @@ shadow a dependency of the same name.
 ## snapshot
 
 Command line equivalent (takes precedence):
-[`--snapshot`](global_flags.md#snapshot-option) or
-[`--resolver`](global_flags.md#resolver-option) option
+[`--snapshot`](../global_flags.md#snapshot-option) or
+[`--resolver`](../global_flags.md#resolver-option) option
 
 The `snapshot` key specifies which snapshot is to be used for this project. A
 snapshot defines a GHC version, the package version of packages available for
@@ -47,8 +47,8 @@ currently four snapshot types:
   the [snapshot and package location](pantry.md) documentation.
 
 Each of these snapshots will also determine what constraints are placed on the
-compiler version. See the [compiler-check](#compiler-check) option for some
-additional control over compiler version.
+compiler version. See the [compiler-check](non-project.md#compiler-check) option
+for some additional control over compiler version.
 
 A package version specified in a snapshot can be shadowed by an
 [extra-dep](#extra-deps) of the same name or a [project package](#packages) of
@@ -102,8 +102,8 @@ specified as an [extra-dep](#extra-deps) or via a [snapshot](#snapshot). For
 example:
 
 * a project package will be built by default by commanding
-  [`stack build`](build_command.md) without specific targets. A dependency will
-  only be built if it is needed; and
+  [`stack build`](../../commands/build_command.md) without specific targets. A
+  dependency will only be built if it is needed; and
 * test suites and benchmarks may be built and run for a project package. They
   are never run for a dependency.
 
@@ -221,7 +221,7 @@ the same name.
 Default: `{}`
 
 Command line equivalent (takes precedence):
-[`stack build --flag`](build_command.md#-flag-option) option
+[`stack build --flag`](../../commands/build_command.md#-flag-option) option
 
 Cabal flags can be set for each package separately. For example:
 

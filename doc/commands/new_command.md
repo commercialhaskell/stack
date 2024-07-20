@@ -19,7 +19,7 @@ By default:
   skip such initialisation; and
 
 * the project template is the one specified by the
-[default-template](yaml_configuration.md#default-template) option.
+[default-template](../configure/yaml/non-project.md#default-template) option.
 
 A package name acceptable to Cabal comprises an alphanumeric 'word'; or two or
 more such words, with the words separated by a hyphen/minus character (`-`). A
@@ -49,8 +49,9 @@ These arguments are ignored if the `--no-init` flag is passed.
 
 If a snapshot is specified at the command line and the project is initialised
 for use with Stack, `stack new` will try to use it. For further information, see
-the documentation for the [`--snapshot`](global_flags.md#-snapshot-option) and
-[`--resolver`](global_flags.md#-resolver-option) options.
+the documentation for the
+[`--snapshot`](../configre/global_flags.md#-snapshot-option) and
+[`--resolver`](../configure/global_flags.md#-resolver-option) options.
 
 ## Project templates
 

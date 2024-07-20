@@ -8,9 +8,9 @@
 
 On Unix-like operating systems and Windows, Stack's installation procedure can
 be fully customised by placing a `sh` shell script (a 'hook') in the
-[Stack root](stack_root.md) directory at `hooks/ghc-install.sh`. On Unix-like
-operating systems, the script file must be made executable. The script is run by
-the `sh` application (which is provided by MSYS2 on Windows).
+[Stack root](..topics/stack_root.md) directory at `hooks/ghc-install.sh`. On
+Unix-like operating systems, the script file must be made executable. The script
+is run by the `sh` application (which is provided by MSYS2 on Windows).
 
 The script **must** return an exit code of `0` and the standard output **must**
 be the absolute path to the GHC binary that was installed. Otherwise Stack will

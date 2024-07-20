@@ -516,7 +516,7 @@ Stack can be installed directly or by using the GHCup tool.
             !!! info "Stack root"
 
                 By default, the Windows installer will set the
-                [Stack root](stack_root.md) by setting the `STACK_ROOT`
+                [Stack root](topics/stack_root.md) by setting the `STACK_ROOT`
                 environment variable to `C:\sr`.
 
             !!! note "Anti-virus software"

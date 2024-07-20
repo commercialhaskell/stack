@@ -41,8 +41,8 @@ they are created and updated.
 Relevant to this discussion, Stack's project-level configuration file
 (`stack.yaml`, by default) specifies:
 
-* the parent snapshot (the [`snapshot`](yaml_configuration.md#snapshot) or
-  [`resolver`](yaml_configuration.md#resolver) key)
+* the parent snapshot (the [`snapshot`](../configure/yaml/project.md#snapshot)
+  or [`resolver`](../configure/yaml/project.md#resolver) key)
 * extra-deps
 
 Some of this information can be incomplete. Consider this `stack.yaml` file:
@@ -167,8 +167,8 @@ rest of this document, we'll assume that the files are simply `stack.yaml` and
 `stack.yaml.lock`.
 
 If the lock file does not exist, subject to Stack's
-[`--lock-file`](global_flags.md#-lock-file-option) option, it will be
-created by:
+[`--lock-file`](../configure/global_flags.md#-lock-file-option) option, it will
+be created by:
 
 * Loading the `stack.yaml`
 * Loading all snapshot files
@@ -180,6 +180,7 @@ created by:
 Whenever a project-level configuration file (`stack.yaml`, by default) is
 loaded, all completed package or snapshot locations (even those completed using
 information from a lock file) get collected to form a new lock file in memory.
-Subject to Stack's [`--lock-file`](global_flags.md#-lock-file-option) option,
-that new lock file is compared against the one on disk and, if there are any
-differences, written out to the disk.
+Subject to Stack's
+[`--lock-file`](../configure/global_flags.md#-lock-file-option) option, that new
+lock file is compared against the one on disk and, if there are any differences,
+written out to the disk.

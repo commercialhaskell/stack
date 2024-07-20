@@ -85,8 +85,8 @@ any `--nix-*` option on the command line will imply the `--nix` option.
 If Nix integration is not enabled, Stack will notify the user if a `nix`
 executable is on the PATH. If that notification is unwanted, it can be muted by
 setting Stack's configuration option
-[`notify-if-nix-on-path`](yaml_configuration.md#notify-if-nix-on-path) to
-`false`.
+[`notify-if-nix-on-path`](../configure/yaml/non-project.md#notify-if-nix-on-path)
+to `false`.
 
 With Nix integration enabled, `stack build` and `stack exec` will automatically
 launch themselves in a local build environment (using `nix-shell` behind the
@@ -187,7 +187,7 @@ Nix integration will instruct Stack to build inside a local build environment.
 That environment will also download and use a
 [GHC Nix package](https://search.nixos.org/packages?query=haskell.compiler.ghc)
 matching the required version of the configured Stack
-[snapshot](yaml_configuration.md#snapshot).
+[snapshot](../configure/yaml/project.md#snapshot).
 
 Enabling Nix integration means that packages will always be built using the
 local GHC from Nix inside your shell, rather than your globally installed system
@@ -264,7 +264,8 @@ installed, which provide the C libraries of the same names.
 **Note:** currently, Stack only discovers dynamic and static libraries in the
 `lib/` folder of any Nix package, and likewise header files in the `include/`
 folder. If you're dealing with a package that doesn't follow this standard
-layout, you'll have to deal with that using a custom `shell.nix` file (see further below).
+layout, you'll have to deal with that using a custom `shell.nix` file (see
+further below).
 
 ### External C libraries through a `shell.nix` file
 

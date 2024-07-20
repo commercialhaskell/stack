@@ -18,8 +18,8 @@ Default: `false`
 
 Command line equivalent (takes precedence): `--[no-]allow-different-user` flag
 
-Allow users other than the owner of the [Stack root](stack_root.md) to use the
-Stack installation.
+Allow users other than the owner of the [Stack root](../../topics/stack_root.md)
+to use the Stack installation.
 
 ~~~yaml
 allow-different-user: true
@@ -69,7 +69,8 @@ allow-newer-deps:
 Default: `locals`
 
 Related command line:
-[`stack build --ghc-options`](build_command.md#-ghc-options-option) option
+[`stack build --ghc-options`](../../commands/build_command.md#-ghc-options-option)
+option
 
 Determines to which packages any GHC command line options specified on the
 command line are applied. Possible values are: `everything` (all packages,
@@ -91,7 +92,7 @@ otherwise), and `targets` (all project packages that are targets).
 Default: `locals`
 
 Related command line:
-[`stack build --PROG-option`](build_command.md#-prog-option-options) options
+[`stack build --PROG-option`](../../commands/build_command.md#-prog-option-options) options
 
 Determines to which packages all and any `--PROG-option` command line options
 specified on the command line are applied. Possible values are: `everything`
@@ -107,7 +108,7 @@ targets or otherwise), and `targets` (all project packages that are targets).
 Default: The machine architecture on which Stack is running.
 
 Command line equivalent (takes precedence):
-[`--arch`](global_flags.md#-arch-option) option
+[`--arch`](../global_flags.md#-arch-option) option
 
 Stack identifies different GHC executables by platform (operating system and
 machine architecture), (optional) GHC variant and (optional) GHC build.
@@ -225,8 +226,7 @@ Allows setting build options which are usually specified on the command line.
 
 The meanings of these settings correspond directly with the command line flags
 of the same name. For further information, see the
-[`stack build` command](build_command.md) documentation and the
-[users guide](GUIDE.md#the-build-command).
+[`stack build`](../../commands/build_command.md) command documentation.
 
 ## casa
 
@@ -486,7 +486,8 @@ concurrent-tests: false
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
 Related command line (takes precedence):
-[`stack build --PROG-option`](build_command.md#prog-option-options) options
+[`stack build --PROG-option`](../../commands/build_command.md#prog-option-options)
+options
 
 `configure-options` can specify Cabal (the library) options (including
 `--PROG-option` or `--PROG-options` options) for the configure step of the Cabal
@@ -551,7 +552,7 @@ Command line equivalent (takes precedence): `--[no-]dump-logs` flag
 In the case of *non-interleaved* output and *more than one* target package,
 Stack sends the build output from GHC for each target package to a log file,
 unless an error occurs that prevents that. For further information, see the
-[`stack build --[no-]interleaved-output` flag](build_command.md#-no-interleaved-output-flag)
+[`stack build --[no-]interleaved-output` flag](../../commands/build_command.md#-no-interleaved-output-flag)
 documentation.
 
 The value of the `dump-logs` key controls what, if any, log file content is sent
@@ -656,10 +657,12 @@ arguments include `standard`, `gmp4`, `nopie`, `tinfo6`, `tinfo6-libc6-pre232`,
 Default: `{}`
 
 Related command line (takes precedence):
-[`stack build --ghc-options`](build_command.md#-ghc-options-option) option
+[`stack build --ghc-options`](../../commands/build_command.md#-ghc-options-option)
+option
 
 GHC command line options can be specified for a package in its Cabal file
-(including one created from a `package.yaml` file). This option augments and, if applicable (see below), overrides any such GHC command line options.
+(including one created from a `package.yaml` file). This option augments and, if
+applicable (see below), overrides any such GHC command line options.
 
 `ghc-options` can specify GHC command line options for a named package, all
 project packages that are targets (using the `$targets` key), all project
@@ -790,7 +793,7 @@ Whether or not to automatically install GHC when necessary.
 Default: the number of CPUs (cores) that the machine has.
 
 Command line equivalent (takes precedence):
-[`-j`, `--jobs` option](global_flags.md#-jobs-or-j-option)
+[`-j`, `--jobs` option](../global_flags.md#-jobs-or-j-option)
 
 Specifies the number of concurrent jobs (principally, Stack actions during
 building - see further below) to run.
@@ -813,13 +816,13 @@ Default (on Windows): `%APPDATA%\local\bin`
 Command line equivalent (takes precedence): `--local-bin-path` option
 
 Specifies the target directory for
-[`stack build --copy-bins`](build_command.md#-no-copy-bins-flag) and
-`stack install`. An absolute or relative path can be specified.
+[`stack build --copy-bins`](../../commands/build_command.md#-no-copy-bins-flag)
+and `stack install`. An absolute or relative path can be specified.
 
 If the project-level configuration is provided in the `global-project` directory
-in the [Stack root](stack_root.md), a relative path is assumed to be relative to
-the current directory. Otherwise, it is assumed to be relative to the directory
-of the project-level configuration file.
+in the [Stack root](../../topics/stack_root.md), a relative path is assumed to
+be relative to the current directory. Otherwise, it is assumed to be relative to
+the directory of the project-level configuration file.
 
 ## local-programs-path
 
@@ -832,13 +835,14 @@ Stack's defaults differ between Unix-like operating systems and Windows.
 
 === "Unix-like"
 
-    Default: `programs` directory in the [Stack root](stack_root.md).
+    Default: `programs` directory in the
+    [Stack root](../../topics/stack_root.md).
 
 === "Windows"
 
     Default: `%LOCALAPPDATA%\Programs\stack`, if the `%LOCALAPPDATA%`
     environment variable exists. Otherwise, the `programs` directory in the
-    [Stack root](stack_root.md).
+    [Stack root](../../topics/stack_root.md).
 
     The MSYS2 tool is also installed in the Stack 'programs' directory.
 
@@ -1306,7 +1310,7 @@ Restrictions: Windows systems only
 Default: `false`
 
 Command line equivalent (takes precedence):
-[`--[no-]skip-msys`](global_flags.md#-no-skip-msys-option) flag
+[`--[no-]skip-msys`](../global_flags.md#-no-skip-msys-option) flag
 
 Skips checking for the Stack-supplied MSYS2 (and installing that MSYS2, if it is
 not installed) when Stack is setting up the environment.
@@ -1526,7 +1530,7 @@ with-hpack: /usr/local/bin/hpack
 Default: `.stack-work`
 
 Command line equivalent (takes precedence):
-[`--work-dir`](global_flags.md#-work-dir-option) option
+[`--work-dir`](../global_flags.md#-work-dir-option) option
 
 Environment variable alternative (lowest precedence):
 [`STACK_WORK`](environment_variables.md#stack_work)

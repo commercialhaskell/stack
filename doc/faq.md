@@ -10,8 +10,9 @@ here is to be as helpful and concise as possible.
 
 The version of GHC, as well as which packages can be installed, are specified by
 the _snapshot_. This may be something like `lts-22.21`, which is from
-[Stackage](https://www.stackage.org/). The [user's guide](GUIDE.md) discusses
-the snapshot in more detail.
+[Stackage](https://www.stackage.org/). The
+[user's guide](tutorial/building_your_project.md) discusses the snapshot in more
+detail.
 
 The snapshot is determined by finding the relevant project-level configuration
 file (`stack.yaml`, by default) for the directory you're running the command
@@ -86,9 +87,9 @@ extra-deps:
 ## I need to use a package (or version of a package) that is not available on Hackage, what should I do?
 
 Add it to the
-[`extra-deps`](yaml_configuration.md#extra-deps) list in your project's
-`stack.yaml` file, specifying the package's source code location relative to the
-directory where your `stack.yaml` file lives, e.g.
+[`extra-deps`](configure/yaml/project-specific_configuration.md#extra-deps) list
+in your project's `stack.yaml` file, specifying the package's source code
+location relative to the directory where your `stack.yaml` file lives, e.g.
 
 ~~~yaml
 snapshot: lts-22.21
@@ -200,7 +201,7 @@ following line to your Cabal file:
     extra-source-files:   B.erb
 
 You could also use the
-[`--custom-preprocessor-extensions`](yaml_configuration.md#custom-preprocessor-extensions)
+[`--custom-preprocessor-extensions`](configure/yaml/project.md#custom-preprocessor-extensions)
 flag.
 
 ## I already have GHC installed, can I still use Stack?
@@ -211,14 +212,14 @@ these sandboxed GHC installations in the `ghc-*` directories in the
 `stack path --programs` directory.
 
 If you would like Stack to use your system GHC installation, use the
-[`--system-ghc`](yaml_configuration.md#system-ghc) flag or run
+[`--system-ghc`](configure/yaml/non-project.md#system-ghc) flag or run
 `stack config set system-ghc --global true` to make Stack check your PATH for a
 suitable GHC by default.
 
 Stack can only use a system GHC installation if its version is compatible with
 the configuration of the current project, particularly the snapshot specified by
-the [`snapshot`](yaml_configuration.md#snapshot) or
-[`resolver`](yaml_configuration.md#resolver) key.
+the [`snapshot`](configure/yaml/project.md#snapshot) or
+[`resolver`](configure/yaml/project.md#resolver) key.
 
 GHC installation doesn't work for all operating systems, so in some cases you
 will need to use `system-ghc` and install GHC yourself.
@@ -230,11 +231,12 @@ GHC version, architecture etc it needs. It then looks in the `ghc-<version>`
 subdirectory of the `stack path --programs` directory for a compatible GHC,
 requesting to install one via `stack setup` if none is found.
 
-If you are using the [`--system-ghc`](yaml_configuration.md/#system-ghc) flag or
-have configured `system-ghc: true` either in the project `stack.yaml` or the
-global `config.yaml`, Stack will use the first GHC that it finds on your PATH,
-falling back on its sandboxed installations only if the found GHC doesn't comply
-with the various requirements (version, architecture) that your project needs.
+If you are using the [`--system-ghc`](configure/yaml/non-project.md#system-ghc)
+flag or have configured `system-ghc: true` either in the project `stack.yaml` or
+the global `config.yaml`, Stack will use the first GHC that it finds on your
+PATH, falling back on its sandboxed installations only if the found GHC doesn't
+comply with the various requirements (version, architecture) that your project
+needs.
 
 See issue [#420](https://github.com/commercialhaskell/stack/issues/420) for a
 detailed discussion of Stack's behavior when `system-ghc` is enabled.
@@ -300,7 +302,7 @@ of those three. Updating the index will have no impact on Stack's behavior.
 ## I have a custom package index I'd like to use, how do I do so?
 
 You can configure this in your project-level configuration file (`stack.yaml`,
-by default). See [YAML configuration](yaml_configuration.md).
+by default). See [YAML configuration](configure/yaml/yaml_configuration.md).
 
 ## How can I make sure my project builds against multiple GHC versions?
 
@@ -422,8 +424,8 @@ is a space character in the `%LOCALAPPDATA%` path this may, in some
 circumstances, cause problems with building packages that make use of the GNU
 project's `autoconf` package and `configure` shell script files. It may be
 necessary to override the default location of Stack's programs folder. See the
-[local-programs-path](yaml_configuration.md#local-programs-path) option for more
-information.
+[local-programs-path](configure/yaml/non-project.md#local-programs-path) option
+for more information.
 
 See issue [#4726](https://github.com/commercialhaskell/stack/issues/4726).
 
@@ -448,8 +450,8 @@ on the disk.
 Because GHC options often only affect optimization levels and warning behavior,
 Stack doesn't recompile when it detects an option change by default. This
 behavior can be changed though by setting the
-[`rebuild-ghc-options` option](yaml_configuration.md#rebuild-ghc-options) to
-`true`.
+[`rebuild-ghc-options` option](configure/yaml/non-project.md#rebuild-ghc-options)
+to `true`.
 
 To force recompilation manually, use the `--force-dirty` flag. If this still
 doesn't lead to a rebuild, add the `-fforce-recomp` flag to your
@@ -458,15 +460,15 @@ doesn't lead to a rebuild, add the `-fforce-recomp` flag to your
 ## Why doesn't Stack apply my `--ghc-options` to my dependencies?
 
 By default, Stack applies command line GHC options only to
-[project packages](yaml_configuration.md#packages). For an explanation of this
-choice see this discussion on issue
+[project packages](configure/yaml/project.md#packages). For an explanation of
+this choice see this discussion on issue
 [#827](https://github.com/commercialhaskell/stack/issues/827#issuecomment-133263678).
 
 If you still want to set specific GHC options for a dependency, use the
-[`ghc-options`](yaml_configuration.md#ghc-options) option in your
-YAML configuration file.
+[`ghc-options`](configure/yaml/non-project.md#ghc-options) option in your YAML
+configuration file.
 
-To change the set of packages that command line GHC options apply to, use the [`apply-ghc-options`](yaml_configuration.md#apply-ghc-options) option.
+To change the set of packages that command line GHC options apply to, use the [`apply-ghc-options`](configure/yaml/non-project.md#apply-ghc-options) option.
 
 ## `stack setup` on a Windows system only tells me to add certain paths to the PATH variable instead of doing it
 
@@ -582,9 +584,9 @@ have the following approaches for handling system dependencies:
   container, and share this container with all developers.
 
 * If you have installed some libraries into a non-standard location, use the
-  [`extra-lib-dirs`](yaml_configuration.md#extra-lib-dirs) option or the
-  [`extra-include-dirs`](yaml_configuration.md#extra-include-dirs) option to
-  specify it.
+  [`extra-lib-dirs`](configure/yaml/non-project.md#extra-lib-dirs) option or the
+  [`extra-include-dirs`](configure/yaml/non-project.md#extra-include-dirs)
+  option to specify it.
 
 In the future, Stack might give operating system-specific suggestions for how to
 install system libraries.
