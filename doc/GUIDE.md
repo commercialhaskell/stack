@@ -11,8 +11,8 @@ building Haskell code. Terms used in the guide are defined in the
 [glossary](glossary.md).
 
 Some of Stack's features will not be needed regularly or by all users. See
-Stack's [commands](commands_introduction.md) and
-[configuration](configuration_introduction.md) for information about those
+Stack's [commands](commands/index.md) and
+[configuration](configure/index.md) for information about those
 features.
 
 ## Stack's functions

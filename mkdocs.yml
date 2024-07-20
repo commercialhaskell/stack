@@ -33,67 +33,67 @@ nav:
 - Getting started: GUIDE.md
 - Commands:
   - commands/index.md
-  - bench command: commands/bench_command.md
-  - build command: commands/build_command.md
-  - clean command: commands/clean_command.md
-  - config commands: commands/config_command.md
-  - dot command: commands/dot_command.md
-  - docker commands: commands/docker_command.md
-  - eval command: commands/eval_command.md
-  - exec command: commands/exec_command.md
-  - ghc command: commands/ghc_command.md
-  - ghci command: commands/ghci_command.md
-  - haddock command: commands/build_command.md
-  - hoogle command: commands/hoogle_command.md
-  - hpc command: commands/hpc_command.md
-  - ide command: commands/ide_command.md
-  - init command: commands/init_command.md
-  - install command: commands/build_command.md
-  - list command: commands/list_command.md
-  - ls command: commands/ls_command.md
-  - new command: commands/new_command.md
-  - path command: commands/path_command.md
-  - purge command: commands/purge_command.md
-  - query command: commands/query_command.md
-  - repl command: commands/ghci_command.md
-  - run command: commands/run_command.md
-  - runghc command: commands/runghc_command.md
-  - runhaskell command: commands/runghc_command.md
-  - script command: commands/script_command.md
-  - sdist command: commands/sdist_command.md
-  - setup command: commands/setup_command.md
-  - templates command: commands/templates_command.md
-  - test command: commands/build_command.md
-  - uninstall command: commands/uninstall_command.md
-  - unpack command: commands/unpack_command.md
-  - update command: commands/update_command.md
-  - upgrade command: commands/upgrade_command.md
-  - upload command: commands/upload_command.md
+  - bench: commands/bench_command.md
+  - build: commands/build_command.md
+  - clean: commands/clean_command.md
+  - config: commands/config_command.md
+  - dot: commands/dot_command.md
+  - docker: commands/docker_command.md
+  - eval: commands/eval_command.md
+  - exec: commands/exec_command.md
+  - ghc: commands/ghc_command.md
+  - ghci: commands/ghci_command.md
+  - haddock: commands/haddock_command.md
+  - hoogle: commands/hoogle_command.md
+  - hpc: commands/hpc_command.md
+  - ide: commands/ide_command.md
+  - init: commands/init_command.md
+  - install: commands/install_command.md
+  - list: commands/list_command.md
+  - ls: commands/ls_command.md
+  - new: commands/new_command.md
+  - path: commands/path_command.md
+  - purge: commands/purge_command.md
+  - query: commands/query_command.md
+  - repl: commands/repl_command.md
+  - run: commands/run_command.md
+  - runghc: commands/runghc_command.md
+  - runhaskell: commands/runhaskell_command.md
+  - script: commands/script_command.md
+  - sdist: commands/sdist_command.md
+  - setup: commands/setup_command.md
+  - templates: commands/templates_command.md
+  - test: commands/test_command.md
+  - uninstall: commands/uninstall_command.md
+  - unpack: commands/unpack_command.md
+  - update: commands/update_command.md
+  - upgrade: commands/upgrade_command.md
+  - upload: commands/upload_command.md
 - Configure:
-  - configuration_introduction.md
-  - Environment variables: environment_variables.md
-  - Configuration (project and global): yaml_configuration.md
-  - Global flags and options: global_flags.md
+  - configure/index.md
+  - Environment variables: configure/environment_variables.md
+  - Configuration (project and global): configure/yaml_configuration.md
+  - Global flags and options: configure/global_flags.md
 - Topics:
-  - Stack root: stack_root.md
-  - Stack work directories: stack_work.md
-  - Snapshot and package location: pantry.md
-  - Snapshot specification: custom_snapshot.md
-  - stack.yaml vs a Cabal file: stack_yaml_vs_cabal_package_file.md
-  - Script interpreter: scripts.md
-  - Docker integration: docker_integration.md
-  - Nix integration: nix_integration.md
-  - Non-standard project initialization: nonstandard_project_init.md
-  - Debugging: debugging.md
-  - Editor integration: editor_integration.md
-  - Stack and Visual Studio Code: Stack_and_VS_Code.md
-  - Developing on Windows: developing_on_windows.md
-  - Shell auto-completion: shell_autocompletion.md
-  - CI: CI.md
-  - Travis CI: travis_ci.md
-  - Azure CI: azure_ci.md
-  - Lock files: lock_files.md
-  - Haskell and C code: haskell_and_c_code.md
+  - Stack root: topics/stack_root.md
+  - Stack work directories: topics/stack_work.md
+  - Snapshot and package location: topics/pantry.md
+  - Snapshot specification: topics/custom_snapshot.md
+  - stack.yaml vs a Cabal file: topics/stack_yaml_vs_cabal_package_file.md
+  - Script interpreter: topics/scripts.md
+  - Docker integration: topics/docker_integration.md
+  - Nix integration: topics/nix_integration.md
+  - Non-standard project initialization: topics/nonstandard_project_init.md
+  - Debugging: topics/debugging.md
+  - Editor integration: topics/editor_integration.md
+  - Stack and Visual Studio Code: topics/Stack_and_VS_Code.md
+  - Developing on Windows: topics/developing_on_windows.md
+  - Shell auto-completion: topics/shell_autocompletion.md
+  - CI: topics/CI.md
+  - Travis CI: topics/travis_ci.md
+  - Azure CI: topics/azure_ci.md
+  - Lock files: topics/lock_files.md
+  - Haskell and C code: topics/haskell_and_c_code.md
 - Get involved:
   - Contributors:
     - Contributor's guide: CONTRIBUTING.md
