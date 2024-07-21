@@ -643,7 +643,7 @@ Stack can be installed directly or by using the GHCup tool.
             as that will make `stack install` and `stack upgrade` work correctly
             out of the box.
 
-            ??? Can I download Stack manually?
+            ??? question "Can I download Stack manually?"
 
                 Yes:
 
