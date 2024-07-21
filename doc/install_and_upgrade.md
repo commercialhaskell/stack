@@ -440,6 +440,24 @@ Stack can be installed directly or by using the GHCup tool.
             provided by Apple which installed the headers to the base system
             under `/usr/include`.
 
+        ??? question "What versions of the LLVM compiler and toolchain are supported?"
+
+            The documentation for each version of GHC identifies the versions of
+            LLVM that are supported. That is summarised in the table below for
+            recent versions of GHC:
+
+            |GHC version|LLVM versions|
+            |-----------|-------------|
+            |9.8.2      |11 to 15     |
+            |9.6.5      |11 to 15     |
+            |9.4.8      |10 to 14     |
+            |9.2.8      |9 to 12      |
+            |9.0.2      |9, 10 or 12  |
+            |8.10.7     |9 to 12      |
+            |8.8.4      |7            |
+            |8.6.5      |6            |
+            |8.4.4      |5            |
+
         From late 2020, Apple began a transition from Mac computers with Intel
         processors (Intel-based Mac) to
         [Mac computers with Apple silicon](https://support.apple.com/en-gb/HT211814).
@@ -560,24 +578,6 @@ Stack can be installed directly or by using the GHCup tool.
                 * Extract the archive and place `stack` somewhere on your PATH.
 
                 Now you can run Stack from the command line in a terminal.
-
-            ### LLVM
-
-            The documentation for each version of GHC identifies the versions of
-            LLVM that are supported. That is summarised in the table below for
-            recent versions of GHC:
-
-            |GHC version|LLVM versions|
-            |-----------|-------------|
-            |9.8.2      |11 to 15     |
-            |9.6.5      |11 to 15     |
-            |9.4.8      |10 to 14     |
-            |9.2.8      |9 to 12      |
-            |9.0.2      |9, 10 or 12  |
-            |8.10.7     |9 to 12      |
-            |8.8.4      |7            |
-            |8.6.5      |6            |
-            |8.4.4      |5            |
 
         ??? question "Can I use the Homebrew package manager to get Stack?"
 
