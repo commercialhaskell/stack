@@ -1,11 +1,14 @@
+---
+title: Commands
+---
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
 # Commands (advanced)
 
 Some of Stack's features will not be needed regularly or by all users. This part
 of the guide and the part on [configuration](../configure/index.md) provide
-information about somethose features, organised as a reference guide. Some of
-the features are complex and separate pages are dedicated to them.
+information about some of those features, organised as a reference guide. Some
+of the features are complex and separate pages are dedicated to them.
 
 ## Stack commands (thematic)
 

@@ -1,32 +1,44 @@
-  <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
+<div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 1. A Hello World Example
+# 1. A Hello World example
 
-With Stack installed, let's create a new project from a template and walk
-through the most common Stack commands.
+With Stack installed, let's create a new project and walk through the most
+common Stack commands.
 
-In this guide, an initial `$` represents the command line prompt. The prompt may
-differ in the terminal on your operating system. Unless stated otherwise, the
-working directory is the project's root directory.
+In this guide, unless stated otherwise, the working directory is the project's
+root directory.
 
 ## The `stack new` command
 
-We'll start off with the `stack new` command to create a new *project*, that
-will contain a Haskell *package* of the same name. So let's pick a valid
-package name first:
+We'll start off with the [`stack new`](../commands/new_command.md) command to
+create a new *project* from a project template. We'll use the `new-template`
+project template. This template is used by default, but in our example we will
+refer to it expressly.
 
-> A package is identified by a globally-unique package name, which consists
-> of one or more alphanumeric words separated by hyphens. To avoid ambiguity,
-> each of these words should contain at least one letter.
+That template will create a project with a package of the same name. So, we need
+to pick a name for the project that is a valid package name. We'll call our
+project `helloworld`.
 
-(From the
-[Cabal users guide](https://www.haskell.org/cabal/users-guide/developing-packages.html#developing-packages))
+??? question "How do project packages relate to projects?"
 
-We'll call our project `helloworld`, and we'll use the `new-template` project
-template. This template is used by default, but in our example we will refer to
-it expressly. Other templates are available. For further information about
-templates, see the `stack templates` command
-[documentation](../commands/templates_command.md).
+    A project can have one or more packages. Each project package has its own
+    root directory. In the case of a single-package project, the project
+    directory and the package directory can be the same directory.
+
+??? question "What is a valid package name?"
+
+    A valid package name consists of one or more alphanumeric words separated by
+    hyphens. Each word must contain at least one letter. That is, the word must
+    not be interpreted as a number.
+
+    The names of packages are intended to be unique.
+
+??? question "Are other project templates available?"
+
+    Yes. For further information about project templates, command:
+    ~~~text
+    stack templates
+    ~~~
 
 From the root directory for all our Haskell projects, we command:
 
@@ -34,28 +46,32 @@ From the root directory for all our Haskell projects, we command:
 stack new helloworld new-template
 ~~~
 
-For this first Stack command, there's quite a bit of initial setup it needs to
-do (such as downloading the list of packages available upstream), so you'll see
-a lot of output. Over the course of this guide a lot of the content will begin
-to make more sense.
+For this first Stack command, Stack will do some setting up. For example, it
+will create the [Stack root](../topics/stack_root.md) directory.
 
-After creating the project directory, and obtaining and populating the project
-template, Stack will initialise its own project-level configuration. For further
-information about setting paramaters to populate templates, see the YAML
-configuration [documentation](yaml_configuration.md#templates). For further
-information about initialisation, see the `stack init` command
-[documentation](#the-stack-init-command). The `stack new` and `stack init`
-commands have options and flags in common.
+Other than any setting up, Stack will:
+* create the project directory;
+* download the project template;
+* attempt to populate the project template based on parameters; and
+* create and initialise Stack's project-level configuration file.
 
-!!! info
+Unless the parameters have been configured, Stack will note that parameters were
+needed by the template but not provided. That can be ignored for now.
 
-    Pass the `--bare` flag to cause Stack to create the project in the current
-    working directory rather than in a new project directory.
+??? question "How can I configure project template paramaters?"
 
-!!! info
+    For further information, see the
+    [`templates`](../configure/yaml/non-project.md#templates) non-project
+    specific configuration option.
 
-    Parameters to populate project templates can be set at the command line with
-    the `--param <key>:<value>` (or `-p`) option.
+    As noted in Stack's output, parameters to populate project templates can
+    also be set at the command line by using the options of the `stack new`
+    command.
+
+??? question "Can I create a new project in the current working directory?"
+
+    Yes. Pass the `--bare` flag to cause Stack to create the project in the
+    current working directory rather than in a new project directory.
 
 We now have a project in the `helloworld` directory! We will change to that
 directory, with command:
@@ -66,26 +82,77 @@ cd helloworld
 
 ## The `stack build` command
 
-Next, we'll run the most important Stack command, `stack build`:
+Next, we'll run the most important Stack command,
+[`stack build`](../commands/build_command.md). We command:
 
 ~~~text
 stack build
-# installing ... building ...
 ~~~
 
-Stack needs a version of GHC in order to build your project. Stack will discover
-that you are missing it and will install it for you.
+Stack needs a version of GHC and, on Windows, a version of MSYS2, in order to
+build your project. Stack will discover that you are missing it and will install
+it for you.
 
 You'll get intermediate download percentage statistics while the download is
 occurring. This command may take some time, depending on download speeds.
 
-!!! note
+??? question "Can I use that version of GHC by commanding `ghc`?"
 
-    GHC will be installed to your Stack programs directory, so calling `ghc` on
-    the command line won't work. See the `stack exec`, `stack ghc`, and
-    `stack runghc` commands below for more information.
+    No. GHC will be installed to the Stack programs directory, which is likely
+    not on the PATH, so commanding `ghc` will not work. However, that version of
+    GHC can be used in the Stack environment. For more information, see the
+    [`stack exec`](../commands/exec_command.md) command,
+    [`stack ghc`](../commands/ghc_command.md) command, and
+    [`stack runghc`](../commands/ghc_command.md) command documentation.
 
-Once a version of GHC is installed, Stack will then build your project.
+Once a version of GHC and, on Windows, a version of MSYS2, is installed, Stack
+will then build your project. The end of the output should look similar to this:
+
+=== "Unix-like"
+
+    ~~~text
+    ...
+    helloworld> configure (lib + exe)
+    Configuring helloworld-0.1.0.0...
+    helloworld> build (lib + exe) with ghc-9.6.6
+    Preprocessing library for helloworld-0.1.0.0..
+    Building library for helloworld-0.1.0.0..
+    [1 of 2] Compiling Lib
+    [2 of 2] Compiling Paths_helloworld
+    Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0..
+    Building executable 'helloworld-exe' for helloworld-0.1.0.0..
+    [1 of 2] Compiling Main
+    [2 of 2] Compiling Paths_helloworld
+    [3 of 3] Linking .stack-work/dist/x86_64-linux-tinfo6/ghc-9.6.6/build/helloworld-exe/helloworld-exe
+    helloworld> copy/register
+    Installing library in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/lib/x86_64-linux-ghc-9.6.6/helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
+    Installing executable helloworld-exe in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/bin
+    Registering library for helloworld-0.1.0.0..
+    ~~~
+
+=== "Windows"
+
+    ~~~text
+    ...
+    helloworld> configure (lib + exe)
+    Configuring helloworld-0.1.0.0...
+    helloworld> build (lib + exe) with ghc-9.6.6
+    Preprocessing library for helloworld-0.1.0.0..
+    Building library for helloworld-0.1.0.0..
+    [1 of 2] Compiling Lib
+    [2 of 2] Compiling Paths_helloworld
+    Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0..
+    Building executable 'helloworld-exe' for helloworld-0.1.0.0..
+    [1 of 2] Compiling Main
+    [2 of 2] Compiling Paths_helloworld
+    [3 of 3] Linking .stack-work\dist\effaccc7\build\helloworld-exe\helloworld-exe.exe
+    helloworld> copy/register
+    Installing library in ...\helloworld\.stack-work\install\c8c71a24\lib\x86_64-windows-ghc-9.6.6\helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
+    Installing executable helloworld-exe in ...\helloworld\.stack-work\install\c8c71a24\bin
+    Registering library for helloworld-0.1.0.0..
+    ~~~
+
+    On Windows, Stack uses hashes of certain information to keep paths short.
 
 ## The `stack exec` command
 
@@ -95,13 +162,43 @@ Windows, `helloworld-exe.exe`). We'll explain more in the next section, but, for
 now, just notice that the executables are installed in a location in our
 project's `.stack-work` directory.
 
-Now, Let's use the `stack exec` command to run our executable (which just
-outputs "someFunc"):
+Now, let's use the [`stack exec`](../commands/exec_command.md) command to run
+our executable. We command:
 
 ~~~text
 stack exec helloworld-exe
+~~~
+
+and the output is just:
+~~~text
 someFunc
 ~~~
+
+??? question "Why is the output just `someFunc`?"
+
+    The code in the `new-template` project template is very simple. The package
+    has a Haskell module `Lib`:
+    ~~~haskell
+    module Lib
+        ( someFunc
+        ) where
+
+    someFunc :: IO ()
+    someFunc = putStrLn "someFunc"
+    ~~~
+
+    and a Haskell module `Main`:
+    ~~~haskell
+    module Main (main) where
+
+    import Lib
+
+    main :: IO ()
+    main = someFunc
+    ~~~
+
+    `putStrLn "someFunc"` is an action that, when executed, outputs the string
+    `someFunc` to the standard output channel.
 
 `stack exec` works by providing the same reproducible environment that was used
 to build your project to the command that you are running. Thus, it knew where

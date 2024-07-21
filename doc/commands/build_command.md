@@ -1028,7 +1028,8 @@ All the following examples assume that:
     consequently, the project-level configuration will be determined by a
     `stack.yaml` file in the `global-project` directory in the
     [Stack root](../topics/stack_root.md) (for further information, see the
-    [YAML configuration](../configure/yaml_configuration.md) documentation); and
+    [YAML configuration](../configure/yaml/yaml_configuration.md)
+    documentation); and
 
 *   if `stack build` is commanded in a project directory, there is a
     `stack.yaml` file in that directory.

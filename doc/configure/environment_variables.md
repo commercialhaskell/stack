@@ -88,7 +88,7 @@ sequences for color to its output.
 ## `STACK_CONFIG`
 
 Related command: all commands that make use of Stack's
-[global YAML configuration files](yaml_configuration.md) (`config.yaml`).
+[global YAML configuration files](yaml/yaml_configuration.md) (`config.yaml`).
 
 The environment variable `STACK_CONFIG` can be used to specify an absolute path
 to the user-specific global YAML configuration file, overriding the default.
@@ -96,7 +96,7 @@ to the user-specific global YAML configuration file, overriding the default.
 ## `STACK_GLOBAL_CONFIG`
 
 Related command: all commands that make use of Stack's
-[global YAML configuration files](yaml_configuration.md) (`config.yaml`).
+[global YAML configuration files](yaml/yaml_configuration.md) (`config.yaml`).
 
 The environment variable `STACK_GLOBAL_CONFIG` can be used to specify an
 absolute path to the system-wide global YAML configuration file, overriding the
@@ -105,7 +105,7 @@ default.
 ## `STACK_ROOT`
 
 Related command: all commands that make use of Stack's
-[user-specific global YAML configuration file](yaml_configuration.md)
+[user-specific global YAML configuration file](yaml/yaml_configuration.md)
 (`config.yaml`).
 
 Overridden by: Stack's global
@@ -131,7 +131,7 @@ the root directory of the project or package. The relative path cannot include a
 ## `STACK_XDG`
 
 Related command: all commands that make use of Stack's
-[user-specific global YAML configuration file](yaml_configuration.md)
+[user-specific global YAML configuration file](yaml/yaml_configuration.md)
 (`config.yaml`).
 
 Overridden by: the use of Stack's `STACK_ROOT` environment variable, or the use
@@ -145,7 +145,7 @@ set to any non-empty value.
 ## `STACK_YAML`
 
 Related command: all commands that make use of Stack's
-[project-level YAML configuration file](yaml_configuration.md).
+[project-level YAML configuration file](yaml/yaml_configuration.md).
 
 Overridden by: Stack's global
 [`--stack-yaml`](global_flags.md#-stack-yaml-option) option.

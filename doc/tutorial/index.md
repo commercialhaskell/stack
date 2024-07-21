@@ -1,63 +1,59 @@
+---
+Title: Getting started
+---
+
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
 # Getting started
 
-Stack is a modern, cross-platform tool for building Haskell code.
+Stack is a program for developing [Haskell](https://www.haskell.org/) projects.
 
-This introductory guide takes a new Stack user through the typical workflows.
-This guide will not teach Haskell or involve much code, and it requires no prior
-experience with the Haskell packaging system or other tools used for, or during,
-building Haskell code. Terms used in the guide are defined in the
-[glossary](../glossary.md).
+This guide to getting started takes a new Stack user through the ways that Stack
+is typically used. It will not teach Haskell or involve much code, and it
+requires no prior experience of Stack or other Haskell tools.
 
-Some of Stack's features will not be needed regularly or by all users. See
-Stack's [commands](../commands/index.md) and
-[configuration](../configure/index.md) for information about those
-features.
+??? question "What are other Haskell tools?"
 
-## Stack's functions
+    Haskell code is compiled by the
+    [Glasgow Haskell Compiler](https://www.haskell.org/ghc/) (GHC), which can
+    also be used interactively. Stack can manage versions of GHC. GHC provides
+    commands such as `ghc`, `ghci`, `runghc` and `ghc-pkg`.
 
-Stack handles the management of your toolchain (including GHC — the Glasgow
-Haskell Compiler — and, for Windows users, MSYS2), building and registering
-libraries, building dependencies on tools used during building, and more. While
-it can use existing tools on your system, Stack has the capacity to be your
-one-stop shop for all Haskell tooling you need. This guide will follow that
-Stack-centric approach.
+    Cabal (the tool) is a tool provided by the
+    [`cabal-install`](https://hackage.haskell.org/package/cabal-install) Haskell
+    package. It aims to simplify the process of managing Haskell software by
+    automating the fetching, configuration, compilation and installation of
+    Haskell libraries and programs. These are goals that Stack shares. Stack can
+    be used independently of Cabal (the tool) but users can also use both, if
+    they wish.
 
-## What makes Stack special?
+    Haskell Language Server (HLS) is an implementation of the Language Server
+    Protocol for Haskell and used by Haskell extensions for code editors.
 
-The primary Stack design point is __reproducible builds__. If you run
-`stack build` today, you should get the same result running `stack build`
-tomorrow. There are some cases that can break that rule (changes in your
-operating system configuration, for example), but, overall, Stack follows this
-design philosophy closely. To make this a simple process, Stack uses curated
-package sets called __snapshots__.
+    [GHCup](https://www.haskell.org/ghcup/) is a tool that can manage other
+    Haskell tools, including Stack, GHC, HLS and Cabal (the tool). Stack can use
+    GHCup to manage versions of GHC, as well as manage GHC directly.
 
-Stack has also been designed from the ground up to be user friendly, with an
-intuitive, discoverable command line interface. For many users, simply
-downloading Stack and reading `stack --help` will be enough to get up and
-running. This guide provides a more gradual tour for users who prefer that
-learning style.
+Terms used in the guide will be explained as they are introduced and are also
+defined in the [glossary](../glossary.md).
 
-To build your project, Stack uses a project-level configuration file, named
-`stack.yaml`, in the root directory of your project as a sort of blueprint. That
-file contains a reference to the snapshot (also known as a __resolver__) which
-your package will be built against.
+Some of Stack's features will not be needed regularly or by all users. Other
+parts of Stack's documentation include its [commands](../commands/index.md) and
+its [configuration](../configure/index.md).
 
-Finally, Stack is __isolated__: it will not make changes outside of specific
-Stack directories. Stack-built files generally go in either the Stack root
-directory or `./.stack-work` directories local to each project. The
-[Stack root](../topics/stack_root.md) directory holds packages belonging to
-snapshots and any Stack-installed versions of GHC. Stack will not tamper with
-any system version of GHC or interfere with packages installed by other tools
-used for building Haskell code, such as Cabal (the tool).
+## Setting up
 
-## Downloading and Installation
+The goal of setting up is a `stack` executable on the PATH. As we will see, when
+Stack is used, it sets other things up as needed.
 
-The [documentation dedicated to downloading Stack](../install_and_upgrade.md)
-has the most up-to-date information for a variety of operating systems. Instead
-of repeating that content here, please go check out that page and come back here
-when you can successfully run `stack --version`.
+*[PATH]: An environment variable that specifies a list of directories searched for executable files.
 
-We also assume that the directory reported by `stack path --local-bin` has been
-added to the PATH.
+For further information about setting up, see the
+[documentation](../install_and_upgrade.md) on that topic. Return here when you
+know that Stack is on the PATH.
+
+This guide assumes that the directory where Stack install executables (the
+location reported by `stack path --local-bin`) has been added to the PATH.
+
+This guide assumes that your computer's operating system is one of Linux, macOS
+or Windows. Stack's commands are the same on all operating systems.
