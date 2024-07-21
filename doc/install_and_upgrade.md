@@ -5,8 +5,7 @@
 The goal of setting up is a `stack` executable file on the PATH. When Stack is
 used, it sets other things up as needed.
 
-*[PATH]: An environment variable that specifies a list of directories searched
-         for executable files.
+*[PATH]: An environment variable that specifies a list of directories searched for executable files.
 
 ??? question "How do I know if Stack is on the PATH?"
 
@@ -162,7 +161,7 @@ Stack can be installed directly or by using the GHCup tool.
             to install to `/usr/local/bin`. If you prefer more control, follow
             the manual installation instructions for your platform below.
 
-        ??? Can I download Stack manually?
+        ??? question "Can I download Stack manually?"
 
             Yes. Manual download for Linux distributions depends on your machine
             architecture, x86_64 or AArch64/ARM64.
@@ -271,7 +270,7 @@ Stack can be installed directly or by using the GHCup tool.
                     sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
                     ~~~
 
-        ??? Can I use a Linux package to get Stack?
+        ??? question "Can I use a Linux package to get Stack?"
 
             Some Linux distributions have official or unofficial packages for
             Stack, including Arch Linux, Debian, Fedora, NixOS, openSUSE/SUSE
@@ -382,8 +381,9 @@ Stack can be installed directly or by using the GHCup tool.
                 [packages](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
                 for Ubuntu 20.04 and up.
 
-            It is possible to set up auto-completion of Stack commands. For
-            further information, see the
+        ??? question "Can I set up auto-completion of Stack commands?"
+
+            Yes. For further information, see the
             [shell auto-completion](topics/shell_autocompletion.md)
             documentation.
 
@@ -471,7 +471,7 @@ Stack can be installed directly or by using the GHCup tool.
                 dependencies and to install to `/usr/local/bin`. If you prefer
                 more control, follow the manual installation instructions below.
 
-            ??? Can I download Stack manually?
+            ??? question "Can I download Stack manually?"
 
                 Yes:
 
@@ -513,39 +513,42 @@ Stack can be installed directly or by using the GHCup tool.
                 dependencies and to install to `/usr/local/bin`. If you prefer
                 more control, follow the manual installation instructions below.
 
-            The installation of Stack or some packages (e.g. `network`)
-            requiring C source compilation might fail with:
+            ??? question "What if I get error `C compiler cannot build executables`?"
 
-            ~~~text
-            configure: error: C compiler cannot build executables
-            ~~~
+                The installation of Stack or some packages (e.g. `network`)
+                requiring C source compilation might fail with:
 
-            In that case you should pass `-arch arm64` as part of the `CFLAGS`
-            environment variable. This setting will be picked up by the C
-            compiler of your choice.
+                ~~~text
+                configure: error: C compiler cannot build executables
+                ~~~
 
-            ~~~bash
-            # Assuming BASH below
+                In that case you should pass `-arch arm64` as part of the
+                `CFLAGS` environment variable. This setting will be picked up by
+                the C compiler of your choice.
 
-            # passing CFLAGS in-line with the command giving rise to the error
-            CFLAGS="-arch arm64 ${CFLAGS:-}" some_command_to_install_stack
-            CFLAGS="-arch arm64 ${CFLAGS:-}" stack [build|install]
+                ~~~bash
+                # Assuming BASH below
 
-            # -- OR --
+                # passing CFLAGS in-line with the command giving rise to the error
+                CFLAGS="-arch arm64 ${CFLAGS:-}" some_command_to_install_stack
+                CFLAGS="-arch arm64 ${CFLAGS:-}" stack [build|install]
 
-            # ~/.bash_profile
-            # NOTE: only do this if you do not have to cross-compile, or remember to unset
-            # CFLAGS when needed
-            export CFLAGS="-arch arm64 ${CFLAGS:-}"
-            ~~~
+                # -- OR --
 
-            The setting instructs the C compiler to compile objects for ARM64.
-            These can then be linked with libraries built for ARM64. Without the
-            instruction, the C compiler, invoked by Cabal running in x86-64,
-            would compile x86-64 objects and attempt to link them with existing
-            ARM64 libraries, resulting in the error above.
+                # ~/.bash_profile
+                # NOTE: only do this if you do not have to cross-compile, or remember to unset
+                # CFLAGS when needed
+                export CFLAGS="-arch arm64 ${CFLAGS:-}"
+                ~~~
 
-            ??? Can I download Stack manually?
+                The setting instructs the C compiler to compile objects for
+                ARM64. These can then be linked with libraries built for ARM64.
+                Without the instruction, the C compiler, invoked by Cabal
+                running in x86-64, would compile x86-64 objects and attempt to
+                link them with existing ARM64 libraries, resulting in the error
+                above.
+
+            ??? question "Can I download Stack manually?"
 
                 Yes:
 
@@ -576,7 +579,7 @@ Stack can be installed directly or by using the GHCup tool.
             |8.6.5      |6            |
             |8.4.4      |5            |
 
-        ??? Can I use the Homebrew package manager to get Stack?
+        ??? question "Can I use the Homebrew package manager to get Stack?"
 
             [Homebrew](https://brew.sh/) is a popular package manager for macOS.
             If you have its `brew` tool installed, you can just command:
@@ -594,11 +597,11 @@ Stack can be installed directly or by using the GHCup tool.
               source (which will take hours), see
               [their FAQ on the topic](https://github.com/Homebrew/brew/blob/master/docs/FAQ.md#why-do-you-compile-everything).
 
-        ### Auto-completion of Stack commands
+        ??? question "Can I set up auto-completion of Stack commands?"
 
-        It is possible to set up auto-completion of Stack commands. For further
-        information, see the
-        [shell auto-completion](topics/shell_autocompletion.md) documentation.
+            Yes. For further information, see the
+            [shell auto-completion](topics/shell_autocompletion.md)
+            documentation.
 
     === "Windows"
 
