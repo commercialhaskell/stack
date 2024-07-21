@@ -7,8 +7,8 @@
 This document describes:
 
 * the specification of a snapshot location (in the
-  [`snapshot`](yaml_configuration.md#snapshot) or
-  [`resolver`](yaml_configuration.md#resolver) key)
+  [`snapshot`](../configure/yaml/project.md#snapshot) or
+  [`resolver`](../configure/yaml/project.md#resolver) key)
 * the specification of a package location (in the `extra-deps` key and in a
   snapshot)
 
@@ -69,7 +69,7 @@ There are essentially four different ways of specifying a snapshot location:
     By default, LTS Haskell and Stackage Nightly snapshot configurations are
     retrieved from the `stackage-snapshots` GitHub repository of user
     `commercialhaskell`. The
-    [snapshot-location-base](yaml_configuration.md#snapshot-location-base)
+    [snapshot-location-base](../configure/yaml/non-project.md#snapshot-location-base)
     option allows a custom location to be set.
 
 For safer, more reproducible builds, you can optionally specify a URL

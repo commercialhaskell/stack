@@ -3,7 +3,7 @@
 # Debugging
 
 To profile a component of the current project, pass the
-[`--profile` flag](build_command.md#-profile-flag) to `stack build`.
+[`--profile` flag](../commands/build_command.md#-profile-flag) to `stack build`.
 
 The flag:
 
@@ -32,8 +32,9 @@ stack exec --profile -- my-exe +RTS -p
 ~~~
 
 For more fine-grained control of compilation options there are the
-[`--library-profiling` flag](build_command.md#-no-library-profiling-flag) and
-[`--executable-profiling` flag](build_command.md#-no-executable-profiling-flag).
+[`--library-profiling` flag](../commands/build_command.md#-no-library-profiling-flag)
+and
+[`--executable-profiling` flag](../commands/build_command.md#-no-executable-profiling-flag).
 
 The `--library-profiling` flag:
 

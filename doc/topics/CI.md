@@ -6,7 +6,7 @@
 
 The Stack repository uses GitHub Actions for its own CI. For further
 information, see the guide to
-[contributing](CONTRIBUTING.md#continuous-integration-ci).
+[contributing](../CONTRIBUTING.md#continuous-integration-ci).
 
 ## Azure
 

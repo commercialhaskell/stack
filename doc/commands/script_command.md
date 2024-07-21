@@ -21,8 +21,9 @@ Non-project level configuration options in global configuration files
 !!! info
 
     Non-project level configuration options may be useful if
-    [`allow-newer`](yaml_configuration.md#allow-newer) and/or
-    [`allow-newer-deps`](yaml_configuration.md#allow-newer-deps) are required.
+    [`allow-newer`](../configure/yaml/non-project.md#allow-newer) and/or
+    [`allow-newer-deps`](../configure/yaml/non-project.md#allow-newer-deps) are
+    required.
 
 ## Project-level configuration file
 
@@ -39,8 +40,8 @@ Stack root.
 ## GHC
 
 The `stack script` command behaves as if the
-[`--install-ghc`](global_flags.md#--no-install-ghc-flag) flag had been passed at
-the command line.
+[`--install-ghc`](../configure/global_flags.md#--no-install-ghc-flag) flag had
+been passed at the command line.
 
 ## Snapshot and extra-deps
 
@@ -202,7 +203,7 @@ outputs will be written to a directory named `MyScript.hs` at
 
 As for Example 1, but `acme-missiles-0.2` is specified by adding it to the
 snapshot as an extra-dep. The `stack script` command is specified using Stack's
-[script interpreter](scripts.md).
+[script interpreter](../topics/scripts.md).
 
 ~~~haskell
 {- stack script
@@ -243,7 +244,7 @@ Consequently, for example, Stack will:
 Consider also the following script extract, based on snapshot Stackage
  LTS Haskell 20.25, where considerations on Windows differ from non-Windows. The
 `stack script` command is specified using Stack's
-[script interpreter](scripts.md).
+[script interpreter](../topics/scripts.md).
 
 === "Windows"
 

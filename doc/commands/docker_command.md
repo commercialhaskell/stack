@@ -14,8 +14,8 @@ Stack is able to build your code inside a Docker image, which means even more
 reproducibility to your builds, since you and the rest of your team will always
 have the same system libraries.
 
-For further information, see the [Docker integration](docker_integration.md)
-documentation.
+For further information, see the
+[Docker integration](../topics/docker_integration.md) documentation.
 
 ## The `stack docker pull` command
 

@@ -6,10 +6,10 @@
 
 Snapshots provide a list of packages to use, along with flags, GHC options, and
 a few other settings. Snapshots may extend any other snapshot that can be
-specified in a [`snapshot`](yaml_configuration.md#snapshot) or
-[`resolver`](yaml_configuration.md#resolver) key. The packages specified follow
-the same syntax for dependencies in Stack's project-level configuration files.
-Unlike the `extra-deps` key, however, no support for local directories is
+specified in a [`snapshot`](../configure/yaml/project.md#snapshot) or
+[`resolver`](../configure/yaml/project.md#resolver) key. The packages specified
+follow the same syntax for dependencies in Stack's project-level configuration
+files. Unlike the `extra-deps` key, however, no support for local directories is
 available in snapshots to ensure reproducibility.
 
 !!! info
@@ -98,7 +98,8 @@ hidden:
 ### Specifying GHC options
 
 In order to specify GHC options for a package, you use the same syntax as the
-[ghc-options](yaml_configuration.md#ghc-options) key for build configuration.
+[ghc-options](../configure/yaml/non-project.md#ghc-options) key for build
+configuration.
 
 The following snapshot specification will be identical to `lts-22.28`, but
 provides `-O1` as a ghc-option for `text`:
@@ -122,7 +123,7 @@ packages in the `packages` list, rather than all packages in the snapshot.
 ### Specifying Cabal flags
 
 In order to specify Cabal flags for a package, you use the same syntax as the
-[flags](yaml_configuration.md#flags) key for build configuration. The
+[flags](../configure/yaml/project.md#flags) key for build configuration. The
 following snapshot specification will be identical to `lts-22.28`, but
 it enables the `developer` Cabal flag:
 

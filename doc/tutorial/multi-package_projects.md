@@ -59,5 +59,5 @@ modified version of a dependency that hasn't yet been released upstream.
     When adding upstream packages directly to your project it is important to
     distinguish _project packages_ located locally from the upstream
     _dependency packages_. Otherwise you may have trouble running `stack ghci`.
-    See [stack.yaml documentation](yaml_configuration.md#packages) for more
-    details.
+    See [stack.yaml documentation](../configure/yaml/project.md#packages) for
+    more details.

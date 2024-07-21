@@ -75,8 +75,8 @@ extra-source-files:
     doc/configure/environment_variables.md
     doc/configure/global_flags.md
     doc/configure/index.md
-    doc/configure/yaml/non-project_specific_configuration.md
-    doc/configure/yaml/project-specific_configuration.md
+    doc/configure/yaml/non-project.md
+    doc/configure/yaml/project.md
     doc/configure/yaml/yaml_configuration.md
     doc/CONTRIBUTING.md
     doc/dev_containers.md

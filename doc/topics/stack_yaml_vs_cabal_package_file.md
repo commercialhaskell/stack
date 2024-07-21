@@ -73,10 +73,10 @@ Sometimes a snapshot doesn't have all of the packages that you want. Or you want
 a different version of a package. Or you want to work on a local modification of
 a package. In all of those cases, you can add more configuration data to your
 `stack.yaml` file to override the values it received from your
-[`snapshot`](yaml_configuration.md#snapshot) or
-[`resolver`](yaml_configuration.md#resolver) setting. At the end of the day,
-each of your projects will end up with some way of resolving a package name into
-a specific version of that package.
+[`snapshot`](../configure/yaml/project.md#snapshot) or
+[`resolver`](../configure/yaml/project.md#resolver) setting. At the end of the
+day, each of your projects will end up with some way of resolving a package name
+into a specific version of that package.
 
 ## Why specify dependencies twice?
 

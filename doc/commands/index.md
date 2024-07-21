@@ -3,7 +3,7 @@
 # Commands (advanced)
 
 Some of Stack's features will not be needed regularly or by all users. This part
-of the guide and the part on [configuration](configure/index.md) provide
+of the guide and the part on [configuration](../configure/index.md) provide
 information about somethose features, organised as a reference guide. Some of
 the features are complex and separate pages are dedicated to them.
 
@@ -14,8 +14,8 @@ the features are complex and separate pages are dedicated to them.
 * [`setup`](setup_command.md) - get GHC for a Stack project (usually not needed)
 * [`update`](update_command.md) - update the package index (usually not needed)
 * [`new`](new_command.md) - create a new project with Stack
-* [`init`](init_command.md) - initialise Stack's project-level YAML configuration file for an
-  existing project
+* [`init`](init_command.md) - initialise Stack's project-level YAML
+  configuration file for an existing project
 
 ### Building
 
@@ -79,8 +79,8 @@ the features are complex and separate pages are dedicated to them.
 
 * [`hoogle`](hoogle_command.md) - run `hoogle`
 * [`dot`](dot_command.md) - dependency visualization
-* [`hpc`](hpc_command.md) - generate Haskell Program Coverage (HPC) code coverage
-  reports
+* [`hpc`](hpc_command.md) - generate Haskell Program Coverage (HPC) code
+  coverage reports
 
 ### Managing Stack versions
 
@@ -100,14 +100,14 @@ Stack's commands are listed below, in alphabetical order.
 * [`exec`](exec_command.md) - executate a command in the Stack environment
 * [`haddock`](build_command.md) - a synonym for `stack build --haddock`
 * [`hoogle`](hoogle_command.md) - run `hoogle`
-* [`hpc`](hpc_command.md) - generate Haskell Program Coverage (HPC) code coverage
-  reports
+* [`hpc`](hpc_command.md) - generate Haskell Program Coverage (HPC) code
+  coverage reports
 * [`ghc`](ghc_command.md) - run `ghc`
 * [`ghci`](ghci_command.md) - run GHCi, a REPL environment
 * [`ide`](ide_command.md) - information for an integrated development
   environment (IDE)
-* [`init`](init_command.md) - initialise Stack's project-level YAML configuration file for an
-  existing project
+* [`init`](init_command.md) - initialise Stack's project-level YAML
+  configuration file for an existing project
 * [`install`](build_command.md) - a synonym for `stack build --copy-bins`
 * [`list`](list_command.md) - list packages on Hackage or in a snapshot
 * [`ls`](ls_command.md) - list information about Stack

@@ -241,7 +241,7 @@ At the time of writing:
 * Experimental custom snapshot support
 
 The most up-to-date information can always be found in the
-[stack.yaml documentation](yaml_configuration.md#snapshot).
+[stack.yaml documentation](../configure/yaml/project.md#snapshot).
 
 ## Cleaning your project
 

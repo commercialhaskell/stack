@@ -25,7 +25,7 @@ see GitHub's REST API documentation.
 
 [:octicons-tag-24: 2.7.5](https://github.com/commercialhaskell/stack/releases/tag/v2.7.5)
 
-Related command: [`stack upload`](upload_command.md)
+Related command: [`stack upload`](../commands/upload_command.md)
 
 Hackage allows its members to register an API authentification token and to
 authenticate using the token.
@@ -52,7 +52,7 @@ example:
 
 [:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
 
-Related command: [`stack upload`](upload_command.md)
+Related command: [`stack upload`](../commands/upload_command.md)
 
 `stack upload` will request a Hackage username and password to authenticate.
 This can be avoided by setting the `HACKAGE_USERNAME` and `HACKAGE_PASSWORD`
@@ -77,7 +77,8 @@ example:
 
 ## `NO_COLOR`
 
-Related command: all commands that can produce colored output using control character sequences.
+Related command: all commands that can produce colored output using control
+character sequences.
 
 Stack follows the standard at http://no-color.org/. Stack checks for a
 `NO_COLOR` environment variable. When it is present and not an empty string
@@ -111,13 +112,13 @@ Overridden by: Stack's global
 [`--stack-root`](global_flags.md#-stack-root-option) option.
 
 The environment variable `STACK_ROOT` can be used to specify the
-[Stack root](stack_root.md) directory.
+[Stack root](../topics/stack_root.md) directory.
 
 ## `STACK_WORK`
 
 Related command: all commands that make use of Stack's work directories.
 
-Overridden by: Stack's [`work-dir`](yaml_configuration.md#work-dir) non-project
+Overridden by: Stack's [`work-dir`](yaml/non-project.md#work-dir) non-project
 specific configuration option, or global
 [`--work-dir`](global_flags.md#-work-dir-option) option.
 

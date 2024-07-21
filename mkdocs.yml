@@ -89,10 +89,10 @@ nav:
   - Environment variables: configure/environment_variables.md
   - Configuration:
     - Introduction: configure/yaml/yaml_configuration.md
-    - Project-specific: configure/yaml/project-specific_configuration.md
-    - Non-project specific: configure/yaml/non-project_specific_configuration.md
+    - Project-specific: configure/yaml/project.md
+    - Non-project specific: configure/yaml/non-project.md
   - Global flags and options: configure/global_flags.md
-  - Customisation scripts: customisation_scripts.md
+  - Customisation scripts: configure/customisation_scripts.md
 - Topics:
   - topics/index.md
   - Stack root: topics/stack_root.md

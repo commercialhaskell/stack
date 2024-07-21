@@ -69,4 +69,4 @@ The command also accepts flags and options of the
 [`stack build`](build_command.md#flags-affecting-ghcs-behaviour) command that
 affect the location of the local project installation directory, such as
 `--profile` and `--no-strip`. For further information, see the documentation of
-the [project Stack work directory](stack_work.md#project-stack-work-directory).
+the [project Stack work directory](../topics/stack_work.md).

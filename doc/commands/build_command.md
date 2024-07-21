@@ -29,8 +29,8 @@ stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
 interface for simple tasks and flexibility for more complicated goals.
 
 See the introductory part of Stack's
-[user's guide](GUIDE.md#the-stack-build-command) for an introduction to the
-command.
+[user's guide](../tutorial/hello_world_example.md#the-stack-build-command) for
+an introduction to the command.
 
 ## Synonyms
 
@@ -206,15 +206,16 @@ its subdirectories.
 ## Controlling what gets built
 
 Stack will automatically build the necessary dependencies. See the introductory
-part of Stack's [user's guide](GUIDE.md#the-stack-build-command) for information
-about how these dependencies get specified.
+part of Stack's
+[user's guide](../tutorial/building_your_project.md#adding-dependencies) for
+information about how these dependencies get specified.
 
 In addition to specifying targets, you can also control what gets built, or
 retained, with the flags and options listed below. You can also affect what gets
 built by specifying Cabal (the library) options for the configure step
 of the Cabal build process (for further information, see the documentation for
-the [configure-options](yaml_configuration.md#configure-options) configuration
-option).
+the [configure-options](../configure/yaml/non-project.md#configure-options)
+configuration option).
 
 ### `--[no-]allow-newer` flag
 
@@ -298,7 +299,7 @@ This overrides:
 !!! note
 
     In order to set a Cabal flag for a GHC boot package, the package must be
-    specified as an [extra-dep](yaml_configuration.md#extra-deps).
+    specified as an [extra-dep](../configure/yaml/project.md#extra-deps).
 
 ### `--[no-]force-dirty` flag
 
@@ -736,8 +737,9 @@ The effect of `--fast` can be overriden with Stack's
     Cabal's default behaviour). The exception is if Cabal's
     `--disable-optimization` flag or `--enable-optimization[=n]`, `-O[n]`
     options are used during the configure step of the Cabal build process; see
-    Stack's [`configure-options`](yaml_configuration.md#configure-options) YAML
-    configuration option.
+    Stack's
+    [`configure-options`](../configure/yaml/non-project.md#configure-options)
+    YAML configuration option.
 
 ### `--ghc-options` option
 
@@ -745,11 +747,12 @@ GHC command line options can be specified for a package in its Cabal file
 (including one created from a `package.yaml` file). This option augments and, if
 applicable (see below), overrides any such GHC command line options and those
 specified in Stack's YAML configuration files - see the
-[`ghc-options`](yaml_configuration.md#ghc-options) configuration option.
+[`ghc-options`](../configure/yaml/non-project.md#ghc-options) configuration
+option.
 
 `stack build --ghc-options <ghc_options>` passes the specified command line
 options to GHC, depending on Stack's
-[`apply-ghc-options`](yaml_configuration.md#apply-ghc-options) YAML
+[`apply-ghc-options`](../configure/yaml/non-project.md#apply-ghc-options) YAML
 configuration option. This option can be specified multiple times.
 
 GHC's command line options are _order-dependent_ and evaluated from left to
@@ -849,14 +852,14 @@ to `happy` its `--ghc` flag.
 By default, all and any `--PROG-option` options on Stack's command line are
 applied to all project packages (targets or otherwise). This behaviour can be
 changed. See the
-[`apply-prog-options`](yaml_configuration.md#apply-prog-options) configuration
-option.
+[`apply-prog-options`](../configure/yaml/non-project.md#apply-prog-options)
+configuration option.
 
 Stack can also be configured to pass Cabal's `--PROG-option`, `--PROG-options`
 or other options to Cabal during the configuration step. For further
 information, see the documentation for the
-[configure-options](yaml_configuration.md#configure-options) configuration
-option.
+[configure-options](../configure/yaml/non-project.md#configure-options)
+configuration option.
 
 ## Flags relating to build outputs
 
@@ -969,9 +972,9 @@ package is targetted in a multi-package project (for example, using
   contents of the log files to the standard error output stream of the console
   at the end of the build, use Stack's `dump-logs` option. For further
   information about that option, see the
-  [YAML configuration](yaml_configuration.md#dump-logs) documentation. The
-  default `dump-logs` mode is to output the contents of any log files that
-  include GHC warnings.
+  [YAML configuration](../configure/yaml/non-project.md#dump-logs)
+  documentation. The default `dump-logs` mode is to output the contents of any
+  log files that include GHC warnings.
 
 ### `--[no]-open` flag
 
@@ -1024,8 +1027,8 @@ All the following examples assume that:
     `stack.yaml` file in the current directory or ancestor directory and,
     consequently, the project-level configuration will be determined by a
     `stack.yaml` file in the `global-project` directory in the
-    [Stack root](stack_root.md) (for further information, see the
-    [YAML configuration](yaml_configuration.md) documentation); and
+    [Stack root](../topics/stack_root.md) (for further information, see the
+    [YAML configuration](../configure/yaml_configuration.md) documentation); and
 
 *   if `stack build` is commanded in a project directory, there is a
     `stack.yaml` file in that directory.

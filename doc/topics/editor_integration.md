@@ -17,4 +17,4 @@ eval "$(stack --bash-completion-script stack)"
 ~~~
 
 For more information and other shells, see the
-[Shell auto-completion wiki page](https://docs.haskellstack.org/en/stable/shell_autocompletion)
+[shell auto-completion](shell_autocompletion.md) documentation.
