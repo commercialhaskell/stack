@@ -126,8 +126,8 @@ extra-source-files:
     doc/tutorial/index.md
     doc/tutorial/installed_package_databases.md
     doc/tutorial/locations_used_by_stack.md
-    "doc/tutorial/multi-package _projects.md"
-    doc/tutorial/stack_build_synoynms.md
+    doc/tutorial/multi-package_projects.md
+    doc/tutorial/stack_build_synonyms.md
     doc/tutorial/stack_build_targets.md
     doc/tutorial/stack_configuration.md
     doc/tutorial/tutorial_conclusion.md
