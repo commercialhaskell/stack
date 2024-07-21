@@ -42,10 +42,11 @@ to make more sense.
 After creating the project directory, and obtaining and populating the project
 template, Stack will initialise its own project-level configuration. For further
 information about setting paramaters to populate templates, see the YAML
-configuration [documentation](yaml_configuration.md#templates). For further
-information about initialisation, see the `stack init` command
-[documentation](#the-stack-init-command). The `stack new` and `stack init`
-commands have options and flags in common.
+configuration
+[documentation](../configure/yaml/yaml_configuration.md#templates). For further
+information about initialisation, see the
+[`stack init`](../commands/init_command.md) command documentation. The
+`stack new` and `stack init` commands have options and flags in common.
 
 !!! info
 
