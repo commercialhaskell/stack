@@ -1,6 +1,9 @@
+---
+title: Topics
+---
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# Topics
+# Topics (advanced)
 
 This part of the guide provides pages dedicated to specific topics.
 

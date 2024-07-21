@@ -1,3 +1,6 @@
+---
+title: Commands
+---
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
 # Commands (advanced)
