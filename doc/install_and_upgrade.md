@@ -1,18 +1,116 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# Install or upgrade
+# Setting up
+
+The goal of setting up is a `stack` executable file on the PATH. When Stack is
+used, it sets other things up as needed.
+
+* [PATH]: An environment variable that specifies a list of directories searched
+  for executable files.
+
+??? question "How do I know if Stack is on the PATH?"
+
+    Command `stack`. If Stack is available, that should output information about
+    how to use it.
+
+??? question "How do I find where Stack is located?"
+
+    === "Unix-like"
+
+    Command `which -a stack`.
+
+    === "Windows"
+
+    Command `where.exe stack`.
+
+??? question "How do I find what version of Stack is available?"
+
+    Command `stack --version` or `stack --numeric-version`.
+
+???+ question "If I don't use GHCup, is there a preferred location for Stack?"
+
+    You can put the `stack` executable file anywhere on your PATH. However, a
+    good location is the directory where Stack itself will install executables.
+    That location depends on the operating system:
+
+    === "Unix-like"
+
+        Stack installs executables to:
+
+        ~~~text
+        $HOME/.local/bin
+        ~~~
+
+        If you don't have that directory in your PATH, you may need to update
+        your PATH. That can be done by editing the `~/.bashrc` file.
+
+    === "Windows"
+
+        Stack installs executables to:
+
+        ~~~text
+        %APPDATA%\local\bin
+        ~~~
+
+        For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
+
+        If you don't have that directory in your PATH, you may need to update
+        your PATH. That can be done by searching for 'Edit Environment variables
+        for your account' under Start.
+
+    !!! note
+
+        If you used GHCup to install Stack, GHCup puts executable files in the
+        `bin` directory in the GHCup root directory.
+
+To get and use Stack, some other things need to be in place first:
+
+<div class="grid cards" markdown>
+
+-   :material-laptop:{ .lg .middle } __A computer__
+
+    ---
+
+    Stack will need at least about 5 GB of disk space (about 3 GB for a single
+    version of GHC and about 2 GB for a local copy of the Hackage package
+    index).
+
+    It will help to know what platform your computer provides - that is, its
+    machine architecture (eg x86_64, AArch64) and its operating system (eg a
+    Linux distribution, macOS, Windows).
+
+-   :material-wifi:{ .lg .middle } __Access to the Internet__
+
+    ---
+
+    Stack will need to fetch files from remote locations.
+
+-   :octicons-terminal-24:{ .lg .middle } __Terminal software__
+
+    ---
+
+    Stack is used at the command line. Your operating system likely provides
+    terminal software and alternatives may be available.
+
+-   :material-text-box-edit-outline:{ .lg .middle } __A code editor__
+
+    ---
+
+    You can use any editor program that can edit text files but code editors
+    with extensions for Haskell code files are recommended.
+
+</div>
 
 ## Install Stack
 
-Stack can be installed on most Linux distributions, macOS and Windows. It will
-require at least about 5 GB of disk space, of which about 3 GB is for a single
-version of GHC and about 2 GB is for Stack's local copy of the Hackage package
-index.
+Stack can be installed on most Linux distributions, macOS and Windows.
 
-Stack is open to supporting more operating systems. To request support for an
-operating system, please submit an
-[issue](https://github.com/commercialhaskell/stack/issues/new) at Stack's
-GitHub repository.
+??? question "What about other operating systems?"
+
+    Stack is open to supporting more operating systems. To request support for
+    an operating system, please submit an
+    [issue](https://github.com/commercialhaskell/stack/issues/new) at Stack's
+    GitHub repository.
 
 Stack can be installed directly or by using the GHCup tool.
 
@@ -20,19 +118,17 @@ Stack can be installed directly or by using the GHCup tool.
 
     Stack can be installed on various operating systems.
 
-    !!! info "Releases on GitHub"
+    ??? question "Where can binary distributions for Stack be found?"
 
-        Stack executables are also available on the
+        Stack executables are available on the
         [releases](https://github.com/commercialhaskell/stack/releases) page of
         Stack's GitHub repository.
 
-    !!! info "`https://get.haskellstack.org/stable` URLs"
-
         URLs with the format
         `https://get.haskellstack.org/stable/<PLATFORM>.<EXTENSION>` point to
-        the latest stable release. See the manual download links for examples.
+        the latest stable release. The manual download links use those URLs.
 
-    !!! info "`sh` script flags and options"
+    ??? question "Does the `sh` installation script have flags and options?"
 
         The `sh` installation script recognises the following optional flags and
         options: `-q` suppresses output and specifies non-intervention (likely a
@@ -58,7 +154,7 @@ Stack can be installed directly or by using the GHCup tool.
 
         These commands download a script file and run it using `sh`.
 
-        !!! note
+        ??? question "Will the installation script need root access?"
 
             The script at [get.haskellstack.org](https://get.haskellstack.org/)
             will ask for root access using `sudo`. It needs such access in order
@@ -78,7 +174,7 @@ Stack can be installed directly or by using the GHCup tool.
               to download an archive file with the latest release.
 
             * Extract the archive and place the `stack` executable somewhere on
-              your PATH (see the [Path](#path) section below).
+              your PATH.
 
             * Ensure you have the required system dependencies installed. These
               include GCC, GNU Make, xz, perl, libgmp, libffi, and zlib. We also
@@ -130,7 +226,7 @@ Stack can be installed directly or by using the GHCup tool.
               to download an archive file with the latest release.
 
             * Extract the archive and place the `stack` executable somewhere on
-              your PATH (see the [Path](#path) section below).
+              your PATH.
 
             * Ensure you have the required system dependencies installed. These
               include GCC, GNU Make, xz, perl, libgmp, libffi, and zlib. We also
@@ -287,8 +383,8 @@ Stack can be installed directly or by using the GHCup tool.
             for Ubuntu 20.04 and up.
 
         It is possible to set up auto-completion of Stack commands. For further
-        information, see the [shell auto-completion](shell_autocompletion.md)
-        documentation.
+        information, see the
+        [shell auto-completion](topics/shell_autocompletion.md) documentation.
 
     === "macOS"
 
@@ -318,7 +414,7 @@ Stack can be installed directly or by using the GHCup tool.
 
             These commands download a script file and run it using `sh`.
 
-            !!! note
+            ??? question "Will the installation script need root access?"
 
                 The script at
                 [get.haskellstack.org](https://get.haskellstack.org/)
@@ -327,12 +423,6 @@ Stack can be installed directly or by using the GHCup tool.
                 dependencies and to install to `/usr/local/bin`. If you prefer
                 more control, follow the manual installation instructions below.
 
-            !!! info
-
-                We generally test on the current version of macOS and do our
-                best to keep it compatible with the three most recent major
-                versions. Stack may also work on older versions.
-
             ### Manual download
 
             * Click
@@ -340,8 +430,7 @@ Stack can be installed directly or by using the GHCup tool.
               to download an archive file with the latest release for x86_64
               architectures.
 
-            * Extract the archive and place `stack` somewhere on your PATH (see the
-              [Path](#path) section below).
+            * Extract the archive and place `stack` somewhere on your PATH.
 
             * Now you can run Stack from the command line in a terminal.
 
@@ -365,7 +454,7 @@ Stack can be installed directly or by using the GHCup tool.
 
             These commands download a script file and run it using `sh`.
 
-            !!! note
+            ??? question "Will the installation script need root access?"
 
                 The script at
                 [get.haskellstack.org](https://get.haskellstack.org/)
@@ -413,8 +502,7 @@ Stack can be installed directly or by using the GHCup tool.
               to download an archive file with the latest release for AArch64
               architectures.
 
-            * Extract the archive and place `stack` somewhere on your PATH (see
-              the [Path](#path) section below).
+            * Extract the archive and place `stack` somewhere on your PATH.
 
             * Now you can run Stack from the command line in a terminal.
 
@@ -498,8 +586,8 @@ Stack can be installed directly or by using the GHCup tool.
         ### Auto-completion of Stack commands
 
         It is possible to set up auto-completion of Stack commands. For further
-        information, see the [shell auto-completion](shell_autocompletion.md)
-        documentation.
+        information, see the
+        [shell auto-completion](topics/shell_autocompletion.md) documentation.
 
     === "Windows"
 
@@ -557,44 +645,7 @@ Stack can be installed directly or by using the GHCup tool.
             The GHC project does not yet provide a version of GHC that runs on
             Windows on Arm.
 
-    ## Path
-
-    You can install Stack by copying the executable file anywhere on your PATH.
-    A good place to install is the same directory where Stack itself will
-    install executables, which depends on the operating system:
-
-    === "Unix-like"
-
-        Stack installs executables to:
-
-        ~~~text
-        $HOME/.local/bin
-        ~~~
-
-        If you don't have that directory in your PATH, you may need to update
-        your PATH. That can be done by editing the `~/.bashrc` file.
-
-    === "Windows"
-
-        Stack installs executables to:
-
-        ~~~text
-        %APPDATA%\local\bin
-        ~~~
-
-        For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
-
-        If you don't have that directory in your PATH, you may need to update
-        your PATH. That can be done by searching for 'Edit Environment variables
-        for your account' under Start.
-
-    !!! note
-
-        If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack,
-        GHCup puts executable files in the `bin` directory in the GHCup root
-        directory.
-
-    !!! note "China-based users"
+    ??? note "China-based users: download"
 
         As of 24 February 2020, the download link has limited connectivity from
         within mainland China. If you experience this, please proceed by
@@ -617,98 +668,111 @@ Stack can be installed directly or by using the GHCup tool.
     also configures Stack so that if Stack needs a version of GHC, GHCup takes
     over obtaining and installing that version.
 
-## China-based users: configuration
+??? note "China-based users: configuration"
 
-After installation, your `config.yaml` file will need to be configured before
-Stack can download large files consistently from within China (without reliance
-on a VPN). Please add the following to the bottom of the `config.yaml` file:
+    After installation, Stack will need to be configured before it can download
+    large files consistently from within China (without reliance on a VPN).
+    Please add the following to the bottom of the
+    [global configuration file](configure/yaml/yaml_configuration.md)
+    (`config.yaml`):
 
-~~~yaml
-###ADD THIS IF YOU LIVE IN CHINA
-setup-info-locations:
-- "http://mirrors.tuna.tsinghua.edu.cn/stackage/stack-setup.yaml"
-urls:
-  latest-snapshot: http://mirrors.tuna.tsinghua.edu.cn/stackage/snapshots.json
+    ~~~yaml
+    ###ADD THIS IF YOU LIVE IN CHINA
+    setup-info-locations:
+    - "http://mirrors.tuna.tsinghua.edu.cn/stackage/stack-setup.yaml"
+    urls:
+      latest-snapshot: http://mirrors.tuna.tsinghua.edu.cn/stackage/snapshots.json
 
-package-indices:
-- download-prefix: http://mirrors.tuna.tsinghua.edu.cn/hackage/
-~~~
-
-## Using an HTTP proxy
-
-To use Stack behind a HTTP proxy with IP address *IP* and port *PORT*, first
-set up an environment variable `http_proxy` and then run the Stack command.
-For example:
-
-=== "Unix-like"
-
-    ~~~text
-    export http_proxy=IP:PORT
-    stack install
+    package-indices:
+    - download-prefix: http://mirrors.tuna.tsinghua.edu.cn/hackage/
     ~~~
 
-    On most operating systems, it is not mandatory for programs to follow the
-    "system-wide" HTTP proxy. Some programs, such as browsers, do honor this
-    "system-wide" HTTP proxy setting, while other programs, including Bash, do
-    not. That means configuring "http proxy setting" in your System Preferences
-    (macOS) would not result in Stack traffic going through the proxy.
+??? question "What if I am using an HTTP proxy?"
 
-=== "Windows"
+    To use Stack behind a HTTP proxy with IP address *IP* and port *PORT*, first
+    set up an environment variable `http_proxy` and then run the Stack command.
+    For example:
 
-    ~~~text
-    $Env:http_proxy=IP:PORT
-    stack install
-    ~~~
+    === "Unix-like"
 
-    It is not mandatory for programs to follow the "system-wide" HTTP proxy.
-    Some programs, such as browsers, do honor this "system-wide" HTTP proxy
-    setting, while other programs do not. That means configuring
-    "http proxy setting" in your Control Panel would not result in Stack traffic
-    going through the proxy.
+        ~~~text
+        export http_proxy=IP:PORT
+        stack install
+        ~~~
+
+        On most operating systems, it is not mandatory for programs to follow
+        the 'system-wide' HTTP proxy. Some programs, such as browsers, do honor
+        this 'system-wide' HTTP proxy setting, while other programs, including
+        Bash, do not. That means configuring 'http proxy setting' in your System
+        Preferences (macOS) would not result in Stack traffic going through the
+        proxy.
+
+    === "Windows"
+
+        ~~~text
+        $Env:http_proxy=IP:PORT
+        stack install
+        ~~~
+
+        It is not mandatory for programs to follow the 'system-wide' HTTP proxy.
+        Some programs, such as browsers, do honor this 'system-wide' HTTP proxy
+        setting, while other programs do not. That means configuring
+        'http proxy setting' in your Control Panel would not result in Stack
+        traffic going through the proxy.
 
 ## Upgrade Stack
+
+The Stack project recommends the use of the latest released version of Stack.
 
 If Stack is already installed, upgrading it depends on whether you are using
 Stack or GHCup to manage versions of Stack.
 
 === "Stack"
 
+    ??? warning "If you use GHCup to manage Stack, use it consistently"
+
+        If you used GHCup to install Stack, you should also use GHCup to upgrade
+        Stack.
+
+        GHCup uses an executable named `stack` to manage versions of Stack,
+        through a file `stack.shim`. Stack will likely overwrite the executable
+        on upgrade.
+
     There are different approaches to upgrading Stack, which vary as between
     Unix-like operating systems (including macOS) and Windows.
-
-    !!! warning
-
-        If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack,
-        you should also use GHCup to upgrade Stack. GHCup uses an executable
-        named `stack` to manage versions of Stack, through a file `stack.shim`.
-        Stack will likely overwrite the executable on upgrade.
 
     === "Unix-like"
 
         There are essentially four different approaches:
 
-        1.  The `stack upgrade` command, which downloads a Stack executable, or
-            builds it from source, and installs it to Stack's 'local-bin'
-            directory (see `stack path --local-bin`). If different and
-            permitted, it also installs a copy in the directory of the current
-            Stack executable. (If copying is not permitted, copy `stack` from
-            Stack's 'local-bin' directory to the system location afterward.)
-            You can use `stack upgrade` to get the latest official release, and
-            `stack upgrade --git` to install from GitHub and live on the
-            bleeding edge. Make sure the location of the Stack executable is on
-            the PATH. See the [Path](#Path) section above.
+        <div class="grid cards" markdown>
 
-        2.  If you're using a package manager and are happy with sticking with
+        -   __Use the `stack upgrade` command__
+
+            ---
+
+            For further information, see the
+            [`stack upgrade`](commands/upgrade_command.md) documentation.
+
+        -   __Use a package manager__
+
+            ---
+
+            If you're using a package manager and want to stick with
             the officially released binaries from the distribution (which may
-            lag behind the latest version of Stack significantly), simply follow
-            your normal package manager strategies for upgrading. For example:
+            lag behind the latest version of Stack significantly), follow your
+            normal package manager strategies for upgrading. For example:
 
             ~~~text
             apt-get update
             apt-get upgrade
             ~~~
 
-        3.  The `get.haskellstack.org` script supports the `-f` argument to
+        -   __Use the `sh` installation script__
+
+            ---
+
+            The `get.haskellstack.org` script supports the `-f` argument to
             over-write the current Stack executable. For example, command
             either:
 
@@ -722,60 +786,36 @@ Stack or GHCup to manage versions of Stack.
             wget -qO- https://get.haskellstack.org/ | sh -s - -f
             ~~~
 
-        4.  Manually follow the steps above to download the newest executable
+        -   __Manual download__
+
+            ---
+
+            Manually follow the steps above to download the newest executable
             from the GitHub releases page and replace the old executable.
+
+        </div>
 
     === "Windows"
 
         There are essentially two different approaches:
 
-        1.  The `stack upgrade` command, which downloads a Stack executable, or
-            builds it from source, and installs it to Stack's 'local-bin'
-            directory (see `stack path --local-bin`). If different and
-            permitted, it also installs a copy in the directory of the current
-            Stack executable. (If copying is not permitted, copy `stack` from
-            Stack's 'local-bin' directory to the system location afterward.) You
-            can use `stack upgrade` to get the latest official release, and
-            `stack upgrade --git` to install from GitHub and live on the
-            bleeding edge. Make sure the location of the Stack executable is on
-            the PATH. See the [Path](#Path) section above.
+        <div class="grid cards" markdown>
 
-        2.  Manually follow the steps above to download the newest executable
+        -   __Use the `stack upgrade` command__
+
+            ---
+
+            For further information, see the
+            [`stack upgrade`](commands/upgrade_command.md) documentation.
+
+        -   __Manual download__
+
+            ---
+
+            Manually follow the steps above to download the newest executable
             from the GitHub releases page and replace the old executable.
 
-=== "GHCup"
-
-    The separate [GHCup](https://www.haskell.org/ghcup/) project provides
-    guidance about how to use GHCup to manage versions of tools such as Stack.
-
-## Install earlier versions
-
-Installing earlier versions of Stack depends on whether you are using Stack or
-GHCup to manage versions of Stack.
-
-=== "Stack"
-
-    To install a specific version of Stack, navigate to the desired version on
-    the [GitHub release page](https://github.com/commercialhaskell/stack/releases),
-    and click the appropriate link under its "Assets" drop-down menu.
-
-    Alternatively, use the URL
-    `https://github.com/commercialhaskell/stack/releases/download/vVERSION/stack-VERSION-PLATFORM.EXTENSION`.
-    For example, the tarball for Stack version 2.1.0.1, osx-x86_64 is at
-    `https://github.com/commercialhaskell/stack/releases/download/v2.1.0.1/stack-2.1.0.1-osx-x86_64.tar.gz`.
-
-    Here's a snippet for `appveyor.yml` files, borrowed from `dhall`'s
-    [`appveyor.yml`](https://github.com/dhall-lang/dhall-haskell/blob/1079b7a3a7a6922f72a373e47daf6f1b74f128b1/appveyor.yml).
-    Change the values of PATH and VERSION as needed.
-
-    ~~~yaml
-    install:
-      - set PATH=C:\Program Files\Git\mingw64\bin;%PATH%
-      - curl --silent --show-error --output stack.zip --location "https://github.com/commercialhaskell/stack/releases/download/v%STACK_VERSION%/stack-%STACK_VERSION%-windows-x86_64.zip"
-      - 7z x stack.zip stack.exe
-      - stack setup > nul
-      - git submodule update --init --recursive
-    ~~~
+        </div>
 
 === "GHCup"
 
