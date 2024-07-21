@@ -5,8 +5,8 @@
 The goal of setting up is a `stack` executable file on the PATH. When Stack is
 used, it sets other things up as needed.
 
-* [PATH]: An environment variable that specifies a list of directories searched
-  for executable files.
+*[PATH]: An environment variable that specifies a list of directories searched
+         for executable files.
 
 ??? question "How do I know if Stack is on the PATH?"
 
@@ -17,11 +17,11 @@ used, it sets other things up as needed.
 
     === "Unix-like"
 
-    Command `which -a stack`.
+        Command `which -a stack`.
 
     === "Windows"
 
-    Command `where.exe stack`.
+        Command `where.exe stack`.
 
 ??? question "How do I find what version of Stack is available?"
 
@@ -162,235 +162,283 @@ Stack can be installed directly or by using the GHCup tool.
             to install to `/usr/local/bin`. If you prefer more control, follow
             the manual installation instructions for your platform below.
 
-        ### Manual download
+        ??? Can I download Stack manually?
 
-        Manual download for Linux distributions depends on your machine
-        architecture, x86_64 or AArch64/ARM64.
+            Yes. Manual download for Linux distributions depends on your machine
+            architecture, x86_64 or AArch64/ARM64.
 
-        === "x86_64"
+            === "x86_64"
 
-            * Click
-              [:material-cloud-download-outline:](https://get.haskellstack.org/stable/linux-x86_64.tar.gz)
-              to download an archive file with the latest release.
+                * Click
+                  [:material-cloud-download-outline:](https://get.haskellstack.org/stable/linux-x86_64.tar.gz)
+                  to download an archive file with the latest release.
 
-            * Extract the archive and place the `stack` executable somewhere on
-              your PATH.
+                * Extract the archive and place the `stack` executable file
+                  somewhere on your PATH.
 
-            * Ensure you have the required system dependencies installed. These
-              include GCC, GNU Make, xz, perl, libgmp, libffi, and zlib. We also
-              recommend Git and GPG.
+                * Ensure you have the required system dependencies installed.
+                  These include GCC, GNU Make, xz, perl, libgmp, libffi, and
+                  zlib. We also recommend Git and GPG.
 
-            The installation of system dependencies will depend on the package
-            manager for your Linux distribution. Notes are provided for Arch
-            Linux, CentOS, Debian, Fedora, Gentoo and Ubuntu.
+                The installation of system dependencies will depend on the
+                package manager for your Linux distribution. Notes are provided
+                for Arch Linux, CentOS, Debian, Fedora, Gentoo and Ubuntu.
+
+                === "Arch Linux"
+
+                    ~~~text
+                    sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib
+                    ~~~
+
+                === "CentOS"
+
+                    ~~~text
+                    sudo yum install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+                    ~~~
+
+                === "Debian"
+
+                    ~~~text
+                    sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
+                    ~~~
+
+                === "Fedora"
+
+                    ~~~text
+                    sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+                    ~~~
+
+                === "Gentoo"
+
+                    Ensure you have the `ncurses` package with `USE=tinfo`. Without
+                    it, Stack will not be able to install GHC.
+
+                === "Ubuntu"
+
+                    ~~~text
+                    sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
+                    ~~~
+
+            === "AArch64"
+
+                * Click
+                  [:material-cloud-download-outline:](https://get.haskellstack.org/stable/linux-aarch64.tar.gz)
+                  to download an archive file with the latest release.
+
+                * Extract the archive and place the `stack` executable file
+                  somewhere on your PATH.
+
+                * Ensure you have the required system dependencies installed.
+                  These include GCC, GNU Make, xz, perl, libgmp, libffi, and
+                  zlib. We also recommend Git and GPG.
+
+                The installation of system dependencies will depend on the
+                package manager for your Linux distribution. Notes are provided
+                for Arch Linux, CentOS, Debian, Fedora, Gentoo and Ubuntu.
+
+                === "Arch Linux"
+
+                    ~~~text
+                    sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib
+                    ~~~
+
+                === "CentOS"
+
+                    ~~~text
+                    sudo yum install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+                    ~~~
+
+                === "Debian"
+
+                    ~~~text
+                    sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
+                    ~~~
+
+                === "Fedora"
+
+                    ~~~text
+                    sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+                    ~~~
+
+                === "Gentoo"
+
+                    Ensure you have the `ncurses` package with `USE=tinfo`. Without it,
+                    Stack will not be able to install GHC.
+
+                === "Ubuntu"
+
+                    ~~~text
+                    sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
+                    ~~~
+
+        ??? Can I use a Linux package to get Stack?
+
+            Some Linux distributions have official or unofficial packages for
+            Stack, including Arch Linux, Debian, Fedora, NixOS, openSUSE/SUSE
+            Linux Enterprise, and Ubuntu. However, the Stack version available
+            as a Linux package may lag behind Stack's current version and, in
+            some cases, the lag may be significant.
+
+            !!! info "Linux packages that lag behind Stack's current version"
+
+                If Stack version available as a Linux package lags behind
+                Stack's current version, using `stack upgrade --binary-only` is
+                recommended after installing it.
 
             === "Arch Linux"
 
-                ~~~text
-                sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib
-                ~~~
-
-            === "CentOS"
+                The Arch extra package repository provides an official x86_64
+                [package](https://www.archlinux.org/packages/extra/x86_64/stack/).
+                You can install it with the command:
 
                 ~~~text
-                sudo yum install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+                sudo pacman -S stack
                 ~~~
+
+                The Arch User Repository (AUR) also provides:
+
+                *   a [`stack-bin` package](https://aur.archlinux.org/packages/stack-bin);
+                    and
+
+                *   a [`stack-static` package](https://aur.archlinux.org/packages/stack-static)
 
             === "Debian"
 
-                ~~~text
-                sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
-                ~~~
+                There are Debian
+                [packages](https://packages.debian.org/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
+                for Buster and up. However, the distribution's Stack version
+                lags behind.
 
             === "Fedora"
 
+                Fedora includes Stack, but its Stack version may lag behind.
+
+            === "NixOS"
+
+                Users who follow the `nixos-unstable` channel or the Nixpkgs
+                `master` branch can install the latest Stack release into their
+                profile with the command:
+
                 ~~~text
-                sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
+                nix-env -f "<nixpkgs>" -iA stack
                 ~~~
 
-            === "Gentoo"
+                Alternatively, the package can be built from source as follows.
 
-                Ensure you have the `ncurses` package with `USE=tinfo`. Without
-                it, Stack will not be able to install GHC.
+                1.  Clone the git repo, with the command:
+
+                    ~~~text
+                    git clone https://github.com/commercialhaskell/stack.git
+                    ~~~
+
+                2.  Create a `shell.nix` file with the command:
+
+                    ~~~text
+                    cabal2nix --shell ./. --no-check --no-haddock > shell.nix
+                    ~~~
+
+                    Note that the tests fail on NixOS, so disable them with
+                    `--no-check`. Also, Haddock currently doesn't work for
+                    Stack, so `--no-haddock` disables it.
+
+                3.  Install Stack to your user profile with the command:
+
+                    ~~~text
+                    nix-env -i -f shell.nix
+                    ~~~
+
+                For more information on using Stack together with Nix, please
+                see the
+                [NixOS manual section on Stack](http://nixos.org/nixpkgs/manual/#how-to-build-a-haskell-project-using-stack).
+
+            === "SUSE"
+
+                There is also an unofficial package for openSUSE or SUSE Linux
+                Enterprise. Its Stack version may lag behind. To install it:
+
+                === "openSUSE Tumbleweed"
+
+                    ~~~text
+                    sudo zypper in stack
+                    ~~~
+
+                === "openSUSE Leap"
+
+                    ~~~text
+                    sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
+                    sudo zypper in stack
+                    ~~~
+
+                === "SUSE Linux Enterprise 12"
+
+                    ~~~text
+                    sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
+                    sudo zypper in stack
+                    ~~~
 
             === "Ubuntu"
 
-                ~~~text
-                sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
-                ~~~
+                There are Ubuntu
+                [packages](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
+                for Ubuntu 20.04 and up.
 
-        === "AArch64"
-
-            * Click
-              [:material-cloud-download-outline:](https://get.haskellstack.org/stable/linux-aarch64.tar.gz)
-              to download an archive file with the latest release.
-
-            * Extract the archive and place the `stack` executable somewhere on
-              your PATH.
-
-            * Ensure you have the required system dependencies installed. These
-              include GCC, GNU Make, xz, perl, libgmp, libffi, and zlib. We also
-              recommend Git and GPG.
-
-            The installation of system dependencies will depend on the package
-            manager for your Linux distribution. Notes are provided for Arch
-            Linux, CentOS, Debian, Fedora, Gentoo and Ubuntu.
-
-            === "Arch Linux"
-
-                ~~~text
-                sudo pacman -S make gcc ncurses git gnupg xz zlib gmp libffi zlib
-                ~~~
-
-            === "CentOS"
-
-                ~~~text
-                sudo yum install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
-                ~~~
-
-            === "Debian"
-
-                ~~~text
-                sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
-                ~~~
-
-            === "Fedora"
-
-                ~~~text
-                sudo dnf install perl make automake gcc gmp-devel libffi zlib zlib-devel xz tar git gnupg
-                ~~~
-
-            === "Gentoo"
-
-                Ensure you have the `ncurses` package with `USE=tinfo`. Without it,
-                Stack will not be able to install GHC.
-
-            === "Ubuntu"
-
-                ~~~text
-                sudo apt-get install g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git gnupg netbase
-                ~~~
-
-        ### Linux packages
-
-        Some Linux distributions have official or unofficial packages for Stack,
-        including Arch Linux, Debian, Fedora, NixOS, openSUSE/SUSE Linux
-        Enterprise, and Ubuntu. However, the Stack version available as a Linux
-        package may lag behind Stack's current version and, in some cases, the
-        lag may be significant.
-
-        !!! info "Linux packages that lag behind Stack's current version"
-
-            If Stack version available as a Linux package lags behind Stack's
-            current version, using `stack upgrade --binary-only` is recommended
-            after installing it.
-
-        === "Arch Linux"
-
-            The Arch extra package repository provides an official x86_64
-            [package](https://www.archlinux.org/packages/extra/x86_64/stack/).
-            You can install it with the command:
-
-            ~~~text
-            sudo pacman -S stack
-            ~~~
-
-            The Arch User Repository (AUR) also provides:
-
-            *   a [`stack-bin` package](https://aur.archlinux.org/packages/stack-bin);
-                and
-
-            *   a [`stack-static` package](https://aur.archlinux.org/packages/stack-static)
-
-        === "Debian"
-
-            There are Debian
-            [packages](https://packages.debian.org/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
-            for Buster and up. However, the distribution's Stack version lags
-            behind.
-
-        === "Fedora"
-
-            Fedora includes Stack, but its Stack version may lag behind.
-
-        === "NixOS"
-
-            Users who follow the `nixos-unstable` channel or the Nixpkgs
-            `master` branch can install the latest Stack release into their
-            profile with the command:
-
-            ~~~text
-            nix-env -f "<nixpkgs>" -iA stack
-            ~~~
-
-            Alternatively, the package can be built from source as follows.
-
-            1.  Clone the git repo, with the command:
-
-                ~~~text
-                git clone https://github.com/commercialhaskell/stack.git
-                ~~~
-
-            2.  Create a `shell.nix` file with the command:
-
-                ~~~text
-                cabal2nix --shell ./. --no-check --no-haddock > shell.nix
-                ~~~
-
-                Note that the tests fail on NixOS, so disable them with
-                `--no-check`. Also, Haddock currently doesn't work for Stack, so
-                `--no-haddock` disables it.
-
-            3.  Install Stack to your user profile with the command:
-
-                ~~~text
-                nix-env -i -f shell.nix
-                ~~~
-
-            For more information on using Stack together with Nix, please see
-            the
-            [NixOS manual section on Stack](http://nixos.org/nixpkgs/manual/#how-to-build-a-haskell-project-using-stack).
-
-        === "SUSE"
-
-            There is also an unofficial package for openSUSE or SUSE Linux
-            Enterprise. Its Stack version may lag behind. To install it:
-
-            === "openSUSE Tumbleweed"
-
-                ~~~text
-                sudo zypper in stack
-                ~~~
-
-            === "openSUSE Leap"
-
-                ~~~text
-                sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/openSUSE_Leap_42.1/devel:languages:haskell.repo
-                sudo zypper in stack
-                ~~~
-
-            === "SUSE Linux Enterprise 12"
-
-                ~~~text
-                sudo zypper ar http://download.opensuse.org/repositories/devel:/languages:/haskell/SLE_12/devel:languages:haskell.repo
-                sudo zypper in stack
-                ~~~
-
-        === "Ubuntu"
-
-            There are Ubuntu
-            [packages](http://packages.ubuntu.com/search?keywords=haskell-stack&searchon=names&suite=all&section=all)
-            for Ubuntu 20.04 and up.
-
-        It is possible to set up auto-completion of Stack commands. For further
-        information, see the
-        [shell auto-completion](topics/shell_autocompletion.md) documentation.
+            It is possible to set up auto-completion of Stack commands. For
+            further information, see the
+            [shell auto-completion](topics/shell_autocompletion.md)
+            documentation.
 
     === "macOS"
 
-        Most users of Stack on macOS will also have up to date tools for software
-        development (see [Xcode Command Line Tools](#xcode-command-line-tools)
-        below).
+        Most users of Stack on macOS will also have up to date tools for
+        software development.
+
+        ??? question "What if I am not sure that I have those tools?"
+
+            macOS does not come with all the tools required for software
+            development but a collection of useful tools, known as the Xcode
+            Command Line Tools, is readily available. A version of that
+            collection is provided with each version of Xcode (Apple’s
+            integrated development environment) and can also be obtained from
+            Apple separately from Xcode. The collection also includes the macOS
+            SDK (software development kit). The macOS SDK provides header files
+            for macOS APIs.
+
+            If you use a command that refers to a common Xcode Command Line Tool
+            and the Xcode Command Line Tools are not installed, macOS may prompt
+            you to install the tools.
+
+            macOS also comes with a command line tool, `xcode-select`, that can
+            be used to obtain the Xcode Command Line Tools. Command
+            `xcode-select --print-path` to print the path to the currently
+            selected (active) developer directory. If the directory does not
+            exist, or is empty, then the Xcode Command Line Tools are not
+            installed.
+
+            If the Xcode Command Line Tools are not installed, command
+            `xcode-select --install` to open a user interface dialog to request
+            automatic installation of the tools.
+
+            An upgrade of macOS may sometimes require the existing Xcode Command
+            Line Tools to be uninstalled and an updated version of the tools to
+            be installed. The existing tools can be uninstalled by deleting the
+            directory reported by `xcode-select --print-path`.
+
+            If, after the installation of Stack, running `stack setup` fails
+            with:
+            ~~~text
+            configure: error: cannot run C compiled programs.
+            ~~~
+
+            that indicates that the Xcode Command Line Tools are not installed.
+
+            If building fails with messages that `*.h` files are not found, that
+            may also indicate that Xcode Command Line Tools are not up to date.
+
+            Xcode 10 provided an SDK for macOS 10.14 (Mojave) and
+            [changed the location](https://developer.apple.com/documentation/xcode-release-notes/xcode-10-release-notes#Command-Line-Tools)
+            of the macOS system headers. As a workaround, an extra package was
+            provided by Apple which installed the headers to the base system
+            under `/usr/include`.
 
         From late 2020, Apple began a transition from Mac computers with Intel
         processors (Intel-based Mac) to
@@ -423,16 +471,18 @@ Stack can be installed directly or by using the GHCup tool.
                 dependencies and to install to `/usr/local/bin`. If you prefer
                 more control, follow the manual installation instructions below.
 
-            ### Manual download
+            ??? Can I download Stack manually?
 
-            * Click
-              [:material-cloud-download-outline:](https://get.haskellstack.org/stable/osx-x86_64.tar.gz)
-              to download an archive file with the latest release for x86_64
-              architectures.
+                Yes:
 
-            * Extract the archive and place `stack` somewhere on your PATH.
+                * Click
+                  [:material-cloud-download-outline:](https://get.haskellstack.org/stable/osx-x86_64.tar.gz)
+                  to download an archive file with the latest release for x86_64
+                  architectures.
 
-            * Now you can run Stack from the command line in a terminal.
+                * Extract the archive and place `stack` somewhere on your PATH.
+
+                Now you can run Stack from the command line in a terminal.
 
         === "Apple silicon"
 
@@ -495,16 +545,18 @@ Stack can be installed directly or by using the GHCup tool.
             would compile x86-64 objects and attempt to link them with existing
             ARM64 libraries, resulting in the error above.
 
-            ### Manual download
+            ??? Can I download Stack manually?
 
-            * Click
-              [:material-cloud-download-outline:](https://get.haskellstack.org/stable/osx-aarch64.tar.gz)
-              to download an archive file with the latest release for AArch64
-              architectures.
+                Yes:
 
-            * Extract the archive and place `stack` somewhere on your PATH.
+                * Click
+                  [:material-cloud-download-outline:](https://get.haskellstack.org/stable/osx-aarch64.tar.gz)
+                  to download an archive file with the latest release for
+                  AArch64 architectures.
 
-            * Now you can run Stack from the command line in a terminal.
+                * Extract the archive and place `stack` somewhere on your PATH.
+
+                Now you can run Stack from the command line in a terminal.
 
             ### LLVM
 
@@ -524,64 +576,23 @@ Stack can be installed directly or by using the GHCup tool.
             |8.6.5      |6            |
             |8.4.4      |5            |
 
-        ### Using Homebrew
+        ??? Can I use the Homebrew package manager to get Stack?
 
-        [Homebrew](https://brew.sh/) is a popular package manager for macOS. If
-        you have its `brew` tool installed, you can just command:
+            [Homebrew](https://brew.sh/) is a popular package manager for macOS.
+            If you have its `brew` tool installed, you can just command:
 
-        ~~~text
-        brew install haskell-stack
-        ~~~
+            ~~~text
+            brew install haskell-stack
+            ~~~
 
-        * The Homebrew formula and bottles are **unofficial** and lag slightly
-          behind new Stack releases, but tend to be updated within a day or two.
+            * The Homebrew formula and bottles are **unofficial** and lag
+              slightly behind new Stack releases, but tend to be updated within
+              a day or two.
 
-        * Normally, Homebrew will install from a pre-built binary (aka "pour
-          from a bottle"), but if it starts trying to build everything from
-          source (which will take hours), see
-          [their FAQ on the topic](https://github.com/Homebrew/brew/blob/master/docs/FAQ.md#why-do-you-compile-everything).
-
-        ### Xcode Command Line Tools
-
-        macOS does not come with all the tools required for software development
-        but a collection of useful tools, known as the Xcode Command Line Tools,
-        is readily available. A version of that collection is provided with each
-        version of Xcode (Apple’s integrated development environment) and can
-        also be obtained from Apple separately from Xcode. The collection also
-        includes the macOS SDK (software development kit). The macOS SDK
-        provides header files for macOS APIs.
-
-        If you use a command that refers to a common Xcode Command Line Tool and
-        the Xcode Command Line Tools are not installed, macOS may prompt you to
-        install the tools.
-
-        macOS also comes with a command line tool, `xcode-select`, that can be
-        used to obtain the Xcode Command Line Tools. Command
-        `xcode-select --print-path` to print the path to the currently selected
-        (active) developer directory. If the directory does not exist, or is
-        empty, then the Xcode Command Line Tools are not installed.
-
-        If the Xcode Command Line Tools are not installed, command
-        `xcode-select --install` to open a user interface dialog to request
-        automatic installation of the tools.
-
-        An upgrade of macOS may sometimes require the existing Xcode Command
-        Line Tools to be uninstalled and an updated version of the tools to be
-        installed. The existing tools can be uninstalled by deleting the
-        directory reported by `xcode-select --print-path`.
-
-        If, after the installation of Stack, running `stack setup` fails with
-        `configure: error: cannot run C compiled programs.` that indicates that
-        the Xcode Command Line Tools are not installed.
-
-        If building fails with messages that `*.h` files are not found, that may
-        also indicate that Xcode Command Line Tools are not up to date.
-
-        Xcode 10 provided an SDK for macOS 10.14 (Mojave) and
-        [changed the location](https://developer.apple.com/documentation/xcode-release-notes/xcode-10-release-notes#Command-Line-Tools)
-        of the macOS system headers. As a workaround, an extra package was
-        provided by Apple which installed the headers to the base system under
-        `/usr/include`.
+            * Normally, Homebrew will install from a pre-built binary (aka "pour
+              from a bottle"), but if it starts trying to build everything from
+              source (which will take hours), see
+              [their FAQ on the topic](https://github.com/Homebrew/brew/blob/master/docs/FAQ.md#why-do-you-compile-everything).
 
         ### Auto-completion of Stack commands
 
@@ -629,16 +640,18 @@ Stack can be installed directly or by using the GHCup tool.
             as that will make `stack install` and `stack upgrade` work correctly
             out of the box.
 
-            ### Manual download
+            ??? Can I download Stack manually?
 
-            * Click
-              [:material-cloud-download-outline:](https://get.haskellstack.org/stable/windows-x86_64.zip)
-              to download an archive file with the latest release.
+                Yes:
 
-            * Unpack the archive and place `stack.exe` somewhere on your PATH
-              (see the [Path](#path) section below).
+                * Click
+                  [:material-cloud-download-outline:](https://get.haskellstack.org/stable/windows-x86_64.zip)
+                  to download an archive file with the latest release.
 
-            * Now you can run Stack from the command line in a terminal.
+                * Unpack the archive and place `stack.exe` somewhere on your
+                  PATH.
+
+                Now you can run Stack from the command line in a terminal.
 
         === "Windows on Arm"
 
