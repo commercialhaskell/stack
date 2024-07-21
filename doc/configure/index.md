@@ -3,9 +3,9 @@
 # Configuration (advanced)
 
 Some of Stack's features will not be needed regularly or by all users. This part
-of the guide and the part on [Stack's commands](commands/index.md)
-provide information about those features, organised as a reference guide. Some
-of the features are complex and separate pages are dedicated to them.
+of the guide and the part on Stack's [commands](../commands/index.md) provide
+information about those features, organised as a reference guide. Some of the
+features are complex and separate pages are dedicated to them.
 
 The behaviour of Stack is configurable using environment variables, YAML
 configuration files, global flags and options on the command line and
