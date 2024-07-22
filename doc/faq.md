@@ -8,7 +8,7 @@
 
     'Cabal' can refer to Cabal (the library) or to Cabal (the tool).
 
-    === "Cabal (the library)
+    === "Cabal (the library)"
 
          Cabal (the library) is used by Stack to build your Haskell code.
 
@@ -137,18 +137,18 @@
 
     === "Unix-like"
 
-    ~~~bash
-    stack build  # builds using the default stack.yaml
-    STACK_YAML=stack-ghc-7.10.yaml
-    stack build  # builds using the given yaml file
-    ~~~
+        ~~~bash
+        stack build  # builds using the default stack.yaml
+        STACK_YAML=stack-ghc-7.10.yaml
+        stack build  # builds using the given yaml file
+        ~~~
 
     === "Windows (with PowerShell)"
 
-    ~~~ps
-    $Env:STACK_YAML='stack-ghc-9.0.2.yaml'
-    stack build
-    ~~~
+        ~~~ps
+        $Env:STACK_YAML='stack-ghc-9.0.2.yaml'
+        stack build
+        ~~~
 
 ## Package-related
 
