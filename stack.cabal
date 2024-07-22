@@ -71,6 +71,7 @@ extra-source-files:
     doc/commands/update_command.md
     doc/commands/upgrade_command.md
     doc/commands/upload_command.md
+    doc/community/index.md
     doc/configure/customisation_scripts.md
     doc/configure/environment_variables.md
     doc/configure/global_flags.md

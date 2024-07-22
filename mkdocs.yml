@@ -115,6 +115,7 @@ nav:
   - Lock files: topics/lock_files.md
   - Haskell and C code: topics/haskell_and_c_code.md
 - Get involved:
+  - community/index.md
   - Contributors:
     - Contributor's guide: CONTRIBUTING.md
     - Dev Containers: dev_containers.md

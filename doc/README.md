@@ -56,14 +56,14 @@ Stack can be installed directly or by using the GHCup tool.
 
         These commands download a script file and run it using `sh`.
 
-        !!! note
+        ??? question "Will the installation script need root access?"
 
             The script at [get.haskellstack.org](https://get.haskellstack.org/)
             will ask for root access using `sudo`. It needs such access in order
             to use your platform's package manager to install dependencies and
             to install to `/usr/local/bin`. If you prefer more control, follow
-            the manual installation instructions in the
-            [install and upgrade guide](install_and_upgrade.md).
+            the manual installation instructions in the guide to
+            [setting up](install_and_upgrade.md).
 
     === "macOS"
 
@@ -88,15 +88,15 @@ Stack can be installed directly or by using the GHCup tool.
 
             These commands download a script file and run it using `sh`.
 
-            !!! note
+            ??? question "Will the installation script need root access?"
 
                 The script at
                 [get.haskellstack.org](https://get.haskellstack.org/) will ask
-                for root access using `sudo`. It needs such access in order to
-                use your platform's package manager to install dependencies and
-                to install to `/usr/local/bin`. If you prefer more control,
-                follow the manual installation instructions in the
-                [install and upgrade guide](install_and_upgrade.md).
+                for root access using `sudo`. It needs such access in order
+                to use your platform's package manager to install dependencies
+                and to install to `/usr/local/bin`. If you prefer more control,
+                follow the manual installation instructions in the guide to
+                [setting up](install_and_upgrade.md).
 
         === "Apple silicon"
 
@@ -118,15 +118,15 @@ Stack can be installed directly or by using the GHCup tool.
 
             These commands download a script file and run it using `sh`.
 
-            !!! note
+            ??? question "Will the installation script need root access?"
 
                 The script at
                 [get.haskellstack.org](https://get.haskellstack.org/) will ask
-                for root access using `sudo`. It needs such access in order to
-                use your platform's package manager to install dependencies and
-                to install to `/usr/local/bin`. If you prefer more control,
-                follow the manual installation instructions in the
-                [install and upgrade guide](install_and_upgrade.md).
+                for root access using `sudo`. It needs such access in order
+                to use your platform's package manager to install dependencies
+                and to install to `/usr/local/bin`. If you prefer more control,
+                follow the manual installation instructions in the guide to
+                [setting up](install_and_upgrade.md).
 
     === "Windows"
 
@@ -157,8 +157,8 @@ Stack can be installed directly or by using the GHCup tool.
 
     === "Other/direct downloads"
 
-        For other operating systems and direct downloads see the
-        [install and upgrade guide](install_and_upgrade.md).
+        For other operating systems and direct downloads see the guide to
+        [setting up](install_and_upgrade.md).
 
 === "GHCup"
 
@@ -176,29 +176,32 @@ Stack can be installed directly or by using the GHCup tool.
     also configures Stack so that if Stack needs a version of GHC, GHCup takes
     over obtaining and installing that version.
 
-## How to upgrade Stack
+??? question "How do I upgrade Stack?"
 
-If Stack is already installed, upgrading it depends on whether you are using
-Stack or GHCup to manage versions of Stack.
+    Follow the advice under [setting up](install_and_upgrade.md#upgrade-stack).
 
-=== "Stack"
+??? question "How do I remove Stack?"
 
-    If Stack is already installed, you can upgrade it to the latest version by
-    the command:
+    For information about how to uninstall Stack, command:
 
     ~~~text
-    stack upgrade
+    stack uninstall
     ~~~
 
-    !!! warning
+    To uninstall Stack, it should be sufficient to delete:
 
-        If you used [GHCup](https://www.haskell.org/ghcup/) to install Stack,
-        you should also use GHCup, and not Stack, to upgrade Stack.
+    1.  the Stack root directory (see `stack path --stack-root`, before you
+        uninstall);
+    2.  if different, the directory containing Stack's global configuration file
+        (see `stack path --global-config`, before you uninstall);
+    3.  on Windows, the directory containing Stack's tools (see
+        `stack path --programs`, before you uninstall), which is usually located
+        outside of the Stack root directory; and
+    4.  the `stack` executable file (see `which stack`, on Unix-like operating
+        systems, or `where.exe stack`, on Windows).
 
-=== "GHCup"
-
-    The separate [GHCup](https://www.haskell.org/ghcup/) project provides
-    guidance about how to use GHCup to manage versions of tools such as Stack.
+    You may also want to delete ``.stack-work`` directories in any Haskell
+    projects that you have built using Stack.
 
 ## Quick Start guide
 
@@ -367,92 +370,16 @@ If you'd like to get involved with Stack, check out the
 [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
 label on the GitHub issue tracker.
 
-## Questions, feedback, and discussion
+## Questions?
 
-* For answers to frequently asked questions about Stack, please see the
-  [FAQ](faq.md).
-* For general questions, comments, feedback and support, please post to the
-  [Haskell Community](https://discourse.haskell.org/about).
-* For bugs, issues, or requests, please
-  [open an issue](https://github.com/commercialhaskell/stack/issues/new).
-* When using Stack Overflow, please use the
-  [haskell-stack](http://stackoverflow.com/questions/tagged/haskell-stack) tag.
+For answers to frequently asked questions about Stack, please see the
+[FAQ](faq.md).
 
-## How to contribute to the maintenance or development of Stack
+For general questions please post to the
+[Haskell Community](https://discourse.haskell.org/about).
 
-A [guide](CONTRIBUTING.md) is provided to help potential contributors to the
-Stack project.
+## Get involved!
 
-If you have already installed a version of Stack and the
-[Git application](https://git-scm.com/) the followings steps should get you
-started with building Stack from source with Stack:
-
-1.  Clone the `stack` repository from GitHub with the command:
-
-    ~~~text
-    git clone https://github.com/commercialhaskell/stack.git
-    ~~~
-
-2.  Change the current working directory to the cloned `stack` directory with
-    the command:
-
-    ~~~text
-    cd stack
-    ~~~
-
-3.  Build the `stack` executable using a preexisting installation of Stack with
-    the command:
-
-    ~~~text
-    stack build
-    ~~~
-
-4.  Once the `stack` executable has been built, check its version with the
-    command:
-
-    ~~~text
-    stack exec -- stack --version
-    ~~~
-
-    Make sure the version is the latest one.
-
-5.  In the GitHub repository's issue tracker, look for issues tagged with
-    [newcomer friendly](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3a%22newcomer+friendly%22)
-    and
-    [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)
-    labels.
-
-If you need to check your changes quickly command:
-
-~~~text
-stack repl
-~~~
-
-and then, at the REPL's prompt, command:
-
-~~~text
-:main --stack-root=<path_to_root> --stack-yaml=<path_to_stack.yaml> <COMMAND>
-~~~
-
-This allows you to set a special Stack root (instead of the default Stack root)
-and to target your commands at a particular `stack.yaml` file instead of the one
-found in the current directory.
-
-## How to uninstall
-
-The `stack uninstall` command provides information about how to uninstall Stack.
-
-To uninstall Stack, it should be sufficient to delete:
-
-1. the Stack root directory (see `stack path --stack-root`, before you
-   uninstall);
-2. if different, the directory containing Stack's global YAML configuration file
-   (see `stack path --global-config`, before you uninstall);
-3. on Windows, the directory containing Stack's tools (see
-   `stack path --programs`, before you uninstall), which is located outside of
-   the Stack root directory; and
-4. the `stack` executable file (see `which stack`, on Unix-like operating
-   systems, or `where.exe stack`, on Windows).
-
-You may also want to delete ``.stack-work`` directories in any Haskell projects
-that you have built using Stack.
+Follow the advice under [get involved](community/index.md) for feedback and
+discussion about Stack, or if you want to know how to contribute to its
+maintenance or development.
