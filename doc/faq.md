@@ -6,127 +6,98 @@
 
 ??? question "What is the relationship between Stack and Cabal?"
 
-    * 'Cabal' can refer to Cabal (the library) or to Cabal (the tool). Cabal (the
-      library) is used by Stack to build your Haskell code. Cabal (the tool) is
-      provided by the `cabal-install` package.
-    * A Cabal file is provided for each package, named `<package_name>.cabal`. It
-      defines all package-level metadata, just like it does in the world of Cabal
-      (the tool): modules, executables, test suites, etc. No change at all on this
-      front.
-    * A `stack.yaml` file references one or more packages, and provides information
-      on where dependencies come from.
-    * The `stack init` command initializes a `stack.yaml` file from an existing
-      Cabal file.
-    * Stack uses Cabal (the library) via an executable. For `build-type: Simple`
-      (the most common case), Stack builds that executable using the version of
-      Cabal which came with the compiler. Stack caches such executables, in the
-      Stack root under directory `setup-exe-cache`.
-    * In rare or complex cases, a different version of Cabal to the one that came
-      with the compiler may be needed. `build-type: Custom` and a `setup-custom`
-      stanza in the Cabal file, and a `Setup.hs` file in the package directory, can
-      be specified. The `stack.yaml` file can then specify the version of Cabal
-      that Stack will use to build the executable (named `setup`) from `Setup.hs`.
-      Stack will use Cabal via `setup`.
+    'Cabal' can refer to Cabal (the library) or to Cabal (the tool).
 
-    For detail on the differences between a `stack.yaml` file and a Cabal file,
-    see
-    [stack.yaml vs a Cabal file](topics/stack_yaml_vs_cabal_package_file.md).
+    === "Cabal (the library)
+
+         Cabal (the library) is used by Stack to build your Haskell code.
+
+         A Haskell package is described by a Cabal file, which file is part of
+         the package. The file is named `<package_name>.cabal`.
+
+         Stack requires a project-level configuration file (`stack.yaml`, by
+         default).
+
+         For further information about the difference between a Cabal file and
+         a project-level configuration file, see the
+         [stack.yaml vs a Cabal file](topics/stack_yaml_vs_cabal_package_file.md)
+         documentation.
+
+         The [`stack init`](commands/init_command.md) command initializes a
+         project-level configuration file from package description files.
+
+         Stack uses Cabal (the library) via an executable. For
+         `build-type: Simple` (the most common case), Stack builds that
+         executable using the version of Cabal which came with GHC. Stack caches
+         such executables, in the [Stack root](topics/stack_root.md) under
+         directory `setup-exe-cache`.
+
+         In rare or complex cases, a different version of Cabal to the one that
+         came with GHC may be needed. `build-type: Custom` and a `setup-custom`
+         stanza in the Cabal file, and a `Setup.hs` file in the package
+         directory, can be specified. Stack's project-level configuration file
+         can then specify the version of Cabal that Stack will use to build the
+         executable (named `setup`) from `Setup.hs`. Stack will use Cabal via
+         `setup`.
+
+    === "Cabal (the tool)"
+
+        Cabal (the tool) is a tool provided by the
+        [`cabal-install`](https://hackage.haskell.org/package/cabal-install)
+        Haskell package. It aims to simplify the process of managing Haskell
+        software by automating the fetching, configuration, compilation and
+        installation of Haskell libraries and programs. These are goals that
+        Stack shares. Stack can be used independently of Cabal (the tool) but
+        users can also use both, if they wish.
 
 ??? question "How do I use Stack with sandboxes?"
 
-    Explicit sandboxing on the part of the user is not required by Stack. All
-    builds are automatically isolated into separate package databases without any
-    user interaction. This ensures that you won't accidentally corrupt your
-    installed packages with actions taken in other projects.
+    The concept of sandboxes is built-in with Stack. All builds are
+    automatically isolated into separate package databases.
 
 ??? question "Can I run `cabal` commands inside `stack exec`?"
 
-    With a recent enough version of Cabal (the tool) (1.22 or later), you can. For
-    earlier versions this does not work, due to Cabal issue
-    [#1800](https://github.com/haskell/cabal/issues/1800). Note that
-    even with recent versions, for some commands you may need the following extra
-    level of indirection. Command:
+    Yes. Some `cabal` commands are inconsistent with the `GHC_PACKAGE_PATH`
+    environment variable in the Stack environment. Command, for example:
 
     ~~~text
-    stack exec -- cabal exec -- cabal <command>
+    stack exec --no-ghc-package-path -- cabal build
     ~~~
-
-    However, virtually all `cabal` commands have an equivalent in Stack, so this
-    should not be necessary. In particular, users of Cabal (the tool) may be
-    accustomed to the `cabal run` command. With Stack, command:
-
-    ~~~text
-    stack build
-    stack exec <program-name>
-    ~~~
-
-    Or, if you want to install the binaries in a shared location, command:
-
-    ~~~text
-    stack install <program-name>
-    ~~~
-
-    assuming your PATH has been set appropriately.
 
 ## GHC or GHCi-related
 
-??? question "When I command `stack ghci` what version of GHC is used?"
+??? question "Will Stack interfere with the GHC I already have installed?"
 
-    The version of GHC, as well as which packages can be installed, are specified by
-    the _snapshot_. This may be something like `lts-22.21`, which is from
-    [Stackage](https://www.stackage.org/). The
-    [user's guide](tutorial/building_your_project.md) discusses the snapshot in more
-    detail.
+    No.
 
-    The snapshot is determined by finding the relevant project-level configuration
-    file (`stack.yaml`, by default) for the directory you're running the command
-    from. This essentially works by:
-
-    1. Check for a `STACK_YAML` environment variable or the `--stack-yaml`
-       command line argument
-    2. If none present, check for a `stack.yaml` file in the current
-       directory or any parents
-    3. If no `stack.yaml` file was found, use the _implicit global_
-
-    The implicit global is a shared project used whenever you're outside
-    of another project. It's a sort of "mutable shared state" that you
-    should be aware of when working with Stack.
-
-    A frequent request when working with the implicit global is how to move to a
-    more recent LTS snapshot. You can do this using the following command from
-    outside of a project:
-
-    ~~~text
-    stack config set snapshot lts
-    ~~~
-
-??? question "Where is Stack installed and will it interfere with the GHC (etc) I already have installed?"
-
-    Stack itself is installed in normal system locations based on the mechanism you
-    used (see the [Install and upgrade](install_and_upgrade.md) page). Stack
-    installs files in the Stack root and other files in a `.stack-work` directory
-    within each project's directory. None of this should affect any existing Haskell
-    tools at all.
-
-??? question "I already have GHC installed, can I still use Stack?"
+??? question "I already have GHC installed. Can I still use Stack?"
 
     Yes. In its default configuration, Stack will simply ignore any system GHC
-    installation and use a sandboxed GHC that it has installed itself. You can find
-    these sandboxed GHC installations in the `ghc-*` directories in the
+    installation and use a sandboxed GHC that it has installed itself. You can
+    find these sandboxed GHC installations in the `ghc-*` directories in the
     `stack path --programs` directory.
 
     If you would like Stack to use your system GHC installation, use the
     [`--system-ghc`](configure/yaml/non-project.md#system-ghc) flag or run
-    `stack config set system-ghc --global true` to make Stack check your PATH for a
-    suitable GHC by default.
+    `stack config set system-ghc --global true` to make Stack check your PATH
+    for a suitable GHC by default.
 
-    Stack can only use a system GHC installation if its version is compatible with
-    the configuration of the current project, particularly the snapshot specified by
-    the [`snapshot`](configure/yaml/project.md#snapshot) or
+    Stack can only use a system GHC installation if its version is compatible
+    with the configuration of the current project, particularly the snapshot
+    specified by the [`snapshot`](configure/yaml/project.md#snapshot) or
     [`resolver`](configure/yaml/project.md#resolver) key.
 
-    GHC installation doesn't work for all operating systems, so in some cases you
-    will need to use `system-ghc` and install GHC yourself.
+    GHC installation doesn't work for all operating systems, so in some cases
+    you will need to use `system-ghc` and install GHC yourself.
+
+??? question "When I command `stack ghci` what version of GHC is used?"
+
+    The version of GHC is specified by the snapshot in the relevant Stack
+    project-level configuration file. This may be the file in the
+    `global-project` directory in the [Stack root](topics/stack_root.md).
+
+    For further information, see the
+    [YAML configuration](configure/yaml/yaml_configuration.md) documentation.
 
 ??? question "How does Stack determine what GHC to use?"
 
@@ -145,10 +116,11 @@
     See issue [#420](https://github.com/commercialhaskell/stack/issues/420) for a
     detailed discussion of Stack's behavior when `system-ghc` is enabled.
 
-??? question "How can I make sure my project builds against multiple GHC versions?"
+??? question "How can I test that different GHC versions can build my project?"
 
-    You can create multiple YAML configuration files for your project, one for each
-    build plan. For example, you might set up your project directory like so:
+    You can create multiple project-level configuration files for your project,
+    one for each build plan. For example, you might set up your project
+    directory like so:
 
     ~~~text
     myproject/
@@ -160,8 +132,10 @@
         ...
     ~~~
 
-    When you run `stack build`, you can set the `STACK_YAML` environment variable to
-    indicate which build plan to use. On Unix-like operating systems command:
+    When you run `stack build`, you can set the `STACK_YAML` environment
+    variable to indicate which build plan to use. Command:
+
+    === "Unix-like"
 
     ~~~bash
     stack build  # builds using the default stack.yaml
@@ -169,7 +143,7 @@
     stack build  # builds using the given yaml file
     ~~~
 
-    On Windows (with PowerShell) command:
+    === "Windows (with PowerShell)"
 
     ~~~ps
     $Env:STACK_YAML='stack-ghc-9.0.2.yaml'
@@ -568,6 +542,16 @@
     This is known to be a problem on Windows 7, but seems to be fixed on Windows 10.
 
 ## Setup-related
+
+??? question "Where is Stack installed?"
+
+    Command:
+
+    ~~~text
+    stack uninstall
+    ~~~
+
+    for information about where Stack is installed.
 
 ??? question "Can I change Stack's default temporary directory?"
 
