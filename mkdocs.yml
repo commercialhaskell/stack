@@ -14,6 +14,7 @@ theme:
   icon:
     logo: material/language-haskell
   features:
+  - content.code.annotate
   - content.code.copy
   - content.code.select
   - content.tabs.link
