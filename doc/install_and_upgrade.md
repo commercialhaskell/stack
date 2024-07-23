@@ -77,7 +77,7 @@ To get and use Stack, some other things need to be in place first:
         About 3 GB for a single version of GHC and about 2 GB for a local copy
         of the Hackage package index. 
  
-    [platform]: machine architecture (eg x86_64, AArch64) and operating system (eg Linux distribution, macOS, Windows).
+    *[platform]: Machine architecture (eg x86_64, AArch64) and operating system (eg Linux distribution, macOS, Windows).
 
 -   :material-wifi:{ .lg .middle } __Access to the Internet__
 
@@ -778,6 +778,24 @@ Stack or GHCup to manage versions of Stack.
             Follow the steps above to download manually the newest executable
             and replace the old executable.
 
+        -   __Use the `sh` installation script__
+
+            ---
+
+            Use the `get.haskellstack.org` script with its `-f` flag to
+            overwrite the current Stack executable. For example, command
+            either:
+
+            ~~~text
+            curl -sSL https://get.haskellstack.org/ | sh -s - -f
+            ~~~
+
+            or:
+
+            ~~~text
+            wget -qO- https://get.haskellstack.org/ | sh -s - -f
+            ~~~
+
         -   __Use a package manager__
 
             ---
@@ -792,24 +810,6 @@ Stack or GHCup to manage versions of Stack.
 
             Be aware that officially released binaries from the distribution may
             lag behind the latest version of Stack significantly.
-
-        -   __Use the `sh` installation script__
-
-            ---
-
-            Use the `get.haskellstack.org` script with the `-f` flag to
-            overwrite the current Stack executable. For example, command
-            either:
-
-            ~~~text
-            curl -sSL https://get.haskellstack.org/ | sh -s - -f
-            ~~~
-
-            or:
-
-            ~~~text
-            wget -qO- https://get.haskellstack.org/ | sh -s - -f
-            ~~~
 
         </div>
 
