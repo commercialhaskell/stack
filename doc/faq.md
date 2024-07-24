@@ -529,18 +529,6 @@
 
     See issue [#4726](https://github.com/commercialhaskell/stack/issues/4726).
 
-??? question "Why is the `--` argument separator ignored in Windows PowerShell?"
-
-    Some versions of Windows PowerShell don't pass the `--` to programs (see issue
-    [#813](https://github.com/commercialhaskell/stack/issues/813)). The workaround
-    is to quote the `"--"`. For example, command:
-
-    ~~~ps
-    stack exec "--" cabal --version
-    ~~~
-
-    This is known to be a problem on Windows 7, but seems to be fixed on Windows 10.
-
 ## Setup-related
 
 ??? question "Where is Stack installed?"
