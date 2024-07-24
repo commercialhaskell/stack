@@ -152,56 +152,28 @@
 
 ## Package-related
 
-??? question "How do I use a package version not in a snapshot?"
+??? question "How do I use a package version on Hackage not in a snapshot?"
 
-    You can make tweaks to a snapshot by modifying the `extra-deps` configuration
-    value in your `stack.yaml` file, e.g.:
-
-    ~~~yaml
-    snapshot: lts-22.21
-    packages:
-    - .
-    extra-deps:
-    - text-2.1.1@rev:0
-    ~~~
+    Add the package version to the [`extra-deps`](configure/yaml/project.md)
+    project-specific configuration option in the
+    [project-level configuration file](configure/yaml/yaml_configuration.md).
 
 ??? question "How do I use a package version not on Hackage?"
 
-    Add it to the
-    [`extra-deps`](configure/yaml/project-specific_configuration.md#extra-deps) list
-    in your project's `stack.yaml` file, specifying the package's source code
-    location relative to the directory where your `stack.yaml` file lives, e.g.
+    Add the location of the package version to the
+    [`extra-deps`](configure/yaml/project.md) project-specific configuration
+    option in the
+    [project-level configuration file](configure/yaml/yaml_configuration.md).
 
-    ~~~yaml
-    snapshot: lts-22.21
-    packages:
-    - .
-    extra-deps:
-    - third-party/proprietary-dep
-    - github-version-of/conduit
-    - patched/diagrams
-    ~~~
-
-    The above example specifies that the `proprietary-dep` package is found in the
-    project's `third-party` directory, that the `conduit` package is found in the
-    project's `github-version-of` directory, and that the `diagrams` package is
-    found in the project's `patched` directory. This autodetects changes and
-    reinstalls the package.
-
-    To install packages directly from a Git repository, use e.g.:
-
-    ~~~yaml
-    extra-deps:
-      - git: https://github.com/githubuser/reponame.git
-        commit: somecommitID
-    ~~~
+    For further information, see the
+    [package location](topics/package_location.md) documentation.
 
 ??? question "How do I use a modified upstream package?"
 
-    Typically, you will want to get the source for the package and then add it to
-    your `packages` list in the `stack.yaml` file. (See the previous question.)
-    `stack unpack` is one approach for getting the source. Another would be to add
-    the upstream package as a submodule to your project.
+    Typically, you will want to get the source for the package and then add it
+    to your `packages` list in the `stack.yaml` file. (See the previous
+    question.) `stack unpack` is one approach for getting the source. Another
+    would be to add the upstream package as a submodule to your project.
 
 ??? question "I'd like to use my installed packages in a different directory. How do I tell Stack where to find my packages?"
 
