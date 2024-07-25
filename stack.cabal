@@ -111,7 +111,7 @@ extra-source-files:
     doc/topics/lock_files.md
     doc/topics/nix_integration.md
     doc/topics/nonstandard_project_init.md
-    "doc/topics/package_location copy.md"
+    doc/topics/package_location.md
     doc/topics/scripts.md
     doc/topics/shell_autocompletion.md
     doc/topics/snapshot_location.md
