@@ -150,6 +150,132 @@
         stack build
         ~~~
 
+## Setup-related
+
+??? question "Where is Stack installed?"
+
+    Command:
+
+    ~~~text
+    stack uninstall
+    ~~~
+
+    for information about where Stack is installed.
+
+??? question "Can I change Stack's default temporary directory?"
+
+    Stack downloads and extracts files to `$STACK_ROOT/programs` on most platforms,
+    which defaults to `~/.stack/programs`. On Windows `$LOCALAPPDATA\Programs\stack`
+    is used. If there is not enough free space in this directory, Stack may fail.
+    For instance, `stack setup` with a GHC installation requires roughly 1GB free.
+    If this is an issue, you can set `local-programs-path` in your
+    `~/.stack/config.yaml` to a directory on a file system with more free space.
+
+    If you use Stack with Nix integration, be aware that Nix uses a `TMPDIR`
+    variable, and if it is not set Nix sets it to some subdirectory of `/run`, which
+    on most Linuxes is a Ramdir. Nix will run the builds in `TMPDIR`, therefore if
+    you don't have enough RAM you will get errors about disk space. If this happens
+    to you, please _manually_ set `TMPDIR` before launching Stack to some directory
+    on the disk.
+
+??? question "On Windows, `stack setup` tells me to add certain paths to the PATH instead of doing it?"
+
+    With PowerShell, it is easy to automate even that step. Command:
+
+    ~~~ps
+    $Env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $Env:Path -join ";"
+    ~~~
+
+??? question "Does Stack install the system/C libraries that some Cabal packages depend on?"
+
+    No. This is currently out of the scope of Stack's target set of features.
+    Instead of attempting to automate the installation of 3rd party dependencies, we
+    have the following approaches for handling system dependencies:
+
+    * Nix and docker help make your build and execution environment deterministic
+      and predictable. This way, you can install system dependencies into a
+      container, and share this container with all developers.
+
+    * If you have installed some libraries into a non-standard location, use the
+      [`extra-lib-dirs`](configure/yaml/non-project.md#extra-lib-dirs) option or the
+      [`extra-include-dirs`](configure/yaml/non-project.md#extra-include-dirs)
+      option to specify it.
+
+    In the future, Stack might give operating system-specific suggestions for how to
+    install system libraries.
+
+??? question "How can I make Stack aware of my custom SSL certificates?"
+
+    === "Linux"
+
+        Use the `SYSTEM_CERTIFICATE_PATH` environment variable to point at the directory
+        where you keep your SSL certificates.
+
+
+    === "macOS"
+
+        In principle, you can use the following command to add a certificate to your
+        system certificate keychain:
+
+        ~~~bash
+        sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <certificate>
+        ~~~
+
+        Some users have reported issues with this approach, see issue
+        [#907](https://github.com/commercialhaskell/stack/issues/907) for more
+        information.
+
+## Package description format-related
+
+??? question "How does Stack support the Hpack specification?"
+
+    The [Hpack](https://github.com/sol/hpack) package description format is an
+    alternative to that used in a Cabal file.
+
+    If a package directory contains an package description file in the Hpack
+    format (`package.yaml`), Stack will use that file to create the
+    corresponding Cabal file.
+
+    [`stack init`](commands/init_command.md) will use Hpack format package
+    description files, if they are present.
+
+    The [`with-hpack`](configure/yaml/non-project.md#with-hpack) non-project
+    specific configuration option or the
+    [`--with-hpack`](configure/global_flags.md#-with-hpack-option) global flag
+    can be used to specify an Hpack executable to use instead of Stack's
+    built-in Hpack functionality.
+
+## Package index-related
+
+??? question "How do I update my package index?"
+
+    Command:
+
+    ~~~text
+    stack update
+    ~~~
+
+    However, generally, it's not necessary with Stack: if the package index is
+    missing, or if a snapshot refers to package version that isn't available,
+    Stack will automatically update the package index and then try again.
+
+    If you run into a situation where Stack doesn't automatically update the
+    package index, please report it as a bug.
+
+??? question "Is it dangerous to update the package index automatically? Can that corrupt build plans?"
+
+    No. Stack is explicit about which packages it's going to build. There are
+    three sources of information to tell Stack which packages to install: the
+    selected snapshot, the `extra-deps` configuration value, and your project
+    packages. The only way to get Stack to change its build plan is to modify
+    one of those three. Updating the index will have no effect on Stack's
+    behavior.
+
+??? question "How do I use a custom package index?"
+
+    You can configure this in your project-level configuration file (`stack.yaml`,
+    by default). See [YAML configuration](configure/yaml/yaml_configuration.md).
+
 ## Package-related
 
 ??? question "How do I use a package version on Hackage not in a snapshot?"
@@ -168,12 +294,16 @@
     For further information, see the
     [package location](topics/package_location.md) documentation.
 
-??? question "How do I use a modified upstream package?"
+??? question "How do I use a modified version of a package?"
 
-    Typically, you will want to get the source for the package and then add it
-    to your `packages` list in the `stack.yaml` file. (See the previous
-    question.) `stack unpack` is one approach for getting the source. Another
-    would be to add the upstream package as a submodule to your project.
+    Typically, a modified version of a package is used as a project package.
+    Add the location of the package to the
+    [`packages`](configure/yaml/project.md#packages) project-specific
+    configuration option in the
+    [project-level configuration file](configure/yaml/yaml_configuration.md).
+
+    One way to get the source code for the unmodified package version is to use
+    the [`stack unpack`](commands/unpack_command.md).
 
 ??? question "I'd like to use my installed packages in a different directory. How do I tell Stack where to find my packages?"
 
@@ -181,59 +311,7 @@
     configuration file for your project. Then you can run `stack exec`, `stack ghc`,
     etc., from any directory and still use your packages.
 
-??? question "How do I update my package index?"
-
-    Command:
-
-    ~~~text
-    stack update
-    ~~~
-
-    Users of Cabal (the tool) are used to running `cabal update` regularly.
-    Generally, it's not necessary with Stack: if the package index is missing,
-    or if a snapshot refers to package/version that isn't available, Stack will
-    automatically update and then try again. If you run into a situation where
-    Stack doesn't automatically do the update for you, please report it as a
-    bug.
-
-??? question "Is it dangerous to update the package index automatically? Can that corrupt build plans?"
-
-    No. Stack is very explicit about which packages it's going to build for you.
-    There are three sources of information to tell it which packages to install:
-    the selected snapshot, the `extra-deps` configuration value, and your local
-    packages. The only way to get Stack to change its build plan is to modify one
-    of those three. Updating the index will have no impact on Stack's behavior.
-
-??? question "How do I use a custom package index?"
-
-    You can configure this in your project-level configuration file (`stack.yaml`,
-    by default). See [YAML configuration](configure/yaml/yaml_configuration.md).
-
-??? question "How does Stack support the Hpack specification?"
-
-    * If a package directory contains an [Hpack](https://github.com/sol/hpack)
-      `package.yaml` file, then Stack will use it to generate a Cabal file when
-      building the package.
-    * You can run `stack init` to initialize a `stack.yaml` file regardless of
-      whether your packages are declared with Cabal files or with Hpack
-      `package.yaml` files.
-    * You can use the `with-hpack` YAML configuration or command line option to
-      specify an Hpack executable to use instead of Stack's in-built Hpack
-      functionality.
-
 ## `stack build`-related
-
-??? question "What is the meaning of the arguments given to `stack build`, `test`, etc?"
-
-    Those are the targets of the build, and can have one of three formats:
-
-    * A package name (e.g., `my-package`) will mean that the `my-package` package
-      must be built
-    * A package identifier (e.g., `my-package-1.2.3`), which includes a specific
-      version. This is useful for passing to `stack install` for getting a specific
-      version from upstream
-    * A directory (e.g., `./my-package`) for including a local directory's package,
-      including any packages in subdirectories
 
 ??? question "How do I use a custom preprocessor?"
 
@@ -426,17 +504,14 @@
 
 ??? question "How do I get `verbose` output from GHC when I build?"
 
-    Add `ghc-options: -vN` to the Cabal file or pass it via
-    `stack build --ghc-options="-v"`.
+    Set the [`--ghc-options`](commands/build_command.md#-ghc-options-option)
+    option of `stack build` to `-v`.
 
 ## Snapshot-related
 
-??? question "How does Stack choose which snapshot to use when creating a new configuration file?"
+??? question "How does Stack choose which snapshot to use when creating a project-level configuration file?"
 
-    It checks the two most recent LTS Haskell major versions and the most recent
-    Stackage Nightly for a snapshot that is compatible with all of the version
-    bounds in your Cabal file, favoring the most recent LTS. For more information,
-    see the snapshot auto-detection section in the architecture document.
+    See the [`stack init`](commands/init_command.md) command documentation.
 
 ## CI-related
 
@@ -448,110 +523,32 @@
 
     See the [Azure CI](topics/azure_ci.md) documentation.
 
-## Setup-related
+## Linux-related
 
-??? question "Where is Stack installed?"
+??? question "How do fix error [S-9443] for 'linux64-ncurses6'?"
 
-    Command:
+    Most Linux distributions have standardized on providing `libtinfo.so.6`,
+    either directly or as a symbolic link to `libncursesw.so.6`. As such, there
+    are no GHC binary distributions that link to `libncursesw.so.6` after
+    GHC 8.2.2.
 
-    ~~~text
-    stack uninstall
-    ~~~
-
-    for information about where Stack is installed.
-
-??? question "Can I change Stack's default temporary directory?"
-
-    Stack downloads and extracts files to `$STACK_ROOT/programs` on most platforms,
-    which defaults to `~/.stack/programs`. On Windows `$LOCALAPPDATA\Programs\stack`
-    is used. If there is not enough free space in this directory, Stack may fail.
-    For instance, `stack setup` with a GHC installation requires roughly 1GB free.
-    If this is an issue, you can set `local-programs-path` in your
-    `~/.stack/config.yaml` to a directory on a file system with more free space.
-
-    If you use Stack with Nix integration, be aware that Nix uses a `TMPDIR`
-    variable, and if it is not set Nix sets it to some subdirectory of `/run`, which
-    on most Linuxes is a Ramdir. Nix will run the builds in `TMPDIR`, therefore if
-    you don't have enough RAM you will get errors about disk space. If this happens
-    to you, please _manually_ set `TMPDIR` before launching Stack to some directory
-    on the disk.
-
-??? question "On Windows, `stack setup` tells me to add certain paths to the PATH instead of doing it?"
-
-    With PowerShell, it is easy to automate even that step. Command:
-
-    ~~~ps
-    $Env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $Env:Path -join ";"
-    ~~~
-
-??? question "Does Stack install the system/C libraries that some Cabal packages depend on?"
-
-    No. This is currently out of the scope of Stack's target set of features.
-    Instead of attempting to automate the installation of 3rd party dependencies, we
-    have the following approaches for handling system dependencies:
-
-    * Nix and docker help make your build and execution environment deterministic
-      and predictable. This way, you can install system dependencies into a
-      container, and share this container with all developers.
-
-    * If you have installed some libraries into a non-standard location, use the
-      [`extra-lib-dirs`](configure/yaml/non-project.md#extra-lib-dirs) option or the
-      [`extra-include-dirs`](configure/yaml/non-project.md#extra-include-dirs)
-      option to specify it.
-
-    In the future, Stack might give operating system-specific suggestions for how to
-    install system libraries.
-
-??? question "How can I make Stack aware of my custom SSL certificates?"
-
-    === "Linux"
-
-        Use the `SYSTEM_CERTIFICATE_PATH` environment variable to point at the directory
-        where you keep your SSL certificates.
-
-
-    === "macOS"
-
-        In principle, you can use the following command to add a certificate to your
-        system certificate keychain:
-
-        ~~~bash
-        sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain <certificate>
-        ~~~
-
-        Some users have reported issues with this approach, see issue
-        [#907](https://github.com/commercialhaskell/stack/issues/907) for more
-        information.
-
-??? question "How do I install GHC in Stack when it fails with the error: Missing ghc bindist for 'linux64-ncurses6'?"
-
-    Example Error:
-
-    ~~~text
-    No setup information found for ghc-8.6.4 on your platform.
-    This probably means a GHC bindist has not yet been added for OS key 'linux64-ncurses6'.
-    Supported versions: ghc-7.10.3, ghc-8.0.1, ghc-8.0.2, ghc-8.2.1, ghc-8.2.2
-    ~~~
-
-    Most Linux distributions have standardized on providing libtinfo.so.6 (either
-    directly or as a symlink to libncursesw.so.6). As such, there aren't GHC 8.6.*
-    bindists that link to libncursesw.so.6 available.
-
-    So creating a symlink to libncursesw.so.6 as libtinfo.so.6 can prevent this
-    error (root privileges might be required). Command:
+    This error can be prevented by creating a symbolic link to
+    `libncursesw.so.6` using name `libtinfo.so.6`. Command:
 
     ~~~bash
     ln -s /usr/lib/libncursesw.so.6 /usr/lib/libtinfo.so.6
     ~~~
 
+    Root privileges may be required.
+
 ## macOS-related
 
 ??? question "On macOS, how do I resolve linker errors when running `stack setup` or `stack build`?"
 
-    This is likely to be caused by having both a LLVM installation and default Apple
-    Clang compiler on the PATH. The symptom of this issue is a linker error "bad
-    relocation (Invalid pointer diff)". The compiler picks up inconsistent versions
-    of binaries and the mysterious error occurs.
+    This is likely to be caused by having both a LLVM installation and default
+    Apple Clang compiler on the PATH. The symptom of this issue is a linker
+    error "bad relocation (Invalid pointer diff)". The compiler picks up
+    inconsistent versions of binaries and the mysterious error occurs.
 
     The workaround is to remove LLVM binaries from the PATH.
 
