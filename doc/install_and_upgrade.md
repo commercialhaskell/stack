@@ -26,7 +26,7 @@ used, it sets other things up as needed.
 
     Command `stack --version` or `stack --numeric-version`.
 
-???+ question "If I don't use GHCup, is there a preferred location for Stack?"
+??? question "If I don't use GHCup, is there a preferred location for Stack?"
 
     You can put the `stack` executable file anywhere on your PATH. However, a
     good location is the directory where Stack itself will install executables.
@@ -70,13 +70,14 @@ To get and use Stack, some other things need to be in place first:
 
     ---
 
-    Stack will need at least about 5 GB of disk space (about 3 GB for a single
-    version of GHC and about 2 GB for a local copy of the Hackage package
-    index).
+    Stack will need at least about 5 GB of disk space[^1]. It will help to know
+    what platform your computer provides.
 
-    It will help to know what platform your computer provides - that is, its
-    machine architecture (eg x86_64, AArch64) and its operating system (eg a
-    Linux distribution, macOS, Windows).
+    [^1]:
+        About 3 GB for a single version of GHC and about 2 GB for a local copy
+        of the Hackage package index. 
+ 
+    *[platform]: Machine architecture (eg x86_64, AArch64) and operating system (eg Linux distribution, macOS, Windows).
 
 -   :material-wifi:{ .lg .middle } __Access to the Internet__
 
@@ -605,9 +606,9 @@ Stack can be installed directly or by using the GHCup tool.
 
     === "Windows"
 
-        Most machines using the Windows operating system have a x86_64
-        architecture. More recently, Microsoft has provided Windows on Arm that
-        runs on other processors.
+        Most computers using Windows have a x86_64 machine architecture. More
+        recently, Microsoft has provided Windows on Arm that runs on other
+        processors.
 
         === "x86_64"
 
@@ -745,7 +746,7 @@ Stack or GHCup to manage versions of Stack.
 
 === "Stack"
 
-    ??? warning "If you use GHCup to manage Stack, use it consistently"
+    ??? warning "If you use GHCup to manage versions of Stack, use it consistently"
 
         If you used GHCup to install Stack, you should also use GHCup to upgrade
         Stack.
@@ -770,26 +771,19 @@ Stack or GHCup to manage versions of Stack.
             For further information, see the
             [`stack upgrade`](commands/upgrade_command.md) documentation.
 
-        -   __Use a package manager__
+        -   __Manual download__
 
             ---
 
-            If you're using a package manager and want to stick with
-            the officially released binaries from the distribution (which may
-            lag behind the latest version of Stack significantly), follow your
-            normal package manager strategies for upgrading. For example:
-
-            ~~~text
-            apt-get update
-            apt-get upgrade
-            ~~~
+            Follow the steps above to download manually the newest executable
+            and replace the old executable.
 
         -   __Use the `sh` installation script__
 
             ---
 
-            The `get.haskellstack.org` script supports the `-f` argument to
-            over-write the current Stack executable. For example, command
+            Use the `get.haskellstack.org` script with its `-f` flag to
+            overwrite the current Stack executable. For example, command
             either:
 
             ~~~text
@@ -802,12 +796,20 @@ Stack or GHCup to manage versions of Stack.
             wget -qO- https://get.haskellstack.org/ | sh -s - -f
             ~~~
 
-        -   __Manual download__
+        -   __Use a package manager__
 
             ---
 
-            Manually follow the steps above to download the newest executable
-            from the GitHub releases page and replace the old executable.
+            Follow your normal package manager approach to upgrading. For
+            example:
+
+            ~~~text
+            apt-get update
+            apt-get upgrade
+            ~~~
+
+            Be aware that officially released binaries from the distribution may
+            lag behind the latest version of Stack significantly.
 
         </div>
 
@@ -828,8 +830,8 @@ Stack or GHCup to manage versions of Stack.
 
             ---
 
-            Manually follow the steps above to download the newest executable
-            from the GitHub releases page and replace the old executable.
+            Follow the steps above to download manually the newest executable
+            and replace the old executable.
 
         </div>
 

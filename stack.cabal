@@ -1,6 +1,6 @@
 cabal-version: 2.0
 
--- This file has been generated from package.yaml by hpack version 0.37.0.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -71,6 +71,7 @@ extra-source-files:
     doc/commands/update_command.md
     doc/commands/upgrade_command.md
     doc/commands/upload_command.md
+    doc/community/index.md
     doc/configure/customisation_scripts.md
     doc/configure/environment_variables.md
     doc/configure/global_flags.md
@@ -110,9 +111,10 @@ extra-source-files:
     doc/topics/lock_files.md
     doc/topics/nix_integration.md
     doc/topics/nonstandard_project_init.md
-    doc/topics/pantry.md
+    doc/topics/package_location.md
     doc/topics/scripts.md
     doc/topics/shell_autocompletion.md
+    doc/topics/snapshot_location.md
     doc/topics/Stack_and_VS_Code.md
     doc/topics/stack_root.md
     doc/topics/stack_work.md

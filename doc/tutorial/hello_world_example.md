@@ -96,6 +96,29 @@ it for you.
 You'll get intermediate download percentage statistics while the download is
 occurring. This command may take some time, depending on download speeds.
 
+??? question "Where is the Stack-supplied GHC located?"
+
+    You can use the [`stack path`](../commands/path_command.md) command for path
+    information. To identify where GHC is installed, command:
+
+    === "Unix-like"
+
+        ~~~text
+        stack exec -- which ghc
+        /home/<user_name>/.stack/programs/x86_64-linux/ghc-9.6.5/bin/ghc
+        ~~~
+
+    === "Windows (with PowerShell)"
+
+        ~~~text
+        stack exec -- where.exe ghc
+        C:\Users\<user_name>\AppData\Local\Programs\stack\x86_64-windows\ghc-9.6.5\bin\ghc.exe
+        ~~~
+
+    As you can see from that path, the installation is placed to not interfere
+    with any other GHC installation, whether system-wide or different GHC
+    versions installed by Stack.
+
 ??? question "Can I use that version of GHC by commanding `ghc`?"
 
     No. GHC will be installed to the Stack programs directory, which is likely
@@ -154,13 +177,28 @@ will then build your project. The end of the output should look similar to this:
 
     On Windows, Stack uses hashes of certain information to keep paths short.
 
+Stack aims not to rebuild unnecessarily. If we command `stack build` a second
+time, nothing happens.
+
 ## The `stack exec` command
 
-Looking closely at the output of the previous command, you can see that it built
-both a library called `helloworld` and an executable called `helloworld-exe` (on
-Windows, `helloworld-exe.exe`). We'll explain more in the next section, but, for
-now, just notice that the executables are installed in a location in our
-project's `.stack-work` directory.
+The output of the previous command has three main steps. You can see, from the
+first two steps, that a library (lib) and an executable (exe) are being built
+and that the final step involved the installation of an executable named
+`helloworld-exe` (on Windows, the file is `helloworld-exe.exe`) (extract):
+
+~~~text
+helloworld> configure (lib + exe)
+...
+helloworld> build (lib + exe) with ghc-9.6.6
+...
+helloworld> copy/register
+...
+Installing executable helloworld-exe in .../helloworld/.stack-work/.../bin
+~~~
+
+The executable is installed in a location in the project's `.stack-work`
+directory.
 
 Now, let's use the [`stack exec`](../commands/exec_command.md) command to run
 our executable. We command:
@@ -170,6 +208,7 @@ stack exec helloworld-exe
 ~~~
 
 and the output is just:
+
 ~~~text
 someFunc
 ~~~
@@ -202,9 +241,12 @@ someFunc
 
 `stack exec` works by providing the same reproducible environment that was used
 to build your project to the command that you are running. Thus, it knew where
-to find `helloworld-exe` even though it is hidden in the `.stack-work`
-directory. Command `stack path --bin-path` to see the PATH in the Stack
+to find `helloworld-exe` even though it is not on the PATH outside of that
 environment.
+
+??? question "How I can find the PATH used in the Stack environment?"
+
+    Command `stack path --bin-path` to see the PATH in the Stack environment.
 
 !!! info
 
@@ -218,32 +260,83 @@ environment.
 
 Finally, like all good software, `helloworld` actually has a test suite.
 
-Let's run it with the `stack test` command:
+Let's run it with the [`stack test`](../commands/test_command.md) command. We
+command:
 
 ~~~text
 stack test
-# build output ...
 ~~~
 
-Reading the output, you'll see that Stack first builds the test suite and then
-automatically runs it for us. For both the `build` and `test` command, already
-built components are not built again. You can see this by using the
-`stack build` and `stack test` commands a second time:
+The start of the output should look similar to this:
+
+=== "Unix-like"
+
+    ~~~text
+    helloworld-0.1.0.0: unregistering (components added: test:helloworld-test)
+    helloworld> configure (lib + exe + test)
+    Configuring helloworld-0.1.0.0...
+    helloworld> build (lib + exe + test) with ghc-9.6.6
+    Preprocessing library for helloworld-0.1.0.0..
+    Building library for helloworld-0.1.0.0..
+    Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
+    Building test suite 'helloworld-test' for helloworld-0.1.0.0..
+    [1 of 2] Compiling Main
+    [2 of 2] Compiling Paths_helloworld
+    [3 of 3] Linking .stack-work/dist/x86_64-linux-tinfo6/ghc-9.6.6/build/helloworld-test/helloworld-test
+    Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0..
+    Building executable 'helloworld-exe' for helloworld-0.1.0.0..
+    helloworld> copy/register
+    Installing library in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/lib/x86_64-linux-ghc-9.6.6/helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
+    Installing executable helloworld-exe in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/bin
+    Registering library for helloworld-0.1.0.0..
+    ~~~
+
+=== "Windows"
+
+    ~~~text
+    helloworld-0.1.0.0: unregistering (components added: test:helloworld-test)
+    helloworld> configure (lib + exe + test)
+    Configuring helloworld-0.1.0.0...
+    helloworld> build (lib + exe + test) with ghc-9.6.6
+    Preprocessing library for helloworld-0.1.0.0..
+    Building library for helloworld-0.1.0.0..
+    Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
+    Building test suite 'helloworld-test' for helloworld-0.1.0.0..
+    [1 of 2] Compiling Main
+    [2 of 2] Compiling Paths_helloworld
+    [3 of 3] Linking .stack-work\dist\effaccc7\build\helloworld-test\helloworld-test.exe
+    Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0..
+    Building executable 'helloworld-exe' for helloworld-0.1.0.0..
+    helloworld> copy/register
+    Installing library in ...\helloworld\.stack-work\install\0aa166fa\lib\x86_64-windows-ghc-9.6.6\helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
+    Installing executable helloworld-exe in ...\helloworld\.stack-work\install\0aa166fa\bin
+    Registering library for helloworld-0.1.0.0..
+    ~~~
+
+Again, Stack does not rebuild unnecessarily. Only the test suite component is
+compiled and linked.
+
+The output should then conclude:
 
 ~~~text
-stack build
-stack test
-# build output ...
+helloworld> test (suite: helloworld-test)
+
+Test suite not yet implemented
+
+
+
+helloworld> Test suite helloworld-test passed
+Completed 2 action(s).
 ~~~
 
-## Inner Workings of Stack
+Having build the test suite executable, Stack then automatically runs it.
 
-In this subsection, we'll dissect the `helloworld` example in more detail.
+## Inner workings of Stack
 
-### Files in helloworld
+Let's look at the `helloworld` example in more detail to understand better how
+Stack works.
 
-Before studying Stack more, let's understand our project a bit better. The files
-in the directory include:
+The files in the project include:
 
 ~~~text
 app/Main.hs
@@ -252,38 +345,78 @@ test/Spec.hs
 ChangeLog.md
 README.md
 LICENSE
-Setup.hs
-helloworld.cabal
-package.yaml
-stack.yaml
 .gitignore
+package.yaml
+helloworld.cabal
+Setup.hs
+stack.yaml
 ~~~
 
 The `app/Main.hs`, `src/Lib.hs`, and `test/Spec.hs` files are all Haskell
-source files that compose the actual functionality of our project (we won't
-dwell on them here).
+source files that compose the actual functionality of our project. We won't
+dwell on them here.
 
 The `ChangeLog.md`, `README.md`, `LICENSE` and `.gitignore` files have no effect
 on the build.
 
+The files of interest here are `package.yaml`, `helloworld.cabal`, `Setup.hs`
+and `stack.yaml`.
+
+### `package.yaml`
+
+Each package contains a file that describes the package. Stack uses the Cabal
+build system and that system uses a Cabal file named after the package (such as
+`helloworld.cabal`) to describe the package.
+
+However, Stack's preferred package description format is the
+[Hpack](https://github.com/sol/hpack) format.
+
+The `package.yaml` file describes the package in the Hpack format.
+
+If a `package.yaml` file is present, Stack will use its built-in Hpack
+functionality to create a Cabal file.
+
+??? question "What is covered by a package description?"
+
+    A package description includes information such as the package name and
+    version, and the package's *components*. A package can have an optional
+    main library component and optional named sub-library components. It can
+    also have optional executable components, test suite components and
+    benchmark components. The description identifies other packages on which
+    those components depend.
+
+    The
+    [Cabal User Guide](https://cabal.readthedocs.io/en/stable/cabal-package.html)
+    is the definitive reference for the Cabal package description format.
+
+    The [Hpack](https://github.com/sol/hpack#quick-reference) documentation
+    is the reference for the Hpack package description format.
+
+### `helloworld.cabal`
+
 The `helloworld.cabal` file is updated automatically as part of the
 `stack build` process and should not be modified.
 
-The files of interest here are `Setup.hs`, `stack.yaml`, and `package.yaml`.
+### `Setup.hs`
 
-The `Setup.hs` file is a component of the Cabal build system which Stack uses.
-It's technically not needed by Stack, but it is still considered good practice
-in the Haskell world to include it. The file we're using is straight
-boilerplate:
+The `Setup.hs` file is a component of the Cabal build system.
+
+Technically, it is not needed by Stack, but it is considered good practice to
+include it. The file we're using is boilerplate:
 
 ~~~haskell
 import Distribution.Simple
 main = defaultMain
 ~~~
 
-Next, let's look at our `stack.yaml` file, which gives our project-level
-settings. Ignoring comments beginning `#`, the contents will look something like
-this:
+### `stack.yaml`
+
+Stack requires a Stack project-level configuration file for every project.
+`stack.yaml` is that file. The contents of the file define project-specific
+options and non-project-specific options that apply to the project.
+
+The contents of the file include comments beginning `#`. Ignoring those
+comments, the contents will look something like this:
 
 ~~~yaml
 resolver:
@@ -292,66 +425,18 @@ packages:
 - .
 ~~~
 
-The value of the [`resolver`](../configure/yaml/project.md#resolver) key tells
-Stack *how* to build your package: which GHC version to use, versions of package
-dependencies, and so on. Our value here says to use
+The key [`resolver`](../configure/yaml/project.md#resolver) is a
+project-specific configuration option. Its value tells Stack *how* to build your
+package: which GHC version to use, which versions of package dependencies to
+use, and so on. Our value here says to use
 [LTS Haskell 22.21](https://www.stackage.org/lts-22.21), which implies GHC 9.6.5
 (which is why `stack build` installs that version of GHC if it is not already
 available to Stack). There are a number of values you can use for `resolver`,
 which we'll cover later.
 
-The value of the `packages` key tells Stack which project packages, located
-locally, to build. In our simple example, we have only a single project package,
-located in the same directory, so '`.`' suffices. However, Stack has powerful
-support for multi-package projects, which we'll elaborate on as this guide
-progresses.
-
-Another file important to the build is `package.yaml`.
-
-The `package.yaml` file describes the package in the
-[Hpack](https://github.com/sol/hpack) format. Stack has in-built Hpack
-functionality and this is its preferred package format. The default behaviour is
-to generate the Cabal file (here named `helloworld.cabal`) from this
-`package.yaml` file, and accordingly you should **not** modify the Cabal file.
-
-It is also important to remember that Stack is built on top of the Cabal build
-system. Therefore, an understanding of the moving parts in Cabal are necessary.
-In Cabal, we have individual *packages*, each of which contains a single Cabal
-file, named `<package_name>.cabal`. The Cabal file can define one or more
-*components*: a library, executables, test suites, and benchmarks. It also
-specifies additional information such as library dependencies, default
-language pragmas, and so on.
-
-In this guide, we'll discuss the bare minimum necessary to understand how to
-modify a `package.yaml` file. You can see a full list of the available options
-at the [Hpack documentation](https://github.com/sol/hpack#quick-reference). The
-Cabal User Guide is the definitive reference for the
-[Cabal file format](https://cabal.readthedocs.io/en/stable/cabal-package.html).
-
-### The location of GHC
-
-As we saw above, the `build` command installed GHC for us. You can use the
-`stack path` command for quite a bit of path information (which we'll play with
-more later). We'll look at where GHC is installed:
-
-=== "Unix-like"
-
-    Command:
-
-    ~~~text
-    stack exec -- which ghc
-    /home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2/bin/ghc
-    ~~~
-
-=== "Windows (with PowerShell)"
-
-    Command:
-
-    ~~~text
-    stack exec -- where.exe ghc
-    C:\Users\<user_name>\AppData\Local\Programs\stack\x86_64-windows\ghc-9.0.2\bin\ghc.exe
-    ~~~
-
-As you can see from that path (and as emphasized earlier), the installation is
-placed to not interfere with any other GHC installation, whether system-wide or
-even different GHC versions installed by Stack.
+The key [`packages`](../configure/yaml/project.md#packages) is another
+project-specific configuration option. Its value tells Stack which project
+packages, located locally, to build. In our simple example, we have only a
+single project package, located in the same directory, so '`.`' suffices.
+However, Stack has powerful support for multi-package projects, which we'll
+describe as this guide progresses.
