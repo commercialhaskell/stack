@@ -273,8 +273,8 @@
 
 ??? question "How do I use a custom package index?"
 
-    You can configure this in your project-level configuration file (`stack.yaml`,
-    by default). See [YAML configuration](configure/yaml/yaml_configuration.md).
+    See the [`package-index`](configure/yaml/non-project.md#package-index)
+    non-project specific configuration option documentation.
 
 ## Package-related
 
@@ -315,37 +315,9 @@
 
 ??? question "How do I use a custom preprocessor?"
 
-    If you have a custom preprocessor, for example, Ruby, you may have a file like:
-
-    ***B.erb***
-
-    ~~~haskell
-    module B where
-
-    <% (1..5).each do |i| %>
-    test<%= i %> :: Int
-    test<%= i %> = <%= i %>
-    <% end %>
-    ~~~
-
-    To ensure that Stack picks up changes to this file for rebuilds, add the
-    following lines to your `stack.yaml` file:
-
-    ~~~yaml
-    custom-preprocessor-extensions:
-    - erb
-
-    require-stack-version: ">= 2.6.0"
-    ~~~
-
-    And for backwards compatability with older versions of Stack, also add the
-    following line to your Cabal file:
-
-        extra-source-files:   B.erb
-
-    You could also use the
-    [`--custom-preprocessor-extensions`](configure/yaml/project.md#custom-preprocessor-extensions)
-    flag.
+    See the
+    [`customer-prepocessor-extensions`](configure/yaml/project.md#custom-preprocessor-extensions)
+    project-specific configuration option documentation.
 
 ??? question "How do I get extra tools used during building?"
 

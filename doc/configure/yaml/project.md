@@ -315,7 +315,95 @@ custom-preprocessor-extensions:
 - erb
 ~~~
 
-TODO: Add a simple example of how to use custom preprocessors.
+??? example "Use of a custom preprocessor"
+
+    The [Ruby](https://www.ruby-lang.org/en/) programming language provides
+    [`erb`](https://docs.ruby-lang.org/en/master/ERB.html) at the command line.
+    `erb` provides a templating system for Ruby. The following example uses
+    `erb` as a custom preprocessor.
+
+    The example is a single-package project with a customised `Setup.hs`, which
+    Stack will use to build:
+    ~~~haskell
+    {-# LANGUAGE CPP #-}
+
+    module Main
+      ( main
+      ) where
+
+    import           Distribution.Simple ( defaultMainWithHooks, simpleUserHooks )
+    import           Distribution.Simple.PreProcess
+                       ( PreProcessor (..), mkSimplePreProcessor, unsorted )
+    import           Distribution.Simple.UserHooks ( UserHooks (..) )
+    import           Distribution.Types.BuildInfo ( BuildInfo )
+    import           Distribution.Types.ComponentLocalBuildInfo
+                       ( ComponentLocalBuildInfo )
+    import           Distribution.Types.LocalBuildInfo ( LocalBuildInfo )
+    import           System.Process ( readCreateProcess, proc, shell )
+
+    main :: IO ()
+    main = defaultMainWithHooks simpleUserHooks
+      { hookedPreProcessors = [("erb", runRuby)]
+      }
+
+    runRuby ::
+         BuildInfo
+      -> LocalBuildInfo
+      -> ComponentLocalBuildInfo
+      -> PreProcessor
+    runRuby _ _ _ = PreProcessor
+      { platformIndependent = True
+      , ppOrdering = unsorted
+      , runPreProcessor = mkSimplePreProcessor $ \erbFile fout verbosity ->
+          readCreateProcess (erbProcess erbFile) "" >>= writeFile fout
+      }
+     where
+       erbProcess erbFile =
+    #if defined(mingw32_HOST_OS)
+         shell $ "erb " <> erbFile
+    #else
+         proc "erb" [erbFile]
+    #endif
+    ~~~
+
+    The example has a package description file (`package.yaml`) that specifies a
+    `Custom` build type:
+    ~~~yaml
+    spec-version: 0.36.0
+    name: my-package
+    version: 0.1.0.0
+    build-type: Custom
+
+    dependencies: base
+
+    custom-setup:
+      dependencies:
+      - base
+      - Cabal
+      - process
+
+    library:
+      source-dirs: src
+      generated-exposed-modules: MyModule
+    ~~~
+
+    The example has a `src/MyModule.erb` file that will be preprocessed to
+    create Haskell source code:
+    ~~~text
+    module MyModule where
+
+    <% (1..5).each do |i| %>
+    test<%= i %> :: Int
+    test<%= i %> = <%= i %>
+    <% end %>
+    ~~~
+
+    The example has a project-level configuration file (`stack.yaml`):
+    ~~~yaml
+    snapshot: lts-22.30
+    custom-preprocessor-extensions:
+    - erb
+    ~~~
 
 ## extra-package-dbs
 
