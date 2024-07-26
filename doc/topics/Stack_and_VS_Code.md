@@ -35,12 +35,11 @@ each version of HLS that the extension needs is on the PATH.
 
 For the most part, the versions of HLS provided by GHCup are built with the same
 versions of GHC that Stack downloads from its default `setup-info` dictionary
-(see
-[YAML configuration: setup-info](../configure/yaml/non-project.md#setup-info)).
-Stack's default is to mirror the 'official' binary distributions published by
-GHC. However, in some cases, it is possible that a GHCup-supplied and
-GHCup-selected HLS has been built with a different binary distribution of GHC
-than the one which Stack has installed.
+(see the [`setup-info`](../configure/yaml/non-project.md#setup-info) non-project
+specific configuration option documentation). Stack's default is to mirror the
+'official' binary distributions published by GHC. However, in some cases, it is
+possible that a GHCup-supplied and GHCup-selected HLS has been built with a
+different binary distribution of GHC than the one which Stack has installed.
 
 One example of that occurred with the release of GHC 9.0.2. For some Linux users
 (Debian 9 and Fedora 27), the version of GHC 9.0.2 linked on GHC’s download

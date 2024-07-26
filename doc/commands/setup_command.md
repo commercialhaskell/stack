@@ -23,9 +23,9 @@ By default:
 Pass the option `--ghc-bindist <url>` to specify the URL of the GHC to be
 downloaded and installed. This option requires the use of the `--ghc-variant`
 option specifying a custom GHC variant. For further information about the
-`--ghc-variant` option, see the see the
-[YAML configuration](../configure/yaml/non-project.md#ghc-variant)
-documentation.
+`--ghc-variant` option, see the
+[`ghc-variant`](../configure/yaml/non-project.md#ghc-variant) non-project
+specific configuration option documentation.
 
 If Stack is configured not to install GHC (`install-ghc: false` or passing the
 `--no-install-ghc` flag) then `stack setup` will warn that the flag and the

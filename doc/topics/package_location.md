@@ -1,92 +1,17 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://rawgit.com/commercialhaskell/stack/master/doc/img/hidden-warning.svg"></a></div>
 
-# Snapshot and package location
+# Package location
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
-This document describes:
-
-* the specification of a snapshot location (in the
-  [`snapshot`](../configure/yaml/project.md#snapshot) or
-  [`resolver`](../configure/yaml/project.md#resolver) key)
-* the specification of a package location (in the `extra-deps` key and in a
-  snapshot)
+This document describes the specification of a package location (in the
+`extra-deps` key and in a snapshot).
 
 !!! info
 
     Stack uses the [Pantry](https://hackage.haskell.org/package/pantry) to
-    specify the location of snapshots and packages. Pantry is geared towards
-    reproducible build plans with cryptographically secure specification of
-    snapshots and packages.
-
-## Snapshot location
-
-There are essentially four different ways of specifying a snapshot location:
-
-1.  Via a compiler version, which is a "compiler only" snapshot. This could be,
-    for example:
-
-    ~~~yaml
-    snapshot: ghc-8.6.5
-    ~~~
-
-2.  Via a URL pointing to a snapshot configuration file, for example:
-
-    ~~~yaml
-    snapshot: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2018/8/21.yaml`
-    ~~~
-
-3.  Via a local file path pointing to a snapshot configuration file, for
-    example:
-
-    ~~~yaml
-    snapshot: my-local-snapshot.yaml
-    ~~~
-
-4.  Via a _convenience synonym_, which provides a short form for some common
-    URLs. These are:
-
-    * GitHub: `github:user/repo:path` is treated as:
-
-        ~~~text
-        https://raw.githubusercontent.com/user/repo/master/path
-        ~~~
-
-    * LTS Haskell: `lts-X.Y` is treated (by default) as:
-
-        ~~~text
-        github:commercialhaskell/stackage-snapshots:lts/X/Y.yaml
-        ~~~
-
-    * Stackage Nightly: `nightly-YYYY-MM-DD` is treated (by default) as:
-
-        ~~~text
-        github:commercialhaskell/stackage-snapshots:nightly/YYYY/M/D.yaml
-        ~~~
-
-!!! info
-
-    By default, LTS Haskell and Stackage Nightly snapshot configurations are
-    retrieved from the `stackage-snapshots` GitHub repository of user
-    `commercialhaskell`. The
-    [snapshot-location-base](../configure/yaml/non-project.md#snapshot-location-base)
-    option allows a custom location to be set.
-
-For safer, more reproducible builds, you can optionally specify a URL
-together with a cryptographic hash of its content. For example:
-
-~~~yaml
-snapshot:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/12/0.yaml
-  size: 499143
-  sha256: 781ea577595dff08b9c8794761ba1321020e3e1ec3297fb833fe951cce1bee11
-~~~
-
-`size` is the number of bytes in the file and `sha256` is the file's SHA256
-hash. If not provided, the information will automatically be generated and
-stored in a [lock file](lock_files.md).
-
-## Package location
+    specify the location of packages. Pantry is geared towards reproducible
+    build plans with cryptographically secure specification of packages.
 
 There are three types of package locations:
 
@@ -98,7 +23,7 @@ All three types support optional tree metadata to be added, which can be used
 for reproducibility and faster downloads. This information can automatically be
 generated in a [lock file](lock_files.md).
 
-### Hackage packages
+## Hackage packages
 
 A package can be identified by its name, version and Cabal file revision
 number, with revision `0` being the original Cabal file. For example:
@@ -158,7 +83,7 @@ provided in Stack's lock file. For further information, see the
 alternative is also what Stack uses when it makes suggestions about missing
 packages.
 
-### Git and Mercurial repositories
+## Git and Mercurial repositories
 
 You can specify a Git or Mercurial repository at a specific commit, and Stack
 will clone that repository and, if it has submodules (Git), update the
@@ -222,7 +147,7 @@ the root of the repository. If you specify a value of `subdirs`, then `'.'` is
 _not_ included by default and needs to be explicitly specified if a required
 package is found in the top-level directory of the repository.
 
-#### git-annex
+### git-annex
 
 [git-annex](https://git-annex.branchable.com) is not supported. This is because
 `git archive` does not handle symbolic links outside the work tree. It is still
@@ -241,9 +166,9 @@ following line:
 fonts export-ignore
 ~~~
 
-### Local or remote archives (such as GitHub archives)
+## Local or remote archives (such as GitHub archives)
 
-#### Filepaths or URLs to archive files
+### Filepaths or URLs to archive files
 
 You can use filepaths referring to local archive files or HTTP or HTTPS URLs
 referring to remote archive files, either tarballs or ZIP files.
@@ -275,7 +200,7 @@ extra-deps:
   sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
 ~~~
 
-#### GitHub archive files
+### GitHub archive files
 
 [:octicons-tag-24: 1.7.1](https://github.com/commercialhaskell/stack/releases/tag/v1.7.1)
 
@@ -294,7 +219,7 @@ extra-deps:
     An archive file of the files in a GitHub repository at a point in its
     history is not the same as a clone of the repository (including its history)
     and the updating of any submodules. If you need the latter, use the syntax
-    for a [Git repository](pantry.md#git-and-mercurial-repositories).
+    for a [Git repository](#git-and-mercurial-repositories).
 
     If the package fails to build due to missing files, it may be that updated
     submodules are required.

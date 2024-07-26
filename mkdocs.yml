@@ -14,6 +14,7 @@ theme:
   icon:
     logo: material/language-haskell
   features:
+  - content.code.annotate
   - content.code.copy
   - content.code.select
   - content.tabs.link
@@ -87,8 +88,8 @@ nav:
 - Configure:
   - configure/index.md
   - Environment variables: configure/environment_variables.md
-  - Configuration:
-    - Introduction: configure/yaml/yaml_configuration.md
+  - Configuration files:
+    - configure/yaml/index.md
     - Project-specific: configure/yaml/project.md
     - Non-project specific: configure/yaml/non-project.md
   - Global flags and options: configure/global_flags.md
@@ -97,7 +98,8 @@ nav:
   - topics/index.md
   - Stack root: topics/stack_root.md
   - Stack work directories: topics/stack_work.md
-  - Snapshot and package location: topics/pantry.md
+  - Snapshot location: topics/snapshot_location.md
+  - Package location: topics/package_location.md
   - Snapshot specification: topics/custom_snapshot.md
   - stack.yaml vs a Cabal file: topics/stack_yaml_vs_cabal_package_file.md
   - Script interpreter: topics/scripts.md
@@ -115,6 +117,7 @@ nav:
   - Lock files: topics/lock_files.md
   - Haskell and C code: topics/haskell_and_c_code.md
 - Get involved:
+  - community/index.md
   - Contributors:
     - Contributor's guide: CONTRIBUTING.md
     - Dev Containers: dev_containers.md

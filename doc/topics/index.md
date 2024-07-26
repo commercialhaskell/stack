@@ -16,9 +16,13 @@ This part of the guide provides pages dedicated to specific topics.
 :   Stack work directories are directories within a local project or package
     directory in which Stack stores files created during the build process.
 
-[Snapshot and package location](pantry.md)
+[Snapshot location](snapshot_location.md)
 
-:   How to specify the location of snapshots or packages.
+:   How to specify the location of snapshots.
+
+[Package location](package_location.md)
+
+:   How to specify the location of packages.
 
 [Snapshot specification](custom_snapshot.md)
 

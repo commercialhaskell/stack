@@ -74,8 +74,8 @@ While we're talking about paths, to wipe our Stack install completely, here's
 what typically needs to be removed:
 
 1. the Stack root folder (see `stack path --stack-root`, before you uninstall);
-2. if different, the folder containing Stack's global YAML configuration file
-   (see `stack path --global-config`, before you uninstall);
+2. if different, the folder containing Stack's global configuration file (see
+   `stack path --global-config`, before you uninstall);
 3. on Windows, the folder containing Stack's tools (see `stack path --programs`,
    before you uninstall), which is located outside of the Stack root folder; and
 4. the `stack` executable file (see `which stack`, on Unix-like operating
