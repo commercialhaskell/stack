@@ -127,8 +127,9 @@ stack config set snapshot SNAPSHOT
 ~~~
 
 `stack config set snapshot <snapshot>` sets the
-[`snapshot`](yaml_configuration.md#snapshot) key in the project-level
-configuration file (`stack.yaml`, by default) to the specified snapshot.
+[`snapshot`](../configure/yaml/project.md#snapshot) project-specific
+configuration option in the project-level configuration file (`stack.yaml`, by
+default) to the specified snapshot.
 
 A snapshot of `lts` or `nightly` will be translated into the most recent
 available. A snapshot of `lts-22` will be translated into the most recent

@@ -44,8 +44,8 @@ includes the corresponding directories if the relevant MSYS2 environment is
 other than `MINGW64`.)
 
 For further information about configuring the relevant MSYS2 environment, see
-Stack's [`msys-environment`](yaml_configuration.md#msys-environment)
-configuration option.
+Stack's [`msys-environment`](../configure/yaml/non-project.md#msys-environment)
+non-project specific configuration option documentation.
 
 ## Updating the Stack-supplied MSYS2 ##
 

@@ -221,8 +221,8 @@ configuration option).
 
 :octicons-tag-24: UNRELEASED
 
-Overrides: [`allow-newer`](yaml_configuration.md#allow-newer) non-project
-specific configuration option
+Overrides: [`allow-newer`](../configure/yaml/non-project.md#allow-newer)
+non-project specific configuration option
 
 Pass the flag to enable or disable the ignoring of lower and upper version
 bounds in Cabal files.
