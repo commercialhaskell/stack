@@ -72,7 +72,7 @@ information about how Stack itself can configure `NIX_PATH`, see further
 
 On NixOS, Nix integration is enabled by default; on other operating systems it
 is disabled. To enable Nix integration, add the following section to your Stack
-YAML configuration file (`stack.yaml` or `config.yaml`):
+configuration file (`stack.yaml` or `config.yaml`):
 
 ~~~yaml
 nix:
@@ -98,8 +98,8 @@ to a bug in GHCi when working with external shared libraries.
 
 ### Supporting both Nix and non-Nix developers
 
-With Nix integration enabled in Stack's YAML configuration file, every developer
-of your project needs to have Nix installed, but the developer also gets all
+With Nix integration enabled in Stack's configuration file, every developer of
+your project needs to have Nix installed, but the developer also gets all
 external libraries automatically.
 
 Julien Debon of Tweag has published a [blog post][tweag-blog-post] on
@@ -241,7 +241,7 @@ gave to `nix-instantiate` earlier.
 ### External C libraries through Nix packages
 
 To let Nix manage external C libraries, add (for example) the following section
-to your Stack YAML configuration file:
+to your Stack configuration file:
 
 ~~~yaml
 nix:
@@ -272,7 +272,7 @@ further below).
 In Nix, a 'derivation' is a description of a build action and its result is a
 Nix store object. Nix's [custom language][nix-language] can provide a fully
 customized derivation as an environment to use. To specify such a `shell.nix`
-file, add the following section to your Stack YAML configuration file:
+file, add the following section to your Stack configuration file:
 
 ~~~yaml
 nix:
@@ -323,7 +323,7 @@ By default, Stack will run the build in a *pure* Nix build environment (or
    session to the nix-shell (variables like `HTTP_PROXY` or `PATH` notably will
    not be available); and
 2. the build should fail if you haven't specified all the dependencies in the
-   `packages:` section of the Stack YAML configuration file, even if these
+   `packages:` section of the Stack configuration file, even if these
    dependencies are installed elsewhere on your system. This behaviour enforces
    a complete description of the build environment to facilitate
    reproducibility.
@@ -356,7 +356,7 @@ nixpkgs should be pinned, i.e., set to the same package set for every developer
 of your project.
 
 To set or override the Nix package set, add the following section to your Stack
-YAML configuration file:
+configuration file:
 
 ~~~yaml
 nix:

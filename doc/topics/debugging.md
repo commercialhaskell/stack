@@ -55,7 +55,7 @@ The `--executable-profiling` flag:
   to any test suites and benchmarks.
 
 To enable compilation with profiling options by default you can add the
-following to a project-level or global YAML configuration file:
+following to a project-level or global configuration file:
 
 ~~~yaml
 build:

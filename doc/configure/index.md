@@ -20,13 +20,13 @@ The existence or content of certain environment variables can affect how Stack
 behaves. For further information, see the
 [environment variables](environment_variables.md) documentation.
 
-## YAML configuration files
+## Configuration files
 
-Stack is configured by the content of YAML files. A global YAML configuration
-file contains non-project specific options. A project-level YAML configuration
-file contains project-specific options and may contain non-project specific
-options. For further information, see the
-[YAML configuration](yaml/yaml_configuration.md) documentation.
+Stack is configured by the content of files in the YAML formal. A global
+configuration file contains non-project specific options. A project-level
+configuration file contains project-specific options and may contain non-project
+specific options. For further information, see the
+[configuration](yaml/yaml_configuration.md) documentation.
 
 ## Global flags and options
 

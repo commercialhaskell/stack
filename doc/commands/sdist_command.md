@@ -27,7 +27,8 @@ available modes for use with Cabal file revisions are `lower-revision`,
 `upper-revision` and `both-revision`.
 
 For futher information, see the
-[YAML configuration](../configure/yaml/non-project.md#pvp-bounds) documentation.
+[`pvp-bounds`](../configure/yaml/non-project.md#pvp-bounds) non-project specific
+configuration option documentation.
 
 ## `--tar-dir` option
 

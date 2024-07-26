@@ -34,8 +34,8 @@ specific configuration [option](yaml/non-project.md#color).
 ## `--compiler` option
 
 Pass the option `--compiler <compiler>` to specify the compiler. For further
-information, see the [YAML configuration](yaml/non-project.md#compiler)
-documentation.
+information, see the [`compiler`](yaml/non-project.md#compiler) non-project
+specific configuration option documentation.
 
 ## `--custom-preprocessor-extensions` option
 
@@ -130,8 +130,8 @@ specific configuration [option](yaml/non-project.md#local-bin-path).
 
 ## `--lock-file` option
 
-Default: `read-write`, if snapshot specified in YAML configuration file;
-`read-only`, if a different snapshot is specified on the command line.
+Default: `read-write`, if snapshot specified in the project-level configuration
+file; `read-only`, if a different snapshot is specified on the command line.
 
 Pass the option `--lock-file <mode>` to specify how Stack interacts with lock
 files. Valid modes are:
@@ -223,8 +223,8 @@ corresponding non-project specific configuration
 [:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)
 
 Pass the option `--snapshot <snapshot>` to specify the snapshot. For further
-information, see the [YAML configuration](yaml/project.md#snapshot)
-documentation.
+information, see the [`snapshot`](yaml/project.md#snapshot) project-specific
+configuration option documentation.
 
 At the command line (only):
 

@@ -40,9 +40,9 @@ page using the flyout.
 Stack moved from MkDocs 0.17.3 to MkDocs 1.3.1 after publishing the
 documentation for Stack 2.7.5.
 
-A YAML configuration file, `.readthedocs.yaml` is included in the repository
-root directory. See https://docs.readthedocs.io/en/stable/config-file/v2.html.
-It specifies a Python requirements file in `doc/requirements.txt`.
+A configuration file, `.readthedocs.yaml` is included in the repository root
+directory. See https://docs.readthedocs.io/en/stable/config-file/v2.html. It
+specifies a Python requirements file in `doc/requirements.txt`.
 
 ## MkDocs
 
@@ -51,8 +51,8 @@ The `doc/requirements.txt` file pins the version of MkDocs. As at
 
     mkdocs==1.3.1
 
-A YAML configuration file, `mkdocs.yml` is included in the repository root
-directory. See https://www.mkdocs.org/user-guide/configuration/.
+A configuration file, `mkdocs.yml` is included in the repository root directory.
+See https://www.mkdocs.org/user-guide/configuration/.
 
 `site_dir: _site` specifies the directory where the output HTML and other files
 are created. This directory is added to the `.gitignore` file.

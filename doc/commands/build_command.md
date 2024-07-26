@@ -647,26 +647,27 @@ The effect of `--fast` can be overriden with Stack's
     options are used during the configure step of the Cabal build process; see
     Stack's
     [`configure-options`](../configure/yaml/non-project.md#configure-options)
-    YAML configuration option.
+    non-project specific configuration option.
 
 ### `--ghc-options` option
 
 GHC command line options can be specified for a package in its Cabal file
 (including one created from a `package.yaml` file). This option augments and, if
 applicable (see below), overrides any such GHC command line options and those
-specified in Stack's YAML configuration files - see the
-[`ghc-options`](../configure/yaml/non-project.md#ghc-options) configuration
-option.
+specified in Stack's configuration files - see the
+[`ghc-options`](../configure/yaml/non-project.md#ghc-options) non-project
+specific configuration option.
 
 `stack build --ghc-options <ghc_options>` passes the specified command line
 options to GHC, depending on Stack's
-[`apply-ghc-options`](../configure/yaml/non-project.md#apply-ghc-options) YAML
-configuration option. This option can be specified multiple times.
+[`apply-ghc-options`](../configure/yaml/non-project.md#apply-ghc-options)
+non-project specific configuration option. This option can be specified multiple
+times.
 
 GHC's command line options are _order-dependent_ and evaluated from left to
 right. Later options can override the effect of earlier ones. Any GHC command
 line options for a package specified at Stack's command line are applied after
-those specified in Stack's YAML configuration files.
+those specified in Stack's configuration files.
 
 ### `--[no-]library-profiling` flag
 
@@ -880,9 +881,9 @@ package is targetted in a multi-package project (for example, using
   contents of the log files to the standard error output stream of the console
   at the end of the build, use Stack's `dump-logs` option. For further
   information about that option, see the
-  [YAML configuration](../configure/yaml/non-project.md#dump-logs)
-  documentation. The default `dump-logs` mode is to output the contents of any
-  log files that include GHC warnings.
+  [`dump-logs](../configure/yaml/non-project.md#dump-logs) non-project
+  specific configuration option documentation. The default `dump-logs` mode is
+  to output the contents of any log files that include GHC warnings.
 
 ### `--[no]-open` flag
 
@@ -936,8 +937,7 @@ All the following examples assume that:
     consequently, the project-level configuration will be determined by a
     `stack.yaml` file in the `global-project` directory in the
     [Stack root](../topics/stack_root.md) (for further information, see the
-    [YAML configuration](../configure/yaml/yaml_configuration.md)
-    documentation); and
+    [configuration](../configure/yaml/yaml_configuration.md) documentation); and
 
 *   if `stack build` is commanded in a project directory, there is a
     `stack.yaml` file in that directory.

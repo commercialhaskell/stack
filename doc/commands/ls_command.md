@@ -211,8 +211,9 @@ example of the applied style. The latter can be disabled with flags `--no-sgr`
 and `--no-example`.
 
 The flag `--basic` specifies a more basic report, in the format that is accepted
-by Stack's command line option `--stack-colors` and the YAML configuration key
-`stack-colors`.
+by Stack's command line option `--stack-colors` and the
+[`stack-colors`](../configure/yaml/non-project.md#stack-colors) non-project
+specific configuration option.
 
 ## The `stack ls tools` command
 

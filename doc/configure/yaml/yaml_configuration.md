@@ -2,7 +2,8 @@
 
 # Configuration
 
-Stack is configured by the content of [YAML](https://yaml.org/) files.
+Stack is configured by the content of files in the [YAML](https://yaml.org/)
+format.
 
 ## Project-specific and non-project specific options
 

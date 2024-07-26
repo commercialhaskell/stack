@@ -97,7 +97,7 @@
     `global-project` directory in the [Stack root](topics/stack_root.md).
 
     For further information, see the
-    [YAML configuration](configure/yaml/yaml_configuration.md) documentation.
+    [configuration](configure/yaml/yaml_configuration.md) documentation.
 
 ??? question "How does Stack determine what GHC to use?"
 

@@ -271,8 +271,8 @@ This option specifies when to use color in output. The option is used as
 versions before Windows 10, for terminals that do not support color codes, the
 default is 'never'; color may work on terminals that support color codes.
 
-(The British English spelling (colour) is also accepted. In yaml configuration
-files, the American spelling is the alternative that has priority.)
+(The British English spelling (colour) is also accepted. In configuration files,
+the American spelling is the alternative that has priority.)
 
 ## compiler
 
@@ -683,7 +683,7 @@ right. Later options can override the effect of earlier ones. Stack applies
 options (as applicable) in the order of `$everything`, `$locals`, `$targets`,
 and then those for the named package. Any GHC command line options for a package
 specified at Stack's command line are applied after those specified in Stack's
-YAML configuration files.
+configuration files.
 
 Since Stack 1.6.1, setting a GHC options for a specific package will
 automatically promote it to a project package (much like setting a custom
@@ -1146,10 +1146,10 @@ By default, Stack obtains the dictionary from
 
 The `setup-info` dictionary is constructed in the following order:
 
-1. `setup-info` in the YAML configuration - inline configuration
+1. `setup-info` in the configuration - inline configuration
 2. `--setup-info-yaml` command line arguments - URLs or paths. Multiple
    locations may be specified.
-3. `setup-info-locations` in the YAML configuration - URLs or paths. See further
+3. `setup-info-locations` in the configuration - URLs or paths. See further
    below.
 
 The format of this key is the same as in the default
@@ -1387,8 +1387,8 @@ stack-colors: error=31:good=32:shell=35:dir=34:recommendation=32:target=95:modul
 In respect of styles used in verbose output, some of that output occurs before
 the configuration file is processed.
 
-(The British English spelling (colour) is also accepted. In YAML configuration
-files, the American spelling is the alternative that has priority.)
+(The British English spelling (colour) is also accepted. In configuration files,
+the American spelling is the alternative that has priority.)
 
 ## stack-developer-mode
 
