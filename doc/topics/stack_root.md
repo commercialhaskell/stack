@@ -26,7 +26,7 @@ command line.
 
     The Stack root contains snapshot packages; (by default) tools such as GHC,
     in a `programs` directory; Stack's global
-    [YAML configuration](../configure/yaml-configuration.md) file
+    [configuration](../configure/yaml-configuration.md) file
     (`config.yaml`); and Stack's
     [`global-projects`](../configure/yaml-configuration.md) directory.
 
@@ -73,7 +73,7 @@ command line.
 
     This approach treats:
 
-    *   the project-level YAML configuration file that is common to all projects
+    *   the project-level configuration file that is common to all projects
         without another such file in their project directory or its ancestor
         directories as _data_ rather than as part of Stack's own
         _configuration_;
@@ -97,7 +97,7 @@ The location of the Stack root is reported by command:
 stack path --stack-root
 ~~~
 
-The full path of Stack's global YAML configuration file is reported by command:
+The full path of Stack's global configuration file is reported by command:
 
 ~~~text
 stack path --global-config
@@ -120,25 +120,23 @@ alternative location to Stack's default 'programs' directory has been specified.
 
     The Stack root contains snapshot packages; (by default) tools such as GHC,
     in a `programs` directory; Stack's global
-    [YAML configuration](../configure/yaml-configuration.md) file
+    [configuration](../configure/yaml-configuration.md) file
     (`config.yaml`); and Stack's
     [`global-projects`](../configure/yaml-configuration.md) directory.
 
 === "Windows"
 
     The Stack root contains snapshot packages; Stack's global
-    [YAML configuration](../configure/yaml-configuration.md) file
-    (`config.yaml`); and Stack's
-    [`global-projects`](../configure/yaml-configuration.md) directory. The
-    default location of tools such as GHC and MSYS2 is outside of the Stack
-    root.
+    [configuration](../configure/yaml-configuration.md) file (`config.yaml`);
+    and Stack's [`global-projects`](../configure/yaml-configuration.md)
+    directory. The default location of tools such as GHC and MSYS2 is outside of
+    the Stack root.
 
 === "XDG Base Directory Specification"
 
     If Stack is following the XDG Base Directory Specification, the Stack root
     contains what it would otherwise contain for the operating system, but
-    Stack's global YAML configuration file (`config.yaml`) may be located
-    elsewhere.
+    Stack's global configuration file (`config.yaml`) may be located elsewhere.
 
 ### `config.yaml`
 

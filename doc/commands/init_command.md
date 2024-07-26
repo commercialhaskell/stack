@@ -6,7 +6,7 @@
 stack init [DIR(S)] [--omit-packages] [--force] [--ignore-subdirs]
 ~~~
 
-`stack init` initialises Stack's default project-level YAML configuration file
+`stack init` initialises Stack's default project-level configuration file
 (`stack.yaml`) for an existing project, based on the Cabal file or
 `package.yaml` file for each of its packages.
 
