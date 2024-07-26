@@ -75,8 +75,8 @@ To get and use Stack, some other things need to be in place first:
 
     [^1]:
         About 3 GB for a single version of GHC and about 2 GB for a local copy
-        of the Hackage package index. 
- 
+        of the Hackage package index.
+
     *[platform]: Machine architecture (eg x86_64, AArch64) and operating system (eg Linux distribution, macOS, Windows).
 
 -   :material-wifi:{ .lg .middle } __Access to the Internet__
@@ -690,8 +690,7 @@ Stack can be installed directly or by using the GHCup tool.
     After installation, Stack will need to be configured before it can download
     large files consistently from within China (without reliance on a VPN).
     Please add the following to the bottom of the
-    [global configuration file](configure/yaml/yaml_configuration.md)
-    (`config.yaml`):
+    [global configuration file](configure/yaml/index.md) (`config.yaml`):
 
     ~~~yaml
     ###ADD THIS IF YOU LIVE IN CHINA

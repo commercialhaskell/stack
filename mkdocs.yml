@@ -88,8 +88,8 @@ nav:
 - Configure:
   - configure/index.md
   - Environment variables: configure/environment_variables.md
-  - Configuration:
-    - Introduction: configure/yaml/yaml_configuration.md
+  - Configuration files:
+    - configure/yaml/index.md
     - Project-specific: configure/yaml/project.md
     - Non-project specific: configure/yaml/non-project.md
   - Global flags and options: configure/global_flags.md

@@ -26,7 +26,7 @@ Stack is configured by the content of files in the YAML formal. A global
 configuration file contains non-project specific options. A project-level
 configuration file contains project-specific options and may contain non-project
 specific options. For further information, see the
-[configuration](yaml/yaml_configuration.md) documentation.
+[configuration](yaml/index.md) documentation.
 
 ## Global flags and options
 

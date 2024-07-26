@@ -1,6 +1,9 @@
+---
+title: Configuration files
+---
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# Configuration
+# Configuration files
 
 Stack is configured by the content of files in the [YAML](https://yaml.org/)
 format.

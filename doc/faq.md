@@ -96,8 +96,8 @@
     project-level configuration file. This may be the file in the
     `global-project` directory in the [Stack root](topics/stack_root.md).
 
-    For further information, see the
-    [configuration](configure/yaml/yaml_configuration.md) documentation.
+    For further information, see the [configuration](configure/yaml/index.md)
+    documentation.
 
 ??? question "How does Stack determine what GHC to use?"
 
@@ -282,14 +282,13 @@
 
     Add the package version to the [`extra-deps`](configure/yaml/project.md)
     project-specific configuration option in the
-    [project-level configuration file](configure/yaml/yaml_configuration.md).
+    [project-level configuration file](configure/yaml/index.md).
 
 ??? question "How do I use a package version not on Hackage?"
 
     Add the location of the package version to the
     [`extra-deps`](configure/yaml/project.md) project-specific configuration
-    option in the
-    [project-level configuration file](configure/yaml/yaml_configuration.md).
+    option in the [project-level configuration file](configure/yaml/index.md).
 
     For further information, see the
     [package location](topics/package_location.md) documentation.
@@ -300,7 +299,7 @@
     Add the location of the package to the
     [`packages`](configure/yaml/project.md#packages) project-specific
     configuration option in the
-    [project-level configuration file](configure/yaml/yaml_configuration.md).
+    [project-level configuration file](configure/yaml/index.md).
 
     One way to get the source code for the unmodified package version is to use
     the [`stack unpack`](commands/unpack_command.md).
