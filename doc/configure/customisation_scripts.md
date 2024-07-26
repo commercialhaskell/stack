@@ -8,7 +8,7 @@
 
 On Unix-like operating systems and Windows, Stack's installation procedure can
 be fully customised by placing a `sh` shell script (a 'hook') in the
-[Stack root](..topics/stack_root.md) directory at `hooks/ghc-install.sh`. On
+[Stack root](../topics/stack_root.md) directory at `hooks/ghc-install.sh`. On
 Unix-like operating systems, the script file must be made executable. The script
 is run by the `sh` application (which is provided by MSYS2 on Windows).
 
@@ -97,4 +97,37 @@ case $HOOK_GHC_TYPE in
         exit 2
         ;;
 esac
+~~~
+
+## `--file-watch` post-processing
+
+:octicons-tag-24: UNRELEASED
+
+On Unix-like operating systems and Windows, Stack's `build --file-watch`
+post-processing can be fully customised by specifying an executable or a `sh`
+shell script (a 'hook') using the
+[`file-watch-hook`](yaml/non-project.md#file-watch-hook)
+non-project specific configuration option. On Unix-like operating systems, the
+script file must be made executable. A script is run by the `sh` application
+(which is provided by MSYS2 on Windows).
+
+The following environment variables are always available to the executable or
+script:
+
+* `HOOK_FW_RESULT` (Equal to `""` if the build did not fail. Equal to the result
+  of `displayException e`, if exception `e` thown during the build.)
+
+An example script is:
+
+~~~sh
+#!/bin/sh
+
+set -eu
+
+if [ -z "$HOOK_FW_RESULT" ]; then
+  echo "Success! Waiting for next file change."
+else
+  echo "Build failed with exception:"
+  echo $HOOK_FW_RESULT
+fi
 ~~~
