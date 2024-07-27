@@ -50,7 +50,8 @@ If we command:
 stack build
 ~~~
 
-Stack will report error [S-7282] during the build:
+Stack will report Stack error [S-7282] during the build, with output like the
+following:
 
 ~~~text
 ...
@@ -72,7 +73,8 @@ Error: [S-7282]
        While executing the build plan, Stack encountered the error:
 
        [S-7011]
-       While building package helloworld-0.1.0.0 (scroll up to its section to see the error) using:
+       While building package helloworld-0.1.0.0 (scroll up to its section to
+       see the error) using:
        ...
        Process exited with code: ExitFailure 1
 ~~~
@@ -90,7 +92,7 @@ dependencies:
 - text # added
 ~~~
 
-Now, if we command again:
+Now, if we command:
 
 ~~~text
 stack build
@@ -153,8 +155,8 @@ someFunc = launchMissiles
 ~~~
 
 As before, to tell Stack that the `acme-missiles` package is a dependency of the
-`helloworld` package, we can update the package description file
-(`package.yaml`). The relevant part of the file now looks like this:
+`helloworld` package, we must update the package description file
+(`package.yaml`). The relevant part of that file now looks like this:
 
 ~~~yaml
 dependencies:
@@ -165,27 +167,28 @@ dependencies:
 - acme-missiles # added
 ~~~
 
-If we command:
+However, if we command:
 
 ~~~text
 stack build
 ~~~
 
-Stack will report error [S-4804]:
+Stack will report Stack error [S-4804] during the build, with output like the
+following:
 
 ~~~text
 Error: [S-4804]
        Stack failed to construct a build plan.
 
-       While constructing the build plan, Stack encountered the following errors. The
-       'Stack configuration' refers to the set of package versions specified by the
-       snapshot (after any dropped packages, or pruned GHC boot packages; if a boot
-       package is replaced, Stack prunes all other such packages that depend on it) and
-       any extra-deps:
+       While constructing the build plan, Stack encountered the following
+       errors. The 'Stack configuration' refers to the set of package versions
+       specified by the snapshot (after any dropped packages, or pruned GHC boot
+       packages; if a boot package is replaced, Stack prunes all other such
+       packages that depend on it) and any extra-deps:
 
        In the dependencies for helloworld-0.1.0.0:
-         * acme-missiles needed, but no version is in the Stack configuration (latest
-           matching version is 0.3).
+         * acme-missiles needed, but no version is in the Stack configuration
+           (latest matching version is 0.3).
        The above is/are needed since helloworld is a build target.
 
        Some different approaches to resolving some or all of this:
@@ -193,16 +196,24 @@ Error: [S-4804]
          * Recommended action: try adding the following to your extra-deps in
            ...\helloworld\stack.yaml (project-level configuration):
 
-           - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,613
+           - acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a6
+87d45965778deb8694c5d1,613
 ~~~
 
-It says that Stack was unable to construct the build plan.
+The error message explains that Stack was unable to construct a build plan and
+why: the package `acme-missiles` was needed but no version of that package is
+in the set of package versions specified by the snapshot. Stack makes a
+suggestion to fix that.
 
 This brings us to the next major topic in using Stack.
 
 ## Extending snapshots
 
-A snapshot specifies a version of GHC and a set of package versions.
+A snapshot specifies a version of GHC and a set of package versions chosen to
+work well together. However, sometimes you will want to use package versions
+that are not specified by the snapshot. That may be because the package is not
+in the snapshot or because a different version of the package is in the
+snapshot.
 
 Remember above when `stack new` selected some
 [LTS snapshot](https://github.com/commercialhaskell/lts-haskell#readme) for us?
@@ -211,8 +222,8 @@ That defined our build plan and available packages. When we tried using the
 
 We have updated the description of the `helloworld` package (in `package.yaml`)
 to specify that it depends on the `acme-missiles` package, but `acme-missiles`
-is not a member of the set of packages specified by the snapshot. So building
-failed.
+is not a member of the set of package versions specified by the snapshot. So
+building failed.
 
 To add a version of `acme-missiles` to the available package versions, we'll use
 the `extra-deps` key in Stack's project-level configuration file (`stack.yaml`).
@@ -224,13 +235,15 @@ extra-deps:
 - acme-missiles-0.3 # not in the LTS snapshot
 ~~~
 
-Now, if we command again:
+Now, if we command:
 
 ~~~text
 stack build
 ~~~
 
 we should get a successful result.
+
+## Stackage snapshots
 
 With that out of the way, let's dig a little bit more into these snapshots. We
 mentioned the LTS snapshots, and you can get information about it at
@@ -252,29 +265,31 @@ about them on the
 If you're not sure which to use, start with LTS Haskell (which Stack will lean
 towards by default as well).
 
-## Available snapshots
+## Snapshots and GHC versions
 
-Let's explore package sets a bit further. Instead of `lts-22.13`, let's change
-our `stack.yaml` file to use the
-[latest nightly](https://www.stackage.org/nightly). Right now, this is currently
-2024-03-20 - please see the snapshot from the link above to get the latest.
+As mentioned, a snapshot specifies a version of GHC as well as a set of package
+versions.
 
-Then, commanding `stack build` again will produce:
-
-~~~text
-stack build
-# Downloaded nightly-2024-03-20 build plan.
-# build output ...
-~~~
-
-We can also change snapshots on the command line, which can be useful in a
-Continuous Integration (CI) setting, like on Travis. For example, command:
+Let's try using an older LTS snapshot. We'll use the Stackage LTS Haskell 21.25
+snapshot with the command:
 
 ~~~text
 stack --snapshot lts-21.25 build
-# Downloaded lts-21.25 build plan.
-# build output ...
 ~~~
+
+Stackage LTS Haskell 21.25 specifies GHC 9.4.8. If that version of GHC is not
+already available, Stack will try to fetch it and install it before starting the
+rest of the build.
+
+## Specifying a snapshot
+
+A snapshot must be specified in Stack's project-level configuration file
+(`stack.yaml`, by default). For further information, see the
+[`snapshot`](../configure/yaml/project.md#snapshot) project-specific
+configuration option documentation.
+
+As we have seen, a snapshot can also be specified on the command line. That can
+be useful in a Continuous Integration (CI) setting.
 
 When passed on the command line, you also get some additional "short-cut"
 versions of snapshots: `--snapshot nightly` will use the newest Nightly snapshot
@@ -287,36 +302,15 @@ on the command line and not in your `stack.yaml` file is that using them:
 2. Produces unreliable results (since a build run today may proceed differently
    tomorrow because of changes outside of your control)
 
-We've mentioned `nightly-YYYY-MM-DD` and `lts-X.Y` values for the snapshot.
-There are actually other options available, and the list will grow over time.
-At the time of writing:
+## Cleaning up your project
 
-* `ghc-X.Y.Z`, for requiring a specific GHC version but no additional packages
-* Experimental custom snapshot support
+Stack creates files during the build process and stores those files in
+directories within a local project or package directory known as
+[Stack work directories](../topics/stack_work.md). Stack can be used without an
+understanding of the content of those directories.
 
-The most up-to-date information can always be found in the
-[stack.yaml documentation](../configure/yaml/project.md#snapshot).
-
-## Snapshots and GHC versions
-
-As mentioned, a snapshot specifies a version of GHC as well as a set of package
-versions.
-
-Let's try using an older LTS snapshot. We'll use the newest 21.x snapshot with
-the command:
-
-~~~text
-stack --snapshot lts-21 build
-~~~
-
-This succeeds, automatically installing the necessary GHC along the way. So, we
-see that different LTS versions use different GHC versions and Stack can handle
-that.
-
-## Cleaning your project
-
-You can clean up build artifacts for your project using the `stack clean` and
-`stack purge` commands.
+if you wish, you can clean up files created during the build process for your
+project using the `stack clean` and `stack purge` commands.
 
 ### The `stack clean` command
 
@@ -333,4 +327,6 @@ _specific-package_ only.
 git dependencies and the compiler output (including logs). It does not delete
 any snapshot packages, compilers or programs installed using `stack install`.
 This essentially reverts the project to a completely fresh state, as if it had
-never been built. `stack purge` is just a shortcut for `stack clean --full`
+never been built.
+
+`stack purge` is a shortcut for `stack clean --full`.
