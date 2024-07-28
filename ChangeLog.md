@@ -1,27 +1,6 @@
 # Changelog
 
-## Unreleased changes
-
-Release notes:
-
-**Changes since v3.1.0.1:**
-
-Major changes:
-
-Behavior changes:
-
-Other enhancements:
-
-* Add flag `--[no-]allow-newer` to Stack's `build` command, which takes
-  precedence over the existing `allow-newer` configuration option.
-
-Bug fixes:
-
-* Fix a regression, introduced in Stack 2.15.7, that caused GHC 8.10.7 or
-  earlier to fail to build a package with a `Custom` build type, if GHC option
-  `-haddock` was specified.
-
-## v3.1.0.1 (release candidate)
+## v3.1.1 2024-07-28
 
 Release notes:
 
@@ -96,6 +75,8 @@ Other enhancements:
 * In YAML configuration files, the `file-watch-hook` key is introduced to allow
   `--file-watch` post-processing to be customised with a executable or `sh`
   shell script.
+* Add flag `--[no-]allow-newer` to Stack's `build` command, which takes
+  precedence over the existing `allow-newer` configuration option.
 
 Bug fixes:
 
@@ -112,6 +93,9 @@ Bug fixes:
   to parse an (otherwise ignored) project-level configuration file.
 * Stack no longer makes recommendations about a project-level configuration file
   when only a global configuration file is in use.
+* Fix a regression, introduced in Stack 2.15.7, that caused GHC 8.10.7 or
+  earlier to fail to build a package with a `Custom` build type, if GHC option
+  `-haddock` was specified.
 
 ## v2.15.7 - 2024-05-12
 
