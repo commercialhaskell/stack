@@ -75,22 +75,22 @@ packages:
   original:
     hackage: time-1.12.2
 - completed:
+    hackage: unix-2.8.5.1@sha256:3f702a252a313a7bcb56e3908a14e7f9f1b40e41b7bdc8ae8a9605a1a8686f06,9808
+    pantry-tree:
+      sha256: b961320db69795a16c4ef4eebb0a3e7ddbbbe506fa1e22dde95ee8d8501bfbe5
+      size: 5821
+  original:
+    hackage: unix-2.8.5.1
+- completed:
     hackage: uuid-types-1.0.6@sha256:7cb34342914f1be68dbdf2dec35c27d360160848ce5a79ad2c1a990fefd1d855,2582
     pantry-tree:
       sha256: 73e7029b6faeb88f5395e72ed38fcef197b9077c38f9f8f34039f209e75d4806
       size: 480
   original:
     hackage: uuid-types-1.0.6
-- completed:
-    hackage: hpack-0.37.0@sha256:b7c91b0416a55c134172a9fd9a02f3815ba68c4b92cca4e320c36906d5e970e0,5187
-    pantry-tree:
-      sha256: de5e75f3757d6957e5fb0032a465cbd1016d051370ec96a7e4f423bf8bafd095
-      size: 3742
-  original:
-    hackage: hpack-0.37.0@sha256:b7c91b0416a55c134172a9fd9a02f3815ba68c4b92cca4e320c36906d5e970e0,5187
 snapshots:
 - completed:
-    sha256: 5534407e1313da2872e0d76a8fe893a1f60b51366672249704cc17b1f3cc65cc
-    size: 651868
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/7/5.yaml
-  original: nightly-2024-07-05
+    sha256: c6e4cd173fb499ea2865dd89ef283f85e7c306972b5039a4f96c6371e37c2118
+    size: 656842
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/7/28.yaml
+  original: nightly-2024-07-28
