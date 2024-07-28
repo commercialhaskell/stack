@@ -1,4 +1,6 @@
-Note: Fixes for the online documentation of the current Stack release (https://docs.haskellstack.org/en/stable/) should target the 'stable' branch, not the 'master' branch.
+Note: Fixes for the online documentation of the current Stack release
+(https://docs.haskellstack.org/en/stable/) should target the 'stable' branch,
+not the 'master' branch.
 
 Please include the following checklist in your pull request:
 
