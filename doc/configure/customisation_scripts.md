@@ -101,7 +101,7 @@ esac
 
 ## `--file-watch` post-processing
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
 On Unix-like operating systems and Windows, Stack's `build --file-watch`
 post-processing can be fully customised by specifying an executable or a `sh`
