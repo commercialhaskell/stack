@@ -58,7 +58,9 @@ command line arguments. For example, to pass `'a single quoted string'`:
     The content of single quotes is taken literally. Within single quotes, `''`
     escapes a single quote.
 
-=== "Windows (PowerShell)"
+=== "Windows"
+
+    In PowerShell:
 
     `stack exec <command> -- '''a single quoted string'''`
 

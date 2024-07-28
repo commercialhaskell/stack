@@ -108,7 +108,7 @@ occurring. This command may take some time, depending on download speeds.
         /home/<user_name>/.stack/programs/x86_64-linux/ghc-9.6.5/bin/ghc
         ~~~
 
-    === "Windows (with PowerShell)"
+    === "Windows"
 
         ~~~text
         stack exec -- where.exe ghc

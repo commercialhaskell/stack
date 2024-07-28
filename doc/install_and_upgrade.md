@@ -48,6 +48,20 @@ used, it sets other things up as needed.
         Stack installs executables to:
 
         ~~~text
+        $Env:APPDATA\local\bin
+        ~~~
+
+        For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
+
+        If you don't have that directory in your PATH, you may need to update
+        your PATH. That can be done by searching for 'Edit Environment variables
+        for your account' under Start.
+
+    === "Windows (Command Prompt)"
+
+        Stack installs executables to:
+
+        ~~~text
         %APPDATA%\local\bin
         ~~~
 
@@ -727,6 +741,19 @@ Stack can be installed directly or by using the GHCup tool.
 
         ~~~text
         $Env:http_proxy=IP:PORT
+        stack install
+        ~~~
+
+        It is not mandatory for programs to follow the 'system-wide' HTTP proxy.
+        Some programs, such as browsers, do honor this 'system-wide' HTTP proxy
+        setting, while other programs do not. That means configuring
+        'http proxy setting' in your Control Panel would not result in Stack
+        traffic going through the proxy.
+
+    === "Windows (Command Prompt)"
+
+        ~~~text
+        set http_proxy=IP:PORT
         stack install
         ~~~
 

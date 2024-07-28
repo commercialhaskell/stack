@@ -132,6 +132,10 @@ for user-specific non-essential (cached) data.
 
 === "Windows"
 
+     On Windows, the default for `<XDG_CACHE_HOME>` is `$Env:LOCALAPPDATA`.
+
+=== "Windows (Command Prompt)"
+
      On Windows, the default for `<XDG_CACHE_HOME>` is `%LOCALAPPDATA%`.
 
 ## Running plain GHCi

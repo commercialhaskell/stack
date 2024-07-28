@@ -55,9 +55,9 @@ installed:
     /home/<user_name>/.stack/programs/x86_64-linux/ghc-9.0.2.installed
     ~~~
 
-=== "Windows (with PowerShell)"
+=== "Windows"
 
-    Command:
+    In PowerShell, command:
 
     ~~~text
     dir "$(stack path --programs)/*.installed"

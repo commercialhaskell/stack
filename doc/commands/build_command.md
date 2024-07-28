@@ -614,7 +614,9 @@ command line arguments. For example, to pass `'a single quoted string'`:
     The content of single quotes is taken literally. Within single quotes, `''`
     escapes a single quote.
 
-=== "Windows (PowerShell)"
+=== "Windows"
+
+    In PowerShell:
 
     `stack bench --benchmark-arguments '"''a single quoted string''"'`
 
@@ -650,7 +652,9 @@ command line arguments. For example, to pass `'a single quoted string'`:
     The content of single quotes is taken literally. Within single quotes, `''`
     escapes a single quote.
 
-=== "Windows (PowerShell)"
+=== "Windows"
+
+    In PowerShell:
 
     `stack build --exec '<command> "''a single quoted string''"'`
 
@@ -687,7 +691,9 @@ command line arguments. For example, to pass `'a single quoted string'`:
     The content of single quotes is taken literally. Within single quotes, `''`
     escapes a single quote.
 
-=== "Windows (PowerShell)"
+=== "Windows"
+
+    In PowerShell:
 
     `stack test --test-arguments '"''a single quoted string''"'`
 
