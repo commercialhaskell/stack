@@ -52,8 +52,9 @@
 
 ??? question "How do I use Stack with sandboxes?"
 
-    The concept of sandboxes is built-in with Stack. All builds are
-    automatically isolated into separate package databases.
+    A 'sandbox' is a development environment that is isolated from other parts
+    of the system. The concept of sandboxing is built in to Stack. All builds
+    are automatically isolated into separate package databases.
 
 ??? question "Can I run `cabal` commands inside `stack exec`?"
 
