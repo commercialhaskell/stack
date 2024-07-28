@@ -50,6 +50,7 @@ For this first Stack command, Stack will do some setting up. For example, it
 will create the [Stack root](../topics/stack_root.md) directory.
 
 Other than any setting up, Stack will:
+
 * create the project directory;
 * download the project template;
 * attempt to populate the project template based on parameters; and
