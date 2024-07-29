@@ -420,19 +420,19 @@ The contents of the file include comments beginning `#`. Ignoring those
 comments, the contents will look something like this:
 
 ~~~yaml
-resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/21.yaml
+snapshot:
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/31.yaml
 packages:
 - .
 ~~~
 
-The key [`resolver`](../configure/yaml/project.md#resolver) is a
+The key [`snapshot`](../configure/yaml/project.md#snapshot) is a
 project-specific configuration option. Its value tells Stack *how* to build your
 package: which GHC version to use, which versions of package dependencies to
 use, and so on. Our value here says to use
-[LTS Haskell 22.21](https://www.stackage.org/lts-22.21), which implies GHC 9.6.5
+[LTS Haskell 22.31](https://www.stackage.org/lts-22.31), which implies GHC 9.6.6
 (which is why `stack build` installs that version of GHC if it is not already
-available to Stack). There are a number of values you can use for `resolver`,
+available to Stack). There are a number of values you can use for `snapshot`,
 which we'll cover later.
 
 The key [`packages`](../configure/yaml/project.md#packages) is another

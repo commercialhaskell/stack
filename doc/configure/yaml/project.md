@@ -290,15 +290,14 @@ For example, a user-message is inserted by `stack init` when it omits packages
 or adds external dependencies, namely:
 
 ~~~yaml
-user-message: ! 'Warning: Some packages were found to be incompatible with the resolver
-  and have been left commented out in the packages section.
+user-message: |
+  Warning (added by new or init): Some packages were found to be incompatible
+  with the snapshot and have been left commented out in the packages section.
 
-  Warning: Specified resolver could not satisfy all dependencies. Some external packages
-  have been added as dependencies.
+  Warning (added by new or init): Specified snapshot could not satisfy all
+  dependencies. Some external packages have been added as dependencies.
 
   You can omit this message by removing it from stack.yaml
-
-'
 ~~~
 
 ## custom-preprocessor-extensions
