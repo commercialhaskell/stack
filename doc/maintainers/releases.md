@@ -463,11 +463,13 @@ final release.
             git shortlog -s origin/release..HEAD|sed 's/^[0-9 \t]*/* /'|LC_ALL=C sort -f
             ~~~
 
-        === "Windows (with PowerShell)"
+        === "Windows"
 
             ~~~text
             (git shortlog -s origin/release..HEAD) -Replace '^[0-9 \t]*', '* ' | Sort-Object
             ~~~
+
+            in PowerShell.
 
     Publish the GitHub release.
 
@@ -598,7 +600,7 @@ final release.
         curl -vL https://get.haskellstack.org/upgrade/linux-x86_64.tar.gz >/dev/null
         ~~~
 
-    === "Windows (with PowerShell)"
+    === "Windows"
 
         ~~~text
         curl -vL https://get.haskellstack.org/stable/linux-x86_64.tar.gz >NUL

@@ -31,10 +31,10 @@ stack exec --package stm -- echo I installed the stm package via --package stm
 yields output like:
 
 ~~~text
-Run from outside a project, using implicit global project config
-Using latest snapshot resolver: lts-22.21
-Writing global (non-project-specific) config file to: /home/michael/.stack/global/stack.yaml
-Note: You can change the snapshot via the resolver field there.
+Writing the configuration file for the implicit global project to:
+.../global-project/stack.yaml. Note: You can change the snapshot via the
+snapshot field there.
+Using the latest snapshot lts-22.31.
 I installed the stm package via --package stm
 ~~~
 

@@ -56,7 +56,7 @@ main = echo "Hello World!"
     stack turtle-example.hs
     ~~~
 
-=== "Windows (with PowerShell)"
+=== "Windows"
 
     The first line beginning with the 'shebang' (`#!`) has a meaning on
     Unix-like operating systems but will be ignored by PowerShell. It can be

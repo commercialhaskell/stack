@@ -41,10 +41,17 @@ example:
      stack upload .
      ~~~
 
-=== "Windows (with PowerShell)"
+=== "Windows"
 
      ~~~text
      $Env:HACKAGE_KEY=<api_authentification_token>
+     stack upload .
+     ~~~
+
+=== "Windows (Command Prompt)"
+
+     ~~~text
+     set HACKAGE_KEY=<api_authentification_token>
      stack upload .
      ~~~
 
@@ -67,11 +74,19 @@ example:
     stack upload .
     ~~~
 
-=== "Windows (with PowerShell)"
+=== "Windows"
 
     ~~~text
     $Env:HACKAGE_USERNAME='<username>'
     $Env:HACKAGE_PASSWORD='<password>'
+    stack upload .
+    ~~~
+
+=== "Windows (Command Prompt)"
+
+    ~~~text
+    set HACKAGE_USERNAME=<username>
+    set HACKAGE_PASSWORD=<password>
     stack upload .
     ~~~
 

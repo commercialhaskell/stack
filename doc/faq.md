@@ -125,9 +125,9 @@
 
     ~~~text
     myproject/
-      stack-ghc-9.0.2.yaml
-      stack-ghc-9.2.4.yaml
-      stack.yaml --> symlink to stack-ghc-9.2.4.yaml
+      stack-ghc-9.6.6.yaml
+      stack-ghc-9.8.2.yaml
+      stack.yaml --> symlink to stack-ghc-9.6.6.yaml
       myproject.cabal
       src/
         ...
@@ -138,16 +138,22 @@
 
     === "Unix-like"
 
-        ~~~bash
-        stack build  # builds using the default stack.yaml
-        STACK_YAML=stack-ghc-7.10.yaml
-        stack build  # builds using the given yaml file
+        ~~~text
+        STACK_YAML=stack-ghc-9.8.2.yaml
+        stack build
         ~~~
 
-    === "Windows (with PowerShell)"
+    === "Windows"
 
-        ~~~ps
-        $Env:STACK_YAML='stack-ghc-9.0.2.yaml'
+        ~~~text
+        $Env:STACK_YAML='stack-ghc-9.8.2.yaml'
+        stack build
+        ~~~
+
+    === "Windows (Command Prompt)"
+
+        ~~~text
+        set STACK_YAML=stack-ghc-9.8.2.yaml
         stack build
         ~~~
 
@@ -181,9 +187,9 @@
 
 ??? question "On Windows, `stack setup` tells me to add certain paths to the PATH instead of doing it?"
 
-    With PowerShell, it is easy to automate even that step. Command:
+    In PowerShell, it is easy to automate even that step. Command:
 
-    ~~~ps
+    ~~~text
     $Env:Path = ( stack setup | %{ $_ -replace '[^ ]+ ', ''} ), $Env:Path -join ";"
     ~~~
 

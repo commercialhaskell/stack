@@ -2,49 +2,78 @@
 
 # 7. Multi-package projects
 
-Until now, everything we've done with Stack has used a single-package project.
+Until now, everything we have done with Stack has used a single-package project.
 However, Stack's power truly shines when you're working on multi-package
 projects. All the functionality you'd expect to work just does: dependencies
 between packages are detected and respected, dependencies of all packages are
 just as one cohesive whole, and if anything fails to build, the build commands
 exits appropriately.
 
-Let's demonstrate this with the `wai-app-static` and `yackage` packages,
+Let us demonstrate this with the `wai-app-static` and `yackage` packages,
 starting in the root directory for all our Haskell projects. Command:
 
 ~~~text
 mkdir multi
 cd multi
 stack unpack wai-app-static yackage
-Unpacked wai-app-static (from Hackage) to .../multi/wai-app-static-3.1.7.4/
-Unpacked yackage (from Hackage) to .../multi/yackage-0.8.1/
-stack init
-Looking for .cabal or package.yaml files to use to init the project.
-Using cabal packages:
-- wai-app-static-3.1.7.4/
-- yackage-0.8.1/
-
-Cabal file warning in .../multi/yackage-0.8.1/yackage.cabal@47:40: version operators used. To use version operators the package needs to specify at least 'cabal-version: >= 1.8'.
-Cabal file warning in .../multi/yackage-0.8.1/yackage.cabal@21:36: version operators used. To use version operators the package needs to specify at least 'cabal-version: >= 1.8'.
-Selecting the best among 18 snapshots...
-
-* Matches ...
-
-Selected resolver: ...
-Initialising configuration using resolver: ...
-Total number of user packages considered: 2
-Writing configuration to file: stack.yaml
-stack build --haddock --test
-# Goes off to build a whole bunch of packages
 ~~~
+
+The last command should report something like:
+
+~~~text
+...
+Unpacked wai-app-static (from Hackage) to .../multi/wai-app-static-3.1.9/.
+Unpacked yackage (from Hackage) to .../multi/yackage-0.8.1/.
+~~~
+
+Then command:
+
+~~~text
+stack init
+~~~
+
+The command should report something like:
+
+~~~text
+Looking for Cabal or package.yaml files to use to initialise Stack's
+project-level configuration file.
+
+Using the Cabal packages:
+* wai-app-static-3.1.9/
+* yackage-0.8.1/
+
+Cabal file warning in .../multi/yackage-0.8.1/yackage.cabal@47:40: version
+operators used. To use version operators the package needs to specify at least
+'cabal-version: >= 1.8'.
+Cabal file warning in .../multi/yackage-0.8.1/yackage.cabal@21:36: version
+operators used. To use version operators the package needs to specify at least
+'cabal-version: >= 1.8'.
+Selecting the best among 12 snapshots...
+
+Note: Matches ...
+
+Selected the snapshot ...
+Initialising Stack's project-level YAML configuration file using snapshot ...
+Considered 2 user packages.
+Writing configuration to stack.yaml.
+Stack's project-level YAML configuration file has been initialised.
+~~~
+
+Then command:
+
+~~~text
+stack build --haddock --test
+~~~
+
+Stack should build and test the project packages.
 
 If you look at the `stack.yaml` file, you'll see exactly what you'd expect:
 
 ~~~yaml
-resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/17.yaml
+snapshot:
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/31.yaml
 packages:
-- wai-app-static-3.1.7.4
+- wai-app-static-3.1.9
 - yackage-0.8.1
 ~~~
 

@@ -34,6 +34,34 @@ command line.
 
 === "Windows"
 
+    The default Stack root is `$Env:APPDIR\stack`.
+
+    If the `LOCALAPPDATA` environment variable exists, then the default location
+    of tools is `$Env:LOCALAPPDATA\Programs\stack`. Otherwise, it is the
+    `programs` directory in the Stack root.
+
+    !!! warning
+
+        If there is a space character in the `$Env:LOCALAPPDATA` path (which may
+        be the case if the relevant user account name and its corresponding user
+        profile path have a space) this may cause problems with building
+        packages that make use of the GNU project's `autoconf` package and
+        `configure` shell script files. That may be the case particularly if
+        there is no corresponding short name ('8 dot 3' name) for the directory
+        in the path with the space (which may be the case if '8 dot 3' names
+        have been stripped or their creation not enabled by default). If there
+        are problems building, it will be necessary to override the default
+        location of Stack's 'programs' directory to specify an alternative path
+        that does not contain space characters. Examples of packages on
+        Hackage that make use of `configure` are `network` and `process`.
+
+    On Windows, the length of filepaths may be limited (to
+    [MAX_PATH](https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=cmd)),
+    and things can break when this limit is exceeded. Setting a Stack root with
+    a short path to its location (for example, `C:\sr`) can help.
+
+=== "Windows (Command Prompt)"
+
     The default Stack root is `%APPDIR%\stack`.
 
     If the `LOCALAPPDATA` environment variable exists, then the default location

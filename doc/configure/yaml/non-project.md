@@ -924,7 +924,28 @@ Stack's defaults differ between Unix-like operating systems and Windows.
 
 === "Windows"
 
-    Default: `%LOCALAPPDATA%\Programs\stack`, if the `%LOCALAPPDATA%`
+    Default: `$Env:LOCALAPPDATA\Programs\stack`, if the `LOCALAPPDATA`
+    environment variable exists. Otherwise, the `programs` directory in the
+    [Stack root](../../topics/stack_root.md).
+
+    The MSYS2 tool is also installed in the Stack 'programs' directory.
+
+    !!! warning
+
+        If there is a space character in the path to Stack's 'programs'
+        directory this may cause problems with building packages that make use
+        of the GNU project's `autoconf` package and `configure` shell script
+        files. That may be the case particularly if there is no corresponding
+        short name ('8 dot 3' name) for the directory in the path with the space
+        (which may be the case if '8 dot 3' names have been stripped or their
+        creation not enabled by default). If there are problems building, it
+        will be necessary to specify an alternative path that does not contain
+        space characters. Examples of packages on Hackage that make use of
+        `configure` are `network` and `process`.
+
+=== "Windows (Command Prompt)"
+
+    Default: `%LOCALAPPDATA%\Programs\stack`, if the `LOCALAPPDATA`
     environment variable exists. Otherwise, the `programs` directory in the
     [Stack root](../../topics/stack_root.md).
 
