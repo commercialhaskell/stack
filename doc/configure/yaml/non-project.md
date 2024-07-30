@@ -1113,8 +1113,9 @@ ignored.
 
 Default: `none`
 
-Command line equivalent (takes precedence): `stack sdist --pvp-bounds` option or
-`stack upload --pvp-bounds` option
+Command line equivalent (takes precedence):
+[`stack sdist --pvp-bounds`](../../commands/sdist_command.md) option or
+[`stack upload --pvp-bounds`](../../commands/upload_command.md) option
 
 !!! warning
 
