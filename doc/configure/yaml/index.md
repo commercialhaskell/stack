@@ -94,7 +94,7 @@ variables, respectively.
 
     * system-wide: `/etc/stack/config.yaml`; and
     * user-specific: `config.yaml` in the
-      [Stack root](../../topcis/stack_root.md).
+      [Stack root](../../topics/stack_root.md).
 
     !!! note
 

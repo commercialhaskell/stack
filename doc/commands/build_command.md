@@ -294,7 +294,7 @@ This overrides:
     For a package included directly in the snapshot, if the Cabal flag
     specifications differ from the Cabal flag specifications (if any) in the
     snapshot, then the package will automatically be promoted to be an
-    [extra-dep](#extra-deps).
+    [extra-dep](../configure/yaml/project.md#extra-deps).
 
 !!! note
 
@@ -382,7 +382,7 @@ If the flag is set:
   flag is ignored and `--haddock-hyperlink-source` is implied;
 * the [`--[no-]haddock-deps`](#-no-haddock-deps-flag) flag is ignored and the
   default value for the flag is implied;
-* the [`--[no-]haddock-internal`](#-no-haddock-hyperlink-internal-flag) flag is
+* the [`--[no-]haddock-internal`](#-no-haddock-internal-flag) flag is
   ignored and `--no-haddock-internal` is implied;
 * the [`--[no-]open`](#-no-open-flag) flag is ignored and `--no-open` is
   implied; and

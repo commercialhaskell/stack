@@ -38,7 +38,8 @@ process.
 Default: `false`
 
 Command line equivalent (takes precedence):
-[`stack build --[no-]allow-newer`](build_command.md#-allow-newer-flag) flag
+[`stack build --[no-]allow-newer`](../../commands/build_command.md#-no-allow-newer-flag)
+flag
 
 Whether to ignore lower and upper version bounds in Cabal files.
 
@@ -98,7 +99,8 @@ otherwise), and `targets` (all project packages that are targets).
 Default: `locals`
 
 Related command line:
-[`stack build --PROG-option`](../../commands/build_command.md#-prog-option-options) options
+[`stack build --PROG-option`](../../commands/build_command.md#-prog-option-options)
+options
 
 Determines to which packages all and any `--PROG-option` command line options
 specified on the command line are applied. Possible values are: `everything`
@@ -492,7 +494,7 @@ concurrent-tests: false
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
 Related command line (takes precedence):
-[`stack build --PROG-option`](../../commands/build_command.md#prog-option-options)
+[`stack build --PROG-option`](../../commands/build_command.md#-prog-option-options)
 options
 
 `configure-options` can specify Cabal (the library) options (including
@@ -532,19 +534,19 @@ Integer indicating how many simultaneous downloads are allowed to happen.
 
 [:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
-Default: As for the [`stack init`](init_command.md) command when no snapshot is
-specified at the command line.
+Default: As for the [`stack init`](../../commands/init_command.md) command when
+no snapshot is specified at the command line.
 
 Command line equivalent (takes precedence):
-[`--snapshot`](global_flags.md#snapshot-option) or
-[`--resolver`](global_flags.md#resolver-option) option
+[`--snapshot`](../global_flags.md#-snapshot-option) or
+[`--resolver`](../global_flags.md#-resolver-option) option
 
 This option specifies which snapshot to use with `stack init`, when none is
 specified at the command line.
 
 `default-init-snapshot: global` specifies the snapshot specified by the
 project-level configuration file in the `global-project` directory in the
-[Stack root](stack_root.md#global-project-directory).
+[Stack root](../../topics/stack_root.md#global-project-directory).
 
 ## default-template
 
@@ -664,14 +666,14 @@ compiler's binary directory - will take precedence over those specified here
 
 Specifies the location of an executable or `sh` shell script to be run after
 each attempted build with
-[`build --file-watch`](build_command.md#-file-watch-flag). An absolute or
-relative path can be specified. Changes to the configuration after the
-initial `build --file-watch` command are ignored.
+[`build --file-watch`](../../commands/build_command.md#-file-watch-flag). An
+absolute or relative path can be specified. Changes to the configuration after
+the initial `build --file-watch` command are ignored.
 
 If the project-level configuration is provided in the `global-project` directory
-in the [Stack root](stack_root.md), a relative path is assumed to be relative to
-the current directory. Otherwise, it is assumed to be relative to the directory
-of the project-level configuration file.
+in the [Stack root](../../topics/stack_root.md), a relative path is assumed to
+be relative to the current directory. Otherwise, it is assumed to be relative to
+the directory of the project-level configuration file.
 
 ## ghc-build
 
@@ -850,7 +852,7 @@ Template Haskell.
 Default: `false`
 
 Command line equivalent (takes precedence):
-[`--hpack-force` option](global_flags.md#-no-hpack-force-flag)
+[`--hpack-force` option](../global_flags.md#-no-hpack-force-flag)
 
 Whether or not to allow Hpack to overwrite a Cabal file that has been modified
 manually. By default, Hpack 0.20.0 or later will decline to overwrite such a
@@ -1013,7 +1015,7 @@ Command line equivalents: `--nix-*` flags and options (see `stack --nix-help`
 for details).
 
 For further information, see the
-[Nix integration](../../topics/nix_integration.md#configuration) documentation.
+[Nix integration](../../topics/nix_integration.md#non-project-specific-configuration) documentation.
 
 ## notify-if-arch-unknown
 
@@ -1200,7 +1202,8 @@ to be used for this project. Example: `require-stack-version: "== 0.1.*"`
 Default: `true`
 
 Command line equivalent (takes precedence):
-[`stack upload --[no]-save-hackage-creds`](upload_command.md) option
+[`stack upload --[no]-save-hackage-creds`](../../commands/upload_command.md)
+option
 
 Controls whether, when using `stack upload`, the user's Hackage username and
 password are stored in a local file.

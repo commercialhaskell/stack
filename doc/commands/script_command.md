@@ -40,7 +40,7 @@ Stack root.
 ## GHC
 
 The `stack script` command behaves as if the
-[`--install-ghc`](../configure/global_flags.md#--no-install-ghc-flag) flag had
+[`--install-ghc`](../configure/global_flags.md#-no-install-ghc-flag) flag had
 been passed at the command line.
 
 ## Snapshot and extra-deps

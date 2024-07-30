@@ -71,8 +71,8 @@ This directory will contain a path to a directory containing:
 * a `doc` directory, containing a directory for each project package. This is
   the directory reported by
   [`stack path --local-doc-root`](../commands/path_command.md);
-* if the [`stack hpc`](hpc_command.md) command is used, a `hpc` directory. This
-  is the directory reported by
+* if the [`stack hpc`](../commands/hpc_command.md) command is used, a `hpc`
+  directory. This is the directory reported by
   [`stack path --local-hpc-root`](../commands/path_command.md);
 * a `lib` directory, containing a directory named after the platform and the
   GHC version and, within that, a directory for each project package;
@@ -106,9 +106,10 @@ The directory is the one reported by
     package depend on:
 
     * the specification of
-      [profiling](https://docs.haskellstack.org/en/stable/build_command/#flags-affecting-ghcs-behaviour);
+      [profiling](../commands/build_command.md#flags-affecting-ghcs-behaviour);
     * the specification of
-      [stripping](https://docs.haskellstack.org/en/stable/build_command/#flags-affecting-ghcs-behaviour); and
+      [stripping](../commands//build_command.md#flags-affecting-ghcs-behaviour);
+      and
     * if
       [`apply-ghc-options: everything`](../configure/yaml/non-project.md#apply-ghc-options)
       is specified, any GHC command line options specified on the command line.
