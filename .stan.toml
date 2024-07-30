@@ -94,25 +94,25 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-hTeu0Y-384:17"
+  id = "OBS-STAN-0203-hTeu0Y-389:17"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Init.hs
 #
-#  383 ┃
-#  384 ┃   commentHelp = BC.pack .  intercalate "\n" . map commentLine
-#  385 ┃                 ^^^^^^^
+#  388 ┃
+#  389 ┃   commentHelp = BC.pack .  intercalate "\n" . map commentLine
+#  390 ┃                 ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-hTeu0Y-401:26"
+  id = "OBS-STAN-0203-hTeu0Y-406:26"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Init.hs
 #
-#  400 ┃
-#  401 ┃         <> B.byteString (BC.pack $ concat
-#  402 ┃                          ^^^^^^^
+#  405 ┃
+#  406 ┃         <> B.byteString (BC.pack $ concat
+#  407 ┃                          ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]

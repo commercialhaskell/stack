@@ -74,7 +74,7 @@ import           Path.IO
                    , getCurrentDir, getXdgDir, resolveDir, resolveDir'
                    , resolveFile, resolveFile'
                    )
-import           RIO.List ( unzip )
+import           RIO.List ( unzip, intersperse )
 import           RIO.Process
                    ( HasProcessContext (..), ProcessContext, augmentPathMap
                    , envVarsL
@@ -743,7 +743,7 @@ withBuildConfig inner = do
 
   (project', configFile) <- case config.project of
     PCProject (project, fp) -> do
-      forM_ project.userMsg prettyWarnS
+      forM_ project.userMsg prettyUserMessage
       pure (project, Right fp)
     PCNoProject extraDeps -> do
       p <-
@@ -860,6 +860,33 @@ withBuildConfig inner = do
       , curator = Nothing
       , dropPackages = mempty
       }
+  prettyUserMessage :: String -> RIO Config ()
+  prettyUserMessage userMsg = do
+    let userMsgs = map flow $ splitAtLineEnds userMsg
+        warningDoc = mconcat $ intersperse blankLine userMsgs
+    prettyWarn warningDoc
+   where
+    splitAtLineEnds = reverse . map reverse . go []
+     where
+      go :: [String] -> String -> [String]
+      go ss [] = ss
+      go ss s = case go' [] s of
+        ([], rest) -> go ss rest
+        (s', rest) -> go (s' : ss) rest
+      go' :: String -> String -> (String, String)
+      go' s [] = (s, [])
+      go' s [c] = (c:s, [])
+      go' s "\n\n" = (s, [])
+      go' s [c1, c2] = (c2:c1:s, [])
+      go' s ('\n':'\n':rest) = (s, stripLineEnds rest)
+      go' s ('\n':'\r':'\n':rest) = (s, stripLineEnds rest)
+      go' s ('\r':'\n':'\n':rest) = (s, stripLineEnds rest)
+      go' s ('\r':'\n':'\r':'\n':rest) = (s, stripLineEnds rest)
+      go' s (c:rest) = go' (c:s) rest
+      stripLineEnds :: String -> String
+      stripLineEnds ('\n':rest) = stripLineEnds rest
+      stripLineEnds ('\r':'\n':rest) = stripLineEnds rest
+      stripLineEnds rest = rest
 
 fillProjectWanted ::
      (HasLogFunc env, HasPantryConfig env, HasProcessContext env)

@@ -250,30 +250,35 @@ initProject currDir initOpts mASnapshot = do
     getDefaultSnapshot initOpts mASnapshot' pkgDirs
   let ignored = Map.difference bundle rbundle
       dupPkgMsg
-        | dupPkgs /= [] =
+        | dupPkgs /= [] = Just
             "Warning (added by new or init): Some packages were found to have \
-            \names conflicting with others and have been commented out in the \
-            \packages section.\n"
-        | otherwise = ""
+            \names\n\
+            \conflicting with others and have been commented out in the \
+            \packages section."
+        | otherwise = Nothing
       missingPkgMsg
-        | Map.size ignored > 0 =
+        | Map.size ignored > 0 = Just
             "Warning (added by new or init): Some packages were found to be \
-            \incompatible with the snapshot and have been left commented out \
-            \in the packages section.\n"
-        | otherwise = ""
+            \incompatible\n\
+            \with the snapshot and have been left commented out in the \
+            \packages section."
+        | otherwise = Nothing
       extraDepMsg
-        | Map.size extraDeps > 0 =
+        | Map.size extraDeps > 0 = Just
             "Warning (added by new or init): Specified snapshot could not \
-            \satisfy all dependencies. Some external packages have been added \
-            \as dependencies.\n"
-        | otherwise = ""
-      makeUserMsg msgs =
-        let msg = concat msgs
-        in  if msg /= ""
-              then
-                   msg
-                <> "You can omit this message by removing it from stack.yaml\n"
-              else ""
+            \satisfy all\n\
+            \dependencies. Some external packages have been added as \
+            \dependencies."
+        | otherwise = Nothing
+      removalMsg =
+        "You can omit this message by removing it from the project-level \
+        \configuration\n\
+        \file."
+      makeUserMsg mMsgs =
+        let msgs = catMaybes mMsgs
+        in  if null msgs
+              then Nothing
+              else Just $ intercalate "\n\n" (msgs <> [removalMsg]) <> "\n"
       userMsg = makeUserMsg [dupPkgMsg, missingPkgMsg, extraDepMsg]
       gpdByDir =
         Map.fromList [ (parent fp, gpd) | (fp, gpd) <- Map.elems bundle]
@@ -284,7 +289,7 @@ initProject currDir initOpts mASnapshot = do
       completePackageLocation
         (RPLIHackage (PackageIdentifierRevision n v CFILatest) Nothing)
   let project = Project
-        { userMsg = if userMsg == "" then Nothing else Just userMsg
+        { userMsg
         , packages = resolvedRelative <$> Map.elems rbundle
         , extraDeps = map toRawPL deps
         , flagsByPkg = removeSrcPkgDefaultFlags gpds flags
