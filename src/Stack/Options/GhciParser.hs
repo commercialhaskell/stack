@@ -28,7 +28,7 @@ ghciOptsParser = GhciOpts
         (  metavar "TARGET/FILE"
         <> completer (targetCompleter <> fileExtCompleter [".hs", ".lhs"])
         <> help "If none specified, use all project packages. See \
-                \https://docs.haskellstack.org/en/stable/build_command/#target-syntax \
+                \https://docs.haskellstack.org/en/stable/commands/build_command/#target-syntax \
                 \for details. If a path to a .hs or .lhs file is specified, it \
                 \will be loaded."
         ))

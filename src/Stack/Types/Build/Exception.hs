@@ -102,7 +102,7 @@ instance Exception BuildException where
       | otherwise = pure $
           "The following target packages were not found: " ++
           intercalate ", " (map packageNameString $ Set.toList noKnown) ++
-          "\nSee https://docs.haskellstack.org/en/stable/build_command/#target-syntax for details."
+          "\nSee https://docs.haskellstack.org/en/stable/commands/build_command/#target-syntax for details."
     notInSnapshot'
       | Map.null notInSnapshot = []
       | otherwise =

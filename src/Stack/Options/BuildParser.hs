@@ -129,7 +129,7 @@ targetsParser =
     <> completer targetCompleter
     <> help "Can be specified multiple times. If none specified, use all \
             \project packages. See \
-            \https://docs.haskellstack.org/en/stable/build_command/#target-syntax \
+            \https://docs.haskellstack.org/en/stable/commands/build_command/#target-syntax \
             \for details."
     ))
 

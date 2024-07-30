@@ -126,7 +126,7 @@ instance Pretty InitPrettyException where
                 \most recent release of Stack)"
          , style
              Url
-             "http://docs.haskellstack.org/en/stable/yaml_configuration/"
+             "http://docs.haskellstack.org/en/stable/configure/yaml/"
            <> "."
          ]
     <> blankLine
@@ -424,7 +424,7 @@ renderStackYaml p ignoredPackages dupPackages =
     , ""
     , "Some commonly used options have been documented as comments in this file."
     , "For advanced use and comprehensive documentation of the format, please see:"
-    , "https://docs.haskellstack.org/en/stable/yaml_configuration/"
+    , "https://docs.haskellstack.org/en/stable/configure/yaml/"
     ]
   snapshotHelp = commentHelp
     [ "A 'specific' Stackage snapshot or a compiler version."

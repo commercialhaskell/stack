@@ -55,7 +55,7 @@ instance Exception ConfigException where
     , T.unpack url
     , "':\n"
     , Yaml.prettyPrintParseException exception
-    , "\nSee https://docs.haskellstack.org/en/stable/custom_snapshot/"
+    , "\nSee https://docs.haskellstack.org/en/stable/topics/custom_snapshot/"
     ]
   displayException (NoProjectConfigFound dir mcmd) = concat
     [ "Error: [S-2206]\n"
@@ -190,7 +190,7 @@ instance Pretty ConfigPrettyException where
                 \files, see (for the most recent release of Stack)"
          ,    style
                 Url
-                "http://docs.haskellstack.org/en/stable/yaml_configuration/"
+                "http://docs.haskellstack.org/en/stable/configure/yaml/"
            <> "."
          ]
   pretty (StackWorkEnvNotRelativeDir x) =

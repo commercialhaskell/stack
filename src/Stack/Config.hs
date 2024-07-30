@@ -792,7 +792,7 @@ withBuildConfig inner = do
               , "# '", encodeUtf8 (T.pack $ toFilePath config.userGlobalConfigFile), "' instead.\n"
               , "#\n"
               , "# For more information about Stack's configuration, see\n"
-              , "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n"
+              , "# http://docs.haskellstack.org/en/stable/configure/yaml/\n"
               , "#\n"
               , Yaml.encode p]
             writeBinaryFileAtomic (parent dest </> relFileReadmeTxt) $
@@ -1250,12 +1250,12 @@ defaultConfigYaml :: (IsString s, Semigroup s) => s
 defaultConfigYaml =
   "# This file contains default non-project-specific settings for Stack, used\n" <>
   "# in all projects. For more information about Stack's configuration, see\n" <>
-  "# http://docs.haskellstack.org/en/stable/yaml_configuration/\n" <>
+  "# http://docs.haskellstack.org/en/stable/configure/yaml/\n" <>
   "\n" <>
   "# The following parameters are used by 'stack new' to automatically fill fields\n" <>
   "# in the Cabal file. We recommend uncommenting them and filling them out if\n" <>
   "# you intend to use 'stack new'.\n" <>
-  "# See https://docs.haskellstack.org/en/stable/yaml_configuration/#templates\n" <>
+  "# See https://docs.haskellstack.org/en/stable/configure/yaml/non-project/#templates\n" <>
   "templates:\n" <>
   "  params:\n" <>
   "#    author-name:\n" <>
