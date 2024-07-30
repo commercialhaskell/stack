@@ -19,16 +19,15 @@ alternative location to Stack's default 'programs' directory has been specified.
 The location of the Stack root can be configured by setting the
 [`STACK_ROOT`](../configure/environment_variables.md#stack_root) environment
 variable or using Stack's
-[`--stack-root`](../configure/global_flags.md#stack-root-option) option on the
+[`--stack-root`](../configure/global_flags.md#-stack-root-option) option on the
 command line.
 
 === "Unix-like"
 
     The Stack root contains snapshot packages; (by default) tools such as GHC,
     in a `programs` directory; Stack's global
-    [configuration](../configure/yaml-configuration.md) file
-    (`config.yaml`); and Stack's
-    [`global-projects`](../configure/yaml-configuration.md) directory.
+    [configuration](../configure/yaml/index.md) file (`config.yaml`); and
+    Stack's [`global-projects`](../configure/yaml/index.md) directory.
 
     The default Stack root is `~/.stack`.
 
@@ -148,17 +147,16 @@ alternative location to Stack's default 'programs' directory has been specified.
 
     The Stack root contains snapshot packages; (by default) tools such as GHC,
     in a `programs` directory; Stack's global
-    [configuration](../configure/yaml-configuration.md) file
-    (`config.yaml`); and Stack's
-    [`global-projects`](../configure/yaml-configuration.md) directory.
+    [configuration](../configure/yaml/index.md) file (`config.yaml`); and
+    Stack's [`global-projects`](../configure/yaml/index.md) directory.
 
 === "Windows"
 
     The Stack root contains snapshot packages; Stack's global
-    [configuration](../configure/yaml-configuration.md) file (`config.yaml`);
-    and Stack's [`global-projects`](../configure/yaml-configuration.md)
-    directory. The default location of tools such as GHC and MSYS2 is outside of
-    the Stack root.
+    [configuration](../configure/yaml/index.md) file (`config.yaml`); and
+    Stack's [`global-projects`](../configure/yaml/index.md) directory. The
+    default location of tools such as GHC and MSYS2 is outside of the Stack
+    root.
 
 === "XDG Base Directory Specification"
 
@@ -266,9 +264,9 @@ then Stack will seek to rebuild it.
 ### `setup-exe-src` directory
 
 See the documentation for the
-[`setup-exe-cache` directory](#setup-exe-cache-directorysetup-exe-cache). This
-contains the two source files (`setup-<hash>.hs` and `setup-shim-<hash>.hs`)
-that Stack uses to build the executable.
+[`setup-exe-cache` directory](#setup-exe-cache-directory). This contains the two
+source files (`setup-<hash>.hs` and `setup-shim-<hash>.hs`) that Stack uses to
+build the executable.
 
 If the contents of the directory are deleted, and Stack needs the executable,
 then Stack will recreate them.

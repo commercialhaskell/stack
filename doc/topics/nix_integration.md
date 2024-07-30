@@ -43,7 +43,7 @@ A `shell.nix` file requires writing code in Nix's
 special requirements, such as using custom Nix packages that override the
 standard ones or using system libraries with special requirements.
 
-### Checking the Nix installation
+## Checking the Nix installation
 
 Once Nix is installed, the Nix commands (`nix-shell` etc) should be available.
 If they are not, it could be because the file
@@ -68,7 +68,7 @@ evaluation mode. However, Stack may use a pure Nix mode (see further
 information about how Stack itself can configure `NIX_PATH`, see further
 [below](#nix-package-sources).
 
-### Enable Nix integration
+## Enable Nix integration
 
 On NixOS, Nix integration is enabled by default; on other operating systems it
 is disabled. To enable Nix integration, add the following section to your Stack
@@ -96,7 +96,7 @@ GHC installation before running a build.
 **Known limitation on macOS:** currently, `stack --nix ghci` fails on macOS, due
 to a bug in GHCi when working with external shared libraries.
 
-### Supporting both Nix and non-Nix developers
+## Supporting both Nix and non-Nix developers
 
 With Nix integration enabled in Stack's configuration file, every developer of
 your project needs to have Nix installed, but the developer also gets all
@@ -181,7 +181,7 @@ command (it searches for `flake.nix` by default) and you'll find a new
 that `flake.lock` file as well, and every Nix developer of your project will use
 precisely the same package set.
 
-### GHC through Nix packages
+## GHC through Nix packages
 
 Nix integration will instruct Stack to build inside a local build environment.
 That environment will also download and use a
@@ -238,7 +238,7 @@ nix-repl> haskell.compiler.ghc<Tab>
 You can type and evaluate any Nix expression in the Nix REPL, such as the one we
 gave to `nix-instantiate` earlier.
 
-### External C libraries through Nix packages
+## External C libraries through Nix packages
 
 To let Nix manage external C libraries, add (for example) the following section
 to your Stack configuration file:
@@ -267,7 +267,7 @@ folder. If you're dealing with a package that doesn't follow this standard
 layout, you'll have to deal with that using a custom `shell.nix` file (see
 further below).
 
-### External C libraries through a `shell.nix` file
+## External C libraries through a `shell.nix` file
 
 In Nix, a 'derivation' is a description of a build action and its result is a
 Nix store object. Nix's [custom language][nix-language] can provide a fully
@@ -314,7 +314,7 @@ function `buildStackProject`. This argument is a GHC Nix package in the
 version as defined in the snapshot you set in Stack's project-level
 configuration file (`stack.yaml`, by default).
 
-### Pure and impure Nix shells
+## Pure and impure Nix shells
 
 By default, Stack will run the build in a *pure* Nix build environment (or
 *shell*), which means two important things:
@@ -343,7 +343,7 @@ The equivalent command line flag (which will prevail) is `--[no-]-nix-pure`.
 to be resolved locale issues. So on macOS you'll need to be a bit more careful
 to check that you really have listed all dependencies.
 
-### Nix package sources
+## Nix package sources
 
 Nix organizes its packages in snapshots of packages (each snapshot being a
 "package set") similar to how Stackage organizes Haskell packages.  By default,

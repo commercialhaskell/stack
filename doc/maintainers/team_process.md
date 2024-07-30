@@ -156,7 +156,7 @@ reviews, as well.
 ## Real-time communications
 
 At present, the maintainer team mostly communicates via a rather quiet channel
-called [`#stack-collaborators`](../CONTRIBUTING/#slack-channel) in the
+called [`#stack-collaborators`](../CONTRIBUTING.md#slack-channel) in the
 Haskell Foundation's Slack workspace, although we may migrate to some other
 platform in the future.
 
