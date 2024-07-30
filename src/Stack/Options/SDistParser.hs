@@ -21,20 +21,22 @@ sdistOptsParser = SDistOpts
   <$> many (strArgument
         (  metavar "DIR"
         <> completer dirCompleter
+        <> help "Project package directory. Can be specified multiple times. \
+                \If none specified, use all project packages."
         ))
   <*> optional pvpBoundsOption
   <*> ignoreCheckSwitch
   <*> buildPackageOption
   <*> optional (strOption
         (  long "tar-dir"
-        <> help "If specified, copy all the tar to this directory."
+        <> help "If specified, copy all the generated files to this directory."
         ))
  where
   ignoreCheckSwitch = switch
     (  long "ignore-check"
-    <> help "Do not check package for common mistakes."
+    <> help "Do not check packages for common mistakes."
     )
   buildPackageOption = boolFlags False
     "test-tarball"
-    "building of the resulting tarball."
+    "building of the resulting generated files."
     idm

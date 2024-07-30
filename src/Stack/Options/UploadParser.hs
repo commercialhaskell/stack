@@ -61,12 +61,12 @@ uploadOptsParser = UploadOpts
       )
   buildPackageOption = boolFlags False
       "test-tarball"
-      "building of the resulting sdist tarball(s), for package upload."
+      "building of the resulting generated files, for package upload."
       idm
   tarDirParser = optional (strOption
     (  long "tar-dir"
-    <> help "For package upload, if specified, copy all the tar to this \
-            \directory."
+    <> help "If specified, copy all the generated files, for package upload, \
+            \to this directory."
     ))
   uploadVariantParser = flag Publishing Candidate
     (  long "candidate"
