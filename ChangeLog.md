@@ -10,6 +10,10 @@ Major changes:
 
 Behavior changes:
 
+* Stack interprets consecutive line ends in the value of the `user-message`
+  project-specific configuration option as a single blank line. Previously all
+  line ends were interpreted as white space.
+
 Other enhancements:
 
 Bug fixes:

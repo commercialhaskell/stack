@@ -286,6 +286,8 @@ loaded by Stack. It can serve as a reminder for the user to review the
 configuration and make any changes if needed. The user can delete this message
 if the generated configuration is acceptable.
 
+Consecutive line ends in the message are interpreted as a single blank line.
+
 For example, a user-message is inserted by `stack init` when it omits packages
 or adds external dependencies, namely:
 
@@ -297,7 +299,8 @@ user-message: |
   Warning (added by new or init): Specified snapshot could not satisfy all
   dependencies. Some external packages have been added as dependencies.
 
-  You can omit this message by removing it from stack.yaml
+  You can omit this message by removing it from the project-level configuration
+  file.
 ~~~
 
 ## custom-preprocessor-extensions
