@@ -160,3 +160,12 @@ markdown_extensions:
     alternate_style: true
 - toc:
     permalink: true
+
+plugins:
+  search: {}
+  redirects:
+    redirect_maps:
+      'yaml_configuration.md' : 'configure/yaml/index.md'
+      'build_command.md' : 'commands/build_command.md'
+      'custom_snapshot.md' : 'topics/custom_snapshot.md'
+      'lock_files.md' : 'topics/lock_files.md'

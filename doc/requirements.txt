@@ -11,4 +11,10 @@
 #
 # Current version as at 20 July 2024
 mkdocs==1.6.0
+# Added as the structure of the online documentation was reorganised around the
+# time of the release of Stack 3.1.1. See:
+#
+# https://github.com/mkdocs/catalog?tab=readme-ov-file#-links--references
+# https://github.com/mkdocs/mkdocs-redirects
+mkdocs-redirects
 mkdocs-material
