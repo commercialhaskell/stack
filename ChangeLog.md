@@ -18,6 +18,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Stack's in-app messages refer to https://haskellstack.org as currently
+  structured. (Most URLs in older Stack versions are redirected.)
+
 ## v3.1.1 - 2024-07-28
 
 Release notes:
