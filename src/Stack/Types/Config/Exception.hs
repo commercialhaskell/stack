@@ -177,7 +177,7 @@ instance Pretty ConfigPrettyException where
     <> fillSep
          [ flow "Stack could not load and parse"
          , pretty configFile
-         , flow "as a YAML configuraton file."
+         , flow "as a configuraton file."
          ]
     <> blankLine
     <> flow "While loading and parsing, Stack encountered the following \
@@ -186,8 +186,8 @@ instance Pretty ConfigPrettyException where
     <> string (Yaml.prettyPrintParseException exception)
     <> blankLine
     <> fillSep
-         [ flow "For help about the content of Stack's YAML configuration \
-                \files, see (for the most recent release of Stack)"
+         [ flow "For help about the content of Stack's configuration files, \
+                \see (for the most recent release of Stack)"
          ,    style
                 Url
                 "http://docs.haskellstack.org/en/stable/configure/yaml/"

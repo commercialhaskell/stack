@@ -594,8 +594,7 @@ applyTemplate project template nonceParams dir templateText = do
          )
     <> blankLine
     <> fillSep
-         [ flow "You can provide them in Stack's global YAML configuration \
-                \file"
+         [ flow "You can provide them in Stack's global configuration file"
          , "(" <> pretty userConfigPath <> ")"
          , "like this:"
          ]

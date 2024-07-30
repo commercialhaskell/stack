@@ -40,7 +40,7 @@ uninstallCmd () = withConfig NoReexec $ do
              ]
          , hang 4 $ fillSep
              [ flow "(3) if different, the directory containing "
-             , flow "Stack's user-specific global YAML configuration file"
+             , flow "Stack's user-specific global configuration file"
              , parens userGlobalConfigFile' <> ";"
              , "and"
              ]

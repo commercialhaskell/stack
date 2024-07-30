@@ -45,8 +45,8 @@ instance Pretty StoragePrettyException where
            flow "This error can be caused by a bug that arises if GHC's \
                 \'--io-manager=native' RTS option is set using the GHCRTS \
                 \environment variable. As a workaround try setting the option \
-                \in the project's Cabal file, Stack's YAML configuration file \
-                \or at the command line."
+                \in the project's Cabal file, Stack's configuration file or at \
+                \the command line."
          else
            flow "As a workaround you may delete the database. This \
                 \will cause the database to be recreated."

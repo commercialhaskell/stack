@@ -83,7 +83,7 @@ instance Pretty InitPrettyException where
   pretty (ConfigFileAlreadyExists reldest) =
     "[S-8009]"
     <> line
-    <> flow "Stack declined to create a project-level YAML configuration file."
+    <> flow "Stack declined to create a project-level configuration file."
     <> blankLine
     <> fillSep
          [ flow "The file"
@@ -94,7 +94,7 @@ instance Pretty InitPrettyException where
   pretty (PackageNameInvalid rels) =
     "[S-5267]"
     <> line
-    <> flow "Stack did not create project-level YAML configuration, as (like \
+    <> flow "Stack did not create project-level configuration, as (like \
             \Hackage) it requires a Cabal file name to match the package it \
             \defines."
     <> blankLine
@@ -115,15 +115,15 @@ instance Pretty InitPrettyException where
   pretty (SnapshotDownloadFailure e) =
     "[S-8332]"
     <> line
-    <> flow "Stack failed to create project-level YAML configuration, as it \
+    <> flow "Stack failed to create project-level configuration file, as it \
             \was unable to download the index of available snapshots."
     <> blankLine
     <> fillSep
          [ flow "This sometimes happens because Certificate Authorities are \
                 \missing on your system. You can try the Stack command again \
                 \or manually create the configuration file. For help about the \
-                \content of Stack's YAML configuration files, see (for the \
-                \most recent release of Stack)"
+                \content of Stack's configuration files, see (for the most \
+                \recent release of Stack)"
          , style
              Url
              "http://docs.haskellstack.org/en/stable/configure/yaml/"
@@ -301,8 +301,8 @@ initProject currDir initOpts mASnapshot = do
         }
       makeRel = fmap toFilePath . makeRelativeToCurrentDir
   prettyInfoL
-    [ flow "Initialising Stack's project-level YAML configuration file \
-           \using snapshot"
+    [ flow "Initialising Stack's project-level configuration file using \
+           \snapshot"
     , pretty (PrettyRawSnapshotLocation snapshot) <> "."
     ]
   prettyInfoL $
@@ -347,7 +347,7 @@ initProject currDir initOpts mASnapshot = do
     (Map.elems $ fmap (makeRelDir . parent . fst) ignored)
     (map (makeRelDir . parent) dupPkgs)
   prettyInfoS
-    "Stack's project-level YAML configuration file has been initialised."
+    "Stack's project-level configuration file has been initialised."
 
 -- | Render a stack.yaml file with comments, see:
 -- https://github.com/commercialhaskell/stack/issues/226
@@ -557,7 +557,7 @@ getWorkingSnapshotPlan initOpts pkgDirs0 snapCandidate snapLoc = do
         | Map.null available -> do
             prettyWarnS
               "Could not find a working plan for any of the user packages. \
-              \Proceeding to create a YAML configuration file anyway."
+              \Proceeding to create a project-level configuration file anyway."
             pure (snapLoc, Map.empty, Map.empty, Map.empty)
         | otherwise -> do
             when (Map.size available == Map.size pkgDirs) $

@@ -13,5 +13,5 @@ data WantedCompilerSetter
   | SnapshotAtCommandLine
     -- ^ At the command line with --snapshot (or --resolver) option.
   | YamlConfiguration (Maybe (Path Abs File))
-    -- ^ Via a YAML configuration file.
+    -- ^ Via a configuration file.
   deriving (Show, Typeable)

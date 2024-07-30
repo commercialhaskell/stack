@@ -220,7 +220,7 @@ commandLineHandler currentDir progName isInterpreter =
         ( do
             addCommand'
               ConfigCmd.cfgCmdSetName
-              "Sets a key in YAML configuration file to value."
+              "Sets a key in configuration file to value."
               (withConfig NoReexec . cfgCmdSet)
               configCmdSetParser
             addCommandWithLocalInstallRootFooter
