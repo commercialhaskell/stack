@@ -13,31 +13,29 @@ archive ('tarball') in the format produced by Cabal's `sdist` action.
 `stack sdist` generates a file for your package, in the format accepted by
 Hackage for uploads. The command will report the location of the generated file.
 
-## `--ignore-check` flag
+By default:
 
-Pass the flag to disable checks of the package for common mistakes. By default,
-the command will check the package for common mistakes.
+*   a file is generated for each project package. In the alternative, one or
+    more project package directories can be specified;
 
-## `--pvp-bounds` option
+*   the command will check the package for common mistakes. Pass the flag
+    `--ignore-check` to disable the checks;
 
-The `--pvp-bounds <pvp_bounds_mode>` option determines whether and, if so, how
-PVP version bounds should be added to the Cabal file of the package. The
-available modes for basic use are: `none`, `lower`, `upper`, and `both`. The
-available modes for use with Cabal file revisions are `lower-revision`,
-`upper-revision` and `both-revision`.
+*   Stack will not test the generated file by attempting to build it. Pass the
+    flag `--test-tarball` to cause Stack to test the generated file;
 
-For futher information, see the
-[`pvp-bounds`](../configure/yaml/non-project.md#pvp-bounds) non-project specific
-configuration option documentation.
+*   the generated file will be created in the `dist` directory of the project
+    package directory. For information about the directory's location, command
+    [`stack path --dist-dir`](path_command.md). Pass the option
+    ``--tar-dir <path_to_directory>` to also copy the file to the specified
+    directory; and
 
-## `--tar-dir` option
+*   no PVP version bounds are added to the Cabal file of the package. Pass the
+    option `--pvp-bounds <pvp_bounds_mode>` to determine whether and, if so,
+    how bounds should be added. The available modes for basic use are: `none`,
+    `lower`, `upper`, and `both`. The available modes for use with Cabal file
+    revisions are `lower-revision`, `upper-revision` and `both-revision`.
 
-The `--tar-dir <path_to_directory>` option determines whether the package
-archive should be copied to the specified directory.
-
-## `--[no-]test-tarball` flag
-
-Default: Disabled
-
-Set the flag to cause Stack to test the resulting package archive, by attempting
-to build it.
+    For futher information, see the
+    [`pvp-bounds`](../configure/yaml/non-project.md#pvp-bounds) non-project
+    specific configuration option documentation.
