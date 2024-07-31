@@ -37,10 +37,11 @@ By default:
   (replacing any existing executable named `stack` there);
 
 * if the current running Stack executable is '`stack`' (that is, it was invoked
-  as `stack` or, on Windows, `stack.exe` - this is case insensitive), an
-  existing binary distribution will replace it. If the executable is located
-  outside of Stack's local binary directory, pass the `--only-local-bin` flag to
-  skip that step;
+  as `stack` or, on Windows, `stack.exe` - this is case insensitive - and the
+  Stack executable file is named `stack` or, on Windows, `stack.exe` - this is
+  case sensitive), an existing binary distribution will replace it. If the
+  executable is located outside of Stack's local binary directory, pass the
+  `--only-local-bin` flag to skip that step;
 
 * if the current running Stack executable is not '`stack`' (as described above),
   an existing binary distribution will only be put in Stack's local binary

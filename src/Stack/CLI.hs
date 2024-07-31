@@ -18,6 +18,7 @@ import           Options.Applicative.Builder.Extra
                    ( boolFlags, extraHelpOption )
 import           Options.Applicative.Complicated
                    ( addCommand, addSubCommands, complicatedOptions )
+import           Path ( filename )
 import           RIO.NonEmpty ( (<|) )
 import qualified RIO.NonEmpty as NE
 import qualified RIO.Process ( exec )
@@ -26,7 +27,10 @@ import           Stack.Build ( buildCmd )
 import           Stack.BuildInfo ( hpackVersion, versionString' )
 import           Stack.Clean ( CleanCommand (..), cleanCmd )
 import           Stack.ConfigCmd as ConfigCmd
-import           Stack.Constants ( globalFooter, osIsWindows, stackProgName )
+import           Stack.Constants
+                   ( globalFooter, osIsWindows, relFileStack, relFileStackDotExe
+                   , stackProgName
+                   )
 import           Stack.Coverage ( hpcReportCmd )
 import           Stack.Docker
                    ( dockerCmdName, dockerHelpOptName, dockerPullCmdName )
@@ -84,7 +88,7 @@ import           Stack.Update ( updateCmd )
 import           Stack.Upgrade ( upgradeCmd )
 import           Stack.Upload ( uploadCmd )
 import qualified System.Directory as D
-import           System.Environment ( getProgName, withArgs )
+import           System.Environment ( withArgs )
 import           System.FilePath ( pathSeparator, takeDirectory )
 
 -- | Type representing \'pretty\' exceptions thrown by functions in the
@@ -103,9 +107,14 @@ instance Exception CliPrettyException
 commandLineHandler ::
      FilePath
   -> String
+     -- ^ The name of the current Stack executable, as it was invoked.
+  -> Maybe (Path Abs File)
+     -- ^ The path to the current Stack executable, if the operating system
+     -- provides a reliable way to determine it and where a result was
+     -- available.
   -> Bool
   -> IO (GlobalOptsMonoid, RIO Runner ())
-commandLineHandler currentDir progName isInterpreter =
+commandLineHandler currentDir progName mExecutablePath isInterpreter =
   -- Append the relevant default (potentially affecting the LogLevel) *after*
   -- appending the global options of the `stack` command to the global options
   -- of the subcommand - see #5326.
@@ -136,7 +145,7 @@ commandLineHandler currentDir progName isInterpreter =
               parseResultHandler (NE.toList args') f
             else
               secondaryCommandHandler args' f
-                >>= interpreterHandler currentDir args'
+                >>= interpreterHandler progName mExecutablePath currentDir args'
         )
         (NE.nonEmpty args)
       Nothing -> parseResultHandler args f
@@ -516,11 +525,18 @@ commandLineHandler currentDir progName isInterpreter =
     \upgrade Stack."
     (upgradeOptsParser onlyLocalBins)
    where
-    onlyLocalBins =
-         (lowercase progName /= lowercase stackProgName)
-      && not ( osIsWindows
-             && lowercase progName == lowercase (stackProgName <> ".EXE")
-             )
+    isProgNameStack =
+         (lowercase progName == lowercase stackProgName)
+      || (  osIsWindows
+         && lowercase progName == lowercase (stackProgName <> ".EXE")
+         )
+    isRelFileNameStack relFile =
+         (relFile == relFileStack)
+      || (osIsWindows && relFile == relFileStackDotExe )
+    isExecutableNameStack =
+      let mExecutableName = filename <$> mExecutablePath
+      in  maybe False isRelFileNameStack mExecutableName
+    onlyLocalBins = not (isProgNameStack && isExecutableNameStack)
     lowercase = map toLower
 
   upload = addCommand'
@@ -669,11 +685,17 @@ secondaryCommandHandler args f =
 
 interpreterHandler ::
      Monoid t
-  => FilePath
+  => String
+     -- ^ The name of the current Stack executable, as it was invoked.
+  -> Maybe (Path Abs File)
+     -- ^ The path to the current Stack executable, if the operating system
+     -- provides a reliable way to determine it and where a result was
+     -- available.
+  -> FilePath
   -> NonEmpty String
   -> ParserFailure ParserHelp
   -> IO (GlobalOptsMonoid, (RIO Runner (), t))
-interpreterHandler currentDir args f = do
+interpreterHandler progName mExecutablePath currentDir args f = do
   -- args can include top-level config such as --extra-lib-dirs=... (set by
   -- nix-shell) - we need to find the first argument which is a file, everything
   -- afterwards is an argument to the script, everything before is an argument
@@ -711,9 +733,9 @@ interpreterHandler currentDir args f = do
     ("File does not exist or is not a regular file '" ++ name ++ "'.")
 
   runInterpreterCommand path stackArgs fileArgs = do
-    progName <- getProgName
     iargs <- getInterpreterArgs path
-    let parseCmdLine = commandLineHandler currentDir progName True
+    let parseCmdLine =
+          commandLineHandler currentDir progName mExecutablePath True
         -- Implicit file arguments are put before other arguments that
         -- occur after "--". See #3658
         cmdArgs = prependList stackArgs $ case NE.break (== "--") iargs of
