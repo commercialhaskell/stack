@@ -21,8 +21,8 @@ sdistOptsParser = SDistOpts
   <$> many (strArgument
         (  metavar "DIR"
         <> completer dirCompleter
-        <> help "Project package directory. Can be specified multiple times. \
-                \If none specified, use all project packages."
+        <> help "A relative path to a package directory. Can be specified \
+                \multiple times. If none specified, use all project packages."
         ))
   <*> optional pvpBoundsOption
   <*> ignoreCheckSwitch

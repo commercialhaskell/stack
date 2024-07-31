@@ -34,7 +34,7 @@ uploadOptsParser = UploadOpts
     (  metavar "ITEM"
     <> completer dirCompleter
     <> help "A relative path to a package directory or, for package upload \
-            \only, an sdist tarball."
+            \only, an sdist tarball. Can be specified multiple times."
     ))
   documentationParser = flag False True
     (  long "documentation"
@@ -57,7 +57,7 @@ uploadOptsParser = UploadOpts
         Right v -> pure v
   ignoreCheckSwitch = switch
       (  long "ignore-check"
-      <> help "For package upload, do not check packages for common mistakes."
+      <> help "Do not check packages, for upload, for common mistakes."
       )
   buildPackageOption = boolFlags False
       "test-tarball"
