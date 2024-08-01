@@ -36,15 +36,16 @@ By default:
   local binary directory (see `stack path --local-bin`) and named `stack`
   (replacing any existing executable named `stack` there);
 
-* if the current running Stack executable is named `stack` (or, on Windows,
-  `stack.exe`) (this is case insensitive), an existing binary distribution will
-  replace it. If the executable is located outside of Stack's local binary
-  directory, pass the `--only-local-bin` flag to skip that step;
+* if the current running Stack executable is '`stack`' (that is, it was invoked
+  as `stack` or, on Windows, `stack.exe` - this is case insensitive), an
+  existing binary distribution will replace it. If the executable is located
+  outside of Stack's local binary directory, pass the `--only-local-bin` flag to
+  skip that step;
 
-* if the current running Stack executable is named other than `stack` (and, on
-  Windows, `stack.exe`), an existing binary distribution will only be put in
-  Stack's local binary directory and named `stack`. Pass the
-  `--no-only-local-bin` flag to replace also the current running executable;
+* if the current running Stack executable is not '`stack`' (as described above),
+  an existing binary distribution will only be put in Stack's local binary
+  directory and named `stack`. Pass the `--no-only-local-bin` flag to replace
+  also the current running executable;
 
 * the new version will be the latest available. Pass the
   `--binary-version <version>` option to specify the version (this implies
@@ -85,9 +86,9 @@ When compiling from source code, by default:
 * `stack upgrade --force-download` seeks an upgrade to the latest version of
   Stack available as a binary distribution for the platform, even if not newer.
 
-* If the Stack executable is named `my-stack`, `my-stack upgrade` seeks only to
-  put the latest version of Stack available as a binary distribution for the
-  platform, if newer, in Stack's local binary directory and name it `stack`.
+* If the Stack executable is invoked as `my-stack`, `my-stack upgrade` seeks
+  only to put the latest version of Stack available as a binary distribution for
+  the platform, if newer, in Stack's local binary directory and name it `stack`.
   `my-stack upgrade --no-only-local-bin` seeks also to upgrade `my-stack` to the
   latest version of Stack available.
 
