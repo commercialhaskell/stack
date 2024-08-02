@@ -66,24 +66,28 @@ class (HasProcessContext env, HasLogFunc env) => HasRunner env where
 class HasRunner env => HasDockerEntrypointMVar env where
   dockerEntrypointMVarL :: Lens' env (MVar Bool)
 
+-- | See the @stackYaml@ field of the 'GlobalOpts' data constructor.
 stackYamlLocL :: HasRunner env => Lens' env StackYamlLoc
 stackYamlLocL =
   globalOptsL . lens (.stackYaml) (\x y -> x { stackYaml = y })
 
+-- | See the @lockFileBehavior@ field of the 'GlobalOpts' data constructor.
 lockFileBehaviorL :: HasRunner env => SimpleGetter env LockFileBehavior
 lockFileBehaviorL = globalOptsL . to (.lockFileBehavior)
 
+-- | See the 'GlobalOpts' type.
 globalOptsL :: HasRunner env => Lens' env GlobalOpts
 globalOptsL = runnerL . lens (.globalOpts) (\x y -> x { globalOpts = y })
 
--- | See 'globalTerminal'
+-- | See the @terminal@ field of the 'GlobalOpts' data constructor.
 terminalL :: HasRunner env => Lens' env Bool
 terminalL =
   globalOptsL . lens (.terminal) (\x y -> x { terminal = y })
 
--- | See 'globalReExecVersion'
+-- | See the @reExecVersion@ field of the 'GlobalOpts' data constructor.
 reExecL :: HasRunner env => SimpleGetter env Bool
 reExecL = globalOptsL . to (isJust . (.reExecVersion))
 
+-- | See the @rslInLog@ field of the 'GlobalOpts' data constructor.
 rslInLogL :: HasRunner env => SimpleGetter env Bool
 rslInLogL = globalOptsL . to (.rslInLog)
