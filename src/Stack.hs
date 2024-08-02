@@ -12,6 +12,7 @@ module Stack
 import           Control.Monad.Extra ( whenJust )
 import           GHC.IO.Encoding ( mkTextEncoding, textEncodingName )
 import           Options.Applicative.Builder.Extra ( execExtraHelp )
+import           Path ( parseAbsFile )
 import           Stack.BuildInfo ( versionString' )
 import           Stack.CLI ( commandLineHandler )
 import           Stack.Constants ( stackProgName )
@@ -30,7 +31,7 @@ import           Stack.Types.Version
                    , stackVersion
                    )
 import           System.Directory ( getCurrentDirectory )
-import           System.Environment ( getArgs, getProgName )
+import           System.Environment ( executablePath, getArgs, getProgName )
 import           System.IO ( hGetEncoding, hPutStrLn, hSetEncoding )
 import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
 
@@ -61,6 +62,8 @@ main = do
   hSetTranslit stderr
   args <- getArgs
   progName <- getProgName
+  mExecutableFilePath <- fromMaybe (pure Nothing) executablePath
+  let mExecutablePath = mExecutableFilePath >>= parseAbsFile
   isTerminal <- hIsTerminalDeviceOrMinTTY stdout
   execExtraHelp
     args
@@ -73,7 +76,8 @@ main = do
     (nixOptsParser False)
     ("Only showing --" ++ nixCmdName ++ "* options.")
   currentDir <- getCurrentDirectory
-  eGlobalRun <- try $ commandLineHandler currentDir progName False
+  eGlobalRun <-
+    try $ commandLineHandler currentDir progName mExecutablePath False
   case eGlobalRun of
     Left (exitCode :: ExitCode) ->
       throwIO exitCode

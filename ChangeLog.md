@@ -21,6 +21,10 @@ Bug fixes:
 * Stack's in-app messages refer to https://haskellstack.org as currently
   structured. (Most URLs in older Stack versions are redirected.)
 
+* Stack's `upgrade` command only treats the current running Stack executable
+  as '`stack`' if the executable file is named `stack` or, on Windows,
+  `stack.exe`. Previously only how it was invoked was considered.
+
 ## v3.1.1 - 2024-07-28
 
 Release notes:
