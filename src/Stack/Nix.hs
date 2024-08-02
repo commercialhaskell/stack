@@ -24,9 +24,10 @@ import           Stack.Types.BuildConfig ( wantedCompilerVersionL )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), configProjectRoot )
 import           Stack.Types.Docker ( reExecArgName )
+import           Stack.Types.Runner ( viewExecutablePath )
 import           Stack.Types.Nix ( NixOpts (..) )
 import           Stack.Types.Version ( showStackVersion )
-import           System.Environment ( getArgs, getExecutablePath, lookupEnv )
+import           System.Environment ( getArgs, lookupEnv )
 import qualified System.FilePath as F
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -49,7 +50,7 @@ runShellAndExit = do
              -- first stack when restarting in the container
            | otherwise =
                ("--" ++ reExecArgName ++ "=" ++ showStackVersion) : origArgs
-  exePath <- liftIO getExecutablePath
+  exePath <- toFilePath <$> viewExecutablePath
   config <- view configL
   envOverride <- view processContextL
   local (set processContextL envOverride) $ do

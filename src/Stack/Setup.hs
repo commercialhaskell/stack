@@ -163,7 +163,10 @@ import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Platform
                    ( HasPlatform (..), PlatformVariant (..)
                    , platformOnlyRelDir )
-import           Stack.Types.Runner ( HasRunner (..), Runner (..) )
+import           Stack.Types.Runner
+                   ( HasRunner (..), Runner (..), mExecutablePathL
+                   , viewExecutablePath
+                   )
 import           Stack.Types.SetupInfo ( SetupInfo (..) )
 import           Stack.Types.SourceMap
                    ( SMActual (..), SMWanted (..), SourceMap (..) )
@@ -173,7 +176,7 @@ import           Stack.Types.VersionedDownloadInfo
                    ( VersionedDownloadInfo (..) )
 import           Stack.Types.WantedCompilerSetter ( WantedCompilerSetter (..) )
 import qualified System.Directory as D
-import           System.Environment ( getExecutablePath, lookupEnv )
+import           System.Environment ( lookupEnv )
 import           System.IO.Error ( isPermissionError )
 import           System.FilePath ( searchPathSeparator )
 import qualified System.FilePath as FP
@@ -726,7 +729,7 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
 
   distDir <- runReaderT distRelativeDir envConfig0 >>= canonicalizePath
 
-  executablePath <- liftIO getExecutablePath
+  mExecutablePath <- view mExecutablePathL
 
   utf8EnvVars <- withProcessContext menv $ getUtf8EnvVars compilerVer
 
@@ -751,7 +754,16 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
                    else id)
 
               $ (if es.stackExe
-                   then Map.insert "STACK_EXE" (T.pack executablePath)
+                   then maybe
+                     -- We don't throw an exception if there is no Stack
+                     -- executable path, so that buildConfigCompleter does not
+                     -- need to specify a path.
+                     id
+                     ( \executablePath -> Map.insert
+                         "STACK_EXE"
+                         (T.pack $ toFilePath executablePath)
+                     )
+                     mExecutablePath
                    else id)
 
               $ (if es.localeUtf8
@@ -2948,10 +2960,10 @@ downloadStackExe platforms0 archiveInfo destDir checkPath testExe = do
 
   prettyInfoS "Download complete, testing executable."
 
-  -- We need to call getExecutablePath before we overwrite the
-  -- currently running binary: after that, Linux will append
-  -- (deleted) to the filename.
-  currExe <- liftIO getExecutablePath >>= parseAbsFile
+  -- We need to preserve the name of the executable file before we overwrite the
+  -- currently running binary: after that, Linux will append (deleted) to the
+  -- filename.
+  currExe <- viewExecutablePath
 
   liftIO $ do
     setFileExecutable (toFilePath tmpFile)

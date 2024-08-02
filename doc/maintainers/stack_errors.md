@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2024-06-03.
+`master` branch of the Stack repository. Last updated: 2024-08-02.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -424,6 +424,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-6854] | BadMsysEnvironment MsysEnvironment Arch
         [S-5006] | NoDefaultMsysEnvironmentBug
         [S-8398] | ConfigFileNotProjectLevelBug
+        [S-6890] | NoExecutablePath String
         ~~~
 
     -   `Stack.Types.Config.ParseAbsolutePathException`

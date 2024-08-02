@@ -168,6 +168,7 @@ data ConfigPrettyException
   | BadMsysEnvironment !MsysEnvironment !Arch
   | NoMsysEnvironmentBug
   | ConfigFileNotProjectLevelBug
+  | NoExecutablePath !String
   deriving (Show, Typeable)
 
 instance Pretty ConfigPrettyException where
@@ -238,6 +239,14 @@ instance Pretty ConfigPrettyException where
     flow "No default MSYS2 environment."
   pretty ConfigFileNotProjectLevelBug = bugPrettyReport "[S-8398]" $
     flow "The configuration file is not a project-level one."
+  pretty (NoExecutablePath progName) =
+    "[S-6890]"
+    <> line
+    <> fillSep
+         [ flow "The path for the executable file invoked as"
+         , style Shell (fromString progName)
+         , flow "can not be identified."
+         ]
 
 instance Exception ConfigPrettyException
 

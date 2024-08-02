@@ -160,8 +160,7 @@ formatSubCommand ::
   -> OA.Mod OA.CommandFields ListDepsOpts
 formatSubCommand cmd desc formatParser =
   OA.command
-    cmd
-    (OA.info (toListDepsOptsParser formatParser) (OA.progDesc desc))
+    cmd (OA.info (toListDepsOptsParser formatParser) (OA.progDesc desc))
 
 listDepsTextParser :: OA.Parser ListDepsFormat
 listDepsTextParser =

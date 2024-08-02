@@ -82,7 +82,8 @@ main = do
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid, run) -> do
-      global <- globalOptsFromMonoid isTerminal globalMonoid
+      global <-
+        globalOptsFromMonoid progName mExecutablePath isTerminal globalMonoid
       when (global.logLevel == LevelDebug) $
         hPutStrLn stderr versionString'
       whenJust global.reExecVersion $ \expectVersion -> do

@@ -19,8 +19,10 @@ By default:
 * the `GHC_PACKAGE_PATH` environment variable is set for the command's process.
   Pass the flag `--no-ghc-package-path` to not set the environment variable;
 
-* the `STACK_EXE` environment variable is set for the command's process. Pass
-  the flag `--no-stack-exe` to not set the environment variable; and
+* if the operating system provides a reliable way to determine it and where a
+  result was available, the `STACK_EXE` environment variable is set to the path
+  to the current Stack executable for the command's process. Pass the flag
+  `--no-stack-exe` to not set the environment variable; and
 
 * the specified executable is executed in the current directory. Pass the option
   `--cwd <directory>` to execute the executable in the specified directory.
