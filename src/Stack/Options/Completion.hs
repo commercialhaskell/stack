@@ -48,16 +48,17 @@ ghcOptsCompleter = mkCompleter $ \inputRaw -> pure $
 -- TODO: Ideally this would pay attention to --stack-yaml, may require
 -- changes to optparse-applicative.
 
-buildConfigCompleter ::
-     (String -> RIO EnvConfig [String])
-  -> Completer
+buildConfigCompleter :: (String -> RIO EnvConfig [String]) -> Completer
 buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
   let input = unescapeBashArg inputRaw
   case input of
     -- If it looks like a flag, skip this more costly completion.
     ('-': _) -> pure []
     _ -> do
-      go' <- globalOptsFromMonoid False mempty
+      -- We do not need to specify the name of the current Stack executable, as
+      -- it was invoked, or the path to the current Stack executable, as
+      -- withDefaultEnvConfig does not need either.
+      go' <- globalOptsFromMonoid "" Nothing False mempty
       let go = go' { logLevel = LevelOther "silent" }
       withRunnerGlobal go $ withConfig NoReexec $ withDefaultEnvConfig $ inner input
 

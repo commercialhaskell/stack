@@ -168,7 +168,7 @@ spec = beforeAll setup $ do
 
   describe "parseProjectAndConfigMonoid" $ do
     let loadProject' fp inner = do
-          globalOpts <- globalOptsFromMonoid False mempty
+          globalOpts <- globalOptsFromMonoid "" Nothing False mempty
           withRunnerGlobal globalOpts { logLevel = logLevel } $ do
               iopc <- loadConfigYaml (
                 parseProjectAndConfigMonoid (parent fp)
@@ -199,7 +199,7 @@ spec = beforeAll setup $ do
 
   describe "loadConfig" $ do
     let loadConfig' inner = do
-          globalOpts <- globalOptsFromMonoid False mempty
+          globalOpts <- globalOptsFromMonoid "" Nothing False mempty
           withRunnerGlobal globalOpts { logLevel = logLevel } $
             loadConfig inner
     -- TODO(danburton): make sure parent dirs also don't have config file

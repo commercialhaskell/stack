@@ -53,7 +53,8 @@ spec :: Spec
 spec = beforeAll setup $ do
   let loadConfig' :: ConfigMonoid -> (Config -> IO ()) -> IO ()
       loadConfig' cmdLineArgs inner = do
-        globalOpts <- globalOptsFromMonoid False mempty { configMonoid = cmdLineArgs }
+        globalOpts <-
+          globalOptsFromMonoid "" Nothing False mempty { configMonoid = cmdLineArgs }
         withRunnerGlobal globalOpts { GlobalOpts.logLevel = LevelOther "silent" } $
           loadConfig (liftIO . inner)
       inTempDir test = do

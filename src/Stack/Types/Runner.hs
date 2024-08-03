@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
@@ -13,10 +14,14 @@ module Stack.Types.Runner
   , terminalL
   , reExecL
   , rslInLogL
+  , progNameL
+  , mExecutablePathL
+  , viewExecutablePath
   ) where
 
 import           RIO.Process ( HasProcessContext (..), ProcessContext )
 import           Stack.Prelude hiding ( stylesUpdate )
+import           Stack.Types.Config.Exception ( ConfigPrettyException (..) )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.LockFileBehavior ( LockFileBehavior )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc )
@@ -91,3 +96,19 @@ reExecL = globalOptsL . to (isJust . (.reExecVersion))
 -- | See the @rslInLog@ field of the 'GlobalOpts' data constructor.
 rslInLogL :: HasRunner env => SimpleGetter env Bool
 rslInLogL = globalOptsL . to (.rslInLog)
+
+-- | See the @progNameL@ field of the 'GlobalOpts' data constructor.
+progNameL :: HasRunner env => SimpleGetter env String
+progNameL = globalOptsL . to (.progName)
+
+-- | See the @mExecutablePath@ field of the 'GlobalOpts' data constructor.
+mExecutablePathL :: HasRunner env => SimpleGetter env (Maybe (Path Abs File))
+mExecutablePathL = globalOptsL . to (.mExecutablePath)
+
+-- | Yield the path to the current Stack executable, if the operating system
+-- provides a reliable way to determine it. Otherwise throw
+-- 'Stack.Types.Config.Exception.NoExecutablePath'.
+viewExecutablePath :: HasRunner env => RIO env (Path Abs File)
+viewExecutablePath = view mExecutablePathL >>= \case
+    Nothing -> view progNameL >>= prettyThrowM . NoExecutablePath
+    Just executablePath -> pure executablePath

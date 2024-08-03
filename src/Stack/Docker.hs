@@ -44,7 +44,7 @@ import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
                    ( copyFile, doesDirExist, doesFileExist, ensureDir
                    , getCurrentDir, getHomeDir, getModificationTime, listDir
-                   , removeDirRecur, removeFile, resolveFile'
+                   , removeDirRecur, removeFile
                    )
 import qualified RIO.Directory ( makeAbsolute )
 import           RIO.Process
@@ -77,12 +77,12 @@ import           Stack.Types.Docker
                   )
 import           Stack.Types.DockerEntrypoint
                    ( DockerEntrypoint (..), DockerUser (..) )
-import           Stack.Types.Runner ( HasDockerEntrypointMVar (..), terminalL )
-import           Stack.Types.Version ( showStackVersion, withinRange )
-import           System.Environment
-                   ( getArgs, getEnv, getEnvironment, getExecutablePath
-                   , getProgName
+import           Stack.Types.Runner
+                   ( HasDockerEntrypointMVar (..), progNameL, terminalL
+                   , viewExecutablePath
                    )
+import           Stack.Types.Version ( showStackVersion, withinRange )
+import           System.Environment ( getArgs, getEnv, getEnvironment )
 import qualified System.FilePath as FP
 import           System.IO.Error ( isDoesNotExistError )
 import qualified System.Posix.User as User
@@ -126,18 +126,18 @@ getCmdArgs docker imageInfo isRemoteDocker = do
     case config.docker.stackExe of
         Just DockerStackExeHost
           | config.platform == dockerContainerPlatform -> do
-              exePath <- resolveFile' =<< liftIO getExecutablePath
+              exePath <- viewExecutablePath
               cmdArgs args exePath
           | otherwise -> throwIO UnsupportedStackExeHostPlatformException
         Just DockerStackExeImage -> do
-            progName <- liftIO getProgName
+            progName <- view progNameL
             pure (FP.takeBaseName progName, args, [], [])
         Just (DockerStackExePath path) -> cmdArgs args path
         Just DockerStackExeDownload -> exeDownload args
         Nothing
           | config.platform == dockerContainerPlatform -> do
               (exePath, exeTimestamp, misCompatible) <-
-                  do exePath <- resolveFile' =<< liftIO getExecutablePath
+                  do exePath <- viewExecutablePath
                      exeTimestamp <- getModificationTime exePath
                      isKnown <-
                          loadDockerImageExeCache

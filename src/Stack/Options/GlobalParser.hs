@@ -114,10 +114,16 @@ globalOptsParser currentDir kind = GlobalOptsMonoid
 -- | Create GlobalOpts from GlobalOptsMonoid.
 globalOptsFromMonoid ::
      MonadIO m
-  => Bool
+  => String
+     -- ^ The name of the current Stack executable, as it was invoked.
+  -> Maybe (Path Abs File)
+     -- ^ The path to the current Stack executable, if the operating system
+     -- provides a reliable way to determine it and where a result was
+     -- available.
+  -> Bool
   -> GlobalOptsMonoid
   -> m GlobalOpts
-globalOptsFromMonoid defaultTerminal globalMonoid = do
+globalOptsFromMonoid progName mExecutablePath defaultTerminal globalMonoid = do
   snapshot <- for (getFirst globalMonoid.snapshot) $ \us -> do
     root <-
       case globalMonoid.snapshotRoot of
@@ -149,6 +155,8 @@ globalOptsFromMonoid defaultTerminal globalMonoid = do
     , termWidthOpt = getFirst globalMonoid.termWidthOpt
     , stackYaml
     , lockFileBehavior
+    , progName
+    , mExecutablePath
     }
 
 -- | Default logging level should be something useful but not crazy.

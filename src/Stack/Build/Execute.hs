@@ -66,8 +66,7 @@ import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler (..), getGhcPkgExe )
 import           Stack.Types.ComponentUtils
                    ( StackUnqualCompName, unqualCompToString )
-import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), buildOptsL )
+import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
@@ -87,10 +86,9 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), packageIdentifier )
 import           Stack.Types.Platform ( HasPlatform (..) )
-import           Stack.Types.Runner ( HasRunner, terminalL )
+import           Stack.Types.Runner ( HasRunner, terminalL, viewExecutablePath )
 import           Stack.Types.SourceMap ( Target )
 import qualified System.Directory as D
-import           System.Environment ( getExecutablePath )
 import qualified System.FilePath as FP
 
 -- | Fetch the packages necessary for a build, for example in combination with
@@ -282,7 +280,8 @@ copyExecutables exes = do
           Platform _ Windows -> ".exe"
           _ -> ""
 
-  currExe <- liftIO getExecutablePath -- needed for windows, see below
+  -- needed for windows, see below
+  currExe <- toFilePath <$> viewExecutablePath
 
   installed <- forMaybeM (Map.toList exes) $ \(name, loc) -> do
     let strName = unqualCompToString name
