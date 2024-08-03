@@ -412,49 +412,6 @@
     See issue [#644](https://github.com/commercialhaskell/stack/issues/644) for more
     details.
 
-??? question "I get strange `ld` errors about recompiling with `-fPIC`"
-
-    (Updated in January 2019)
-
-    This is related to more recent versions of Linux distributions that have GCC
-    with PIE enabled by default. The continuously-updated distros like Arch, in
-    particular, had been in flux with this change and the upgrading
-    libtinfo6/ncurses6, and there were some workarounds attempted in Stack that
-    ended up causing trouble as these distros evolved.
-
-    GHC added official support for this setup in 8.0.2, so if you are using an
-    older version your best bet is to upgrade. You may be able to work around it
-    for older versions by editing `~/.stack/programs/x86_64-osx/ghc-VER/lib/ghc-
-    VER/settings` (replace `VER` with the GHC version) and adding `-no-pie` (or
-    `--no-pie` in the case of Gentoo, at least as of December 2017) to the __C
-    compiler link flags__.
-
-    If `stack setup` complains that there is no `linuxNN-*-nopie` bindist available,
-    try adding `ghc-build: *` (replacing the `*` with the actual value that
-    precedes `-nopie`, which may be empty) to your `~/.stack/config.yaml` (this
-    will no longer be necessary for stack >= 1.7).
-
-    If you are experiencing this with GHC >= 8.0.2, try running
-    `stack setup --reinstall` if you've upgraded your Linux distribution or you set
-    up GHC before late December 2017.
-
-    If GHC doesn't recognize your C compiler as being able to use `-no-pie`, this
-    can happen even with GCC and Clang, it might be necessary to enable this feature
-    manually. To do this, just change
-    `("C compiler supports -no-pie", "NO"),` to
-    `("C compiler supports -no-pie", "YES"),`
-    in the file `~/.stack/programs/x86_64-osx/ghc-VER/lib/ghc-VER/settings`.
-
-    If you are still having trouble after trying the above, check the following for
-    more possible workarounds:
-
-      * Previous version of this [FAQ entry](https://docs.haskellstack.org/en/v1.6.3/faq/#i-get-strange-ld-errors-about-recompiling-with-fpic)
-      * Related issues:
-        [#3518](https://github.com/commercialhaskell/stack/issues/3518),
-        [#2712](https://github.com/commercialhaskell/stack/issues/2712),
-        [#3630](https://github.com/commercialhaskell/stack/issues/3630),
-        [#3648](https://github.com/commercialhaskell/stack/issues/3648)
-
 ??? question "Where does the output from `--ghc-options=-ddump-splices` (and other `-ddump*` options) go?"
 
     These are written to `*.dump-*` files inside the package's `.stack-work`
