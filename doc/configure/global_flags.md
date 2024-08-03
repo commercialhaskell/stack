@@ -25,6 +25,27 @@ architecture. For further information, see the documentation for the
 corresponding non-project specific configuration
 [option](yaml/non-project.md#arch).
 
+## `--bash-completion-index` option
+
+Visibility: Hidden
+
+See the [shell auto-completion](../topics/shell_autocompletion.md)
+documentation.
+
+## `--bash-completion-script` option
+
+Visibility: Hidden
+
+See the [shell auto-completion](../topics/shell_autocompletion.md)
+documentation.
+
+## `--bash-completion-index` option
+
+Visibility: Hidden
+
+See the [shell auto-completion](../topics/shell_autocompletion.md)
+documentation.
+
 ## `--color` or `-colour` options
 
 Pass the option `stack --color <when>` to specify when to use color in output.
@@ -73,6 +94,13 @@ to check for libraries. The option can be specified multiple times. For further
 information, see the documentation for the corresponding non-project specific
 configuration [option](yaml/non-project.md#extra-lib-dirs).
 
+## `--fish-completion-script` option
+
+Visibility: Hidden
+
+See the [shell auto-completion](../topics/shell_autocompletion.md)
+documentation.
+
 ## `--ghc-build` option
 
 Pass the option `--ghc-build <build>` to specify the relevant specialised GHC
@@ -84,6 +112,17 @@ non-project specific configuration [option](yaml/non-project.md#ghc-build).
 Pass the option `--ghc-variant <variant>` to specify the relevant GHC variant.
 For further information, see the documentation for the corresponding non-project
 specific configuration [option](yaml/non-project.md#ghc-variant).
+
+## `--help` or `-h` flags
+
+Pass the `--help` (or `-h`) flag to cause Stack to list its commands and flags
+and options common to those commands. Alternatively, command
+
+~~~text
+stack
+~~~
+
+for the same information.
 
 ## `--[no-]hpack-force` flag
 
@@ -341,6 +380,13 @@ path to Stack's work directory, within a local project or package directory. The
 path must be a relative one, relative to the the root directory of the project
 or package. The relative path cannot include a `..` (parent directory)
 component.
+
+## `--zsh-completion-script` option
+
+Visibility: Hidden
+
+See the [shell auto-completion](../topics/shell_autocompletion.md)
+documentation.
 
 ## `--setup-info-yaml` command option
 
