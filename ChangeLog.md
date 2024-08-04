@@ -13,6 +13,10 @@ Behavior changes:
 * Stack interprets consecutive line ends in the value of the `user-message`
   project-specific configuration option as a single blank line. Previously all
   line ends were interpreted as white space.
+* Stack no longer supports Docker versions before Docker 1.9.1 and,
+  consequently, if a Docker container is not being run 'detached', its standard
+  input channel will always be kept open. (Before Docker 1.9.1 the use of an
+  interactive container could hang in certain circumstances.)
 
 Other enhancements:
 
