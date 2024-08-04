@@ -212,9 +212,6 @@ runContainerAndExit = do
   isStdoutTerminal <- view terminalL
   let dockerHost = lookup "DOCKER_HOST" env
       dockerCertPath = lookup "DOCKER_CERT_PATH" env
-      bamboo = lookup "bamboo_buildKey" env
-      jenkins = lookup "JENKINS_HOME" env
-      notBambooAndNotJenkins = isNothing bamboo && isNothing jenkins
       msshAuthSock = lookup "SSH_AUTH_SOCK" env
       muserEnv = lookup "USER" env
       isRemoteDocker = maybe False (isPrefixOf "tcp://") dockerHost
@@ -245,11 +242,7 @@ runContainerAndExit = do
       sandboxHomeDir = sandboxDir </> homeDirName
       isTerm = isStdinTerminal && isStdoutTerminal && isStderrTerminal
       allocatePseudoTty = not docker.detach && isTerm
-      keepStdinOpen = not docker.detach &&
-                      -- Workaround for https://github.com/docker/docker/issues/12319
-                      -- This is fixed in Docker 1.9.1, but will leave the workaround
-                      -- in place for now, for users who haven't upgraded yet.
-                      (isTerm || notBambooAndNotJenkins)
+      keepStdinOpen = not docker.detach
   let mpath = T.pack <$> lookupImageEnv "PATH" imageEnvVars
   when (isNothing mpath) $ do
     prettyWarnL
