@@ -84,8 +84,7 @@ createPrunedDependencyGraph ::
        Runner
        (Set PackageName, Map PackageName (Set PackageName, DotPayload))
 createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
-  localNames <-
-    view $ buildConfigL . to (Map.keysSet . (.smWanted.project))
+  localNames <- view $ buildConfigL . to (Map.keysSet . (.smWanted.project))
   logDebug "Creating dependency graph"
   resultGraph <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotOpts.includeBase
@@ -141,10 +140,10 @@ withDotConfig opts inner =
     logDebug "Loading source map"
     sourceMap <- loadSourceMap targets boptsCLI smActual
     let dc = DotConfig
-                { buildConfig
-                , sourceMap
-                , globalDump = toList smActual.globals
-                }
+          { buildConfig
+          , sourceMap
+          , globalDump = toList smActual.globals
+          }
     logDebug "DotConfig fully loaded"
     runRIO dc inner
 
@@ -165,28 +164,35 @@ withDotConfig opts inner =
     , flags = opts.flags
     }
   modifyGO =
-    (if opts.testTargets
-       then set (globalOptsBuildOptsMonoidL . buildOptsMonoidTestsL) (Just True)
-       else id) .
-    (if opts.benchTargets
-       then set (globalOptsBuildOptsMonoidL . buildOptsMonoidBenchmarksL) (Just True)
-       else id)
+      ( if opts.testTargets
+          then
+            set
+              (globalOptsBuildOptsMonoidL . buildOptsMonoidTestsL)
+              (Just True)
+          else id
+      )
+    . ( if opts.benchTargets
+          then
+            set
+              (globalOptsBuildOptsMonoidL . buildOptsMonoidBenchmarksL)
+              (Just True)
+          else id
+      )
 
--- | Create the dependency graph, the result is a map from a package
--- name to a tuple of dependencies and payload if available. This
--- function mainly gathers the required arguments for
--- @resolveDependencies@.
+-- | Create the dependency graph, the result is a map from a package name to a
+-- tuple of dependencies and payload if available. This function mainly gathers
+-- the required arguments for @resolveDependencies@.
 createDependencyGraph ::
      DotOpts
   -> RIO DotConfig (Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
   locals <- for (toList sourceMap.project) loadLocalPackage
-  let graph =
-        Map.fromList $ projectPackageDependencies dotOpts (filter (.wanted) locals)
+  let graph = Map.fromList $
+        projectPackageDependencies dotOpts (filter (.wanted) locals)
   globalDump <- view $ to (.globalDump)
-  -- TODO: Can there be multiple entries for wired-in-packages? If so,
-  -- this will choose one arbitrarily..
+  -- TODO: Can there be multiple entries for wired-in-packages? If so, this will
+  -- choose one arbitrarily..
   let globalDumpMap = Map.fromList $
         map (\dp -> (Stack.Prelude.pkgName dp.packageIdent, dp)) globalDump
       globalIdMap =
@@ -197,16 +203,19 @@ createDependencyGraph dotOpts = do
         -- Skip packages that can't be loaded - see
         -- https://github.com/commercialhaskell/stack/issues/2967
         | name `elem` [mkPackageName "rts", mkPackageName "ghc"] =
-            pure ( Set.empty
-                 , DotPayload (Just version) (Just $ Right BSD3) Nothing )
-        | otherwise =
-            fmap (setOfPackageDeps &&& makePayload loc)
-                 (loadPackage loc flags ghcOptions cabalConfigOpts)
+            pure
+              ( Set.empty
+              , DotPayload (Just version) (Just $ Right BSD3) Nothing
+              )
+        | otherwise = fmap
+            (setOfPackageDeps &&& makePayload loc)
+            (loadPackage loc flags ghcOptions cabalConfigOpts)
   resolveDependencies dotOpts.dependencyDepth graph depLoader
  where
-  makePayload loc pkg = DotPayload (Just pkg.version)
-                                   (Just pkg.license)
-                                   (Just $ PLImmutable loc)
+  makePayload loc pkg = DotPayload
+    (Just pkg.version)
+    (Just pkg.license)
+    (Just $ PLImmutable loc)
 
 -- | Resolve the direct (depth 0) external dependencies of the given local
 -- packages (assumed to come from project packages)
@@ -215,21 +224,21 @@ projectPackageDependencies ::
   -> [LocalPackage]
   -> [(PackageName, (Set PackageName, DotPayload))]
 projectPackageDependencies dotOpts locals =
-  map (\lp -> let pkg = localPackageToPackage lp
-                  pkgDir = parent lp.cabalFP
-                  packageDepsSet = setOfPackageDeps pkg
-                  loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
-              in  (pkg.name, (deps pkg packageDepsSet, lpPayload pkg loc)))
-      locals
+  map
+    ( \lp -> let pkg = localPackageToPackage lp
+                 pkgDir = parent lp.cabalFP
+                 packageDepsSet = setOfPackageDeps pkg
+                 loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
+             in  (pkg.name, (deps pkg packageDepsSet, lpPayload pkg loc))
+    )
+    locals
  where
   deps pkg packageDepsSet = if dotOpts.includeExternal
     then Set.delete pkg.name packageDepsSet
     else Set.intersection localNames packageDepsSet
   localNames = Set.fromList $ map (.package.name) locals
   lpPayload pkg loc =
-    DotPayload (Just pkg.version)
-               (Just pkg.license)
-               (Just loc)
+    DotPayload (Just pkg.version) (Just pkg.license) (Just loc)
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for
 -- a package
@@ -268,7 +277,8 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
     loadDeps dp@DepPackage{ location = PLImmutable loc } = do
       let common = dp.depCommon
       gpd <- liftIO common.gpd
-      let PackageIdentifier name version = PD.package $ PD.packageDescription gpd
+      let PackageIdentifier name version =
+            PD.package $ PD.packageDescription gpd
           flags = common.flags
           ghcOptions = common.ghcOptions
           cabalConfigOpts = common.cabalConfigOpts
@@ -284,17 +294,18 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
      where
       deps = map ghcIdToPackageName dump.depends
       ghcIdToPackageName depId =
-        maybe (impureThrow $ DependencyNotFoundBug depId)
-              Stack.Prelude.pkgName
-              (Map.lookup depId globalIdMap)
+        maybe
+          (impureThrow $ DependencyNotFoundBug depId)
+          Stack.Prelude.pkgName
+          (Map.lookup depId globalIdMap)
 
   payloadFromLocal pkg =
     DotPayload (Just pkg.version) (Just pkg.license)
 
-  payloadFromDump dp =
-    DotPayload (Just $ pkgVersion dp.packageIdent)
-               (Right <$> dp.license)
-               Nothing
+  payloadFromDump dp = DotPayload
+    (Just $ pkgVersion dp.packageIdent)
+    (Right <$> dp.license)
+    Nothing
 
 -- | Resolve the dependency graph up to (Just depth) or until fixpoint is reached
 resolveDependencies ::
@@ -309,18 +320,19 @@ resolveDependencies limit graph loadPackageDeps = do
       keys = Map.keysSet graph
       next = Set.difference values keys
   if Set.null next
-     then pure graph
-     else do
-       x <- T.traverse (\name -> (name,) <$> loadPackageDeps name) (F.toList next)
-       resolveDependencies (subtract 1 <$> limit)
-                      (Map.unionWith unifier graph (Map.fromList x))
-                      loadPackageDeps
+    then pure graph
+    else do
+      x <- T.traverse (\name -> (name,) <$> loadPackageDeps name) (F.toList next)
+      resolveDependencies
+        (subtract 1 <$> limit)
+        (Map.unionWith unifier graph (Map.fromList x))
+        loadPackageDeps
  where
   unifier (pkgs1,v1) (pkgs2,_) = (Set.union pkgs1 pkgs2, v1)
 
--- | @pruneGraph dontPrune toPrune graph@ prunes all packages in
--- @graph@ with a name in @toPrune@ and removes resulting orphans
--- unless they are in @dontPrune@
+-- | @pruneGraph dontPrune toPrune graph@ prunes all packages in @graph@ with a
+-- name in @toPrune@ and removes resulting orphans unless they are in
+-- @dontPrune@
 pruneGraph ::
      (F.Foldable f, F.Foldable g, Eq a)
   => f PackageName
