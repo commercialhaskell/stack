@@ -57,6 +57,7 @@
   # the GHC2021 set. Other extensions can be added, if need be.
   - name:
     - NoImplicitPrelude
+    - ApplicativeDo
     - ConstraintKinds
     - DataKinds
     - DefaultSignatures
