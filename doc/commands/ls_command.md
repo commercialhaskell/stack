@@ -40,20 +40,56 @@ stack ls dependencies [--separator SEP] [--[no-]license] [--filter ITEM]
                       [--test] [--bench] [--global-hints]
 ~~~
 
-`stack ls dependencies` lists all of the packages and versions used for a
-project. All project packages are considered by default, but one or more targets
-can be specified as an argument. For further information, see the
-[target syntax](build_command.md#target-syntax) documentation.
+`stack ls dependencies` lists package versions used for a project.
 
-!!! note
+By default:
 
-    If the first target is one of `cabal`, `json`, `text` and `tree`, then a
-    subcommand must be specified.
+*   with the `text` or `tree` subcommand (see below), the package name is
+    followed by its version. Pass the `--license` flag to follow the package
+    name with its licence. (Consistent with the Cabal package description format
+    specification, only the American English spelling (license) is accepted.)
+*   With the `text` or `tree` subcommand, the separator between the package name
+    and what follows is a space character. Pass the `--separator` option to
+    specify a different separator;
+*   with the `text` command, all relevant package names are included. Pass the
+    `--filter` option to specify an item to be filtered out from the results, if
+    present. An item can be `$locals` (for all project packages) or a package
+    name. It can be specified multiple times;
 
-!!! info
+    !!! note
 
-    If a specified target is not a project package, then it will not contribute
-    packages to the command's output.
+        The special value `$locals` will need to be enclosed with single quotes
+        to distinguish it from a shell variable.
+
+*   external dependencies are excluded from the output. Pass the flag
+    `--external` to include external dependencies;
+*   the `base` package and its dependencies are included in the output. Pass the
+    flag `--no-include-base` to exclude `base` and its dependencies;
+*   there is no limit to the depth of the resolution of dependencies. Pass the
+    `--depth <depth>` option to limit the depth;
+*   all relevant packages are included in the output. Pass the
+    `--prune <packages>` option to exclude the specified packages (including
+    project packages), where `<packages>` is a list of package names separated
+    by commas;
+*   for all relevant project packages, relevant dependencies are included in the
+    output. However, each project package for which dependencies are included
+    can be specified as a target argument. The argument uses the same format as
+    the [`stack build` command](build_command.md) but components of project
+    packages are ignored. Non-project packages are also ignored;
+
+    !!! note
+
+        If the first target is one of `cabal`, `json`, `text` and `tree`, then a
+        subcommand must be specified.
+
+*   test components of project packages are excluded from the output. Pass the
+    flag `--test` to include test components;
+*   benchmark components of project packages are excluded from the output. Pass
+    the flag `--bench` to include benchmark components; and
+*   global packages for the specified version of GHC are those specified by the
+    global package database of an installed GHC. Pass the flag `--global-hints`
+    to use a hint file for global packages. If a hint file is used, GHC does not
+    need to be installed.
 
 Subcommands specify the format of the output, as follows:
 
@@ -143,43 +179,6 @@ Subcommands specify the format of the output, as follows:
       │ │ │ │   └── rts 1.0.2
       │ │ │ ├─┬ ghc-prim 0.8.0
     ~~~
-
-The `--separator` option, with the `text` or `tree` subcommand, specifies the
-separator between the package name and its version. The default is a space
-character.
-
-Set the `--license` flag, after the `text` or `tree` subcommand, to replace each
-package's version with its licence. (Consistent with the Cabal package
-description format specification, only the American English spelling (license)
-is accepted.)
-
-The `--filter` option, with the `text` subcommand, specifies an item to be
-filtered out from the results, if present. An item can be `$locals` (for all
-project packages) or a package name. It can be specified multiple times.
-
-!!! note
-
-    The special value `$locals` will need to be enclosed with single quotes to
-    distinguish it from a shell variable.
-
-Set the `--no-external` flag to exclude external dependencies.
-
-Set the `--no-include-base` flag to exclude dependencies on the `base` package.
-
-The `--depth` option limits the depth of dependency resolution.
-
-The `--prune <packages>` option prunes the specified packages and their
-dependencies from the tree of packages used to generate the output, where
-`<packages>` is a comma separated list of package names.
-
-The `--flag` option allows Cabal flags to be specified.
-
-Pass the `--test` flag to consider the dependencies of test suite components.
-
-Pass the `--bench` flag to consider the dependencies of benchmark components.
-
-Pass the `--global-hints` flag to use a hints file for global packages. The
-command then does not require an installed GHC.
 
 ## The `stack ls globals` command
 

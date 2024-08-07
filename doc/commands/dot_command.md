@@ -20,29 +20,34 @@ to represent the relationships between your packages and their dependencies.
 
 By default:
 
-* external dependencies are excluded from the output. Pass the flag
-  `--external` to include external dependencies;
-* the `base` package and its dependencies are included in the output. Pass the
-  flag `--no-include-base` to exclude `base` and its dependencies;
-* there is no limit to the depth of the resolution of dependencies. Pass the
-  `--depth <depth>` option to limit the depth;
-* all relevant packages are included in the output. Pass the
-  `--prune <packages>` option to exclude the specified packages, where
-  `<packages>` is a list of package names separated by commas;
-* all packages in the project are included in the output. However, the target
-  for the command can be specified as an argument. It uses the same format
-  as the [`stack build` command](build_command.md);
-* test components of the packages in the project are excluded from the output.
-  Pass the flag `--test` to include test components; and
-* benchmark components of the packages in the project are excluded from the
-  output. Pass the flag `--bench` to include benchmark components.git p
-
-Pass the option `--flag <package_name>:<flag_name>` or
-`--flag <package_name>:-<flag_name>` to set or unset a Cabal flag. This
-option can be specified multiple times.
-
-Pass the flag `--global-hints` to use a hint file for global packages. If a hint
-file is used, GHC does not need to be installed.
+*   external dependencies are excluded from the output. Pass the flag
+    `--external` to include external dependencies;
+*   the `base` package and its dependencies are included in the output. Pass the
+    flag `--no-include-base` to exclude `base` and its dependencies;
+*   there is no limit to the depth of the resolution of dependencies. Pass the
+    `--depth <depth>` option to limit the depth;
+*   all relevant packages are included in the output. Pass the
+    `--prune <packages>` option to exclude the specified packages (including
+    project packages), where `<packages>` is a list of package names separated
+    by commas;
+*   for all relevant project packages, relevant dependencies are included in the
+    output. However, each project package for which dependencies are included
+    can be specified as a target argument. The argument uses the same format as
+    the [`stack build` command](build_command.md) but components of project
+    packages are ignored. Non-project packages are also ignored;
+*   Cabal flags are as specified by the package description files and the
+    project-level configuration file (`stack.yaml`, by default). Pass the
+    option `--flag <package_name>:<flag_name>` or
+    `--flag <package_name>:-<flag_name>` to set or unset a Cabal flag. This
+    option can be specified multiple times;
+*   test components of project packages are excluded from the output. Pass the
+    flag `--test` to include test components;
+*   benchmark components of project packages are excluded from the output. Pass
+    the flag `--bench` to include benchmark components; and
+*   global packages for the specified version of GHC are those specified by the
+    global package database of an installed GHC. Pass the flag `--global-hints`
+    to use a hint file for global packages. If a hint file is used, GHC does not
+    need to be installed.
 
 ## Examples
 
