@@ -34,7 +34,7 @@ Available commands:
 or
 
 ~~~text
-stack ls dependencies [--separator SEP] [--[no-]license] [--filter ITEM]
+stack ls dependencies [--[no-]license] [--separator SEP] [--filter ITEM]
                       [--[no-]external] [--[no-]include-base] [--depth DEPTH]
                       [--prune PACKAGES] [TARGET] [--flag PACKAGE:[-]FLAG]
                       [--test] [--bench] [--global-hints]
@@ -143,9 +143,10 @@ Subcommands specify the format of the output, as follows:
 *   `text` (the default) lists the packages, each on a separate line.
 
     ~~~text
-    stack ls dependencies text [--separator SEP] [--[no-]license] [--filter ITEM]
-                               [--[no-]external] [--[no-]include-base]
-                               [--depth DEPTH] [--prune PACKAGES] [TARGET]
+    stack ls dependencies text [--[no-]license] [--separator SEP]
+                               [--filter ITEM] [--[no-]external]
+                               [--[no-]include-base] [--depth DEPTH]
+                               [--prune PACKAGES] [TARGET]
                                [--flag PACKAGE:[-]FLAG] [--test] [--bench]
                                [--global-hints]
     ~~~
@@ -161,9 +162,11 @@ Subcommands specify the format of the output, as follows:
 *   `tree` lists dependencies in the format of a tree.
 
     ~~~text
-    stack ls dependencies tree [--separator SEP] [--[no-]license] [--[no-]external]
-                               [--[no-]include-base] [--depth DEPTH]
-                               [--prune PACKAGES] [TARGET] [--flag PACKAGE:[-]FLAG] [--test] [--bench] [--global-hints]
+    stack ls dependencies tree [--[no-]license] [--separator SEP]
+                               [--[no-]external] [--[no-]include-base]
+                               [--depth DEPTH] [--prune PACKAGES] [TARGET]
+                               [--flag PACKAGE:[-]FLAG] [--test] [--bench]
+                               [--global-hints]
     ~~~
 
     For example (extract):
