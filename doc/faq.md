@@ -319,6 +319,59 @@
 
 ## `stack build`-related
 
+??? question "Why does `stack test` trigger a rebuild of other components?"
+
+    If the set of dependencies of a project package to be built are not a
+    subset of the set of dependencies when it was last built, then that will
+    trigger a rebuild of components that were previously built.
+
+    The command:
+
+    ~~~text
+    stack build
+    ~~~
+
+    will build the library and executable components of project packages and the
+    build will take into account the dependencies of those components.
+
+    If you then command:
+
+    ~~~text
+    stack test
+    ~~~
+
+    or, equivalently:
+
+    ~~~text
+    stack build --test
+    ~~~
+
+    the test suite components of project packages are added to the build
+    targets.
+
+    That can add dependencies to a project package, if its test suite
+    components have dependencies that are not dependencies of its library
+    and executable components.
+
+    What is true of test suite components applies equally to benchmark
+    components.
+
+    If that behaviour is undesirable, a way to avoid it is to change the
+    description of each project package so that adding its test suite (or
+    benchmark) components does not add dependencies to the package. That is,
+    to specify, in the package description, the dependencies as common to all
+    the components that you are switching between from one build to another.
+
+    For example, if you are using `package.yaml`, add the dependencies to its
+    top-level `dependencies` key.
+
+    Alternatively, build all components of project packages without running
+    tests or benchmarks once built. Command:
+
+    ~~~text
+    stack build --test --no-run-tests --bench --no-run-benchmarks
+    ~~~
+
 ??? question "How do I use a custom preprocessor?"
 
     See the
