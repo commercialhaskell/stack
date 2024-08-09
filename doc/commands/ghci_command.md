@@ -76,7 +76,7 @@ By default:
     GHCi (only).
 
 *   Stack configures GHCi to hide unnecessary packages, unless no packages are
-    targetted and no additional packages are specified. Pass the
+    targeted and no additional packages are specified. Pass the
     `--package-hiding` flag to hide unnecessary packages or
     `--no-package-hiding` flag not to hide unnecessary packages.
 
