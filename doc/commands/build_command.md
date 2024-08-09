@@ -369,7 +369,7 @@ directory `doc\html\<package_version>-docs\`, relative to Stack's dist work
 directory (see [`stack path --dist-dir`](path_command.md)).
 
 Unless flags are set to exclude the building of project packages, for each
-targetted project package with generated documentation, an archive of the
+targeted project package with generated documentation, an archive of the
 `<package_version>-docs` directory and its contents is in Stack's dist work
 directory. (The flags that exclude project packages are
 [`--only-dependencies`](#-only-dependencies-flag),
@@ -964,7 +964,7 @@ Unset the flag for non-interleaved output. With non-interleaved output, the
 build output from GHC (as opposed to from Stack) in respect of dependencies is
 ignored. The behaviour then depends whether there is one target package or more
 than one. There can be one target if the project has a single package or if one
-package is targetted in a multi-package project (for example, using
+package is targeted in a multi-package project (for example, using
 `stack build <package_name>`).
 
 * **One target package:** The build output for the target package is sent to the
