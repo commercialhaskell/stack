@@ -20,6 +20,10 @@ Behavior changes:
 
 Other enhancements:
 
+* Add flags `--run-tests` and `--run-benchmarks` (the existing defaults) to
+  Stack's `build` command, which take precedence over the existing
+  `no-run-tests` and `no-run-benchmarks` configuration options, respectively.
+
 Bug fixes:
 
 * Stack's in-app messages refer to https://haskellstack.org as currently

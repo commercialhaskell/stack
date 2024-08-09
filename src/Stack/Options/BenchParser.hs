@@ -5,9 +5,9 @@ module Stack.Options.BenchParser
  ( benchOptsParser
  ) where
 
-import           Options.Applicative
-                   ( Parser, flag', help, long, metavar, strOption )
-import           Options.Applicative.Builder.Extra ( optionalFirst )
+import           Options.Applicative ( Parser, help, long, metavar, strOption )
+import           Options.Applicative.Builder.Extra
+                   ( firstBoolFlagsTrue, optionalFirst )
 import           Stack.Prelude
 import           Stack.Options.Utils ( hideMods )
 import           Stack.Types.BuildOptsMonoid ( BenchmarkOptsMonoid (..) )
@@ -20,15 +20,13 @@ benchOptsParser hide0 = BenchmarkOptsMonoid
         (  long "benchmark-arguments"
         <> long "ba"
         <> metavar "BENCH_ARGS"
-        <> help "Forward BENCH_ARGS to the benchmark suite. Supports templates \
-                \from 'cabal bench'."
+        <> help "Arguments passed to the benchmarks. Supports path variables \
+                \provided by the Cabal build system."
         <> hide
         ))
-  <*> optionalFirst (flag' True
-        (  long "no-run-benchmarks"
-        <> help "Disable running of benchmarks. (Benchmarks will still be \
-                \built.)"
-        <> hide
-        ))
+  <*> firstBoolFlagsTrue
+        "run-benchmarks"
+        "running of targeted benchmarks."
+        hide
  where
   hide = hideMods hide0

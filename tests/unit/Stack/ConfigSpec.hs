@@ -255,14 +255,14 @@ spec = beforeAll setup $ do
           { rerunTests = True
           , additionalArgs = ["-fprof"]
           , coverage = True
-          , disableRun = True
+          , runTests = False
           , maximumTimeSeconds = Nothing
           , allowStdin = True
           }
         bopts.benchmarks `shouldBe` True
         bopts.benchmarkOpts `shouldBe` BenchmarkOpts
            { additionalArgs = Just "-O2"
-           , disableRun = True
+           , runBenchmarks = False
            }
         bopts.reconfigure `shouldBe` True
         bopts.cabalVerbose `shouldBe` CabalVerbosity verbose

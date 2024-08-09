@@ -258,7 +258,7 @@ data TestOptsMonoid = TestOptsMonoid
   { rerunTests :: !FirstTrue
   , additionalArgs :: ![String]
   , coverage :: !FirstFalse
-  , disableRun :: !FirstFalse
+  , runTests :: !FirstTrue
   , maximumTimeSeconds :: !(First (Maybe Int))
   , allowStdin :: !FirstTrue
   }
@@ -269,14 +269,14 @@ instance FromJSON (WithJSONWarnings TestOptsMonoid) where
     rerunTests <- FirstTrue <$> o ..:? rerunTestsArgName
     additionalArgs <- o ..:? testAdditionalArgsName ..!= []
     coverage <- FirstFalse <$> o ..:? coverageArgName
-    disableRun <- FirstFalse <$> o ..:? testDisableRunArgName
+    runTests <- FirstTrue . (not <$>) <$> o ..:? noRunTestsArgName
     maximumTimeSeconds <- First <$> o ..:? maximumTimeSecondsArgName
     allowStdin <- FirstTrue <$> o ..:? testsAllowStdinName
     pure TestOptsMonoid
       { rerunTests
       , additionalArgs
       , coverage
-      , disableRun
+      , runTests
       , maximumTimeSeconds
       , allowStdin
       }
@@ -290,8 +290,8 @@ testAdditionalArgsName = "additional-args"
 coverageArgName :: Text
 coverageArgName = "coverage"
 
-testDisableRunArgName :: Text
-testDisableRunArgName = "no-run-tests"
+noRunTestsArgName :: Text
+noRunTestsArgName = "no-run-tests"
 
 maximumTimeSecondsArgName :: Text
 maximumTimeSecondsArgName = "test-suite-timeout"
@@ -328,24 +328,24 @@ haddockAdditionalArgsName = "haddock-args"
 
 data BenchmarkOptsMonoid = BenchmarkOptsMonoid
   { additionalArgs :: !(First String)
-  , disableRun :: !(First Bool)
+  , runBenchmarks :: !FirstTrue
   }
   deriving (Generic, Show)
 
 instance FromJSON (WithJSONWarnings BenchmarkOptsMonoid) where
   parseJSON = withObjectWarnings "BenchmarkOptsMonoid" $ \o -> do
     additionalArgs <- First <$> o ..:? benchmarkAdditionalArgsName
-    disableRun <- First <$> o ..:? benchmarkDisableRunArgName
+    runBenchmarks <- FirstTrue . (not <$>) <$> o ..:? noRunBenchmarksArgName
     pure BenchmarkOptsMonoid
       { additionalArgs
-      , disableRun
+      , runBenchmarks
       }
 
 benchmarkAdditionalArgsName :: Text
 benchmarkAdditionalArgsName = "benchmark-arguments"
 
-benchmarkDisableRunArgName :: Text
-benchmarkDisableRunArgName = "no-run-benchmarks"
+noRunBenchmarksArgName :: Text
+noRunBenchmarksArgName = "no-run-benchmarks"
 
 instance Semigroup BenchmarkOptsMonoid where
   (<>) = mappenddefault
