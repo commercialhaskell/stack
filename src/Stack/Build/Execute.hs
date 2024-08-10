@@ -58,8 +58,7 @@ import           Stack.Types.Build
                    , taskProvides
                    )
 import           Stack.Types.Build.Exception ( BuildPrettyException (..) )
-import           Stack.Types.BuildOpts ( BuildOpts (..), TestOpts (..)
-                   )
+import           Stack.Types.BuildOpts ( BuildOpts (..), TestOpts (..) )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.BuildOptsMonoid ( ProgressBarFormat (..) )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
@@ -67,8 +66,7 @@ import           Stack.Types.CompilerPaths ( HasCompiler (..), getGhcPkgExe )
 import           Stack.Types.ComponentUtils
                    ( StackUnqualCompName, unqualCompToString )
 import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
-import           Stack.Types.ConfigureOpts
-                   ( BaseConfigOpts (..) )
+import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
                    ( HasEnvConfig (..), actualCompilerVersionL
