@@ -53,8 +53,7 @@ import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( HasCompiler, cabalVersionL )
 import           Stack.Types.ComponentUtils
                    ( StackUnqualCompName, unqualCompToString )
-import           Stack.Types.Config
-                   ( Config (..), HasConfig (..), buildOptsL )
+import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap
@@ -71,8 +70,7 @@ import           Stack.Types.Package
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap
-                   ( SMTargets (..)
-                   , SourceMap (..), Target (..) )
+                   ( SMTargets (..), SourceMap (..), Target (..) )
 import           System.Terminal ( fixCodePage )
 
 newtype CabalVersionPrettyException
