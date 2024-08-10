@@ -102,7 +102,7 @@ data TestOpts = TestOpts
   { rerunTests :: !Bool -- ^ Whether successful tests will be run gain
   , additionalArgs :: ![String] -- ^ Arguments passed to the test program
   , coverage :: !Bool -- ^ Generate a code coverage report
-  , disableRun :: !Bool -- ^ Disable running of tests
+  , runTests :: !Bool -- ^ Enable running of tests
   , maximumTimeSeconds :: !(Maybe Int) -- ^ test suite timeout in seconds
   , allowStdin :: !Bool -- ^ Whether to allow standard input
   }
@@ -112,8 +112,8 @@ data TestOpts = TestOpts
 data BenchmarkOpts = BenchmarkOpts
   { additionalArgs :: !(Maybe String)
     -- ^ Arguments passed to the benchmark program
-  , disableRun :: !Bool
-    -- ^ Disable running of benchmarks
+  , runBenchmarks :: !Bool
+    -- ^ Enable running of benchmarks
   }
   deriving (Eq, Show)
 

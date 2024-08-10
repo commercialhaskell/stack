@@ -366,7 +366,19 @@
     top-level `dependencies` key.
 
     Alternatively, build all components of project packages without running
-    tests or benchmarks once built. Command:
+    tests or benchmarks once built. Add the following to a configuration file:
+
+    ~~~yaml
+    build:
+      test: true
+      test-arguments:
+        no-run-tests: true
+      bench: true
+      benchmark-opts:
+        no-run-benchmarks: true
+    ~~~
+
+    or command:
 
     ~~~text
     stack build --test --no-run-tests --bench --no-run-benchmarks

@@ -978,11 +978,8 @@ singleTest topts testsToRun ac ee task installedMap = do
       config <- view configL
       let needHpc = topts.coverage
       toRun <-
-        if topts.disableRun
-          then do
-            announce "Test running disabled by --no-run-tests flag."
-            pure False
-          else if topts.rerunTests
+        if topts.runTests
+          then if topts.rerunTests
             then pure True
             else do
               status <- getTestStatus pkgDir
@@ -999,6 +996,9 @@ singleTest topts testsToRun ac ee task installedMap = do
                       announce "rerunning previously failed test"
                       pure True
                 TSUnknown -> pure True
+          else do
+            announce "Test running disabled by --no-run-tests flag."
+            pure False
 
       when toRun $ do
         buildDir <- distDirFromDir pkgDir
@@ -1262,11 +1262,11 @@ singleBench beopts benchesToRun ac ee task installedMap = do
                        beopts.additionalArgs
 
       toRun <-
-        if beopts.disableRun
-          then do
+        if beopts.runBenchmarks
+          then pure True
+          else do
             announce "Benchmark running disabled by --no-run-benchmarks flag."
             pure False
-          else pure True
 
       when toRun $ do
         announce "benchmarks"

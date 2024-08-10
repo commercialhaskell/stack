@@ -17,8 +17,9 @@ import           Stack.Types.BuildOpts
                    , TestOpts (..)
                    )
 import           Stack.Types.BuildOptsMonoid
-                   ( BuildOptsMonoid (..), CabalVerbosity (..)
-                   , ProgressBarFormat (..), TestOptsMonoid (..)
+                   ( BenchmarkOptsMonoid (..), BuildOptsMonoid (..)
+                   , CabalVerbosity (..), ProgressBarFormat (..)
+                   , TestOptsMonoid (..)
                    )
 
 defaultBuildOpts :: BuildOpts
@@ -63,7 +64,7 @@ defaultTestOpts = TestOpts
   { rerunTests = defaultFirstTrue toMonoid.rerunTests
   , additionalArgs = []
   , coverage = defaultFirstFalse toMonoid.coverage
-  , disableRun = defaultFirstFalse toMonoid.disableRun
+  , runTests = defaultFirstTrue toMonoid.runTests
   , maximumTimeSeconds = Nothing
   , allowStdin = defaultFirstTrue toMonoid.allowStdin
   }
@@ -76,5 +77,7 @@ defaultHaddockOpts = HaddockOpts { additionalArgs = [] }
 defaultBenchmarkOpts :: BenchmarkOpts
 defaultBenchmarkOpts = BenchmarkOpts
   { additionalArgs = Nothing
-  , disableRun = False
+  , runBenchmarks = defaultFirstTrue beoMonoid.runBenchmarks
   }
+ where
+  beoMonoid = undefined :: BenchmarkOptsMonoid

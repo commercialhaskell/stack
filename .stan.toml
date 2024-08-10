@@ -190,25 +190,36 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-59:17"
+  id = "OBS-STAN-0212-FNS1cF-60:17"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\BuildOpts.hs
 #
-#   58 ┃
-#   59 ┃   buildMonoid = undefined :: BuildOptsMonoid
-#   60 ┃                 ^^^^^^^^^
+#   59 ┃
+#   60 ┃   buildMonoid = undefined :: BuildOptsMonoid
+#   61 ┃                 ^^^^^^^^^
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-71:14"
+  id = "OBS-STAN-0212-FNS1cF-72:14"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\BuildOpts.hs
 #
-#    70 ┃
-#    71 ┃   toMonoid = undefined :: TestOptsMonoid
-#    72 ┃              ^^^^^^^^^
+#   71 ┃
+#   72 ┃   toMonoid = undefined :: TestOptsMonoid
+#   73 ┃              ^^^^^^^^^
+
+# Anti-pattern: unsafe functions
+[[ignore]]
+  id = "OBS-STAN-0212-FNS1cF-83:15"
+# ✦ Description:   Usage of unsafe functions breaks referential transparency
+# ✦ Category:      #Unsafe #AntiPattern
+# ✦ File:          src/Stack/BuildOpts.hs
+#
+#   82 ┃
+#   83 ┃   beoMonoid = undefined :: BenchmarkOptsMonoid
+#   84 ┃               ^^^^^^^^^
 
 # Anti-pattern: Pattern matching on '_'
 # Pattern matching on '_' for sum types can create maintainability issues

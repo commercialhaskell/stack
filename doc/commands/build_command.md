@@ -16,9 +16,9 @@ stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
             [--[no-]copy-bins] [--[no-]copy-compiler-tool] [--[no-]prefetch]
             [--[no-]keep-going] [--[no-]keep-tmp-files] [--[no-]force-dirty]
             [--[no-]test] [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS]
-            [--coverage] [--no-run-tests] [--test-suite-timeout ARG]
+            [--coverage] [--[no-]run-tests] [--test-suite-timeout ARG]
             [--[no-]tests-allow-stdin] [--[no-]bench]
-            [--ba|--benchmark-arguments BENCH_ARGS] [--no-run-benchmarks]
+            [--ba|--benchmark-arguments BENCH_ARGS] [--[no-]run-benchmarks]
             [--[no-]reconfigure] [--cabal-verbosity VERBOSITY |
               --[no-]cabal-verbose] [--[no-]split-objs] [--skip ARG]
             [--[no-]interleaved-output] [--ddump-dir ARG]
@@ -660,6 +660,25 @@ command line arguments. For example, to pass `'a single quoted string'`:
 
     The content of single quotes is taken literally. Within single quotes, `''`
     escapes a single quote.
+
+### `--[no-]rerun-tests` flag
+
+Default: Enabled
+
+Unset the flag to disable the automatic running of targeted test-suites that
+have already been successful.
+
+### `--[no-]run-benchmarks` flag
+
+Default: Enabled
+
+Unset the flag to disable the automatic running of targeted benchmarks.
+
+### `--[no-]run-tests` flag
+
+Default: Enabled
+
+Unset the flag to disable the automatic running of targeted test suites.
 
 ### `--test-arguments`, `--ta` option
 

@@ -213,9 +213,9 @@ ghciCmd ghciOpts =
         bopts <- view buildOptsL
         -- override env so running of tests and benchmarks is disabled
         let boptsLocal = bopts
-              { testOpts = bopts.testOpts { TestOpts.disableRun = True }
+              { testOpts = bopts.testOpts { TestOpts.runTests = False }
               , benchmarkOpts =
-                  bopts.benchmarkOpts { BenchmarkOpts.disableRun = True }
+                  bopts.benchmarkOpts { BenchmarkOpts.runBenchmarks = False }
               }
         local (set buildOptsL boptsLocal) (ghci ghciOpts)
 

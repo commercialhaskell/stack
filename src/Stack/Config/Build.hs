@@ -122,7 +122,7 @@ testOptsFromMonoid toMonoid madditional = defaultTestOpts
   , TestOpts.additionalArgs =
       fromMaybe [] madditional <> toMonoid.additionalArgs
   , TestOpts.coverage = fromFirstFalse toMonoid.coverage
-  , TestOpts.disableRun = fromFirstFalse toMonoid.disableRun
+  , TestOpts.runTests = fromFirstTrue toMonoid.runTests
   , TestOpts.maximumTimeSeconds =
       fromFirst
         defaultTestOpts.maximumTimeSeconds
@@ -135,12 +135,9 @@ benchmarkOptsFromMonoid ::
      BenchmarkOptsMonoid
   -> Maybe [String]
   -> BenchmarkOpts
-benchmarkOptsFromMonoid beoMonoid madditional =
-  defaultBenchmarkOpts
-    { BenchmarkOpts.additionalArgs =
-        fmap (\args -> unwords args <> " ") madditional <>
-        getFirst beoMonoid.additionalArgs
-    , BenchmarkOpts.disableRun = fromFirst
-        defaultBenchmarkOpts.disableRun
-        beoMonoid.disableRun
-    }
+benchmarkOptsFromMonoid beoMonoid madditional = defaultBenchmarkOpts
+  { BenchmarkOpts.additionalArgs =
+      fmap (\args -> unwords args <> " ") madditional <>
+      getFirst beoMonoid.additionalArgs
+  , BenchmarkOpts.runBenchmarks = fromFirstTrue beoMonoid.runBenchmarks
+  }
