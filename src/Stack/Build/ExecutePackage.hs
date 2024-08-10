@@ -997,7 +997,9 @@ singleTest topts testsToRun ac ee task installedMap = do
                       pure True
                 TSUnknown -> pure True
           else do
-            announce "Test running disabled by --no-run-tests flag."
+            notifyIfNoRunTests <- view $ configL . to (.notifyIfNoRunTests)
+            when notifyIfNoRunTests $
+              announce "Test running disabled by --no-run-tests flag."
             pure False
 
       when toRun $ do
@@ -1265,7 +1267,10 @@ singleBench beopts benchesToRun ac ee task installedMap = do
         if beopts.runBenchmarks
           then pure True
           else do
-            announce "Benchmark running disabled by --no-run-benchmarks flag."
+            notifyIfNoRunBenchmarks <-
+              view $ configL . to (.notifyIfNoRunBenchmarks)
+            when notifyIfNoRunBenchmarks $
+              announce "Benchmark running disabled by --no-run-benchmarks flag."
             pure False
 
       when toRun $ do

@@ -1053,6 +1053,24 @@ Default: `true`
 If Stack's integration with the Nix package manager is not enabled, should Stack
 notify the user if a `nix` executable is on the PATH?
 
+## notify-if-no-run-benchmarks
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+Should Stack notify the user if the automatic running of a benchmark is
+prevented by the `--no-run-benchmarks` flag?
+
+## notify-if-no-run-tests
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+Should Stack notify the user if the automatic running of a test suite is
+prevented by the `--no-run-tests` flag?
+
 ## package-index
 
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)

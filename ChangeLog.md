@@ -23,6 +23,9 @@ Other enhancements:
 * Add flags `--run-tests` and `--run-benchmarks` (the existing defaults) to
   Stack's `build` command, which take precedence over the existing
   `no-run-tests` and `no-run-benchmarks` configuration options, respectively.
+* In configuration files, the `notify-if-no-run-tests` and
+  `notify-if-no-run-benchmarks` keys are introduced, to allow the exisitng
+  notification to be muted if unwanted.
 
 Bug fixes:
 

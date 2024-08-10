@@ -437,6 +437,9 @@ configFromConfigMonoid
         notifyIfGhcUntested = fromFirstTrue configMonoid.notifyIfGhcUntested
         notifyIfCabalUntested = fromFirstTrue configMonoid.notifyIfCabalUntested
         notifyIfArchUnknown = fromFirstTrue configMonoid.notifyIfArchUnknown
+        notifyIfNoRunTests = fromFirstTrue configMonoid.notifyIfNoRunTests
+        notifyIfNoRunBenchmarks =
+          fromFirstTrue configMonoid.notifyIfNoRunBenchmarks
         noRunCompile = fromFirstFalse configMonoid.noRunCompile
     allowDifferentUser <-
       case getFirst configMonoid.allowDifferentUser of
@@ -597,6 +600,8 @@ configFromConfigMonoid
                 , notifyIfGhcUntested
                 , notifyIfCabalUntested
                 , notifyIfArchUnknown
+                , notifyIfNoRunTests
+                , notifyIfNoRunBenchmarks
                 , noRunCompile
                 , stackDeveloperMode
                 , casa
