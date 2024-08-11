@@ -58,7 +58,8 @@ import           Stack.Types.Build
                    , taskProvides
                    )
 import           Stack.Types.Build.Exception ( BuildPrettyException (..) )
-import           Stack.Types.BuildOpts ( BuildOpts (..), TestOpts (..) )
+import           Stack.Types.BuildOpts
+                   ( BenchmarkOpts (..), BuildOpts (..), TestOpts (..) )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.BuildOptsMonoid ( ProgressBarFormat (..) )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
@@ -84,7 +85,7 @@ import           Stack.Types.NamedComponent
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), packageIdentifier )
 import           Stack.Types.Platform ( HasPlatform (..) )
-import           Stack.Types.Runner ( HasRunner, terminalL, viewExecutablePath )
+import           Stack.Types.Runner ( terminalL, viewExecutablePath )
 import           Stack.Types.SourceMap ( Target )
 import qualified System.Directory as D
 import qualified System.FilePath as FP
@@ -108,7 +109,7 @@ preFetch plan
       TTRemotePackage _ _ pkgloc -> Set.singleton pkgloc
 
 -- | Print a description of build plan for human consumption.
-printPlan :: (HasRunner env, HasTerm env) => Plan -> RIO env ()
+printPlan :: HasEnvConfig env => Plan -> RIO env ()
 printPlan plan = do
   case Map.elems plan.unregisterLocal of
     [] -> prettyInfo $
@@ -135,24 +136,47 @@ printPlan plan = do
         <> bulletedList (map displayTask xs)
         <> line
 
+  buildOpts <- view buildOptsL
   let hasTests = not . Set.null . testComponents . taskComponents
       hasBenches = not . Set.null . benchComponents . taskComponents
       tests = Map.elems $ Map.filter hasTests plan.finals
       benches = Map.elems $ Map.filter hasBenches plan.finals
+      runTests = buildOpts.testOpts.runTests
+      runBenchmarks = buildOpts.benchmarkOpts.runBenchmarks
 
-  unless (null tests) $ do
-    prettyInfo $
-         flow "Would test:"
-      <> line
-      <> bulletedList (map displayTask tests)
-      <> line
+  unless (null tests) $
+    if runTests
+      then
+        prettyInfo $
+             flow "Would test:"
+          <> line
+          <> bulletedList (map displayTask tests)
+          <> line
+      else
+        prettyInfo $
+             fillSep
+               [ flow "Would not test, as running disabled by"
+               , style Shell "--no-run-tests"
+               , "flag."
+               ]
+          <> line
 
-  unless (null benches) $ do
-    prettyInfo $
-         flow "Would benchmark:"
-      <> line
-      <> bulletedList (map displayTask benches)
-      <> line
+  unless (null benches) $
+    if runBenchmarks
+      then
+        prettyInfo $
+             flow "Would benchmark:"
+          <> line
+          <> bulletedList (map displayTask benches)
+          <> line
+      else
+        prettyInfo $
+             fillSep
+               [ flow "Would not benchmark, as running disabled by"
+               , style Shell "--no-run-benchmarks"
+               , "flag."
+               ]
+          <> line
 
   case Map.toList plan.installExes of
     [] -> prettyInfo $
