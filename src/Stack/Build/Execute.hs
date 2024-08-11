@@ -368,7 +368,7 @@ executePlan' :: HasEnvConfig env
              -> RIO env ()
 executePlan' installedMap0 targets plan ee = do
   let !buildOpts = ee.buildOpts
-  let !testOpts = buildOpts.testOpts
+      !testOpts = buildOpts.testOpts
   when testOpts.coverage deleteHpcReports
   cv <- view actualCompilerVersionL
   whenJust (nonEmpty $ Map.toList plan.unregisterLocal) $ \ids -> do
