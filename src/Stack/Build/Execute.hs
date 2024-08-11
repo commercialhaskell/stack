@@ -367,8 +367,18 @@ executePlan' :: HasEnvConfig env
              -> ExecuteEnv
              -> RIO env ()
 executePlan' installedMap0 targets plan ee = do
+  config <- view configL
   let !buildOpts = ee.buildOpts
       !testOpts = buildOpts.testOpts
+      !benchmarkOpts = buildOpts.benchmarkOpts
+      runTests = testOpts.runTests
+      runBenchmarks = benchmarkOpts.runBenchmarks
+      noNotifyIfNoRunTests = not config.notifyIfNoRunTests
+      noNotifyIfNoRunBenchmarks = not config.notifyIfNoRunBenchmarks
+      hasTests = not . Set.null . testComponents . taskComponents
+      hasBenches = not . Set.null . benchComponents . taskComponents
+      tests = Map.elems $ Map.filter hasTests plan.finals
+      benches = Map.elems $ Map.filter hasBenches plan.finals
   when testOpts.coverage deleteHpcReports
   cv <- view actualCompilerVersionL
   whenJust (nonEmpty $ Map.toList plan.unregisterLocal) $ \ids -> do
@@ -400,6 +410,24 @@ executePlan' installedMap0 targets plan ee = do
         buildOpts.keepGoing
   terminal <- view terminalL
   terminalWidth <- view termWidthL
+  unless (noNotifyIfNoRunTests || runTests || null tests) $
+    prettyInfo $
+      fillSep
+        [ flow "All test running disabled by"
+        , style Shell "--no-run-tests"
+        , flow "flag. To mute this message in future, set"
+        , style Shell (flow "notify-if-no-run-tests: false")
+        , flow "in Stack's configuration."
+        ]
+  unless (noNotifyIfNoRunBenchmarks || runBenchmarks || null benches) $
+    prettyInfo $
+      fillSep
+        [ flow "All benchmark running disabled by"
+        , style Shell "--no-run-benchmarks"
+        , flow "flag. To mute this message in future, set"
+        , style Shell (flow "notify-if-no-run-benchmarks: false")
+        , flow "in Stack's configuration."
+        ]
   errs <- liftIO $ runActions threads keepGoing actions $
     \doneVar actionsVar -> do
       let total = length actions
@@ -564,8 +592,9 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
             , concurrency = ConcurrencyAllowed
             }
       ) $
-      -- These are the "final" actions - running tests and benchmarks.
-      ( if Set.null tests
+      -- These are the "final" actions - running test suites and benchmarks,
+      -- unless --no-run-tests or --no-run-benchmarks is enabled.
+      ( if Set.null tests || not runTests
           then id
           else (:) Action
             { actionId = ActionId pkgId ATRunTests
@@ -578,7 +607,7 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
             , concurrency = ConcurrencyAllowed
             }
       ) $
-      ( if Set.null benches
+      ( if Set.null benches || not runBenchmarks
           then id
           else (:) Action
             { actionId = ActionId pkgId ATRunBenchmarks
@@ -615,6 +644,8 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
   bopts = ee.buildOpts
   topts = bopts.testOpts
   beopts = bopts.benchmarkOpts
+  runTests = topts.runTests
+  runBenchmarks = beopts.runBenchmarks
 
 taskComponents :: Task -> Set NamedComponent
 taskComponents task =

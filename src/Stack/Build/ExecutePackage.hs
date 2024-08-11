@@ -997,6 +997,9 @@ singleTest topts testsToRun ac ee task installedMap = do
                       pure True
                 TSUnknown -> pure True
           else do
+            -- This should never be reached, because the action should have been
+            -- filtered out in Stack.Build.Execute.toActions. However, we leave
+            -- it as is, for now. The alternative would be to throw a Stack bug.
             notifyIfNoRunTests <- view $ configL . to (.notifyIfNoRunTests)
             when notifyIfNoRunTests $
               announce "Test running disabled by --no-run-tests flag."
@@ -1267,6 +1270,9 @@ singleBench beopts benchesToRun ac ee task installedMap = do
         if beopts.runBenchmarks
           then pure True
           else do
+            -- This should never be reached, because the action should have been
+            -- filtered out in Stack.Build.Execute.toActions. However, we leave
+            -- it as is, for now. The alternative would be to throw a Stack bug.
             notifyIfNoRunBenchmarks <-
               view $ configL . to (.notifyIfNoRunBenchmarks)
             when notifyIfNoRunBenchmarks $

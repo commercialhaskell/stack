@@ -17,5 +17,5 @@ checkFlagsAfterCommand = stackCheckStderr ["build", "--test", "--no-run-tests"] 
 
 checker :: String -> IO ()
 checker output = do
-  let testsAreDisabled = any (\ln -> "Test running disabled by" `isInfixOf` ln) (lines output)
+  let testsAreDisabled = any (\ln -> "All test running disabled by" `isInfixOf` ln) (lines output)
   unless testsAreDisabled $ fail "Tests should not be run"

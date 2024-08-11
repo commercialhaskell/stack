@@ -21,6 +21,10 @@ Behavior changes:
   character in Stack's 'programs' path, as GHC 9.4.1 and later do not work if
   there is a space in the path to the `ghc` executable. S-8432 now presents as a
   warning and not an error.
+* Stack respects the `--no-run-tests` and `--no-run-benchmarks` flags when
+  determining build actions. Previously Stack respected the flags when executing
+  the run test suites or run benchmarks actions for each targeted project
+  package.
 
 Other enhancements:
 
