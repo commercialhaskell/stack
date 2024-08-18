@@ -387,7 +387,7 @@ functionality to create a Cabal file.
     those components depend.
 
     The
-    [Cabal User Guide](https://cabal.readthedocs.io/en/stable/cabal-package.html)
+    [Cabal User Guide](https://cabal.readthedocs.io/en/stable/cabal-package-description-file.html)
     is the definitive reference for the Cabal package description format.
 
     The [Hpack](https://github.com/sol/hpack#quick-reference) documentation
