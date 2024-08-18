@@ -337,31 +337,69 @@ Having build the test suite executable, Stack then automatically runs it.
 Let's look at the `helloworld` example in more detail to understand better how
 Stack works.
 
-The files in the project include:
+The files in the project are set out below. Click :material-plus-circle: to
+learn more about each file:
 
-~~~text
-app/Main.hs
-src/Lib.hs
-test/Spec.hs
-ChangeLog.md
-README.md
-LICENSE
-.gitignore
-package.yaml
-helloworld.cabal
-Setup.hs
-stack.yaml
+~~~shell
+.
+├── app
+│   └── Main.hs # (1)!
+├── src
+│   └── Lib.hs # (2)!
+├── test
+│   └── Spec.hs # (3)!
+│
+├── .gitignore # (4)!
+├── CHANGELOG.md # (5)!
+├── LICENSE # (6)!
+├── README.md # (7)!
+│
+├── package.yaml # (8)!
+├── helloworld.cabal # (9)!
+├── Setup.hs # (10)!
+└── stack.yaml # (11)!
 ~~~
 
-The `app/Main.hs`, `src/Lib.hs`, and `test/Spec.hs` files are all Haskell
-source files that compose the actual functionality of our project. We won't
-dwell on them here.
+1.  The Haskell source code for the executable (application).
 
-The `ChangeLog.md`, `README.md`, `LICENSE` and `.gitignore` files have no effect
-on the build.
+    As your project develops you can add further source code files to the `app`
+    directory.
 
-The files of interest here are `package.yaml`, `helloworld.cabal`, `Setup.hs`
-and `stack.yaml`.
+2.  The executable uses a library. The Haskell source code for the library.
+
+    As your project develops you can add further source code files to the `src`
+    directory.
+
+3.  The package has a test suite executable. The Haskell source code for the
+    test suite.
+
+    As your project develops you can add further source code files to the `test`
+    directory.
+
+4.  A text file used to configure the Git tool to ignore certain files. Does not
+    affect the build.
+
+5.  A text file in the Markdown format in which changes to the project can be
+    documented. Does not affect the build.
+
+6.  A text file used to document the copyright applicable to the project's files
+    and the licence for the use of those files. Does not affect the build.
+
+7.  A text file in the Markdown format which is intended to be read by users of
+    the project. Does not affect the build.
+
+8.  A file describing the package in the Hpack format. See further below.
+
+9.  A file describing the package in the Cabal format. See further below.
+
+10. A Haskell source file which is a component of the Cabal build system. See
+    further below.
+
+11. A text file in the YAML format, containing Stack's project-level
+    configuration. See further below.
+
+The files of most interest here are `package.yaml`, `helloworld.cabal`,
+`Setup.hs` and `stack.yaml`.
 
 ### `package.yaml`
 
