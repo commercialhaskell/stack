@@ -165,7 +165,9 @@ plugins:
   search: {}
   redirects:
     redirect_maps:
+      'GUIDE.md': 'tutorial/index.md'
       'yaml_configuration.md': 'configure/yaml/index.md'
       'build_command.md': 'commands/build_command.md'
       'custom_snapshot.md': 'topics/custom_snapshot.md'
       'lock_files.md': 'topics/lock_files.md'
+      'scripts.md': 'topics/scripts.md'

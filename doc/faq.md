@@ -424,7 +424,7 @@
     is as follows:
 
     * In the Cabal file, the following
-      [`ld-options`](https://cabal.readthedocs.io/en/stable/cabal-package.html#pkg-field-ld-options)
+      [`ld-options`](https://cabal.readthedocs.io/en/stable/cabal-package-description-file.html#pkg-field-ld-options)
       are set: `-static` and `-pthread`.
 
     * The Stack command is run in a Docker container based on Alpine Linux. The
