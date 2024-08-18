@@ -7,7 +7,7 @@ The following terms are used in Stack's documentation.
 |Term               |Meaning                                                   |
 |-------------------|----------------------------------------------------------|
 |Cabal              |The Haskell Common Architecture for Building Applications and Libraries, provided by the [`Cabal` package](https://hackage.haskell.org/package/Cabal). Also referred to as Cabal (the library) to distinguish it from Cabal (the tool).|
-|Cabal file|A file containing a [package description](https://cabal.readthedocs.io/en/stable/cabal-package.html) used by Cabal, named `<package_name>.cabal`.|
+|Cabal file|A file containing a [package description](https://cabal.readthedocs.io/en/stable/cabal-package-description-file.html) used by Cabal, named `<package_name>.cabal`.|
 |Cabal (the tool)|The Haskell tool used for building provided by the [`cabal-install` package](https://hackage.haskell.org/package/cabal-install).|
 |CI                 |Continuous integration.                                   |
 |CMake              |A [system](https://cmake.org/) for managing build processes.|
