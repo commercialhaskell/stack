@@ -431,10 +431,221 @@ functionality to create a Cabal file.
     The [Hpack](https://github.com/sol/hpack#quick-reference) documentation
     is the reference for the Hpack package description format.
 
+??? question "What are the contents of the `package.yaml` file?"
+
+    The contents of the `package.yaml` file are described below, using
+    additional YAML comments:
+
+    ~~~yaml
+    # The name of the package:
+    name:                helloworld
+    # The version of the package:
+    version:             0.1.0.0
+    # The GitHub repository for the package:
+    github:              "githubuser/helloworld"
+    # The licence for the use of the package's files:
+    license:             BSD-3-Clause
+    # The author of the package:
+    author:              "Author name here"
+    # The email address to contact the maintainer of the package:
+    maintainer:          "example@example.com"
+    # The copyright for the package's files:
+    copyright:           "2024 Author name here"
+
+    # Extra files to be distributed with the source files of the package:
+    extra-source-files:
+    - README.md
+    - CHANGELOG.md
+
+    # Metadata used when publishing your package
+    # synopsis:            Short description of your package
+    # category:            Web
+
+    # To avoid duplicated efforts in documentation and dealing with the
+    # complications of embedding Haddock markup inside cabal files, it is
+    # common to point users to the README.md file.
+    description:         Please see the README on GitHub at
+                         <https://github.com/githubuser/helloworld#readme>
+
+    # Dependencies applicable to all components:
+    dependencies:
+    - base >= 4.7 && < 5
+
+    # GHC options common to all components:
+    ghc-options:
+    # These GHC flags affect which warnings GHC will emit:
+    - -Wall
+    - -Wcompat
+    - -Widentities
+    - -Wincomplete-record-updates
+    - -Wincomplete-uni-patterns
+    - -Wmissing-export-lists
+    - -Wmissing-home-modules
+    - -Wpartial-fields
+    - -Wredundant-constraints
+
+    # The main (unnamed) library component of the package:
+    library:
+      # Directories containing source files:
+      source-dirs: src
+
+    # The executable components of the package:
+    executables:
+      # The executable component named 'helloworld-exe':
+      helloworld-exe:
+        # The source file exporting the 'main' function:
+        main:                Main.hs
+        # Directories containing source files:
+        source-dirs:         app
+        # GHC options applicable to the component:
+        ghc-options:
+        # Link the program with the 'threaded' version of GHC's runtime system:
+        - -threaded
+        # Make all of GHC's runtime system (RTS) options available:
+        - -rtsopts
+        # Compile so as to use simultaneous threads when running the program,
+        # based on how many processors are in the machine.
+        - -with-rtsopts=-N
+        # Dependencies applicable to the component:
+        dependencies:
+        # The main library of the package:
+        - helloworld
+
+    # The test suite components of the package. Test suites have keys in common
+    # with executables:
+    tests:
+      # The test suite component named 'helloworld-test':
+      helloworld-test:
+        main:                Spec.hs
+        source-dirs:         test
+        ghc-options:
+        - -threaded
+        - -rtsopts
+        - -with-rtsopts=-N
+        dependencies:
+        - helloworld
+    ~~~
+
 ### `helloworld.cabal`
 
 The `helloworld.cabal` file is updated automatically as part of the
 `stack build` process and should not be modified.
+
+??? question "What are the contents of the `helloworld.cabal` file?"
+
+    The contents of the `helloworld.cabal` file are described below, using
+    additional Cabal file comments:
+
+    ~~~text
+    -- The version of the Cabal package description format specification:
+    cabal-version: 2.2
+
+    -- This file has been generated from package.yaml by hpack version 0.37.0.
+    --
+    -- see: https://github.com/sol/hpack
+
+    -- The name of the package:
+    name:           helloworld
+    -- The version of the package:
+    version:        0.1.0.0
+    -- The description of the package:
+    description:    Please see the README on GitHub at
+                    <https://github.com/githubuser/helloworld#readme>
+    -- A URL for the package:
+    homepage:       https://github.com/githubuser/helloworld#readme
+    -- A URL for bug reports for the package:
+    bug-reports:    https://github.com/githubuser/helloworld/issues
+    -- The author of the package:
+    author:         Author name here
+    -- The email address to contact the maintainer of the package:
+    maintainer:     example@example.com
+    -- The copyright for the package's files:
+    copyright:      2024 Author name here
+    -- The licence for the use of the package's files:
+    license:        BSD-3-Clause
+    -- The file documenting the terms of the licence:
+    license-file:   LICENSE
+    -- The Cabal system build type of the package:
+    build-type:     Simple
+    -- Extra files to be distributed with the source files of the package:
+    extra-source-files:
+        README.md
+        CHANGELOG.md
+
+    -- The respository for the package:
+    source-repository head
+      type: git
+      location: https://github.com/githubuser/helloworld
+
+    -- The main (unnamed) library component of the package:
+    library
+      -- The modules that the library exposes:
+      exposed-modules:
+          Lib
+      -- The other modules of the compoment:
+      other-modules:
+          Paths_helloworld
+      -- Automatically generated modules of the component:
+      autogen-modules:
+          Paths_helloworld
+      -- Directories containing source files:
+      hs-source-dirs:
+          src
+      -- GHC options applicable to the component. In this case, they are flags
+      -- that affect which warnings GHC will emit:
+      ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates
+                   -Wincomplete-uni-patterns -Wmissing-export-lists
+                   -Wmissing-home-modules -Wpartial-fields
+                   -Wredundant-constraints
+      -- Dependencies applicable to the building of the component:
+      build-depends:
+          base >=4.7 && <5
+      -- The applicable version of the Haskell language:
+      default-language: Haskell2010
+
+    -- The executable 'helloworld-exe' component of the package. Executable
+    -- components have fields in common with library components:
+    executable helloworld-exe
+      -- The source file exporting the 'main' function:
+      main-is: Main.hs
+      other-modules:
+          Paths_helloworld
+      autogen-modules:
+          Paths_helloworld
+      hs-source-dirs:
+          app
+      -- GHC options applicable to the component. In this case, they include
+      -- flags that affect GHC's runtime system (RTS).
+      ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates
+                   -Wincomplete-uni-patterns -Wmissing-export-lists
+                   -Wmissing-home-modules -Wpartial-fields
+                   -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+      build-depends:
+          base >=4.7 && <5
+        , helloworld
+      default-language: Haskell2010
+
+    -- The test suite 'helloworld-test' component of the package. Test suite
+    -- components have fields in common with executable components:
+    test-suite helloworld-test
+      -- The type of the test suite:
+      type: exitcode-stdio-1.0
+      main-is: Spec.hs
+      other-modules:
+          Paths_helloworld
+      autogen-modules:
+          Paths_helloworld
+      hs-source-dirs:
+          test
+      ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates
+                   -Wincomplete-uni-patterns -Wmissing-export-lists
+                   -Wmissing-home-modules -Wpartial-fields
+                   -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+      build-depends:
+          base >=4.7 && <5
+        , helloworld
+      default-language: Haskell2010
+    ~~~
 
 ### `Setup.hs`
 
