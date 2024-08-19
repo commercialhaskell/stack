@@ -35,6 +35,7 @@ The following terms are used in Stack's documentation.
 |Linux              |A family of operating systems based on the Linux kernel.  |
 |macOS              |The primary operating system for Apple's Mac computers. Previously known as Mac OS X or OS X.|
 |Make               |A [build automation tool](https://www.gnu.org/software/make/).|
+|Markdown           |A plain text [formatting syntax](https://daringfireball.net/projects/markdown/) or software used to convert files in that format to HTML.|
 |MSYS2              |The [MSYS2](https://www.msys2.org/) software distribution and building platform for Windows.|
 |Nix                |A purely functional [package manager](https://nixos.org/), available for Linux and macOS.|
 |package            |A Haskell package is an organised collection of Haskell code and related files. It is described by a Cabal file or a `package.yaml` file, which is itself part of the package.|
