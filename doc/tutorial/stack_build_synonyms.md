@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 5. `stack build` synonyms
+# 7. `stack build` synonyms
 
 Let's look at a subset of the `stack --help` output:
 

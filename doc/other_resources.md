@@ -17,3 +17,10 @@ There are lots of resources available for learning more about Stack:
 * The [haskell-stack tag on Stack Overflow](http://stackoverflow.com/questions/tagged/haskell-stack)
 * [Another getting started with Stack tutorial](http://seanhess.github.io/2015/08/04/practical-haskell-getting-started.html)
 * [Why is Stack not Cabal?](https://www.fpcomplete.com/blog/2015/06/why-is-stack-not-cabal)
+
+Package description format specifications supported by Stack:
+
+* Cabal's: a
+  [Cabal file](https://cabal.readthedocs.io/en/stable/cabal-package-description-file.html)
+* Hpack's: a
+  [`package.yaml` file](https://github.com/sol/hpack?tab=readme-ov-file#documentation)

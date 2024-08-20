@@ -1,6 +1,6 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 2. Building your project
+# 4. Building your project
 
 The [`stack build`](../commands/build_command.md) command is the heart of Stack.
 It is the engine that powers building your code, testing it, getting

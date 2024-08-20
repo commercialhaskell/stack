@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 8. Cabal flags and GHC options
+# 10. Cabal flags and GHC options
 
 There are two common ways to alter how a package will install: with Cabal flags
 and with GHC options.

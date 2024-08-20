@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 11. Using GHC interactively
+# 13. Using GHC interactively
 
 GHCi is the interactive GHC environment, a.k.a. the REPL. You *could* access it
 with command:

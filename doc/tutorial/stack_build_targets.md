@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 6. `stack build` targets
+# 8. `stack build` targets
 
 We haven't discussed this too much yet, but, in addition to having a number of
 synonyms *and* taking a number of options on the command line, the `build`
