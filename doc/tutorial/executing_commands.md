@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 10. Executing commands
+# 12. Executing commands
 
 We've already used `stack exec` multiple times in this guide. As you've likely
 already guessed, it allows you to run executables, but with a slightly modified

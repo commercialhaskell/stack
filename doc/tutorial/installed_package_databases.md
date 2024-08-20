@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 4. Installed package databases
+# 6. Installed package databases
 
 Time to take a short break from hands-on examples and discuss a little
 architecture. Stack has the concept of multiple *databases*.

@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 7. Multi-package projects
+# 9. Multi-package projects
 
 Until now, everything we have done with Stack has used a single-package project.
 However, Stack's power truly shines when you're working on multi-package

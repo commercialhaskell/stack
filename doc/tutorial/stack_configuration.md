@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 12. Stack configuration
+# 14. Stack configuration
 
 Whenever you run something with Stack, it needs a project-level configuration
 file. The algorithm Stack uses to find such a file is:

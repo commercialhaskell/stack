@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 3. Building existing projects
+# 5. Building existing projects
 
 Alright, enough playing around with simple projects. Let's take an open source
 package and try to build it. We'll be ambitious and use

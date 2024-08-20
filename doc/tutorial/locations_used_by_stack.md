@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 9. Locations used by Stack
+# 11. Locations used by Stack
 
 Generally, you don't need to worry about where Stack stores various files. But
 some people like to know this stuff. That's when the `stack path` command is

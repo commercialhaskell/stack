@@ -1,6 +1,6 @@
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# 13. In conclusion
+# 15. In conclusion
 
 Stack is not the only tool available for building Haskell code. If you are
 happy building Haskell code with other tools, you may not need Stack. If
