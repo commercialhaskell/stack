@@ -132,6 +132,19 @@ may be present in the package's root directory:
 
 </div>
 
+??? question "Why use the Hpack format?"
+
+    A `package.yaml` file can be more concise and less repetitive than the Cabal
+    file that is generated from it. That is because the Hpack format uses
+    defaults and top-level fields common to sections. The YAML syntax, which may
+    already be familiar for some users, can also avoid repetition.
+
+    In particular, the format's defaults can infer the names of exposed and
+    other modules.
+
+    The format allows a user to specify defaults in a file on GitHub or a local
+    file.
+
 ??? question "I use the Hpack format. Should I also check-in a Cabal file to my repository?"
 
     Yes. This helps people who do not use Stack or the Hpack tool separately.
