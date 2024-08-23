@@ -150,6 +150,19 @@ Stack can be installed directly or by using the GHCup tool.
                 Systems with antivirus software may need to add Stack to the
                 list of 'trusted' applications.
 
+            ??? warning "I have a Windows username with a space in it"
+
+                GHC 9.4.1 and later have a bug which means they do not work if
+                the path to the `ghc` executable has a space character in it.
+                The default location for Stack's 'programs' directory will have
+                a space in the path if the value of the `USERNAME` environment
+                variable includes a space.
+
+                A solution is to configure Stack to use a different location for
+                its 'programs' directory. For further information, see the
+                [`local-programs-path`](configure/yaml/non-project.md#local-programs-path)
+                non-project specific configuration option documentation.
+
         === "Windows on Arm"
 
             The GHC project does not yet provide a version of GHC that runs on

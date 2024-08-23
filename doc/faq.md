@@ -581,6 +581,11 @@
     Stack. See issue [#399](https://github.com/commercialhaskell/stack/issues/399)
     for the ongoing effort and information on workarounds.
 
+??? question "I have a Windows username with a space in it and problems building"
+
+    See the [`local-programs-path`](configure/yaml/non-project.md#local-programs-path)
+    non-project specific configuration option documentation for advice.
+
 ??? question "How to get a working executable on Windows?"
 
     When executing a binary after building with `stack build` (e.g. for target
@@ -604,14 +609,3 @@
     https://msdn.microsoft.com/de-de/library/7d83bc18.aspx).
 
     See issue [#425](https://github.com/commercialhaskell/stack/issues/425).
-
-    Another issue that may arise with building on Windows is as follows. The default
-    location of Stack's programs folder is `%LOCALAPPDATA\Programs\stack`. If there
-    is a space character in the `%LOCALAPPDATA%` path this may, in some
-    circumstances, cause problems with building packages that make use of the GNU
-    project's `autoconf` package and `configure` shell script files. It may be
-    necessary to override the default location of Stack's programs folder. See the
-    [local-programs-path](configure/yaml/non-project.md#local-programs-path) option
-    for more information.
-
-    See issue [#4726](https://github.com/commercialhaskell/stack/issues/4726).
