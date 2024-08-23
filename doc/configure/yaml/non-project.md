@@ -932,18 +932,45 @@ Stack's defaults differ between Unix-like operating systems and Windows.
 
     The MSYS2 tool is also installed in the Stack 'programs' directory.
 
-    !!! warning
+    !!! warning "Space character in the path to Stack's 'programs' directory"
 
         If there is a space character in the path to Stack's 'programs'
-        directory this may cause problems with building packages that make use
-        of the GNU project's `autoconf` package and `configure` shell script
-        files. That may be the case particularly if there is no corresponding
-        short name ('8 dot 3' name) for the directory in the path with the space
-        (which may be the case if '8 dot 3' names have been stripped or their
-        creation not enabled by default). If there are problems building, it
-        will be necessary to specify an alternative path that does not contain
-        space characters. Examples of packages on Hackage that make use of
-        `configure` are `network` and `process`.
+        directory this may cause problems:
+
+        *   with building packages that make use of the GNU project's `autoconf`
+            package and `configure` shell script files. That may be the case
+            particularly if there is no corresponding short name ('8 dot 3'
+            name) for the directory in the path with the space (which may be the
+            case if '8 dot 3' names have been stripped or their creation not
+            enabled by default). Examples of packages on Hackage that make use
+            of `configure` are `network` and `process`; and
+
+        *   building with GHC 9.4.1 and later. These versions of GHC have a bug
+            which means they do not work if the path to the `ghc` executable has
+            a space in it.
+
+        The default location for Stack's 'programs' directory will have a space
+        in the path if the value of the `USERNAME` environment variable includes
+        a space.
+
+        If there are problems building, it will be necessary to specify an
+        alternative path that does not contain spaces. For example, the
+        `programs` directory in the [Stack root](../../topics/stack_root.md)
+        (assuming that path is space-free). For example, if the relevant
+        directory is `C:\sr\programs`, add:
+        ~~~yaml
+        local-program-paths: C:\sr\programs
+        ~~~
+
+        to Stack's [global configuration](https://docs.haskellstack.org/en/stable/configure/yaml/#location-of-global-configuration)
+        file (`config.yaml`).
+
+        If that global configuration file does not yet exist, command:
+        ~~~text
+        stack --no-install-ghc setup
+        ~~~
+
+        to cause Stack to create it (without also installing GHC).
 
 === "Windows (Command Prompt)"
 
@@ -953,18 +980,45 @@ Stack's defaults differ between Unix-like operating systems and Windows.
 
     The MSYS2 tool is also installed in the Stack 'programs' directory.
 
-    !!! warning
+    !!! warning "Space character in the path to Stack's 'programs' directory"
 
         If there is a space character in the path to Stack's 'programs'
-        directory this may cause problems with building packages that make use
-        of the GNU project's `autoconf` package and `configure` shell script
-        files. That may be the case particularly if there is no corresponding
-        short name ('8 dot 3' name) for the directory in the path with the space
-        (which may be the case if '8 dot 3' names have been stripped or their
-        creation not enabled by default). If there are problems building, it
-        will be necessary to specify an alternative path that does not contain
-        space characters. Examples of packages on Hackage that make use of
-        `configure` are `network` and `process`.
+        directory this may cause problems:
+
+        *   with building packages that make use of the GNU project's `autoconf`
+            package and `configure` shell script files. That may be the case
+            particularly if there is no corresponding short name ('8 dot 3'
+            name) for the directory in the path with the space (which may be the
+            case if '8 dot 3' names have been stripped or their creation not
+            enabled by default). Examples of packages on Hackage that make use
+            of `configure` are `network` and `process`; and
+
+        *   building with GHC 9.4.1 and later. These versions of GHC have a bug
+            which means they do not work if the path to the `ghc` executable has
+            a space in it.
+
+        The default location for Stack's 'programs' directory will have a space
+        in the path if the value of the `USERNAME` environment variable includes
+        a space.
+
+        If there are problems building, it will be necessary to specify an
+        alternative path that does not contain spaces. For example, the
+        `programs` directory in the [Stack root](../../topics/stack_root.md)
+        (assuming that path is space-free). For example, if the relevant
+        directory is `C:\sr\programs`, add:
+        ~~~yaml
+        local-program-paths: C:\sr\programs
+        ~~~
+
+        to Stack's [global configuration](https://docs.haskellstack.org/en/stable/configure/yaml/#location-of-global-configuration)
+        file (`config.yaml`).
+
+        If that global configuration file does not yet exist, command:
+        ~~~text
+        stack --no-install-ghc setup
+        ~~~
+
+        to cause Stack to create it (without also installing GHC).
 
 ## modify-code-page
 

@@ -646,7 +646,20 @@ Stack can be installed directly or by using the GHCup tool.
                 installer. If so, click on **More info**, and then click on the
                 **Run anyway** button that appears.
 
-            !!! warning "Long user PATH environment variable"
+            ??? warning "I have a Windows username with a space in it"
+
+                GHC 9.4.1 and later have a bug which means they do not work if
+                the path to the `ghc` executable has a space character in it.
+                The default location for Stack's 'programs' directory will have
+                a space in the path if the value of the `USERNAME` environment
+                variable includes a space.
+
+                A solution is to configure Stack to use a different location for
+                its 'programs' directory. For further information, see the
+                [`local-programs-path`](configure/yaml/non-project.md#local-programs-path)
+                non-project specific configuration option documentation.
+
+            ??? warning "Stack 2.9.1, 2.9.3 and 2.11.1: Long user PATH environment variable"
 
                 The Windows installer for Stack 2.9.1, 2.9.3 and 2.11.1 (only)
                 will replace the user `PATH` environment variable (rather than
