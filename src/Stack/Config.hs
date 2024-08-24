@@ -347,20 +347,29 @@ configFromConfigMonoid
       -- exist.
       shortLocalProgramsFilePath <-
         liftIO $ getShortPathName localProgramsFilePath
-      when (' ' `elem` shortLocalProgramsFilePath) $
-        prettyError $
+      prettyWarn $
           "[S-8432]"
           <> line
           <> fillSep
-               [ flow "Stack's 'programs' path contains a space character and \
-                      \has no alternative short ('8 dot 3') name. This will \
-                      \cause problems with packages that use the GNU project's \
-                      \'configure' shell script. Use the"
+               (  [ flow "Stack's 'programs' path is"
+                  , style File (fromString localProgramsFilePath) <> "."
+                  , flow "It contains a space character. This will prevent \
+                         \building with GHC 9.4.1 or later."
+                  ]
+               <> [ flow "It also has no alternative short ('8 dot 3') name. \
+                         \This will cause problems with packages that use the \
+                         \GNU project's 'configure' shell script."
+                  | ' ' `elem` shortLocalProgramsFilePath
+                  ]
+               )
+          <> blankLine
+          <> fillSep
+               [ flow "To avoid sucn problems, use the"
                , style Shell "local-programs-path"
-               , flow "configuration option to specify an alternative path. \
-                      \The current path is:"
-               , style File (fromString localProgramsFilePath) <> "."
+               , flow "non-project specific configuration option to specify an \
+                      \alternative space-free path."
                ]
+          <> line
     platformOnlyDir <-
       runReaderT platformOnlyRelDir (platform, platformVariant)
     let localPrograms = localProgramsBase </> platformOnlyDir
