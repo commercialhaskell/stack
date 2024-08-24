@@ -542,12 +542,28 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
 *   `Stack.Config.configFromConfigMonoid`:
 
+    Presented as a warning rather than as an error:
+
     ~~~text
-    [S-8432] Stack's 'programs' path contains a space character and has no alternative
+    [S-8432]
+    Stack's 'programs' path is <path>. It contains a space character. This will
+    prevent building with GHC 9.4.1 or later. It also has has no alternative
     short ('8 dot 3') name. This will cause problems with packages that use the
-    GNU project's 'configure' shell script. Use the 'local-programs-path'
-    configuration option to specify an alternative path. The current path is:
-    <path>
+    GNU project's 'configure' shell script.
+
+    To avoid such problems, use the local-programs-path non-project specific
+    configuration option to specify an alternative space-free path.
+    ~~~
+
+    or
+
+    ~~~text
+    [S-8432]
+    Stack's 'programs' path is <path>. It contains a space character. This will
+    prevent building with GHC 9.4.1 or later.
+
+    To avoid such problems, use the local-programs-path non-project specific
+    configuration option to specify an alternative space-free path.
     ~~~
 
 *   `Stack.Coverage.generateHpcReport`: catches exceptions from

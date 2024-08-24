@@ -17,6 +17,10 @@ Behavior changes:
   consequently, if a Docker container is not being run 'detached', its standard
   input channel will always be kept open. (Before Docker 1.9.1 the use of an
   interactive container could hang in certain circumstances.)
+* On Windows, Stack will always warn (message S-8432) if there is a space
+  character in Stack's 'programs' path, as GHC 9.4.1 and later do not work if
+  there is a space in the path to the `ghc` executable. S-8432 now presents as a
+  warning and not an error.
 
 Other enhancements:
 
