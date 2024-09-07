@@ -996,12 +996,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                       announce "rerunning previously failed test"
                       pure True
                 TSUnknown -> pure True
-          else do
-            notifyIfNoRunTests <- view $ configL . to (.notifyIfNoRunTests)
-            when notifyIfNoRunTests $
-              announce "Test running disabled by --no-run-tests flag."
-            pure False
-
+          else prettyThrowM $ ActionNotFilteredBug "singleTest"
       when toRun $ do
         buildDir <- distDirFromDir pkgDir
         hpcDir <- hpcDirFromDir pkgDir
@@ -1262,17 +1257,10 @@ singleBench beopts benchesToRun ac ee task installedMap = do
       let args = map unqualCompToString benchesToRun <> maybe []
                        ((:[]) . ("--benchmark-options=" <>))
                        beopts.additionalArgs
-
       toRun <-
         if beopts.runBenchmarks
           then pure True
-          else do
-            notifyIfNoRunBenchmarks <-
-              view $ configL . to (.notifyIfNoRunBenchmarks)
-            when notifyIfNoRunBenchmarks $
-              announce "Benchmark running disabled by --no-run-benchmarks flag."
-            pure False
-
+          else prettyThrowM $ ActionNotFilteredBug "singleBench"
       when toRun $ do
         announce "benchmarks"
         cabal CloseOnException KeepTHLoading ("bench" : args)
