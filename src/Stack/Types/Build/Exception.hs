@@ -261,6 +261,7 @@ data BuildPrettyException
       VersionCheck
       WantedCompilerSetter -- Way that the wanted compiler is set
       StyleDoc -- recommended resolution
+  | ActionNotFilteredBug StyleDoc
   deriving (Show, Typeable)
 
 instance Pretty BuildPrettyException where
@@ -450,6 +451,12 @@ instance Pretty BuildPrettyException where
          ]
     <> blankLine
     <> resolution
+  pretty (ActionNotFilteredBug source) = bugPrettyReport "S-4660" $
+    fillSep
+      [ source
+      , flow "is seeking to run an action that should have been filtered from \
+             \the list of actions."
+      ]
 
 instance Exception BuildPrettyException
 
