@@ -417,7 +417,7 @@ For answers to frequently asked questions about Stack, please see the
 [FAQ](faq.md).
 
 For general questions please post to the
-[Haskell Community](https://discourse.haskell.org/about).
+[Haskell Community](https://discourse.haskell.org/about) forum.
 
 ## Get involved!
 
