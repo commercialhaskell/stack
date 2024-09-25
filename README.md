@@ -20,11 +20,7 @@ If are learning to use Stack and have questions, a discussion at the
 You can participate with the Stack community in the following areas:
 
 * the [Haskell Community](https://discourse.haskell.org/) forum
-* the Haskell Foundation's
-  [Slack workspace](https://haskell-foundation.slack.com/join/shared_invite/zt-z45o9x38-8L55P27r12YO0YeEufcO2w#/shared-invite/email)
-    * `#stack-users` channel, for general Stack discussion
-    * `#stack-collaborators` channel, for working on Stack's code base
-* the [Haskell Stack room](https://matrix.to/#/#haskell-stack:matrix.org) on
-  [Matrix](https://matrix.org/)
-* the [Google Group mailing list](https://groups.google.com/g/haskell-stack) for
-  Stack
+
+* the Haskell
+  [Stack and Stackage](https://matrix.to/#/#haskell-stack:matrix.org)
+  room (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/)

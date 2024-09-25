@@ -372,38 +372,17 @@ final release.
 
     ### G: Announce the release candidate
 
-    Announce the release candidate to the following mailing lists
-
-    * haskell-cafe@haskell.org
-
-        !!! note
-
-            You have to be a member of the mailing list to post to it. See the
-            list's
-            [interface](https://mail.haskell.org/cgi-bin/mailman/listinfo/haskell-cafe)
-
-    * haskell-stack@googlegroups.com
-
-        !!! note
-
-            Members of the group can post but posts from new members are held
-            for moderation.
-
-    * commercialhaskell@googlegroups.com
-
-        !!! note
-
-            Members of the group can post but posts from new members are held
-            for moderation.
-
     Announce the release candidate on the
-    [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest).
+    [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest)
+    forum.
 
-    Announce the release candidate in the `#stack-users` channel of the Haskell
-    Foundation's Slack workspace.
+    Announce the release candidate in the Haskell Foundation's
+    [general](https://matrix.to/#/#haskell-foundation-general:matrix.org) room
+    (address `#haskell-foundation-general:matrix.org`) on
+    [Matrix](https://matrix.org/).
 
-    Announce the release candidate in the
-    [Haskell Stack room](https://matrix.to/#/#haskell-stack:matrix.org)
+    Announce the release candidate in the Haskell
+    [Stack and Stackage](https://matrix.to/#/#haskell-stack:matrix.org) room
     (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/).
 
     Announce the release candidate in Reddit's
@@ -657,38 +636,17 @@ final release.
 
     ### K: Announce the release
 
-    Announce the release to the following mailing lists
-
-    * haskell-cafe@haskell.org
-
-        !!! note
-
-            You have to be a member of the mailing list to post to it. See the
-            list's
-            [interface](https://mail.haskell.org/cgi-bin/mailman/listinfo/haskell-cafe)
-
-    * haskell-stack@googlegroups.com
-
-        !!! note
-
-            Members of the group can post but posts from new members are held
-            for moderation.
-
-    * commercialhaskell@googlegroups.com
-
-        !!! note
-
-            Members of the group can post but posts from new members are held
-            for moderation.
-
     Announce the release on the
-    [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest).
+    [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest)
+    forum.
 
-    Announce the release in the `#stack-users` channel of the Haskell
-    Foundation's Slack workspace.
+    Announce the release candidate in the Haskell Foundation's
+    [general](https://matrix.to/#/#haskell-foundation-general:matrix.org)
+    room (address `#haskell-foundation-general:matrix.org`) on
+    [Matrix](https://matrix.org/).
 
-    Announce the release in the
-    [Haskell Stack room](https://matrix.to/#/#haskell-stack:matrix.org)
+    Announce the release in the Haskell
+    [Stack and Stackage](https://matrix.to/#/#haskell-stack:matrix.org) room
     (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/).
 
     Announce the release in Reddit's

@@ -8,7 +8,7 @@ title: Get involved
 ## Feedback and discussion
 
 * For general comments, feedback and support, please post to the
-  [Haskell Community](https://discourse.haskell.org/about).
+  [Haskell Community](https://discourse.haskell.org/about) forum.
 * For bugs, issues, or requests, please
   [open an issue](https://github.com/commercialhaskell/stack/issues/new).
 * When using Stack Overflow, please use the

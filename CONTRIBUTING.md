@@ -87,11 +87,18 @@ topics, and that is reflected in the current issue tracker content. Assistance
 in responding to such matters is greatly appreciated.
 
 While support-related matters can be posted here as an 'issue', we encourage the
-use of other forums, in particular
-[Haskell's Discourse](https://discourse.haskell.org/). We also recommend
-Haskell's Discourse for general discussions about Stack's current or desired
-features. Stack is also discussed on Reddit's
-[Haskell community](https://www.reddit.com/r/haskell/).
+use of other forums, in particular the
+[Haskell Community](https://discourse.haskell.org/) forum. See its 'Learn'
+category. We also recommend that forum for general discussions about Stack's
+current or desired features.
+
+Stack is also discussed:
+
+* in the Haskell
+  [Stack and Stackage](https://matrix.to/#/#haskell-stack:matrix.org) room
+  (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/); and
+
+* on Reddit's [Haskell community](https://www.reddit.com/r/haskell/).
 
 We encourage use of those other forums because support-related discussions can
 clog up the issue tracker and make it more difficult to maintain the project.
