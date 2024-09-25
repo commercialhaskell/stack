@@ -12,7 +12,7 @@ theme:
     primary: 'deep purple'
     accent: 'deep purple'
   icon:
-    logo: material/language-haskell
+    logo: simple/haskell
   features:
   - content.code.annotate
   - content.code.copy
