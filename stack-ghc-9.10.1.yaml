@@ -4,7 +4,7 @@
 # Currently, Stack cannot be built with GHC 9.10.1 because Cabal-3.12.0.0 has
 # changed the type of Distribution.PackageDescription.Check.checkPackage.
 
-snapshot: nightly-2024-08-02 # GHC 9.8.2
+snapshot: nightly-2024-09-26 # GHC 9.8.2
 compiler: ghc-9.10.1
 
 extra-deps:
@@ -18,6 +18,8 @@ extra-deps:
 - http-api-data-0.6.1
 - process-1.6.19.0@rev:1
 - time-1.12.2
+# nightly-2024-09-26 provides tls-2.0.6
+- tls-2.1.0@sha256:39f9a6183a6dafc3365e99f4f3b99a55154f8a3a3114d9475459a066f56a3a32,6173
 - unix-2.8.5.1
 - uuid-types-1.0.6
 
