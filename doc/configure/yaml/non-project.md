@@ -433,9 +433,10 @@ build with this compiler depends on such global packages because Stack may not
 be able to find versions of those packages (on Hackage, etc.) that are
 compatible with the compiler.
 
-The easiest way to deal with this issue is to drop the offending packages as
-follows. Instead of using the packages specified in the snapshot, the global
-packages bundled with GHC will be used.
+The easiest way to deal with this issue is to use the
+[`drop-packages`](project.md#drop-packages) project-specific configuration
+option to drop the offending packages as follows. Instead of using the packages
+specified in the snapshot, the global packages bundled with GHC will be used.
 
 ~~~yaml
 drop-packages:
@@ -444,8 +445,9 @@ drop-packages:
 ~~~
 
 Another way to deal with this issue is to add the relevant packages as
-`extra-deps` built from source. To avoid mismatching versions, you can use
-exactly the same commit id you used to build GHC as follows:
+[`extra-deps`](project.md#extra-deps) built from source. To avoid mismatching
+versions, you can use exactly the same commit id you used to build GHC as
+follows:
 
 ~~~
 extra-deps:
