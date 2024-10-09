@@ -319,6 +319,17 @@
 
 ## `stack build`-related
 
+??? question "Why does `stack build` fail with GHC 9.8.1 and 9.8.2 only?"
+
+    If the Cabal file of the relevant package makes use of a `c-sources` field,
+    the failure may be due to `Cabal-3.10.2.0` enforcing that the field can
+    specify only `*.c` files. Earlier and later versions of Cabal (the library)
+    tolerate other files.
+
+    When the Cabal build type is not `Custom`, Stack builds with the `Cabal`
+    boot package of the specified version of GHC. The boot package of GHC 9.8.1
+    and 9.8.2 is `Cabal-3.10.2.0`.
+
 ??? question "Why does `stack test` trigger a rebuild of other components?"
 
     If the set of dependencies of a project package to be built are not a
