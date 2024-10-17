@@ -46,6 +46,7 @@ Bug fixes:
    project packages with test suites and
    `stack bench --no-run-benchmarks --dry-run` no longer reports that Stack
    would benchmark project packages with benchmarks.
+* `StackSetupShim` compiles with `Cabal >= 3.14.0.0`.
 
 ## v3.1.1 - 2024-07-28
 

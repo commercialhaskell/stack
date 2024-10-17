@@ -46,6 +46,10 @@ import "Cabal" Distribution.Types.GenericPackageDescription
 import Distribution.Types.ComponentLocalBuildInfo ( ComponentLocalBuildInfo )
 import Distribution.Types.LocalBuildInfo ( LocalBuildInfo )
 import Distribution.Types.PackageDescription ( PackageDescription )
+#if MIN_VERSION_Cabal(3,14,0)
+import Distribution.Utils.Path
+         ( interpretSymbolicPathCWD, makeSymbolicPath, relativeSymbolicPath )
+#endif
 import Distribution.Verbosity ( Verbosity )
 #endif
 import Distribution.Verbosity ( flagToVerbosity )
@@ -85,7 +89,12 @@ stackReplHook arg1 arg2 = do
             "stack-initial-build-steps, expected to parse Cabal verbosity: " <>
             msg1
           Right verbosity -> do
-            eFp <- findPackageDesc ""
+            eFp <-
+#if MIN_VERSION_Cabal(3,14,0)
+              findPackageDesc Nothing
+#else
+              findPackageDesc ""
+#endif
             case eFp of
               Left err -> fail $
                 "Unexpected happened running Setup.hs with " <>
@@ -99,9 +108,23 @@ stackReplHook arg1 arg2 = do
                 msg2 = err
 #endif
               Right fp -> do
-                gpd <- readGenericPackageDescription verbosity fp
+                gpd <-
+                  readGenericPackageDescription
+                    verbosity
+#if MIN_VERSION_Cabal(3,14,0)
+                    Nothing
+                    (relativeSymbolicPath fp)
+#else
+                    fp
+#endif
                 let pd = packageDescription gpd
-                lbi <- getPersistBuildConfig rawBuildDir
+                lbi <- getPersistBuildConfig
+#if MIN_VERSION_Cabal(3,14,0)
+                  Nothing
+                  (makeSymbolicPath rawBuildDir)
+#else
+                  rawBuildDir
+#endif
                 initialBuildSteps rawBuildDir pd lbi verbosity
 
 -- | Temporary, can be removed if initialBuildSteps restored to Cabal's API.
@@ -127,7 +150,14 @@ componentInitialBuildSteps ::
   -> Verbosity -- ^The verbosity to use
   -> IO ()
 componentInitialBuildSteps _distPref pkg_descr lbi clbi verbosity = do
-  createDirectoryIfMissingVerbose verbosity True (componentBuildDir lbi clbi)
+  createDirectoryIfMissingVerbose
+    verbosity
+    True
+#if MIN_VERSION_Cabal(3,14,0)
+    (interpretSymbolicPathCWD $ componentBuildDir lbi clbi)
+#else
+    (componentBuildDir lbi clbi)
+#endif
   -- Cabal-3.10.3.0 used writeAutogenFiles, that generated and wrote out the
   -- Paths_<pkg>.hs, PackageInfo_<pkg>.hs, and cabal_macros.h files. This
   -- appears to be the equivalent function for Cabal-3.11.0.0.
