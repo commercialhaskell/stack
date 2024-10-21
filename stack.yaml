@@ -11,6 +11,8 @@ extra-deps:
 - tls-2.1.0@sha256:39f9a6183a6dafc3365e99f4f3b99a55154f8a3a3114d9475459a066f56a3a32,6173
 # lts-22.28 provides crypton-connection-0.3.2
 - crypton-connection-0.4.1@sha256:a03dabfac16fcc58b4089c2f75ad1e97fc71c4a44f3aeb790db65cebb9ebd1d0,1590
+# lts-22.28 provides static-bytes-0.1.0
+- static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
 
 docker:
   enable: false

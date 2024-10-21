@@ -1,11 +1,14 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.8.2.
+# built with GHC 9.8.3.
 
-snapshot: nightly-2024-09-26 # GHC 9.8.2
+snapshot: nightly-2024-10-21 # GHC 9.8.2
+compiler: ghc-9.8.3
 
 extra-deps:
-# nightly-2024-09-26 provides tls-2.0.6
+# nightly-2024-10-21 provides tls-2.0.6
 - tls-2.1.0@sha256:39f9a6183a6dafc3365e99f4f3b99a55154f8a3a3114d9475459a066f56a3a32,6173
+# nightly-2024-10-21 provides static-bytes-0.1.0
+- static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
 
 docker:
   enable: false

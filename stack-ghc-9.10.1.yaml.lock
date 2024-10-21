@@ -54,9 +54,9 @@ packages:
   original:
     hackage: hpc-0.7.0.1@rev:1
 - completed:
-    hackage: http-api-data-0.6.1@sha256:f7fbff94524714b9d319a864aa61b8a63a520fc9a3b5d4eca3ebdfc8e6109566,3228
+    hackage: http-api-data-0.6.1@sha256:e389f4353cc6fc9a6522e2a6e21973fe627deac2fcae5df753fe1606a182813f,3247
     pantry-tree:
-      sha256: c709779a9ed1858603bf238d68fa303841b7e46a671564578d2ad49db4633a5d
+      sha256: 2d03a605ac637ccfed7d027188450030d072bbd786058f0f0c5f46fb0fbb0256
       size: 819
   original:
     hackage: http-api-data-0.6.1
@@ -67,6 +67,13 @@ packages:
       size: 1675
   original:
     hackage: process-1.6.19.0@rev:1
+- completed:
+    hackage: static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
+    pantry-tree:
+      sha256: 505d5c1a9a89bb60cd21639bd9a4ce0e3f043dc7b8ed42e47c6b2eb0b89d2524
+      size: 440
+  original:
+    hackage: static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
 - completed:
     hackage: time-1.12.2@sha256:88e8493d9130038d3b9968a2530a0900141cd3d938483c83dde56e12b875ebc8,6510
     pantry-tree:
@@ -89,15 +96,15 @@ packages:
   original:
     hackage: unix-2.8.5.1
 - completed:
-    hackage: uuid-types-1.0.6@sha256:7cb34342914f1be68dbdf2dec35c27d360160848ce5a79ad2c1a990fefd1d855,2582
+    hackage: uuid-types-1.0.6@sha256:595644500d36908be85cd02fb446c411555ecc5c59b7ce33d1205cfc9ceb55a6,2604
     pantry-tree:
-      sha256: 73e7029b6faeb88f5395e72ed38fcef197b9077c38f9f8f34039f209e75d4806
+      sha256: 8ddb70a1c62025f4cb9e5d0b1063631e3b0f709a70b320e7a30696ee4398559c
       size: 480
   original:
     hackage: uuid-types-1.0.6
 snapshots:
 - completed:
-    sha256: 9efe9f561e73b88351653af623aa1aaa4a51b6fbe62fa549a0d24b040de11300
-    size: 664617
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/9/26.yaml
-  original: nightly-2024-09-26
+    sha256: 867086a789eaf6da9f48a56bb5e8bfd6df27b120023c144cc7bbec5c95717915
+    size: 669588
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/10/21.yaml
+  original: nightly-2024-10-21

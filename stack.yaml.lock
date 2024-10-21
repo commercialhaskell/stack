@@ -39,6 +39,13 @@ packages:
       size: 394
   original:
     hackage: crypton-connection-0.4.1@sha256:a03dabfac16fcc58b4089c2f75ad1e97fc71c4a44f3aeb790db65cebb9ebd1d0,1590
+- completed:
+    hackage: static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
+    pantry-tree:
+      sha256: 505d5c1a9a89bb60cd21639bd9a4ce0e3f043dc7b8ed42e47c6b2eb0b89d2524
+      size: 440
+  original:
+    hackage: static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
 snapshots:
 - completed:
     sha256: 87da71cb0ae9ee1ea1bf51a8eb9812f39f779be76abc0a3c926defd8afda05d1
