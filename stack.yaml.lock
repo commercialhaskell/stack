@@ -5,19 +5,19 @@
 
 packages:
 - completed:
-    hackage: pantry-0.10.0@sha256:6f99ee8d7cfeeb0e2513638618acf80c72d018e7f10120048fa120a409b9dcd2,7864
+    hackage: crypton-connection-0.4.1@sha256:a03dabfac16fcc58b4089c2f75ad1e97fc71c4a44f3aeb790db65cebb9ebd1d0,1590
     pantry-tree:
-      sha256: 780acb3eaec5c14b3905d5343a8b0152165643634741590a96a5b0d5904a9bcc
-      size: 2722
+      sha256: 821d6ea277735b78fe6df218f158188aed4081317d3ef614a50aac44bb7a4061
+      size: 394
   original:
-    hackage: pantry-0.10.0@sha256:6f99ee8d7cfeeb0e2513638618acf80c72d018e7f10120048fa120a409b9dcd2,7864
+    hackage: crypton-connection-0.4.1@sha256:a03dabfac16fcc58b4089c2f75ad1e97fc71c4a44f3aeb790db65cebb9ebd1d0,1590
 - completed:
-    hackage: tar-0.6.2.0@sha256:619828cae098a7b6deeb0316e12f55011101d88f756787ed024ceedb81cf1eba,4576
+    hackage: hi-file-parser-0.1.7.0@sha256:6cb54bc4bcc07c3b4c7b5dca73bc81e6b052636dc212eb6791608e70aab1ddfe,3012
     pantry-tree:
-      sha256: 1dde50961e9d1a6e6f820d918c0edbbd9673c83afdd300e0aae40a691e8151df
-      size: 2168
+      sha256: 6aa8f0023bb0ea61d62c3b60ffa5720d497847bc55c7f0e50254acc30f9bfe68
+      size: 2693
   original:
-    hackage: tar-0.6.2.0@sha256:619828cae098a7b6deeb0316e12f55011101d88f756787ed024ceedb81cf1eba,4576
+    hackage: hi-file-parser-0.1.7.0@sha256:6cb54bc4bcc07c3b4c7b5dca73bc81e6b052636dc212eb6791608e70aab1ddfe,3012
 - completed:
     hackage: hpack-0.37.0@sha256:b7c91b0416a55c134172a9fd9a02f3815ba68c4b92cca4e320c36906d5e970e0,5187
     pantry-tree:
@@ -26,19 +26,12 @@ packages:
   original:
     hackage: hpack-0.37.0@sha256:b7c91b0416a55c134172a9fd9a02f3815ba68c4b92cca4e320c36906d5e970e0,5187
 - completed:
-    hackage: tls-2.1.0@sha256:39f9a6183a6dafc3365e99f4f3b99a55154f8a3a3114d9475459a066f56a3a32,6173
+    hackage: pantry-0.10.0@sha256:d13f99099753b0acf0695a00dc4d82f2671d3c604161d169ac0fc8fcf3004dec,7912
     pantry-tree:
-      sha256: eaa57b1302d6e68d064f126094360df6ecb7cf5e1c79837bf832595eb800590a
-      size: 6452
+      sha256: 9b2d3bc9156c7daed86c591ccf777ccf86973baf4072c953d5fbd30d64d06f55
+      size: 2722
   original:
-    hackage: tls-2.1.0@sha256:39f9a6183a6dafc3365e99f4f3b99a55154f8a3a3114d9475459a066f56a3a32,6173
-- completed:
-    hackage: crypton-connection-0.4.1@sha256:a03dabfac16fcc58b4089c2f75ad1e97fc71c4a44f3aeb790db65cebb9ebd1d0,1590
-    pantry-tree:
-      sha256: 821d6ea277735b78fe6df218f158188aed4081317d3ef614a50aac44bb7a4061
-      size: 394
-  original:
-    hackage: crypton-connection-0.4.1@sha256:a03dabfac16fcc58b4089c2f75ad1e97fc71c4a44f3aeb790db65cebb9ebd1d0,1590
+    hackage: pantry-0.10.0@sha256:d13f99099753b0acf0695a00dc4d82f2671d3c604161d169ac0fc8fcf3004dec,7912
 - completed:
     hackage: static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
     pantry-tree:
@@ -46,6 +39,20 @@ packages:
       size: 440
   original:
     hackage: static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
+- completed:
+    hackage: tar-0.6.2.0@sha256:619828cae098a7b6deeb0316e12f55011101d88f756787ed024ceedb81cf1eba,4576
+    pantry-tree:
+      sha256: 1dde50961e9d1a6e6f820d918c0edbbd9673c83afdd300e0aae40a691e8151df
+      size: 2168
+  original:
+    hackage: tar-0.6.2.0@sha256:619828cae098a7b6deeb0316e12f55011101d88f756787ed024ceedb81cf1eba,4576
+- completed:
+    hackage: tls-2.1.0@sha256:39f9a6183a6dafc3365e99f4f3b99a55154f8a3a3114d9475459a066f56a3a32,6173
+    pantry-tree:
+      sha256: eaa57b1302d6e68d064f126094360df6ecb7cf5e1c79837bf832595eb800590a
+      size: 6452
+  original:
+    hackage: tls-2.1.0@sha256:39f9a6183a6dafc3365e99f4f3b99a55154f8a3a3114d9475459a066f56a3a32,6173
 snapshots:
 - completed:
     sha256: 87da71cb0ae9ee1ea1bf51a8eb9812f39f779be76abc0a3c926defd8afda05d1

@@ -47,6 +47,13 @@ packages:
   original:
     hackage: ghc-boot-9.10.1@rev:1
 - completed:
+    hackage: hi-file-parser-0.1.7.0@sha256:6cb54bc4bcc07c3b4c7b5dca73bc81e6b052636dc212eb6791608e70aab1ddfe,3012
+    pantry-tree:
+      sha256: 6aa8f0023bb0ea61d62c3b60ffa5720d497847bc55c7f0e50254acc30f9bfe68
+      size: 2693
+  original:
+    hackage: hi-file-parser-0.1.7.0@sha256:6cb54bc4bcc07c3b4c7b5dca73bc81e6b052636dc212eb6791608e70aab1ddfe,3012
+- completed:
     hackage: hpc-0.7.0.1@sha256:637509832c52b3dcb8013e07cf2f73358df789737e4ba865cbb9baf4481734ca,1170
     pantry-tree:
       sha256: 50daf61b7f38d5bbc847713d1fb7ce30ca00f09130f649de321afd217b3e90a4
@@ -60,6 +67,13 @@ packages:
       size: 819
   original:
     hackage: http-api-data-0.6.1
+- completed:
+    hackage: pantry-0.10.0@sha256:d13f99099753b0acf0695a00dc4d82f2671d3c604161d169ac0fc8fcf3004dec,7912
+    pantry-tree:
+      sha256: 9b2d3bc9156c7daed86c591ccf777ccf86973baf4072c953d5fbd30d64d06f55
+      size: 2722
+  original:
+    hackage: pantry-0.10.0@sha256:d13f99099753b0acf0695a00dc4d82f2671d3c604161d169ac0fc8fcf3004dec,7912
 - completed:
     hackage: process-1.6.19.0@sha256:807bfa9b4038b59ae0c362bd94a783f898fbe0b42dbe1f2ede3c392bf2b8727d,3148
     pantry-tree:
