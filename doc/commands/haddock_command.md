@@ -1,6 +1,6 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# The `stack bench` command
+# The `stack haddock` command
 
 ~~~text
 stack haddock [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
