@@ -61,6 +61,23 @@ is for filesystem `/dev/sda1`.
 If the available space is low, that may be due to unncessary GHC versions
 installed in Stack's `programs` directory.
 
+## Re-configuring a removed `stack-github-action3` runner
+
+A self-hosted runner is automatically removed from GitHub if it has not
+connected to GitHub Actions for more than 14 days.
+
+Re-adding a self-hosted runner to GitHub requires it to be configured, and
+GitHub will suggest a configuration command like:
+
+~~~text
+./config.sh --url https://github.com/commercialhaskell/stack --token <token_value>
+~~~
+
+However, to re-use and configure the runner machine, you have first to delete
+the `.runner` file inside the `actions-runner` directory. This allows the runner
+to be registered without having to re-download the self-hosted runner
+application.
+
 ## The `ghc-arm-5` runner
 
 From 9 February 2024, the Haskell Foundation sought to provide an alternative
