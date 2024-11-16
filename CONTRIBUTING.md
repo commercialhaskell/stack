@@ -336,7 +336,7 @@ entry and
 [documentation](https://github.com/commercialhaskell/stack/tree/master/doc/)
 updates with your pull request.
 
-## Backwards Compatability
+## Backwards Compatibility
 
 The Stack package provides a library and an executable (`stack`) that depends on
 the library. The library is intended for use only by the executable.
@@ -482,7 +482,7 @@ That said, the following may help:
 * Stack's imports are listed alphabetically, including `Stack.Prelude`, where
   applicable. The module names are left aligned, with space left for `qualified`
   where it is absent.
-* Stack's code is sufficiently stable that explict import lists can sensibly be
+* Stack's code is sufficiently stable that explicit import lists can sensibly be
   used. The exception is the import of `Stack.Prelude`. Not all modules have
   comprehensive explicit import lists.
 * Short explicit import lists follow the module name. Longer lists start on the
@@ -816,7 +816,7 @@ project‑level configuration (`stack.yaml`). But there are also Dev Containers
 for the experimental project‑level configurations.
 
 For further information, see the documentation for
-[Dev Containers](dev_containers.md).
+[Dev Containers](doc/dev_containers.md).
 
 ## Slack channel
 
