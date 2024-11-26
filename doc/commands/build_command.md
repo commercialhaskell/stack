@@ -623,6 +623,11 @@ command line arguments. For example, to pass `'a single quoted string'`:
     The content of single quotes is taken literally. Within single quotes, `''`
     escapes a single quote.
 
+!!! note "Runtime system (RTS) options"
+
+    RTS options must be quoted to prevent the RTS extracting them as its own
+    when the Stack executable is run.
+
 ### `--exec` option
 
 `stack build --exec '<command> [<argument(s)>]'` will run the specified command
@@ -699,6 +704,11 @@ command line arguments. For example, to pass `'a single quoted string'`:
 
     The content of single quotes is taken literally. Within single quotes, `''`
     escapes a single quote.
+
+!!! note "Runtime system (RTS) options"
+
+    RTS options must be quoted to prevent the RTS extracting them as its own
+    when the Stack executable is run.
 
 ## Flags affecting GHC's behaviour
 

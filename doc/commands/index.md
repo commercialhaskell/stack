@@ -10,6 +10,36 @@ of the guide and the part on [configuration](../configure/index.md) provide
 information about some of those features, organised as a reference guide. Some
 of the features are complex and separate pages are dedicated to them.
 
+## stack command
+
+Stack is usually used with one of its commands (see further below). However:
+
+* `stack`, `stack --help` (or `-h`) lists Stack's commands, and flags and
+  options common to those commands;
+
+* `stack <command> --help` (or `-h`) — provides help on the particular Stack
+  command, including flags and options specific to the command; and
+
+* `stack --version` identifies the version and Git hash of the Stack executable.
+
+!!! info "Runtime system (RTS) options"
+
+    The Stack executable is built by GHC with the `-rtsopts=some` option. This
+    means that the RTS extracts command-line arguments bracketed between `+RTS`
+    and `-RTS` as its own when Stack is run. Only the following RTS
+    options are available:
+
+    *   `-?` (e.g. `stack +RTS -?`) causes the RTS to output information about
+        RTS options; and
+
+    *   `--info` (e.g. `stack +RTS --info`) causes the RTS to output information
+        about the RTS.
+
+    To avoid the RTS extracting such command-line arguments as its own when
+    using Stack commands such as [`exec`](exec_command.md),
+    [`test`](test_command.md) or [`bench`](bench_command.md), see the
+    documentation for those commands.
+
 ## Stack commands (thematic)
 
 ### Setting up
