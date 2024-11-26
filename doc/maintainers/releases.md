@@ -67,7 +67,7 @@ Examples:
 
 4.  Check the copyright dates, and update if needed.
 
-5.  Check the backwards compatability section of `CONTRIBUTING.md` is up to
+5.  Check the backwards compatibility section of `CONTRIBUTING.md` is up to
     date.
 
 6.  Ensure CI matrices in docs (travis-complex, appveyor, azure) have current
