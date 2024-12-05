@@ -186,7 +186,7 @@ An extra-dep will shadow a dependency specified in a [snapshot](#snapshot) of
 the same name. An extra-dep can be shadowed by a [project package](#packages) of
 the same name.
 
-!!! info
+!!! info "GHC wired-in packages"
 
     Some Haskell packages published on Hackage, for example `base` and `ghc`,
     are referred to as 'wired-in' to one or more versions of GHC or as 'magic'.
