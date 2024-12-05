@@ -330,6 +330,22 @@
     boot package of the specified version of GHC. The boot package of GHC 9.8.1
     and 9.8.2 is `Cabal-3.10.2.0`.
 
+??? question "What causes dependency on multiple versions of the same package?"
+
+    When building a package, during its configuration, Stack may warn:
+
+    ~~~text
+    This package indirectly depends on multiple versions of the same package.
+    This is very likely to cause a compile failure.
+    ~~~
+
+    and the build subsequently fails.
+
+    Often the cause is that: (1) the package depends, directly or indirectly, on
+    a GHC wired-in package (for example, the `ghc` package); and (2) a direct or
+    indirect dependency of that wired-in package is also specified as an
+    extra-dep but the versions differ.
+
 ??? question "Why does `stack test` trigger a rebuild of other components?"
 
     If the set of dependencies of a project package to be built are not a
