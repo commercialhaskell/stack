@@ -3,11 +3,12 @@
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
--- | A sourcemap maps a package name to how it should be built, including source
--- code, flags, options, etc. This module contains various stages of source map
--- construction. See the @build_overview.md@ doc for details on these stages.
+-- | A source map maps a package name to how it should be built, including
+-- source code, flags and options. This module exports types used in various
+-- stages of source map construction. See @build_overview.md@ for details on
+-- these stages.
 module Stack.Types.SourceMap
-  ( -- * Different source map types
+  ( -- * Source map types
     SMWanted (..)
   , SMActual (..)
   , Target (..)
@@ -56,8 +57,8 @@ data CommonPackage = CommonPackage
     -- ^ Should Haddock documentation be built for this package?
   }
 
--- | Flag showing if package comes from a snapshot needed to ignore dependency
--- bounds between such packages
+-- | Flag showing if package comes from a snapshot. Used to ignore dependency
+-- bounds between such packages.
 data FromSnapshot
   = FromSnapshot
   | NotFromSnapshot
@@ -75,16 +76,20 @@ data DepPackage = DepPackage
     -- See https://github.com/commercialhaskell/stackage/issues/3185
   }
 
--- | A view of a project package needed for resolving components
+-- | A view of a project package. Used to resolve components.
 data ProjectPackage = ProjectPackage
   { projectCommon :: !CommonPackage
   , cabalFP :: !(Path Abs File)
   , resolvedDir :: !(ResolvedPath Dir)
   }
 
--- | A view of a package installed in the global package database also could
--- include marker for a replaced global package (could be replaced because of a
--- replaced dependency)
+-- | A type representing versions of packages in the global package database.
+newtype GlobalPackageVersion
+  = GlobalPackageVersion Version
+
+-- | A view of a package installed in the global package database or a marker
+-- for a replaced global package. A global package could be replaced because of
+-- a replaced dependency.
 data GlobalPackage
   = GlobalPackage !Version
   | ReplacedGlobalPackage ![PackageName]
@@ -93,6 +98,16 @@ data GlobalPackage
 isReplacedGlobal :: GlobalPackage -> Bool
 isReplacedGlobal (ReplacedGlobalPackage _) = True
 isReplacedGlobal (GlobalPackage _) = False
+
+-- | A type representing how a package is intended to be built.
+data Target
+  = TargetAll !PackageType
+    -- ^ Build all of the default components.
+  | TargetComps !(Set NamedComponent)
+    -- ^ Only build specific components
+
+data PackageType = PTProject | PTDependency
+  deriving (Eq, Show)
 
 -- | A source map with information on the wanted (but not actual) compiler. This
 -- is derived by parsing the @stack.yaml@ file for @packages@, @extra-deps@,
@@ -110,8 +125,9 @@ data SMWanted = SMWanted
     -- ^ Where this snapshot is loaded from.
   }
 
--- | Adds in actual compiler information to 'SMWanted', in particular the
--- contents of the global package database.
+-- | A source map with information on the actual compiler, including the
+-- contents of its global package database. It does not include any information
+-- from the command line.
 --
 -- Invariant: a @PackageName@ appears in only one of the @Map@s.
 data SMActual global = SMActual
@@ -120,19 +136,6 @@ data SMActual global = SMActual
   , deps :: !(Map PackageName DepPackage)
   , globals :: !(Map PackageName global)
   }
-
-newtype GlobalPackageVersion
-  = GlobalPackageVersion Version
-
--- | How a package is intended to be built
-data Target
-  = TargetAll !PackageType
-  -- ^ Build all of the default components.
-  | TargetComps !(Set NamedComponent)
-  -- ^ Only build specific components
-
-data PackageType = PTProject | PTDependency
-  deriving (Eq, Show)
 
 -- | Builds on an 'SMActual' by resolving the targets specified on the command
 -- line, potentially adding in new dependency packages in the process.
@@ -143,6 +146,9 @@ data SMTargets = SMTargets
 
 -- | The final source map, taking an 'SMTargets' and applying all command line
 -- flags and GHC options.
+--
+-- One source map value is distinguished from another by a hash of the parts of
+-- the value that are immutable.
 data SourceMap = SourceMap
   { targets :: !SMTargets
     -- ^ Doesn't need to be included in the hash, does not affect the source
