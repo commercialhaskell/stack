@@ -1,0 +1,18 @@
+# This is an experimental project-level configuration, to see if Stack can be
+# built with GHC 9.8.4.
+
+snapshot: nightly-2024-12-07 # GHC 9.8.4
+
+docker:
+  enable: false
+  repo: quay.io/benz0li/ghc-musl:9.8.4
+
+nix:
+  # --nix on the command-line to enable.
+  packages:
+  - zlib
+  - unzip
+
+flags:
+  stack:
+    developer-mode: true
