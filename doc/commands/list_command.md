@@ -45,17 +45,17 @@ Error: [S-4926]
          pantry, pretty, pasty, xattr, alloy, para, pappy, alure, polar and
          factory.
 
-stack --snapshot lts-22.28 list base unix Win32 acme-missiles pantry
+stack --snapshot lts-22.43 list base unix Win32 acme-missiles pantry
 Error: [S-4926]
        * Package does not appear in snapshot (directly or indirectly): acme-missiles.
 
-stack --snapshot lts-22.28 list base unix Win32 pantry
+stack --snapshot lts-22.43 list base unix Win32 pantry
 base-4.18.2.1
 unix-2.8.4.0
 Win32-2.13.3.0
 pantry-0.9.3.2
 
-stack --snapshot lts-22.28 list
+stack --snapshot lts-22.43 list
 AC-Angle-1.0
 ALUT-2.4.0.3
 ...
