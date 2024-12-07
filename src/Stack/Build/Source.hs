@@ -31,8 +31,8 @@ import           Stack.Package
 import           Stack.PackageFile ( getPackageFile )
 import           Stack.Prelude
 import           Stack.SourceMap
-                   ( DumpedGlobalPackage, getCompilerInfo, immutableLocSha
-                   , mkProjectPackage, pruneGlobals
+                   ( getCompilerInfo, immutableLocSha, mkProjectPackage
+                   , pruneGlobals
                    )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
@@ -48,6 +48,7 @@ import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
 import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.Curator ( Curator (..) )
+import           Stack.Types.DumpPackage ( DumpedGlobalPackage )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..)
                    , actualCompilerVersionL

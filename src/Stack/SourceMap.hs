@@ -10,7 +10,6 @@ module Stack.SourceMap
   , loadVersion
   , getPLIVersion
   , loadGlobalHints
-  , DumpedGlobalPackage
   , actualFromGhc
   , actualFromHints
   , globalCondCheck
@@ -39,7 +38,8 @@ import           Stack.Types.Compiler
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe, HasCompiler (..) )
 import           Stack.Types.Config ( HasConfig )
-import           Stack.Types.DumpPackage ( DumpPackage (..) )
+import           Stack.Types.DumpPackage
+                   ( DumpPackage (..), DumpedGlobalPackage )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( rslInLogL )
 import           Stack.Types.SourceMap
@@ -166,8 +166,6 @@ globalsFromHints compiler = do
         , fromString $ T.unpack $ textDisplay compiler
         ]
       pure mempty
-
-type DumpedGlobalPackage = DumpPackage
 
 actualFromGhc ::
      (HasConfig env, HasCompiler env)
