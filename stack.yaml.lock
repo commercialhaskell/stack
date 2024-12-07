@@ -12,13 +12,6 @@ packages:
   original:
     hackage: crypton-connection-0.4.1@sha256:a03dabfac16fcc58b4089c2f75ad1e97fc71c4a44f3aeb790db65cebb9ebd1d0,1590
 - completed:
-    hackage: hi-file-parser-0.1.7.0@sha256:6cb54bc4bcc07c3b4c7b5dca73bc81e6b052636dc212eb6791608e70aab1ddfe,3012
-    pantry-tree:
-      sha256: 6aa8f0023bb0ea61d62c3b60ffa5720d497847bc55c7f0e50254acc30f9bfe68
-      size: 2693
-  original:
-    hackage: hi-file-parser-0.1.7.0@sha256:6cb54bc4bcc07c3b4c7b5dca73bc81e6b052636dc212eb6791608e70aab1ddfe,3012
-- completed:
     hackage: hpack-0.37.0@sha256:b7c91b0416a55c134172a9fd9a02f3815ba68c4b92cca4e320c36906d5e970e0,5187
     pantry-tree:
       sha256: de5e75f3757d6957e5fb0032a465cbd1016d051370ec96a7e4f423bf8bafd095
@@ -32,13 +25,6 @@ packages:
       size: 2722
   original:
     hackage: pantry-0.10.0@sha256:d13f99099753b0acf0695a00dc4d82f2671d3c604161d169ac0fc8fcf3004dec,7912
-- completed:
-    hackage: static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
-    pantry-tree:
-      sha256: 505d5c1a9a89bb60cd21639bd9a4ce0e3f043dc7b8ed42e47c6b2eb0b89d2524
-      size: 440
-  original:
-    hackage: static-bytes-0.1.1@sha256:e090886a4752a816cfff7ccb2c51c533cc8e39ec2d27e485427577fc92d9e9f9,1627
 - completed:
     hackage: tar-0.6.2.0@sha256:619828cae098a7b6deeb0316e12f55011101d88f756787ed024ceedb81cf1eba,4576
     pantry-tree:
@@ -55,7 +41,7 @@ packages:
     hackage: tls-2.1.0@sha256:39f9a6183a6dafc3365e99f4f3b99a55154f8a3a3114d9475459a066f56a3a32,6173
 snapshots:
 - completed:
-    sha256: 87da71cb0ae9ee1ea1bf51a8eb9812f39f779be76abc0a3c926defd8afda05d1
-    size: 719139
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/28.yaml
-  original: lts-22.28
+    sha256: 08bd13ce621b41a8f5e51456b38d5b46d7783ce114a50ab604d6bbab0d002146
+    size: 720271
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/43.yaml
+  original: lts-22.43

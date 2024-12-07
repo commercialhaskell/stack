@@ -1,4 +1,4 @@
-snapshot: lts-22.28 # GHC 9.6.6
+snapshot: lts-22.43
 packages:
 - .
 - subproject

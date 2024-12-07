@@ -1,4 +1,4 @@
-snapshot: lts-22.28
+snapshot: lts-22.43
 packages:
 - .
 - subproject
