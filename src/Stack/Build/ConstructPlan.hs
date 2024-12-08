@@ -65,7 +65,7 @@ import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
-import           Stack.Types.DumpPackage ( DumpPackage (..), dpParentLibIdent )
+import           Stack.Types.DumpPackage ( DumpPackage (..), sublibParentPkgId )
 import           Stack.Types.EnvConfig ( EnvConfig (..), HasEnvConfig (..) )
 import           Stack.Types.EnvSettings
                    ( EnvSettings (..), minimalEnvSettings )
@@ -371,7 +371,7 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
    where
     gid = dp.ghcPkgId
     ident = dp.packageIdent
-    mParentLibId = dpParentLibIdent dp
+    mParentLibId = sublibParentPkgId dp
     deps = dp.depends
 
   maybeUnregisterReason ::

@@ -22,7 +22,7 @@ import           Stack.Prelude
 import           Stack.SourceMap ( getPLIVersion, loadVersion )
 import           Stack.Types.CompilerPaths ( getGhcPkgExe )
 import           Stack.Types.DumpPackage
-                   ( DumpPackage (..), SublibDump (..), dpParentLibIdent )
+                   ( DumpPackage (..), SublibDump (..), sublibParentPkgId )
 import           Stack.Types.EnvConfig
                     ( HasEnvConfig, packageDatabaseDeps, packageDatabaseExtra
                     , packageDatabaseLocal
@@ -199,7 +199,7 @@ isAllowed installMap pkgDb dp = case Map.lookup name installMap of
     -- If the sourceMap has nothing to say about this package,
     -- check if it represents a sub-library first
     -- See: https://github.com/commercialhaskell/stack/issues/3899
-    case dpParentLibIdent dp of
+    case sublibParentPkgId dp of
       Just (PackageIdentifier parentLibName version') ->
         case Map.lookup parentLibName installMap of
           Nothing -> checkNotFound
