@@ -276,22 +276,22 @@ versions.
     [homepage](https://www.stackage.org/) lists the most recent Stackage
     snapshot. In most cases, that is the snapshot you should use.
 
-??? question "Can I use a snapshot like `ghc-9.6.6`?"
+??? question "Can I use a snapshot like `ghc-9.8.4`?"
 
-    Snapshot `ghc-9.6.6` specifies GHC 9.6.6 and, consequently, the GHC boot
+    Snapshot `ghc-9.8.4` specifies GHC 9.8.4 and, consequently, the GHC boot
     packages that come with that compiler. However, the snapshot does not
     include the many other package versions that will work with that compiler.
     For a set of those package versions, see the snapshots published by the
     [Stackage](https://www.stackage.org/) project.
 
 Let us try using an older Stackage LTS Haskell snapshot. We will use the LTS
-21.25 snapshot with the command:
+22.43 snapshot with the command:
 
 ~~~text
-stack --snapshot lts-21.25 build
+stack --snapshot lts-22.43 build
 ~~~
 
-Stackage LTS Haskell 21.25 specifies GHC 9.4.8. If that version of GHC is not
+Stackage LTS Haskell 22.43 specifies GHC 9.6.6. If that version of GHC is not
 already available, Stack will try to fetch it and install it before starting the
 rest of the build.
 

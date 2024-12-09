@@ -9,5 +9,5 @@ import StackTest
 main :: IO ()
 -- The '--install-ghc' flag is passed here, because IntegrationSpec.runApp sets
 -- up `config.yaml` with `system-ghc: true` and `install-ghc: false`.
--- (See stack.yaml; using GHC 9.6.6.)
+-- (See stack.yaml; using GHC 9.8.4.)
 main = stack ["build", "--install-ghc"]
