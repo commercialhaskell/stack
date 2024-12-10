@@ -1,4 +1,4 @@
-snapshot: lts-22.43
+snapshot: lts-23.0
 
 packages:
 - ./local-mmorph
