@@ -1,10 +1,11 @@
-snapshot: ghc-9.6.6
+snapshot: ghc-9.8.4
 name: test-snapshot-2
 packages:
-- stm-2.5.1.0
-- async-2.2.4
-- hashable-1.4.2.0
-- zlib-0.6.3.0@sha256:9adce39e4ca0b7a87d45df0a243134816c57059a08e28cff5469c98ae1f54dfc,5367
+- async-2.2.5
+- hashable-1.4.7.0
+- os-string-2.0.7
+- stm-2.5.3.1
+- zlib-0.7.1.0@rev:2
 # FIXME: test these here
 flags: {}
 ghc-options: {}

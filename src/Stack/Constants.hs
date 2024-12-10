@@ -259,7 +259,7 @@ wiredInPackages = case mparsed of
       -- A magic package
     , "integer-gmp"
       -- No longer magic > 1.0.3.0 (GHC >= 9.0) and deprecated in favour of
-      -- ghc-bignum. With GHC 9.6.6 at least, there seems to be no problem in
+      -- ghc-bignum. With GHC 9.8.4 at least, there seems to be no problem in
       -- using it.
     , "integer-simple"
       -- A magic package
@@ -274,7 +274,7 @@ wiredInPackages = case mparsed of
       -- if they were defined in modules all sharing a common package
       -- interactive. See 'Note [The interactive package]' at
       -- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Runtime/Context.hs
-      -- With GHC 9.6.6 at least, there seems to be no problem in using it.
+      -- With GHC 9.8.4 at least, there seems to be no problem in using it.
     ]
 
 -- | Just to avoid repetition and magic strings.

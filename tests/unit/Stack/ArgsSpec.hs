@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-x-partial #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -- | Args parser test suite.

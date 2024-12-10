@@ -290,12 +290,12 @@ Command line equivalent (takes precedence): `--compiler` option
 
 Overrides the compiler version in the snapshot. Note that the `compiler-check`
 flag also applies to the version numbers. This uses the same syntax as compiler
-snapshots like `ghc-9.6.6`. This can be used to override the compiler for a
+snapshots like `ghc-9.8.4`. This can be used to override the compiler for a
 Stackage snapshot, like this:
 
 ~~~yaml
-snapshot: lts-22.43
-compiler: ghc-9.6.5
+snapshot: lts-23.0
+compiler: ghc-9.8.3
 compiler-check: match-exact
 ~~~
 

@@ -31,8 +31,8 @@ For example:
 ~~~text
 stack list base unix Win32 acme-missiles pantry
 base-4.20.0.1
-unix-2.8.5.1
-Win32-2.14.0.0
+unix-2.8.6.0
+Win32-2.14.1.0
 acme-missiles-0.3
 pantry-0.10.0
 
@@ -45,20 +45,20 @@ Error: [S-4926]
          pantry, pretty, pasty, xattr, alloy, para, pappy, alure, polar and
          factory.
 
-stack --snapshot lts-22.43 list base unix Win32 acme-missiles pantry
+stack --snapshot lts-23.0 list base unix Win32 acme-missiles pantry
 Error: [S-4926]
        * Package does not appear in snapshot (directly or indirectly): acme-missiles.
 
-stack --snapshot lts-22.43 list base unix Win32 pantry
-base-4.18.2.1
-unix-2.8.4.0
-Win32-2.13.3.0
-pantry-0.9.3.2
+stack --snapshot lts-23.0 list base unix Win32 pantry
+base-4.19.2.0
+unix-2.8.6.0
+Win32-2.13.4.0
+pantry-0.10.0
 
-stack --snapshot lts-22.43 list
+stack --snapshot lts-23.0 list
 AC-Angle-1.0
 ALUT-2.4.0.3
 ...
+zot-0.0.3
 zstd-0.1.3.0
-zxcvbn-hs-0.3.6
 ~~~
