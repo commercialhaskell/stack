@@ -1,5 +1,5 @@
-{-# OPTIONS_GHC -Wno-x-partial #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedLists   #-}
 
 -- | Args parser test suite.
 
@@ -13,8 +13,8 @@ module Stack.ArgsSpec
 import           Data.Attoparsec.Args ( EscapingMode (..), parseArgsFromString )
 import           Data.Attoparsec.Interpreter ( interpreterArgsParser )
 import qualified Data.Attoparsec.Text as P
+import qualified Data.List.NonEmpty as NE
 import           Data.Text ( pack )
-import           Prelude ( head )
 import           Stack.Constants ( stackProgName )
 import           Stack.Prelude
 import           Test.Hspec ( Spec, describe, it )
@@ -76,10 +76,10 @@ interpreterArgsSpec =
       describe "Failure cases" $ do
         checkFailures
         describe "Bare directives in literate files" $ do
-          forM_ (interpreterGenValid lineComment []) $
-            testAndCheck (acceptFailure True) []
-          forM_ (interpreterGenValid blockComment []) $
-            testAndCheck (acceptFailure True) []
+          forM_ (interpreterGenValid lineComment "") $
+            testAndCheck (acceptFailure True) ""
+          forM_ (interpreterGenValid blockComment "") $
+            testAndCheck (acceptFailure True) ""
     where
       parse isLiterate s =
         P.parseOnly (interpreterArgsParser isLiterate stackProgName) (pack s)
@@ -116,60 +116,82 @@ interpreterArgsSpec =
         (testAndCheck (acceptFailure False) "unused")
 
       -- Generate a set of acceptable inputs for given format and args
+      interpreterGenValid ::
+           (String -> NonEmpty String)
+        -> String
+        -> NonEmpty String
       interpreterGenValid fmt args = shebang <++> newLine <++> fmt args
 
-      interpreterGenInvalid :: [String]
+      interpreterGenInvalid :: NonEmpty String
       -- Generate a set of Invalid inputs
       interpreterGenInvalid =
         ["-stack\n"] -- random input
         -- just the shebang
-        <|> shebang <++> ["\n"]
+        <> shebang <++> ["\n"]
         -- invalid shebang
-        <|> blockSpace <++> [head (interpreterGenValid lineComment args)]
+        <> blockSpace <++> [NE.head (interpreterGenValid lineComment args)]
         -- something between shebang and Stack comment
-        <|> shebang
+        <> shebang
             <++> newLine
             <++> blockSpace
-            <++> ([head (lineComment args)] <|> [head (blockComment args)])
+            <++> ([NE.head (lineComment args)] <> [NE.head (blockComment args)])
         -- unterminated block comment
         -- just chop the closing chars from a valid block comment
-        <|> shebang
+        <> shebang
             <++> ["\n"]
-            <++> let c = head (blockComment args)
+            <++> let c = NE.head (blockComment args)
                      l = length c - 2
                  in  [assert (drop l c == "-}") (take l c)]
         -- nested block comment
-        <|> shebang
+        <> shebang
             <++> ["\n"]
-            <++> [head (blockComment "--x {- nested -} --y")]
+            <++> [NE.head (blockComment "--x {- nested -} --y")]
        where
         args = " --x --y"
-      (<++>) = liftA2 (++)
+      (<++>) = liftA2 (<>)
 
       -- Generative grammar for the interpreter comments
+      shebang :: NonEmpty String
       shebang = ["#!/usr/bin/env stack"]
-      newLine = ["\n"] <|> ["\r\n"]
+
+      newLine :: NonEmpty String
+      newLine = ["\n"] <> ["\r\n"]
 
       -- A comment may be the last line or followed by something else
-      postComment = [""] <|> newLine
+      postComment :: NonEmpty String
+      postComment = [""] <> newLine
 
       -- A command starts with zero or more whitespace followed by "stack"
+      makeComment ::
+           (String -> String)
+        -> NonEmpty String
+        -> String
+        -> NonEmpty String
       makeComment maker space args =
-        let makePrefix s = (s <|> [""]) <++> [stackProgName]
-        in  (maker <$> (makePrefix space <++> [args])) <++> postComment
+        let makePrefix :: NonEmpty String -> NonEmpty String
+            makePrefix s = (s <> [""]) <++> [stackProgName]
+        in  (maker <$> (makePrefix space <&> (++ args))) <++> postComment
 
-      lineSpace = [" "] <|> ["\t"]
+      lineSpace :: NonEmpty String
+      lineSpace = [" "] <> ["\t"]
+
+      lineComment :: String -> NonEmpty String
       lineComment = makeComment makeLine lineSpace
        where
         makeLine s = "--" ++ s
 
+      literateLineComment :: String -> NonEmpty String
       literateLineComment = makeComment ("> --" ++) lineSpace
 
-      blockSpace = lineSpace <|> newLine
+      blockSpace :: NonEmpty String
+      blockSpace = lineSpace <> newLine
+
+      blockComment :: String -> NonEmpty String
       blockComment = makeComment makeBlock blockSpace
        where
         makeBlock s = "{-" ++ s ++ "-}"
 
+      literateBlockComment :: String -> NonEmpty String
       literateBlockComment = makeComment
         (\s -> "> {-" ++ s ++ "-}")
-        (lineSpace <|> map (++ ">") newLine)
+        (lineSpace <> NE.map (++ ">") newLine)
