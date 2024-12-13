@@ -28,6 +28,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Consider GHC 9.10 to be a tested compiler and remove warnings.
+* Consider Cabal 3.12 to be a tested library and remove warnings.
 * Add flags `--run-tests` and `--run-benchmarks` (the existing defaults) to
   Stack's `build` command, which take precedence over the existing
   `no-run-tests` and `no-run-benchmarks` configuration options, respectively.
