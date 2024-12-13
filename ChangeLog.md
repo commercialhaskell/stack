@@ -1,12 +1,8 @@
 # Changelog
 
-## Unreleased changes
-
-Release notes:
+## v3.3.0.1 (release candidate) - 2024-12-13
 
 **Changes since v3.1.1:**
-
-Major changes:
 
 Behavior changes:
 

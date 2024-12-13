@@ -432,7 +432,7 @@ renderStackYaml p ignoredPackages dupPackages =
     , "to be used for project dependencies. For example:"
     , ""
     , "snapshot: lts-23.0"
-    , "snapshot: nightly-2024-12-09"
+    , "snapshot: nightly-2024-12-13"
     , "snapshot: ghc-9.8.4"
     , ""
     , "The location of a snapshot can be provided as a file or url. Stack assumes"

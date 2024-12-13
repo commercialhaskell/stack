@@ -1111,7 +1111,7 @@ notify the user if a `nix` executable is on the PATH?
 
 ## notify-if-no-run-benchmarks
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.3.1](https://github.com/commercialhaskell/stack/releases/tag/v3.3.1)
 
 Default: `true`
 
@@ -1120,7 +1120,7 @@ prevented by the `--no-run-benchmarks` flag?
 
 ## notify-if-no-run-tests
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.3.1](https://github.com/commercialhaskell/stack/releases/tag/v3.3.1)
 
 Default: `true`
 
