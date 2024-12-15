@@ -10,6 +10,11 @@ Major changes:
 
 Behavior changes:
 
+* Stack will also warn (message S-8432) if there is any non-ISO/IEC 8859-1
+  (Latin-1) character in Stack's 'programs' path, as `hsc2hs` does not work if
+  there is such a character in the path to its default template
+  `template-hsc.h`.
+
 Other enhancements:
 
 Bug fixes:
