@@ -961,7 +961,7 @@ Stack's defaults differ between Unix-like operating systems and Windows.
         (assuming that path is space-free). For example, if the relevant
         directory is `C:\sr\programs`, add:
         ~~~yaml
-        local-program-paths: C:\sr\programs
+        local-programs-path: C:\sr\programs
         ~~~
 
         to Stack's [global configuration](https://docs.haskellstack.org/en/stable/configure/yaml/#location-of-global-configuration)
@@ -1009,7 +1009,7 @@ Stack's defaults differ between Unix-like operating systems and Windows.
         (assuming that path is space-free). For example, if the relevant
         directory is `C:\sr\programs`, add:
         ~~~yaml
-        local-program-paths: C:\sr\programs
+        local-programs-path: C:\sr\programs
         ~~~
 
         to Stack's [global configuration](https://docs.haskellstack.org/en/stable/configure/yaml/#location-of-global-configuration)
