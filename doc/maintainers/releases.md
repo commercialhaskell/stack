@@ -2,80 +2,27 @@
 
 # Releases
 
-!!! todo "To do - Simplify the branch or version structure"
+## Branches
 
-    Just release from the `master` branch (but keep the `stable` branch
-    tracking the latest stable release plus updates to documentation).
+* The `release` branch is intended to preserve the most recent release
+  (including, if applicable, Hackage-only dependency compatibility patch
+  releases).
 
-## Version scheme
+* The `stable` branch is intended to be a copy of the `release` branch together
+  with any subsequent commits that (only) revise the documentation for the most
+  recent release. That documentation is presented at <https://haskellstack.org>.
 
-A Stack package or executable may have a version with three or four components:
-`X.Y.Z` or `X.Y.Z.A`.
+* The `master` branch is the current development branch. It is intended that a
+  working version of Stack can be built from the branch. The release process
+  begins with a copy of the branch.
 
-### Development or stable versions
-
-* Versions with an _even_ `Y` component are development versions (the `master`
-  branch)
-
-* Versions with an _odd_ `Y` component are stable versions (the `stable` branch,
-  or in a `rc/vX.Y` release candidate branch for not-yet-released versions)
-
-### Unreleased or released versions
-
-* Versions with an _even_ `Z` component are unreleased versions (including
-  release candidates)
-
-* Versions with an _odd_ `Z` component are released versions
-
-* Except for the `release` branch (which matches exactly the most recent
-  release), all branches must have an even `Z` component
-
-* Branches other than `stable`, `release`, and a `rc/vX.Y` release candidate
-  will always have a `0` `Z` component
-
-### Use of a fourth component
-
-* Release candidate binaries will be released with an odd `A` component
-
-* Hackage-only dependency compatibility patch releases add a `A` component
-  (e.g. `v2.5.1.1`, in the `release` branch)
-
-* Pre-release unstable binaries will be released with the date as the `A`
-  component (e.g. `3.6.0.20241228`)
-
-Examples:
-
-* `3.5.0.0`: `v3.5.x` series pre-release branch (`rc/v3.5` branch)
-
-* `3.5.0.1`: first release candidate for first release of `v3.5.x` series
-  (`rc/v3.5` branch)
-
-* `3.5.0.2`: continuing development on pre-release branch
-
-* `3.5.0.3`: second release candidate for first release of `v3.5.x` series
-  (`rc/v3.5` branch)
-
-* `3.5.1`: first release of the `3.5.x` series (`release` branch)
-
-* `3.5.2`: development for second release of `3.5.x` series
-  (`stable` branch)
-
-* `3.5.2.1`: first release candidate for second release of `3.5.x` series
-  (`rc/v3.5` branch)
-
-* `3.5.3`: second release of `3.5.x` series (`release` branch)
-
-* `3.5.3.1`: first Hackage-only patch of `3.5.3` (`release` branch)
-
-* `3.5.3.2`: second Hackage-only patch of `3.5.3` (`release` branch)
-
-* `3.6.0`: unstable development code (`master` branch)
-
-* `3.6.0.20241228`: pre-release snapshot of unstable version (`master` branch)
+* A `rc/vX.Y` branch (named after a release in the Stack X.Y.* series) is
+  intended to be for release candidates and final releases. It begins as a copy
+  of the `master` branch.
 
 ## Pre-release checks
 
-1.  Check for any P0 and P1 issues that should be dealt with before release.
+1.  Check for any important issues that should be dealt with before release.
 
 2.  Check for un-merged pull requests that should be merged before release.
 

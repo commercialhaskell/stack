@@ -96,6 +96,7 @@ extra-source-files:
     doc/maintainers/self-hosted_runners.md
     doc/maintainers/stack_errors.md
     doc/maintainers/team_process.md
+    doc/maintainers/version_scheme.md
     doc/other_resources.md
     doc/README.md
     doc/SIGNING_KEY.md

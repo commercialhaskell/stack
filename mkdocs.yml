@@ -127,6 +127,7 @@ nav:
     - Contributor's guide: CONTRIBUTING.md
     - Dev Containers: dev_containers.md
   - Maintainers:
+    - Version scheme: maintainers/version_scheme.md
     - Releases: maintainers/releases.md
     - Maintainer team process: maintainers/team_process.md
     - Add GHC version: maintainers/ghc.md
