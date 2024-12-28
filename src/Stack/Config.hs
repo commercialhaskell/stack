@@ -41,6 +41,7 @@ import           Data.Aeson.WarningParser
 import           Data.Array.IArray ( (!), (//) )
 import qualified Data.ByteString as S
 import           Data.ByteString.Builder ( byteString )
+import           Data.Char ( isLatin1 )
 import           Data.Coerce ( coerce )
 import qualified Data.Either.Extra as EE
 import qualified Data.IntMap as IntMap
@@ -341,33 +342,57 @@ configFromConfigMonoid
       Nothing -> getDefaultLocalProgramsBase stackRoot platform origEnv
       Just path -> pure path
     let localProgramsFilePath = toFilePath localProgramsBase
-    when (osIsWindows && ' ' `elem` localProgramsFilePath) $ do
-      ensureDir localProgramsBase
-      -- getShortPathName returns the long path name when a short name does not
-      -- exist.
-      shortLocalProgramsFilePath <-
-        liftIO $ getShortPathName localProgramsFilePath
+        spaceInLocalProgramsPath = ' ' `elem` localProgramsFilePath
+        nonLatin1InLocalProgramsPath = not $ all isLatin1 localProgramsFilePath
+        problematicLocalProgramsPath =
+             nonLatin1InLocalProgramsPath
+          || (osIsWindows && spaceInLocalProgramsPath)
+    when problematicLocalProgramsPath $ do
+      let msgSpace =
+            [ flow "It contains a space character. This will prevent building \
+                   \with GHC 9.4.1 or later."
+            | osIsWindows && spaceInLocalProgramsPath
+            ]
+      msgNoShort <- if osIsWindows && spaceInLocalProgramsPath
+        then do
+          ensureDir localProgramsBase
+          -- getShortPathName returns the long path name when a short name does not
+          -- exist.
+          shortLocalProgramsFilePath <-
+            liftIO $ getShortPathName localProgramsFilePath
+          pure [ flow "It also has no alternative short ('8 dot 3') name. This \
+                      \will cause problems with packages that use the GNU \
+                      \project's 'configure' shell script."
+               | ' ' `elem` shortLocalProgramsFilePath
+               ]
+        else pure []
+      let msgNonLatin1 = if nonLatin1InLocalProgramsPath
+            then
+              [ flow "It contains at least one non-ISO/IEC 8859-1 (Latin-1) \
+                     \character (Unicode code point > 255). This will cause \
+                     \problems with packages that build using the"
+              , style Shell "hsc2hs"
+              , flow "tool with its default template"
+              , style Shell "template-hsc.h" <> "."
+              ]
+            else []
       prettyWarn $
           "[S-8432]"
           <> line
           <> fillSep
                (  [ flow "Stack's 'programs' path is"
                   , style File (fromString localProgramsFilePath) <> "."
-                  , flow "It contains a space character. This will prevent \
-                         \building with GHC 9.4.1 or later."
                   ]
-               <> [ flow "It also has no alternative short ('8 dot 3') name. \
-                         \This will cause problems with packages that use the \
-                         \GNU project's 'configure' shell script."
-                  | ' ' `elem` shortLocalProgramsFilePath
-                  ]
+               <> msgSpace
+               <> msgNoShort
+               <> msgNonLatin1
                )
           <> blankLine
           <> fillSep
                [ flow "To avoid sucn problems, use the"
                , style Shell "local-programs-path"
                , flow "non-project specific configuration option to specify an \
-                      \alternative space-free path."
+                      \alternative path without those characteristics."
                ]
           <> line
     platformOnlyDir <-
