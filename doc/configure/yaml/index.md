@@ -122,5 +122,5 @@ variables, respectively.
     If Stack is following the XDG Base Directory Specification, the location of
     `config.yaml` (for user-specific options) is `<XDG_CONFIG_HOME>/stack`. If
     the `XDG_CONFIG_HOME` environment variable does not exist, the default is
-    `~/.config/stack` on Unix-like operating systems and `%APPDIR%\stack` on
+    `~/.config/stack` on Unix-like operating systems and `%APPDATA%\stack` on
     Windows.
