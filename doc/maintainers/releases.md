@@ -2,63 +2,27 @@
 
 # Releases
 
-!!! todo "To do - Simplify the branch or version structure"
+## Branches
 
-    Just release from the `master` branch (but keep the `stable` branch
-    tracking the latest stable release plus updates to documentation).
+* The `release` branch is intended to preserve the most recent release
+  (including, if applicable, Hackage-only dependency compatibility patch
+  releases).
 
-## Version scheme
+* The `stable` branch is intended to be a copy of the `release` branch together
+  with any subsequent commits that (only) revise the documentation for the most
+  recent release. That documentation is presented at <https://haskellstack.org>.
 
-A Stack package or executable may have a version with three or four components:
-`X.Y.Z` or `X.Y.Z.A`.
+* The `master` branch is the current development branch. It is intended that a
+  working version of Stack can be built from the branch. The release process
+  begins with a copy of the branch.
 
-### Development or stable versions
-
-* Versions with an _even_ `Y` component are development versions (the `master`
-  branch)
-* Versions with an _odd_ `Y` component are stable versions (the `stable` branch,
-  or in a `rc/vX.Y` release candidate branch for not-yet-released versions)
-
-### Unreleased or released versions
-
-* Versions with an _even_ `Z` component are unreleased versions (including
-  release candidates)
-* Versions with an _odd_ `Z` component are released versions
-* Except for the `release` branch (which matches exactly the most recent
-  release), all branches must have an even `Z` component
-* Branches other than `stable`, `release`, and a `rc/vX.Y` release candidate
-  will always have a `0` `Z` component
-
-### Use of a fourth component
-
-* Release candidate binaries will be released with an odd `A` component
-* Hackage-only dependency compatibility patch releases add a `A` component
-  (e.g. `v2.5.5.1`, in the `release` branch)
-* Pre-release unstable binaries will be released with the date as the `A`
-  component (e.g. `2.14.0.20240126`)
-
-Examples:
-
-* `2.15.0.0`: `v2.15.x` series pre-release branch (`rc/v2.15` branch)
-* `2.15.0.1`: first release candidate for first release of `v2.15.x` series
-  (`rc/v2.15` branch)
-* `2.15.0.2`: continuing development on pre-release branch
-* `2.15.0.3`: second release candidate for first release of `v2.15.x` series
-  (`rc/v2.15` branch)
-* `2.15.1`: first release of the `2.15.x` series (`release` branch)
-* `2.15.2`: development for second release of `2.15.x` series
-  (`stable` branch)
-* `2.15.2.1`: first release candidate for second release of `2.15.x` series
-  (`rc/v2.15` branch)
-* `2.15.3`: second release of `2.15.x` series (`release` branch)
-* `2.15.3.1`: first Hackage-only patch of `2.15.3` (`release` branch)
-* `2.15.3.2`: second Hackage-only patch of `2.15.3` (`release` branch)
-* `2.14.0`: unstable development code (`master` branch)
-* `2.14.0.20240126`: pre-release snapshot of unstable version (`master` branch)
+* A `rc/vX.Y` branch (named after a release in the Stack X.Y.* series) is
+  intended to be for release candidates and final releases. It begins as a copy
+  of the `master` branch.
 
 ## Pre-release checks
 
-1.  Check for any P0 and P1 issues that should be dealt with before release.
+1.  Check for any important issues that should be dealt with before release.
 
 2.  Check for un-merged pull requests that should be merged before release.
 
@@ -99,37 +63,52 @@ Examples:
 
 ### A: In the `master` branch
 
-* `package.yaml`: bump to the next release candidate version (bump the second
-  component to the next odd number, ensure the third component is `0`, and add
-  patchlevel `0`; e.g. from `2.14.0` to `2.15.0.0`).
+1.  `package.yaml`: bump to the next release candidate version (bump the second
+    component to the next odd number, ensure the third component is `0`, and add
+    patchlevel `0`; e.g. from `3.4.0` to `3.5.0.0`).
 
     !!! attention
 
         Be sure to update also `stack.cabal` (for example by using
         `stack build --dry-run`).
 
-* `ChangeLog.md`: Check for any entries that snuck into the previous version's
-  changes due to merges (`git diff origin/stable HEAD ChangeLog.md`)
+2.  `cabal.config`: Ensure the `stack` constraint is set to the same version as
+    in the `package.yaml`.
+
+3.  `ChangeLog.md`: Check for any entries that snuck into the previous version's
+    changes due to merges (`git diff origin/stable HEAD ChangeLog.md`)
+
+4.  Commit the changes to the `master` branch.
 
 ### B: Create a new release candidate branch
 
-Cut a new release candidate (RC) branch named `rc/vX.Y` from the `master`
-branch.
+From the `master` branch, checkout a new release candidate (RC) branch named
+`rc/vX.Y` (replacing `X.Y` with the first and second components of the release
+version).
+
+~~~text
+git checkout -b rc/vX.Y
+~~~
 
 ### C: Return to the `master` branch
 
 1.  `package.yaml`: bump version to the next unstable version (bump the second
     component to the next even number, ensure the third component is `0`; e.g.
-    from `2.15.0` to `2.16.0`).
+    from `3.5.0` to `3.6.0`).
 
     !!! attention
 
         Be sure to update also `stack.cabal` (for example by using
         `stack build --dry-run`).
 
-2.  `Changelog.md`:
+2.  `cabal.config`: Ensure the `stack` constraint is set to the same version as
+    in the `package.yaml`.
+
+3.  `Changelog.md`:
+
     *   Change the title of the existing **Unreleased changes** section to what
-        will be the next final (non-RC) release (e.g. `v2.15.1`).
+        will be the next final (non-RC) release (e.g. `v3.5.1`).
+
     *   Add new "Unreleased changes" section:
 
         ~~~markdown
@@ -148,18 +127,19 @@ branch.
         Bug fixes:
         ~~~
 
-3.  `cabal.config`: Ensure the `stack` constraint is set to the same version as
-    in the `package.yaml`.
+4.  Commit the changes to the `master` branch.
 
-### D: In the release candidate branch
+### D: For each release candidate, in the release candidate branch
 
 1.  Review documentation for any changes that need to be made:
 
     *   Ensure all the documentation pages are listed in the `mkdocs.yaml` file.
         Use `git diff --stat origin/stable..HEAD doc/` to look for new or
         deleted files.
+
     *   Any new documentation pages should have the "may not be correct for the
         released version of Stack" warning at the top.
+
     *   Search for old Stack version, unstable Stack version, and the next
         "obvious" possible versions in sequence, and `UNRELEASED` and replace
         with next release version (`X.Y.1`, where Y is odd).
@@ -172,16 +152,21 @@ branch.
 
     *   Search for old snapshots, set to latest snapshot (e.g. in documentation
         where it references the "currently the latest LTS")
+
     *   Look for any links to "latest" (`latest/`) documentation, replace with
         version tag
 
 2.  Check for any platform entries that need to be added to (or removed from):
 
     * [releases.yaml](https://github.com/fpco/stackage-content/blob/master/stack/releases.yaml),
+
     * [install_and_upgrade.md](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md),
+
     * [get-stack.sh](https://github.com/commercialhaskell/stack/blob/master/etc/scripts/get-stack.sh),
+
     * [doc/README.md](https://github.com/commercialhaskell/stack/blob/master/doc/README.md),
       and
+
     * `get.haskellstack.org` redirects.
 
 3.  Re-do the pre-release checks (see the section above).
@@ -225,7 +210,9 @@ branch.
 5.  Ensure the `stack ==` constraint in `cabal.config` is set to be equal to the
     same version as `package.yaml`.
 
-6.  Follow the steps in the *Release process* section below that apply.
+6.  Commit the changes to the release candidate branch.
+
+7.  Follow the steps in the *Release process* section below that apply.
 
 ## Release process
 
@@ -266,6 +253,7 @@ final release.
 
     * Add `(release candidate)` to the name field and ensure that
       *This is a pre-release* is checked.
+
     * Add the ChangeLog to the description.
 
     Publish the GitHub release.
@@ -281,8 +269,11 @@ final release.
     prerequisites are:
 
     * a computer with that platform (operating system, machine architecture);
+
     * a sufficiently-recent existing version of Stack for that platform;
+
     * a tool to print SHA checksums, such as `shasum` on Linux and macOS; and
+
     * the GNU Privacy Guard tool (`gpg`), which has had imported the private key
       used to sign Stack executables (see further below).
 
@@ -335,12 +326,15 @@ final release.
     In the `rc/vX.Y` branch:
 
     * `package.yaml`: bump the version number. Bump the fourth component to an
-       even number (e.g. from `2.15.0.1` to `2.15.0.2`).
+       even number (e.g. from `3.5.0.1` to `3.5.0.2`).
 
         !!! attention
 
             Be sure to update also `stack.cabal` (for example by using
             `stack build --dry-run`).
+
+    * `cabal.config`: Ensure the `stack` constraint is set to the same version
+      as in the `package.yaml`.
 
     * `ChangeLog.md`: Add an “Unreleased changes” section (update the “changes
       since” version):
@@ -372,32 +366,35 @@ final release.
 
     ### G: Announce the release candidate
 
-    Announce the release candidate on the
-    [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest)
-    forum.
+    Announce the release candidate:
 
-    Announce the release candidate in the Haskell Foundation's
-    [general](https://matrix.to/#/#haskell-foundation-general:matrix.org) room
-    (address `#haskell-foundation-general:matrix.org`) on
-    [Matrix](https://matrix.org/).
+    * on the
+      [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest)
+      forum;
 
-    Announce the release candidate in the Haskell
-    [Stack and Stackage](https://matrix.to/#/#haskell-stack:matrix.org) room
-    (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/).
+    * in the Haskell Foundation's
+      [general](https://matrix.to/#/#haskell-foundation-general:matrix.org) room
+      (address `#haskell-foundation-general:matrix.org`) on
+      [Matrix](https://matrix.org/);
 
-    Announce the release candidate in Reddit's
-    [Haskell](https://www.reddit.com/r/haskell/) community.
+    * in the Haskell
+      [Stack and Stackage](https://matrix.to/#/#haskell-stack:matrix.org) room
+      (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/);
+      and
+
+    * in Reddit's [Haskell](https://www.reddit.com/r/haskell/) community.
 
     In each case, use the subject (change 'first' to 'second' etc for subsequent
     release candidates):
 
-    * `ANN: first release candidate for stack-X.Y.Z`
+    * `[ANN] First release candidate for Stack X.Y.Z`
 
     In the message, include:
 
     * a link to the release on GitHub
       (`https://github.com/commercialhaskell/stack/releases/tag/rc/vX.Y.Z.A`) to
       download it
+
     * the release description from Github.
 
 === "Final Release"
@@ -463,8 +460,11 @@ final release.
     prerequisites are:
 
     * a computer with that platform (operating system, machine architecture);
+
     * a sufficiently-recent existing version of Stack for that platform;
+
     * a tool to print SHA checksums, such as `shasum` on Linux and macOS; and
+
     * the GNU Privacy Guard tool (`gpg`), which has had imported the private key
       used to sign Stack executables (see further below).
 
@@ -593,31 +593,15 @@ final release.
     In the `stable` branch:
 
     * `package.yaml`: bump the version number. Bump the third component to an
-      even number (e.g. from `2.15.1` to `2.15.2`).
+      even number (e.g. from `3.5.1` to `3.5.2`).
 
         !!! attention
 
             Be sure to update also `stack.cabal` (for example by using
             `stack build --dry-run`).
 
-    * `ChangeLog.md`: Add an “Unreleased changes” section (update the “changes
-      since” version):
-
-        ~~~markdown
-        ## Unreleased changes
-
-        Release notes:
-
-        **Changes since vX.Y.Z:**
-
-        Major changes:
-
-        Behavior changes:
-
-        Other enhancements:
-
-        Bug fixes:
-        ~~~
+    * `cabal.config`: Ensure the `stack` constraint is set to the same version
+      as in the `package.yaml`.
 
     ### I: Update the repository's issue and pull request templates
 
@@ -636,24 +620,26 @@ final release.
 
     ### K: Announce the release
 
-    Announce the release on the
-    [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest)
-    forum.
+    Announce the release:
 
-    Announce the release candidate in the Haskell Foundation's
-    [general](https://matrix.to/#/#haskell-foundation-general:matrix.org)
-    room (address `#haskell-foundation-general:matrix.org`) on
-    [Matrix](https://matrix.org/).
+    * on the
+      [Haskell Community](https://discourse.haskell.org/c/announcements/10/l/latest)
+      forum.
 
-    Announce the release in the Haskell
-    [Stack and Stackage](https://matrix.to/#/#haskell-stack:matrix.org) room
-    (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/).
+    * in the Haskell Foundation's
+      [general](https://matrix.to/#/#haskell-foundation-general:matrix.org)
+      room (address `#haskell-foundation-general:matrix.org`) on
+      [Matrix](https://matrix.org/).
 
-    Announce the release in Reddit's
-    [Haskell](https://www.reddit.com/r/haskell/) community.
+    * in the Haskell
+      [Stack and Stackage](https://matrix.to/#/#haskell-stack:matrix.org) room
+      (address `#haskell-stack:matrix.org`) on [Matrix](https://matrix.org/).
+
+    * in Reddit's [Haskell](https://www.reddit.com/r/haskell/) community.
 
     In each case, use the subject:
-    * `ANN: stack-X.Y.Z`
+
+    * `[ANN] Stack X.Y.Z`
 
     In the message, include:
 

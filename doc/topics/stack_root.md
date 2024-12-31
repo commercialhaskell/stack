@@ -33,7 +33,7 @@ command line.
 
 === "Windows"
 
-    The default Stack root is `$Env:APPDIR\stack`.
+    The default Stack root is `$Env:APPDATA\stack`.
 
     If the `LOCALAPPDATA` environment variable exists, then the default location
     of tools is `$Env:LOCALAPPDATA\Programs\stack`. Otherwise, it is the
@@ -61,7 +61,7 @@ command line.
 
 === "Windows (Command Prompt)"
 
-    The default Stack root is `%APPDIR%\stack`.
+    The default Stack root is `%APPDATA%\stack`.
 
     If the `LOCALAPPDATA` environment variable exists, then the default location
     of tools is `%LOCALAPPDATA%\Programs\stack`. Otherwise, it is the `programs`
@@ -91,11 +91,11 @@ command line.
 
     The Stack root is `<XDG_DATA_HOME>/stack`. If the `XDG_DATA_HOME`
     environment variable does not exist, the default is `~/.local/share/stack`
-    on Unix-like operating systems and `%APPDIR%\stack` on Windows.
+    on Unix-like operating systems and `%APPDATA%\stack` on Windows.
 
     The location of `config.yaml` is `<XDG_CONFIG_HOME>/stack`. If the
     `XDG_CONFIG_HOME` environment variable does not exist, the default is
-    `~/.config/stack` on Unix-like operating systems and `%APPDIR%\stack` on
+    `~/.config/stack` on Unix-like operating systems and `%APPDATA%\stack` on
     Windows.
 
     This approach treats:
