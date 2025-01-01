@@ -39,25 +39,37 @@ There are essentially four different ways of specifying a snapshot location:
 4.  Via a _convenience synonym_, which provides a short form for some common
     URLs. These are:
 
-    * GitHub: `github:user/repo:path` is treated as:
+    *   GitHub: `github:user/repo:path` is treated as:
 
         ~~~text
         https://raw.githubusercontent.com/user/repo/master/path
         ~~~
 
-    * LTS Haskell: `lts-X.Y` is treated (by default) as:
+    *   LTS Haskell: `lts-X.Y` is treated (by default) as:
 
         ~~~text
         github:commercialhaskell/stackage-snapshots:lts/X/Y.yaml
         ~~~
 
-    * Stackage Nightly: `nightly-YYYY-MM-DD` is treated (by default) as:
+        and, consequently, expands to:
+
+        ~~~text
+        https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/X/Y.yaml
+        ~~~
+
+    *   Stackage Nightly: `nightly-YYYY-MM-DD` is treated (by default) as:
 
         ~~~text
         github:commercialhaskell/stackage-snapshots:nightly/YYYY/M/D.yaml
         ~~~
 
-!!! info
+        and, consequently, expands to:
+
+        ~~~text
+        https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/YYYY/M/D.yaml
+        ~~~
+
+!!! info "Overriding the default snapshot location base"
 
     By default, LTS Haskell and Stackage Nightly snapshot configurations are
     retrieved from the `stackage-snapshots` GitHub repository of user

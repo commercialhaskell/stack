@@ -400,7 +400,9 @@ The `--setup-info-yaml <url>` command option specifies the location of a
 Default: `https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master`
 
 The `--snapshot-location-base <url>` command option specifies the base location
-of snapshots.
+of snapshots. For further information, see the documentation for the
+corresponding non-project specific configuration
+[option](yaml/non-project.md#snapshot-location-base).
 
 ## `--help` or `-h` command flags
 
