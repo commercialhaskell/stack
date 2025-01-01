@@ -1694,6 +1694,10 @@ getGhcBuilds = do
     Just ghcBuild -> pure [ghcBuild]
     Nothing -> determineGhcBuild
  where
+  -- The GHCup project is also interested in the algorithm below, as it copies
+  -- it at GHCup.Platform.getStackGhcBuilds. If you change this algorithm, it
+  -- would be a courtesy to bring that to the attention of the GHCup project
+  -- maintainers.
   determineGhcBuild = do
     -- TODO: a more reliable, flexible, and data driven approach would be to
     -- actually download small "test" executables (from setup-info) that link to
