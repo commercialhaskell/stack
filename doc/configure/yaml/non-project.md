@@ -1495,7 +1495,9 @@ skip-msys: true
 Default: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/
 (as set in the `pantry` library)
 
-Command line equivalent (takes precedence): `--snapshot-location-base` option
+Command line equivalent (takes precedence):
+[`--snapshot-location-base`](../global_flags.md#--snapshot-location-base-command-option)
+option
 
 Sets the base location of the LTS Haskell or Stackage Nightly snapshots.
 
