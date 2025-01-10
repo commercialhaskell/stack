@@ -20,7 +20,7 @@ description: |
 category: Development
 author: Commercial Haskell SIG
 maintainer: manny@fpcomplete.com
-license: BSD3
+license: BSD-3-Clause
 github: commercialhaskell/stack
 homepage: http://haskellstack.org
 custom-setup:

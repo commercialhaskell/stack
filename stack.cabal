@@ -1,4 +1,4 @@
-cabal-version: 2.0
+cabal-version: 2.2
 
 -- This file has been generated from package.yaml by hpack version 0.37.0.
 --
@@ -24,7 +24,7 @@ homepage:       http://haskellstack.org
 bug-reports:    https://github.com/commercialhaskell/stack/issues
 author:         Commercial Haskell SIG
 maintainer:     manny@fpcomplete.com
-license:        BSD3
+license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Custom
 extra-source-files:
