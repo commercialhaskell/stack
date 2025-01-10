@@ -144,9 +144,11 @@ version of its built-in Hpack library to the standard output stream (e.g.
 
 Default: Enabled
 
-Enables/disables the download and instalation of GHC if necessary. For further
-information, see the documentation for the corresponding non-project specific
-configuration [option](yaml/non-project.md#install-ghc).
+Enables/disables the download and installation of GHC when necessary. On
+Windows, `--no-install-ghc` also disables the download and installation of the
+Stack-supplied MSYS2 when necessary. For further information, see the
+documentation for the corresponding non-project specific configuration
+[option](yaml/non-project.md#install-ghc).
 
 ## `--jobs` or `-j` option
 
