@@ -874,7 +874,9 @@ Default: `true`
 
 Command line equivalent (takes precedence): `--[no-]install-ghc` flag
 
-Whether or not to automatically install GHC when necessary.
+Whether or not to download and install GHC when necessary. On Windows,
+`install-ghc: false` also disables the download and installation of the
+Stack-supplied MSYS2 when necessary.
 
 ## jobs
 
