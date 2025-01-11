@@ -13,6 +13,7 @@ theme:
     accent: 'deep purple'
   icon:
     logo: simple/haskell
+  favicon: img/stack-favicon.svg
   features:
   - content.code.annotate
   - content.code.copy
