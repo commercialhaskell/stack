@@ -11,6 +11,7 @@ module Stack.Types.ConfigMonoid
   , configMonoidAllowDifferentUserName
   , configMonoidGHCVariantName
   , configMonoidInstallGHCName
+  , configMonoidInstallMsysName
   , configMonoidRecommendStackUpgradeName
   , configMonoidSystemGHCName
   ) where
@@ -83,6 +84,8 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See: 'configSystemGHC'
   , installGHC              :: !FirstTrue
     -- ^ See: 'configInstallGHC'
+  , installMsys             :: !(First Bool)
+    -- ^ See: 'configInstallMsys'
   , skipGHCCheck            :: !FirstFalse
     -- ^ See: 'configSkipGHCCheck'
   , skipMsys                :: !FirstFalse
@@ -248,6 +251,7 @@ parseConfigMonoidObject rootDir obj = do
     First <$> jsonSubWarningsT (obj ..:?  configMonoidPackageIndexName)
   systemGHC <- First <$> obj ..:? configMonoidSystemGHCName
   installGHC <- FirstTrue <$> obj ..:? configMonoidInstallGHCName
+  installMsys <- First <$> obj ..:? configMonoidInstallMsysName
   skipGHCCheck <- FirstFalse <$> obj ..:? configMonoidSkipGHCCheckName
   skipMsys <- FirstFalse <$> obj ..:? configMonoidSkipMsysName
   msysEnvironment <- First <$> obj ..:? configMonoidMsysEnvironmentName
@@ -366,6 +370,7 @@ parseConfigMonoidObject rootDir obj = do
     , packageIndex
     , systemGHC
     , installGHC
+    , installMsys
     , skipGHCCheck
     , skipMsys
     , msysEnvironment
@@ -460,6 +465,9 @@ configMonoidSystemGHCName = "system-ghc"
 
 configMonoidInstallGHCName :: Text
 configMonoidInstallGHCName = "install-ghc"
+
+configMonoidInstallMsysName :: Text
+configMonoidInstallMsysName = "install-msys"
 
 configMonoidSkipGHCCheckName :: Text
 configMonoidSkipGHCCheckName = "skip-ghc-check"

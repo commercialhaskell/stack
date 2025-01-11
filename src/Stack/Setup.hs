@@ -620,7 +620,8 @@ defaultSetupInfoYaml =
   "https://raw.githubusercontent.com/commercialhaskell/stackage-content/master/stack/stack-setup-2.yaml"
 
 data SetupOpts = SetupOpts
-  { installIfMissing :: !Bool
+  { installGhcIfMissing :: !Bool
+  , installMsysIfMissing :: !Bool
   , useSystem :: !Bool
     -- ^ Should we use a system compiler installation, if available?
   , wantedCompiler :: !WantedCompiler
@@ -661,7 +662,8 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
   actual <- either throwIO pure $ wantedToActual wcVersion
   let wc = actual^.whichCompilerL
       sopts = SetupOpts
-        { installIfMissing = config.installGHC
+        { installGhcIfMissing = config.installGHC
+        , installMsysIfMissing = config.installMsys
         , useSystem = config.systemGHC
         , wantedCompiler = wcVersion
         , compilerCheck = config.compilerCheck
@@ -1120,7 +1122,7 @@ ensureMsys sopts getSetupInfo' = do
       case getInstalledTool installed (mkPackageName "msys2") (const True) of
         Just tool -> pure (Just tool)
         Nothing
-          | sopts.installIfMissing -> do
+          | sopts.installMsysIfMissing -> do
               si <- runMemoized getSetupInfo'
               let msysDir = fillSep
                     [ style Dir "msys2-yyyymmdd"
@@ -1185,7 +1187,7 @@ installGhcBindist sopts getSetupInfo' installed = do
   case existingCompilers of
     (tool, build_):_ -> pure (tool, build_)
     []
-      | sopts.installIfMissing -> do
+      | sopts.installGhcIfMissing -> do
           si <- runMemoized getSetupInfo'
           downloadAndInstallPossibleCompilers
             (map snd possibleCompilers)

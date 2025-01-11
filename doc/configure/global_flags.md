@@ -150,6 +150,23 @@ Stack-supplied MSYS2 when necessary. For further information, see the
 documentation for the corresponding non-project specific configuration
 [option](yaml/non-project.md#install-ghc).
 
+## `--[no-]install-msys` flag
+
+:octicons-tag-24: UNRELEASED
+
+Restrictions: Windows systems only
+
+Default: Same as the [`install-ghc`](yaml/non-project.md#install-ghc) setting
+(including if that is set on the command line)
+
+If Stack is checking for the Stack-supplied MSYS2 when Stack is setting up the
+environment, enables/disables the download and installation of MSYS2 when
+necessary. For further information, see the documentation for the corresponding
+non-project specific configuration [option](yaml/non-project.md#install-msys).
+
+To skip entirely checking for the Stack-supplied MSYS2, see the documentation
+for the [`skip-msys`](yaml/non-project.md#skip-msys) configuration option.
+
 ## `--jobs` or `-j` option
 
 Pass the option `--jobs <number_of_jobs>` to specify the number of concurrent
@@ -268,6 +285,9 @@ installing that MSYS2, if it is not installed) when Stack is setting up the
 environment. For further information, see the documentation for the
 corresponding non-project specific configuration
 [option](yaml/non-project.md#skip-msys).
+
+To prevent installation of MSYS2, if it is not installed, see the documentation
+for the [`install-msys`](yaml/non-project.md#install-msys) configuration option.
 
 ## `--snapshot` option
 

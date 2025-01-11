@@ -48,6 +48,8 @@ stack config set COMMAND
 Available commands:
   install-ghc              Configure whether or not Stack should automatically
                            install GHC when necessary.
+  install-msys             Configure whether or not Stack should automatically
+                           install MSYS2 when necessary.
   package-index            Configure Stack's package index
   recommend-stack-upgrade  Configure whether or not Stack should notify the user
                            if it identifes a new version of Stack is available.
@@ -74,6 +76,21 @@ stack config set install-ghc [--global] true|false
 
 `stack config set install-ghc true` or `false` sets the
 [`install-ghc`](../configure/yaml/non-project.md#install-ghc) non-project
+specific configuration option in a configuration file, accordingly. By default,
+the project-level configuration file (`stack.yaml`, by default) is altered. The
+`--global` flag specifies the user-specific global configuration file
+(`config.yaml`).
+
+## The `stack config set install-msys` command
+
+:octicons-tag-24: UNRELEASED
+
+~~~text
+stack config set install-msys [--global] true|false
+~~~
+
+`stack config set install-msys true` or `false` sets the
+[`install-msys`](../configure/yaml/non-project.md#install-msys) non-project
 specific configuration option in a configuration file, accordingly. By default,
 the project-level configuration file (`stack.yaml`, by default) is altered. The
 `--global` flag specifies the user-specific global configuration file

@@ -7,7 +7,7 @@ stack setup [GHC_VERSION] [--[no-]reinstall] [--ghc-bindist URL]
             [--ghcjs-boot-options GHCJS_BOOT] [--[no-]ghcjs-boot-clean]
 ~~~
 
-`stack setup` attempts to install a version of GHC.
+`stack setup` attempts to install a version of GHC and, on Windows, MSYS2.
 
 By default:
 
@@ -28,8 +28,9 @@ option specifying a custom GHC variant. For further information about the
 specific configuration option documentation.
 
 If Stack is configured not to install GHC (`install-ghc: false` or passing the
-`--no-install-ghc` flag) then `stack setup` will warn that the flag and the
-command are inconsistent and take no action.
+`--no-install-ghc` flag) or not to install MSYS2 (`install-msys: false` or
+passing the `--no-install-msys` flag) then `stack setup` will warn that the flag
+and the command are inconsistent and take no action.
 
 === "Linux"
 

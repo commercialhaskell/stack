@@ -17,6 +17,14 @@ Behavior changes:
 
 Other enhancements:
 
+* In YAML configuration files, the `install-msys` key is introduced, to enable
+  or disable the download and installation of Stack-supplied MSYS2 when
+  necessary (subject to `skip-msys: false`). The default is the same as the
+  `install-ghc` setting (including if that is set at the command line).
+  Consequently, the default behaviour of Stack is unaffected.
+* Add the `stack config set install-msys` command to configure the
+  `install-msys` option in YAML configuration files.
+
 Bug fixes:
 
 ## v3.3.1 - 2024-12-28

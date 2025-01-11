@@ -872,11 +872,30 @@ will receive a warning if this configuration value is set.
 Default: `true`
 ([:octicons-tag-24: 1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v1.5.0))
 
-Command line equivalent (takes precedence): `--[no-]install-ghc` flag
+Command line equivalent (takes precedence):
+[`--[no-]install-ghc`](../global_flags.md#-no-install-ghc-flag) flag
 
 Whether or not to download and install GHC when necessary. On Windows,
 `install-ghc: false` also disables the download and installation of the
 Stack-supplied MSYS2 when necessary.
+
+## install-msys
+
+:octicons-tag-24: UNRELEASED
+
+Restrictions: Windows systems only
+
+Default: same as the [`install-ghc`](#install-ghc) setting (including if that is
+set on the command line)
+
+Command line equivalent (takes precedence):
+[`--[no-]install-msys`](../global_flags.md#-no-install-msys-flag) flag
+
+If Stack is checking for the Stack-supplied MSYS2 when Stack is setting up the
+environment, whether or not to download and install MSYS2 when necessary.
+
+To skip entirely checking for the Stack-supplied MSYS2, see the documentation
+for the [`skip-msys`](#skip-msys) configuration option.
 
 ## jobs
 
@@ -1480,6 +1499,9 @@ Command line equivalent (takes precedence):
 
 Skips checking for the Stack-supplied MSYS2 (and installing that MSYS2, if it is
 not installed) when Stack is setting up the environment.
+
+To prevent installation of MSYS2, if it is not installed, see the documentation
+for the [`install-msys`](#install-msys) configuration option.
 
 ~~~yaml
 skip-msys: true
