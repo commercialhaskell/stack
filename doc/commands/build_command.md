@@ -213,8 +213,7 @@ information about how these dependencies get specified.
 If a package description specifies a custom build type, it must also specify a
 custom setup. That should list the dependencies needed to compile `Setup.hs`.
 Stack further customises the setup, using the `Cabal` package. If that package
-is not listed, Stack will not add the package as a dependency but warn that
-build errors are likely.
+is not listed, Stack will warn and add the GHC boot package as a dependency. 
 
 In addition to specifying targets, you can also control what gets built, or
 retained, with the flags and options listed below. You can also affect what gets
