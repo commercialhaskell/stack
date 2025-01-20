@@ -729,13 +729,21 @@ withSingleContext
               -- providing an explicit list of dependencies, and we should
               -- simply use all of them.
               Just customSetupDeps -> do
-                unless (Map.member (mkPackageName "Cabal") customSetupDeps) $
-                  prettyWarnL
-                    [ fromPackageName package.name
-                    , flow "has a setup-depends field, but it does not mention \
-                           \a Cabal dependency. This is likely to cause build \
-                           \errors."
-                    ]
+                cabalPackageArg' <-
+                  if Map.member (mkPackageName "Cabal") customSetupDeps
+                    then pure []
+                    else do
+                      prettyWarnL
+                        [ style Current (fromPackageName package.name)
+                        , flow "has a"
+                        , style Shell "setup-depends"
+                        , flow "field, but it does not mention a"
+                        , style Current "Cabal"
+                        , flow "dependency. Stack customizes setup using \
+                               \Cabal, so it has added the GHC boot package as \
+                               \a dependency."
+                        ]
+                      pure cabalPackageArg
                 matchedDeps <-
                   forM (Map.toList customSetupDeps) $ \(name, depValue) -> do
                     let matches (PackageIdentifier name' version) =
@@ -772,7 +780,7 @@ withSingleContext
                           )
                       )
                   )
-                pure (packageDBArgs ++ depsArgs ++ cppArgs)
+                pure (packageDBArgs ++ depsArgs ++ cabalPackageArg' ++ cppArgs)
 
               -- This branch is usually taken for builds, and is always taken
               -- for `stack sdist`.

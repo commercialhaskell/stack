@@ -14,6 +14,10 @@ Behavior changes:
   (Latin-1) character in Stack's 'programs' path, as `hsc2hs` does not work if
   there is such a character in the path to its default template
   `template-hsc.h`.
+* Stack customizes setup using `Cabal`, so if a `setup-depends` field does not
+  mention it as a dependency, Stack warns and adds the GHC boot package as a
+  dependency. Previously, Stack would not do so but only warn that build errors
+  were likely.
 
 Other enhancements:
 
