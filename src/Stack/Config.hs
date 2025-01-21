@@ -286,6 +286,7 @@ configFromConfigMonoid
           configMonoid.compilerRepository
         ghcBuild = getFirst configMonoid.ghcBuild
         installGHC = fromFirstTrue configMonoid.installGHC
+        installMsys = fromFirst installGHC configMonoid.installMsys
         skipGHCCheck = fromFirstFalse configMonoid.skipGHCCheck
         skipMsys = fromFirstFalse configMonoid.skipMsys
         defMsysEnvironment = case platform of
@@ -587,6 +588,7 @@ configFromConfigMonoid
                 , latestSnapshot
                 , systemGHC
                 , installGHC
+                , installMsys
                 , skipGHCCheck
                 , skipMsys
                 , msysEnvironment

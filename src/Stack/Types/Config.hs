@@ -97,6 +97,9 @@ data Config = Config
   , installGHC              :: !Bool
     -- ^ Should we automatically install GHC if missing or the wrong
     -- version is available? Can be overridden by command line options.
+  , installMsys              :: !Bool
+    -- ^ On Windows, should we automatically install MSYS2 if missing? Can be
+    -- overridden by command line options.
   , skipGHCCheck            :: !Bool
     -- ^ Don't bother checking the GHC version or architecture.
   , skipMsys                :: !Bool

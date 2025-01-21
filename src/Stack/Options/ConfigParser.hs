@@ -33,7 +33,7 @@ import qualified System.FilePath as FilePath
 -- | Command-line arguments parser for configuration.
 configOptsParser :: FilePath -> GlobalOptsContext -> Parser ConfigMonoid
 configOptsParser currentDir hide0 =
-  ( \stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC arch
+  ( \stackRoot workDir buildOpts dockerOpts nixOpts systemGHC installGHC installMsys arch
      ghcVariant ghcBuild jobs extraIncludeDirs extraLibDirs
      customPreprocessorExts overrideGccPath overrideHpack hpackForce skipGHCCheck skipMsys
      localBinPath setupInfoLocations modifyCodePage allowDifferentUser dumpLogs
@@ -45,6 +45,7 @@ configOptsParser currentDir hide0 =
        , nixOpts
        , systemGHC
        , installGHC
+       , installMsys
        , skipGHCCheck
        , arch
        , ghcVariant
@@ -99,6 +100,11 @@ configOptsParser currentDir hide0 =
         "install-ghc"
         "downloading and installing GHC if necessary. (Can be done manually \
         \with 'stack setup'.)"
+        hide
+  <*> firstBoolFlagsNoDefault
+        "install-msys"
+        "downloading and installing MSYS2 if necessary (Windows only). (Can be \
+        \done manually with 'stack setup'.) (default: same as 'install-ghc')"
         hide
   <*> optionalFirst (strOption
         (  long "arch"
