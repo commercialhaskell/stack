@@ -16,9 +16,9 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 6 May 2024, ubuntu-latest and windows-latest come with Stack 2.15.5 and
-# GHC 9.8.2. However, macos-13 and macos-latest do not come with Haskell tools.
-# windows-latest comes with NSIS 3.08, for which the default value of the
+# As of 7 February 2025, ubuntu-latest and windows-latest come with Stack 3.3.1
+# and GHC 9.12.1. However, macos-13 and macos-latest do not come with Haskell
+# tools. windows-latest comes with NSIS 3.10, for which the default value of the
 # 'Unicode' installer attribute is 'true'. However, that is not the 'large
 # strings' build of NSIS and creates installers that corrupt the PATH
 # environment variable if the default string length of 1024 characters is
@@ -35,6 +35,16 @@ jobs:
         - os: ubuntu-latest
           release-args: "--alpine"
           cache-bust: "2024-05-17"
+        # On public preview since 16 January 2025
+        - os: ubuntu-24.04-arm
+          # Stack's project-level configuration (stack.yaml) specifies the
+          # multi-architecture (including Linux/Aarch64) Docker image published
+          # by Oliver Benz (@benz0li, on GitHub). That image comes with
+          # Stack 3.1.1. (Note that the online documentation for
+          # '--docker-stack-exe image' specifies that the host Stack and image
+          # Stack must have the same version number.)
+          release-args: "--alpine --stack-args --docker-stack-exe=image"
+          cache-bust: "2025-02-07b"
         - os: windows-latest
           release-args: ""
           cache-bust: "2024-05-17"
@@ -68,9 +78,10 @@ jobs:
       run: |
         set -ex
 
-        if [[ "${{ matrix.os }}" == "macos-13" || "${{ matrix.os }}" == "macos-latest" ]]
+        if [[ "${{ matrix.os }}" == "ubuntu-24.04-arm" || "${{ matrix.os }}" == "macos-13" || "${{ matrix.os }}" == "macos-latest" ]]
         then
-          # macos-13 and macos-latest do not include Haskell tools as at 2024-05-06.
+          # ubuntu-24.04-arm, macos-13 and macos-latest do not include Haskell
+          # tools as at 2025-02-07.
           curl -sSL https://get.haskellstack.org/ | sh
         fi
 
@@ -141,8 +152,12 @@ jobs:
         # information.
         df -h
 
-        # Do this in the same step as installing deps to get relevant env var modifications
-        stack etc/scripts/release.hs check ${{ matrix.release-args }}
+        # Skip checks for Linux/AArch64, given checks for Linux/x86-64
+        if [[ "${{ matrix.os }}" != "ubuntu-24.04-arm" ]]
+        then
+          # Do this in the same step as installing deps to get relevant env var modifications
+          stack etc/scripts/release.hs check ${{ matrix.release-args }}
+        fi
 
         # Report the file system disk space usage after checks, for information.
         df -h
@@ -160,81 +175,12 @@ jobs:
         name: ${{ runner.os }}-${{ runner.arch }}
         path: _release/stack-*
 
-  configuration:
-    name: Check for self-hosted runners
-    runs-on: ubuntu-latest
-    env:
-      CAN_SIGN: ${{ secrets.RELEASE_SIGNING_KEY != '' }}
-    outputs:
-      arm64-runner: ${{ steps.runners.outputs.arm64 }}
-      can-sign: ${{ env.CAN_SIGN }}
-      test-arm64: ${{ steps.runners.outputs.test-arm64 }}
-    steps:
-    - name: Check for hosted runners
-      id: runners
-      shell: bash
-      env:
-        SELF_HOSTED_RUNNERS: ${{ secrets.SELF_HOSTED_RUNNERS || (github.repository_owner == 'commercialhaskell' && 'arm64') }}
-      run: |
-        echo "runners=$SELF_HOSTED_RUNNERS" >> $GITHUB_OUTPUT
-        if echo "$SELF_HOSTED_RUNNERS" | grep -q 'arm64'; then
-          echo "arm64=['self-hosted', 'linux', 'ARM64']" >> $GITHUB_OUTPUT
-          echo "test-arm64=true" >> $GITHUB_OUTPUT
-        else
-          echo "arm64='ubuntu-latest'" >> $GITHUB_OUTPUT
-          echo "test-arm64=false" >> $GITHUB_OUTPUT
-        fi
-
-  linux-arm64:
-    name: Linux ARM64
-    runs-on: ${{ fromJSON(needs.configuration.outputs.arm64-runner) }}
-    needs: configuration
-    steps:
-    - name: Skipping ARM64
-      if: needs.configuration.outputs.test-arm64 == 'false'
-      shell: bash
-      run: |
-        echo '::notice title=ARM64 skipped::To build ARM64, a self-hosted runner needs to be configured and the SELF_HOSTED_RUNNERS secret must contain arm64'
-    - name: Clone project
-      if: needs.configuration.outputs.test-arm64 == 'true'
-      uses: actions/checkout@v4
-    - name: Install deps
-      shell: bash
-      run: |
-        set -ex
-
-        # As of 9 December 2024, the self-hosted runner comes with Stack 3.1.1,
-        # but it is not on the PATH. Logging the version for information.
-        /usr/local/bin/stack --version
-
-        set +ex
-    - name: Build bindist
-      if: needs.configuration.outputs.test-arm64 == 'true'
-      shell: bash
-      run: |
-        # Stack's project-level configuration (stack.yaml) specifies the
-        # multi-architecture (including Linux/Aarch64) Docker image published by
-        # Oliver Benz (@benz0li, on GitHub). That image comes with Stack 3.1.1.
-        # (Note that the online documentation for '--docker-stack-exe image'
-        # specifies that the host Stack and image Stack must have the same
-        # version number.)
-        /usr/local/bin/stack etc/scripts/release.hs build --alpine --stack-args --docker-stack-exe=image
-
-    - name: Upload bindist
-      if: needs.configuration.outputs.test-arm64 == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: Linux-ARM64
-        path: _release/stack-*
-
   github-release:
     name: Create GitHub release
     permissions:
       contents: write
     needs:
-    - configuration
     - integration-tests
-    - linux-arm64
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -259,13 +205,11 @@ jobs:
         name: Windows-X64
         path: _release
     - name: Download Linux/AArch64 artifact
-      if: needs.configuration.outputs.test-arm64 == 'true'
       uses: actions/download-artifact@v4
       with:
         name: Linux-ARM64
         path: _release
     - name: Hash and sign assets
-      if: needs.configuration.outputs.can-sign == 'true'
       shell: bash
       env:
         RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
