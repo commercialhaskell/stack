@@ -3,10 +3,17 @@
 # Self-hosted runners
 
 [GitHub Actions](https://docs.github.com/en/actions) is used to do CI on Stack.
-The `linux-arm64` job of the `integration-tests.yml` workflow runs on a
-self-hosted runner for Linux and ARM64.
 
-The current basic setup is:
+In the case of the Linux/AArch64 platform, since 8 February 2025, that is done
+with a GitHub-hosted runner (currently in public preview). Previously, that was
+done in a separate `linux-arm64` job of the `integration-tests.yml` workflow
+that ran on a self-hosted runner for Linux and ARM64. Given that the
+GitHub-hosted runner is only in preview, the documentation of the self-hosted
+runner is being preserved for the time being.
+
+## Introduction
+
+The current basic setup was:
 
 * FP Complete has an Oracle Cloud account that provides a free tier that
   includes a really powerful ARM64 machine;
