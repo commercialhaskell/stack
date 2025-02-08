@@ -128,15 +128,15 @@ jobs:
         EOF
         fi
 
-        # Updates NSIS 3.08 to a 'large strings' build of the same tool. See
+        # Updates NSIS 3.10 to a 'large strings' build of the same tool. See
         # https://nsis.sourceforge.io/Special_Builds.
         if [[ "${{ matrix.os }}" == "windows-latest" ]]
         then
           # wget is not available but the Stack-supplied MSYS2 will provide it
-          stack exec -- wget -O nsis-3.08-strlen_8192.zip https://downloads.sourceforge.net/nsis/NSIS%203/3.08/nsis-3.08-strlen_8192.zip
-          7z x -aoa -o"/c/Program Files (x86)/NSIS" nsis-3.08-strlen_8192.zip
+          stack exec -- wget -O nsis-3.10-strlen_8192.zip https://downloads.sourceforge.net/nsis/NSIS%203/3.10/nsis-3.10-strlen_8192.zip
+          7z x -aoa -o"/c/Program Files (x86)/NSIS" nsis-3.10-strlen_8192.zip
           # Clean up
-          rm nsis-3.08-strlen_8192.zip
+          rm nsis-3.10-strlen_8192.zip
           makensis -VERSION && echo
           # Should include defined symbol NSIS_MAX_STRLEN=8192
           makensis -HDRINFO
