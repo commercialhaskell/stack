@@ -600,9 +600,18 @@ do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
 include 'escaped' characters, escaped with an initial `\` character.
 
 Account may need to be taken of the shell's approach to the processing of
-command line arguments. For example, to pass `'a single quoted string'`:
+command line arguments:
 
 === "Unix-like (Bash or Zsh)"
+
+    For example, to pass `word` and `words with spaces` in Bash, or Zsh:
+
+    `stack test --benchmark-arguments 'word "words with spaces"'`
+
+    The content of single quotes is taken literally, but cannot contain a single
+    quote.
+
+    For example, to pass `'a single quoted string'`:
 
     In Bash, or Zsh (if `RC_QUOTES` option not set):
 
@@ -621,7 +630,13 @@ command line arguments. For example, to pass `'a single quoted string'`:
 
 === "Windows"
 
-    In PowerShell:
+    For example, to pass `word` and `words with spaces` in PowerShell:
+
+    `stack test --benchmark-arguments 'word "words with spaces"'`
+
+    The content of single quotes is taken literally.
+
+    For example, to pass `'a single quoted string'` in PowerShell:
 
     `stack bench --benchmark-arguments '"''a single quoted string''"'`
 
@@ -643,9 +658,18 @@ do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
 include 'escaped' characters, escaped with an initial `\` character.
 
 Account may need to be taken of the shell's approach to the processing of
-command line arguments. For example, to pass `'a single quoted string'`:
+command line arguments:
 
 === "Unix-like (Bash or Zsh)"
+
+    For example, to pass `word` and `words with spaces` in Bash, or Zsh:
+
+    `stack build --exec '<command> word "words with spaces"'`
+
+    The content of single quotes is taken literally, but cannot contain a single
+    quote.
+
+    For example, to pass `'a single quoted string'`:
 
     In Bash, or Zsh (if `RC_QUOTES` option not set):
 
@@ -664,7 +688,13 @@ command line arguments. For example, to pass `'a single quoted string'`:
 
 === "Windows"
 
-    In PowerShell:
+    For example, to pass `word` and `words with spaces` in PowerShell:
+
+    `stack build --exec '<command> word "words with spaces"'`
+
+    The content of single quotes is taken literally.
+
+    For example, to pass `'a single quoted string'` in PowerShell:
 
     `stack build --exec '<command> "''a single quoted string''"'`
 
@@ -701,9 +731,18 @@ do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
 include 'escaped' characters, escaped with an initial `\` character.
 
 Account may need to be taken of the shell's approach to the processing of
-command line arguments. For example, to pass `'a single quoted string'`:
+command line arguments:
 
 === "Unix-like (Bash or Zsh)"
+
+    For example, to pass `word` and `words with spaces` in Bash, or Zsh:
+
+    `stack test --test-arguments 'word "words with spaces"'`
+
+    The content of single quotes is taken literally, but cannot contain a single
+    quote.
+
+    For example, to pass `'a single quoted string'`:
 
     In Bash, or Zsh (if `RC_QUOTES` option not set):
 
@@ -722,7 +761,13 @@ command line arguments. For example, to pass `'a single quoted string'`:
 
 === "Windows"
 
-    In PowerShell:
+    For example, to pass `word` and `words with spaces` in PowerShell:
+
+    `stack test --test-arguments 'word "words with spaces"'`
+
+    The content of single quotes is taken literally.
+
+    For example, to pass `'a single quoted string'` in PowerShell:
 
     `stack test --test-arguments '"''a single quoted string''"'`
 
