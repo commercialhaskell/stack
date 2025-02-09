@@ -40,8 +40,9 @@ import           System.IO.Error ( isUserError )
 
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
-resolveFileOrWarn :: FilePath.FilePath
-                  -> RIO GetPackageFileContext (Maybe (Path Abs File))
+resolveFileOrWarn ::
+     FilePath.FilePath
+  -> RIO GetPackageFileContext (Maybe (Path Abs File))
 resolveFileOrWarn = resolveOrWarn "File" f
  where
   f p x = forgivingResolveFile p x >>= rejectMissingFile

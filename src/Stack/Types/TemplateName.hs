@@ -73,16 +73,18 @@ instance FromJSON TemplateName where
 
 -- | An argument which accepts a template name of the format @foo.hsfiles@ or
 -- @foo@, ultimately normalized to @foo@.
-templateNameArgument :: O.Mod O.ArgumentFields TemplateName
-                     -> O.Parser TemplateName
+templateNameArgument ::
+     O.Mod O.ArgumentFields TemplateName
+  -> O.Parser TemplateName
 templateNameArgument =
   O.argument
     (do s <- O.str
         either O.readerError pure (parseTemplateNameFromString s))
 
 -- | An argument which accepts a @key:value@ pair for specifying parameters.
-templateParamArgument :: O.Mod O.OptionFields (Text,Text)
-                      -> O.Parser (Text,Text)
+templateParamArgument ::
+     O.Mod O.OptionFields (Text,Text)
+  -> O.Parser (Text,Text)
 templateParamArgument =
   O.option
     (do s <- O.str

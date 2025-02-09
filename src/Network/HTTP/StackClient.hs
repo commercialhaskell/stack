@@ -153,19 +153,24 @@ setGitHubHeaders = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
 -- appropriate destination.
 --
 -- Throws an exception if things go wrong
-download :: HasTerm env
-         => Request
-         -> Path Abs File -- ^ destination
-         -> RIO env Bool -- ^ Was a downloaded performed (True) or did the file already exist (False)?
+download ::
+     HasTerm env
+  => Request
+  -> Path Abs File
+     -- ^ destination
+  -> RIO env Bool
+     -- ^ Was a downloaded performed (True) or did the file already exist
+     -- (False)?
 download req = Download.download (setUserAgent req)
 
 -- | Same as 'download', but will download a file a second time if it is already present.
 --
 -- Returns 'True' if the file was downloaded, 'False' otherwise
-redownload :: HasTerm env
-           => Request
-           -> Path Abs File -- ^ destination
-           -> RIO env Bool
+redownload ::
+     HasTerm env
+  => Request
+  -> Path Abs File -- ^ destination
+  -> RIO env Bool
 redownload req = Download.redownload (setUserAgent req)
 
 -- | Copied and extended version of Network.HTTP.Download.download.

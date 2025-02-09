@@ -621,10 +621,11 @@ tellExecutablesPackage loc p = do
 
 -- | Given a 'PackageSource' and perhaps an 'Installed' value, adds build
 -- 'Task's for the package and its dependencies.
-installPackage :: PackageName
-               -> PackageSource
-               -> Maybe Installed
-               -> M (Either ConstructPlanException AddDepRes)
+installPackage ::
+     PackageName
+  -> PackageSource
+  -> Maybe Installed
+  -> M (Either ConstructPlanException AddDepRes)
 installPackage name ps minstalled = do
   ctx <- ask
   case ps of
@@ -1234,9 +1235,10 @@ logDebugPlanS s msg = do
 -- value; and (2) a pair of an 'InstallLocation' value and an 'Installed' value.
 -- Checks that the version of the 'PackageSource' value and the version of the
 -- `Installed` value are the same.
-combineSourceInstalled :: PackageSource
-                       -> (InstallLocation, Installed)
-                       -> PackageInfo
+combineSourceInstalled ::
+     PackageSource
+  -> (InstallLocation, Installed)
+  -> PackageInfo
 combineSourceInstalled ps (location, installed) =
   assert (psVersion ps == installedVersion installed) $
     case location of

@@ -371,9 +371,10 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
     destHtmlAbsDir = parent opts.destInterfaceFile
 
 -- | Find first DumpPackage matching the GhcPkgId
-lookupDumpPackage :: GhcPkgId
-                  -> [Map GhcPkgId DumpPackage]
-                  -> Maybe DumpPackage
+lookupDumpPackage ::
+     GhcPkgId
+  -> [Map GhcPkgId DumpPackage]
+  -> Maybe DumpPackage
 lookupDumpPackage ghcPkgId dumpPkgs =
   listToMaybe $ mapMaybe (Map.lookup ghcPkgId) dumpPkgs
 

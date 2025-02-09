@@ -390,9 +390,10 @@ findCandidate dirs name = do
     fmap
       (nubOrd . concat)
       (mapM (makeDirCandidates haskellPreprocessorExts) dirs)
-  makeDirCandidates :: [Text]
-                    -> Path Abs Dir
-                    -> IO [Path Abs File]
+  makeDirCandidates ::
+       [Text]
+    -> Path Abs Dir
+    -> IO [Path Abs File]
   makeDirCandidates haskellPreprocessorExts dir =
     case name of
       DotCabalMain fp -> resolveCandidate dir fp
@@ -525,8 +526,9 @@ parsePackageNameFromFilePath fp = do
 
 -- | Resolve the directory, if it can't be resolved, warn for the user
 -- (purely to be helpful).
-resolveDirOrWarn :: FilePath.FilePath
-                 -> RIO GetPackageFileContext (Maybe (Path Abs Dir))
+resolveDirOrWarn ::
+     FilePath.FilePath
+  -> RIO GetPackageFileContext (Maybe (Path Abs Dir))
 resolveDirOrWarn = resolveOrWarn "Directory" f
  where
   f p x = forgivingResolveDir p x >>= rejectMissingDir

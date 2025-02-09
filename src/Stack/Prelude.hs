@@ -146,10 +146,11 @@ withSystemTempDir str inner = withRunInIO $ \run ->
   Path.IO.withSystemTempDir str $ run . inner
 
 -- | Like `withSystemTempDir`, but the temporary directory is not deleted.
-withKeepSystemTempDir :: MonadUnliftIO m
-                      => String
-                      -> (Path Abs Dir -> m a)
-                      -> m a
+withKeepSystemTempDir ::
+     MonadUnliftIO m
+  => String
+  -> (Path Abs Dir -> m a)
+  -> m a
 withKeepSystemTempDir str inner = withRunInIO $ \run -> do
   path <- Path.IO.getTempDir
   dir <- Path.IO.createTempDir path str
@@ -210,20 +211,22 @@ logProcessStderrStdout pc = withLoggedProcess_ pc $ \p ->
 -- | Read from the process, ignoring any output.
 --
 -- Throws a 'ReadProcessException' exception if the process fails.
-readProcessNull :: (HasProcessContext env, HasLogFunc env, HasCallStack)
-                => String -- ^ Command
-                -> [String] -- ^ Command line arguments
-                -> RIO env ()
+readProcessNull ::
+     (HasProcessContext env, HasLogFunc env, HasCallStack)
+  => String -- ^ Command
+  -> [String] -- ^ Command line arguments
+  -> RIO env ()
 readProcessNull name args =
   -- We want the output to appear in any exceptions, so we capture and drop it
   void $ proc name args readProcess_
 
 -- | Use the new 'ProcessContext', but retain the working directory
 -- from the parent environment.
-withProcessContext :: HasProcessContext env
-                   => ProcessContext
-                   -> RIO env a
-                   -> RIO env a
+withProcessContext ::
+     HasProcessContext env
+  => ProcessContext
+  -> RIO env a
+  -> RIO env a
 withProcessContext pcNew inner = do
   pcOld <- view processContextL
   let pcNew' = set workingDirL (view workingDirL pcOld) pcNew

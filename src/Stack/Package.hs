@@ -826,7 +826,8 @@ topSortPackageComponent package target includeDirectTarget =
 -- iterating by increasing amount of required dependencies.
 -- 'PackageType' with value 'PTProject' here means the component is a direct target
 -- and 'PTDependency' means it's a dependency of a direct target.
-topProcessPackageComponent :: forall b.
+topProcessPackageComponent ::
+     forall b.
      Package
   -> Target
   -> (    forall component. (HasComponentInfo component)

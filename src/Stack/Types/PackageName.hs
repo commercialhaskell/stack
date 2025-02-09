@@ -11,8 +11,9 @@ import           Stack.Prelude
 
 -- | An argument which accepts a template name of the format
 -- @foo.hsfiles@.
-packageNameArgument :: O.Mod O.ArgumentFields PackageName
-                    -> O.Parser PackageName
+packageNameArgument ::
+     O.Mod O.ArgumentFields PackageName
+  -> O.Parser PackageName
 packageNameArgument =
   O.argument
     (do s <- O.str

@@ -554,13 +554,14 @@ unregisterPackages globalDb pkgargs pkgDb = do
  where
   -- Update a list of 'packages by package database' for a package. Assumes that
   -- a package to be unregistered is in no more than one database.
-  getPkgsByPkgDBs :: [(PackageDB GhcPkg.DbReadWrite, [UnitId])]
-                  -- ^ List of considered 'packages by package database'
-                  -> [(PackageDB GhcPkg.DbReadWrite, [UnitId])]
-                  -- ^ List of to be considered 'packages by package database'
-                  -> PackageArg
-                  -- Package to update
-                  -> RIO env [(PackageDB GhcPkg.DbReadWrite, [UnitId])]
+  getPkgsByPkgDBs ::
+       [(PackageDB GhcPkg.DbReadWrite, [UnitId])]
+       -- ^ List of considered 'packages by package database'
+    -> [(PackageDB GhcPkg.DbReadWrite, [UnitId])]
+       -- ^ List of to be considered 'packages by package database'
+    -> PackageArg
+       -- Package to update
+    -> RIO env [(PackageDB GhcPkg.DbReadWrite, [UnitId])]
   -- No more 'packages by package database' to consider? We need to try to get
   -- another package database.
   getPkgsByPkgDBs pkgsByPkgDBs [] pkgarg =

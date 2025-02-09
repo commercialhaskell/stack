@@ -299,8 +299,9 @@ defaultGlobalConfigPath :: Maybe (Path Abs File)
 defaultGlobalConfigPath = parseAbsFile "/etc/stack/config.yaml"
 
 -- | Path where build plans are stored.
-buildPlanDir :: Path Abs Dir -- ^ Stack root
-             -> Path Abs Dir
+buildPlanDir ::
+     Path Abs Dir -- ^ Stack root
+  -> Path Abs Dir
 buildPlanDir = (</> $(mkRelDir "build-plan"))
 
 -- | Path where binary caches of the build plans are stored.
