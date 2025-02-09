@@ -491,10 +491,11 @@ checkBuildCache oldCache files = do
       fileDigests
       oldCache
  where
-  go :: FilePath
-     -> Maybe SHA256
-     -> Maybe FileCacheInfo
-     -> RIO env (Set FilePath, Map FilePath FileCacheInfo)
+  go ::
+       FilePath
+    -> Maybe SHA256
+    -> Maybe FileCacheInfo
+    -> RIO env (Set FilePath, Map FilePath FileCacheInfo)
   -- Filter out the cabal_macros file to avoid spurious recompilations
   go fp _ _ | takeFileName fp == "cabal_macros.h" = pure (Set.empty, Map.empty)
   -- Common case where it's in the cache and on the filesystem.

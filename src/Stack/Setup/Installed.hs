@@ -78,25 +78,28 @@ parseToolText (parseWantedCompiler -> Right (WCGhcGit c f)) = Just (ToolGhcGit c
 parseToolText (parsePackageIdentifier . T.unpack -> Just pkgId) = Just (Tool pkgId)
 parseToolText _ = Nothing
 
-markInstalled :: (MonadIO m, MonadThrow m)
-              => Path Abs Dir
-              -> Tool
-              -> m ()
+markInstalled ::
+     (MonadIO m, MonadThrow m)
+  => Path Abs Dir
+  -> Tool
+  -> m ()
 markInstalled programsPath tool = do
   fpRel <- parseRelFile $ toolString tool ++ ".installed"
   writeBinaryFileAtomic (programsPath </> fpRel) "installed"
 
-unmarkInstalled :: MonadIO m
-                => Path Abs Dir
-                -> Tool
-                -> m ()
+unmarkInstalled ::
+     MonadIO m
+  => Path Abs Dir
+  -> Tool
+  -> m ()
 unmarkInstalled programsPath tool = liftIO $ do
   fpRel <- parseRelFile $ toolString tool ++ ".installed"
   ignoringAbsence (removeFile $ programsPath </> fpRel)
 
-listInstalled :: (MonadIO m, MonadThrow m)
-              => Path Abs Dir
-              -> m [Tool]
+listInstalled ::
+     (MonadIO m, MonadThrow m)
+  => Path Abs Dir
+  -> m [Tool]
 listInstalled programsPath =
   doesDirExist programsPath >>= \case
     False -> pure []
@@ -107,10 +110,11 @@ listInstalled programsPath =
     x <- T.stripSuffix ".installed" $ T.pack $ toFilePath $ filename fp
     parseToolText x
 
-filterTools :: PackageName       -- ^ package to find
-            -> (Version -> Bool) -- ^ which versions are acceptable
-            -> [Tool]            -- ^ tools to filter
-            -> [PackageIdentifier]
+filterTools ::
+     PackageName       -- ^ package to find
+  -> (Version -> Bool) -- ^ which versions are acceptable
+  -> [Tool]            -- ^ tools to filter
+  -> [PackageIdentifier]
 filterTools name goodVersion installed =
   [ pkgId | Tool pkgId <- installed
           , pkgName pkgId == name
@@ -178,10 +182,11 @@ toolExtraDirs tool = do
  where
   isGHC n = "ghc" == n || "ghc-" `L.isPrefixOf` n
 
-installDir :: (MonadReader env m, MonadThrow m)
-           => Path Abs Dir
-           -> Tool
-           -> m (Path Abs Dir)
+installDir ::
+     (MonadReader env m, MonadThrow m)
+  => Path Abs Dir
+  -> Tool
+  -> m (Path Abs Dir)
 installDir programsDir tool = do
   relativeDir <- parseRelDir $ toolString tool
   pure $ programsDir </> relativeDir

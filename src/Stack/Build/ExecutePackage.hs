@@ -214,15 +214,21 @@ getConfigCache ee task installedMap enableTest enableBench = do
   pure (allDepsMap, cache)
 
 -- | Ensure that the configuration for the package matches what is given
-ensureConfig :: HasEnvConfig env
-             => ConfigCache -- ^ newConfigCache
-             -> Path Abs Dir -- ^ package directory
-             -> BuildOpts
-             -> RIO env () -- ^ announce
-             -> (ExcludeTHLoading -> [String] -> RIO env ()) -- ^ cabal
-             -> Path Abs File -- ^ Cabal file
-             -> Task
-             -> RIO env Bool
+ensureConfig ::
+     HasEnvConfig env
+  => ConfigCache
+     -- ^ newConfigCache
+  -> Path Abs Dir
+     -- ^ package directory
+  -> BuildOpts
+  -> RIO env ()
+     -- ^ announce
+  -> (ExcludeTHLoading -> [String] -> RIO env ())
+     -- ^ cabal
+  -> Path Abs File
+     -- ^ Cabal file
+  -> Task
+  -> RIO env Bool
 ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
   newCabalMod <-
     liftIO $ modificationTime <$> getFileStatus (toFilePath cabalFP)
@@ -355,13 +361,15 @@ announceTask ee taskType action = logInfo $
 --   local install directory. Note that this is literally invoking Cabal
 --   with @copy@, and not the copying done by @stack install@ - that is
 --   handled by 'copyExecutables'.
-singleBuild :: forall env. (HasEnvConfig env, HasRunner env)
-            => ActionContext
-            -> ExecuteEnv
-            -> Task
-            -> InstalledMap
-            -> Bool             -- ^ Is this a final build?
-            -> RIO env ()
+singleBuild ::
+     forall env. (HasEnvConfig env, HasRunner env)
+  => ActionContext
+  -> ExecuteEnv
+  -> Task
+  -> InstalledMap
+  -> Bool
+     -- ^ Is this a final build?
+  -> RIO env ()
 singleBuild
     ac
     ee
@@ -958,14 +966,15 @@ checkForUnlistedFiles TTRemotePackage{} _ = pure []
 
 -- | Implements running a package's tests. Also handles producing
 -- coverage reports if coverage is enabled.
-singleTest :: HasEnvConfig env
-           => TestOpts
-           -> [StackUnqualCompName]
-           -> ActionContext
-           -> ExecuteEnv
-           -> Task
-           -> InstalledMap
-           -> RIO env ()
+singleTest ::
+     HasEnvConfig env
+  => TestOpts
+  -> [StackUnqualCompName]
+  -> ActionContext
+  -> ExecuteEnv
+  -> Task
+  -> InstalledMap
+  -> RIO env ()
 singleTest topts testsToRun ac ee task installedMap = do
   -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
   -- full blown 'withSingleContext'.
@@ -1242,14 +1251,15 @@ singleTest topts testsToRun ac ee task installedMap = do
         setTestStatus pkgDir $ if succeeded then TSSuccess else TSFailure
 
 -- | Implements running a package's benchmarks.
-singleBench :: HasEnvConfig env
-            => BenchmarkOpts
-            -> [StackUnqualCompName]
-            -> ActionContext
-            -> ExecuteEnv
-            -> Task
-            -> InstalledMap
-            -> RIO env ()
+singleBench ::
+     HasEnvConfig env
+  => BenchmarkOpts
+  -> [StackUnqualCompName]
+  -> ActionContext
+  -> ExecuteEnv
+  -> Task
+  -> InstalledMap
+  -> RIO env ()
 singleBench beopts benchesToRun ac ee task installedMap = do
   (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
   withSingleContext ac ee task.taskType allDepsMap (Just "bench") $

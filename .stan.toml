@@ -43,24 +43,24 @@
 # Infinite: base/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-luLR/n-525:30"
+  id = "OBS-STAN-0102-luLR/n-527:30"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\New.hs
 #
-#  524 ┃
-#  525 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
-#  526 ┃                              ^^^^^^^^^^^^^^
+#  526 ┃
+#  527 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
+#  528 ┃                              ^^^^^^^^^^^^^^
 
 # Infinite: base/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-luLR/n-525:65"
+  id = "OBS-STAN-0102-luLR/n-527:65"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\New.hs
 #
-#  524 ┃
-#  525 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
-#  526 ┃                                                                 ^^^^^^^^^^^^^^
+#  526 ┃
+#  527 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
+#  528 ┃                                                                 ^^^^^^^^^^^^^^
 
 # Infinite: base/length
 # Usage of the 'length' function that hangs on infinite lists
@@ -72,25 +72,25 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-erw24B-1039:3"
+  id = "OBS-STAN-0203-erw24B-1053:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecuteEnv.hs
 #
-#  1038 ┃
-#  1039 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  1040 ┃   ^^^^^^^
+#  1052 ┃
+#  1053 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+#  1054 ┃   ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-tuE+RG-236:24"
+  id = "OBS-STAN-0203-tuE+RG-242:24"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecutePackage.hs
 #
-#   235 ┃
-#   236 ┃   newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
-#   237 ┃                        ^^^^^^^
+#   241 ┃
+#   242 ┃   newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
+#   243 ┃                        ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
@@ -177,16 +177,16 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-5rtOmw-460:33"
+  id = "OBS-STAN-0212-5rtOmw-461:33"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\Constants.hs
 #
-#  459 ┃
-#  460 ┃ setupGhciShimCode = byteString $(do
-#  461 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
-#  462 ┃     embedFile path)
-#  463 ┃
+#  460 ┃
+#  461 ┃ setupGhciShimCode = byteString $(do
+#  462 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
+#  463 ┃     embedFile path)
+#  464 ┃
 
 # Anti-pattern: unsafe functions
 [[ignore]]

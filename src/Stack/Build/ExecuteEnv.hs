@@ -183,11 +183,15 @@ simpleSetupHash =
   <> simpleSetupCode
 
 -- | Get a compiled Setup exe
-getSetupExe :: HasEnvConfig env
-            => Path Abs File -- ^ Setup.hs input file
-            -> Path Abs File -- ^ SetupShim.hs input file
-            -> Path Abs Dir -- ^ temporary directory
-            -> RIO env (Maybe (Path Abs File))
+getSetupExe ::
+     HasEnvConfig env
+  => Path Abs File
+     -- ^ Setup.hs input file
+  -> Path Abs File
+     -- ^ SetupShim.hs input file
+  -> Path Abs Dir
+     -- ^ temporary directory
+  -> RIO env (Maybe (Path Abs File))
 getSetupExe setupHs setupShimHs tmpdir = do
   wc <- view $ actualCompilerVersionL . whichCompilerL
   platformDir <- platformGhcRelDir
@@ -253,10 +257,14 @@ withExecuteEnv ::
   -> BuildOptsCLI
   -> BaseConfigOpts
   -> [LocalPackage]
-  -> [DumpPackage] -- ^ global packages
-  -> [DumpPackage] -- ^ snapshot packages
-  -> [DumpPackage] -- ^ project packages and local extra-deps
-  -> Maybe Int -- ^ largest package name, for nicer interleaved output
+  -> [DumpPackage]
+     -- ^ global packages
+  -> [DumpPackage]
+     -- ^ snapshot packages
+  -> [DumpPackage]
+     -- ^ project packages and local extra-deps
+  -> Maybe Int
+     -- ^ largest package name, for nicer interleaved output
   -> (ExecuteEnv -> RIO env a)
   -> RIO env a
 withExecuteEnv
@@ -488,8 +496,10 @@ prettyAnnounceTask ee taskType action = prettyInfo $
 -- <https://github.com/commercialhaskell/stack/issues/2730>
 withLockedDistDir ::
      forall env a. HasEnvConfig env
-  => (StyleDoc -> RIO env ()) -- ^ A pretty announce function
-  -> Path Abs Dir -- ^ root directory for package
+  => (StyleDoc -> RIO env ())
+     -- ^ A pretty announce function
+  -> Path Abs Dir
+     -- ^ root directory for package
   -> RIO env a
   -> RIO env a
 withLockedDistDir announce root inner = do
@@ -938,10 +948,14 @@ withSingleContext
 -- | Strip Template Haskell "Loading package" lines and making paths absolute.
 mungeBuildOutput ::
      forall m. (MonadIO m, MonadUnliftIO m)
-  => ExcludeTHLoading       -- ^ exclude TH loading?
-  -> ConvertPathsToAbsolute -- ^ convert paths to absolute?
-  -> Path Abs Dir           -- ^ package's root directory
-  -> ActualCompiler         -- ^ compiler we're building with
+  => ExcludeTHLoading
+     -- ^ exclude TH loading?
+  -> ConvertPathsToAbsolute
+     -- ^ convert paths to absolute?
+  -> Path Abs Dir
+     -- ^ package's root directory
+  -> ActualCompiler
+     -- ^ compiler we're building with
   -> ConduitM Text Text m ()
 mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
   CT.lines
@@ -1040,8 +1054,9 @@ formatZonedTimeForLog =
 
 -- | Find the Setup.hs or Setup.lhs in the given directory. If none exists,
 -- throw an exception.
-getSetupHs :: Path Abs Dir -- ^ project directory
-           -> IO (Path Abs File)
+getSetupHs ::
+     Path Abs Dir -- ^ project directory
+  -> IO (Path Abs File)
 getSetupHs dir = do
   exists1 <- doesFileExist fp1
   if exists1

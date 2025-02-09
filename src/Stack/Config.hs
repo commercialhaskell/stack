@@ -650,12 +650,13 @@ withLocalLogFunc :: HasLogFunc env => LogFunc -> RIO env a -> RIO env a
 withLocalLogFunc logFunc = local (set logFuncL logFunc)
 
 -- | Runs the provided action with a new 'LogFunc', given a 'StylesUpdate'.
-withNewLogFunc :: MonadUnliftIO m
-               => GlobalOpts
-               -> Bool  -- ^ Use color
-               -> StylesUpdate
-               -> (LogFunc -> m a)
-               -> m a
+withNewLogFunc ::
+     MonadUnliftIO m
+  => GlobalOpts
+  -> Bool  -- ^ Use color
+  -> StylesUpdate
+  -> (LogFunc -> m a)
+  -> m a
 withNewLogFunc go useColor (StylesUpdate update) inner = do
   logOptions0 <- logOptionsHandle stderr False
   let logOptions
@@ -678,11 +679,12 @@ withNewLogFunc go useColor (StylesUpdate update) inner = do
   highlightColor = fromString $ setSGRCode $ snd $ styles ! Highlight
 
 -- | Get the default location of the local programs directory.
-getDefaultLocalProgramsBase :: MonadThrow m
-                            => Path Abs Dir
-                            -> Platform
-                            -> ProcessContext
-                            -> m (Path Abs Dir)
+getDefaultLocalProgramsBase ::
+     MonadThrow m
+  => Path Abs Dir
+  -> Platform
+  -> ProcessContext
+  -> m (Path Abs Dir)
 getDefaultLocalProgramsBase configStackRoot configPlatform override =
   case configPlatform of
     -- For historical reasons, on Windows a subdirectory of LOCALAPPDATA is
@@ -1167,9 +1169,10 @@ getInNixShell = liftIO (isJust <$> lookupEnv inNixShellEnvVar)
 -- | Determine the extra config file locations which exist.
 --
 -- Returns most local first
-getExtraConfigs :: HasTerm env
-                => Path Abs File -- ^ use config path
-                -> RIO env [Path Abs File]
+getExtraConfigs ::
+     HasTerm env
+  => Path Abs File -- ^ use config path
+  -> RIO env [Path Abs File]
 getExtraConfigs userConfigPath = liftIO $ do
   env <- getEnvironment
   mstackConfig <-
@@ -1212,10 +1215,11 @@ loadYaml parser path = do
           pure (Right res)
 
 -- | Get the location of the project config file, if it exists.
-getProjectConfig :: HasTerm env
-                 => StackYamlLoc
-                 -- ^ Override stack.yaml
-                 -> RIO env (ProjectConfig (Path Abs File))
+getProjectConfig ::
+     HasTerm env
+  => StackYamlLoc
+     -- ^ Override stack.yaml
+  -> RIO env (ProjectConfig (Path Abs File))
 getProjectConfig (SYLOverride stackYaml) = pure $ PCProject stackYaml
 getProjectConfig SYLGlobalProject = pure PCGlobalProject
 getProjectConfig SYLDefault = do

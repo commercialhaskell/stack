@@ -347,10 +347,11 @@ instance Show (MemoizedWith env a) where
 lpFiles :: HasEnvConfig env => LocalPackage -> RIO env (Set.Set (Path Abs File))
 lpFiles = runMemoizedWith . fmap (Set.unions . M.elems) . (.componentFiles)
 
-lpFilesForComponents :: HasEnvConfig env
-                     => Set NamedComponent
-                     -> LocalPackage
-                     -> RIO env (Set.Set (Path Abs File))
+lpFilesForComponents ::
+     HasEnvConfig env
+  => Set NamedComponent
+  -> LocalPackage
+  -> RIO env (Set.Set (Path Abs File))
 lpFilesForComponents components lp = runMemoizedWith $ do
   componentFiles <- lp.componentFiles
   pure $ mconcat (M.elems (M.restrictKeys componentFiles components))

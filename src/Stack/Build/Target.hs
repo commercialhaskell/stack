@@ -148,11 +148,12 @@ data RawTarget
   deriving (Eq, Show)
 
 -- | Same as @parseRawTarget@, but also takes directories into account.
-parseRawTargetDirs :: MonadIO m
-                   => Path Abs Dir -- ^ current directory
-                   -> Map PackageName ProjectPackage
-                   -> RawInput -- ^ raw target information from the commandline
-                   -> m (Either StyleDoc [(RawInput, RawTarget)])
+parseRawTargetDirs ::
+     MonadIO m
+  => Path Abs Dir -- ^ current directory
+  -> Map PackageName ProjectPackage
+  -> RawInput -- ^ raw target information from the commandline
+  -> m (Either StyleDoc [(RawInput, RawTarget)])
 parseRawTargetDirs root locals ri =
   case parseRawTarget t of
     Just rt -> pure $ Right [(ri, rt)]

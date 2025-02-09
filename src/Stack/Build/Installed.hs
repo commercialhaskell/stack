@@ -53,14 +53,15 @@ toInstallMap sourceMap = do
   pure $ projectInstalls <> depInstalls
 
 -- | Returns the new InstalledMap and all of the locally registered packages.
-getInstalled :: HasEnvConfig env
-             => InstallMap -- ^ does not contain any installed information
-             -> RIO env
-                  ( InstalledMap
-                  , [DumpPackage] -- globally installed
-                  , [DumpPackage] -- snapshot installed
-                  , [DumpPackage] -- locally installed
-                  )
+getInstalled ::
+     HasEnvConfig env
+  => InstallMap -- ^ does not contain any installed information
+  -> RIO env
+       ( InstalledMap
+       , [DumpPackage] -- globally installed
+       , [DumpPackage] -- snapshot installed
+       , [DumpPackage] -- locally installed
+       )
 getInstalled {-opts-} installMap = do
   logDebug "Finding out which packages are already installed"
   snapDBPath <- packageDatabaseDeps

@@ -354,9 +354,10 @@ runContainerAndExit = do
     sshRelDir = relDirDotSsh
 
 -- | Inspect Docker image or container.
-inspect :: (HasProcessContext env, HasLogFunc env)
-        => String
-        -> RIO env (Maybe Inspect)
+inspect ::
+     (HasProcessContext env, HasLogFunc env)
+  => String
+  -> RIO env (Maybe Inspect)
 inspect image = do
   results <- inspects [image]
   case Map.toList results of
@@ -365,9 +366,10 @@ inspect image = do
     _ -> throwIO (InvalidInspectOutputException "expect a single result")
 
 -- | Inspect multiple Docker images and/or containers.
-inspects :: (HasProcessContext env, HasLogFunc env)
-         => [String]
-         -> RIO env (Map Text Inspect)
+inspects ::
+     (HasProcessContext env, HasLogFunc env)
+  => [String]
+  -> RIO env (Map Text Inspect)
 inspects [] = pure Map.empty
 inspects images = do
   maybeInspectOut <-
@@ -397,10 +399,11 @@ pull = do
   either throwIO (pullImage docker) docker.image
 
 -- | Pull Docker image from registry.
-pullImage :: (HasProcessContext env, HasTerm env)
-          => DockerOpts
-          -> String
-          -> RIO env ()
+pullImage ::
+     (HasProcessContext env, HasTerm env)
+  => DockerOpts
+  -> String
+  -> RIO env ()
 pullImage docker image = do
   prettyInfoL
     [ flow "Pulling image from registry:"

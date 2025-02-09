@@ -333,9 +333,10 @@ loadTemplate name logIt = do
       downloadFromUrl settings templateDir
 
  where
-  loadLocalFile :: Path b File
-                -> (ByteString -> Either String Text)
-                -> RIO env Text
+  loadLocalFile ::
+       Path b File
+    -> (ByteString -> Either String Text)
+    -> RIO env Text
   loadLocalFile path extract = do
     logDebug $
          "Opening local template: \""
@@ -386,10 +387,11 @@ loadTemplate name logIt = do
       (useCachedVersionOrThrow url path)
     loadLocalFile path extract
 
-  useCachedVersionOrThrow :: String
-                          -> Path Abs File
-                          -> VerifiedDownloadException
-                          -> RIO env ()
+  useCachedVersionOrThrow ::
+       String
+    -> Path Abs File
+    -> VerifiedDownloadException
+    -> RIO env ()
   useCachedVersionOrThrow url path exception = do
     exists <- doesFileExist path
 

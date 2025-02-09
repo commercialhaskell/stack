@@ -226,17 +226,21 @@ displayTask task = fillSep $
   missing = task.configOpts.missing
 
 -- | Perform the actual plan
-executePlan :: HasEnvConfig env
-            => BuildOptsCLI
-            -> BaseConfigOpts
-            -> [LocalPackage]
-            -> [DumpPackage] -- ^ global packages
-            -> [DumpPackage] -- ^ snapshot packages
-            -> [DumpPackage] -- ^ project packages and local extra-deps
-            -> InstalledMap
-            -> Map PackageName Target
-            -> Plan
-            -> RIO env ()
+executePlan ::
+     HasEnvConfig env
+  => BuildOptsCLI
+  -> BaseConfigOpts
+  -> [LocalPackage]
+  -> [DumpPackage]
+     -- ^ global packages
+  -> [DumpPackage]
+     -- ^ snapshot packages
+  -> [DumpPackage]
+     -- ^ project packages and local extra-deps
+  -> InstalledMap
+  -> Map PackageName Target
+  -> Plan
+  -> RIO env ()
 executePlan
     boptsCli
     baseConfigOpts
@@ -281,9 +285,9 @@ executePlan
     Map.keysSet plan.tasks <> Map.keysSet plan.finals
 
 copyExecutables ::
-       HasEnvConfig env
-    => Map StackUnqualCompName InstallLocation
-    -> RIO env ()
+     HasEnvConfig env
+  => Map StackUnqualCompName InstallLocation
+  -> RIO env ()
 copyExecutables exes | Map.null exes = pure ()
 copyExecutables exes = do
   snapBin <- (</> bindirSuffix) <$> installationRootDeps
@@ -360,12 +364,13 @@ windowsRenameCopy src dest = do
   old = dest ++ ".old"
 
 -- | Perform the actual plan (internal)
-executePlan' :: HasEnvConfig env
-             => InstalledMap
-             -> Map PackageName Target
-             -> Plan
-             -> ExecuteEnv
-             -> RIO env ()
+executePlan' ::
+     HasEnvConfig env
+  => InstalledMap
+  -> Map PackageName Target
+  -> Plan
+  -> ExecuteEnv
+  -> RIO env ()
 executePlan' installedMap0 targets plan ee = do
   config <- view configL
   let !buildOpts = ee.buildOpts
@@ -556,13 +561,14 @@ unregisterPackages cv localDB ids = do
 
     _ -> for_ ids . unregisterSinglePkg $ \ident _gid -> Left ident
 
-toActions :: HasEnvConfig env
-          => InstalledMap
-          -> Maybe (MVar ())
-          -> (RIO env () -> IO ())
-          -> ExecuteEnv
-          -> (Maybe Task, Maybe Task) -- build and final
-          -> [Action]
+toActions ::
+     HasEnvConfig env
+  => InstalledMap
+  -> Maybe (MVar ())
+  -> (RIO env () -> IO ())
+  -> ExecuteEnv
+  -> (Maybe Task, Maybe Task) -- build and final
+  -> [Action]
 toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
   abuild ++ afinal
  where
