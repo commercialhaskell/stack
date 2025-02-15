@@ -1,23 +1,16 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.10.1.
 #
-# Currently, Stack cannot be built with GHC 9.10.1 because Cabal-3.12.0.0 has
-# changed the type of Distribution.PackageDescription.Check.checkPackage.
+# Currently, Stack cannot be built with GHC 9.10.1 because:
+# * Cabal-3.14.1.0 has changed the type of
+#   Distribution.PackageDescription.Check.checkPackage.
+# * fsnotify does not work at runtime with GHC 9.10.1/Linux. See
+#   https://github.com/haskell-fswatch/hfsnotify/issues/115
 
-snapshot: nightly-2024-12-16 # GHC 9.10.1
-
-extra-deps:
-- aeson-warning-parser-0.1.1@sha256:e5b81492d39bfe5de99fdc838e54e0fc0f2e290eb9fcfd4531cabf24baeada76,1353
-- http-download-0.2.1.0@sha256:a97863e96f7d44efc3d0e3061db7fe2540b8374ca44ae90d0b56040140cb7506,1716
-- pantry-0.10.0@sha256:d13f99099753b0acf0695a00dc4d82f2671d3c604161d169ac0fc8fcf3004dec,7912
-- path-0.9.6@sha256:63c2783d76c425514b2904e392f487921de823d883dcc629d7eaad36930198ce,5531
-- path-io-1.8.2@sha256:97725811b06f3fea7c1f2b0b39f21806c2f90470fc571acd75d3606b49b0f0d9,2009
-- rio-prettyprint-0.1.8.0@sha256:28a034bfa2842043d4603800e47943027677746cca0b3b8088aee10168870105,1428
+snapshot: nightly-2025-02-15 # GHC 9.10.1
 
 allow-newer: true
 allow-newer-deps:
-# See https://github.com/yesodweb/persistent/issues/1538
-# - persistent
 - path
 # Added to ignore upper bound on Cabal.
 - stack
