@@ -1,4 +1,4 @@
-snapshot: lts-23.0
+snapshot: lts-23.8
 extra-deps:
 - ./filepath-1.4.100.4
 # Required, otherwise Stack reports that GHC boot library has been pruned.

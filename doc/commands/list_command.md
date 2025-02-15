@@ -30,7 +30,7 @@ For example:
 
 ~~~text
 stack list base unix Win32 acme-missiles pantry
-base-4.20.0.1
+base-4.21.0.0
 unix-2.8.6.0
 Win32-2.14.1.0
 acme-missiles-0.3
@@ -42,20 +42,20 @@ Could not find package paltry, updating
 Package index cache populated
 Error: [S-4926]
        * Could not find package paltry on Hackage. Perhaps you meant one of:
-         pantry, pretty, pasty, xattr, alloy, para, pappy, alure, polar and
-         factory.
+         tasty, retry, path, pretty, pasty, xattr, alloy, para, pappy and
+         alure.
 
-stack --snapshot lts-23.0 list base unix Win32 acme-missiles pantry
+stack --snapshot lts-23.8 list base unix Win32 acme-missiles pantry
 Error: [S-4926]
        * Package does not appear in snapshot (directly or indirectly): acme-missiles.
 
-stack --snapshot lts-23.0 list base unix Win32 pantry
+stack --snapshot lts-23.8 list base unix Win32 pantry
 base-4.19.2.0
 unix-2.8.6.0
 Win32-2.13.4.0
 pantry-0.10.0
 
-stack --snapshot lts-23.0 list
+stack --snapshot lts-23.8 list
 AC-Angle-1.0
 ALUT-2.4.0.3
 ...

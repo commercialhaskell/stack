@@ -294,7 +294,7 @@ snapshots like `ghc-9.8.4`. This can be used to override the compiler for a
 Stackage snapshot, like this:
 
 ~~~yaml
-snapshot: lts-23.0
+snapshot: lts-23.8
 compiler: ghc-9.8.3
 compiler-check: match-exact
 ~~~
