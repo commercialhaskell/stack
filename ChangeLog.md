@@ -21,6 +21,7 @@ Behavior changes:
 
 Other enhancements:
 
+* Bump to Hpack 0.38.0.
 * In YAML configuration files, the `install-msys` key is introduced, to enable
   or disable the download and installation of Stack-supplied MSYS2 when
   necessary (subject to `skip-msys: false`). The default is the same as the

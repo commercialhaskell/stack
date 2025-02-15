@@ -1,5 +1,9 @@
 snapshot: lts-23.8 # GHC 9.8.4
 
+extra-deps:
+# lts-23.8 provides hpack-0.37.0
+- hpack-0.38.0
+
 docker:
   enable: false
   repo: quay.io/benz0li/ghc-musl:9.8.4
