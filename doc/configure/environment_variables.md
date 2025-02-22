@@ -5,6 +5,12 @@
 The environment variables listed in alphabetal order below can affect how Stack
 behaves.
 
+If using Stack's
+[Nix integration](../topics/nix_integration.md#pure-and-impure-nix-shells) and a
+*pure* Nix build environment (or *shell*), by default, these environment
+variables will not be forwarded from your user session to the Nix shell.
+However, the Nix shell can be configured to keep specific environment variables.
+
 ## `GH_TOKEN` or `GITHUB_TOKEN`
 
 [:octicons-tag-24: 2.11.1](https://github.com/commercialhaskell/stack/releases/tag/v2.11.1)

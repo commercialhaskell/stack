@@ -13,6 +13,7 @@ configured to integrate with Nix. Integration provides these benefits:
   conflict with any existing versions of these libraries on your system. That
   they are managed locally to the project means that you don't need to alter
   your system in any way to build any odd project pulled from the Internet; and
+
 * implicit sharing of system packages between projects. This means you don't
   have more copies on-disk than you need.
 
@@ -317,12 +318,13 @@ configuration file (`stack.yaml`, by default).
 ## Pure and impure Nix shells
 
 By default, Stack will run the build in a *pure* Nix build environment (or
-*shell*), which means two important things:
+*shell*). Building in a pure Nix shell means:
 
-1. basically **no environment variable will be forwarded** from your user
-   session to the nix-shell (variables like `HTTP_PROXY` or `PATH` notably will
-   not be available); and
-2. the build should fail if you haven't specified all the dependencies in the
+1. with limited exceptions, **no environment variable will be forwarded** from
+   your user session to the Nix shell (variables like `HTTP_PROXY`, `PATH`,
+   `STACK_XDG` and `STACK_ROOT` notably will not be available); and
+
+2. the build should fail if you have not specified all the dependencies in the
    `packages:` section of the Stack configuration file, even if these
    dependencies are installed elsewhere on your system. This behaviour enforces
    a complete description of the build environment to facilitate
@@ -338,6 +340,24 @@ nix:
 ~~~
 
 The equivalent command line flag (which will prevail) is `--[no-]-nix-pure`.
+
+To run the build in a *pure* Nix shell but preserve specific environment
+variables use Nix's `nix-shell` command's `--keep` option. For example, to
+preserve the [`STACK_XDG`](../configure/environment_variables.md#stack_xdg)
+environment variable, add the following to your Stack YAML configuration file:
+
+~~~yaml
+nix:
+  nix-shell-options:
+  - --keep
+  - STACK_XDG
+~~~
+
+The equivalent command line option is:
+
+~~~text
+--nix-shell-options "--keep STACK_XDG"
+~~~
 
 **Note:** On macOS, shells are non-pure by default currently. This is due soon
 to be resolved locale issues. So on macOS you'll need to be a bit more careful
