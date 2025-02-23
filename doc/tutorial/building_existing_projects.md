@@ -79,7 +79,7 @@ stack init --force --omit-packages
 ~~~
 
 Looking at `stack.yaml`, you will see that the excluded packages have been
-commented out under the `packages` field. In case wrong packages are excluded
+commented out under the `packages` key. In case wrong packages are excluded
 you can uncomment the right one and comment the other one.
 
 Packages may get excluded due to conflicting requirements among user packages or
@@ -123,7 +123,7 @@ _Cabal warnings_: `stack init` will show warnings if there were issues in
 reading a Cabal file. You may want to pay attention to the warnings as sometimes
 they may result in incomprehensible errors later on during dependency solving.
 
-_Package naming_: If the `Name` field defined in a Cabal file does not match
+_Package naming_: If the `name` field defined in a Cabal file does not match
 with the Cabal file name then `stack init` will refuse to continue.
 
 _User warnings_: When packages are excluded or external dependencies added Stack

@@ -33,7 +33,7 @@ yields output like:
 ~~~text
 Writing the configuration file for the implicit global project to:
 .../global-project/stack.yaml. Note: You can change the snapshot via the
-snapshot field there.
+snapshot key there.
 Using the latest snapshot lts-22.31.
 I installed the stm package via --package stm
 ~~~

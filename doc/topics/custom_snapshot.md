@@ -112,7 +112,7 @@ ghc-options:
   text: -O1
 ~~~
 
-This works somewhat differently than the stack.yaml `ghc-options` field, in that
+This works somewhat differently than the stack.yaml `ghc-options` key, in that
 options can only be specified for packages that are mentioned in the custom
 snapshot's `packages` list. It sets the ghc-options, rather than extending those
 specified in the snapshot being extended.

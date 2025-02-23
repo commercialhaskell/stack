@@ -7,7 +7,7 @@ The following terms are used in Stack's documentation.
 |Term                |Meaning                                                  |
 |--------------------|---------------------------------------------------------|
 |Cabal               |The Haskell Common Architecture for Building Applications and Libraries, provided by the [`Cabal` package](https://hackage.haskell.org/package/Cabal). Also referred to as Cabal (the library) to distinguish it from Cabal (the tool).|
-|Cabal file          |A file containing a [package description](https://cabal.readthedocs.io/en/stable/cabal-package-description-file.html) used by Cabal, named `<package_name>.cabal`.|
+|Cabal file          |A file containing a [package description](https://cabal.readthedocs.io/en/stable/cabal-package-description-file.html) used by Cabal, named `<package_name>.cabal`. A Cabal file specifies properties in the form of field/value pairs.|
 |Cabal (the tool)    |The Haskell tool used for building provided by the [`cabal-install` package](https://hackage.haskell.org/package/cabal-install).|
 |CI                  |Continuous integration.                                  |
 |CMake               |A [system](https://cmake.org/) for managing build processes.|
@@ -60,4 +60,4 @@ The following terms are used in Stack's documentation.
 |Windows             |A group of operating systems developed by Microsoft.     |
 |WSL                 |[Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/). Provides a Linux environment on Windows.|
 |XDG Base Directory Specification|A [specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html) of directories relative to which files should be located.|
-|YAML                |A human-friendly [data serialization language](https://yaml.org/).|
+|YAML                |A human-friendly [data serialization language](https://yaml.org/). The YAML syntax allows for key/value pairs.|

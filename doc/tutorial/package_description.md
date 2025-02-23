@@ -136,8 +136,9 @@ may be present in the package's root directory:
 
     A `package.yaml` file can be more concise and less repetitive than the Cabal
     file that is generated from it. That is because the Hpack format uses
-    defaults and top-level fields common to sections. The YAML syntax, which may
-    already be familiar for some users, can also avoid repetition.
+    defaults and top-level keys common to other parts of the format. The YAML
+    syntax, which may already be familiar for some users, can also avoid
+    repetition.
 
     In particular, the format's defaults can infer the names of exposed and
     other modules.
