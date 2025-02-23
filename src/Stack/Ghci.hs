@@ -1171,13 +1171,16 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
                 , pretty projectConfigFile <> ","
                 , flow "then you can use"
                 , style Shell "stack init"
-                , flow "to create a new stack.yaml for the packages in the \
-                       \current directory."
+                , flow "to create a new"
+                , style File "stack.yaml"
+                , flow "for the packages in the current directory."
                 , line
                 ]
             , flow "If you want to use the project configuration at"
             , pretty projectConfigFile <> ","
-            , flow "then you can add to its 'packages' field."
+            , flow "then you can add to the value of its"
+            , style Shell "packages"
+            , "key."
             ]
         , ""
         ]

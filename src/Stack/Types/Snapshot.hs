@@ -43,8 +43,8 @@ instance Exception TypesSnapshotException where
     ]
   displayException (FilepathInDownloadedSnapshot url) = unlines
     [ "Error: [S-4865]"
-    , "Downloaded snapshot specified a 'snapshot: { location: filepath }' "
-    , "field, but filepaths are not allowed in downloaded snapshots.\n"
+    , "Downloaded snapshot specified 'snapshot: { location: filepath }', "
+    , "but filepaths are not allowed in downloaded snapshots.\n"
     , "Filepath specified: " ++ T.unpack url
     ]
 
