@@ -205,6 +205,30 @@ its subdirectories.
 
 ## Controlling what gets built
 
+Stack will rebuild a targeted project package if it considers one or more of
+its files to be dirty.
+
+Stack will consider a package to be dirty if a file is added to the
+`extra-source-files` field of its Cabal file or the contents of an existing file
+listed in the `extra-source-files` field is changed.
+
+??? note "GHC's recompilation checker and Template Haskell"
+
+    GHC's recompilation checker (which is on by default) stops compilation early
+    if GHC can determine that a module does not need to be recompiled.
+
+    For modules that use Template Haskell, when the module is compiled, GHC can
+    determine dependencies, or be told about dependent files, of the code
+    inserted by the splice. (Instances of the `Quasi` class promise to provide
+    `qAddDependentFile`; see package `template-haskell`.)
+
+    However, GHC cannot be told of as yet *unknown* dependent files when a
+    module using Template Haskell is compiled. For example, this can affect the
+    `embedDir` function provided by package `file-embed`, when files are added
+    to the directory in question after the module is compiled. The resolution is
+    either to specify GHC's `-fforce-recomp` option (to turn off the
+    recompilation checker for the package) or to do a clean build.
+
 Stack will automatically build the necessary dependencies. See the introductory
 part of Stack's
 [user's guide](../tutorial/building_your_project.md#adding-dependencies) for
