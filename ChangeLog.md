@@ -405,8 +405,8 @@ Behavior changes:
 * Drop support for `Cabal` versions before 1.22 and, consequently, GHC versions
   before 7.10.
 * `stack ghci` and `stack repl` now take into account the values of
-  `default-language` keys in Cabal files, like they take into account the values
-  of `default-extensions` keys.
+  `default-language` fields in Cabal files, like they take into account the
+  values of `default-extensions` fields.
 * Removed `--ghc-paths`, `--global-stack-root` and `--local-bin-path` flags for
   `stack path`, deprecated in Stack 1.1.0 in favour of `--programs`,
   `--stack-root` and `local-bin` respectively.
@@ -512,7 +512,7 @@ Other enhancements:
   user-specific global YAML configuration file (`config.yaml`).
 * Experimental: Add option `allow-newer-deps`, which allows users to specify a
   subset of dependencies for which version bounds should be ignored
-  (`allow-newer-deps: ['foo', 'bar']`). This field has no effect unless
+  (`allow-newer-deps: ['foo', 'bar']`). This key has no effect unless
   `allow-newer` is enabled.
 
 Bug fixes:
@@ -739,8 +739,8 @@ Behavior changes:
 
 Other enhancements:
 
-* `stack ls dependencies json` now includes fields `sha256` and `size` for
-  dependencies of `type` `archive` in `location`.
+* The output of `stack ls dependencies json` now includes keys `sha256` and
+  `size` for dependencies of `type` `archive` in `location`.
   [#5280](https://github.com/commercialhaskell/stack/issues/5280)
 * Build failures now show a hint to scroll up to the corresponding section
   [#5279](https://github.com/commercialhaskell/stack/issues/5279)
@@ -1013,9 +1013,9 @@ Major changes:
     * Drop support for multiple package indices and legacy
       `00-index.tar` style indices. See
       [#4137](https://github.com/commercialhaskell/stack/issues/4137).
-    * Support for archives and repos in the `packages` section has
-      been removed. Instead, you must use `extra-deps` for such
-      dependencies. `packages` now only supports local filepaths.
+    * Support for archives and repos in values of the `packages` key has been
+      removed. Instead, you must use the `extra-deps` key for such dependencies.
+      `packages` now only supports local filepaths.
     * Add support for Git repositories containing (recursive) submodules.
     * Addition of new configuration options for specifying a "pantry
       tree" key, which provides more reproducibility around builds,
@@ -1078,7 +1078,7 @@ Behavior changes:
 * When using `stack script`, custom snapshot files will be resolved
   relative to the directory containing the script.
 * Remove the deprecated `--upgrade-cabal` flag to `stack setup`.
-* Support the `drop-packages` field in `stack.yaml`
+* Support the `drop-packages` key in `stack.yaml`
 * Remove the GPG signing code during uploads. The GPG signatures have
   never been used yet, and there are no plans to implement signature
   verification.
@@ -1190,13 +1190,11 @@ Other enhancements:
   variables. See [#620](https://github.com/commercialhaskell/stack/issues/620).
 * Less verbose output from `stack setup` on Windows. See
   [#1212](https://github.com/commercialhaskell/stack/issues/1212).
-* Add an optional `ignore-expiry` flag to the `hackage-security`
-  section of the `~/.stack/config.yaml`. It allows to disable timestamp
-  expiration verification just like `cabal --ignore-expiry` does.
-  The flag is not enabled by default so that the default functionality
-  is not changed.
-* Include default values for most command line flags in the `--help`
-  output. See
+* Add an optional `ignore-expiry` key to the `hackage-security` key of
+  `~/.stack/config.yaml`. It allows disabling of timestamp expiration
+  verification just like `cabal --ignore-expiry` does. The flag is not enabled
+  by default so that the default functionality is not changed.
+* Include default values for most command line flags in the `--help` output. See
   [#893](https://github.com/commercialhaskell/stack/issues/893).
 * Set the `GHC_ENVIRONMENT` environment variable to specify dependency
   packages explicitly when running test. This is done to prevent
@@ -1664,7 +1662,7 @@ newer dependency versions).
 Major changes:
 
 * Complete overhaul of how snapshots are defined, the `packages` and
-  `extra-deps` fields, and a number of related items. For full
+  `extra-deps` keys, and a number of related items. For full
   details, please see the
   [writeup](https://www.fpcomplete.com/blog/2017/07/stacks-new-extensible-snapshots)
   on these changes.
@@ -1750,7 +1748,7 @@ Other enhancements:
   Sometimes GHC's heuristics would work fine even before this change,
   for example in `stack ghci`, but this override's GHC's heuristics
   when they're broken by our collecting and processing GHC's output.
-* Extended the `ghc-options` field to support `$locals`, `$targets`,
+* Extended the `ghc-options` key to support `$locals`, `$targets`,
   and `$everything`. See:
   [#3329](https://github.com/commercialhaskell/stack/issues/3329)
 * Better error message for case that `stack ghci` file targets are
@@ -2043,7 +2041,7 @@ Other enhancements:
   ([#2384](https://github.com/commercialhaskell/stack/issues/2384))
 * `stack haddock` now shows index.html paths when documentation is already up to
   date. Resolved [#781](https://github.com/commercialhaskell/stack/issues/781)
-* Respects the `custom-setup` field introduced in Cabal 1.24. This supercedes
+* Respects the `custom-setup` stanza introduced in Cabal 1.24. This supercedes
   any `explicit-setup-deps` settings in your `stack.yaml` and trusts the
   package's Cabal file to explicitly state all its dependencies.
 * If system package installation fails, `get-stack.sh` will fail as well. Also
@@ -2174,8 +2172,8 @@ Other enhancements:
 
 * `stack haddock` now supports `--haddock-internal`. See
   [#2229](https://github.com/commercialhaskell/stack/issues/2229)
-* Add support for `system-ghc` and `install-ghc` fields to `stack config set`
-  command.
+* Add support for `system-ghc` and `install-ghc` subcommands to
+  `stack config set` command.
 * Add `ghc-build` option to override autodetected GHC build to use (e.g. gmp4,
   tinfo6, nopie) on Linux.
 * `stack setup` detects systems where gcc enables PIE by default (such as Ubuntu
@@ -2193,7 +2191,7 @@ Other enhancements:
 * Add the `--open` option to "stack hpc report" command, causing the report to
   be opened in the browser.
 * The `stack config set` command now accepts a `--global` flag for suitable
-  fields which causes it to modify the global user configuration
+  subcommands which causes it to modify the global user configuration
   (`~/.stack/config.yaml`) instead of the project configuration.
   [#2675](https://github.com/commercialhaskell/stack/pull/2675)
 * Information on the latest available snapshots is now downloaded from S3
@@ -2303,8 +2301,7 @@ Major changes:
 
 * Add `stack hoogle` command.
   [#55](https://github.com/commercialhaskell/stack/issues/55)
-* Support for absolute file path in `url` field of `setup-info` or
-  `--ghc-bindist`
+* Support for absolute file path in `url` key of `setup-info` or `--ghc-bindist`
 * Add support for rendering GHCi scripts targeting different GHCi like
   applications
   [#2457](https://github.com/commercialhaskell/stack/pull/2457)
@@ -2539,11 +2536,11 @@ Behavior changes:
   package version - it is treated as an extra-dep. `stack build local-pkg-1.2.3`
   is an error even if the version number matches the local package
   [#2028](https://github.com/commercialhaskell/stack/issues/2028).
-* Having a `nix:` section no longer implies enabling nix build. This allows the
-  user to globally configure whether nix is used (unless the project overrides
-  the default explicitly). See
+* A `nix` key in a Stack YAML configuration file no longer implies enabling a
+  Nix build. This allows the user to globally configure whether Nix is used
+  (unless the project overrides the default explicitly). See
   [#1924](https://github.com/commercialhaskell/stack/issues/1924).
-* Remove deprecated valid-wanted field.
+* Remove deprecated `valid-wanted` key.
 * Docker: mount home directory in container
   [#1949](https://github.com/commercialhaskell/stack/issues/1949).
 * Deprecate `stack path --local-bin-path`; instead use `--local-bin`.
@@ -2931,7 +2928,7 @@ Bug fixes:
 
 Major changes:
 
-* GHCJS can now be used with stackage snapshots via the new `compiler` field.
+* GHCJS can now be used with stackage snapshots via the new `compiler` key.
 * Windows installers are now available:
   [download them here](http://docs.haskellstack.org/en/stable/install_and_upgrade/#windows)
   [#613](https://github.com/commercialhaskell/stack/issues/613)
@@ -3176,9 +3173,9 @@ Other enhancements:
   [#824](https://github.com/commercialhaskell/stack/issues/824)
 * By default, `stack upgrade` automatically installs GHC as necessary
   [#797](https://github.com/commercialhaskell/stack/issues/797)
-* Added the `ghc-options` field to `stack.yaml`
+* Added the `ghc-options` key to `stack.yaml`
   [#796](https://github.com/commercialhaskell/stack/issues/796)
-* Added the `extra-path` field to `stack.yaml`
+* Added the `extra-path` key to `stack.yaml`
 * Code page changes on Windows only apply to the build command (and its
   synonyms), and can be controlled via a command line flag (still defaults to
   on) [#757](https://github.com/commercialhaskell/stack/issues/757)
@@ -3286,8 +3283,8 @@ Other enhancements:
 
 Bug fixes:
 
-* Extensions from the `other-extensions` field no longer enabled by default
-  [#449](https://github.com/commercialhaskell/stack/issues/449)
+* Extensions from the Cabal `other-extensions` field no longer enabled by
+  default [#449](https://github.com/commercialhaskell/stack/issues/449)
 * Fix: haddock forces rebuild of empty packages
   [#452](https://github.com/commercialhaskell/stack/issues/452)
 * Don't copy over executables excluded by component selection

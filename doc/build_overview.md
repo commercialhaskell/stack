@@ -59,12 +59,12 @@ Given these inputs, Stack attempts the following process when performing a build
 
 This file is parsed to provide the following config values:
 
-* `snapshot` (or, alternatively, `resolver`) (required field)
-* `compiler` (optional field)
-* `packages` (optional field, defaults to `["."]`)
-* `extra-deps` (optional field, defaults to `[]`)
-* `flags` (optional field, defaults to `{}`)
-* `ghc-options` (optional field, defaults to `{}`)
+* `snapshot` (or, alternatively, `resolver`) (required key)
+* `compiler` (optional key)
+* `packages` (optional key, value defaults to `["."]`)
+* `extra-deps` (optional key, value defaults to `[]`)
+* `flags` (optional key, value defaults to `{}`)
+* `ghc-options` (optional key, value defaults to `{}`)
 
 `flags` and `ghc-options` break down into both _by name_ (applied to a
 specific package) and _general_ (general option `*` for flags is only available
