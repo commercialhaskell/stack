@@ -61,8 +61,6 @@ allow-newer: true
 
 ## allow-newer-deps
 
-:octicons-beaker-24: Experimental
-
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
 Default: `none`
