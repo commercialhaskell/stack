@@ -29,6 +29,8 @@ Other enhancements:
   Consequently, the default behaviour of Stack is unaffected.
 * Add the `stack config set install-msys` command to configure the
   `install-msys` option in YAML configuration files.
+* Option `allow-newer-deps` is no longer classified as experimental in
+  documentation.
 
 Bug fixes:
 
