@@ -16,7 +16,7 @@ Stack's configuration options are each of one of two types:
 
 -   :material-account:{ .lg .middle } __Project-specific__
 
-    Configured at the project level
+    Configured only at the project level
 
     ---
 
@@ -31,6 +31,8 @@ Stack's configuration options are each of one of two types:
     [:octicons-arrow-right-24: Learn more](non-project.md)
 
 </div>
+
+Most of Stack's configuration options are non-project specific.
 
 ## Project-level and global configuration files
 

@@ -25,11 +25,13 @@ is the `stack.yaml` file.
 ## `stack.yaml`
 
 Stack requires a Stack project-level configuration file for every project.
-`stack.yaml` is that file. The contents of the file define project-specific
-options and non-project-specific options that apply to the project.
+`stack.yaml` is that file. The contents of the file set project-specific and
+non-project-specific options that apply to the project. (Non-project
+specific options that affect the project may also be set in a
+[global Stack configuration file](../configure/yaml/index.md#project-level-and-global-configuration-files).)
 
-The contents of the file include comments beginning `#`. Ignoring those
-comments, the contents will look something like this:
+The contents of the `stack.yaml` file include comments beginning `#`. Ignoring
+those comments, the contents will look something like this:
 
 ~~~yaml
 snapshot:

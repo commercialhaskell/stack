@@ -15,19 +15,26 @@ command:
 stack build --flag yackage:-upload
 ~~~
 
-This means: when compiling the `yackage` package, turn off the `upload` flag
-(thus the `-` in `-upload`). Unlike other tools, Stack is explicit about which
-package's flag you want to change. It does this for two reasons:
+This means: when compiling the `yackage` package, turn off the `upload` Cabal
+flag (thus the `-` in `-upload`). Unlike other tools, Stack is explicit about
+which package's flag you want to change. It does this for two reasons:
 
 1. There's no global meaning for Cabal flags, and therefore two packages can
    use the same flag name for completely different things.
-2. By following this approach, we can avoid unnecessarily recompiling snapshot
-   packages that happen to use a flag that we're using.
 
-You can also change flag values on the command line for extra-dep and snapshot
-packages. If you do this, that package will automatically be promoted to an
-extra-dep, since the build plan is different than what the plan snapshot
+2. By following this approach, we can avoid unnecessarily recompiling snapshot
+   packages that happen to use a Cabal flag that we're using.
+
+You can also change Cabal flag values on the command line for extra-dep and
+snapshot packages. If you do this, that package will automatically be promoted
+to an extra-dep, since the build plan is different than what the plan snapshot
 definition would entail.
+
+If you have Cabal flags that you will be setting regularly when building your
+packages, you can add them to your Stack project-level configuration file
+(`stack.yaml`). For more information, see the
+[flags](../configure/yaml/project.md#flags) project-specific configuration
+option documentation.
 
 ## GHC options
 
@@ -90,10 +97,13 @@ While this specific corner case does catch people by surprise, the overall goal
 of reproducible builds is - in the Stack maintainers' views - worth the
 confusion.
 
-Final point: if you have GHC options that you'll be regularly passing to your
-packages, you can add them to your `stack.yaml` file. For more information, see
-the [ghc-options](../configure/yaml/non-project.md#ghc-options) non-project
-specific configuration option documentation.
+If you have GHC options that you will be applying regularly when building your
+packages, you can add them to your Stack project-level configuration file
+(`stack.yaml`) or (if applicable) to a
+[global Stack configuration file](../configure/yaml/index.md#project-level-and-global-configuration-files).
+For more information, see the
+[ghc-options](../configure/yaml/non-project.md#ghc-options) non-project specific
+configuration option documentation.
 
 !!! note
 
