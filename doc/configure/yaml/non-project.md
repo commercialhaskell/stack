@@ -2,11 +2,18 @@
 
 # Non-project-specific configuration
 
-Non-project configuration options can be included in a project-level
-configuration file (`stack.yaml`, by default) or in global configuration files
-(`config.yaml`). However, non-project-specific options in the project-level
-configuration file in the `global-project` directory are ignored by Stack. The
-options below are listed in alphabetic order.
+Non-project configuration options can be included in:
+
+* a [project-level configuration file](../yaml/index.md#project-level-and-global-configuration-files)
+  (`stack.yaml`, by default), like [project-specific](project.md) ones; or
+
+* [global configuration files](../yaml/index.md#project-level-and-global-configuration-files)
+  (`config.yaml`).
+
+However, non-project-specific options in the project-level configuration file in
+the `global-project` directory are ignored by Stack.
+
+The options below are listed in alphabetic order.
 
 ## allow-different-user
 

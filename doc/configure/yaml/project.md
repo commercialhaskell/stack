@@ -3,7 +3,8 @@
 # Project-specific configuration
 
 Project-specific configuration options are valid only in a project-level
-configuration file (`stack.yaml`, by default).
+configuration file (`stack.yaml`, by default). Most of Stack's configuration
+options are [non-project specific](non-project.md).
 
 Each of the Haskell packages to which a Stack project relates is either a
 **project package** that is part of the project and located locally or a package
