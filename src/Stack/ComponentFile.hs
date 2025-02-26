@@ -432,7 +432,10 @@ logPossibilities dirs mn = do
     , line <> bulletedList (map pretty possibilities)
     , flow "If you are using a custom preprocessor for this module"
     , flow "with its own file extension, consider adding the extension"
-    , flow "to the 'custom-preprocessor-extensions' field in stack.yaml."
+    , flow "to the value of the"
+    , style Shell "custom-preprocessor-extensions"
+    , flow "key in Stack's project-level configuration file"
+    , "(" <> style File "stack.yaml" <> ")."
     ]
  where
   makePossibilities name =

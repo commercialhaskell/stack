@@ -824,7 +824,7 @@ withBuildConfig inner = do
             , pretty dest <> "."
             , flow "Note: You can change the snapshot via the"
             , style Shell "snapshot"
-            , flow "field there."
+            , flow "key there."
             ]
           p <- getEmptyProject mSnapshot []
           liftIO $ do

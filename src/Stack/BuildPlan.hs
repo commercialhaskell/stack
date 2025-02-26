@@ -91,7 +91,7 @@ instance Exception BuildPlanException where
           , case mapMaybe goRecommend $ Map.toList unknown of
               [] -> []
               rec ->
-                  ("Recommended action: modify the extra-deps field of " ++
+                  ("Recommended action: modify the value of the extra-deps key of " ++
                   toFilePath stackYaml ++
                   " to include the following:")
                   : (rec
@@ -125,7 +125,7 @@ instance Exception BuildPlanException where
       | otherwise = concat
           [ ["The following packages are shadowed by project packages:"]
           , map go (Map.toList shadowed)
-          , ["Recommended action: modify the extra-deps field of " ++
+          , ["Recommended action: modify the value of the extra-deps key of " ++
              toFilePath stackYaml ++
              " to include the following:"]
           , extraDeps

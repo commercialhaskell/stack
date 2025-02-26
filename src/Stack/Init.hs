@@ -376,9 +376,8 @@ renderStackYaml p ignoredPackages dupPackages =
    where
     convert v = B.byteString (Yaml.encode $ Yaml.object [(name, v)])
 
-    -- Some fields in stack.yaml are optional and may not be
-    -- generated. For these, we provided commented out dummy
-    -- values to go along with the comments.
+    -- Some keys in stack.yaml are optional and may not be generated. For these,
+    -- we provided commented out dummy values to go along with the comments.
     nonPresentValue "extra-deps" = Just "# extra-deps: []\n"
     nonPresentValue "flags" = Just "# flags: {}\n"
     nonPresentValue "extra-package-dbs" = Just "# extra-package-dbs: []\n"
