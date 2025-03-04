@@ -11,8 +11,7 @@ theme:
   palette:
     primary: 'deep purple'
     accent: 'deep purple'
-  icon:
-    logo: simple/haskell
+  logo: img/stack-favicon.svg
   favicon: img/stack-favicon.svg
   features:
   - content.code.annotate
