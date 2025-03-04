@@ -11,7 +11,7 @@ theme:
   palette:
     primary: 'deep purple'
     accent: 'deep purple'
-  logo: img/stack-favicon.svg
+  logo: img/stack-logo-white.svg
   favicon: img/stack-favicon.svg
   features:
   - content.code.annotate
