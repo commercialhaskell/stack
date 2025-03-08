@@ -43,8 +43,9 @@ uploads the package to Hackage.
 
 By default:
 
-* the command will check each package for common mistakes. Pass the flag
-  `--ignore-check` to disable such checks;
+* the command will check each package for common mistakes. For further
+  information, see the [`stack sdist` command](sdist_command.md) documentation.
+  Pass the flag `--ignore-check` to disable such checks; and
 
 * Stack will not test the resulting package archive. Pass the flag
   `--test-tarball` to cause Stack to test each resulting package archive, by
