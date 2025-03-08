@@ -42,6 +42,7 @@ import qualified Distribution.PackageDescription.Check as Check
 import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint
                    ( showGenericPackageDescription )
+import           Distribution.Simple.Utils ( cabalVersion )
 import           Distribution.Version
                    ( earlierVersion, hasLowerBound, hasUpperBound, isAnyVersion
                    , orLaterVersion, simplifyVersionRange
@@ -574,7 +575,8 @@ checkPackageInExtractedTarball pkgDir = do
   prettyInfoL
     [ flow "Checking package"
     , style Current (fromPackageName name)
-    , flow "for common mistakes."
+    , flow "for common mistakes using Cabal version"
+    , fromString $ versionString cabalVersion <> "."
     ]
   let pkgChecks =
         -- MSS 2017-12-12: Try out a few different variants of pkgDesc to try
