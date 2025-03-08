@@ -31,6 +31,8 @@ Other enhancements:
   `install-msys` option in YAML configuration files.
 * Option `allow-newer-deps` is no longer classified as experimental in
   documentation.
+* `stack sdist` and `stack upload` report the version of Cabal (the library)
+  being used to check packages.
 
 Bug fixes:
 
