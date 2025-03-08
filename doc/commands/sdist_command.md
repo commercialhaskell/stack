@@ -39,3 +39,9 @@ By default:
     For futher information, see the
     [`pvp-bounds`](../configure/yaml/non-project.md#pvp-bounds) non-project
     specific configuration option documentation.
+
+!!! note
+
+    Stack checks a package for common mistakes using checks provided by Cabal
+    (the library). The version of Cabal used by Stack to check may be
+    older than the version used by Stack to build.
