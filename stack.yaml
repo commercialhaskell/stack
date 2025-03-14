@@ -1,7 +1,7 @@
-snapshot: lts-23.8 # GHC 9.8.4
+snapshot: lts-23.14 # GHC 9.8.4
 
 extra-deps:
-# lts-23.8 provides hpack-0.37.0
+# lts-23.14 provides hpack-0.37.0
 - hpack-0.38.0
 
 docker:
