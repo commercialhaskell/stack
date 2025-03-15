@@ -177,7 +177,7 @@ functionality to create a Cabal file.
     # The email address to contact the maintainer of the package (optional):
     maintainer:          "example@example.com"
     # The copyright for the package's files (optional):
-    copyright:           "2024 Author name here"
+    copyright:           "2025 Author name here"
 
     # Extra files (if any) to be distributed with the source files of the
     # package:
@@ -316,7 +316,7 @@ directly.
     -- The email address to contact the maintainer of the package:
     maintainer:     example@example.com
     -- The copyright for the package's files:
-    copyright:      2024 Author name here
+    copyright:      2025 Author name here
     -- The licence for the use of the package's files:
     license:        BSD-3-Clause
     -- The file documenting the terms of the licence:

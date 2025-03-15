@@ -1641,7 +1641,7 @@ The parameters are: `author-email`, `author-name`, `category`, `copyright`,
   set per project by passing `-p "category:value"` to the `stack new` command.
 * _copyright_ - sets the `copyright` property in Cabal. It is typically the
   name of the holder of the copyright on the package and the year(s) from which
-  copyright is claimed. For example: `Copyright (c) 2023-2024 Joe Bloggs`
+  copyright is claimed. For example: `Copyright (c) 2023-2025 Joe Bloggs`
 * _year_ - if `copyright` is not specified, `year` and `author-name` are used
   to generate the copyright property in Cabal. If `year` is not specified, it
   defaults to the current year.
@@ -1664,7 +1664,7 @@ templates:
     author-name: Your Name
     author-email: youremail@example.com
     category: Your Projects Category
-    copyright: 'Copyright (c) 2024 Your Name'
+    copyright: 'Copyright (c) 2025 Your Name'
     github-username: yourusername
 ~~~
 
