@@ -4,6 +4,20 @@
 
 Release notes:
 
+**Changes since v3.5.1:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+## v3.5.1
+
+Release notes:
+
 **Changes since v3.3.1:**
 
 Major changes:
