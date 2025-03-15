@@ -9,8 +9,8 @@ on:
     - rc/**
   workflow_dispatch:
 
-# As of 6 May 2024, ubuntu-latest and windows-latest come with Stack 2.15.5 and
-# GHC 9.8.2. However, macos-latest does not come with Haskell tools.
+# As of 15 March 2025, ubuntu-latest and windows-latest come with Stack 3.3.1
+# and GHC 9.12.1. However, macos-latest does not come with Haskell tools.
 
 jobs:
   pedantic:
@@ -76,7 +76,7 @@ jobs:
 
         if [[ "${{ matrix.os }}" == "macos-latest" ]]
         then
-          # macos-latest does not include Haskell tools as at 2024-05-06.
+          # macos-latest does not include Haskell tools as at 2025-03-15.
           curl -sSL https://get.haskellstack.org/ | sh
         fi
 

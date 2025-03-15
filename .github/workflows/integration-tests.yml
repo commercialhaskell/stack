@@ -16,7 +16,7 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 7 February 2025, ubuntu-latest and windows-latest come with Stack 3.3.1
+# As of 15 March 2025, ubuntu-latest and windows-latest come with Stack 3.3.1
 # and GHC 9.12.1. However, macos-13 and macos-latest do not come with Haskell
 # tools. windows-latest comes with NSIS 3.10, for which the default value of the
 # 'Unicode' installer attribute is 'true'. However, that is not the 'large
@@ -40,7 +40,7 @@ jobs:
           # Stack's project-level configuration (stack.yaml) specifies the
           # multi-architecture (including Linux/Aarch64) Docker image published
           # by Oliver Benz (@benz0li, on GitHub). That image comes with
-          # Stack 3.1.1. (Note that the online documentation for
+          # Stack 3.3.1. (Note that the online documentation for
           # '--docker-stack-exe image' specifies that the host Stack and image
           # Stack must have the same version number.)
           release-args: "--alpine --stack-args --docker-stack-exe=image"
@@ -81,7 +81,7 @@ jobs:
         if [[ "${{ matrix.os }}" == "ubuntu-24.04-arm" || "${{ matrix.os }}" == "macos-13" || "${{ matrix.os }}" == "macos-latest" ]]
         then
           # ubuntu-24.04-arm, macos-13 and macos-latest do not include Haskell
-          # tools as at 2025-02-07.
+          # tools as at 2025-03-15.
           curl -sSL https://get.haskellstack.org/ | sh
         fi
 
