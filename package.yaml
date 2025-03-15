@@ -2,7 +2,7 @@
 spec-version: 0.35.0
 
 name: stack
-version: '3.4.0'
+version: '3.5.0.0'
 synopsis: The Haskell Tool Stack
 description: |
   Please see the documentation at <https://docs.haskellstack.org>
