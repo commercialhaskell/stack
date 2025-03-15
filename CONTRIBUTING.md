@@ -348,20 +348,21 @@ compatibility with a range of versions of GHC that a library package (such as
 Stack aims to depend on well-known packages. The specific versions on which it
 depends at any time are specified by `package.yaml` and `stack.yaml`. It does
 not aim to be compatible with more than one version of the `Cabal` package at
-any time. At the time of writing (December 2024) the package versions are
-primarily ones in Stackage snapshot LTS Haskell 23.14 (for GHC 9.8.4).
+any time. At the time of writing (March 2025) the package versions are
+primarily ones in Stackage snapshot LTS Haskell 23.14 (for GHC 9.8.4) and
+`hpack-0.38.0`.
 
 A Stack executable makes use of Cabal (the library) through a small 'Setup'
 executable that it compiles from Haskell source code. The executable compiles
 that code with a dependency on the version of Cabal that ships with the
 specified GHC compiler. Each release of Stack will normally aim to support all
-versions of GHC and the Cabal package in Stackage snapshots published within
-seven years of the release. For example, snapshot LTS Haskell 10.0, published on
-19 December 2017, was the first LTS Haskell snapshot to provide GHC 8.2.2 which
-comes with `base-4.10.1.0` and `Cabal-2.0.1.1`. Normally, until, at least,
-19 December 2024, Stack releases would aim to support the immediate
-predecessor, GHC 8.0.2 and `base-4.9.1.0`, `Cabal-1.24.2.0` and Haddock 2.17.4.
-However, the next version of Stack will drop support for versions of Cabal
+versions of GHC and the Cabal package in Stackage LTS Haskell snapshots
+published within seven years of the release. For example, snapshot LTS Haskell
+12.0, published on 9 July 2018, was the first LTS Haskell snapshot to
+provide GHC 8.4.3 which comes with `base-4.11.1.0` and `Cabal-2.2.0.1`.
+Normally, until, at least, 9 July 2025, Stack releases would aim to support the
+immediate predecessor, GHC 8.2.2 and `base-4.10.1.0`, `Cabal-2.0.1.1` and
+Haddock 2.18.1. However, Stack 3.1.1 dropped support for versions of Cabal
 before 2.2. `Cabal-2.2.0.0` was released with GHC 8.4.1 on 8 March 2018.
 
 When a version of the Stack executable actually ceases to support a version of
