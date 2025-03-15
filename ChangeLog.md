@@ -1,12 +1,8 @@
 # Changelog
 
-## Unreleased changes
-
-Release notes:
+## v3.5.0.1 (release candidate) - 2025-03-15
 
 **Changes since v3.3.1:**
-
-Major changes:
 
 Behavior changes:
 
@@ -33,8 +29,6 @@ Other enhancements:
   documentation.
 * `stack sdist` and `stack upload` report the version of Cabal (the library)
   being used to check packages.
-
-Bug fixes:
 
 ## v3.3.1 - 2024-12-28
 
