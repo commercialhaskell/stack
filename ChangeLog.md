@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased changes
+
+Release notes:
+
+**Changes since v3.5.0.1:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
 ## v3.5.0.1 (release candidate) - 2025-03-15
 
 **Changes since v3.3.1:**
