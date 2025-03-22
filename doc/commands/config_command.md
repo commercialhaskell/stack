@@ -6,12 +6,31 @@
 stack config COMMAND
 
 Available commands:
-  env                      Print environment variables for use in a shell
-  set                      Sets a key in configuration file to value
+  build-files              Generate (when applicable) a Cabal file from a
+                           package description in the Hpack format and/or a lock
+                           file for Stack's project-level configuration.
+  env                      Print environment variables for use in a shell.
+  set                      Set a key in a configuration file to value.
 ~~~
 
 The `stack config` commands provide assistance with accessing or modifying
 Stack's configuration. See `stack config` for the available commands.
+
+## The `stack config build-files` command
+
+~~~text
+stack config build-files
+~~~
+
+`stack config build-files` generates (when applicable):
+
+* a Cabal file from a package description in the Hpack format (`package.yaml`);
+  and/or
+
+* a [lock file](../topics/lock_files.md) for Stack's project-level
+  configuration (by default, `stack.yaml`);
+
+without taking any other build steps.
 
 ## The `stack config env` command
 

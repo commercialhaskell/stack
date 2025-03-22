@@ -26,7 +26,11 @@ import           RIO.Process ( withProcessContextNoLogging )
 import           Stack.Build ( buildCmd )
 import           Stack.BuildInfo ( hpackVersion, versionString' )
 import           Stack.Clean ( CleanCommand (..), cleanCmd )
-import           Stack.ConfigCmd as ConfigCmd
+import           Stack.ConfigCmd
+                   ( cfgCmdBuildFiles, cfgCmdBuildFilesName, cfgCmdEnv
+                   , cfgCmdEnvName, configCmdEnvParser, cfgCmdName, cfgCmdSet
+                   , cfgCmdSetName, configCmdSetParser
+                   )
 import           Stack.Constants
                    ( globalFooter, osIsWindows, relFileStack, relFileStackDotExe
                    , stackProgName
@@ -72,7 +76,9 @@ import qualified Stack.Path ( path )
 import           Stack.Prelude
 import           Stack.Query ( queryCmd )
 import           Stack.Runners
-                   ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
+                   ( ShouldReexec (..), withBuildConfig, withConfig
+                   , withDefaultEnvConfig
+                   )
 import           Stack.SDist ( sdistCmd )
 import           Stack.Script ( ScriptOpts (..), scriptCmd )
 import           Stack.SetupCmd ( setupCmd )
@@ -224,19 +230,28 @@ commandLineHandler currentDir progName mExecutablePath isInterpreter =
     (cleanOptsParser Clean)
 
   config = addSubCommands'
-      ConfigCmd.cfgCmdName
+      cfgCmdName
         "Subcommands for accessing and modifying configuration values."
         ( do
             addCommand'
-              ConfigCmd.cfgCmdSetName
-              "Sets a key in configuration file to value."
+              cfgCmdSetName
+              "Set a key in a configuration file to value."
               (withConfig NoReexec . cfgCmdSet)
               configCmdSetParser
             addCommandWithLocalInstallRootFooter
-              ConfigCmd.cfgCmdEnvName
+              cfgCmdEnvName
               "Print environment variables for use in a shell."
               (withConfig YesReexec . withDefaultEnvConfig . cfgCmdEnv)
               configCmdEnvParser
+            addCommand'
+              cfgCmdBuildFilesName
+              "Generate (when applicable) a Cabal file from a package \
+              \ description in the Hpack format and/or a lock file for Stack's \
+              \project-level configuration."
+              -- It is withBuildConfig that yields the desired actions;
+              -- cfgCmdBuildFiles itself yields nothing of interest.
+              (withConfig YesReexec . withBuildConfig . cfgCmdBuildFiles)
+              (pure ())
         )
 
   docker = addSubCommands'

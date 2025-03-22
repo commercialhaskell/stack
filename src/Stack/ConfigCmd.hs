@@ -13,6 +13,8 @@ module Stack.ConfigCmd
   , configCmdEnvParser
   , cfgCmdEnv
   , cfgCmdEnvName
+  , cfgCmdBuildFiles
+  , cfgCmdBuildFilesName
   , cfgCmdName
   ) where
 
@@ -40,6 +42,7 @@ import           Stack.Config
                    )
 import           Stack.Constants ( stackDotYaml )
 import           Stack.Prelude
+import           Stack.Types.BuildConfig ( BuildConfig )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigMonoid
                    ( configMonoidInstallGHCName
@@ -307,6 +310,9 @@ cfgCmdSetName = "set"
 cfgCmdEnvName :: String
 cfgCmdEnvName = "env"
 
+cfgCmdBuildFilesName :: String
+cfgCmdBuildFilesName = "build-files"
+
 configCmdSetParser :: OA.Parser ConfigCmdSet
 configCmdSetParser =
   OA.hsubparser $
@@ -461,3 +467,8 @@ cfgCmdEnv es = do
       escape '\'' = "'\"'\"'"
       escape c = T.singleton c
   putBuilder $ Map.foldMapWithKey toLine actions
+
+-- | This function takes no settings and yields no action of interest. It is
+-- 'withBuildConfig' that yields the desired actions.
+cfgCmdBuildFiles :: () -> RIO BuildConfig ()
+cfgCmdBuildFiles () = pure ()

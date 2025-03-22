@@ -10,6 +10,7 @@ few problems with making this work:
 * Entering all of the information to fully provide reproducibility is tedious.
   This would include things like Hackage revisions, hashes of remote tarballs,
   etc. Users don't want to enter this information.
+
 * Many operations in Stack rely upon a "snapshot hash," which transitively
   includes the completed information for all of these dependencies. If any of
   that information is missing when parsing the `stack.yaml` file or snapshot
@@ -184,3 +185,11 @@ Subject to Stack's
 [`--lock-file`](../configure/global_flags.md#-lock-file-option) option, that new
 lock file is compared against the one on disk and, if there are any differences,
 written out to the disk.
+
+## `stack config build-files` command
+
+The
+[`stack config build-files`](../commands/config_command.md#the-stack-config-build-files-command)
+loads a project-level configuration file (see above) without taking any other
+build steps (other than generating, when applicable, a Cabal file from a package
+description in the Hpack format).
