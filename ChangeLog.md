@@ -12,6 +12,10 @@ Behavior changes:
 
 Other enhancements:
 
+* Add the `stack config build-files` command to generate (when applicable) a
+  Cabal file from a package description in the Hpack format and/or a lock file
+  for Stack's project-level configuration, without taking any other build steps.
+
 Bug fixes:
 
 ## v3.5.1
