@@ -102,7 +102,7 @@ the project-level configuration file (`stack.yaml`, by default) is altered. The
 
 ## The `stack config set install-msys` command
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.5.1](https://github.com/commercialhaskell/stack/releases/tag/v3.5.1)
 
 ~~~text
 stack config set install-msys [--global] true|false

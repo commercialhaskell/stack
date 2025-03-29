@@ -152,7 +152,7 @@ documentation for the corresponding non-project specific configuration
 
 ## `--[no-]install-msys` flag
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.5.1](https://github.com/commercialhaskell/stack/releases/tag/v3.5.1)
 
 Restrictions: Windows systems only
 

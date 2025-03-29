@@ -886,7 +886,7 @@ Stack-supplied MSYS2 when necessary.
 
 ## install-msys
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.5.1](https://github.com/commercialhaskell/stack/releases/tag/v3.5.1)
 
 Restrictions: Windows systems only
 

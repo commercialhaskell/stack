@@ -12,19 +12,11 @@ Behavior changes:
 
 Other enhancements:
 
-* Add the `stack config build-files` command to generate (when applicable) a
-  Cabal file from a package description in the Hpack format and/or a lock file
-  for Stack's project-level configuration, without taking any other build steps.
-
 Bug fixes:
 
-## v3.5.1
-
-Release notes:
+## v3.5.1 - 2025-03-29
 
 **Changes since v3.3.1:**
-
-Major changes:
 
 Behavior changes:
 
@@ -51,8 +43,9 @@ Other enhancements:
   documentation.
 * `stack sdist` and `stack upload` report the version of Cabal (the library)
   being used to check packages.
-
-Bug fixes:
+* Add the `stack config build-files` command to generate (when applicable) a
+  Cabal file from a package description in the Hpack format and/or a lock file
+  for Stack's project-level configuration, without taking any other build steps.
 
 ## v3.3.1 - 2024-12-28
 
