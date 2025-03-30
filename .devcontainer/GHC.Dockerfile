@@ -8,7 +8,7 @@ ARG HLS_IMAGE_TAG=${HLS_VERSION:-none}-ghc${HLS_GHC_VERSION:-all}
 
 ARG STACK_VERSION_OVERRIDE=${STACK_VERSION}
 
-FROM ${BUILD_ON_IMAGE}:${GHC_VERSION} as files
+FROM ${BUILD_ON_IMAGE}:${GHC_VERSION} AS files
 
 RUN mkdir /files
 
@@ -25,7 +25,7 @@ FROM quay.io/benz0li/hlssi:${HLS_IMAGE_TAG} AS hlssi
 
 FROM quay.io/benz0li/hlsi:latest AS hlsi
 
-FROM docker.io/koalaman/shellcheck:stable as sci
+FROM docker.io/koalaman/shellcheck:stable AS sci
 
 FROM ${BUILD_ON_IMAGE}:${GHC_VERSION}
 
