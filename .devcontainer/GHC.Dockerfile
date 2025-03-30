@@ -56,11 +56,14 @@ RUN sysArch="$(uname -m)" \
 
 ## Update environment
 ARG USE_ZSH_FOR_ROOT
-ARG SET_LANG
-ARG SET_TZ
+ARG LANG
+ARG TZ
 
-ENV TZ=${SET_TZ:-$TZ} \
-    LANG=${SET_LANG:-$LANG}
+ARG LANG_OVERRIDE=${LANG}
+ARG TZ_OVERRIDE=${TZ}
+
+ENV LANG=${LANG_OVERRIDE:-$LANG} \
+    TZ=${TZ_OVERRIDE:-$TZ}
 
   ## Change root's shell to ZSH
 RUN if [ -n "$USE_ZSH_FOR_ROOT" ]; then \

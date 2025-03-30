@@ -6,8 +6,8 @@
     "args": {
       "GHC_VERSION": "9.12.1",
       "USE_ZSH_FOR_ROOT": "unset-to-use-ash",
-      "SET_LANG": "C.UTF-8",
-      "SET_TZ": ""
+      "LANG": "C.UTF-8",
+      "TZ": ""
     }
   },
 
