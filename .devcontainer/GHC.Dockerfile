@@ -4,11 +4,11 @@ ARG HLS_VERSION
 ARG STACK_VERSION
 
 ARG HLS_GHC_VERSION=${HLS_VERSION:+$GHC_VERSION}
-ARG HLS_SFX=/${HLS_GHC_VERSION:-all}/hls:${HLS_VERSION:-none}
+ARG HLS_IMAGE_TAG=${HLS_VERSION:-none}-ghc${HLS_GHC_VERSION:-all}
 
 ARG STACK_VERSION_OVERRIDE=${STACK_VERSION}
 
-FROM ${BUILD_ON_IMAGE}:${GHC_VERSION} as files
+FROM ${BUILD_ON_IMAGE}:${GHC_VERSION} AS files
 
 RUN mkdir /files
 
@@ -21,11 +21,11 @@ RUN find /files -type d -exec chmod 755 {} \; \
   && find /files -type f -exec chmod 644 {} \; \
   && find /files/usr/local/bin -type f -exec chmod 755 {} \;
 
-FROM glcr.b-data.ch/ghc/ghc-musl${HLS_SFX} as hls
+FROM quay.io/benz0li/hlssi:${HLS_IMAGE_TAG} AS hlssi
 
-FROM glcr.b-data.ch/ndmitchell/hlsi:latest as hlsi
+FROM quay.io/benz0li/hlsi:latest AS hlsi
 
-FROM docker.io/koalaman/shellcheck:stable as sci
+FROM docker.io/koalaman/shellcheck:stable AS sci
 
 FROM ${BUILD_ON_IMAGE}:${GHC_VERSION}
 
@@ -56,11 +56,14 @@ RUN sysArch="$(uname -m)" \
 
 ## Update environment
 ARG USE_ZSH_FOR_ROOT
-ARG SET_LANG
-ARG SET_TZ
+ARG LANG
+ARG TZ
 
-ENV TZ=${SET_TZ:-$TZ} \
-    LANG=${SET_LANG:-$LANG}
+ARG LANG_OVERRIDE=${LANG}
+ARG TZ_OVERRIDE=${TZ}
+
+ENV LANG=${LANG_OVERRIDE:-$LANG} \
+    TZ=${TZ_OVERRIDE:-$TZ}
 
   ## Change root's shell to ZSH
 RUN if [ -n "$USE_ZSH_FOR_ROOT" ]; then \
@@ -89,7 +92,7 @@ RUN if [ -n "$USE_ZSH_FOR_ROOT" ]; then \
 
 ## Copy binaries as late as possible to avoid cache busting
 ## Install HLS
-COPY --from=hls /usr/local /usr/local
+COPY --from=hlssi /usr/local /usr/local
 ## Install HLint
 COPY --from=hlsi /usr/local /usr/local
 ## Install ShellCheck

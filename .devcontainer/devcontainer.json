@@ -6,8 +6,8 @@
       "GHC_VERSION": "9.8.4",
       "HLS_VERSION": "2.10.0.0",
       "USE_ZSH_FOR_ROOT": "unset-to-use-ash",
-      "SET_LANG": "C.UTF-8",
-      "SET_TZ": ""
+      "LANG": "C.UTF-8",
+      "TZ": ""
     }
   },
 
