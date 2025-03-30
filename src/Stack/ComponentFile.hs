@@ -81,12 +81,19 @@ stackBenchmarkFiles ::
 stackBenchmarkFiles bench =
   resolveComponentFiles (CBench bench.name) build names
  where
+  names :: [DotCabalDescriptor]
   names = bnames <> exposed
+
+  exposed :: [DotCabalDescriptor]
   exposed =
     case bench.interface of
       BenchmarkExeV10 _ fp -> [DotCabalMain fp]
       BenchmarkUnsupported _ -> []
+
+  bnames :: [DotCabalDescriptor]
   bnames = map DotCabalModule build.otherModules
+
+  build :: StackBuildInfo
   build = bench.buildInfo
 
 -- | Get all files referenced by the test.
@@ -96,13 +103,20 @@ stackTestSuiteFiles ::
 stackTestSuiteFiles test =
   resolveComponentFiles (CTest test.name) build names
  where
+  names :: [DotCabalDescriptor]
   names = bnames <> exposed
+
+  exposed :: [DotCabalDescriptor]
   exposed =
     case test.interface of
       TestSuiteExeV10 _ fp -> [DotCabalMain fp]
       TestSuiteLibV09 _ mn -> [DotCabalModule mn]
       TestSuiteUnsupported _ -> []
+
+  bnames :: [DotCabalDescriptor]
   bnames = map DotCabalModule build.otherModules
+
+  build :: StackBuildInfo
   build = test.buildInfo
 
 -- | Get all files referenced by the executable.
@@ -112,7 +126,10 @@ stackExecutableFiles ::
 stackExecutableFiles exe =
   resolveComponentFiles (CExe exe.name) build names
  where
+  build :: StackBuildInfo
   build = exe.buildInfo
+
+  names :: [DotCabalDescriptor]
   names =
     map DotCabalModule build.otherModules ++ [DotCabalMain exe.modulePath]
 
@@ -124,13 +141,24 @@ stackLibraryFiles ::
 stackLibraryFiles lib =
   resolveComponentFiles componentName build names
  where
+  componentRawName :: StackUnqualCompName
   componentRawName = lib.name
+
+  componentName :: NamedComponent
   componentName
     | componentRawName == emptyCompName = CLib
     | otherwise = CSubLib componentRawName
+
+  build :: StackBuildInfo
   build = lib.buildInfo
+
+  names :: [DotCabalDescriptor]
   names = bnames ++ exposed
+
+  exposed :: [DotCabalDescriptor]
   exposed = map DotCabalModule lib.exposedModules
+
+  bnames :: [DotCabalDescriptor]
   bnames = map DotCabalModule build.otherModules
 
 -- | Get all files referenced by the component.
@@ -154,6 +182,7 @@ resolveComponentFiles component build names = do
   cfiles <- buildOtherSources build
   pure (component, ComponentFile modules (files <> cfiles) warnings)
  where
+  autogenDirs :: RIO GetPackageFileContext [Path Abs Dir]
   autogenDirs = do
     distDir <- asks (.distDir)
     let compDir = componentAutogenDir component distDir
