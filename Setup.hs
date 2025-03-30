@@ -28,6 +28,8 @@ import           Distribution.Types.UnqualComponentName
 import           Distribution.Verbosity ( Verbosity, normal )
 import           System.FilePath ( (</>) )
 
+import           Distribution.Utils.Path hiding ((</>))
+
 main :: IO ()
 main = defaultMainWithHooks simpleUserHooks
   { buildHook = \pkg lbi hooks flags -> do
@@ -47,7 +49,7 @@ generateBuildModule ::
   -> LocalBuildInfo
   -> IO ()
 generateBuildModule verbosity pkg lbi = do
-  let dir = autogenPackageModulesDir lbi
+  let dir = interpretSymbolicPathCWD (autogenPackageModulesDir lbi)
   createDirectoryIfMissingVerbose verbosity True dir
   withLibLBI pkg lbi $ \_ libcfg -> do
     withExeLBI pkg lbi $ \exe clbi ->

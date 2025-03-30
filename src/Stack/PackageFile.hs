@@ -13,6 +13,7 @@ import qualified Data.Set as S
 import           Distribution.CabalSpecVersion ( CabalSpecVersion )
 import qualified Distribution.PackageDescription as Cabal
 import           Distribution.Simple.Glob ( matchDirFileGlob )
+import           Distribution.Utils.Path ( makeSymbolicPath, getSymbolicPath )
 import           Path ( parent, (</>) )
 import           Path.Extra ( forgivingResolveFile, rejectMissingFile )
 import           Path.IO ( doesFileExist )
@@ -99,9 +100,9 @@ resolveGlobFiles cabalFileVersion =
     mapM resolveFileOrWarn names
 
   matchDirFileGlob' :: FilePath -> FilePath -> RIO GetPackageFileContext [FilePath]
-  matchDirFileGlob' dir glob =
+  matchDirFileGlob' dir glob = map getSymbolicPath <$> do
     catch
-      (liftIO (matchDirFileGlob minBound cabalFileVersion dir glob))
+      (liftIO $ matchDirFileGlob minBound cabalFileVersion (Just $ makeSymbolicPath dir) (makeSymbolicPath glob))
       ( \(e :: IOException) ->
         if isUserError e
           then do
@@ -159,9 +160,9 @@ getPackageFile pkg cabalFP =
 stackPackageFileFromCabal :: Cabal.PackageDescription -> StackPackageFile
 stackPackageFileFromCabal cabalPkg =
   StackPackageFile
-    (Cabal.extraSrcFiles cabalPkg)
-    (Cabal.dataDir cabalPkg)
-    (Cabal.dataFiles cabalPkg)
+    (map getSymbolicPath $ Cabal.extraSrcFiles cabalPkg)
+    (getSymbolicPath $ Cabal.dataDir cabalPkg)
+    (map getSymbolicPath $ Cabal.dataFiles cabalPkg)
 
 insertComponentFile ::
      PackageComponentFile
