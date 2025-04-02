@@ -86,14 +86,19 @@ resolveGlobFiles ::
 resolveGlobFiles cabalFileVersion =
   fmap (S.fromList . concatMap catMaybes) . mapM resolve
  where
+  resolve :: FilePath -> RIO GetPackageFileContext [Maybe (Path Abs File)]
   resolve name =
     if '*' `elem` name
       then explode name
       else fmap pure (resolveFileOrWarn name)
+
+  explode :: FilePath -> RIO GetPackageFileContext [Maybe (Path Abs File)]
   explode name = do
     dir <- asks (parent . (.file))
     names <- matchDirFileGlob' (toFilePath dir) name
     mapM resolveFileOrWarn names
+
+  matchDirFileGlob' :: FilePath -> FilePath -> RIO GetPackageFileContext [FilePath]
   matchDirFileGlob' dir glob =
     catch
       (liftIO (matchDirFileGlob minBound cabalFileVersion dir glob))
