@@ -98,7 +98,10 @@ resolveGlobFiles cabalFileVersion =
     names <- matchDirFileGlob' (toFilePath dir) name
     mapM resolveFileOrWarn names
 
-  matchDirFileGlob' :: FilePath -> FilePath -> RIO GetPackageFileContext [FilePath]
+  matchDirFileGlob' ::
+       FilePath
+    -> FilePath
+    -> RIO GetPackageFileContext [FilePath]
   matchDirFileGlob' dir glob =
     catch
       (liftIO (matchDirFileGlob minBound cabalFileVersion dir glob))
