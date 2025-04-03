@@ -1,0 +1,37 @@
+# This is an experimental project-level configuration, to see if Stack can be
+# built with GHC 9.12.2.
+#
+# Currently, Stack cannot be built with GHC 9.12.2 because:
+# * Cabal-3.14.1.0 has changed the type of
+#   Distribution.PackageDescription.Check.checkPackage.
+
+snapshot: nightly-2025-04-03 # GHC 9.10.1
+compiler: ghc-9.12.2
+
+extra-deps:
+# Reinstated because pruned
+- Cabal-3.14.1.0
+# Reinstated because pruned
+- Cabal-syntax-3.14.1.0
+- parsec-3.1.18.0
+# mustache cannot deal with Data.Text.show ambiguity in boot package text-2.1.2
+- text-2.1.1
+
+allow-newer: true
+allow-newer-deps:
+# Added to ignore upper bound on Cabal:
+- stack
+
+docker:
+  enable: false
+  repo: quay.io/benz0li/ghc-musl:9.12.2
+
+nix:
+  # --nix on the command-line to enable.
+  packages:
+  - zlib
+  - unzip
+
+flags:
+  stack:
+    developer-mode: true
