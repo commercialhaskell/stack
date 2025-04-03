@@ -11,7 +11,7 @@ of this repository, for more information.
 
 ### Learning to use Stack
 
-If are learning to use Stack and have questions, a discussion at the
+If you are learning to use Stack and have questions, a discussion at the
 [Haskell Community](https://discourse.haskell.org/) forum may help. See its
 'Learn' category.
 
