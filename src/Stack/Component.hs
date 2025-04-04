@@ -36,6 +36,7 @@ import           Distribution.PackageDescription
 import           Distribution.Types.BuildInfo ( BuildInfo )
 import           Distribution.Package ( mkPackageName )
 import qualified Distribution.PackageDescription as Cabal
+import           Distribution.Utils.Path (interpretSymbolicPathCWD)
 import           GHC.Records ( HasField )
 import           Stack.Prelude
 import           Stack.Types.Component
@@ -74,7 +75,7 @@ stackExecutableFromCabal :: Executable -> StackExecutable
 stackExecutableFromCabal cabalExecutable = StackExecutable
   { name = fromCabalName cabalExecutable.exeName
   , buildInfo = stackBuildInfoFromCabal cabalExecutable.buildInfo
-  , modulePath = cabalExecutable.modulePath
+  , modulePath = interpretSymbolicPathCWD cabalExecutable.modulePath
   }
 
 stackForeignLibraryFromCabal :: ForeignLib -> StackForeignLibrary
@@ -108,9 +109,9 @@ stackBuildInfoFromCabal buildInfoV = gatherComponentToolsAndDepsFromCabal
   StackBuildInfo
     { buildable = buildInfoV.buildable
     , otherModules = buildInfoV.otherModules
-    , jsSources = buildInfoV.jsSources
+    , jsSources = map interpretSymbolicPathCWD buildInfoV.jsSources
     , hsSourceDirs = buildInfoV.hsSourceDirs
-    , cSources = buildInfoV.cSources
+    , cSources = map interpretSymbolicPathCWD buildInfoV.cSources
     , dependency = mempty
     , unknownTools = mempty
     , cppOptions = buildInfoV.cppOptions
@@ -118,10 +119,10 @@ stackBuildInfoFromCabal buildInfoV = gatherComponentToolsAndDepsFromCabal
     , options = buildInfoV.options
     , allLanguages = Cabal.allLanguages buildInfoV
     , usedExtensions = Cabal.usedExtensions buildInfoV
-    , includeDirs = buildInfoV.includeDirs
+    , includeDirs = map interpretSymbolicPathCWD buildInfoV.includeDirs
     , extraLibs = buildInfoV.extraLibs
-    , extraLibDirs = buildInfoV.extraLibDirs
-    , frameworks = buildInfoV.frameworks
+    , extraLibDirs = map interpretSymbolicPathCWD buildInfoV.extraLibDirs
+    , frameworks = map interpretSymbolicPathCWD buildInfoV.frameworks
     }
 
 -- | Iterate on all three dependency list given, and transform and sort them

@@ -31,7 +31,8 @@ import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription
                    ( BenchmarkInterface, Dependency, TestSuiteInterface )
 import           Distribution.Simple ( Extension, Language )
-import           Distribution.Utils.Path ( PackageDir, SourceDir, SymbolicPath )
+import           Distribution.Utils.Path ( Pkg, Source, SymbolicPath )
+import qualified Distribution.Utils.Path as Cabal
 import           GHC.Records ( HasField (..) )
 import           Stack.Prelude
 import           Stack.Types.ComponentUtils
@@ -133,7 +134,7 @@ data StackBuildInfo = StackBuildInfo
     -- ^ Only used in file gathering. See usage in "Stack.ComponentFile" module.
   , jsSources :: [FilePath]
     -- ^ Only used in file gathering. See usage in "Stack.ComponentFile" module.
-  , hsSourceDirs :: [SymbolicPath PackageDir SourceDir]
+  , hsSourceDirs :: [SymbolicPath Pkg (Cabal.Dir Source)]
     -- ^ Only used in file & opts gathering. See usage in "Stack.ComponentFile"
     -- module for fle gathering.
   , cSources :: [FilePath]

@@ -3,6 +3,8 @@ snapshot: lts-23.14 # GHC 9.8.4
 extra-deps:
 # lts-23.14 provides hpack-0.37.0
 - hpack-0.38.1
+- Cabal-syntax-3.14.1.0
+- Cabal-3.14.1.1
 
 docker:
   enable: false
