@@ -11,6 +11,17 @@ packages:
       size: 3798
   original:
     hackage: hpack-0.38.1
+- completed:
+    commit: d0d05e2b950189d2db023313e3edd1610a873dd5
+    git: https://github.com/commercialhaskell/pantry.git
+    name: pantry
+    pantry-tree:
+      sha256: 71c0a8d8999fc4dff290dc0dc2f2afc23b5a72a9996dc4988413920e3fc2f34d
+      size: 3698
+    version: 0.10.1
+  original:
+    commit: d0d05e2b950189d2db023313e3edd1610a873dd5
+    git: https://github.com/commercialhaskell/pantry.git
 snapshots:
 - completed:
     sha256: 1964d439d2a152be4238053f3f997a09fb348391984daab86d724975ef9a423f

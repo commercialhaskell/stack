@@ -16,7 +16,7 @@ data ProjectConfig a
   | PCGlobalProject
     -- ^ No project was found when using 'SYLDefault'. Instead, use
     -- the implicit global.
-  | PCNoProject ![PackageIdentifierRevision]
+  | PCNoProject ![RawPackageLocationImmutable]
     -- ^ Use a no project run. This comes from 'SYLNoProject'.
 
 -- | Yields 'True' only if the project configuration information is for the
