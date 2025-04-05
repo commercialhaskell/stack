@@ -47,7 +47,7 @@ jobs:
           cache-bust: "2025-02-07b"
         - os: windows-latest
           release-args: ""
-          cache-bust: "2024-05-17"
+          cache-bust: "2025-04-06"
         - os: macos-13
           release-args: ""
           cache-bust: "2024-05-17"
