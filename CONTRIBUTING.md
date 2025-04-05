@@ -349,8 +349,8 @@ Stack aims to depend on well-known packages. The specific versions on which it
 depends at any time are specified by `package.yaml` and `stack.yaml`. It does
 not aim to be compatible with more than one version of the `Cabal` package at
 any time. At the time of writing (March 2025) the package versions are
-primarily ones in Stackage snapshot LTS Haskell 23.14 (for GHC 9.8.4) and
-`hpack-0.38.0`.
+primarily ones in Stackage snapshot LTS Haskell 23.17 (for GHC 9.8.4) and
+`hpack-0.38.1`.
 
 A Stack executable makes use of Cabal (the library) through a small 'Setup'
 executable that it compiles from Haskell source code. The executable compiles

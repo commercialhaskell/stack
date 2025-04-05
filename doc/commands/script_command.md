@@ -49,7 +49,7 @@ A snapshot must be specified on the command line, using the `--snapshot` option.
 For example:
 
 ~~~text
-stack script --snapshot lts-23.14 MyScript.hs
+stack script --snapshot lts-23.17 MyScript.hs
 ~~~
 
 An extra-dep from the package index can be added to the snapshot on the command
@@ -197,7 +197,7 @@ main = do
 can be compiled and run, with arguments, with:
 
 ~~~text
-stack --snapshot lts-23.14 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
+stack --snapshot lts-23.17 script --package acme-missiles --compile MyScript.hs -- "Don't panic!" "Duck and cover!"
 ~~~
 
 `acme-missiles-0.3` (the most recent version in the package index) will be used.
@@ -217,7 +217,7 @@ snapshot as an extra-dep. The `stack script` command is specified using Stack's
 
 ~~~haskell
 {- stack script
-   -- snapshot lts-23.14
+   -- snapshot lts-23.17
    -- extra-dep acme-missiles-0.2
    -- package acme-missiles
 -}
@@ -319,7 +319,7 @@ A Haskell source file `MyScript.hs`, as follows:
 
 ~~~haskell
 {- stack script
-   --snapshot lts-23.14
+   --snapshot lts-23.17
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
