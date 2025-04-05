@@ -13,7 +13,7 @@ packages:
     hackage: hpack-0.38.1
 snapshots:
 - completed:
-    sha256: 1964d439d2a152be4238053f3f997a09fb348391984daab86d724975ef9a423f
-    size: 683814
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/14.yaml
-  original: lts-23.14
+    sha256: 2763632e4c4094ce12f5ae12b22f524cdc6453b6b19007ff164a37fd9d2ea829
+    size: 683819
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/17.yaml
+  original: lts-23.17
