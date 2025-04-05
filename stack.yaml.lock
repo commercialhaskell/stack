@@ -11,6 +11,13 @@ packages:
       size: 3798
   original:
     hackage: hpack-0.38.1
+- completed:
+    hackage: pantry-0.10.1@sha256:f776cd39c211128561a80a865545fd3b7caec9935ceedd7f2d14c341d0b0ca41,7896
+    pantry-tree:
+      sha256: 101b1db0815386bebc32dec0db3611969efc6a432cf866c173dc2971b369211d
+      size: 2722
+  original:
+    hackage: pantry-0.10.1
 snapshots:
 - completed:
     sha256: 2763632e4c4094ce12f5ae12b22f524cdc6453b6b19007ff164a37fd9d2ea829

@@ -13,6 +13,10 @@ Behavior changes:
 Other enhancements:
 
 * Bump to Hpack 0.38.1.
+* The `--extra-dep` option of Stack's `script` command now accepts a YAML value
+  specifying any immutable extra-dep. Previously only an extra-dep in the
+  package index that could be specified by a YAML string (for example,
+  `acme-missiles-0.3@rev:0`) was accepted.
 
 Bug fixes:
 

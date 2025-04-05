@@ -16,6 +16,7 @@ module Stack.Script
 import           Data.ByteString.Builder ( toLazyByteString )
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.Conduit.List as CL
+import qualified Data.List.NonEmpty as NE
 import           Data.List.Split ( splitWhen )
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -127,10 +128,9 @@ data ScriptOpts = ScriptOpts
   , compile :: !ScriptExecute
   , useRoot :: !Bool
   , ghcOptions :: ![String]
-  , scriptExtraDeps :: ![PackageIdentifierRevision]
+  , scriptExtraDeps :: ![Unresolved (NonEmpty RawPackageLocationImmutable)]
   , shouldRun :: !ShouldRun
   }
-  deriving Show
 
 -- | Run a Stack Script
 scriptCmd :: ScriptOpts -> RIO Runner ()
@@ -149,16 +149,20 @@ scriptCmd opts = do
 
   file <- resolveFile' opts.file
   let scriptFile = filename file
+      scriptRoot = parent file
 
   isNoRunCompile <- fromFirstFalse . (.noRunCompile) <$>
                            view (globalOptsL . to (.configMonoid))
 
+  resolvedExtraDeps <-
+    mapM (resolvePaths (Just scriptRoot)) opts.scriptExtraDeps
   let scriptDir = parent file
+      extraDeps = concatMap NE.toList resolvedExtraDeps
       modifyGO go = go
         { configMonoid = go.configMonoid
             { ConfigMonoid.installGHC = FirstTrue $ Just True
             }
-        , stackYaml = SYLNoProject opts.scriptExtraDeps
+        , stackYaml = SYLNoProject extraDeps
         }
       (shouldRun, shouldCompile) = if isNoRunCompile
         then (NoRun, SECompile)
