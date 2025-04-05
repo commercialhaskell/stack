@@ -1,5 +1,5 @@
 {- stack script
-    --resolver lts-23.14
+    --resolver lts-23.17
     --install-ghc
     --package nsis
 -}
