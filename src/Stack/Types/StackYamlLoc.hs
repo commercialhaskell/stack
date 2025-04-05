@@ -13,7 +13,7 @@ data StackYamlLoc
     -- ^ Use the standard parent-directory-checking logic
   | SYLOverride !(Path Abs File)
     -- ^ Use a specific stack.yaml file provided
-  | SYLNoProject ![PackageIdentifierRevision]
+  | SYLNoProject ![RawPackageLocationImmutable]
     -- ^ Do not load up a project, just user configuration. Include
     -- the given extra dependencies with the snapshot.
   | SYLGlobalProject
