@@ -62,7 +62,7 @@ example (where the file size is `631` bytes):
 
 ~~~yaml
 extra-deps:
-- acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,631
+- acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,613
 ~~~
 
 Optionally, you can specify also the Pantry tree information. For example:

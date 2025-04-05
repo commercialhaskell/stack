@@ -52,8 +52,18 @@ For example:
 stack script --snapshot lts-23.14 MyScript.hs
 ~~~
 
-A package version can be added to the snapshot on the command line with the
-`--extra-dep` option (which can be specified multiple times).
+An extra-dep from the package index can be added to the snapshot on the command
+line with the `--extra-dep` option (which can be specified multiple times).
+
+Such an extra-dep can be specified using a valid YAML string value. For further
+information, see the [package location](../topics/package_location.md)
+documentation. Examples are:
+
+~~~text
+--extra-dep acme-missiles-0.3
+--extra-dep acme-missiles-0.3@rev:0
+--extra-dep acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,613
+~~~
 
 GHC boot packages that have been 'replaced' (see further below) can be specified
 as an `--extra-dep`.

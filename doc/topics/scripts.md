@@ -139,6 +139,8 @@ stack script --snapshot lts-23.14 -- MyScript.hs arg1 arg2 +RTS -s -RTS
 where `+RTS -s -RTS` are some of GHC's
 [runtime system (RTS) options](https://downloads.haskell.org/~ghc/latest/docs/users_guide/runtime_control.html).
 
+Arguments that include spaces can be quoted using double quotation marks.
+
 ## Just-in-time compilation
 
 As with using [`stack script`](../commands/script_command.md) at the command
@@ -166,6 +168,20 @@ options, or by providing a comma or space separated list. For example:
    --package turtle
    --package "stm async"
    --package http-client,http-conduit
+-}
+~~~
+
+## Using extra-deps
+
+As with using [`stack script`](../commands/script_command.md) at the command
+line, you can also specify one or more extra-deps from the package index using a
+valid YAML string for each. For example:
+
+~~~haskell
+#!/usr/bin/env stack
+{- stack script
+   --snapshot lts-23.14
+   --extra-dep acme-missile-0.3@rev:0
 -}
 ~~~
 
