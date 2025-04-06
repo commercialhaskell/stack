@@ -242,15 +242,20 @@ scriptCmd opts = do
               targets' <- mapM parsePackageNameThrowing targets
               pure $ Set.fromList targets'
 
+        GhcPkgExe pkg <- view $ compilerPathsL . to (.pkg)
+        let ghcPkgPath = toFilePath pkg
         unless (Set.null targetsSet) $ do
           -- Optimization: use the relatively cheap ghc-pkg list --simple-output
           -- to check which packages are installed already. If all needed
           -- packages are available, we can skip the (rather expensive) build
           -- call below.
-          GhcPkgExe pkg <- view $ compilerPathsL . to (.pkg)
           -- https://github.com/haskell/process/issues/251
-          bss <- snd <$> sinkProcessStderrStdout (toFilePath pkg)
-              ["list", "--simple-output"] CL.sinkNull CL.consume -- FIXME use the package info from envConfigPackages, or is that crazy?
+          bss <- snd <$> sinkProcessStderrStdout
+                   ghcPkgPath
+                   ["list", "--simple-output"]
+                   CL.sinkNull
+                   CL.consume
+          -- ^ FIXME use the package info from envConfigPackages, or is that crazy?
           let installed = Set.fromList
                         $ map toPackageName
                         $ words
@@ -264,14 +269,28 @@ scriptCmd opts = do
                     map (T.pack . packageNameString) $ Set.toList targetsSet
               withNewLocalBuildTargets targets $ build Nothing
 
-        let ghcArgs = concat
+        let packagesSet = Set.insert (mkPackageName "base") targetsSet
+            -- Yields 'raw' strings with trailing whitespace. Assumes that the
+            -- ghc-pkg application will find a package of the given name.
+            getRawPackageId :: PackageName -> RIO EnvConfig [ByteString]
+            getRawPackageId target = snd <$> sinkProcessStderrStdout
+              ghcPkgPath
+              ["field", packageNameString target, "id", "--simple-output"]
+              CL.sinkNull
+              CL.consume
+        rawPackageIds <- mapM getRawPackageId $ Set.toList packagesSet
+        let packageIds = words $ S8.unpack $ S8.concat $ concat rawPackageIds
+            -- ^ The use of words will eliminate whitespace between 'raw' items
+            ghcArgs = concat
               [ ["-i", "-i" ++ fromAbsDir (parent file)]
               , ["-hide-all-packages"]
               , maybeToList colorFlag
-              , map ("-package" ++)
-                  $ Set.toList
-                  $ Set.insert "base"
-                  $ Set.map packageNameString targetsSet
+                -- We use GHC's -package-id option rather than -package because
+                -- there is a bug in the latter. For packages with a public
+                -- sublibrary, -package <pkg> can expose an installed package
+                -- that is not listed by ghc-pkg list <pkg>. See:
+                -- https://gitlab.haskell.org/ghc/ghc/-/issues/25025
+              , map ("-package-id=" ++) packageIds
               , case shouldCompile of
                   SEInterpret -> []
                   SECompile -> []

@@ -95,6 +95,11 @@ statements in the source file. In that regard, Stack assumes that:
     The first time that Stack deduces package names from module names can take
     some time. Use the `--verbose` option to understand Stack's progress.
 
+!!! note
+
+    The installed packages of modules exposed by public sub-libraries will not
+    be deduced, because those installed packages are hidden.
+
 !!! info
 
     Certain packages are blacklisted because they expose one or more modules
@@ -115,6 +120,11 @@ single `--package` option can also refer to a list of package names, separated
 by a space or comma character. If the package is not in the snapshot, the most
 recent version in the package index (e.g. Hackage) will be obtained.
 
+In the case of a named public sub-library of a Cabal package, the required
+installed package is specified by the 'munged' package name. For example, for
+public sub-library `my-library` of Cabal package `my-package` the munged name of
+the installed package is `z-my-library-z-my-package`.
+
 If a required package is a GHC boot package, the behaviour can be complex. If
 the boot package has not been 'replaced', then it will be used in Stack's build
 plan. However, if the boot package has been 'replaced', the latest version of
@@ -127,7 +137,7 @@ packages but some snapshots may include directly some boot packages. In
 particular, some snapshots include directly `Win32` (which is a boot package on
 Windows) while others do not.
 
-!!! warning
+!!! info
 
     GHC has the concept of 'installed packages' (which differ from 'Cabal
     packages') in package databases. An installed package has a name. An
@@ -138,16 +148,17 @@ Windows) while others do not.
     installed package corresponding to a sub-library also has a `package-name`,
     which is the name of the Cabal package.
 
-    The `--package` option of `stack script` makes use of GHC's `-package`
-    option to expose an installed package. Unfortunately, the latter treats
-    `package-name` (if it exists) as if it were also the name of the installed
-    package. That means, for a Cabal package with one or more sub-libraries, the
-    GHC option `-package=<name>` cannot distinguish between (a) the installed
-    package `<name>` corresponding to the main library of Cabal package `<name>`
-    and (b) an installed package corresponding to a sub-library of that Cabal
-    package. The installed package that GHC picks to expose is indeterminate.
-    This can cause GHC to pick the wrong installed package and to report that it
-    cannot load a module because it is a member of a hidden package.
+    The `--package` option of `stack script` makes use of GHC's `-package-id`
+    option to expose an installed package, rather than its `-package` option.
+    The latter option treats `package-name` (if it exists) as if it were also
+    the name of the installed package. That means, for a Cabal package with one
+    or more sub-libraries, the GHC option `-package=<name>` cannot distinguish
+    between (a) the installed package `<name>` corresponding to the main library
+    of Cabal package `<name>` and (b) an installed package corresponding to a
+    sub-library of that Cabal package. The installed package that GHC picks to
+    expose is indeterminate. This can cause GHC to pick the wrong installed
+    package and to report that it cannot load a module because it is a member of
+    a hidden package.
 
 !!! warning
 
@@ -347,3 +358,34 @@ As module `Data.Text` is exposed by a number of packages that are included,
 directly or indirectly, in the specified snapshot (`incipit-base`,
 `incipit-core`, `relude` and `text`), `PackageImports` and `"text"` are required
 to specify which module is being imported.
+
+### Example 5
+
+Stackage snapshot LTS Haskell 23.18 specifies Cabal package `vector-0.13.2.0`
+which includes public sub-library `benchmarks-O2`. The sub-library exposes
+module `Bench.Vector.TestData.ParenTree` which exports `parenTree`. The
+following is a valid script:
+
+~~~haskell
+{- stack script
+   --snapshot lts-23.18
+   --package z-vector-z-benchmarks-O2
+-}
+{-# LANGUAGE LambdaCase #-}
+
+import Bench.Vector.TestData.ParenTree ( parenTree )
+import System.Environment ( getArgs )
+
+main :: IO ()
+main = getArgs >>= \case
+  [] -> putStrLn "An initial argument is required."
+  (arg:_) -> do
+    let n = read arg
+    if n >= 0 && even n
+      then do
+        putStrLn "A balanced binary tree structure"
+        putStrLn $ "with " <> show n <> " parentheses positions:"
+        print $ parenTree n
+      else
+        putStrLn "A positive even integer argument is required."
+~~~
