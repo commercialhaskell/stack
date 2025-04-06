@@ -25,6 +25,7 @@ import           Distribution.Simple.Utils
 import           Distribution.Types.PackageName ( unPackageName )
 import           Distribution.Types.UnqualComponentName
                    ( unUnqualComponentName )
+import           Distribution.Utils.Path ( interpretSymbolicPathCWD )
 import           Distribution.Verbosity ( Verbosity, normal )
 import           System.FilePath ( (</>) )
 
@@ -47,7 +48,7 @@ generateBuildModule ::
   -> LocalBuildInfo
   -> IO ()
 generateBuildModule verbosity pkg lbi = do
-  let dir = autogenPackageModulesDir lbi
+  let dir = interpretSymbolicPathCWD (autogenPackageModulesDir lbi)
   createDirectoryIfMissingVerbose verbosity True dir
   withLibLBI pkg lbi $ \_ libcfg -> do
     withExeLBI pkg lbi $ \exe clbi ->

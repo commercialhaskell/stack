@@ -26,7 +26,7 @@ homepage: http://haskellstack.org
 custom-setup:
   dependencies:
   - base >= 4.14.3.0 && < 5
-  - Cabal < 3.12
+  - Cabal >= 3.14 && < 3.16
   - filepath
 extra-source-files:
 # note: leaving out 'package.yaml' because it causes confusion with hackage metadata revisions
@@ -58,7 +58,7 @@ ghc-options:
 - -optP-Wno-nonportable-include-path
 dependencies:
 - base >= 4.16.0.0 && < 5
-- Cabal >= 3.8.1.0 && < 3.12
+- Cabal >= 3.14 && < 3.16
 - aeson >= 2.0.3.0
 - aeson-warning-parser >= 0.1.1
 - ansi-terminal >= 1.0.2

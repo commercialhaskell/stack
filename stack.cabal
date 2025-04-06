@@ -153,7 +153,7 @@ source-repository head
 
 custom-setup
   setup-depends:
-      Cabal <3.12
+      Cabal >=3.14 && <3.16
     , base >=4.14.3.0 && <5
     , filepath
 
@@ -397,7 +397,7 @@ library
       src
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -Widentities
   build-depends:
-      Cabal >=3.8.1.0 && <3.12
+      Cabal >=3.14 && <3.16
     , aeson >=2.0.3.0
     , aeson-warning-parser >=0.1.1
     , ansi-terminal >=1.0.2
@@ -520,7 +520,7 @@ executable stack
       app
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded -rtsopts
   build-depends:
-      Cabal >=3.8.1.0 && <3.12
+      Cabal >=3.14 && <3.16
     , aeson >=2.0.3.0
     , aeson-warning-parser >=0.1.1
     , ansi-terminal >=1.0.2
@@ -622,7 +622,7 @@ executable stack-integration-test
       tests/integration/lib
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      Cabal >=3.8.1.0 && <3.12
+      Cabal >=3.14 && <3.16
     , aeson >=2.0.3.0
     , aeson-warning-parser >=0.1.1
     , ansi-terminal >=1.0.2
@@ -739,7 +739,7 @@ test-suite stack-unit-test
       tests/unit
   ghc-options: -fwrite-ide-info -hiedir=.hie -Wall -Wmissing-export-lists -optP-Wno-nonportable-include-path -threaded
   build-depends:
-      Cabal >=3.8.1.0 && <3.12
+      Cabal >=3.14 && <3.16
     , QuickCheck
     , aeson >=2.0.3.0
     , aeson-warning-parser >=0.1.1
