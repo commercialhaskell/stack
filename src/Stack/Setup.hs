@@ -733,8 +733,6 @@ setupEnv needTargets buildOptsCLI mResolveMissingGHC = do
 
   mExecutablePath <- view mExecutablePathL
 
-  utf8EnvVars <- withProcessContext menv $ getUtf8EnvVars compilerVer
-
   mGhcRtsEnvVar <- liftIO $ lookupEnv "GHCRTS"
 
   envRef <- liftIO $ newIORef Map.empty
@@ -1041,15 +1039,12 @@ warnUnsupportedCompiler ::
 warnUnsupportedCompiler ghcVersion = do
   notifyIfGhcUntested <- view $ configL . to (.notifyIfGhcUntested)
   if
-    | ghcVersion < mkVersion [7, 8] -> do
+    | ghcVersion < mkVersion [8, 4] -> do
         prettyWarnL
-          [ flow "Stack will almost certainly fail with GHC below version 7.8, \
+          [ flow "Stack will almost certainly fail with GHC below version 8.4, \
                  \requested"
           , fromString (versionString ghcVersion) <> "."
-          , flow "Valiantly attempting to run anyway, but I know this is \
-                 \doomed."
-          , flow "For more information, see:"
-          , style Url "https://github.com/commercialhaskell/stack/issues/648" <> "."
+          , flow "Valiantly attempting to run anyway, but this is doomed."
           ]
         pure True
     | ghcVersion >= mkVersion [9, 11] && notifyIfGhcUntested -> do
@@ -2630,140 +2625,11 @@ removeHaskellEnvVars =
   -- https://github.com/commercialhaskell/stack/issues/3444
   Map.delete "GHCRTS"
 
--- | Get map of environment variables to set to change the GHC's encoding to
--- UTF-8.
-getUtf8EnvVars ::
-     (HasPlatform env, HasProcessContext env, HasTerm env)
-  => ActualCompiler
-  -> RIO env (Map Text Text)
-getUtf8EnvVars compilerVer =
-  if getGhcVersion compilerVer >= mkVersion [7, 10, 3]
-    -- GHC_CHARENC supported by GHC >=7.10.3
-    then pure $ Map.singleton "GHC_CHARENC" "UTF-8"
-    else legacyLocale
- where
-  legacyLocale = do
-    menv <- view processContextL
-    Platform _ os <- view platformL
-    if os == Cabal.Windows
-      then
-        -- On Windows, locale is controlled by the code page, so we don't set
-        -- any environment variables.
-        pure Map.empty
-      else do
-        let checkedVars = map checkVar (Map.toList $ view envVarsL menv)
-            -- List of environment variables that will need to be updated to set
-            -- UTF-8 (because they currently do not specify UTF-8).
-            needChangeVars = concatMap fst checkedVars
-            -- Set of locale-related environment variables that have already
-            -- have a value.
-            existingVarNames = Set.unions (map snd checkedVars)
-            -- True if a locale is already specified by one of the "global"
-            -- locale variables.
-            hasAnyExisting =
-              any (`Set.member` existingVarNames) ["LANG", "LANGUAGE", "LC_ALL"]
-        if null needChangeVars && hasAnyExisting
-          then
-            -- If no variables need changes and at least one "global" variable
-            -- is set, no changes to environment need to be made.
-            pure Map.empty
-          else do
-            -- Get a list of known locales by running @locale -a@.
-            elocales <- tryAny (fst <$> proc "locale" ["-a"] readProcess_)
-            let
-                -- Filter the list to only include locales with UTF-8 encoding.
-                utf8Locales =
-                  case elocales of
-                    Left _ -> []
-                    Right locales ->
-                      filter
-                        isUtf8Locale
-                        ( T.lines $
-                          T.decodeUtf8With
-                            T.lenientDecode $
-                            LBS.toStrict locales
-                        )
-                mfallback = getFallbackLocale utf8Locales
-            when
-              (isNothing mfallback)
-              ( prettyWarnS
-                  "Unable to set locale to UTF-8 encoding; GHC may \
-                  \fail with 'invalid character'"
-              )
-            let
-                -- Get the new values of variables to adjust.
-                changes =
-                  Map.unions $
-                  map
-                    (adjustedVarValue menv utf8Locales mfallback)
-                    needChangeVars
-                -- Get the values of variables to add.
-                adds
-                  | hasAnyExisting =
-                      -- If we already have a "global" variable, then nothing
-                      -- needs to be added.
-                      Map.empty
-                  | otherwise =
-                      -- If we don't already have a "global" variable, then set
-                      -- LANG to the fallback.
-                      case mfallback of
-                        Nothing -> Map.empty
-                        Just fallback ->
-                          Map.singleton "LANG" fallback
-            pure (Map.union changes adds)
-  -- Determines whether an environment variable is locale-related and, if so,
-  -- whether it needs to be adjusted.
-  checkVar :: (Text, Text) -> ([Text], Set Text)
-  checkVar (k,v) =
-    if k `elem` ["LANG", "LANGUAGE"] || "LC_" `T.isPrefixOf` k
-      then if isUtf8Locale v
-             then ([], Set.singleton k)
-             else ([k], Set.singleton k)
-      else ([], Set.empty)
-  -- Adjusted value of an existing locale variable.  Looks for valid UTF-8
-  -- encodings with same language /and/ territory, then with same language, and
-  -- finally the first UTF-8 locale returned by @locale -a@.
-  adjustedVarValue ::
-       ProcessContext
-    -> [Text]
-    -> Maybe Text
-    -> Text
-    -> Map Text Text
-  adjustedVarValue menv utf8Locales mfallback k =
-    case Map.lookup k (view envVarsL menv) of
-      Nothing -> Map.empty
-      Just v ->
-        case concatMap
-               (matchingLocales utf8Locales)
-               [ T.takeWhile (/= '.') v <> "."
-               , T.takeWhile (/= '_') v <> "_"] of
-          (v':_) -> Map.singleton k v'
-          [] -> case mfallback of
-                  Just fallback -> Map.singleton k fallback
-                  Nothing -> Map.empty
-  -- Determine the fallback locale, by looking for any UTF-8 locale prefixed
-  -- with the list in @fallbackPrefixes@, and if not found, picking the first
-  -- UTF-8 encoding returned by @locale -a@.
-  getFallbackLocale :: [Text] -> Maybe Text
-  getFallbackLocale utf8Locales =
-    case concatMap (matchingLocales utf8Locales) fallbackPrefixes of
-      (v:_) -> Just v
-      [] -> case utf8Locales of
-              [] -> Nothing
-              (v:_) -> Just v
-  -- Filter the list of locales for any with the given prefixes
-  -- (case-insensitive).
-  matchingLocales :: [Text] -> Text -> [Text]
-  matchingLocales utf8Locales prefix =
-    filter (\v -> T.toLower prefix `T.isPrefixOf` T.toLower v) utf8Locales
-  -- Does the locale have one of the encodings in @utf8Suffixes@
-  -- (case-insensitive)?
-  isUtf8Locale locale =
-    any (\ v -> T.toLower v `T.isSuffixOf` T.toLower locale) utf8Suffixes
-  -- Prefixes of fallback locales (case-insensitive)
-  fallbackPrefixes = ["C.", "en_US.", "en_"]
-  -- Suffixes of UTF-8 locales (case-insensitive)
-  utf8Suffixes = [".UTF-8", ".utf8"]
+-- | Map of environment variables to set to change the GHC's encoding to UTF-8.
+utf8EnvVars :: Map Text Text
+utf8EnvVars =
+  -- GHC_CHARENC supported by GHC >=7.10.3
+  Map.singleton "GHC_CHARENC" "UTF-8"
 
 -- Binary Stack upgrades
 

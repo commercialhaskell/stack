@@ -33,7 +33,6 @@ import qualified Data.ByteArray.Encoding as Mem ( Base(Base16), convertToBase )
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.Text as T
 import qualified Distribution.Text ( display )
-import           Distribution.Version ( mkVersion )
 import           Path
                    ( (</>), parseAbsDir, parseAbsFile, parseRelDir
                    , parseRelFile
@@ -49,7 +48,7 @@ import           Stack.Types.BuildConfig
                     ( BuildConfig (..), HasBuildConfig (..), getWorkDir )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI )
 import           Stack.Types.Compiler
-                   ( ActualCompiler (..), compilerVersionString, getGhcVersion )
+                   ( ActualCompiler (..), compilerVersionString )
 import           Stack.Types.CompilerBuild ( compilerBuildSuffix )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
@@ -129,11 +128,7 @@ instance HasSourceMap EnvConfig where
 shouldForceGhcColorFlag ::
      (HasEnvConfig env, HasRunner env)
   => RIO env Bool
-shouldForceGhcColorFlag = do
-  canDoColor <- (>= mkVersion [8, 2, 1]) . getGhcVersion
-            <$> view actualCompilerVersionL
-  shouldDoColor <- view useColorL
-  pure $ canDoColor && shouldDoColor
+shouldForceGhcColorFlag = view useColorL
 
 appropriateGhcColorFlag ::
      (HasEnvConfig env, HasRunner env)

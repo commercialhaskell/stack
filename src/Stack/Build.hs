@@ -49,7 +49,6 @@ import           Stack.Types.BuildOptsMonoid
                    ( buildOptsMonoidBenchmarksL, buildOptsMonoidHaddockL
                    , buildOptsMonoidInstallExesL, buildOptsMonoidTestsL
                    )
-import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( HasCompiler, cabalVersionL )
 import           Stack.Types.ComponentUtils
                    ( StackUnqualCompName, unqualCompToString )
@@ -71,7 +70,6 @@ import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.SourceMap
                    ( SMTargets (..), SourceMap (..), Target (..) )
-import           System.Terminal ( fixCodePage )
 
 newtype CabalVersionPrettyException
   = CabalVersionNotSupported Version
@@ -150,87 +148,84 @@ build :: HasEnvConfig env
       => Maybe (Set (Path Abs File) -> IO ()) -- ^ callback after discovering all local files
       -> RIO env ()
 build msetLocalFiles = do
-  mcp <- view $ configL . to (.modifyCodePage)
-  ghcVersion <- view $ actualCompilerVersionL . to getGhcVersion
-  fixCodePage mcp ghcVersion $ do
-    bopts <- view buildOptsL
-    sourceMap <- view $ envConfigL . to (.sourceMap)
-    locals <- projectLocalPackages
-    depsLocals <- localDependencies
-    boptsCli <- view $ envConfigL . to (.buildOptsCLI)
-    -- Set local files, necessary for file watching
-    configFile <- view configFileL
-    let allLocals = locals <> depsLocals
-        -- We are indifferent as to whether the configuration file is a
-        -- user-specifc global or a project-level one.
-        eitherConfigFile = EE.fromEither configFile
-    for_ msetLocalFiles $ \setLocalFiles -> do
-      files <-
-        if boptsCli.watchAll
-        then sequence [lpFiles lp | lp <- allLocals]
-        else forM allLocals $ \lp -> do
-          let pn = lp.package.name
-          case Map.lookup pn sourceMap.targets.targets of
-            Nothing ->
-              pure Set.empty
-            Just (TargetAll _) ->
-              lpFiles lp
-            Just (TargetComps components) ->
-              lpFilesForComponents components lp
-      liftIO $ setLocalFiles $ Set.insert eitherConfigFile $ Set.unions files
+  bopts <- view buildOptsL
+  sourceMap <- view $ envConfigL . to (.sourceMap)
+  locals <- projectLocalPackages
+  depsLocals <- localDependencies
+  boptsCli <- view $ envConfigL . to (.buildOptsCLI)
+  -- Set local files, necessary for file watching
+  configFile <- view configFileL
+  let allLocals = locals <> depsLocals
+      -- We are indifferent as to whether the configuration file is a
+      -- user-specifc global or a project-level one.
+      eitherConfigFile = EE.fromEither configFile
+  for_ msetLocalFiles $ \setLocalFiles -> do
+    files <-
+      if boptsCli.watchAll
+      then sequence [lpFiles lp | lp <- allLocals]
+      else forM allLocals $ \lp -> do
+        let pn = lp.package.name
+        case Map.lookup pn sourceMap.targets.targets of
+          Nothing ->
+            pure Set.empty
+          Just (TargetAll _) ->
+            lpFiles lp
+          Just (TargetComps components) ->
+            lpFilesForComponents components lp
+    liftIO $ setLocalFiles $ Set.insert eitherConfigFile $ Set.unions files
 
-    checkComponentsBuildable allLocals
+  checkComponentsBuildable allLocals
 
-    installMap <- toInstallMap sourceMap
-    (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
-        getInstalled installMap
+  installMap <- toInstallMap sourceMap
+  (installedMap, globalDumpPkgs, snapshotDumpPkgs, localDumpPkgs) <-
+      getInstalled installMap
 
-    baseConfigOpts <- mkBaseConfigOpts boptsCli
-    plan <- constructPlan
-              baseConfigOpts
-              localDumpPkgs
-              loadPackage
-              sourceMap
-              installedMap
-              boptsCli.initialBuildSteps
+  baseConfigOpts <- mkBaseConfigOpts boptsCli
+  plan <- constructPlan
+            baseConfigOpts
+            localDumpPkgs
+            loadPackage
+            sourceMap
+            installedMap
+            boptsCli.initialBuildSteps
 
-    allowLocals <- view $ configL . to (.allowLocals)
-    unless allowLocals $ case justLocals plan of
-      [] -> pure ()
-      localsIdents -> throwM $ LocalPackagesPresent localsIdents
+  allowLocals <- view $ configL . to (.allowLocals)
+  unless allowLocals $ case justLocals plan of
+    [] -> pure ()
+    localsIdents -> throwM $ LocalPackagesPresent localsIdents
 
-    checkCabalVersion
-    haddockCompsSupported <- warnAboutHaddockComps bopts
-    let disableHaddockComps =
-          local $ over buildOptsL $ \bo ->
-            bo
-              { haddockExecutables = False
-              , haddockTests = False
-              , haddockBenchmarks = False
-              }
-        withHaddockCompsGuarded = if haddockCompsSupported
-          then id
-          else disableHaddockComps
-    warnAboutSplitObjs bopts
-    warnIfExecutablesWithSameNameCouldBeOverwritten locals plan
+  checkCabalVersion
+  haddockCompsSupported <- warnAboutHaddockComps bopts
+  let disableHaddockComps =
+        local $ over buildOptsL $ \bo ->
+          bo
+            { haddockExecutables = False
+            , haddockTests = False
+            , haddockBenchmarks = False
+            }
+      withHaddockCompsGuarded = if haddockCompsSupported
+        then id
+        else disableHaddockComps
+  warnAboutSplitObjs bopts
+  warnIfExecutablesWithSameNameCouldBeOverwritten locals plan
 
-    when bopts.preFetch $
-        preFetch plan
+  when bopts.preFetch $
+      preFetch plan
 
-    if boptsCli.dryrun
-      then
-        printPlan plan
-      else
-        withHaddockCompsGuarded $ executePlan
-          boptsCli
-          baseConfigOpts
-          locals
-          globalDumpPkgs
-          snapshotDumpPkgs
-          localDumpPkgs
-          installedMap
-          sourceMap.targets.targets
-          plan
+  if boptsCli.dryrun
+    then
+      printPlan plan
+    else
+      withHaddockCompsGuarded $ executePlan
+        boptsCli
+        baseConfigOpts
+        locals
+        globalDumpPkgs
+        snapshotDumpPkgs
+        localDumpPkgs
+        installedMap
+        sourceMap.targets.targets
+        plan
 
 buildLocalTargets ::
      HasEnvConfig env

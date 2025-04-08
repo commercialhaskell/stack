@@ -32,7 +32,6 @@ import           Distribution.System ( OS (..), Platform (..) )
 import qualified Distribution.Text as C
 import           Distribution.Types.MungedPackageName
                    ( encodeCompatPackageName )
-import           Distribution.Version ( mkVersion )
 import           Path
                    ( (</>), addExtension, filename, isProperPrefixOf, parent
                    , parseRelDir, parseRelFile, stripProperPrefix
@@ -80,9 +79,9 @@ import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
 import           Stack.Types.Build
                    ( ConfigCache (..), PrecompiledCache (..), Task (..)
-                   , TaskConfigOpts (..), TaskType (..), taskAnyMissing
-                   , taskIsTarget, taskLocation, taskProvides
-                   , taskTargetIsMutable, taskTypePackageIdentifier
+                   , TaskConfigOpts (..), TaskType (..), taskIsTarget
+                   , taskLocation, taskProvides, taskTargetIsMutable
+                   , taskTypePackageIdentifier
                    )
 import qualified Stack.Types.Build as ConfigCache ( ConfigCache (..) )
 import           Stack.Types.Build.Exception
@@ -98,10 +97,7 @@ import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
                    , foldComponentToAnotherCollection, getBuildableListText
                    )
-import           Stack.Types.Compiler
-                   ( ActualCompiler (..), WhichCompiler (..), getGhcVersion
-                   , whichCompilerL
-                   )
+import           Stack.Types.Compiler ( WhichCompiler (..), whichCompilerL )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..)
                    , cpWhich, getGhcPkgExe
@@ -240,10 +236,6 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
           (getFileStatus (toFilePath setupConfigfp))
   newSetupConfigMod <- getNewSetupConfigMod
   newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
-  -- See https://github.com/commercialhaskell/stack/issues/3554. This can be
-  -- dropped when Stack drops support for GHC < 8.4.
-  taskAnyMissingHackEnabled <-
-    view $ actualCompilerVersionL . to getGhcVersion . to (< mkVersion [8, 4])
   needConfig <-
     if buildOpts.reconfigure
           -- The reason 'taskAnyMissing' is necessary is a bug in Cabal. See:
@@ -253,7 +245,6 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
           -- check, Stack would think that a reconfigure is unnecessary, when in
           -- fact we _do_ need to reconfigure. The details here suck. We really
           -- need proper hashes for package identifiers.
-       || (taskAnyMissingHackEnabled && taskAnyMissing task)
       then pure True
       else do
         -- We can ignore the components portion of the config
@@ -600,11 +591,7 @@ realConfigAndBuild
         else "haddock"
 
       -- For GHC 8.4 and later, provide the --quickjump option.
-      let quickjump =
-            case actualCompiler of
-              ACGhc ghcVer
-                | ghcVer >= mkVersion [8, 4] -> ["--haddock-option=--quickjump"]
-              _ -> []
+      let quickjump = ["--haddock-option=--quickjump"]
 
       fulfillHaddockExpectations pname mcurator $ \keep -> do
         let args = concat

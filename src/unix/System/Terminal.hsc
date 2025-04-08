@@ -3,8 +3,7 @@
 -- | The module of this name differs as between Windows and non-Windows builds.
 -- This is the non-Windows version.
 module System.Terminal
-( fixCodePage
-, getTerminalWidth
+( getTerminalWidth
 , hIsTerminalDeviceOrMinTTY
 ) where
 
@@ -40,9 +39,6 @@ getTerminalWidth =
     else do
       WindowWidth w <- peek p
       return . Just . fromIntegral $ w
-
-fixCodePage :: x -> y -> a -> a
-fixCodePage _ _ = id
 
 -- | hIsTerminaDevice does not recognise handles to mintty terminals as terminal
 -- devices, but isMinTTYHandle does.
