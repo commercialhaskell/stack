@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2024-09-07.
+`master` branch of the Stack repository. Last updated: 2025-04-09.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -26,18 +26,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-2816] = InconsistentDependenciesBug
-        ~~~
-
-    -   `GHC.GHC.Utils.GhcPkg.Main.Compat`
-
-        ~~~haskell
-        [S-6512] = CannotParse String String String
-        [S-3384] | CannotOpenDBForModification FilePath IOException
-        [S-1430] | SingleFileDBUnsupported FilePath
-        [S-5996] | ParsePackageInfoExceptions String
-        [S-3189] | CannotFindPackage PackageArg (Maybe FilePath)
-        [S-9323] | CannotParseRelFileBug String
-        [S-7651] | CannotParseDirectoryWithDBug String
         ~~~
 
     -   `Options.Applicative.Builder.Extra.OptionsApplicativeExtraException`
@@ -455,6 +443,19 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-7058] | DockerNotInstalledException
         [S-6894] | UnsupportedStackExeHostPlatformException
         [S-1512] | DockerStackExeParseException String
+        ~~~
+
+    -   `Stack.Types.GhcPkgExe`
+
+        ~~~haskell
+        [S-6512] = CannotParse String String String
+        [S-3384] | CannotOpenDBForModification FilePath IOException
+        [S-1430] | SingleFileDBUnsupported FilePath
+        [S-5996] | ParsePackageInfoExceptions String
+        [S-3189] | CannotFindPackage PackageArg (Maybe FilePath)
+        [S-9323] | CannotParseRelFileBug String
+        [S-7651] | CannotParseDirectoryWithDBug String
+        [S-6590] | CannotRecacheAfterUnregister (Path Abs Dir) SomeException
         ~~~
 
     -   `Stack.Types.GhcPkgId.GhcPkgIdParseFail`
