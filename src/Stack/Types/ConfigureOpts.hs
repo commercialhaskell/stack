@@ -22,7 +22,6 @@ import           Distribution.Types.MungedPackageName
 import           Distribution.Types.PackageName ( unPackageName )
 import           Distribution.Types.UnqualComponentName
                    ( unUnqualComponentName )
-import qualified Distribution.Version as C
 import           GHC.Records ( HasField )
 import           Path ( (</>), parseRelDir )
 import           Path.Extra ( toFilePathNoTrailingSep )
@@ -33,7 +32,7 @@ import           Stack.Constants
 import           Stack.Prelude
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI )
-import           Stack.Types.Compiler ( getGhcVersion, whichCompiler )
+import           Stack.Types.Compiler ( whichCompiler )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.EnvConfig ( EnvConfig, actualCompilerVersionL )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
@@ -164,7 +163,7 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
       (\customGcc -> ["--with-gcc=" ++ toFilePath customGcc])
       config.overrideGccPath
   , ["--exact-configuration"]
-  , ["--ghc-option=-fhide-source-paths" | hideSourcePaths cv]
+  , ["--ghc-option=-fhide-source-paths" | hideSourcePaths]
   ]
  where
   -- This function parses the GHC options that are providing in the
@@ -198,10 +197,8 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
     in  concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) newArgs
 
   wc = view (actualCompilerVersionL . to whichCompiler) econfig
-  cv = view (actualCompilerVersionL . to getGhcVersion) econfig
 
-  hideSourcePaths ghcVersion =
-    ghcVersion >= C.mkVersion [8, 2] && config.hideSourcePaths
+  hideSourcePaths = config.hideSourcePaths
 
   config = view configL econfig
   bopts = bco.buildOpts

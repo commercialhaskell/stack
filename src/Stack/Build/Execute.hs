@@ -28,7 +28,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Data.Tuple ( swap )
 import           Distribution.System ( OS (..), Platform (..) )
-import           Distribution.Version ( mkVersion )
 import           Path ( (</>),  parent )
 import           Path.CheckInstall ( warnInstallSearchPathIssues )
 import           Path.Extra ( forgivingResolveFile, rejectMissingFile )
@@ -62,7 +61,6 @@ import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), TestOpts (..) )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.BuildOptsMonoid ( ProgressBarFormat (..) )
-import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler (..), getGhcPkgExe )
 import           Stack.Types.ComponentUtils
                    ( StackUnqualCompName, unqualCompToString )
@@ -70,9 +68,9 @@ import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
-                   ( HasEnvConfig (..), actualCompilerVersionL
-                   , bindirCompilerTools, installationRootDeps
-                   , installationRootLocal, packageDatabaseLocal
+                   ( HasEnvConfig (..), bindirCompilerTools
+                   , installationRootDeps, installationRootLocal
+                   , packageDatabaseLocal
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
@@ -385,10 +383,9 @@ executePlan' installedMap0 targets plan ee = do
       tests = Map.elems $ Map.filter hasTests plan.finals
       benches = Map.elems $ Map.filter hasBenches plan.finals
   when testOpts.coverage deleteHpcReports
-  cv <- view actualCompilerVersionL
   whenJust (nonEmpty $ Map.toList plan.unregisterLocal) $ \ids -> do
     localDB <- packageDatabaseLocal
-    unregisterPackages cv localDB ids
+    unregisterPackages localDB ids
 
   liftIO $ atomically $ modifyTVar' ee.localDumpPkgs $ \initMap ->
     foldl' (flip Map.delete) initMap $ Map.keys plan.unregisterLocal
@@ -518,11 +515,10 @@ executePlan' installedMap0 targets plan ee = do
 
 unregisterPackages ::
      (HasCompiler env, HasPlatform env, HasProcessContext env, HasTerm env)
-  => ActualCompiler
-  -> Path Abs Dir
+  => Path Abs Dir
   -> NonEmpty (GhcPkgId, (PackageIdentifier, Text))
   -> RIO env ()
-unregisterPackages cv localDB ids = do
+unregisterPackages localDB ids = do
   let logReason ident reason =
         prettyInfoL
           (  [ fromString (packageIdentifierString ident) <> ":"
@@ -530,36 +526,24 @@ unregisterPackages cv localDB ids = do
              ]
           <> [ parens (flow $ T.unpack reason) | not $ T.null reason ]
           )
-  let unregisterSinglePkg select (gid, (ident, reason)) = do
-        logReason ident reason
-        pkg <- getGhcPkgExe
-        unregisterGhcPkgIds True pkg localDB $ select ident gid :| []
-  case cv of
-    -- GHC versions >= 8.2.1 support batch unregistering of packages. See
-    -- https://gitlab.haskell.org/ghc/ghc/issues/12637
-    ACGhc v | v >= mkVersion [8, 2, 1] -> do
-      platform <- view platformL
-      -- According to
-      -- https://support.microsoft.com/en-us/help/830473/command-prompt-cmd-exe-command-line-string-limitation
-      -- the maximum command line length on Windows since XP is 8191 characters.
-      -- We use conservative batch size of 100 ids on this OS thus argument name
-      -- '-ipid', package name, its version and a hash should fit well into this
-      -- limit. On Unix-like systems we're limited by ARG_MAX which is normally
-      -- hundreds of kilobytes so batch size of 500 should work fine.
-      let batchSize = case platform of
-            Platform _ Windows -> 100
-            _ -> 500
-      let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NE.toList
-      for_ (chunksOfNE batchSize ids) $ \batch -> do
-        for_ batch $ \(_, (ident, reason)) -> logReason ident reason
-        pkg <- getGhcPkgExe
-        unregisterGhcPkgIds True pkg localDB $ fmap (Right . fst) batch
-
-    -- GHC versions >= 7.9 support unregistering of packages via their GhcPkgId.
-    ACGhc v | v >= mkVersion [7, 9] ->
-      for_ ids . unregisterSinglePkg $ \_ident gid -> Right gid
-
-    _ -> for_ ids . unregisterSinglePkg $ \ident _gid -> Left ident
+  -- GHC versions >= 8.2.1 support batch unregistering of packages. See
+  -- https://gitlab.haskell.org/ghc/ghc/issues/12637
+  platform <- view platformL
+  -- According to
+  -- https://support.microsoft.com/en-us/help/830473/command-prompt-cmd-exe-command-line-string-limitation
+  -- the maximum command line length on Windows since XP is 8191 characters. We
+  -- use conservative batch size of 100 ids on this OS thus argument name
+  -- '-ipid', package name, its version and a hash should fit well into this
+  -- limit. On Unix-like systems we're limited by ARG_MAX which is normally
+  -- hundreds of kilobytes so batch size of 500 should work fine.
+  let batchSize = case platform of
+        Platform _ Windows -> 100
+        _ -> 500
+  let chunksOfNE size = mapMaybe nonEmpty . chunksOf size . NE.toList
+  for_ (chunksOfNE batchSize ids) $ \batch -> do
+    for_ batch $ \(_, (ident, reason)) -> logReason ident reason
+    pkg <- getGhcPkgExe
+    unregisterGhcPkgIds True pkg localDB $ fmap (Right . fst) batch
 
 toActions ::
      HasEnvConfig env

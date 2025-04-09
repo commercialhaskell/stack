@@ -49,7 +49,6 @@ import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System ( OS (..), Platform (..) )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Verbosity ( showForCabal )
-import           Distribution.Version ( mkVersion )
 import           Path
                    ( PathException, (</>), parent, parseRelDir, parseRelFile )
 import           Path.Extra ( forgivingResolveFile, toFilePathNoTrailingSep )
@@ -83,9 +82,7 @@ import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.BuildOptsMonoid ( CabalVerbosity (..) )
 import           Stack.Types.Compiler
-                   ( ActualCompiler (..), WhichCompiler (..)
-                   , compilerVersionString, getGhcVersion, whichCompilerL
-                   )
+                   ( WhichCompiler (..), compilerVersionString, whichCompilerL )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), cabalVersionL
                    , getCompilerPath
@@ -425,12 +422,11 @@ withExecuteEnv
            : [ pretty filepath <> "." ]
            )
       <> line
-    compilerVer <- view actualCompilerVersionL
     withSourceFile (toFilePath filepath) $ \src ->
          runConduit
        $ src
       .| CT.decodeUtf8Lenient
-      .| mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir compilerVer
+      .| mungeBuildOutput ExcludeTHLoading ConvertPathsToAbsolute pkgDir
       .| CL.mapM_ (logInfo . display)
     prettyNote $
          fillSep
@@ -838,8 +834,7 @@ withSingleContext
 
           runExe :: Path Abs File -> [String] -> RIO env ()
           runExe exeName fullArgs = do
-            compilerVer <- view actualCompilerVersionL
-            runAndOutput compilerVer `catch` \ece -> do
+            runAndOutput `catch` \ece -> do
               (mlogFile, bss) <-
                 case outputType of
                   OTConsole _ -> pure (Nothing, [])
@@ -854,14 +849,13 @@ withSingleContext
                              runConduit
                            $ src
                           .| CT.decodeUtf8Lenient
-                          .| mungeBuildOutput
-                               stripTHLoading makeAbsolute pkgDir compilerVer
+                          .| mungeBuildOutput stripTHLoading makeAbsolute pkgDir
                           .| CL.consume
               prettyThrowM $ CabalExitedUnsuccessfully
                 (eceExitCode ece) pkgId exeName fullArgs mlogFile bss
            where
-            runAndOutput :: ActualCompiler -> RIO env ()
-            runAndOutput compilerVer = withWorkingDir (toFilePath pkgDir) $
+            runAndOutput :: RIO env ()
+            runAndOutput = withWorkingDir (toFilePath pkgDir) $
               withProcessContext menv $ case outputType of
                 OTLogFile _ h -> do
                   let prefixWithTimestamps =
@@ -876,18 +870,17 @@ withSingleContext
                   in  void $ sinkProcessStderrStdout
                         (toFilePath exeName)
                         fullArgs
-                        (outputSink KeepTHLoading LevelWarn compilerVer prefix)
-                        (outputSink stripTHLoading LevelInfo compilerVer prefix)
+                        (outputSink KeepTHLoading LevelWarn prefix)
+                        (outputSink stripTHLoading LevelInfo prefix)
             outputSink ::
                  HasCallStack
               => ExcludeTHLoading
               -> LogLevel
-              -> ActualCompiler
               -> Utf8Builder
               -> ConduitM S.ByteString Void (RIO env) ()
-            outputSink excludeTH level compilerVer prefix =
+            outputSink excludeTH level prefix =
               CT.decodeUtf8Lenient
-              .| mungeBuildOutput excludeTH makeAbsolute pkgDir compilerVer
+              .| mungeBuildOutput excludeTH makeAbsolute pkgDir
               .| CL.mapM_ (logGeneric "" level . (prefix <>) . display)
             -- If users want control, we should add a config option for this
             makeAbsolute :: ConvertPathsToAbsolute
@@ -954,10 +947,8 @@ mungeBuildOutput ::
      -- ^ convert paths to absolute?
   -> Path Abs Dir
      -- ^ package's root directory
-  -> ActualCompiler
-     -- ^ compiler we're building with
   -> ConduitM Text Text m ()
-mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
+mungeBuildOutput excludeTHLoading makeAbsolute pkgDir = void $
   CT.lines
   .| CL.map stripCR
   .| CL.filter (not . isTHLoading)
@@ -974,18 +965,10 @@ mungeBuildOutput excludeTHLoading makeAbsolute pkgDir compilerVer = void $
       ("done." `T.isSuffixOf` bs || "done.\r" `T.isSuffixOf` bs)
 
   filterLinkerWarnings :: ConduitM Text Text m ()
-  filterLinkerWarnings
+  filterLinkerWarnings =
     -- Check for ghc 7.8 since it's the only one prone to producing
     -- linker warnings on Windows x64
-    | getGhcVersion compilerVer >= mkVersion [7, 8] = doNothing
-    | otherwise = CL.filter (not . isLinkerWarning)
-
-  isLinkerWarning :: Text -> Bool
-  isLinkerWarning str =
-       (  "ghc.exe: warning:" `T.isPrefixOf` str
-       || "ghc.EXE: warning:" `T.isPrefixOf` str
-       )
-    && "is linked instead of __imp_" `T.isInfixOf` str
+    doNothing
 
   -- | Convert GHC error lines with file paths to have absolute file paths
   toAbsolute :: ConduitM Text Text m ()

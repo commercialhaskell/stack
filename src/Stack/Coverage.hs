@@ -27,7 +27,6 @@ import qualified Data.Text.Lazy as LT
 import           Distribution.Types.MungedPackageId ( computeCompatPackageId )
 import           Distribution.Types.UnqualComponentName
                    ( mkUnqualComponentName )
-import           Distribution.Version ( mkVersion )
 import           Path
                    ( (</>), dirname, parent, parseAbsFile, parseRelDir
                    , parseRelFile, stripProperPrefix
@@ -54,16 +53,13 @@ import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( getGhcPkgExe )
 import           Stack.Types.CompCollection ( getBuildableSetText )
 import           Stack.Types.ComponentUtils ( unqualCompToString )
 import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
-                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
-                   , hpcReportDir
-                   )
+                   ( EnvConfig (..), HasEnvConfig (..), hpcReportDir )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Package ( Package (..), packageIdentifier )
 import           Stack.Types.Runner ( Runner )
@@ -184,40 +180,37 @@ tixFilePath pkgName' testName = do
   tixRel <- parseRelFile (testName ++ "/" ++ testName ++ ".tix")
   pure (pkgPath </> tixRel)
 
--- | Generates the HTML coverage report and shows a textual coverage summary for a package.
+-- | Generates the HTML coverage report and shows a textual coverage summary for
+-- a package.
 generateHpcReport :: HasEnvConfig env
                   => Path Abs Dir -> Package -> [Text] -> RIO env ()
 generateHpcReport pkgDir package tests = do
-  compilerVersion <- view actualCompilerVersionL
-  -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc package key. See
+  -- If we're using > GHC 7.10, the hpc 'include' parameter must specify a ghc
+  -- package key. See
   -- https://github.com/commercialhaskell/stack/issues/785
-  let pkgId = packageIdentifierString $ packageIdentifier package
-      pkgName' = packageNameString package.name
-      ghcVersion = getGhcVersion compilerVersion
+  let pkgName' = packageNameString package.name
       hasLibrary = hasBuildableMainLibrary package
       subLibs = package.subLibraries
   eincludeName <-
-    -- Pre-7.8 uses plain PKG-version in tix files.
-    if ghcVersion < mkVersion [7, 10] then pure $ Right $ Just [pkgId]
-    -- We don't expect to find a package key if there is no library.
-    else if not hasLibrary && null subLibs then pure $ Right Nothing
-    -- Look in the inplace DB for the package key.
-    -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
-    else do
-      -- GHC 8.0 uses package id instead of package key.
-      -- See https://github.com/commercialhaskell/stack/issues/2424
-      let hpcNameField = if ghcVersion >= mkVersion [8, 0] then "id" else "key"
-      eincludeName <-
-        findPackageFieldForBuiltPackage
-          pkgDir
-          (packageIdentifier package)
-          (getBuildableSetText subLibs)
-          hpcNameField
-      case eincludeName of
-        Left err -> do
-          logError $ display err
-          pure $ Left err
-        Right includeNames -> pure $ Right $ Just $ map T.unpack includeNames
+    if not hasLibrary && null subLibs
+      -- We don't expect to find a package key if there is no library.
+      then pure $ Right Nothing
+      -- Look in the inplace DB for the package key.
+      -- See https://github.com/commercialhaskell/stack/issues/1181#issuecomment-148968986
+      else do
+        eincludeName <-
+          findPackageFieldForBuiltPackage
+            pkgDir
+            (packageIdentifier package)
+            (getBuildableSetText subLibs)
+            -- GHC 8.0 uses package id instead of package key.
+            -- See https://github.com/commercialhaskell/stack/issues/2424
+            "id"
+        case eincludeName of
+          Left err -> do
+            logError $ display err
+            pure $ Left err
+          Right includeNames -> pure $ Right $ Just $ map T.unpack includeNames
   forM_ tests $ \testName -> do
     tixSrc <- tixFilePath package.name (T.unpack testName)
     let report = fillSep

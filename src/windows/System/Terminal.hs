@@ -4,12 +4,10 @@
 -- | The module of this name differs as between Windows and non-Windows builds.
 -- This is the Windows version.
 module System.Terminal
-  ( fixCodePage
-  , getTerminalWidth
+  ( getTerminalWidth
   , hIsTerminalDeviceOrMinTTY
   ) where
 
-import           Distribution.Types.Version ( mkVersion )
 import           Foreign.Marshal.Alloc ( allocaBytes )
 import           Foreign.Ptr ( Ptr )
 import           Foreign.Storable ( peekByteOff )
@@ -20,10 +18,6 @@ import           System.Process
                    , std_out, waitForProcess
                    )
 import           System.Win32 ( isMinTTYHandle, withHandleToHANDLE )
-import           System.Win32.Console
-                   ( setConsoleCP, setConsoleOutputCP, getConsoleCP
-                   , getConsoleOutputCP
-                   )
 
 type HANDLE = Ptr ()
 
@@ -75,50 +69,6 @@ getTerminalWidth = do
           v <- peekByteOff p (i * 2 + posCONSOLE_SCREEN_BUFFER_INFO_srWindow)
           pure $ fromIntegral (v :: Word16)
         pure $ Just (1 + right - left)
-
--- | Set the code page for this process as necessary. Only applies to Windows.
--- See: https://github.com/commercialhaskell/stack/issues/738
-fixCodePage ::
-     HasTerm env
-  => Bool -- ^ modify code page?
-  -> Version -- ^ GHC version
-  -> RIO env a
-  -> RIO env a
-fixCodePage mcp ghcVersion inner =
-  if mcp && ghcVersion < mkVersion [7, 10, 3]
-    then fixCodePage'
-    -- GHC >=7.10.3 doesn't need this code page hack.
-    else inner
- where
-  fixCodePage' = do
-    origCPI <- liftIO getConsoleCP
-    origCPO <- liftIO getConsoleOutputCP
-
-    let setInput = origCPI /= expected
-        setOutput = origCPO /= expected
-        fixInput
-          | setInput = bracket_
-              (liftIO $ setConsoleCP expected)
-              (liftIO $ setConsoleCP origCPI)
-          | otherwise = id
-        fixOutput
-          | setOutput = bracket_
-              (liftIO $ setConsoleOutputCP expected)
-              (liftIO $ setConsoleOutputCP origCPO)
-          | otherwise = id
-
-    case (setInput, setOutput) of
-      (False, False) -> pure ()
-      (True, True) -> warn []
-      (True, False) -> warn ["input"]
-      (False, True) -> warn ["output"]
-
-    fixInput $ fixOutput inner
-  expected = 65001 -- UTF-8
-  warn typ = prettyInfoL $
-       "Setting"
-    :  typ
-    <> [ flow "codepage to UTF-8 (65001) to ensure correct output from GHC." ]
 
 -- | hIsTerminaDevice does not recognise handles to mintty terminals as terminal
 -- devices, but isMinTTYHandle does.
