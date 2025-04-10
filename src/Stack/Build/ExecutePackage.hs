@@ -869,9 +869,23 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
         (unregisterGhcPkgIds False ghcPkgExe pkgDb allToUnregister')
         (const (pure ()))
       -- Now, register the cached conf files.
-      forM_ allToRegister $ \libpath ->
-        ghcPkg ghcPkgExe [pkgDb] ["register", "--force", toFilePath libpath]
-
+      forM_ allToRegister $ \libpath -> do
+        let args = ["register", "--force", toFilePath libpath]
+        eres <- ghcPkg ghcPkgExe [pkgDb] args
+        case eres of
+          Left e -> prettyWarn $
+            "[S-4541]"
+            <> line
+            <> fillSep
+                 [ flow "While registering"
+                 , pretty libpath
+                 , "in"
+                 , pretty pkgDb <> ","
+                 , flow "Stack encountered the following error:"
+                 ]
+            <> blankLine
+            <> string (displayException e)
+          Right _ -> pure ()
   liftIO $ forM_ exes $ \exe -> do
     ensureDir bindir
     let dst = bindir </> filename exe
