@@ -33,6 +33,7 @@ import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler
                    , compilerPathsL
                    )
+import           Stack.Types.GhcPkgExe ( GhcPkgPrettyException (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           System.FilePath ( searchPathSeparator )
 
@@ -170,13 +171,9 @@ unregisterGhcPkgIds ::
   -> RIO env ()
 unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
   globalDb <- view $ compilerPathsL . to (.globalDB)
-  eres <- try $ do
+  eresUnregister <- try $ do
     ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs
-    -- ghcPkgUnregisterForce does not perform an effective
-    -- 'ghc-pkg recache', as that depends on a specific version of the Cabal
-    -- package.
-    ghcPkg pkgexe [pkgDb] ["recache"]
-  case eres of
+  case eresUnregister of
     Left (PrettyException e) -> when isWarn $
       prettyWarn $
         "[S-8729]"
@@ -185,6 +182,12 @@ unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
                 \error:"
         <> blankLine
         <> pretty e
+    Right _ -> pure ()
+  -- ghcPkgUnregisterForce does not perform an effective 'ghc-pkg recache', as
+  -- that depends on a specific version of the Cabal package.
+  eresRecache <- ghcPkg pkgexe [pkgDb] ["recache"]
+  case eresRecache of
+    Left err -> prettyThrowM $ CannotRecacheAfterUnregister pkgDb err
     Right _ -> pure ()
  where
   (idents, gids) = partitionEithers $ toList epgids
