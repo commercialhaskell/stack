@@ -46,6 +46,10 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-1727] = NotOnlyLocal [PackageName] [Text]
         ~~~
 
+    -   `Stack.Build.ExecutePackage`
+
+        `[S-4541]` used in `copyPreCompiled`
+
     -   `Stack.BuildPlan.BuildPlanException`
 
         ~~~haskell
