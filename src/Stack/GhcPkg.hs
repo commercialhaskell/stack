@@ -66,7 +66,16 @@ ghcPkg ::
 ghcPkg pkgexe@(GhcPkgExe pkgPath) pkgDbs args = do
   eres <- go
   case eres of
-    Left _ -> do
+    Left e -> do
+      prettyDebug $
+           fillSep
+             [ flow "While using"
+             , style Shell "ghc-pkg" <>","
+             , flow "Stack encountered the following error:"
+             ]
+        <> blankLine
+        <> string (displayException e)
+        <> flow "Trying again after considering database creation..."
       mapM_ (createDatabase pkgexe) pkgDbs
       go
     Right _ -> pure eres
