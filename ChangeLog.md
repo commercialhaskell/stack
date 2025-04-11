@@ -16,6 +16,11 @@ Other enhancements:
 
 Bug fixes:
 
+* `stack script --package <pkg-name>` now uses GHC's `-package-id` option to
+  expose the installed package, rather than GHC's `-package` option. For
+  packages with public sub-libraries, `-package <pkg>` can expose an
+  installed package other than one listed by `ghc-pkg list <pkg>`.
+
 ## v3.5.1 - 2025-03-29
 
 **Changes since v3.3.1:**
