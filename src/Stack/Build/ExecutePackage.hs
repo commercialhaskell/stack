@@ -865,10 +865,12 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
       let pkgDb = ee.baseConfigOpts.snapDB
       ghcPkgExe <- getGhcPkgExe
       -- First unregister, silently, everything that needs to be unregistered.
-      whenJust (nonEmpty allToUnregister) $ \allToUnregister' -> catchAny
-        (unregisterGhcPkgIds False ghcPkgExe pkgDb allToUnregister')
-        (const (pure ()))
-      -- Now, register the cached conf files.
+      whenJust (nonEmpty allToUnregister) $ \allToUnregister' -> do
+        logLevel <- view $ globalOptsL . to (.logLevel)
+        let isDebug = logLevel == LevelDebug
+        catchAny
+          (unregisterGhcPkgIds isDebug ghcPkgExe pkgDb allToUnregister')
+          (const (pure ()))
       forM_ allToRegister $ \libpath -> do
         let args = ["register", "--force", toFilePath libpath]
         eres <- ghcPkg ghcPkgExe [pkgDb] args
