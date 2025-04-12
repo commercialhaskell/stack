@@ -335,6 +335,15 @@ rules global args = do
 
   releaseDir </> binaryInstallerNSIFileName %> \out -> do
     need ["etc" </> "scripts" </> "build-stack-installer" <.> "hs"]
+    -- Added as part of the work around for:
+    -- https://github.com/commercialhaskell/stack/issues/6711
+    --
+    -- On Windows only, for some unidentified reason, stack script can fail when
+    -- using a pre-compiled package. This can affect the script
+    -- build-stack-installer.hs. The work around is to build the package
+    -- required for that script using the same Stack configuration as used by
+    -- the script.
+    () <- cmd "stack --stack-yaml etc/scripts/stack.yaml build nsis"
     cmd "stack etc/scripts/build-stack-installer.hs"
       [ binaryExeFileName
       , binaryInstallerFileName
