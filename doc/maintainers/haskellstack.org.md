@@ -47,17 +47,15 @@ specifies a Python requirements file in `doc/requirements.txt`.
 ## MkDocs
 
 The `doc/requirements.txt` file pins the version of MkDocs. As at
-2 September 2021 it is set to:
+13 April 2025 it is set to:
 
-    mkdocs==1.3.1
+    mkdocs==1.6.0
 
 A configuration file, `mkdocs.yml` is included in the repository root directory.
 See https://www.mkdocs.org/user-guide/configuration/.
 
 `site_dir: _site` specifies the directory where the output HTML and other files
 are created. This directory is added to the `.gitignore` file.
-
-MkDocs 1.3.0 replaced the `pages:` key with the `nav:` key.
 
 ## Material for MkDocs
 
@@ -77,8 +75,16 @@ theme:
   palette:
     primary: 'deep purple'
     accent: 'deep purple'
-  icon:
-    logo: material/language-haskell
+  logo: img/stack-logo-white.svg
+  favicon: img/stack-favicon.svg
+  features:
+  - content.code.annotate
+  - content.code.copy
+  - content.code.select
+  - content.tabs.link
+  - navigation.indexes
+  - navigation.tabs
+  - navigation.top
 ~~~
 
 Read the Docs requires [JQuery](https://jquery.com/) for its JavaScript code to

@@ -97,8 +97,8 @@ nav:
   - Environment variables: configure/environment_variables.md
   - Configuration files:
     - configure/yaml/index.md
-    - Project-specific: configure/yaml/project.md
-    - Non-project specific: configure/yaml/non-project.md
+    - Project-specific configuration: configure/yaml/project.md
+    - Non-project specific configuration: configure/yaml/non-project.md
   - Global flags and options: configure/global_flags.md
   - Customisation scripts: configure/customisation_scripts.md
 - Topics:
@@ -145,7 +145,7 @@ nav:
 - FAQ: faq.md
 - Glossary: glossary.md
 - More:
-  - Other resoruces: other_resources.md
+  - Other resources: other_resources.md
   - Version history: ChangeLog.md
 
 markdown_extensions:
