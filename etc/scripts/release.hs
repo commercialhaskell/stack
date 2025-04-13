@@ -1,5 +1,5 @@
 {- stack script
-   --resolver lts-23.14
+   --snapshot lts-23.14
    --ghc-options -Wall
 -}
 

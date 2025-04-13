@@ -1,6 +1,5 @@
 {- stack script
-    --resolver lts-23.14
-    --install-ghc
+    --snapshot lts-23.14
     --package nsis
 -}
 {-# LANGUAGE OverloadedStrings #-}
