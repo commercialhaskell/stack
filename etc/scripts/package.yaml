@@ -1,0 +1,18 @@
+# # Added as part of the work around for:
+# https://github.com/commercialhaskell/stack/issues/6711
+#
+# On Windows only, for some unidentified reason, stack script can fail when
+# using a pre-compiled package. This can affect the script
+# build-stack-installer.hs. The work around is to build the package required for
+# that script using the same Stack configuration as used by the script.
+
+# This dummy package descriptions is required because the first place that Stack
+# looks for a target is project packages and without a Cabal file, Stack will
+# report error [S-636].
+
+spec-version: 0.36.0
+
+name: dummy-for-build-stack-installer-work-around
+version: 0.0.0.0
+
+library: {}
