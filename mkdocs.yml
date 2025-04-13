@@ -1,6 +1,8 @@
 site_name: The Haskell Tool Stack
-site_description: The Haskell Tool Stack
+site_description: |
+  A program for developing Haskell projects.
 site_author: Stack contributors
+site_url: !ENV READTHEDOCS_CANONICAL_URL
 repo_url: https://github.com/commercialhaskell/stack/
 edit_uri: tree/stable/doc/
 copyright: Copyright (c) 2015-2025, Stack contributors
@@ -168,8 +170,8 @@ markdown_extensions:
     permalink: true
 
 plugins:
-  search: {}
-  redirects:
+- search: {}
+- redirects:
     redirect_maps:
       'GUIDE.md': 'tutorial/index.md'
       'yaml_configuration.md': 'configure/yaml/index.md'
@@ -177,3 +179,5 @@ plugins:
       'custom_snapshot.md': 'topics/custom_snapshot.md'
       'lock_files.md': 'topics/lock_files.md'
       'scripts.md': 'topics/scripts.md'
+- social:
+    cards_layout: default

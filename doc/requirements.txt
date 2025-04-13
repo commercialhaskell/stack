@@ -17,4 +17,4 @@ mkdocs==1.6.0
 # https://github.com/mkdocs/catalog?tab=readme-ov-file#-links--references
 # https://github.com/mkdocs/mkdocs-redirects
 mkdocs-redirects
-mkdocs-material
+mkdocs-material[imaging]
