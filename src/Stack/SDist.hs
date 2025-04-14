@@ -578,18 +578,7 @@ checkPackageInExtractedTarball pkgDir = do
     , flow "for common mistakes using Cabal version"
     , fromString $ versionString cabalVersion <> "."
     ]
-  let pkgChecks =
-        -- MSS 2017-12-12: Try out a few different variants of pkgDesc to try
-        -- and provoke an error or warning. I don't know why, but when using
-        -- `Just pkgDesc`, it appears that Cabal does not detect that `^>=` is
-        -- used with `cabal-version: 1.24` or earlier. It seems like pkgDesc
-        -- (the one we create) does not populate the `buildDepends` field,
-        -- whereas flattenPackageDescription from Cabal does. In any event,
-        -- using `Nothing` seems more logical for this check anyway, and the
-        -- fallback to `Just pkgDesc` is just a crazy sanity check.
-        case Check.checkPackage gpd Nothing of
-          [] -> Check.checkPackage gpd (Just pkgDesc)
-          x -> x
+  let pkgChecks = Check.checkPackage gpd
   fileChecks <-
     liftIO $ Check.checkPackageFiles minBound pkgDesc (toFilePath pkgDir)
   let checks = pkgChecks ++ fileChecks

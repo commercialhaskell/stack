@@ -32,7 +32,8 @@ import           Distribution.PackageDescription
                    ( BenchmarkInterface (..), TestSuiteInterface (..) )
 import           Distribution.Text ( display )
 import           Distribution.Utils.Path
-                   ( PackageDir, SourceDir, SymbolicPath, getSymbolicPath )
+                   ( Pkg, Source, SymbolicPath, getSymbolicPath )
+import qualified Distribution.Utils.Path as Cabal
 import           GHC.Records ( HasField )
 import qualified HiFileParser as Iface
 import           Path
@@ -87,7 +88,7 @@ stackBenchmarkFiles bench =
   exposed :: [DotCabalDescriptor]
   exposed =
     case bench.interface of
-      BenchmarkExeV10 _ fp -> [DotCabalMain fp]
+      BenchmarkExeV10 _ fp -> [DotCabalMain $ getSymbolicPath fp]
       BenchmarkUnsupported _ -> []
 
   bnames :: [DotCabalDescriptor]
@@ -109,7 +110,7 @@ stackTestSuiteFiles test =
   exposed :: [DotCabalDescriptor]
   exposed =
     case test.interface of
-      TestSuiteExeV10 _ fp -> [DotCabalMain fp]
+      TestSuiteExeV10 _ fp -> [DotCabalMain $ getSymbolicPath fp]
       TestSuiteLibV09 _ mn -> [DotCabalModule mn]
       TestSuiteUnsupported _ -> []
 
@@ -164,7 +165,7 @@ stackLibraryFiles lib =
 -- | Get all files referenced by the component.
 resolveComponentFiles ::
      ( CAndJsSources rec
-     , HasField "hsSourceDirs" rec [SymbolicPath PackageDir SourceDir]
+     , HasField "hsSourceDirs" rec [SymbolicPath Pkg (Cabal.Dir Source)]
      )
   => NamedComponent
   -> rec
