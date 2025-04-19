@@ -24,6 +24,11 @@ Bug fixes:
   expose the installed package, rather than GHC's `-package` option. For
   packages with public sub-libraries, `-package <pkg>` can expose an
   installed package other than one listed by `ghc-pkg list <pkg>`.
+* Work around `ghc-pkg` bug where, on Windows only, it cannot register a package
+  into a package database that is also listed in the `GHC_PACKAGE_PATH`
+  environment variable. In previous versions of Stack, this affected
+  `stack script` when copying a pre-compiled package from another package
+  database.
 
 ## v3.5.1 - 2025-03-29
 
