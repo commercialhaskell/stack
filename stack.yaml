@@ -3,6 +3,8 @@ snapshot: lts-23.17 # GHC 9.8.4
 extra-deps:
 # lts-23.17 provides hpack-0.37.0
 - hpack-0.38.1
+# lts-23.17 provides pantry-0.10.0.
+- pantry-0.10.1
 
 docker:
   enable: false

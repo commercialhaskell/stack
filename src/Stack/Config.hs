@@ -874,7 +874,7 @@ withBuildConfig inner = do
  where
   getEmptyProject ::
        Maybe RawSnapshotLocation
-    -> [PackageIdentifierRevision]
+    -> [RawPackageLocationImmutable]
     -> RIO Config Project
   getEmptyProject mSnapshot extraDeps = do
     snapshot <- case mSnapshot of
@@ -895,7 +895,7 @@ withBuildConfig inner = do
     pure Project
       { userMsg = Nothing
       , packages = []
-      , extraDeps = map (RPLImmutable . flip RPLIHackage Nothing) extraDeps
+      , extraDeps = map RPLImmutable extraDeps
       , flagsByPkg = mempty
       , snapshot
       , compiler = Nothing

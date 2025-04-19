@@ -6,7 +6,7 @@
 stack script [--package PACKAGE] FILE
              [-- ARGUMENT(S) (e.g. stack script X.hs -- argument(s) to program).]
              [--compile | --optimize] [--[no-]use-root] [--ghc-options OPTIONS]
-             [--extra-dep PACKAGE-VERSION] [--no-run]
+             [--extra-dep EXTRA-DEP] [--no-run]
 ~~~
 
 The `stack script` command either runs a specified Haskell source file (using
@@ -52,18 +52,21 @@ For example:
 stack script --snapshot lts-23.17 MyScript.hs
 ~~~
 
-An extra-dep from the package index can be added to the snapshot on the command
-line with the `--extra-dep` option (which can be specified multiple times).
+An immutable extra-dep can be added to the snapshot on the command line with the
+`--extra-dep` option (which can be specified multiple times).
 
-Such an extra-dep can be specified using a valid YAML string value. For further
-information, see the [package location](../topics/package_location.md)
-documentation. Examples are:
+An extra-dep is specified using a valid YAML value. For further information, see
+the [package location](../topics/package_location.md) documentation. Examples
+are:
 
 ~~~text
---extra-dep acme-missiles-0.3
 --extra-dep acme-missiles-0.3@rev:0
---extra-dep acme-missiles-0.3@sha256:2ba66a092a32593880a87fb00f3213762d7bca65a687d45965778deb8694c5d1,613
+--extra-dep '{git: git@github.com:yesodweb/wai, commit: '2f8a8e1b771829f4a8a77c0111352ce45a14c30f', subdirs: [auto-update, wai]}
+--extra-dep acme-missiles-0.3.tar.gz
 ~~~
+
+Relative paths to local archive files are assumed to be relative to the
+directory in which the script file is located.
 
 GHC boot packages that have been 'replaced' (see further below) can be specified
 as an `--extra-dep`.

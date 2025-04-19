@@ -174,16 +174,20 @@ options, or by providing a comma or space separated list. For example:
 ## Using extra-deps
 
 As with using [`stack script`](../commands/script_command.md) at the command
-line, you can also specify one or more extra-deps from the package index using a
-valid YAML string for each. For example:
+line, you can also specify one or more extra-deps using a valid YAML value for
+each. For example:
 
 ~~~haskell
 #!/usr/bin/env stack
 {- stack script
    --snapshot lts-23.17
-   --extra-dep acme-missile-0.3@rev:0
+   --extra-dep acme-missiles-0.3@rev:0
+   --extra-dep "{git: git@github.com:yesodweb/wai, commit: '2f8a8e1b771829f4a8a77c0111352ce45a14c30f', subdirs: [auto-update, wai]}"
 -}
 ~~~
+
+Relative paths to local archive files are assumed to be relative to the
+directory in which the script file is located.
 
 ## Stack configuration for scripts
 

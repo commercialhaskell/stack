@@ -58,8 +58,9 @@ scriptOptsParser = ScriptOpts
         ))
   <*> many (option extraDepRead
         (  long "extra-dep"
-        <> metavar "PACKAGE-VERSION"
-        <> help "Extra dependencies to be added to the snapshot."
+        <> metavar "EXTRA-DEP"
+        <> help "An immutable extra dependency to be added to the snapshot \
+                \(can be specified multiple times)."
         ))
   <*> (   flag' NoRun
             (  long "no-run"
@@ -69,4 +70,4 @@ scriptOptsParser = ScriptOpts
       )
  where
   extraDepRead = eitherReader $
-                   mapLeft show . parsePackageIdentifierRevision . fromString
+                   mapLeft show . parseRawPackageLocationImmutables . fromString
