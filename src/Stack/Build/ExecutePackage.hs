@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -43,10 +44,11 @@ import           Path.IO
                    )
 import           RIO.NonEmpty ( nonEmpty )
 import           RIO.Process
-                   ( byteStringInput, findExecutable, getStderr, getStdout
-                   , inherit, modifyEnvVars, proc, setStderr, setStdin
-                   , setStdout, showProcessArgDebug, useHandleOpen, waitExitCode
-                   , withProcessWait, withWorkingDir, HasProcessContext
+                   ( HasProcessContext, byteStringInput, findExecutable
+                   , getStderr, getStdout, inherit, modifyEnvVars, proc
+                   , setStderr, setStdin, setStdout, showProcessArgDebug
+                   , useHandleOpen, waitExitCode, withModifyEnvVars
+                   , withProcessWait, withWorkingDir
                    )
 import           Stack.Build.Cache
                    ( TestStatus (..), deleteCaches, getTestStatus
@@ -70,7 +72,7 @@ import           Stack.Constants.Config
                    , hpcRelativeDir, setupConfigFromDir
                    )
 import           Stack.Coverage ( generateHpcReport, updateTixFile )
-import           Stack.GhcPkg ( ghcPkg, unregisterGhcPkgIds )
+import           Stack.GhcPkg ( ghcPkg, ghcPkgPathEnvVar, unregisterGhcPkgIds )
 import           Stack.Package
                    ( buildLogPath, buildableExes, buildableSubLibs
                    , hasBuildableMainLibrary, mainLibraryHasExposedModules
@@ -97,7 +99,8 @@ import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
                    , foldComponentToAnotherCollection, getBuildableListText
                    )
-import           Stack.Types.Compiler ( WhichCompiler (..), whichCompilerL )
+import           Stack.Types.Compiler
+                   ( WhichCompiler (..), whichCompiler, whichCompilerL )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe (..), HasCompiler (..)
                    , cpWhich, getGhcPkgExe
@@ -114,7 +117,7 @@ import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
-                   ( HasEnvConfig (..), actualCompilerVersionL
+                   ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL
                    , appropriateGhcColorFlag
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
@@ -136,6 +139,7 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Runner ( HasRunner, globalOptsL )
+import           Stack.Types.SourceMap ( SourceMap (..) )
 import           System.IO.Error ( isDoesNotExistError )
 import           System.PosixCompat.Files
                    ( createLink, getFileStatus, modificationTime )
@@ -871,23 +875,30 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
         catchAny
           (unregisterGhcPkgIds isDebug ghcPkgExe pkgDb allToUnregister')
           (const (pure ()))
-      forM_ allToRegister $ \libpath -> do
-        let args = ["register", "--force", toFilePath libpath]
-        eres <- ghcPkg ghcPkgExe [pkgDb] args
-        case eres of
-          Left e -> prettyWarn $
-            "[S-4541]"
-            <> line
-            <> fillSep
-                 [ flow "While registering"
-                 , pretty libpath
-                 , "in"
-                 , pretty pkgDb <> ","
-                 , flow "Stack encountered the following error:"
-                 ]
-            <> blankLine
-            <> string (displayException e)
-          Right _ -> pure ()
+      -- There appears to be a bug in the ghc-pkg executable such that, on
+      -- Windows only, it cannot register a package into a package database that
+      -- is also listed in the GHC_PACKAGE_PATH environment variable. See:
+      -- https://gitlab.haskell.org/ghc/ghc/-/issues/25962. We work around that
+      -- by removing GHC_PACKAGE_PATH from the environment for the register
+      -- step.
+      wc <- view $ envConfigL . to (.sourceMap.compiler) . to whichCompiler
+      withModifyEnvVars (Map.delete $ ghcPkgPathEnvVar wc) $
+        forM_ allToRegister $ \libpath -> do
+          let args = ["register", "--force", toFilePath libpath]
+          ghcPkg ghcPkgExe [pkgDb] args >>= \case
+            Left e -> prettyWarn $
+              "[S-4541]"
+              <> line
+              <> fillSep
+                   [ flow "While registering"
+                   , pretty libpath
+                   , "in"
+                   , pretty pkgDb <> ","
+                   , flow "Stack encountered the following error:"
+                   ]
+              <> blankLine
+              <> string (displayException e)
+            Right _ -> pure ()
   liftIO $ forM_ exes $ \exe -> do
     ensureDir bindir
     let dst = bindir </> filename exe

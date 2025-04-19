@@ -163,16 +163,6 @@ Windows) while others do not.
     package and to report that it cannot load a module because it is a member of
     a hidden package.
 
-!!! warning
-
-    On Windows only, `stack script` can fail if building a required package or
-    a dependency of a required package requires the registration in the relevant
-    package database of a pre-compiled package in another package database.
-
-    A work around is to build the required package with the same configuration
-    as will be used by `stack script`, causing the compiled package to then be
-    present in the relevant package database, before invoking `stack script`.
-
 ## Compilation
 
 The source file can be compiled by passing either the `--compile` flag (no
