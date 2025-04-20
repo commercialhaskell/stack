@@ -240,7 +240,11 @@ test testDir = withDir $ \dir -> withHome $ do
       hClose logh
 
       case ec of
-        ExitSuccess -> logInfo "Success!"
+        ExitSuccess -> do
+          logInfo "Success! Dumping log\n\n"
+          withSourceFile logfp $ \src ->
+            runConduit $ src .| stderrC
+          logInfo $ "\n\nEnd of log for " <> fromString name
         _ -> do
           logError "Failure, dumping log\n\n"
           withSourceFile logfp $ \src ->

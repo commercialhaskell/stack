@@ -3,5 +3,5 @@ import StackTest
 main :: IO ()
 main = do
   stackCleanFull
-  stack ["build", "acme-dont-copy"]
-  stack ["test"]
+  stack ["--verbose", "build", "acme-dont-copy"]
+  stack ["--verbose", "test"]
