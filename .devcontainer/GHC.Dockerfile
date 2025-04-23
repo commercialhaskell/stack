@@ -1,5 +1,6 @@
 ARG BUILD_ON_IMAGE=quay.io/benz0li/ghc-musl
 ARG GHC_VERSION=latest
+ARG SUBTAG
 ARG HLS_VERSION
 ARG STACK_VERSION
 
@@ -8,7 +9,7 @@ ARG HLS_IMAGE_TAG=${HLS_VERSION:-none}-ghc${HLS_GHC_VERSION:-all}
 
 ARG STACK_VERSION_OVERRIDE=${STACK_VERSION}
 
-FROM ${BUILD_ON_IMAGE}:${GHC_VERSION} AS files
+FROM ${BUILD_ON_IMAGE}:${GHC_VERSION}${SUBTAG:+-}${SUBTAG} AS files
 
 RUN mkdir /files
 
@@ -27,7 +28,7 @@ FROM quay.io/benz0li/hlsi:latest AS hlsi
 
 FROM docker.io/koalaman/shellcheck:stable AS sci
 
-FROM ${BUILD_ON_IMAGE}:${GHC_VERSION}
+FROM ${BUILD_ON_IMAGE}:${GHC_VERSION}${SUBTAG:+-}${SUBTAG}
 
 COPY --from=files /files /
 
