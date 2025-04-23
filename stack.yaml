@@ -8,7 +8,10 @@ extra-deps:
 
 docker:
   enable: false
-  repo: quay.io/benz0li/ghc-musl:9.8.4-int-native
+  repo: quay.io/benz0li/ghc-musl:9.8.4
+# See LICENSE. In order to build a statically-linked Stack executable for Linux
+# that is not linked against GMP, use this alternative Docker image:
+# repo: quay.io/benz0li/ghc-musl:9.8.4-int-native
 
 nix:
   # --nix on the command-line to enable.
