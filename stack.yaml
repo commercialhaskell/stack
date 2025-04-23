@@ -8,7 +8,7 @@ extra-deps:
 
 docker:
   enable: false
-  repo: quay.io/benz0li/ghc-musl:9.8.4
+  repo: quay.io/benz0li/ghc-musl:9.8.4-int-native
 
 nix:
   # --nix on the command-line to enable.
