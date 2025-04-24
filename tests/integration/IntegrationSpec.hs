@@ -109,6 +109,9 @@ exeExt = if isWindows then ".exe" else ""
 isWindows :: Bool
 isWindows = os == "mingw32"
 
+isLinux :: Bool
+isLinux = os == "linux"
+
 runApp :: Options -> RIO App a -> RIO SimpleApp a
 runApp options inner = do
   let speed = fromMaybe Normal $ optSpeed options
@@ -225,18 +228,27 @@ test testDir = withDir $ \dir -> withHome $ do
     copyTree (testDir </> "files") dir
 
     withSystemTempFile (name <.> "log") $ \logfp logh -> do
-      ec <- withWorkingDir dir
-          $ withModifyEnvVars (Map.insert "TEST_DIR" $ fromString testDir)
-          $ proc runghc
-              [ "-clear-package-db"
-              , "-global-package-db"
-              , "-i" ++ libDir
-              , mainFile
-              ]
-           $ runProcess
-           . setStdin closed
-           . setStdout (useHandleOpen logh)
-           . setStderr (useHandleOpen logh)
+      let args =
+            [ "-clear-package-db"
+            , "-global-package-db"
+            , "-i" ++ libDir
+            , mainFile
+            ]
+          args' = if isLinux
+            then
+              -- We seek to use lld as the linker on Linux, as it is much faster
+              -- than the default linker. The executable assumes lld is on the
+              -- PATH.
+              "--" : "-optl-fuse-ld=lld" : args
+            else
+              args
+      ec <- withWorkingDir dir $
+              withModifyEnvVars (Map.insert "TEST_DIR" $ fromString testDir) $
+                proc runghc args' $
+                    runProcess
+                  . setStdin closed
+                  . setStdout (useHandleOpen logh)
+                  . setStderr (useHandleOpen logh)
       hClose logh
 
       case ec of
