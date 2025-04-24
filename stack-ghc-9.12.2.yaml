@@ -24,7 +24,7 @@ allow-newer-deps:
 
 docker:
   enable: false
-  repo: quay.io/benz0li/ghc-musl:9.12.2-int-native
+  repo: quay.io/benz0li/ghc-musl:9.12.2
 
 nix:
   # --nix on the command-line to enable.
