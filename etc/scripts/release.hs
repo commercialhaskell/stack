@@ -236,8 +236,8 @@ rules global args = do
       ["--haddock" | global.gTestHaddocks]
       ["stack"]
     () <- cmd
-      stackProgName -- Use the platform's Stack
-      global.gStackArgs -- Possibiy to set up a Docker container
+      (global.gProjectRoot </> releaseBinDir </> binaryName </>
+          stackExeFileName) -- Use the target Stack
       ["exec"] -- To execute the target stack-integration-test
       [ global.gProjectRoot </> releaseBinDir </> binaryName </>
           "stack-integration-test"

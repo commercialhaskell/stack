@@ -87,6 +87,9 @@ jobs:
 
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
         then
+          # Install a faster linker than Ubuntu's default...
+          sudo apt-get update
+          sudo apt-get install -y lld
           # Set up Nix for Stack's tests that require it.
           #
           # Install Nix via the single-user installation...
