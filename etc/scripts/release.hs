@@ -235,9 +235,13 @@ rules global args = do
       ["--pedantic", "--no-haddock-deps", "--test"]
       ["--haddock" | global.gTestHaddocks]
       ["stack"]
+    -- We use the target Stack to execute the target stack-integration-test
+    -- outside of any Alpine Linux Docker container as the default linker on
+    -- Alpine Linux is ld.bfd and it is remarkably slow. stack-integration-test
+    -- will seek to use lld as the linker on Linux.
     () <- cmd
-      stackProgName -- Use the platform's Stack
-      global.gStackArgs -- Possibiy to set up a Docker container
+      (global.gProjectRoot </> releaseBinDir </> binaryName </>
+          stackExeFileName) -- Use the target Stack
       ["exec"] -- To execute the target stack-integration-test
       [ global.gProjectRoot </> releaseBinDir </> binaryName </>
           "stack-integration-test"
