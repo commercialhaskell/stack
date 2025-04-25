@@ -30,6 +30,10 @@ Note that this command can take a _long_ time. It's also more thorough
 than the quick command given above, as it will run each test with a
 clean `STACK_ROOT`.
 
+On Linux, the `stack-integration-test` executable uses the `lld` linker and
+expects it to be on the PATH. The integration tests complete significantly
+quicker with `lld` than with the `ld.bfd` linker.
+
 ## Helper scripts
 
 There are two helper scripts in this directory. Note that these may

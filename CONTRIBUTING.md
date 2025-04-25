@@ -582,6 +582,10 @@ stack build --flag stack:integration-tests stack --exec "stack-integration-test 
 To disable folders named after `<PATTERN1>` and `<PATTERN2>`
 It's especially useful when some tests are taking a while to complete.
 
+On Linux, the `stack-integration-test` executable uses the `lld` linker and
+expects it to be on the PATH. The integration tests complete significantly
+quicker with `lld` than with the `ld.bfd` linker.
+
 ## Continuous integration (CI)
 
 We use [GitHub Actions](https://docs.github.com/en/actions) to do CI on Stack.
