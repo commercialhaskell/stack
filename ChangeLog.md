@@ -342,9 +342,9 @@ Bug fixes:
 Release notes:
 
 * Further to the release notes for Stack 2.3.1, the `-static` suffix has been
-  removed from the statically linked Linux/x86_64 binaries.
-* The binaries for Linux/Aarch64 are now statically linked.
-* Binaries are now provided for macOS/AArch64.
+  removed from the statically-linked Linux/x86_64 executables.
+* The executables for Linux/Aarch64 are now statically-linked.
+* Executables are now provided for macOS/AArch64.
 
 **Changes since v2.11.1:**
 
@@ -566,11 +566,11 @@ Release notes:
 
 * After an upgrade from an earlier version of Stack, on first use only,
   Stack 2.9.1 may warn that it had trouble loading the CompilerPaths cache.
-* The support from the Stack team for binary releases now includes Linux/AArch64
-  and is limited to:
+* The support from the Stack team for executable releases now includes
+  Linux/AArch64 and is limited to:
 
-    * Linux 64-bit/x86_64 (statically linked)
-    * Linux AArch64 (dynamically linked)
+    * Linux 64-bit/x86_64 (statically-linked)
+    * Linux AArch64 (dynamically-linked)
     * macOS x86_64
     * Windows 64-bit/x86_64
 
@@ -645,7 +645,7 @@ Behavior changes:
 
 Other enhancements:
 
-* `stack setup` supports installing GHC for macOS aarch64 (M1)
+* `stack setup` supports installing GHC for macOS/AArch64 (M1)
 * `stack upload` supports authentication with a Hackage API key (via
   `HACKAGE_KEY` environment variable).
 
@@ -815,26 +815,27 @@ Bug fixes:
 
 Release notes:
 
-* We have reduced the number of platforms that we support with binary releases.
-  The reason behind this is that we've been slowed down in our release process
-  until now with issues trying to build binaries for less common platforms. In
-  order to make sure we can address issues more quickly (like supporting new GHC
-  versions), we're limiting support from the Stack team to:
+* We have reduced the number of platforms that we support with executable
+  releases. The reason behind this is that we've been slowed down in our release
+  process until now with issues trying to build executables for less common
+  platforms. In order to make sure we can address issues more quickly (like
+  supporting new GHC versions), we're limiting support from the Stack team to:
 
-    * Linux 64-bit/x86_64 (statically linked)
+    * Linux 64-bit/x86_64 (statically-linked)
     * macOS x86_64
     * Windows 64-bit/x86_64
 
-  If others want to provide additional binaries, we will definitely be happy for
-  the support. But since our CI system is currently able to produce these three
-  bindists only, that's what we will be providing with the next release.
+  If others want to provide additional executables, we will definitely be happy
+  for the support. But since our CI system is currently able to produce these
+  three executables only, that's what we will be providing with the next
+  release.
 
-* Since we no longer have dynamically linked Linux binaries, we are removing the
-  `-static` suffix from the static Linux/x86_64 binaries. If you have scripts to
-  download the latest stable Linux/x86_64 binary, update them to use
-  `linux-x86_64` instead of `linux-x86_64-static` (if you are already using the
-  former, nothing needs to change). For this release, both are supported, but
-  the next release will no longer have the `-static` variant.
+* Since we no longer have dynamically-linked Linux executables, we are removing
+  the `-static` suffix from the static Linux/x86_64 executables. If you have
+  scripts to download the latest stable Linux/x86_64 executable, update them to
+  use `linux-x86_64` instead of `linux-x86_64-static` (if you are already using
+  the former, nothing needs to change). For this release, both are supported,
+  but the next release will no longer have the `-static` variant.
 
 * We are also deprecating the download links at https://stackage.org/stack. See
   this page for the current installation instructions:
@@ -1308,7 +1309,7 @@ Bug fixes:
 * Help text for the `templates` subcommand now reflects behaviour in Stack 1.9
   — that it downloads and shows a help file, rather than listing available
   templates.
-* Fix detection of aarch64 platform (this broke when we upgraded to a newer
+* Fix detection of AArch64 platform (this broke when we upgraded to a newer
   Cabal version).
 * Docker: fix detecting and pulling missing images with `--docker-auto-pull`.
   See
@@ -1362,7 +1363,7 @@ Hackage-only release with no user facing changes.
 
 Release notes:
 
-* Statically linked Linux bindists are back again, thanks to
+* Statically-linked Linux executables are back again, thanks to
   [@nh2](https://github.com/nh2).
 * We will be deleting the Ubuntu, Debian, CentOS, Fedora, and Arch package repos
   from `download.fpcomplete.com` soon. These have been deprecated for over a
@@ -1530,10 +1531,10 @@ Bug fixes:
 
 Release notes:
 
-* aarch64 (64-bit ARM) bindists are now available for the first time.
-* Statically linked Linux bindists are no longer available, due to difficulty
+* AArch64 (64-bit ARM) executables are now available for the first time.
+* Statically-linked Linux executables are no longer available, due to difficulty
   with GHC 8.2.2 on Alpine Linux.
-* 32-bit Linux GMP4 bindists for CentOS 6 are no longer available, since
+* 32-bit Linux GMP4 executables for CentOS 6 are no longer available, since
   GHC 8.2.2 is no longer being built for that platform.
 
 Major changes:
@@ -1560,8 +1561,8 @@ Other enhancements:
   for details.
 * Specify User-Agent HTTP request header on every HTTP request.
   See [#3628](https://github.com/commercialhaskell/stack/issues/3628) for details.
-* `stack setup` looks for GHC bindists and installations by any OS key
-  that is compatible (rather than only checking a single one).   This is
+* `stack setup` looks for GHC binary distributions and installations by any OS
+  key that is compatible (rather than only checking a single one). This is
   relevant on Linux where different distributions may have different
   combinations of libtinfo 5/6, ncurses 5/6, and gmp 4/5, and will allow
   simplifying the setup-info metadata YAML for future GHC releases.
@@ -1673,7 +1674,8 @@ Enhancements:
   cases where HTTP servers mistakenly set the transfer encoding to `gzip`. See
   [#3647](https://github.com/commercialhaskell/stack/issues/3647).
 * Links to docs.haskellstack.org ignore Stack version patchlevel.
-* Downloading Docker-compatible `stack` binary ignores Stack version patchlevel.
+* Downloading Docker-compatible `stack` executable ignores Stack version
+  patchlevel.
 
 Bug fixes:
 
@@ -1828,8 +1830,8 @@ Other enhancements:
 * Automatically run `autoreconf -i` as necessary when a `configure`
   script is missing. See
   [#3534](https://github.com/commercialhaskell/stack/issues/3534)
-* GHC bindists can now be identified by their SHA256 checksum in addition to
-  their SHA1 checksum, allowing for more security in download.
+* GHC binary distributions can now be identified by their SHA256 checksum in
+  addition to their SHA1 checksum, allowing for more security in download.
 * For filesystem setup-info paths, it's no longer assumed that the
   directory is writable, instead a temp dir is used.  See
   [#3188](https://github.com/commercialhaskell/stack/issues/3188).
@@ -2131,7 +2133,7 @@ Bug fixes:
 
 * `stack config set` can now be used without a compiler installed
   [#2852](https://github.com/commercialhaskell/stack/issues/2852).
-* `get-stack.sh` now installs correct binary on ARM for generic linux and
+* `get-stack.sh` now installs correct executable on ARM for generic Linux and
   raspbian, closing
   [#2856](https://github.com/commercialhaskell/stack/issues/2856).
 * Correct the testing of whether a package database exists by checking
@@ -2150,17 +2152,15 @@ Bug fixes:
 
 Release notes:
 
-* For the _next_ Stack release after this one, we are planning
-  changes to our Linux releases, including dropping our Ubuntu,
-  Debian, CentOS, and Fedora package repositories and switching to
-  statically linked binaries. See
+* For the _next_ Stack release after this one, we are planning changes to our
+  Linux releases, including dropping our Ubuntu, Debian, CentOS, and Fedora
+  package repositories and switching to statically-linked executables. See
   [#2534](https://github.com/commercialhaskell/stack/issues/2534).
-  Note that upgrading without a package manager has gotten easier
-  with new binary upgrade support in `stack upgrade` (see the Major
-  Changes section below for more information). In addition, the
-  get.haskellstack.org script no longer installs from Ubuntu,
-  Debian, CentOS, or Fedora package repositories. Instead it places
-  a generic binary in /usr/local/bin.
+  Note that upgrading without a package manager has gotten easier with new
+  binary upgrade support in `stack upgrade` (see the Major Changes section below
+  for more information). In addition, the get.haskellstack.org script no longer
+  installs from Ubuntu, Debian, CentOS, or Fedora package repositories. Instead
+  it places a generic executable in /usr/local/bin.
 
 Major changes:
 
@@ -2181,11 +2181,10 @@ Major changes:
   because it should no longer be necessary. See
   [#1364](https://github.com/commercialhaskell/stack/issues/1364)
 
-* Stack is now capable of doing binary upgrades instead of always
-  recompiling a new version from source. Running `stack upgrade` will
-  now default to downloading a binary version of Stack from the most
-  recent release, if one is available. See `stack upgrade --help` for
-  more options.
+* Stack is now capable of doing binary upgrades instead of always recompiling a
+  new version from source. Running `stack upgrade` will now default to
+  downloading a Stack executable from the most recent release, if one is
+  available. See `stack upgrade --help` for more options.
   [#1238](https://github.com/commercialhaskell/stack/issues/1238)
 
 Behavior changes:
@@ -2321,13 +2320,16 @@ Release notes:
   [store#37](https://github.com/fpco/store/issues/37)).  Please stay with
   version 1.1.2 for now on those architectures.  This will be rectified soon!
 
-* We are now releasing a statically linked Stack binary for
+* We are now releasing a statically-linked Stack executable for
   [64-bit Linux](https://get.haskellstack.org/stable/linux-x86_64-static.tar.gz).
   Please try it and let us know if you run into any trouble on your platform.
+  The executable is linked against a version of the GNU Multiple Precision
+  Arithmetic Library (GMP), which is licensed under the GNU Lesser General
+  Public License, Version 3, 29 June 2007 (LGPL).
 
 * We are planning some changes to our Linux releases, including dropping our
   Ubuntu, Debian, CentOS, and Fedora package repositories and switching to
-  statically linked binaries.  We would value your feedback in
+  statically-linked executables. We would value your feedback in
   [#2534](https://github.com/commercialhaskell/stack/issues/2534).
 
 Major changes:
@@ -2348,9 +2350,10 @@ Behavior changes:
 * Support -ferror-spans syntax in GHC error messages.
 * Avoid unpacking ghc to `/tmp`
   [#996](https://github.com/commercialhaskell/stack/issues/996)
-* The Linux `gmp4` GHC bindist is no longer considered a full-fledged GHC
-  variant and can no longer be specified using the `ghc-variant` option,
-  and instead is treated more like a slightly different platform.
+* The Linux `gmp4` GHC binary distribution is no longer considered a
+  full-fledged GHC variant and can no longer be specified using the
+  `ghc-variant` option, and instead is treated more like a slightly different
+  platform.
 
 Other enhancements:
 
@@ -2377,9 +2380,11 @@ Other enhancements:
 * `stack setup` no longer unpacks to the system temp dir on posix systems.
   [#996](https://github.com/commercialhaskell/stack/issues/996)
 * `stack setup` detects libtinfo6 and ncurses6 and can download alternate GHC
-  bindists [#257](https://github.com/commercialhaskell/stack/issues/257)
+  binary distributions
+  [#257](https://github.com/commercialhaskell/stack/issues/257)
   [#2302](https://github.com/commercialhaskell/stack/issues/2302).
-* `stack setup` detects Linux ARMv7 downloads appropriate GHC bindist
+* `stack setup` detects Linux ARMv7 downloads appropriate GHC binary
+  distribution
   [#2103](https://github.com/commercialhaskell/stack/issues/2103)
 * Custom `stack` binaries list dependency versions in output for `--version`.
   See [#2222](https://github.com/commercialhaskell/stack/issues/2222)
@@ -3123,8 +3128,8 @@ Major changes:
     * `setup-info` in `stack.yaml`, to specify where to download custom binary
       distributions (also `--ghc-bindist` command-line option)
     * Note: On systems with libgmp4 (aka `libgmp.so.3`), such as CentOS 6, you
-      may need to re-run `stack setup` due to the centos6 GHC bindist being
-      treated like a variant
+      may need to re-run `stack setup` due to the centos6 GHC binary
+      distribution being treated like a variant
 * A new `--pvp-bounds` flag to the sdist and upload commands allows automatic
   adding of PVP upper and/or lower bounds to your dependencies
 
@@ -3322,8 +3327,9 @@ Bug fixes:
   [#452](https://github.com/commercialhaskell/stack/issues/452)
 * Don't copy over executables excluded by component selection
   [#605](https://github.com/commercialhaskell/stack/issues/605)
-* Fix: Stack fails on Windows with git package in `stack.yaml` and no git binary
-  on path [#712](https://github.com/commercialhaskell/stack/issues/712)
+* Fix: Stack fails on Windows with git package in `stack.yaml` and no git
+  executable on the PATH
+  [#712](https://github.com/commercialhaskell/stack/issues/712)
 * Fixed GHCi issue: Specifying explicit package versions (#678)
 * Fixed GHCi issue: Specifying -odir and -hidir as .stack-work/odir (#529)
 * Fixed GHCi issue: Specifying A instead of A.ext for modules (#498)
