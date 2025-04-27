@@ -1,4 +1,3 @@
-import Control.Concurrent
 import Control.Monad.IO.Class
 import Control.Monad
 import Data.List
@@ -14,7 +13,6 @@ main
       copy "src/Lib.v1" "src/Lib.hs"
       copy "src-internal/Internal.v1" "src-internal/Internal.hs"
       stack ["build"] -- need a build before ghci at the moment, see #4148
-      forkIO fileEditingThread
       replThread
 
 replThread :: IO ()
@@ -23,7 +21,9 @@ replThread = repl ["--ghci-options=-ignore-dot-ghci"] $ do
   -- otherwise, on Windows from msys2-20230526, `stack repl` encounters a EOF
   -- and terminates gracefully.
   replCommand ":main"
+  liftIO $ putStrLn "Awaiting prompt..."
   nextPrompt
+  liftIO $ putStrLn "Initial prompt received"
   line <- replGetLine
   let expected = "hello world"
   when (line /= expected) $
@@ -31,25 +31,17 @@ replThread = repl ["--ghci-options=-ignore-dot-ghci"] $ do
          "Main module didn't load correctly.\n"
       <> "Expected: " <> expected <> "\n"
       <> "Actual  : " <> line <> "\n"
-  liftIO $ threadDelay 1000000 -- wait for an edit of the internal library
+  liftIO $ copy "src-internal/Internal.v2" "src-internal/Internal.hs"
   reloadAndTest "testInt" "42" "Internal library didn't reload."
-  liftIO $ threadDelay 1000000 -- wait for an edit of the internal library
+  liftIO $ copy "src/Lib.v2" "src/Lib.hs"
   reloadAndTest "testStr" "\"OK\"" "Main library didn't reload."
-
-fileEditingThread :: IO ()
-fileEditingThread = do
-  threadDelay 1000000
-  -- edit the internal library and pure to ghci
-  copy "src-internal/Internal.v2" "src-internal/Internal.hs"
-  threadDelay 1000000
-  -- edit the internal library and end thread, returning to ghci
-  copy "src/Lib.v2" "src/Lib.hs"
 
 reloadAndTest :: String -> String -> String -> Repl ()
 reloadAndTest cmd exp err = do
   reload
   replCommand cmd
   line <- replGetLine
+  liftIO . putStrLn $ line
   unless (exp `isSuffixOf` line) $ error err
 
 reload :: Repl ()
