@@ -4,7 +4,7 @@ import StackTest
 main :: IO ()
 main = do
   stack ["build"]
-  repl [] $ do
+  repl ["--ghci-options=-ignore-dot-ghci"] $ do
     -- The command must be issued before searching the output for the next
     -- prompt, otherwise, on Windows from msys2-20230526, `stack repl`
     -- encounters a EOF and terminates gracefully.
