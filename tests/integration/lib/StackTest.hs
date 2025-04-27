@@ -51,7 +51,9 @@ module StackTest
 
 import           Control.Monad ( forever, unless, void, when )
 import           Control.Monad.IO.Class ( liftIO )
-import           Control.Monad.Trans.Reader ( ReaderT, ask, runReaderT )
+import           Control.Monad.Trans.Reader ( ReaderT, ask, asks, runReaderT )
+import qualified Control.Monad.Trans.State as State
+import           Control.Monad.Trans ( lift )
 import           Control.Concurrent ( forkIO )
 import           Control.Exception
                    ( Exception (..), IOException, bracket_, catch, throw
@@ -157,14 +159,16 @@ data ReplConnection = ReplConnection
   }
 
 nextPrompt :: Repl ()
-nextPrompt = do
-  (ReplConnection _ replStdoutHandle) <- ask
-  c <- liftIO $ hGetChar replStdoutHandle
-  if c == '>'
-    then do
-      -- Skip next character
-      void $ liftIO $ hGetChar replStdoutHandle
-    else nextPrompt
+nextPrompt = State.evalStateT poll "" where
+  poll = do
+    c <- lift (asks replStdout) >>= liftIO . hGetChar
+    State.modify (++ [c]) -- FIXME crap perf
+    when (c == '\n') $ do
+      State.get >>= liftIO . putStr . ("ghci> " <>)
+      State.put ""
+    buf <- State.get
+    unless (buf == "ghci> ")
+      poll
 
 replCommand :: String -> Repl ()
 replCommand cmd = do
