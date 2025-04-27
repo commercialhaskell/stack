@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Types and functions related to Stack's @ls@ command.
+{-|
+Module      : Stack.Ls
+Description : Types and functions related to Stack's @ls@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @ls@ command.
+-}
+
 module Stack.Ls
   ( LsCmdOpts (..)
   , LsCmds (..)
@@ -50,7 +57,7 @@ import           Stack.Runners
 import           Stack.Setup.Installed
                    ( Tool (..), filterTools, listInstalled, toolString )
 import           Stack.SourceMap ( globalsFromHints )
-import           Stack.Types.BuildConfig 
+import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.DependencyTree
@@ -333,7 +340,7 @@ listStylesCmd opts = do
     ansi = fromString $ setSGRCode sgrs
     reset = fromString $ setSGRCode [Reset]
 
--- | List Stack's installed tools, sorted (see instance of 'Ord' for 'Tool').
+-- | List Stack's installed tools, sorted (see instance of 'Ord' for t'Tool').
 listToolsCmd :: ListToolsOpts -> RIO Config ()
 listToolsCmd opts = do
   localPrograms <- view $ configL . to (.localPrograms)

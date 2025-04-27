@@ -3,6 +3,11 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
+{-|
+Module      : Stack.SourceMap
+License     : BSD-3-Clause
+-}
+
 module Stack.SourceMap
   ( mkProjectPackage
   , snapToDepPackage
@@ -48,7 +53,7 @@ import           Stack.Types.SourceMap
                    , ProjectPackage (..), SMActual (..), SMWanted (..)
                    )
 
--- | Create a 'ProjectPackage' from a directory containing a package.
+-- | Create a t'ProjectPackage' from a directory containing a package.
 mkProjectPackage ::
      forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => PrintWarnings
@@ -73,8 +78,8 @@ mkProjectPackage printWarnings resolvedDir buildHaddocks = do
           }
     }
 
--- | Create a 'DepPackage' from a 'PackageLocation', from some additional
--- to a snapshot setting (extra-deps or command line)
+-- | Create a t'DepPackage' from a 'PackageLocation', from some additional to a
+-- snapshot setting (extra-deps or command line).
 additionalDepPackage ::
      forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Bool

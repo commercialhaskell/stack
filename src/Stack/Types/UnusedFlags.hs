@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.UnusedFlags
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.UnusedFlags
   ( UnusedFlags (..)
   , FlagSource (..)

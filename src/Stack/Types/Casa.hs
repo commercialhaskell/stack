@@ -2,7 +2,13 @@
 {-# LANGUAGE NoFieldSelectors   #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
--- | Casa configuration types.
+{-|
+Module      : Stack.Types.Cache
+Description : Casa configuration types.
+License     : BSD-3-Clause
+
+Casa configuration types.
+-}
 
 module Stack.Types.Casa
   ( CasaOptsMonoid (..)

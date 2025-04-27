@@ -1,6 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions to parse command line arguments for Stack's @eval@ command.
+{-|
+Module      : Stack.Options.EvalParser
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @eval@ command.
+-}
+
 module Stack.Options.EvalParser
   ( evalOptsParser
   ) where

@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions to parse command line arguments for Stack's @unpack@ command.
+{-|
+Module      : Stack.Options.UnpackParser
+Description : Parse arguments for Stack's @unpack@ command.
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @unpack@ command.
+-}
+
 module Stack.Options.UnpackParser
   ( unpackOptsParser
   ) where

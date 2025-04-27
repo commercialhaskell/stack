@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.FileDigestCache
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.FileDigestCache
   ( FileDigestCache
   , newFileDigestCache

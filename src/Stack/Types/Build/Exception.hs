@@ -3,6 +3,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-|
+Module      : Stack.Types.Build.Exception
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.Build.Exception
   ( BuildException (..)
   , BuildPrettyException (..)
@@ -824,7 +829,7 @@ data BadDependency
   | Couldn'tResolveItsDependencies Version
   | DependencyMismatch Version
   | HasNoLibrary
-  -- ^ See description of 'DepType'
+  -- ^ See description of 'Stack.Types.Dependency.DepType'
   | BDDependencyCycleDetected ![PackageName]
   deriving (Eq, Ord, Show, Typeable)
 
@@ -901,9 +906,8 @@ showBuildError errorCode isBuildingSetup exitCode mtaskProvides execName fullArg
     removeTrailingSpaces = dropWhileEnd isSpace . unlines
     dropQuotes = filter ('\"' /=)
 
--- | Get the shortest reason for the package to be in the build plan. In
--- other words, trace the parent dependencies back to a 'wanted'
--- package.
+-- | Get the shortest reason for the package to be in the build plan. In other
+-- words, trace the parent dependencies back to a \'wanted\' package.
 getShortestDepsPath ::
      ParentMap
   -> Set PackageName

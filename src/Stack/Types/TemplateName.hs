@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Template name handling.
+{-|
+Module      : Stack.Types.TemplateName
+Description : Template name handling.
+License     : BSD-3-Clause
+
+Template name handling.
+-}
+
 module Stack.Types.TemplateName
   ( TemplateName
   , RepoTemplatePath (..)

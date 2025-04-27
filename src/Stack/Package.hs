@@ -5,7 +5,13 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
--- | Dealing with Cabal.
+{-|
+Module      : Stack.Package
+Description : Dealing with Cabal.
+License     : BSD-3-Clause
+
+Dealing with Cabal.
+-}
 
 module Stack.Package
   ( readDotBuildinfo
@@ -128,8 +134,9 @@ readDotBuildinfo :: MonadIO m => Path Abs File -> m HookedBuildInfo
 readDotBuildinfo buildinfofp =
   liftIO $ readHookedBuildInfo silent (toFilePath buildinfofp)
 
--- | Resolve a parsed Cabal file into a 'Package', which contains all of the
--- info needed for Stack to build the 'Package' given the current configuration.
+-- | Resolve a parsed Cabal file into a t'Package', which contains all of the
+-- info needed for Stack to build the t'Package' given the current
+-- configuration.
 resolvePackage :: PackageConfig -> GenericPackageDescription -> Package
 resolvePackage packageConfig gpkg =
   packageFromPackageDescription
@@ -416,8 +423,8 @@ packageDependencies pkg =
          concatMap targetBuildDepends (allBuildInfo' pkg)
       <> maybe [] setupDepends (setupBuildInfo pkg)
 
--- | Variant of 'allBuildInfo' from Cabal that, like versions before Cabal 2.2
--- only includes buildable components.
+-- | Variant of 'Distribution.Types.PackageDescription.allBuildInfo' from Cabal
+-- that, like versions before Cabal 2.2 only includes buildable components.
 allBuildInfo' :: PackageDescription -> [BuildInfo]
 allBuildInfo' pkg_descr = [ bi | lib <- allLibraries pkg_descr
                                , let bi = libBuildInfo lib
@@ -435,8 +442,8 @@ allBuildInfo' pkg_descr = [ bi | lib <- allLibraries pkg_descr
                                , let bi = benchmarkBuildInfo tst
                                , buildable bi ]
 
--- | Evaluates the conditions of a 'GenericPackageDescription', yielding
--- a resolved 'PackageDescription'.
+-- | Evaluates the conditions of a t'GenericPackageDescription', yielding
+-- a resolved t'PackageDescription'.
 resolvePackageDescription ::
      PackageConfig
   -> GenericPackageDescription

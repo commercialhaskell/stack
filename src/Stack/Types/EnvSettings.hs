@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoFieldSelectors  #-}
 
+{-|
+Module      : Stack.Types.EnvSettings
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.EnvSettings
   ( EnvSettings (..)
   , minimalEnvSettings

@@ -1,7 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ViewPatterns      #-}
 
--- | Extra Path utilities.
+{-|
+Module      : Path.Extra
+Description : Extra Path utilities.
+License     : BSD-3-Clause
+-}
+
 module Path.Extra
   ( toFilePathNoTrailingSep
   , parseCollapsedAbsDir
@@ -88,16 +93,16 @@ collapseFilePath = FP.joinPath . reverse . foldl' go [] . FP.splitDirectories
   checkPathSeparator _ = False
 
 -- | If given file in 'Maybe' does not exist, ensure we have 'Nothing'. This
--- is to be used in conjunction with 'forgivingAbsence' and
--- 'resolveFile'.
+-- is to be used in conjunction with 'Path.IO.forgivingAbsence' and
+-- 'Path.IO.resolveFile'.
 --
--- Previously the idiom @forgivingAbsence (resolveFile …)@ alone was used,
--- which relied on 'canonicalizePath' throwing 'isDoesNotExistError' when
--- path does not exist. As it turns out, this behavior is actually not
--- intentional and unreliable, see
--- <https://github.com/haskell/directory/issues/44>. This was “fixed” in
--- version @1.2.3.0@ of @directory@ package (now it never throws). To make
--- it work with all versions, we need to use the following idiom:
+-- Previously the idiom @forgivingAbsence (resolveFile …)@ alone was used, which
+-- relied on 'Path.IO.canonicalizePath' throwing 'isDoesNotExistError' when path
+-- does not exist. As it turns out, this behavior is actually not intentional
+-- and unreliable, see <https://github.com/haskell/directory/issues/44>. This
+-- was “fixed” in version @1.2.3.0@ of @directory@ package (now it never
+-- throws). To make it work with all versions, we need to use the following
+-- idiom:
 --
 -- > forgivingAbsence (resolveFile …) >>= rejectMissingFile
 

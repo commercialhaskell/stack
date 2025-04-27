@@ -4,18 +4,22 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | A module providing the type 'CompCollection' and associated helper
--- functions.
---
--- The corresponding Cabal approach uses lists. See, for example, the
--- 'Distribution.Types.PackageDescription.sublibraries',
--- 'Distribution.Types.PackageDescription.foreignLibs',
--- 'Distribution.Types.PackageDescription.executables',
--- 'Distribution.Types.PackageDescription.testSuites', and
--- 'Distribution.Types.PackageDescription.benchmarks' fields.
---
--- Cabal removes all the unbuildable components very early (at the cost of
--- slightly worse error messages).
+{-|
+Module      : Stack.Types.CompCollection
+License     : BSD-3-Clause
+
+A module providing the type t'CompCollection' and associated helper functions.
+
+The corresponding Cabal approach uses lists. See, for example, the
+'Distribution.Types.PackageDescription.sublibraries',
+'Distribution.Types.PackageDescription.foreignLibs',
+'Distribution.Types.PackageDescription.executables',
+'Distribution.Types.PackageDescription.testSuites', and
+'Distribution.Types.PackageDescription.benchmarks' fields.
+
+Cabal removes all the unbuildable components very early (at the cost of slightly
+worse error messages).
+-}
 module Stack.Types.CompCollection
   ( CompCollection
   , getBuildableSet
@@ -86,7 +90,7 @@ addComponent component = M.insert component.name component
 
 -- | For the given function and foldable data structure of components of type
 -- @compA@, iterates on the elements of that structure and maps each element to
--- a component of type @compB@ while building a 'CompCollection'.
+-- a component of type @compB@ while building a v'CompCollection'.
 foldAndMakeCollection ::
      (HasBuildInfo compB, HasName compB, Foldable sourceCollection)
   => (compA -> compB)

@@ -1,3 +1,8 @@
+{-|
+Module      : Data.Monoid.Map
+License     : BSD-3-Clause
+-}
+
 module Data.Monoid.Map
   ( MonoidMap (..)
   ) where

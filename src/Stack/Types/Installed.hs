@@ -1,8 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
--- | This module contains all the types related to the idea of installing a
--- package in the pkg-db or an executable on the file system.
+{-|
+Module      : Stack.Types.Installed
+License     : BSD-3-Clause
+
+This module contains all the types related to the idea of installing a package
+in the pkg-db or an executable on the file system.
+-}
+
 module Stack.Types.Installed
   ( InstallLocation (..)
   , InstalledPackageLocation (..)

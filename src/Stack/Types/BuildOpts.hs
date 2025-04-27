@@ -3,7 +3,14 @@
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
--- | Configuration options for building.
+{-|
+Module      : Stack.Types.BuildOpts
+Description : Configuration options for building.
+License     : BSD-3-Clause
+
+Configuration options for building.
+-}
+
 module Stack.Types.BuildOpts
   ( BuildOpts (..)
   , HaddockOpts (..)

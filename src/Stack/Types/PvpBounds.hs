@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.PvpBounds
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.PvpBounds
   ( PvpBounds (..)
   , PvpBoundsType (..)

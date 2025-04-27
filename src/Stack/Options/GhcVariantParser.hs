@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.GhcVariantParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.GhcVariantParser
   ( ghcVariantParser
   ) where

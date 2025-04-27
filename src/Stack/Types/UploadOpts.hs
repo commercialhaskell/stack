@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoFieldSelectors  #-}
 
--- | Types for command line options for the @stack upload@ command.
+{-|
+Module      : Stack.Types.UploadOpts
+Description : Types for command line options for the @stack upload@ command.
+License     : BSD-3-Clause
+
+Types for command line options for the @stack upload@ command.
+-}
+
 module Stack.Types.UploadOpts
   ( UploadOpts (..)
   , UploadVariant (..)

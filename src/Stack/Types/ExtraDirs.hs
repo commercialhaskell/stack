@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoFieldSelectors  #-}
 
+{-|
+Module      : Stack.Types.ExtraDirs
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.ExtraDirs
   ( ExtraDirs (..)
   ) where

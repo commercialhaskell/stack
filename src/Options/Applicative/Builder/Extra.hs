@@ -2,7 +2,13 @@
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
--- | Extra functions for optparse-applicative.
+{-|
+Module      : Options.Applicative.Builder.Extra
+Description : Extra functions for optparse-applicative.
+License     : BSD-3-Clause
+
+Extra functions for optparse-applicative.
+-}
 
 module Options.Applicative.Builder.Extra
   ( boolFlags
@@ -245,15 +251,15 @@ textOption = option (T.pack <$> readerAsk)
 textArgument :: Mod ArgumentFields Text -> Parser Text
 textArgument = argument (T.pack <$> readerAsk)
 
--- | Like 'optional', but returning a 'First'.
+-- | Like 'optional', but returning a t'First'.
 optionalFirst :: Alternative f => f a -> f (First a)
 optionalFirst = fmap First . optional
 
--- | Like 'optional', but returning a 'FirstTrue'.
+-- | Like 'optional', but returning a t'FirstTrue'.
 optionalFirstTrue :: Alternative f => f Bool -> f FirstTrue
 optionalFirstTrue = fmap FirstTrue . optional
 
--- | Like 'optional', but returning a 'FirstFalse'.
+-- | Like 'optional', but returning a t'FirstFalse'.
 optionalFirstFalse :: Alternative f => f Bool -> f FirstFalse
 optionalFirstFalse = fmap FirstFalse . optional
 

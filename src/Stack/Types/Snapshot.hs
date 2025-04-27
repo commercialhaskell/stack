@@ -6,6 +6,11 @@
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+{-|
+Module      : Stack.Types.Snapshot
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.Snapshot
   ( AbstractSnapshot (..)
   , readAbstractSnapshot

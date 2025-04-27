@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions to parse command line arguments for Stack's @upload@ command.
+{-|
+Module      : Stack.Options.UploadParser
+Description : Parse arguments for Stack's @upload@ command.
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @upload@ command.
+-}
+
 module Stack.Options.UploadParser
   ( uploadOptsParser
   ) where

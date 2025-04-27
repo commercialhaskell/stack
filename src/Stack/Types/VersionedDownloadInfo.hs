@@ -2,6 +2,11 @@
 {-# LANGUAGE NoFieldSelectors  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.VersionedDownloadInfo
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.VersionedDownloadInfo
   ( VersionedDownloadInfo (..)
   ) where

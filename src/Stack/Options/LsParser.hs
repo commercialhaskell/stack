@@ -2,7 +2,14 @@
 {-# LANGUAGE ApplicativeDo       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Function to parse command line arguments for Stack's @ls@ command.
+{-|
+Module      : Stack.Options.LsParser
+Description : Parse arguments for Stack's @ls@ command.
+License     : BSD-3-Clause
+
+Function to parse command line arguments for Stack's @ls@ command.
+-}
+
 module Stack.Options.LsParser
   ( lsOptsParser
   ) where

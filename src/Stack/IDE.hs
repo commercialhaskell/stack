@@ -2,7 +2,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Types and functions related to Stack's @ide@ command.
+{-|
+Module      : Stack.IDE
+Description : Types and functions related to Stack's @ide@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @ide@ command.
+-}
+
 module Stack.IDE
   ( OutputStream (..)
   , ListPackagesCmd (..)

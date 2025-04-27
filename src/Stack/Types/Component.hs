@@ -10,9 +10,15 @@
 {-# LANGUAGE OverloadedRecordDot        #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
--- | A module providing the types that represent different sorts of components
--- of a package (library and sub-library, foreign library, executable, test
--- suite and benchmark).
+{-|
+Module      : Stack.Types.Component
+License     : BSD-3-Clause
+
+A module providing the types that represent different sorts of components of a
+package (library and sub-library, foreign library, executable, test suite and
+benchmark).
+-}
+
 module Stack.Types.Component
   ( StackLibrary (..)
   , StackForeignLibrary (..)
@@ -22,6 +28,7 @@ module Stack.Types.Component
   , StackUnqualCompName (..)
   , StackBuildInfo (..)
   , HasName
+  , HasQualiName
   , HasBuildInfo
   , HasComponentInfo
   ) where

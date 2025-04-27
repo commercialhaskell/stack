@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions to parse command line arguments for Stack's @upgrade@ command.
+{-|
+Module      : Stack.Options.UpgradeParser
+Description : Parse arguments for Stack's @upgrade@ command.
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @upgrade@ command.
+-}
+
 module Stack.Options.UpgradeParser
   ( upgradeOptsParser
   ) where

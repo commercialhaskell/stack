@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
+{-|
+Module      : Stack.Options.NixParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.NixParser
   ( nixOptsParser
   ) where

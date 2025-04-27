@@ -1,6 +1,11 @@
 
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.StackYamlLoc
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.StackYamlLoc
   ( StackYamlLoc (..)
   ) where

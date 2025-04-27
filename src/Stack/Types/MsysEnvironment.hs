@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Type representing MSYS2 environments and related functions.
+{-|
+Module      : Stack.Types.MsysEnvironment
+Description : Type representing MSYS2 environments and related functions.
+License     : BSD-3-Clause
+
+Type representing MSYS2 environments and related functions.
+-}
+
 module Stack.Types.MsysEnvironment
   ( MsysEnvironment (..)
   , msysEnvArch

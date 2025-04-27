@@ -3,6 +3,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-|
+Module      : Stack.Types.DependencyTree
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.DependencyTree
   ( DependencyTree (..)
   , DotPayload (..)

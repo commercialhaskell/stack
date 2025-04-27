@@ -6,8 +6,14 @@
 {-# LANGUAGE TemplateHaskell   #-}
 #endif
 
--- Extracted from "Stack" so that module does not use CPP or Template Haskell,
--- and therefore doesn't need to be recompiled as often.
+{-|
+Module      : Stack.BuildInfo
+License     : BSD-3-Clause
+
+Extracted from "Stack" so that module does not use CPP or Template Haskell, and
+therefore doesn't need to be recompiled as often.
+-}
+
 module Stack.BuildInfo
   ( versionString'
   , hpackVersion

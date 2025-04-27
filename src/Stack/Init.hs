@@ -4,7 +4,14 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
 
--- | Types and functions related to Stack's @init@ command.
+{-|
+Module      : Stack.Init
+Description : Types and functions related to Stack's @init@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @init@ command.
+-}
+
 module Stack.Init
   ( InitOpts (..)
   , initCmd
@@ -536,7 +543,7 @@ getWorkingSnapshotPlan ::
        , Map PackageName (Map FlagName Bool)
        , Map PackageName Version
        , Map PackageName (ResolvedPath Dir))
-     -- ^ ( SnapshotDef
+     -- ^ ( Raw snapshot location
      --   , Flags for src packages and extra deps
      --   , Extra dependencies
      --   , Src packages actually considered)

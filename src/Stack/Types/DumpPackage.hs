@@ -2,6 +2,11 @@
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
+{-|
+Module      : Stack.Types.DumpPackage
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.DumpPackage
   ( DumpPackage (..)
   , SublibDump (..)
@@ -55,7 +60,7 @@ data SublibDump = SublibDump
 -- in the global package database.
 type DumpedGlobalPackage = DumpPackage
 
--- | If the given 'DumpPackage' is for a sub-library of a Cabal package, yields
+-- | If the given t'DumpPackage' is for a sub-library of a Cabal package, yields
 -- the package identifier of the Cabal package.
 sublibParentPkgId :: DumpPackage -> Maybe PackageIdentifier
 sublibParentPkgId dp = dp.sublib <&> \subLibDump ->

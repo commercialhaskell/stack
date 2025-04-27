@@ -1,8 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
--- | The module of this name differs as between Windows and non-Windows builds.
--- This is the Windows version.
+{-|
+Module      : Stack.Docker.Handlers
+License     : BSD-3-Clause
+
+The module of this name differs as between Windows and non-Windows builds. This
+is the Windows version.
+-}
+
 module Stack.Docker.Handlers
   ( handleSetGroups
   , handleSignals

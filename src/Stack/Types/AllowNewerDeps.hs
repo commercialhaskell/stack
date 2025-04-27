@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.AllowNewerDeps
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.AllowNewerDeps
   ( AllowNewerDeps (..)
   ) where

@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- Load information on package sources
+{-|
+Module      : Stack.Build.Source
+Description : Load information on package sources.
+License     : BSD-3-Clause
+
+Load information on package sources.
+-}
+
 module Stack.Build.Source
   ( projectLocalPackages
   , localDependencies
@@ -205,7 +212,7 @@ loadSourceMap targets boptsCli sma = do
       else
         pure $ Left $ UFFlagsNotDefined FSCommandLine name pkgFlags unusedByName
 
--- | Get a 'SourceMapHash' for a given 'SourceMap'
+-- | Get a t'SourceMapHash' for a given t'SourceMap'
 --
 -- Basic rules:
 --
@@ -566,7 +573,7 @@ getFileDigestMaybe fp = do
     (Just <$> readFileDigest cache fp)
     (\e -> if isDoesNotExistError e then pure Nothing else throwM e)
 
--- | Get 'PackageConfig' for package given its name.
+-- | Get t'PackageConfig' for package given its name.
 getPackageConfig ::
      (HasBuildConfig env, HasSourceMap env)
   => Map FlagName Bool

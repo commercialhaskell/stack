@@ -8,52 +8,58 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ViewPatterns          #-}
 
--- | Parsing command line targets
---
--- There are two relevant data sources for performing this parsing: the project
--- configuration, and command line arguments. Project configurations includes
--- the snapshot (defining a LoadedSnapshot of global and snapshot packages),
--- local dependencies, and project packages. It also defines local flag
--- overrides.
---
--- The command line arguments specify both additional local flag overrides and
--- targets in their raw form.
---
--- Flags are simple: we just combine CLI flags with config flags and make one
--- big map of flags, preferring CLI flags when present.
---
--- Raw targets can be a package name, a package name with component, just a
--- component, or a package name and version number. We first must resolve these
--- raw targets into both simple targets and additional dependencies. This works
--- as follows:
---
--- * If a component is specified, find a unique project package which defines
---   that component, and convert it into a name+component target.
---
--- * Ensure that all name+component values refer to valid components in the
---   given project package.
---
--- * For names, check if the name is present in the snapshot, local deps, or
---   project packages. If it is not, then look up the most recent version in the
---   package index and convert to a name+version.
---
--- * For name+version, first ensure that the name is not used by a project
---   package. Next, if that name+version is present in the snapshot or local
---   deps _and_ its location is PLIndex, we have the package. Otherwise, add to
---   local deps with the appropriate PLIndex.
---
--- If in either of the last two bullets we added a package to local deps, print
--- a warning to the user recommending modifying the extra-deps.
---
--- Combine the various 'ResolveResults's together into 'Target' values, by
--- combining various components for a single package and ensuring that no
--- conflicting statements were made about targets.
---
--- At this point, we now have a Map from package name to SimpleTarget, and an
--- updated Map of local dependencies. We still have the aggregated flags, and
--- the snapshot and project packages.
---
--- Finally, we upgrade the snapshot by using calculatePackagePromotion.
+{-|
+Module      : Stack.Build.Target
+Description : Parsing command line targets.
+License     : BSD-3-Clause
+
+Parsing command line targets
+
+There are two relevant data sources for performing this parsing: the project
+configuration, and command line arguments. Project configurations includes the
+snapshot (defining a LoadedSnapshot of global and snapshot packages), local
+dependencies, and project packages. It also defines local flag overrides.
+
+The command line arguments specify both additional local flag overrides and
+targets in their raw form.
+
+Flags are simple: we just combine CLI flags with config flags and make one big
+map of flags, preferring CLI flags when present.
+
+Raw targets can be a package name, a package name with component, just a
+component, or a package name and version number. We first must resolve these raw
+targets into both simple targets and additional dependencies. This works as
+follows:
+
+* If a component is specified, find a unique project package which defines that
+  component, and convert it into a name+component target.
+
+* Ensure that all name+component values refer to valid components in the given
+  project package.
+
+* For names, check if the name is present in the snapshot, local deps, or
+  project packages. If it is not, then look up the most recent version in the
+  package index and convert to a name+version.
+
+* For name+version, first ensure that the name is not used by a project
+  package. Next, if that name+version is present in the snapshot or local deps
+  _and_ its location is PLIndex, we have the package. Otherwise, add to local
+  deps with the appropriate PLIndex.
+
+If in either of the last two bullets we added a package to local deps, print a
+warning to the user recommending modifying the extra-deps.
+
+Combine the various t'ResolveResult's together into t'Target' values, by
+combining various components for a single package and ensuring that no
+conflicting statements were made about targets.
+
+At this point, we now have a Map from package name to SimpleTarget, and an
+updated Map of local dependencies. We still have the aggregated flags, and the
+snapshot and project packages.
+
+Finally, we upgrade the snapshot by using calculatePackagePromotion.
+-}
+
 module Stack.Build.Target
   ( -- * Types
     Target (..)
@@ -66,6 +72,8 @@ module Stack.Build.Target
   , parseRawTarget
   , RawTarget (..)
   , UnresolvedComponent (..)
+  , ComponentName
+  , ResolveResult
   ) where
 
 import qualified Data.Map as Map
@@ -247,7 +255,7 @@ data ResolveResult = ResolveResult
   , packageType :: !PackageType
   }
 
--- | Convert a 'RawTarget' into a 'ResolveResult' (see description on the
+-- | Convert a 'RawTarget' into a t'ResolveResult' (see description on the
 -- module).
 resolveRawTarget ::
      (HasLogFunc env, HasPantryConfig env, HasProcessContext env)

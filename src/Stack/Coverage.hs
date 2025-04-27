@@ -5,7 +5,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Generate HPC (Haskell Program Coverage) reports
+{-|
+Module      : Stack.Coverage
+Description : Generate HPC (Haskell Program Coverage) reports.
+License     : BSD-3-Clause
+
+Generate HPC (Haskell Program Coverage) reports.
+-}
+
 module Stack.Coverage
   ( HpcReportOpts (..)
   , hpcReportCmd

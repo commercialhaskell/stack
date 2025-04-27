@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.NewParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.NewParser
   ( newOptsParser
   ) where

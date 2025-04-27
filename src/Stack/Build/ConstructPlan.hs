@@ -5,7 +5,14 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ViewPatterns          #-}
 
--- | Construct a @Plan@ for how to build
+{-|
+Module      : Stack.Build.ConstructPlan
+Description : Construct a @Plan@ for how to build.
+License     : BSD-3-Clause
+
+Construct a @Plan@ for how to build.
+-}
+
 module Stack.Build.ConstructPlan
   ( constructPlan
   ) where
@@ -94,14 +101,14 @@ import           Stack.Types.Version
                    )
 import           System.Environment ( lookupEnv )
 
--- | Computes a build plan. This means figuring out which build 'Task's to take,
--- and the interdependencies among the build 'Task's. In particular:
+-- | Computes a build plan. This means figuring out which build t'Task's to
+-- take, and the interdependencies among the build t'Task's. In particular:
 --
 -- 1) It determines which packages need to be built, based on the transitive
 -- deps of the current targets. For project packages, this is indicated by the
--- 'lpWanted' boolean. For extra packages to build, this comes from the
--- @extraToBuild0@ argument of type @Set PackageName@. These are usually
--- packages that have been specified on the command line.
+-- 'Stack.Types.Package.wanted' boolean. For extra packages to build, this comes
+-- from the @extraToBuild0@ argument of type @Set PackageName@. These are
+-- usually packages that have been specified on the command line.
 --
 -- 2) It will only rebuild an upstream package if it isn't present in the
 -- 'InstalledMap', or if some of its dependencies have changed.
@@ -415,8 +422,8 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
       relevantPkgName :: PackageName
       relevantPkgName = maybe (pkgName ident) pkgName mParentLibId
 
--- | Given a 'LocalPackage' and its 'lpTestBench', adds a 'Task' for running its
--- tests and benchmarks.
+-- | Given a t'LocalPackage' and its 'testBench', adds a t'Task' for running
+-- its tests and benchmarks.
 --
 -- If @isAllInOne@ is 'True', then this means that the build step will also
 -- build the tests. Otherwise, this indicates that there's a cyclic dependency
@@ -590,10 +597,10 @@ tellExecutablesUpstream name retrievePkgLoc loc flags = do
       p <- ctx.loadPackage pkgLoc flags [] []
       tellExecutablesPackage loc p
 
--- | For given 'InstallLocation' and 'Package' values, adds relevant executables
--- to the collected output. In most cases, the relevant executables are all the
--- executables of the package. If the package is a wanted local one, the
--- executables are those executables that are wanted executables.
+-- | For given 'InstallLocation' and t'Package' values, adds relevant
+-- executables to the collected output. In most cases, the relevant executables
+-- are all the executables of the package. If the package is a wanted local one,
+-- the executables are those executables that are wanted executables.
 tellExecutablesPackage :: InstallLocation -> Package -> M ()
 tellExecutablesPackage loc p = do
   cm <- asks (.combinedMap)
@@ -619,8 +626,8 @@ tellExecutablesPackage loc p = do
     | Set.null myComps = x
     | otherwise = Set.intersection x myComps
 
--- | Given a 'PackageSource' and perhaps an 'Installed' value, adds build
--- 'Task's for the package and its dependencies.
+-- | Given a 'PackageSource' and perhaps an 'Installed' value, adds
+-- build t'Task's for the package and its dependencies.
 installPackage ::
      PackageName
   -> PackageSource
@@ -715,7 +722,7 @@ resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
         installPackageGivenDeps
           isAllInOne buildHaddocks ps package minstalled deps
 
--- | Checks if we need to install the given 'Package', given the results of
+-- | Checks if we need to install the given t'Package', given the results of
 -- 'addPackageDeps'. If dependencies are missing, the package is dirty, or it is
 -- not installed, then it needs to be installed.
 installPackageGivenDeps ::

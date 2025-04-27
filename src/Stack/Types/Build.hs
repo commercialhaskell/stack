@@ -5,7 +5,13 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Build-specific types.
+{-|
+Module      : Stack.Types.Build
+Description : Build-specific types.
+License     : BSD-3-Clause
+
+Build-specific types.
+-}
 
 module Stack.Types.Build
   ( InstallLocation (..)

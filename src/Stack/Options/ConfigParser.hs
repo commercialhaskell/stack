@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
+{-|
+Module      : Stack.Options.ConfigParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.ConfigParser
   ( configOptsParser
   ) where

@@ -6,8 +6,14 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
 
--- | Provides all the necessary types and functions for running cabal Setup.hs
--- commands. Only used in the "Execute" and "ExecutePackage" modules
+{-|
+Module      : Stack.Build.ExecuteEnv
+License     : BSD-3-Clause
+
+Provides all the necessary types and functions for running cabal Setup.hs
+commands. Only used in the "Execute" and "ExecutePackage" modules.
+-}
+
 module Stack.Build.ExecuteEnv
   ( ExecuteEnv (..)
   , withExecuteEnv
@@ -247,7 +253,7 @@ getSetupExe setupHs setupShimHs tmpdir = do
       renameFile tmpExePath exePath
       pure $ Just exePath
 
--- | Execute a function that takes an 'ExecuteEnv'.
+-- | Execute a function that takes an t'ExecuteEnv'.
 withExecuteEnv ::
      forall env a. HasEnvConfig env
   => BuildOpts

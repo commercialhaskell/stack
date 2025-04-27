@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Config.ConfigureScript
+License     : BSD-3-Clause
+-}
+
 module Stack.Config.ConfigureScript
   ( ensureConfigureScript
   ) where

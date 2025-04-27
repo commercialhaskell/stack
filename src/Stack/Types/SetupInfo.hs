@@ -4,6 +4,10 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ViewPatterns        #-}
 
+{-|
+Module      : Stack.Types.SetupInfo
+License     : BSD-3-Clause
+-}
 
 module Stack.Types.SetupInfo
   ( SetupInfo (..)

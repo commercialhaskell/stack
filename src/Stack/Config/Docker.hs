@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Docker configuration
+{-|
+Module      : Stack.Config.Docker
+Description : Docker configuration.
+License     : BSD-3-Clause
+
+Docker configuration.
+-}
+
 module Stack.Config.Docker
   ( ConfigDockerException (..)
   , addDefaultTag

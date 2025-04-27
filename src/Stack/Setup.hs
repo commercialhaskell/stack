@@ -9,6 +9,11 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ViewPatterns          #-}
 
+{-|
+Module      : Stack.Setup
+License     : BSD-3-Clause
+-}
+
 module Stack.Setup
   ( setupEnv
   , ensureCompilerAndMsys
@@ -1878,7 +1883,7 @@ sysRelease =
     )
     (liftIO getRelease)
 
--- | Ensure Docker container-compatible 'stack' executable is downloaded
+-- | Ensure Docker container-compatible \'stack\' executable is downloaded
 ensureDockerStackExe :: HasConfig env => Platform -> RIO env (Path Abs File)
 ensureDockerStackExe containerPlatform = do
   config <- view configL

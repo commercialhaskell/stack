@@ -3,7 +3,14 @@
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
--- | Types and functions related to Stack's @eval@ command.
+{-|
+Module      : Stack.Eval
+Description : Types and functions related to Stack's @eval@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @eval@ command.
+-}
+
 module Stack.Eval
   ( EvalOpts (..)
   , evalCmd

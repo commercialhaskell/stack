@@ -8,8 +8,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
--- | A module providing a type representing the name of an \'unqualified\'
--- component and related helper functions.
+{-|
+Module      : Stack.Types.ComponentUtils
+License     : BSD-3-Clause
+
+A module providing a type representing the name of an \'unqualified\' component
+and related helper functions.
+-}
+
 module Stack.Types.ComponentUtils
   ( StackUnqualCompName (..)
   , unqualCompToText

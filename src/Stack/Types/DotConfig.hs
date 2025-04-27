@@ -3,6 +3,11 @@
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
+{-|
+Module      : Stack.Types.DotConfig
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.DotConfig
   ( DotConfig (..)
   ) where

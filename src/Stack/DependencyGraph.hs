@@ -4,8 +4,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Module exporting a function to create a pruned dependency graph given a
--- 'DotOpts' value.
+{-|
+Module      : Stack.DependencyGraph
+License     : BSD-3-Clause
+
+Module exporting a function to create a pruned dependency graph given
+a t'DotOpts' value.
+-}
+
 module Stack.DependencyGraph
   ( createPrunedDependencyGraph
   , resolveDependencies

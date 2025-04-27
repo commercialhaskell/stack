@@ -2,7 +2,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
--- | Build configuration
+{-|
+Module      : Stack.Config.Build
+Description : Build configuration.
+License     : BSD-3-Clause
+
+Build configuration.
+-}
+
 module Stack.Config.Build
  ( buildOptsFromMonoid
  , haddockOptsFromMonoid

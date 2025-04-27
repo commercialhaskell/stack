@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Options.LogLevelParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.LogLevelParser
   ( logLevelOptsParser
   ) where

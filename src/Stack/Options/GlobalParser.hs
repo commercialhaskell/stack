@@ -2,7 +2,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
--- | Functions to parse Stack's \'global\' command line arguments.
+{-|
+Module      : Stack.Options.GlobalParser
+Description : Functions to parse Stack's \'global\' command line arguments.
+License     : BSD-3-Clause
+
+Functions to parse Stack's \'global\' command line arguments.
+-}
+
 module Stack.Options.GlobalParser
   ( globalOptsFromMonoid
   , globalOptsParser

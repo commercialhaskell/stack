@@ -2,7 +2,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
--- | Default configuration options for building.
+{-|
+Module      : Stack.BuildOpts
+Description : Default configuration options for building.
+License     : BSD-3-Clause
+
+Default configuration options for building.
+-}
+
 module Stack.BuildOpts
   ( defaultBuildOpts
   , defaultTestOpts

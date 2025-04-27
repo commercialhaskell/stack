@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.HaddockParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.HaddockParser
   ( haddockOptsParser
   ) where

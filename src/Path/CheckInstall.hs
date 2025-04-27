@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Path.CheckInstall
+License     : BSD-3-Clause
+-}
+
 module Path.CheckInstall
   ( warnInstallSearchPathIssues
   ) where

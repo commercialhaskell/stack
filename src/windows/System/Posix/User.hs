@@ -1,9 +1,14 @@
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
--- | The module of this name differs as between Windows and non-Windows builds.
--- This is the Windows version. Non-Windows builds rely on the unix package,
--- which exposes a module of the same name.
+{-|
+Module      : System.Posix.User
+License     : BSD-3-Clause
+
+The module of this name differs as between Windows and non-Windows builds. This
+is the Windows version. Non-Windows builds rely on the unix package, which
+exposes a module of the same name.
+-}
 
 module System.Posix.User
   ( getEffectiveUserID

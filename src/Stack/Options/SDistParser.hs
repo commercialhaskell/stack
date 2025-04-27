@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions to parse command line arguments for Stack's @sdist@ and @upload@
--- commands.
+{-|
+Module      : Stack.Options.SDistParser
+Description : Parse arguments for Stack's @sdist@ and @upload@ commands.
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @sdist@ and @upload@
+commands.
+-}
+
 module Stack.Options.SDistParser
  ( sdistOptsParser
  ) where

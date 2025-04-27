@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | More readable combinators for writing parsers.
+{-|
+Module      : Data.Attoparsec.Combinators
+Description : More readable combinators for writing parsers.
+License     : BSD-3-Clause
+
+More readable combinators for writing parsers.
+-}
+
 module Data.Attoparsec.Combinators
   ( alternating
   , appending

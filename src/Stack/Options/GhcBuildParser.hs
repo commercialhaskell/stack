@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.GhcBuildParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.GhcBuildParser
 ( ghcBuildParser
 ) where

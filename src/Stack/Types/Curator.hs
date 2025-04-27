@@ -3,9 +3,15 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Module exporting the 'Curator' type, used to represent Stack's
--- project-specific @curator@ option, which supports the needs of the
--- [@curator@ tool](https://github.com/commercialhaskell/curator).
+{-|
+Module      : Stack.Types.Curator
+License     : BSD-3-Clause
+
+Module exporting the t'Curator' type, used to represent Stack's project-specific
+@curator@ option, which supports the needs of the
+[@curator@ tool](https://github.com/commercialhaskell/curator).
+-}
+
 module Stack.Types.Curator
   ( Curator (..)
   ) where

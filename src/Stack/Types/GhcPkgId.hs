@@ -1,6 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | A ghc-pkg id.
+{-|
+Module      : Stack.Types.GhcPkgId
+Description : A ghc-pkg id.
+License     : BSD-3-Clause
+
+A ghc-pkg id.
+-}
 
 module Stack.Types.GhcPkgId
   ( GhcPkgId

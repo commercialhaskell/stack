@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Types and functions related to Stack's @list@ command.
+{-|
+Module      : Stack.List
+Description : Types and functions related to Stack's @list@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @list@ command.
+-}
+
 module Stack.List
   ( listCmd
   , listPackages
@@ -104,7 +111,7 @@ listPackages mSnapshot mGlobals input = do
   toLocSnapshot snapshot name =
     case Map.lookup name (rsPackages snapshot) of
       Nothing -> case Map.lookup name =<< mGlobals of
-        Nothing -> 
+        Nothing ->
           pure $ Left $ fillSep
             [ flow "Package does not appear in snapshot (directly or \
                    \indirectly):"

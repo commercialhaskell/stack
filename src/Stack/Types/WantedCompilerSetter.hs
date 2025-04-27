@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.WantedCompilerSetter
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.WantedCompilerSetter
   ( WantedCompilerSetter (..)
   ) where

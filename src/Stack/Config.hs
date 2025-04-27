@@ -6,16 +6,22 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
 
--- | The general Stack configuration that starts everything off. This should be
--- smart to fallback if there is no stack.yaml, instead relying on whatever
--- files are available.
---
--- If there is no stack.yaml, and there is a cabal.config, we read in those
--- constraints, and if there's a cabal.sandbox.config, we read any constraints
--- from there and also find the package database from there, etc. And if there's
--- nothing, we should probably default to behaving like cabal, possibly with
--- spitting out a warning that "you should run `stk init` to make things
--- better".
+{-|
+Module      : Stack.Config
+Description : The general Stack configuration.
+License     : BSD-3-Clause
+
+The general Stack configuration that starts everything off. This should be smart
+to fallback if there is no stack.yaml, instead relying on whatever files are
+available.
+
+If there is no stack.yaml, and there is a cabal.config, we read in those
+constraints, and if there's a cabal.sandbox.config, we read any constraints from
+there and also find the package database from there, etc. And if there's
+nothing, we should probably default to behaving like cabal, possibly with
+spitting out a warning that "you should run `stk init` to make things better".
+-}
+
 module Stack.Config
   ( loadConfig
   , loadConfigYaml
@@ -160,7 +166,7 @@ import           System.Posix.User ( getEffectiveUserID )
 getImplicitGlobalProjectDir :: HasConfig env => RIO env (Path Abs Dir)
 getImplicitGlobalProjectDir = view $ stackRootL . to implicitGlobalProjectDir
 
--- | Download the 'Snapshots' value from stackage.org.
+-- | Download the t'Snapshots' value from stackage.org.
 getSnapshots :: HasConfig env => RIO env Snapshots
 getSnapshots = do
   latestUrlText <- askLatestSnapshotUrl
@@ -649,7 +655,7 @@ configFromConfigMonoid
 withLocalLogFunc :: HasLogFunc env => LogFunc -> RIO env a -> RIO env a
 withLocalLogFunc logFunc = local (set logFuncL logFunc)
 
--- | Runs the provided action with a new 'LogFunc', given a 'StylesUpdate'.
+-- | Runs the provided action with a new 'LogFunc', given a t'StylesUpdate'.
 withNewLogFunc ::
      MonadUnliftIO m
   => GlobalOpts
@@ -1145,8 +1151,8 @@ getDirAndOwnership dir = liftIO $ forgivingAbsence $ do
     ownership <- isOwnedByUser dir
     pure (dir, ownership)
 
--- | Check whether the current user (determined with 'getEffectiveUserId') is
--- the owner for the given path.
+-- | Check whether the current user (determined with
+-- 'System.Posix.User.getEffectiveUserId') is the owner for the given path.
 --
 -- Will always pure 'True' on Windows.
 isOwnedByUser :: MonadIO m => Path Abs t -> m Bool

@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.Platform
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.Platform
   ( PlatformVariant (..)
   , HasPlatform (..)

@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.ColorWhen
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.ColorWhen
   ( ColorWhen (..)
   , readColorWhen

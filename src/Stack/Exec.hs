@@ -2,8 +2,16 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Types and function related to Stack's @exec@, @ghc@, @run@, @runghc@ and
--- @runhaskell@ commands.
+{-|
+Module      : Stack.Exec
+Description : Types and function related to Stack's @exec@, @ghc@, @run@,
+              @runghc@ and @runhaskell@ commands.
+License     : BSD-3-Clause
+
+Types and function related to Stack's @exec@, @ghc@, @run@, @runghc@ and
+@runhaskell@ commands.
+-}
+
 module Stack.Exec
   ( ExecOpts (..)
   , SpecialExecCmd (..)

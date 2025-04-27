@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoFieldSelectors  #-}
 
+{-|
+Module      : Stack.Types.GhcOptions
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.GhcOptions
   ( GhcOptions (..)
   ) where

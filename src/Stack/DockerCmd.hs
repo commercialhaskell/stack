@@ -1,6 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions related to Stack's @docker pull@ and @docker reset@ commands.
+{-|
+Module      : Stack.DockerCmd
+Description : Functions related to Stack's @docker pull@ and @docker reset@
+              commands.
+License     : BSD-3-Clause
+
+Functions related to Stack's @docker pull@ and @docker reset@ commands.
+-}
+
 module Stack.DockerCmd
   ( dockerPullCmd
   , dockerResetCmd

@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.IsMutable
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.IsMutable
   ( IsMutable (..)
   ) where

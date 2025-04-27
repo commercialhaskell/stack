@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.BuildMonoidParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.BuildMonoidParser
   ( buildOptsMonoidParser
   , cabalVerboseParser

@@ -2,7 +2,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Types and functions related to Stack's @query@ command.
+{-|
+Module      : Stack.Query
+Description : Types and functions related to Stack's @query@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @query@ command.
+-}
+
 module Stack.Query
   ( queryCmd
   , queryBuildInfo

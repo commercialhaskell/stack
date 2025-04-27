@@ -3,7 +3,13 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Functions for the GHC package database.
+{-|
+Module      : Stack.GhcPkg
+Description : Functions for the GHC package database.
+License     : BSD-3-Clause
+
+Functions for the GHC package database.
+-}
 
 module Stack.GhcPkg
   ( createDatabase
@@ -155,7 +161,7 @@ findGhcPkgField pkgexe pkgDbs name field = do
 -- using GHC package id where available (from GHC 7.9)
 --
 -- The version of the ghc-pkg executable supplied with GHCs published before
--- 28 August 2023 does not efficiently bulk unregister. Until an 'efficient'
+-- 28 August 2023 does not efficiently bulk unregister. Until an \'efficient\'
 -- ghc-pkg is available, this function no longer uses:
 --
 -- >   eres <- ghcPkg pkgexe [pkgDb] args

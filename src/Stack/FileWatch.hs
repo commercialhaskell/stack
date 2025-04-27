@@ -2,6 +2,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-|
+Module      : Stack.FileWatch
+License     : BSD-3-Clause
+-}
+
 module Stack.FileWatch
   ( WatchMode (WatchModePoll)
   , fileWatch

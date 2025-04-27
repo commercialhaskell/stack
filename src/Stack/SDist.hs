@@ -5,7 +5,14 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
 
--- Types and functions related to Stack's @sdist@ command.
+{-|
+Module      : Stack.SDist
+Description : Types and functions related to Stack's @sdist@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @sdist@ command.
+-}
+
 module Stack.SDist
   ( SDistOpts (..)
   , sdistCmd
@@ -453,8 +460,9 @@ gtraverseT f =
                  Nothing -> gtraverseT f x
                  Just b  -> fromMaybe x (cast (f b)))
 
--- | Read in a 'LocalPackage' config.  This makes some default decisions about
--- 'LocalPackage' fields that might not be appropriate for other use-cases.
+-- | Read in a t'LocalPackage' config.  This makes some default decisions
+-- about v'LocalPackage' fields that might not be appropriate for other
+-- use-cases.
 readLocalPackage :: HasEnvConfig env => Path Abs Dir -> RIO env LocalPackage
 readLocalPackage pkgDir = do
   config  <- getDefaultPackageConfig

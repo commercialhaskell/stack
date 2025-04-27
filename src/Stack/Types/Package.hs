@@ -5,6 +5,11 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
+{-|
+Module      : Stack.Types.Package
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.Package
   ( BioInput (..)
   , BuildInfoOpts (..)
@@ -201,11 +206,11 @@ data Package = Package
   , testEnabled :: Bool
     -- ^ This is a requirement because when tests are not enabled, Stack's
     -- package dependencies should ignore test dependencies. Directly set from
-    -- 'packageConfigEnableTests'.
+    -- 'enableTests'.
   , benchmarkEnabled :: Bool
     -- ^ This is a requirement because when benchmark are not enabled, Stack's
     -- package dependencies should ignore benchmark dependencies. Directly set
-    -- from 'packageConfigEnableBenchmarks'.
+    -- from 'enableBenchmarks'.
   }
   deriving (Show, Typeable)
 
@@ -291,7 +296,7 @@ data LocalPackage = LocalPackage
 
     -- FIXME Should completely drop this "wanted" terminology, it's unclear.
   , testBench      :: !(Maybe Package)
-    -- ^ This stores the 'Package' with tests and benchmarks enabled, if either
+    -- ^ This stores the t'Package' with tests and benchmarks enabled, if either
     -- is asked for by the user.
   , cabalFP        :: !(Path Abs File)
     -- ^ Absolute path to the Cabal file.
@@ -429,7 +434,7 @@ installedPackageToGhcPkgId ident (Library ident' libInfo) =
   assert (ident == ident') (installedMapGhcPkgId ident libInfo)
 installedPackageToGhcPkgId _ (Executable _) = mempty
 
--- | Creates a 'MungedPackageName' identifier.
+-- | Creates a t'MungedPackageName' identifier.
 toCabalMungedPackageIdentifier ::
      PackageName
   -> Version

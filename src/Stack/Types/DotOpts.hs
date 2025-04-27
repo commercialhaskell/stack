@@ -1,8 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoFieldSelectors  #-}
 
--- | Module exporting the `DotOpts` type used by Stack's @dot@ and
--- @ls dependencies@ commands.
+{-|
+Module      : Stack.Types.DotOpts
+License     : BSD-3-Clause
+
+Module exporting the t`DotOpts` type used by Stack's @dot@ and @ls dependencies@
+commands.
+-}
+
 module Stack.Types.DotOpts
   ( DotOpts (..)
   ) where

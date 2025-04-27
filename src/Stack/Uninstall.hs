@@ -2,7 +2,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Function related to Stack's @uninstall@ command.
+{-|
+Module      : Stack.Uninstall
+Description : Function related to Stack's @uninstall@ command.
+License     : BSD-3-Clause
+
+Function related to Stack's @uninstall@ command.
+-}
+
 module Stack.Uninstall
   ( uninstallCmd
   ) where

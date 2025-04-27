@@ -5,6 +5,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeFamilies        #-}
 
+{-|
+Module      : Stack.Types.BuildConfig
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.BuildConfig
   ( BuildConfig (..)
   , HasBuildConfig (..)

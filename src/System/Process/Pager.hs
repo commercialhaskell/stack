@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 
--- | Run external pagers (@$PAGER@, @less@, @more@).
+{-|
+Module      : System.Process.Pager
+Description : Run external pagers (@$PAGER@, @less@, @more@).
+License     : BSD-3-Clause
+
+Run external pagers (@$PAGER@, @less@, @more@).
+-}
+
 module System.Process.Pager
   ( pageWriter
   , pageText

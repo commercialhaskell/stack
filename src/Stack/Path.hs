@@ -4,9 +4,17 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Types and functions related to Stack's @path@ command.
+{-|
+Module      : Stack.Path
+Description : Types and functions related to Stack's @path@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @path@ command.
+-}
+
 module Stack.Path
   ( EnvConfigPathInfo
+  , UseHaddocks
   , path
   , pathsFromRunner
   , pathsFromConfig
@@ -218,11 +226,11 @@ data UseHaddocks a
   = UseHaddocks a
   | WithoutHaddocks a
 
--- | The paths of interest to a user which do require a 'Config' or 'EnvConfig'.
--- The first tuple string is used for a description that the optparse flag uses,
--- and the second string as a machine-readable key and also for @--foo@ flags.
--- The user can choose a specific path to list like @--stack-root@. But really
--- it's mainly for the documentation aspect.
+-- | The paths of interest to a user which do require a t'Config' or
+-- 'EnvConfig'. The first tuple string is used for a description that the
+-- optparse flag uses, and the second string as a machine-readable key and also
+-- for @--foo@ flags. The user can choose a specific path to list like
+-- @--stack-root@. But really it's mainly for the documentation aspect.
 pathsFromRunner :: (String, Text)
 pathsFromRunner = ("Global Stack root directory", stackRootOptionName')
 

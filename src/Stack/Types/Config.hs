@@ -10,6 +10,11 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ViewPatterns        #-}
 
+{-|
+Module      : Stack.Types.Config
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.Config
   (
     Config (..)
@@ -245,7 +250,7 @@ ghcInstallHook = do
 -- Lens classes
 -----------------------------------
 
--- | Class for environment values that can provide a 'Config'.
+-- | Class for environment values that can provide a t'Config'.
 class ( HasPlatform env
       , HasGHCVariant env
       , HasProcessContext env

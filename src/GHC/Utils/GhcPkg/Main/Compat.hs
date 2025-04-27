@@ -10,24 +10,31 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
--- This module is based on GHC's utils\ghc-pkg\Main.hs at
--- commit f66fc15f2e6849125074bcfeb44334a663323ca6 (see GHC merge request
--- !11142), with:
--- * changeDBDir' does not perform an effective @ghc-pkg recache@,
--- * the cache is not used,
--- * consistency checks are not performed,
--- * use Stack program name,
--- * use "Stack.Prelude" rather than "Prelude",
--- * use 'RIO' @env@ monad,
--- * use well-typed representations of paths from the @path@ package,
--- * add pretty messages and exceptions,
--- * redundant code deleted,
--- * Hlint applied, and
--- * explicit import lists.
---
--- The version of the ghc-pkg executable supplied with GHCs published before
--- 28 August 2023 does not efficiently bulk unregister. This module exports a
--- function that does efficiently bulk unregister.
+{-|
+Module      : GHC.Utils.GhcPkg.Main.Compat
+License     : BSD-3-Clause
+
+This module is based on GHC's utils\ghc-pkg\Main.hs at
+commit f66fc15f2e6849125074bcfeb44334a663323ca6 (see GHC merge request !11142),
+with:
+
+* changeDBDir' does not perform an effective @ghc-pkg recache@,
+* the cache is not used,
+* consistency checks are not performed,
+* use Stack program name,
+* use "Stack.Prelude" rather than "Prelude",
+* use t
+'RIO' @env@ monad,
+* use well-typed representations of paths from the @path@ package,
+* add pretty messages and exceptions,
+* redundant code deleted,
+* Hlint applied, and
+* explicit import lists.
+
+The version of the ghc-pkg executable supplied with GHCs published before
+28 August 2023 does not efficiently bulk unregister. This module exports a
+function that does efficiently bulk unregister.
+-}
 
 module GHC.Utils.GhcPkg.Main.Compat
   ( ghcPkgUnregisterForce
@@ -137,8 +144,8 @@ data PackageDB (mode :: GhcPkg.DbMode) = PackageDB
 -- | A stack of package databases. Convention: head is the topmost in the stack.
 type PackageDBStack = [PackageDB 'GhcPkg.DbReadOnly]
 
--- | Selector for picking the right package DB to modify as 'modify' changes the
--- first database that contains a specific package.
+-- | Selector for picking the right package DB to modify as \'modify\' changes
+-- the first database that contains a specific package.
 newtype DbModifySelector = ContainsPkg PackageArg
 
 getPkgDatabases ::

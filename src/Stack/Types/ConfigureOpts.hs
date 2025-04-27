@@ -4,6 +4,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-|
+Module      : Stack.Types.ConfigureOpts
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.ConfigureOpts
   ( ConfigureOpts (..)
   , BaseConfigOpts (..)
@@ -52,8 +57,8 @@ data BaseConfigOpts = BaseConfigOpts
   }
   deriving Show
 
--- | All these fields come from the 'Package' data type but bringing the whole
--- Package is way too much, hence this datatype.
+-- | All these fields come from the v'Package' data type but bringing the
+-- whole t'Package' is way too much, hence this datatype.
 data PackageConfigureOpts = PackageConfigureOpts
   { pkgCabalConfigOpts :: [Text]
   , pkgGhcOptions :: [Text]

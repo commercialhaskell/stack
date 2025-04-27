@@ -1,7 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Accepting arguments to be passed through to a sub-process.
+{-|
+Module      : Options.Applicative.Args
+Description : Accepting arguments to be passed through to a sub-process.
+License     : BSD-3-Clause
+
+Accepting arguments to be passed through to a sub-process.
+-}
 
 module Options.Applicative.Args
   ( argsArgument

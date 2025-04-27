@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ViewPatterns      #-}
 
--- | Versions for packages.
+{-|
+Module      : Stack.Types.Version
+Description : Versions for packages.
+License     : BSD-3-Clause
+
+Versions for packages.
+-}
+
 module Stack.Types.Version
   ( Cabal.VersionRange -- TODO in the future should have a newtype wrapper
   , IntersectingVersionRange (..)

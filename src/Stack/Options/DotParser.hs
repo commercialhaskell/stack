@@ -1,8 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Function to parse command line arguments for Stack's @dot@ command and
--- certain command line arguments for Stack's @ls dependencies@ command.
+{-|
+Module      : Stack.Options.DotParser
+License     : BSD-3-Clause
+
+Function to parse command line arguments for Stack's @dot@ command and certain
+command line arguments for Stack's @ls dependencies@ command.
+-}
+
 module Stack.Options.DotParser
   ( dotOptsParser
   ) where

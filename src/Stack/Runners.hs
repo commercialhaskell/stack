@@ -4,12 +4,18 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Utilities for running stack commands.
---
--- Instead of using Has-style classes below, the type signatures use
--- concrete environments to try and avoid accidentally rerunning
--- configuration parsing. For example, we want @withConfig $
--- withConfig $ ...@ to fail.
+{-|
+Module      : Stack.Runners
+Description : Utilities for running stack commands.
+License     : BSD-3-Clause
+
+Utilities for running stack commands.
+
+Instead of using Has-style classes below, the type signatures use concrete
+environments to try and avoid accidentally rerunning configuration parsing. For
+example, we want @withConfig $ withConfig $ ...@ to fail.
+-}
+
 module Stack.Runners
   ( withBuildConfig
   , withEnvConfig
@@ -98,11 +104,10 @@ withGlobalProject inner = do
 withDefaultEnvConfig :: RIO EnvConfig a -> RIO Config a
 withDefaultEnvConfig = withEnvConfig AllowNoTargets defaultBuildOptsCLI
 
--- | Upgrade a 'Config' environment to an 'EnvConfig' environment by
--- performing further parsing of project-specific configuration (like
--- 'withBuildConfig') and then setting up a build environment
--- toolchain. This is intended to be run inside a call to
--- 'withConfig'.
+-- | Upgrade a t'Config' environment to an 'EnvConfig' environment by performing
+-- further parsing of project-specific configuration (like 'withBuildConfig')
+-- and then setting up a build environment toolchain. This is intended to be run
+-- inside a call to 'withConfig'.
 withEnvConfig ::
      NeedTargets
   -> BuildOptsCLI
@@ -216,7 +221,7 @@ reexec inner = do
             else throwIO Docker.OnlyOnHostException
         else Docker.runContainerAndExit
 
--- | Use the 'GlobalOpts' to create a 'Runner' and run the provided
+-- | Use the t'GlobalOpts' to create a t'Runner' and run the provided
 -- action.
 withRunnerGlobal :: GlobalOpts -> RIO Runner a -> IO a
 withRunnerGlobal go inner = do

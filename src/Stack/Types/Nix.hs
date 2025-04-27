@@ -3,7 +3,14 @@
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Nix types.
+{-|
+Module      : Stack.Types.Nix
+Description : Nix types.
+License     : BSD-3-Clause
+
+Nix types.
+-}
+
 module Stack.Types.Nix
   ( NixOpts (..)
   , NixOptsMonoid (..)
@@ -55,7 +62,7 @@ data NixOptsMonoid = NixOptsMonoid
   , shellOptions :: !(First [Text])
     -- ^ Options to be given to the nix-shell command line
   , path :: !(First [Text])
-    -- ^ Override parts of NIX_PATH (notably 'nixpkgs')
+    -- ^ Override parts of NIX_PATH (notably \'nixpkgs\')
   , addGCRoots :: !FirstFalse
     -- ^ Should we register gc roots so running nix-collect-garbage doesn't
     -- remove nix dependencies
