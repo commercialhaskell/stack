@@ -2,7 +2,14 @@
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE TypeFamilies          #-}
 
--- | Utils for the other Stack.Storage modules
+{-|
+Module      : Stack.Storage.Util
+Description : Utilities for other @Stack.Storage@ modules.
+License     : BSD-3-Clause
+
+Utilities for the other @Stack.Storage@ modules.
+-}
+
 module Stack.Storage.Util
   ( handleMigrationException
   , updateCollection

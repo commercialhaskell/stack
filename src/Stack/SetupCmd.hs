@@ -5,7 +5,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Types and functions related to Stack's @setup@ command.
+{-|
+Module      : Stack.SetupCmd
+Description : Types and functions related to Stack's @setup@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @setup@ command.
+-}
+
 module Stack.SetupCmd
   ( SetupCmdOpts (..)
   , setupCmd

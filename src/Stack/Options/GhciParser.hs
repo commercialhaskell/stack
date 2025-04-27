@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Options.GhciParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.GhciParser
   ( ghciOptsParser
   ) where

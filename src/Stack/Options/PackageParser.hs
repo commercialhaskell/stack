@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.PackageParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.PackageParser
   ( readFlag
   ) where

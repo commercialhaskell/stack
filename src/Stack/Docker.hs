@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Run commands in Docker containers
+{-|
+Module      : Stack.Docker
+Description : Run commands in Docker containers.
+License     : BSD-3-Clause
+
+Run commands in Docker containers.
+-}
+
 module Stack.Docker
   ( dockerCmdName
   , dockerHelpOptName
@@ -584,7 +591,7 @@ removeDirectoryContents path excludeDirs excludeFiles = do
                         (removeFile f))
 
 -- | Produce a strict 'S.ByteString' from the stdout of a process. Throws a
--- 'ReadProcessException' exception if the process fails.
+-- 'Rio.Process.ReadProcessException' exception if the process fails.
 --
 -- The stderr output is passed straight through, which is desirable for some
 -- cases e.g. docker pull, in which docker uses stderr for progress output.
@@ -599,7 +606,7 @@ readDockerProcess args = BL.toStrict <$> proc "docker" args readProcessStdout_
 homeDirName :: Path Rel Dir
 homeDirName = relDirUnderHome
 
--- | Directory where 'stack' executable is bind-mounted in Docker container
+-- | Directory where \'stack\' executable is bind-mounted in Docker container
 -- This refers to a path in the Linux *container*, and so should remain a
 -- 'FilePath' (not 'Path Abs Dir') so that it works when the host runs Windows.
 hostBinDir :: FilePath

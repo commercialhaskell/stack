@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.LockFileBehavior
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.LockFileBehavior
   ( LockFileBehavior (..)
   , readLockFileBehavior

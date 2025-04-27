@@ -1,35 +1,40 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-{- |  This module implements parsing of additional arguments embedded in a
-      comment when Stack is invoked as a script interpreter
+{-|
+Module      : Data.Attoparsec.Interpreter
+License     : BSD-3-Clause
 
-  ===Specifying arguments in script interpreter mode
-  @/stack/@ can execute a Haskell source file using @/runghc/@ and if required
-  it can also install and setup the compiler and any package dependencies
-  automatically.
+This module implements parsing of additional arguments embedded in a comment
+when Stack is invoked as a script interpreter
 
-  For using a Haskell source file as an executable script on a Unix like OS,
-  the first line of the file must specify @stack@ as the interpreter using a
-  shebang directive e.g.
+=== Specifying arguments in script interpreter mode
 
-  > #!/usr/bin/env stack
+@/stack/@ can execute a Haskell source file using @/runghc/@ and if required it
+can also install and setup the compiler and any package dependencies
+automatically.
 
-  Additional arguments can be specified in a haskell comment following the
-  @#!@ line. The contents inside the comment must be a single valid stack
-  command line, starting with @stack@ as the command and followed by the
-  options to use for executing this file.
+For using a Haskell source file as an executable script on a Unix like OS, the
+first line of the file must specify @stack@ as the interpreter using a shebang
+directive e.g.
 
-  The comment must be on the line immediately following the @#!@ line. The
-  comment must start in the first column of the line. When using a block style
-  comment the command can be split on multiple lines.
+> #!/usr/bin/env stack
 
-  Here is an example of a single line comment:
+Additional arguments can be specified in a haskell comment following the @#!@
+line. The contents inside the comment must be a single valid stack command line,
+starting with @stack@ as the command and followed by the options to use for
+executing this file.
 
-  > #!/usr/bin/env stack
-  > -- stack --snapshot lts-3.14 --install-ghc runghc --package random
+The comment must be on the line immediately following the @#!@ line. The
+comment must start in the first column of the line. When using a block style
+comment the command can be split on multiple lines.
 
-  Here is an example of a multi line block comment:
+Here is an example of a single line comment:
+
+> #!/usr/bin/env stack
+> -- stack --snapshot lts-3.14 --install-ghc runghc --package random
+
+Here is an example of a multi line block comment:
 
 @
   #!\/usr\/bin\/env stack
@@ -41,13 +46,13 @@
   -\}
 @
 
-  When the @#!@ line is not present, the file can still be executed
-  using @stack \<file name\>@ command if the file starts with a valid stack
-  interpreter comment. This can be used to execute the file on Windows for
-  example.
+When the @#!@ line is not present, the file can still be executed using
+@stack \<file name\>@ command if the file starts with a valid stack interpreter
+comment. This can be used to execute the file on Windows for example.
 
-  Nested block comments are not supported.
+Nested block comments are not supported.
 -}
+
 module Data.Attoparsec.Interpreter
   ( interpreterArgsParser -- for unit tests
   , getInterpreterArgs

@@ -1,6 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Options.BenchParser
+Description : Parser for benchmark arguments.
+License     : BSD-3-Clause
+
+Parser for benchmark arguments.
+-}
+
 module Stack.Options.BenchParser
  ( benchOptsParser
  ) where

@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoFieldSelectors  #-}
 
+{-|
+Module      : Stack.Types.DockerEntrypoint
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.DockerEntrypoint
   ( DockerEntrypoint (..)
   , DockerUser (..)

@@ -4,12 +4,19 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Types and functions related to Stack's @ghci@ and @repl@ commands.
+{-|
+Module      : Stack.Ghci
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @ghci@ and @repl@ commands.
+-}
+
 module Stack.Ghci
   ( GhciOpts (..)
   , GhciPkgInfo (..)
   , GhciException (..)
   , GhciPrettyException (..)
+  , ModuleMap
   , ghciCmd
   , ghci
   ) where

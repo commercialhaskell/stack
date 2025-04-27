@@ -5,7 +5,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- Types and functions related to Stack's @script@ command.
+{-|
+Module      : Stack.Script
+Description : Types and functions related to Stack's @script@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @script@ command.
+-}
+
 module Stack.Script
   ( ScriptOpts (..)
   , ScriptExecute (..)

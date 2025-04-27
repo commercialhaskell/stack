@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Functions related to Stack's @templates@ command.
+{-|
+Module      : Stack.Templates
+Description : Functions related to Stack's @templates@ command.
+License     : BSD-3-Clause
+
+Functions related to Stack's @templates@ command.
+-}
+
 module Stack.Templates
   ( templatesCmd
   , templatesHelp

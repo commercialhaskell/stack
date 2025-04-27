@@ -2,6 +2,11 @@
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
+{-|
+Module      : Stack.Types.GlobalOpts
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.GlobalOpts
   ( GlobalOpts (..)
   , globalOptsBuildOptsMonoidL
@@ -30,7 +35,7 @@ data GlobalOpts = GlobalOpts
     -- ^ Whether to include debug information about the construction of the
     -- build plan in logs.
   , configMonoid     :: !ConfigMonoid
-    -- ^ Config monoid, for passing into 'loadConfig'
+    -- ^ Config monoid, for passing into 'Stack.Config.loadConfig'
   , snapshot         :: !(Maybe AbstractSnapshot) -- ^ Snapshot override
   , compiler         :: !(Maybe WantedCompiler) -- ^ Compiler override
   , terminal         :: !Bool -- ^ We're in a terminal?

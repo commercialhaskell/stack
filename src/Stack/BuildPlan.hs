@@ -5,7 +5,12 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Resolving a build plan for a set of packages in a given Stackage snapshot.
+{-|
+Module      : Stack.BuildPlan
+License     : BSD-3-Clause
+
+Resolving a build plan for a set of packages in a given Stackage snapshot.
+-}
 
 module Stack.BuildPlan
   ( BuildPlanException (..)
@@ -308,7 +313,7 @@ data DepError = DepError
   }
   deriving Show
 
--- | Combine two 'DepError's for the same 'Version'.
+-- | Combine two t'DepError's for the same 'Version'.
 combineDepError :: DepError -> DepError -> DepError
 combineDepError (DepError a x) (DepError b y) =
   assert (a == b) $ DepError a (Map.unionWith C.intersectVersionRanges x y)

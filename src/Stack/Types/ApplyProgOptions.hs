@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.ApplyProgOptions
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.ApplyProgOptions
   ( ApplyProgOptions (..)
   ) where

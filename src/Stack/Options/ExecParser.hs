@@ -1,7 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions to parse command line arguments for Stack's @exec@, @ghc@, @run@,
--- @runghc@ and @runhaskell@ commands.
+{-|
+Module      : Stack.Options.ExecParser
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @exec@, @ghc@, @run@,
+@runghc@ and @runhaskell@ commands.
+-}
+
 module Stack.Options.ExecParser
   ( execOptsParser
   , execOptsExtraParser

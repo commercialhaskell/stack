@@ -3,7 +3,13 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Build the project.
+{-|
+Module      : Stack.Build
+Description : Build the project.
+License     : BSD-3-Clause
+
+Build the project.
+-}
 
 module Stack.Build
   ( buildCmd

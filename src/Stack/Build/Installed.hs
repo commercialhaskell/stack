@@ -4,7 +4,14 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
--- Determine which packages are already installed
+{-|
+Module      : Stack.Build.Installed
+Description : Determine which packages are already installed.
+License     : BSD-3-Clause
+
+Determine which packages are already installed.
+-}
+
 module Stack.Build.Installed
   ( getInstalled
   , toInstallMap

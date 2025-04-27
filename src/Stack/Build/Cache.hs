@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Cache information about previous builds
+{-|
+Module      : Stack.Build.Cache
+Description : Cache information about previous builds.
+License     : BSD-3-Clause
+
+Cache information about previous builds.
+-}
+
 module Stack.Build.Cache
   ( tryGetBuildCache
   , tryGetConfigCache

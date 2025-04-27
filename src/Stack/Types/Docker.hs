@@ -4,7 +4,13 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Docker types.
+{-|
+Module      : Stack.Types.Docker
+Description : Docker types.
+License     : BSD-3-Clause
+
+Docker types.
+-}
 
 module Stack.Types.Docker
   ( DockerException (..)
@@ -258,10 +264,10 @@ data DockerOpts = DockerOpts
      -- ^ Whether to run a detached container
   , persist :: !Bool
      -- ^ Create a persistent container (don't remove it when finished). Implied
-     -- by `dockerDetach`.
+     -- by 'DockerOpts.detach'.
   , containerName :: !(Maybe String)
      -- ^ Container name to use, only makes sense from command-line with
-     -- `dockerPersist` or `dockerDetach`.
+     -- 'DockerOpts.persist' or 'DockerOpts.detach'.
   , network :: !(Maybe String)
     -- ^ The network docker uses.
   , runArgs :: ![String]
@@ -304,12 +310,12 @@ data DockerOptsMonoid = DockerOptsMonoid
     -- ^ Whether to run a detached container
   , persist :: !FirstFalse
     -- ^ Create a persistent container (don't remove it when finished). Implied
-    -- by -- `dockerDetach`.
+    -- by 'DockerOpts.detach'.
   , containerName :: !(First String)
     -- ^ Container name to use, only makes sense from command-line with
-    -- `dockerPersist` or `dockerDetach`.
+    -- 'DockerOpts.persist' or 'DockerOpts.detach'.
   , network :: !(First String)
-    -- ^ See: 'dockerNetwork'
+    -- ^ See: 'DockerOpts.network'
   , runArgs :: ![String]
     -- ^ Arguments to pass directly to @docker run@
   , mount :: ![Mount]
@@ -323,7 +329,7 @@ data DockerOptsMonoid = DockerOptsMonoid
   , setUser :: !(First Bool)
     -- ^ Set in-container user to match host's
   , requireDockerVersion :: !IntersectingVersionRange
-    -- ^ See: 'dockerRequireDockerVersion'
+    -- ^ See: 'DockerOpts.requireDockerVersion'
   }
   deriving (Show, Generic)
 
@@ -388,11 +394,11 @@ instance Monoid DockerOptsMonoid where
   mempty = memptydefault
   mappend = (<>)
 
--- | Where to get the `stack` executable to run in Docker containers
+-- | Where to get the \'stack\' executable to run in Docker containers
 data DockerStackExe
   = DockerStackExeDownload  -- ^ Download from official bindist
-  | DockerStackExeHost  -- ^ Host's `stack` (linux-x86_64 only)
-  | DockerStackExeImage  -- ^ Docker image's `stack` (versions must match)
+  | DockerStackExeHost  -- ^ Host's \'stack\' (linux-x86_64 only)
+  | DockerStackExeImage  -- ^ Docker image's \'stack\' (versions must match)
   | DockerStackExePath (Path Abs File) -- ^ Executable at given path
   deriving Show
 

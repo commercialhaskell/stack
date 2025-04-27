@@ -1,7 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds         #-}
 
--- | Finding files.
+{-|
+Module      : Path.Find
+Description : Finding files.
+License     : BSD-3-Clause
+
+Finding files.
+-}
 
 module Path.Find
   ( findFileUp

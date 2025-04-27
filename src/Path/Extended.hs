@@ -1,3 +1,8 @@
+{-|
+Module      : Path.Extended
+License     : BSD-3-Clause
+-}
+
 module Path.Extended
   ( fileExtension
   , addExtension

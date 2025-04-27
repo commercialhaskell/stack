@@ -3,10 +3,15 @@
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
--- | The facility for retrieving all files from the main Stack
--- 'Stack.Types.Package' type. This was moved into its own module to allow
--- component-level file-gathering without circular dependency at the Package
--- level.
+{-|
+Module      : Stack.Types.PackageFile
+License     : BSD-3-Clause
+
+The facility for retrieving all files from the main Stack 'Stack.Types.Package'
+type. This was moved into its own module to allow component-level file-gathering
+without circular dependency at the Package level.
+-}
+
 module Stack.Types.PackageFile
   ( GetPackageFileContext (..)
   , DotCabalPath (..)

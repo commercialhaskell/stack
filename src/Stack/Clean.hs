@@ -2,7 +2,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Types and functions related to Stack's @clean@ and @purge@ commands.
+{-|
+Module      : Stack.Clean
+Description : Types and functions related to Stack's @clean@ and @purge@ commands.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @clean@ and @purge@ commands.
+-}
+
 module Stack.Clean
   ( CleanOpts (..)
   , CleanCommand (..)

@@ -3,7 +3,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-} -- keep TH usage here
 
--- | Constants used throughout the project.
+{-|
+Module      : Stack.Constants
+Description : Constants used throughout the project.
+License     : BSD-3-Clause
+
+Constants used throughout the project.
+-}
 
 module Stack.Constants
   ( buildPlanDir
@@ -191,7 +197,7 @@ haskellFileExts = ["hs", "hsc", "lhs"]
 haskellDefaultPreprocessorExts :: [Text]
 haskellDefaultPreprocessorExts = ["gc", "chs", "hsc", "x", "y", "ly", "cpphs"]
 
--- | Name of the 'stack' program, uppercased
+-- | Name of the \'stack\' program, uppercased
 stackProgNameUpper :: String
 stackProgNameUpper = map toUpper stackProgName
 

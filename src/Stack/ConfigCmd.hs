@@ -4,9 +4,17 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Make changes to project or global configuration.
+{-|
+Module      : Stack.ConfigCmd
+Description : Make changes to project or global configuration.
+License     : BSD-3-Clause
+
+Make changes to project or global configuration.
+-}
+
 module Stack.ConfigCmd
   ( ConfigCmdSet (..)
+  , CommandScope
   , configCmdSetParser
   , cfgCmdSet
   , cfgCmdSetName
@@ -469,6 +477,6 @@ cfgCmdEnv es = do
   putBuilder $ Map.foldMapWithKey toLine actions
 
 -- | This function takes no settings and yields no action of interest. It is
--- 'withBuildConfig' that yields the desired actions.
+-- 'Stack.Config.withBuildConfig' that yields the desired actions.
 cfgCmdBuildFiles :: () -> RIO BuildConfig ()
 cfgCmdBuildFiles () = pure ()

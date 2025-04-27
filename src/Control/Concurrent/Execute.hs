@@ -3,8 +3,15 @@
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
--- Concurrent execution with dependencies. Types currently hard-coded for needs
--- of stack, but could be generalized easily.
+{-|
+Module      : Control.Concurrent.Execute
+Description : Concurrent execution with dependencies.
+License     : BSD-3-Clause
+
+Concurrent execution with dependencies. Types currently hard-coded for needs of
+stack, but could be generalized easily.
+-}
+
 module Control.Concurrent.Execute
     ( ActionType (..)
     , ActionId (..)
@@ -34,9 +41,9 @@ instance Exception ExecuteException where
 data ActionType
   = ATBuild
     -- ^ Action for building a package's library and executables. If
-    -- 'taskAllInOne' is 'True', then this will also build benchmarks and tests.
-    -- It is 'False' when the library's benchmarks or test-suites have cyclic
-    -- dependencies.
+    -- 'Stack.Types.Build.Task.allInOne' is 'True', then this will also build
+    -- benchmarks and tests. It is 'False' when the library's benchmarks or
+    -- test-suites have cyclic dependencies.
   | ATBuildFinal
     -- ^ Task for building the package's benchmarks and test-suites. Requires
     -- that the library was already built.

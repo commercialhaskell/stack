@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Types and functions related to Stack's @upgrade@ command.
+{-|
+Module      : Stack.Upgrade
+Description : Types and functions related to Stack's @upgrade@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @upgrade@ command.
+-}
+
 module Stack.Upgrade
   ( UpgradeOpts (..)
   , BinaryOpts (..)

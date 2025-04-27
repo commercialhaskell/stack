@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | A wrapper around hoogle.
+{-|
+Module      : Stack.Hoogle
+Description : A wrapper around hoogle.
+License     : BSD-3-Clause
+
+A wrapper around hoogle.
+-}
+
 module Stack.Hoogle
   ( hoogleCmd
   ) where

@@ -3,7 +3,13 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Main Stack tool entry point.
+{-|
+Module      : Stack
+Description : Main Stack tool entry point.
+License     : BSD-3-Clause
+
+Main Stack tool entry point.
+-}
 
 module Stack
   ( main
@@ -51,6 +57,7 @@ instance Exception StackException where
     , actual
     ]
 
+-- | Main Stack tool entry point.
 main :: IO ()
 main = do
   -- Line buffer the output by default, particularly for non-terminal runs.

@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Configuration options for building from the command line only.
+{-|
+Module      : Stack.Types.BuildOptsCLI
+Description : Configuration options for building from the command line only.
+License     : BSD-3-Clause
+
+Configuration options for building from the command line only.
+-}
+
 module Stack.Types.BuildOptsCLI
   ( BuildOptsCLI (..)
   , defaultBuildOptsCLI

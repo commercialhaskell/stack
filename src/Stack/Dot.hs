@@ -2,7 +2,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Functions related to Stack's @dot@ command.
+{-|
+Module      : Stack.Dot
+Description : Functions related to Stack's @dot@ command.
+License     : BSD-3-Clause
+
+Functions related to Stack's @dot@ command.
+-}
+
 module Stack.Dot
   ( dotCmd
   , printGraph

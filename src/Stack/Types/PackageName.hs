@@ -1,6 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Names for packages.
+{-|
+Module      : Stack.Types.PackageName
+Description : Names for packages.
+License     : BSD-3-Clause
+
+Names for packages.
+-}
 
 module Stack.Types.PackageName
   ( packageNameArgument

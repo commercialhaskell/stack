@@ -1,20 +1,20 @@
 # Partial: base/head
 # Usage of partial function 'head' for lists
 [[ignore]]
-  id = "OBS-STAN-0001-1XF2BN-48:1"
+  id = "OBS-STAN-0001-1XF2BN-57:1"
 # ✦ Category:      #Partial #List
 # ✦ File:          src\Stack\Storage\Project.hs
 #
-#   48 ┃ share [ mkPersist sqlSettings
+#   57 ┃ share [ mkPersist sqlSettings
 
 # Partial: base/head
 # Usage of partial function 'head' for lists
 [[ignore]]
-  id = "OBS-STAN-0001-0pmobG-87:1"
+  id = "OBS-STAN-0001-0pmobG-95:1"
 # ✦ Category:      #Partial #List
 # ✦ File:          src\Stack\Storage\User.hs
 #
-#   87 ┃ share [ mkPersist sqlSettings
+#   95 ┃ share [ mkPersist sqlSettings
 
 # Partial: base/last
 # On Windows
@@ -43,24 +43,24 @@
 # Infinite: base/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-luLR/n-527:30"
+  id = "OBS-STAN-0102-luLR/n-534:30"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\New.hs
 #
-#  526 ┃
-#  527 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
-#  528 ┃                              ^^^^^^^^^^^^^^
+#  533 ┃
+#  534 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
+#  535 ┃                              ^^^^^^^^^^^^^^
 
 # Infinite: base/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-luLR/n-527:65"
+  id = "OBS-STAN-0102-luLR/n-534:65"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\New.hs
 #
-#  526 ┃
-#  527 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
-#  528 ┃                                                                 ^^^^^^^^^^^^^^
+#  533 ┃
+#  534 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
+#  535 ┃                                                                 ^^^^^^^^^^^^^^
 
 # Infinite: base/length
 # Usage of the 'length' function that hangs on infinite lists
@@ -72,58 +72,58 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-erw24B-1036:3"
+  id = "OBS-STAN-0203-erw24B-1042:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecuteEnv.hs
 #
-#  1035 ┃
-#  1036 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  1037 ┃   ^^^^^^^
+#  1041 ┃
+#  1042 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+#  1043 ┃   ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-tuE+RG-242:24"
+  id = "OBS-STAN-0203-tuE+RG-249:24"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecutePackage.hs
 #
-#   241 ┃
-#   242 ┃   newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
-#   243 ┃                        ^^^^^^^
+#   248 ┃
+#   249 ┃   newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
+#   250 ┃                        ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-hTeu0Y-388:17"
+  id = "OBS-STAN-0203-hTeu0Y-395:17"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Init.hs
 #
-#  387 ┃
-#  388 ┃   commentHelp = BC.pack .  intercalate "\n" . map commentLine
-#  389 ┃                 ^^^^^^^
+#  394 ┃
+#  395 ┃   commentHelp = BC.pack .  intercalate "\n" . map commentLine
+#  396 ┃                 ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-hTeu0Y-405:26"
+  id = "OBS-STAN-0203-hTeu0Y-412:26"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Init.hs
 #
-#  404 ┃
-#  405 ┃         <> B.byteString (BC.pack $ concat
-#  406 ┃                          ^^^^^^^
+#  411 ┃
+#  412 ┃         <> B.byteString (BC.pack $ concat
+#  413 ┃                          ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-axv1UG-347:32"
+  id = "OBS-STAN-0203-axv1UG-354:32"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Docker.hs
 #
-#  346 ┃
-#  347 ┃     hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
-#  348 ┃                                ^^^^^^^
+#  353 ┃
+#  354 ┃     hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
+#  355 ┃                                ^^^^^^^
 
 # Data types with non-strict fields
 # Defining lazy fields in data types can lead to unexpected space leaks
@@ -177,49 +177,49 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-5rtOmw-461:33"
+  id = "OBS-STAN-0212-5rtOmw-467:33"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\Constants.hs
 #
-#  460 ┃
-#  461 ┃ setupGhciShimCode = byteString $(do
-#  462 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
-#  463 ┃     embedFile path)
-#  464 ┃
+#  466 ┃
+#  467 ┃ setupGhciShimCode = byteString $(do
+#  468 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
+#  469 ┃     embedFile path)
+#  470 ┃
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-60:17"
+  id = "OBS-STAN-0212-FNS1cF-67:17"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\BuildOpts.hs
 #
-#   59 ┃
-#   60 ┃   buildMonoid = undefined :: BuildOptsMonoid
-#   61 ┃                 ^^^^^^^^^
+#   66 ┃
+#   67 ┃   buildMonoid = undefined :: BuildOptsMonoid
+#   68 ┃                 ^^^^^^^^^
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-72:14"
+  id = "OBS-STAN-0212-FNS1cF-79:14"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\BuildOpts.hs
 #
-#   71 ┃
-#   72 ┃   toMonoid = undefined :: TestOptsMonoid
-#   73 ┃              ^^^^^^^^^
+#   78 ┃
+#   79 ┃   toMonoid = undefined :: TestOptsMonoid
+#   80 ┃              ^^^^^^^^^
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-83:15"
+  id = "OBS-STAN-0212-FNS1cF-90:15"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src/Stack/BuildOpts.hs
 #
-#   82 ┃
-#   83 ┃   beoMonoid = undefined :: BenchmarkOptsMonoid
-#   84 ┃               ^^^^^^^^^
+#   89 ┃
+#   90 ┃   beoMonoid = undefined :: BenchmarkOptsMonoid
+#   91 ┃               ^^^^^^^^^
 
 # Anti-pattern: Pattern matching on '_'
 # Pattern matching on '_' for sum types can create maintainability issues

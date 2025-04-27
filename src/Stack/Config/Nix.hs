@@ -3,9 +3,17 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Nix configuration
+{-|
+Module      : Stack.Config.Nix
+Description : Nix configuration.
+License     : BSD-3-Clause
+
+Nix configuration.
+-}
+
 module Stack.Config.Nix
-  ( nixCompiler
+  ( ConfigNixException
+  , nixCompiler
   , nixCompilerVersion
   , nixOptsFromMonoid
   ) where

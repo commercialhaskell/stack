@@ -11,10 +11,18 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
--- | Work with SQLite database used for caches across an entire user account.
+{-|
+Module      : Stack.Storage.User
+Description : Work with SQLite DB for caches across a user account.
+License     : BSD-3-Clause
+
+Work with SQLite database used for caches across an entire user account.
+-}
+
 module Stack.Storage.User
   ( initUserStorage
   , PrecompiledCacheKey
+  , PrecompiledCacheParent (..)
   , precompiledCacheKey
   , loadPrecompiledCache
   , savePrecompiledCache
@@ -189,7 +197,7 @@ precompiledCacheKey platformGhcDir compiler cabalVersion =
     (compilerVersionText compiler)
     (T.pack $ versionString cabalVersion)
 
--- | Internal helper to read the 'PrecompiledCache' from the database
+-- | Internal helper to read the t'PrecompiledCache' from the database
 readPrecompiledCache ::
      (HasConfig env, HasLogFunc env)
   => PrecompiledCacheKey
@@ -215,7 +223,7 @@ readPrecompiledCache key = do
           }
       )
 
--- | Load 'PrecompiledCache' from the database.
+-- | Load t'PrecompiledCache' from the database.
 loadPrecompiledCache ::
      (HasConfig env, HasLogFunc env)
   => PrecompiledCacheKey
@@ -223,7 +231,7 @@ loadPrecompiledCache ::
 loadPrecompiledCache key =
   withUserStorage $ fmap snd <$> readPrecompiledCache key
 
--- | Insert or update 'PrecompiledCache' to the database.
+-- | Insert or update t'PrecompiledCache' to the database.
 savePrecompiledCache ::
      (HasConfig env, HasLogFunc env)
   => PrecompiledCacheKey

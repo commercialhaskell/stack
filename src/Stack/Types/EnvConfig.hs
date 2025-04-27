@@ -2,10 +2,16 @@
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
+{-|
+Module      : Stack.Types.EnvConfig
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.EnvConfig
   ( EnvConfig (..)
   , HasEnvConfig (..)
   , HasSourceMap (..)
+  , IsPath (..)
   , actualCompilerVersionL
   , appropriateGhcColorFlag
   , bindirCompilerTools
@@ -257,8 +263,8 @@ extraBinDirs = do
     else [deps </> bindirSuffix, tools]
 
 -- | The version of the compiler which will actually be used. May be different
--- than that specified in the 'SnapshotDef' and returned by
--- 'wantedCompilerVersionL'.
+-- than that specified in the snapshot and returned by
+-- 'Stack.Types.BuildConfig.wantedCompilerVersionL'.
 actualCompilerVersionL :: HasSourceMap env => SimpleGetter env ActualCompiler
 actualCompilerVersionL = sourceMapL . to (.compiler)
 

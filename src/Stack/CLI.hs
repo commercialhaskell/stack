@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
+{-|
+Module      : Stack.CLI
+License     : BSD-3-Clause
+-}
+
 module Stack.CLI
   ( commandLineHandler
   ) where
@@ -670,9 +675,9 @@ commandLineHandler currentDir progName mExecutablePath isInterpreter =
    where
     hide = kind /= OuterGlobalOpts
 
--- | fall-through to external executables in `git` style if they exist
--- (i.e. `stack something` looks for `stack-something` before
--- failing with "Invalid argument `something'")
+-- | fall-through to external executables in \'git\' style if they exist
+-- (i.e. @stack something@ looks for @stack-something@ before failing with
+-- "Invalid argument \'something\'".)
 secondaryCommandHandler ::
      NonEmpty String
   -> ParserFailure ParserHelp

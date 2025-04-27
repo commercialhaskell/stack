@@ -3,6 +3,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-|
+Module      : Stack.Types.Project
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.Project
   ( Project (..)
   ) where

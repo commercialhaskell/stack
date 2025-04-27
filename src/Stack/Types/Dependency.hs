@@ -2,6 +2,11 @@
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
+{-|
+Module      : Stack.Types.Dependency
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.Dependency
   ( DepValue (..)
   , DepType (..)

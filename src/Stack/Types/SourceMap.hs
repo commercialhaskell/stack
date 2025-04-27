@@ -3,10 +3,15 @@
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
--- | A source map maps a package name to how it should be built, including
--- source code, flags and options. This module exports types used in various
--- stages of source map construction. See @build_overview.md@ for details on
--- these stages.
+{-|
+Module      : Stack.Types.SourceMap
+License     : BSD-3-Clause
+
+A source map maps a package name to how it should be built, including source
+code, flags and options. This module exports types used in various stages of
+source map construction. See @build_overview.md@ for details on these stages.
+-}
+
 module Stack.Types.SourceMap
   ( -- * Source map types
     SMWanted (..)
@@ -115,8 +120,8 @@ data PackageType = PTProject | PTDependency
 -- refers to. It does not include global packages or any information from the
 -- command line.
 --
--- Invariant: a @PackageName@ appears in either 'smwProject' or 'smwDeps', but
--- not both.
+-- Invariant: a @PackageName@ appears in either 'SMWanted.project' or
+-- 'SMWanted.deps', but not both.
 data SMWanted = SMWanted
   { compiler :: !WantedCompiler
   , project :: !(Map PackageName ProjectPackage)
@@ -137,14 +142,14 @@ data SMActual global = SMActual
   , globals :: !(Map PackageName global)
   }
 
--- | Builds on an 'SMActual' by resolving the targets specified on the command
+-- | Builds on an t'SMActual' by resolving the targets specified on the command
 -- line, potentially adding in new dependency packages in the process.
 data SMTargets = SMTargets
   { targets :: !(Map PackageName Target)
   , deps :: !(Map PackageName DepPackage)
   }
 
--- | The final source map, taking an 'SMTargets' and applying all command line
+-- | The final source map, taking an t'SMTargets' and applying all command line
 -- flags and GHC options.
 --
 -- One source map value is distinguished from another by a hash of the parts of
@@ -170,7 +175,7 @@ data SourceMap = SourceMap
     -- hash and make Stack more resilient.
   }
 
--- | A unique hash for the immutable portions of a 'SourceMap'.
+-- | A unique hash for the immutable portions of a t'SourceMap'.
 newtype SourceMapHash
   = SourceMapHash SHA256
 
@@ -181,11 +186,11 @@ smRelDir (SourceMapHash smh) = parseRelDir $ T.unpack $ SHA256.toHexText smh
 ppGPD :: MonadIO m => ProjectPackage -> m GenericPackageDescription
 ppGPD = liftIO . (.projectCommon.gpd)
 
--- | Root directory for the given 'ProjectPackage'
+-- | Root directory for the given t'ProjectPackage'
 ppRoot :: ProjectPackage -> Path Abs Dir
 ppRoot = parent . (.cabalFP)
 
--- | All components available in the given 'ProjectPackage'
+-- | All components available in the given t'ProjectPackage'
 ppComponents :: MonadIO m => ProjectPackage -> m (Set NamedComponent)
 ppComponents = ppComponentsMaybe Just
 
@@ -205,6 +210,6 @@ ppComponentsMaybe compType pp = do
         (C.condBenchmarks gpd)
     ]
 
--- | Version for the given 'ProjectPackage
+-- | Version for the given t'ProjectPackage
 ppVersion :: MonadIO m => ProjectPackage -> m Version
 ppVersion = fmap gpdVersion . ppGPD

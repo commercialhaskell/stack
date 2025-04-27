@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Module exporting the 'ParentMap' type synonym.
+{-|
+Module      : Stack.Types.ParentMap
+Description : Module exporting the 'ParentMap' type synonym.
+License     : BSD-3-Clause
+
+Module exporting the 'ParentMap' type synonym.
+-}
+
 module Stack.Types.ParentMap
   ( ParentMap
   ) where

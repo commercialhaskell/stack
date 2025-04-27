@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.GHCVariant
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.GHCVariant
   ( GHCVariant (..)
   , HasGHCVariant (..)

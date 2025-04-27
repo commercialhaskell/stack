@@ -10,10 +10,19 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-identities #-}
 
--- | Work with SQLite database used for caches across a single project.
+{-|
+Module      : Stack.Storage.Project
+Description : Work with SQLite DB for caches across a project.
+License     : BSD-3-Clause
+
+Work with SQLite database used for caches across a single project.
+-}
+
 module Stack.Storage.Project
   ( initProjectStorage
   , ConfigCacheKey
+  , ConfigCacheParent (..)
+  , ConfigCacheParentId
   , configCacheKey
   , loadConfigCache
   , saveConfigCache
@@ -111,7 +120,7 @@ type ConfigCacheKey = Unique ConfigCacheParent
 configCacheKey :: Path Abs Dir -> ConfigCacheType -> ConfigCacheKey
 configCacheKey dir = UniqueConfigCacheParent (toFilePath dir)
 
--- | Internal helper to read the 'ConfigCache'
+-- | Internal helper to read the t'ConfigCache'
 readConfigCache ::
      (HasBuildConfig env, HasLogFunc env)
   => Entity ConfigCacheParent
@@ -144,7 +153,7 @@ readConfigCache (Entity parentId configCacheParent) = do
     , pathEnvVar
     }
 
--- | Load 'ConfigCache' from the database.
+-- | Load t'ConfigCache' from the database.
 loadConfigCache ::
      (HasBuildConfig env, HasLogFunc env)
   => ConfigCacheKey
@@ -159,7 +168,7 @@ loadConfigCache key =
             Just <$> readConfigCache parentEntity
         | otherwise -> pure Nothing
 
--- | Insert or update 'ConfigCache' to the database.
+-- | Insert or update t'ConfigCache' to the database.
 saveConfigCache ::
      (HasBuildConfig env, HasLogFunc env)
   => ConfigCacheKey
@@ -215,7 +224,7 @@ saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
       (maybe Set.empty (.components) mold)
       new.components
 
--- | Mark 'ConfigCache' as inactive in the database. We use a flag instead of
+-- | Mark t'ConfigCache' as inactive in the database. We use a flag instead of
 -- deleting the records since, in most cases, the same cache will be written
 -- again within in a few seconds (after `cabal configure`), so this avoids
 -- unnecessary database churn.

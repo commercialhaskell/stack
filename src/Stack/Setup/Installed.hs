@@ -5,6 +5,11 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ViewPatterns        #-}
 
+{-|
+Module      : Stack.Setup.Installed
+License     : BSD-3-Clause
+-}
+
 module Stack.Setup.Installed
   ( getCompilerVersion
   , markInstalled
@@ -48,7 +53,7 @@ data Tool
   | ToolGhcGit !Text !Text   -- ^ e.g. ghc-git-COMMIT_ID-FLAVOUR
   deriving Eq
 
--- | 'Tool' values are ordered by name (being @ghc-git@, for @ToolGhcGit _ _@)
+-- | t'Tool' values are ordered by name (being @ghc-git@, for @ToolGhcGit _ _@)
 -- alphabetically and then by version (later versions are ordered before
 -- earlier versions, where applicable).
 instance Ord Tool where

@@ -3,8 +3,13 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | A module which exports all component-level file-gathering logic. It also
--- includes utility functions for handling paths and directories.
+{-|
+Module      : Stack.ComponentFile
+License     : BSD-3-Clause
+
+A module which exports all component-level file-gathering logic. It also
+includes utility functions for handling paths and directories.
+-}
 
 module Stack.ComponentFile
   ( resolveOrWarn

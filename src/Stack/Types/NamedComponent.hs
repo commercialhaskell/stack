@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Module exporting the 'NamedComponent' type and related functions.
+{-|
+Module      : Stack.Types.NamedComponent
+Description : Module exporting the 'NamedComponent' type and related functions.
+License     : BSD-3-Clause
+
+Module exporting the 'NamedComponent' type and related functions.
+-}
+
 module Stack.Types.NamedComponent
   ( NamedComponent (..)
   , componentCachePath
@@ -122,7 +129,7 @@ isPotentialDependency v = isCLib v || isCSubLib v || isCExe v
 
 -- | A function to split the given list of components into sets of the names of
 -- the named components by the type of component (sub-libraries, executables,
--- test-suites, benchmarks), ignoring any 'main' unnamed library component or
+-- test-suites, benchmarks), ignoring any \'main\' unnamed library component or
 -- foreign library component. This function should be used very sparingly; more
 -- often than not, you can keep/parse the components split from the start.
 splitComponents ::

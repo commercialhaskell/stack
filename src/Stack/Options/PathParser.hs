@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions to parse command line arguments for Stack's @path@ command.
+{-|
+Module      : Stack.Options.PathParser
+Description : Parse arguments for Stack's @path@ command.
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @path@ command.
+-}
+
 module Stack.Options.PathParser
   ( pathParser
   ) where

@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.Utils
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.Utils
   ( GlobalOptsContext (..)
   , hideMods

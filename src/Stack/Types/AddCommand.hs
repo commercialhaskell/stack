@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.AddCommand
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.AddCommand
   ( AddCommand
   ) where

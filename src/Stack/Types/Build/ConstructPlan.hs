@@ -1,8 +1,15 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
--- | A module providing types and related helper functions used in module
--- "Stack.Build.ConstructPlan".
+{-|
+Module      : Stack.Storage.Util
+Description : Utilities for module "Stack.Build.ConstructPlan".
+License     : BSD-3-Clause
+
+A module providing types and related helper functions used in module
+"Stack.Build.ConstructPlan".
+-}
+
 module Stack.Types.Build.ConstructPlan
   ( PackageInfo (..)
   , CombinedMap
@@ -114,7 +121,7 @@ instance Monoid W where
   mempty = memptydefault
   mappend = (<>)
 
--- | Type representing results of 'addDep'.
+-- | Type representing results of 'Stack.Build.ConstructPlan.addDep'.
 data AddDepRes
   = ADRToInstall Task
     -- ^ A task must be performed to provide the package name.

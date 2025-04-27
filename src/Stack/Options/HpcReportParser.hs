@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.HpcReportParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.HpcReportParser
   ( hpcReportOptsParser
   , pvpBoundsOption

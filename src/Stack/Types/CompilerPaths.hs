@@ -2,6 +2,11 @@
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
+{-|
+Module      : Stack.Types.CompilerPaths
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.CompilerPaths
   ( CompilerPaths (..)
   , GhcPkgExe (..)
@@ -77,6 +82,6 @@ cpWhich = view $ compilerPathsL . to (whichCompiler . (.compilerVersion))
 getCompilerPath :: HasCompiler env => RIO env (Path Abs File)
 getCompilerPath = view $ compilerPathsL . to (.compiler)
 
--- | Get the 'GhcPkgExe' from a 'HasCompiler' environment
+-- | Get the t'GhcPkgExe' from a 'HasCompiler' environment
 getGhcPkgExe :: HasCompiler env => RIO env GhcPkgExe
 getGhcPkgExe = view $ compilerPathsL . to (.pkg)

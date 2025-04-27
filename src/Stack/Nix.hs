@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Run commands in a nix-shell
+{-|
+Module      : Stack.Nix
+Description : Run commands in a nix-shell.
+License     : BSD-3-Clause
+
+Run commands in a nix-shell.
+-}
+
 module Stack.Nix
   ( nixCmdName
   , nixHelpOptName

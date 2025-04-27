@@ -4,7 +4,14 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE TypeFamilies        #-}
 
--- | Perform a build
+{-|
+Module      : Stack.Build.Execute
+Description : Perform a build.
+License     : BSD-3-Clause
+
+Perform a build.
+-}
+
 module Stack.Build.Execute
   ( printPlan
   , preFetch

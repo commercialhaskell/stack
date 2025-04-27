@@ -2,7 +2,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | A module which exports all package-level file-gathering logic.
+{-|
+Module      : Stack.PackageFile
+Description : All package-level file-gathering logic.
+License     : BSD-3-Clause
+
+A module which exports all package-level file-gathering logic.
+-}
+
 module Stack.PackageFile
   ( getPackageFile
   , stackPackageFileFromCabal

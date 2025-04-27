@@ -2,6 +2,11 @@
 {-# LANGUAGE MultiWayIf        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.DumpLogs
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.DumpLogs
   ( DumpLogs (..)
   ) where

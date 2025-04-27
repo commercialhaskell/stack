@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Functions related to Stack's @unpack@ command.
+{-|
+Module      : Stack.Unpack
+Description : Functions related to Stack's @unpack@ command.
+License     : BSD-3-Clause
+
+Functions related to Stack's @unpack@ command.
+-}
+
 module Stack.Unpack
   ( UnpackOpts (..)
   , UnpackTarget

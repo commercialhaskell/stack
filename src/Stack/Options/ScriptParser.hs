@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions to parse command line arguments for Stack's @script@ command.
+{-|
+Module      : Stack.Options.ScriptParser
+Description : Parse arguments for Stack's @script@ command.
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @script@ command.
+-}
+
 module Stack.Options.ScriptParser
   ( scriptOptsParser
   ) where

@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.CabalConfigKey
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.CabalConfigKey
   ( CabalConfigKey (..)
   , parseCabalConfigKey

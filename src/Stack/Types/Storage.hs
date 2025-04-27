@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Types used by @Stack.Storage@ modules.
+{-|
+Module      : Stack.Types.Storage
+Description : Types used by @Stack.Storage@ modules.
+License     : BSD-3-Clause
+
+Types used by @Stack.Storage@ modules.
+-}
+
 module Stack.Types.Storage
   ( StoragePrettyException (..)
   , ProjectStorage (..)

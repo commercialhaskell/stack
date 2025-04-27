@@ -4,6 +4,11 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeFamilies          #-}
 
+{-|
+Module      : Stack.Types.Config.Exception
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.Config.Exception
   ( ConfigException (..)
   , ConfigPrettyException (..)

@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.DockerParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.DockerParser
   ( dockerOptsParser
   ) where

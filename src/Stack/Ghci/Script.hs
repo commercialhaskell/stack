@@ -2,6 +2,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-|
+Module      : Stack.Ghci.Script
+License     : BSD-3-Clause
+-}
+
 module Stack.Ghci.Script
   ( GhciScript
   , ModuleName

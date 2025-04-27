@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Generate haddocks
+{-|
+Module      : Stack.Build.Haddock
+Description : Generate Haddock documentation.
+License     : BSD-3-Clause
+
+Generate Haddock documentation.
+-}
+
 module Stack.Build.Haddock
   ( generateDepsHaddockIndex
   , generateLocalHaddockIndex

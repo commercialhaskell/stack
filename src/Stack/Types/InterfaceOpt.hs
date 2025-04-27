@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoFieldSelectors  #-}
 
--- | Type representing Haddock interface options.
+{-|
+Module      : Stack.Types.InterfaceOpt
+Description : Type representing Haddock interface options.
+License     : BSD-3-Clause
+
+Type representing Haddock interface options.
+-}
+
 module Stack.Types.InterfaceOpt
   ( InterfaceOpt (..)
   ) where

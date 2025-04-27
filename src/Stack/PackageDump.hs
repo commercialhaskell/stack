@@ -2,6 +2,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-|
+Module      : Stack.PackageDump
+License     : BSD-3-Clause
+-}
+
 module Stack.PackageDump
   ( Line
   , eachSection
@@ -93,9 +98,9 @@ ghcPkgDescribe pkgexe pkgName' = ghcPkgCmdArgs
   pkgexe
   ["describe", "--simple-output", packageNameString pkgName']
 
--- | Call @ghc-pkg field@ with appropriate flags and stream to the given
--- sink, using the given package database. Throws 'ExitCodeException' if the
--- process fails (for example, if the package is not found in the package
+-- | Call @ghc-pkg field@ with appropriate flags and stream to the given sink,
+-- using the given package database. Throws 'RIO.Process.ExitCodeException' if
+-- the process fails (for example, if the package is not found in the package
 -- database or the field is not found in the package's *.conf file).
 ghcPkgField ::
      (HasCompiler env, HasProcessContext env, HasTerm env)

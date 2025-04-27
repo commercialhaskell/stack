@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.TestParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.TestParser
   ( testOptsParser
   ) where

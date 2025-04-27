@@ -3,6 +3,11 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TypeFamilies       #-}
 
+{-|
+Module      : Stack.Types.Compiler
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.Compiler
   ( ActualCompiler (..)
   , WhichCompiler (..)

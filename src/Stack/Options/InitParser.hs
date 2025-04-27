@@ -1,7 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions to parse command line arguments for Stack's @init@ and @new@
--- commands.
+{-|
+Module      : Stack.Options.InitParser
+Description : Parse arguments for Stack's @init@ and @new@ commands.
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @init@ and @new@ commands.
+-}
+
 module Stack.Options.InitParser
   ( initOptsParser
   ) where

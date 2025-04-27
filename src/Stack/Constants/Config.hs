@@ -2,6 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
+{-|
+Module      : Stack.Constants.Config
+License     : BSD-3-Clause
+-}
+
 module Stack.Constants.Config
   ( buildCachesDir
   , configCabalMod

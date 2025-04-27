@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.SCM
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.SCM
   ( SCM (..)
   ) where

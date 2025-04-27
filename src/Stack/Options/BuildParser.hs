@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Options.BuildParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.BuildParser
   ( buildOptsParser
   , flagsParser

@@ -3,7 +3,14 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
--- | Types and functions related to Stack's @new@ command.
+{-|
+Module      : Stack.New
+Description : Types and functions related to Stack's @new@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @new@ command.
+-}
+
 module Stack.New
   ( NewOpts (..)
   , TemplateName
@@ -409,7 +416,7 @@ loadTemplate name logIt = do
 data TemplateDownloadSettings = TemplateDownloadSettings
   { downloadUrl :: String
   , basicAuth :: Maybe (ByteString, ByteString)
-    -- ^ Optional HTTP 'Basic' authentication (type, credentials)
+    -- ^ Optional HTTP \'Basic\' authentication (type, credentials)
   , extract :: ByteString -> Either String Text
   }
 

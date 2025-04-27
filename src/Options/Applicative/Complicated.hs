@@ -1,12 +1,17 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Simple interface to complicated program arguments.
---
--- This is a "fork" of the @optparse-simple@ package that has some workarounds
--- for optparse-applicative issues that become problematic with programs that
--- have many options and subcommands. Because it makes the interface more
--- complex, these workarounds are not suitable for pushing upstream to
--- optparse-applicative.
+{-|
+Module      : Options.Applicative.Complicated
+Description : Simple interface to complicated program arguments.
+License     : BSD-3-Clause
+
+Simple interface to complicated program arguments.
+
+This is a "fork" of the @optparse-simple@ package that has some workarounds for
+optparse-applicative issues that become problematic with programs that have many
+options and subcommands. Because it makes the interface more complex, these
+workarounds are not suitable for pushing upstream to optparse-applicative.
+-}
 
 module Options.Applicative.Complicated
   ( addCommand

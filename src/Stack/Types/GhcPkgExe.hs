@@ -2,6 +2,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.GhcPkgExe
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.GhcPkgExe
   ( GhcPkgPrettyException (..)
   , GlobPackageIdentifier (..)
@@ -123,7 +128,7 @@ displayGlobPkgId :: GlobPackageIdentifier -> String
 displayGlobPkgId (ExactPackageIdentifier pid) = display pid
 displayGlobPkgId (GlobPackageIdentifier pn) = display pn ++ "-*"
 
--- | Either an exact 'PackageIdentifier', or a glob for all packages
+-- | Either an exact t'PackageIdentifier', or a glob for all packages
 -- matching 'PackageName'.
 data GlobPackageIdentifier
   = ExactPackageIdentifier MungedPackageId

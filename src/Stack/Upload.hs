@@ -4,7 +4,14 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Types and functions related to Stack's @upload@ command.
+{-|
+Module      : Stack.Upload
+Description : Types and functions related to Stack's @upload@ command.
+License     : BSD-3-Clause
+
+Types and functions related to Stack's @upload@ command.
+-}
+
 module Stack.Upload
   ( -- * Upload
     UploadOpts (..)

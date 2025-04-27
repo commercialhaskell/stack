@@ -3,6 +3,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-|
+Module      : Stack.Lock
+License     : BSD-3-Clause
+-}
+
 module Stack.Lock
   ( lockCachedWanted
   , LockedLocation (..)

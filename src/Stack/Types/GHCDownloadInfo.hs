@@ -2,6 +2,11 @@
 {-# LANGUAGE NoFieldSelectors  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.GHCDownloadInfo
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.GHCDownloadInfo
   ( GHCDownloadInfo (..)
   ) where

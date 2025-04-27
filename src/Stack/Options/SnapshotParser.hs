@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds         #-}
 
+{-|
+Module      : Stack.Options.SnapshotParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.SnapshotParser
   ( abstractSnapshotOptsParser
   , compilerOptsParser

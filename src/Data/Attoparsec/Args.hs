@@ -1,7 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Parsing of Stack command line arguments
+{-|
+Module      : Data.Attoparsec.Args
+Description : Parsing of Stack command line arguments.
+License     : BSD-3-Clause
+
+Parsing of Stack command line arguments.
+-}
+
 module Data.Attoparsec.Args
   ( EscapingMode (..)
   , argsParser

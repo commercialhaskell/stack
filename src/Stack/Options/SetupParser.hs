@@ -2,7 +2,14 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Functions to parse command line arguments for Stack's @setup@ command.
+{-|
+Module      : Stack.Options.SetupParser
+Description : Parse arguments for Stack's @setup@ command.
+License     : BSD-3-Clause
+
+Functions to parse command line arguments for Stack's @setup@ command.
+-}
+
 module Stack.Options.SetupParser
   ( setupOptsParser
   ) where

@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Types.CompilerBuild
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.CompilerBuild
   ( CompilerBuild (..)
   , compilerBuildName

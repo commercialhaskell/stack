@@ -1,6 +1,13 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
--- | Functions related to Stack's @update@ command.
+{-|
+Module      : Stack.Update
+Description : Functions related to Stack's @update@ command.
+License     : BSD-3-Clause
+
+Functions related to Stack's @update@ command.
+-}
+
 module Stack.Update
   ( updateCmd
   ) where

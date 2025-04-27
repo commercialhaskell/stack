@@ -2,6 +2,11 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 
+{-|
+Module      : Stack.Options.Completion
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.Completion
   ( ghcOptsCompleter
   , targetCompleter

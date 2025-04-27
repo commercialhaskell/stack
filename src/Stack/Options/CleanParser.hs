@@ -1,5 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-|
+Module      : Stack.Options.CleanParser
+License     : BSD-3-Clause
+-}
+
 module Stack.Options.CleanParser
   ( cleanOptsParser
   ) where

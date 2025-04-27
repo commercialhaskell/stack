@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : Stack.Types.GhcOptionKey
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.GhcOptionKey
   ( GhcOptionKey (..)
   ) where

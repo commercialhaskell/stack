@@ -4,8 +4,15 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
--- | Configuration options for building from the command line and/or a
--- configuration file.
+{-|
+Module      : Stack.Types.BuildOptsMonoid
+Description : Configuration options for building.
+License     : BSD-3-Clause
+
+Configuration options for building from the command line and/or a configuration
+file.
+-}
+
 module Stack.Types.BuildOptsMonoid
   ( BuildOptsMonoid (..)
   , HaddockOptsMonoid (..)

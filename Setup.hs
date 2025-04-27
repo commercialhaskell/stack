@@ -50,12 +50,19 @@ generateBuildModule verbosity pkg lbi = do
   let dir = autogenPackageModulesDir lbi
   createDirectoryIfMissingVerbose verbosity True dir
   withLibLBI pkg lbi $ \_ libcfg -> do
-    withExeLBI pkg lbi $ \exe clbi ->
-      rewriteFileEx normal (dir </> "Build_" ++ exeName' exe ++ ".hs") $ unlines
-        [ "module Build_" ++ exeName' exe
+    withExeLBI pkg lbi $ \exe clbi -> do
+      let name = exeName' exe
+      rewriteFileEx normal (dir </> "Build_" ++ name ++ ".hs") $ unlines
+        [ "{-|"
+        , "Module      : Build_" ++ name
+        , "License     : BSD-3-Clause"
+        , "-}"
+        , ""
+        , "module Build_" ++ name
         , "  ( deps"
         , "  ) where"
         , ""
+        , "-- | The dependencies against which \\'" ++ name ++ "\\' is built."
         , "deps :: [String]"
         , "deps = " ++ show (formatdeps (transDeps libcfg clbi))
         ]

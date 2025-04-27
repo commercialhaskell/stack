@@ -1,6 +1,11 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE NoFieldSelectors  #-}
 
+{-|
+Module      : Stack.Types.GlobalOptsMonoid
+License     : BSD-3-Clause
+-}
+
 module Stack.Types.GlobalOptsMonoid
   ( GlobalOptsMonoid (..)
   ) where
@@ -29,7 +34,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
     -- ^ Whether to include debug information about the construction of the
     -- build plan in logs.
   , configMonoid     :: !ConfigMonoid
-    -- ^ Config monoid, for passing into 'loadConfig'
+    -- ^ Config monoid, for passing into 'Stack.Config.loadConfig'
   , snapshot         :: !(First (Unresolved AbstractSnapshot))
     -- ^ Snapshot override
   , snapshotRoot     :: !(First FilePath)
@@ -45,7 +50,7 @@ data GlobalOptsMonoid = GlobalOptsMonoid
   , stackYaml        :: !(First FilePath)
     -- ^ Override project stack.yaml
   , lockFileBehavior :: !(First LockFileBehavior)
-    -- ^ See 'globalLockFileBehavior'
+    -- ^ See 'Stack.Types.GlobalOpts.lockFileBehavior'
   }
   deriving Generic
 
