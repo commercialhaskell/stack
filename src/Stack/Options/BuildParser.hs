@@ -127,6 +127,7 @@ buildOptsParser cmd = BuildOptsCLI
         <> internal
         )
 
+-- | Parser for build targets. Also used by the @stack dot@ command.
 targetsParser :: Parser [Text]
 targetsParser =
   many (textArgument
@@ -138,6 +139,7 @@ targetsParser =
             \for details."
     ))
 
+-- | Parser for the @--flag@ option, for Cabal flags.
 flagsParser :: Parser (Map.Map ApplyCLIFlag (Map.Map FlagName Bool))
 flagsParser = Map.unionsWith Map.union
   <$> many (option readFlag
