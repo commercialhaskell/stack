@@ -102,14 +102,19 @@ instance Pretty ExecPrettyException where
 
 instance Exception ExecPrettyException
 
--- Type representing Stack's execution commands.
+-- | Type representing Stack's execution commands.
 data SpecialExecCmd
   = ExecCmd String
+    -- ^ @stack exec@ command.
   | ExecRun
+    -- ^ @stack run@ command.
   | ExecGhc
+    -- ^ @stack ghc@ command.
   | ExecRunGhc
+    -- ^ @stack runghc@ or @stack runhaskell@ command.
   deriving (Eq, Show)
 
+-- | Type representing extra Stack options for Stack's execution commands.
 data ExecOptsExtra = ExecOptsExtra
   { envSettings :: !EnvSettings
   , packages :: ![String]
@@ -118,7 +123,7 @@ data ExecOptsExtra = ExecOptsExtra
   }
   deriving Show
 
--- Type representing options for Stack's execution commands.
+-- | Type representing options for Stack's execution commands.
 data ExecOpts = ExecOpts
   { cmd :: !SpecialExecCmd
   , args :: ![String]
@@ -126,7 +131,7 @@ data ExecOpts = ExecOpts
   }
   deriving Show
 
--- Type representing valid targets for --package option.
+-- | Type representing valid targets for @--package@ option.
 data ExecTarget = ExecTarget PackageName (Maybe Version)
 
 -- | The function underlying Stack's @exec@, @ghc@, @run@, @runghc@ and

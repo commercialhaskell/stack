@@ -23,7 +23,7 @@ import           Stack.Exec
 import           Stack.Prelude
 import           Stack.Types.Runner ( Runner )
 
--- Type representing command line options for the @stack eval@ command.
+-- | Type representing command line options for the @stack eval@ command.
 data EvalOpts = EvalOpts
   { arg :: !String
   , extra :: !ExecOptsExtra
