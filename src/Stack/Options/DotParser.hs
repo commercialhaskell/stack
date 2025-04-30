@@ -22,8 +22,8 @@ import           Options.Applicative
                    , strOption, switch
                    )
 import           Options.Applicative.Builder.Extra ( boolFlags, textArgument )
-import           Stack.Options.BuildParser ( flagsParser )
 import           Stack.Options.Completion ( targetCompleter )
+import           Stack.Options.FlagsParser ( flagsParser )
 import           Stack.Prelude
 import           Stack.Types.DotOpts ( DotOpts (..) )
 
