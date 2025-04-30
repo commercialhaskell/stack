@@ -229,6 +229,7 @@ library:
   - Stack.Options.DotParser
   - Stack.Options.EvalParser
   - Stack.Options.ExecParser
+  - Stack.Options.FlagsParser
   - Stack.Options.GhcBuildParser
   - Stack.Options.GhciParser
   - Stack.Options.GhcVariantParser

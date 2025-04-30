@@ -8,28 +8,24 @@ License     : BSD-3-Clause
 
 module Stack.Options.BuildParser
   ( buildOptsParser
-  , flagsParser
-  , targetsParser
   ) where
 
 import qualified Data.List as L
-import qualified Data.Map as Map
 import qualified Data.Text as T
 import           Options.Applicative
                    ( Parser, completer, flag, flag', help, internal, long
-                   , metavar, option, strOption, switch, value
+                   , metavar, strOption, switch, value
                    )
 import           Options.Applicative.Args ( cmdOption )
 import           Options.Applicative.Builder.Extra
                    ( firstBoolFlagsNoDefault, textArgument, textOption )
-import           Stack.Options.Completion
-                   ( flagCompleter, ghcOptsCompleter, targetCompleter )
-import           Stack.Options.PackageParser ( readFlag )
+import           Stack.Options.Completion ( ghcOptsCompleter, targetCompleter )
+import           Stack.Options.FlagsParser ( flagsParser )
 import           Stack.Options.Utils ( hideMods )
 import           Stack.Prelude
 import           Stack.Types.BuildOptsCLI
-                   ( ApplyCLIFlag, BuildCommand, BuildOptsCLI (..)
-                   , BuildSubset (..), FileWatchOpts (..)
+                   ( BuildCommand, BuildOptsCLI (..), BuildSubset (..)
+                   , FileWatchOpts (..)
                    )
 
 -- | Parser for CLI-only build arguments
@@ -127,7 +123,7 @@ buildOptsParser cmd = BuildOptsCLI
         <> internal
         )
 
--- | Parser for build targets. Also used by the @stack dot@ command.
+-- | Parser for build targets.
 targetsParser :: Parser [Text]
 targetsParser =
   many (textArgument
@@ -138,21 +134,6 @@ targetsParser =
             \https://docs.haskellstack.org/en/stable/commands/build_command/#target-syntax \
             \for details."
     ))
-
--- | Parser for the @--flag@ option, for Cabal flags.
-flagsParser :: Parser (Map.Map ApplyCLIFlag (Map.Map FlagName Bool))
-flagsParser = Map.unionsWith Map.union
-  <$> many (option readFlag
-       (  long "flag"
-       <> completer flagCompleter
-       <> metavar "PACKAGE:[-]FLAG"
-       <> help "Set (or unset) the Cabal flag for the package (or use '*' for \
-               \all packages) (can be specified multiple times). Applies to \
-               \project packages, packages included directly in the snapshot, \
-               \and extra-deps. Takes precedence over any Cabal flags \
-               \specified for the package in the snapshot or in the \
-               \project-level configuration file (stack.yaml)."
-       ))
 
 progsOptionsParser :: Parser [(Text, [Text])]
 progsOptionsParser =

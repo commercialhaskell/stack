@@ -21,9 +21,8 @@ import           Options.Applicative.Builder.Extra
                    )
 import           Stack.Config ( packagesParser )
 import           Stack.Ghci ( GhciOpts (..) )
-import           Stack.Options.BuildParser ( flagsParser )
-import           Stack.Options.Completion
-                   ( ghcOptsCompleter, targetCompleter )
+import           Stack.Options.Completion ( ghcOptsCompleter, targetCompleter )
+import           Stack.Options.FlagsParser ( flagsParser )
 import           Stack.Prelude
 
 -- | Parser for GHCI options
