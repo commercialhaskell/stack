@@ -122,11 +122,14 @@ data SnapshotType
     -- ^ Stackage Nightly
   deriving (Eq, Ord, Show)
 
+-- | Type representing command line options for the @stack ls globals@ command.
 newtype ListGlobalsOpts = ListGlobalsOpts
   { globalHints :: Bool
     -- ^ Use global hints instead of relying on an actual GHC installation.
   }
 
+-- | Type representing command line options for the @stack ls dependencies@
+-- command.
 data ListDepsOpts = ListDepsOpts
   { format :: !ListDepsFormat
     -- ^ Format of printing dependencies
@@ -134,12 +137,15 @@ data ListDepsOpts = ListDepsOpts
     -- ^ The normal dot options.
   }
 
+-- | Type representing formats for printing dependencies.
 data ListDepsFormat
   = ListDepsText ListDepsFormatOpts [ListDepsTextFilter]
   | ListDepsTree ListDepsFormatOpts
   | ListDepsJSON
   | ListDepsConstraints
 
+-- | Type representing command line options for the @stack ls dependencies text@
+-- command and similar @cabal@, @tree@ and @json@ commands.
 data ListDepsFormatOpts = ListDepsFormatOpts
   { sep :: !Text
     -- ^ Separator between the package name and details.
@@ -301,6 +307,7 @@ handleRemote lsOpts = do
  where
   urlInfo = "https://www.stackage.org/snapshots"
 
+-- | Function underlying the @stack ls@ command.
 lsCmd :: LsCmdOpts -> RIO Runner ()
 lsCmd lsOpts =
   case lsOpts.lsCmds of
