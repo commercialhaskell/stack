@@ -279,6 +279,7 @@ library
       Stack.Options.NixParser
       Stack.Options.PackageParser
       Stack.Options.PathParser
+      Stack.Options.PvpBoundsParser
       Stack.Options.SDistParser
       Stack.Options.ScriptParser
       Stack.Options.SetupParser

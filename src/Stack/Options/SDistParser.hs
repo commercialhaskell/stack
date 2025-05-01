@@ -2,11 +2,10 @@
 
 {-|
 Module      : Stack.Options.SDistParser
-Description : Parse arguments for Stack's @sdist@ and @upload@ commands.
+Description : Parse arguments for Stack's @sdist@ command.
 License     : BSD-3-Clause
 
-Functions to parse command line arguments for Stack's @sdist@ and @upload@
-commands.
+Functions to parse command line arguments for Stack's @sdist@ command.
 -}
 
 module Stack.Options.SDistParser
@@ -20,9 +19,9 @@ import           Options.Applicative
 import           Options.Applicative.Builder.Extra ( boolFlags, dirCompleter )
 import           Stack.Prelude
 import           Stack.SDist ( SDistOpts (..) )
-import           Stack.Options.HpcReportParser ( pvpBoundsOption )
+import           Stack.Options.PvpBoundsParser ( pvpBoundsParser )
 
--- | Parse command line arguments for Stack's @sdist@ and @upload@ commands.
+-- | Parse command line arguments for Stack's @sdist@ command.
 sdistOptsParser :: Parser SDistOpts
 sdistOptsParser = SDistOpts
   <$> many (strArgument
@@ -31,7 +30,7 @@ sdistOptsParser = SDistOpts
         <> help "A relative path to a package directory. Can be specified \
                 \multiple times. If none specified, use all project packages."
         ))
-  <*> optional pvpBoundsOption
+  <*> optional (pvpBoundsParser Nothing)
   <*> ignoreCheckSwitch
   <*> buildPackageOption
   <*> optional (strOption
