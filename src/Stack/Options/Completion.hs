@@ -4,7 +4,10 @@
 
 {-|
 Module      : Stack.Options.Completion
+Description : Completers for command line arguments.
 License     : BSD-3-Clause
+
+Completers for command line arguments or arguments of command line options.
 -}
 
 module Stack.Options.Completion
@@ -38,6 +41,7 @@ import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.NamedComponent ( renderPkgComponent )
 import           Stack.Types.SourceMap ( SMWanted (..), ppComponents, ppGPD )
 
+-- | A completer for @--ghc-options@ or @--ghci-options@.
 ghcOptsCompleter :: Completer
 ghcOptsCompleter = mkCompleter $ \inputRaw -> pure $
   let input = unescapeBashArg inputRaw
@@ -67,6 +71,7 @@ buildConfigCompleter inner = mkCompleter $ \inputRaw -> do
       let go = go' { logLevel = LevelOther "silent" }
       withRunnerGlobal go $ withConfig NoReexec $ withDefaultEnvConfig $ inner input
 
+-- | A completer for components of project packages.
 targetCompleter :: Completer
 targetCompleter = buildConfigCompleter $ \input -> do
   packages <- view $ buildConfigL . to (.smWanted.project)
@@ -79,6 +84,7 @@ targetCompleter = buildConfigCompleter $ \input -> do
   allComponentNames (name, comps) =
     map (T.unpack . renderPkgComponent . (name,)) (Set.toList comps)
 
+-- | A completer for Cabal flags of project packages.
 flagCompleter :: Completer
 flagCompleter = buildConfigCompleter $ \input -> do
   bconfig <- view buildConfigL
@@ -111,6 +117,7 @@ flagCompleter = buildConfigCompleter $ \input -> do
       ('*' : _) -> wildcardFlags
       _ -> normalFlags
 
+-- | A completer for executable components of project packages.
 projectExeCompleter :: Completer
 projectExeCompleter = buildConfigCompleter $ \input -> do
   packages <- view $ buildConfigL . to (.smWanted.project)

@@ -2,14 +2,14 @@
 
 {-|
 Module      : Stack.Options.BuildMonoidParser
+Description : Parse arguments for Stack's build configuration.
 License     : BSD-3-Clause
+
+Parse arguments for Stack's build configuration.
 -}
 
 module Stack.Options.BuildMonoidParser
   ( buildOptsMonoidParser
-  , cabalVerboseParser
-  , cabalVerbosityOptsParser
-  , cabalVerbosityParser
   ) where
 
 import           Distribution.Parsec ( eitherParsec )
@@ -33,6 +33,7 @@ import           Stack.Types.BuildOptsMonoid
                    )
 import           Stack.Types.ComponentUtils ( unqualCompFromString )
 
+-- | Parse command line arguments for build configuration.
 buildOptsMonoidParser :: GlobalOptsContext -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 = BuildOptsMonoid
   <$> trace'
