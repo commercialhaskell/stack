@@ -44,7 +44,7 @@ foreign import ccall unsafe "windows.h GetConsoleScreenBufferInfo"
 foreign import ccall unsafe "windows.h GetStdHandle"
   c_GetStdHandle :: Int -> IO HANDLE
 
-
+-- | If available, yields the width of the terminal.
 getTerminalWidth :: IO (Maybe Int)
 getTerminalWidth = do
   hdl <- c_GetStdHandle c_STD_OUTPUT_HANDLE

@@ -36,6 +36,7 @@ instance Storable WindowWidth where
 foreign import capi "sys/ioctl.h ioctl"
   ioctl :: CInt -> CInt -> Ptr WindowWidth -> IO CInt
 
+-- | If available, yields the width of the terminal.
 getTerminalWidth :: IO (Maybe Int)
 getTerminalWidth =
   alloca $ \p -> do

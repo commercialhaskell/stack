@@ -347,11 +347,13 @@ announceTask ee taskType action = logInfo $
        (packageNamePrefix ee (pkgName (taskTypePackageIdentifier taskType)))
   <> action
 
--- Implements running a package's build, used to implement 'ATBuild' and
--- 'ATBuildFinal' tasks.  In particular this does the following:
+-- | Implements running a package's build, used to implement
+-- 'Control.Concurrent.Execute.ATBuild' and
+-- 'Control.Concurrent.Execute.ATBuildFinal' tasks. In particular this does the
+-- following:
 --
--- * Checks if the package exists in the precompiled cache, and if so,
---   add it to the database instead of performing the build.
+-- * Checks if the package exists in the precompiled cache, and if so, add it to
+--   the database instead of performing the build.
 --
 -- * Runs the configure step if needed ('ensureConfig')
 --
@@ -359,10 +361,10 @@ announceTask ee taskType action = logInfo $
 --
 -- * Generates haddocks
 --
--- * Registers the library and copies the built executables into the
---   local install directory. Note that this is literally invoking Cabal
---   with @copy@, and not the copying done by @stack install@ - that is
---   handled by 'copyExecutables'.
+-- * Registers the library and copies the built executables into the local
+--   install directory. Note that this is literally invoking Cabal with @copy@,
+--   and not the copying done by @stack install@ - that is handled by
+--   'Stack.Build.copyExecutables'.
 singleBuild ::
      forall env. (HasEnvConfig env, HasRunner env)
   => ActionContext

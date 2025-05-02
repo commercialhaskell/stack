@@ -12,18 +12,7 @@ Types and functions related to Stack's @ls@ command.
 -}
 
 module Stack.Ls
-  ( LsCmdOpts (..)
-  , LsCmds (..)
-  , SnapshotOpts (..)
-  , LsView (..)
-  , ListDepsOpts (..)
-  , ListDepsFormat (..)
-  , ListDepsFormatOpts (..)
-  , ListDepsTextFilter (..)
-  , ListGlobalsOpts (..)
-  , ListStylesOpts (..)
-  , ListToolsOpts (..)
-  , lsCmd
+  ( lsCmd
   ) where
 
 import           Control.Monad.Extra ( whenJust )
@@ -67,6 +56,13 @@ import           Stack.Types.DependencyTree
 import           Stack.Types.DotOpts ( DotOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig ( EnvConfig (..), installationRootDeps )
+import           Stack.Types.LsOpts
+                   ( LsCmdOpts (..), LsCmds (..), ListDepsFormat (..)
+                   , ListDepsFormatOpts (..), ListDepsOpts (..)
+                   , ListDepsTextFilter (..), ListGlobalsOpts (..)
+                   , ListStylesOpts (..), ListToolsOpts (..), LsView (..)
+                   , SnapshotOpts (..)
+                   )
 import           Stack.Types.Runner ( HasRunner, Runner, terminalL )
 import           Stack.Types.SourceMap ( SMWanted (..) )
 import           System.Console.ANSI.Codes
@@ -87,33 +83,6 @@ instance Exception LsException where
     ++ "Failure to parse values as a snapshot: "
     ++ show val
 
--- | Type representing command line options for the @stack ls@ command.
-newtype LsCmdOpts
-  = LsCmdOpts { lsCmds :: LsCmds }
-
--- | Type representing subcommands for the @stack ls@ command.
-data LsCmds
-  = LsSnapshot SnapshotOpts
-  | LsGlobals ListGlobalsOpts
-  | LsDependencies ListDepsOpts
-  | LsStyles ListStylesOpts
-  | LsTools ListToolsOpts
-
--- | Type representing command line options for the @stack ls snapshots@
--- command.
-data SnapshotOpts = SnapshotOpts
-  { viewType :: LsView
-  , ltsSnapView :: Bool
-  , nightlySnapView :: Bool
-  }
-  deriving (Eq, Ord, Show)
-
--- | Type representing subcommands for the @stack ls snapshots@ command.
-data LsView
-  = Local
-  | Remote
-  deriving (Eq, Ord, Show)
-
 -- | Type representing Stackage snapshot types.
 data SnapshotType
   = Lts
@@ -121,57 +90,6 @@ data SnapshotType
   | Nightly
     -- ^ Stackage Nightly
   deriving (Eq, Ord, Show)
-
--- | Type representing command line options for the @stack ls globals@ command.
-newtype ListGlobalsOpts = ListGlobalsOpts
-  { globalHints :: Bool
-    -- ^ Use global hints instead of relying on an actual GHC installation.
-  }
-
--- | Type representing command line options for the @stack ls dependencies@
--- command.
-data ListDepsOpts = ListDepsOpts
-  { format :: !ListDepsFormat
-    -- ^ Format of printing dependencies
-  , dotOpts :: !DotOpts
-    -- ^ The normal dot options.
-  }
-
--- | Type representing formats for printing dependencies.
-data ListDepsFormat
-  = ListDepsText ListDepsFormatOpts [ListDepsTextFilter]
-  | ListDepsTree ListDepsFormatOpts
-  | ListDepsJSON
-  | ListDepsConstraints
-
--- | Type representing command line options for the @stack ls dependencies text@
--- command and similar @cabal@, @tree@ and @json@ commands.
-data ListDepsFormatOpts = ListDepsFormatOpts
-  { sep :: !Text
-    -- ^ Separator between the package name and details.
-  , license :: !Bool
-    -- ^ Print dependency licenses instead of versions.
-  }
-
--- | Type representing items to filter the results of @stack ls dependencies@.
-data ListDepsTextFilter
-  = FilterPackage PackageName
-    -- ^ Item is a package name.
-  | FilterLocals
-    -- ^ Item represents all project packages.
-
--- | Type representing command line options for the @stack ls stack-colors@ and
--- @stack ls stack-colours@ commands.
-data ListStylesOpts = ListStylesOpts
-  { basic   :: Bool
-  , sgr     :: Bool
-  , example :: Bool
-  }
-  deriving (Eq, Ord, Show)
-
--- | Type representing command line options for the @stack ls tools@ command.
-newtype ListToolsOpts
-  = ListToolsOpts { filter  :: String }
 
 data Snapshot = Snapshot
   { snapId :: Text

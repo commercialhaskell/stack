@@ -16,9 +16,9 @@ import           Options.Applicative
                    ( Parser, completer, help, long, metavar, strOption, switch )
 import           Options.Applicative.Builder.Extra
                    ( dirCompleter, fileExtCompleter, textArgument )
-import           Stack.Coverage ( HpcReportOpts (..) )
 import           Stack.Options.Completion ( targetCompleter )
 import           Stack.Prelude
+import           Stack.Types.HpcReportOpts ( HpcReportOpts (..) )
 
 -- | Parser for @stack hpc report@.
 hpcReportOptsParser :: Parser HpcReportOpts

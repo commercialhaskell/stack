@@ -14,12 +14,10 @@ Generate HPC (Haskell Program Coverage) reports.
 -}
 
 module Stack.Coverage
-  ( HpcReportOpts (..)
-  , hpcReportCmd
+  ( hpcReportCmd
   , deleteHpcReports
   , updateTixFile
   , generateHpcReport
-  , generateHpcReportForTargets
   , generateHpcUnifiedReport
   , generateHpcMarkupIndex
   ) where
@@ -67,6 +65,7 @@ import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), hpcReportDir )
+import           Stack.Types.HpcReportOpts ( HpcReportOpts (..) )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Package ( Package (..), packageIdentifier )
 import           Stack.Types.Runner ( Runner )
@@ -111,15 +110,6 @@ instance Pretty CoveragePrettyException where
          ]
 
 instance Exception CoveragePrettyException
-
--- | Type representing command line options for the @stack hpc report@ command.
-data HpcReportOpts = HpcReportOpts
-  { inputs :: [Text]
-  , all :: Bool
-  , destDir :: Maybe String
-  , openBrowser :: Bool
-  }
-  deriving Show
 
 -- | Function underlying the @stack hpc report@ command.
 hpcReportCmd :: HpcReportOpts -> RIO Runner ()
@@ -431,6 +421,7 @@ generateHpcReportForTargets opts tixFiles targetNames = do
         void $ liftIO $ openBrowser (toFilePath reportPath)
       else displayReportPath "The" report (pretty reportPath)
 
+-- | Generates the HTML unified coverage report.
 generateHpcUnifiedReport :: HasEnvConfig env => RIO env ()
 generateHpcUnifiedReport = do
   outputDir <- hpcReportDir
@@ -528,6 +519,7 @@ unionTixes tixes = (Map.keys errs, Tix (Map.elems outputs))
         Right (TixModule k hash1 len1 (zipWith (+) tix1 tix2))
   merge _ _ = Left ()
 
+-- | Generates the HTML index report.
 generateHpcMarkupIndex :: HasEnvConfig env => RIO env ()
 generateHpcMarkupIndex = do
   outputDir <- hpcReportDir
