@@ -258,9 +258,13 @@ instance NFData (PrecompiledCache Abs)
 
 instance NFData (PrecompiledCache Rel)
 
+-- | Type representing treatments of GHC's informational messages during
+-- compilation when it evaluates Template Haskell code.
 data ExcludeTHLoading
   = ExcludeTHLoading
+    -- ^ Suppress the messages.
   | KeepTHLoading
+    -- ^ Do not suppress the messages.
 
 data ConvertPathsToAbsolute
   = ConvertPathsToAbsolute

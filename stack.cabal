@@ -371,6 +371,7 @@ library
       Stack.Types.PvpBounds
       Stack.Types.Runner
       Stack.Types.SCM
+      Stack.Types.SDistOpts
       Stack.Types.SetupInfo
       Stack.Types.Snapshot
       Stack.Types.SourceMap
@@ -378,6 +379,7 @@ library
       Stack.Types.Storage
       Stack.Types.TemplateName
       Stack.Types.UnusedFlags
+      Stack.Types.UpgradeOpts
       Stack.Types.UploadOpts
       Stack.Types.Version
       Stack.Types.VersionedDownloadInfo

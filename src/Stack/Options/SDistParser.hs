@@ -18,7 +18,7 @@ import           Options.Applicative
                    )
 import           Options.Applicative.Builder.Extra ( boolFlags, dirCompleter )
 import           Stack.Prelude
-import           Stack.SDist ( SDistOpts (..) )
+import           Stack.Types.SDistOpts ( SDistOpts (..) )
 import           Stack.Options.PvpBoundsParser ( pvpBoundsParser )
 
 -- | Parse command line arguments for Stack's @sdist@ command.

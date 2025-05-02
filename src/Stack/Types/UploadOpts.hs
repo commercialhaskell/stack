@@ -3,10 +3,10 @@
 
 {-|
 Module      : Stack.Types.UploadOpts
-Description : Types for command line options for the @stack upload@ command.
+Description : Types for command line options for Stack's @upload@ command.
 License     : BSD-3-Clause
 
-Types for command line options for the @stack upload@ command.
+Types for command line options for Stack's @upload@ command.
 -}
 
 module Stack.Types.UploadOpts

@@ -92,6 +92,7 @@ import           Stack.Types.Package
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
 import           Stack.Types.Runner ( HasRunner, Runner )
+import           Stack.Types.SDistOpts ( SDistOpts (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), ProjectPackage (..), SMWanted (..)
                    , SourceMap (..), ppRoot
@@ -136,20 +137,6 @@ instance Pretty SDistPrettyException where
     <> string e
 
 instance Exception SDistPrettyException
-
--- | Type representing command line options for @stack sdist@ command.
-data SDistOpts = SDistOpts
-  { dirsToWorkWith :: [String]
-    -- ^ Directories to package
-  , pvpBounds :: Maybe PvpBounds
-    -- ^ PVP Bounds overrides
-  , ignoreCheck :: Bool
-    -- ^ Whether to ignore check of the package for common errors
-  , buildTarball :: Bool
-    -- ^ Whether to build the tarball
-  , tarPath :: Maybe FilePath
-    -- ^ Where to copy the tarball
-  }
 
 -- | Function underlying the @stack sdist@ command.
 sdistCmd :: SDistOpts -> RIO Runner ()

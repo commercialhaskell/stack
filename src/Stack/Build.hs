@@ -233,9 +233,11 @@ build msetLocalFiles = do
         sourceMap.targets.targets
         plan
 
+-- | Build one or more local targets.
 buildLocalTargets ::
      HasEnvConfig env
   => NonEmpty Text
+     -- ^ Local targets to build.
   -> RIO env (Either SomeException ())
 buildLocalTargets targets =
   tryAny $ withNewLocalBuildTargets (NE.toList targets) $ build Nothing
@@ -377,6 +379,7 @@ warnAboutSplitObjs bopts |  bopts.splitObjs =
     ]
 warnAboutSplitObjs _ = pure ()
 
+-- | Text warning about the experimental nature of Stack's @--split-objs@ flag.
 splitObjsWarning :: String
 splitObjsWarning =
   "Note that this feature is EXPERIMENTAL, and its behavior may be changed and \

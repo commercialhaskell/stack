@@ -5,7 +5,7 @@ Module      : Stack.Options.UpgradeParser
 Description : Parse arguments for Stack's @upgrade@ command.
 License     : BSD-3-Clause
 
-Functions to parse command line arguments for Stack's @upgrade@ command.
+Function to parse command line arguments for Stack's @upgrade@ command.
 -}
 
 module Stack.Options.UpgradeParser
@@ -18,7 +18,7 @@ import         Options.Applicative
                  )
 import         Options.Applicative.Builder.Extra ( boolFlags )
 import         Stack.Prelude
-import         Stack.Upgrade
+import         Stack.Types.UpgradeOpts
                  ( BinaryOpts (..), SourceOpts (..), UpgradeOpts (..) )
 
 -- | Parse command line arguments for Stack's @upgrade@ command.

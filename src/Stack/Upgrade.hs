@@ -5,18 +5,14 @@
 
 {-|
 Module      : Stack.Upgrade
-Description : Types and functions related to Stack's @upgrade@ command.
+Description : Function related to Stack's @upgrade@ command.
 License     : BSD-3-Clause
 
-Types and functions related to Stack's @upgrade@ command.
+Function related to Stack's @upgrade@ command.
 -}
 
 module Stack.Upgrade
-  ( UpgradeOpts (..)
-  , BinaryOpts (..)
-  , SourceOpts (..)
-  , upgradeCmd
-  , upgrade
+  ( upgradeCmd
   ) where
 
 import qualified Data.Text as T
@@ -41,6 +37,8 @@ import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
 import           Stack.Types.StackYamlLoc ( StackYamlLoc (..) )
+import           Stack.Types.UpgradeOpts
+                   ( BinaryOpts (..), SourceOpts (..), UpgradeOpts (..) )
 import           System.Process ( rawSystem, readProcess )
 
 -- | Type representing \'pretty\' exceptions thrown by functions in the
@@ -92,34 +90,6 @@ instance Pretty UpgradePrettyException where
     <> flow "Latest version with no revision."
 
 instance Exception UpgradePrettyException
-
--- | Type representing options for upgrading Stack with a binary executable
--- file.
-data BinaryOpts = BinaryOpts
-  { platform :: !(Maybe String)
-  , force :: !Bool
-    -- ^ Force a download, even if the downloaded version is older than what we
-    -- are.
-  , onlyLocalBin :: !Bool
-    -- ^ Only download to Stack's local binary directory.
-  , version :: !(Maybe String)
-    -- ^ Specific version to download
-  , gitHubOrg :: !(Maybe String)
-  , gitHubRepo :: !(Maybe String)
-  }
-  deriving Show
-
--- | Type representing options for upgrading Stack from source code.
-newtype SourceOpts
-  = SourceOpts (Maybe (String, String)) -- repo and branch
-  deriving Show
-
--- | Type representing command line options for the @stack upgrade@ command.
-data UpgradeOpts = UpgradeOpts
-  { binary :: !(Maybe BinaryOpts)
-  , source :: !(Maybe SourceOpts)
-  }
-  deriving Show
 
 -- | Function underlying the @stack upgrade@ command.
 upgradeCmd :: UpgradeOpts -> RIO Runner ()
