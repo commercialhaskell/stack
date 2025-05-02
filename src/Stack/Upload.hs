@@ -1,5 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -266,6 +267,7 @@ uploadCmd uo = do
       (as, bs) <- partitionM f xs
       pure $ if r then (x:as, bs) else (as, x:bs)
 
+-- | Type representing Hackage API authentification tokens.
 newtype HackageKey = HackageKey Text
   deriving (Eq, Show)
 
@@ -279,9 +281,12 @@ data HackageCreds = HackageCreds
   }
   deriving (Eq, Show)
 
+-- | Type representing Hackage authentifications
 data HackageAuth
   = HAKey HackageKey
+    -- ^ With a Hackage API authentification token registered by a user.
   | HACreds HackageCreds
+    -- ^ With a Hackage user's credentials.
   deriving (Eq, Show)
 
 instance ToJSON HackageCreds where
@@ -299,19 +304,23 @@ withEnvVariable :: Text -> IO Text -> IO Text
 withEnvVariable varName fromPrompt =
   lookupEnv (T.unpack varName) >>= maybe fromPrompt (pure . T.pack)
 
+-- | Optionally, load Hackage API authentification token from the @HACKAGE_KEY@
+-- environment variable, if it exists.
 maybeGetHackageKey :: RIO m (Maybe HackageKey)
 maybeGetHackageKey =
   liftIO $ fmap (HackageKey . T.pack) <$> lookupEnv "HACKAGE_KEY"
 
+-- | Load Hackage authentification from the environment, if applicable, or from
+-- the given configuration.
 loadAuth :: (HasLogFunc m, HasTerm m) => Config -> RIO m HackageAuth
-loadAuth config = do
-  maybeHackageKey <- maybeGetHackageKey
-  case maybeHackageKey of
-    Just key -> do
-      prettyInfoS
-        "HACKAGE_KEY environment variable found, using that for credentials."
-      pure $ HAKey key
-    Nothing -> HACreds <$> loadUserAndPassword config
+loadAuth config = maybeGetHackageKey >>= \case
+  Just key -> do
+    prettyInfoL
+      [ style Shell "HACKAGE_KEY"
+      , flow "environment variable found, using that for credentials."
+      ]
+    pure $ HAKey key
+  Nothing -> HACreds <$> loadUserAndPassword config
 
 -- | Load Hackage credentials, either from a save file or the command
 -- line.
@@ -564,6 +573,7 @@ upload baseUrl auth contentForm mPkgIdName fp uploadVariant =
     baseUrl auth contentForm mPkgIdName (FP.takeFileName fp) uploadVariant
       =<< liftIO (L.readFile fp)
 
+-- | Upload a revised Cabal file for the given package.
 uploadRevision ::
      (HasLogFunc m, HasTerm m)
   => String -- ^ Hackage base URL
