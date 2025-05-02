@@ -14,7 +14,6 @@ Types and functions related to Stack's @path@ command.
 
 module Stack.Path
   ( EnvConfigPathInfo
-  , UseHaddocks
   , path
   , pathsFromRunner
   , pathsFromConfig
@@ -170,6 +169,8 @@ fillEnvConfigPathInfo = do
     , compiler
     }
 
+-- | Type representing information needed to generate an appropriate string for
+-- paths of interest to a user which require an 'EnvConfig'.
 data EnvConfigPathInfo = EnvConfigPathInfo
   { buildConfig  :: !BuildConfig
   , snapDb       :: !(Path Abs Dir)
@@ -240,7 +241,7 @@ pathsFromRunner = ("Global Stack root directory", stackRootOptionName')
 -- can choose a specific path to list like @--stack-root@. But really it's
 -- mainly for the documentation aspect.
 --
--- When printing output we generate @Config@ and pass it to the function
+-- When printing output we generate t'Config' and pass it to the function
 -- to generate an appropriate string. Trailing slashes are removed, see #506.
 pathsFromConfig :: [(String, Text, Config -> Text)]
 pathsFromConfig =
@@ -264,7 +265,7 @@ pathsFromConfig =
 -- can choose a specific path to list like @--project-root@. But really it's
 -- mainly for the documentation aspect.
 --
--- When printing output we generate @EnvConfigPathInfo@ and pass it to the
+-- When printing output we generate t'EnvConfigPathInfo' and pass it to the
 -- function to generate an appropriate string. Trailing slashes are removed, see
 -- #506.
 pathsFromEnvConfig :: [(String, Text, UseHaddocks (EnvConfigPathInfo -> Text))]

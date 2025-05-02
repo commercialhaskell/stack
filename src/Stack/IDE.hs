@@ -37,7 +37,7 @@ import           Stack.Types.SourceMap
                    ( ProjectPackage (..), SMWanted (..), ppComponentsMaybe )
 import           System.IO ( putStrLn )
 
--- Type representing output stream choices for the @stack ide packages@ and
+-- | Type representing output stream choices for the @stack ide packages@ and
 -- @stack ide targets@ commands.
 data OutputStream
   = OutputLogInfo
@@ -45,7 +45,7 @@ data OutputStream
   | OutputStdout
     -- ^ To the standard output stream.
 
--- Type representing output choices for the @stack ide packages@ command.
+-- | Type representing output choices for the @stack ide packages@ command.
 data ListPackagesCmd
   = ListPackageNames
     -- ^ Package names.

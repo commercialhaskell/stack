@@ -19,15 +19,15 @@ import qualified Options.Applicative as OA
 import           Options.Applicative ( idm )
 import           Options.Applicative.Builder.Extra ( boolFlags, textOption )
 import           Stack.Constants ( globalFooter )
-import           Stack.Ls
+import           Stack.Options.DotParser ( dotOptsParser )
+import           Stack.Prelude hiding ( sep )
+import           Stack.Types.LsOpts
                    ( ListDepsFormat (..), ListDepsFormatOpts (..)
                    , ListDepsOpts (..), ListDepsTextFilter (..)
                    , ListGlobalsOpts (..), ListStylesOpts (..)
                    , ListToolsOpts (..), LsCmdOpts (..), LsCmds (..)
                    , LsView (..), SnapshotOpts (..), ListGlobalsOpts
                    )
-import           Stack.Options.DotParser ( dotOptsParser )
-import           Stack.Prelude hiding ( sep )
 
 -- | Parse command line arguments for Stack's @ls@ command.
 lsOptsParser :: OA.Parser LsCmdOpts

@@ -551,6 +551,7 @@ dockerEntrypointArgName = "internal-docker-entrypoint"
 dockerCmdName :: String
 dockerCmdName = "docker"
 
+-- | Command-line option to show only @--docker-*@ options.
 dockerHelpOptName :: String
 dockerHelpOptName = dockerCmdName ++ "-help"
 

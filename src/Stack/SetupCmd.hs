@@ -7,16 +7,14 @@
 
 {-|
 Module      : Stack.SetupCmd
-Description : Types and functions related to Stack's @setup@ command.
+Description : Function related to Stack's @setup@ command.
 License     : BSD-3-Clause
 
-Types and functions related to Stack's @setup@ command.
+Function related to Stack's @setup@ command.
 -}
 
 module Stack.SetupCmd
-  ( SetupCmdOpts (..)
-  , setupCmd
-  , setup
+  ( setupCmd
   ) where
 
 import qualified Data.Either.Extra as EE
@@ -30,16 +28,8 @@ import           Stack.Types.CompilerPaths ( CompilerPaths (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
 import           Stack.Types.Runner ( Runner )
+import           Stack.Types.SetupOpts ( SetupCmdOpts (..) )
 import           Stack.Types.Version ( VersionCheck (..) )
-
--- | Type representing command line options for the @stack setup@ command.
-data SetupCmdOpts = SetupCmdOpts
-  { compilerVersion :: !(Maybe WantedCompiler)
-  , forceReinstall  :: !Bool
-  , ghcBindistUrl   :: !(Maybe String)
-  , ghcjsBootOpts   :: ![String]
-  , ghcjsBootClean  :: !Bool
-  }
 
 -- | Function underlying the @stack setup@ command.
 setupCmd :: SetupCmdOpts -> RIO Runner ()

@@ -624,6 +624,7 @@ defaultSetupInfoYaml :: String
 defaultSetupInfoYaml =
   "https://raw.githubusercontent.com/commercialhaskell/stackage-content/master/stack/stack-setup-2.yaml"
 
+-- | Type representing setup configurations.
 data SetupOpts = SetupOpts
   { installGhcIfMissing :: !Bool
   , installMsysIfMissing :: !Bool
@@ -2638,7 +2639,7 @@ utf8EnvVars =
 
 -- Binary Stack upgrades
 
--- | Information on a binary release of Stack
+-- | Information on a binary release of Stack.
 data StackReleaseInfo
   = SRIGitHub !Value
     -- ^ Metadata downloaded from GitHub releases about available binaries.
@@ -2651,11 +2652,14 @@ data HaskellStackOrg = HaskellStackOrg
   }
   deriving Show
 
+-- | Download information on a binary release of Stack. If there is no given
+-- GitHub user, GitHub repository and version, then first tries
+-- @haskellstack.org@.
 downloadStackReleaseInfo ::
      (HasLogFunc env, HasPlatform env)
-  => Maybe String -- GitHub org
-  -> Maybe String -- GitHub repo
-  -> Maybe String -- ^ optional version
+  => Maybe String -- ^ Optional GitHub user.
+  -> Maybe String -- ^ Optional GitHub repository.
+  -> Maybe String -- ^ Optional version.
   -> RIO env StackReleaseInfo
 downloadStackReleaseInfo Nothing Nothing Nothing = do
   platform <- view platformL
@@ -2762,6 +2766,9 @@ downloadStackReleaseInfoGitHub morg mrepo mver = liftIO $ do
     then pure $ SRIGitHub $ getResponseBody res
     else prettyThrowIO $ StackReleaseInfoNotFound url
 
+-- | Yield a list of the preferred GHC variants for the platform. The first item
+-- of each pair indicates if the operating system is Windows. The second item
+-- is the name of the GHC variant in Stack's @setup-info@ dictionary.
 preferredPlatforms ::
      (MonadReader env m, HasPlatform env, MonadThrow m)
   => m [(Bool, String)]
@@ -2790,6 +2797,7 @@ preferredPlatforms = do
         | otherwise = ["-static", ""]
   pure $ map (\suffix -> (isWindows, concat [os, "-", arch, suffix])) suffixes
 
+-- | Download a Stack executable.
 downloadStackExe ::
      HasConfig env
   => [(Bool, String)] -- ^ acceptable platforms
@@ -3000,6 +3008,7 @@ performPathChecking newExeFile currExeFile = do
                   <> flow "sudo file copy worked!"
         | otherwise -> throwM e
 
+-- | If available, yields the version of the given binary release of Stack.
 getDownloadVersion :: StackReleaseInfo -> Maybe Version
 getDownloadVersion (SRIGitHub val) = do
   Object o <- Just val

@@ -19,7 +19,7 @@ import qualified Options.Applicative as OA
 import qualified Options.Applicative.Builder.Extra as OA
 import qualified Options.Applicative.Types as OA
 import           Stack.Prelude
-import           Stack.SetupCmd ( SetupCmdOpts (..) )
+import           Stack.Types.SetupOpts ( SetupCmdOpts (..) )
 
 -- | Parse command line arguments for Stack's @setup@ command.
 setupOptsParser :: OA.Parser SetupCmdOpts
