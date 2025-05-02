@@ -49,6 +49,7 @@ instance Exception NixException where
     "Error: [S-7384]\n"
     ++ "Cannot determine project root directory."
 
+-- | Execute @nix-shell@, replacing the current process.
 runShellAndExit :: RIO Config void
 runShellAndExit = do
   inContainer <- getInContainer -- TODO we can probably assert that this is False based on Stack.Runners now
@@ -162,9 +163,10 @@ escape str =
   ++ foldr (\c -> if c == '\'' then ("'\"'\"'"++) else (c:)) "" str
   ++ "'"
 
--- | Command-line argument for "nix"
+-- | Command-line argument for "nix".
 nixCmdName :: String
 nixCmdName = "nix"
 
+-- | Command-line option to show only @--nix-*@ options.
 nixHelpOptName :: String
 nixHelpOptName = nixCmdName ++ "-help"

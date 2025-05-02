@@ -115,6 +115,8 @@ import           System.Environment ( lookupEnv )
 import           System.FileLock
                    ( SharedExclusive (..), withFileLock, withTryFileLock )
 
+-- | Type representing environments in which the @Setup.hs@ commands of Cabal
+-- (the library) can be executed.
 data ExecuteEnv = ExecuteEnv
   { installLock    :: !(MVar ())
   , buildOpts      :: !BuildOpts

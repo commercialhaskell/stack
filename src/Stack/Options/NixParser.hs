@@ -3,7 +3,10 @@
 
 {-|
 Module      : Stack.Options.NixParser
+Description : Parser for options for Nix integration.
 License     : BSD-3-Clause
+
+Parser for Stack's command line options for Nix integration.
 -}
 
 module Stack.Options.NixParser
@@ -23,6 +26,7 @@ import           Stack.Options.Utils ( hideMods )
 import           Stack.Prelude
 import           Stack.Types.Nix ( NixOptsMonoid (..) )
 
+-- | Parser for Stack's command line options for integration with Nix.
 nixOptsParser :: Bool -> Parser NixOptsMonoid
 nixOptsParser hide0 = overrideActivation <$>
   (   NixOptsMonoid
