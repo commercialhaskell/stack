@@ -23,8 +23,7 @@ with:
 * consistency checks are not performed,
 * use Stack program name,
 * use "Stack.Prelude" rather than "Prelude",
-* use t
-'RIO' @env@ monad,
+* use t'RIO' @env@ monad,
 * use well-typed representations of paths from the @path@ package,
 * add pretty messages and exceptions,
 * redundant code deleted,

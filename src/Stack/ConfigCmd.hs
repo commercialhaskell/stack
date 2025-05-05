@@ -13,12 +13,8 @@ Make changes to project or global configuration.
 -}
 
 module Stack.ConfigCmd
-  ( ConfigCmdSet (..)
-  , CommandScope
-  , configCmdSetParser
-  , cfgCmdSet
+  ( cfgCmdSet
   , cfgCmdSetName
-  , configCmdEnvParser
   , cfgCmdEnv
   , cfgCmdEnvName
   , cfgCmdBuildFiles
@@ -35,9 +31,6 @@ import           Data.Attoparsec.Text as P
 import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
-import qualified Options.Applicative as OA
-import           Options.Applicative.Builder.Extra
-import qualified Options.Applicative.Types as OA
 import           Pantry ( loadSnapshot )
 import           Path ( (</>), parent )
 import qualified RIO.Map as Map
@@ -58,13 +51,15 @@ import           Stack.Types.ConfigMonoid
                    , configMonoidRecommendStackUpgradeName
                    , configMonoidSystemGHCName
                    )
+import           Stack.Types.ConfigSetOpts
+                   ( CommandScope (..), ConfigCmdSet (..) ,configCmdSetScope )
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
 import           Stack.Types.Runner ( globalOptsL )
-import           Stack.Types.Snapshot ( AbstractSnapshot, readAbstractSnapshot )
+import           Stack.Types.Snapshot ( AbstractSnapshot )
 import           System.Environment ( getEnvironment )
 
 -- | Type repesenting exceptions thrown by functions exported by the
@@ -78,31 +73,7 @@ instance Exception ConfigCmdException where
     "Error: [S-3136]\n"
     ++ "'config' command used when no project configuration available."
 
-data ConfigCmdSet
-  = ConfigCmdSetSnapshot !(Unresolved AbstractSnapshot)
-  | ConfigCmdSetResolver !(Unresolved AbstractSnapshot)
-  | ConfigCmdSetSystemGhc !CommandScope !Bool
-  | ConfigCmdSetInstallGhc !CommandScope !Bool
-  | ConfigCmdSetInstallMsys !CommandScope !Bool
-  | ConfigCmdSetRecommendStackUpgrade !CommandScope !Bool
-  | ConfigCmdSetDownloadPrefix !CommandScope !Text
-
-data CommandScope
-  = CommandScopeGlobal
-    -- ^ Apply changes to the global configuration,
-    --   typically at @~/.stack/config.yaml@.
-  | CommandScopeProject
-    -- ^ Apply changes to the project @stack.yaml@.
-
-configCmdSetScope :: ConfigCmdSet -> CommandScope
-configCmdSetScope (ConfigCmdSetSnapshot _) = CommandScopeProject
-configCmdSetScope (ConfigCmdSetResolver _) = CommandScopeProject
-configCmdSetScope (ConfigCmdSetSystemGhc scope _) = scope
-configCmdSetScope (ConfigCmdSetInstallGhc scope _) = scope
-configCmdSetScope (ConfigCmdSetInstallMsys scope _) = scope
-configCmdSetScope (ConfigCmdSetRecommendStackUpgrade scope _) = scope
-configCmdSetScope (ConfigCmdSetDownloadPrefix scope _) = scope
-
+-- | Function underlying Stack's @config set@ command.
 cfgCmdSet ::
      (HasConfig env, HasGHCVariant env)
   => ConfigCmdSet -> RIO env ()
@@ -309,148 +280,26 @@ cfgCmdSetKeys (ConfigCmdSetRecommendStackUpgrade _ _) =
 cfgCmdSetKeys (ConfigCmdSetDownloadPrefix _ _) =
   [["package-index", "download-prefix"]]
 
+-- | The name of Stack's @config@ command.
 cfgCmdName :: String
 cfgCmdName = "config"
 
+-- | The name of Stack's @config@ command's @set@ subcommand.
 cfgCmdSetName :: String
 cfgCmdSetName = "set"
 
+-- | The name of Stack's @config@ command's @env@ subcommand.
 cfgCmdEnvName :: String
 cfgCmdEnvName = "env"
 
+-- | The name of Stack's @config@ command's @build-files@ subcommand.
 cfgCmdBuildFilesName :: String
 cfgCmdBuildFilesName = "build-files"
-
-configCmdSetParser :: OA.Parser ConfigCmdSet
-configCmdSetParser =
-  OA.hsubparser $
-    mconcat
-      [ OA.command "snapshot"
-          ( OA.info
-              (   ConfigCmdSetSnapshot
-              <$> OA.argument
-                    readAbstractSnapshot
-                    (  OA.metavar "SNAPSHOT"
-                    <> OA.help "E.g. \"nightly\" or \"lts-22.8\"" ))
-              ( OA.progDesc
-                  "Change the snapshot of the current project." ))
-      , OA.command "resolver"
-          ( OA.info
-              (   ConfigCmdSetResolver
-              <$> OA.argument
-                    readAbstractSnapshot
-                    (  OA.metavar "SNAPSHOT"
-                    <> OA.help "E.g. \"nightly\" or \"lts-22.8\"" ))
-              ( OA.progDesc
-                  "Change the snapshot of the current project, using the \
-                  \resolver key." ))
-      , OA.command (T.unpack configMonoidSystemGHCName)
-          ( OA.info
-              (   ConfigCmdSetSystemGhc
-              <$> globalScopeFlag
-              <*> boolArgument )
-              ( OA.progDesc
-                  "Configure whether or not Stack should use a system GHC \
-                  \installation." ))
-      , OA.command (T.unpack configMonoidInstallGHCName)
-          ( OA.info
-              (   ConfigCmdSetInstallGhc
-              <$> globalScopeFlag
-              <*> boolArgument )
-              ( OA.progDesc
-                  "Configure whether or not Stack should automatically install \
-                  \GHC when necessary." ))
-      , OA.command (T.unpack configMonoidInstallMsysName)
-          ( OA.info
-              (   ConfigCmdSetInstallMsys
-              <$> globalScopeFlag
-              <*> boolArgument )
-              ( OA.progDesc
-                  "Configure whether or not Stack should automatically install \
-                  \MSYS2 when necessary." ))
-      , OA.command (T.unpack configMonoidRecommendStackUpgradeName)
-          ( OA.info
-              (   ConfigCmdSetRecommendStackUpgrade
-              <$> projectScopeFlag
-              <*> boolArgument )
-              ( OA.progDesc
-                  "Configure whether or not Stack should notify the user if it \
-                  \identifes a new version of Stack is available." ))
-      , OA.command "package-index"
-          ( OA.info
-              ( OA.hsubparser $
-                  OA.command "download-prefix"
-                    ( OA.info
-                        (   ConfigCmdSetDownloadPrefix
-                        <$> globalScopeFlag
-                        <*> urlArgument )
-                        ( OA.progDesc
-                            "Configure download prefix for Stack's package \
-                            \index." )))
-              ( OA.progDesc
-                  "Configure Stack's package index" ))
-      ]
-
-globalScopeFlag :: OA.Parser CommandScope
-globalScopeFlag = OA.flag
-  CommandScopeProject
-  CommandScopeGlobal
-  (  OA.long "global"
-  <> OA.help
-       "Modify the user-specific global configuration file ('config.yaml') \
-       \instead of the project-level configuration file ('stack.yaml')."
-  )
-
-projectScopeFlag :: OA.Parser CommandScope
-projectScopeFlag = OA.flag
-  CommandScopeGlobal
-  CommandScopeProject
-  (  OA.long "project"
-  <> OA.help
-       "Modify the project-level configuration file ('stack.yaml') instead of \
-       \the user-specific global configuration file ('config.yaml')."
-  )
-
-readBool :: OA.ReadM Bool
-readBool = do
-  s <- OA.readerAsk
-  case s of
-    "true" -> pure True
-    "false" -> pure False
-    _ -> OA.readerError ("Invalid value " ++ show s ++
-           ": Expected \"true\" or \"false\"")
-
-boolArgument :: OA.Parser Bool
-boolArgument = OA.argument
-  readBool
-  (  OA.metavar "true|false"
-  <> OA.completeWith ["true", "false"]
-  )
-
-urlArgument :: OA.Parser Text
-urlArgument = OA.strArgument
-  (  OA.metavar "URL"
-  <> OA.value defaultDownloadPrefix
-  <> OA.showDefault
-  <> OA.help
-       "Location of package index. It is highly recommended to use only the \
-       \official Hackage server or a mirror."
-  )
-
-configCmdEnvParser :: OA.Parser EnvSettings
-configCmdEnvParser = EnvSettings
-  <$> boolFlags True "locals" "include information about local packages" mempty
-  <*> boolFlags True
-        "ghc-package-path" "set GHC_PACKAGE_PATH environment variable" mempty
-  <*> boolFlags True "stack-exe" "set STACK_EXE environment variable" mempty
-  <*> boolFlags False
-        "locale-utf8" "set the GHC_CHARENC environment variable to UTF-8" mempty
-  <*> boolFlags False
-        "keep-ghc-rts" "keep any GHCRTS environment variable" mempty
 
 data EnvVarAction = EVASet !Text | EVAUnset
   deriving Show
 
+-- | Function underlying Stack's @config env@ command.
 cfgCmdEnv :: EnvSettings -> RIO EnvConfig ()
 cfgCmdEnv es = do
   origEnv <- liftIO $ Map.fromList . map (first fromString) <$> getEnvironment

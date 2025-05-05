@@ -30,6 +30,9 @@ data EnvSettings = EnvSettings
   }
   deriving (Eq, Ord, Show)
 
+-- | Minimal @EnvSettings@ which do not embellish the environment and do not
+-- pass through the GHCRTS environment variable. See
+-- https://github.com/commercialhaskell/stack/issues/3444
 minimalEnvSettings :: EnvSettings
 minimalEnvSettings =
   EnvSettings
@@ -42,8 +45,8 @@ minimalEnvSettings =
 
 -- | Default @EnvSettings@ which includes locals and GHC_PACKAGE_PATH.
 --
--- Note that this also passes through the GHCRTS environment variable.
--- See https://github.com/commercialhaskell/stack/issues/3444
+-- Note that this also passes through the GHCRTS environment variable. See
+-- https://github.com/commercialhaskell/stack/issues/3444
 defaultEnvSettings :: EnvSettings
 defaultEnvSettings = EnvSettings
   { includeLocals = True
@@ -55,8 +58,8 @@ defaultEnvSettings = EnvSettings
 
 -- | Environment settings which do not embellish the environment
 --
--- Note that this also passes through the GHCRTS environment variable.
--- See https://github.com/commercialhaskell/stack/issues/3444
+-- Note that this also passes through the GHCRTS environment variable. See
+-- https://github.com/commercialhaskell/stack/issues/3444
 plainEnvSettings :: EnvSettings
 plainEnvSettings = EnvSettings
   { includeLocals = False

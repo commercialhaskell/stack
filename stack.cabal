@@ -260,6 +260,8 @@ library
       Stack.Options.BuildParser
       Stack.Options.CleanParser
       Stack.Options.ConfigParser
+      Stack.Options.ConfigEnvParser
+      Stack.Options.ConfigSetParser
       Stack.Options.Completion
       Stack.Options.DockerParser
       Stack.Options.DotParser
@@ -330,6 +332,7 @@ library
       Stack.Types.Config
       Stack.Types.Config.Exception
       Stack.Types.ConfigMonoid
+      Stack.Types.ConfigSetOpts
       Stack.Types.ConfigureOpts
       Stack.Types.Curator
       Stack.Types.Dependency
@@ -375,6 +378,7 @@ library
       Stack.Types.SCM
       Stack.Types.SDistOpts
       Stack.Types.SetupInfo
+      Stack.Types.SetupOpts
       Stack.Types.Snapshot
       Stack.Types.SourceMap
       Stack.Types.StackYamlLoc
@@ -397,8 +401,6 @@ library
       System.Terminal
       Build_stack
       Paths_stack
-  other-modules:
-      Stack.Types.SetupOpts
   autogen-modules:
       Build_stack
       Paths_stack
