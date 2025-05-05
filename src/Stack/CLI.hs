@@ -33,8 +33,7 @@ import           Stack.BuildInfo ( hpackVersion, versionString' )
 import           Stack.Clean ( CleanCommand (..), cleanCmd )
 import           Stack.ConfigCmd
                    ( cfgCmdBuildFiles, cfgCmdBuildFilesName, cfgCmdEnv
-                   , cfgCmdEnvName, configCmdEnvParser, cfgCmdName, cfgCmdSet
-                   , cfgCmdSetName, configCmdSetParser
+                   , cfgCmdEnvName, cfgCmdName, cfgCmdSet, cfgCmdSetName
                    )
 import           Stack.Constants
                    ( globalFooter, osIsWindows, relFileStack, relFileStackDotExe
@@ -60,6 +59,8 @@ import           Stack.New ( newCmd )
 import qualified Stack.Nix as Nix
 import           Stack.Options.BuildParser ( buildOptsParser )
 import           Stack.Options.CleanParser ( cleanOptsParser )
+import           Stack.Options.ConfigEnvParser ( configCmdEnvParser )
+import           Stack.Options.ConfigSetParser ( configCmdSetParser )
 import           Stack.Options.DotParser ( dotOptsParser )
 import           Stack.Options.EvalParser ( evalOptsParser )
 import           Stack.Options.ExecParser ( execOptsParser )
