@@ -280,6 +280,7 @@ library
       Stack.Options.NewParser
       Stack.Options.NixParser
       Stack.Options.PackageParser
+      Stack.Options.PackagesParser
       Stack.Options.PathParser
       Stack.Options.PvpBoundsParser
       Stack.Options.SDistParser
