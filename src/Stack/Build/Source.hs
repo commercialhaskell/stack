@@ -74,7 +74,7 @@ import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.SourceMap
                    ( CommonPackage (..), DepPackage (..), ProjectPackage (..)
                    , SMActual (..), SMTargets (..), SourceMap (..)
-                   , SourceMapHash (..), Target (..), ppGPD, ppRoot
+                   , SourceMapHash (..), Target (..), ppRoot
                    )
 import           Stack.Types.UnusedFlags ( FlagSource (..), UnusedFlags (..) )
 import           System.FilePath ( takeFileName )
@@ -330,18 +330,28 @@ generalGhcOptions bconfig boptsCli isTarget isLocal = concat
       AGOLocals -> isLocal
       AGOEverything -> True
 
+-- | Yield a t'Package' from the settings common to dependency and project
+-- packages.
 loadCommonPackage ::
      forall env. (HasBuildConfig env, HasSourceMap env)
   => CommonPackage
   -> RIO env Package
 loadCommonPackage common = do
+  (_, _, pkg) <- loadCommonPackage' common
+  pure pkg
+
+loadCommonPackage' ::
+     forall env. (HasBuildConfig env, HasSourceMap env)
+  => CommonPackage
+  -> RIO env (PackageConfig, C.GenericPackageDescription, Package)
+loadCommonPackage' common = do
   config <-
     getPackageConfig
       common.flags
       common.ghcOptions
       common.cabalConfigOpts
   gpkg <- liftIO common.gpd
-  pure $ resolvePackage config gpkg
+  pure (config, gpkg, resolvePackage config gpkg)
 
 -- | Upgrade the initial project package info to a full-blown @LocalPackage@
 -- based on the selected components
@@ -354,11 +364,7 @@ loadLocalPackage pp = do
   let common = pp.projectCommon
   bopts <- view buildOptsL
   mcurator <- view $ buildConfigL . to (.curator)
-  config <- getPackageConfig
-              common.flags
-              common.ghcOptions
-              common.cabalConfigOpts
-  gpkg <- ppGPD pp
+  (config, gpkg, pkg) <- loadCommonPackage' common
   let name = common.name
       mtarget = M.lookup name sm.targets.targets
       (exeCandidates, testCandidates, benchCandidates) =
@@ -426,7 +432,6 @@ loadLocalPackage pp = do
       -- --enable-benchmarks or --enable-tests are configured. This allows us to
       -- do an optimization where these are passed if the deps are present. This
       -- can avoid doing later unnecessary reconfigures.
-      pkg = resolvePackage config gpkg
       btpkg
         | Set.null tests && Set.null benches = Nothing
         | otherwise = Just (resolvePackage btconfig gpkg)

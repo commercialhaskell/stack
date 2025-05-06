@@ -19,10 +19,10 @@ import           Options.Applicative.Builder.Extra
                    ( boolFlags, boolFlagsNoDefault, fileExtCompleter
                    , textArgument, textOption
                    )
-import           Stack.Config ( packagesParser )
 import           Stack.Ghci ( GhciOpts (..) )
 import           Stack.Options.Completion ( ghcOptsCompleter, targetCompleter )
 import           Stack.Options.FlagsParser ( flagsParser )
+import           Stack.Options.PackagesParser ( packagesParser )
 import           Stack.Prelude
 
 -- | Parser for GHCI options

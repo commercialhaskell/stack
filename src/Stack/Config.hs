@@ -25,7 +25,6 @@ spitting out a warning that "you should run `stk init` to make things better".
 module Stack.Config
   ( loadConfig
   , loadConfigYaml
-  , packagesParser
   , getImplicitGlobalProjectDir
   , getSnapshots
   , makeConcreteSnapshot
@@ -67,7 +66,6 @@ import qualified Hpack
 import           GHC.Conc ( getNumProcessors )
 import           Network.HTTP.StackClient
                    ( httpJSON, parseUrlThrow, getResponseBody )
-import           Options.Applicative ( Parser, help, long, metavar, strOption )
 import           Pantry ( loadSnapshot )
 import           Path
                    ( PathException (..), (</>), parent, parseAbsDir
@@ -1291,32 +1289,27 @@ getDefaultUserConfigPath configRoot = do
     liftIO $ writeBinaryFileAtomic userConfigPath defaultConfigYaml
   pure userConfigPath
 
-packagesParser :: Parser [String]
-packagesParser = many (strOption
-                   (long "package" <>
-                     metavar "PACKAGE" <>
-                     help "Add a package (can be specified multiple times)"))
-
+-- | The contents of the default Stack global configuration file.
 defaultConfigYaml :: (IsString s, Semigroup s) => s
 defaultConfigYaml =
-  "# This file contains default non-project-specific settings for Stack, used\n" <>
-  "# in all projects. For more information about Stack's configuration, see\n" <>
-  "# http://docs.haskellstack.org/en/stable/configure/yaml/\n" <>
-  "\n" <>
-  "# The following parameters are used by 'stack new' to automatically fill fields\n" <>
-  "# in the Cabal file. We recommend uncommenting them and filling them out if\n" <>
-  "# you intend to use 'stack new'.\n" <>
-  "# See https://docs.haskellstack.org/en/stable/configure/yaml/non-project/#templates\n" <>
-  "templates:\n" <>
-  "  params:\n" <>
-  "#    author-name:\n" <>
-  "#    author-email:\n" <>
-  "#    copyright:\n" <>
-  "#    github-username:\n" <>
-  "\n" <>
-  "# The following parameter specifies Stack's output styles; STYLES is a\n" <>
-  "# colon-delimited sequence of key=value, where 'key' is a style name and\n" <>
-  "# 'value' is a semicolon-delimited list of 'ANSI' SGR (Select Graphic\n" <>
-  "# Rendition) control codes (in decimal). Use 'stack ls stack-colors --basic'\n" <>
-  "# to see the current sequence.\n" <>
-  "# stack-colors: STYLES\n"
+  "# This file contains default non-project-specific settings for Stack, used\n\
+  \# in all projects. For more information about Stack's configuration, see\n\
+  \# http://docs.haskellstack.org/en/stable/configure/yaml/\n\
+  \\n\
+  \# The following parameters are used by 'stack new' to automatically fill fields\n\
+  \# in the Cabal file. We recommend uncommenting them and filling them out if\n\
+  \# you intend to use 'stack new'.\n\
+  \# See https://docs.haskellstack.org/en/stable/configure/yaml/non-project/#templates\n\
+  \templates:\n\
+  \  params:\n\
+  \#    author-name:\n\
+  \#    author-email:\n\
+  \#    copyright:\n\
+  \#    github-username:\n\
+  \\n\
+  \# The following parameter specifies Stack's output styles; STYLES is a\n\
+  \# colon-delimited sequence of key=value, where 'key' is a style name and\n\
+  \# 'value' is a semicolon-delimited list of 'ANSI' SGR (Select Graphic\n\
+  \# Rendition) control codes (in decimal). Use 'stack ls stack-colors --basic'\n\
+  \# to see the current sequence.\n\
+  \# stack-colors: STYLES\n"
