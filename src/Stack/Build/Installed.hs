@@ -44,6 +44,9 @@ import           Stack.Types.Installed
 import           Stack.Types.SourceMap
                    ( DepPackage (..), ProjectPackage (..), SourceMap (..) )
 
+-- | For the given t'SourceMap', yield a dictionary of package names for a
+-- project's packages and dependencies, and pairs of their relevant database
+-- (write-only or mutable) and package versions.
 toInstallMap :: MonadIO m => SourceMap -> m InstallMap
 toInstallMap sourceMap = do
   projectInstalls <-

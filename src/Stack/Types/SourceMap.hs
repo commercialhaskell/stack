@@ -111,7 +111,12 @@ data Target
   | TargetComps !(Set NamedComponent)
     -- ^ Only build specific components
 
-data PackageType = PTProject | PTDependency
+-- | A type representing types of packages.
+data PackageType
+  = PTProject
+    -- ^ The package is a project package.
+  | PTDependency
+    -- ^ The package is other than a project package and a dependency.
   deriving (Eq, Show)
 
 -- | A source map with information on the wanted (but not actual) compiler. This

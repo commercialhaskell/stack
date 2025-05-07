@@ -828,11 +828,11 @@ topSortPackageComponent package target includeDirectTarget =
     | not includeDirectTarget && packageType == PTProject = id
     | otherwise = \v -> v |> component.qualifiedName
 
--- | Process a package's internal components in the order of their topological sort.
--- The first iteration will effect the component depending on no other component etc,
--- iterating by increasing amount of required dependencies.
--- 'PackageType' with value 'PTProject' here means the component is a direct target
--- and 'PTDependency' means it's a dependency of a direct target.
+-- | Process a package's internal components in the order of their topological
+-- sort. The first iteration will effect the component depending on no other
+-- component etc, iterating by increasing amount of required dependencies.
+-- 'PackageType' with value 'PTProject' here means the component is a direct
+-- target and 'PTDependency' means it's a dependency of a direct target.
 topProcessPackageComponent ::
      forall b.
      Package
