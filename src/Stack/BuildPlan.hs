@@ -20,7 +20,6 @@ module Stack.BuildPlan
   , DepErrors
   , removeSrcPkgDefaultFlags
   , selectBestSnapshot
-  , showItems
   ) where
 
 import qualified Data.Foldable as F
@@ -194,8 +193,8 @@ gpdPackageDeps gpd compilerVersion platform flags =
     , platform
     }
 
--- Remove any src package flags having default values
--- Remove any package entries with no flags set
+-- | For the given list of packages and dictionary of packages and Cabal flags,
+-- remove flags that have defaults and packages with no remaining flags.
 removeSrcPkgDefaultFlags ::
      [C.GenericPackageDescription]
   -> Map PackageName (Map FlagName Bool)
@@ -210,12 +209,8 @@ removeSrcPkgDefaultFlags gpds flags =
     in  Just $ Map.differenceWith diff f1 f2
 
   gpdDefaultFlags gpd =
-    let tuples = map getDefault (C.genPackageFlags gpd)
-    in  Map.singleton (gpdPackageName gpd) (Map.fromList tuples)
-
-  getDefault f
-    | C.flagDefault f = (C.flagName f, True)
-    | otherwise       = (C.flagName f, False)
+    let pairs = map (C.flagName &&& C.flagDefault) (C.genPackageFlags gpd)
+    in  Map.singleton (gpdPackageName gpd) (Map.fromList pairs)
 
 -- | Find the set of @FlagName@s necessary to get the given
 -- @GenericPackageDescription@ to compile against the given @BuildPlan@. Will
@@ -305,11 +300,17 @@ checkPackageDeps myName deps packages =
             , neededBy = Map.singleton myName range
             }
 
+-- | A type synoynm for a dictionary of packages and failures to satisfy
+-- packages' dependency constraints.
 type DepErrors = Map PackageName DepError
 
+-- | A type representing failures to satisfy packages' dependency constraints.
 data DepError = DepError
   { version :: !(Maybe Version)
+    -- ^ If available, the available version of the package.
   , neededBy :: !(Map PackageName VersionRange)
+    -- ^ A dictionary of the packages requiring the package and the permitted
+    -- range of versions.
   }
   deriving Show
 
@@ -344,6 +345,8 @@ checkBundleBuildPlan platform compiler pool flags gpds =
 
   dupError _ _ = impureThrow DuplicatePackagesBug
 
+-- | A type representing the results of evaluating how well a snapshot satisfies
+-- the dependencies of a set of packages and a set of Cabal flags.
 data BuildPlanCheck
   = BuildPlanCheckOk (Map PackageName (Map FlagName Bool))
   | BuildPlanCheckPartial (Map PackageName (Map FlagName Bool)) DepErrors

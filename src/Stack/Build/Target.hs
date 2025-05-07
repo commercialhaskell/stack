@@ -64,7 +64,6 @@ module Stack.Build.Target
   ( -- * Types
     Target (..)
   , NeedTargets (..)
-  , PackageType (..)
   , parseTargets
     -- * Convenience helpers
   , gpdVersion
@@ -245,6 +244,7 @@ parseRawTarget t =
 -- Resolve the raw targets
 --------------------------------------------------------------------------------
 
+-- | A type representing results of resolving a raw target.
 data ResolveResult = ResolveResult
   { name :: !PackageName
   , rawInput :: !RawInput
@@ -559,10 +559,13 @@ combineResolveResults results = do
 -- OK, let's do it!
 --------------------------------------------------------------------------------
 
+-- | Parse targets and dependencies from the given command line arguments and
+-- source map.
 parseTargets ::
      HasBuildConfig env
   => NeedTargets
   -> Bool
+     -- ^ Should Haddock documentation be built for the package?
   -> BuildOptsCLI
   -> SMActual GlobalPackage
   -> RIO env SMTargets
