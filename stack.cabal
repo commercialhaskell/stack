@@ -355,6 +355,7 @@ library
       Stack.Types.GhcOptions
       Stack.Types.GhcPkgExe
       Stack.Types.GhcPkgId
+      Stack.Types.GhciOpts
       Stack.Types.GlobalOpts
       Stack.Types.GlobalOptsMonoid
       Stack.Types.HpcReportOpts

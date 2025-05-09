@@ -80,6 +80,7 @@ import           Stack.Types.EnvConfig
                    , shaPathForBytes
                    )
 import           Stack.Types.EnvSettings ( defaultEnvSettings )
+import           Stack.Types.GhciOpts ( GhciOpts (..) )
 import           Stack.Types.Installed ( InstallMap, InstalledMap )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCLib, isCSubLib, renderComponentTo
@@ -153,24 +154,6 @@ instance Pretty GhciPrettyException where
     flow "figureOutMainFile: index out of range."
 
 instance Exception GhciPrettyException
-
--- | Typre respresenting command line options for the @stack ghci@ and
--- @stack repl@ commands.
-data GhciOpts = GhciOpts
-  { targets            :: ![Text]
-  , args               :: ![String]
-  , ghcOptions         :: ![String]
-  , flags              :: !(Map ApplyCLIFlag (Map FlagName Bool))
-  , ghcCommand         :: !(Maybe FilePath)
-  , noLoadModules      :: !Bool
-  , additionalPackages :: ![String]
-  , mainIs             :: !(Maybe Text)
-  , loadLocalDeps      :: !Bool
-  , hidePackages       :: !(Maybe Bool)
-  , noBuild            :: !Bool
-  , onlyMain           :: !Bool
-  }
-  deriving Show
 
 -- | Type representing information required to load a package or its components.
 --

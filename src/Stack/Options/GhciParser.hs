@@ -3,7 +3,10 @@
 
 {-|
 Module      : Stack.Options.GhciParser
+Description : Parse arguments for Stack's @ghci@ and @repl@ commands.
 License     : BSD-3-Clause
+
+Function to parse arguments for Stack's @ghci@ and @repl@ commands.
 -}
 
 module Stack.Options.GhciParser
@@ -19,13 +22,13 @@ import           Options.Applicative.Builder.Extra
                    ( boolFlags, boolFlagsNoDefault, fileExtCompleter
                    , textArgument, textOption
                    )
-import           Stack.Ghci ( GhciOpts (..) )
 import           Stack.Options.Completion ( ghcOptsCompleter, targetCompleter )
 import           Stack.Options.FlagsParser ( flagsParser )
 import           Stack.Options.PackagesParser ( packagesParser )
 import           Stack.Prelude
+import           Stack.Types.GhciOpts ( GhciOpts (..) )
 
--- | Parser for GHCI options
+-- | Parse command line arguments for Stack's @ghci@ and @repl@ commands.
 ghciOptsParser :: Parser GhciOpts
 ghciOptsParser = GhciOpts
   <$> many (textArgument
