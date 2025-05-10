@@ -15,9 +15,10 @@ import           Data.Char ( toLower )
 import qualified Data.List as L
 import           Data.List.NonEmpty ( prependList )
 import           Options.Applicative
-                   ( Parser, ParserFailure, ParserHelp, ParserResult (..), flag, switch
+                   ( Parser, ParserFailure, ParserHelp, ParserResult (..)
                    , handleParseResult, help, helpError, idm, long, metavar
-                   , overFailure, renderFailure, strArgument, switch )
+                   , overFailure, renderFailure, strArgument, switch
+                   )
 import           Options.Applicative.Help ( errorHelp, stringChunk, vcatChunks )
 import           Options.Applicative.Builder.Extra
                    ( boolFlags, extraHelpOption )
@@ -48,10 +49,7 @@ import           Stack.Exec ( SpecialExecCmd (..), execCmd )
 import           Stack.Eval ( evalCmd )
 import           Stack.Ghci ( ghciCmd )
 import           Stack.Hoogle ( hoogleCmd )
-import           Stack.IDE
-                   ( ListPackagesCmd (..), OutputStream (..), idePackagesCmd
-                   , ideTargetsCmd
-                   )
+import           Stack.IDE ( idePackagesCmd, ideTargetsCmd )
 import           Stack.Init ( initCmd )
 import           Stack.List ( listCmd )
 import           Stack.Ls ( lsCmd )
@@ -67,6 +65,7 @@ import           Stack.Options.ExecParser ( execOptsParser )
 import           Stack.Options.GhciParser ( ghciOptsParser )
 import           Stack.Options.GlobalParser ( globalOptsParser )
 import           Stack.Options.HpcReportParser ( hpcReportOptsParser )
+import           Stack.Options.IdeParser ( idePackagesParser, ideTargetsParser )
 import           Stack.Options.InitParser ( initOptsParser )
 import           Stack.Options.LsParser ( lsOptsParser )
 import           Stack.Options.NewParser ( newOptsParser )
@@ -358,46 +357,17 @@ commandLineHandler currentDir progName mExecutablePath isInterpreter =
   ide = addSubCommands'
     "ide"
     "IDE-specific commands."
-    ( let outputFlag = flag
-            OutputLogInfo
-            OutputStdout
-            (  long "stdout"
-            <> help "Send output to the standard output stream instead of the \
-                    \default, the standard error stream."
-            )
-          cabalFileFlag = flag
-            ListPackageNames
-            ListPackageCabalFiles
-            (  long "cabal-files"
-            <> help "Print paths to package Cabal files instead of package \
-                    \names."
-            )
-          exeFlag = switch
-            (  long "exes"
-            <> help "Include executables."
-            )
-          testFlag = switch
-            (  long "tests"
-            <> help "Include test suites."
-            )
-          benchFlag = switch
-            (  long "benchmarks"
-            <> help "Include benchmarks."
-            )
-       in  do
-             addCommand'
-               "packages"
-               "List all available local loadable packages."
-               idePackagesCmd
-               ((,) <$> outputFlag <*> cabalFileFlag)
-             addCommand'
-               "targets"
-               "List all targets or pick component types to list."
-               ideTargetsCmd
-                 (   (,)
-                 <$> ((,,) <$> exeFlag <*> testFlag <*> benchFlag)
-                 <*> outputFlag
-                 )
+    ( do
+        addCommand'
+          "packages"
+          "List all available local loadable packages."
+          idePackagesCmd
+          idePackagesParser
+        addCommand'
+          "targets"
+          "List all targets or pick component types to list."
+          ideTargetsCmd
+          ideTargetsParser
     )
 
   init = addCommand'

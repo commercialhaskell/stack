@@ -28,6 +28,7 @@ import           Stack.Runners
                    ( ShouldReexec (..), withBuildConfig, withConfig )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
+import           Stack.Types.IdeOpts ( ListPackagesCmd (..), OutputStream (..) )
 import           Stack.Types.NamedComponent
                    ( NamedComponent, isCBench, isCExe, isCTest
                    , renderPkgComponent
@@ -36,21 +37,6 @@ import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap
                    ( ProjectPackage (..), SMWanted (..), ppComponentsMaybe )
 import           System.IO ( putStrLn )
-
--- | Type representing output stream choices for the @stack ide packages@ and
--- @stack ide targets@ commands.
-data OutputStream
-  = OutputLogInfo
-    -- ^ To the same output stream as other log information.
-  | OutputStdout
-    -- ^ To the standard output stream.
-
--- | Type representing output choices for the @stack ide packages@ command.
-data ListPackagesCmd
-  = ListPackageNames
-    -- ^ Package names.
-  | ListPackageCabalFiles
-    -- ^ Paths to Cabal files.
 
 -- | Function underlying the @stack ide packages@ command. List packages in the
 -- project.

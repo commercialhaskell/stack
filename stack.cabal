@@ -274,6 +274,7 @@ library
       Stack.Options.GlobalParser
       Stack.Options.HaddockParser
       Stack.Options.HpcReportParser
+      Stack.Options.IdeParser
       Stack.Options.InitParser
       Stack.Options.LogLevelParser
       Stack.Options.LsParser
@@ -359,6 +360,7 @@ library
       Stack.Types.GlobalOpts
       Stack.Types.GlobalOptsMonoid
       Stack.Types.HpcReportOpts
+      Stack.Types.IdeOpts
       Stack.Types.Installed
       Stack.Types.InterfaceOpt
       Stack.Types.IsMutable
