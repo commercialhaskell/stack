@@ -215,6 +215,7 @@ library
       Stack.Build.Execute
       Stack.Build.ExecuteEnv
       Stack.Build.ExecutePackage
+      Stack.Build.FileTargets
       Stack.Build.Haddock
       Stack.Build.Installed
       Stack.Build.Source
@@ -357,6 +358,7 @@ library
       Stack.Types.GhcPkgExe
       Stack.Types.GhcPkgId
       Stack.Types.GhciOpts
+      Stack.Types.GhciPkg
       Stack.Types.GlobalOpts
       Stack.Types.GlobalOptsMonoid
       Stack.Types.HpcReportOpts

@@ -17,6 +17,7 @@ module Stack.Types.SourceMap
     SMWanted (..)
   , SMActual (..)
   , Target (..)
+  , unionTargets
   , PackageType (..)
   , SMTargets (..)
   , SourceMap (..)
@@ -37,6 +38,7 @@ module Stack.Types.SourceMap
   , smRelDir
   ) where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.PackageDescription ( GenericPackageDescription )
@@ -110,6 +112,15 @@ data Target
     -- ^ Build all of the default components.
   | TargetComps !(Set NamedComponent)
     -- ^ Only build specific components
+
+-- | Combine targets.
+unionTargets :: Ord k => Map k Target -> Map k Target -> Map k Target
+unionTargets = Map.unionWith $ \l r -> case (l, r) of
+  (TargetAll PTDependency, _) -> r
+  (TargetComps sl, TargetComps sr) -> TargetComps (Set.union sl sr)
+  (TargetComps _, TargetAll PTProject) -> TargetAll PTProject
+  (TargetComps _, _) -> l
+  (TargetAll PTProject, _) -> TargetAll PTProject
 
 -- | A type representing types of packages.
 data PackageType

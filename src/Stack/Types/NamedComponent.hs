@@ -16,6 +16,7 @@ module Stack.Types.NamedComponent
   , renderComponentTo
   , renderPkgComponents
   , renderPkgComponent
+  , displayPkgComponent
   , exeComponents
   , testComponents
   , benchComponents
@@ -79,6 +80,11 @@ renderPkgComponents = T.intercalate " " . map renderPkgComponent
 renderPkgComponent :: (PackageName, NamedComponent) -> Text
 renderPkgComponent (pkg, comp) =
   fromPackageName pkg <> ":" <> renderComponent comp
+
+-- | Display PackageName + NamedComponent
+displayPkgComponent :: (PackageName, NamedComponent) -> StyleDoc
+displayPkgComponent =
+  style PkgComponent . fromString . T.unpack . renderPkgComponent
 
 exeComponents :: Set NamedComponent -> Set StackUnqualCompName
 exeComponents = Set.fromList . mapMaybe mExeName . Set.toList
