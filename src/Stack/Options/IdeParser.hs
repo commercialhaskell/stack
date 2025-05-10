@@ -12,9 +12,13 @@ Functions to parse command line arguments for Stack's @ide@ commands.
 module Stack.Options.IdeParser
   ( idePackagesParser
   , ideTargetsParser
+  , ideGhcOptionsParser
   ) where
 
-import           Options.Applicative ( Parser, flag, help, long, switch )
+import           Options.Applicative
+                   ( Parser, completer, flag, help, long, metavar, switch )
+import           Options.Applicative.Builder.Extra
+                   ( fileExtCompleter, textArgument )
 import           Stack.Prelude
 import           Stack.Types.IdeOpts ( ListPackagesCmd (..), OutputStream (..) )
 
@@ -26,6 +30,13 @@ idePackagesParser = (,) <$> outputFlag <*> cabalFileFlag
 ideTargetsParser :: Parser ((Bool, Bool, Bool), OutputStream)
 ideTargetsParser =
   (,) <$> ((,,) <$> exeFlag <*> testFlag <*> benchFlag) <*> outputFlag
+
+-- | Parse command line arguments for Stack's @ide ghc-options@ command.
+ideGhcOptionsParser :: Parser Text
+ideGhcOptionsParser = textArgument
+  (  metavar "FILE"
+  <> completer (fileExtCompleter [".hs", ".lhs"])
+  )
 
 outputFlag :: Parser OutputStream
 outputFlag = flag
