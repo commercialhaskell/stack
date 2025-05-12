@@ -130,15 +130,26 @@ pathToLazyByteString = BSL.fromStrict . pathToByteString
 pathToByteString :: Path b t -> BS.ByteString
 pathToByteString = T.encodeUtf8 . pathToText
 
+-- | Convert to a 'T.Text' type.
 pathToText :: Path b t -> T.Text
 pathToText = T.pack . toFilePath
 
+-- | Attempt to get the time at which the given file was last modified. Yields
+-- `Left ()` if the file does not exist.
+--
+-- The operation may fail with 'System.IO.Error.isPermissionError' if the user
+-- is not permitted to read the modification time.
+--
+-- Caveat for POSIX systems: This function returns a timestamp with sub-second
+-- resolution only if this package is compiled against `unix-2.6.0.0` or later
+-- and the underlying filesystem supports them.
 tryGetModificationTime :: MonadIO m => Path Abs File -> m (Either () UTCTime)
 tryGetModificationTime =
   liftIO . tryJust (guard . isDoesNotExistError) . getModificationTime
 
 -- | 'Path.IO.resolveDir' (@path-io@ package) throws 'InvalidAbsDir' (@path@
--- package) if the directory does not exist; this function yields 'Nothing'.
+-- package) in certain circumstances; this function yields 'Nothing' in those
+-- circumstances.
 forgivingResolveDir ::
      MonadIO m
   => Path Abs Dir
@@ -156,7 +167,8 @@ forgivingResolveDir b p = liftIO $
       )
 
 -- | 'Path.IO.resolveFile' (@path-io@ package) throws 'InvalidAbsFile' (@path@
--- package) if the file does not exist; this function yields 'Nothing'.
+-- package) in certain circumstances; this function yields 'Nothing' in those
+-- circumstances.
 forgivingResolveFile ::
      MonadIO m
   => Path Abs Dir
@@ -174,7 +186,8 @@ forgivingResolveFile b p = liftIO $
       )
 
 -- | 'Path.IO.resolveFile'' (@path-io@ package) throws 'InvalidAbsFile' (@path@
--- package) if the file does not exist; this function yields 'Nothing'.
+-- package) in certain circumstances; this function yields 'Nothing' in those
+-- circumstances.
 forgivingResolveFile' ::
      MonadIO m
   => FilePath
