@@ -14,7 +14,6 @@ Types and functions related to Stack's @ghci@ and @repl@ commands.
 module Stack.Ghci
   ( GhciOpts (..)
   , GhciPkgInfo (..)
-  , GhciException (..)
   , GhciPrettyException (..)
   , ModuleMap
   , ghciCmd
@@ -102,42 +101,15 @@ import           Stack.Types.SourceMap
 import           System.IO ( putStrLn )
 import           System.Permissions ( setScriptPerms )
 
--- | Type representing exceptions thrown by functions exported by the
--- "Stack.Ghci" module.
-data GhciException
-  = InvalidPackageOption !String
-  | LoadingDuplicateModules
-  | MissingFileTarget !String
-  | Can'tSpecifyFilesAndTargets
-  | Can'tSpecifyFilesAndMainIs
-  deriving (Show, Typeable)
-
-instance Exception GhciException where
-  displayException (InvalidPackageOption name) =
-    "Error: [S-6716]\n"
-    ++ "Failed to parse '--package' option " ++ name ++ "."
-  displayException LoadingDuplicateModules = unlines
-    [ "Error: [S-9632]"
-    , "Not attempting to start ghci due to these duplicate modules."
-    , "Use '--no-load' to try to start it anyway, without loading any \
-      \modules (but these are still likely to cause errors)."
-    ]
-  displayException (MissingFileTarget name) =
-    "Error: [S-3600]\n"
-    ++ "Cannot find file target " ++ name ++ "."
-  displayException Can'tSpecifyFilesAndTargets =
-    "Error: [S-9906]\n"
-    ++ "Cannot use 'stack ghci' with both file targets and package targets."
-  displayException Can'tSpecifyFilesAndMainIs =
-    "Error: [S-5188]\n"
-    ++ "Cannot use 'stack ghci' with both file targets and '--main-is' \
-       \flag."
-
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Ghci" module.
 data GhciPrettyException
   = GhciTargetParseException ![StyleDoc]
   | CandidatesIndexOutOfRangeBug
+  | InvalidPackageOption !String
+  | FileTargetIsInvalidAbsFile !String
+  | Can'tSpecifyFilesAndTargets
+  | Can'tSpecifyFilesAndMainIs
   deriving (Show, Typeable)
 
 instance Pretty GhciPrettyException where
@@ -152,6 +124,40 @@ instance Pretty GhciPrettyException where
          ]
   pretty CandidatesIndexOutOfRangeBug = bugPrettyReport "[S-1939]" $
     flow "figureOutMainFile: index out of range."
+  pretty (InvalidPackageOption name) =
+       "[S-6716]"
+    <> line
+    <> fillSep
+         [ flow "Failed to parse"
+         , style Shell "--package"
+         , "option"
+         , style Target (fromString name) <> "."
+         ]
+  pretty (FileTargetIsInvalidAbsFile name) =
+       "[S-3600]"
+    <> line
+    <> fillSep
+         [ flow "Cannot work out a valid path for file target"
+         , style File (fromString name) <> "."
+         ]
+  pretty Can'tSpecifyFilesAndTargets =
+       "[S-9906]"
+    <> line
+    <> fillSep
+         [ flow "Cannot use"
+         , style Shell "stack ghci"
+         , flow "with both file targets and package targets."
+         ]
+  pretty Can'tSpecifyFilesAndMainIs =
+       "[S-5188]"
+    <> line
+    <> fillSep
+         [ flow "Cannot use"
+         , style Shell "stack ghci"
+         , flow "with both file targets and"
+         , style Shell "--main-is"
+         , "flag."
+         ]
 
 instance Exception GhciPrettyException
 
@@ -237,7 +243,7 @@ ghci opts = do
   (inputTargets, mfileTargets) <- case etargets of
     Right packageTargets -> pure (packageTargets, Nothing)
     Left rawFileTargets -> do
-      whenJust mainIsTargets $ \_ -> throwM Can'tSpecifyFilesAndMainIs
+      whenJust mainIsTargets $ \_ -> prettyThrowM Can'tSpecifyFilesAndMainIs
       -- Figure out targets based on filepath targets
       (targetMap, fileInfo, extraFiles) <- findFileTargets locals rawFileTargets
       pure (targetMap, Just (fileInfo, extraFiles))
@@ -305,7 +311,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
         let fp = T.unpack fp0
         mpath <- forgivingResolveFile' fp
         case mpath of
-          Nothing -> throwM (MissingFileTarget fp)
+          Nothing -> prettyThrowM (FileTargetIsInvalidAbsFile fp)
           Just path -> pure path
       pure (Left fileTargets)
     else do
@@ -318,7 +324,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
             Just (TargetParseException xs) ->
               prettyThrowM $ GhciTargetParseException xs
             _ -> throwM pex
-      unless (null fileTargetsRaw) $ throwM Can'tSpecifyFilesAndTargets
+      unless (null fileTargetsRaw) $ prettyThrowM Can'tSpecifyFilesAndTargets
       pure (Right normalTargets.targets)
 
 parseMainIsTargets ::
@@ -472,7 +478,7 @@ checkAdditionalPackages :: MonadThrow m => [String] -> m [PackageName]
 checkAdditionalPackages pkgs = forM pkgs $ \name -> do
   let mres = (pkgName <$> parsePackageIdentifier name)
         <|> parsePackageNameThrowing name
-  maybe (throwM $ InvalidPackageOption name) pure mres
+  maybe (prettyThrowM $ InvalidPackageOption name) pure mres
 
 runGhci ::
      HasEnvConfig env
@@ -1081,14 +1087,14 @@ checkForIssues pkgs =
 checkForDuplicateModules :: HasTerm env => [GhciPkgInfo] -> RIO env ()
 checkForDuplicateModules pkgs =
   unless (null duplicates) $
+    -- Two or more files with the same module name are treated as a warning
+    -- rather than an error. See:
+    -- https://github.com/commercialhaskell/stack/issues/5407#issuecomment-707339928
     prettyWarn $
          flow "Multiple files use the same module name:"
       <> line
       <> bulletedList (map prettyDuplicate duplicates)
       <> line
-    -- MSS 2020-10-13 Disabling, may remove entirely in the future
-    -- See: https://github.com/commercialhaskell/stack/issues/5407#issuecomment-707339928
-    -- throwM LoadingDuplicateModules
  where
   duplicates ::
     [(ModuleName, Map (Path Abs File) (Set (PackageName, NamedComponent)))]

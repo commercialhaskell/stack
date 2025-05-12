@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2025-04-09.
+`master` branch of the Stack repository. Last updated: 2025-05-12.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -132,21 +132,15 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         `[S-6716]` used in `unregisterGhcPkgIds`
 
-    -   `Stack.Ghci.GhciException`
-
-        ~~~haskell
-        [S-6716] = InvalidPackageOption String
-        [S-9632] | LoadingDuplicateModules
-        [S-3600] | MissingFileTarget String
-        [S-9906] | Can'tSpecifyFilesAndTargets
-        [S-5188] | Can'tSpecifyFilesAndMainIs
-        ~~~
-
     -   `Stack.Ghci.GhciPrettyException`
 
         ~~~haskell
         [S-6948] = GhciTargetParseException [StyleDoc]
         [S-1939] | CandidatesIndexOutOfRangeBug
+        [S-6716] | InvalidPackageOption String
+        [S-3600] | FileTargetIsInvalidAbsFile String
+        [S-9906] | Can'tSpecifyFilesAndTargets
+        [S-5188] | Can'tSpecifyFilesAndMainIs
         ~~~
 
     -   `Stack.Hoogle.HoogleException`
