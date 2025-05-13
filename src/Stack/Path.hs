@@ -14,6 +14,7 @@ Types and functions related to Stack's @path@ command.
 
 module Stack.Path
   ( EnvConfigPathInfo
+  , UseHaddocks
   , path
   , pathsFromRunner
   , pathsFromConfig
@@ -223,9 +224,12 @@ instance HasBuildConfig EnvConfigPathInfo where
   buildConfigL =
     lens (.buildConfig) (\x y -> x { buildConfig = y }) . buildConfigL
 
+-- | Type representing whether or not building Haddocks is required.
 data UseHaddocks a
   = UseHaddocks a
+    -- ^ Building Haddocks is required.
   | WithoutHaddocks a
+    -- ^ Building Haddocks is not required.
 
 -- | The paths of interest to a user which do require a t'Config' or
 -- 'EnvConfig'. The first tuple string is used for a description that the

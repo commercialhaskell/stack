@@ -355,7 +355,7 @@ announceTask ee taskType action = logInfo $
 -- * Checks if the package exists in the precompiled cache, and if so, add it to
 --   the database instead of performing the build.
 --
--- * Runs the configure step if needed ('ensureConfig')
+-- * Runs the configure step if needed (@ensureConfig@)
 --
 -- * Runs the build step
 --

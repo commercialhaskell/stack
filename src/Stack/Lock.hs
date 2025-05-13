@@ -57,6 +57,7 @@ instance Pretty LockPrettyException where
 
 instance Exception LockPrettyException
 
+-- | Type representing locked locations.
 data LockedLocation a b = LockedLocation
   { original :: a
   , completed :: b
@@ -90,6 +91,7 @@ instance FromJSON (WithJSONWarnings (Unresolved SingleRPLI)) where
       let withWarnings x = WithJSONWarnings x ws
       pure $ withWarnings $ SingleRPLI . NE.head <$> unresolvedRPLIs
 
+-- | Type representing the contents of lock files.
 data Locked = Locked
   { snapshotLocations :: [LockedLocation RawSnapshotLocation SnapshotLocation]
   , pkgImmutableLocations :: [LockedLocation RawPackageLocationImmutable PackageLocationImmutable]
@@ -127,10 +129,14 @@ loadYamlThrow parser path = do
         logJSONWarnings (toFilePath path) warnings
         pure res
 
+-- | Yields a t'Stack.Types.SourceMap.SMWanted' taking into account the relevant
+-- lock file, if one is applicable and it exists.
 lockCachedWanted ::
      (HasPantryConfig env, HasRunner env)
   => Path Abs File
+     -- ^ The relevant Stack project-level configuration file.
   -> RawSnapshotLocation
+     -- ^ The relevant snapshot.
   -> (  Map RawPackageLocationImmutable PackageLocationImmutable
      -> WantedCompiler
      -> Map PackageName (Bool -> RIO env DepPackage)
