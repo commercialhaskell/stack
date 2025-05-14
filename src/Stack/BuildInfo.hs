@@ -37,6 +37,7 @@ import           Stack.Prelude
 import           Stack.Types.Version ( showStackVersion )
 #endif
 
+-- | The output of @stack --version@.
 versionString' :: String
 #ifdef USE_GIT_INFO
 versionString' = concat $ concat

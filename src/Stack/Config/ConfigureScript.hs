@@ -17,6 +17,8 @@ import           Stack.DefaultColorWhen ( defaultColorWhen )
 import           Stack.Prelude
 import           RIO.Process ( HasProcessContext, withWorkingDir )
 
+-- | For the given directory, yields an action that trys to generate a
+-- @configure@ script with @autoreconf@, if one does not exist in the directory.
 ensureConfigureScript ::
      (HasProcessContext env, HasTerm env)
   => Path b Dir

@@ -51,6 +51,8 @@ data GlobalOpts = GlobalOpts
     -- available.
   }
 
+-- | View or set the @buildOpts@ field of the @configMonoid@ field of a
+-- v'GlobalOpts'.
 globalOptsBuildOptsMonoidL :: Lens' GlobalOpts BuildOptsMonoid
 globalOptsBuildOptsMonoidL =
     lens (.configMonoid) (\x y -> x { configMonoid = y })
