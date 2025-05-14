@@ -259,7 +259,7 @@ writeSetupConfigMod dir (Just x) = do
   writeBinaryFileAtomic fp "Just used for its modification time"
   liftIO $ setFileTimes (toFilePath fp) x x
 
--- | See 'tryGetPackageProjectRoot'
+-- | See 'tryGetPackageProjectRoot'.
 writePackageProjectRoot ::
      HasEnvConfig env
   => Path Abs Dir
@@ -288,7 +288,7 @@ flagCacheKey installed = do
     Executable ident -> pure $
       configCacheKey installationRoot (ConfigCacheTypeFlagExecutable ident)
 
--- | Loads the flag cache for the given installed extra-deps
+-- | Loads the flag cache for the given installed extra-deps.
 tryGetFlagCache ::
      HasEnvConfig env
   => Installed
@@ -297,6 +297,7 @@ tryGetFlagCache gid = do
   key <- flagCacheKey gid
   loadConfigCache key
 
+-- | Write the flag cache for the given installed extra-deps.
 writeFlagCache ::
      HasEnvConfig env
   => Installed

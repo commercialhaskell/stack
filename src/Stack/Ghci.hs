@@ -186,8 +186,10 @@ data GhciPkgDesc = GhciPkgDesc
 
 -- | Type synonym representing maps from a module name to a map with all of the
 -- paths that use that name. Each of those paths is associated with a set of
--- components that contain it. The purpose of this complex structure is for use
--- in 'checkForDuplicateModules'.
+-- components that contain it.
+
+-- The purpose of this complex structure is for use in
+-- 'checkForDuplicateModules'.
 type ModuleMap =
   Map ModuleName (Map (Path Abs File) (Set (PackageName, NamedComponent)))
 

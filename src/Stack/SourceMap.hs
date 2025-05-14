@@ -16,7 +16,6 @@ module Stack.SourceMap
   , getPLIVersion
   , loadGlobalHints
   , actualFromGhc
-  , actualFromHints
   , globalCondCheck
   , pruneGlobals
   , globalsFromHints
@@ -39,7 +38,7 @@ import           Stack.Constants ( stackProgName' )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDump )
 import           Stack.Prelude
 import           Stack.Types.Compiler
-                   ( ActualCompiler, actualToWanted, wantedToActual )
+                   ( ActualCompiler, wantedToActual )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), GhcPkgExe, HasCompiler (..) )
 import           Stack.Types.Config ( HasConfig )
@@ -112,6 +111,8 @@ additionalDepPackage buildHaddocks location = do
           }
     }
 
+-- | Given a t'PackageName' and its t'SnapshotPackage', yields the corresponding
+-- t'DepPackage'.
 snapToDepPackage ::
      forall env. (HasPantryConfig env, HasLogFunc env, HasProcessContext env)
   => Bool
@@ -136,16 +137,22 @@ snapToDepPackage buildHaddocks name sp = do
           }
     }
 
+-- | For the given t'CommonPackage', load its generic package description and
+-- yield its version.
 loadVersion :: MonadIO m => CommonPackage -> m Version
 loadVersion common = do
   gpd <- liftIO common.gpd
-  pure (pkgVersion $ PD.package $ PD.packageDescription gpd)
+  pure gpd.packageDescription.package.pkgVersion
 
+-- | For the given t'PackageLocationImmutable', yield the version of the
+-- referenced package.
 getPLIVersion :: PackageLocationImmutable -> Version
 getPLIVersion (PLIHackage (PackageIdentifier _ v) _ _) = v
 getPLIVersion (PLIArchive _ pm) = pkgVersion $ pmIdent pm
 getPLIVersion (PLIRepo _ pm) = pkgVersion $ pmIdent pm
 
+-- | For the given @ghc-pkg@ executable, yield the contents of the global
+-- package database.
 globalsFromDump ::
      (HasProcessContext env, HasTerm env)
   => GhcPkgExe
@@ -157,21 +164,24 @@ globalsFromDump pkgexe = do
         Map.fromList $ map (pkgName . (.packageIdent) &&& id) $ Map.elems ds
   toGlobals <$> ghcPkgDump pkgexe [] pkgConduit
 
+-- | For the given wanted compiler, yield the global hints (if available).
 globalsFromHints ::
      HasConfig env
   => WantedCompiler
   -> RIO env (Map PackageName Version)
-globalsFromHints compiler = do
-  mglobalHints <- loadGlobalHints compiler
-  case mglobalHints of
-    Just hints -> pure hints
-    Nothing -> do
+globalsFromHints compiler = loadGlobalHints compiler >>= maybe
+  ( do
       prettyWarnL
         [ flow "Unable to load global hints for"
         , fromString $ T.unpack $ textDisplay compiler
         ]
       pure mempty
+  )
+  pure
 
+-- | When the environment 'HasCompiler', for the
+-- given t'Stack.Types.SourceMap.SMWanted' and 'ActualCompiler', yield
+-- a t'SMActual' parameterised by t'DumpedGlobalPackage'.
 actualFromGhc ::
      (HasConfig env, HasCompiler env)
   => SMWanted
@@ -187,21 +197,6 @@ actualFromGhc smw compiler = do
       , globals
       }
 
-actualFromHints ::
-     (HasConfig env)
-  => SMWanted
-  -> ActualCompiler
-  -> RIO env (SMActual GlobalPackageVersion)
-actualFromHints smw compiler = do
-  globals <- globalsFromHints (actualToWanted compiler)
-  pure
-    SMActual
-      { compiler
-      , project = smw.project
-      , deps = smw.deps
-      , globals = Map.map GlobalPackageVersion globals
-      }
-
 -- | Simple cond check for boot packages - checks only OS and Arch
 globalCondCheck ::
      (HasConfig env)
@@ -214,9 +209,12 @@ globalCondCheck = do
       condCheck c = Left c
   pure condCheck
 
+-- | Prune the given packages from GHC's global package database.
 pruneGlobals ::
      Map PackageName DumpedGlobalPackage
+     -- ^ Packages in GHC's global package database.
   -> Set PackageName
+     -- ^ Package names to prune.
   -> Map PackageName GlobalPackage
 pruneGlobals globals deps =
   let (prunedGlobals, keptGlobals) =
@@ -225,9 +223,12 @@ pruneGlobals globals deps =
   in  Map.map (GlobalPackage . pkgVersion . (.packageIdent)) keptGlobals <>
       Map.map ReplacedGlobalPackage prunedGlobals
 
+-- | Get the output of @ghc --info@ for the compiler in the environment.
 getCompilerInfo :: (HasConfig env, HasCompiler env) => RIO env Builder
 getCompilerInfo = view $ compilerPathsL . to (byteString . (.ghcInfo))
 
+-- | For the given 'PackageLocationImmutable', yield its 256-bit cryptographic
+-- hash.
 immutableLocSha :: PackageLocationImmutable -> Builder
 immutableLocSha = byteString . treeKeyToBs . locationTreeKey
  where
@@ -236,9 +237,13 @@ immutableLocSha = byteString . treeKeyToBs . locationTreeKey
   locationTreeKey (PLIRepo _ pm) = pmTreeKey pm
   treeKeyToBs (TreeKey (BlobKey sha _)) = SHA256.toHexBytes sha
 
+-- | Type synonym for functions that yield a t'SMActual' parameterised by
+-- t'GlobalPackageVersion' for a given list of project package directories.
 type SnapshotCandidate env
   = [ResolvedPath Dir] -> RIO env (SMActual GlobalPackageVersion)
 
+-- | For the given raw snapshot location, yield a function to yield a
+-- t'SMActual' from a list of project package directories.
 loadProjectSnapshotCandidate ::
      (HasConfig env)
   => RawSnapshotLocation
