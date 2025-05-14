@@ -255,6 +255,8 @@ instance Pretty ConfigPrettyException where
 
 instance Exception ConfigPrettyException
 
+-- | Type representing an exception thrown by functions exported by the
+-- "Stack.Config" module.
 data ParseAbsolutePathException
   = ParseAbsolutePathException String String
   deriving (Show, Typeable)

@@ -166,6 +166,8 @@ getPackageFile pkg cabalFP =
           moreBuildFiles <> packageComponentFile.packageExtraFile
       }
 
+-- | For the given contents of a Cabal file, yields the information from it that
+-- Stack needs to track files.
 stackPackageFileFromCabal :: Cabal.PackageDescription -> StackPackageFile
 stackPackageFileFromCabal cabalPkg =
   StackPackageFile

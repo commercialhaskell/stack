@@ -32,6 +32,8 @@ import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 
+-- | Type representing environments in which Stack gets all files referenced by
+-- a package.
 data GetPackageFileContext = GetPackageFileContext
   { file :: !(Path Abs File)
   , distDir :: !(Path Abs Dir)

@@ -54,6 +54,8 @@ instance PersistField ConfigCacheType where
 instance PersistFieldSql ConfigCacheType where
   sqlType _ = SqlString
 
+-- | Type representing actions for which the last time the action was performed
+-- should be cached.
 data Action
   = UpgradeCheck
   deriving (Eq, Ord, Show)

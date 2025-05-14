@@ -15,6 +15,7 @@ import           Data.Attoparsec.Args ( EscapingMode (Escaping), parseArgs )
 import qualified Data.Text as T
 import           Stack.Prelude
 
+-- | Type representing lists of GHC options.
 newtype GhcOptions = GhcOptions { ghcOptions :: [Text] }
 
 instance FromJSON GhcOptions where
