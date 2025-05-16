@@ -177,5 +177,4 @@ plugins:
       'custom_snapshot.md': 'topics/custom_snapshot.md'
       'lock_files.md': 'topics/lock_files.md'
       'scripts.md': 'topics/scripts.md'
-- social:
-    cards_layout: default
+- social
