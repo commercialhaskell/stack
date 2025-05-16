@@ -2,6 +2,7 @@ import Control.Monad.IO.Class
 import Control.Monad
 import Data.List
 import StackTest
+import StackTest.Repl
 
 main :: IO ()
 main

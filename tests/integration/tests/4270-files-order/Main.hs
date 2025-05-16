@@ -1,5 +1,6 @@
 import Control.Monad
 import StackTest
+import StackTest.Repl
 
 main :: IO ()
 main = do

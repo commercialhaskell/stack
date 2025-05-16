@@ -1,6 +1,5 @@
 import Control.Monad
-import Data.List
-import StackTest
+import StackTest.Repl
 
 main :: IO ()
 main = repl ["--ghci-options=-ignore-dot-ghci"] $ do
