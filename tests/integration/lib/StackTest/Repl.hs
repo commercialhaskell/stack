@@ -10,16 +10,19 @@ module StackTest.Repl
     , replGetLine
     ) where
 
+import Control.Exception (SomeException, catch, displayException, finally)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (fromMaybe)
 import GHC.Stack (HasCallStack)
+import System.Directory (removeFile)
 import System.Environment (lookupEnv)
-import System.Exit (ExitCode (..))
+import System.Exit (ExitCode (..), exitFailure)
 import System.IO
-    ( BufferMode (NoBuffering, LineBuffering), Handle
-    , hClose, hGetChar, hGetLine, hPutStrLn, hSetBuffering
+    ( BufferMode (NoBuffering, LineBuffering), Handle, IOMode (ReadMode)
+    , hClose, hGetChar, hGetContents', hGetLine, hPutStrLn, hSetBuffering
     , openTempFile
+    , withFile
     )
 
 import Control.Monad.Trans (lift)
@@ -87,6 +90,18 @@ runRepl cmd args actions = do
 
   -- run the test script which is to talk to the GHCi subprocess.
   runReaderT actions (ReplConnection rStdin rStdout)
+    -- the nested actions script may fail in arbitrary ways; handle that here,
+    -- attaching the subprocess stderr as relevant context
+    `catch` \(e :: SomeException) -> do
+      putStrLn "=============================="
+      putStrLn "EXCEPTION in test: "
+      putStrLn . quote $ displayException e
+      putStrLn "------[ stderr of repl ]------"
+      withFile stderrBufPath ReadMode $ \h -> hGetContents' h >>= putStr . quote
+      putStrLn "=============================="
+    `finally` do
+      hClose stderrBufHandle
+      removeFile stderrBufPath
 
   -- once done with the test, signal EOF on stdin for clean termination of ghci
   hClose rStdin
@@ -104,5 +119,9 @@ repl :: HasCallStack => [String] -> Repl () -> IO ()
 repl args action = do
   stackExe' <- stackExe
   ec <- runRepl stackExe' ("repl" : "--ghci-options=-ignore-dot-ghci" : args) action
-  unless (ec == ExitSuccess) $
-    error $ "GHCi exited with " <> show ec
+  unless (ec == ExitSuccess) $ do
+    putStrLn $ "repl exited with " <> show ec
+    exitFailure
+
+quote :: String -> String
+quote = unlines . map ("> " <>) . lines
