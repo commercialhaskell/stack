@@ -10,27 +10,24 @@ module StackTest.Repl
     , replGetLine
     ) where
 
-import Control.Concurrent (forkIO)
-import Control.Exception (throw, catch)
-import Control.Monad (forever, unless, when)
+import Control.Monad (unless, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (fromMaybe)
 import GHC.Stack (HasCallStack)
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode (..))
 import System.IO
-    ( BufferMode (NoBuffering, LineBuffering), Handle, IOMode (WriteMode)
-    , hClose, hGetChar, hGetLine, hPutChar, hPutStrLn, hSetBuffering
-    , withFile
+    ( BufferMode (NoBuffering, LineBuffering), Handle
+    , hClose, hGetChar, hGetLine, hPutStrLn, hSetBuffering
+    , openTempFile
     )
-import System.IO.Error (isEOFError)
 
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State qualified as State
 import System.Process
     ( CreateProcess (std_err, std_in, std_out)
-    , StdStream (CreatePipe)
+    , StdStream (CreatePipe, UseHandle)
     , createProcess, proc, waitForProcess
     )
 
@@ -42,6 +39,16 @@ data ReplConnection = ReplConnection
   { replStdin  :: Handle
   , replStdout :: Handle
   }
+
+replCommand :: String -> Repl ()
+replCommand cmd = do
+  (ReplConnection replStdinHandle _) <- ask
+  -- echo what we send to the test's stdout
+  liftIO . putStrLn $ "____> " <> cmd
+  liftIO $ hPutStrLn replStdinHandle cmd
+
+replGetLine :: Repl String
+replGetLine = ask >>= liftIO . hGetLine . replStdout
 
 nextPrompt :: Repl ()
 nextPrompt = State.evalStateT poll "" where
@@ -55,14 +62,6 @@ nextPrompt = State.evalStateT poll "" where
     unless (buf == "ghci> ")
       poll
 
-replCommand :: String -> Repl ()
-replCommand cmd = do
-  (ReplConnection replStdinHandle _) <- ask
-  liftIO $ hPutStrLn replStdinHandle cmd
-
-replGetLine :: Repl String
-replGetLine = ask >>= liftIO . hGetLine . replStdout
-
 runRepl
   :: HasCallStack
   => FilePath
@@ -70,27 +69,21 @@ runRepl
   -> Repl ()
   -> IO ExitCode
 runRepl cmd args actions = do
-  logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
-  (Just rStdin, Just rStdout, Just rStderr, ph) <-
+  (stderrBufPath, stderrBufHandle) <- openTempStderrBufferFile
+  hSetBuffering stderrBufHandle NoBuffering
+
+  logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args) ++ "\n\
+            \         with stderr in " ++ stderrBufPath
+
+  -- launch the GHCi subprocess, grab its FD handles and process handle
+  (Just rStdin, Just rStdout, Nothing, ph) <-
     createProcess (proc cmd args)
       { std_in = CreatePipe
       , std_out = CreatePipe
-      , std_err = CreatePipe
+      , std_err = UseHandle stderrBufHandle
       }
   hSetBuffering rStdin LineBuffering
   hSetBuffering rStdout NoBuffering
-  hSetBuffering rStderr NoBuffering
-  -- Log stack repl's standard error output
-  tempDir <- if isWindows
-                then fromMaybe "" <$> lookupEnv "TEMP"
-                else pure "/tmp"
-  let tempLogFile = tempDir ++ "/stderr"
-  _ <- forkIO $ withFile tempLogFile WriteMode $ \logFileHandle -> do
-    --hSetBuffering logFileHandle NoBuffering
-    forever $
-      catch
-        (hGetChar rStderr >>= hPutChar logFileHandle)
-        (\e -> unless (isEOFError e) $ throw e)
 
   -- run the test script which is to talk to the GHCi subprocess.
   runReaderT actions (ReplConnection rStdin rStdout)
@@ -99,6 +92,13 @@ runRepl cmd args actions = do
   hClose rStdin
   -- read out the exit-code
   waitForProcess ph
+
+-- | Roll a bicycle, rather than just `import Path.IO (getTempDir, openTempFile)`,
+-- because it's a hassle to use anything beyond base & boot libs here.
+openTempStderrBufferFile :: IO (FilePath, Handle)
+openTempStderrBufferFile = getTempDir >>= (`openTempFile` "err.log") where
+  getTempDir | isWindows = fromMaybe "" <$> lookupEnv "TEMP"
+             | otherwise = pure "/tmp"
 
 repl :: HasCallStack => [String] -> Repl () -> IO ()
 repl args action = do
