@@ -19,8 +19,8 @@ import GHC.Stack (HasCallStack)
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode (..))
 import System.IO
-    ( BufferMode (NoBuffering), Handle, IOMode (WriteMode)
-    , hGetChar, hGetLine, hPutChar, hPutStrLn, hSetBuffering
+    ( BufferMode (NoBuffering, LineBuffering), Handle, IOMode (WriteMode)
+    , hClose, hGetChar, hGetLine, hPutChar, hPutStrLn, hSetBuffering
     , withFile
     )
 import System.IO.Error (isEOFError)
@@ -67,7 +67,7 @@ runRepl
   :: HasCallStack
   => FilePath
   -> [String]
-  -> ReaderT ReplConnection IO ()
+  -> Repl ()
   -> IO ExitCode
 runRepl cmd args actions = do
   logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
@@ -77,7 +77,7 @@ runRepl cmd args actions = do
       , std_out = CreatePipe
       , std_err = CreatePipe
       }
-  hSetBuffering rStdin NoBuffering
+  hSetBuffering rStdin LineBuffering
   hSetBuffering rStdout NoBuffering
   hSetBuffering rStderr NoBuffering
   -- Log stack repl's standard error output
@@ -91,14 +91,18 @@ runRepl cmd args actions = do
       catch
         (hGetChar rStderr >>= hPutChar logFileHandle)
         (\e -> unless (isEOFError e) $ throw e)
+
+  -- run the test script which is to talk to the GHCi subprocess.
   runReaderT actions (ReplConnection rStdin rStdout)
+
+  -- once done with the test, signal EOF on stdin for clean termination of ghci
+  hClose rStdin
+  -- read out the exit-code
   waitForProcess ph
 
 repl :: HasCallStack => [String] -> Repl () -> IO ()
 repl args action = do
   stackExe' <- stackExe
   ec <- runRepl stackExe' ("repl" : "--ghci-options=-ignore-dot-ghci" : args) action
-  unless (ec == ExitSuccess) $ pure ()
-  -- TODO: Understand why the exit code is 1 despite running GHCi tests
-  -- successfully.
-  -- else error $ "Exited with exit code: " ++ show ec
+  unless (ec == ExitSuccess) $
+    error $ "GHCi exited with " <> show ec
