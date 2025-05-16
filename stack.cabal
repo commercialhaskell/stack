@@ -85,10 +85,10 @@ extra-source-files:
     doc/glossary.md
     doc/install_and_upgrade.md
     doc/maintainers/7zip.md
+    doc/maintainers/archive/docker.md
+    doc/maintainers/archive/docker_images.md
     doc/maintainers/archive/README.md
     doc/maintainers/archive/releases.md
-    doc/maintainers/docker.md
-    doc/maintainers/docker_images.md
     doc/maintainers/ghc.md
     doc/maintainers/haskellstack.org.md
     doc/maintainers/msys.md
