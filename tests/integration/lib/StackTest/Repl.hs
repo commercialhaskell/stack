@@ -97,7 +97,7 @@ runRepl cmd args actions = do
 repl :: HasCallStack => [String] -> Repl () -> IO ()
 repl args action = do
   stackExe' <- stackExe
-  ec <- runRepl stackExe' ("repl":args) action
+  ec <- runRepl stackExe' ("repl" : "--ghci-options=-ignore-dot-ghci" : args) action
   unless (ec == ExitSuccess) $ pure ()
   -- TODO: Understand why the exit code is 1 despite running GHCi tests
   -- successfully.
