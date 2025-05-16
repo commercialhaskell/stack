@@ -5,9 +5,9 @@ module StackTest.Repl
     ( Repl
     , ReplConnection (..)
     , nextPrompt
-    , repl
     , replCommand
     , replGetLine
+    , stackRepl
     ) where
 
 import Control.Exception (SomeException, catch, displayException, finally)
@@ -115,8 +115,9 @@ openTempStderrBufferFile = getTempDir >>= (`openTempFile` "err.log") where
   getTempDir | isWindows = fromMaybe "" <$> lookupEnv "TEMP"
              | otherwise = pure "/tmp"
 
-repl :: HasCallStack => [String] -> Repl () -> IO ()
-repl args action = do
+-- | Testing helper to exercise `stack repl`.
+stackRepl :: HasCallStack => [String] -> Repl () -> IO ()
+stackRepl args action = do
   stackExe' <- stackExe
   ec <- runRepl stackExe' ("repl" : "--ghci-options=-ignore-dot-ghci" : args) action
   unless (ec == ExitSuccess) $ do
