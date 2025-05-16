@@ -13,7 +13,12 @@ module StackTest.Repl
 import Control.Exception (SomeException, catch, displayException, finally)
 import Control.Monad (unless, when)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State qualified as State
 import Data.Maybe (fromMaybe)
+import Data.Foldable (toList)
+import Data.Sequence as Seq (Seq(Empty), (|>), fromList)
 import GHC.Stack (HasCallStack)
 import System.Directory (removeFile)
 import System.Environment (lookupEnv)
@@ -24,10 +29,6 @@ import System.IO
     , openTempFile
     , withFile
     )
-
-import Control.Monad.Trans (lift)
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.State qualified as State
 import System.Process
     ( CreateProcess (std_err, std_in, std_out)
     , StdStream (CreatePipe, UseHandle)
@@ -54,15 +55,15 @@ replGetLine :: Repl String
 replGetLine = ask >>= liftIO . hGetLine . replStdout
 
 nextPrompt :: Repl ()
-nextPrompt = State.evalStateT poll "" where
+nextPrompt = State.evalStateT poll Seq.Empty where
   poll = do
     c <- lift (asks replStdout) >>= liftIO . hGetChar
-    State.modify (++ [c]) -- FIXME crap perf
+    State.modify (|> c)
     when (c == '\n') $ do
-      State.get >>= liftIO . putStr . ("ghci> " <>)
-      State.put ""
+      State.get >>= liftIO . putStr . ("ghci> " ++) . toList
+      State.put Seq.Empty
     buf <- State.get
-    unless (buf == "ghci> ")
+    unless (buf == Seq.fromList "ghci> ")
       poll
 
 runRepl
