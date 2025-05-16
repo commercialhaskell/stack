@@ -629,6 +629,7 @@ executable stack-integration-test
   main-is: IntegrationSpec.hs
   other-modules:
       StackTest
+      StackTest.Repl
       Paths_stack
   autogen-modules:
       Paths_stack
