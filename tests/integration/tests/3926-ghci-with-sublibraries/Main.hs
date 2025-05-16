@@ -10,7 +10,7 @@ main = do
   copy "src/Lib.v1" "src/Lib.hs"
   copy "src-internal/Internal.v1" "src-internal/Internal.hs"
   stack ["build"] -- need a build before ghci at the moment, see #4148
-  repl [] $ do
+  stackRepl [] $ do
     -- The command must be issued before searching the output for the next prompt,
     -- otherwise, on Windows from msys2-20230526, `stack repl` encounters a EOF
     -- and terminates gracefully.
