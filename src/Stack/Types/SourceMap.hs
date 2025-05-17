@@ -111,7 +111,7 @@ data Target
   = TargetAll !PackageType
     -- ^ Build all of the default components.
   | TargetComps !(Set NamedComponent)
-    -- ^ Only build specific components
+    -- ^ Build only the specified components.
 
 -- | Combine targets.
 unionTargets :: Ord k => Map k Target -> Map k Target -> Map k Target
