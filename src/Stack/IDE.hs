@@ -38,6 +38,7 @@ import           Stack.Runners
                    ( ShouldReexec (..), withBuildConfig, withConfig
                    , withEnvConfig
                    )
+import           Stack.Types.Build.FileTargets ( FileTarget (..), toTarget )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
@@ -56,7 +57,7 @@ import           Stack.Types.Package ( LocalPackage (..), Package (..) )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap
                    ( ProjectPackage (..), SMWanted (..), ppComponentsMaybe )
-import           System.IO ( putStrLn )
+import           System.IO ( print, putStrLn )
 
 -- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.IDE" module.
@@ -153,10 +154,11 @@ ideGhcOptions rawTarget = do
   depLocals <- localDependencies
   let localMap = M.fromList [(lp.package.name, lp) | lp <- locals ++ depLocals]
   -- Parse to either file targets or build targets
-  (inputTargets, mfileTargets) <- processRawTarget rawTarget >>= maybe
+  (inputTargets', mfileTargets) <- processRawTarget rawTarget >>= maybe
     (pure (mempty, Nothing))
     -- Figure out targets based on file target
     (findFileTargets locals . pure)
+  let inputTargets = Map.map toTarget inputTargets'
   -- Get a list of all the local target packages.
   (directlyWanted, extraLoadDeps) <-
     getAllLocalTargets True inputTargets Nothing localMap
@@ -179,6 +181,9 @@ ideGhcOptions rawTarget = do
       nonLocalTargets
       relevantDependencies
   let outputDivider = liftIO $ putStrLn "---"
+  outputDivider
+  mapM_ (liftIO . print) $
+    concatMap (\(FileTarget t) -> concat $ Map.elems t) (Map.elems inputTargets')
   outputDivider
   mapM_ (liftIO . putStrLn) pkgopts
   outputDivider

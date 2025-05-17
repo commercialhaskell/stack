@@ -26,6 +26,7 @@ import           Data.ByteString.Builder ( byteString )
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.List as L
 import           Data.List.Extra ( (!?) )
+import qualified Data.Map as Map
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -58,6 +59,7 @@ import           Stack.Prelude
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Types.Build.Exception
                    ( BuildPrettyException (..), pprintTargetParseErrors )
+import           Stack.Types.Build.FileTargets ( toTarget )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), configFileL )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
@@ -200,7 +202,7 @@ ghci opts = do
     Left rawFileTargets -> do
       whenJust mainIsTargets $ \_ -> prettyThrowM Can'tSpecifyFilesAndMainIs
       -- Figure out targets based on filepath targets
-      findFileTargets locals rawFileTargets
+      findFileTargets' locals rawFileTargets
   -- Get a list of all the local target packages.
   localTargets <- getAllLocalTargets' opts inputTargets mainIsTargets localMap
   -- Get a list of all the non-local target packages.
@@ -291,6 +293,29 @@ parseMainIsTargets buildOptsCLI sma mtarget = forM mtarget $ \target -> do
   let boptsCLI = buildOptsCLI { targetsCLI = [target] }
   targets <- parseTargets AllowNoTargets False boptsCLI sma
   pure targets.targets
+
+-- | Given a list of project packages and a list of absolute paths to files,
+-- seek to identify which component of which project package each file relates
+-- to (if any).
+findFileTargets' ::
+     HasEnvConfig env
+  => [LocalPackage]
+     -- ^ All project packages
+  -> [Path Abs File]
+     -- ^ File targets to find
+  -> RIO
+       env
+       ( Map PackageName Target
+       , Maybe
+           ( Map PackageName [Path Abs File]
+             -- Dictionary of project package names and lists of file targets
+             -- associated with the package.
+           , [Path Abs File]
+             -- List of file targets not associated with any project package.
+           )
+       )
+findFileTargets' locals fileTargets =
+  first ( Map.map toTarget ) <$> findFileTargets locals fileTargets
 
 getAllLocalTargets' ::
      HasEnvConfig env

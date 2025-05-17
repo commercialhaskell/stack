@@ -46,6 +46,8 @@ import           Stack.Types.BuildOptsCLI ( ApplyCLIFlag (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), actualCompilerVersionL )
+import           Stack.Types.Build.FileTargets
+                   ( FileTarget (..), unionFileTargets )
 import           Stack.Types.GhciPkg
                    ( GhciPkgDesc (..), GhciPkgInfo (..), unionModuleMaps )
 import           Stack.Types.Installed ( InstallMap, InstalledMap )
@@ -75,20 +77,44 @@ findFileTargets ::
      -- ^ File targets to find
   -> RIO
        env
-       ( Map PackageName Target
-       , Maybe (Map PackageName [Path Abs File], [Path Abs File])
+       ( Map PackageName FileTarget
+       , Maybe
+           ( Map PackageName [Path Abs File]
+             -- Dictionary of project package names and lists of file targets
+             -- associated with the package.
+           , [Path Abs File]
+             -- List of file targets not associated with any project package.
+           )
        )
 findFileTargets locals fileTargets = do
   filePackages <- forM locals $ \lp -> do
     PackageComponentFile _ compFiles _ _ <- getPackageFile lp.package lp.cabalFP
     pure (lp, M.map (map dotCabalGetPath) compFiles)
-  let foundFileTargetComponents :: [(Path Abs File, [(PackageName, NamedComponent)])]
-      foundFileTargetComponents =
-        map (\fp -> (fp, ) $ L.sort $
-                    concatMap (\(lp, files) -> map ((lp.package.name,) . fst)
-                                                   (filter (elem fp . snd) (M.toList files))
-                              ) filePackages
-            ) fileTargets
+  let foundFileTargetComponents ::
+        [ ( Path Abs File
+            -- The target file.
+          , [ ( PackageName
+                -- A relevant package.
+              , NamedComponent
+                -- A relevant component of the relevant package.
+              , [Path Abs File]
+                -- The module source files of the relevant component.
+              )
+            ]
+          )
+        ]
+      foundFileTargetComponents = map
+        ( \fp ->
+              (fp,)
+            $ L.sort
+            $ concatMap
+                ( \(lp, files) -> map
+                    (\(comp, compFiles) -> (lp.package.name, comp, compFiles))
+                    (filter (elem fp . snd) (M.toList files))
+                )
+                filePackages
+        )
+        fileTargets
   results <- forM foundFileTargetComponents $ \(fp, xs) ->
     case xs of
       [] -> do
@@ -99,36 +125,38 @@ findFileTargets locals fileTargets = do
                  \Attempting to load the file anyway."
           ]
         pure $ Left fp
-      [x] -> do
+      [x@(name, comp, _)] -> do
         prettyInfoL
           [ flow "Using configuration for"
-          , displayPkgComponent x
+          , displayPkgComponent (name, comp)
           , flow "to load"
           , pretty fp
           ]
         pure $ Right (fp, x)
-      (x:_) -> do
+      (x@(name, comp, _):_) -> do
         prettyWarn $
              fillSep
                [ flow "Multiple components contain file target"
                , pretty fp <> ":"
-               , fillSep $ punctuate "," (map displayPkgComponent xs)
+               , fillSep $ punctuate "," (map (\(n, c, _) -> displayPkgComponent (n, c)) xs)
                ]
           <> line
           <> fillSep
                [ flow "Guessing the first one,"
-               , displayPkgComponent x <> "."
+               , displayPkgComponent (name, comp) <> "."
                ]
         pure $ Right (fp, x)
   let (extraFiles, associatedFiles) = partitionEithers results
       targetMap =
-          foldl' unionTargets M.empty $
-          map (\(_, (name, comp)) -> M.singleton name (TargetComps (S.singleton comp)))
-              associatedFiles
+          foldl' unionFileTargets M.empty
+        $ map
+            (\(_, (name, comp, compFiles)) -> M.singleton name (FileTarget (M.singleton comp compFiles)))
+            associatedFiles
       infoMap =
-          foldl' (M.unionWith (<>)) M.empty $
-          map (\(fp, (name, _)) -> M.singleton name [fp])
-              associatedFiles
+          foldl' (M.unionWith (<>)) M.empty
+        $ map
+            (\(fp, (name, _, _)) -> M.singleton name [fp])
+            associatedFiles
   pure (targetMap, Just (infoMap, extraFiles))
 
 -- | Yields all of the targets that are local, those that are directly wanted

@@ -282,6 +282,7 @@ library:
   - Stack.Types.Build
   - Stack.Types.Build.ConstructPlan
   - Stack.Types.Build.Exception
+  - Stack.Types.Build.FileTargets
   - Stack.Types.BuildConfig
   - Stack.Types.BuildOpts
   - Stack.Types.BuildOptsCLI
