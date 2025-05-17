@@ -156,6 +156,12 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3025] | HoogleDatabaseNotFound
         ~~~
 
+    -   `Stack.IDE.IdePrettyException`
+
+        ~~~haskell
+        [S-9208] = FileTargetIsInvalidAbsFile
+        ~~~
+
     -   `Stack.Init.InitException`
 
         ~~~haskell
