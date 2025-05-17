@@ -8,6 +8,8 @@ module StackTest.Repl
     , replCommand
     , replGetLine
     , stackRepl
+    -- * Reexport
+    , module StackTest
     ) where
 
 import Control.Exception (SomeException, catch, displayException, finally)
