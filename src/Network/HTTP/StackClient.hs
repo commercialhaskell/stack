@@ -117,22 +117,24 @@ import           RIO
 import           RIO.PrettyPrint ( HasTerm )
 import           Text.Printf ( printf )
 
+-- | Set the User-Agent request header to @The Haskell Stack@.
 setUserAgent :: Request -> Request
 setUserAgent = setRequestHeader "User-Agent" ["The Haskell Stack"]
 
-
+-- | Like 'Network.HTTP.Simple.httpJSON' but sets the User-Agent request header.
 httpJSON :: (MonadIO m, FromJSON a) => Request -> m (Response a)
 httpJSON = Network.HTTP.Simple.httpJSON . setUserAgent
 
-
+-- | Like 'Network.HTTP.Simple.httpLbs' but sets the User-Agent request header.
 httpLbs :: MonadIO m => Request -> m (Response LByteString)
 httpLbs = Network.HTTP.Simple.httpLbs . setUserAgent
 
-
+-- | Like 'Network.HTTP.Simple.httpNoBody' but sets the User-Agent request
+-- header.
 httpNoBody :: MonadIO m => Request -> m (Response ())
 httpNoBody = Network.HTTP.Simple.httpNoBody . setUserAgent
 
-
+-- | Like 'Network.HTTP.Simple.httpSink' but sets the User-Agent request header.
 httpSink ::
      MonadUnliftIO m
   => Request
@@ -140,7 +142,8 @@ httpSink ::
   -> m a
 httpSink = Network.HTTP.Simple.httpSink . setUserAgent
 
-
+-- | Like 'Network.HTTP.Simple.withResponse' but sets the User-Agent request
+-- header.
 withResponse ::
      (MonadUnliftIO m, MonadIO n)
   => Request
@@ -148,7 +151,7 @@ withResponse ::
   -> m a
 withResponse = Network.HTTP.Simple.withResponse . setUserAgent
 
--- | Set the user-agent request header
+-- | Set the Accept request header to specify GitHub API v3.
 setGitHubHeaders :: Request -> Request
 setGitHubHeaders = setRequestHeader "Accept" ["application/vnd.github.v3+json"]
 
