@@ -4,6 +4,9 @@ dist-newstyle/
 *.hi
 *.o
 
+# Cabal Project user-local part
+cabal.project.local
+
 # Haskell Tool Stack-related
 .stack-work/
 tests/integration/tests/**/*.yaml.lock
