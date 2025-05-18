@@ -205,7 +205,6 @@ library
       Options.Applicative.Builder.Extra
       Options.Applicative.Complicated
       Path.CheckInstall
-      Path.Extended
       Path.Extra
       Path.Find
       Stack

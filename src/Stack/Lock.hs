@@ -24,8 +24,7 @@ import qualified Data.Map as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import qualified RIO.NonEmpty as NE
-import           Path ( parent )
-import           Path.Extended ( addExtension )
+import           Path ( addExtension, parent )
 import           Path.IO ( doesFileExist )
 import           Stack.Prelude
 import           Stack.SourceMap ( snapToDepPackage )
