@@ -74,12 +74,11 @@ import           Network.HTTP.StackClient
                    )
 import           Network.HTTP.Simple ( getResponseHeader )
 import           Path
-                   ( (</>), addExtension, filename, parent, parseAbsDir
-                   , parseAbsFile, parseRelDir, parseRelFile, takeDrive
-                   , toFilePath
+                   ( (</>), addExtension, fileExtension, filename, parent
+                   , parseAbsDir, parseAbsFile, parseRelDir, parseRelFile
+                   , takeDrive, toFilePath
                    )
 import           Path.CheckInstall ( warnInstallSearchPathIssues )
-import           Path.Extended ( fileExtension )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
                    ( canonicalizePath, doesFileExist, ensureDir, executable
