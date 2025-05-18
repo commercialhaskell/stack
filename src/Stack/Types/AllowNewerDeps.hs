@@ -10,20 +10,14 @@ module Stack.Types.AllowNewerDeps
   ) where
 
 import           Data.Aeson.Types ( FromJSON (..) )
-import qualified Distribution.PackageDescription as C
-import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
+import           Distribution.PackageDescription ( mkPackageName )
 import           Stack.Prelude
 
+-- | A type representing lists of packages for which Stack should ignore lower
+-- and upper version bounds in its Cabal file.
 newtype AllowNewerDeps
   = AllowNewerDeps [PackageName]
-  deriving (Eq, Generic, Ord, Read, Show)
-
-instance Semigroup AllowNewerDeps where
-  (<>) = mappenddefault
-
-instance Monoid AllowNewerDeps where
-  mappend = (<>)
-  mempty = memptydefault
+  deriving (Eq, Generic, Monoid, Ord, Read, Semigroup, Show)
 
 instance FromJSON AllowNewerDeps where
-  parseJSON = fmap (AllowNewerDeps . fmap C.mkPackageName) . parseJSON
+  parseJSON = fmap (AllowNewerDeps . fmap mkPackageName) . parseJSON
