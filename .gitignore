@@ -23,6 +23,9 @@ hie.yaml
 .hie
 stan.html
 
+# Cabal (the tool)-related
+cabal.project.local
+
 # Emacs-related
 .dir-locals.el
 *_flymake.hs
