@@ -13,14 +13,6 @@ module StackTest
   , stackCleanFull
   , stackIgnoreException
   , stackErr
-  , Repl
-  , ReplConnection (..)
-  , nextPrompt
-  , replCommand
-  , replGetChar
-  , replGetLine
-  , runRepl
-  , repl
   , stackStderr
   , stackCheckStderr
   , stackErrStderr
@@ -49,15 +41,11 @@ module StackTest
   , superslow
   ) where
 
-import           Control.Monad ( forever, unless, void, when )
-import           Control.Monad.IO.Class ( liftIO )
-import           Control.Monad.Trans.Reader ( ReaderT, ask, runReaderT )
-import           Control.Concurrent ( forkIO )
+import           Control.Monad ( unless, void, when )
 import           Control.Exception
-                   ( Exception (..), IOException, bracket_, catch, throw
+                   ( Exception (..), IOException, bracket_, catch
                    , throwIO
                    )
-import           Data.Maybe ( fromMaybe )
 import           GHC.Stack ( HasCallStack )
 import           System.Environment ( getEnv, lookupEnv )
 import           System.Directory
@@ -66,14 +54,12 @@ import           System.Directory
                    , setCurrentDirectory
                    )
 import           System.IO
-                   ( BufferMode (..), Handle, IOMode (..), hGetChar, hGetLine
-                   , hPutChar, hPutStr, hPutStrLn, hSetBuffering, stderr
-                   , withFile
+                   ( hPutStr, hPutStrLn, stderr
                    )
 import           System.IO.Error
-                   ( isDoesNotExistError, isEOFError )
+                   ( isDoesNotExistError )
 import           System.Process
-                   ( CreateProcess (..), StdStream (..), createProcess, proc
+                   ( CreateProcess (..), createProcess, proc
                    , readCreateProcessWithExitCode, readProcessWithExitCode
                    , shell, waitForProcess
                    )
@@ -148,74 +134,6 @@ stackErr :: HasCallStack => [String] -> IO ()
 stackErr args = do
   ec <- stack' args
   when (ec == ExitSuccess) $ error "stack was supposed to fail, but didn't"
-
-type Repl = ReaderT ReplConnection IO
-
-data ReplConnection = ReplConnection
-  { replStdin  :: Handle
-  , replStdout :: Handle
-  }
-
-nextPrompt :: Repl ()
-nextPrompt = do
-  (ReplConnection _ replStdoutHandle) <- ask
-  c <- liftIO $ hGetChar replStdoutHandle
-  if c == '>'
-    then do
-      -- Skip next character
-      void $ liftIO $ hGetChar replStdoutHandle
-    else nextPrompt
-
-replCommand :: String -> Repl ()
-replCommand cmd = do
-  (ReplConnection replStdinHandle _) <- ask
-  liftIO $ hPutStrLn replStdinHandle cmd
-
-replGetLine :: Repl String
-replGetLine = ask >>= liftIO . hGetLine . replStdout
-
-replGetChar :: Repl Char
-replGetChar = ask >>= liftIO . hGetChar . replStdout
-
-runRepl ::
-     HasCallStack
-  => FilePath
-  -> [String]
-  -> ReaderT ReplConnection IO ()
-  -> IO ExitCode
-runRepl cmd args actions = do
-  logInfo $ "Running: " ++ cmd ++ " " ++ unwords (map showProcessArgDebug args)
-  (Just rStdin, Just rStdout, Just rStderr, ph) <-
-    createProcess (proc cmd args)
-      { std_in = CreatePipe
-      , std_out = CreatePipe
-      , std_err = CreatePipe
-      }
-  hSetBuffering rStdin NoBuffering
-  hSetBuffering rStdout NoBuffering
-  hSetBuffering rStderr NoBuffering
-  -- Log stack repl's standard error output
-  tempDir <- if isWindows
-                then fromMaybe "" <$> lookupEnv "TEMP"
-                else pure "/tmp"
-  let tempLogFile = tempDir ++ "/stderr"
-  _ <- forkIO $ withFile tempLogFile WriteMode $ \logFileHandle -> do
-    hSetBuffering logFileHandle NoBuffering
-    forever $
-      catch
-        (hGetChar rStderr >>= hPutChar logFileHandle)
-        (\e -> unless (isEOFError e) $ throw e)
-  runReaderT actions (ReplConnection rStdin rStdout)
-  waitForProcess ph
-
-repl :: HasCallStack => [String] -> Repl () -> IO ()
-repl args action = do
-  stackExe' <- stackExe
-  ec <- runRepl stackExe' ("repl":args) action
-  unless (ec == ExitSuccess) $ pure ()
-  -- TODO: Understand why the exit code is 1 despite running GHCi tests
-  -- successfully.
-  -- else error $ "Exited with exit code: " ++ show ec
 
 stackStderr :: HasCallStack => [String] -> IO (ExitCode, String)
 stackStderr args = do
