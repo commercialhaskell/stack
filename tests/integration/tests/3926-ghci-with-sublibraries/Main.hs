@@ -11,9 +11,7 @@ main = do
   copy "src-internal/Internal.v1" "src-internal/Internal.hs"
   stack ["build"] -- need a build before ghci at the moment, see #4148
   stackRepl [] $ do
-    liftIO $ putStrLn "Awaiting prompt..."
     nextPrompt
-    liftIO $ putStrLn "Initial prompt received"
     replCommand ":main"
     line <- replGetLine
     let expected = "hello world"

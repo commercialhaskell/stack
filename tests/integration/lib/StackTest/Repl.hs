@@ -6,6 +6,7 @@ module StackTest.Repl
     , ReplConnection (..)
     , nextPrompt
     , replCommand
+    , replGetChar
     , replGetLine
     , stackRepl
     -- * Reexport
@@ -13,7 +14,7 @@ module StackTest.Repl
     ) where
 
 import Control.Exception (SomeException, catch, displayException, finally)
-import Control.Monad (unless, when)
+import Control.Monad ((>=>), unless, when)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Reader
@@ -52,6 +53,9 @@ replCommand cmd = do
   -- echo what we send to the test's stdout
   liftIO . putStrLn $ "____> " <> cmd
   liftIO $ hPutStrLn replStdinHandle cmd
+
+replGetChar :: Repl Char
+replGetChar = asks replStdout >>= liftIO . hGetChar
 
 replGetLine :: Repl String
 replGetLine = ask >>= liftIO . hGetLine . replStdout
@@ -100,7 +104,7 @@ runRepl cmd args actions = do
       putStrLn "EXCEPTION in test: "
       putStrLn . quote $ displayException e
       putStrLn "------[ stderr of repl ]------"
-      withFile stderrBufPath ReadMode $ \h -> hGetContents' h >>= putStr . quote
+      withFile stderrBufPath ReadMode $ hGetContents' >=> putStr . quote
       putStrLn "=============================="
     `finally` do
       hClose stderrBufHandle
