@@ -94,3 +94,17 @@ and the command are inconsistent and take no action.
     * the `tinfo6` and `tinfo6-libc6-pre232` builds with the 'Fedora 27' binary
       distribution of GHC 9.4.4 to 9.4.8. Those binary distributions require
       versions of `libc6` that are compatible with `libc6` 2.26.
+
+=== "Windows"
+
+    Since Windows 10 version 1607, Windows has been 'long file paths' capable
+    but that capability is not enabled by default. Consequently, Stack does not
+    assume that it is being used on a system that is 'long file paths' enabled.
+
+    Stack uses the 7-Zip tool to decompress, and extract tools from, downloaded
+    archive files. Aiming to avoid long file paths, Stack does so in a temporary
+    directory (named `stack-tmp-<hash>`) in the root of the drive of the final
+    destination. Consequently, Stack needs permission to create a directory in
+    that location. A Windows user account of type Administrator will have
+    permission to create a directory in the root of the system drive (`C:\`, by
+    convention) but a Standard user account may well not have permission.
