@@ -103,8 +103,13 @@ and the command are inconsistent and take no action.
 
     Stack uses the 7-Zip tool to decompress, and extract tools from, downloaded
     archive files. Aiming to avoid long file paths, Stack does so in a temporary
-    directory (named `stack-tmp-<hash>`) in the root of the drive of the final
-    destination. Consequently, Stack needs permission to create a directory in
-    that location. A Windows user account of type Administrator will have
-    permission to create a directory in the root of the system drive (`C:\`, by
-    convention) but a Standard user account may well not have permission.
+    directory (named `stack-tmp-<hash>`) on the drive of the final destination
+    (either in the system temporary directory, where applicable, or the root of
+    the drive). Consequently, Stack needs permission to create a directory in
+    that location.
+
+    A Windows user account will usually have permission to create a directory in
+    the system temporary directory. A Windows user account of type Administrator
+    will have permission to create a directory in the root of the system drive
+    (`C:\`, by convention) but a Standard user account may well not have
+    permission.
