@@ -82,9 +82,9 @@ import           Path.CheckInstall ( warnInstallSearchPathIssues )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Path.IO
                    ( canonicalizePath, doesFileExist, ensureDir, executable
-                   , getPermissions, ignoringAbsence, listDir, removeDirRecur
-                   , removeFile, renameDir, renameFile, resolveFile'
-                   , withTempDir
+                   , getPermissions, getTempDir, ignoringAbsence, listDir
+                   , removeDirRecur, removeFile, renameDir, renameFile
+                   , resolveFile', withTempDir
                    )
 import           RIO.List
                    ( headMaybe, intercalate, intersperse, isPrefixOf
@@ -2454,19 +2454,26 @@ withUnpackedTarball7z name si archiveFile archiveType destDir = do
       Nothing -> prettyThrowIO $ TarballFileInvalid name archiveFile
       Just x -> parseRelFile $ T.unpack x
   run7z <- setup7z si
-  -- We use a short name for the temporary directory to reduce the risk of a
-  -- filepath length of more than 260 characters, which can be problematic for
-  -- 7-Zip even if Long Filepaths are enabled on Windows.
+  -- We aim to reduce the risk of a filepath length of more than 260 characters,
+  -- which can be problematic for 7-Zip if Windows is not 'long file paths'
+  -- enabled. We use a short name for the temporary directory ...
   let tmpName = "stack-tmp"
       destDrive = takeDrive destDir
   ensureDir (parent destDir)
+  tempDrive <- takeDrive <$> getTempDir
+  -- We use a temporary directory with likely a short absolute path ...
+  let withTempDir' = if tempDrive == destDrive
+        then
+          -- We use the system temporary directory if we can, as a Standard user
+          -- may well not have permission to create a directory in the root of
+          -- the system drive.
+          withSystemTempDir
+        else
+          -- Otherwise we use a temporary directory in the root of the
+          -- destination drive.
+          withTempDir destDrive
   withRunInIO $ \run ->
-  -- We use a temporary directory in the same drive as that of 'destDir' to
-  -- reduce the risk of a filepath length of more than 260 characters, which can
-  -- be problematic for 7-Zip even if Long Filepaths are enabled on Windows. We
-  -- do not use the system temporary directory as it may be on a different
-  -- drive.
-    withTempDir destDrive tmpName $ \tmpDir ->
+    withTempDir' tmpName $ \tmpDir ->
       run $ do
         liftIO $ ignoringAbsence (removeDirRecur destDir)
         run7z tmpDir archiveFile
