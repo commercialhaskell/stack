@@ -6,4 +6,4 @@
 # build-stack-installer.hs. The work around is to build the package required for
 # that script using the same Stack configuration as used by the script.
 
-snapshot: lts-23.17
+snapshot: lts-23.24
