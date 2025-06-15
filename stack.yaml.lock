@@ -12,13 +12,6 @@ packages:
   original:
     hackage: hpack-0.38.1@rev:0
 - completed:
-    hackage: pantry-0.10.1@sha256:f776cd39c211128561a80a865545fd3b7caec9935ceedd7f2d14c341d0b0ca41,7896
-    pantry-tree:
-      sha256: 101b1db0815386bebc32dec0db3611969efc6a432cf866c173dc2971b369211d
-      size: 2722
-  original:
-    hackage: pantry-0.10.1@rev:0
-- completed:
     hackage: tls-2.1.8@sha256:69b583c77cc25d8efd62fd48462f469a7c66db551013db753e4062e3b56576f9,6223
     pantry-tree:
       sha256: 59190b5a3cf91ba383c94e893a409526dadd66b44e1c7dd0598603d2b580fe2a
@@ -27,7 +20,7 @@ packages:
     hackage: tls-2.1.8@rev:0
 snapshots:
 - completed:
-    sha256: 2763632e4c4094ce12f5ae12b22f524cdc6453b6b19007ff164a37fd9d2ea829
-    size: 683819
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/17.yaml
-  original: lts-23.17
+    sha256: 400dfb2174640dd2f9f2ba7cbf9148699f2380ab64faa46f4be298a5d6205316
+    size: 684057
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/24.yaml
+  original: lts-23.24

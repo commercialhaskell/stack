@@ -35,7 +35,7 @@ those comments, the contents will look something like this:
 
 ~~~yaml
 snapshot:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/17.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/24.yaml
 packages:
 - .
 ~~~
@@ -44,7 +44,7 @@ The key [`snapshot`](../configure/yaml/project.md#snapshot) is a
 project-specific configuration option. Its value tells Stack *how* to build your
 package: which GHC version to use, which versions of package dependencies to
 use, and so on. Our value here says to use
-[LTS Haskell 23.17](https://www.stackage.org/lts-23.17), which implies GHC 9.8.4
+[LTS Haskell 23.24](https://www.stackage.org/lts-23.24), which implies GHC 9.8.4
 (which is why `stack build` installs that version of GHC if it is not already
 available to Stack). There are a number of values you can use for `snapshot`,
 which we'll cover later.

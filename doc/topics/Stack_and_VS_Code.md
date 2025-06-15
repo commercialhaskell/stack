@@ -150,7 +150,7 @@ VS Code with the 'Haskell' extension can be configured in a number of ways:
 
         Each time that a snapshot is used that references a different version of
         GHC, then GHCup must be used to install it (if GHCup has not already
-        installed that version). For example, to use `snapshot: lts-23.17`
+        installed that version). For example, to use `snapshot: lts-23.24`
         (GHC 9.8.4), the command `ghcup install ghc 9.8.4` must have been used
         to install GHC 9.8.4. That may be a minor inconvenience for some people,
         as one the primary benefits of Stack over other tools for building
