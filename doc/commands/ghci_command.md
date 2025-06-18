@@ -106,7 +106,7 @@ By default:
 
 *   If there are multiple definitions for the `Main` module, Stack will ask you
     to select one from a list of options. Pass the `--main-is <target>` option
-    to specific which `Main` module to load.
+    to specify which `Main` module to load.
 
 Stack combines all of the GHC options of components.
 
