@@ -12,6 +12,48 @@ This guide to getting started takes a new Stack user through the ways that Stack
 is typically used. It will not teach Haskell or involve much code, and it
 requires no prior experience of Stack or other Haskell tools.
 
+## Other Haskell tools
+
+First, lets briefly place Stack and other Haskell tools in the Haskell
+landscape.
+
+The Haskell compiler is the
+[Glasgow Haskell Compiler](https://www.haskell.org/ghc/) (GHC). It compiles
+Haskell code into executable and other files.
+
+~~~mermaid
+flowchart LR
+  code[Haskell code]
+  ghc[GHC]
+  binaries[Executables and other files]
+  code --> ghc --> binaries
+~~~
+
+GHC is described in its
+[User Guide](https://downloads.haskell.org/ghc/latest/docs/users_guide/). It can
+be used directly but it is a complex application. Haskell 'build tools' are
+applications that make it easier to use GHC. Stack is such a build tool.
+
+~~~mermaid
+flowchart LR
+  stack[Stack]
+  code[Haskell code]
+  ghc[GHC]
+  binaries[Executables and other files]
+  subgraph buildtool [""]
+    direction TB
+    stack --> ghc
+  end
+  code --> buildtool --> binaries
+~~~
+
+
+
+
+
+
+
+
 ??? question "What are other Haskell tools?"
 
     Haskell code is compiled by the
