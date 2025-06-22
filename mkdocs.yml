@@ -30,6 +30,7 @@ extra_javascript:
 # Read the Docs requires JQuery for its JavaScript code to inject the flyout
 # menu. Material for MkDocs does not come with JQuery.
 - 'https://code.jquery.com/jquery-3.6.1.min.js'
+- https://cdn.jsdelivr.net/npm/mermaid@11.7.0/dist/mermaid.min.js
 exclude_docs: |
   /maintainers/archive/
   /maintainers/stack_errors.md
@@ -161,7 +162,11 @@ markdown_extensions:
     anchor_linenums: true
 - pymdownx.inlinehilite
 - pymdownx.snippets
-- pymdownx.superfences
+- pymdownx.superfences:
+    custom_fences:
+    - name: mermaid
+      class: mermaid
+      format: !!python/name:pymdownx.superfences.fence_code_format
 - pymdownx.tabbed:
     alternate_style: true
 - toc:
