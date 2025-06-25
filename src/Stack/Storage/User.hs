@@ -97,7 +97,7 @@ share [ mkPersist sqlSettings
       ]
       [persistLowerCase|
 PrecompiledCacheParent sql="precompiled_cache"
-  platformGhcDir FilePath "default=(hex(randomblob(16)))"
+  platformGhcDir FilePath default="(hex(randomblob(16)))"
   compiler Text
   cabalVersion Text
   packageKey Text
