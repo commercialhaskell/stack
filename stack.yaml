@@ -3,6 +3,8 @@ snapshot: lts-23.24 # GHC 9.8.4
 extra-deps:
 # lts-23.24 provides hpack-0.37.0
 - hpack-0.38.1@rev:0
+# lts-23.24 provides persistent-2.14.6.3
+- persistent-2.17.0.0@rev:0
 # lts-23.24 provides tls-2.1.1
 - tls-2.1.8@rev:0
 

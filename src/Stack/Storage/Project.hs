@@ -59,7 +59,7 @@ share [ mkPersist sqlSettings
       ]
       [persistLowerCase|
 ConfigCacheParent sql="config_cache"
-  directory FilePath "default=(hex(randomblob(16)))"
+  directory FilePath default="(hex(randomblob(16)))"
   type ConfigCacheType
   pkgSrc CachePkgSrc
   active Bool
