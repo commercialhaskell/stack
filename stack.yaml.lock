@@ -12,6 +12,13 @@ packages:
   original:
     hackage: hpack-0.38.1@rev:0
 - completed:
+    hackage: persistent-2.17.0.0@sha256:0f7e9ffa26c2d3fc4b9529de4604ce3880b5ce6d95229372c3aae83ca2a0f0ea,7049
+    pantry-tree:
+      sha256: dbb4bb665db11ca940ddea74f455afdfeb827fd9a3cef663e15673a678e3917c
+      size: 7096
+  original:
+    hackage: persistent-2.17.0.0@rev:0
+- completed:
     hackage: tls-2.1.8@sha256:69b583c77cc25d8efd62fd48462f469a7c66db551013db753e4062e3b56576f9,6223
     pantry-tree:
       sha256: 59190b5a3cf91ba383c94e893a409526dadd66b44e1c7dd0598603d2b580fe2a
