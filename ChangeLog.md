@@ -37,7 +37,7 @@ Bug fixes:
   environment variable. In previous versions of Stack, this affected
   `stack script` when copying a pre-compiled package from another package
   database.
-* On Windows, when decompressing, and extracting tools, from archive files,
+* On Windows, when decompressing, and extracting, tools from archive files,
   Stack uses the system temporary directory, rather than the root of the
   destination drive, if the former is on the destination drive.
 
