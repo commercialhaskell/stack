@@ -14,7 +14,7 @@ Other enhancements:
 
 Bug fixes:
 
-## v3.7.1 - 2025-06-15
+## v3.7.1 - 2025-06-28
 
 **Changes since v3.5.1:**
 
