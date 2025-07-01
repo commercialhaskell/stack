@@ -23,11 +23,11 @@ name only. In that case, by default:
 
 !!! note
 
-    Stackage snapshots do not include directly most GHC boot packages (packages
-    that come with GHC and are included in GHC's global package database) but
-    some snapshots may include directly some boot packages. In particular, some
-    snapshots include directly `Win32` (which is a boot package on Windows)
-    while others do not.
+    Stackage snapshots are not expected to include directly GHC boot packages
+    (packages that come with GHC and are included in GHC's global package
+    database) but some such snapshots may include directly some boot packages.
+    In particular, some snapshots include directly `Win32` (which is a boot
+    package on Windows) while most do not.
 
 Otherwise, a target should specify a package name and version (for example,
 `acme-missiles-0.3`). In the case of package versions from the package index,

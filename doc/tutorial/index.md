@@ -69,6 +69,14 @@ have named *sub-library* components as well as a main library.
 The code in a Haskell package can depend on the libraries in the same package
 or in another package. These are known as its *dependencies*.
 
+GHC comes with the libraries of certain Haskell packages (known as
+*boot packages*) already installed in its global database of installed
+libraries. These include the library of the
+[package `base`](https://hackage.haskell.org/package/base), which
+is a dependency of almost all other packages, and the library of
+[package `Cabal`](https://hackage.haskell.org/package/Cabal), which provides
+code to build packages and components of packages using GHC.
+
 Two important public databases are **Hackage**
 [(the  Haskell Package Repository)](https://hackage.haskell.org/) and
 [**Stackage**](https://hackage.haskell.org/).
@@ -85,17 +93,9 @@ flowchart LR
 Hackage is a database of Haskell packages, each identified by a name and version
 number. Stackage is a database of collections of Haskell package versions on
 Hackage that are known, by testing, to work well together and with a specific
-version of GHC. Those collections are known as *snapshots*. Stack can unpack
-packages from, and upload packages to, Hackage and builds making use of
-snapshots from Stackage.
-
-GHC comes with the libraries of certain Haskell packages (known as
-*boot packages*) already installed in its global database of installed
-libraries. These include the library of the
-[package `base`](https://hackage.haskell.org/package/base), which
-is a dependency of almost all other packages, and the library of
-[package `Cabal`](https://hackage.haskell.org/package/Cabal), which provides
-code to build packages and components of packages using GHC.
+version of GHC and its boot packages. Those collections are known as
+*snapshots*. Stack can unpack packages from, and upload packages to, Hackage and
+builds making use of snapshots from Stackage.
 
 GHC comes with an application
 [**Haddock**](https://haskell-haddock.readthedocs.io/latest/) that automatically

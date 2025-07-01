@@ -19,7 +19,7 @@ The following terms are used in Stack's documentation.
 |FreeBSD             |A Unix-like operating system.                            |
 |GCC                 |The [GNU Compiler Collection](https://gcc.gnu.org/) or its executable `gcc`.|
 |GHC                 |The [Glasgow Haskell Compiler](https://www.haskell.org/ghc/).|
-|GHC boot package    |A package that comes with GHC, is included in GHC's global package database, and is not included in a Stackage snapshot. See the output of command `stack exec -- ghc-pkg list --global`.|
+|GHC boot package    |A package that comes with GHC, is included in GHC's global package database, and is not specified directly in a Stackage snapshot. See the output of command `stack exec -- ghc-pkg list --global`.|
 |GHC wired-in package|A GHC boot package that cannot be shaddowed with different versions of the same package. Also referred to as 'magic'.|
 |GHCi                |GHC's [interactive environment](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/ghci.html).|
 |GHCJS               |A Haskell to JavaScript [compiler](https://github.com/ghcjs/ghcjs).|
@@ -49,7 +49,7 @@ The following terms are used in Stack's documentation.
 |REPL                |An interactive (run-eval-print loop) programming environment.|
 |resolver            |A synonym for snapshot.                                  |
 |`Setup.hs`          |A project-specific file used by Cabal to perform setup tasks.|
-|snapshot            |A snapshot defines a GHC version, a set of packages (one version of each), and build flags or other settings.|
+|snapshot            |A snapshot defines a version of GHC (and, implicitly, its boot packages), a set of packages (one version of each), Cabal flags and GHC options.|
 |Stack               |The Haskell Tool Stack project or its executable `stack`.|
 |`stack.yaml`        |A project-level configuration file used by Stack, which may also contain non-project-specific options.|
 |Stackage            |A [distribution](https://www.stackage.org/) of compatible Haskell packages.|
