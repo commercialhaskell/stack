@@ -54,9 +54,10 @@ specific configuration [option](yaml/non-project.md#color).
 
 ## `--compiler` option
 
-Pass the option `--compiler <compiler>` to specify the compiler. For further
-information, see the [`compiler`](yaml/non-project.md#compiler) non-project
-specific configuration option documentation.
+Pass the option `--compiler <compiler>` to specify the compiler (and,
+implicitly, its boot packages). For further information, see the
+[`compiler`](yaml/non-project.md#compiler) non-project specific configuration
+option documentation.
 
 ## `--custom-preprocessor-extensions` option
 

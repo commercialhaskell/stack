@@ -4,9 +4,19 @@
 
 [:octicons-tag-24: 2.1.1](https://github.com/commercialhaskell/stack/releases/tag/v2.1.1)
 
-Snapshots provide a list of packages to use, along with flags, GHC options, and
-a few other settings. Snapshots may extend any other snapshot that can be
-specified in a [`snapshot`](../configure/yaml/project.md#snapshot) or
+A snapshot specifies: (a) a version of GHC and, implicitly, its boot packages;
+(b) usually, directly, specific versions of a list of packages; (c) sometimes,
+Cabal flags for certain packages; and (d) sometimes, GHC options.
+
+!!! info
+
+    Stackage snapshots are not expected to include directly any boot packages
+    but some such snapshots may include directly some boot packages.  In
+    particular, some snapshots include directly `Win32` (which is a boot package
+    on Windows) while most do not.
+
+Snapshots may extend any other snapshot that can be specified in a
+[`snapshot`](../configure/yaml/project.md#snapshot) or
 [`resolver`](../configure/yaml/project.md#resolver) key. The packages specified
 follow the same syntax for dependencies in Stack's project-level configuration
 files. Unlike the `extra-deps` key, however, no support for local directories is
@@ -18,8 +28,12 @@ available in snapshots to ensure reproducibility.
     for snapshot specification.
 
 ~~~yaml
-snapshot: lts-23.24 # Inherits GHC version and package set
-compiler: ghc-9.8.3 # Overwrites GHC version in the snapshot, optional
+# Inherits a specific GHC version and, implicitly, its boot packages and
+# specific versions of a set of other packages:
+snapshot: lts-23.24
+# Overwrites the version of GHC (and, implicitly, its boot packages) specified
+# in the snapshot (optional):
+compiler: ghc-9.8.3
 
 # Additional packages, follows extra-deps syntax
 packages:
@@ -63,7 +77,8 @@ custom snapshot, due to Stack sharing snapshot packages whenever possible.
 ### Overriding the compiler
 
 The following snapshot specification will be identical to `lts-23.24`, but
-instead use `ghc-9.8.3` instead of `ghc-9.8.4`:
+instead use `ghc-9.8.3` and its boot packages instead of `ghc-9.8.4` and its
+boot packages:
 
 ~~~yaml
 snapshot: lts-23.24
