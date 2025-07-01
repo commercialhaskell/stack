@@ -120,10 +120,10 @@ snapshot.
 
 !!! note
 
-    Stackage snapshots do not include directly most boot packages but some
-    snapshots may include directly some boot packages. In particular, some
-    snapshots include directly `Win32` (which is a boot package on Windows)
-    while others do not.
+    Stackage snapshots are not expected to include directly any boot packages
+    but some such snapshots may include directly some boot packages. In
+    particular, some snapshots include directly `Win32` (which is a boot package
+    on Windows) while most do not.
 
     For example, if `Cabal` (a boot package) is not a project package or an
     extra-dep, then `stack build Cabal` with Stackage snapshot LTS Haskell 20.25
@@ -237,7 +237,7 @@ information about how these dependencies get specified.
 If a package description specifies a custom build type, it must also specify a
 custom setup. That should list the dependencies needed to compile `Setup.hs`.
 Stack further customises the setup, using the `Cabal` package. If that package
-is not listed, Stack will warn and add the GHC boot package as a dependency. 
+is not listed, Stack will warn and add the GHC boot package as a dependency.
 
 In addition to specifying targets, you can also control what gets built, or
 retained, with the flags and options listed below. You can also affect what gets
