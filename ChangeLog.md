@@ -10,6 +10,8 @@ Major changes:
 
 Behavior changes:
 
+* Stack now treats `ghc-internal` as a GHC wired-in package.
+
 Other enhancements:
 
 Bug fixes:

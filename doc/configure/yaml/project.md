@@ -215,8 +215,8 @@ the same name.
     build is likely to fail.
 
     Stack treats the following as the names of 'wired-in' packages: `base`,
-    `ghc-bignum`, `ghc-prim`, `ghc`, `integer-gmp`, `integer-simple`,
-    `interactive`, `rts` and `template-haskell`.
+    `ghc-bignum`, `ghc-prim`, `ghc`, `ghc-internal`, `integer-gmp`,
+    `integer-simple`, `interactive`, `rts` and `template-haskell`.
 
 ## flags
 

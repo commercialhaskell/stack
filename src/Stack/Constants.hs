@@ -251,6 +251,9 @@ inNixShellEnvVar = map toUpper stackProgName ++ "_IN_NIX_SHELL"
 -- > ghc-options: -this-unit-id ghc-prim
 --
 -- in their Cabal file because they are \'magic\'.
+--
+-- Cabal (the tool) also treats certain packages as non-reinstallable. See
+-- @Distribution.Client.Dependency.nonReinstallablePackages@.
 wiredInPackages :: Set PackageName
 wiredInPackages = case mparsed of
   Just parsed -> Set.fromList parsed
@@ -258,23 +261,33 @@ wiredInPackages = case mparsed of
  where
   mparsed = mapM parsePackageName
     [ "rts"
-      -- Said to be not a \'real\' package
-    , "ghc-prim"
-      -- A magic package
+      -- Said to be not a \'real\' package.
+    , "base"
+      -- A magic package. Also treated as non-reinstallable by
+      -- cabal-install-3.14.2.0.
+    , "ghc"
+      -- A magic package. Also treated as non-reinstallable by
+      -- cabal-install-3.14.2.0.
     , "ghc-bignum"
-      -- A magic package
+      -- A magic package from GHC 9.0.1. Also treated as non-reinstallable by
+      -- cabal-install-3.14.2.0.
+    , "ghc-internal"
+      -- A magic package from GHC 9.10.1. Also treated as non-reinstallable by
+      -- cabal-install-3.14.2.0.
+    , "ghc-prim"
+      -- A magic package. Also treated as non-reinstallable by
+      -- cabal-install-3.14.2.0.
     , "integer-gmp"
       -- No longer magic > 1.0.3.0 (GHC >= 9.0) and deprecated in favour of
       -- ghc-bignum. With GHC 9.8.4 at least, there seems to be no problem in
-      -- using it.
+      -- using it. Also treated as non-reinstallable by
+      -- cabal-install-3.14.2.0.
     , "integer-simple"
-      -- A magic package
-    , "base"
-      -- A magic package
+      -- A magic package. Also treated as non-reinstallable by
+      -- cabal-install-3.14.2.0.
     , "template-haskell"
-      -- A magic package
-    , "ghc"
-      -- A magic package
+      -- No longer magic > 2.22.0.0 (GHC >= 9.12). Also treated as
+      -- non-reinstallable by cabal-install-3.14.2.0.
     , "interactive"
       -- Type and class declarations at the GHCi command prompt are treated as
       -- if they were defined in modules all sharing a common package
