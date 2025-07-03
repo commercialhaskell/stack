@@ -193,7 +193,7 @@ the same name.
     are referred to as 'wired-in' to one or more versions of GHC or as 'magic'.
     They can be distinguished from normal packages by the contents of their
     Cabal files: GHC's `-this-unit-id` option is set as the name of the package
-    without a version. For example, the `base.cabal` for `base-4.19.1.0`
+    without a version. For example, the `base.cabal` for `base-4.19.2.0`
     includes:
 
     ~~~yaml
@@ -207,16 +207,16 @@ the same name.
     boot packages in a build plan may limit what can be specified as an
     extra-dep.
 
-    For example, GHC boot package `ghc-9.8.2` has a dependency on `process`. Its
-    `*.conf` file identifies the dependency as `process-1.6.18.0-4fb7`. If
-    package `ghc-9.8.2` is part of a build plan and a different version of
+    For example, GHC boot package `ghc-9.8.4` has a dependency on `process`. Its
+    `*.conf` file identifies the dependency as `process-1.6.25.0-c853`. If
+    package `ghc-9.8.4` is part of a build plan and a different version of
     `process` is specified as an extra-dep, during a build, Stack will identify
     that the build plan refers to two versions of `process` and warn that the
     build is likely to fail.
 
     Stack treats the following as the names of 'wired-in' packages: `base`,
-    `dph-par`, `dph-seq`, `ghc-bignum`, `ghc-prim`, `ghc`, `integer-gmp`,
-    `integer-simple`, `interactive`, `rts` and `template-haskell`.
+    `ghc-bignum`, `ghc-prim`, `ghc`, `integer-gmp`, `integer-simple`,
+    `interactive`, `rts` and `template-haskell`.
 
 ## flags
 
