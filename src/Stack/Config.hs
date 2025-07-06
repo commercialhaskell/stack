@@ -394,7 +394,7 @@ configFromConfigMonoid
                )
           <> blankLine
           <> fillSep
-               [ flow "To avoid sucn problems, use the"
+               [ flow "To avoid such problems, use the"
                , style Shell "local-programs-path"
                , flow "non-project specific configuration option to specify an \
                       \alternative path without those characteristics."
