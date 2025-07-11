@@ -11,10 +11,10 @@ configured to integrate with Nix. Integration provides these benefits:
   libraries and commands required to build the project are automatically built
   using Nix and managed locally for each project. These system packages never
   conflict with any existing versions of these libraries on your system. That
-  they are managed locally to the project means that you don't need to alter
+  they are managed locally to the project means that you do not need to alter
   your system in any way to build any odd project pulled from the Internet; and
 
-* implicit sharing of system packages between projects. This means you don't
+* implicit sharing of system packages between projects. This means you do not
   have more copies on-disk than you need.
 
 The Nix package manager is a pre-requisite for integration. On Linux (including
@@ -145,11 +145,11 @@ above to use Nix flakes. The `flake.nix` file is:
           pkgs.zlib # External C library needed by some Haskell packages
         ];
 
-        # Wrap Stack to work with our Nix integration. We don't want to modify
-        # stack.yaml so non-Nix users don't notice anything.
-        # - no-nix: We don't want Stack's way of integrating Nix.
+        # Wrap Stack to work with our Nix integration. We do not want to modify
+        # stack.yaml so non-Nix users do not notice anything.
+        # - no-nix: We do not want Stack's way of integrating Nix.
         # --system-ghc    # Use the existing GHC on PATH (will come from this Nix file)
-        # --no-install-ghc  # Don't try to install GHC if no matching GHC found on PATH
+        # --no-install-ghc  # Do not try to install GHC if no matching GHC found on PATH
         stack-wrapped = pkgs.symlinkJoin {
           name = "stack"; # will be available as the usual `stack` in terminal
           paths = [ pkgs.stack ];
@@ -177,7 +177,7 @@ above to use Nix flakes. The `flake.nix` file is:
 ~~~
 
 Check-in this `flake.nix` to your project's repository. Run the `nix develop`
-command (it searches for `flake.nix` by default) and you'll find a new
+command (it searches for `flake.nix` by default) and you WIll find a new
 `flake.lock` file. That file that pins the precise nixpkgs package set. Check-in
 that `flake.lock` file as well, and every Nix developer of your project will use
 precisely the same package set.
@@ -210,7 +210,8 @@ nix-env -f "<nixpkgs>" -qaP -A haskell.compiler.ghc924
 haskell.compiler.ghc924  ghc-9.2.4
 ~~~
 
-If Nix doesn't know that version of GHC, you'll see the following error message:
+If Nix does not know that version of GHC, you will see the following error
+message:
 
 ~~~sh
 nix-env -f "<nixpkgs>" -qaP -A haskell.compiler.ghc999
@@ -264,8 +265,8 @@ installed, which provide the C libraries of the same names.
 
 **Note:** currently, Stack only discovers dynamic and static libraries in the
 `lib/` folder of any Nix package, and likewise header files in the `include/`
-folder. If you're dealing with a package that doesn't follow this standard
-layout, you'll have to deal with that using a custom `shell.nix` file (see
+folder. If you are dealing with a package that does not follow this standard
+layout, you will have to deal with that using a custom `shell.nix` file (see
 further below).
 
 ## External C libraries through a `shell.nix` file
@@ -360,7 +361,7 @@ The equivalent command line option is:
 ~~~
 
 **Note:** On macOS, shells are non-pure by default currently. This is due soon
-to be resolved locale issues. So on macOS you'll need to be a bit more careful
+to be resolved locale issues. So on macOS you will need to be a bit more careful
 to check that you really have listed all dependencies.
 
 ## Nix package sources
@@ -369,7 +370,7 @@ Nix organizes its packages in snapshots of packages (each snapshot being a
 "package set") similar to how Stackage organizes Haskell packages.  By default,
 `nix-shell` will look for the "nixpkgs" package set located by your `NIX_PATH`
 environment variable. This package set can be different depending on when you
-installed Nix and which nixpkgs channel you're using (similar to the LTS channel
+installed Nix and which nixpkgs channel you are using (similar to the LTS channel
 for stable packages and the nightly channel for bleeding edge packages in
 [Stackage](https://www.stackage.org/)). This is bad for reproducibility so that
 nixpkgs should be pinned, i.e., set to the same package set for every developer
@@ -447,10 +448,10 @@ packages defined in the Nixpkgs project.
 
 When using Stack on NixOS, you must use Stack's Nix integration to install GHC.
 That is because external C libraries in NixOS are not installed in the usual
-distribution directories. GHC installed through Stack (without Nix) can't find
-those libraries and, therefore, can't build most projects. However, GHC provided
-through Nix can be modified to find the external C libraries provided through
-Nix.
+distribution directories. GHC installed through Stack (without Nix) cannot find
+those libraries and, therefore, cannot build most projects. However, GHC
+provided through Nix can be modified to find the external C libraries provided
+through Nix.
 
 [nix-language]: https://wiki.nixos.org/wiki/Overview_of_the_Nix_Language
 [nix-manual-exprs]: http://nixos.org/manual/nix/stable/expressions/writing-nix-expressions.html

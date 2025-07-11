@@ -1,5 +1,5 @@
 ---
-Title: Getting started
+title: Getting started
 ---
 
   <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
@@ -21,8 +21,8 @@ its [configuration](../configure/index.md).
 
 ## Other Haskell tools
 
-First, simplifying greatly, lets briefly place Stack and other Haskell tools in
-the Haskell landscape.
+First, simplifying greatly, let us briefly place Stack and other Haskell tools
+in the Haskell landscape.
 
 Haskell was specified in the
 [Haskell 98 Language and Library Reports](https://www.haskell.org/onlinereport/),
@@ -44,9 +44,14 @@ flowchart LR
   code --> ghc --> binaries
 ~~~
 
-Haskell code can be organised into *packages*. A Haskell package also includes a
-file that describes the package's contents. The most established description
-format is known as a
+A lot of interesting things can be done using only what comes with GHC
+(including GHCi) but as Haskell code becomes more complex and there is a desire
+to reuse efficiently code developed by others it becomes necessary to organise
+code in a structured way.
+
+In that regard, Haskell code can be organised into *packages*. A Haskell package
+also includes a file that describes the package's contents. The most established
+description format is known as a
 [Cabal file](https://cabal.readthedocs.io/en/stable/file-format-changelog.html).
 The [**Hpack** project](https://github.com/sol/hpack) provides a modern
 alternative format (in a file named `package.yaml`) and a library and
@@ -91,10 +96,15 @@ flowchart LR
 ~~~
 
 Hackage is a database of Haskell packages, each identified by a name and version
-number. Stackage is a database of collections of Haskell package versions on
+number. There were over 17,000 package names on Hackage as at July 2025.
+
+Stackage is a database of collections of Haskell package versions on
 Hackage that are known, by testing, to work well together and with a specific
 version of GHC and its boot packages. Those collections are known as
-*snapshots*. Stack can unpack packages from, and upload packages to, Hackage and
+*snapshots*. As at July 2025, a snapshot for a recent version of GHC includes
+well over 3,000 packages.
+
+Stack can unpack packages from, and upload packages to, Hackage and
 builds making use of snapshots from Stackage.
 
 GHC comes with an application

@@ -668,7 +668,7 @@ Bug fixes:
   [#5608](https://github.com/commercialhaskell/stack/pull/5608)
 * On Unix-like operating systems, respect the `with-gcc` option when installing
   GHC. See [#5609](https://github.com/commercialhaskell/stack/pull/5609)
-* Fixed logic in `get_isa()` in `get-stack.sh` to exclude systems that don't
+* Fixed logic in `get_isa()` in `get-stack.sh` to exclude systems that do not
   have x86 in their `uname -m` output. See
   [5792](https://github.com/commercialhaskell/stack/issues/5792).
 * Fixed output of `stack ls snapshots local` on Windows, to behave like that on
@@ -683,7 +683,7 @@ Bug fixes:
 
 Behavior changes:
 
-* Cloning git repositories isn't per sub-directory anymore, see
+* Cloning git repositories is not per sub-directory anymore, see
   [#5411](https://github.com/commercialhaskell/stack/issues/5411)
 
 Other enhancements:
@@ -859,10 +859,11 @@ Bug fixes:
 Release notes:
 
 * We have reduced the number of platforms that we support with executable
-  releases. The reason behind this is that we've been slowed down in our release
-  process until now with issues trying to build executables for less common
-  platforms. In order to make sure we can address issues more quickly (like
-  supporting new GHC versions), we're limiting support from the Stack team to:
+  releases. The reason behind this is that we have been slowed down in our
+  release process until now with issues trying to build executables for less 
+  common platforms. In order to make sure we can address issues more quickly 
+  (like supporting new GHC versions), we are limiting support from the Stack
+  team to:
 
     * Linux 64-bit/x86_64 (statically-linked)
     * macOS x86_64
@@ -962,8 +963,8 @@ Bug fixes:
   Previously, if you SIGTERMed at the wrong time while running a script, you
   could end up with an inconsistent database state.
 
-* `--resolver global` doesn't retrieve snapshots list from the internet because
-  doesn't need it. See
+* `--resolver global` does not retrieve snapshots list from the internet because
+  does not need it. See
   [#5103](https://github.com/commercialhaskell/stack/issues/5103)
 
 * Fix using relative links in haddocks output.  See
@@ -1229,7 +1230,7 @@ Other enhancements:
   now include package names so they can be more easily copy-pasted.
 * Git repos are shared across multiple projects. See
   [#3551](https://github.com/commercialhaskell/stack/issues/3551)
-* Use en_US.UTF-8 locale by default in pure Nix mode so programs won't
+* Use en_US.UTF-8 locale by default in pure Nix mode so programs will not
   crash because of Unicode in their output
   [#4095](https://github.com/commercialhaskell/stack/issues/4095)
 * Add `--tree` to `ls dependencies` to list dependencies as tree.
@@ -1251,7 +1252,7 @@ Other enhancements:
   with packages from Hackage, not Git repos or archives.
 * When using the script interpreter with `--optimize` or `--compile`,
   Stack will perform an optimization of checking whether a newer
-  executable exists, making reruns significantly faster. There's a
+  executable exists, making reruns significantly faster. There is a
   downside to this, however: if you have a multifile script, and
   change one of the dependency modules, Stack will not automatically
   detect and recompile.
@@ -1329,7 +1330,7 @@ Bug fixes:
 * Fix for git packages to update submodules to the correct state. See
   [#4314](https://github.com/commercialhaskell/stack/pull/4314)
 * Add `--cabal-files` flag to `stack ide targets` command.
-* Don't download ghc when using `stack clean`.
+* Do not download ghc when using `stack clean`.
 * Support loading in GHCi definitions from symlinked C files. Without this
   patch, Stack will try to find object files in the directory pointed to
   by symlinks, while GCC will produce the object files in the original
@@ -1368,7 +1369,7 @@ Bug fixes:
   [#4488](https://github.com/commercialhaskell/stack/issues/4488)
 * Docker: fix detection of expected subprocess failures.  This fixes
   downloading a compatible `stack` executable  when the host `stack` is not
-  compatible with the Docker image (on Linux), and doesn't show an unnecessary
+  compatible with the Docker image (on Linux), and does not show an unnecessary
   extra error when the in-container re-exec'ed `stack` exits with failure.
 * The `stack ghci` command's `--ghc-options` flag now parses multiple options.
   See [#3315](https://github.com/commercialhaskell/stack/issues/3315).
@@ -1613,10 +1614,10 @@ Other enhancements:
 * `stack setup --verbose` causes verbose output of GHC configure process.
   See [#3716](https://github.com/commercialhaskell/stack/issues/3716)
 * Improve the error message when an `extra-dep` from a path or git reference
-  can't be found. See
+  cannot be found. See
   [#3808](https://github.com/commercialhaskell/stack/pull/3808)
 * Nix integration is now disabled on windows even if explicitly enabled,
-  since it isn't supported. See
+  since it is not supported. See
   [#3600](https://github.com/commercialhaskell/stack/issues/3600)
 * `stack build` now supports a new flag `--keep-tmp-files` to retain
   intermediate files and directories for the purpose of debugging. It is best
@@ -1637,7 +1638,7 @@ Bug fixes:
   [#3658](https://github.com/commercialhaskell/stack/issues/3658).
   In particular, this makes it possible to pass `-- +RTS ... -RTS` to specify
   RTS arguments used when running the script.
-* Don't ignore the template `year` parameter in config files, and clarify the
+* Do not ignore the template `year` parameter in config files, and clarify the
   surrounding documentation. See
   [#2275](https://github.com/commercialhaskell/stack/issues/2275).
 * Benchmarks used to be run concurrently with other benchmarks
@@ -1665,8 +1666,8 @@ Bug fixes:
 * `stack ghci` now replaces the Stack process with ghci. This improves
   signal handling behavior. In particular, handling of Ctrl-C.  To make
   this possible, the generated files are now left behind after exit.
-  The paths are based on hashing file contents, and it's stored in the
-  system temporary directory, so this shouldn't result in too much
+  The paths are based on hashing file contents, and it is stored in the
+  system temporary directory, so this should not result in too much
   garbage. See
   [#3821](https://github.com/commercialhaskell/stack/issues/3821).
 
@@ -1796,7 +1797,7 @@ Other enhancements:
 * The `with-hpack` configuration option specifies an Hpack executable to use
   instead of the Hpack bundled with Stack. Please
   see [#3179](https://github.com/commercialhaskell/stack/issues/3179).
-* It's now possible to skip tests and benchmarks using `--skip`
+* It is now possible to skip tests and benchmarks using `--skip`
   flag
 * `GitSHA1` is now `StaticSHA256` and is implemented using the
   `StaticSize 64 ByteString` for improved performance. See
@@ -1838,7 +1839,7 @@ Other enhancements:
 * Better descriptions are now available for `stack upgrade --help`. See:
   [#3070](https://github.com/commercialhaskell/stack/issues/3070)
 * When using Nix, nix-shell now depends always on gcc to prevent build errors
-  when using the FFI. As ghc depends on gcc anyway, this doesn't increase the
+  when using the FFI. As ghc depends on gcc anyway, this does not increase the
   dependency footprint.
 * `--cwd DIR` can now be passed to `stack exec` in order to execute the
   program in a different directory. See:
@@ -1856,7 +1857,7 @@ Other enhancements:
 * Log when each individual test suite finishes. See:
   [#3552](https://github.com/commercialhaskell/stack/issues/3552).
 * Avoid spurious rebuilds when using `--file-watch` by not watching files for
-  executable, test and benchmark components that aren't a target. See:
+  executable, test and benchmark components that are not a target. See:
   [#3483](https://github.com/commercialhaskell/stack/issues/3483).
 * Stack will now try to detect the width of the running terminal
   (only on POSIX for the moment) and use that to better display
@@ -1875,7 +1876,7 @@ Other enhancements:
   [#3534](https://github.com/commercialhaskell/stack/issues/3534)
 * GHC binary distributions can now be identified by their SHA256 checksum in
   addition to their SHA1 checksum, allowing for more security in download.
-* For filesystem setup-info paths, it's no longer assumed that the
+* For filesystem setup-info paths, it is no longer assumed that the
   directory is writable, instead a temp dir is used.  See
   [#3188](https://github.com/commercialhaskell/stack/issues/3188).
 
@@ -1888,7 +1889,7 @@ Bug fixes:
 * `stack haddock` now includes package names for all modules in the
    Haddock index page. See:
   [#2886](https://github.com/commercialhaskell/stack/issues/2886)
-* Fixed an issue where Stack wouldn't detect missing Docker images
+* Fixed an issue where Stack would not detect missing Docker images
   properly with newer Docker versions.
   [#3171](https://github.com/commercialhaskell/stack/pull/3171)
 * Previously, Cabal files with just test-suite could cause build to fail
@@ -1938,7 +1939,7 @@ Bug fixes:
   [#3562](https://github.com/commercialhaskell/stack/issues/3562)
 * Fixes a bug that has existed since 1.5.0, where
   `stack setup --upgrade-cabal` would say that Cabal is already the latest
-  version, when it wasn't.
+  version, when it was not.
 * Ensure that an `extra-dep` from a local directory is not treated as
   a `$locals` for GHC options purposes. See
   [#3574](https://github.com/commercialhaskell/stack/issues/3574).
@@ -1994,7 +1995,7 @@ Other enhancements:
   of sources being included in Haddock output.
   See [#3099](https://github.com/commercialhaskell/stack/issues/3099)
 * `stack ghci` will now skip building all local targets, even if they have
-  downstream deps, as long as it's registered in the DB.
+  downstream deps, as long as it is registered in the DB.
 * The `pvp-bounds` feature now supports adding `-revision` to the end of each
   value, e.g. `pvp-bounds: both-revision`. This means that, when uploading to
   Hackage, Stack will first upload your tarball with an unmodified Cabal file,
@@ -2027,7 +2028,7 @@ Bug fixes:
 * Fixes case where `stack build --profile` might not cause executables /
   tests / benchmarks to be rebuilt.
   See [#2984](https://github.com/commercialhaskell/stack/issues/2984)
-* `stack ghci file.hs` now loads the file even if it isn't part of
+* `stack ghci file.hs` now loads the file even if it is not part of
   your project.
 * `stack clean --full` now works when docker is enabled.
   See [#2010](https://github.com/commercialhaskell/stack/issues/2010)
@@ -2043,7 +2044,7 @@ Bug fixes:
   groups on Ubuntu Yakkety (16.10).
   See [#3092](https://github.com/commercialhaskell/stack/issues/3092)
 * Switching a package between extra-dep and local package now forces
-  rebuild (previously it wouldn't if versions were the same).
+  rebuild (previously it would not if versions were the same).
   See [#2147](https://github.com/commercialhaskell/stack/issues/2147)
 * `stack upload` no longer reveals your password when you type it on
   MinTTY-based Windows shells, such as Cygwin and MSYS2.
@@ -2279,7 +2280,7 @@ Other enhancements:
   [#2647](https://github.com/commercialhaskell/stack/issues/2647).
 * The `--main-is` flag for GHCI now implies the TARGET, fixing
   [#1845](https://github.com/commercialhaskell/stack/issues/1845).
-* `stack ghci` no longer takes all build options, as many weren't useful
+* `stack ghci` no longer takes all build options, as many were not useful
   [#2199](https://github.com/commercialhaskell/stack/issues/2199)
 * `--no-time-in-log` option, to make verbose logs more diffable
   [#2727](https://github.com/commercialhaskell/stack/issues/2727)
@@ -2530,8 +2531,8 @@ Behavior changes:
   --compiler-exe`. See
   [#2123](https://github.com/commercialhaskell/stack/issues/2123)
 * For packages specified in terms of a git or hg repo, the hash used in the
-  location has changed.  This means that existing downloads from older stack
-  versions won't be used.  This is a side-effect of the fix to
+  location has changed.  This means that existing downloads from older Stack
+  versions will not be used.  This is a side-effect of the fix to
   [#2133](https://github.com/commercialhaskell/stack/issues/2133)
 * `stack upgrade` no longer pays attention to local `stack.yaml` files, just the
   global config and CLI options.
@@ -2608,7 +2609,7 @@ Behavior changes:
   `sdist`)
 * GPG signing of packages while uploading to Hackage is now the default. Use
   `upload --no-signature` if you would rather not contribute your package
-  signature. If you don't yet have a GPG keyset, read this
+  signature. If you do not yet have a GPG keyset, read this
   [blog post on GPG keys](https://fpcomplete.com/blog/2016/05/stack-security-gnupg-keys).
   We can add a `stack.yaml` config setting to disable signing if some people
   desire it. We hope that people will sign. Later we will be adding GPG
@@ -2720,7 +2721,7 @@ Bug fixes:
 
 Bug fixes:
 
-* Don't delete contents of ~/.ssh when using `stack clean --full` with Docker
+* Do not delete contents of ~/.ssh when using `stack clean --full` with Docker
   enabled [#2000](https://github.com/commercialhaskell/stack/issues/2000)
 
 ## 1.0.4.2 - 2016-03-09
@@ -2799,7 +2800,7 @@ Bug fixes:
 * Add space before auto-generated bench opts (makes profiling options work
   uniformly for applications and benchmark suites)
   [#1771](https://github.com/commercialhaskell/stack/issues/1771).
-* Don't try to find plugin if it resembles flag.
+* Do not try to find plugin if it resembles flag.
 * Setup.hs changes cause package dirtiness
   [#1711](https://github.com/commercialhaskell/stack/issues/1711).
 * Send "stack templates" output to stdout
@@ -2831,7 +2832,7 @@ Other enhancements:
 - Docker: pass supplementary groups and umask into container
 - If git fetch fails wipe the directory and try again from scratch
   [#1418](https://github.com/commercialhaskell/stack/issues/1418)
-- Warn if newly installed executables won't be available on the PATH
+- Warn if newly installed executables will not be available on the PATH
   [#1362](https://github.com/commercialhaskell/stack/issues/1362)
 - `stack.yaml`: for `stack image container`, specify multiple images to
   generate, and which executables should be added to those images
@@ -2844,7 +2845,7 @@ Other enhancements:
 
 Bug fixes:
 
-- Don't share precompiled packages between GHC/platform variants and Docker
+- Do not share precompiled packages between GHC/platform variants and Docker
   [#1551](https://github.com/commercialhaskell/stack/issues/1551)
 - Properly redownload corrupted downloads with the correct file size.
   [Mailing list discussion](https://groups.google.com/d/msg/haskell-stack/iVGDG5OHYxs/FjUrR5JsDQAJ)
@@ -2871,7 +2872,7 @@ Bug fixes:
 
 Release notes:
 
-*  We're calling this version 1.0.0 in preparation for Stackage
+*  We are calling this version 1.0.0 in preparation for Stackage
    LTS 4.  Note, however, that this does not mean the code's API
    will be stable as this is primarily an end-user tool.
 
@@ -2922,7 +2923,7 @@ Bug fixes:
   [#1480](https://github.com/commercialhaskell/stack/issues/1480)
 * Restrict commands allowed in interpreter mode
   [#1504](https://github.com/commercialhaskell/stack/issues/1504)
-* `stack ghci` doesn't see preprocessed files for executables
+* `stack ghci` does not see preprocessed files for executables
   [#1347](https://github.com/commercialhaskell/stack/issues/1347)
 * All test suites run even when only one is requested
   [#1550](https://github.com/commercialhaskell/stack/pull/1550)
@@ -2995,12 +2996,12 @@ Bug fixes:
 * Docker-built binaries and libraries in different path
   [#911](https://github.com/commercialhaskell/stack/issues/911)
   [#1367](https://github.com/commercialhaskell/stack/issues/1367)
-* Docker: `--resolver` argument didn't effect selected image tag
+* Docker: `--resolver` argument did not effect selected image tag
 * GHCi: Spaces in filepaths caused module loading issues
   [#1401](https://github.com/commercialhaskell/stack/issues/1401)
-* GHCi: cpp-options in Cabal files weren't used
+* GHCi: cpp-options in Cabal files were not used
   [#1419](https://github.com/commercialhaskell/stack/issues/1419)
-* Benchmarks couldn't be run independently of each other
+* Benchmarks could not be run independently of each other
   [#1412](https://github.com/commercialhaskell/stack/issues/1412)
 * Send output of building setup to stderr
   [#1410](https://github.com/commercialhaskell/stack/issues/1410)
@@ -3073,7 +3074,7 @@ Bug fixes:
   [#1105](https://github.com/commercialhaskell/stack/issues/1105)
 * Fix: Global options did not work consistently after subcommand
   [#519](https://github.com/commercialhaskell/stack/issues/519)
-* Fix: 'stack ghci' doesn't notice that a module got deleted
+* Fix: 'stack ghci' does not notice that a module got deleted
   [#1180](https://github.com/commercialhaskell/stack/issues/1180)
 * Rebuild when Cabal file is changed
 * Fix: Paths in GHC warnings not canonicalized, nor those for packages in
@@ -3122,7 +3123,7 @@ Other enhancements:
   [#1089](https://github.com/commercialhaskell/stack/issues/1089)
 * Docker: download or override location of Stack executable to re-run in
   container [#974](https://github.com/commercialhaskell/stack/issues/974)
-* Docker: when Docker Engine is remote, don't run containerized processes as
+* Docker: when Docker Engine is remote, do not run containerized processes as
   host's UID/GID [#194](https://github.com/commercialhaskell/stack/issues/194)
 * Docker: `set-user` option to enable/disable running containerized processes as
   host's UID/GID [#194](https://github.com/commercialhaskell/stack/issues/194)
@@ -3194,7 +3195,7 @@ Other enhancements:
 * Added `--file-watch-poll` flag for polling instead of using filesystem events
   (useful for running tests in a Docker container while modifying code in the
   host environment. When code is injected into the container via a volume, the
-  container won't propagate filesystem events).
+  container will not propagate filesystem events).
 * Give a preemptive error message when `-prof` is given as a GHC option
   [#1015](https://github.com/commercialhaskell/stack/issues/1015)
 * Locking is now optional, and will be turned on by setting the `STACK_LOCK`
@@ -3211,7 +3212,7 @@ Bug fixes:
   [#806](https://github.com/commercialhaskell/stack/issues/806)
 * Build executables for local extra-deps
   [#920](https://github.com/commercialhaskell/stack/issues/920)
-* copyFile can't handle directories
+* copyFile cannot handle directories
   [#942](https://github.com/commercialhaskell/stack/pull/942)
 * Support for spaces in Haddock interface files
   [fpco/minghc#85](https://github.com/fpco/minghc/issues/85)
@@ -3284,7 +3285,7 @@ Bug fixes:
 * More intelligent logic for setting UTF-8 locale environment variables
   [#856](https://github.com/commercialhaskell/stack/issues/856)
 * Create missing directories for `stack sdist`
-* Don't ignore Cabal files with extra periods
+* Do not ignore Cabal files with extra periods
   [#895](https://github.com/commercialhaskell/stack/issues/895)
 * Deprecate unused `--optimizations` flag
 * Truncated output on slow terminals
@@ -3323,7 +3324,7 @@ Other enhancements:
 * Track build status of tests and benchmarks
   [#525](https://github.com/commercialhaskell/stack/issues/525)
 * `--no-run-tests` [#517](https://github.com/commercialhaskell/stack/pull/517)
-* Targets outside of root dir don't build
+* Targets outside of root dir do not build
   [#366](https://github.com/commercialhaskell/stack/issues/366)
 * Upper limit on number of flag combinations to test
   [#543](https://github.com/commercialhaskell/stack/issues/543)
@@ -3333,7 +3334,7 @@ Other enhancements:
   `--copy-bins` [#342](https://github.com/commercialhaskell/stack/issues/342)
 * Custom snapshots [#111](https://github.com/commercialhaskell/stack/issues/111)
 * --force-dirty flag: Force treating all local packages as having dirty files
-  (useful for cases where Stack can't detect a file change)
+  (useful for cases where Stack cannot detect a file change)
 * GHC error messages: display file paths as absolute instead of relative for
   better editor integration
 * Add the `--copy-bins` option
@@ -3341,7 +3342,7 @@ Other enhancements:
 * Give warnings on unexpected config keys
   [#48](https://github.com/commercialhaskell/stack/issues/48)
 * Remove Docker `pass-host` option
-* Don't require `cabal-install` to upload
+* Do not require `cabal-install` to upload
   [#313](https://github.com/commercialhaskell/stack/issues/313)
 * Generate indexes for all deps and all installed snapshot packages
   [#143](https://github.com/commercialhaskell/stack/issues/143)
@@ -3368,7 +3369,7 @@ Bug fixes:
   default [#449](https://github.com/commercialhaskell/stack/issues/449)
 * Fix: haddock forces rebuild of empty packages
   [#452](https://github.com/commercialhaskell/stack/issues/452)
-* Don't copy over executables excluded by component selection
+* Do not copy over executables excluded by component selection
   [#605](https://github.com/commercialhaskell/stack/issues/605)
 * Fix: Stack fails on Windows with git package in `stack.yaml` and no git
   executable on the PATH
@@ -3390,11 +3391,11 @@ Bug fixes:
 * Add `--force` flag to `init` command
 * exec style commands accept the `--package` option (see
   [Reddit discussion](http://www.reddit.com/r/haskell/comments/3bd66h/stack_runghc_turtle_as_haskell_script_solution/))
-* `stack upload` without arguments doesn't do anything
+* `stack upload` without arguments doe snot do anything
   [#439](https://github.com/commercialhaskell/stack/issues/439)
 * Print latest version of packages on conflicts
   [#450](https://github.com/commercialhaskell/stack/issues/450)
-* Flag to avoid rerunning tests that haven't changed
+* Flag to avoid rerunning tests that have not changed
   [#451](https://github.com/commercialhaskell/stack/issues/451)
 * Stack can act as a script interpreter (see [Script interpreter]
   (https://github.com/commercialhaskell/stack/wiki/Script-interpreter) and
@@ -3434,7 +3435,7 @@ Bug fixes:
 * Give a reason for unregistering packages
   [#389](https://github.com/commercialhaskell/stack/issues/389)
 * `stack exec` accepts the `--no-ghc-package-path` parameter
-* Don't require build plan to upload
+* Do not require build plan to upload
   [#400](https://github.com/commercialhaskell/stack/issues/400)
 * Specifying test components only builds/runs those tests
   [#398](https://github.com/commercialhaskell/stack/issues/398)
@@ -3458,7 +3459,7 @@ Bug fixes:
 
 ## 0.1.0.0 - 2015-06-23
 
-* Fall back to Cabal dependency solver when a snapshot can't be found
+* Fall back to Cabal dependency solver when a snapshot cannot be found
 * Basic implementation of `stack new`
   [#137](https://github.com/commercialhaskell/stack/issues/137)
 * `stack solver` command

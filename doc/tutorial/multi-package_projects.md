@@ -3,7 +3,7 @@
 # 9. Multi-package projects
 
 Until now, everything we have done with Stack has used a single-package project.
-However, Stack's power truly shines when you're working on multi-package
+However, Stack's power truly shines when you are working on multi-package
 projects. All the functionality you'd expect to work just does: dependencies
 between packages are detected and respected, dependencies of all packages are
 just as one cohesive whole, and if anything fails to build, the build commands
@@ -67,7 +67,7 @@ stack build --haddock --test
 
 Stack should build and test the project packages.
 
-If you look at the `stack.yaml` file, you'll see exactly what you'd expect:
+If you look at the `stack.yaml` file, you will see exactly what you'd expect:
 
 ~~~yaml
 snapshot:
@@ -81,7 +81,7 @@ Notice that multiple directories are listed in the `packages` key.
 
 In addition to local directories, you can also refer to packages available in a
 Git repository or in a tarball over HTTP/HTTPS. This can be useful for using a
-modified version of a dependency that hasn't yet been released upstream.
+modified version of a dependency that has not yet been released upstream.
 
 !!! note
 

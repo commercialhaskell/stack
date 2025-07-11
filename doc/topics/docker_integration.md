@@ -307,10 +307,11 @@ Additional notes
 ### Volume-mounts and ephemeral containers
 
 Since filesystem changes outside of the volume-mounted project directory are not
-persisted across runs, this means that if you `stack exec sudo apt-get install some-ubuntu-package`,
-that package will be installed but then the container it's
-installed in will disappear, thus causing it to have no effect. If you wish to
-make this kind of change permanent, see later instructions for how to create a
+persisted across runs, this means that if you
+`stack exec sudo apt-get install some-ubuntu-package`, that package will be
+installed but then the container it is installed in will disappear, thus causing
+it to have no effect. If you wish to make this kind of change permanent, see 
+later instructions for how to create a
 [derivative Docker image](#derivative-image).
 
 Inside the container, your home directory is a special location that volume-
@@ -339,8 +340,8 @@ If you do want to do all your work, including editing, in the container, it
 might be better to use a persistent container in which you can install Ubuntu
 packages. You could get that by running something like
 `stack --docker-container-name=NAME --docker-persist exec bash`. This
-means when the container exits, it won't be deleted. You can then restart it
-using `docker start -a -i NAME`. It's also possible to detach from a container
+means when the container exits, it will not be deleted. You can then restart it
+using `docker start -a -i NAME`. It is also possible to detach from a container
 while it continues running in the background using by pressing Ctrl-P Ctrl-Q,
 and then reattach to it using `docker attach NAME`.
 
@@ -354,7 +355,7 @@ information about managing Docker containers.
 Creating your own custom derivative image can be useful if you need to install
 additional Ubuntu packages or make other changes to the operating system. Here
 is an example (replace `stack-build:custom` if you prefer a different name for
-your derived container, but it's best if the repo name matches what you're
+your derived container, but it is best if the repo name matches what you are
 deriving from, only with a different tag, to avoid recompilation):
 
     ;;; On host
@@ -384,7 +385,7 @@ on creating Docker images.
 
 The easiest way to create your own custom image us by extending FP Complete's
 images, but if you prefer to start from scratch, most images that include the
-basics for building code with GHC will work. The image doesn't even, strictly
+basics for building code with GHC will work. The image does not even, strictly
 speaking, need to include GHC, but it does need to have libraries and tools that
 GHC requires (e.g., libgmp, gcc, etc.).
 
@@ -392,7 +393,7 @@ There are also a few ways to set up images that tightens the integration:
 
 * Create a user and group named `stack`, and create a `~/.stack` directory for
   it. Any build plans and caches from it will be copied from the image by Stack,
-  meaning they don't need to be downloaded separately.
+  meaning they do not need to be downloaded separately.
 * Any packages in GHC's global package database will be available. This can be
   used to add private libraries to the image, or the make available a set of
   packages from an LTS release.
@@ -410,7 +411,7 @@ We recommend using either the `overlay` or `aufs` storage driver for stack, as
 they are least likely to give you trouble.  On Ubuntu, `aufs` is the default for
 new installations, but older installations sometimes used `devicemapper`.
 
-The `devicemapper` storage driver's doesn't work well with large filesystems,
+The `devicemapper` storage driver's does not work well with large filesystems,
 and we have experienced other instabilities with it as well. We recommend
 against its use.
 
@@ -430,7 +431,7 @@ for this condition.  Unfortunately, the number of inodes is set when creating
 the filesystem, so fixing this requires reformatting and passing the `-N`
 argument to mkfs.ext4.
 
-### Name resolution doesn't work from within container
+### Name resolution does not work from within container
 
 On Ubuntu 12.04, by default `NetworkManager` runs `dnsmasq` service, which sets
 `127.0.0.1` as your DNS server. Since Docker containers cannot access this

@@ -337,7 +337,7 @@ compiler-repository: git://my/ghc/repository
 ~~~
 
 Stack does not check the compiler version when it uses a compiler built from
-source. It is assumed that the built compiler is recent enough as Stack doesn't
+source. It is assumed that the built compiler is recent enough as Stack does not
 enable any known workaround to make older compilers work.
 
 Building the compiler can take a very long time (more than one hour). For faster
@@ -595,7 +595,7 @@ The value of the `dump-logs` key controls what, if any, log file content is sent
 Possible values are:
 
 ~~~yaml
-dump-logs: none    # don't dump the content of any log files
+dump-logs: none    # do not dump the content of any log files
 dump-logs: warning # dump the content of any log files that include GHC warnings
 dump-logs: all     # dump the content of all log files
 ~~~
@@ -1608,7 +1608,7 @@ Default: `false`, unless the [Docker](../../topics/docker_integration.md) or
 Command line equivalent (takes precedence): `--[no-]system-ghc` flag
 
 Enables or disables using the GHC available on the PATH. (Make sure PATH is
-explicit, i.e., don't use ~.) Useful to enable if you want to save the time,
+explicit, i.e., do not use ~.) Useful to enable if you want to save the time,
 bandwidth or storage space needed to setup an isolated GHC.
 
 In a Nix-enabled configuration, Stack is incompatible with `system-ghc: false`.

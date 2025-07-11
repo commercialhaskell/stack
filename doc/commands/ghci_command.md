@@ -94,13 +94,13 @@ By default:
 
         The `--only-main` flag can be useful if:
 
-        1.  You're loading the project in order to run it in GHCi (e.g. via
+        1.  You are loading the project in order to run it in GHCi (e.g. via
             `main`), and you intend to reload while developing. Without flag,
             you will need to quit and restart GHCi whenever a module gets
             deleted. With the flag, reloading should work fine in this case.
 
-        2.  If many of your modules have exports named the same thing, then
-            you'll need to refer to them using qualified names. To avoid this,
+        2.  If many of your modules have exports named the same thing, then you 
+            will need to refer to them using qualified names. To avoid this,
             use the `--only-main` flag to start with a blank slate and just
             import the modules you are interested in.
 
@@ -114,7 +114,7 @@ Stack combines all of the GHC options of components.
 
     Combining GHC options should work out when packages share similar
     conventions. However, conflicts may arise, such as when one component
-    defines default extensions which aren't assumed by another. For example,
+    defines default extensions which are not assumed by another. For example,
     specifying `NoImplicitPrelude` in one component but not another is likely to
     cause failures. GHCi will be run with `-XNoImplicitPrelude`, but it is
     likely that modules in the other component assume that the `Prelude` is
@@ -156,7 +156,7 @@ and so will have access to your databases.
 
 !!! note
 
-    Running `stack ghci` on a pristine copy of the code doesn't currently build
+    Running `stack ghci` on a pristine copy of the code does not currently build
     libraries
     (issue [#2790](https://github.com/commercialhaskell/stack/issues/2790)) or
     internal libraries

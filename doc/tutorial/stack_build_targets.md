@@ -2,21 +2,21 @@
 
 # 8. `stack build` targets
 
-We haven't discussed this too much yet, but, in addition to having a number of
+We have not discussed this too much yet, but, in addition to having a number of
 synonyms *and* taking a number of options on the command line, the `build`
 command *also* takes many arguments. These are parsed in different ways, and can
 be used to achieve a high level of flexibility in telling Stack exactly what you
 want to build.
 
-We're not going to cover the full generality of these arguments here; instead,
-there's documentation covering the full
-[build command syntax](../commands/build_command.md). Here, we'll just point out
-a few different types of arguments:
+We are not going to cover the full generality of these arguments here; instead,
+there is documentation covering the full
+[build command syntax](../commands/build_command.md). Here, we will just point
+out a few different types of arguments:
 
 * You can specify a *package name*, e.g. `stack build vector`.
-    * This will attempt to build the `vector` package, whether it's a local
+    * This will attempt to build the `vector` package, whether it is a local
       package, in your extra-deps, in your snapshot, or just available upstream.
-      If it's just available upstream but not included in your locals,
+      If it is just available upstream but not included in your locals,
       extra-deps, or snapshot, the newest version is automatically promoted to
       an extra-dep.
 * You can also give a *package identifier*, which is a package name plus
@@ -34,13 +34,13 @@ a few different types of arguments:
   of any project packages included in those directories or subdirectories.
 
 When you give no specific arguments on the command line (e.g., `stack build`),
-it's the same as specifying the names of all of your project packages. If you
-just want to build the package for the directory you're currently in, you can
+it is the same as specifying the names of all of your project packages. If you
+just want to build the package for the directory you are currently in, you can
 use `stack build .`.
 
 ## Components, --test, and --bench
 
-Here's one final important yet subtle point. Consider our `helloworld` package:
+Here is one final important yet subtle point. Consider our `helloworld` package:
 it has a library component, an executable `helloworld-exe`, and a test suite
 `helloworld-test`. When you run `stack build helloworld`, how does it know which
 ones to build? By default, it will build the library (if any) and all of the
@@ -102,6 +102,6 @@ running a test suite which has already passed and has not changed.
 
 !!! note
 
-    Stack doesn't build or run test suites and benchmarks for non-local
-    packages. This is done so that a command like `stack test` doesn't need to
+    Stack does not build or run test suites and benchmarks for non-local
+    packages. This is done so that a command like `stack test` does not need to
     run 200 test suites!

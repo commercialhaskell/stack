@@ -17,7 +17,7 @@ cover its features.
 
 A Haskell package often depends on code exposed by other Haskell packages.
 
-Let's say we decide to modify our existing `helloworld` package source code to
+Let us say we decide to modify our existing `helloworld` package source code to
 use a new library, the one provided by the
 [`text`](https://hackage.haskell.org/package/text) package.
 
@@ -107,7 +107,7 @@ dependencies — it does so automatically.
 
 ## Listing dependencies
 
-Let's have Stack add a few more dependencies to our project. First, we'll
+Let us have Stack add a few more dependencies to our project. First, we will
 include two new packages in the `dependencies` section for our library in our
 `package.yaml`:
 
@@ -138,7 +138,7 @@ stack ls dependencies
 The packages `text`, `filepath` and `containers` have something in common: they
 are all provided with GHC (referred to as GHC boot packages).
 
-Let's try a dependency on a more off-the-beaten-track package: the joke
+Let us try a dependency on a more off-the-beaten-track package: the joke
 [acme-missiles](http://www.stackage.org/package/acme-missiles) package.
 
 We can further modify `src/Lib.hs` so that its contents are as follows:
@@ -225,10 +225,10 @@ to specify that it depends on the `acme-missiles` package, but `acme-missiles`
 is not a member of the set of package versions specified by the snapshot. So
 building failed.
 
-To add a version of `acme-missiles` to the available package versions, we'll use
-the `extra-deps` key in Stack's project-level configuration file (`stack.yaml`).
-That key defines extra package versions, not present in the snapshot, that will
-be needed as dependencies. You can add this like so:
+To add a version of `acme-missiles` to the available package versions, we will
+use the `extra-deps` key in Stack's project-level configuration file 
+(`stack.yaml`). That key defines extra package versions, not present in the 
+snapshot, that will be needed as dependencies. You can add this like so:
 
 ~~~yaml
 extra-deps:
@@ -245,7 +245,7 @@ we should get a successful result.
 
 ## Stackage snapshots
 
-With that out of the way, let's dig a little bit more into these snapshots. We
+With that out of the way, let us dig a little bit more into these snapshots. We
 mentioned the LTS snapshots, and you can get information about it at
 [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
@@ -258,11 +258,11 @@ mentioned the LTS snapshots, and you can get information about it at
   `package.yaml` file.
 
 You can also see a
-[list of all available snapshots](https://www.stackage.org/snapshots). You'll
+[list of all available snapshots](https://www.stackage.org/snapshots). You will
 notice two flavors: LTS (for "Long Term Support") and Nightly. You can read more
 about them on the
 [LTS Haskell GitHub page](https://github.com/commercialhaskell/lts-haskell#readme).
-If you're not sure which to use, start with LTS Haskell (which Stack will lean
+If you are not sure which to use, start with LTS Haskell (which Stack will lean
 towards by default as well).
 
 ## Snapshots and GHC versions

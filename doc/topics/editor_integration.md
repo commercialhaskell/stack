@@ -9,7 +9,7 @@ documentation.
 
 ## Shell auto-completion
 
-Love tab-completion of commands? You're not alone. If you're on bash, just run
+Love tab-completion of commands? You are not alone. If you are on bash, just run
 the following command (or add it to `.bashrc`):
 
 ~~~text

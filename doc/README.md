@@ -243,8 +243,8 @@ stack exec my-project-exe # (4)!
 3.  Build the template project and create an executable named `my-project-exe`.
 
     First, if necessary, Stack will download a version of GHC in an isolated
-    location. That won't interfere with other GHC installations on your system.
-    (On Windows, if necessary, Stack will also download
+    location. That will not interfere with other GHC installations on your 
+    system. (On Windows, if necessary, Stack will also download
     [MSYS2](https://www.msys2.org/). MSYS2 is a project that provides popular
     tools for developers on Windows.)
 

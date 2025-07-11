@@ -39,8 +39,8 @@ improvements, and feature enhancements.
 Maintainers should be included in discussions of controversial changes and
 tricky code changes.
 
-Our general approach is **"it's easier to ask forgiveness than permission"**. If
-there is ever a bad change, it can always be rolled back.
+Our general approach is **"it is easier to ask forgiveness than permission"**.
+If there is ever a bad change, it can always be rolled back.
 
 ### Stack's maintainers
 
@@ -318,11 +318,11 @@ used for that purpose.
 ## Code
 
 If you would like to contribute code to fix a bug, add a new feature, or
-otherwise improve `stack`, pull requests are most welcome. It's a good idea to
+otherwise improve `stack`, pull requests are most welcome. It is a good idea to
 [submit an issue](https://github.com/commercialhaskell/stack/issues/new) to
 discuss the change before plowing into writing code.
 
-If you'd like to help out but aren't sure what to work on, look for issues with
+If you'd like to help out but are not sure what to work on, look for issues with
 the
 [awaiting pull request](https://github.com/commercialhaskell/stack/issues?q=is%3Aopen+is%3Aissue+label%3A%22awaiting+pull+request%22)
 label. Issues that are suitable for newcomers to the codebase have the
@@ -509,10 +509,10 @@ stack test
 ~~~
 
 The `--file-watch` is a very useful option to get quick feedback. However,
-running the entire test suite after each file change will slow you down. You'll
-need to specify which test suite (unit test or integration) and pass arguments
-to specify which module you'd specifically like to run to get quick feedback. A
-description of this follows below.
+running the entire test suite after each file change will slow you down. You
+will need to specify which test suite (unit test or integration) and pass 
+arguments to specify which module you'd specifically like to run to get quick 
+feedback. A description of this follows below.
 
 
 If you would like to run the unit tests on their own, you can command:
@@ -545,7 +545,7 @@ Integration tests can be found in the
 [tests/integration](https://github.com/commercialhaskell/stack/tree/master/tests/integration)
 folder.
 
-Running the integration tests is a little involved, you'll need to command:
+Running the integration tests is a little involved, you will need to command:
 
 ~~~text
 stack build --flag stack:integration-tests stack --exec stack-integration-test
@@ -579,8 +579,8 @@ You can disable a few integration tests through the -n option :
 stack build --flag stack:integration-tests stack --exec "stack-integration-test -n <PATTERN1> -n <PATTERN2>"
 ~~~
 
-To disable folders named after `<PATTERN1>` and `<PATTERN2>`
-It's especially useful when some tests are taking a while to complete.
+to disable folders named after `<PATTERN1>` and `<PATTERN2>`. It is especially
+useful when some tests are taking a while to complete.
 
 On Linux, the `stack-integration-test` executable uses the `lld` linker and
 expects it to be on the PATH. The integration tests complete significantly
@@ -823,7 +823,7 @@ For further information, see the documentation for
 
 ## Slack channel
 
-If you're making deep changes and real-time communication with the Stack team
+If you are making deep changes and real-time communication with the Stack team
 would be helpful, we have a `#stack-collaborators` Slack channel in the
 Haskell Foundation workspace. To join the workspace, follow this
 [link](https://haskell-foundation.slack.com/join/shared_invite/zt-z45o9x38-8L55P27r12YO0YeEufcO2w#/shared-invite/email).

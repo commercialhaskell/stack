@@ -676,7 +676,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
     ~~~text
     [S-2804] forbidden upload
-    Usually means: you've already uploaded this package/version combination
+    Usually means: you have already uploaded this package/version combination
     Ignoring error and continuing, full message from Hackage below:
     <Hackage_message>
     ~~~

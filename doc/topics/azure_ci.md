@@ -44,8 +44,8 @@ We provide two fully baked configuration ready to be used on your projects:
       It is likely going to be necessary to modify this configuration to match
       the needs of your project, such as tweaking the build matrix to alter
       which GHC versions you test against, or to specify GHC-version-specific
-      `stack.yaml` files if necessary. Don't be surprised if it doesn't work the
-      first time around. See the multiple GHC section below for more
+      `stack.yaml` files if necessary. Do not be surprised if it does not work
+      the first time around. See the multiple GHC section below for more
       information.
 
 ## Creating Azure Pipelines
@@ -131,7 +131,7 @@ But we only use the first method of using Stack to download GHC.
 ### Multiple GHC - parametrised builds
 
 For different GHC versions, you probably want to use different project-level
-configuration files (`stack.yaml`, by default). If you don't want to put a
+configuration files (`stack.yaml`, by default). If you do not want to put a
 specific `stack.yaml` for a particular snapshot and still want to test it, you
 have specify your snapshot argument in `ARGS` environment variable (you will see
 an example below).

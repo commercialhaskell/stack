@@ -53,7 +53,7 @@ information, see issue
     stack --zsh-completion-script $(which stack)
     ~~~
 
-    You won't need to `source` this, but do update your `fpath`:
+    You will not need to `source` this, but do update your `fpath`:
 
     ~~~zsh
     fpath=($HOME/.config/zsh/completions $fpath)

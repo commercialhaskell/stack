@@ -3,7 +3,7 @@
 # Stack's script interpreter
 
 Stack offers a very useful feature for running files: a script interpreter. For
-too long have Haskellers felt shackled to bash or Python because it's just too
+too long have Haskellers felt shackled to bash or Python because it is just too
 hard to create reusable source-only Haskell scripts. Stack attempts to solve
 that.
 
@@ -289,7 +289,7 @@ those curious, here is an example with
 ~~~
 
 The [`stack runghc`](../commands/runghc_command.md) command is still useful,
-especially when you're working on a project and want to access the package
+especially when you are working on a project and want to access the package
 databases and configurations used by that project. See the next section for more
 information on configuration files.
 

@@ -33,7 +33,7 @@ any Linux distribution.
 - Check out Stack commit to be released to `~/stack-release` (or elsewhere, in
   which case adjust following instructions)
 
-- `rm -f ~/stack-release/*.cabal`, to ensure it's regenerated
+- `rm -f ~/stack-release/*.cabal`, to ensure it is regenerated
 
 - clone https://github.com/nh2/static-haskell-nix recursively (last known to
   work with commit 725ceb2479637b3b3ab29298a1bc0e48c54984c9)

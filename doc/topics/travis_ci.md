@@ -22,16 +22,16 @@ ready to be used on your projects:
         It is likely going to be necessary to modify this configuration to match
         the needs of your project, such as tweaking the build matrix to alter
         which GHC versions you test against, or to specify GHC-version-specific
-        `stack.yaml` files if necessary. Don't be surprised if it doesn't work
+        `stack.yaml` files if necessary. Do not be surprised if it does not work
         the first time around. See the multiple GHC section below for more
         information.
 
 Each of these configurations is ready to be used immediately, just
 copy-paste the content into the `.travis.yml` file in the root or your
-repo, enable Travis on the repo, and you're good to go.
+repo, enable Travis on the repo, and you are good to go.
 
 You may also be interested in using AppVeyor, which supports Windows
-builds, for more cross-platform testing. There's a
+builds, for more cross-platform testing. There is a
 [short blog post available on how to do this](http://www.snoyman.com/blog/2016/08/appveyor-haskell-windows-ci),
 or just copy in
 [the appveyor.yml file](https://raw.githubusercontent.com/commercialhaskell/stack/stable/doc/resources/appveyor.yml)
@@ -105,7 +105,7 @@ addons:
 
 ### Multiple GHC - parametrised builds
 
-Travis apt plugin doesn't yet support installing apt packages dynamically
+Travis apt plugin does not yet support installing apt packages dynamically
 (https://github.com/travis-ci/travis-ci/issues/4291). That for we need to write
 a bit repetitive `.travis.yml`.
 
@@ -157,7 +157,7 @@ script:
   - stack --no-terminal --skip-ghc-check test
 ~~~
 
-In case you're wondering: we need `--no-terminal` because stack does some fancy
+In case you are wondering: we need `--no-terminal` because stack does some fancy
 sticky display on smart terminals to give nicer status and progress messages,
 and the terminal detection is broken on Travis.
 

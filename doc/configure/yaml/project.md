@@ -258,7 +258,7 @@ Packages which, when present in the snapshot specified in the
 [`snapshot`](#snapshot) or [`resolver`](#resolver) key, should not be included
 in our project. This can be used for a few different purposes, e.g.:
 
-* Ensure that packages you don't want used in your project cannot be used in a
+* Ensure that packages you do not want used in your project cannot be used in a
   `package.yaml` file (e.g., for license reasons)
 * When using a custom GHC build, avoid incompatible packages (see this
   [comment](https://github.com/commercialhaskell/stack/pull/4655#issuecomment-477954429)).

@@ -67,7 +67,7 @@ This will output to the standard output stream a summary report for the combined
 coverage from `A` and `B`'s test suites. It will also log the path to the HTML
 for the corresponding full report.
 
-This command also supports taking extra `.tix` files.  If you've also built an
+This command also supports taking extra `.tix` files.  If you have also built an
 executable, against exactly the same library versions of `A`, `B`, and `C`, then
 you could command the following:
 
@@ -95,7 +95,7 @@ This report will consider all test results as well as the newly generated
 2.  These test suites link against your library, rather than building the
     library directly. Coverage information is only given for libraries, ignoring
     the modules which get compiled directly into your executable. A common case
-    where this doesn't happen is when your test suite and library both have
+    where this does not happen is when your test suite and library both have
     something like `hs-source-dirs: src/`. In this case, when building your test
     suite you may also be compiling your library, instead of just linking
     against it.
@@ -140,8 +140,8 @@ However, advanced users may want to understand exactly how `--coverage` works:
    will then get loaded, modified, and outputted to
    `pkg-name/test-name/test-name.tix` in the local HPC root directory.
 
-   The `.tix` file gets modified to remove coverage file that isn't associated
-   with a library. So, this means that you won't get coverage information for
+   The `.tix` file gets modified to remove coverage file that is not associated
+   with a library. So, this means that you will not get coverage information for
    the modules compiled in the `executable` or `test-suite` stanza of your Cabal
    file. This makes it possible to directly union multiple `*.tix` files from
    different executables (assuming they are using the exact same versions of the
