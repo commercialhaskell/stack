@@ -2,9 +2,9 @@
 
 # 12. Executing commands
 
-We've already used `stack exec` multiple times in this guide. As you've likely
-already guessed, it allows you to run executables, but with a slightly modified
-environment.
+We have already used `stack exec` multiple times in this guide. As you have
+likely already guessed, it allows you to run executables, but with a slightly 
+modified environment.
 
 ## The `stack exec` command
 
@@ -56,7 +56,7 @@ stack exec bash
 
 ## The `stack ghc` and `stack runghc` commands
 
-You'll sometimes want to just compile (or run) a single Haskell source file,
+You will sometimes want to just compile (or run) a single Haskell source file,
 instead of creating an entire Cabal package for it. You can use `stack exec ghc`
 or `stack exec runghc` for that. As simple helpers, we also provide the
 `stack ghc` and `stack runghc` commands, for these common cases.

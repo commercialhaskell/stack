@@ -334,7 +334,7 @@ This overrides:
 
 Default: Disabled
 
-Set the flag to force rebuild of packages even when it doesn't seem necessary
+Set the flag to force rebuild of packages even when it does not seem necessary
 based on file dirtiness.
 
 ### `--[no-]haddock` flag
@@ -530,7 +530,7 @@ Default (`stack build`): Disabled
 Default (`stack test` or `stack bench`): Enabled
 
 Set the flag to continue building packages even after some build step fails.
-The packages which depend upon the failed build won't get built.
+The packages which depend upon the failed build will not get built.
 
 ### `--[no-]keep-tmp-files` flag
 
@@ -571,7 +571,7 @@ with other projects.
 
 Default: Disabled
 
-Set the flag to force reconfiguration even when it doesn't seem necessary based
+Set the flag to force reconfiguration even when it does not seem necessary based
 on file dirtiness. This is sometimes useful with custom `Setup.hs` files, in
 particular when they depend on external data files.
 
@@ -581,7 +581,7 @@ particular when they depend on external data files.
 project package. It allows you to skip test suites and benchmark without
 specifying other components (e.g. `stack test --skip long-test-suite` will run
 the tests without the `long-test-suite` test suite). Be aware that skipping
-executables won't work the first time the package is built due to an issue in
+executables will not work the first time the package is built due to an issue in
 [Cabal](https://github.com/commercialhaskell/stack/issues/3229).
 
 This option can be specified multiple times to skip multiple components.

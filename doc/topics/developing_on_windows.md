@@ -62,8 +62,8 @@ This command may need to be run more than once, until everything is reported by
 ## Setup.hs ##
 
 `Setup.hs` is automatically run inside the Stack environment. So when you need
-to launch another tool you don't need to prefix the command with `stack exec --`
-within the custom `Setup.hs` file.
+to launch another tool you do not need to prefix the command with 
+`stack exec --` within the custom `Setup.hs` file.
 
 ## Pacman packages to install for common Haskell packages ##
 

@@ -26,7 +26,7 @@ used, it sets other things up as needed.
 
     Command `stack --version` or `stack --numeric-version`.
 
-??? question "If I don't use GHCup, is there a preferred location for Stack?"
+??? question "If I do not use GHCup, is there a preferred location for Stack?"
 
     You can put the `stack` executable file anywhere on your PATH. However, a
     good location is the directory where Stack itself will install executables.
@@ -40,7 +40,7 @@ used, it sets other things up as needed.
         $HOME/.local/bin
         ~~~
 
-        If you don't have that directory in your PATH, you may need to update
+        If you do not have that directory in your PATH, you may need to update
         your PATH. That can be done by editing the `~/.bashrc` file.
 
     === "Windows"
@@ -53,7 +53,7 @@ used, it sets other things up as needed.
 
         For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
 
-        If you don't have that directory in your PATH, you may need to update
+        If you do not have that directory in your PATH, you may need to update
         your PATH. That can be done by searching for 'Edit Environment variables
         for your account' under Start.
 
@@ -67,7 +67,7 @@ used, it sets other things up as needed.
 
         For example: `C:\Users\<user-name>\AppData\Roaming\local\bin`.
 
-        If you don't have that directory in your PATH, you may need to update
+        If you do not have that directory in your PATH, you may need to update
         your PATH. That can be done by searching for 'Edit Environment variables
         for your account' under Start.
 
@@ -352,7 +352,7 @@ Stack can be installed directly or by using the GHCup tool.
                     ~~~
 
                     Note that the tests fail on NixOS, so disable them with
-                    `--no-check`. Also, Haddock currently doesn't work for
+                    `--no-check`. Also, Haddock currently does not work for
                     Stack, so `--no-haddock` disables it.
 
                 3.  Install Stack to your user profile with the command:

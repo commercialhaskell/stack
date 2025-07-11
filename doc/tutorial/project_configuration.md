@@ -47,11 +47,11 @@ versions of other package dependencies to use, and so on. Our value here says to
 use [LTS Haskell 23.24](https://www.stackage.org/lts-23.24), which implies
 GHC 9.8.4 (which is why `stack build` installs that version of GHC if it is not
 already available to Stack). There are a number of values you can use for
-`snapshot`, which we'll cover later.
+`snapshot`, which we will cover later.
 
 The key [`packages`](../configure/yaml/project.md#packages) is another
 project-specific configuration option. Its value tells Stack which project
 packages, located locally, to build. In our simple example, we have only a
 single project package, located in the same directory, so '`.`' suffices.
-However, Stack has powerful support for multi-package projects, which we'll
+However, Stack has powerful support for multi-package projects, which we will
 describe as this guide progresses.

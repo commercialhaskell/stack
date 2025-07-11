@@ -85,7 +85,7 @@ located on a local file path.
 The reason we have this structure is that:
 
 * it lets multiple projects reuse the same binary builds of immutable packages,
-* but doesn't allow different projects to "contaminate" each other by putting
+* but does not allow different projects to "contaminate" each other by putting
   non-standard content into the shared snapshot database.
 
 As you probably guessed, there can be multiple snapshot databases available. See
@@ -102,9 +102,9 @@ the contents of the `snapshots` directory in the
   systems. This is done to avoid problems created by default limits on file
   path lengths on Windows systems.
 
-These snapshot databases don't get layered on top of each other; they are each
+These snapshot databases do not get layered on top of each other; they are each
 used separately.
 
-In reality, you'll rarely — if ever — interact directly with these databases,
-but it's good to have a basic understanding of how they work so you can
+In reality, you will rarely — if ever — interact directly with these databases,
+but it is good to have a basic understanding of how they work so you can
 understand why rebuilding may occur at different points.

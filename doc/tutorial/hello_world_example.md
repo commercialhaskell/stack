@@ -2,7 +2,7 @@
 
 # 1. A Hello World example
 
-With Stack installed, let's create a new project and walk through the most
+With Stack installed, let us create a new project and walk through the most
 common Stack commands.
 
 In this guide, unless stated otherwise, the working directory is the project's
@@ -10,13 +10,13 @@ root directory.
 
 ## The `stack new` command
 
-We'll start off with the [`stack new`](../commands/new_command.md) command to
-create a new *project* from a project template. We'll use the `new-template`
+We will start off with the [`stack new`](../commands/new_command.md) command to
+create a new *project* from a project template. We will use the `new-template`
 project template. This template is used by default, but in our example we will
 refer to it expressly.
 
 That template will create a project with a package of the same name. So, we need
-to pick a name for the project that is a valid package name. We'll call our
+to pick a name for the project that is a valid package name. We will call our
 project `helloworld`.
 
 ??? question "How do project packages relate to projects?"
@@ -83,7 +83,7 @@ cd helloworld
 
 ## The `stack build` command
 
-Next, we'll run the most important Stack command,
+Next, we will run the most important Stack command,
 [`stack build`](../commands/build_command.md). We command:
 
 ~~~text
@@ -94,7 +94,7 @@ Stack needs a version of GHC and, on Windows, a version of MSYS2, in order to
 build your project. Stack will discover that you are missing it and will install
 it for you.
 
-You'll get intermediate download percentage statistics while the download is
+You will get intermediate download percentage statistics while the download is
 occurring. This command may take some time, depending on download speeds.
 
 ??? question "Where is the Stack-supplied GHC located?"
@@ -201,7 +201,7 @@ Installing executable helloworld-exe in .../helloworld/.stack-work/.../bin
 The executable is installed in a location in the project's `.stack-work`
 directory.
 
-Now, let's use the [`stack exec`](../commands/exec_command.md) command to run
+Now, let us use the [`stack exec`](../commands/exec_command.md) command to run
 our executable. We command:
 
 ~~~text
@@ -261,7 +261,7 @@ environment.
 
 Finally, like all good software, `helloworld` actually has a test suite.
 
-Let's run it with the [`stack test`](../commands/test_command.md) command. We
+Let us run it with the [`stack test`](../commands/test_command.md) command. We
 command:
 
 ~~~text

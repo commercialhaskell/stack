@@ -9,7 +9,7 @@ few problems with making this work:
 
 * Entering all of the information to fully provide reproducibility is tedious.
   This would include things like Hackage revisions, hashes of remote tarballs,
-  etc. Users don't want to enter this information.
+  etc. Users do not want to enter this information.
 
 * Many operations in Stack rely upon a "snapshot hash," which transitively
   includes the completed information for all of these dependencies. If any of
@@ -69,7 +69,7 @@ extra-deps:
 ~~~
 
 The `lts-19.22` information is also incomplete. While we assume in general that
-Haskell LTS snapshots never change, there's nothing that prohibits that from
+Haskell LTS snapshots never change, there is nothing that prohibits that from
 happening. Instead, the complete version of that key is:
 
 ~~~yaml
@@ -79,7 +79,7 @@ snapshot:
   sha256: 5098594e71bdefe0c13e9e6236f12e3414ef91a2b89b029fd30e8fc8087f3a07
 ~~~
 
-Users don't particularly feel like writing all of that. Therefore, it's common
+Users do not particularly feel like writing all of that. Therefore, it is common
 to see _incomplete_ information in a `stack.yaml` file.
 
 ## Recursive snapshot layers
@@ -164,7 +164,7 @@ stack --stack-yaml my-stack.yaml build --dry-run
 ~~~
 
 then Stack will use a lock file in the location `my-stack.yaml.lock`. For the
-rest of this document, we'll assume that the files are simply `stack.yaml` and
+rest of this document, we will assume that the files are simply `stack.yaml` and
 `stack.yaml.lock`.
 
 If the lock file does not exist, subject to Stack's

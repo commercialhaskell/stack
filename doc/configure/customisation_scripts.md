@@ -27,7 +27,7 @@ mechanisms reflect distinct concepts, namely:
   installation.
 
 When `install-ghc: false`, the script is still run. That allows you to ensure
-that only your script will install GHC and Stack won't default to its own
+that only your script will install GHC and Stack will not default to its own
 installation logic, even when the script fails.
 
 The following environment variables are always available to the script:
@@ -61,7 +61,7 @@ case $HOOK_GHC_TYPE in
 		#   command install $HOOK_GHC_VERSION >/dev/null
 		;;
 	git)
-		>&2 echo "Hook doesn't support installing from source"
+		>&2 echo "Hook does not support installing from source"
 		exit 1
 		;;
 	*)
@@ -89,7 +89,7 @@ case $HOOK_GHC_TYPE in
         ;;
     git)
         # TODO: should be somewhat possible
-        >&2 echo "Hook doesn't support installing from source"
+        >&2 echo "Hook does not support installing from source"
         exit 1
         ;;
     *)

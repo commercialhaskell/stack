@@ -5,7 +5,7 @@
 ## Purpose of this document
 
 This guide is intended to formalize the process by which the `Stack` maintainer
-team operates. We expect it'll evolve over time as experience makes clearer
+team operates. We expect it will evolve over time as experience makes clearer
 what works best in practice.
 
 Having a well-documented set of processes and responsibilities has been
@@ -41,7 +41,7 @@ these goals.
 ## Issue triage
 
 The maintainer team provides ongoing review and responses to newly-filed GitHub
-issues and pull requests. From experience, we find it's easiest to have a
+issues and pull requests. From experience, we find it is easiest to have a
 single person "on call" at any given time. Therefore, the team rotates shifts
 on a weekly basis. The "on call" triager is responsible for:
 
@@ -118,20 +118,20 @@ Oftentimes though, the request is larger and more far-reaching in nature.
 Perhaps the requester is unaware of the extent to which his or her change would
 impact other people's workflows or related components in the code. Conversely,
 they may have a deep understanding of its implications and feel strongly that
-it would be a valuable improvement, whereas it's not so clear to the triager.
+it would be a valuable improvement, whereas it is not so clear to the triager.
 
 Discerning which requests should be considered "small" and which warrant
 broader collaboration is admittedly an inexact science. Use your best judgment
-and don't sweat the occasional mistake if you approve something you thought was
-small but ultimately wasn't.
+and do not sweat the occasional mistake if you approve something you thought was
+small but ultimately was not.
 
-In the case of medium-to-large sized feature requests, it's best to solicit
+In the case of medium-to-large sized feature requests, it is best to solicit
 feedback from at least one or two of the core `Stack` developers. You may use
 GitHub @mentions to draw the relevant contributors' attention to the issue in
-question. If you're not sure who's best to consult you should ask on
+question. If you are not sure who's best to consult you should ask on
 `#stack-collaborators`.
 
-Try to be clear to the requester that you're opening the discussion up to more
+Try to be clear to the requester that you are opening the discussion up to more
 participants and that the proposal will require thoughtful consideration
 (probably a majority vote) before any decision is made.
 
@@ -189,7 +189,7 @@ of this is: any open issue indicates "this deserves attention in the near
 future." Before this policy existed, issues actually meant "maybe someone will
 deal with this someday."
 
-The policy for closing an issue depends entirely on the type of issue we're
+The policy for closing an issue depends entirely on the type of issue we are
 looking at.
 
 When closing an issue, please provide a brief explanation for why the issue was
@@ -201,7 +201,7 @@ etc.
     The following sections establish rules under which a bug report will be
     closed by the maintainer team. The goal is to avoid a situation where issues
     linger in an indeterminate state. The maintainer team is allowed to
-    disregard these "rules" at any point. In other words: the goal isn't to
+    disregard these "rules" at any point. In other words: the goal is not to
     allow people to "lawyer" issues.
 
 ### Discussion

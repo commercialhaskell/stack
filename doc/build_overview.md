@@ -94,8 +94,8 @@ in CLI).
   snapshot packages that have been replaced.
 * Apply the `flags` and `ghc-options` by name to these packages overwriting
   any previous values coming from a snapshot. If any values are specified
-  but no matching package is found, it's an error. If a flag is not defined
-  in the corresponding package cabal file, it's an error.
+  but no matching package is found, it is an error. If a flag is not defined
+  in the corresponding package cabal file, it is an error.
 * We are now left with the following:
     * A wanted compiler version
     * A map from package name to immutable packages with package config (flags,
@@ -160,13 +160,13 @@ specific components).
 
 Named CLI flags are applied to specific packages by updating the
 config in one of the four maps. If a flag is specified and no package
-is found, it's an error. Note that flag settings are added _on top of_
+is found, it is an error. Note that flag settings are added _on top of_
 previous settings in this case, and does not replace them. That is, if
 previously we have `singleton (FlagName "foo") True` and now add
 `singleton (FlagName "bar") True`, both `foo` and `bar` will now be
 true. If any flags are specified but no matching package is found,
-it's an error. If a flag is not defined in the corresponding package
-cabal file, it's an error.
+it is an error. If a flag is not defined in the corresponding package
+Cabal file, it is an error.
 
 ## Apply CLI GHC options
 
@@ -182,7 +182,7 @@ project package which uses that flag name.
 
 General options are divided into the following categories:
 
-* `$locals` is deprecated, it's now a synonym for `$project`
+* `$locals` is deprecated, it is now a synonym for `$project`
 * `$project` applies to all project packages, not to any dependencies
 * `$targets` applies to all project packages that are targets, not to any
   dependencies or non-target project packages. This is the default option
@@ -199,9 +199,8 @@ they get prepended otherwise they get used as is.
 Use some deterministic binary serialization and SHA256 thereof to get
 a hash of the following information:
 
-* Actual compiler (GHC version, path, *FIXME* probably some other
-  unique info from GHC, I've heard that `ghc --info` gives you
-  something)
+* Actual compiler (GHC version, path, *FIXME* probably some other unique info 
+  from GHC, I have heard that `ghc --info` gives you something)
 * Global database map
 * Immutable dependency map
 
@@ -234,9 +233,9 @@ installed in this database will never need to be rebuilt.
   all enabled components (using the fun backwards compat logic for
   `build-tools`)
 * Apply the logic recursively to come up with a full build plan
-* If a task depends exclusively on immutable packages, mark it as
-  immutable. Otherwise, it's mutable. The former go into the snapshot
-  database, the latter into the local database.
+* If a task depends exclusively on immutable packages, mark it as immutable. 
+  Otherwise, it is mutable. The former go into the snapshot database, the latter
+  into the local database.
 
 We now have a set of tasks of packages/components to build, with full
 config information for each package, and dependencies that must be
@@ -244,9 +243,9 @@ built first.
 
 !!! bug "To do"
 
-    There's some logic to deal with cyclic dependencies between test suites and
+    There is some logic to deal with cyclic dependencies between test suites and
     benchmarks, where a task can be broken up into individual components versus
-    be kept as a single task. Need to document this better. Currently it's the
+    be kept as a single task. Need to document this better. Currently it is the
     "all in one" logic.
 
 ## Unregister local modified packages
@@ -269,7 +268,7 @@ built first.
 * If all good: do nothing
 * Otherwise, for immutable tasks: check the precompiled cache for an
   identical package installation (same GHC, dependencies, etc). If
-  present: copy that over, and we're done.
+  present: copy that over, and we are done.
 * Otherwise, perform the build, register, write to the Stack specific
   "is installed" stuff, and (for immutable tasks) register to the
   precompiled cache

@@ -5,13 +5,13 @@ directory inside the `tests` subdirectory represents a single
 test. Each of those directories has:
 
 * A `Main.hs` file, which provides the script to be run
-* A `files `directory, providing the working directory the script will
-  be run from. (If you have a test that doesn't require any specific
-  working directory, there may be no `files` directory.)
+* A `files `directory, providing the working directory the script will be run 
+  from. (If you have a test that does not require any specific working 
+  directory, there may be no `files` directory.)
 
-It would be great to expand this file into a full tutorial, but for
-now, the easiest way to get started with writing an integration test
-is to copy an existing example.
+It would be great to expand this file into a full tutorial, but for now, the 
+easiest way to get started with writing an integration test is to copy an 
+existing example.
 
 ## Running
 
@@ -26,7 +26,7 @@ A more thorough way to run the tests is with command:
 stack build --flag stack:integration-tests stack --exec stack-integration-test
 ~~~
 
-Note that this command can take a _long_ time. It's also more thorough
+Note that this command can take a _long_ time. It is also more thorough
 than the quick command given above, as it will run each test with a
 clean `STACK_ROOT`.
 

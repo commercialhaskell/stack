@@ -88,7 +88,7 @@
     specified by the [`snapshot`](configure/yaml/project.md#snapshot) or
     [`resolver`](configure/yaml/project.md#resolver) key.
 
-    GHC installation doesn't work for all operating systems, so in some cases
+    GHC installation does not work for all operating systems, so in some cases
     you will need to use `system-ghc` and install GHC yourself.
 
 ??? question "When I command `stack ghci` what version of GHC is used?"
@@ -107,15 +107,16 @@
     subdirectory of the `stack path --programs` directory for a compatible GHC,
     requesting to install one via `stack setup` if none is found.
 
-    If you are using the [`--system-ghc`](configure/yaml/non-project.md#system-ghc)
-    flag or have configured `system-ghc: true` either in the project `stack.yaml` or
-    the global `config.yaml`, Stack will use the first GHC that it finds on your
-    PATH, falling back on its sandboxed installations only if the found GHC doesn't
-    comply with the various requirements (version, architecture) that your project
-    needs.
+    If you are using the
+    [`--system-ghc`](configure/yaml/non-project.md#system-ghc) flag or have
+    configured `system-ghc: true` either in the project `stack.yaml` or the 
+    global `config.yaml`, Stack will use the first GHC that it finds on your
+    PATH, falling back on its sandboxed installations only if the found GHC does
+    not comply with the various requirements (version, architecture) that your
+    project needs.
 
-    See issue [#420](https://github.com/commercialhaskell/stack/issues/420) for a
-    detailed discussion of Stack's behavior when `system-ghc` is enabled.
+    See issue [#420](https://github.com/commercialhaskell/stack/issues/420) for
+    a detailed discussion of Stack's behavior when `system-ghc` is enabled.
 
 ??? question "How can I test that different GHC versions can build my project?"
 
@@ -179,11 +180,11 @@
     `~/.stack/config.yaml` to a directory on a file system with more free space.
 
     If you use Stack with Nix integration, be aware that Nix uses a `TMPDIR`
-    variable, and if it is not set Nix sets it to some subdirectory of `/run`, which
-    on most Linuxes is a Ramdir. Nix will run the builds in `TMPDIR`, therefore if
-    you don't have enough RAM you will get errors about disk space. If this happens
-    to you, please _manually_ set `TMPDIR` before launching Stack to some directory
-    on the disk.
+    variable, and if it is not set Nix sets it to some subdirectory of `/run`, 
+    which on most Linuxes is a Ramdir. Nix will run the builds in `TMPDIR`, 
+    therefore if you do not have enough RAM you will get errors about disk 
+    space. If this happens to you, please _manually_ set `TMPDIR` before 
+    launching Stack to some directory on the disk.
 
 ??? question "On Windows, `stack setup` tells me to add certain paths to the PATH instead of doing it?"
 
@@ -262,16 +263,16 @@
     stack update
     ~~~
 
-    However, generally, it's not necessary with Stack: if the package index is
-    missing, or if a snapshot refers to package version that isn't available,
+    However, generally, it is not necessary with Stack: if the package index is
+    missing, or if a snapshot refers to package version that is not available,
     Stack will automatically update the package index and then try again.
 
-    If you run into a situation where Stack doesn't automatically update the
+    If you run into a situation where Stack does not automatically update the
     package index, please report it as a bug.
 
 ??? question "Is it dangerous to update the package index automatically? Can that corrupt build plans?"
 
-    No. Stack is explicit about which packages it's going to build. There are
+    No. Stack is explicit about which packages it is going to build. There are
     three sources of information to tell Stack which packages to install: the
     selected snapshot, the `extra-deps` configuration value, and your project
     packages. The only way to get Stack to change its build plan is to modify
@@ -474,19 +475,19 @@
       (on AArch64; the host Stack and the image Stack must have the same version
       number).
 
-??? question "Why doesn't Stack rebuild my project when I specify `--ghc-options` on the command line?"
+??? question "Why does Stack not rebuild my project when I specify `--ghc-options` on the command line?"
 
-    Because GHC options often only affect optimization levels and warning behavior,
-    Stack doesn't recompile when it detects an option change by default. This
-    behavior can be changed though by setting the
+    Because GHC options often only affect optimization levels and warning
+    behavior, Stack does not recompile when it detects an option change by 
+    default. This behavior can be changed though by setting the
     [`rebuild-ghc-options` option](configure/yaml/non-project.md#rebuild-ghc-options)
     to `true`.
 
     To force recompilation manually, use the `--force-dirty` flag. If this still
-    doesn't lead to a rebuild, add the `-fforce-recomp` flag to your
+    does not lead to a rebuild, add the `-fforce-recomp` flag to your
     `--ghc-options`.
 
-??? question "Why doesn't Stack apply my `--ghc-options` to my dependencies?"
+??? question "Why does Stack not apply my `--ghc-options` to my dependencies?"
 
     By default, Stack applies command line GHC options only to
     [project packages](configure/yaml/project.md#packages). For an explanation of
@@ -587,8 +588,8 @@
     ~~~
 
     This warning is shown when compiler support of `-no-pie` is expected but
-    unavailable. It's possible to bypass the warning for a specific version of GHC
-    by modifying a global setting:
+    unavailable. It is possible to bypass the warning for a specific version of
+    GHC by modifying a global setting:
 
     ~~~bash
     # ~/.stack/programs/x86_64-osx/ghc-8.2.2/lib/ghc-8.2.2/settings
@@ -596,7 +597,8 @@
     ++ ("C compiler supports -no-pie", "NO"),
     ~~~
 
-    **Note that we're fixing `ghc-8.2.2` in this case; repeat for other versions as necessary.**
+    **Note that we are fixing `ghc-8.2.2` in this case; repeat for other
+    versions as necessary.**
     You should apply this fix for the version of GHC that matches your snapshot.
 
     Issue [#4009](https://github.com/commercialhaskell/stack/issues/4009) goes into
@@ -613,11 +615,12 @@
     Haskell code licensed under permissive BSD3 license, GMP library is licensed
     under LGPL, which means resulting binaries
     [have to be provided with source code or object files](http://www.gnu.org/licenses/gpl-faq.html#LGPLStaticVsDynamic).
-    That may or may not be acceptable for your situation. Current workaround is to
-    use GHC built with alternative big integer implementation called
-    `integer-simple`, which is free from LGPL limitations as it's pure Haskell and
-    does not use GMP.  Unfortunately it has yet to be available out of the box with
-    Stack. See issue [#399](https://github.com/commercialhaskell/stack/issues/399)
+    That may or may not be acceptable for your situation. The current workaround
+    is to use GHC built with alternative big integer implementation called
+    `integer-simple`, which is free from LGPL limitations as it is pure Haskell
+    and does not use GMP. Unfortunately it has yet to be available out of the
+    box with Stack. See issue
+    [#399](https://github.com/commercialhaskell/stack/issues/399)
     for the ongoing effort and information on workarounds.
 
 ??? question "I have a Windows username with a space in it and problems building"
@@ -633,7 +636,7 @@
 
     Windows is not able to find the necessary C++ libraries from the standard
     prompt because they're not in the PATH environment variable. `stack exec` works
-    because it's modifying PATH to include extra things.
+    because it is modifying PATH to include extra things.
 
     Those libraries are shipped with GHC (and, theoretically in some cases, MSYS2).
     The easiest way to find them is `stack exec which`. For example, command:

@@ -408,7 +408,7 @@ directly.
 The `Setup.hs` file is a component of the Cabal build system.
 
 Technically, it is not needed by Stack, but it is considered good practice to
-include it. The file we're using is boilerplate:
+include it. The file we are using is boilerplate:
 
 ~~~haskell
 import Distribution.Simple

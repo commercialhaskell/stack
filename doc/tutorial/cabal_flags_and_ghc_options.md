@@ -22,11 +22,11 @@ This means: when compiling the `yackage` package, turn off the `upload` Cabal
 flag (thus the `-` in `-upload`). Unlike other tools, Stack is explicit about
 which package's flag you want to change. It does this for two reasons:
 
-1. There's no global meaning for Cabal flags, and therefore two packages can
+1. There is no global meaning for Cabal flags, and therefore two packages can
    use the same flag name for completely different things.
 
 2. By following this approach, we can avoid unnecessarily recompiling snapshot
-   packages that happen to use a Cabal flag that we're using.
+   packages that happen to use a Cabal flag that we are using.
 
 You can also change Cabal flag values on the command line for extra-dep and
 snapshot packages. If you do this, that package will automatically be promoted
@@ -88,7 +88,7 @@ provides us with reproducible and fast builds.
     Stack will build all of the dependencies of `wai` (inclduding `warp`) and then
     build `wai` with all GHC optimizations disabled.
 
-    Now let's add `warp` as a target. If we command:
+    Now let us add `warp` as a target. If we command:
 
     ~~~text
     stack build --ghc-options=-O0 wai warp

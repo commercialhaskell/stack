@@ -2,7 +2,7 @@
 
 # 11. Locations used by Stack
 
-Generally, you don't need to worry about where Stack stores various files. But
+Generally, you do not need to worry about where Stack stores various files. But
 some people like to know this stuff. That's when the `stack path` command is
 useful.
 
@@ -42,8 +42,8 @@ the output of the command:
 ~~~
 
 In addition, `stack path` accepts the flags above on the command line to state
-which keys you're interested in. This can be convenient for scripting. As a
-simple example, let's find out the sandboxed versions of GHC that Stack
+which keys you are interested in. This can be convenient for scripting. As a
+simple example, let us find out the sandboxed versions of GHC that Stack
 installed:
 
 === "Unix-like"
@@ -70,7 +70,7 @@ installed:
     -a---          25/02/2022 11:39 PM              9 msys2-20210604.installed
     ~~~
 
-While we're talking about paths, to wipe our Stack install completely, here's
+While we are talking about paths, to wipe our Stack install completely, here is
 what typically needs to be removed:
 
 1. the Stack root folder (see `stack path --stack-root`, before you uninstall);

@@ -9,7 +9,7 @@ with command:
 stack exec ghci
 ~~~
 
-But that won't load up locally written modules for access. For that, use the
+But that will not load up locally written modules for access. For that, use the
 `stack ghci` or `stack repl` commands, which are equivalent.
 
 ## The `stack ghci` or `stack repl` command

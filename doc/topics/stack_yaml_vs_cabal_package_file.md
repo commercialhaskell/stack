@@ -52,8 +52,8 @@ Stack defines a new concept called a _project_. A project has:
 Often you will have a project that defines only one local Cabal package that you
 are working on. If you need to specify a dependency, a source of confusion can
 be why you need to specify it both in the `stack.yaml` file _and_
-in the Cabal file. To explain, let's take a quick detour to talk about snapshots
-and how Stack resolves dependencies.
+in the Cabal file. To explain, let us take a quick detour to talk about
+snapshots and how Stack resolves dependencies.
 
 ## Snapshots and resolvers
 
@@ -66,13 +66,13 @@ The most common means by which this set of packages is defined is via a
 snapshot provided by Stackage. For example, if you go to the page
 <https://www.stackage.org/lts-23.24>, you will see a list of 3,212 packages at
 specific version numbers. When you then specify `snapshot: lts-23.24` or,
-alternatively, `resolver: lts-23.24`, you're telling Stack to use those package
+alternatively, `resolver: lts-23.24`, you are telling Stack to use those package
 versions in resolving dependencies down to specific versions of packages.
 
-Sometimes a snapshot doesn't have all of the packages that you want. Or you want
-a different version of a package. Or you want to work on a local modification of
-a package. In all of those cases, you can add more configuration data to your
-`stack.yaml` file to override the values it received from your
+Sometimes a snapshot does not have all of the packages that you want. Or you
+want a different version of a package. Or you want to work on a local 
+modification of a package. In all of those cases, you can add more configuration 
+data to your `stack.yaml` file to override the values it received from your
 [`snapshot`](../configure/yaml/project.md#snapshot) or
 [`resolver`](../configure/yaml/project.md#resolver) setting. At the end of the
 day, each of your projects will end up with some way of resolving a package name
@@ -88,10 +88,11 @@ extra-deps:
 - acme-missiles-0.3
 ~~~
 
-what you're saying to Stack is: "if at any point you find that you need to build
-the `acme-missiles` package, please use version `0.3`". You are _not_ saying
-"please build `acme-missiles` now." You are also not saying "my package depends
-on `acme-missiles`." You are simply making it available should the need arise.
+what you are saying to Stack is: "if at any point you find that you need to
+build the `acme-missiles` package, please use version `0.3`". You are _not_ 
+saying "please build `acme-missiles` now." You are also not saying "my package
+depends on `acme-missiles`." You are simply making it available should the need
+arise.
 
 When you add to your `package.yaml` file:
 
@@ -106,8 +107,8 @@ or, alternatively, you add directly to your Cabal file:
 build-depends: acme-missiles
 ~~~
 
-you're saying "this package requires that `acme-missiles` be available." Since
-`acme-missiles` doesn't appear in your snapshot, without also modifying your
+you are saying "this package requires that `acme-missiles` be available." Since
+`acme-missiles` does not appear in your snapshot, without also modifying your
 `stack.yaml` to mention it via `extra-deps`, Stack will complain about the
 dependency being unavailable.
 
@@ -124,23 +125,23 @@ matter when in time you use it, and no matter how many new release happen in
 the interim, the build plan generated should be the same.
 
 (There is, however, at least one hole in this theory today, which is Hackage
-revisions. When you specify `extra-deps: [acme-missiles-0.3]`, it doesn't
+revisions. When you specify `extra-deps: [acme-missiles-0.3]`, it does not
 specify which revision of the Cabal file to use, and Stack will just choose the
 latest. Stack has the ability to specify exact revisions of Cabal files, but
-this isn't enforced as a requirement, because it is so different from the way
+this is not enforced as a requirement, because it is so different from the way
 most people work with packages.)
 
-And now, how about the other side: why doesn't Stack automatically add
+And now, how about the other side: why does Stack not automatically add
 `acme-missiles` to `build-depends` in your Cabal file if you add it as an
 extra-dep? There are a surprising number reasons for this:
 
-* The Cabal specification doesn't support anything like that
+* The Cabal specification does not support anything like that
 * There can be multiple packages in a project, and how do we know which package
   actually needs the dependency?
 * There can be multiple components (libraries, executable, etc) in a package,
   and how do we know which of those actually needs the dependency?
 * The dependency may only be conditionally needed, based on flags, operating
-  system, or architecture. As an extreme example, we wouldn't want a Linux-only
+  system, or architecture. As an extreme example, we would not want a Linux-only
   package to be built by force on Windows.
 
 While for simple use cases it seems like automatically adding dependencies from
@@ -148,10 +149,10 @@ the Cabal file to the `stack.yaml` file or vice-versa would be a good thing, it
 breaks down immediately for any semi-difficult case. Therefore, Stack requires
 you to add it to both places.
 
-And a final note, in case it wasn't clear. The example above used
+And a final note, in case it was not clear. The example above used
 `acme-missiles`, which is not in Stackage snapshots. If, however, you want to
-depend on a package already present in the snapshot you've selected, there's no
-need to add it explicitly to your `stack.yaml` file: it's already there
+depend on a package already present in the snapshot you have selected, there is
+no need to add it explicitly to your `stack.yaml` file: it is already there
 implicitly via the `snapshot` setting. This is what you do the majority of the
 time, such as when you add `vector` or `mtl` as a `build-depends` value.
 

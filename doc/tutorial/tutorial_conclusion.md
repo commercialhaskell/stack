@@ -4,10 +4,10 @@
 
 Stack is not the only tool available for building Haskell code. If you are
 happy building Haskell code with other tools, you may not need Stack. If
-you're experiencing problems with other tools, give Stack a try.
+you are experiencing problems with other tools, give Stack a try.
 
-If you're a new user who has no experience with other tools, we recommend Stack.
-It aims to be easy to use and its defaults match modern best practices in
+If you are a new user who has no experience with other tools, we recommend
+Stack. It aims to be easy to use and its defaults match modern best practices in
 Haskell development.
 
 Other key features of Stack include:

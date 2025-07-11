@@ -2,10 +2,10 @@
 
 # 5. Building existing projects
 
-Alright, enough playing around with simple projects. Let's take an open source
-package and try to build it. We'll be ambitious and use
+Alright, enough playing around with simple projects. Let us take an open source
+package and try to build it. We will be ambitious and use
 [yackage](https://hackage.haskell.org/package/yackage), a local package server
-using [Yesod](http://www.yesodweb.com/). To get the code, we'll use the
+using [Yesod](http://www.yesodweb.com/). To get the code, we will use the
 `stack unpack` command from the root directory for all our Haskell projects:
 
 ~~~text
@@ -31,7 +31,7 @@ cd yackage-0.8.1
 ## The `stack init` command
 
 This new directory does not have a `stack.yaml` file, so we need to make one
-first. We could do it by hand, but let's be lazy instead with the `stack init`
+first. We could do it by hand, but let us be lazy instead with the `stack init`
 command:
 
 ~~~text
@@ -64,14 +64,14 @@ In that case `stack init` will fail, so what do you do?
 
 You could manually create `stack.yaml` by omitting some packages to resolve the
 conflict. Alternatively you can ask `stack init` to do that for you by
-specifying `--omit-packages` flag on the command line. Let's see how that
+specifying `--omit-packages` flag on the command line. Let us see how that
 works.
 
 To simulate a conflict we will use `acme-missiles-0.3` in `yackage` and we will
 also copy `yackage.cabal` to another directory and change the name of the file
 and package to `yackage-test`. In this new package we will use
-`acme-missiles-0.2` instead. Let's see what happens when we command `stack init`
-again:
+`acme-missiles-0.2` instead. Let us see what happens when we command
+`stack init` again:
 
 ~~~text
 stack init --force --omit-packages
