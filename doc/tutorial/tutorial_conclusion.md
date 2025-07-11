@@ -3,8 +3,8 @@
 # 15. In conclusion
 
 Stack is not the only tool available for building Haskell code. If you are
-happy building Haskell code with other tools, you may not need Stack. If
-you are experiencing problems with other tools, give Stack a try.
+happy building with other tools, you may not need Stack. If you are experiencing
+problems with other tools, give Stack a try.
 
 If you are a new user who has no experience with other tools, we recommend
 Stack. It aims to be easy to use and its defaults match modern best practices in
@@ -16,8 +16,10 @@ Other key features of Stack include:
 
 -   __Sandboxing__
 
+    ---
+
     A 'sandbox' is a development environment that is isolated from other parts
-    of the system. The concept of sandboxing is built in to Stack.
+    of the system. The concept of sandboxing is built into Stack.
 
 -   __Snapshots__
 

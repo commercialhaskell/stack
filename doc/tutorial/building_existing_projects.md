@@ -2,19 +2,19 @@
 
 # 5. Building existing projects
 
-Alright, enough playing around with simple projects. Let us take an open source
+So far, we have been building simple projects. Let us now take an open source
 package and try to build it. We will be ambitious and use
 [yackage](https://hackage.haskell.org/package/yackage), a local package server
 using [Yesod](http://www.yesodweb.com/). To get the code, we will use the
-`stack unpack` command from the root directory for all our Haskell projects:
+`stack unpack` command run from the root directory for all our Haskell projects:
 
 ~~~text
 stack unpack yackage
 Unpacked yackage-0.8.1 to <root_directory>/yackage-0.8.1/
 ~~~
 
-You can also unpack to the directory of your liking instead of the current one
-by issuing the command:
+You can also unpack to a directory of your liking instead of the current one
+by commanding:
 
 ~~~text
 stack unpack yackage --to <desired_directory>
