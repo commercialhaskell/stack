@@ -84,7 +84,7 @@ code to build packages and components of packages using GHC.
 
 Two important public databases are **Hackage**
 [(the  Haskell Package Repository)](https://hackage.haskell.org/) and
-[**Stackage**](https://hackage.haskell.org/).
+[**Stackage**](https://www.stackage.org/).
 
 ~~~mermaid
 flowchart LR
