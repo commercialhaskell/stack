@@ -1,10 +1,10 @@
 {
-  "name": "GHC 9.10.1",
+  "name": "GHC 9.12.2",
   "build": {
     "dockerfile": "../GHC.Dockerfile",
     "context": "..",
     "args": {
-      "GHC_VERSION": "9.10.1",
+      "GHC_VERSION": "9.12.2",
       // "SUBTAG": "int-native",
       "USE_ZSH_FOR_ROOT": "unset-to-use-ash",
       "LANG": "C.UTF-8",
