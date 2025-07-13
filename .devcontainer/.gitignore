@@ -27,6 +27,8 @@
 
 !/devcontainer.json
 !/GHC.Dockerfile
+!/init
+!/init.cmd
 !/LICENSE
 !/README.md
 

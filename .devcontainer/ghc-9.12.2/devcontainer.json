@@ -12,6 +12,7 @@
     }
   },
 
+  "initializeCommand": [".devcontainer/init"],
   "onCreateCommand": "onCreateCommand.sh",
   "postCreateCommand": "postCreateCommand.sh",
 
