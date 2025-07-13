@@ -1,6 +1,7 @@
 Note: Fixes for the online documentation of the current Stack release
 (https://docs.haskellstack.org/en/stable/) should target the 'stable' branch,
-not the 'master' branch.
+not the 'master' branch. (The former branch is merged into the latter on
+release, if not before.)
 
 Please include the following checklist in your pull request:
 
