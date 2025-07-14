@@ -41,7 +41,7 @@ import qualified Codec.Compression.GZip as GZip
 import           Control.Exception ( tryJust )
 import           Control.Monad ( forM, guard, when )
 import qualified Data.ByteString.Lazy.Char8 as L8
-import           Data.List.Extra ( isInfixOf, lower, stripPrefix, trim )
+import           "extra" Data.List.Extra ( isInfixOf, lower, stripPrefix, trim )
 import           Data.Maybe ( fromMaybe )
 import           Development.Shake
                    ( Action, Change (..), pattern Chatty, CmdOption (..), Rules

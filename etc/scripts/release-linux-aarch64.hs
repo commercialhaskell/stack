@@ -39,7 +39,7 @@ import qualified Codec.Compression.GZip as GZip
 import           Control.Exception ( tryJust )
 import           Control.Monad ( guard )
 import qualified Data.ByteString.Lazy.Char8 as L8
-import           Data.List.Extra ( stripPrefix )
+import           "extra" Data.List.Extra ( stripPrefix )
 import           Development.Shake
                    ( Action, Change (..), pattern Chatty, Rules
                    , ShakeOptions (..), (%>), actionOnException, alwaysRerun
