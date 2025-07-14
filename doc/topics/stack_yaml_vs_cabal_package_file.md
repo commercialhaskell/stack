@@ -64,14 +64,14 @@ requires that you have chosen a specific version for each package available.
 
 The most common means by which this set of packages is defined is via a
 snapshot provided by Stackage. For example, if you go to the page
-<https://www.stackage.org/lts-23.24>, you will see a list of 3,212 packages at
-specific version numbers. When you then specify `snapshot: lts-23.24` or,
-alternatively, `resolver: lts-23.24`, you are telling Stack to use those package
+<https://www.stackage.org/lts-24.0>, you will see a list of 3,407 packages at
+specific version numbers. When you then specify `snapshot: lts-24.0` or,
+alternatively, `resolver: lts-24.0`, you are telling Stack to use those package
 versions in resolving dependencies down to specific versions of packages.
 
 Sometimes a snapshot does not have all of the packages that you want. Or you
-want a different version of a package. Or you want to work on a local 
-modification of a package. In all of those cases, you can add more configuration 
+want a different version of a package. Or you want to work on a local
+modification of a package. In all of those cases, you can add more configuration
 data to your `stack.yaml` file to override the values it received from your
 [`snapshot`](../configure/yaml/project.md#snapshot) or
 [`resolver`](../configure/yaml/project.md#resolver) setting. At the end of the
@@ -89,7 +89,7 @@ extra-deps:
 ~~~
 
 what you are saying to Stack is: "if at any point you find that you need to
-build the `acme-missiles` package, please use version `0.3`". You are _not_ 
+build the `acme-missiles` package, please use version `0.3`". You are _not_
 saying "please build `acme-missiles` now." You are also not saying "my package
 depends on `acme-missiles`." You are simply making it available should the need
 arise.

@@ -1,19 +1,12 @@
-snapshot: lts-23.24 # GHC 9.8.4
-
-extra-deps:
-# lts-23.24 provides hpack-0.37.0
-- hpack-0.38.1@rev:0
-# lts-23.24 provides persistent-2.14.6.3
-- persistent-2.17.0.0@rev:0
-# lts-23.24 provides tls-2.1.1
-- tls-2.1.8@rev:0
+snapshot: lts-24.0 # GHC 9.10.2
 
 docker:
   enable: false
-  repo: quay.io/benz0li/ghc-musl:9.8.4
+  repo: quay.io/benz0li/ghc-musl:9.10.2
+
 # See LICENSE. In order to build a statically-linked Stack executable for Linux
 # that is not linked against GMP, use this alternative Docker image:
-# repo: quay.io/benz0li/ghc-musl:9.8.4-int-native
+# repo: quay.io/benz0li/ghc-musl:9.10.2-int-native
 
 nix:
   # --nix on the command-line to enable.

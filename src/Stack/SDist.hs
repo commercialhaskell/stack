@@ -582,8 +582,8 @@ checkPackageInExtractedTarball pkgDir = do
         -- whereas flattenPackageDescription from Cabal does. In any event,
         -- using `Nothing` seems more logical for this check anyway, and the
         -- fallback to `Just pkgDesc` is just a crazy sanity check.
-        case Check.checkPackage gpd Nothing of
-          [] -> Check.checkPackage gpd (Just pkgDesc)
+        case Check.checkPackage gpd of
+          [] -> Check.checkConfiguredPackage pkgDesc
           x -> x
   fileChecks <-
     liftIO $ Check.checkPackageFiles minBound pkgDesc (toFilePath pkgDir)

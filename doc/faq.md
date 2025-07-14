@@ -109,7 +109,7 @@
 
     If you are using the
     [`--system-ghc`](configure/yaml/non-project.md#system-ghc) flag or have
-    configured `system-ghc: true` either in the project `stack.yaml` or the 
+    configured `system-ghc: true` either in the project `stack.yaml` or the
     global `config.yaml`, Stack will use the first GHC that it finds on your
     PATH, falling back on its sandboxed installations only if the found GHC does
     not comply with the various requirements (version, architecture) that your
@@ -126,9 +126,9 @@
 
     ~~~text
     myproject/
+      stack-ghc-9.10.2.yaml
       stack-ghc-9.8.4.yaml
-      stack-ghc-9.8.4.yaml
-      stack.yaml --> symlink to stack-ghc-9.8.4.yaml
+      stack.yaml --> symlink to stack-ghc-9.10.2.yaml
       myproject.cabal
       src/
         ...
@@ -140,21 +140,21 @@
     === "Unix-like"
 
         ~~~text
-        STACK_YAML=stack-ghc-9.8.4.yaml
+        STACK_YAML=stack-ghc-9.10.2.yaml
         stack build
         ~~~
 
     === "Windows"
 
         ~~~text
-        $Env:STACK_YAML='stack-ghc-9.8.4.yaml'
+        $Env:STACK_YAML='stack-ghc-9.10.2.yaml'
         stack build
         ~~~
 
     === "Windows (Command Prompt)"
 
         ~~~text
-        set STACK_YAML=stack-ghc-9.8.4.yaml
+        set STACK_YAML=stack-ghc-9.10.2.yaml
         stack build
         ~~~
 
@@ -180,10 +180,10 @@
     `~/.stack/config.yaml` to a directory on a file system with more free space.
 
     If you use Stack with Nix integration, be aware that Nix uses a `TMPDIR`
-    variable, and if it is not set Nix sets it to some subdirectory of `/run`, 
-    which on most Linuxes is a Ramdir. Nix will run the builds in `TMPDIR`, 
-    therefore if you do not have enough RAM you will get errors about disk 
-    space. If this happens to you, please _manually_ set `TMPDIR` before 
+    variable, and if it is not set Nix sets it to some subdirectory of `/run`,
+    which on most Linuxes is a Ramdir. Nix will run the builds in `TMPDIR`,
+    therefore if you do not have enough RAM you will get errors about disk
+    space. If this happens to you, please _manually_ set `TMPDIR` before
     launching Stack to some directory on the disk.
 
 ??? question "On Windows, `stack setup` tells me to add certain paths to the PATH instead of doing it?"
@@ -478,7 +478,7 @@
 ??? question "Why does Stack not rebuild my project when I specify `--ghc-options` on the command line?"
 
     Because GHC options often only affect optimization levels and warning
-    behavior, Stack does not recompile when it detects an option change by 
+    behavior, Stack does not recompile when it detects an option change by
     default. This behavior can be changed though by setting the
     [`rebuild-ghc-options` option](configure/yaml/non-project.md#rebuild-ghc-options)
     to `true`.
