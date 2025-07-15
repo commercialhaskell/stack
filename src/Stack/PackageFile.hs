@@ -132,6 +132,7 @@ getPackageFile ::
      ( HasEnvConfig s, MonadReader s m, MonadThrow m, MonadUnliftIO m )
   => Package
   -> Path Abs File
+     -- ^ The Cabal file describing the package.
   -> m PackageComponentFile
 getPackageFile pkg cabalFP =
   debugBracket ("getPackageFiles" <+> pretty cabalFP) $ do

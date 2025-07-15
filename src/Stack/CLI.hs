@@ -49,7 +49,7 @@ import           Stack.Exec ( SpecialExecCmd (..), execCmd )
 import           Stack.Eval ( evalCmd )
 import           Stack.Ghci ( ghciCmd )
 import           Stack.Hoogle ( hoogleCmd )
-import           Stack.IDE ( idePackagesCmd, ideTargetsCmd )
+import           Stack.IDE ( ideGhcOptionsCmd, idePackagesCmd, ideTargetsCmd )
 import           Stack.Init ( initCmd )
 import           Stack.List ( listCmd )
 import           Stack.Ls ( lsCmd )
@@ -65,7 +65,8 @@ import           Stack.Options.ExecParser ( execOptsParser )
 import           Stack.Options.GhciParser ( ghciOptsParser )
 import           Stack.Options.GlobalParser ( globalOptsParser )
 import           Stack.Options.HpcReportParser ( hpcReportOptsParser )
-import           Stack.Options.IdeParser ( idePackagesParser, ideTargetsParser )
+import           Stack.Options.IdeParser
+                   ( ideGhcOptionsParser, idePackagesParser, ideTargetsParser )
 import           Stack.Options.InitParser ( initOptsParser )
 import           Stack.Options.LsParser ( lsOptsParser )
 import           Stack.Options.NewParser ( newOptsParser )
@@ -368,6 +369,12 @@ commandLineHandler currentDir progName mExecutablePath isInterpreter =
           "List all targets or pick component types to list."
           ideTargetsCmd
           ideTargetsParser
+        addCommand'
+          "ghc-options"
+          "List, on the standard output stream, GHC options and other \
+          \information passed to GHCi for a given Haskell source code file."
+          ideGhcOptionsCmd
+          ideGhcOptionsParser
     )
 
   init = addCommand'
