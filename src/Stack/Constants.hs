@@ -279,7 +279,7 @@ wiredInPackages = case mparsed of
       -- cabal-install-3.14.2.0.
     , "integer-gmp"
       -- No longer magic > 1.0.3.0 (GHC >= 9.0) and deprecated in favour of
-      -- ghc-bignum. With GHC 9.8.4 at least, there seems to be no problem in
+      -- ghc-bignum. With GHC 9.10.2 at least, there seems to be no problem in
       -- using it. Also treated as non-reinstallable by
       -- cabal-install-3.14.2.0.
     , "integer-simple"
@@ -293,7 +293,7 @@ wiredInPackages = case mparsed of
       -- if they were defined in modules all sharing a common package
       -- interactive. See 'Note [The interactive package]' at
       -- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Runtime/Context.hs
-      -- With GHC 9.8.4 at least, there seems to be no problem in using it.
+      -- With GHC 9.10.2 at least, there seems to be no problem in using it.
     ]
 
 -- | Just to avoid repetition and magic strings.

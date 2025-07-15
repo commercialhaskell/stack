@@ -87,6 +87,9 @@
     - GHC.Utils.GhcPkg.Main.Compat
     - Stack.BuildInfo
     - Stack.Constants
+  - name: ExplicitNamespaces
+    within:
+    - Stack.Prelude
   # The following list provides an inventory of the small number of modules
   # where Template Haskell is used.
   - name: TemplateHaskell

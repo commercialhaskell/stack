@@ -349,8 +349,7 @@ Stack aims to depend on well-known packages. The specific versions on which it
 depends at any time are specified by `package.yaml` and `stack.yaml`. It does
 not aim to be compatible with more than one version of the `Cabal` package at
 any time. At the time of writing (June 2025) the package versions are
-primarily ones in Stackage snapshot LTS Haskell 23.24 (for GHC 9.8.4) and
-`hpack-0.38.1`, `persistent-2.17.0.0` and `tls-2.1.8`.
+primarily ones in Stackage snapshot LTS Haskell 24.0 (for GHC 9.10.2).
 
 A Stack executable makes use of Cabal (the library) through a small 'Setup'
 executable that it compiles from Haskell source code. The executable compiles
@@ -510,8 +509,8 @@ stack test
 
 The `--file-watch` is a very useful option to get quick feedback. However,
 running the entire test suite after each file change will slow you down. You
-will need to specify which test suite (unit test or integration) and pass 
-arguments to specify which module you'd specifically like to run to get quick 
+will need to specify which test suite (unit test or integration) and pass
+arguments to specify which module you'd specifically like to run to get quick
 feedback. A description of this follows below.
 
 
@@ -674,7 +673,7 @@ for each file.
 
 [Stan](https://hackage.haskell.org/package/stan) is a Haskell static analysis
 tool. As of `stan-0.1.0.1`, it supports GHC >= 9.6.3 and Stack is built with
-GHC 9.8.4. The tool is configured by the contents of the `.stan.toml` file.
+GHC 9.10.2. The tool is configured by the contents of the `.stan.toml` file.
 
 This workflow will run if:
 

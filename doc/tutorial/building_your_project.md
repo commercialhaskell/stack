@@ -226,8 +226,8 @@ is not a member of the set of package versions specified by the snapshot. So
 building failed.
 
 To add a version of `acme-missiles` to the available package versions, we will
-use the `extra-deps` key in Stack's project-level configuration file 
-(`stack.yaml`). That key defines extra package versions, not present in the 
+use the `extra-deps` key in Stack's project-level configuration file
+(`stack.yaml`). That key defines extra package versions, not present in the
 snapshot, that will be needed as dependencies. You can add this like so:
 
 ~~~yaml
@@ -249,7 +249,7 @@ With that out of the way, let us dig a little bit more into these snapshots. We
 mentioned the LTS snapshots, and you can get information about it at
 [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate value (`lts-23.24`, as is currently the latest LTS)
+* The appropriate value (`lts-24.0`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages versions available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
@@ -276,9 +276,9 @@ versions.
     [homepage](https://www.stackage.org/) lists the most recent Stackage
     snapshot. In most cases, that is the snapshot you should use.
 
-??? question "Can I use a snapshot like `ghc-9.8.4`?"
+??? question "Can I use a snapshot like `ghc-9.10.2`?"
 
-    Snapshot `ghc-9.8.4` specifies GHC 9.8.4 and, consequently, the GHC boot
+    Snapshot `ghc-9.10.2` specifies GHC 9.10.2 and, consequently, the GHC boot
     packages that come with that compiler. However, the snapshot does not
     include the many other package versions that will work with that compiler.
     For a set of those package versions, see the snapshots published by the

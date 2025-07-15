@@ -26,7 +26,7 @@ setupOptsParser :: OA.Parser SetupCmdOpts
 setupOptsParser = SetupCmdOpts
   <$> OA.optional (OA.argument readVersion
         (  OA.metavar "GHC_VERSION"
-        <> OA.help "Version of GHC to install, e.g. 9.8.4. (default: install \
+        <> OA.help "Version of GHC to install, e.g. 9.10.2. (default: install \
                    \the version implied by the snapshot)"
         ))
   <*> OA.boolFlags False

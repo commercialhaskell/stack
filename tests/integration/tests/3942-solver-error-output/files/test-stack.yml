@@ -1,4 +1,4 @@
-resolver: lts-23.24
+resolver: lts-24.0
 
 packages: []
 

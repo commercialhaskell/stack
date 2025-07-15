@@ -32,6 +32,30 @@
   directory = ".stack-work/dist"
   type = "Exclude"
 
+# Partial: ghc-internal/succ
+# Usage of partial function 'succ' for enumerable types
+# Stack uses Enum in many places
+[[check]]
+  id = "STAN-0010"
+  scope = "all"
+  type = "Exclude"
+
+# Partial: ghc-internal/pred
+# Usage of partial function 'pred' for enumerable types
+# Stack uses Enum in many places
+[[check]]
+  id = "STAN-0011"
+  scope = "all"
+  type = "Exclude"
+
+# Partial: ghc-internal/toEnum
+# Usage of partial function 'toEnum' for enumerable types
+# Stack uses Enum in many places
+[[check]]
+  id = "STAN-0012"
+  scope = "all"
+  type = "Exclude"
+
 # Infinite: base/reverse
 # Usage of the 'reverse' function that hangs on infinite lists
 # Stack uses Data.List.reverse in many places
@@ -61,6 +85,50 @@
 #  533 ┃
 #  534 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
 #  535 ┃                                                                 ^^^^^^^^^^^^^^
+
+# Infinite: ghc-internal/isSuffixOf
+# Usage of the 'isSuffixOf' function that hangs on infinite lists
+[[ignore]]
+  id = "OBS-STAN-0102-8cspI6-402:41"
+# ✦ Category:      #Infinite #List
+# ✦ File:          src\Stack\Coverage.hs
+#
+#  401 ┃
+#  402 ┃                   pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
+#  403 ┃                         ^^^^^^^^^^^^^^
+
+# Infinite: ghc-internal/isSuffixOf
+# Usage of the 'isSuffixOf' function that hangs on infinite lists
+[[ignore]]
+  id = "OBS-STAN-0102-8cspI6-435:31"
+# ✦ Category:      #Infinite #List
+# ✦ File:          src\Stack\Coverage.hs
+#
+#  434 ┃
+#  435 ┃         pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
+#  436 ┃                         ^^^^^^^^^^^^^^
+
+# Infinite: ghc-internal/isSuffixOf
+# Usage of the 'isSuffixOf' function that hangs on infinite lists
+[[ignore]]
+  id = "OBS-STAN-0102-8cspI6-666:30"
+# ✦ Category:      #Infinite #List
+# ✦ File:          src\Stack\Coverage.hs
+#
+#  665 ┃
+#  666 ┃       pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
+#  667 ┃                         ^^^^^^^^^^^^^^
+
+# Infinite: ghc-internal/isSuffixOf
+# Usage of the 'isSuffixOf' function that hangs on infinite lists
+[[ignore]]
+  id = "OBS-STAN-0102-hTeu0Y-664:23"
+# ✦ Category:      #Infinite #List
+# ✦ File:          src\Stack\Init.hs
+#
+#  663 ┃
+#  664 ┃   isCabal = (".cabal" `isSuffixOf`) . toFilePath
+#  665 ┃                       ^^^^^^^^^^^^
 
 # Infinite: base/length
 # Usage of the 'length' function that hangs on infinite lists
@@ -177,16 +245,16 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-5rtOmw-467:33"
+  id = "OBS-STAN-0212-5rtOmw-480:33"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\Constants.hs
 #
-#  466 ┃
-#  467 ┃ setupGhciShimCode = byteString $(do
-#  468 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
-#  469 ┃     embedFile path)
-#  470 ┃
+#  479 ┃
+#  480 ┃ setupGhciShimCode = byteString $(do
+#  481 ┃     path <- makeRelativeToProject "src/setup-shim/StackSetupShim.hs"
+#  482 ┃     embedFile path)
+#  483 ┃
 
 # Anti-pattern: unsafe functions
 [[ignore]]

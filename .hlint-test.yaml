@@ -20,3 +20,7 @@
     - ScopedTypeVariables
     - TemplateHaskell
     - ViewPatterns
+
+# The filepath-1.5.4.0 package, used in testing, fails Hlint in many ways.
+- ignore:
+    path: "tests/integration/tests/mutable-deps/files/filepath-1.5.4.0/*"

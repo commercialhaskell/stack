@@ -1,3 +1,3 @@
-snapshot: ghc-9.8.4
+snapshot: ghc-9.10.2
 extra-deps:
 - Cabal-2.4.1.0
