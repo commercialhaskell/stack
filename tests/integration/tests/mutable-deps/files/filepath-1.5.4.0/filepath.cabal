@@ -1,0 +1,184 @@
+cabal-version:      2.2
+name:               filepath
+version:            1.5.4.0
+
+-- NOTE: Don't forget to update ./changelog.md
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Neil Mitchell <ndmitchell@gmail.com>
+maintainer:         Julian Ospald <hasufell@posteo.de>
+copyright:          Neil Mitchell 2005-2020, Julian Ospald 2021-2022
+bug-reports:        https://github.com/haskell/filepath/issues
+homepage:
+  https://github.com/haskell/filepath/blob/master/README.md
+
+category:           System
+build-type:         Simple
+synopsis:           Library for manipulating FilePaths in a cross platform way.
+tested-with:
+  GHC ==8.6.5
+   || ==8.8.4
+   || ==8.10.7
+   || ==9.0.2
+   || ==9.2.8
+   || ==9.4.8
+   || ==9.6.3
+   || ==9.8.1
+
+description:
+  This package provides functionality for manipulating @FilePath@ values, and is shipped with <https://www.haskell.org/ghc/ GHC>. It provides two variants for filepaths:
+  .
+  1. legacy filepaths: @type FilePath = String@
+  .
+  2. operating system abstracted filepaths (@OsPath@): internally unpinned @ShortByteString@ (platform-dependent encoding)
+  .
+  It is recommended to use @OsPath@ when possible, because it is more correct.
+  .
+  For each variant there are three main modules:
+  .
+  * "System.FilePath.Posix" / "System.OsPath.Posix" manipulates POSIX\/Linux style @FilePath@ values (with @\/@ as the path separator).
+  .
+  * "System.FilePath.Windows" / "System.OsPath.Windows" manipulates Windows style @FilePath@ values (with either @\\@ or @\/@ as the path separator, and deals with drives).
+  .
+  * "System.FilePath" / "System.OsPath" for dealing with current platform-specific filepaths
+  .
+  For more powerful string manipulation of @OsPath@, you can use the <https://hackage.haskell.org/package/os-string os-string package> (@OsPath@ is a type synonym for @OsString@).
+  .
+  An introduction into the new API can be found in this
+  <https://hasufell.github.io/posts/2022-06-29-fixing-haskell-filepaths.html blog post>.
+  Code examples for the new API can be found <https://github.com/hasufell/filepath-examples here>.
+
+extra-source-files:
+  Generate.hs
+  Makefile
+  System/FilePath/Internal.hs
+  System/OsPath/Common.hs
+
+extra-doc-files:
+  changelog.md
+  HACKING.md
+  README.md
+
+flag cpphs
+  description: Use cpphs (fixes haddock source links)
+  default:     False
+  manual:      True
+
+source-repository head
+  type:     git
+  location: https://github.com/haskell/filepath
+
+library
+  exposed-modules:
+    System.FilePath
+    System.FilePath.Posix
+    System.FilePath.Windows
+    System.OsPath
+    System.OsPath.Encoding
+    System.OsPath.Internal
+    System.OsPath.Posix
+    System.OsPath.Posix.Internal
+    System.OsPath.Types
+    System.OsPath.Windows
+    System.OsPath.Windows.Internal
+
+  other-extensions:
+    CPP
+    PatternGuards
+
+  if impl(ghc >=7.2)
+    other-extensions: Safe
+
+  default-language: Haskell2010
+  build-depends:
+    , base              >=4.12.0.0      && <4.22
+    , bytestring        >=0.11.3.0
+    , deepseq
+    , exceptions
+    , template-haskell
+    , os-string         >=2.0.1
+
+  ghc-options:      -Wall
+
+  if flag(cpphs)
+    ghc-options:        -pgmPcpphs -optP--cpp
+    build-tool-depends: cpphs:cpphs -any
+
+test-suite filepath-tests
+  type:             exitcode-stdio-1.0
+  main-is:          Test.hs
+  hs-source-dirs:   tests tests/filepath-tests
+  other-modules:
+    TestGen
+    TestUtil
+
+  build-depends:
+    , base
+    , bytestring  >=0.11.3.0
+    , filepath
+    , os-string   >=2.0.1
+    , tasty
+    , tasty-quickcheck
+
+  default-language: Haskell2010
+  ghc-options:      -Wall
+
+test-suite filepath-equivalent-tests
+  default-language: Haskell2010
+  ghc-options:      -Wall
+  type:             exitcode-stdio-1.0
+  main-is:          TestEquiv.hs
+  hs-source-dirs:   tests tests/filepath-equivalent-tests
+  other-modules:
+    Legacy.System.FilePath
+    Legacy.System.FilePath.Posix
+    Legacy.System.FilePath.Windows
+    TestUtil
+    Gen
+
+  build-depends:
+    , base
+    , bytestring  >=0.11.3.0
+    , filepath
+    , generic-random
+    , generic-deriving
+    , os-string   >=2.0.1
+    , tasty
+    , tasty-quickcheck
+
+test-suite abstract-filepath
+  default-language: Haskell2010
+  ghc-options:      -Wall
+  type:             exitcode-stdio-1.0
+  main-is:          Test.hs
+  hs-source-dirs:   tests tests/abstract-filepath
+  other-modules:
+    Arbitrary
+    OsPathSpec
+    TestUtil
+
+  build-depends:
+    , base
+    , bytestring  >=0.11.3.0
+    , deepseq
+    , filepath
+    , os-string   >=2.0.1
+    , quickcheck-classes-base ^>=0.6.2
+    , tasty
+    , tasty-quickcheck
+
+benchmark bench-filepath
+  default-language: Haskell2010
+  ghc-options:      -Wall
+  type:             exitcode-stdio-1.0
+  main-is:          BenchFilePath.hs
+  hs-source-dirs:   bench
+  build-depends:
+    , base
+    , bytestring  >=0.11.3.0
+    , deepseq
+    , filepath
+    , os-string   >=2.0.1
+    , tasty-bench
+
+  ghc-options: -with-rtsopts=-A32m
