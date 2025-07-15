@@ -2,8 +2,8 @@ snapshot: ghc-9.10.2
 name: test-snapshot-2
 packages:
 - async-2.2.5
-- hashable-1.4.7.0
-- os-string-2.0.7
+- hashable-1.5.0.0
+- os-string-2.0.4
 - stm-2.5.3.1
 - zlib-0.7.1.0@rev:2
 # FIXME: test these here
