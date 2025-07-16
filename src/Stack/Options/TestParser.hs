@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE NoMonoLocalBinds  #-}
 
 {-|
 Module      : Stack.Options.TestParser
@@ -11,7 +10,7 @@ module Stack.Options.TestParser
   ) where
 
 import           Options.Applicative
-                   ( Parser, auto, flag', help, long, metavar, option )
+                   ( Mod, Parser, auto, flag', help, long, metavar, option )
 import           Options.Applicative.Args ( argsOption )
 import           Options.Applicative.Builder.Extra
                    ( firstBoolFlagsTrue, optionalFirst, optionalFirstFalse )
@@ -53,4 +52,5 @@ testOptsParser hide0 = TestOptsMonoid
         "allow standard input in test suites."
         hide
  where
+  hide :: Mod f a
   hide = hideMods hide0

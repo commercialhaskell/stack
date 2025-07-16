@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE NoMonoLocalBinds  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
@@ -83,6 +82,7 @@ interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpret
   sheBangLine =   P.string "#!"
                *> P.manyTill P.anyChar P.endOfLine
 
+  commentStart :: P.Parser Text -> P.Parser Text
   commentStart psr =   (psr <?> (progName ++ " options comment"))
                     *> P.skipSpace
                     *> (P.string (pack progName) <?> show progName)
@@ -91,6 +91,7 @@ interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpret
   anyCharNormalizeSpace = let normalizeSpace c = if isSpace c then ' ' else c
                             in  P.satisfyWith normalizeSpace $ const True
 
+  comment :: P.Parser Text -> P.Parser a -> P.Parser String
   comment start end = commentStart start
     *> ((end >> pure "")
         <|> (P.space *> (P.manyTill anyCharNormalizeSpace end <?> "-}")))

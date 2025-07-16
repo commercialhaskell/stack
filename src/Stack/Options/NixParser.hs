@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE NoMonoLocalBinds    #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 {-|
@@ -16,7 +15,7 @@ module Stack.Options.NixParser
 
 import qualified Data.Text as T
 import           Options.Applicative
-                   ( Parser, completer, help, long, metavar, option, str )
+                   ( Mod, Parser, completer, help, long, metavar, option, str )
 import           Options.Applicative.Args ( argsOption )
 import           Options.Applicative.Builder.Extra
                    ( fileExtCompleter, firstBoolFlagsFalse
@@ -74,6 +73,7 @@ nixOptsParser hide0 = overrideActivation <$>
         hide
   )
  where
+  hide :: Mod f a
   hide = hideMods hide0
   overrideActivation m =
     if fromFirst False m.pureShell

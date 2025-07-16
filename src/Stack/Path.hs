@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE NoMonoLocalBinds      #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
@@ -67,6 +66,7 @@ path :: [Text] -> RIO Runner ()
 path keys = do
   let -- filter the chosen paths in flags (keys), or show all of them if no
       -- specific paths chosen.
+      filterKeys :: (String, Text, a) -> Bool
       filterKeys (_, key, _) = null keys || elem key keys
       goodPathsFromRunner = null keys || elem stackRootOptionName' keys
       goodPathsFromConfig = filter filterKeys pathsFromConfig

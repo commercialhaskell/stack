@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE NoMonoLocalBinds  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
@@ -14,7 +13,8 @@ module Stack.Options.BenchParser
  ( benchOptsParser
  ) where
 
-import           Options.Applicative ( Parser, help, long, metavar, strOption )
+import           Options.Applicative
+                   ( Mod, Parser, help, long, metavar, strOption )
 import           Options.Applicative.Builder.Extra
                    ( firstBoolFlagsTrue, optionalFirst )
 import           Stack.Prelude
@@ -38,4 +38,5 @@ benchOptsParser hide0 = BenchmarkOptsMonoid
         "running of targeted benchmarks."
         hide
  where
+  hide :: Mod f a
   hide = hideMods hide0

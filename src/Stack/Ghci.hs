@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE NoMonoLocalBinds      #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
@@ -925,6 +924,7 @@ makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
   (mods, files, opts) <-
     getPackageOpts pkg installMap installedMap locals addPkgs cabalFP
   let filteredOpts = filterWanted opts
+      filterWanted :: Map NamedComponent a -> Map NamedComponent a
       filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
       allWanted = wantedPackageComponents bopts target pkg
   pure GhciPkgInfo

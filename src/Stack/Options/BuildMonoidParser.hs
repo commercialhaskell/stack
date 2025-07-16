@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE NoMonoLocalBinds  #-}
 
 {-|
 Module      : Stack.Options.BuildMonoidParser
@@ -15,8 +14,8 @@ module Stack.Options.BuildMonoidParser
 
 import           Distribution.Parsec ( eitherParsec )
 import           Options.Applicative
-                   ( Parser, eitherReader, flag, help, long, metavar, option
-                   , strOption
+                   ( FlagFields, Mod, Parser, eitherReader, flag, help, long
+                   , metavar, option, strOption
                    )
 import           Options.Applicative.Builder.Extra
                    ( firstBoolFlagsFalse, firstBoolFlagsNoDefault
@@ -73,7 +72,9 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
   <*> ddumpDir
  where
   hideBool = hide0 /= BuildCmdGlobalOpts
+  hide :: Mod f a
   hide = hideMods hideBool
+  hideExceptGhci :: Mod FlagFields a
   hideExceptGhci =
     hideMods (hide0 `notElem` [BuildCmdGlobalOpts, GhciCmdGlobalOpts])
 

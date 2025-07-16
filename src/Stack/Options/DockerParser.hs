@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE NoMonoLocalBinds  #-}
 
 {-|
 Module      : Stack.Options.DockerParser
@@ -14,8 +13,8 @@ import           Data.List ( intercalate )
 import qualified Data.Text as T
 import           Distribution.Version ( anyVersion )
 import           Options.Applicative
-                   ( Parser, auto, completer, help, listCompleter, long, metavar
-                   , option, str, value
+                   ( Mod, Parser, auto, completer, help, listCompleter, long
+                   , metavar, option, str, value
                    )
 import           Options.Applicative.Args ( argsOption )
 import           Options.Applicative.Builder.Extra
@@ -155,4 +154,5 @@ dockerOptsParser hide0 = DockerOptsMonoid (Any False)
  where
   dockerOptName optName = dockerCmdName ++ "-" ++ T.unpack optName
   firstStrOption = optionalFirst . option str
+  hide :: Mod f a
   hide = hideMods hide0
