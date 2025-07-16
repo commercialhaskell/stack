@@ -94,25 +94,6 @@
     name:
     - CPP
     - PackageImports
-  # The following list provides an inventory of the small number of modules
-  # where MonoLocalBinds (implied by GHC2024) breaks GHC's ability to infer the
-  # correct type from Stack's code.
-  - name: NoMonoLocalBinds
-    within:
-    - Data.Attoparsec.Interpreter
-    - Stack.Ghci
-    - Stack.Package
-    - Stack.PackageDump
-    - Stack.PackageFile
-    - Stack.Path
-    - Stack.Script
-    - Stack.Options.BenchParser
-    - Stack.Options.BuildMonoidParser
-    - Stack.Options.ConfigParser
-    - Stack.Options.DockerParser
-    - Stack.Options.GlobalParser
-    - Stack.Options.NixParser
-    - Stack.Options.TestParser
 
 # Not considered useful hints
 - ignore:

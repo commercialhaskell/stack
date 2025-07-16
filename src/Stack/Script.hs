@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE NoMonoLocalBinds      #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
@@ -42,7 +41,10 @@ import           Path
                    )
 import           Path.IO ( getModificationTime, resolveFile' )
 import qualified RIO.Directory as Dir
-import           RIO.Process ( exec, proc, readProcessStdout_, withWorkingDir )
+import           RIO.Process
+                   ( HasProcessContext, exec, proc, readProcessStdout_
+                   , withWorkingDir
+                   )
 import qualified RIO.Text as T
 import           Stack.Build ( build )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
@@ -221,6 +223,11 @@ scriptCmd opts = do
       SEOptimize -> shortCut shouldRun shouldCompile file exe
 
  where
+  runCompiled ::
+       (HasProcessContext env, HasTerm env)
+    => ShouldRun
+    -> Path Abs File
+    -> RIO env ()
   runCompiled shouldRun exe = do
     case shouldRun of
       YesRun -> exec (fromAbsFile exe) opts.args
