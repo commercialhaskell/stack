@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE GADTs               #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 

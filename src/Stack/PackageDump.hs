@@ -215,12 +215,15 @@ sinkMatching allowed =
       _ -> True
 
 -- | Convert a stream of bytes into a stream of @DumpPackage@s
-conduitDumpPackage :: MonadThrow m
-                   => ConduitM Text DumpPackage m ()
+conduitDumpPackage ::
+     MonadThrow m
+  => ConduitM Text DumpPackage m ()
 conduitDumpPackage = (.| CL.catMaybes) $ eachSection $ do
   pairs <- eachPair (\k -> (k, ) <$> CL.consume) .| CL.consume
   let m = Map.fromList pairs
-  let parseS k =
+
+      parseS :: MonadThrow m => Text -> m Line
+      parseS k =
         case Map.lookup k m of
           Just [v] -> pure v
           _ -> throwM $ MissingSingleField k m

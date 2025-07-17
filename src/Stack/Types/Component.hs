@@ -1,14 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DuplicateRecordFields      #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NoFieldSelectors           #-}
 {-# LANGUAGE OverloadedRecordDot        #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
 
 {-|
 Module      : Stack.Types.Component

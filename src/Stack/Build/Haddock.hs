@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings   #-}
 

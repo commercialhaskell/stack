@@ -64,8 +64,20 @@ packageDescModulesAndFiles pkg = do
   packageExtraFile <- resolveGlobFilesFromStackPackageFile
               pkg.cabalSpec pkg.file
   let initialValue = mempty{packageExtraFile=packageExtraFile}
-  let accumulator f comp st = (insertComponentFile <$> st) <*> f comp
-  let gatherCompFileCollection createCompFileFn getCompFn res =
+      accumulator ::
+           Applicative f
+        => (t -> f (NamedComponent, ComponentFile))
+        -> t
+        -> f PackageComponentFile
+        -> f PackageComponentFile
+      accumulator f comp st = (insertComponentFile <$> st) <*> f comp
+      gatherCompFileCollection ::
+           (Applicative f, Foldable t)
+        => (a -> f (NamedComponent, ComponentFile))
+        -> (Package -> t a)
+        -> f PackageComponentFile
+        -> f PackageComponentFile
+      gatherCompFileCollection createCompFileFn getCompFn res =
         foldr' (accumulator createCompFileFn) res (getCompFn pkg)
   gatherCompFileCollection stackLibraryFiles (.library)
     . gatherCompFileCollection stackLibraryFiles (.subLibraries)

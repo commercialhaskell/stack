@@ -16,7 +16,7 @@ module Stack.Options.GlobalParser
   ) where
 
 import           Options.Applicative
-                   ( Parser, ReadM, auto, completer, help, hidden, internal
+                   ( Mod, Parser, ReadM, auto, completer, help, hidden, internal
                    , long, metavar, option, strOption, value
                    )
 import           Options.Applicative.Builder.Extra
@@ -115,6 +115,7 @@ globalOptsParser currentDir kind = GlobalOptsMonoid
         <> hide
         ))
  where
+  hide :: Mod f a
   hide = hideMods hide0
   hide0 = kind /= OuterGlobalOpts
 

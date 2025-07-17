@@ -1,7 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude    #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE DerivingStrategies   #-}
-{-# LANGUAGE GADTs                #-}
 {-# LANGUAGE OverloadedRecordDot  #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE QuasiQuotes          #-}

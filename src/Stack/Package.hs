@@ -1,9 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
 
 {-|
 Module      : Stack.Package
@@ -95,9 +93,11 @@ import           Stack.Types.CompCollection
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.Component
-                   ( HasBuildInfo, HasComponentInfo, StackUnqualCompName (..) )
-import           Stack.Types.ComponentUtils ( emptyCompName, toCabalName )
+                   ( HasBuildInfo, HasComponentInfo, HasQualiName, HasName
+                   , StackUnqualCompName (..)
+                   )
 import qualified Stack.Types.Component as Component
+import           Stack.Types.ComponentUtils ( emptyCompName, toCabalName )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.Dependency
                    ( DepLibrary (..), DepType (..), DepValue (..)
@@ -266,14 +266,20 @@ generatePkgDescOpts
             , componentName
             , cabalVersion
             }
-      let insertInMap name compVal = M.insert name (generate name compVal)
-      let translatedInsertInMap constructor name =
+          insertInMap name compVal = M.insert name (generate name compVal)
+          translatedInsertInMap constructor name =
             insertInMap (constructor name)
-      let makeBuildInfoOpts selector constructor =
-            foldOnNameAndBuildInfo
-              (selector pkg)
-              (translatedInsertInMap constructor)
-      let aggregateAllBuildInfoOpts =
+          makeBuildInfoOpts ::
+               (Foldable t, HasBuildInfo component, HasName component)
+            => (Package -> t component)
+            -> (StackUnqualCompName -> NamedComponent)
+            -> Map NamedComponent BuildInfoOpts
+            -> Map NamedComponent BuildInfoOpts
+          makeBuildInfoOpts selector constructor =
+              foldOnNameAndBuildInfo
+                (selector pkg)
+                (translatedInsertInMap constructor)
+          aggregateAllBuildInfoOpts =
               makeBuildInfoOpts (.library) (const CLib)
             . makeBuildInfoOpts (.subLibraries) CSubLib
             . makeBuildInfoOpts (.executables) CExe
@@ -751,7 +757,11 @@ processPackageDeps ::
   -> m resT
   -> m resT
 processPackageDeps pkg combineResults fn = do
-  let asPackageNameSet accessor =
+  let
+      asPackageNameSet ::
+           (Package -> CompCollection component)
+        -> Set PackageName
+      asPackageNameSet accessor =
         S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
       (!subLibNames, !foreignLibNames) =
         ( asPackageNameSet (.subLibraries)
@@ -824,6 +834,12 @@ topSortPackageComponent ::
 topSortPackageComponent package target includeDirectTarget =
   topProcessPackageComponent package target processor mempty
  where
+  processor ::
+       HasQualiName component
+    => PackageType
+    -> component
+    -> Seq NamedComponent
+    -> Seq NamedComponent
   processor packageType component
     | not includeDirectTarget && packageType == PTProject = id
     | otherwise = \v -> v |> component.qualifiedName
@@ -846,7 +862,14 @@ topProcessPackageComponent ::
   -> b
   -> b
 topProcessPackageComponent package target fn res = do
-  let initialState = (mempty, res)
+  let
+      initialState :: (Set NamedComponent, b)
+      initialState = (mempty, res)
+      processInitialComponents ::
+           HasComponentInfo component
+        => component
+        -> (Set NamedComponent, b)
+        -> (Set NamedComponent, b)
       processInitialComponents c = case target of
         TargetAll{} -> processComponent PTProject c
         TargetComps targetSet -> if S.member c.qualifiedName targetSet
@@ -854,7 +877,8 @@ topProcessPackageComponent package target fn res = do
           else id
   snd $ processPackageComponent package processInitialComponents initialState
  where
-  processComponent :: HasComponentInfo component
+  processComponent ::
+       HasComponentInfo component
     => PackageType
        -- ^ Finally add this component in the seq
     -> component
@@ -879,6 +903,10 @@ topProcessPackageComponent package target fn res = do
   lookupLibName isMain name = if isMain
     then package.library
     else collectionLookup name package.subLibraries
+  processOneDep ::
+       Maybe DepValue
+    -> (Set NamedComponent, b)
+    -> (Set NamedComponent, b)
   processOneDep mDependency res' =
     case (.depType) <$> mDependency of
       Just (AsLibrary (DepLibrary mainLibDep subLibDeps)) -> do

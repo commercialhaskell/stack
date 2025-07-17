@@ -1,12 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude        #-}
-{-# LANGUAGE ConstraintKinds          #-}
-{-# LANGUAGE DataKinds                #-}
-{-# LANGUAGE DisambiguateRecordFields #-}
-{-# LANGUAGE FlexibleContexts         #-}
-{-# LANGUAGE GADTs                    #-}
 {-# LANGUAGE OverloadedRecordDot      #-}
 {-# LANGUAGE OverloadedStrings        #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
 
 {-|
 Module      : Stack.Component

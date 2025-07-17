@@ -12,8 +12,8 @@ module Stack.Options.ConfigParser
 
 import           Data.Char ( toUpper )
 import           Options.Applicative
-                   ( Parser, auto, completer, completeWith, eitherReader, help
-                   , long, metavar, option, short, strOption
+                   ( Mod, Parser, auto, completer, completeWith, eitherReader
+                   , help, long, metavar, option, short, strOption
                    )
 import           Options.Applicative.Builder.Extra
                    ( PathCompleterOpts (..), absDirOption, absFileOption
@@ -222,6 +222,7 @@ configOptsParser currentDir hide0 =
         "the use of options `--no-run --compile` with `stack script`."
         hide
  where
+  hide :: Mod f a
   hide = hideMods (hide0 /= OuterGlobalOpts)
   toDumpLogs (First (Just True)) = First (Just DumpAllLogs)
   toDumpLogs (First (Just False)) = First (Just DumpNoLogs)
