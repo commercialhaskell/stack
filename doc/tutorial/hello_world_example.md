@@ -73,13 +73,14 @@ root directory.
 ## The `stack new` command
 
 We will start off with the [`stack new`](../commands/new_command.md) command to
-create a new *project* from a project template. We will use the `new-template`
-project template. This template is used by default, but in our example we will
-refer to it expressly.
+create a new Stack *project* from a project template.
 
-That template will create a project with a package of the same name. So, we need
-to pick a name for the project that is a valid package name. We will call our
-project `helloworld`.
+The project template `new-template` is used by default. However, in our example,
+we will use it by name.
+
+That template creates a project with a single package of the same name. So, we
+need to pick a name for the project that is also a valid package name. We will
+call our project `helloworld`.
 
 ??? question "How do project packages relate to projects?"
 
