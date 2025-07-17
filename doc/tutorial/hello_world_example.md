@@ -2,8 +2,70 @@
 
 # 1. A Hello World example
 
-With Stack installed, let us create a new project and walk through the most
-common Stack commands.
+With Stack installed, we will create a new Stack project and walk through the
+most common Stack commands. First, let us look at other foundations for getting
+started with Haskell.
+
+## Foundations
+
+Although this guide starts with creating Stack projects using Stack, if you are
+relatively inexperienced in coding with Haskell, there are things you
+may wish to experience first. Examples are:
+
+* using GHC interactively to evaluate Haskell expressions and explore their
+  types. The [`stack ghci`](../commands/ghci_command.md) command can help do
+  that; and
+
+* developing simple Haskell programs where all your source code is in a single
+  file. The [`stack runghc`](../commands/runghc_command.md),
+  [`stack ghc`](../commands/ghc_command.md), and
+  [`stack script`](../commands/script_command.md) commands can all help with
+  that.
+
+By default, the `stack new` command introduced below creates a simple project.
+However, Stack projects can be even simpler than that.
+
+For example, imagine you already had the following simple Haskell program in a
+single source file named `MyMainModule.hs` in a directory named `my-project`.
+
+~~~haskell
+module Main ( main ) where
+
+main :: IO ()
+main = putStrLn "Hello, World!"
+~~~
+
+You could create a Haskell package from that source file by also creating
+manually a package description file named `package.yaml` in `my-project`, with
+the contents:
+
+~~~yaml
+name: my-package-name
+version: 1
+dependencies: base
+executable:
+  main: MyMainModule.hs
+~~~
+
+This description reflects the following:
+
+* all Haskell packages have a name and a version; and
+
+* the GHC boot package [`base`](https://hackage.haskell.org/package/base) is a
+  dependency of almost all other packages.
+
+You could then create a Stack project based on that single package by also
+creating manually a Stack project-level configuration file named `stack.yaml` in
+`my-project`, with the contents:
+
+~~~yaml
+snapshot: lts-24.0
+~~~
+
+By adding those two files (one to describe a package, the other to configure the
+project) manually, you would now have a valid single-package Stack project in
+the `my-project` directory. However, let us step through what Stack's commands
+provide, when it comes to creating new projects.
 
 In this guide, unless stated otherwise, the working directory is the project's
 root directory.
@@ -32,6 +94,13 @@ project `helloworld`.
     not be interpreted as a number.
 
     The names of packages are intended to be unique.
+
+??? question "What is a valid package version number?"
+
+    A package version number is one or more natural numbers (including zero)
+    separated by dots (`.`). However, Haskell's Package Versioning Policy (PVP)
+    says that a version should have the form *A.B.C*, and may optionally have
+    any number of additional components.
 
 ??? question "Are other project templates available?"
 
