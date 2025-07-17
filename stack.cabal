@@ -476,7 +476,7 @@ library
     , vector
     , yaml
     , zlib
-  default-language: GHC2021
+  default-language: GHC2024
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -600,7 +600,7 @@ executable stack
     , vector
     , yaml
     , zlib
-  default-language: GHC2021
+  default-language: GHC2024
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -704,7 +704,7 @@ executable stack-integration-test
     , vector
     , yaml
     , zlib
-  default-language: GHC2021
+  default-language: GHC2024
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:
@@ -823,7 +823,7 @@ test-suite stack-unit-test
     , vector
     , yaml
     , zlib
-  default-language: GHC2021
+  default-language: GHC2024
   if os(windows)
     cpp-options: -DWINDOWS
     build-depends:

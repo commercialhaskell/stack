@@ -1,6 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude    #-}
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE GADTs                #-}
 {-# LANGUAGE NoFieldSelectors     #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TypeFamilies         #-}

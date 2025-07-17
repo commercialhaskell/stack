@@ -1,7 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DefaultSignatures   #-}
-{-# LANGUAGE GADTs               #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoMonoLocalBinds  #-}
 
 {-|
 Module      : Stack.Options.TestParser

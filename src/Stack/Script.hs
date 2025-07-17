@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE NoMonoLocalBinds      #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE NoFieldSelectors      #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE OverloadedStrings     #-}

@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE NoMonoLocalBinds      #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
 
