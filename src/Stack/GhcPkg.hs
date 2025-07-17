@@ -143,17 +143,11 @@ findGhcPkgField ::
   -> String -- ^ package identifier, or GhcPkgId
   -> Text
   -> RIO env (Maybe Text)
-findGhcPkgField pkgexe pkgDbs name field = do
-  result <-
-    ghcPkg
-      pkgexe
-      pkgDbs
-      ["field", "--simple-output", name, T.unpack field]
-  pure $
-    case result of
-      Left{} -> Nothing
-      Right bs ->
-        fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines bs
+findGhcPkgField pkgexe pkgDbs name field =
+  let cmd = ["field", "--simple-output", name, T.unpack field]
+  in  ghcPkg pkgexe pkgDbs cmd <&> \case
+        Left _ -> Nothing
+        Right bs -> fmap (stripCR . T.decodeUtf8) $ listToMaybe $ S8.lines bs
 
 -- | unregister list of package ghcids, batching available from GHC 8.2.1,
 -- see https://github.com/commercialhaskell/stack/issues/2662#issuecomment-460342402
@@ -185,9 +179,7 @@ unregisterGhcPkgIds ::
   -> RIO env ()
 unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
   globalDb <- view $ compilerPathsL . to (.globalDB)
-  eresUnregister <- try $ do
-    ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs
-  case eresUnregister of
+  try (ghcPkgUnregisterForce globalDb pkgDb hasIpid pkgarg_strs) >>= \case
     Left (PrettyException e) -> when isWarn $
       prettyWarn $
         "[S-8729]"
@@ -199,8 +191,7 @@ unregisterGhcPkgIds isWarn pkgexe pkgDb epgids = do
     Right _ -> pure ()
   -- ghcPkgUnregisterForce does not perform an effective 'ghc-pkg recache', as
   -- that depends on a specific version of the Cabal package.
-  eresRecache <- ghcPkg pkgexe [pkgDb] ["recache"]
-  case eresRecache of
+  ghcPkg pkgexe [pkgDb] ["recache"] >>= \case
     Left err -> prettyThrowM $ CannotRecacheAfterUnregister pkgDb err
     Right _ -> pure ()
  where

@@ -156,9 +156,8 @@ loadConfigCache ::
   => ConfigCacheKey
   -> RIO env (Maybe ConfigCache)
 loadConfigCache key =
-  withProjectStorage $ do
-    mparent <- getBy key
-    case mparent of
+  withProjectStorage $
+    getBy key >>= \case
       Nothing -> pure Nothing
       Just parentEntity@(Entity _ configCacheParent)
         |  configCacheParent.configCacheParentActive ->
@@ -173,9 +172,7 @@ saveConfigCache ::
   -> RIO env ()
 saveConfigCache key@(UniqueConfigCacheParent dir type_) new =
   withProjectStorage $ do
-    mparent <- getBy key
-    (parentId, mold) <-
-      case mparent of
+    (parentId, mold) <- getBy key >>= \case
         Nothing ->
           (, Nothing) <$>
           insert

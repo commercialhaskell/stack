@@ -162,11 +162,9 @@ runApp options inner = do
             }
       runRIO app $ withModifyEnvVars modifyEnvCommon inner
     _ -> do
-      morigStackRoot <- liftIO $ lookupEnv "STACK_ROOT"
-      origStackRoot <-
-        case morigStackRoot of
-          Nothing -> getAppUserDataDirectory "stack"
-          Just x -> pure x
+      origStackRoot <- liftIO (lookupEnv "STACK_ROOT") >>= \case
+        Nothing -> getAppUserDataDirectory "stack"
+        Just x -> pure x
 
       logInfo "Initializing/updating the original Pantry store"
       proc stack ["update"] runProcess_

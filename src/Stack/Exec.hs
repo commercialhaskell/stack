@@ -180,8 +180,7 @@ execCmd opts =
   getPkgId (ExecTarget pkgName _) = do
     let name = unPackageName pkgName
     pkg <- getGhcPkgExe
-    mId <- findGhcPkgField pkg [] name "id"
-    case mId of
+    findGhcPkgField pkg [] name "id" >>= \case
       Just i -> maybe
         (prettyThrowIO NoPackageIdReportedBug)
         (pure . head)

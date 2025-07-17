@@ -241,14 +241,15 @@ ghci opts = do
   -- Parse --main-is argument.
   mainIsTargets <- parseMainIsTargets buildOptsCLI sma opts.mainIs
   -- Parse to either file targets or build targets
-  etargets <- preprocessTargets buildOptsCLI sma opts.targets
-  (inputTargets, mfileTargets) <- case etargets of
-    Right packageTargets -> pure (packageTargets, Nothing)
-    Left rawFileTargets -> do
-      whenJust mainIsTargets $ \_ -> prettyThrowM Can'tSpecifyFilesAndMainIs
-      -- Figure out targets based on filepath targets
-      (targetMap, fileInfo, extraFiles) <- findFileTargets locals rawFileTargets
-      pure (targetMap, Just (fileInfo, extraFiles))
+  (inputTargets, mfileTargets) <-
+    preprocessTargets buildOptsCLI sma opts.targets >>= \case
+      Right packageTargets -> pure (packageTargets, Nothing)
+      Left rawFileTargets -> do
+        whenJust mainIsTargets $ \_ -> prettyThrowM Can'tSpecifyFilesAndMainIs
+        -- Figure out targets based on filepath targets
+        (targetMap, fileInfo, extraFiles) <-
+          findFileTargets locals rawFileTargets
+        pure (targetMap, Just (fileInfo, extraFiles))
   -- Get a list of all the local target packages.
   localTargets <- getAllLocalTargets opts inputTargets mainIsTargets localMap
   -- Get a list of all the non-local target packages.
@@ -311,8 +312,7 @@ preprocessTargets buildOptsCLI sma rawTargets = do
     then do
       fileTargets <- forM fileTargetsRaw $ \fp0 -> do
         let fp = T.unpack fp0
-        mpath <- forgivingResolveFile' fp
-        case mpath of
+        forgivingResolveFile' fp >>= \case
           Nothing -> prettyThrowM (FileTargetIsInvalidAbsFile fp)
           Just path -> pure path
       pure (Left fileTargets)
@@ -467,8 +467,7 @@ buildDepsAndInitialSteps ghciOpts localTargets = do
   whenJust (nonEmpty targets) $ \nonEmptyTargets ->
     unless ghciOpts.noBuild $ do
       -- only new project package targets could appear here
-      eres <- buildLocalTargets nonEmptyTargets
-      case eres of
+      buildLocalTargets nonEmptyTargets >>= \case
         Right () -> pure ()
         Left err -> do
           case fromException err of
@@ -1147,8 +1146,7 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
       ]
   when (null localTargets && isNothing mfileTargets) $ do
     smWanted <- view $ buildConfigL . to (.smWanted)
-    configFile <- view configFileL
-    case configFile of
+    view configFileL >>= \case
       -- A user-specific global configuration file
       Left _ -> prettyThrowM ConfigFileNotProjectLevelBug
       -- A project-level configuration file

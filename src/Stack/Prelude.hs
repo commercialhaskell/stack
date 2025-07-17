@@ -275,9 +275,8 @@ promptPassword txt = liftIO $ do
 -- print a message indicating that "y" or "n" is expected, and ask
 -- again.
 promptBool :: MonadIO m => Text -> m Bool
-promptBool txt = liftIO $ do
-  input <- prompt txt
-  case input of
+promptBool txt = liftIO $
+  prompt txt >>= \case
     "y" -> pure True
     "n" -> pure False
     _ -> do

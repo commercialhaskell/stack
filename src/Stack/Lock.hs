@@ -117,9 +117,8 @@ loadYamlThrow ::
   => (Value -> Yaml.Parser (WithJSONWarnings a))
   -> Path Abs File
   -> RIO env a
-loadYamlThrow parser path = do
-  eVal <- liftIO $ Yaml.decodeFileEither (toFilePath path)
-  case eVal of
+loadYamlThrow parser path =
+  liftIO (Yaml.decodeFileEither (toFilePath path)) >>= \case
     Left parseException -> throwIO $
       ParseConfigFileException path parseException
     Right val -> case Yaml.parseEither parser val of

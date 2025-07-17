@@ -211,9 +211,8 @@ getSDistTarball mpvpBounds pkgDir = do
   lp <- readLocalPackage pkgDir
   forM_ lp.package.setupDeps $ \customSetupDeps ->
     case nonEmpty (map (T.pack . packageNameString) (Map.keys customSetupDeps)) of
-      Just nonEmptyDepTargets -> do
-        eres <- buildLocalTargets nonEmptyDepTargets
-        case eres of
+      Just nonEmptyDepTargets ->
+        buildLocalTargets nonEmptyDepTargets >>= \case
           Left err ->
             logError $
               "Error: [S-8399]\n" <>

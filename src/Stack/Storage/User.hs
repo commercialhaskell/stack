@@ -246,25 +246,23 @@ savePrecompiledCache
   new
   = withUserStorage $ do
       let precompiledCacheParentLibrary = fmap toFilePath new.library
-      mIdOld <- readPrecompiledCache key
-      (parentId, mold) <-
-        case mIdOld of
-          Nothing -> (, Nothing) <$> insert PrecompiledCacheParent
-            { precompiledCacheParentPlatformGhcDir
-            , precompiledCacheParentCompiler
-            , precompiledCacheParentCabalVersion
-            , precompiledCacheParentPackageKey
-            , precompiledCacheParentOptionsHash
-            , precompiledCacheParentHaddock
-            , precompiledCacheParentLibrary
-            }
-          Just (parentId, old) -> do
-            update
-              parentId
-              [ PrecompiledCacheParentLibrary =.
-                precompiledCacheParentLibrary
-              ]
-            pure (parentId, Just old)
+      (parentId, mold) <- readPrecompiledCache key >>= \case
+        Nothing -> (, Nothing) <$> insert PrecompiledCacheParent
+          { precompiledCacheParentPlatformGhcDir
+          , precompiledCacheParentCompiler
+          , precompiledCacheParentCabalVersion
+          , precompiledCacheParentPackageKey
+          , precompiledCacheParentOptionsHash
+          , precompiledCacheParentHaddock
+          , precompiledCacheParentLibrary
+          }
+        Just (parentId, old) -> do
+          update
+            parentId
+            [ PrecompiledCacheParentLibrary =.
+              precompiledCacheParentLibrary
+            ]
+          pure (parentId, Just old)
       updateCollection
         (setUpdateDiff PrecompiledCacheSubLibValue)
         (PrecompiledCacheSubLib parentId)

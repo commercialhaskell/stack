@@ -118,11 +118,9 @@ interpreterArgsParser isLiterate progName = P.option "" sheBangLine *> interpret
 -- | Extract Stack arguments from a correctly placed and correctly formatted
 -- comment when it is being used as an interpreter
 getInterpreterArgs :: String -> IO (NonEmpty String)
-getInterpreterArgs file = do
-  eArgStr <- withSourceFile file parseFile
-  case eArgStr of
-    Left err -> handleFailure $ decodeError err
-    Right str -> parseArgStr str
+getInterpreterArgs file = withSourceFile file parseFile >>= \case
+  Left err -> handleFailure $ decodeError err
+  Right str -> parseArgStr str
  where
   parseFile src =
        runConduit

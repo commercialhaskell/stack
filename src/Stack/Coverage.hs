@@ -143,8 +143,7 @@ updateTixFile pkgName' tixSrc testName = do
     -- Remove exe modules because they are problematic. This could be
     -- revisited if there's a GHC version that fixes
     -- https://ghc.haskell.org/trac/ghc/ticket/1853
-    mtix <- readTixOrLog tixSrc
-    case mtix of
+    readTixOrLog tixSrc >>= \case
       Nothing -> prettyError $
         "[S-2887]"
         <> line

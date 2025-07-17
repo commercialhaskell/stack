@@ -34,8 +34,7 @@ warnInstallSearchPathIssues destDir installed = do
       searchPath
   if destDirIsInPATH
     then forM_ installed $ \exe -> do
-      mexePath <- (liftIO . D.findExecutable) exe
-      case mexePath of
+      (liftIO . D.findExecutable) exe >>= \case
         Just exePath -> do
           exeDir <-
             (liftIO . fmap FP.takeDirectory . D.canonicalizePath) exePath
