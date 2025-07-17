@@ -1,5 +1,4 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE DataKinds         #-}
 
 {-|
 Module      : Stack.Options.SnapshotParser

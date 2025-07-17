@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 {-|
 Module      : Stack.DefaultColorWhen
 License     : BSD-3-Clause

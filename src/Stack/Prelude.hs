@@ -1,4 +1,3 @@
-{-# LANGUAGE ExplicitNamespaces  #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE NoFieldSelectors    #-}
 {-# LANGUAGE OverloadedRecordDot #-}

@@ -45,8 +45,8 @@ extra-source-files:
 # Support for people who prefer, or need, to build Stack with Cabal (the tool):
 - cabal.project
 - cabal.config
-# GHC's GHC2021 language extension is supported by GHC >= 9.2.1
-language: GHC2021
+# GHC's GHC2024 language extension is supported by GHC >= 9.10.1
+language: GHC2024
 ghc-options:
 - -fwrite-ide-info
 - -hiedir=.hie

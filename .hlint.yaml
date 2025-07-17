@@ -50,26 +50,16 @@
     within:
     - Network.HTTP.StackClient
 
-# A number of extensions are implied by the use of GHC2021.
+# A number of extensions are implied by the use of GHC2024.
 - extensions:
   - default: false
   # The following list provides an inventory of extensions used over and above
-  # the GHC2021 set. Other extensions can be added, if need be.
+  # the GHC2024 set. Other extensions can be added, if need be.
   - name:
     - NoImplicitPrelude
     - ApplicativeDo
-    - ConstraintKinds
-    - DataKinds
     - DefaultSignatures
-    - DeriveDataTypeable
-    - DeriveGeneric
-    - DerivingStrategies
-    - DisambiguateRecordFields
     - DuplicateRecordFields
-    - FlexibleContexts
-    - GADTs
-    - GeneralizedNewtypeDeriving
-    - LambdaCase
     - MultiWayIf
     - NoFieldSelectors
     - OverloadedLists
@@ -77,7 +67,6 @@
     - OverloadedRecordDot
     - OverloadedStrings
     - QuasiQuotes
-    - ScopedTypeVariables
     - TypeFamilies
     - UndecidableInstances
     - ViewPatterns
@@ -105,14 +94,25 @@
     name:
     - CPP
     - PackageImports
-  # GHC.Utils.GhcPkg.Main.Compat's code largely comes from the GHC repository.
-  - within: GHC.Utils.GhcPkg.Main.Compat
-    name:
-    - FlexibleInstances
-    - KindSignatures
-    - MultiParamTypeClasses
-    - ScopedTypeVariables
-    - TupleSections
+  # The following list provides an inventory of the small number of modules
+  # where MonoLocalBinds (implied by GHC2024) breaks GHC's ability to infer the
+  # correct type from Stack's code.
+  - name: NoMonoLocalBinds
+    within:
+    - Data.Attoparsec.Interpreter
+    - Stack.Ghci
+    - Stack.Package
+    - Stack.PackageDump
+    - Stack.PackageFile
+    - Stack.Path
+    - Stack.Script
+    - Stack.Options.BenchParser
+    - Stack.Options.BuildMonoidParser
+    - Stack.Options.ConfigParser
+    - Stack.Options.DockerParser
+    - Stack.Options.GlobalParser
+    - Stack.Options.NixParser
+    - Stack.Options.TestParser
 
 # Not considered useful hints
 - ignore:
