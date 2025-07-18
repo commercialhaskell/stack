@@ -29,7 +29,7 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "eamodio.gitlens@11.7.0",
+        "/var/tmp/extensions/eamodio.gitlens-11.7.0.vsix",
         "exiasr.hadolint",
         "GitHub.vscode-pull-request-github",
         "mhutchie.git-graph",
