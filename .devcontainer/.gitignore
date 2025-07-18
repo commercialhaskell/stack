@@ -17,6 +17,10 @@
 !/scripts/usr/
 !/scripts/usr/local/
 !/scripts/usr/local/bin/
+!/vsix/
+!/vsix/var/
+!/vsix/var/tmp/
+!/vsix/var/tmp/extensions/
 
 !/assets/cradles/cabal/hie.yaml
 !/assets/cradles/stack/hie.yaml
@@ -24,6 +28,7 @@
 !/conf/stack/etc/stack/config.yaml
 !/ghc-*/devcontainer.json
 !/scripts/usr/local/bin/*.sh
+!/vsix/var/tmp/extensions/*.vsix
 
 !/devcontainer.json
 !/GHC.Dockerfile
