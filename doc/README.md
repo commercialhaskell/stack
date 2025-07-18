@@ -1,11 +1,16 @@
 <div class="hidden-warning"><a href="https://docs.haskellstack.org/"><img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/hidden-warning.svg"></a></div>
 
-# The Haskell Tool Stack
+# Welcome to Stack
 
-Welcome to the [Haskell](https://www.haskell.org/) programming language and the
-Haskell Tool Stack (Stack)! Stack is a program for developing Haskell projects.
-It is aimed at new and experienced users of Haskell and seeks to support
-them fully on Linux, macOS and Windows.
+Welcome to the [Haskell](https://www.haskell.org/) programming language and
+Stack! Stack is an established program for developing Haskell projects.[^1] It
+is aimed at new and experienced users of Haskell and seeks to support them fully
+on Linux, macOS and Windows.
+
+[^1]:
+    The project's first public commit was on 29 April 2015. It changed its name
+    to the Haskell Tool Stack on 18 May 2015. It is now widely known simply as
+    Stack.
 
 Haskell code is compiled by the
 [Glasgow Haskell Compiler](https://www.haskell.org/ghc/) (GHC), which can also
@@ -243,7 +248,7 @@ stack exec my-project-exe # (4)!
 3.  Build the template project and create an executable named `my-project-exe`.
 
     First, if necessary, Stack will download a version of GHC in an isolated
-    location. That will not interfere with other GHC installations on your 
+    location. That will not interfere with other GHC installations on your
     system. (On Windows, if necessary, Stack will also download
     [MSYS2](https://www.msys2.org/). MSYS2 is a project that provides popular
     tools for developers on Windows.)
@@ -374,9 +379,9 @@ Stack does not stand alone. It is built on the great work provided by:
 -   :fontawesome-solid-trowel-bricks:{ .lg .middle } __Cabal build system__
 
     A specification for defining Haskell packages and a library for performing
-    builds.[^1]
+    builds.[^2]
 
-    [^1]:
+    [^2]:
         Cabal is also the name of a tool used for building Haskell code,
         provided by the `cabal-install` package. This guide distinguishes
         between them by Cabal (the library) and Cabal (the tool).
