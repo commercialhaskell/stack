@@ -58,8 +58,7 @@ getTerminalWidth = do
             , std_err = CreatePipe
             }
         (_, mbStdout, _, rStty) <- createProcess stty
-        exStty <- waitForProcess rStty
-        case exStty of
+        waitForProcess rStty >>= \case
           ExitFailure _ -> pure Nothing
           ExitSuccess ->
             maybe (pure Nothing)

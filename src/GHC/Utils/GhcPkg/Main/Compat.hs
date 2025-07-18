@@ -259,36 +259,32 @@ readParseDatabase ::
   => GhcPkg.DbOpenMode mode t
   -> SomeBase Dir
   -> RIO env (PackageDB mode)
-readParseDatabase mode path = do
-  e <- tryIO $ prjSomeBase listDir path
-  case e of
-    Left err
-      | ioeGetErrorType err == InappropriateType -> do
-         -- We provide a limited degree of backwards compatibility for
-         -- old single-file style db:
-         mdb <- tryReadParseOldFileStyleDatabase mode path
-         case mdb of
-           Just db -> pure db
-           Nothing -> prettyThrowIO $ SingleFileDBUnsupported path
+readParseDatabase mode path = tryIO (prjSomeBase listDir path) >>= \case
+  Left err
+    | ioeGetErrorType err == InappropriateType ->
+       -- We provide a limited degree of backwards compatibility for
+       -- old single-file style db:
+       tryReadParseOldFileStyleDatabase mode path >>= \case
+         Just db -> pure db
+         Nothing -> prettyThrowIO $ SingleFileDBUnsupported path
+    | otherwise -> liftIO $ ioError err
+  Right (_, fs) -> ignore_cache
+   where
+    confs = filter isConf fs
 
-      | otherwise -> liftIO $ ioError err
-    Right (_, fs) -> ignore_cache
-     where
-      confs = filter isConf fs
+    isConf :: Path Abs File -> Bool
+    isConf f = case fileExtension f of
+      Nothing -> False
+      Just ext -> ext == ".conf"
 
-      isConf :: Path Abs File -> Bool
-      isConf f = case fileExtension f of
-        Nothing -> False
-        Just ext -> ext == ".conf"
-
-      ignore_cache :: RIO env (PackageDB mode)
-      ignore_cache = do
-        -- If we're opening for modification, we need to acquire a lock even if
-        -- we don't open the cache now, because we are going to modify it later.
-        lock <- liftIO $
-          F.mapM (const $ GhcPkg.lockPackageDb (prjSomeBase toFilePath cache)) mode
-        pkgs <- mapM parseSingletonPackageConf confs
-        mkPackageDB pkgs lock
+    ignore_cache :: RIO env (PackageDB mode)
+    ignore_cache = do
+      -- If we're opening for modification, we need to acquire a lock even if
+      -- we don't open the cache now, because we are going to modify it later.
+      lock <- liftIO $
+        F.mapM (const $ GhcPkg.lockPackageDb (prjSomeBase toFilePath cache)) mode
+      pkgs <- mapM parseSingletonPackageConf confs
+      mkPackageDB pkgs lock
  where
   cache = mapSomeBase (P.</> relFilePackageCache) path
 

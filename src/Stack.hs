@@ -82,9 +82,7 @@ main = do
     (nixOptsParser False)
     ("Only showing --" ++ nixCmdName ++ "* options.")
   currentDir <- getCurrentDirectory
-  eGlobalRun <-
-    try $ commandLineHandler currentDir progName mExecutablePath False
-  case eGlobalRun of
+  try (commandLineHandler currentDir progName mExecutablePath False) >>= \case
     Left (exitCode :: ExitCode) ->
       throwIO exitCode
     Right (globalMonoid, run) -> do
@@ -130,8 +128,7 @@ handleAnyPrettyException :: (Exception e, Pretty e) => e -> RIO Runner a
 handleAnyPrettyException e = do
   -- The code below loads the entire Stack configuration, when all that is
   -- needed are the Stack colours. A tailored approach may be better.
-  result <- tryAny $ withConfig NoReexec $ prettyError $ pretty e
-  case result of
+  tryAny (withConfig NoReexec $ prettyError $ pretty e) >>= \case
     -- Falls back to the command line's Stack colours if there is any error in
     -- loading the entire Stack configuration.
     Left _ -> prettyError $ pretty e

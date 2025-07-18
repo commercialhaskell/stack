@@ -226,15 +226,13 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
     (liftIO . fmap nubOrd . mapMaybeM toInterfaceOpt) dumpPackages
   unless (null interfaceOpts) $ do
     let destIndexFile = haddockIndexFile destDir
-    eindexModTime <- liftIO (tryGetModificationTime destIndexFile)
-    let needUpdate =
-          case eindexModTime of
-            Left _ -> True
-            Right indexModTime ->
-              or [ mt > indexModTime
-                 | mt <- map (.srcInterfaceFileModTime) interfaceOpts
-                 ]
         prettyDescr = style Current (fromString $ T.unpack descr)
+    needUpdate <- liftIO (tryGetModificationTime destIndexFile) <&> \case
+      Left _ -> True
+      Right indexModTime ->
+        or [ mt > indexModTime
+           | mt <- map (.srcInterfaceFileModTime) interfaceOpts
+           ]
     if needUpdate
       then do
         prettyInfo $
@@ -342,27 +340,24 @@ generateHaddockIndex descr bco dumpPackages docRelFP destDir = do
               "-i" : intersperse "-i" (interfaces : compInterfaces)
         destInterfaceFile <-
           parseCollapsedAbsFile (toFilePath destDir FP.</> destInterfaceRelFP)
-        eSrcInterfaceFileModTime <- tryGetModificationTime srcInterfaceFile
-        pure $
-          case eSrcInterfaceFileModTime of
-            Left _ -> Nothing
-            Right srcInterfaceFileModTime ->
-              Just InterfaceOpt
-                { readInterfaceArgs
-                , srcInterfaceFileModTime
-                , srcInterfaceFile
-                , destInterfaceFile
-                }
+        tryGetModificationTime srcInterfaceFile <&> \case
+          Left _ -> Nothing
+          Right srcInterfaceFileModTime ->
+            Just InterfaceOpt
+              { readInterfaceArgs
+              , srcInterfaceFileModTime
+              , srcInterfaceFile
+              , destInterfaceFile
+              }
   copyPkgDocs :: InterfaceOpt -> IO ()
-  copyPkgDocs opts = do
+  copyPkgDocs opts =
   -- Copy dependencies' haddocks to documentation directory.  This way,
   -- relative @../$pkg-$ver@ links work and it's easy to upload docs to a web
   -- server or otherwise view them in a non-local-filesystem context. We copy
   -- instead of symlink for two reasons: (1) symlinks aren't reliably supported
   -- on Windows, and (2) the filesystem containing dependencies' docs may not be
   -- available where viewing the docs (e.g. if building in a Docker container).
-    edestInterfaceModTime <- tryGetModificationTime opts.destInterfaceFile
-    case edestInterfaceModTime of
+    tryGetModificationTime opts.destInterfaceFile >>= \case
       Left _ -> doCopy
       Right destInterfaceModTime
         | destInterfaceModTime < opts.srcInterfaceFileModTime -> doCopy

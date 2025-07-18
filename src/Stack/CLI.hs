@@ -658,8 +658,7 @@ secondaryCommandHandler args f =
   if elem pathSeparator cmd || "-" `L.isPrefixOf` NE.head args
      then pure f
   else do
-    mExternalExec <- D.findExecutable cmd
-    case mExternalExec of
+    D.findExecutable cmd >>= \case
       Just ex -> withProcessContextNoLogging $ do
         -- TODO show the command in verbose mode
         -- hPutStrLn stderr $ unwords $

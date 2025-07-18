@@ -47,22 +47,21 @@ instance Exception PagerException where
 -- | Run pager, providing a function that writes to the pager's input.
 pageWriter :: (Handle -> IO ()) -> IO ()
 pageWriter writer = do
-  mpager <- runMaybeT $ cmdspecFromEnvVar
-                    <|> cmdspecFromExeName "less"
-                    <|> cmdspecFromExeName "more"
-  case mpager of
-    Just pager ->
-      do (Just h,_,_,procHandle) <- createProcess pager
-                                      { std_in = CreatePipe
-                                      , close_fds = True
-                                      , delegate_ctlc = True
-                                      }
-         (_ :: Either IOException ()) <- try (do writer h
-                                                 hClose h)
-         exit <- waitForProcess procHandle
-         case exit of
-           ExitSuccess -> pure ()
-           ExitFailure n -> throwIO (PagerExitFailure (cmdspec pager) n)
+  let alternatives =
+            cmdspecFromEnvVar
+        <|> cmdspecFromExeName "less"
+        <|> cmdspecFromExeName "more"
+  runMaybeT alternatives >>= \case
+    Just pager -> do
+      (Just h,_,_,procHandle) <- createProcess pager
+                                   { std_in = CreatePipe
+                                   , close_fds = True
+                                   , delegate_ctlc = True
+                                   }
+      (_ :: Either IOException ()) <- try (do writer h; hClose h)
+      waitForProcess procHandle >>= \case
+        ExitSuccess -> pure ()
+        ExitFailure n -> throwIO (PagerExitFailure (cmdspec pager) n)
     Nothing -> writer stdout
  where
   cmdspecFromEnvVar = shell <$> MaybeT (lookupEnv "PAGER")

@@ -747,8 +747,7 @@ prettyPath ::
      (MonadIO m, RelPath (Path r t) ~ Path Rel t, AnyPath (Path r t))
   => Path r t
   -> m FilePath
-prettyPath path = do
-  eres <- liftIO $ try $ makeRelativeToCurrentDir path
-  pure $ case eres of
+prettyPath path =
+  liftIO (try $ makeRelativeToCurrentDir path) <&> \case
     Left (_ :: PathException) -> toFilePath path
     Right res -> toFilePath res

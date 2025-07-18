@@ -236,11 +236,10 @@ hoogleCmd (args, setup, rebuild, startServer) =
   ensureHoogleInPath = do
     config <- view configL
     menv <- liftIO $ config.processContextSettings envSettings
-    mHooglePath' <- eitherToMaybe <$> runRIO menv (findExecutable "hoogle")
-    let mHooglePath'' =
+    mHooglePath <- eitherToMaybe <$> runRIO menv (findExecutable "hoogle")
+    let mHooglePath' =
           eitherToMaybe <$> requiringHoogle NotMuted (findExecutable "hoogle")
-    mHooglePath <- maybe mHooglePath'' (pure . Just) mHooglePath'
-    eres <- case mHooglePath of
+    eres <- maybe mHooglePath' (pure . Just) mHooglePath >>= \case
       Nothing -> pure $ Left (flow "Hoogle isn't installed.")
       Just hooglePath -> do
         result <- withProcessContext menv

@@ -33,9 +33,8 @@ instance FromJSON ColorWhen where
                  "option are 'never', 'always', or 'auto'.")
 
 readColorWhen :: ReadM ColorWhen
-readColorWhen = do
-  s <- OA.readerAsk
-  case s of
+readColorWhen =
+  OA.readerAsk >>= \case
     "never" -> pure ColorNever
     "always" -> pure ColorAlways
     "auto" -> pure ColorAuto

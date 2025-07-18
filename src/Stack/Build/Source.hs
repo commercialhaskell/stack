@@ -542,9 +542,8 @@ addUnlistedToBuildCache pkg cabalFP nonLibComponents buildCaches = do
     pure ((component, addBuildCache), warnings)
   pure (M.fromList (map fst results), concatMap snd results)
  where
-  addFileToCache fp = do
-    mdigest <- getFileDigestMaybe fp
-    case mdigest of
+  addFileToCache fp =
+    getFileDigestMaybe fp >>= \case
       Nothing -> pure Map.empty
       Just digest' -> pure $ Map.singleton fp $ FileCacheInfo digest'
 

@@ -368,8 +368,7 @@ withExecuteEnv
       -- No log files generated, nothing to dump
       [] -> pure ()
       firstLog:_ -> do
-        toDump <- view $ configL . to (.dumpLogs)
-        case toDump of
+        view (configL . to (.dumpLogs)) >>= \case
           DumpAllLogs -> mapM_ (dumpLog "") allLogs
           DumpWarningLogs -> mapM_ dumpLogIfWarning allLogs
           DumpNoLogs
@@ -391,9 +390,8 @@ withExecuteEnv
     when colors $ liftIO $ mapM_ (stripColors . snd) allLogs
    where
     drainChan :: STM [(Path Abs Dir, Path Abs File)]
-    drainChan = do
-      mx <- tryReadTChan chan
-      case mx of
+    drainChan =
+      tryReadTChan chan >>= \case
         Nothing -> pure []
         Just x -> do
           xs <- drainChan

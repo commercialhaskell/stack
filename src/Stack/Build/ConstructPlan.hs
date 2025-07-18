@@ -440,8 +440,7 @@ addFinal ::
      -- ^ Should Haddock documentation be built?
   -> M ()
 addFinal lp package allInOne buildHaddocks = do
-  depsRes <- addPackageDeps package
-  res <- case depsRes of
+  res <- addPackageDeps package >>= \case
     Left e -> pure $ Left e
     Right (MissingPresentDeps missing present _minLoc) -> do
       let pkgConfigOpts = ConfigureOpts.packageConfigureOptsFromPackage package
@@ -540,9 +539,8 @@ addDep name packageInfo = do
       -- FIXME Slightly hacky, no flags since they likely won't affect
       -- executable names. This code does not feel right.
       let version = installedVersion installed
-          askPkgLoc = liftRIO $ do
-            mrev <- getLatestHackageRevision YesRequireHackageIndex name version
-            case mrev of
+          askPkgLoc = liftRIO $
+            getLatestHackageRevision YesRequireHackageIndex name version >>= \case
               Nothing -> do
                 -- This could happen for GHC boot libraries missing from
                 -- Hackage.
@@ -712,9 +710,8 @@ resolveDepsAndInstall ::
   -> Package
   -> Maybe Installed
   -> M (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled = do
-  res <- addPackageDeps package
-  case res of
+resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled =
+  addPackageDeps package >>= \case
     Left err -> pure $ Left err
     Right deps ->
       Right <$>
@@ -809,8 +806,7 @@ addPackageDeps ::
 addPackageDeps package = do
   checkAndWarnForUnknownTools package
   let pkgId = packageIdentifier package
-  result <- processPackageDepsEither package (processDep pkgId)
-  pure $ case result of
+  processPackageDepsEither package (processDep pkgId) <&> \case
     -- Note that the Monoid for 'IsMutable' means that if any is 'Mutable',
     -- the result is 'Mutable'. Otherwise the result is 'Immutable'.
     Right v -> Right v
@@ -837,10 +833,9 @@ processDep ::
            MissingPresentDeps
        )
 processDep pkgId name value = do
-  eRes <- getCachedDepOrAddDep name
   let failure mLatestApp err =
         Left $ Map.singleton name (range, mLatestApp, err)
-  case eRes of
+  getCachedDepOrAddDep name >>= \case
     Left e -> do
       addParent
       let bd = case e of
@@ -1049,14 +1044,12 @@ checkDirtiness ps installed package present buildHaddocks = do
         | Just reason <- describeConfigDiff config oldOpts wantConfigCache ->
             pure $ Just reason
         | True <- psForceDirty ps -> pure $ Just "--force-dirty specified"
-        | otherwise -> do
-            dirty <- psDirty ps
-            pure $
-              case dirty of
-                Just files -> Just $
-                     "local file changes: "
-                  <> addEllipsis (T.pack $ unwords $ Set.toList files)
-                Nothing -> Nothing
+        | otherwise ->
+            psDirty ps <&> \case
+              Just files -> Just $
+                   "local file changes: "
+                <> addEllipsis (T.pack $ unwords $ Set.toList files)
+              Nothing -> Nothing
   case mreason of
     Nothing -> pure False
     Just reason -> do
@@ -1211,9 +1204,8 @@ toolWarningText (ToolWarning (ExeName toolName) pkgName') = fillSep
 inSnapshot :: PackageName -> Version -> M Bool
 inSnapshot name version = do
   ctx <- ask
-  pure $ fromMaybe False $ do
-    ps <- Map.lookup name ctx.combinedMap
-    case ps of
+  pure $ fromMaybe False $
+    Map.lookup name ctx.combinedMap >>= \case
       PIOnlySource (PSRemote _ srcVersion FromSnapshot _) ->
         pure $ srcVersion == version
       PIBoth (PSRemote _ srcVersion FromSnapshot _) _ ->

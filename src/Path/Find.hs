@@ -103,12 +103,10 @@ findInParents ::
      MonadIO m
   => (Path Abs Dir -> m (Maybe a))
   -> Path Abs Dir -> m (Maybe a)
-findInParents f path = do
-  mres <- f path
-  case mres of
-    Just res -> pure (Just res)
-    Nothing -> do
-      let next = parent path
-      if next == path
-        then pure Nothing
-        else findInParents f next
+findInParents f path = f path >>= \case
+  Just res -> pure (Just res)
+  Nothing -> do
+    let next = parent path
+    if next == path
+      then pure Nothing
+      else findInParents f next

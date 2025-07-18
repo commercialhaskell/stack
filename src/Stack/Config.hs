@@ -487,9 +487,8 @@ configFromConfigMonoid
     let stylesUpdate' = (configRunner' ^. stylesUpdateL) <>
           configMonoid.styles
         useColor' = configRunner'.useColor
-        mUseColor = do
-          colorWhen <- getFirst configMonoid.colorWhen
-          pure $ case colorWhen of
+        mUseColor =
+          getFirst configMonoid.colorWhen <&> \case
             ColorNever  -> False
             ColorAlways -> True
             ColorAuto  -> useAnsi
@@ -500,14 +499,12 @@ configFromConfigMonoid
           & useColorL .~ useColor''
         go = configRunner'.globalOpts
         pic = fromFirst  defaultPackageIndexConfig configMonoid.packageIndex
-    mpantryRoot <- liftIO $ lookupEnv pantryRootEnvVar
-    pantryRoot <-
-      case mpantryRoot of
-        Just dir ->
-          case parseAbsDir dir of
-            Nothing -> throwIO $ ParseAbsolutePathException pantryRootEnvVar dir
-            Just x -> pure x
-        Nothing -> pure $ stackRoot </> relDirPantry
+    pantryRoot <- liftIO (lookupEnv pantryRootEnvVar) >>= \case
+      Just dir ->
+        case parseAbsDir dir of
+          Nothing -> throwIO $ ParseAbsolutePathException pantryRootEnvVar dir
+          Just x -> pure x
+      Nothing -> pure $ stackRoot </> relDirPantry
     let snapLoc =
           case getFirst configMonoid.snapshotLocation of
             Nothing -> defaultSnapshotLocation
@@ -1082,12 +1079,11 @@ determineStackRootAndOwnership ::
   -- ^ Parsed command-line arguments
   -> m (Path Abs Dir, Path Abs Dir, Bool)
 determineStackRootAndOwnership clArgs = liftIO $ do
-  (configRoot, stackRoot) <- do
+  (configRoot, stackRoot) <-
     case getFirst clArgs.stackRoot of
       Just x -> pure (x, x)
-      Nothing -> do
-        mstackRoot <- lookupEnv stackRootEnvVar
-        case mstackRoot of
+      Nothing ->
+        lookupEnv stackRootEnvVar >>= \case
           Nothing -> do
             wantXdg <- fromMaybe "" <$> lookupEnv stackXdgEnvVar
             if not (null wantXdg)
@@ -1104,9 +1100,8 @@ determineStackRootAndOwnership clArgs = liftIO $ do
               throwIO $ ParseAbsolutePathException stackRootEnvVar x
             Just parsed -> pure (parsed, parsed)
 
-  (existingStackRootOrParentDir, userOwnsIt) <- do
-    mdirAndOwnership <- findInParents getDirAndOwnership stackRoot
-    case mdirAndOwnership of
+  (existingStackRootOrParentDir, userOwnsIt) <-
+    findInParents getDirAndOwnership stackRoot >>= \case
       Just x -> pure x
       Nothing -> throwIO (BadStackRoot stackRoot)
 
@@ -1129,9 +1124,8 @@ determineStackRootAndOwnership clArgs = liftIO $ do
 -- If the parent directory doesn't exist either,
 -- @'NoSuchDirectory' ('parent' dir)@ is thrown.
 checkOwnership :: MonadIO m => Path Abs Dir -> m ()
-checkOwnership dir = do
-  mdirAndOwnership <- firstJustM getDirAndOwnership [dir, parent dir]
-  case mdirAndOwnership of
+checkOwnership dir =
+  firstJustM getDirAndOwnership [dir, parent dir] >>= \case
     Just (_, True) -> pure ()
     Just (dir', False) -> throwIO (UserDoesn'tOwnDirectory dir')
     Nothing ->
@@ -1193,11 +1187,9 @@ loadConfigYaml ::
      HasLogFunc env
   => (Value -> Yaml.Parser (WithJSONWarnings a))
   -> Path Abs File -> RIO env a
-loadConfigYaml parser path = do
-  eres <- loadYaml parser path
-  case eres of
-    Left err -> prettyThrowM (ParseConfigFileException path err)
-    Right res -> pure res
+loadConfigYaml parser path = loadYaml parser path >>= \case
+  Left err -> prettyThrowM (ParseConfigFileException path err)
+  Right res -> pure res
 
 -- | Load and parse YAML from the given file.
 loadYaml ::
@@ -1205,9 +1197,8 @@ loadYaml ::
   => (Value -> Yaml.Parser (WithJSONWarnings a))
   -> Path Abs File
   -> RIO env (Either Yaml.ParseException a)
-loadYaml parser path = do
-  eres <- liftIO $ Yaml.decodeFileEither (toFilePath path)
-  case eres  of
+loadYaml parser path =
+  liftIO (Yaml.decodeFileEither (toFilePath path)) >>= \case
     Left err -> pure (Left err)
     Right val ->
       case Yaml.parseEither parser val of
@@ -1254,20 +1245,20 @@ loadProjectConfig ::
   => StackYamlLoc
      -- ^ Override stack.yaml
   -> RIO env (ProjectConfig (Project, Path Abs File, ConfigMonoid))
-loadProjectConfig mstackYaml = do
-  mfp <- getProjectConfig mstackYaml
-  case mfp of
-    PCProject fp -> do
-      currDir <- getCurrentDir
-      logDebug $ "Loading project config file " <>
-                  fromString (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
-      PCProject <$> load fp
-    PCGlobalProject -> do
-      logDebug "No project config file found, using defaults."
-      pure PCGlobalProject
-    PCNoProject extraDeps -> do
-      logDebug "Ignoring config files"
-      pure $ PCNoProject extraDeps
+loadProjectConfig mstackYaml = getProjectConfig mstackYaml >>= \case
+  PCProject fp -> do
+    currDir <- getCurrentDir
+    logDebug $
+         "Loading project config file "
+      <> fromString
+           (maybe (toFilePath fp) toFilePath (stripProperPrefix currDir fp))
+    PCProject <$> load fp
+  PCGlobalProject -> do
+    logDebug "No project config file found, using defaults."
+    pure PCGlobalProject
+  PCNoProject extraDeps -> do
+    logDebug "Ignoring config files"
+    pure $ PCNoProject extraDeps
  where
   load fp = do
     iopc <- loadConfigYaml (parseProjectAndConfigMonoid (parent fp)) fp

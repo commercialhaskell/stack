@@ -80,12 +80,10 @@ fileWatchConf cfg inner = do
                 (Map.zipWithMatched keepListening)
                 watch0
                 newDirs
-          watch1 <- forM (Map.toList actions) $ \(k, mmv) -> do
-            mv <- mmv
-            pure $
-              case mv of
-                Nothing -> Map.empty
-                Just v -> Map.singleton k v
+          watch1 <- forM (Map.toList actions) $ \(k, mmv) ->
+            mmv <&> \case
+              Nothing -> Map.empty
+              Just v -> Map.singleton k v
           atomically $ writeTVar watchVar $ Map.unions watch1
          where
           newDirs = Map.fromList $ map (, ())
@@ -203,8 +201,7 @@ runFileWatchHook buildResult hook =
           then ("sh", [toFilePath hook])
           else (toFilePath hook, [])
     menv <- view processContextL
-    exit <- withProcessContext menv $ proc cmd args runProcess
-    case exit of
+    withProcessContext menv $ proc cmd args runProcess >>= \case
       ExitSuccess -> pure ()
       ExitFailure i -> do
         prettyWarnL

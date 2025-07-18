@@ -399,8 +399,7 @@ findCandidate dirs name = do
   customPreprocessorExts <- view $ configL . to (.customPreprocessorExts)
   let haskellPreprocessorExts =
         haskellDefaultPreprocessorExts ++ customPreprocessorExts
-  candidates <- liftIO $ makeNameCandidates haskellPreprocessorExts
-  case candidates of
+  liftIO (makeNameCandidates haskellPreprocessorExts) >>= \case
     [candidate] -> pure (Just (cons candidate))
     [] -> do
       case name of
@@ -499,9 +498,8 @@ buildOtherSources build = do
   dir <- asks (parent . (.file))
   file <- asks (.file)
   let resolveDirFiles files toCabalPath =
-        forMaybeM files $ \fp -> do
-          result <- resolveDirFile dir fp
-          case result of
+        forMaybeM files $ \fp ->
+          resolveDirFile dir fp >>= \case
             Nothing -> do
               warnMissingFile "File" cwd fp file
               pure Nothing

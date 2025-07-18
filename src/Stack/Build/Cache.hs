@@ -340,13 +340,11 @@ getTestStatus dir = do
   fp <- testSuccessFile dir
   -- we could ensure the file is the right size first, but we're not expected an
   -- attack from the user's filesystem
-  eres <- tryIO (readFileBinary $ toFilePath fp)
-  pure $
-    case eres of
-      Right bs
-        | bs == successBS -> TSSuccess
-        | bs == failureBS -> TSFailure
-      _ -> TSUnknown
+  tryIO (readFileBinary $ toFilePath fp) <&> \case
+    Right bs
+      | bs == successBS -> TSSuccess
+      | bs == failureBS -> TSFailure
+    _ -> TSUnknown
 
 --------------------------------------
 -- Precompiled Cache

@@ -243,14 +243,12 @@ parseConfigMonoidObject rootDir obj = do
   hideTHLoading <- FirstTrue <$> obj ..:? configMonoidHideTHLoadingName
   prefixTimestamps <- First <$> obj ..:? configMonoidPrefixTimestampsName
 
-  murls :: Maybe Value <- obj ..:? configMonoidUrlsName
-  latestSnapshot <-
-    case murls of
-      Nothing -> pure $ First Nothing
-      Just urls -> jsonSubWarnings $ lift $ withObjectWarnings
-        "urls"
-        (\o -> First <$> o ..:? "latest-snapshot" :: WarningParser (First Text))
-        urls
+  latestSnapshot <- obj ..:? configMonoidUrlsName >>= \case
+    Nothing -> pure $ First Nothing
+    Just urls -> jsonSubWarnings $ lift $ withObjectWarnings
+      "urls"
+      (\o -> First <$> o ..:? "latest-snapshot" :: WarningParser (First Text))
+      (urls :: Value)
 
   packageIndex <-
     First <$> jsonSubWarningsT (obj ..:?  configMonoidPackageIndexName)
@@ -281,14 +279,12 @@ parseConfigMonoidObject rootDir obj = do
   concurrentTests <- First <$> obj ..:? configMonoidConcurrentTestsName
   localBinPath <- First <$> obj ..:? configMonoidLocalBinPathName
   fileWatchHook <- First <$> obj ..:? configMonoidFileWatchHookName
-  templates <- obj ..:? "templates"
-  (scmInit, templateParameters) <-
-    case templates of
-      Nothing -> pure (First Nothing,M.empty)
-      Just tobj -> do
-        scmInit <- tobj ..:? configMonoidScmInitName
-        params <- tobj ..:? configMonoidTemplateParametersName
-        pure (First scmInit,fromMaybe M.empty params)
+  (scmInit, templateParameters) <- obj ..:? "templates" >>= \case
+    Nothing -> pure (First Nothing,M.empty)
+    Just tobj -> do
+      scmInit <- tobj ..:? configMonoidScmInitName
+      params <- tobj ..:? configMonoidTemplateParametersName
+      pure (First scmInit,fromMaybe M.empty params)
   compilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
   compilerRepository <- First <$> (obj ..:? configMonoidCompilerRepositoryName)
 

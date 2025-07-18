@@ -298,9 +298,8 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
               [ ("ghc", toFilePath cp.compiler)
               , ("ghc-pkg", toFilePath pkgPath)
               ]
-    exes <- forM programNames $ \(name, file) -> do
-      mpath <- findExecutable file
-      pure $ case mpath of
+    exes <- forM programNames $ \(name, file) ->
+      findExecutable file <&> \case
         Left _ -> []
         Right x -> pure $ concat ["--with-", name, "=", x]
     let allOpts =
@@ -640,8 +639,7 @@ realConfigAndBuild
           && (hasLibrary || hasSubLibraries || hasExecutables)
     when shouldCopy $ withMVar ee.installLock $ \() -> do
       announce "copy/register"
-      eres <- try $ cabal KeepTHLoading $ "copy" : copyOpts
-      case eres of
+      try (cabal KeepTHLoading $ "copy" : copyOpts) >>= \case
         Left err@CabalExitedUnsuccessfully{} ->
           throwM $ CabalCopyFailed
                      (package.buildType == C.Simple)
@@ -734,8 +732,7 @@ fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
         package.subLibraries
         foldSubLibToMap
         mempty
-      mGhcPkgId <- ghcPkgIdLoader Nothing
-      case mGhcPkgId of
+      ghcPkgIdLoader Nothing >>= \case
         Nothing -> throwM $ Couldn'tFindPkgId package.name
         Just ghcPkgId -> pure $ simpleInstalledLib pkgId ghcPkgId subLibsPkgIds
     else do
@@ -803,12 +800,8 @@ getPrecompiled ::
   -> RIO env (Maybe (PrecompiledCache Abs))
 getPrecompiled cache taskType bcoSnapInstallRoot =
   case taskType of
-    TTRemotePackage Immutable _ loc -> do
-      mpc <- readPrecompiledCache
-                loc
-                cache.configureOpts
-                cache.buildHaddocks
-      case mpc of
+    TTRemotePackage Immutable _ loc ->
+      readPrecompiledCache loc cache.configureOpts cache.buildHaddocks >>= \case
         Nothing -> pure Nothing
         -- Only pay attention to precompiled caches that refer to packages
         -- within the snapshot.
@@ -926,8 +919,8 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
         case mpkgid of
           Nothing -> assert False $ Executable pkgId
           Just pkgid -> simpleInstalledLib pkgId pkgid mempty
-  where
-    bindir = ee.baseConfigOpts.snapInstallRoot </> bindirSuffix
+ where
+  bindir = ee.baseConfigOpts.snapInstallRoot </> bindirSuffix
 
 loadInstalledPkg ::
      (HasCompiler env, HasProcessContext env, HasTerm env)
@@ -952,16 +945,15 @@ fulfillHaddockExpectations ::
   -> (KeepOutputOpen -> m ())
   -> m ()
 fulfillHaddockExpectations pname mcurator action
-  | expectHaddockFailure mcurator = do
-      eres <- tryAny $ action KeepOpen
-      case eres of
+  | expectHaddockFailure mcurator =
+      tryAny (action KeepOpen) >>= \case
         Right () -> prettyWarnL
           [ style Current (fromPackageName pname) <> ":"
           , flow "unexpected Haddock success."
           ]
         Left _ -> pure ()
-  where
-    expectHaddockFailure = maybe False (Set.member pname . (.expectHaddockFailure))
+ where
+  expectHaddockFailure = maybe False (Set.member pname . (.expectHaddockFailure))
 fulfillHaddockExpectations _ _ action = action CloseOnException
 
 -- | Check if any unlisted files have been found, and add them to the build cache.
@@ -1011,9 +1003,8 @@ singleTest topts testsToRun ac ee task installedMap = do
         if topts.runTests
           then if topts.rerunTests
             then pure True
-            else do
-              status <- getTestStatus pkgDir
-              case status of
+            else
+              getTestStatus pkgDir >>= \case
                 TSSuccess -> do
                   unless (null testsToRun) $
                     announce "skipping already passed test"
@@ -1377,9 +1368,8 @@ fulfillCuratorBuildExpectations ::
   -> RIO env b
   -> RIO env b
 fulfillCuratorBuildExpectations pname mcurator enableTests _ defValue action
-  | enableTests && expectTestFailure pname mcurator = do
-      eres <- tryAny action
-      case eres of
+  | enableTests && expectTestFailure pname mcurator =
+      tryAny action >>= \case
         Right res -> do
           prettyWarnL
             [ style Current (fromPackageName pname) <> ":"
@@ -1388,9 +1378,8 @@ fulfillCuratorBuildExpectations pname mcurator enableTests _ defValue action
           pure res
         Left _ -> pure defValue
 fulfillCuratorBuildExpectations pname mcurator _ enableBench defValue action
-  | enableBench && expectBenchmarkFailure pname mcurator = do
-      eres <- tryAny action
-      case eres of
+  | enableBench && expectBenchmarkFailure pname mcurator =
+      tryAny action >>= \case
         Right res -> do
           prettyWarnL
             [ style Current (fromPackageName pname) <> ":"

@@ -464,9 +464,8 @@ settingsFromRepoTemplatePath (RepoTemplatePath GitHub user name) = do
         , T.unpack name
         ]
     , basicAuth = mBasicAuth
-    , extract = \bs -> do
-        decodedJson <- eitherDecode (LB.fromStrict bs)
-        case decodedJson of
+    , extract = \bs ->
+        eitherDecode (LB.fromStrict bs) >>= \case
           Object o | Just (String content) <- KeyMap.lookup "content" o -> do
             let noNewlines = T.filter (/= '\n')
             bsContent <- B64.decode $ T.encodeUtf8 (noNewlines content)

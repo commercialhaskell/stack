@@ -163,8 +163,7 @@ parseRawTargetDirs root locals ri =
   case parseRawTarget t of
     Just rt -> pure $ Right [(ri, rt)]
     Nothing -> do
-      mdir <- forgivingResolveDir root (T.unpack t) >>= rejectMissingDir
-      case mdir of
+      forgivingResolveDir root (T.unpack t) >>= rejectMissingDir >>= \case
         Nothing -> pure $ Left $
           if | T.isPrefixOf "stack-yaml=" t -> projectOptionTypo
              | T.isSuffixOf ".yaml" t -> projectYamlExtTypo
@@ -436,9 +435,8 @@ resolveRawTarget sma allLocs (rawInput, rt) =
                      \extra-deps."
               ]
           -- Not present at all, add it from Hackage
-          Nothing -> do
-            mrev <- getLatestHackageRevision YesRequireHackageIndex name version
-            pure $ case mrev of
+          Nothing ->
+            getLatestHackageRevision YesRequireHackageIndex name version <&> \case
               Nothing -> Left $
                 fillSep
                   [ flow "Stack did not know the location of a package named"
@@ -456,10 +454,8 @@ resolveRawTarget sma allLocs (rawInput, rt) =
                 , packageType = PTDependency
                 }
 
-  hackageLatest name = do
-    mloc <-
-      getLatestHackageLocation YesRequireHackageIndex name UsePreferredVersions
-    pure $ case mloc of
+  hackageLatest name =
+    getLatestHackageLocation YesRequireHackageIndex name UsePreferredVersions <&> \case
       Nothing -> deferToConstructPlan name
       Just loc ->
         Right ResolveResult
@@ -470,10 +466,9 @@ resolveRawTarget sma allLocs (rawInput, rt) =
           , packageType = PTDependency
           }
 
-  hackageLatestRevision name version versionLoc = do
-    mrev <- getLatestHackageRevision YesRequireHackageIndex name version
-    pure $ case mrev of
-      Nothing ->  Left $
+  hackageLatestRevision name version versionLoc =
+    getLatestHackageRevision YesRequireHackageIndex name version <&> \case
+      Nothing -> Left $
         fillSep
           [ flow "Stack knows the location of"
           , style Current (fromPackageId pkgId')

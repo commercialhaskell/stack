@@ -327,9 +327,7 @@ memoizeRefWith :: MonadIO m => RIO env a -> m (MemoizedWith env a)
 memoizeRefWith action = do
   ref <- newIORef Nothing
   pure $ MemoizedWith $ do
-    mres <- readIORef ref
-    res <-
-      case mres of
+    res <- readIORef ref >>= \case
         Just res -> pure res
         Nothing -> do
           res <- tryAny action

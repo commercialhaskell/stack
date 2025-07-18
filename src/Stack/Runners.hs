@@ -89,11 +89,9 @@ instance Exception RunnersException where
 
 -- | Ensure that no project settings are used when running 'withConfig'.
 withGlobalProject :: RIO Runner a -> RIO Runner a
-withGlobalProject inner = do
-  oldSYL <- view stackYamlLocL
-  case oldSYL of
-    SYLDefault -> local (set stackYamlLocL SYLGlobalProject) inner
-    _ -> throwIO CommandInvalid
+withGlobalProject inner = view stackYamlLocL >>= \case
+  SYLDefault -> local (set stackYamlLocL SYLGlobalProject) inner
+  _ -> throwIO CommandInvalid
 
 -- | Helper for 'withEnvConfig' which passes in some default arguments:
 --
@@ -153,9 +151,8 @@ reexec :: RIO Config a -> RIO Config a
 reexec inner = do
   nixEnable' <- asks $ (.nix.enable)
   notifyIfNixOnPath <- asks (.notifyIfNixOnPath)
-  when (not nixEnable' && notifyIfNixOnPath) $ do
-    eNix <- findExecutable nixProgName
-    case eNix of
+  when (not nixEnable' && notifyIfNixOnPath) $
+    findExecutable nixProgName >>= \case
       Left _ -> pure ()
       Right nix -> proc nix ["--version"] $ \pc -> do
         let nixProgName' = style Shell (fromString nixProgName)
@@ -178,8 +175,7 @@ reexec inner = do
               <> blankLine
               <> muteMsg
               <> line
-        res <- tryAny (readProcess pc)
-        case res of
+        tryAny (readProcess pc) >>= \case
           Left e -> reportErr (ppException e)
           Right (ec, out, err) -> case ec of
             ExitFailure _ -> reportErr $ string (L8.unpack err)
@@ -224,21 +220,20 @@ reexec inner = do
 -- action.
 withRunnerGlobal :: GlobalOpts -> RIO Runner a -> IO a
 withRunnerGlobal go inner = do
-  colorWhen <-
-    maybe defaultColorWhen pure $
-    getFirst go.configMonoid.colorWhen
-  useColor <- case colorWhen of
-    ColorNever -> pure False
-    ColorAlways -> pure True
-    ColorAuto -> hNowSupportsANSI stderr
-  termWidth <- clipWidth <$> maybe (fromMaybe defaultTerminalWidth
-                                    <$> getTerminalWidth)
-                                   pure go.termWidthOpt
+  useColor <-
+    maybe defaultColorWhen pure (getFirst go.configMonoid.colorWhen) >>= \case
+      ColorNever -> pure False
+      ColorAlways -> pure True
+      ColorAuto -> hNowSupportsANSI stderr
+  termWidth <- clipWidth <$> maybe
+    (fromMaybe defaultTerminalWidth <$> getTerminalWidth)
+    pure
+    go.termWidthOpt
   menv <- mkDefaultProcessContext
   -- MVar used to ensure the Docker entrypoint is performed exactly once.
   dockerEntrypointMVar <- newMVar False
   let update = go.stylesUpdate
-  withNewLogFunc go useColor update $ \logFunc -> do
+  withNewLogFunc go useColor update $ \logFunc ->
     runRIO Runner
       { globalOpts = go
       , useColor = useColor
@@ -262,7 +257,8 @@ shouldUpgradeCheck = do
     let yesterday = addUTCTime (-(24 * 60 * 60)) now
     checks <- upgradeChecksSince yesterday
     when (checks == 0) $ do
-      mversion <- getLatestHackageVersion NoRequireHackageIndex "stack" UsePreferredVersions
+      mversion <-
+        getLatestHackageVersion NoRequireHackageIndex "stack" UsePreferredVersions
       case mversion of
         -- Compare the minor version so we avoid patch-level, Hackage-only releases.
         -- See: https://github.com/commercialhaskell/stack/pull/4729#pullrequestreview-227176315

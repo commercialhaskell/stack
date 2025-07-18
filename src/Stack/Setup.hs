@@ -1111,11 +1111,9 @@ ensureMsys ::
   -> Memoized SetupInfo
   -> RIO env (Maybe Tool)
 ensureMsys sopts getSetupInfo' = do
-  platform <- view platformL
   localPrograms <- view $ configL . to (.localPrograms)
   installed <- listInstalled localPrograms
-
-  case platform of
+  view platformL >>= \case
     Platform _ Cabal.Windows | not sopts.skipMsys ->
       case getInstalledTool installed (mkPackageName "msys2") (const True) of
         Just tool -> pure (Just tool)
@@ -1659,8 +1657,7 @@ buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId fla
                    "ghc-" `isPrefixOf` toFilePath (filename p)
                 && extension == ".xz"
 
-        mbindist <- filterM isBindist files
-        case mbindist of
+        filterM isBindist files >>= \case
           [bindist] -> do
             let bindist' = T.pack (toFilePath bindist)
                 dlinfo = DownloadInfo
@@ -1720,8 +1717,7 @@ getGhcBuilds = do
     -- Of course, could also try to make a static GHC bindist instead of all
     -- this rigamarole.
 
-    platform <- view platformL
-    case platform of
+    view platformL >>= \case
       Platform _ Cabal.Linux -> do
         -- Some systems don't have ldconfig in the PATH, so make sure to look in
         -- /sbin and /usr/sbin as well
@@ -1757,8 +1753,7 @@ getGhcBuilds = do
               libD = fromString (toFilePath lib)
               libT = T.pack (toFilePath lib)
             hasMatches lib dirs = do
-              matches <- filterM (doesFileExist . (</> lib)) dirs
-              case matches of
+              filterM (doesFileExist . (</> lib)) dirs >>= \case
                 [] ->
                      logDebug
                        (  "Did not find shared library "
@@ -1775,15 +1770,12 @@ getGhcBuilds = do
                   >> pure True
              where
               libD = fromString (toFilePath lib)
-            getLibc6Version = do
-              elddOut <-
-                -- On Alpine Linux, 'ldd --version' will send output to stderr,
-                -- which we wish to smother.
-                proc "ldd" ["--version"] $ tryAny . readProcess_
-              pure $ case elddOut of
+            getLibc6Version =
+              -- On Alpine Linux, 'ldd --version' will send output to stderr,
+              -- which we wish to smother.
+              proc "ldd" ["--version"] (tryAny . readProcess_) <&> \case
                 Right (lddOut, _) ->
-                  let lddOut' =
-                        decodeUtf8Lenient (LBS.toStrict lddOut)
+                  let lddOut' = decodeUtf8Lenient (LBS.toStrict lddOut)
                   in  case P.parse lddVersion lddOut' of
                         P.Done _ result -> Just result
                         _ -> Nothing
@@ -2136,11 +2128,10 @@ getGhcKey ::
   -> RIO env Text
 getGhcKey ghcBuild = do
   ghcVariant <- view ghcVariantL
-  wantedComiler <- view $ buildConfigL . to (.smWanted.compiler)
-  ghcVersion <- case wantedComiler of
-        WCGhc version -> pure version
-        WCGhcjs _ _ ->  throwIO GhcjsNotSupported
-        WCGhcGit _ _ -> throwIO DownloadAndInstallCompilerError
+  ghcVersion <- view (buildConfigL . to (.smWanted.compiler)) >>= \case
+    WCGhc version -> pure version
+    WCGhcjs _ _ ->  throwIO GhcjsNotSupported
+    WCGhcGit _ _ -> throwIO DownloadAndInstallCompilerError
   let variantSuffix = ghcVariantSuffix ghcVariant
       buildSuffix = compilerBuildSuffix ghcBuild
       ghcDir = style Dir $ mconcat
@@ -2160,10 +2151,8 @@ getOSKey ::
   -> StyleDoc
      -- ^ Description of the root directory of the tool.
   -> RIO env Text
-getOSKey tool toolDir = do
-  programsDir <- view $ configL . to (.localPrograms)
-  platform <- view platformL
-  case platform of
+getOSKey tool toolDir =
+  view platformL >>= \case
     Platform I386                  Cabal.Linux   -> pure "linux32"
     Platform X86_64                Cabal.Linux   -> pure "linux64"
     Platform I386                  Cabal.OSX     -> pure "macosx"
@@ -2179,7 +2168,8 @@ getOSKey tool toolDir = do
     Platform Sparc                 Cabal.Linux   -> pure "linux-sparc"
     Platform AArch64               Cabal.OSX     -> pure "macosx-aarch64"
     Platform AArch64               Cabal.FreeBSD -> pure "freebsd-aarch64"
-    Platform arch os ->
+    Platform arch os -> do
+      programsDir <- view $ configL . to (.localPrograms)
       prettyThrowM $ UnsupportedSetupCombo os arch tool toolDir programsDir
 
 downloadOrUseLocal ::
@@ -2374,9 +2364,8 @@ instance Applicative (CheckDependency env) where
 
 instance Alternative (CheckDependency env) where
   empty = CheckDependency $ pure $ Left []
-  CheckDependency x <|> CheckDependency y = CheckDependency $ do
-    res1 <- x
-    case res1 of
+  CheckDependency x <|> CheckDependency y = CheckDependency $
+    x >>= \case
       Left _ -> y
       Right x' -> pure $ Right x'
 
@@ -2486,9 +2475,8 @@ expectSingleUnpackedDir ::
   => Path Abs File
   -> Path Abs Dir
   -> m (Path Abs Dir)
-expectSingleUnpackedDir archiveFile unpackDir = do
-  contents <- listDir unpackDir
-  case contents of
+expectSingleUnpackedDir archiveFile unpackDir =
+  listDir unpackDir >>= \case
     ([dir], _ ) -> pure dir
     _ -> prettyThrowIO $ UnknownArchiveStructure archiveFile
 
@@ -2954,9 +2942,7 @@ performPathChecking newExeFile currExeFile = do
       , pretty currExeFile <> "."
       ]
     tmpFile <- toFilePath <$> addExtension ".tmp" currExeFile
-    eres <- tryIO $
-      relocateStackExeFile currExeFile newExeFile currExeFile
-    case eres of
+    tryIO (relocateStackExeFile currExeFile newExeFile currExeFile) >>= \case
       Right () -> prettyInfoS "Stack executable copied successfully!"
       Left e
         | isPermissionError e -> if osIsWindows

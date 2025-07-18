@@ -229,14 +229,12 @@ runContainerAndExit = do
     ( prettyWarnS
         "Using boot2docker is NOT supported, and not likely to perform well."
     )
-  maybeImageInfo <- inspect image
-  imageInfo <- case maybeImageInfo of
+  imageInfo <- inspect image >>= \case
     Just ii -> pure ii
     Nothing
       | docker.autoPull -> do
           pullImage docker image
-          mii2 <- inspect image
-          case mii2 of
+          inspect image >>= \case
             Just ii2 -> pure ii2
             Nothing -> throwM (InspectFailedException image)
       | otherwise -> throwM (NotPulledException image)
@@ -342,23 +340,22 @@ runContainerAndExit = do
         , args
         ]
       )
-  e <- handleSignals docker keepStdinOpen containerID
-  case e of
+  handleSignals docker keepStdinOpen containerID >>= \case
     Left ExitCodeException{eceExitCode} -> exitWith eceExitCode
     Right () -> exitSuccess
-  where
-    -- This is using a hash of the Docker repository (without tag or digest) to
-    -- ensure binaries/libraries aren't shared between Docker and host (or
-    -- incompatible Docker images)
-    hashRepoName :: String -> Hash.Digest Hash.MD5
-    hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
-    lookupImageEnv name vars =
-      case lookup name vars of
-        Just ('=':val) -> Just val
-        _ -> Nothing
-    mountArg mountSuffix (Mount host container) =
-      ["-v",host ++ ":" ++ container ++ mountSuffix]
-    sshRelDir = relDirDotSsh
+ where
+  -- This is using a hash of the Docker repository (without tag or digest) to
+  -- ensure binaries/libraries aren't shared between Docker and host (or
+  -- incompatible Docker images)
+  hashRepoName :: String -> Hash.Digest Hash.MD5
+  hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
+  lookupImageEnv name vars =
+    case lookup name vars of
+      Just ('=':val) -> Just val
+      _ -> Nothing
+  mountArg mountSuffix (Mount host container) =
+    ["-v",host ++ ":" ++ container ++ mountSuffix]
+  sshRelDir = relDirDotSsh
 
 -- | Inspect Docker image or container.
 inspect ::
