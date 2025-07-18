@@ -3,24 +3,14 @@
 # Copyright (c) 2023 Microsoft Corporation
 # Distributed under the terms of the MIT License.
 #
-# https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials
 # https://docs.github.com/en/authentication/connecting-to-github-with-ssh/working-with-ssh-key-passphrases?platform=windows
 #
-# Modified by b-data for seamless use with development containers.
+# Modified by b-data for seamless integration with development containers on Linux/macOS.
 
 set -e
 
-if [ -z "$CODESPACES" ] && [ "$(command -v ssh-agent)" ]; then
-  if [ -z "$SSH_AUTH_SOCK" ]; then
-    # Check for a currently running instance of the agent
-    RUNNING_AGENT="$(pgrep -f 'ssh-agent -s' | wc -l | tr -d '[:space:]')"
-    if [ "$RUNNING_AGENT" = "0" ] || [ ! -f "$HOME/.ssh/ssh-agent" ]; then
-      mkdir -p -m 0700 "$HOME/.ssh"
-      # Launch a new instance of the agent
-      ssh-agent -s &> "$HOME/.ssh/ssh-agent"
-    fi
-    eval "$(cat "$HOME/.ssh/ssh-agent")" > /dev/null
-  fi
+# Do not execute on GitHub Codespaces
+if [ -z "$CODESPACES" ]; then
   # Check the state of the currently running instance of the agent
   # 0: running with key(s); 1: running w/o key(s); 2: not running
   AGENT_RUN_STATE="$(ssh-add -l > /dev/null 2>&1; echo $?)"
@@ -30,3 +20,20 @@ if [ -z "$CODESPACES" ] && [ "$(command -v ssh-agent)" ]; then
   fi
   # Means: Not adding key(s) to a forwarded agent with key(s)
 fi
+
+# https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials
+#
+# On Linux: For an X session, the agent is usually started automatically.
+#           For a login session, add the following to your `~/.bash_profile`
+#           or `~/.zprofile`:
+# 
+# if [ -z "$SSH_AUTH_SOCK" ]; then
+#   # Check for a currently running instance of the agent
+#   RUNNING_AGENT="$(pgrep -f 'ssh-agent -s' -u "$USER" | wc -l | tr -d '[:space:]')"
+#   if [ "$RUNNING_AGENT" = "0" ]; then
+#     mkdir -p -m 0700 "$HOME/.ssh"
+#     # Launch a new instance of the agent
+#     ssh-agent -s &> "$HOME/.ssh/ssh-agent"
+#   fi
+#   eval "$(cat "$HOME/.ssh/ssh-agent")" > /dev/null
+# fi
