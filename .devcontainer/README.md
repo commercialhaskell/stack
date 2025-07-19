@@ -1,9 +1,8 @@
 # Dev Containers
 
 For further information, see
-[haskellstack.org](https://docs.haskellstack.org): Stack's code (advanced) \>
-Contributors \> Dev Containers or
-[../doc/dev_containers.md](../doc/dev_containers.md).
+[haskellstack.org](https://docs.haskellstack.org): Get involved \> Contributors
+\> Dev Containers or [../doc/dev_containers.md](../doc/dev_containers.md).
 
 ## License
 

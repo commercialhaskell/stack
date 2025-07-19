@@ -17,16 +17,16 @@ Stack provides the following Dev Containers:
 
 Stack's Dev Containers provide the following tools:
 
-1.  The
-    [Haskell Toolchain](https://www.haskell.org/ghcup/install/#supported-tools)
-    ([GHC](https://www.haskell.org/ghc), Stack,
-    [Cabal (the tool)](https://cabal.readthedocs.io) and
-    [HLS](https://haskell-language-server.readthedocs.io))
-2.  [Git](https://git-scm.com)
-3.  [HLint](https://hackage.haskell.org/package/hlint)
-4.  [yamllint](https://yamllint.readthedocs.io)
-5.  [ShellCheck](https://www.shellcheck.net)
-6.  [hadolint](https://github.com/hadolint/hadolint)
+1. The
+   [Haskell Toolchain](https://www.haskell.org/ghcup/install/#supported-tools)
+   ([GHC](https://www.haskell.org/ghc), Stack,
+   [Cabal (the tool)](https://cabal.readthedocs.io) and
+   [HLS](https://haskell-language-server.readthedocs.io))
+2. [Git](https://git-scm.com)
+3. [HLint](https://hackage.haskell.org/package/hlint)
+4. [yamllint](https://yamllint.readthedocs.io)
+5. [ShellCheck](https://www.shellcheck.net)
+6. [hadolint](https://github.com/hadolint/hadolint)
 
 The tools in the Haskell Toolchain are installed at `/usr/local/bin`. HLS is
 provided in the default Dev Container only.
@@ -47,7 +47,7 @@ extensions pre‑installed:
   (Default Dev Container only)
 * [GitHub Pull Requests and Issues](https://marketplace.visualstudio.com/items?itemName=GitHub.vscode-pull-request-github)
 * [GitLens — Git supercharged](https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens)
-    * Pinned to version 11.7.0 due to unsolicited AI content in recent versions
+  * Pinned to version 11.7.0 due to unsolicited AI content in recent versions
 * [Git Graph](https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph)
 * [ShellCheck](https://marketplace.visualstudio.com/items?itemName=timonwong.shellcheck)
 * [hadolint](https://marketplace.visualstudio.com/items?itemName=exiasr.hadolint)
@@ -63,12 +63,13 @@ These Docker images are multi‑architecture (`linux/amd64`, `linux/arm64/v8`)
 <nobr>*GHC musl*</nobr> images. They are based on Alpine Linux (that is
 [musl libc](https://musl.libc.org) and [BusyBox](https://www.busybox.net)).
 
-The images contain *unofficial* binary distributions of GHC (that is, ones not
-released by the GHC developers). That is because:
+The images contain *unofficial* and *untested* binary distributions of GHC (that
+is, ones not released by the GHC developers). That is because:
 
-1.  the official GHC binary distributions for Alpine Linux/x86_64 have known
-    bugs; and
-2.  there are no official binary distributions for Alpine Linux/AArch64.
+1. the official GHC binary distributions for Alpine Linux/x86_64 have
+   [known](https://gitlab.haskell.org/ghc/ghc/-/issues/23043)
+   [bugs](https://gitlab.haskell.org/ghc/ghc/-/issues/25093) ~~; and~~
+1. ~~there are no official binary distributions for Alpine Linux/AArch64.~~
 
 Stack's global configuration (`/etc/stack/config.yaml`) sets
 <nobr>`system-ghc: true`</nobr> and <nobr>`install-ghc: false`</nobr>. That
