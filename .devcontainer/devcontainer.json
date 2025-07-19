@@ -1,5 +1,5 @@
 {
-  "name": "Default",
+  "name": "GHC 9.10.2 (default)",
   "build": {
     "dockerfile": "GHC.Dockerfile",
     "args": {
