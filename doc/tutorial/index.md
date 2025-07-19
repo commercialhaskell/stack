@@ -8,9 +8,17 @@ title: Getting started
 
 Stack is a program for developing [Haskell](https://www.haskell.org/) projects.
 
-This guide to getting started takes a new Stack user through the ways that Stack
-is typically used. It will not teach Haskell or involve much code, and it
-requires no prior experience of Stack or other Haskell tools.
+You may be getting started with Haskell or you may only be getting started with
+Stack. If you are getting started with Haskell, you may already know other
+programming languages or you may be new to coding.
+
+This guide is aimed at people getting started with Stack. It takes a new Stack
+user through the ways that Stack is typically used. It requires no prior
+experience of Stack or other Haskell tools.
+
+This guide will not teach Haskell - other resources are better placed to do
+that - or involve much code. However, it does aim to be accessible to people who
+who are relatively inexperienced in coding with Haskell.
 
 Terms used in the guide will be explained as they are introduced and are also
 defined in the [glossary](../glossary.md).

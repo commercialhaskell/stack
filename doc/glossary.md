@@ -50,7 +50,7 @@ The following terms are used in Stack's documentation.
 |resolver            |A synonym for snapshot.                                  |
 |`Setup.hs`          |A project-specific file used by Cabal to perform setup tasks.|
 |snapshot            |A snapshot defines a version of GHC (and, implicitly, its boot packages), a set of packages (one version of each), Cabal flags and GHC options.|
-|Stack               |The Haskell Tool Stack project or its executable `stack`.|
+|Stack               |The Stack project or its executable `stack`.|
 |`stack.yaml`        |A project-level configuration file used by Stack, which may also contain non-project-specific options.|
 |Stackage            |A [distribution](https://www.stackage.org/) of compatible Haskell packages.|
 |Stack root          |A directory in which Stack stores important files. See `stack path --stack-root`. On Windows, or if Stack is configured to use the XDG Base Directory Specification, Stack also stores important files outside of the Stack root.|

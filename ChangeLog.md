@@ -860,8 +860,8 @@ Release notes:
 
 * We have reduced the number of platforms that we support with executable
   releases. The reason behind this is that we have been slowed down in our
-  release process until now with issues trying to build executables for less 
-  common platforms. In order to make sure we can address issues more quickly 
+  release process until now with issues trying to build executables for less
+  common platforms. In order to make sure we can address issues more quickly
   (like supporting new GHC versions), we are limiting support from the Stack
   team to:
 
@@ -3508,4 +3508,4 @@ Bug fixes:
 
 ## 0.0.1 - 2015-06-09
 
-* First public release, beta quality
+* First public release, as the Haskell Tool Stack (beta quality).
