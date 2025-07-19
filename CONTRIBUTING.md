@@ -415,8 +415,20 @@ stack exec -- sh ./etc/scripts/hlint.sh
 
 ## Code syntax
 
-Stack makes use of GHC's `GHC2021` collection of language extensions, which is
+Stack makes use of GHC's `GHC2024` collection of language extensions. That is
 set using the `language` key in the `package.yaml` file.
+
+The `GHC2024` edition enables the `MonoLocalBinds` language extension. Enabling
+the extension can change how GHC infers the types of local bindings (that is,
+let-bound or where-bound variables). When enabled it means that the types of a
+group of local bindings are not generalised unless:
+
+* any of its binders has a partial type signature; or
+
+* all of its free variables are closed. If a variable is closed then its type
+  definitely has no free type variables. A variable imported from another module
+  is closed. A variable that is let-bound and has an explicit type signature
+  with no free type variables is closed.
 
 Stack makes use of single-constructor types where the constructor has a large
 number of fields. Some of those fields have similar types, and so on. Given
