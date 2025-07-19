@@ -6,24 +6,30 @@ cabal-version: 2.2
 
 name:           stack
 version:        3.8.0
-synopsis:       The Haskell Tool Stack
-description:    Please see the documentation at <https://docs.haskellstack.org>
-                for usage information.
+synopsis:       A program for developing Haskell projects
+description:    Stack (the Haskell Tool Stack) is a program for developing Haskell projects.
+                It is aimed at new and experienced users of Haskell and seeks to support them
+                fully on Linux, macOS and Windows.
+                .
+                For information about how to use Stack, see <https://docs.haskellstack.org>.
                 .
                 If building a 'stack' executable for distribution, please download the
                 source code from <https://github.com/commercialhaskell/stack/releases>
-                and build it using Stack itself in order to ensure identical behaviour
-                to official binaries. This package on Hackage is provided for convenience
-                and bootstrapping purposes.
+                and build it with Stack in order to ensure identical behaviour to official
+                binaries.
                 .
-                Note that the API for the library is not currently stable, and may
-                change significantly, even between minor releases. It is
-                currently only intended for use by the executable.
+                This package is provided on Hackage for convenience and bootstrapping
+                purposes.
+                .
+                Currently, the library exposed by the package is intended for use only by the
+                executable. The library's API may change significantly, even between minor
+                releases.
 category:       Development
 homepage:       http://haskellstack.org
 bug-reports:    https://github.com/commercialhaskell/stack/issues
 author:         Commercial Haskell SIG
-maintainer:     manny@fpcomplete.com
+maintainer:     Mike Pilgrem <public@pilgrem.com>,
+                Emanuel Borsboom <manny@fpcomplete.com>
 license:        BSD-3-Clause
 license-file:   LICENSE
 build-type:     Custom
