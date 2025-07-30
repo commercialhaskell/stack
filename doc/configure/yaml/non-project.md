@@ -1194,7 +1194,24 @@ signed. The Hackage timestamp is also signed. A signature is valid when one key
 holder has signed.
 
 If the `hackage-security` key is absent, the Hackage Security configuration will
-default to that for the official Hackage server.
+default to that applicable to the official Hackage server before 2025-07-24.
+
+!!! note
+
+    The Hackage Security configuration applicable to the official Hackage server
+    since 2025-07-24 is:
+
+    ~~~yaml
+    hackage-security:
+      keyids:
+      - 0a5c7ea47cd1b15f01f5f51a33adda7e655bc0f0b0615baa8e271f4c3351e21d
+      - 1ea9ba32c526d1cc91ab5e5bd364ec5e9e8cb67179a471872f6e26f0ae773d42
+      - 51f0161b906011b52c6613376b1ae937670da69322113a246a09f807c62f6921
+      - c7de58fc6a224b92b5b513f26fbb8b370f2d97c7cfe0075a951314a55734be93
+      - fe331502606802feac15e514d9b9ea83fee8b6ffef71335479a2e68d84adc6b0
+      key-threshold: 3
+      ignore-expiry: true
+    ~~~
 
 `key-threshold` specifies the minimum number of keyholders that must have signed
 the package index for it to be considered valid.
