@@ -11,6 +11,8 @@ Major changes:
 Behavior changes:
 
 * Stack now treats `ghc-internal` as a GHC wired-in package.
+* The configuration option `package-index` has a new default value: the `keyids`
+  key lists the keys of the Hackage root key holders applicable from 2025-07-24.
 
 Other enhancements:
 

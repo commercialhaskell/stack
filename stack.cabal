@@ -459,7 +459,7 @@ library
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.10.1
+    , pantry >=0.11.0
     , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.18
@@ -582,7 +582,7 @@ executable stack
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.10.1
+    , pantry >=0.11.0
     , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.18
@@ -687,7 +687,7 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative >=0.18.1.0
     , optparse-generic
-    , pantry >=0.10.1
+    , pantry >=0.11.0
     , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.18
@@ -804,7 +804,7 @@ test-suite stack-unit-test
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.10.1
+    , pantry >=0.11.0
     , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.18
