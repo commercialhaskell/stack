@@ -1,5 +1,9 @@
 snapshot: lts-24.0 # GHC 9.10.2
 
+extra-deps:
+# lts-24.0 specifies pantry-0.10.1
+- pantry-0.11.0@sha256:d23aad04f560280264bde7a8d20ed158a668c037c303dc00793d8af61176c491,7542
+
 docker:
   enable: false
   repo: quay.io/benz0li/ghc-musl:9.10.2

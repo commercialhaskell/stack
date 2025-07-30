@@ -106,7 +106,7 @@ dependencies:
 - neat-interpolation
 - open-browser
 - optparse-applicative >= 0.18.1.0
-- pantry >= 0.10.1
+- pantry >= 0.11.0
 - path >= 0.9.5
 - path-io
 # In order for Cabal (the tool) to build Stack, it needs to be told of the

@@ -5,21 +5,14 @@
 # * Cabal-3.14.1.0 has changed the type of
 #   Distribution.PackageDescription.Check.checkPackage.
 
-snapshot: nightly-2025-04-03 # GHC 9.10.1
-compiler: ghc-9.12.2
+snapshot: nightly-2025-07-30 # GHC 9.12.2
 
 extra-deps:
-# Reinstated because pruned
-- Cabal-3.14.1.0
-# Reinstated because pruned
-- Cabal-syntax-3.14.1.0
-- parsec-3.1.18.0
-# mustache cannot deal with Data.Text.show ambiguity in boot package text-2.1.2
-- text-2.1.1
+# nightly-2025-07-30 specifies pantry-0.10.1
+- pantry-0.11.0@sha256:d23aad04f560280264bde7a8d20ed158a668c037c303dc00793d8af61176c491,7542
 
 allow-newer: true
 allow-newer-deps:
-# Added to ignore upper bound on Cabal:
 - stack
 
 docker:
