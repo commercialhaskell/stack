@@ -27,6 +27,8 @@ FROM quay.io/benz0li/hlssi:${HLS_IMAGE_TAG} AS hlssi
 
 FROM quay.io/benz0li/hlsi:latest AS hlsi
 
+FROM ghcr.io/hadolint/hadolint:latest as hsi
+
 FROM docker.io/koalaman/shellcheck:stable AS sci
 
 FROM ${BUILD_ON_IMAGE}:${GHC_VERSION}${SUBTAG:+-}${SUBTAG}
@@ -42,19 +44,7 @@ RUN sysArch="$(uname -m)" \
   ## Install terminal multiplexers
   && apk add --no-cache screen tmux \
   ## Install yamllint
-  && apk add --no-cache yamllint \
-  ## Install hadolint
-  && case "$sysArch" in \
-    x86_64) tarArch="x86_64" ;; \
-    aarch64) tarArch="arm64" ;; \
-    *) echo "error: Architecture $sysArch unsupported"; exit 1 ;; \
-  esac \
-  && apiResponse="$(curl -sSL \
-    https://api.github.com/repos/hadolint/hadolint/releases/latest)" \
-  && downloadUrl="$(echo "$apiResponse" | grep -e \
-    "browser_download_url.*Linux-$tarArch\"" | cut -d : -f 2,3 | tr -d \")" \
-  && echo "$downloadUrl" | xargs curl -sSLo /usr/local/bin/hadolint \
-  && chmod 755 /usr/local/bin/hadolint
+  && apk add --no-cache yamllint
 
 ## Update environment
 ARG USE_ZSH_FOR_ROOT
@@ -97,6 +87,8 @@ RUN if [ -n "$USE_ZSH_FOR_ROOT" ]; then \
 COPY --from=hlssi /usr/local /usr/local
 ## Install HLint
 COPY --from=hlsi /usr/local /usr/local
+## Install Haskell Dockerfile Linter
+COPY --from=hsi /bin/hadolint /usr/local/bin
 ## Install ShellCheck
 COPY --from=sci --chown=root:root /bin/shellcheck /usr/local/bin
 
