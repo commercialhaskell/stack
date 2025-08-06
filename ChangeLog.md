@@ -20,6 +20,7 @@ Bug fixes:
 
 * `--PROG-option=<argument>` passes `--PROG-option=<argument>` (and not
   `--PROG-option="<argument>"`) to Cabal (the library).
+* The message S-7151 now presents as an error, with advice, and not as a bug.
 
 ## v3.7.1 - 2025-06-28
 
