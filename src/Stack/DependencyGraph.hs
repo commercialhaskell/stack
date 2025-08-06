@@ -64,9 +64,8 @@ import           Stack.Types.SourceMap
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.DependencyGraph" module.
-data DependencyGraphException
+newtype DependencyGraphException
   = DependencyNotFoundBug GhcPkgId
-  | PackageNotFoundBug PackageName
   deriving (Show, Typeable)
 
 instance Exception DependencyGraphException where
@@ -75,11 +74,33 @@ instance Exception DependencyGraphException where
     , ghcPkgIdString depId
     , " in global DB."
     ]
-  displayException (PackageNotFoundBug pkgName) = bugReport "[S-7151]" $ concat
-    [ "The '"
-    , packageNameString pkgName
-    , "' package was not found in any of the dependency sources."
-    ]
+
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
+-- "Stack.DependencyGraph" module.
+newtype DependencyGraphPrettyException
+  = PackageNotFound PackageName
+  deriving (Show, Typeable)
+
+instance Pretty DependencyGraphPrettyException where
+
+  pretty (PackageNotFound pkgName) =
+       "[S-7151]"
+    <> line
+    <> fillSep
+         [ flow "The package"
+         , style Error . fromPackageName $ pkgName
+         , flow "was not identified as a project package, an extra-dep, or a \
+                \package specified by the snapshot."
+         ]
+    <> blankLine
+    <> fillSep
+         [ "Command"
+         , style Shell "stack build --dry-run"
+         , flow "for information about why Stack fails to construct a build \
+                \plan."
+         ]
+
+instance Exception DependencyGraphPrettyException
 
 -- | Create the dependency graph and also prune it as specified in the dot
 -- options. Returns a set of local names and a map from package names to
@@ -263,7 +284,7 @@ createDepLoader ::
   -> PackageName
   -> RIO DotConfig (Set PackageName, DotPayload)
 createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
-  fromMaybe (throwIO $ PackageNotFoundBug pkgName)
+  fromMaybe (prettyThrowIO $ PackageNotFound pkgName)
     (projectPackageDeps <|> dependencyDeps <|> globalDeps)
  where
   projectPackageDeps = loadDeps <$> Map.lookup pkgName sourceMap.project
