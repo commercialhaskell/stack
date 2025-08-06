@@ -18,6 +18,9 @@ Other enhancements:
 
 Bug fixes:
 
+* `--PROG-option=<argument>` passes `--PROG-option=<argument>` (and not
+  `--PROG-option="<argument>"`) to Cabal (the library).
+
 ## v3.7.1 - 2025-06-28
 
 **Changes since v3.5.1:**

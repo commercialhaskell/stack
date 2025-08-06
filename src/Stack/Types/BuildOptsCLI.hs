@@ -97,23 +97,27 @@ data BuildCommand
   | Install
   deriving (Eq, Show)
 
--- | Generate a list of --PROG-option="<argument>" arguments for all PROGs.
+-- | Generate a list of @--PROG-option=<argument>@ arguments for all PROGs.
+
+-- At the command line, --PROG-option="<argument>" is received as
+-- --PROG-option=<argument> (without quotes). However, with the process library,
+-- what is received is --PROG-option="<argument>" (with quotes), which is NOT
+-- what is required.
 boptsCLIAllProgOptions :: BuildOptsCLI -> [Text]
 boptsCLIAllProgOptions boptsCLI =
   concatMap progOptionArgs boptsCLI.progsOptions
  where
-  -- Generate a list of --PROG-option="<argument>" arguments for a PROG.
+  -- Generate a list of --PROG-option=<argument> arguments for a PROG.
   progOptionArgs :: (Text, [Text]) -> [Text]
   progOptionArgs (prog, opts) = map progOptionArg opts
    where
-    -- Generate a --PROG-option="<argument>" argument for a PROG and option.
+    -- Generate a --PROG-option=<argument> argument for a PROG and option.
     progOptionArg :: Text -> Text
     progOptionArg opt = T.concat
       [ "--"
       , prog
-      , "-option=\""
+      , "-option="
       , opt
-      , "\""
       ]
 
 -- | Only flags set via 'ACFByName'
