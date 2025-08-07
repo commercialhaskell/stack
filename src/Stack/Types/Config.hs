@@ -212,6 +212,9 @@ data Config = Config
   , notifyIfNoRunBenchmarks :: !Bool
     -- ^ Notify if the --no-run-benchmarks flag has prevented the running of a
     -- targeted benchmark?
+  , notifyIfBaseNotBoot     :: !Bool
+    -- ^ Notify if the specified base package is other than the GHC boot
+    -- package?
   , noRunCompile            :: !Bool
     -- ^ Use --no-run and --compile options when using `stack script`
   , stackDeveloperMode      :: !Bool
