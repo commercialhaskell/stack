@@ -10,7 +10,7 @@ unattainableBaseWarning =
 -- Use short message fragment because prettyWarn formatting and colour
 noBaseUpgradeWarning :: String
 noBaseUpgradeWarning =
-  "You are trying to upgrade or downgrade"
+  "Before GHC 9.12.1, the base package is"
 
 main :: IO ()
 main = do

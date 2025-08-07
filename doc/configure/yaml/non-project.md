@@ -1109,6 +1109,20 @@ Default: `true`
 If the specified machine architecture value is unknown to Cabal (the library),
 should Stack notify the user of that?
 
+## notify-if-base-not-boot
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+From GHC 9.12.1, `base` is not a GHC wired-in package. When using such GHC
+versions, if the specified `base` package is other than the GHC boot package,
+should Stack notify the user of that?
+
+When using GHC versions where `base` is a GHC wired-in package, Stack will
+always notify the user if the specified `base` package is other than the GHC
+boot package.
+
 ## notify-if-cabal-untested
 
 [:octicons-tag-24: 2.15.1](https://github.com/commercialhaskell/stack/releases/tag/v2.15.1)

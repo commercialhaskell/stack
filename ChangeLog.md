@@ -16,6 +16,10 @@ Behavior changes:
 
 Other enhancements:
 
+* From GHC 9.12.1, `base` is not a GHC wired-in package. In configuration files,
+  the `notify-if-base-not-boot` key is introduced, to allow the exisitng
+  notification to be muted if unwanted when using such GHC versions.
+
 Bug fixes:
 
 * `--PROG-option=<argument>` passes `--PROG-option=<argument>` (and not

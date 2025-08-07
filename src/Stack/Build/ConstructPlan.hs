@@ -24,6 +24,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Types.BuildType ( BuildType (Configure) )
 import           Distribution.Types.PackageName ( mkPackageName )
+import           Distribution.Version ( mkVersion )
 import           Path ( parent )
 import qualified RIO.NonEmpty as NE
 import           RIO.Process ( findExecutable )
@@ -62,7 +63,7 @@ import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), BuildSubset (..) )
 import           Stack.Types.CompCollection ( collectionMember )
-import           Stack.Types.Compiler ( WhichCompiler (..) )
+import           Stack.Types.Compiler ( WhichCompiler (..), getGhcVersion )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..) )
 import           Stack.Types.ComponentUtils ( unqualCompFromText )
@@ -142,22 +143,45 @@ constructPlan
   = do
     logDebug "Constructing the build plan"
 
-    when hasBaseInDeps $
+    config <- view configL
+    let ghcVersion = getGhcVersion sourceMap.compiler
+        isBaseWiredIn = ghcVersion < mkVersion [9,12]
+    when (hasBaseInDeps && (isBaseWiredIn || config.notifyIfBaseNotBoot)) $ do
+      let intro = fillSep
+            [ flow "Before GHC 9.12.1, the base package is a GHC wired-in \
+                   \one. For other GHC versions it is not. You are using"
+            , style Current $ "GHC " <> fromString (versionString ghcVersion)
+            , flow "and trying to replace its"
+            , style Current "base"
+            , flow "boot package."
+            ]
+          adviceInit = if isBaseWiredIn
+            then
+              [ flow "Almost certainly, that is not what you really want to \
+                     \do. Consider removing"
+              ]
+            else
+              [ flow "That may be not what you want to do. If not, consider \
+                     \removing"
+              ]
+          adviceRest =
+            [ style Current "base"
+            , flow "as an"
+            , style Shell "extra-deps" <> ","
+            , flow "or, if you need a particular version of"
+            , style Current "base" <> ","
+            , flow "consider using a different GHC version."
+            ]
+          adviceMute = fillSep
+            [ flow "To mute this message in future, set"
+            , style Shell (flow "notify-if-base-not-boot: false")
+            , flow "in Stack's configuration."
+            ]
       prettyWarn $
-           fillSep
-             [ flow "You are trying to upgrade or downgrade the"
-             , style Current "base"
-             , flow "package, which is almost certainly not what you really \
-                    \want. Please, consider using another GHC version if you \
-                    \need a certain version of"
-             , style Current "base" <> ","
-             , flow "or removing"
-             , style Current "base"
-             , flow "as an"
-             , style Shell "extra-deps" <> "."
-             , flow "For further information, see"
-             , style Url "https://github.com/commercialhaskell/stack/issues/3940" <> "."
-             ]
+           intro
+        <> blankLine
+        <> fillSep (adviceInit <> adviceRest)
+        <> (if isBaseWiredIn then mempty else blankLine <> adviceMute)
         <> line
 
     econfig <- view envConfigL
