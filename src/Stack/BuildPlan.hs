@@ -407,11 +407,11 @@ checkSnapBuildPlan pkgDirs flags snapCandidate = do
       else pure $ BuildPlanCheckFail f cerrs compiler
  where
   compilerErrors compiler errs
-    | whichCompiler compiler == Ghc = ghcErrors errs
+    | whichCompiler compiler == Ghc = ghcErrors compiler errs
     | otherwise = Map.empty
 
-  isGhcWiredIn p _ = p `Set.member` wiredInPackages
-  ghcErrors = Map.filterWithKey isGhcWiredIn
+  isGhcWiredIn compiler p _ = p `Set.member` wiredInPackages compiler
+  ghcErrors compiler = Map.filterWithKey (isGhcWiredIn compiler)
 
 -- | Find a snapshot and set of flags that is compatible with and matches as
 -- best as possible with the given 'GenericPackageDescription's.

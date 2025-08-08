@@ -26,12 +26,13 @@ import           Stack.PackageDump
                    ( conduitDumpPackage, ghcPkgDump, pruneDeps )
 import           Stack.Prelude
 import           Stack.SourceMap ( getPLIVersion, loadVersion )
+import           Stack.Types.Compiler ( ActualCompiler )
 import           Stack.Types.CompilerPaths ( getGhcPkgExe )
 import           Stack.Types.DumpPackage
                    ( DumpPackage (..), SublibDump (..), sublibParentPkgId )
 import           Stack.Types.EnvConfig
-                    ( HasEnvConfig, packageDatabaseDeps, packageDatabaseExtra
-                    , packageDatabaseLocal
+                    ( HasEnvConfig, HasSourceMap (..), packageDatabaseDeps
+                    , packageDatabaseExtra, packageDatabaseLocal
                     )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Installed
@@ -139,8 +140,10 @@ loadDatabase ::
      -- ^ from parent databases
   -> RIO env ([LoadHelper], [DumpPackage])
 loadDatabase installMap db lhs0 = do
+  sourceMap <- view sourceMapL
+  let compiler = sourceMap.compiler
   pkgexe <- getGhcPkgExe
-  (lhs1', dps) <- ghcPkgDump pkgexe pkgDb $ conduitDumpPackage .| sink
+  (lhs1', dps) <- ghcPkgDump pkgexe pkgDb $ conduitDumpPackage .| sink compiler
   lhs1 <- mapMaybeM processLoadResult lhs1'
   let lhs = pruneDeps id (.ghcPkgId) (.depsGhcPkgId) const (lhs0 ++ lhs1)
   pure (map (\lh -> lh { depsGhcPkgId = [] }) $ Map.elems lhs, dps)
@@ -149,12 +152,13 @@ loadDatabase installMap db lhs0 = do
     GlobalPkgDb -> []
     UserPkgDb _ fp -> [fp]
 
-  sinkDP =  CL.map (isAllowed installMap db' &&& toLoadHelper db')
-         .| CL.consume
+  sinkDP compiler =
+       CL.map (isAllowed installMap db' &&& toLoadHelper compiler db')
+    .| CL.consume
    where
     db' = toPackageDbVariety db
-  sink =   getZipSink $ (,)
-       <$> ZipSink sinkDP
+  sink compiler =   getZipSink $ (,)
+       <$> ZipSink (sinkDP compiler)
        <*> ZipSink CL.consume
 
   processLoadResult :: (Allowed, LoadHelper) -> RIO env (Maybe LoadHelper)
@@ -264,8 +268,8 @@ data LoadHelper = LoadHelper
   }
   deriving Show
 
-toLoadHelper :: PackageDbVariety -> DumpPackage -> LoadHelper
-toLoadHelper pkgDb dp = LoadHelper
+toLoadHelper :: ActualCompiler -> PackageDbVariety -> DumpPackage -> LoadHelper
+toLoadHelper compiler pkgDb dp = LoadHelper
   { ghcPkgId
   , depsGhcPkgId
   , subLibDump = dp.sublib
@@ -280,7 +284,7 @@ toLoadHelper pkgDb dp = LoadHelper
     -- is especially important for using different minor versions of GHC, where
     -- the dependencies of wired-in packages may change slightly and therefore
     -- not match the snapshot.
-    if name `Set.member` wiredInPackages
+    if name `Set.member` wiredInPackages compiler
       then []
       else dp.depends
   installedLibInfo = InstalledLibraryInfo ghcPkgId (Right <$> dp.license) mempty

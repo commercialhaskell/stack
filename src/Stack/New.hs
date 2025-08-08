@@ -48,8 +48,8 @@ import           Path.IO
                    ( doesDirExist, doesFileExist, ensureDir, getCurrentDir )
 import           RIO.Process ( proc, runProcess_, withWorkingDir )
 import           Stack.Constants
-                   ( altGitHubTokenEnvVar, backupUrlRelPath, gitHubBasicAuthType
-                   , gitHubTokenEnvVar, stackDotYaml, wiredInPackages
+                   ( allWiredInPackages, altGitHubTokenEnvVar, backupUrlRelPath
+                   , gitHubBasicAuthType, gitHubTokenEnvVar, stackDotYaml
                    )
 import           Stack.Constants.Config ( templatesDir )
 import           Stack.Init ( InitOpts (..), initProject )
@@ -195,7 +195,7 @@ instance Pretty NewPrettyException where
              (map fromPackageName sortedWiredInPackages :: [StyleDoc])
          )
    where
-    sortedWiredInPackages = L.sort $ S.toList wiredInPackages
+    sortedWiredInPackages = L.sort $ S.toList allWiredInPackages
   pretty (AttemptedOverwrites name fps) =
     "[S-3113]"
     <> line
@@ -249,7 +249,7 @@ newCmd (newOpts, initOpts) =
 -- | Create a new project with the given options.
 new :: HasConfig env => NewOpts -> Bool -> RIO env (Path Abs Dir)
 new opts forceOverwrite = do
-  when (project `elem` wiredInPackages) $
+  when (project `elem` allWiredInPackages) $
       prettyThrowM $ MagicPackageNameInvalid projectName
   pwd <- getCurrentDir
   absDir <- if bare
