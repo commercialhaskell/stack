@@ -189,11 +189,11 @@ the same name.
 
 !!! info "GHC wired-in packages"
 
-    Some Haskell packages published on Hackage, for example `base` and `ghc`,
-    are referred to as 'wired-in' to one or more versions of GHC or as 'magic'.
-    They can be distinguished from normal packages by the contents of their
-    Cabal files: GHC's `-this-unit-id` option is set as the name of the package
-    without a version. For example, the `base.cabal` for `base-4.19.2.0`
+    Some Haskell packages published on Hackage, for example `base < 4.21.0.0`
+    and `ghc`, are referred to as 'wired-in' to one or more versions of GHC or
+    as 'magic'. They can be distinguished from normal packages by the contents
+    of their Cabal files: GHC's `-this-unit-id` option is set as the name of the
+    package without a version. For example, the `base.cabal` for `base-4.20.1.0`
     includes:
 
     ~~~yaml
