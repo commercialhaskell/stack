@@ -261,46 +261,40 @@ wiredInPackages ::
      ActualCompiler
      -- ^ The actual compiler being used. (Not yet implemented.)
   -> Set PackageName
-wiredInPackages _compiler = case mparsed of
+-- When building the GHC compiler from source, we know nothing about its
+-- wired-in packages. We take a cautious approach.
+wiredInPackages (ACGhcGit _ _) = allWiredInPackages
+wiredInPackages (ACGhc ghcVersion) = case mparsed of
   Just parsed -> Set.fromList parsed
   Nothing -> impureThrow WiredInPackagesNotParsedBug
  where
-  mparsed = mapM parsePackageName
-    [ "rts"
-      -- Said to be not a \'real\' package.
-    , "base"
-      -- A magic package. Also treated as non-reinstallable by
-      -- cabal-install-3.14.2.0.
-    , "ghc"
-      -- A magic package. Also treated as non-reinstallable by
-      -- cabal-install-3.14.2.0.
-    , "ghc-bignum"
-      -- A magic package from GHC 9.0.1. Also treated as non-reinstallable by
-      -- cabal-install-3.14.2.0.
-    , "ghc-internal"
-      -- A magic package from GHC 9.10.1. Also treated as non-reinstallable by
-      -- cabal-install-3.14.2.0.
-    , "ghc-prim"
-      -- A magic package. Also treated as non-reinstallable by
-      -- cabal-install-3.14.2.0.
-    , "integer-gmp"
-      -- No longer magic > 1.0.3.0 (GHC >= 9.0) and deprecated in favour of
-      -- ghc-bignum. With GHC 9.10.2 at least, there seems to be no problem in
-      -- using it. Also treated as non-reinstallable by
-      -- cabal-install-3.14.2.0.
-    , "integer-simple"
-      -- A magic package. Also treated as non-reinstallable by
-      -- cabal-install-3.14.2.0.
-    , "template-haskell"
-      -- No longer magic > 2.22.0.0 (GHC >= 9.12). Also treated as
-      -- non-reinstallable by cabal-install-3.14.2.0.
-    , "interactive"
-      -- Type and class declarations at the GHCi command prompt are treated as
-      -- if they were defined in modules all sharing a common package
-      -- interactive. See 'Note [The interactive package]' at
-      -- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Runtime/Context.hs
-      -- With GHC 9.10.2 at least, there seems to be no problem in using it.
-    ]
+  mparsed = mapM parsePackageName $
+       [ "rts"
+         -- Said to be not a \'real\' package.
+       , "ghc"
+         -- A magic package.
+       , "ghc-prim"
+         -- A magic package.
+       , "integer-simple"
+         -- A magic package.
+       , "interactive"
+         -- Type and class declarations at the GHCi command prompt are treated
+         -- as if they were defined in modules all sharing a common package
+         -- interactive. See 'Note [The interactive package]' at
+         -- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Runtime/Context.hs
+         -- With GHC 9.10.2 at least, there seems to be no problem in using it.
+       ]
+    <> [ "base" | ghcVersion < mkVersion [9, 12] ]
+         -- A formerly magic package.
+    <> [ "ghc-bignum" | ghcVersion >= mkVersion [9, 0, 1] ]
+         -- A magic package from GHC 9.0.1.
+    <> [ "ghc-internal" | ghcVersion >= mkVersion [9, 10, 1] ]
+         -- A magic package from GHC 9.10.1.
+    <> [ "integer-gmp" | ghcVersion < mkVersion [9, 0] ]
+         -- No longer magic > 1.0.3.0 (GHC >= 9.0) and deprecated in favour of
+         -- ghc-bignum.
+    <> [ "template-haskell" | ghcVersion < mkVersion [9, 12] ]
+         -- No longer magic > 2.22.0.0 (GHC >= 9.12).
 
 -- | A set of all package names that have been GHC wired-in packages for
 -- versions of GHC supported by Stack.
