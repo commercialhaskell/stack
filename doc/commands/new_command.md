@@ -31,6 +31,15 @@ or Number categories (Nd (decimal), Nl (letter), or No (other)).
 
 !!! note
 
+    `stack new` will decline to accept a package name that is a GHC wired-in
+    package for a version of GHC that is supported by Stack.
+
+    Stack treats the following as the names of 'wired-in' packages: `base`,
+    `ghc-bignum`, `ghc-prim`, `ghc`, `ghc-internal`, `integer-gmp`,
+    `integer-simple`, `interactive`, `rts` and `template-haskell`.
+
+!!! note
+
     In the case of Hackage and acceptable package names, an alphanumeric
     character is limited to one of `A` to `Z`, `a` to `z`, and `0` to `9`.
 

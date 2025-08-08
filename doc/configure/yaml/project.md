@@ -214,10 +214,6 @@ the same name.
     that the build plan refers to two versions of `process` and warn that the
     build is likely to fail.
 
-    Stack treats the following as the names of 'wired-in' packages: `base`,
-    `ghc-bignum`, `ghc-prim`, `ghc`, `ghc-internal`, `integer-gmp`,
-    `integer-simple`, `interactive`, `rts` and `template-haskell`.
-
 ## flags
 
 Default: `{}`
