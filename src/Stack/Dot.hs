@@ -23,6 +23,7 @@ import qualified Data.Text.IO as Text
 import           Stack.Constants ( wiredInPackages )
 import           Stack.DependencyGraph ( createPrunedDependencyGraph )
 import           Stack.Prelude
+import           Stack.Types.Compiler ( ActualCompiler )
 import           Stack.Types.DependencyTree ( DotPayload (..) )
 import           Stack.Types.DotOpts ( DotOpts (..) )
 import           Stack.Types.Runner ( Runner )
@@ -30,21 +31,22 @@ import           Stack.Types.Runner ( Runner )
 -- | Visualize the project's dependencies as a graphviz graph
 dotCmd :: DotOpts -> RIO Runner ()
 dotCmd dotOpts = do
-  (localNames, prunedGraph) <- createPrunedDependencyGraph dotOpts
-  printGraph dotOpts localNames prunedGraph
+  (compiler, localNames, prunedGraph) <- createPrunedDependencyGraph dotOpts
+  printGraph dotOpts compiler localNames prunedGraph
 
 -- | Print a graphviz graph of the edges in the Map and highlight the given
 -- project packages
 printGraph ::
      (Applicative m, MonadIO m)
   => DotOpts
+  -> ActualCompiler
   -> Set PackageName -- ^ All project packages.
   -> Map PackageName (Set PackageName, DotPayload)
   -> m ()
-printGraph dotOpts locals graph = do
+printGraph dotOpts compiler locals graph = do
   liftIO $ Text.putStrLn "strict digraph deps {"
   printLocalNodes dotOpts filteredLocals
-  printLeaves graph
+  printLeaves compiler graph
   void (Map.traverseWithKey printEdges (fst <$> graph))
   liftIO $ Text.putStrLn "}"
  where
@@ -71,9 +73,11 @@ printLocalNodes dotOpts locals =
 -- | Print nodes without dependencies
 printLeaves ::
      MonadIO m
-  => Map PackageName (Set PackageName, DotPayload)
+  => ActualCompiler
+  -> Map PackageName (Set PackageName, DotPayload)
   -> m ()
-printLeaves = F.mapM_ printLeaf . Map.keysSet . Map.filter Set.null . fmap fst
+printLeaves compiler =
+  F.mapM_ (printLeaf compiler) . Map.keysSet . Map.filter Set.null . fmap fst
 
 -- | @printDedges p ps@ prints an edge from p to every ps
 printEdges :: MonadIO m => PackageName -> Set PackageName -> m ()
@@ -92,12 +96,13 @@ nodeName :: PackageName -> Text
 nodeName name = "\"" <> Text.pack (packageNameString name) <> "\""
 
 -- | Print a node with no dependencies
-printLeaf :: MonadIO m => PackageName -> m ()
-printLeaf package = liftIO . Text.putStrLn . Text.concat $
-  if isWiredIn package
+printLeaf :: MonadIO m => ActualCompiler -> PackageName -> m ()
+printLeaf compiler package = liftIO . Text.putStrLn . Text.concat $
+  if isWiredIn compiler package
     then ["{rank=max; ", nodeName package, " [shape=box]; };"]
     else ["{rank=max; ", nodeName package, "; };"]
 
--- | Check if the package is wired in (shipped with) ghc
-isWiredIn :: PackageName -> Bool
-isWiredIn = (`Set.member` wiredInPackages)
+-- | Check if the package is a GHC wired-in package
+isWiredIn :: ActualCompiler -> PackageName -> Bool
+isWiredIn compiler package =
+  package `Set.member` wiredInPackages compiler

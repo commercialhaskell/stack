@@ -30,6 +30,7 @@ module Stack.Constants
   , inNixShellEnvVar
   , stackProgNameUpper
   , wiredInPackages
+  , allWiredInPackages
   , cabalPackageName
   , implicitGlobalProjectDir
   , defaultUserConfigPath
@@ -161,13 +162,15 @@ import           Data.FileEmbed ( embedFile, makeRelativeToProject )
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Package ( mkPackageName )
+import           Distribution.Version ( mkVersion )
 import           Hpack.Config ( packageConfig )
 import qualified Language.Haskell.TH.Syntax as TH ( runIO, lift )
 import           Path ( (</>), mkRelDir, mkRelFile, parseAbsFile )
 import           Stack.Constants.StackProgName ( stackProgName )
 import           Stack.Constants.UsrLibDirs ( libDirs, usrLibDirs )
 import           Stack.Prelude
-import           Stack.Types.Compiler ( WhichCompiler (..) )
+import           Stack.Types.Compiler
+                   ( ActualCompiler (..), WhichCompiler (..) )
 import           System.Permissions ( osIsMacOS, osIsWindows )
 import           System.Process ( readProcess )
 
@@ -254,8 +257,11 @@ inNixShellEnvVar = map toUpper stackProgName ++ "_IN_NIX_SHELL"
 --
 -- Cabal (the tool) also treats certain packages as non-reinstallable. See
 -- @Distribution.Client.Dependency.nonReinstallablePackages@.
-wiredInPackages :: Set PackageName
-wiredInPackages = case mparsed of
+wiredInPackages ::
+     ActualCompiler
+     -- ^ The actual compiler being used. (Not yet implemented.)
+  -> Set PackageName
+wiredInPackages _compiler = case mparsed of
   Just parsed -> Set.fromList parsed
   Nothing -> impureThrow WiredInPackagesNotParsedBug
  where
@@ -294,6 +300,25 @@ wiredInPackages = case mparsed of
       -- interactive. See 'Note [The interactive package]' at
       -- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Runtime/Context.hs
       -- With GHC 9.10.2 at least, there seems to be no problem in using it.
+    ]
+
+-- | A set of all package names that have been GHC wired-in packages for
+-- versions of GHC supported by Stack.
+allWiredInPackages :: Set PackageName
+allWiredInPackages = Set.unions $ map wiredInPackages supportedCompilers
+ where
+  supportedCompilers = map (ACGhc . mkVersion)
+    [ [8, 4, 4]
+    , [8, 6, 5]
+    , [8, 8, 4]
+    , [8, 10, 7]
+    , [9, 0, 2]
+    , [9, 2, 8]
+    , [9, 4, 8]
+    , [9, 6, 7]
+    , [9, 8, 4]
+    , [9, 10, 2]
+    , [9, 12, 2]
     ]
 
 -- | Just to avoid repetition and magic strings.

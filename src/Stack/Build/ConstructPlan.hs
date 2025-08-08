@@ -521,6 +521,7 @@ checkCallStackAndAddDep ::
   -> M (Either ConstructPlanException AddDepRes)
 checkCallStackAndAddDep name = do
   ctx <- ask
+  let compiler = ctx.ctxEnvConfig.sourceMap.compiler
   res <- if name `elem` ctx.callStack
     then do
       logDebugPlanS "checkCallStackAndAddDep" $
@@ -537,7 +538,7 @@ checkCallStackAndAddDep name = do
              "No package info for "
           <> fromPackageName name
           <> "."
-        pure $ Left $ UnknownPackage name
+        pure $ Left $ UnknownPackage compiler name
       Just packageInfo ->
         -- Add the current package name to the head of the call stack.
         local (\ctx' -> ctx' { callStack = name : ctx'.callStack }) $
@@ -863,7 +864,7 @@ processDep pkgId name value = do
     Left e -> do
       addParent
       let bd = case e of
-            UnknownPackage name' -> assert (name' == name) NotInBuildPlan
+            UnknownPackage _ name' -> assert (name' == name) NotInBuildPlan
             DependencyCycleDetected names -> BDDependencyCycleDetected names
             -- Ultimately we won't show any information on this to the user;
             -- we'll allow the dependency failures alone to display to avoid

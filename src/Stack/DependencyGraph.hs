@@ -46,7 +46,7 @@ import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), defaultBuildOptsCLI )
 import           Stack.Types.BuildOptsMonoid
                    ( buildOptsMonoidBenchmarksL, buildOptsMonoidTestsL )
-import           Stack.Types.Compiler ( wantedToActual )
+import           Stack.Types.Compiler ( ActualCompiler, wantedToActual )
 import           Stack.Types.DependencyTree ( DotPayload (..) )
 import           Stack.Types.DotConfig ( DotConfig (..) )
 import           Stack.Types.DotOpts ( DotOpts (..) )
@@ -109,17 +109,20 @@ createPrunedDependencyGraph ::
      DotOpts
   -> RIO
        Runner
-       (Set PackageName, Map PackageName (Set PackageName, DotPayload))
+       ( ActualCompiler
+       , Set PackageName
+       , Map PackageName (Set PackageName, DotPayload)
+       )
 createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
   localNames <- view $ buildConfigL . to (Map.keysSet . (.smWanted.project))
   logDebug "Creating dependency graph"
-  resultGraph <- createDependencyGraph dotOpts
+  (compiler, resultGraph) <- createDependencyGraph dotOpts
   let pkgsToPrune = if dotOpts.includeBase
                       then dotOpts.prune
                       else Set.insert "base" dotOpts.prune
       prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
   logDebug "Returning pruned dependency graph"
-  pure (localNames, prunedGraph)
+  pure (compiler, localNames, prunedGraph)
 
 -- Plumbing for --test and --bench flags
 withDotConfig ::
@@ -211,7 +214,9 @@ withDotConfig opts inner =
 -- the required arguments for @resolveDependencies@.
 createDependencyGraph ::
      DotOpts
-  -> RIO DotConfig (Map PackageName (Set PackageName, DotPayload))
+  -> RIO
+       DotConfig
+       (ActualCompiler, Map PackageName (Set PackageName, DotPayload))
 createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
   locals <- for (toList sourceMap.project) loadLocalPackage
@@ -237,7 +242,8 @@ createDependencyGraph dotOpts = do
         | otherwise = fmap
             (setOfPackageDeps &&& makePayload loc)
             (loadPackage loc flags ghcOptions cabalConfigOpts)
-  resolveDependencies dotOpts.dependencyDepth graph depLoader
+  resultGraph <- resolveDependencies dotOpts.dependencyDepth graph depLoader
+  pure (sourceMap.compiler, resultGraph)
  where
   makePayload loc pkg = DotPayload
     (Just pkg.version)

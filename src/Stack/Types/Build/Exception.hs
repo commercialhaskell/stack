@@ -699,12 +699,13 @@ pprintExceptions exceptions configFile stackRoot isImplicitGlobal parentMap want
         pkgName' = style Current (fromPackageName pkg.name)
         pkgIdent = style Current (fromPackageId $ packageIdentifier pkg)
   -- Skip these when they are redundant with 'NotInBuildPlan' info.
-  pprintException (UnknownPackage name)
+  pprintException (UnknownPackage compiler name)
     | name `Set.member` allNotInBuildPlan = Nothing
-    | name `Set.member` wiredInPackages = Just $ fillSep
-        [ flow "Can't build a package with same name as a wired-in-package:"
-        , style Current . fromPackageName $ name
-        ]
+    | name `Set.member` wiredInPackages compiler =
+        Just $ fillSep
+          [ flow "Can't build a package with same name as a wired-in-package:"
+          , style Current . fromPackageName $ name
+          ]
     | Just pruned <- Map.lookup name prunedGlobalDeps =
         let prunedDeps =
               map (style Current . fromPackageName) pruned
@@ -813,8 +814,9 @@ data ConstructPlanException
   | DependencyPlanFailures
       Package
       (Map PackageName (VersionRange, LatestApplicableVersion, BadDependency))
-  | UnknownPackage PackageName -- TODO perhaps this constructor will be removed,
-                               -- and BadDependency will handle it all
+  | UnknownPackage ActualCompiler PackageName
+    -- TODO perhaps this constructor will be removed, and BadDependency will
+    -- handle it all
   -- ^ Recommend adding to extra-deps, give a helpful version number?
   deriving (Eq, Show, Typeable)
 

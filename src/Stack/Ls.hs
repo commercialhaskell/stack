@@ -299,7 +299,7 @@ listGlobalsCmd opts = do
 listDependencies :: ListDepsOpts -> RIO Runner ()
 listDependencies opts = do
   let dotOpts = opts.dotOpts
-  (pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
+  (_, pkgs, resultGraph) <- createPrunedDependencyGraph dotOpts
   liftIO $ case opts.format of
     ListDepsTree treeOpts ->
       T.putStrLn "Packages"
