@@ -24,7 +24,7 @@ import           Stack.Constants ( wiredInPackages )
 import           Stack.DependencyGraph ( createPrunedDependencyGraph )
 import           Stack.Prelude
 import           Stack.Types.Compiler ( ActualCompiler )
-import           Stack.Types.DependencyTree ( DotPayload (..) )
+import           Stack.Types.DependencyTree ( DependencyGraph )
 import           Stack.Types.DotOpts ( DotOpts (..) )
 import           Stack.Types.Runner ( Runner )
 
@@ -41,7 +41,7 @@ printGraph ::
   => DotOpts
   -> ActualCompiler
   -> Set PackageName -- ^ All project packages.
-  -> Map PackageName (Set PackageName, DotPayload)
+  -> DependencyGraph
   -> m ()
 printGraph dotOpts compiler locals graph = do
   liftIO $ Text.putStrLn "strict digraph deps {"
@@ -71,11 +71,7 @@ printLocalNodes dotOpts locals =
   lpNodes = map (applyStyle . nodeName) (F.toList locals)
 
 -- | Print nodes without dependencies
-printLeaves ::
-     MonadIO m
-  => ActualCompiler
-  -> Map PackageName (Set PackageName, DotPayload)
-  -> m ()
+printLeaves :: MonadIO m => ActualCompiler -> DependencyGraph -> m ()
 printLeaves compiler =
   F.mapM_ (printLeaf compiler) . Map.keysSet . Map.filter Set.null . fmap fst
 
