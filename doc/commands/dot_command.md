@@ -49,6 +49,12 @@ By default:
     to use a hint file for global packages. If a hint file is used, GHC does not
     need to be installed.
 
+All GHC wired-in packages are identified by a rectangular box.
+
+Nodes with no dependencies in the graph are given the maximum rank in the DOT
+language (that is, the `dot` executable will place those nodes on the bottom row
+of the diagram).
+
 ## Examples
 
 The following examples are based on a version of the

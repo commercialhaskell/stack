@@ -15,6 +15,10 @@ Behavior changes:
 * Stack now recognises `ghc-internal` as a GHC wired-in package.
 * The configuration option `package-index` has a new default value: the `keyids`
   key lists the keys of the Hackage root key holders applicable from 2025-07-24.
+* Stack's `dot` command now treats `--depth` the same way as the
+  `ls dependencies` command, so that the nodes of
+  `stack dot --external --depth 0` are the same as the packages listed by
+  `stack ls dependencies --depth 0`.
 
 Other enhancements:
 
@@ -27,6 +31,11 @@ Bug fixes:
 * `--PROG-option=<argument>` passes `--PROG-option=<argument>` (and not
   `--PROG-option="<argument>"`) to Cabal (the library).
 * The message S-7151 now presents as an error, with advice, and not as a bug.
+* Stack's `dot` command now uses a box to identify all GHC wired-in packages,
+  not just those with no dependencies (being only `rts`).
+* Stack's `dot` command now gives all nodes with no dependencies in the graph
+  the maximum rank, not just those nodes with no relevant dependencies at all
+  (being only `rts`, when `--external` is specified).
 
 ## v3.7.1 - 2025-06-28
 
