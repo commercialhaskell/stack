@@ -47,7 +47,7 @@ import           Stack.Types.BuildOptsCLI
 import           Stack.Types.BuildOptsMonoid
                    ( buildOptsMonoidBenchmarksL, buildOptsMonoidTestsL )
 import           Stack.Types.Compiler ( ActualCompiler, wantedToActual )
-import           Stack.Types.DependencyTree ( DotPayload (..) )
+import           Stack.Types.DependencyTree ( DependencyGraph, DotPayload (..) )
 import           Stack.Types.DotConfig ( DotConfig (..) )
 import           Stack.Types.DotOpts ( DotOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
@@ -111,7 +111,7 @@ createPrunedDependencyGraph ::
        Runner
        ( ActualCompiler
        , Set PackageName
-       , Map PackageName (Set PackageName, DotPayload)
+       , DependencyGraph
        )
 createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
   localNames <- view $ buildConfigL . to (Map.keysSet . (.smWanted.project))
@@ -148,9 +148,12 @@ withDotConfig opts inner =
           , globals = Map.mapWithKey toDump globals
           }
         toDump :: PackageName -> Version -> DumpPackage
-        toDump name version = DumpPackage
+        toDump pkgName pkgVersion = DumpPackage
           { ghcPkgId = fakeGhcPkgId
-          , packageIdent = PackageIdentifier name version
+          , packageIdent = PackageIdentifier
+              { pkgName
+              , pkgVersion
+              }
           , sublib = Nothing
           , license = Nothing
           , libDirs = []
@@ -214,9 +217,7 @@ withDotConfig opts inner =
 -- the required arguments for @resolveDependencies@.
 createDependencyGraph ::
      DotOpts
-  -> RIO
-       DotConfig
-       (ActualCompiler, Map PackageName (Set PackageName, DotPayload))
+  -> RIO DotConfig (ActualCompiler, DependencyGraph)
 createDependencyGraph dotOpts = do
   sourceMap <- view sourceMapL
   locals <- for (toList sourceMap.project) loadLocalPackage
@@ -237,7 +238,11 @@ createDependencyGraph dotOpts = do
         | name `elem` [mkPackageName "rts", mkPackageName "ghc"] =
             pure
               ( Set.empty
-              , DotPayload (Just version) (Just $ Right BSD3) Nothing
+              , DotPayload
+                  { version = Just version
+                  , license = Just $ Right BSD3
+                  , location = Nothing
+                  }
               )
         | otherwise = fmap
             (setOfPackageDeps &&& makePayload loc)
@@ -246,9 +251,10 @@ createDependencyGraph dotOpts = do
   pure (sourceMap.compiler, resultGraph)
  where
   makePayload loc pkg = DotPayload
-    (Just pkg.version)
-    (Just pkg.license)
-    (Just $ PLImmutable loc)
+    { version = Just pkg.version
+    , license = Just pkg.license
+    , location = Just $ PLImmutable loc
+    }
 
 -- | Resolve the direct (depth 0) external dependencies of the given local
 -- packages (assumed to come from project packages)
@@ -261,7 +267,10 @@ projectPackageDependencies dotOpts locals =
     ( \lp -> let pkg = localPackageToPackage lp
                  pkgDir = parent lp.cabalFP
                  packageDepsSet = setOfPackageDeps pkg
-                 loc = PLMutable $ ResolvedPath (RelFilePath "N/A") pkgDir
+                 loc = PLMutable $ ResolvedPath
+                   { resolvedRelative = RelFilePath "N/A"
+                   , resolvedAbsolute = pkgDir
+                   }
              in  (pkg.name, (deps pkg packageDepsSet, lpPayload pkg loc))
     )
     locals
@@ -270,8 +279,11 @@ projectPackageDependencies dotOpts locals =
     then Set.delete pkg.name packageDepsSet
     else Set.intersection localNames packageDepsSet
   localNames = Set.fromList $ map (.package.name) locals
-  lpPayload pkg loc =
-    DotPayload (Just pkg.version) (Just pkg.license) (Just loc)
+  lpPayload pkg loc =  DotPayload
+    { version = Just pkg.version
+    , license = Just pkg.license
+    , location = Just loc
+    }
 
 -- | Given a SourceMap and a dependency loader, load the set of dependencies for
 -- a package
@@ -332,21 +344,26 @@ createDepLoader sourceMap globalDumpMap globalIdMap loadPackageDeps pkgName =
           Stack.Prelude.pkgName
           (Map.lookup depId globalIdMap)
 
-  payloadFromLocal pkg =
-    DotPayload (Just pkg.version) (Just pkg.license)
+  payloadFromLocal pkg location = DotPayload
+    { version = Just pkg.version
+    , license = Just pkg.license
+    , location
+    }
 
   payloadFromDump dp = DotPayload
-    (Just $ pkgVersion dp.packageIdent)
-    (Right <$> dp.license)
-    Nothing
+    { version = Just $ pkgVersion dp.packageIdent
+    , license = Right <$> dp.license
+    , location = Nothing
+    }
 
--- | Resolve the dependency graph up to (Just depth) or until fixpoint is reached
+-- | Resolve the dependency graph up to (Just depth) or until fixpoint is
+-- reached
 resolveDependencies ::
      (Applicative m, Monad m)
   => Maybe Int
-  -> Map PackageName (Set PackageName, DotPayload)
+  -> DependencyGraph
   -> (PackageName -> m (Set PackageName, DotPayload))
-  -> m (Map PackageName (Set PackageName, DotPayload))
+  -> m DependencyGraph
 resolveDependencies (Just 0) graph _ = pure graph
 resolveDependencies limit graph loadPackageDeps = do
   let values = Set.unions (fst <$> Map.elems graph)
@@ -361,7 +378,7 @@ resolveDependencies limit graph loadPackageDeps = do
         (Map.unionWith unifier graph (Map.fromList x))
         loadPackageDeps
  where
-  unifier (pkgs1,v1) (pkgs2,_) = (Set.union pkgs1 pkgs2, v1)
+  unifier (pkgs1, v1) (pkgs2, _) = (Set.union pkgs1 pkgs2, v1)
 
 -- | @pruneGraph dontPrune toPrune graph@ prunes all packages in @graph@ with a
 -- name in @toPrune@ and removes resulting orphans unless they are in
@@ -373,13 +390,13 @@ pruneGraph ::
   -> Map PackageName (Set PackageName, a)
   -> Map PackageName (Set PackageName, a)
 pruneGraph dontPrune names =
-  pruneUnreachable dontPrune . Map.mapMaybeWithKey (\pkg (pkgDeps,x) ->
+  pruneUnreachable dontPrune . Map.mapMaybeWithKey (\pkg (pkgDeps, x) ->
     if pkg `F.elem` names
       then Nothing
       else let filtered = Set.filter (`F.notElem` names) pkgDeps
            in  if Set.null filtered && not (Set.null pkgDeps)
                  then Nothing
-                 else Just (filtered,x))
+                 else Just (filtered, x))
 
 -- | Make sure that all unreachable nodes (orphans) are pruned
 pruneUnreachable ::

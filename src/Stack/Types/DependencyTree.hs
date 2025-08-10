@@ -10,6 +10,7 @@ License     : BSD-3-Clause
 
 module Stack.Types.DependencyTree
   ( DependencyTree (..)
+  , DependencyGraph
   , DotPayload (..)
   , licenseText
   , versionText
@@ -35,9 +36,12 @@ data DotPayload = DotPayload
   }
   deriving (Eq, Show)
 
+-- | Type synoynm representing dependency graphs.
+type DependencyGraph = Map PackageName (Set PackageName, DotPayload)
+
+-- | Type representing dependency trees.
 data DependencyTree =
-  DependencyTree (Set PackageName)
-                 (Map PackageName (Set PackageName, DotPayload))
+  DependencyTree (Set PackageName) DependencyGraph
 
 instance ToJSON DependencyTree where
   toJSON (DependencyTree _ dependencyMap) =
@@ -86,11 +90,14 @@ pkgLocToJSON (PLImmutable (PLIRepo repo _)) = object
   , "subdir" .= repoSubdir repo
   ]
 
+-- | For the given dot payload, yield a text representation of the name of the
+-- licence.
 licenseText :: DotPayload -> Text
 licenseText payload =
   maybe "<unknown>" (Text.pack . display . either licenseFromSPDX id)
                     payload.license
 
+-- | For the given dot payload, yield a text representation of the version.
 versionText :: DotPayload -> Text
 versionText payload =
   maybe "<unknown>" (Text.pack . display) payload.version

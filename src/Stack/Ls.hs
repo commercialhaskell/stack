@@ -50,8 +50,8 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.DependencyTree
-                   ( DependencyTree (..), DotPayload (..), licenseText
-                   , versionText
+                   ( DependencyGraph, DependencyTree (..), DotPayload (..)
+                   , licenseText, versionText
                    )
 import           Stack.Types.DotOpts ( DotOpts (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
@@ -320,7 +320,10 @@ listDependencies opts = do
         FilterPackage pkgName -> pkgName : exclude' locals fs
         FilterLocals -> locals <> exclude' locals fs
     ListDepsConstraints -> do
-      let constraintOpts = ListDepsFormatOpts " ==" False
+      let constraintOpts = ListDepsFormatOpts
+            { sep = " =="
+            , license = False
+            }
       T.putStrLn "constraints:"
       void $ Map.traverseWithKey (go "  , " constraintOpts)
                                  (snd <$> resultGraph)
@@ -341,7 +344,7 @@ printTree ::
   -> Int
   -> [Int]
   -> Set PackageName
-  -> Map PackageName (Set PackageName, DotPayload)
+  -> DependencyGraph
   -> IO ()
 printTree opts dotOpts depth remainingDepsCounts packages dependencyMap =
   F.sequence_ $ Seq.mapWithIndex go (toSeq packages)
@@ -385,8 +388,10 @@ treeNodePrefix t [0] True  _ = t <> "└─┬"
 treeNodePrefix t [_] True  _ = t <> "├─┬"
 treeNodePrefix t [0] False _ = t <> "└──"
 treeNodePrefix t [_] False _ = t <> "├──"
-treeNodePrefix t (0:ns) d remainingDepth = treeNodePrefix (t <> "  ") ns d remainingDepth
-treeNodePrefix t (_:ns) d remainingDepth = treeNodePrefix (t <> "│ ") ns d remainingDepth
+treeNodePrefix t (0:ns) d remainingDepth =
+  treeNodePrefix (t <> "  ") ns d remainingDepth
+treeNodePrefix t (_:ns) d remainingDepth =
+  treeNodePrefix (t <> "│ ") ns d remainingDepth
 
 listDepsLine :: ListDepsFormatOpts -> PackageName -> DotPayload -> Text
 listDepsLine opts name payload =
@@ -399,9 +404,6 @@ payloadText opts payload =
     then licenseText payload
     else versionText payload
 
-printJSON ::
-     Set PackageName
-  -> Map PackageName (Set PackageName, DotPayload)
-  -> IO ()
+printJSON :: Set PackageName -> DependencyGraph -> IO ()
 printJSON pkgs dependencyMap =
   LBC8.putStrLn $ encode $ DependencyTree pkgs dependencyMap
