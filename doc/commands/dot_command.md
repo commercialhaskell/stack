@@ -108,7 +108,7 @@ and `dot` produces output in the form of a PNG file named `wreq.png`.
     Graphviz's `twopi` executable draws graphs in a radial layout.
 
     ~~~text
-    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tpng -o wreq-example5.png
+    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tsvg -o wreq-example5.svg
     ~~~
 
-    <img alt="wreq-example2.png" src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example5.png">
+    ![wreq-example5.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@mkdocs-test/doc/img/dot_command/wreq-example5.svg)
