@@ -57,50 +57,51 @@ of the diagram).
 
 ## Examples
 
-The following examples are based on a version of the
-[`wreq` package](https://hackage.haskell.org/package/wreq). In each case, the
-output from `stack dot` is piped as an input into Graphviz's `dot` executable,
-and `dot` produces output in the form of a PNG file named `wreq.png`.
+The following examples are based on the package
+[`wreq-0.5.4.3`](https://hackage.haskell.org/package/wreq-0.5.4.3) and the boot
+packages of GHC 9.10.2. In each case, the output from `stack dot` is piped as an
+input into Graphviz's `dot` or `twopi` executables, and the executable produces
+output in the form of a SVG file named `wreq-example*.svg`.
 
 *   A simple example:
 
     ~~~text
-    stack dot | dot -Tpng -o wreq-example1.png
+    stack dot | dot -Tsvg -o wreq-example1.svg
     ~~~
 
-    <img alt="wreq-example1.png" src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example1.png">
+    ![wreq-example1.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example1.svg)
 
 *   Include external dependencies:
 
     ~~~text
-    stack dot --external | dot -Tpng -o wreq-example2.png
+    stack dot --external | dot -Tsvg -o wreq-example2.svg
     ~~~
 
-    <img alt="wreq-example2.png" src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example2.png">
+    ![wreq-example2.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example2.svg)
 
 *   Include external dependencies, limit the depth and save the output from
-    `stack dot` as an intermediate file (`wreq.dot`).
+    `stack dot` as an intermediate file (`wreq-example3.dot`).
 
     ~~~text
-    stack dot --external --depth 1 > wreq.dot
-    dot -Tpng -o wreq.png wreq.dot
+    stack dot --external --depth 2 > wreq-example3.dot
+    dot -Tsvg -o wreq-example3.svg wreq-example3.dot
     ~~~
 
 *   Include external dependencies, exclude `base` and limit the depth:
 
     ~~~text
-    stack dot --no-include-base --external --depth 2 | dot -Tpng -o wreq-example3.png
+    stack dot --no-include-base --external --depth 2 | dot -Tsvg -o wreq-example4.svg
     ~~~
 
-    <img alt="wreq-example2.png" src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example3.png">
+    ![wreq-example4.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example4.svg)
 
 *   Include external dependencies and prune `base` and other packages:
 
     ~~~text
-    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | dot -Tpng -o wreq-example4.png
+    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | dot -Tsvg -o wreq-example5.svg
     ~~~
 
-    <img alt="wreq-example2.png" src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example4.png">
+    ![wreq-example5.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example5.svg)
 
 *   Include external dependencies, prune `base` and other packages, and use a
     different Graphviz executable to draw the graph:
@@ -108,7 +109,7 @@ and `dot` produces output in the form of a PNG file named `wreq.png`.
     Graphviz's `twopi` executable draws graphs in a radial layout.
 
     ~~~text
-    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tpng -o wreq-example5.png
+    stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tsvg -o wreq-example6.svg
     ~~~
 
-    <img alt="wreq-example2.png" src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example5.png">
+    ![wreq-example6.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example6.svg)
