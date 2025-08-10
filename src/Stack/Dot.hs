@@ -47,7 +47,8 @@ printGraph dotOpts compiler locals graph = do
   liftIO $ Text.putStrLn "strict digraph deps {"
   printLocalNodes dotOpts filteredLocals
   printLeaves compiler graph
-  void (Map.traverseWithKey printEdges (fst <$> graph))
+  let allNodes = Map.keysSet graph
+  void (Map.traverseWithKey (printEdges allNodes) (fst <$> graph))
   liftIO $ Text.putStrLn "}"
  where
   filteredLocals =
@@ -70,14 +71,31 @@ printLocalNodes dotOpts locals =
   lpNodes :: [Text]
   lpNodes = map (applyStyle . nodeName) (F.toList locals)
 
--- | Print nodes without dependencies
+-- | Print relevant nodes, based on their relevant attributes.
 printLeaves :: MonadIO m => ActualCompiler -> DependencyGraph -> m ()
-printLeaves compiler =
-  F.mapM_ (printLeaf compiler) . Map.keysSet . Map.filter Set.null . fmap fst
+printLeaves compiler graph =
+  F.mapM_ printLeaf (Map.mapWithKey nodeAttributes graph)
+ where
+  allNodes = Map.keysSet graph
+  hasNoNodes = F.all (`Set.notMember` allNodes)
+  nodeAttributes package (deps, _) =
+    let isWiredInPackage = isWiredIn compiler package
+        isBottomRow = hasNoNodes deps
+    in  (package, isWiredInPackage, isBottomRow)
 
--- | @printDedges p ps@ prints an edge from p to every ps
-printEdges :: MonadIO m => PackageName -> Set PackageName -> m ()
-printEdges package deps = F.forM_ deps (printEdge package)
+-- | @printDedges ps p ps'@ prints an edge from @p@ to every @ps'@, if it is a
+-- member of @ps@.
+printEdges ::
+     MonadIO m
+  => Set PackageName
+     -- ^ The nodes in the graph.
+  -> PackageName
+     -- ^ The node in question.
+  -> Set PackageName
+     -- ^ The dependencies of the node in question.
+  -> m ()
+printEdges nodes package deps = F.forM_ deps $ \dep ->
+  when (dep `elem` nodes) $ printEdge package dep
 
 -- | Print an edge between the two package names
 printEdge :: MonadIO m => PackageName -> PackageName -> m ()
@@ -91,12 +109,26 @@ printEdge from to' =
 nodeName :: PackageName -> Text
 nodeName name = "\"" <> Text.pack (packageNameString name) <> "\""
 
--- | Print a node with no dependencies
-printLeaf :: MonadIO m => ActualCompiler -> PackageName -> m ()
-printLeaf compiler package = liftIO . Text.putStrLn . Text.concat $
-  if isWiredIn compiler package
-    then ["{rank=max; ", nodeName package, " [shape=box]; };"]
-    else ["{rank=max; ", nodeName package, "; };"]
+-- | Print a node if it (a) is a GHC wired-in package or (b) has no dependencies
+-- that are also nodes.
+printLeaf ::
+     MonadIO m
+  =>  ( PackageName
+      , Bool
+        -- Is package a GHC wired-in package?
+      , Bool
+        -- Does package have no dependencies that are are also nodes in the
+        -- graph?
+      )
+  -> m ()
+printLeaf (package, isWiredInPackage, isBottomRow) =
+  when (isWiredInPackage || isBottomRow) $
+    liftIO . Text.putStrLn . Text.concat $
+         [ "{"]
+      <> [ "rank=max; " | isBottomRow ]
+      <> [ nodeName package ]
+      <> [ " [shape=box]" | isWiredInPackage ]
+      <> [ "; };" ]
 
 -- | Check if the package is a GHC wired-in package
 isWiredIn :: ActualCompiler -> PackageName -> Bool
