@@ -69,7 +69,7 @@ output in the form of a SVG file named `wreq-example*.svg`.
     stack dot | dot -Tsvg -o wreq-example1.svg
     ~~~
 
-    ![wreq-example1.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example1.svg)
+    [![wreq-example1.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example1.svg)](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example1.svg)
 
 *   Include external dependencies:
 
@@ -77,7 +77,7 @@ output in the form of a SVG file named `wreq-example*.svg`.
     stack dot --external | dot -Tsvg -o wreq-example2.svg
     ~~~
 
-    ![wreq-example2.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example2.svg)
+    [![wreq-example2.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example2.svg)](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example2.svg)
 
 *   Include external dependencies, limit the depth and save the output from
     `stack dot` as an intermediate file (`wreq-example3.dot`).
@@ -93,7 +93,7 @@ output in the form of a SVG file named `wreq-example*.svg`.
     stack dot --no-include-base --external --depth 2 | dot -Tsvg -o wreq-example4.svg
     ~~~
 
-    ![wreq-example4.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example4.svg)
+    [![wreq-example4.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example4.svg)](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example4.svg)
 
 *   Include external dependencies and prune `base` and other packages:
 
@@ -101,7 +101,7 @@ output in the form of a SVG file named `wreq-example*.svg`.
     stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | dot -Tsvg -o wreq-example5.svg
     ~~~
 
-    ![wreq-example5.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example5.svg)
+    [![wreq-example5.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example5.svg)](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example5.svg)
 
 *   Include external dependencies, prune `base` and other packages, and use a
     different Graphviz executable to draw the graph:
@@ -112,4 +112,4 @@ output in the form of a SVG file named `wreq-example*.svg`.
     stack dot --external --prune base,lens,wreq-examples,http-client,aeson,tls,http-client-tls,exceptions | twopi -Groot=wreq -Goverlap=false -Tsvg -o wreq-example6.svg
     ~~~
 
-    ![wreq-example6.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example6.svg)
+    [![wreq-example6.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example6.svg)](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example6.svg)
