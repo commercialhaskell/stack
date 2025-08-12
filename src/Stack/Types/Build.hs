@@ -77,11 +77,6 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.EnvConfig ( EnvConfig )
 
--- | Package dependency oracle.
-newtype PkgDepsOracle
-  = PkgDeps PackageName
-  deriving (Eq, NFData, Show, Typeable)
-
 -- | Stored on disk to know whether the files have changed.
 newtype BuildCache = BuildCache
   { times :: Map FilePath FileCacheInfo
