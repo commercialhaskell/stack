@@ -84,13 +84,6 @@ import           Stack.Package
                    )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
-import           Stack.Types.Build
-                   ( ConfigCache (..), PrecompiledCache (..), Task (..)
-                   , TaskConfigOpts (..), TaskType (..), taskIsTarget
-                   , taskLocation, taskProvides, taskTargetIsMutable
-                   , taskTypePackageIdentifier
-                   )
-import qualified Stack.Types.Build as ConfigCache ( ConfigCache (..) )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig
@@ -100,6 +93,9 @@ import           Stack.Types.BuildOpts
                    , TestOpts (..)
                    )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
+import           Stack.Types.Cache
+                   ( ConfigCache (..), PrecompiledCache (..) )
+import qualified Stack.Types.Cache as ConfigCache ( ConfigCache (..) )
 import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
                    , foldComponentToAnotherCollection, getBuildableListText
@@ -143,6 +139,11 @@ import           Stack.Types.Package
                    , toCabalMungedPackageName
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
+import           Stack.Types.Plan
+                   ( Task (..), TaskConfigOpts (..), TaskType (..), taskIsTarget
+                   , taskLocation, taskProvides, taskTargetIsMutable
+                   , taskTypePackageIdentifier
+                   )
 import           Stack.Types.Runner ( HasRunner, globalOptsL )
 import           Stack.Types.SourceMap ( SourceMap (..) )
 import           System.IO.Error ( isDoesNotExistError )

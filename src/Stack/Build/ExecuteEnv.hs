@@ -78,8 +78,7 @@ import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build
                    ( ConvertPathsToAbsolute (..), ExcludeTHLoading (..)
-                   , KeepOutputOpen (..), TaskType (..), taskTypeLocation
-                   , taskTypePackageIdentifier
+                   , KeepOutputOpen (..)
                    )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
@@ -107,6 +106,9 @@ import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.Installed ( InstallLocation (..), Installed (..) )
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), packageIdentifier )
+import           Stack.Types.Plan
+                   ( TaskType (..), taskTypeLocation, taskTypePackageIdentifier
+                   )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Version ( withinRange )
 import qualified System.Directory as D

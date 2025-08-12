@@ -42,10 +42,10 @@ import           Stack.Storage.Util
                    ( handleMigrationException, listUpdateDiff, setUpdateDiff
                    , updateCollection
                    )
-import           Stack.Types.Build ( CachePkgSrc, ConfigCache (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.Cache ( ConfigCacheType )
+import           Stack.Types.Cache
+                   ( CachePkgSrc, ConfigCache (..), ConfigCacheType )
 import           Stack.Types.ConfigureOpts
                    ( ConfigureOpts (..), configureOptsFromDb )
 import           Stack.Types.GhcPkgId ( GhcPkgId )

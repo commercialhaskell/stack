@@ -50,9 +50,9 @@ import           Path ( (</>), mkRelFile, parseRelFile )
 import           Path.IO ( resolveFile', resolveDir' )
 import qualified RIO.FilePath as FP
 import           Stack.Prelude
-import           Stack.Storage.Util ( handleMigrationException, updateCollection, setUpdateDiff )
-import           Stack.Types.Build ( PrecompiledCache (..) )
-import           Stack.Types.Cache ( Action (..) )
+import           Stack.Storage.Util
+                   ( handleMigrationException, setUpdateDiff, updateCollection )
+import           Stack.Types.Cache ( Action (..), PrecompiledCache (..) )
 import           Stack.Types.Compiler ( ActualCompiler, compilerVersionText )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
 import           Stack.Types.CompilerPaths

@@ -343,6 +343,7 @@ library:
   - Stack.Types.PackageFile
   - Stack.Types.PackageName
   - Stack.Types.ParentMap
+  - Stack.Types.Plan
   - Stack.Types.Platform
   - Stack.Types.Project
   - Stack.Types.ProjectAndConfigMonoid

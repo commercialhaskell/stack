@@ -62,11 +62,10 @@ import           Stack.Storage.User
                    ( PrecompiledCacheKey, loadPrecompiledCache
                    , precompiledCacheKey, savePrecompiledCache
                    )
-import           Stack.Types.Build
-                   ( BuildCache (..), ConfigCache, FileCacheInfo
-                   , InstallLocation (..), Installed (..), PrecompiledCache (..)
+import           Stack.Types.Cache
+                   ( BuildCache (..), ConfigCache, ConfigCacheType (..)
+                   , PrecompiledCache (..)
                    )
-import           Stack.Types.Cache ( ConfigCacheType (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.ComponentUtils
                    ( StackUnqualCompName, unqualCompToString )
@@ -80,9 +79,12 @@ import           Stack.Types.EnvConfig
                    )
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.Installed
-                   (InstalledLibraryInfo (..), foldOnGhcPkgId' )
+                   ( InstallLocation (..), Installed (..)
+                   , InstalledLibraryInfo (..), foldOnGhcPkgId'
+                   )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), componentCachePath )
+import           Stack.Types.Package ( FileCacheInfo )
 import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
                    ( getFileStatus, modificationTime, setFileTimes )
