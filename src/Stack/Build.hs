@@ -41,10 +41,6 @@ import           Stack.Package ( buildableExes, resolvePackage )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Setup ( withNewLocalBuildTargets )
-import           Stack.Types.Build
-                   ( Plan (..), Task (..), TaskType (..), taskLocation
-                   , taskProvides
-                   )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig ( HasBuildConfig, configFileL )
@@ -71,6 +67,10 @@ import           Stack.Types.NamedComponent ( exeComponents )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..)
                    , PackageConfig (..), lpFiles, lpFilesForComponents
+                   )
+import           Stack.Types.Plan
+                   ( Plan (..), Task (..), TaskType (..), taskLocation
+                   , taskProvides
                    )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )

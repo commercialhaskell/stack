@@ -32,8 +32,6 @@ import           RIO.State ( StateT )
 import           RIO.Writer ( WriterT (..) )
 import           Stack.Package ( hasBuildableMainLibrary )
 import           Stack.Prelude hiding ( loadPackage )
-import           Stack.Types.Build
-                    ( Task (..), TaskType (..), taskProvides )
 import           Stack.Types.Build.Exception ( ConstructPlanException )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig(..) )
@@ -55,6 +53,8 @@ import           Stack.Types.Package
                    , PackageSource (..)
                    )
 import           Stack.Types.ParentMap ( ParentMap )
+import           Stack.Types.Plan
+                    ( Task (..), TaskType (..), taskProvides )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 

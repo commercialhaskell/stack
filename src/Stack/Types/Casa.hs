@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 
 {-|
-Module      : Stack.Types.Cache
+Module      : Stack.Types.Casa
 Description : Casa configuration types.
 License     : BSD-3-Clause
 

@@ -72,7 +72,6 @@ import           Stack.Prelude
 import           Stack.Runners
                    ( ShouldReexec (..), withConfig, withDefaultEnvConfig )
 import           Stack.SourceMap ( mkProjectPackage )
-import           Stack.Types.Build ( TaskType (..) )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..), configFileL )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
@@ -89,6 +88,7 @@ import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), PackageConfig (..)
                    , packageIdentifier
                    )
+import           Stack.Types.Plan ( TaskType (..) )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.PvpBounds ( PvpBounds (..), PvpBoundsType (..) )
 import           Stack.Types.Runner ( HasRunner, Runner )

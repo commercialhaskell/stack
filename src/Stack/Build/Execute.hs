@@ -58,10 +58,7 @@ import           Stack.Coverage
 import           Stack.GhcPkg ( unregisterGhcPkgIds )
 import           Stack.Prelude
 import           Stack.Types.Build
-                   ( ExcludeTHLoading (..), KeepOutputOpen (..), Plan (..)
-                   , Task (..), TaskConfigOpts (..), TaskType (..), taskLocation
-                   , taskProvides
-                   )
+                   ( ExcludeTHLoading (..), KeepOutputOpen (..) )
 import           Stack.Types.Build.Exception ( BuildPrettyException (..) )
 import           Stack.Types.BuildOpts
                    ( BenchmarkOpts (..), BuildOpts (..), TestOpts (..) )
@@ -88,6 +85,10 @@ import           Stack.Types.NamedComponent
                    ( NamedComponent, benchComponents, testComponents )
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), packageIdentifier )
+import           Stack.Types.Plan
+                   ( Plan (..), Task (..), TaskConfigOpts (..), TaskType (..)
+                   , taskLocation, taskProvides
+                   )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( terminalL, viewExecutablePath )
 import           Stack.Types.SourceMap ( Target )

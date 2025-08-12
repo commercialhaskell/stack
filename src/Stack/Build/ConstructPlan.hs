@@ -41,12 +41,6 @@ import           Stack.Package
                    )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
-import           Stack.Types.Build
-                   ( CachePkgSrc (..), ConfigCache (..), Plan (..), Task (..)
-                   , TaskConfigOpts (..), TaskType (..)
-                   , installLocationIsMutable, taskIsTarget, taskLocation
-                   , taskProvides, taskTargetIsMutable, toCachePkgSrc
-                   )
 import           Stack.Types.Build.ConstructPlan
                    ( AddDepRes (..), CombinedMap, Ctx (..), M
                    , MissingPresentDeps (..), PackageInfo (..), ToolWarning(..)
@@ -62,6 +56,8 @@ import           Stack.Types.BuildConfig
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), BuildSubset (..) )
+import           Stack.Types.Cache
+                   ( CachePkgSrc (..), ConfigCache (..), toCachePkgSrc )
 import           Stack.Types.CompCollection ( collectionMember )
 import           Stack.Types.Compiler ( WhichCompiler (..), getGhcVersion )
 import           Stack.Types.CompilerPaths
@@ -88,6 +84,11 @@ import           Stack.Types.Package
                    ( ExeName (..), LocalPackage (..), Package (..)
                    , PackageSource (..), installedMapGhcPkgId
                    , packageIdentifier, psVersion, runMemoizedWith
+                   )
+import           Stack.Types.Plan
+                   ( Plan (..), Task (..), TaskConfigOpts (..), TaskType (..)
+                   , installLocationIsMutable, taskIsTarget, taskLocation
+                   , taskProvides, taskTargetIsMutable
                    )
 import           Stack.Types.ProjectConfig ( isPCGlobalProject )
 import           Stack.Types.Runner ( HasRunner (..), globalOptsL )
