@@ -64,6 +64,12 @@ directory, is the one reported by
 
 ## Project Stack work directory
 
+The Stack work directory for a project will contain:
+
+* a `stack.sqlite3` file (being a SQLite v3 database); and
+* a `stack.sqlite3.pantry-write-lock` file (used to ensure that only one
+  process is trying to write to the database at any time).
+
 The Stack work directory for a project will contain a `install` directory.
 This directory will contain a path to a directory containing:
 
@@ -75,11 +81,9 @@ This directory will contain a path to a directory containing:
   directory. This is the directory reported by
   [`stack path --local-hpc-root`](../commands/path_command.md);
 * a `lib` directory, containing a directory named after the platform and the
-  GHC version and, within that, a directory for each project package;
+  GHC version and, within that, a directory for each project package; and
 * a `pkgdb` directory. This is the directory reported by
-  [`stack path --local-pkg-db`](../commands/path_command.md);
-* a `stack.sqlite3` file; and
-* a `stack.sqlite3.pantry-write-lock` file.
+  [`stack path --local-pkg-db`](../commands/path_command.md).
 
 The directory is the one reported by
 [`stack path --local-install-root`](../commands/path_command.md).
