@@ -37,10 +37,16 @@ updateCollection ::
      , Foldable collection
      )
   => (collection rawValue -> collection rawValue -> ([Filter record], [value]))
+     -- ^ Function to yield items in old not in new, to delete, and values in
+     -- new not in old, to add, from the old and new collections of values.
   -> (value -> record)
+     -- ^ Function to yield new records from values in new not in old.
   -> [Filter record]
+     -- ^ Extra items to delete, if there are other items to delete.
   -> collection rawValue
+     -- ^ The old collection of values.
   -> collection rawValue
+     -- ^ The new collection of values.
   -> ReaderT backend m ()
 updateCollection fnDiffer recordCons extra old new =
   when (old /= new) $ do

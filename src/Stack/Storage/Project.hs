@@ -9,10 +9,10 @@
 
 {-|
 Module      : Stack.Storage.Project
-Description : Work with SQLite DB for caches across a project.
+Description : Work with the SQLite database for a project's caches.
 License     : BSD-3-Clause
 
-Work with SQLite database used for caches across a single project.
+Work with the SQLite database used for a project's caches.
 -}
 
 module Stack.Storage.Project
@@ -51,6 +51,25 @@ import           Stack.Types.ConfigureOpts
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Storage ( ProjectStorage (..) )
 
+-- Uses the Persistent entity syntax to generate entities for five tables in a
+-- SQLite database:
+--
+-- config_cache
+-- config_cache_dir_option
+-- config_cache_no_dir_option
+-- config_cache_dep
+-- config_cache_component
+--
+-- The ID column for each table is automatically generated.
+--
+-- The other tables have a foreign key referring to the config_cache table, via:
+--
+--   parent ConfigCacheParentId sql="config_cache_id" OnDeleteCascade
+--
+-- The tables have UNIQUE constraints on multiple columns.
+--
+-- Creates a function migrateAll to perform all migrations for the generated
+-- entities.
 share [ mkPersist sqlSettings
       , mkMigrate "migrateAll"
       ]
@@ -92,11 +111,14 @@ ConfigCacheComponent
   deriving Show
 |]
 
--- | Initialize the database.
+-- | Initialize the project database for caches.
 initProjectStorage ::
      HasLogFunc env
-  => Path Abs File -- ^ storage file
+  => Path Abs File
+     -- ^ The storage file.
   -> (ProjectStorage -> RIO env a)
+     -- ^ Action, given a SQL database connection to the project database for
+     -- caches.
   -> RIO env a
 initProjectStorage fp f = handleMigrationException $
   initStorage "Stack" migrateAll fp $ f . ProjectStorage
@@ -110,11 +132,19 @@ withProjectStorage inner = do
   storage <- view (buildConfigL . to (.projectStorage.projectStorage))
   withStorage_ storage inner
 
--- | Key used to retrieve configuration or flag cache
+-- | Type synonym representing keys used to retrieve a record from the Cabal
+-- configuration cache or the library or executable Cabal flag cache.
 type ConfigCacheKey = Unique ConfigCacheParent
 
--- | Build key used to retrieve configuration or flag cache
-configCacheKey :: Path Abs Dir -> ConfigCacheType -> ConfigCacheKey
+-- | For the given directory and type of cache, yields the key used to retrieve
+-- a record from the Cabal configuration cache or the library or executable
+-- Cabal flag cache.
+configCacheKey ::
+     Path Abs Dir
+     -- ^ Directory.
+  -> ConfigCacheType
+     -- ^ Type of cache.
+  -> ConfigCacheKey
 configCacheKey dir = UniqueConfigCacheParent (toFilePath dir)
 
 -- | Internal helper to read the t'ConfigCache'
@@ -150,7 +180,7 @@ readConfigCache (Entity parentId configCacheParent) = do
     , pathEnvVar
     }
 
--- | Load t'ConfigCache' from the database.
+-- | Load a t'ConfigCache' value from the project database for caches.
 loadConfigCache ::
      (HasBuildConfig env, HasLogFunc env)
   => ConfigCacheKey
@@ -164,7 +194,7 @@ loadConfigCache key =
             Just <$> readConfigCache parentEntity
         | otherwise -> pure Nothing
 
--- | Insert or update t'ConfigCache' to the database.
+-- | Insert or update a t'ConfigCache' value to the project database for caches.
 saveConfigCache ::
      (HasBuildConfig env, HasLogFunc env)
   => ConfigCacheKey

@@ -1082,7 +1082,15 @@ checkDirtiness ps installed package present buildHaddocks = do
       tell mempty { wDirty = Map.singleton package.name reason }
       pure True
 
-describeConfigDiff :: Config -> ConfigCache -> ConfigCache -> Maybe Text
+-- | If the new Cabal configuration cache is the same as the old, yields
+-- 'Nothing'. Otherwise yields 'Just' a textual explanation of how they differ.
+describeConfigDiff ::
+     Config
+  -> ConfigCache
+     -- ^ The old Cabal configuration cache.
+  -> ConfigCache
+     -- ^ The new Cabal configuration cache.
+  -> Maybe Text
 describeConfigDiff config old new
   | old.pkgSrc /= new.pkgSrc = Just $
       "switching from " <>
