@@ -32,11 +32,14 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.Package
                    ( FileCacheInfo (..), LocalPackage (..), PackageSource (..) )
 
--- | Type of config cache
+-- | Type representing types of cache in the Stack project SQLite database.
 data ConfigCacheType
   = ConfigCacheTypeConfig
+    -- ^ Cabal configuration cache.
   | ConfigCacheTypeFlagLibrary GhcPkgId
+    -- ^ Library Cabal flag cache.
   | ConfigCacheTypeFlagExecutable PackageIdentifier
+    -- ^ Executable Cabal flag cache.
   deriving (Eq, Show)
 
 instance PersistField ConfigCacheType where
@@ -89,7 +92,8 @@ newtype BuildCache = BuildCache
 
 instance NFData BuildCache
 
--- | Stored on disk to know whether the flags have changed.
+-- | Stored in the project's SQLite database to know whether the Cabal
+-- configuration has changed or libarary or executable Cabal flags have changed.
 data ConfigCache = ConfigCache
   { configureOpts :: !ConfigureOpts
     -- ^ All Cabal configure options used for this package.
@@ -103,11 +107,12 @@ data ConfigCache = ConfigCache
     -- here, as it's not a configure option (just a build option), but this
     -- is a convenient way to force compilation when the components change.
   , buildHaddocks :: !Bool
-    -- ^ Are haddocks to be built?
+    -- ^ Is Haddock documentation to be built?
   , pkgSrc :: !CachePkgSrc
+    -- ^ The origin of the package's source code.
   , pathEnvVar :: !Text
-  -- ^ Value of the PATH env var, see
-  -- <https://github.com/commercialhaskell/stack/issues/3138>
+    -- ^ Value of the PATH environment variable. See
+    -- <https://github.com/commercialhaskell/stack/issues/3138>
   }
   deriving (Data, Eq, Generic, Show, Typeable)
 

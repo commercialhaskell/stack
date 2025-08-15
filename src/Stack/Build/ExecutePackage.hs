@@ -151,7 +151,7 @@ import           System.PosixCompat.Files
                    ( createLink, getFileStatus, modificationTime )
 import           System.Random ( randomIO )
 
--- | Generate the ConfigCache
+-- | Generate the t'ConfigCache' value.
 getConfigCache ::
      HasEnvConfig env
   => ExecuteEnv
@@ -257,15 +257,14 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
           -- need proper hashes for package identifiers.
       then pure True
       else do
-        -- We can ignore the components portion of the config
-        -- cache, because it's just used to inform 'construct
-        -- plan that we need to plan to build additional
-        -- components. These components don't affect the actual
-        -- package configuration.
+        -- We can ignore the components field of the Cabal configuration cache,
+        -- because it is only used to inform 'construct plan' that we need to
+        -- plan to build additional components. These components don't affect
+        -- the Cabal configuration for the package.
         let ignoreComponents :: ConfigCache -> ConfigCache
             ignoreComponents cc = cc { ConfigCache.components = Set.empty }
-        -- Determine the old and new configuration in the local directory, to
-        -- determine if we need to reconfigure.
+        -- Determine the old and new Cabal configuration for the package
+        -- directory, to determine if we need to reconfigure.
         mOldConfigCache <- tryGetConfigCache pkgDir
 
         mOldCabalMod <- tryGetCabalMod pkgDir

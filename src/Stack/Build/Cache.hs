@@ -89,7 +89,7 @@ import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
                    ( getFileStatus, modificationTime, setFileTimes )
 
--- | Directory containing files to mark an executable as installed
+-- | Directory containing files to mark an executable as installed.
 exeInstalledDir ::
      (HasEnvConfig env)
   => InstallLocation
@@ -97,7 +97,7 @@ exeInstalledDir ::
 exeInstalledDir Snap = (</> relDirInstalledPackages) <$> installationRootDeps
 exeInstalledDir Local = (</> relDirInstalledPackages) <$> installationRootLocal
 
--- | Get all of the installed executables
+-- | Get all of the installed executables.
 getInstalledExes ::
      (HasEnvConfig env)
   => InstallLocation
@@ -115,7 +115,7 @@ getInstalledExes loc = do
     map (\x -> (pkgName x, [x])) $
     mapMaybe (parsePackageIdentifier . toFilePath . filename) files
 
--- | Mark the given executable as installed
+-- | Mark the given executable as installed.
 markExeInstalled ::
      (HasEnvConfig env)
   => InstallLocation
@@ -135,7 +135,7 @@ markExeInstalled loc ident = do
   -- and invalidate this file in getInstalledExes if they no longer exist
   writeBinaryFileAtomic fp "Installed"
 
--- | Mark the given executable as not installed
+-- | Mark the given executable as not installed.
 markExeNotInstalled ::
      (HasEnvConfig env)
   => InstallLocation
@@ -149,7 +149,9 @@ markExeNotInstalled loc ident = do
 buildCacheFile ::
      (HasEnvConfig env, MonadReader env m, MonadThrow m)
   => Path Abs Dir
+     -- ^ Package directory.
   -> NamedComponent
+     -- ^ Package component.
   -> m (Path Abs File)
 buildCacheFile dir component = do
   cachesDir <- buildCachesDir dir
@@ -162,7 +164,9 @@ buildCacheFile dir component = do
 tryGetBuildCache ::
      HasEnvConfig env
   => Path Abs Dir
+     -- ^ Package directory.
   -> NamedComponent
+     -- ^ Package component.
   -> RIO env (Maybe (Map FilePath FileCacheInfo))
 tryGetBuildCache dir component = do
   fp <- buildCacheFile dir component
@@ -171,27 +175,30 @@ tryGetBuildCache dir component = do
       decode = Yaml.decodeFileThrow (toFilePath fp)
   either (const Nothing) (Just . (.times)) <$> liftIO (tryAny decode)
 
--- | Try to read the dirtiness cache for the given package directory.
+-- | Try to read the Cabal configuration cache for the given package directory.
 tryGetConfigCache ::
      HasEnvConfig env
   => Path Abs Dir
+     -- ^ Package directory.
   -> RIO env (Maybe ConfigCache)
 tryGetConfigCache dir =
   loadConfigCache $ configCacheKey dir ConfigCacheTypeConfig
 
--- | Try to read the mod time of the Cabal file from the last build
+-- | Try to read the modification time of the Cabal file from the last build.
 tryGetCabalMod ::
      HasEnvConfig env
   => Path Abs Dir
+     -- ^ Package directory.
   -> RIO env (Maybe CTime)
 tryGetCabalMod dir = do
   fp <- toFilePath <$> configCabalMod dir
   tryGetFileMod fp
 
--- | Try to read the mod time of setup-config file from the last build
+-- | Try to read the modification time of setup-config file from the last build.
 tryGetSetupConfigMod ::
      HasEnvConfig env
   => Path Abs Dir
+     -- ^ Package directory.
   -> RIO env (Maybe CTime)
 tryGetSetupConfigMod dir = do
   fp <- toFilePath <$> configSetupConfigMod dir
@@ -202,7 +209,7 @@ tryGetFileMod fp =
   liftIO $ either (const Nothing) (Just . modificationTime) <$>
     tryIO (getFileStatus fp)
 
--- | Try to read the project root from the last build of a package
+-- | Try to read the project root from the last build of a package.
 tryGetPackageProjectRoot ::
      HasEnvConfig env
   => Path Abs Dir
@@ -220,17 +227,21 @@ tryReadFileBinary fp =
 writeBuildCache ::
      HasEnvConfig env
   => Path Abs Dir
+     -- ^ Package directory.
   -> NamedComponent
+     -- ^ Package component.
   -> Map FilePath FileCacheInfo -> RIO env ()
 writeBuildCache dir component times = do
   fp <- toFilePath <$> buildCacheFile dir component
   liftIO $ Yaml.encodeFile fp BuildCache { times = times }
 
--- | Write the dirtiness cache for this package's configuration.
+-- | Write the given Cabal configuration cache for the given package directory.
 writeConfigCache ::
      HasEnvConfig env
   => Path Abs Dir
+     -- ^ Package directory.
   -> ConfigCache
+     -- ^ Cabal configuration cache.
   -> RIO env ()
 writeConfigCache dir =
   saveConfigCache (configCacheKey dir ConfigCacheTypeConfig)
@@ -270,8 +281,12 @@ writePackageProjectRoot dir projectRoot = do
   fp <- configPackageProjectRoot dir
   writeBinaryFileAtomic fp (byteString projectRoot)
 
--- | Delete the caches for the project.
-deleteCaches :: HasEnvConfig env => Path Abs Dir -> RIO env ()
+-- | Delete the Cabal configuration cache for the given package directory.
+deleteCaches ::
+     HasEnvConfig env
+  => Path Abs Dir
+     -- ^ Package directory.
+  -> RIO env ()
 deleteCaches dir =
   {- FIXME confirm that this is acceptable to remove
   bfp <- buildCacheFile dir
@@ -279,6 +294,8 @@ deleteCaches dir =
   -}
   deactiveConfigCache $ configCacheKey dir ConfigCacheTypeConfig
 
+-- | For the given installed item, yields the key used to retrieve a record from
+-- the library Cabal flag cache or executable Cabal flag cache.
 flagCacheKey :: (HasEnvConfig env) => Installed -> RIO env ConfigCacheKey
 flagCacheKey installed = do
   installationRoot <- installationRootLocal
@@ -289,7 +306,7 @@ flagCacheKey installed = do
     Executable ident -> pure $
       configCacheKey installationRoot (ConfigCacheTypeFlagExecutable ident)
 
--- | Loads the flag cache for the given installed extra-deps.
+-- | Loads the Cabal flag cache for the given installed extra-deps.
 tryGetFlagCache ::
      HasEnvConfig env
   => Installed
@@ -298,7 +315,7 @@ tryGetFlagCache gid = do
   key <- flagCacheKey gid
   loadConfigCache key
 
--- | Write the flag cache for the given installed extra-deps.
+-- | Write the Cabal flag cache for the given installed extra-deps.
 writeFlagCache ::
      HasEnvConfig env
   => Installed
@@ -313,17 +330,22 @@ successBS = "success"
 failureBS = "failure"
 unknownBS = "unknown"
 
--- | Status of a test suite
+-- | Status of test suite(s).
 data TestStatus
   = TSSuccess
+    -- ^ The test suite(s) succeeded.
   | TSFailure
+    -- ^ One or more test suites failed.
   | TSUnknown
+    -- ^ The outcome of the test suite(s) is unknown.
 
--- | Mark test suite status
+-- | Mark test suite status.
 setTestStatus ::
      HasEnvConfig env
   => Path Abs Dir
+     -- ^ Package directory.
   -> TestStatus
+     -- ^ The status of the test suite(s).
   -> RIO env ()
 setTestStatus dir status = do
   fp <- testSuccessFile dir
@@ -333,10 +355,11 @@ setTestStatus dir status = do
       TSFailure -> failureBS
       TSUnknown -> unknownBS
 
--- | Check if the test suite already passed
+-- | Check if the test suite(s) already passed.
 getTestStatus ::
      HasEnvConfig env
   => Path Abs Dir
+     -- ^ Package directory.
   -> RIO env TestStatus
 getTestStatus dir = do
   fp <- testSuccessFile dir

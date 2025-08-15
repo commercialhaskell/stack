@@ -64,12 +64,15 @@ instance Pretty StoragePrettyException where
 
 instance Exception StoragePrettyException
 
--- | A bit of type safety to ensure we're talking to the right database.
+-- | Type representing SQL database connections to the user database. This
+-- provides a bit of type safety to ensure we're talking to the right database.
 newtype UserStorage = UserStorage
   { userStorage :: Storage
   }
 
--- | A bit of type safety to ensure we're talking to the right database.
+-- | Type representing SQL database connections to the project database for
+-- caches. This provides a bit of type safety to ensure we're talking to the
+-- right database.
 newtype ProjectStorage = ProjectStorage
   { projectStorage :: Storage
   }
