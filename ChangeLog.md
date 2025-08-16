@@ -30,6 +30,7 @@ Other enhancements:
 * Add flag `--[no-]omit-this` (default: disabled) to Stack's `clean` command to
   omit directories currently in use from cleaning (when `--full` is not
   specified).
+* Add option `-w` as synonym for `--stack-yaml`.
 
 Bug fixes:
 

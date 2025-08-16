@@ -17,7 +17,7 @@ module Stack.Options.GlobalParser
 
 import           Options.Applicative
                    ( Mod, Parser, ReadM, auto, completer, help, hidden, internal
-                   , long, metavar, option, strOption, value
+                   , long, metavar, option, short, strOption, value
                    )
 import           Options.Applicative.Builder.Extra
                    ( fileExtCompleter, firstBoolFlagsFalse
@@ -102,6 +102,7 @@ globalOptsParser currentDir kind = GlobalOptsMonoid
         ))
   <*> optionalFirst (strOption
         (  long "stack-yaml"
+        <> short 'w'
         <> metavar "STACK-YAML"
         <> completer (fileExtCompleter [".yaml"])
         <> help "Override project stack.yaml file (overrides any STACK_YAML \
