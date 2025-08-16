@@ -324,7 +324,7 @@ Pass the option `--stack-root <absolute_path_to_the_Stack_root>` to specify the
 path to the [Stack root](../topics/stack_root.md) directory. The path must be an
 absolute one.
 
-## `--stack-yaml` option
+## `--stack-yaml` or `-w` option
 
 Default: `stack.yaml`
 
