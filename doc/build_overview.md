@@ -52,8 +52,8 @@ Given these inputs, Stack attempts the following process when performing a build
 
 ## Find the `stack.yaml` file
 
-* Check for a `--stack-yaml` CLI arg, and use that
-* Check for a `STACK_YAML` env var
+* Check for a `--stack-yaml` or `-w` command line argument, and use that
+* Check for a `STACK_YAML` environment variable
 * Look for a `stack.yaml` in this directory or ancestor directories
 * Fall back to the default global project
 
@@ -199,7 +199,7 @@ they get prepended otherwise they get used as is.
 Use some deterministic binary serialization and SHA256 thereof to get
 a hash of the following information:
 
-* Actual compiler (GHC version, path, *FIXME* probably some other unique info 
+* Actual compiler (GHC version, path, *FIXME* probably some other unique info
   from GHC, I have heard that `ghc --info` gives you something)
 * Global database map
 * Immutable dependency map
@@ -233,7 +233,7 @@ installed in this database will never need to be rebuilt.
   all enabled components (using the fun backwards compat logic for
   `build-tools`)
 * Apply the logic recursively to come up with a full build plan
-* If a task depends exclusively on immutable packages, mark it as immutable. 
+* If a task depends exclusively on immutable packages, mark it as immutable.
   Otherwise, it is mutable. The former go into the snapshot database, the latter
   into the local database.
 

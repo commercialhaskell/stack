@@ -5,7 +5,7 @@
 Whenever you run something with Stack, it needs a project-level configuration
 file. The algorithm Stack uses to find such a file is:
 
-1. Check for a `--stack-yaml` option on the command line
+1. Check for a `--stack-yaml` or `-w` option on the command line
 2. Check for a `STACK_YAML` environment variable
 3. Check the current directory and all ancestor directories for a `stack.yaml`
    file
@@ -30,7 +30,7 @@ for you with the latest LTS snapshot. This allows you to do things like:
 Keep in mind that there is nothing magical about this implicit global
 configuration. It has no effect on projects at all. Every package you install
 with it is put into isolated databases just like everywhere else. The only magic
-is that it is the catch-all project whenever you are running Stack somewhere 
+is that it is the catch-all project whenever you are running Stack somewhere
 else.
 
 ## Package description vs project-level configuration

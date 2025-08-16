@@ -73,7 +73,7 @@ Stack's configuration files are each of one of two types:
 Stack obtains project-level configuration from one of the following (in order of
 preference):
 
-1. A file specified by the `--stack-yaml` command line option.
+1. A file specified by the `--stack-yaml` or `-w` command line option.
 2. A file specified by the `STACK_YAML` environment variable.
 3. A file named `stack.yaml` in the current directory or an ancestor directory.
 4. A file name `stack.yaml` in the `global-project` directory in the

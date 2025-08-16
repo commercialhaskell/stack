@@ -167,7 +167,7 @@ Related command: all commands that make use of Stack's
 [project-level configuration](yaml/index.md).
 
 Overridden by: Stack's global
-[`--stack-yaml`](global_flags.md#-stack-yaml-option) option.
+[`--stack-yaml`](global_flags.md#-stack-yaml-or-w-option) option.
 
 The environment variable `STACK_YAML` can be used to specify Stack's
 project-level configuration file.
