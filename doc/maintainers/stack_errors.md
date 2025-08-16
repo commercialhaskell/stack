@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2025-08-06.
+`master` branch of the Stack repository. Last updated: 2025-08-16.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -65,7 +65,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-4639] = NoArgumentsBug
         ~~~
 
-    -   `Stack.Clean.CleanException`
+    -   `Stack.Clean.CleanPrettyException`
 
         ~~~haskell
         [S-9463] = NonLocalPackages [PackageName]

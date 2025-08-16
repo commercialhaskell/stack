@@ -17,7 +17,7 @@ module Stack.Clean
   , clean
   ) where
 
-import           Data.List ( (\\), intercalate )
+import           Data.List ( (\\) )
 import qualified Data.Map.Strict as Map
 import           Path.IO ( ignoringAbsence, removeDirRecur )
 import           Stack.Config ( withBuildConfig )
@@ -30,27 +30,38 @@ import           Stack.Types.Config ( Config )
 import           Stack.Types.Runner ( Runner )
 import           Stack.Types.SourceMap ( SMWanted (..), ppRoot )
 
--- | Type representing exceptions thrown by functions exported by the
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Clean" module.
-data CleanException
+data CleanPrettyException
   = NonLocalPackages [PackageName]
   | DeletionFailures [(Path Abs Dir, SomeException)]
   deriving (Show, Typeable)
 
-instance Exception CleanException where
-  displayException (NonLocalPackages pkgs) = concat
-    [ "Error: [S-9463]\n"
-    , "The following packages are not part of this project: "
-    , intercalate ", " (map show pkgs)
-    ]
-  displayException (DeletionFailures failures) = concat
-    [ "Error: [S-6321]\n"
-    , "Exception while recursively deleting:\n"
-    , concatMap (\(dir, e) ->
-        toFilePath dir <> "\n" <> displayException e <> "\n") failures
-    , "Perhaps you do not have permission to delete these files or they are in \
-      \use?"
-    ]
+instance Pretty CleanPrettyException where
+  pretty (NonLocalPackages pkgs) =
+    "[S-9463]"
+    <> line
+    <> fillSep
+         ( flow "The following are not project packages:"
+         : mkNarrativeList (Just Current) False
+             (map fromPackageName pkgs :: [StyleDoc])
+         )
+  pretty (DeletionFailures failures) =
+    "[S-6321]"
+    <> line
+    <> flow "Exception while recursively deleting:"
+    <> line
+    <> mconcat (map prettyFailure failures)
+    <> flow "Perhaps you do not have permission to delete these files or they \
+            \are in use?"
+   where
+    prettyFailure (dir, e) =
+         pretty dir
+      <> line
+      <> string (displayException e)
+      <> line
+
+instance Exception CleanPrettyException
 
 -- | Type representing command line options for the @stack clean@ command.
 data CleanOpts
@@ -78,7 +89,7 @@ clean cleanOpts = do
   failures <- catMaybes <$> mapM cleanDir toDelete
   case failures of
     [] -> pure ()
-    _  -> throwIO $ DeletionFailures failures
+    _  -> prettyThrowIO $ DeletionFailures failures
 
 cleanDir :: Path Abs Dir -> RIO Config (Maybe (Path Abs Dir, SomeException))
 cleanDir dir = do
@@ -98,7 +109,7 @@ dirsToDelete cleanOpts = do
           getPkgDir pkgName' = fmap ppRoot (Map.lookup pkgName' packages)
       case targets \\ localPkgNames of
         [] -> mapM rootDistDirFromDir (mapMaybe getPkgDir targets)
-        xs -> throwM (NonLocalPackages xs)
+        xs -> prettyThrowM (NonLocalPackages xs)
     CleanFull -> do
       pkgWorkDirs <- mapM (workDirFromDir . ppRoot) $ Map.elems packages
       projectWorkDir <- getWorkDir
