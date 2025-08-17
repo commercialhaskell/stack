@@ -70,6 +70,8 @@ import           Stack.Build.ExecuteEnv
                    )
 import           Stack.Build.Source ( addUnlistedToBuildCache )
 import           Stack.Config.ConfigureScript ( ensureConfigureScript )
+import           Stack.ConfigureOpts
+                   ( configureOptsFromBase, renderConfigureOpts )
 import           Stack.Constants
                    ( bindirSuffix, compilerOptionsCabalFlag, testGhcEnvRelFile )
 import           Stack.Constants.Config
@@ -114,7 +116,6 @@ import           Stack.Types.ComponentUtils
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
-import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
@@ -195,7 +196,7 @@ getConfigCache ee task installedMap enableTest enableBench = do
       -- where it was the opposite resulted in this. It doesn't seem to make any
       -- difference anyway.
       allDepsMap = Map.union missing' task.present
-      configureOpts' = ConfigureOpts.configureOpts
+      configureOpts' = configureOptsFromBase
         cOpts.envConfig
         cOpts.baseConfigOpts
         allDepsMap
@@ -304,7 +305,7 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
         Right x -> pure $ concat ["--with-", name, "=", x]
     let allOpts =
              concat exes
-          <> ConfigureOpts.renderConfigureOpts newConfigCache.configureOpts
+          <> renderConfigureOpts newConfigCache.configureOpts
     -- Configure cabal with arguments determined by
     -- Stack.Types.Build.configureOpts
     cabal KeepTHLoading $ "configure" : allOpts

@@ -33,7 +33,7 @@ module Stack.Build.Cache
   , writePrecompiledCache
   , readPrecompiledCache
   -- Exported for testing
-  , BuildCache (..)
+  , BuildFileCache (..)
   ) where
 
 import           Crypto.Hash ( hashWith, SHA256 (..) )
@@ -63,8 +63,8 @@ import           Stack.Storage.User
                    , precompiledCacheKey, savePrecompiledCache
                    )
 import           Stack.Types.Cache
-                   ( BuildCache (..), ConfigCache, ConfigCacheType (..)
-                   , PrecompiledCache (..)
+                   ( BuildFileCache (..), ConfigCache, ConfigCacheType (..)
+                   , FileCache, PrecompiledCache (..)
                    )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
 import           Stack.Types.ComponentUtils
@@ -84,7 +84,6 @@ import           Stack.Types.Installed
                    )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), componentCachePath )
-import           Stack.Types.Package ( FileCacheInfo )
 import           Stack.Types.SourceMap ( smRelDir )
 import           System.PosixCompat.Files
                    ( getFileStatus, modificationTime, setFileTimes )
@@ -167,13 +166,13 @@ tryGetBuildCache ::
      -- ^ Package directory.
   -> NamedComponent
      -- ^ Package component.
-  -> RIO env (Maybe (Map FilePath FileCacheInfo))
+  -> RIO env (Maybe FileCache)
 tryGetBuildCache dir component = do
   fp <- buildCacheFile dir component
   ensureDir $ parent fp
-  let decode :: MonadIO m => m BuildCache
+  let decode :: MonadIO m => m BuildFileCache
       decode = Yaml.decodeFileThrow (toFilePath fp)
-  either (const Nothing) (Just . (.times)) <$> liftIO (tryAny decode)
+  either (const Nothing) (Just . (.fileCache)) <$> liftIO (tryAny decode)
 
 -- | Try to read the Cabal configuration cache for the given package directory.
 tryGetConfigCache ::
@@ -230,10 +229,12 @@ writeBuildCache ::
      -- ^ Package directory.
   -> NamedComponent
      -- ^ Package component.
-  -> Map FilePath FileCacheInfo -> RIO env ()
-writeBuildCache dir component times = do
+  -> FileCache
+     -- ^ File cache.
+  -> RIO env ()
+writeBuildCache dir component fileCache = do
   fp <- toFilePath <$> buildCacheFile dir component
-  liftIO $ Yaml.encodeFile fp BuildCache { times = times }
+  liftIO $ Yaml.encodeFile fp BuildFileCache { fileCache }
 
 -- | Write the given Cabal configuration cache for the given package directory.
 writeConfigCache ::
@@ -250,6 +251,7 @@ writeConfigCache dir =
 writeCabalMod ::
      HasEnvConfig env
   => Path Abs Dir
+     -- ^ Package directory.
   -> CTime
   -> RIO env ()
 writeCabalMod dir x = do

@@ -52,6 +52,7 @@ import           Stack.Types.BuildOptsCLI
                    , boptsCLIAllProgOptions
                    )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
+import           Stack.Types.Cache ( FileCache, FileCacheInfo (..) )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
 import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.Curator ( Curator (..) )
@@ -64,9 +65,8 @@ import           Stack.Types.FileDigestCache ( readFileDigest )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), isCSubLib, splitComponents )
 import           Stack.Types.Package
-                   ( FileCacheInfo (..), LocalPackage (..), Package (..)
-                   , PackageConfig (..), dotCabalGetPath, memoizeRefWith
-                   , runMemoizedWith
+                   ( LocalPackage (..), Package (..), PackageConfig (..)
+                   , dotCabalGetPath, memoizeRefWith, runMemoizedWith
                    )
 import           Stack.Types.PackageFile
                    ( PackageComponentFile (..), PackageWarning )
@@ -488,9 +488,9 @@ loadLocalPackage pp = do
 -- determine (1) if the files are dirty, and (2) the new cache values.
 checkBuildCache ::
      HasEnvConfig env
-  => Map FilePath FileCacheInfo -- ^ old cache
+  => FileCache -- ^ old cache
   -> [Path Abs File] -- ^ files in package
-  -> RIO env (Set FilePath, Map FilePath FileCacheInfo)
+  -> RIO env (Set FilePath, FileCache)
 checkBuildCache oldCache files = do
   fileDigests <- fmap Map.fromList $ forM files $ \fp -> do
     mdigest <- getFileDigestMaybe (toFilePath fp)
@@ -507,7 +507,7 @@ checkBuildCache oldCache files = do
        FilePath
     -> Maybe SHA256
     -> Maybe FileCacheInfo
-    -> RIO env (Set FilePath, Map FilePath FileCacheInfo)
+    -> RIO env (Set FilePath, FileCache)
   -- Filter out the cabal_macros file to avoid spurious recompilations
   go fp _ _ | takeFileName fp == "cabal_macros.h" = pure (Set.empty, Map.empty)
   -- Common case where it's in the cache and on the filesystem.
@@ -529,7 +529,7 @@ addUnlistedToBuildCache ::
   -> Path Abs File
   -> Set NamedComponent
   -> Map NamedComponent (Map FilePath a)
-  -> RIO env (Map NamedComponent [Map FilePath FileCacheInfo], [PackageWarning])
+  -> RIO env (Map NamedComponent [FileCache], [PackageWarning])
 addUnlistedToBuildCache pkg cabalFP nonLibComponents buildCaches = do
   (componentFiles, warnings) <-
     getPackageFilesForTargets pkg cabalFP nonLibComponents

@@ -34,6 +34,10 @@ import           RIO.Writer ( WriterT (..), pass, tell )
 import           Stack.Build.Cache ( tryGetFlagCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
+import           Stack.ConfigureOpts
+                   ( configureOptsFromBase, packageConfigureOptsFromPackage
+                   , renderConfigureOpts
+                   )
 import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
                    ( applyForceCustomBuild, buildableExes, packageUnknownTools
@@ -56,8 +60,7 @@ import           Stack.Types.BuildConfig
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI
                    ( BuildOptsCLI (..), BuildSubset (..) )
-import           Stack.Types.Cache
-                   ( CachePkgSrc (..), ConfigCache (..), toCachePkgSrc )
+import           Stack.Types.Cache ( CachePkgSrc (..), ConfigCache (..) )
 import           Stack.Types.CompCollection ( collectionMember )
 import           Stack.Types.Compiler ( WhichCompiler (..), getGhcVersion )
 import           Stack.Types.CompilerPaths
@@ -65,7 +68,6 @@ import           Stack.Types.CompilerPaths
 import           Stack.Types.ComponentUtils ( unqualCompFromText )
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
-import qualified Stack.Types.ConfigureOpts as ConfigureOpts
 import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
 import           Stack.Types.DumpPackage ( DumpPackage (..), sublibParentPkgId )
@@ -468,7 +470,7 @@ addFinal lp package allInOne buildHaddocks = do
   res <- addPackageDeps package >>= \case
     Left e -> pure $ Left e
     Right (MissingPresentDeps missing present _minLoc) -> do
-      let pkgConfigOpts = ConfigureOpts.packageConfigureOptsFromPackage package
+      let pkgConfigOpts = packageConfigureOptsFromPackage package
       ctx <- ask
       let configOpts = TaskConfigOpts
             { missing
@@ -778,7 +780,7 @@ installPackageGivenDeps allInOne buildHaddocks ps package minstalled
     ctx <- ask
     let loc = psLocation ps
         isMutable = installLocationIsMutable loc <> minMutable
-        pkgConfigOpts = ConfigureOpts.packageConfigureOptsFromPackage package
+        pkgConfigOpts = packageConfigureOptsFromPackage package
         configOpts = TaskConfigOpts
             { missing
             , envConfig = ctx.ctxEnvConfig
@@ -1041,9 +1043,8 @@ checkDirtiness ::
 checkDirtiness ps installed package present buildHaddocks = do
   ctx <- ask
   moldOpts <- runRIO ctx $ tryGetFlagCache installed
-  let packageConfigureOpt =
-        ConfigureOpts.packageConfigureOptsFromPackage package
-      configureOpts = ConfigureOpts.configureOpts
+  let packageConfigureOpt = packageConfigureOptsFromPackage package
+      configureOpts = configureOptsFromBase
         (view envConfigL ctx)
         ctx.baseConfigOpts
         present
@@ -1138,7 +1139,7 @@ describeConfigDiff config old new
                 then id
                 else stripGhcOptions)
            . map T.pack
-           . ConfigureOpts.renderConfigureOpts
+           . renderConfigureOpts
            . (.configureOpts)
    where
     -- options set by Stack
@@ -1286,3 +1287,8 @@ combineMap = Map.merge
   (Map.mapMissing (\_ s -> PIOnlySource s))
   (Map.mapMissing (\_ i -> uncurry PIOnlyInstalled i))
   (Map.zipWithMatched (\_ s i -> combineSourceInstalled s i))
+
+toCachePkgSrc :: PackageSource -> CachePkgSrc
+toCachePkgSrc (PSFilePath lp) =
+  CacheSrcLocal (toFilePath (parent lp.cabalFP))
+toCachePkgSrc PSRemote{} = CacheSrcUpstream

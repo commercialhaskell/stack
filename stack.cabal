@@ -236,6 +236,7 @@ library
       Stack.Config.ConfigureScript
       Stack.Config.Docker
       Stack.Config.Nix
+      Stack.ConfigureOpts
       Stack.ConfigCmd
       Stack.Constants
       Stack.Constants.Config
