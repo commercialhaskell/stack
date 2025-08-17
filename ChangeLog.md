@@ -22,6 +22,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Consider GHC 9.12 to be a tested compiler and remove warnings.
+* Consider Cabal 3.14 to be a tested library and remove warnings.
 * From GHC 9.12.1, `base` is not a GHC wired-in package. In configuration files,
   the `notify-if-base-not-boot` key is introduced, to allow the exisitng
   notification to be muted if unwanted when using such GHC versions.
