@@ -1,4 +1,4 @@
-snapshot: lts-24.0
+snapshot: lts-24.4
 packages:
 - package-with-th
 - package-with-working-th

@@ -13,7 +13,7 @@ packages:
     hackage: pantry-0.11.0@sha256:d23aad04f560280264bde7a8d20ed158a668c037c303dc00793d8af61176c491,7542
 snapshots:
 - completed:
-    sha256: 3f59fb01f884a786c64e247ffe145df5f6045d929b1d2752b5ce768e37fd44e5
-    size: 724510
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/0.yaml
-  original: lts-24.0
+    sha256: b96cc8b203559fdd1c1617ebd71e90ea04a2db0d71b416717a2a1d1539d5d5c9
+    size: 724735
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/4.yaml
+  original: lts-24.4

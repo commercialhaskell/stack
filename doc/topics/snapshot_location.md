@@ -20,13 +20,13 @@ There are essentially four different ways of specifying a snapshot location:
     for example:
 
     ~~~yaml
-    snapshot: ghc-8.6.5
+    snapshot: ghc-9.10.2
     ~~~
 
 2.  Via a URL pointing to a snapshot configuration file, for example:
 
     ~~~yaml
-    snapshot: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2018/8/21.yaml`
+    snapshot: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2025/8/17.yaml`
     ~~~
 
 3.  Via a local file path pointing to a snapshot configuration file, for

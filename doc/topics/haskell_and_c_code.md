@@ -83,7 +83,7 @@ executables:
 
 The project's `stack.yaml` file only needs to identify a snapshot:
 ~~~yaml
-snapshot: lts-24.0 # GHC 9.10.2
+snapshot: lts-24.4 # GHC 9.10.2
 ~~~
 
 This example project can be built with Stack in the normal way (`stack build`),
@@ -220,7 +220,7 @@ The `include-dirs` key will cause the specified directory (again,
 
 The project's `stack.yaml` file only needs to identify a snapshot:
 ~~~yaml
-snapshot: lts-24.0 # GHC 9.10.2
+snapshot: lts-24.4 # GHC 9.10.2
 ~~~
 
 This example project can be built with Stack in the normal way (`stack build`),
