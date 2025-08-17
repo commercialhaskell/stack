@@ -40,8 +40,8 @@ installation, and various settings like build flags. It is also called a
 resolver since a snapshot states how dependencies are resolved. There are
 currently four snapshot types:
 
-* LTS Haskell snapshots, e.g. `snapshot: lts-24.0`
-* Stackage Nightly snapshots, e.g. `snapshot: nightly-2025-07-14`
+* LTS Haskell snapshots, e.g. `snapshot: lts-24.4`
+* Stackage Nightly snapshots, e.g. `snapshot: nightly-2025-08-17`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
   like `snapshot: ghc-9.10.2`
 * Custom snapshot, via a URL or relative file path. For further information, see
