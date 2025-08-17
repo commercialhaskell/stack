@@ -13,7 +13,6 @@ module Stack.Types.Package
   ( BioInput (..)
   , BuildInfoOpts (..)
   , ExeName (..)
-  , FileCacheInfo (..)
   , InstallLocation (..)
   , Installed (..)
   , InstalledLibraryInfo (..)
@@ -46,9 +45,6 @@ module Stack.Types.Package
   , toPackageDbVariety
   ) where
 
-import           Data.Aeson
-                   ( ToJSON (..), FromJSON (..), (.=), (.:), object, withObject
-                   )
 import qualified Data.Map as M
 import qualified Data.Set as Set
 import           Distribution.CabalSpecVersion
@@ -62,6 +58,7 @@ import           Distribution.Types.MungedPackageName
                    ( encodeCompatPackageName )
 import qualified RIO.Text as T
 import           Stack.Prelude
+import           Stack.Types.Cache ( FileCache )
 import           Stack.Types.CompCollection ( CompCollection )
 import           Stack.Types.Compiler ( ActualCompiler )
 import           Stack.Types.Component
@@ -306,16 +303,13 @@ data LocalPackage = LocalPackage
     -- ^ Nothing == not dirty, Just == dirty. Note that the Set may be empty if
     -- we forced the build to treat packages as dirty. Also, the Set may not
     -- include all modified files.
-  , newBuildCaches :: !( MemoizedWith
-                           EnvConfig
-                           (Map NamedComponent (Map FilePath FileCacheInfo))
-                       )
-    -- ^ current state of the files
+  , newBuildCaches :: !(MemoizedWith EnvConfig (Map NamedComponent FileCache))
+    -- ^ Current state of the files.
   , componentFiles :: !( MemoizedWith
                            EnvConfig
                            (Map NamedComponent (Set (Path Abs File)))
                        )
-    -- ^ all files used by this package
+    -- ^ All files used by this package.
   }
   deriving Show
 
@@ -357,23 +351,6 @@ lpFilesForComponents ::
 lpFilesForComponents components lp = runMemoizedWith $ do
   componentFiles <- lp.componentFiles
   pure $ mconcat (M.elems (M.restrictKeys componentFiles components))
-
-newtype FileCacheInfo = FileCacheInfo
-  { hash :: SHA256
-  }
-  deriving (Eq, Generic, Show, Typeable)
-
-instance NFData FileCacheInfo
-
--- Provided for storing the BuildCache values in a file. But maybe JSON/YAML
--- isn't the right choice here, worth considering.
-instance ToJSON FileCacheInfo where
-  toJSON (FileCacheInfo hash') = object
-    [ "hash" .= hash'
-    ]
-instance FromJSON FileCacheInfo where
-  parseJSON = withObject "FileCacheInfo" $ \o -> FileCacheInfo
-    <$> o .: "hash"
 
 -- | Maybe get the module name from the .cabal descriptor.
 dotCabalModule :: DotCabalDescriptor -> Maybe ModuleName

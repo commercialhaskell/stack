@@ -8,29 +8,29 @@ License     : BSD-3-Clause
 -}
 
 module Stack.Types.Cache
-  ( BuildCache (..)
+  ( FileCache
+  , BuildFileCache (..)
+  , FileCacheInfo (..)
   , ConfigCache (..)
   , CachePkgSrc (..)
-  , toCachePkgSrc
   , PrecompiledCache (..)
   , ConfigCacheType (..)
   , Action (..)
   ) where
 
-import           Data.Aeson ( ToJSON, FromJSON )
+import           Data.Aeson
+                   ( ToJSON (..), FromJSON (..), (.=), (.:), object, withObject
+                   )
 import qualified Data.ByteString as S
 import qualified Data.Text as T
 import           Database.Persist.Sql
                    ( PersistField (..), PersistFieldSql (..), PersistValue (..)
                    , SqlType (..)
                    )
-import           Path ( parent )
 import           Stack.Prelude
 import           Stack.Types.ConfigureOpts ( ConfigureOpts )
 import           Stack.Types.GhcPkgId
                    ( GhcPkgId, ghcPkgIdToText, parseGhcPkgId )
-import           Stack.Types.Package
-                   ( FileCacheInfo (..), LocalPackage (..), PackageSource (..) )
 
 -- | Type representing types of cache in the Stack project SQLite database.
 data ConfigCacheType
@@ -83,14 +83,39 @@ instance PersistField Action where
 instance PersistFieldSql Action where
   sqlType _ = SqlInt64
 
--- | Stored on disk to know whether the files have changed.
-newtype BuildCache = BuildCache
-  { times :: Map FilePath FileCacheInfo
-    -- ^ Modification times of files.
+-- | Type synonym representing caches of files and information about them
+-- sufficient to identify if they have changed subsequently.
+type FileCache = Map FilePath FileCacheInfo
+
+-- | Type representing caches of information about files sufficient to identify
+-- if they have changed subsequently. Stored on disk.
+newtype BuildFileCache = BuildFileCache
+  { fileCache :: FileCache
   }
   deriving (Eq, FromJSON, Generic, Show, ToJSON, Typeable)
 
-instance NFData BuildCache
+instance NFData BuildFileCache
+
+-- | Type representing information about a file sufficient to identify if
+-- it has changed subsequently.
+newtype FileCacheInfo = FileCacheInfo
+  { hash :: SHA256
+    -- ^ SHA-256 hash of file contents.
+  }
+  deriving (Eq, Generic, Show, Typeable)
+
+instance NFData FileCacheInfo
+
+-- Provided for storing the t'BuildFileCache' values in a file. But maybe
+-- JSON/YAML isn't the right choice here, worth considering.
+instance ToJSON FileCacheInfo where
+  toJSON fileCacheInfo = object
+    [ "hash" .= fileCacheInfo.hash
+    ]
+
+instance FromJSON FileCacheInfo where
+  parseJSON = withObject "FileCacheInfo" $ \o -> FileCacheInfo
+    <$> o .: "hash"
 
 -- | Stored in the project's SQLite database to know whether the Cabal
 -- configuration has changed or libarary or executable Cabal flags have changed.
@@ -138,11 +163,6 @@ instance PersistField CachePkgSrc where
 
 instance PersistFieldSql CachePkgSrc where
   sqlType _ = SqlString
-
-toCachePkgSrc :: PackageSource -> CachePkgSrc
-toCachePkgSrc (PSFilePath lp) =
-  CacheSrcLocal (toFilePath (parent lp.cabalFP))
-toCachePkgSrc PSRemote{} = CacheSrcUpstream
 
 -- | Information on a compiled package: the library .conf file (if relevant),
 -- the sub-libraries (if present) and all of the executable paths.

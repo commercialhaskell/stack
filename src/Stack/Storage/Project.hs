@@ -37,6 +37,7 @@ import           Database.Persist.TH
                    , sqlSettings
                    )
 import           Pantry.SQLite ( initStorage, withStorage_ )
+import           Stack.ConfigureOpts ( configureOptsFromDb )
 import           Stack.Prelude
 import           Stack.Storage.Util
                    ( handleMigrationException, listUpdateDiff, setUpdateDiff
@@ -46,8 +47,7 @@ import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
 import           Stack.Types.Cache
                    ( CachePkgSrc, ConfigCache (..), ConfigCacheType )
-import           Stack.Types.ConfigureOpts
-                   ( ConfigureOpts (..), configureOptsFromDb )
+import           Stack.Types.ConfigureOpts ( ConfigureOpts (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Storage ( ProjectStorage (..) )
 

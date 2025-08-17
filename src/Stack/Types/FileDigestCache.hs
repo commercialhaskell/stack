@@ -12,8 +12,8 @@ module Stack.Types.FileDigestCache
   ) where
 
 import qualified Data.Map.Strict as Map
-import           Stack.Prelude
 import qualified Pantry.SHA256 as SHA256
+import           Stack.Prelude
 
 -- | Type synonym representing caches of digests of files.
 type FileDigestCache = IORef (Map FilePath SHA256)
