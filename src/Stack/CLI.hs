@@ -230,7 +230,7 @@ commandLineHandler currentDir progName mExecutablePath isInterpreter =
 
   clean = addCommand'
     "clean"
-    "Delete build artefacts for the project packages."
+    "Delete build artefacts for project packages."
     cleanCmd
     (cleanOptsParser Clean)
 

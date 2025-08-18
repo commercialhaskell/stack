@@ -5,7 +5,7 @@
 Either
 
 ~~~text
-stack clean [PACKAGE]
+stack clean [PACKAGE] [--[no-]omit-this]
 ~~~
 
 or
@@ -14,8 +14,17 @@ or
 stack clean --full
 ~~~
 
-`stack clean` deletes build artefacts for one or more project packages specified
-as arguments. If no project packages are specified, all project packages are
-cleaned.
+`stack clean` deletes build artefacts for one or more project packages.
 
-`stack clean --full` deletes the project's Stack working directory.
+By default:
+
+* all project packages are cleaned. Pass one or more project package names to
+  specify individual project packages; and
+
+* the `dist` directory and all of its subdirectories in the Stack work directory
+  for each relevant project package are deleted. Pass the flag `--omit-this` to
+  omit, from cleaning, the `dist` work directory (see `stack path --dist-dir`)
+  and its subdirectories currently in use.
+
+`stack clean --full` deletes the Stack work directories of the project and its
+project packages.
