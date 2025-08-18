@@ -27,6 +27,9 @@ Other enhancements:
 * From GHC 9.12.1, `base` is not a GHC wired-in package. In configuration files,
   the `notify-if-base-not-boot` key is introduced, to allow the exisitng
   notification to be muted if unwanted when using such GHC versions.
+* Add flag `--[no-]omit-this` (default: disabled) to Stack's `clean` command to
+  omit directories currently in use from cleaning (when `--full` is not
+  specified).
 
 Bug fixes:
 
