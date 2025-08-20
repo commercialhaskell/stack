@@ -61,7 +61,7 @@ import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
 import           Distribution.System ( OS (..), Arch, Platform (..) )
 import           Distribution.Text ( display )
 import qualified Distribution.Types.CondTree as Cabal
-import           Distribution.Utils.Path ( getSymbolicPath )
+import           Distribution.Utils.Path ( makeSymbolicPath, getSymbolicPath )
 import           Distribution.Verbosity ( silent )
 import           Distribution.Version
                    ( anyVersion, mkVersion, orLaterVersion )
@@ -131,8 +131,8 @@ import           RIO.Seq ((|>))
 --
 -- NOTE: not to be confused with BuildInfo, an Stack-internal datatype.
 readDotBuildinfo :: MonadIO m => Path Abs File -> m HookedBuildInfo
-readDotBuildinfo buildinfofp =
-  liftIO $ readHookedBuildInfo silent (toFilePath buildinfofp)
+readDotBuildinfo =
+  liftIO . readHookedBuildInfo silent Nothing . makeSymbolicPath . toFilePath
 
 -- | Resolve a parsed Cabal file into a t'Package', which contains all of the
 -- info needed for Stack to build the t'Package' given the current

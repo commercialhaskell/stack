@@ -1,6 +1,9 @@
 snapshot: lts-24.4 # GHC 9.10.2
 
 extra-deps:
+# lts-24.4 specifies Cabal-3.12.1.0
+- Cabal-syntax-3.14.2.0
+- Cabal-3.14.2.0
 # lts-24.4 specifies pantry-0.10.1
 - pantry-0.11.0@sha256:d23aad04f560280264bde7a8d20ed158a668c037c303dc00793d8af61176c491,7542
 
