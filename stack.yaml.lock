@@ -5,26 +5,33 @@
 
 packages:
 - completed:
-    hackage: Cabal-syntax-3.14.2.0@sha256:16766e2cd18f98bf259d2caf2b507764ebdfff0b16c2fb5b293fc57c1137af6f,7380
+    hackage: Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
     pantry-tree:
-      sha256: 737f9522e754f8c1610a115a01bb264924a7cde1c931e285f3758ba46f145443
-      size: 10977
+      sha256: 4de976261238dd4045dd3addebf6a006d4aff3873ee680bac7af83dcbf068280
+      size: 11238
   original:
-    hackage: Cabal-syntax-3.14.2.0
+    hackage: Cabal-syntax-3.16.0.0
 - completed:
-    hackage: Cabal-3.14.2.0@sha256:f98aa86a37b9920dc6dfc8d79119a10df69542734f158a1c66ff144592f1d004,14148
+    hackage: Cabal-3.16.0.0@sha256:7d5d80355ac02c42cb90ec575d83653139a2054ab9aac0753527ced8f343c6b3,14024
     pantry-tree:
-      sha256: 6094a5f661024a46193c4b27ec92123bf4677bec2f275ab14405eeee98fe8d9e
-      size: 12219
+      sha256: 1af1de9cd20b19df20b311b2e176855068a2a09203fa20de0eed76d2b95a45f7
+      size: 12139
   original:
-    hackage: Cabal-3.14.2.0
+    hackage: Cabal-3.16.0.0
 - completed:
-    hackage: pantry-0.11.0@sha256:d23aad04f560280264bde7a8d20ed158a668c037c303dc00793d8af61176c491,7542
+    hackage: hpack-0.38.1@sha256:609ea3a56fb4c1a37c24935e1bd31d64bbd6e44c527470adb7c2cc2bee35cd37,5457
     pantry-tree:
-      sha256: 0b8e1d77c3ea3d95a544fadfeaa4c92ec63c581f778fd65036395eaa021686c2
+      sha256: 1ac9e15a26ab88c1c94945914fb5e7ac5327521586a9300ffe7df849502b0d78
+      size: 3798
+  original:
+    hackage: hpack-0.38.1@sha256:609ea3a56fb4c1a37c24935e1bd31d64bbd6e44c527470adb7c2cc2bee35cd37,5457
+- completed:
+    hackage: pantry-0.11.0@sha256:2dd0fd7e08f9c1464a993e288cba1128479f79e4b0c7977e5c1c26a68941127e,7911
+    pantry-tree:
+      sha256: a491bcbf56eb0b05efb7bc213a19d548ca19dffb2d3ea92d1de3ce2bc1d44b91
       size: 2722
   original:
-    hackage: pantry-0.11.0@sha256:d23aad04f560280264bde7a8d20ed158a668c037c303dc00793d8af61176c491,7542
+    hackage: pantry-0.11.0@sha256:2dd0fd7e08f9c1464a993e288cba1128479f79e4b0c7977e5c1c26a68941127e,7911
 snapshots:
 - completed:
     sha256: b96cc8b203559fdd1c1617ebd71e90ea04a2db0d71b416717a2a1d1539d5d5c9
