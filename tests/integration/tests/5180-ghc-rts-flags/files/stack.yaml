@@ -1,4 +1,4 @@
-snapshot: lts-24.4
+snapshot: lts-24.6
 
 ghc-options:
   "$locals": -j8 +RTS -s -A128M

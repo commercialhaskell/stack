@@ -5,8 +5,8 @@ import System.IO (readFile)
 main :: IO ()
 main = do
   removeFileIgnore "stack.yaml"
-  stackErr ["init", "--snapshot", "lts-24.4"]
-  stack ["init", "--snapshot", "lts-24.4", "--omit-packages"]
+  stackErr ["init", "--snapshot", "lts-24.6"]
+  stack ["init", "--snapshot", "lts-24.6", "--omit-packages"]
   contents <- lines <$> readFile "stack.yaml"
   unless ("#- bad" `elem` contents) $
     error "commented out 'bad' package was expected"
