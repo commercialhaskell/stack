@@ -19,7 +19,7 @@ An example will be easiest to understand. Consider the Haskell source file
 
 ~~~haskell
 #!/usr/bin/env stack
--- stack script --snapshot lts-24.4 --package turtle
+-- stack script --snapshot lts-24.6 --package turtle
 {-# LANGUAGE OverloadedStrings #-}
 import Turtle (echo)
 main = echo "Hello World!"
@@ -78,11 +78,11 @@ able to reuse everything already built).
 
 The second line of the source code is the Stack interpreter options comment. In
 this example, it specifies the [`stack script`](../commands/script_command.md)
-command with the options of a LTS Haskell 24.4 snapshot
-(`--snapshot lts-24.4`) and ensuring the
+command with the options of a LTS Haskell 24.6 snapshot
+(`--snapshot lts-24.6`) and ensuring the
 [`turtle`](https://hackage.haskell.org/package/turtle) package is available
 (`--package turtle`). The version of the package will be that in the specified
-snapshot (`lts-24.4` provides `turtle-1.6.2`).
+snapshot (`lts-24.6` provides `turtle-1.6.2`).
 
 ## Arguments and interpreter options and arguments
 
@@ -117,7 +117,7 @@ For example, the command `stack MyScript.hs arg1 arg2` with `MyScript.hs`:
 ~~~haskell
 #!/usr/bin/env stack
 {- stack script
-   --snapshot lts-24.4
+   --snapshot lts-24.6
    --
    +RTS -s -RTS
 -}
@@ -133,7 +133,7 @@ main = do
 is equivalent to the following command at the command line:
 
 ~~~text
-stack script --snapshot lts-24.4 -- MyScript.hs arg1 arg2 +RTS -s -RTS
+stack script --snapshot lts-24.6 -- MyScript.hs arg1 arg2 +RTS -s -RTS
 ~~~
 
 where `+RTS -s -RTS` are some of GHC's
@@ -164,7 +164,7 @@ options, or by providing a comma or space separated list. For example:
 ~~~haskell
 #!/usr/bin/env stack
 {- stack script
-   --snapshot lts-24.4
+   --snapshot lts-24.6
    --package turtle
    --package "stm async"
    --package http-client,http-conduit
@@ -180,7 +180,7 @@ each. For example:
 ~~~haskell
 #!/usr/bin/env stack
 {- stack script
-   --snapshot lts-24.4
+   --snapshot lts-24.6
    --extra-dep acme-missiles-0.3@rev:0
    --extra-dep "{git: git@github.com:yesodweb/wai, commit: '2f8a8e1b771829f4a8a77c0111352ce45a14c30f', subdirs: [auto-update, wai]}"
 -}
@@ -227,7 +227,7 @@ which makes use of the joke package
 
 ~~~haskell
 {- stack script
-   --snapshot lts-24.4
+   --snapshot lts-24.6
    --package acme-missiles
 -}
 import Acme.Missiles (launchMissiles)
@@ -238,7 +238,7 @@ main = launchMissiles
 
 The command `stack --script-no-run-compile Script.hs` then behaves as if the
 command
-`stack script --snapshot lts-24.4 --package acme-missiles --no-run --compile -- Script.hs`
+`stack script --snapshot lts-24.6 --package acme-missiles --no-run --compile -- Script.hs`
 had been given. `Script.hs` is compiled (without optimisation) and the resulting
 executable is not run: no missiles are launched in the process!
 
@@ -280,7 +280,7 @@ those curious, here is an example with
 {- stack
   runghc
   --install-ghc
-  --snapshot lts-24.4
+  --snapshot lts-24.6
   --package base
   --package turtle
   --
@@ -304,7 +304,7 @@ it. Here is an example:
 {- stack
    exec ghci
    --install-ghc
-   --snapshot lts-24.4
+   --snapshot lts-24.6
    --package turtle
 -}
 ~~~
