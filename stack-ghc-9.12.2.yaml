@@ -1,19 +1,11 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.12.2.
-#
-# Currently, Stack cannot be built with GHC 9.12.2 because:
-# * Cabal-3.14.1.0 has changed the type of
-#   Distribution.PackageDescription.Check.checkPackage.
-
-snapshot: nightly-2025-07-30 # GHC 9.12.2
+snapshot: nightly-2025-08-23 # GHC 9.12.2
 
 extra-deps:
-# nightly-2025-07-30 specifies pantry-0.10.1
-- pantry-0.11.0@sha256:d23aad04f560280264bde7a8d20ed158a668c037c303dc00793d8af61176c491,7542
-
-allow-newer: true
-allow-newer-deps:
-- stack
+# nightly-2025-08-23 specifies Cabal-3.14.1.0
+- Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
+- Cabal-3.16.0.0@sha256:7d5d80355ac02c42cb90ec575d83653139a2054ab9aac0753527ced8f343c6b3,14024
 
 docker:
   enable: false
