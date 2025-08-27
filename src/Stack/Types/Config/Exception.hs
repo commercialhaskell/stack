@@ -49,7 +49,7 @@ data ConfigException
   | NoSnapshotWhenUsingNoProject
   | NoLTSWithMajorVersion Int
   | NoLTSFound
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception ConfigException where
   displayException (ParseCustomSnapshotException url exception) = concat
@@ -172,7 +172,7 @@ data ConfigPrettyException
   | NoMsysEnvironmentBug
   | ConfigFileNotProjectLevelBug
   | NoExecutablePath !String
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty ConfigPrettyException where
   pretty (ParseConfigFileException configFile exception) =
@@ -257,7 +257,7 @@ instance Exception ConfigPrettyException
 -- "Stack.Config" module.
 data ParseAbsolutePathException
   = ParseAbsolutePathException String String
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception ParseAbsolutePathException where
   displayException (ParseAbsolutePathException envVar dir) = concat

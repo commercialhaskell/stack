@@ -30,7 +30,7 @@ import           System.Process
 -- "System.Process.Pager" module.
 data PagerException
   = PagerExitFailure CmdSpec Int
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception PagerException where
   displayException (PagerExitFailure cmd n) =

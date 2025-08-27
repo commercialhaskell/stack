@@ -48,7 +48,7 @@ data CompCollection component = CompCollection
     -- require unbuildable components to be built. The field allows for
     -- intelligible error messages.
   }
-  deriving (Show)
+  deriving Show
 
 instance Semigroup (CompCollection component) where
   a <> b = CompCollection

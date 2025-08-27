@@ -27,7 +27,7 @@ import           Stack.Types.Runner ( Runner )
 -- "Stack.List" module.
 newtype ListPrettyException
   = CouldNotParsePackageSelectors [StyleDoc]
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty ListPrettyException where
   pretty (CouldNotParsePackageSelectors errs) =

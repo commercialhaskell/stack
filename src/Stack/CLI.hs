@@ -106,7 +106,7 @@ import           System.FilePath ( pathSeparator, takeDirectory )
 -- "Stack.CLI" module.
 data CliPrettyException
   = NoArgumentsBug
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty CliPrettyException where
   pretty NoArgumentsBug = bugPrettyReport "[S-4639]" $

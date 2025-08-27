@@ -110,7 +110,7 @@ data GhciPrettyException
   | FileTargetIsInvalidAbsFile !String
   | Can'tSpecifyFilesAndTargets
   | Can'tSpecifyFilesAndMainIs
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty GhciPrettyException where
   pretty (GhciTargetParseException errs) =

@@ -54,7 +54,7 @@ import           System.FilePath ( isValid )
 -- module.
 newtype ExecException
   = InvalidPathForExec FilePath
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception ExecException where
   displayException (InvalidPathForExec path) = concat
@@ -71,7 +71,7 @@ data ExecPrettyException
   | ExecutableToRunNotFound
   | NoPackageIdReportedBug
   | InvalidExecTargets ![Text]
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty ExecPrettyException where
   pretty (PackageIdNotFoundBug name) = bugPrettyReport "[S-8251]" $

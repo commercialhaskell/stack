@@ -83,7 +83,7 @@ data ScriptException
   | NoRunWithoutCompilationInvalid
   | FailedToParseScriptFileAsDirBug (Path Rel File)
   | FailedToParseFileAsDirBug (Path Abs Dir)
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception ScriptException where
   displayException (MutableDependenciesForScript names) = unlines

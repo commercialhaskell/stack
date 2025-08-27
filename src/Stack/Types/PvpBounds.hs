@@ -24,13 +24,13 @@ data PvpBoundsType
   | PvpBoundsUpper
   | PvpBoundsLower
   | PvpBoundsBoth
-  deriving (Bounded, Enum, Eq, Ord, Read, Show, Typeable)
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 data PvpBounds = PvpBounds
   { pbType :: !PvpBoundsType
   , pbAsRevision :: !Bool
   }
-  deriving (Eq, Ord, Read, Show, Typeable)
+  deriving (Eq, Ord, Read, Show)
 
 pvpBoundsText :: PvpBoundsType -> Text
 pvpBoundsText PvpBoundsNone = "none"

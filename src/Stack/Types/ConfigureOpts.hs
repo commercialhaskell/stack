@@ -48,6 +48,6 @@ data ConfigureOpts = ConfigureOpts
   , nonPathRelated :: ![String]
     -- ^ Options other than path-related options.
   }
-  deriving (Data, Eq, Generic, Show, Typeable)
+  deriving (Data, Eq, Generic, Show)
 
 instance NFData ConfigureOpts

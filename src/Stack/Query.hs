@@ -43,7 +43,7 @@ data QueryException
   | IndexOutOfRange ![Text]
   | NoNumericSelector ![Text]
   | CannotApplySelector !Value ![Text]
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception QueryException where
   displayException (SelectorNotFound sels) =

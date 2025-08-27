@@ -70,7 +70,7 @@ data RunnersException
   | DockerAndNixInvalid
   | NixWithinDockerInvalid
   | DockerWithinNixInvalid
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception RunnersException where
   displayException CommandInvalid =

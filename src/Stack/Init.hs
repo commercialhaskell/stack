@@ -69,7 +69,7 @@ import           Stack.Types.Version ( stackMajorVersion )
 -- "Stack.Init" module.
 data InitException
   = NoPackagesToIgnoreBug
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception InitException where
   displayException NoPackagesToIgnoreBug = bugReport "[S-2747]"
@@ -84,7 +84,7 @@ data InitPrettyException
   | NoMatchingSnapshot !(NonEmpty SnapName)
   | SnapshotMismatch !RawSnapshotLocation String
   | SnapshotPartial !RawSnapshotLocation !String
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty InitPrettyException where
   pretty (ConfigFileAlreadyExists reldest) =

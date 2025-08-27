@@ -75,7 +75,7 @@ import           System.IO ( putStrLn )
 -- module.
 newtype LsException
   = ParseFailure [Value]
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception LsException where
   displayException (ParseFailure val) =

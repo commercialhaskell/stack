@@ -65,7 +65,7 @@ import           System.Environment ( getEnvironment )
 -- "Stack.ConfigCmd" module.
 data ConfigCmdException
   = NoProjectConfigAvailable
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception ConfigCmdException where
   displayException NoProjectConfigAvailable =

@@ -41,7 +41,7 @@ import           Stack.Types.SourceMap ( ProjectPackage, SMWanted (..), ppRoot )
 data CleanPrettyException
   = NonLocalPackages [PackageName]
   | DeletionFailures [(Path Abs Dir, SomeException)]
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty CleanPrettyException where
   pretty (NonLocalPackages pkgs) =

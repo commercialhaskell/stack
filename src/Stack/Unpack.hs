@@ -39,7 +39,7 @@ data UnpackPrettyException
   | CouldNotParsePackageSelectors [StyleDoc]
   | PackageCandidatesRequireVersions [PackageName]
   | PackageLocationInvalid PackageIdentifierRevision
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty UnpackPrettyException where
   pretty (UnpackDirectoryAlreadyExists dirs) =

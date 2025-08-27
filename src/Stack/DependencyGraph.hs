@@ -66,7 +66,7 @@ import           Stack.Types.SourceMap
 -- "Stack.DependencyGraph" module.
 newtype DependencyGraphException
   = DependencyNotFoundBug GhcPkgId
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception DependencyGraphException where
   displayException (DependencyNotFoundBug depId) = bugReport "[S-7071]" $ concat
@@ -79,7 +79,7 @@ instance Exception DependencyGraphException where
 -- "Stack.DependencyGraph" module.
 newtype DependencyGraphPrettyException
   = PackageNotFound PackageName
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty DependencyGraphPrettyException where
 

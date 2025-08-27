@@ -41,7 +41,7 @@ import qualified System.FilePath as F
 data NixException
   = CannotDetermineProjectRoot
     -- ^ Can't determine the project root (location of the shell file if any).
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception NixException where
   displayException CannotDetermineProjectRoot =

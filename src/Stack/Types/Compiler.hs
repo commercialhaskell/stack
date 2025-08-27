@@ -40,7 +40,7 @@ import           Distribution.Version ( mkVersion )
 data CompilerException
   = GhcjsNotSupported
   | PantryException PantryException
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception CompilerException where
   displayException GhcjsNotSupported =
@@ -62,7 +62,7 @@ data WhichCompiler
 data ActualCompiler
   = ACGhc !Version
   | ACGhcGit !Text !Text
-  deriving (Data, Eq, Generic, Ord, Show, Typeable)
+  deriving (Data, Eq, Generic, Ord, Show)
 
 instance NFData ActualCompiler
 

@@ -70,7 +70,7 @@ data StorageUserException
   | GlobalPackageCacheFileMetadataMismatch
   | GlobalDumpParseFailure
   | CompilerCacheArchitectureInvalid Text
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception StorageUserException where
   displayException CompilerFileMetadataMismatch =

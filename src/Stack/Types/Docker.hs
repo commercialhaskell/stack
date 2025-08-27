@@ -108,7 +108,7 @@ data DockerException
     -- ^ Using host stack-exe on unsupported platform.
   | DockerStackExeParseException String
     -- ^ @stack-exe@ option fails to parse.
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception DockerException where
   displayException DockerMustBeEnabledException =

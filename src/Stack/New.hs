@@ -84,7 +84,6 @@ data NewPrettyException
   | TemplateInvalid !TemplateName !StyleDoc
   | MagicPackageNameInvalid !String
   | AttemptedOverwrites !Text ![Path Abs File]
-  deriving Typeable
 
 deriving instance Show NewPrettyException
 

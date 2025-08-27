@@ -19,4 +19,4 @@ data WantedCompilerSetter
     -- ^ At the command line with --snapshot (or --resolver) option.
   | YamlConfiguration (Maybe (Path Abs File))
     -- ^ Via a configuration file.
-  deriving (Show, Typeable)
+  deriving Show

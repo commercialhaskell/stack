@@ -96,7 +96,7 @@ data PackageException
   | CabalFileNameParseFail FilePath
   | CabalFileNameInvalidPackageName FilePath
   | ComponentNotParsedBug String
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception PackageException where
   displayException (PackageInvalidCabalFile loc _mversion errs warnings) = concat
@@ -160,7 +160,7 @@ instance Exception PackageException where
 -- | Name of an executable.
 newtype ExeName
   = ExeName { exeName :: Text }
-  deriving (Data, Eq, Generic, Hashable, IsString, NFData, Ord, Show, Typeable)
+  deriving (Data, Eq, Generic, Hashable, IsString, NFData, Ord, Show)
 
 -- | Some package info.
 data Package = Package
@@ -208,7 +208,7 @@ data Package = Package
     -- package dependencies should ignore benchmark dependencies. Directly set
     -- from 'enableBenchmarks'.
   }
-  deriving (Show, Typeable)
+  deriving Show
 
 packageIdentifier :: Package -> PackageIdentifier
 packageIdentifier p = PackageIdentifier p.name p.version
@@ -245,7 +245,7 @@ data PackageConfig = PackageConfig
   , platform :: !Platform
     -- ^ host platform
   }
- deriving (Show, Typeable)
+ deriving Show
 
 -- | Compares the package name.
 instance Ord Package where

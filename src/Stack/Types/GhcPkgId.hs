@@ -33,7 +33,7 @@ import           Text.Read ( Read (..) )
 -- | A parse fail.
 newtype GhcPkgIdParseFail
   = GhcPkgIdParseFail Text
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception GhcPkgIdParseFail where
   displayException (GhcPkgIdParseFail bs) = concat
@@ -45,7 +45,7 @@ instance Exception GhcPkgIdParseFail where
 -- | A ghc-pkg package identifier.
 newtype GhcPkgId
   = GhcPkgId UnitId
-  deriving (Data, Eq, Generic, Ord, Typeable)
+  deriving (Data, Eq, Generic, Ord)
 
 instance PersistField GhcPkgId where
   toPersistValue = toPersistValue . ghcPkgIdToText

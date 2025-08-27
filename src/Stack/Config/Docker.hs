@@ -34,7 +34,7 @@ import           Stack.Types.Version ( IntersectingVersionRange (..) )
 data ConfigDockerException
   = SnapshotNotSupportedException !(Maybe Project) !(Maybe AbstractSnapshot)
   -- ^ Only LTS snapshots are supported for default image tag.
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception ConfigDockerException where
   displayException (SnapshotNotSupportedException mproject mASnapshot) =

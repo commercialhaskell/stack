@@ -34,7 +34,7 @@ import           Stack.Prelude
 -- "Stack.Types.TemplateName" module.
 newtype TypeTemplateNameException
   = DefaultTemplateNameNotParsedBug String
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception TypeTemplateNameException where
   displayException (DefaultTemplateNameNotParsedBug s) = bugReport "[S-7410]" $

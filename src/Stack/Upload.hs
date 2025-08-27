@@ -88,7 +88,7 @@ data UploadPrettyException
   | PackageIdNotSpecifiedForDocsUploadBug
   | PackageIdSpecifiedForPackageUploadBug
   | TarGzFileNameInvalidBug !String
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty UploadPrettyException where
   pretty AuthenticationFailure =

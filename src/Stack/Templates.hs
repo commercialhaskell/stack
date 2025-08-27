@@ -29,7 +29,6 @@ import           Stack.Types.Runner ( Runner )
 data TemplatesPrettyException
   = DownloadTemplatesHelpFailed !HttpException
   | TemplatesHelpEncodingInvalid !String !UnicodeException
-  deriving Typeable
 
 deriving instance Show TemplatesPrettyException
 
