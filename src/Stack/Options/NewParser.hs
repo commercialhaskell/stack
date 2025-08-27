@@ -42,9 +42,10 @@ newOptsParser = (,) <$> newOpts <*> initOptsParser
           (  metavar "TEMPLATE_NAME"
           <> help "Name of a template - can take the form\
                   \ [[service:]username/]template with optional service name\
-                  \ (github, gitlab, or bitbucket) and username for the \
-                  \service; or, a local filename such as foo.hsfiles or ~/foo; \
-                  \or, a full URL such as https://example.com/foo.hsfiles."
+                  \ (github, gitlab, bitbucket, or codeberg) and username for\
+                  \ the service; or, a local filename such as foo.hsfiles or\
+                  \ ~/foo; or, a full URL such as\
+                  \ https://example.com/foo.hsfiles."
           ))
     <*> fmap M.fromList (many (templateParamArgument
           (  short 'p'

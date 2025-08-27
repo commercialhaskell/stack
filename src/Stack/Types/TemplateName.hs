@@ -72,6 +72,7 @@ data RepoService
   = GitHub
   | GitLab
   | Bitbucket
+  | Codeberg
   deriving (Eq, Ord, Show)
 
 instance FromJSON TemplateName where
@@ -148,6 +149,7 @@ parseRepoPath s =
     ["github"    , rest] -> parseRepoPathWithService GitHub rest
     ["gitlab"    , rest] -> parseRepoPathWithService GitLab rest
     ["bitbucket" , rest] -> parseRepoPathWithService Bitbucket rest
+    ["codeberg"  , rest] -> parseRepoPathWithService Codeberg rest
     _                    -> Nothing
 
 -- | Parses a template path of the form @user/template@, given a service

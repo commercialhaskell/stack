@@ -19,6 +19,7 @@ spec =
         pathOf "github:user/name"     `shouldBe` RepoPath (RepoTemplatePath GitHub    "user" "name.hsfiles")
         pathOf "bitbucket:user/name"  `shouldBe` RepoPath (RepoTemplatePath Bitbucket "user" "name.hsfiles")
         pathOf "gitlab:user/name"     `shouldBe` RepoPath (RepoTemplatePath GitLab    "user" "name.hsfiles")
+        pathOf "codeberg:user/name"   `shouldBe` RepoPath (RepoTemplatePath Codeberg  "user" "name.hsfiles")
 
         pathOf "http://www.com/file"  `shouldBe` UrlPath "http://www.com/file"
         pathOf "https://www.com/file" `shouldBe` UrlPath "https://www.com/file"
