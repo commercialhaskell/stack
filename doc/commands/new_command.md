@@ -65,22 +65,23 @@ the documentation for the
 ## Project templates
 
 A project template file can be located in a repository named `stack-templates`
-on GitHub, GitLab or Bitbucket; at a URL; or on the local file system.
+on GitHub, GitLab, Bitbucket or Codeberg; at a URL; or on the local file system.
 
 Project template file names have the extension `.hsfiles`. The extension does
 not need to be specified with `stack new`.
 
 A project template file `my-template.hsfiles` in a repository
-`username/stack-templates` on GitHub, GitLab or Bitbucket can be specified
-with `stack new` as:
+`username/stack-templates` on GitHub, GitLab, Bitbucket or Codeberg can be
+specified with `stack new` as:
 
 ~~~test
 <service>:username/my-template
 ~~~
 
 where `<service>` is one of `github` for [GitHub](https://github.com/),
-`gitlab` for [GitLab](https://gitlab.com), or `bitbucket` for
-[Bitbucket](https://bitbucket.com).
+`gitlab` for [GitLab](https://gitlab.com), `bitbucket` for
+[Bitbucket](https://bitbucket.com), or `codeberg:` for
+[Codeberg](https://codeberg.org).
 
 The default service is GitHub, the default username is `commercialhaskell` and
 the default project template name is `new-template`.

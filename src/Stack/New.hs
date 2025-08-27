@@ -489,6 +489,14 @@ settingsFromRepoTemplatePath (RepoTemplatePath Bitbucket user name) = pure $
     , "/stack-templates/raw/master/"
     , T.unpack name
     ]
+settingsFromRepoTemplatePath (RepoTemplatePath Codeberg user name) = pure $
+  asIsFromUrl $ concat
+    [ "https://codeberg.org"
+    , "/"
+    , T.unpack user
+    , "/stack-templates/raw/"
+    , T.unpack name
+    ]
 
 -- | Apply and unpack a template into a directory.
 applyTemplate ::
