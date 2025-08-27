@@ -117,7 +117,7 @@ data StackPackageFile = StackPackageFile
   , dataDir :: FilePath
   , dataFiles :: [FilePath]
   }
-  deriving (Show, Typeable)
+  deriving Show
 
 -- | Files that the package depends on, relative to package directory.
 data PackageComponentFile = PackageComponentFile

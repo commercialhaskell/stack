@@ -92,7 +92,7 @@ type FileCache = Map FilePath FileCacheInfo
 newtype BuildFileCache = BuildFileCache
   { fileCache :: FileCache
   }
-  deriving (Eq, FromJSON, Generic, Show, ToJSON, Typeable)
+  deriving (Eq, FromJSON, Generic, Show, ToJSON)
 
 instance NFData BuildFileCache
 
@@ -102,7 +102,7 @@ newtype FileCacheInfo = FileCacheInfo
   { hash :: SHA256
     -- ^ SHA-256 hash of file contents.
   }
-  deriving (Eq, Generic, Show, Typeable)
+  deriving (Eq, Generic, Show)
 
 instance NFData FileCacheInfo
 
@@ -139,14 +139,14 @@ data ConfigCache = ConfigCache
     -- ^ Value of the PATH environment variable. See
     -- <https://github.com/commercialhaskell/stack/issues/3138>
   }
-  deriving (Data, Eq, Generic, Show, Typeable)
+  deriving (Data, Eq, Generic, Show)
 
 instance NFData ConfigCache
 
 data CachePkgSrc
   = CacheSrcUpstream
   | CacheSrcLocal FilePath
-  deriving (Data, Eq, Generic, Read, Show, Typeable)
+  deriving (Data, Eq, Generic, Read, Show)
 
 instance NFData CachePkgSrc
 
@@ -174,7 +174,7 @@ data PrecompiledCache base = PrecompiledCache
   , exes    :: ![Path base File]
     -- ^ Full paths to executables
   }
-  deriving (Eq, Generic, Show, Typeable)
+  deriving (Eq, Generic, Show)
 
 instance NFData (PrecompiledCache Abs)
 

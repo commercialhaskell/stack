@@ -40,7 +40,7 @@ import           Stack.Prelude
 -- unnecessary work, but there is no 'Hashable' instance for
 -- 'Distribution.Types.UnqualComponentName.UnqualComponentName' yet.
 newtype StackUnqualCompName = StackUnqualCompName UnqualComponentName
-  deriving (Data, Eq, Generic, IsString, NFData, Ord, Read, Show, Typeable)
+  deriving (Data, Eq, Generic, IsString, NFData, Ord, Read, Show)
 
 instance Hashable StackUnqualCompName where
   hashWithSalt a v = hashWithSalt a (show v)

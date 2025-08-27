@@ -48,7 +48,7 @@ import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId )
 data PackageDumpException
   = MissingSingleField Text (Map Text [Line])
   | Couldn'tParseField Text [Line]
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception PackageDumpException where
   displayException (MissingSingleField name values) = unlines $

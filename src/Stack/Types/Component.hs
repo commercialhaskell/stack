@@ -56,7 +56,7 @@ data StackLibrary = StackLibrary
   , exposedModules :: [ModuleName]
     -- |^ This is only used for gathering the files related to this component.
   }
-  deriving (Show, Typeable)
+  deriving Show
 
 -- | A type representing foreign library components of a package.
 --
@@ -66,7 +66,7 @@ data StackForeignLibrary = StackForeignLibrary
   { name :: StackUnqualCompName
   , buildInfo :: !StackBuildInfo
   }
-  deriving (Show, Typeable)
+  deriving Show
 
 -- | A type representing executable components of a package.
 --
@@ -77,7 +77,7 @@ data StackExecutable = StackExecutable
   , buildInfo :: !StackBuildInfo
   , modulePath :: FilePath
   }
-  deriving (Show, Typeable)
+  deriving Show
 
 -- | A type representing test suite components of a package.
 --
@@ -88,7 +88,7 @@ data StackTestSuite = StackTestSuite
   , buildInfo :: !StackBuildInfo
   , interface :: !TestSuiteInterface
   }
-  deriving (Show, Typeable)
+  deriving Show
 
 -- | A type representing benchmark components of a package.
 --
@@ -100,11 +100,11 @@ data StackBenchmark = StackBenchmark
   , interface :: BenchmarkInterface
     -- ^ This is only used for gathering the files related to this component.
   }
-  deriving (Show, Typeable)
+  deriving Show
 
 -- | Type representing the name of an executable.
 newtype ExeName = ExeName Text
-  deriving (Data, Eq, Hashable, IsString, Generic, NFData, Ord, Show, Typeable)
+  deriving (Data, Eq, Hashable, IsString, Generic, NFData, Ord, Show)
 
 -- | Type representing information needed to build. The file gathering-related
 -- fields are lazy because they are not always needed.
@@ -158,7 +158,7 @@ data StackBuildInfo = StackBuildInfo
   , frameworks :: [String]
     -- ^ Only used in opts gathering.
   }
-  deriving (Show)
+  deriving Show
 
 -- | Type synonym for a 'HasField' constraint.
 type HasName component = HasField "name" component StackUnqualCompName

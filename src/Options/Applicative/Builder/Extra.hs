@@ -66,7 +66,7 @@ import           System.FilePath
 -- "Options.Applicative.Builder.Extra" module.
 data OptionsApplicativeExtraException
   = FlagNotFoundBug
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception OptionsApplicativeExtraException where
   displayException FlagNotFoundBug =

@@ -43,7 +43,7 @@ import           System.Terminal ( hIsTerminalDeviceOrMinTTY )
 -- | Type representing exceptions thrown by functions in the "Stack" module.
 data StackException
   = InvalidReExecVersion String String
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception StackException where
   displayException (InvalidReExecVersion expected actual) = concat

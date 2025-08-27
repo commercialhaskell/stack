@@ -112,7 +112,7 @@ data SDistPrettyException
   = CheckException (NonEmpty Check.PackageCheck)
   | CabalFilePathsInconsistentBug (Path Abs File) (Path Abs File)
   | ToTarPathException String
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty SDistPrettyException where
   pretty (CheckException xs) =

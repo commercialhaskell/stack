@@ -82,7 +82,7 @@ data CoveragePrettyException
   = NonTestSuiteTarget PackageName
   | NoTargetsOrTixSpecified
   | NotLocalPackage PackageName
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty CoveragePrettyException where
   pretty (NonTestSuiteTarget name) =

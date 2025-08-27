@@ -54,7 +54,7 @@ import           Stack.Types.SourceMap ( DepPackage (..), SourceMap (..) )
 -- "Stack.Hoogle" module.
 data HoogleException
   = HoogleOnPathNotFoundBug
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception HoogleException where
   displayException HoogleOnPathNotFoundBug = bugReport "[S-9669]"
@@ -65,7 +65,7 @@ instance Exception HoogleException where
 data HooglePrettyException
   = HoogleNotFound StyleDoc
   | HoogleDatabaseNotFound
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty HooglePrettyException where
   pretty (HoogleNotFound e) =

@@ -158,7 +158,7 @@ data MissingPresentDeps = MissingPresentDeps
   , presentPackages :: !(Map PackageIdentifier GhcPkgId)
   , isMutable :: !IsMutable
   }
-  deriving (Show)
+  deriving Show
 
 instance Semigroup MissingPresentDeps where
   (<>) a b = MissingPresentDeps

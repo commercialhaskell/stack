@@ -22,7 +22,7 @@ import           Stack.Prelude
 -- modules beginning @Stack.Storage@.
 data StoragePrettyException
   = StorageMigrationFailure !Text !(Path Abs File) !SomeException
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty StoragePrettyException where
   pretty (StorageMigrationFailure desc fp ex) =

@@ -50,7 +50,7 @@ data UpgradePrettyException
   | CommitsNotFound String String
   | StackInPackageIndexNotFound
   | VersionWithNoRevision
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty UpgradePrettyException where
   pretty SnapshotOptionInvalid =

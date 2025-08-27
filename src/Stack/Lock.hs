@@ -37,7 +37,7 @@ import           Stack.Types.SourceMap ( DepPackage, SMWanted )
 -- "Stack.Lock" module.
 data LockPrettyException
   = WritingLockFileError (Path Abs File) Locked
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty LockPrettyException where
   pretty (WritingLockFileError lockFile newLocked) =

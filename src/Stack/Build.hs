@@ -79,7 +79,7 @@ import           Stack.Types.SourceMap
 
 newtype CabalVersionPrettyException
   = CabalVersionNotSupported Version
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty CabalVersionPrettyException where
   pretty (CabalVersionNotSupported cabalVer) =

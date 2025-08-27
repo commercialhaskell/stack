@@ -82,7 +82,7 @@ data BuildException
   | HaddockIndexNotFound
   | ShowBuildErrorBug
   | CallStackEmptyBug
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception BuildException where
   displayException (Couldn'tFindPkgId name) = bugReport "[S-7178]" $ concat
@@ -266,7 +266,7 @@ data BuildPrettyException
       WantedCompilerSetter -- Way that the wanted compiler is set
       StyleDoc -- recommended resolution
   | ActionNotFilteredBug StyleDoc
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty BuildPrettyException where
   pretty ( ConstructPlanFailed errs configFile stackRoot isImplicitGlobal parents wanted prunedGlobalDeps ) =
@@ -818,7 +818,7 @@ data ConstructPlanException
     -- TODO perhaps this constructor will be removed, and BadDependency will
     -- handle it all
   -- ^ Recommend adding to extra-deps, give a helpful version number?
-  deriving (Eq, Show, Typeable)
+  deriving (Eq, Show)
 
 -- | The latest applicable version and it's latest Cabal file revision.
 -- For display purposes only, Nothing if package not found
@@ -832,7 +832,7 @@ data BadDependency
   | HasNoLibrary
   -- ^ See description of 'Stack.Types.Dependency.DepType'
   | BDDependencyCycleDetected ![PackageName]
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show)
 
 missingExeError :: String -> Bool -> String -> String
 missingExeError errorCode isSimpleBuildType msg = unlines

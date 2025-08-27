@@ -178,7 +178,7 @@ import           System.Process ( readProcess )
 -- "Stack.Constants" module.
 data ConstantsException
   = WiredInPackagesNotParsedBug
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception ConstantsException where
   displayException WiredInPackagesNotParsedBug = bugReport "[S-6057]"

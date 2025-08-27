@@ -36,7 +36,7 @@ data DepValue = DepValue
   { versionRange :: !VersionRange
   , depType :: !DepType
   }
-  deriving (Show, Typeable)
+  deriving Show
 
 -- | Is this package being used as a library, or just as a build tool? If the
 -- former, we need to ensure that a library actually exists. See

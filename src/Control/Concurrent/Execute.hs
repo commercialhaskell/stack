@@ -30,7 +30,7 @@ import qualified Data.Set as Set
 -- "Control.Concurrent.Execute" module.
 data ExecuteException
   = InconsistentDependenciesBug
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception ExecuteException where
   displayException InconsistentDependenciesBug = bugReport "[S-2816]"

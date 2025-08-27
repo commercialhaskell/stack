@@ -190,7 +190,7 @@ import           System.Uname ( getRelease )
 data SetupException
   = WorkingDirectoryInvalidBug
   | StackBinaryArchiveZipUnsupportedBug
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception SetupException where
   displayException WorkingDirectoryInvalidBug = bugReport "[S-2076]"
@@ -251,7 +251,7 @@ data SetupPrettyException
   | BinaryUpgradeOnOSUnsupported !Cabal.OS
   | BinaryUpgradeOnArchUnsupported !Cabal.Arch
   | ExistingMSYS2NotDeleted !(Path Abs Dir) !IOException
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty SetupPrettyException where
   pretty (GHCInstallFailed ex step cmd args wd tempDir destDir) =
@@ -605,7 +605,7 @@ instance Exception SetupPrettyException
 -- | Type representing exceptions thrown by 'performPathChecking'
 data PerformPathCheckingException
   = ProcessExited ExitCode String [String]
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception PerformPathCheckingException where
   displayException (ProcessExited ec cmd args) = concat

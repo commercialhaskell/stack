@@ -33,7 +33,7 @@ import           Stack.Prelude
 data TypesSnapshotException
   = ParseSnapshotException !Text
   | FilepathInDownloadedSnapshot !Text
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception TypesSnapshotException where
   displayException (ParseSnapshotException t) = concat

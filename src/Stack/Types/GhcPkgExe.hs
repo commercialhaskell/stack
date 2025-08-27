@@ -29,7 +29,7 @@ data GhcPkgPrettyException
   | CannotParseRelFileBug !String
   | CannotParseDirectoryWithDBug !String
   | CannotRecacheAfterUnregister !(Path Abs Dir) !SomeException
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Pretty GhcPkgPrettyException where
   pretty (CannotParse str what e) =
