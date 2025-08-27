@@ -32,6 +32,7 @@ Other enhancements:
   omit directories currently in use from cleaning (when `--full` is not
   specified).
 * Add option `-w` as synonym for `--stack-yaml`.
+* `stack new` now allows `codeberg:` as a service for template downloads
 
 Bug fixes:
 
