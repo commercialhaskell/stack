@@ -14,13 +14,14 @@ is documented at the
 [`commercialhaskell/stack-templates`](https://github.com/commercialhaskell/stack-templates#project-template-format)
 repository on GitHub.
 
-Any GitHub, GitLab or Bitbucket repository named `stack-templates` can provide
-project template files. For example, a template file
+Any GitHub, GitLab, Bitbucket or Codeberg repository named `stack-templates`
+can provide project template files. For example, a template file
 `username/stack-templates/my-template.hsfiles` on GitHub can be identified as
 `username/my-template` when using `stack new`. The relevant service can be
 specified by a prefix: `github:` for [GitHub](https://github.com/) (the default
-service), `gitlab:` for [GitLab](https://gitlab.com), or `bitbucket:` for
-[Bitbucket](https://bitbucket.com).
+service), `gitlab:` for [GitLab](https://gitlab.com), `bitbucket:` for
+[Bitbucket](https://bitbucket.com), or `codeberg:` for
+[Codeberg](https://codeberg.org).
 
 [`commercialhaskell/stack-templates`](https://github.com/commercialhaskell/stack-templates#project-template-format)
 on GitHub is the default repository for project templates. Its username
