@@ -44,6 +44,7 @@ Bug fixes:
 * Stack's `dot` command now gives all nodes with no dependencies in the graph
   the maximum rank, not just those nodes with no relevant dependencies at all
   (being only `rts`, when `--external` is specified).
+* Improved error messages for S-4634 and S-8215.
 
 ## v3.7.1 - 2025-06-28
 
