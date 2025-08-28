@@ -262,12 +262,14 @@ generateHpcReportInternal
           prettyError $
             "[S-4634]"
             <> line
-            <> flow "Didn't find"
-            <> style File ".tix"
-            <> "for"
-            <> report
-            <> flow "- expected to find it at"
-            <> pretty tixSrc <> "."
+            <> fillSep
+                 [ flow "Didn't find"
+                 , style File ".tix"
+                 , "for"
+                 , report
+                 , flow "- expected to find it at"
+                 , pretty tixSrc <> "."
+                 ]
           pure Nothing
         else (`catch` \(err :: ProcessException) -> do
                logError $ displayShow err
@@ -278,8 +280,10 @@ generateHpcReportInternal
                prettyError
                  ( "[S-8215]"
                    <> line
-                   <> flow "Error occurred while producing "
-                   <> report <> "."
+                   <> fillSep
+                        [ flow "Error occurred while producing"
+                        , report <> "."
+                        ]
                  )) $ do
           -- Directories for .mix files.
           hpcRelDir <- hpcRelativeDir
