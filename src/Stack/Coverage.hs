@@ -278,7 +278,7 @@ generateHpcReportInternal
                prettyError
                  ( "[S-8215]"
                    <> line
-                   <> flow "Error occurred while producing"
+                   <> flow "Error occurred while producing "
                    <> report <> "."
                  )) $ do
           -- Directories for .mix files.
