@@ -4,6 +4,8 @@ extra-deps:
 # lts-24.6 specifies Cabal-3.12.1.0
 - Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
 - Cabal-3.16.0.0@sha256:7d5d80355ac02c42cb90ec575d83653139a2054ab9aac0753527ced8f343c6b3,14024
+# lts-24.6 specifies hi-file-parser-0.1.7.0
+- hi-file-parser-0.1.8.0@sha256:0a2b11324b7021df7e5be6f5a5630fcedd31f247f566842de7eedf1053662f23,3080
 # lts-24.6 specifies hpack-0.38.1@rev:0
 - hpack-0.38.2@sha256:26bc63ea8d430e754e7de1c05a39bd7694901015f6d17fd96420dd2b149b8de2,5212
 # lts-24.6 specifies pantry-0.10.1

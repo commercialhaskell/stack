@@ -1,6 +1,6 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.38.1.
+-- This file has been generated from package.yaml by hpack version 0.38.2.
 --
 -- see: https://github.com/sol/hpack
 
@@ -446,7 +446,7 @@ library
     , generic-deriving
     , ghc-boot
     , hashable
-    , hi-file-parser >=0.1.7.0
+    , hi-file-parser >=0.1.8.0
     , hpack >=0.36.0
     , hpc
     , http-client
@@ -569,7 +569,7 @@ executable stack
     , generic-deriving
     , ghc-boot
     , hashable
-    , hi-file-parser >=0.1.7.0
+    , hi-file-parser >=0.1.8.0
     , hpack >=0.36.0
     , hpc
     , http-client
@@ -672,7 +672,7 @@ executable stack-integration-test
     , generic-deriving
     , ghc-boot
     , hashable
-    , hi-file-parser >=0.1.7.0
+    , hi-file-parser >=0.1.8.0
     , hpack >=0.36.0
     , hpc
     , hspec
@@ -790,7 +790,7 @@ test-suite stack-unit-test
     , generic-deriving
     , ghc-boot
     , hashable
-    , hi-file-parser >=0.1.7.0
+    , hi-file-parser >=0.1.8.0
     , hpack >=0.36.0
     , hpc
     , hspec

@@ -19,6 +19,13 @@ packages:
   original:
     hackage: Cabal-3.16.0.0@sha256:7d5d80355ac02c42cb90ec575d83653139a2054ab9aac0753527ced8f343c6b3,14024
 - completed:
+    hackage: hi-file-parser-0.1.8.0@sha256:0a2b11324b7021df7e5be6f5a5630fcedd31f247f566842de7eedf1053662f23,3080
+    pantry-tree:
+      sha256: 46bd5fc67cc8d0427b3614a7b7460f1fd175a2b50bc25663367199ec4cf77acd
+      size: 2843
+  original:
+    hackage: hi-file-parser-0.1.8.0@sha256:0a2b11324b7021df7e5be6f5a5630fcedd31f247f566842de7eedf1053662f23,3080
+- completed:
     hackage: hpack-0.38.2@sha256:26bc63ea8d430e754e7de1c05a39bd7694901015f6d17fd96420dd2b149b8de2,5212
     pantry-tree:
       sha256: 444e84d48497c61a5e3e59fc15ebbc97e576a9f014ae283021063cee3cf2e845
