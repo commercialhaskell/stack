@@ -1,4 +1,4 @@
-resolver: lts-24.6
+resolver: lts-24.8
 extra-deps:
 - acme-cuteboy-0.1.0.0
 - acme-dont-1.1

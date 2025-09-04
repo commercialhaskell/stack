@@ -2,6 +2,6 @@
 
 set -euxo pipefail
 
-stack build --resolver lts-24.6 async
-eval `stack config env --resolver lts-24.6`
+stack build --resolver lts-24.8 async
+eval `stack config env --resolver lts-24.8`
 ghc Main.hs

@@ -1,4 +1,4 @@
-snapshot: lts-24.6
+snapshot: lts-24.8
 packages:
 - .
 - ../package-c
