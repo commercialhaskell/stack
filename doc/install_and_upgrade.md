@@ -729,7 +729,7 @@ Stack can be installed directly or by using the GHCup tool.
       latest-snapshot: http://mirrors.tuna.tsinghua.edu.cn/stackage/snapshots.json
 
     package-index:
-    - download-prefix: http://mirrors.tuna.tsinghua.edu.cn/hackage/
+      download-prefix: http://mirrors.tuna.tsinghua.edu.cn/hackage/
     ~~~
 
 ??? question "What if I am using an HTTP proxy?"
