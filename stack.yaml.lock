@@ -5,13 +5,6 @@
 
 packages:
 - completed:
-    hackage: Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
-    pantry-tree:
-      sha256: 4de976261238dd4045dd3addebf6a006d4aff3873ee680bac7af83dcbf068280
-      size: 11238
-  original:
-    hackage: Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
-- completed:
     hackage: Cabal-3.16.0.0@sha256:7d5d80355ac02c42cb90ec575d83653139a2054ab9aac0753527ced8f343c6b3,14024
     pantry-tree:
       sha256: 1af1de9cd20b19df20b311b2e176855068a2a09203fa20de0eed76d2b95a45f7
@@ -19,12 +12,12 @@ packages:
   original:
     hackage: Cabal-3.16.0.0@sha256:7d5d80355ac02c42cb90ec575d83653139a2054ab9aac0753527ced8f343c6b3,14024
 - completed:
-    hackage: hi-file-parser-0.1.8.0@sha256:0a2b11324b7021df7e5be6f5a5630fcedd31f247f566842de7eedf1053662f23,3080
+    hackage: Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
     pantry-tree:
-      sha256: 46bd5fc67cc8d0427b3614a7b7460f1fd175a2b50bc25663367199ec4cf77acd
-      size: 2843
+      sha256: 4de976261238dd4045dd3addebf6a006d4aff3873ee680bac7af83dcbf068280
+      size: 11238
   original:
-    hackage: hi-file-parser-0.1.8.0@sha256:0a2b11324b7021df7e5be6f5a5630fcedd31f247f566842de7eedf1053662f23,3080
+    hackage: Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
 - completed:
     hackage: pantry-0.11.0@sha256:2dd0fd7e08f9c1464a993e288cba1128479f79e4b0c7977e5c1c26a68941127e,7911
     pantry-tree:
@@ -34,7 +27,7 @@ packages:
     hackage: pantry-0.11.0@sha256:2dd0fd7e08f9c1464a993e288cba1128479f79e4b0c7977e5c1c26a68941127e,7911
 snapshots:
 - completed:
-    sha256: d347039f81388e16ea93ddaf9ff1850abfba8f8680ff75fbdd177692542ceb26
-    size: 726286
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/8.yaml
-  original: lts-24.8
+    sha256: 188228e10dbb5b533bae584049b112e72000902e64b17348679a69f92fbc0d32
+    size: 726076
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/9.yaml
+  original: lts-24.9

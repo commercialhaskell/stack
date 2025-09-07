@@ -300,7 +300,7 @@ can be used to override the compiler (and, implicitly, its boot packages) for a
 Stackage snapshot, like this:
 
 ~~~yaml
-snapshot: lts-24.8
+snapshot: lts-24.9
 compiler: ghc-9.10.1
 compiler-check: match-exact
 ~~~
