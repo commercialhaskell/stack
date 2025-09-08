@@ -1,4 +1,4 @@
-snapshot: lts-24.8
+snapshot: lts-24.9
 name: snapshot-modify-lts
 drop-packages:
 - zlib

@@ -249,7 +249,7 @@ With that out of the way, let us dig a little bit more into these snapshots. We
 mentioned the LTS snapshots, and you can get information about it at
 [https://www.stackage.org/lts](https://www.stackage.org/lts), including:
 
-* The appropriate value (`lts-24.8`, as is currently the latest LTS)
+* The appropriate value (`lts-24.9`, as is currently the latest LTS)
 * The GHC version used
 * A full list of all packages versions available in this snapshot
 * The ability to perform a Hoogle search on the packages in this snapshot
