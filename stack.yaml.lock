@@ -19,12 +19,12 @@ packages:
   original:
     hackage: Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
 - completed:
-    hackage: pantry-0.11.0@sha256:2dd0fd7e08f9c1464a993e288cba1128479f79e4b0c7977e5c1c26a68941127e,7911
+    hackage: pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
     pantry-tree:
-      sha256: a491bcbf56eb0b05efb7bc213a19d548ca19dffb2d3ea92d1de3ce2bc1d44b91
+      sha256: 56e76aecdbe8f9d13de1360b11e4a68aae5e072b17dfda49a333274079841e99
       size: 2722
   original:
-    hackage: pantry-0.11.0@sha256:2dd0fd7e08f9c1464a993e288cba1128479f79e4b0c7977e5c1c26a68941127e,7911
+    hackage: pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
 snapshots:
 - completed:
     sha256: 188228e10dbb5b533bae584049b112e72000902e64b17348679a69f92fbc0d32

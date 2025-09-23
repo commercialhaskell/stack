@@ -1,11 +1,12 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.12.2.
-snapshot: nightly-2025-08-23 # GHC 9.12.2
+snapshot: nightly-2025-09-23 # GHC 9.12.2
 
 extra-deps:
-# nightly-2025-08-23 specifies Cabal-3.14.1.0
+# nightly-2025-09-23 specifies Cabal-3.14.1.0
 - Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
 - Cabal-3.16.0.0@sha256:7d5d80355ac02c42cb90ec575d83653139a2054ab9aac0753527ced8f343c6b3,14024
+- pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
 
 docker:
   enable: false

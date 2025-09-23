@@ -1,6 +1,6 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.14.*.
-snapshot: nightly-2025-09-13 # GHC 9.12.2
+snapshot: nightly-2025-09-23 # GHC 9.12.2
 compiler: ghc-9.14.0.20250908 # GHC 9.14.1-alpha2
 compiler-check: match-exact # Anticipate future alpha releases
 
@@ -14,7 +14,7 @@ setup-info:
         # Can be extended with SHA protections etc: see https://docs.haskellstack.org/en/stable/yaml_configuration/#setup-info
 
 extra-deps:
-- rio-0.1.23.0@sha256:7e29e746ab5c33e6ae9977cc8d8250a749d16ff2c372c59fd4a4eb67b06d9919,3690
+- pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
 
 docker:
   enable: false
