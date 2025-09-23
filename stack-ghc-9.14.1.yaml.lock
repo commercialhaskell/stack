@@ -5,15 +5,15 @@
 
 packages:
 - completed:
-    hackage: rio-0.1.23.0@sha256:7e29e746ab5c33e6ae9977cc8d8250a749d16ff2c372c59fd4a4eb67b06d9919,3690
+    hackage: pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
     pantry-tree:
-      sha256: 110a9f8b0d6ff910021cb2bb959af0b6399d33d0a47fee2a7a8c63e3e3beacc8
-      size: 4802
+      sha256: 56e76aecdbe8f9d13de1360b11e4a68aae5e072b17dfda49a333274079841e99
+      size: 2722
   original:
-    hackage: rio-0.1.23.0@sha256:7e29e746ab5c33e6ae9977cc8d8250a749d16ff2c372c59fd4a4eb67b06d9919,3690
+    hackage: pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
 snapshots:
 - completed:
-    sha256: 325eb08867d8315dbd42e334e4b4661130a17d3ae4bff4c390808b687b442213
-    size: 692683
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2025/9/13.yaml
-  original: nightly-2025-09-13
+    sha256: cd03bd25361efda3a5495d54dc6ec32e3c5e2ffe418fee0245262f021b133ddd
+    size: 696399
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2025/9/23.yaml
+  original: nightly-2025-09-23
