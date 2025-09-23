@@ -72,7 +72,25 @@ jobs:
           ~\AppData\Roaming\stack
           ~\AppData\Local\Programs\stack
         key: ${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
-
+    - name: Install NSIS 3.10 on Windows
+      if: startsWith(runner.os, 'Windows')
+      uses: repolevedavaj/install-nsis@v1.0.3
+      with:
+        nsis-version: '3.10'
+    # Upgrades to a 'large strings' build of NSIS 3.10 tool. See
+    # https://nsis.sourceforge.io/Special_Builds.
+    - name: Upgrade NSIS 3.10 on Windows
+      if: startsWith(runner.os, 'Windows')
+      shell: bash
+      run: |
+        # wget is not available but the Stack-supplied MSYS2 will provide it
+        stack exec -- wget -O nsis-3.10-strlen_8192.zip https://downloads.sourceforge.net/nsis/NSIS%203/3.10/nsis-3.10-strlen_8192.zip
+        7z x -aoa -o"/c/Program Files (x86)/NSIS" nsis-3.10-strlen_8192.zip
+        # Clean up
+        rm nsis-3.10-strlen_8192.zip
+        makensis -VERSION && echo
+        # Should include defined symbol NSIS_MAX_STRLEN=8192
+        makensis -HDRINFO
     - name: Install deps and run checks
       shell: bash
       run: |
@@ -130,20 +148,6 @@ jobs:
             - /lib
             - /usr/lib
         EOF
-        fi
-
-        # Updates NSIS 3.10 to a 'large strings' build of the same tool. See
-        # https://nsis.sourceforge.io/Special_Builds.
-        if [[ "${{ matrix.os }}" == "windows-latest" ]]
-        then
-          # wget is not available but the Stack-supplied MSYS2 will provide it
-          stack exec -- wget -O nsis-3.10-strlen_8192.zip https://downloads.sourceforge.net/nsis/NSIS%203/3.10/nsis-3.10-strlen_8192.zip
-          7z x -aoa -o"/c/Program Files (x86)/NSIS" nsis-3.10-strlen_8192.zip
-          # Clean up
-          rm nsis-3.10-strlen_8192.zip
-          makensis -VERSION && echo
-          # Should include defined symbol NSIS_MAX_STRLEN=8192
-          makensis -HDRINFO
         fi
 
         # In case GHCup hooks have been created, remove them
