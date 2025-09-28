@@ -330,11 +330,14 @@ label. Issues that are suitable for newcomers to the codebase have the
 label. Best to post a comment to the issue before you start work, in case anyone
 has already started.
 
-Please include a
-[ChangeLog](https://github.com/commercialhaskell/stack/blob/master/ChangeLog.md)
-entry and
-[documentation](https://github.com/commercialhaskell/stack/tree/master/doc/)
-updates with your pull request.
+Please include with your pull request:
+
+* a
+  [ChangeLog](https://github.com/commercialhaskell/stack/blob/master/ChangeLog.md)
+  entry; and
+
+* [documentation](https://github.com/commercialhaskell/stack/tree/master/doc/)
+  updates.
 
 ## Backwards Compatibility
 
@@ -693,6 +696,28 @@ This workflow will run if:
 
 * there is a pull request
 * requested
+
+## Change log
+
+Stack seeks to maintain a comprehesive and useful change log, that captures all
+changes that could be relevant to users of Stack. The change log is also
+published at <https://docs.haskellstack.org/> under menu item
+"More/Version history".
+
+The change log for each release or the current, unreleased, version of Stack is
+organised under one or more of the headings "Major changes", "Behavior changes",
+"Other enhancements" and "Bug fixes". Major changes are those anticipated to be
+important to many Stack users. The heading "Release notes" can also be used to
+communicate other important information about a release not categorised under
+those headings.
+
+Change log entries aim to be succinct and clear. The change log is not intended
+to be a substitute for high quality in-tool and online documentation.
+
+If you consider that the existing change log is incomplete, inaccurate or
+ambiguous, please
+[open an issue](https://github.com/commercialhaskell/stack/issues/new) at
+Stack's GitHub repository.
 
 ## Haskell Language Server
 
