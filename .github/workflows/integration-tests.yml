@@ -45,7 +45,7 @@ jobs:
           # Stack must have the same version number.)
           release-args: "--alpine --stack-args --docker-stack-exe=image"
           cache-bust: "2025-02-07b"
-        - os: windows-latest
+        - os: windows-2022
           release-args: ""
           cache-bust: "2025-04-06"
         - os: macos-13
