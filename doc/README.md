@@ -16,7 +16,7 @@ Haskell code is compiled by the
 [Glasgow Haskell Compiler](https://www.haskell.org/ghc/) (GHC), which can also
 be used interactively.
 
-<img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack/doc/img/stack-welcome.gif" width="50%" align="right">
+<img src="https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/stack-welcome.gif" width="50%" align="right">
 
 Stack features include:
 
