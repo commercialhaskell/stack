@@ -45,7 +45,7 @@ jobs:
         - os: ubuntu-latest
           extra-suffix: "alpine"
           stack-args: "--docker --system-ghc --no-install-ghc --flag stack:static"
-        - os: windows-latest
+        - os: windows-2022
           extra-suffix: ""
           stack-args: ""
         - os: macos-latest
