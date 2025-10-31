@@ -131,9 +131,10 @@ for the same information.
 
 Default: Disabled
 
-By default, Hpack 0.20.0 or later will decline to overwrite a Cabal file that
-has been modified manually. Pass the flag `--hpack-force` to allow Hpack to
-overwrite such a Cabal file.
+By default, Hpack 0.12.0 or later will decline to overwrite a Cabal file that
+was created by a more recent version of Hpack and Hpack 0.20.0 or later will
+decline to overwrite a Cabal file that has been modified manually. Pass the flag
+`--hpack-force` to allow Hpack to overwrite such a Cabal file.
 
 ## `--hpack-numeric-version` flag
 

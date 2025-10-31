@@ -168,10 +168,12 @@ Other enhancements:
 * In YAML configuration files, the `global-hints-location` key is introduced to
   allow the location of the global hints YAML specification file to be
   specified.
-* By default, Hpack 0.20.0 or later will decline to overwrite a Cabal file that
-  was modified manually. In YAML configuration files, the `hpack-force` key is
-  introduced to allow Hpack to overwrite such a Cabal file. The corresponding
-  `--hpack-force` flag is also added.
+* By default, Hpack 0.12.0 or later will decline to overwrite a Cabal file that
+  was created by a more recent version of Hpack and Hpack 0.20.0 or later will
+  decline to overwrite a Cabal file that was modified manually. In YAML
+  configuration files, the `hpack-force` key is introduced to allow Hpack to
+  overwrite such a Cabal file. The corresponding `--hpack-force` flag is also
+  added.
 * Add the `stack config set recommend-stack-upgrade` command to configure
   whether or not Stack should notify the user if it identifes a new version of
   Stack is available in YAML configuration files.
