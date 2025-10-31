@@ -45,6 +45,7 @@ Bug fixes:
   the maximum rank, not just those nodes with no relevant dependencies at all
   (being only `rts`, when `--external` is specified).
 * Improved error messages for S-4634 and S-8215.
+* Improved in-app help for the `--hpack-force` flag.
 
 ## v3.7.1 - 2025-06-28
 

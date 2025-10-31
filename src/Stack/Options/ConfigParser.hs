@@ -160,7 +160,8 @@ configOptsParser currentDir hide0 =
         ))
   <*> firstBoolFlagsFalse
         "hpack-force"
-        "overwriting of Cabal files that have been modified manually."
+        "overwriting of Cabal files that were created by a more recent \
+        \version of Hpack or have been modified manually."
         hide
   <*> firstBoolFlagsFalse
         "skip-ghc-check"
