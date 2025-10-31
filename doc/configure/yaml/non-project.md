@@ -862,9 +862,11 @@ Default: `false`
 Command line equivalent (takes precedence):
 [`--hpack-force` option](../global_flags.md#-no-hpack-force-flag)
 
-Whether or not to allow Hpack to overwrite a Cabal file that has been modified
-manually. By default, Hpack 0.20.0 or later will decline to overwrite such a
-Cabal file.
+Whether or not to allow Hpack to overwrite a Cabal file that was created by a
+more recent version of Hpack or has been modified manually. By default,
+Hpack 0.12.0 or later will decline to overwrite a Cabal file that was created by
+a more recent version of Hpack and Hpack 0.20.0 or later will decline to
+overwrite a Cabal file that has been modified manually.
 
 ## ignore-revision-mismatch
 
