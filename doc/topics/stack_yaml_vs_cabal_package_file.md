@@ -64,9 +64,9 @@ requires that you have chosen a specific version for each package available.
 
 The most common means by which this set of packages is defined is via a
 snapshot provided by Stackage. For example, if you go to the page
-<https://www.stackage.org/lts-24.9>, you will see a list of 3,407 packages at
-specific version numbers. When you then specify `snapshot: lts-24.9` or,
-alternatively, `resolver: lts-24.9`, you are telling Stack to use those package
+<https://www.stackage.org/lts-24.18>, you will see a list of 3,407 packages at
+specific version numbers. When you then specify `snapshot: lts-24.18` or,
+alternatively, `resolver: lts-24.18`, you are telling Stack to use those package
 versions in resolving dependencies down to specific versions of packages.
 
 Sometimes a snapshot does not have all of the packages that you want. Or you

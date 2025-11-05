@@ -9,8 +9,8 @@ on:
     - rc/**
   workflow_dispatch:
 
-# As of 15 March 2025, ubuntu-latest and windows-latest come with Stack 3.3.1
-# and GHC 9.12.1. However, macos-latest does not come with Haskell tools.
+# As of 2025-11-5, ubuntu-latest and windows-latest come with Stack 3.7.1
+# and GHC 9.12.2. However, macos-latest does not come with Haskell tools.
 
 jobs:
   pedantic:

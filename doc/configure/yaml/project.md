@@ -40,10 +40,10 @@ installation, and various settings like build flags. It is also called a
 resolver since a snapshot states how dependencies are resolved. There are
 currently four snapshot types:
 
-* LTS Haskell snapshots, e.g. `snapshot: lts-24.9`
+* LTS Haskell snapshots, e.g. `snapshot: lts-24.18`
 * Stackage Nightly snapshots, e.g. `snapshot: nightly-2025-08-17`
 * No snapshot, just use packages shipped with the compiler. For GHC this looks
-  like `snapshot: ghc-9.10.2`
+  like `snapshot: ghc-9.10.3`
 * Custom snapshot, via a URL or relative file path. For further information, see
   the [snapshot location](../../topics/snapshot_location.md) documentation.
 
@@ -207,9 +207,9 @@ the same name.
     boot packages in a build plan may limit what can be specified as an
     extra-dep.
 
-    For example, GHC boot package `ghc-9.10.2` has a dependency on `process`. Its
-    `*.conf` file identifies the dependency as `process-1.6.25.0-68e9`. If
-    package `ghc-9.10.2` is part of a build plan and a different version of
+    For example, GHC boot package `ghc-9.10.3` has a dependency on `process`. Its
+    `*.conf` file identifies the dependency as `process-1.6.26.1-10ef`. If
+    package `ghc-9.10.3` is part of a build plan and a different version of
     `process` is specified as an extra-dep, during a build, Stack will identify
     that the build plan refers to two versions of `process` and warn that the
     build is likely to fail.

@@ -54,7 +54,6 @@ module Stack.Prelude
   , StyleSpec
   , StylesUpdate (..)
   , (<+>)
-  , type (~)
   , align
   , bulletedList
   , debugBracket
@@ -110,7 +109,6 @@ import           Data.Conduit.Process.Typed
                    ( byteStringInput, createSource, withLoggedProcess_ )
 import           Data.Foldable ( Foldable(foldr') )
 import qualified Data.Text.IO as T
-import           Data.Type.Equality ( type (~) )
 import           Distribution.Types.LibraryName ( LibraryName (..) )
 import           Distribution.Types.MungedPackageId ( MungedPackageId (..) )
 import           Distribution.Types.MungedPackageName ( MungedPackageName (..) )

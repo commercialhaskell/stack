@@ -20,7 +20,7 @@ There are essentially four different ways of specifying a snapshot location:
     for example:
 
     ~~~yaml
-    snapshot: ghc-9.10.2
+    snapshot: ghc-9.10.3
     ~~~
 
 2.  Via a URL pointing to a snapshot configuration file, for example:

@@ -1,3 +1,3 @@
-snapshot: lts-24.9
+snapshot: lts-24.18
 drop-packages:
 - unliftio-core
