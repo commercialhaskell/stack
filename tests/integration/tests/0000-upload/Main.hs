@@ -1,3 +1,5 @@
+{-# LANGUAGE NumericUnderscores #-}
+
 import           Control.Concurrent
 
 import           StackTest
@@ -28,7 +30,7 @@ withFakeHackage act = do
     -- Start the fake server
     withCreateProcess (proc stackEnv $ withNetworkArgs ++ ["FakeHackage.hs"]) $ \_ _ _ _ -> do
         -- Wait for the fake server to start accepting requests
-        threadDelay 3000000
+        threadDelay 10_000_000
         act
   where
     withNetworkArgs = ["runghc", "--package", "network"]
