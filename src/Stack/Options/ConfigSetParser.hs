@@ -36,7 +36,7 @@ configCmdSetParser =
               <$> OA.argument
                     readAbstractSnapshot
                     (  OA.metavar "SNAPSHOT"
-                    <> OA.help "E.g. \"nightly\" or \"lts-24.9\"" ))
+                    <> OA.help "E.g. \"nightly\" or \"lts-24.18\"" ))
               ( OA.progDesc
                   "Change the snapshot of the current project." ))
       , OA.command "resolver"
@@ -45,7 +45,7 @@ configCmdSetParser =
               <$> OA.argument
                     readAbstractSnapshot
                     (  OA.metavar "SNAPSHOT"
-                    <> OA.help "E.g. \"nightly\" or \"lts-24.9\"" ))
+                    <> OA.help "E.g. \"nightly\" or \"lts-24.18\"" ))
               ( OA.progDesc
                   "Change the snapshot of the current project, using the \
                   \resolver key." ))

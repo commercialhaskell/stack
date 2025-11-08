@@ -16,11 +16,11 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 15 March 2025, ubuntu-latest and windows-latest come with Stack 3.3.1
-# and GHC 9.12.1. However, macos-13 and macos-latest do not come with Haskell
-# tools. windows-latest comes with NSIS 3.10, for which the default value of the
-# 'Unicode' installer attribute is 'true'. However, that is not the 'large
-# strings' build of NSIS and creates installers that corrupt the PATH
+# As of 2025-11-05, ubuntu-latest and windows-latest come with Stack 3.7.1
+# and GHC 9.12.2. However, macos-13 and macos-latest do not come with Haskell
+# tools. windows-latest no longer comes with NSIS 3.10, for which the default
+# value of the 'Unicode' installer attribute is 'true'. However, that is not the
+# 'large strings' build of NSIS and creates installers that corrupt the PATH
 # environment variable if the default string length of 1024 characters is
 # exceeded.
 
@@ -34,27 +34,27 @@ jobs:
         include:
         - os: ubuntu-latest
           release-args: "--alpine"
-          cache-bust: "2024-05-17"
+          cache-bust: "2025-11-05"
         # On public preview since 16 January 2025
         - os: ubuntu-24.04-arm
           # Stack's project-level configuration (stack.yaml) specifies the
           # multi-architecture (including Linux/Aarch64) Docker image published
           # by Oliver Benz (@benz0li, on GitHub). That image comes with
-          # Stack 3.3.1. (Note that the online documentation for
+          # Stack 3.7.1. (Note that the online documentation for
           # '--docker-stack-exe image' specifies that the host Stack and image
           # Stack must have the same version number.)
           release-args: "--alpine --stack-args --docker-stack-exe=image"
-          cache-bust: "2025-02-07b"
+          cache-bust: "2025-11-05"
         - os: windows-latest
           release-args: ""
-          cache-bust: "2025-04-06"
+          cache-bust: "2025-11-05"
         - os: macos-13
           release-args: ""
-          cache-bust: "2024-05-17"
+          cache-bust: "2024-11-05"
         # macos-latest provides macOS/AArch64 (M1)
         - os: macos-latest
           release-args: ""
-          cache-bust: "2024-05-17"
+          cache-bust: "2024-11-05"
     steps:
     - name: Clone project
       uses: actions/checkout@v4
@@ -99,7 +99,7 @@ jobs:
         if [[ "${{ matrix.os }}" == "ubuntu-24.04-arm" || "${{ matrix.os }}" == "macos-13" || "${{ matrix.os }}" == "macos-latest" ]]
         then
           # ubuntu-24.04-arm, macos-13 and macos-latest do not include Haskell
-          # tools as at 2025-03-15.
+          # tools as at 2025-11-05.
           curl -sSL https://get.haskellstack.org/ | sh
         fi
 

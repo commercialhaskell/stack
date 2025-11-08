@@ -1,4 +1,4 @@
-snapshot: lts-24.9
+snapshot: lts-24.18
 name: local-snapshot
 packages:
 - archive: package-0.1.2.3.tar.gz

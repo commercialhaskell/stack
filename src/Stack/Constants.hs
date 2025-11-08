@@ -282,7 +282,7 @@ wiredInPackages (ACGhc ghcVersion) = case mparsed of
          -- as if they were defined in modules all sharing a common package
          -- interactive. See 'Note [The interactive package]' at
          -- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Runtime/Context.hs
-         -- With GHC 9.10.2 at least, there seems to be no problem in using it.
+         -- With GHC 9.10.3 at least, there seems to be no problem in using it.
        ]
     <> [ "base" | ghcVersion < mkVersion [9, 12] ]
          -- A formerly magic package.

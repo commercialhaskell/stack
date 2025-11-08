@@ -13,7 +13,7 @@ By default:
 
 * the version of GHC is the one required by the project. Specify the version of
   GHC as an argument to attempt to install a different version of GHC. For
-  example `stack setup 9.10.2` will attempt to install GHC 9.10.2; and
+  example `stack setup 9.10.3` will attempt to install GHC 9.10.3; and
 
 * an attempt to install is made only if the version of GHC is not already
   available to Stack. Pass the flag `--reinstall` (disabled by default) to

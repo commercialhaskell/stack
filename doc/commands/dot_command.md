@@ -59,7 +59,7 @@ of the diagram).
 
 The following examples are based on the package
 [`wreq-0.5.4.3`](https://hackage.haskell.org/package/wreq-0.5.4.3) and the boot
-packages of GHC 9.10.2. In each case, the output from `stack dot` is piped as an
+packages of GHC 9.10.3. In each case, the output from `stack dot` is piped as an
 input into Graphviz's `dot` or `twopi` executables, and the executable produces
 output in the form of a SVG file named `wreq-example*.svg`.
 

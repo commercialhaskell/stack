@@ -8,7 +8,7 @@ main = unless isWindows $ do
   stackCheckStdout ["ls", "dependencies", "tree"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "├─┬ files 0.1.0.0"
-                           , "│ ├─┬ base 4.20.1.0"
+                           , "│ ├─┬ base 4.20.2.0"
                            ]
     unless (expected `isPrefixOf` stdOut) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]
@@ -16,12 +16,12 @@ main = unless isWindows $ do
   stackCheckStdout ["ls", "dependencies", "tree", "--depth=1"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "├─┬ files 0.1.0.0"
-                           , "│ ├── base 4.20.1.0"
+                           , "│ ├── base 4.20.2.0"
                            , "│ ├── filelock 0.1.1.2"
                            , "│ ├── mtl 2.3.1"
                            , "│ └── subproject 0.1.0.0"
                            , "└─┬ subproject 0.1.0.0"
-                           , "  └── base 4.20.1.0"
+                           , "  └── base 4.20.2.0"
                            ]
     when (stdOut /= expected) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]
@@ -29,8 +29,8 @@ main = unless isWindows $ do
   stackCheckStdout ["ls", "dependencies", "tree", "subproject"] $ \stdOut -> do
     let expected = unlines [ "Packages"
                            , "└─┬ subproject 0.1.0.0"
-                           , "  └─┬ base 4.20.1.0"
-                           , "    ├─┬ ghc-internal 9.1002.0"
+                           , "  └─┬ base 4.20.2.0"
+                           , "    ├─┬ ghc-internal 9.1003.0"
                            , "    │ ├─┬ ghc-bignum 1.3"
                            , "    │ │ └─┬ ghc-prim 0.12.0"
                            , "    │ │   └── rts 1.0.2"

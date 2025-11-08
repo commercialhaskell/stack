@@ -352,7 +352,7 @@ Stack aims to depend on well-known packages. The specific versions on which it
 depends at any time are specified by `package.yaml` and `stack.yaml`. It does
 not aim to be compatible with more than one version of the `Cabal` package at
 any time. At the time of writing (August 2025) the package versions are
-primarily ones in Stackage snapshot LTS Haskell 24.9 (for GHC 9.10.2), the
+primarily ones in Stackage snapshot LTS Haskell 24.18 (for GHC 9.10.3), the
 latest version of `Cabal` released on Hackage (`Cabal-3.16.0.0`) and
 `pantry-0.11.0`.
 
@@ -690,7 +690,7 @@ for each file.
 
 [Stan](https://hackage.haskell.org/package/stan) is a Haskell static analysis
 tool. As of `stan-0.1.0.1`, it supports GHC >= 9.6.3 and Stack is built with
-GHC 9.10.2. The tool is configured by the contents of the `.stan.toml` file.
+GHC 9.10.3. The tool is configured by the contents of the `.stan.toml` file.
 
 This workflow will run if:
 

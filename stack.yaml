@@ -1,19 +1,21 @@
-snapshot: lts-24.9 # GHC 9.10.2
+snapshot: lts-24.18 # GHC 9.10.3
 
 extra-deps:
-# lts-24.9 specifies Cabal-3.12.1.0
+# lts-24.18 specifies Cabal-3.12.1.0
 - Cabal-3.16.0.0@sha256:7d5d80355ac02c42cb90ec575d83653139a2054ab9aac0753527ced8f343c6b3,14024
 - Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
-# lts-24.9 specifies pantry-0.10.1
+# lts-24.18 specifies pantry-0.10.1
 - pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
+# lts-24.18 specifies rio-0.1.23.0
+- rio-0.1.24.0@sha256:c8f45307e917cb5e8c88a42726c407af8fb900033c15d1feefad54be80859be4,3690
 
 docker:
   enable: false
-  repo: quay.io/benz0li/ghc-musl:9.10.2
+  repo: quay.io/benz0li/ghc-musl:9.10.3
 
 # See LICENSE. In order to build a statically-linked Stack executable for Linux
 # that is not linked against GMP, use this alternative Docker image:
-# repo: quay.io/benz0li/ghc-musl:9.10.2-int-native
+# repo: quay.io/benz0li/ghc-musl:9.10.3-int-native
 
 nix:
   # --nix on the command-line to enable.

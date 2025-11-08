@@ -126,9 +126,9 @@
 
     ~~~text
     myproject/
-      stack-ghc-9.10.2.yaml
+      stack-ghc-9.10.3.yaml
       stack-ghc-9.8.4.yaml
-      stack.yaml --> symlink to stack-ghc-9.10.2.yaml
+      stack.yaml --> symlink to stack-ghc-9.10.3.yaml
       myproject.cabal
       src/
         ...
@@ -140,21 +140,21 @@
     === "Unix-like"
 
         ~~~text
-        STACK_YAML=stack-ghc-9.10.2.yaml
+        STACK_YAML=stack-ghc-9.10.3.yaml
         stack build
         ~~~
 
     === "Windows"
 
         ~~~text
-        $Env:STACK_YAML='stack-ghc-9.10.2.yaml'
+        $Env:STACK_YAML='stack-ghc-9.10.3.yaml'
         stack build
         ~~~
 
     === "Windows (Command Prompt)"
 
         ~~~text
-        set STACK_YAML=stack-ghc-9.10.2.yaml
+        set STACK_YAML=stack-ghc-9.10.3.yaml
         stack build
         ~~~
 

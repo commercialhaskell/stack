@@ -464,7 +464,7 @@ Stack can be installed directly or by using the GHCup tool.
             |GHC version|LLVM versions|
             |-----------|-------------|
             |9.12.2     |11 to 15     |
-            |9.10.2     |11 to 15     |
+            |9.10.3     |11 to 15     |
             |9.8.4      |11 to 15     |
             |9.6.7      |11 to 15     |
             |9.4.8      |10 to 14     |

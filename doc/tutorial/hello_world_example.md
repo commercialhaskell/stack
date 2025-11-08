@@ -59,7 +59,7 @@ creating manually a Stack project-level configuration file named `stack.yaml` in
 `my-project`, with the contents:
 
 ~~~yaml
-snapshot: lts-24.9
+snapshot: lts-24.18
 ~~~
 
 By adding those two files (one to describe a package, the other to configure the
@@ -208,7 +208,7 @@ will then build your project. The end of the output should look similar to this:
     ...
     helloworld> configure (lib + exe)
     Configuring helloworld-0.1.0.0...
-    helloworld> build (lib + exe) with ghc-9.10.2
+    helloworld> build (lib + exe) with ghc-9.10.3
     Preprocessing library for helloworld-0.1.0.0..
     Building library for helloworld-0.1.0.0..
     [1 of 2] Compiling Lib
@@ -217,9 +217,9 @@ will then build your project. The end of the output should look similar to this:
     Building executable 'helloworld-exe' for helloworld-0.1.0.0..
     [1 of 2] Compiling Main
     [2 of 2] Compiling Paths_helloworld
-    [3 of 3] Linking .stack-work/dist/x86_64-linux-tinfo6/ghc-9.10.2/build/helloworld-exe/helloworld-exe
+    [3 of 3] Linking .stack-work/dist/x86_64-linux-tinfo6/ghc-9.10.3/build/helloworld-exe/helloworld-exe
     helloworld> copy/register
-    Installing library in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/lib/x86_64-linux-ghc-9.10.2/helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
+    Installing library in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/lib/x86_64-linux-ghc-9.10.3/helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
     Installing executable helloworld-exe in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/bin
     Registering library for helloworld-0.1.0.0..
     ~~~
@@ -230,7 +230,7 @@ will then build your project. The end of the output should look similar to this:
     ...
     helloworld> configure (lib + exe)
     Configuring helloworld-0.1.0.0...
-    helloworld> build (lib + exe) with ghc-9.10.2
+    helloworld> build (lib + exe) with ghc-9.10.3
     Preprocessing library for helloworld-0.1.0.0..
     Building library for helloworld-0.1.0.0..
     [1 of 2] Compiling Lib
@@ -241,7 +241,7 @@ will then build your project. The end of the output should look similar to this:
     [2 of 2] Compiling Paths_helloworld
     [3 of 3] Linking .stack-work\dist\effaccc7\build\helloworld-exe\helloworld-exe.exe
     helloworld> copy/register
-    Installing library in ...\helloworld\.stack-work\install\c8c71a24\lib\x86_64-windows-ghc-9.10.2\helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
+    Installing library in ...\helloworld\.stack-work\install\c8c71a24\lib\x86_64-windows-ghc-9.10.3\helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
     Installing executable helloworld-exe in ...\helloworld\.stack-work\install\c8c71a24\bin
     Registering library for helloworld-0.1.0.0..
     ~~~
@@ -261,7 +261,7 @@ and that the final step involved the installation of an executable named
 ~~~text
 helloworld> configure (lib + exe)
 ...
-helloworld> build (lib + exe) with ghc-9.10.2
+helloworld> build (lib + exe) with ghc-9.10.3
 ...
 helloworld> copy/register
 ...
@@ -346,18 +346,18 @@ The start of the output should look similar to this:
     helloworld-0.1.0.0: unregistering (components added: test:helloworld-test)
     helloworld> configure (lib + exe + test)
     Configuring helloworld-0.1.0.0...
-    helloworld> build (lib + exe + test) with ghc-9.10.2
+    helloworld> build (lib + exe + test) with ghc-9.10.3
     Preprocessing library for helloworld-0.1.0.0..
     Building library for helloworld-0.1.0.0..
     Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
     Building test suite 'helloworld-test' for helloworld-0.1.0.0..
     [1 of 2] Compiling Main
     [2 of 2] Compiling Paths_helloworld
-    [3 of 3] Linking .stack-work/dist/x86_64-linux-tinfo6/ghc-9.10.2/build/helloworld-test/helloworld-test
+    [3 of 3] Linking .stack-work/dist/x86_64-linux-tinfo6/ghc-9.10.3/build/helloworld-test/helloworld-test
     Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0..
     Building executable 'helloworld-exe' for helloworld-0.1.0.0..
     helloworld> copy/register
-    Installing library in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/lib/x86_64-linux-ghc-9.10.2/helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
+    Installing library in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/lib/x86_64-linux-ghc-9.10.3/helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
     Installing executable helloworld-exe in .../helloworld/.stack-work/install/x86_64-linux-tinfo6/a2caceceda039eb4f791856f85a68f9582d4daf3d0527344693ff3d1fcd92ba4/9.6.6/bin
     Registering library for helloworld-0.1.0.0..
     ~~~
@@ -368,7 +368,7 @@ The start of the output should look similar to this:
     helloworld-0.1.0.0: unregistering (components added: test:helloworld-test)
     helloworld> configure (lib + exe + test)
     Configuring helloworld-0.1.0.0...
-    helloworld> build (lib + exe + test) with ghc-9.10.2
+    helloworld> build (lib + exe + test) with ghc-9.10.3
     Preprocessing library for helloworld-0.1.0.0..
     Building library for helloworld-0.1.0.0..
     Preprocessing test suite 'helloworld-test' for helloworld-0.1.0.0..
@@ -379,7 +379,7 @@ The start of the output should look similar to this:
     Preprocessing executable 'helloworld-exe' for helloworld-0.1.0.0..
     Building executable 'helloworld-exe' for helloworld-0.1.0.0..
     helloworld> copy/register
-    Installing library in ...\helloworld\.stack-work\install\0aa166fa\lib\x86_64-windows-ghc-9.10.2\helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
+    Installing library in ...\helloworld\.stack-work\install\0aa166fa\lib\x86_64-windows-ghc-9.10.3\helloworld-0.1.0.0-KFyX8zLxDvzLZURq3JaCVX
     Installing executable helloworld-exe in ...\helloworld\.stack-work\install\0aa166fa\bin
     Registering library for helloworld-0.1.0.0..
     ~~~
