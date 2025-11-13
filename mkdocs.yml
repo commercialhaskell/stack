@@ -114,6 +114,7 @@ nav:
   - Docker integration: topics/docker_integration.md
   - Nix integration: topics/nix_integration.md
   - Non-standard project initialization: topics/nonstandard_project_init.md
+  - Building GHC from source: topics/GHC_from_source.md
   - Debugging: topics/debugging.md
   - Editor integration: topics/editor_integration.md
   - Stack and Visual Studio Code: topics/Stack_and_VS_Code.md

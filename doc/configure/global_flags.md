@@ -174,8 +174,8 @@ for the [`skip-msys`](yaml/non-project.md#skip-msys) configuration option.
 Pass the option `--jobs <number_of_jobs>` to specify the number of concurrent
 jobs (Stack actions during building) to run.
 
-When [building GHC from source](yaml/non-project.md#building-ghc-from-source),
-specifies the `-j[<n>]` flag of GHC's Hadrian build system.
+When [building GHC from source](../topics/GHC_from_source.md), specifies the
+`-j[<n>]` flag of GHC's Hadrian build system.
 
 By default, Stack specifies a number of concurrent jobs equal to the number of
 CPUs (cores) that the machine has. In some circumstances, that default can cause
