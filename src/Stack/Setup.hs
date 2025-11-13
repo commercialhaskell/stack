@@ -131,8 +131,9 @@ import           Stack.Types.BuildConfig
                    )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.Compiler
-                   ( ActualCompiler (..), CompilerException (..)
-                   , CompilerRepository (..), WhichCompiler (..)
+                   ( ActualCompiler (..), CompilerBindistPath (..)
+                   , CompilerException (..), CompilerRepository (..)
+                   , CompilerTarget (..), WhichCompiler (..)
                    , compilerVersionText, getGhcVersion, isWantedCompiler
                    , wantedToActual, whichCompiler, whichCompilerL
                    )
@@ -1368,6 +1369,8 @@ ensureSandboxedCompiler sopts getSetupInfo' = do
          getSetupInfo'
          installed
          config.compilerRepository
+         config.compilerTarget
+         config.compilerBindistPath
          commitId
          flavour
      _ -> installGhcBindist sopts getSetupInfo' installed
@@ -1569,118 +1572,130 @@ buildGhcFromSource ::
   => Memoized SetupInfo
   -> [Tool]
   -> CompilerRepository
+  -> CompilerTarget
+     -- ^ The Hadrian build target.
+  -> CompilerBindistPath
+     -- ^ The Hadrian path to the built binary distribution.
   -> Text
      -- ^ Commit ID.
   -> Text
      -- ^ Hadrain flavour.
   -> RIO (WithMSYS env) (Tool, CompilerBuild)
-buildGhcFromSource getSetupInfo' installed (CompilerRepository url) commitId flavour = do
-  config <- view configL
-  let compilerTool = ToolGhcGit commitId flavour
-  -- detect when the correct GHC is already installed
-  if compilerTool `elem` installed
-    then pure (compilerTool, CompilerBuildStandard)
-    else
-      -- clone the repository and execute the given commands
-      withRepo (SimpleRepo url commitId RepoGit) $ do
-        -- withRepo is guaranteed to set workingDirL, so let's get it
-        mcwd <- traverse parseAbsDir =<< view workingDirL
-        cwd <- maybe (throwIO WorkingDirectoryInvalidBug) pure mcwd
-        let threads = config.jobs
-            relFileHadrianStackDotYaml' = toFilePath relFileHadrianStackDotYaml
-            ghcBootScriptPath = cwd </> ghcBootScript
-            boot = if osIsWindows
-              then proc "python3" ["boot"] runProcess_
-              else
-                proc (toFilePath ghcBootScriptPath) [] runProcess_
-            stack args = proc "stack" args'' runProcess_
-             where
-              args'' = "--stack-yaml=" <> relFileHadrianStackDotYaml' : args'
-              -- If a snapshot is specified on the command line, Stack will
-              -- apply it. This allows the snapshot specified in Hadrian's
-              -- stack.yaml file to be overridden.
-              args' = maybe args addSnapshot config.snapshot
-              addSnapshot snapshot = "--snapshot=" <> show snapshot : args
-            happy = stack ["install", "happy"]
-            alex = stack ["install", "alex"]
-            -- Executed in the Stack environment, because GHC is required.
-            configure = stack ("exec" : "--" : ghcConfigure)
-            ghcConfigure
-              | osIsWindows = ghcConfigureWindows
-              | osIsMacOS = ghcConfigureMacOS
-              | otherwise   = ghcConfigurePosix
-            hadrianScripts
-              | osIsWindows = hadrianScriptsWindows
-              | otherwise   = hadrianScriptsPosix
-            hadrianArgs = fmap T.unpack
-              [ "-j" <> tshow threads   -- parallel build
-              , "--flavour=" <> flavour -- selected flavour
-              , "binary-dist"
-              ]
-        foundHadrianPaths <-
-          filterM doesFileExist $ (cwd </>) <$> hadrianScripts
-        hadrianPath <- maybe (prettyThrowIO HadrianScriptNotFound) pure $
-          listToMaybe foundHadrianPaths
-        exists <- doesFileExist ghcBootScriptPath
-        unless exists $ prettyThrowIO GhcBootScriptNotFound
-        ensureConfigureScript cwd
-        logInfo "Running GHC boot script..."
-        boot
-        doesExecutableExist "happy" >>= \case
-          True -> logInfo "happy executable installed on the PATH."
-          False -> do
-            logInfo "Installing happy executable..."
-            happy
-        doesExecutableExist "alex" >>= \case
-          True -> logInfo "alex executable installed on the PATH."
-          False -> do
-            logInfo "Installing alex executable..."
-            alex
-        logInfo "Running GHC configure script..."
-        configure
-        logSticky $
-             "Building GHC from source with `"
-          <> display flavour
-          <> "` flavour. It can take a long time (more than one hour)..."
-        -- We need to provide an absolute path to the script since the process
-        -- package only sets working directory _after_ discovering the
-        -- executable.
-        proc (toFilePath hadrianPath) hadrianArgs runProcess_
+buildGhcFromSource
+    getSetupInfo'
+    installed
+    (CompilerRepository url)
+    (CompilerTarget hadrianBuildTarget)
+    (CompilerBindistPath hadrianBindistPath)
+    commitId
+    flavour
+  = do
+    config <- view configL
+    let compilerTool = ToolGhcGit commitId flavour
+    -- detect when the correct GHC is already installed
+    if compilerTool `elem` installed
+      then pure (compilerTool, CompilerBuildStandard)
+      else
+        -- clone the repository and execute the given commands
+        withRepo (SimpleRepo url commitId RepoGit) $ do
+          -- withRepo is guaranteed to set workingDirL, so let's get it
+          mcwd <- traverse parseAbsDir =<< view workingDirL
+          cwd <- maybe (throwIO WorkingDirectoryInvalidBug) pure mcwd
+          let threads = config.jobs
+              relFileHadrianStackDotYaml' = toFilePath relFileHadrianStackDotYaml
+              ghcBootScriptPath = cwd </> ghcBootScript
+              boot = if osIsWindows
+                then proc "python3" ["boot"] runProcess_
+                else
+                  proc (toFilePath ghcBootScriptPath) [] runProcess_
+              stack args = proc "stack" args'' runProcess_
+               where
+                args'' = "--stack-yaml=" <> relFileHadrianStackDotYaml' : args'
+                -- If a snapshot is specified on the command line, Stack will
+                -- apply it. This allows the snapshot specified in Hadrian's
+                -- stack.yaml file to be overridden.
+                args' = maybe args addSnapshot config.snapshot
+                addSnapshot snapshot = "--snapshot=" <> show snapshot : args
+              happy = stack ["install", "happy"]
+              alex = stack ["install", "alex"]
+              -- Executed in the Stack environment, because GHC is required.
+              configure = stack ("exec" : "--" : ghcConfigure)
+              ghcConfigure
+                | osIsWindows = ghcConfigureWindows
+                | osIsMacOS = ghcConfigureMacOS
+                | otherwise   = ghcConfigurePosix
+              hadrianScripts
+                | osIsWindows = hadrianScriptsWindows
+                | otherwise   = hadrianScriptsPosix
+              hadrianArgs = fmap T.unpack
+                [ "-j" <> tshow threads   -- parallel build
+                , "--flavour=" <> flavour -- selected flavour
+                , hadrianBuildTarget
+                ]
+          foundHadrianPaths <-
+            filterM doesFileExist $ (cwd </>) <$> hadrianScripts
+          hadrianPath <- maybe (prettyThrowIO HadrianScriptNotFound) pure $
+            listToMaybe foundHadrianPaths
+          exists <- doesFileExist ghcBootScriptPath
+          unless exists $ prettyThrowIO GhcBootScriptNotFound
+          ensureConfigureScript cwd
+          logInfo "Running GHC boot script..."
+          boot
+          doesExecutableExist "happy" >>= \case
+            True -> logInfo "happy executable installed on the PATH."
+            False -> do
+              logInfo "Installing happy executable..."
+              happy
+          doesExecutableExist "alex" >>= \case
+            True -> logInfo "alex executable installed on the PATH."
+            False -> do
+              logInfo "Installing alex executable..."
+              alex
+          logInfo "Running GHC configure script..."
+          configure
+          logSticky $
+               "Building GHC from source with `"
+            <> display flavour
+            <> "` flavour. It can take a long time (more than one hour)..."
+          -- We need to provide an absolute path to the script since the process
+          -- package only sets working directory _after_ discovering the
+          -- executable.
+          proc (toFilePath hadrianPath) hadrianArgs runProcess_
 
-        -- find the bindist and install it
-        bindistPath <- parseRelDir "_build/bindist"
-        (_,files) <- listDir (cwd </> bindistPath)
-        let isBindist p = do
-              extension <- fileExtension (filename p)
+          -- find the bindist and install it
+          bindistPath <- parseRelDir (T.unpack hadrianBindistPath)
+          (_,files) <- listDir (cwd </> bindistPath)
+          let isBindist p = do
+                extension <- fileExtension (filename p)
 
-              pure $
-                   "ghc-" `isPrefixOf` toFilePath (filename p)
-                && extension == ".xz"
+                pure $
+                     "ghc-" `isPrefixOf` toFilePath (filename p)
+                  && extension == ".xz"
 
-        filterM isBindist files >>= \case
-          [bindist] -> do
-            let bindist' = T.pack (toFilePath bindist)
-                dlinfo = DownloadInfo
-                  { url = bindist'
-                    -- we can specify a filepath instead of a URL
-                  , contentLength = Nothing
-                  , sha1 = Nothing
-                  , sha256 = Nothing
-                  }
-                ghcdlinfo = GHCDownloadInfo mempty mempty dlinfo
-                installer
-                   | osIsWindows = installGHCWindows
-                   | otherwise   = installGHCPosix ghcdlinfo
-            si <- runMemoized getSetupInfo'
-            _ <- downloadAndInstallTool
-              config.localPrograms
-              dlinfo
-              compilerTool
-              (installer si)
-            pure (compilerTool, CompilerBuildStandard)
-          _ -> do
-            forM_ files (logDebug . fromString . (" - " ++) . toFilePath)
-            prettyThrowIO HadrianBindistNotFound
+          filterM isBindist files >>= \case
+            [bindist] -> do
+              let bindist' = T.pack (toFilePath bindist)
+                  dlinfo = DownloadInfo
+                    { url = bindist'
+                      -- we can specify a filepath instead of a URL
+                    , contentLength = Nothing
+                    , sha1 = Nothing
+                    , sha256 = Nothing
+                    }
+                  ghcdlinfo = GHCDownloadInfo mempty mempty dlinfo
+                  installer
+                     | osIsWindows = installGHCWindows
+                     | otherwise   = installGHCPosix ghcdlinfo
+              si <- runMemoized getSetupInfo'
+              _ <- downloadAndInstallTool
+                config.localPrograms
+                dlinfo
+                compilerTool
+                (installer si)
+              pure (compilerTool, CompilerBuildStandard)
+            _ -> do
+              forM_ files (logDebug . fromString . (" - " ++) . toFilePath)
+              prettyThrowIO HadrianBindistNotFound
 
 -- | Determine which GHC builds to use depending on which shared libraries are
 -- available on the system.
