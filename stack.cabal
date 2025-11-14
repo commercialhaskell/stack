@@ -1,6 +1,6 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.38.2.
+-- This file has been generated from package.yaml by hpack version 0.38.3.
 --
 -- see: https://github.com/sol/hpack
 
@@ -113,6 +113,7 @@ extra-source-files:
     doc/topics/developing_on_windows.md
     doc/topics/docker_integration.md
     doc/topics/editor_integration.md
+    doc/topics/GHC_from_source.md
     doc/topics/haskell_and_c_code.md
     doc/topics/index.md
     doc/topics/lock_files.md
