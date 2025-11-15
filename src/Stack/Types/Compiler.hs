@@ -11,8 +11,12 @@ module Stack.Types.Compiler
   ( ActualCompiler (..)
   , WhichCompiler (..)
   , CompilerRepository (..)
+  , CompilerTarget (..)
+  , CompilerBindistPath (..)
   , CompilerException (..)
   , defaultCompilerRepository
+  , defaultCompilerTarget
+  , defaultCompilerBindistPath
   , getGhcVersion
   , whichCompiler
   , compilerVersionText
@@ -31,9 +35,10 @@ import           Data.Aeson
 import           Database.Persist.Sql
                    ( PersistField (..), PersistFieldSql (..), SqlType (..) )
 import qualified Data.Text as T
+import           Distribution.Version ( mkVersion )
 import           Stack.Prelude
 import           Stack.Types.Version ( VersionCheck, checkVersion )
-import           Distribution.Version ( mkVersion )
+import           System.Permissions ( osIsWindows )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Stack.Types.Compiler" module.
@@ -146,6 +151,32 @@ instance FromJSON CompilerRepository where
 defaultCompilerRepository :: CompilerRepository
 defaultCompilerRepository =
   CompilerRepository "https://gitlab.haskell.org/ghc/ghc.git"
+
+-- | Target for Hadrian build
+newtype CompilerTarget
+  = CompilerTarget Text
+  deriving Show
+
+instance FromJSON CompilerTarget where
+  parseJSON = withText "CompilerTarget" (pure . CompilerTarget)
+
+defaultCompilerTarget :: CompilerTarget
+defaultCompilerTarget = if osIsWindows
+  then CompilerTarget "reloc-binary-dist"
+  else CompilerTarget "binary-dist"
+
+-- | Hadrian path to built binary distribution
+newtype CompilerBindistPath
+  = CompilerBindistPath Text
+  deriving Show
+
+instance FromJSON CompilerBindistPath where
+  parseJSON = withText "CompilerBindistPath" (pure . CompilerBindistPath)
+
+defaultCompilerBindistPath :: CompilerBindistPath
+defaultCompilerBindistPath = if osIsWindows
+  then CompilerBindistPath "_build/reloc-bindist"
+  else CompilerBindistPath "_build/bindist"
 
 whichCompilerL :: Getting r ActualCompiler WhichCompiler
 whichCompilerL = to whichCompiler

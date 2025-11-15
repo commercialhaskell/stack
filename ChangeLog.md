@@ -19,6 +19,9 @@ Behavior changes:
   `ls dependencies` command, so that the nodes of
   `stack dot --external --depth 0` are the same as the packages listed by
   `stack ls dependencies --depth 0`.
+* When building GHC from source, on Windows, the default Hadrian build target is
+  `reloc-binary-dist` and the default path to the GHC built by Hadrian is
+  `_build/reloc-bindist`.
 
 Other enhancements:
 
@@ -33,6 +36,10 @@ Other enhancements:
   specified).
 * Add option `-w` as synonym for `--stack-yaml`.
 * `stack new` now allows `codeberg:` as a service for template downloads
+* In YAML configuration files, the `compiler-target` and
+  `compiler-bindist-path` keys are introduced to allow, when building GHC from
+  source, the Hadrian build target and Hadrian path to the built GHC to be
+  specified.
 
 Bug fixes:
 
