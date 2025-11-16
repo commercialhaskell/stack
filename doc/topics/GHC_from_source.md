@@ -8,8 +8,8 @@
 
 Stack supports building the GHC compiler from source, using
 [Hadrian](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/README.md) (the
-build system for GHC). The GHC version to build and to use is defined by a a Git
-commit ID and a Hadrian "flavour", with the following syntax in a YAML
+build system for GHC). The GHC version to be built and used is defined by a
+Git commit ID and a Hadrian "flavour", with the following syntax in a YAML
 configuration file:
 
 ~~~yaml
@@ -39,6 +39,12 @@ enable any known workaround to make older compilers work.
 
 Building the compiler can take a very long time (more than one hour). For faster
 build times, use Hadrian flavours that disable documentation generation.
+
+!!! note
+
+    The building of the compiler can require the creation of symbolic links
+    (symlinks). On Windows, symlinks can only be created by processes with
+    Administrator privileges unless Windows' Developer Mode has been set.
 
 ### Bootstrap compiler
 
