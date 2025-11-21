@@ -134,6 +134,16 @@ Stack will build and install `happy` and `alex`, if not already on the PATH.
     Hadrian may require certain LaTeX packages and may prompt for these to be
     installed duing the build process.
 
+    !!! note
+
+        Before commit
+        [cdddeb0f1280b40cc194028bbaef36e127175c4c](https://gitlab.haskell.org/ghc/ghc/-/commit/cdddeb0f1280b40cc194028bbaef36e127175c4c)
+        the GHC project did not support `autoconf >= 2.72`.
+
+        MSYS2 can be
+        [configured](https://www.msys2.org/docs/autotools/#autoconf-wrapper) to
+        use an earlier version of `autoconf` than the latest version.
+
 ### Global packages
 
 The GHC compiler you build from sources may depend on unreleased versions of
