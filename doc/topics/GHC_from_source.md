@@ -23,6 +23,10 @@ In the following example the commit ID is "5be7ad..." and the flavour is
 compiler: ghc-git-5be7ad7861c8d39f60b7101fd8d8e816ff50353a-quick
 ~~~
 
+The [`-j`, `--jobs` option](../configure/global_flags.md#-jobs-or-j-option) at
+the command line or the [`jobs`](../configure/yaml/non-project.md#jobs) option
+in a YAML configuraton file can be used to specify Hadrian's `-j[<n>]` flag.
+
 By default, the code is retrieved from the main GHC repository. If you want to
 select another repository, use the `compiler-repository` option in a YAML
 configuration file:
@@ -32,6 +36,40 @@ compiler-repository: git://my/ghc/repository
 # default
 # compiler-repository: https://gitlab.haskell.org/ghc/ghc.git
 ~~~
+
+By default, the Hadrian build target is `reloc-binary-dist` on Windows and
+`binary-dist` on other operating systems. If you want to specify another
+Hadrian build target, use the `compiler-target` option in a YAML configuration
+file:
+
+~~~yaml
+compiler-target: binary-dist
+# default (Windows)
+# compiler-target: reloc-binary-dist
+# default (non-Windows)
+# compiler-target: binary-dist
+~~~
+
+By default, Stack assumes that the path to the binary distribution built by
+Hadrian is `_build/reloc-bindist` on Windows and `_build/bindist` on other
+operating systems. If you want to specify another path, use the
+`compiler-bindist-path` option in a YAML configuration file:
+
+~~~yaml
+compiler-bindist-path: _build/bindist
+# default (Windows)
+# compiler-bindist-path: _build/reloc-bindist
+# default (non-Windows)
+# compiler-bindist-path: _build/bindist
+~~~
+
+!!! note
+
+    The Hadrian build target `reloc-binary-dist` was introduced with Git commit
+    id
+    [`fe23629b147d419053052e6e881f6e8ddfbf3bae`](https://gitlab.haskell.org/ghc/ghc/-/commit/fe23629b147d419053052e6e881f6e8ddfbf3bae).
+
+    Once introduced, the target must be used on Windows.
 
 Stack does not check the compiler version when it uses a compiler built from
 source. It is assumed that the built compiler is recent enough as Stack does not
@@ -65,13 +103,17 @@ fully managed by Stack.
     configure: error: GHC version 9.2 or later is required to compile GHC.
     ~~~
 
-    The resolution is: (1) to specify an alternative snapshot (one that
-    specifies a sufficiently recent version of GHC) on the command line, using
-    Stack's option `--snapshot <snapshot>`. Stack will use that snapshot when
-    running GHC's `configure` script; and (2) to set the contents of the `STACK`
-    environment variable to be `stack --snapshot <snapshot>`. Hadrian's
-    `build-stack` script wil refer to that environment variable for the Stack
-    command it uses.
+    The resolution is:
+
+    1.  to specify an alternative snapshot (one that specifies a sufficiently
+        recent version of GHC) on the command line, using Stack's option
+        `--snapshot <snapshot>`. Stack will use that snapshot when running GHC's
+        `configure` script; and
+
+    2.  to set the contents of the `STACK` environment variable to be
+        `stack --snapshot <snapshot>`. If `<snapshot>` is a path to a local YAML
+        file, it needs to be an absolute one. Hadrian's `build-stack` script
+        will refer to that environment variable for the Stack command it uses.
 
 ### Hadrian prerequisites
 
@@ -127,8 +169,10 @@ Stack will build and install `happy` and `alex`, if not already on the PATH.
     # documentation from a single source file, including `makeinfo`.
     stack exec -- pacman --sync mingw-w64-x86_64-ca-certificates
     # Common CA (certificate authority) certificates.
-    stack exec -- pip install -U sphinx
+    stack exec -- pacman -sync mingw-w64-x86_64-python-sphinx
     # Sphinx is the Python documentation generator.
+    stack exec -- pacman -sync mingw-w64-x86_64-texlive-full
+    # The TeX Live distribution.
     ~~~
 
     Hadrian may require certain LaTeX packages and may prompt for these to be
