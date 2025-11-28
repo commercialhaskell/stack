@@ -40,7 +40,8 @@ import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
 import           Stack.Types.BuildOpts ( BuildOpts )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
-import           Stack.Types.Compiler ( CompilerRepository )
+import           Stack.Types.Compiler
+                   ( CompilerBindistPath, CompilerRepository, CompilerTarget )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
 import           Stack.Types.Docker ( DockerOpts )
 import           Stack.Types.DumpLogs ( DumpLogs )
@@ -114,6 +115,10 @@ data Config = Config
     -- ^ Specifies which versions of the compiler are acceptable.
   , compilerRepository      :: !CompilerRepository
     -- ^ Specifies the repository containing the compiler sources
+  , compilerTarget          :: !CompilerTarget
+    -- ^ Specifies the Hadrian build target
+  , compilerBindistPath     :: !CompilerBindistPath
+    -- ^ Specifies the Hadrian path to built binary distribution
   , localBin                :: !(Path Abs Dir)
     -- ^ Directory we should install executables into
   , fileWatchHook           :: !(Maybe (Path Abs File))

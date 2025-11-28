@@ -113,7 +113,10 @@ import           Stack.Types.Build.Exception
 import           Stack.Types.BuildConfig ( BuildConfig (..) )
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.ColorWhen ( ColorWhen (..) )
-import           Stack.Types.Compiler ( defaultCompilerRepository )
+import           Stack.Types.Compiler
+                   ( defaultCompilerBindistPath, defaultCompilerRepository
+                   , defaultCompilerTarget
+                   )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), askLatestSnapshotUrl
                    , configProjectRoot, stackRootL, workDirL
@@ -286,6 +289,12 @@ configFromConfigMonoid
         compilerRepository = fromFirst
           defaultCompilerRepository
           configMonoid.compilerRepository
+        compilerTarget = fromFirst
+          defaultCompilerTarget
+          configMonoid.compilerTarget
+        compilerBindistPath = fromFirst
+          defaultCompilerBindistPath
+          configMonoid.compilerBindistPath
         ghcBuild = getFirst configMonoid.ghcBuild
         installGHC = fromFirstTrue configMonoid.installGHC
         installMsys = fromFirst installGHC configMonoid.installMsys
@@ -595,6 +604,8 @@ configFromConfigMonoid
                 , msysEnvironment
                 , compilerCheck
                 , compilerRepository
+                , compilerTarget
+                , compilerBindistPath
                 , localBin
                 , fileWatchHook
                 , requireStackVersion

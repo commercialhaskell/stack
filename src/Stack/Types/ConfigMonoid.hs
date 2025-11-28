@@ -44,7 +44,8 @@ import           Stack.Types.BuildOptsMonoid ( BuildOptsMonoid )
 import           Stack.Types.Casa ( CasaOptsMonoid )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey )
 import           Stack.Types.ColorWhen ( ColorWhen )
-import           Stack.Types.Compiler ( CompilerRepository )
+import           Stack.Types.Compiler
+                   ( CompilerBindistPath, CompilerRepository, CompilerTarget )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
 import           Stack.Types.Docker ( DockerOptsMonoid, VersionRangeJSON (..) )
 import           Stack.Types.DumpLogs ( DumpLogs )
@@ -101,6 +102,10 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See: 'Stack.Types.Config.compilerCheck'
   , compilerRepository      :: !(First CompilerRepository)
     -- ^ See: 'Stack.Types.Config.compilerRepository'
+  , compilerTarget          :: !(First CompilerTarget)
+    -- ^ See: 'Stack.Types.Config.compilerTarget'
+  , compilerBindistPath     :: !(First CompilerBindistPath)
+    -- ^ See: 'Stack.Types.Config.compilerBindistPath'
   , requireStackVersion     :: !IntersectingVersionRange
     -- ^ See: 'Stack.Types.Config.requireStackVersion'
   , arch                    :: !(First String)
@@ -289,6 +294,9 @@ parseConfigMonoidObject rootDir obj = do
       pure (First scmInit,fromMaybe M.empty params)
   compilerCheck <- First <$> obj ..:? configMonoidCompilerCheckName
   compilerRepository <- First <$> (obj ..:? configMonoidCompilerRepositoryName)
+  compilerTarget <- First <$> (obj ..:? configMonoidCompilerTargetName)
+  compilerBindistPath <-
+    First <$> (obj ..:? configMonoidCompilerBindistPathName)
 
   options <- Map.map (.ghcOptions) <$>
     obj ..:? configMonoidGhcOptionsName ..!= (mempty :: Map GhcOptionKey GhcOptions)
@@ -381,6 +389,8 @@ parseConfigMonoidObject rootDir obj = do
     , msysEnvironment
     , compilerCheck
     , compilerRepository
+    , compilerTarget
+    , compilerBindistPath
     , requireStackVersion
     , arch
     , ghcVariant
@@ -537,6 +547,12 @@ configMonoidCompilerCheckName = "compiler-check"
 
 configMonoidCompilerRepositoryName :: Text
 configMonoidCompilerRepositoryName = "compiler-repository"
+
+configMonoidCompilerTargetName :: Text
+configMonoidCompilerTargetName = "compiler-target"
+
+configMonoidCompilerBindistPathName :: Text
+configMonoidCompilerBindistPathName = "compiler-bindist-path"
 
 configMonoidGhcOptionsName :: Text
 configMonoidGhcOptionsName = "ghc-options"
