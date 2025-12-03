@@ -471,7 +471,7 @@ library
     , process >=1.6.13.2
     , project-template
     , random
-    , rio >=0.1.22.0
+    , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
     , split
     , stm
@@ -594,7 +594,7 @@ executable stack
     , process >=1.6.13.2
     , project-template
     , random
-    , rio >=0.1.22.0
+    , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
     , split
     , stack
@@ -699,7 +699,7 @@ executable stack-integration-test
     , process >=1.6.13.2
     , project-template
     , random
-    , rio >=0.1.22.0
+    , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
     , split
     , stm
@@ -817,7 +817,7 @@ test-suite stack-unit-test
     , project-template
     , random
     , raw-strings-qq
-    , rio >=0.1.22.0
+    , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
     , split
     , stack
