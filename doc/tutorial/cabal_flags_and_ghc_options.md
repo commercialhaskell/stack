@@ -7,6 +7,35 @@ flags and with GHC options.
 
 ## Cabal flags
 
+A package description may specify one or more Cabal flags:
+
+=== "Cabal file"
+
+    ~~~text
+    flag my-flag-name
+      description: My (optional) description of my flag.
+      default: false -- Optional: the default value is true
+      manual: true -- Optional: the default value is false
+    ~~~
+
+=== "`package.yaml` (Hpack)"
+
+    ~~~yaml
+    flags:
+      my-flag-name:
+        description: My (optional) description of my flag.
+        default: true # Required
+        manual: false # Required
+    ~~~
+
+??? question "How does `manual: false` affect Stack's builds?"
+
+    `manual: false` has different implications for Cabal and Stack. Cabal tries
+    to 'solve' dependencies using the flag’s default value and, if it can't,
+    tries again with the negated default value. Stack emphasises reproducible
+    builds. It only tries to build with the flag's default value and, if it
+    can't, reports that it can't.
+
 Cabal flags can be set or unset at the command line or as a project-specific
 Stack option.
 

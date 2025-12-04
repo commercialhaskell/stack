@@ -122,6 +122,20 @@ The Hadrian build system has certain
 It requires certain versions of the `happy` and `alex` executables on the PATH.
 Stack will build and install `happy` and `alex`, if not already on the PATH.
 
+!!! note
+
+    If `happy` and/or `alex` is already on the PATH, it may not be a version
+    that Hadrian supports. In that case, you may wish to remove that version
+    from the PATH and ensure that the package version specified by
+    `hadrian/stack.yaml` or, if applicable, via the contents of the `STACK` environment variable is an appropriate one.
+
+!!! note
+
+    `alex-3.5.0.0` removed `-v` as an alias for `--version` and added `-v` as an
+    alias for `--verbose` (a flag that is not implemented as of `alex-3.5.4.0`).
+
+    Hadrian may expect `-v` to be an alias for `--version`.
+
 === "macOS"
 
     Hadrian requires, or case use, certain tools or Python packages that do not
