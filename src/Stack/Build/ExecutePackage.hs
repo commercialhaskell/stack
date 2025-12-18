@@ -82,7 +82,7 @@ import           Stack.Coverage ( generateHpcReport, updateTixFile )
 import           Stack.GhcPkg ( ghcPkg, ghcPkgPathEnvVar, unregisterGhcPkgIds )
 import           Stack.Package
                    ( buildLogPath, buildableExes, buildableSubLibs
-                   , hasBuildableMainLibrary, mainLibraryHasExposedModules
+                   , hasBuildableMainLibrary
                    )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
@@ -347,8 +347,10 @@ announceTask ee taskType action = logInfo $
 
 -- | Implements running a package's build, used to implement
 -- 'Control.Concurrent.Execute.ATBuild' and
--- 'Control.Concurrent.Execute.ATBuildFinal' tasks. In particular this does the
--- following:
+-- 'Control.Concurrent.Execute.ATBuildFinal' tasks. The latter is a task for
+-- building a package's benchmarks and test-suites.
+--
+-- In particular this does the following:
 --
 -- * Checks if the package exists in the precompiled cache, and if so, add it to
 --   the database instead of performing the build.
@@ -471,12 +473,9 @@ realConfigAndBuild
  where
   pkgId = taskProvides task
   PackageIdentifier pname _ = pkgId
-  doHaddock curator package =
+  doHaddock curator =
        task.buildHaddocks
     && not isFinalBuild
-       -- Works around haddock failing on bytestring-builder since it has no
-       -- modules when bytestring is new enough.
-    && mainLibraryHasExposedModules package
        -- Special help for the curator tool to avoid haddocks that are known
        -- to fail
     && maybe True (Set.notMember pname . (.skipHaddock)) curator
@@ -593,7 +592,7 @@ realConfigAndBuild
     postBuildCheck True
 
     mcurator <- view $ buildConfigL . to (.curator)
-    when (doHaddock mcurator package) $ do
+    when (doHaddock mcurator) $ do
       let isTaskTargetMutable = taskTargetIsMutable task == Mutable
           isHaddockForHackage =
             ee.buildOpts.haddockForHackage && isTaskTargetMutable
