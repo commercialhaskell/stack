@@ -4,7 +4,7 @@ main :: IO ()
 main = do
   -- Newer Cabal: dry run and building should succeed, because they'll
   -- both ignore the do-not-build
-  writeFile "stack.yaml" "snapshot: lts-24.18"
+  writeFile "stack.yaml" "snapshot: lts-24.24"
   stack ["build", "--dry-run"]
   stack ["build"]
 

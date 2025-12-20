@@ -1,6 +1,6 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.14.1.
-snapshot: nightly-2025-12-19 # GHC 9.12.2
+snapshot: nightly-2025-12-20 # GHC 9.12.2
 compiler: ghc-9.14.1
 
 docker:
