@@ -26,5 +26,5 @@ stack haddock [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
 ~~~
 
 `stack haddock` is a synonym for `stack build --haddock`. For further
-information, see the documentation for the [`stack build`](build_command.md)
-command.
+information, see the documentation for the
+[`stack build`](build_command.md#-no-haddock-flag) command.

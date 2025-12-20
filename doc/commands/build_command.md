@@ -341,9 +341,10 @@ based on file dirtiness.
 
 Default: Disabled
 
+The [`stack haddock`](haddock_command.md) synonym sets this flag.
+
 Set the flag to build Haddock documentation. This may cause a lot of packages to
-get re-built, so that the documentation links work. The `stack haddock` synonym
-sets this flag.
+get re-built, so that the documentation links work.
 
 Stack applies Haddock's `--gen-contents` and `--gen-index` flags to generate a
 single HTML contents and index for multiple sets of Haddock documentation.
@@ -368,8 +369,10 @@ single HTML contents and index for multiple sets of Haddock documentation.
 
 ### `--haddock-arguments` option
 
-`stack haddock --haddock-arguments <haddock_argument(s)>` passes the specified
-arguments to the Haddock tool.
+When building Haddock documentation (see the
+[`--[no-]haddock`](#-no-haddock-flag) flag),
+`--haddock-arguments <haddock_argument(s)>` passes the specified arguments to
+the Haddock tool.
 
 Specified arguments are separated by spaces. Arguments can be unquoted (if they
 do not contain space or `"` characters) or quoted (`""`). Quoted arguments can
@@ -382,9 +385,11 @@ include 'escaped' characters, escaped with an initial `\` character.
 
 ### `--[no-]haddock-deps` flag
 
-Default: Enabled (if building Haddock documnentation)
+Default: Enabled (if building Haddock documentation)
 
-Unset the flag to disable building Haddock documentation for dependencies.
+When building Haddock documentation (see the
+[`--[no-]haddock`](#-no-haddock-flag) flag), unset the flag to disable building
+documentation for dependencies.
 
 ### `--[no-]haddock-for-hackage` flag
 
@@ -394,9 +399,10 @@ Unset the flag to disable building Haddock documentation for dependencies.
 
 Default: Disabled
 
-Set the flag to build project packages with flags to generate Haddock
-documentation suitable for upload to Hackage. The form of the Haddock
-documentation generated for other packages is unaffected.
+When building Haddock documentation (see the
+[`--[no-]haddock`](#-no-haddock-flag) flag), set the flag to build project
+packages with flags to generate documentation suitable for upload to Hackage.
+The form of the documentation generated for other packages is unaffected.
 
 For each project package, the generated Haddock documentation files are in
 directory `doc\html\<package_version>-docs\`, relative to Stack's dist work
@@ -443,9 +449,11 @@ If the flag is set:
 
 ### `--[no-]haddock-hyperlink-source` flag
 
-Default: Enabled
+Default: Enabled (if building Haddock documentation)
 
-Unset the flag to disable building building hyperlinked source for Haddock.
+When building Haddock documentation (see the
+[`--[no-]haddock`](#-no-haddock-flag) flag), unset the flag to disable building
+documentation with hyperlinked sources.
 
 If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
@@ -454,8 +462,9 @@ this flag is ignored.
 
 Default: Disabled
 
-Set the flag to enable building Haddock documentation for benchmark components
-of packages.
+When building Haddock documentation (see the
+[`--[no-]haddock`](#-no-haddock-flag) flag), set the flag to enable building
+documentation for benchmark components of packages.
 
 If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
@@ -477,8 +486,9 @@ this flag is ignored.
 
 Default: Disabled
 
-Set the flag to enable building Haddock documentation for executable components
-of packages.
+When building Haddock documentation (see the
+[`--[no-]haddock`](#-no-haddock-flag) flag), set the flag to enable building
+documentation for executable components of packages.
 
 If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
@@ -500,7 +510,9 @@ this flag is ignored.
 
 Default: Disabled
 
-Set the flag to enable building Haddock documentation for internal modules.
+When building Haddock documentation (see the
+[`--[no-]haddock`](#-no-haddock-flag) flag), set the flag to enable building
+documentation for internal modules.
 
 If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
@@ -509,8 +521,9 @@ this flag is ignored.
 
 Default: Disabled
 
-Set the flag to enable building Haddock documentation for test suite components
-of packages.
+When building Haddock documentation (see the
+[`--[no-]haddock`](#-no-haddock-flag) flag), set the flag to enable building
+documentation for test suite components of packages.
 
 If the [`--haddock-for-hackage`](#-no-haddock-for-hackage-flag) flag is passed,
 this flag is ignored.
