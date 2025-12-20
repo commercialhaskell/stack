@@ -28,8 +28,8 @@ Behavior changes:
 Other enhancements:
 
 * Bump to Hpack 0.38.2.
-* Consider GHC 9.12 to be a tested compiler and remove warnings.
-* Consider Cabal 3.14 to be a tested library and remove warnings.
+* Consider GHC 9.14 to be a tested compiler and remove warnings.
+* Consider Cabal 3.16 to be a tested library and remove warnings.
 * From GHC 9.12.1, `base` is not a GHC wired-in package. In configuration files,
   the `notify-if-base-not-boot` key is introduced, to allow the exisitng
   notification to be muted if unwanted when using such GHC versions.
