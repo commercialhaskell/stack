@@ -962,7 +962,7 @@ should Stack notify the user of that?
 
 ## notify-if-base-not-boot
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.9.1](https://github.com/commercialhaskell/stack/releases/tag/v3.9.1)
 
 Default: `true`
 

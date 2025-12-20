@@ -3,7 +3,7 @@
 # 12. Executing commands
 
 We have already used `stack exec` multiple times in this guide. As you have
-likely already guessed, it allows you to run executables, but with a slightly 
+likely already guessed, it allows you to run executables, but with a slightly
 modified environment.
 
 ## The `stack exec` command
@@ -34,7 +34,7 @@ yields output like:
 Writing the configuration file for the implicit global project to:
 .../global-project/stack.yaml. Note: You can change the snapshot via the
 snapshot key there.
-Using the latest snapshot lts-22.31.
+Using the latest snapshot lts-24.24.
 I installed the stm package via --package stm
 ~~~
 
