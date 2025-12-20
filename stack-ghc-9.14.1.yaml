@@ -1,21 +1,11 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.14.*.
-snapshot: nightly-2025-11-08 # GHC 9.12.2
-compiler: ghc-9.14.0.20251104 # GHC 9.14.1-rc2
-compiler-check: match-exact # Anticipate future alpha releases
-
-# Only required before the GHC version has been installed:
-setup-info:
-  ghc:
-    # Add relevant platforms:
-    windows64:
-      9.14.0.20251104:
-        url: https://downloads.haskell.org/ghc/9.14.1-rc2/ghc-9.14.0.20251104-x86_64-unknown-mingw32.tar.xz
-        # Can be extended with SHA protections etc: see https://docs.haskellstack.org/en/stable/yaml_configuration/#setup-info
+# built with GHC 9.14.1.
+snapshot: nightly-2025-12-19 # GHC 9.12.2
+compiler: ghc-9.14.1
 
 docker:
   enable: false
-  repo: quay.io/benz0li/ghc-musl:9.12.2
+  repo: quay.io/benz0li/ghc-musl:9.14.1
 
 nix:
   # --nix on the command-line to enable.
