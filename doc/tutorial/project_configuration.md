@@ -44,7 +44,7 @@ The key [`snapshot`](../configure/yaml/project.md#snapshot) is a
 project-specific configuration option. Its value tells Stack *how* to build your
 package: which version of GHC (and, implicitly, its boot packages) to use; which
 versions of other package dependencies to use, and so on. Our value here says to
-use [LTS Haskell 24.18](https://www.stackage.org/lts-24.18), which implies
+use [LTS Haskell 24.24](https://www.stackage.org/lts-24.24), which implies
 GHC 9.10.3 (which is why `stack build` installs that version of GHC if it is not
 already available to Stack). There are a number of values you can use for
 `snapshot`, which we will cover later.

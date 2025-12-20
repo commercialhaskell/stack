@@ -59,7 +59,7 @@ creating manually a Stack project-level configuration file named `stack.yaml` in
 `my-project`, with the contents:
 
 ~~~yaml
-snapshot: lts-24.18
+snapshot: lts-24.24
 ~~~
 
 By adding those two files (one to describe a package, the other to configure the

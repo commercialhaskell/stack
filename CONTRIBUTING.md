@@ -351,10 +351,10 @@ compatibility with a range of versions of GHC that a library package (such as
 Stack aims to depend on well-known packages. The specific versions on which it
 depends at any time are specified by `package.yaml` and `stack.yaml`. It does
 not aim to be compatible with more than one version of the `Cabal` package at
-any time. At the time of writing (August 2025) the package versions are
-primarily ones in Stackage snapshot LTS Haskell 24.18 (for GHC 9.10.3), the
+any time. At the time of writing (December 2025) the package versions are
+primarily ones in Stackage snapshot LTS Haskell 24.24 (for GHC 9.10.3), the
 latest version of `Cabal` released on Hackage (`Cabal-3.16.0.0`) and
-`pantry-0.11.0`.
+`pantry-0.11.2`.
 
 A Stack executable makes use of Cabal (the library) through a small 'Setup'
 executable that it compiles from Haskell source code. The executable compiles
@@ -362,12 +362,11 @@ that code with a dependency on the version of Cabal that ships with the
 specified GHC compiler. Each release of Stack will normally aim to support all
 versions of GHC and the Cabal package in Stackage LTS Haskell snapshots
 published within seven years of the release. For example, snapshot LTS Haskell
-12.0, published on 9 July 2018, was the first LTS Haskell snapshot to
-provide GHC 8.4.3 which comes with `base-4.11.1.0` and `Cabal-2.2.0.1`.
-Normally, until, at least, 9 July 2025, Stack releases would aim to support the
-immediate predecessor, GHC 8.2.2 and `base-4.10.1.0`, `Cabal-2.0.1.1` and
-Haddock 2.18.1. However, Stack 3.1.1 dropped support for versions of Cabal
-before 2.2. `Cabal-2.2.0.0` was released with GHC 8.4.1 on 8 March 2018.
+13.0, published on 23 December 2018, was the first LTS Haskell snapshot to
+provide GHC 8.6.3 which comes with `base-4.12.0.0` and `Cabal-2.4.0.1`.
+Normally, until, at least, 23 December 2025, Stack releases would aim to support
+the immediate predecessor, GHC 8.4.4 and `base-4.11.1.0`, `Cabal-2.2.0.1` and
+Haddock 2.20.0.
 
 When a version of the Stack executable actually ceases to support a version of
 GHC and `Cabal`, that should be recorded in Stack's
