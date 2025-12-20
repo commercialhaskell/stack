@@ -22,6 +22,8 @@ Behavior changes:
 * When building GHC from source, on Windows, the default Hadrian build target is
   `reloc-binary-dist` and the default path to the GHC built by Hadrian is
   `_build/reloc-bindist`.
+* Stack's `haddock` command no longer requires a package to have a main library
+  that exposes modules.
 
 Other enhancements:
 

@@ -23,7 +23,6 @@ module Stack.Package
   , packageDependencies
   , applyForceCustomBuild
   , hasBuildableMainLibrary
-  , mainLibraryHasExposedModules
   , packageUnknownTools
   , buildableForeignLibs
   , buildableSubLibs
@@ -650,15 +649,6 @@ applyForceCustomBuild cabalVersion package
 hasBuildableMainLibrary :: Package -> Bool
 hasBuildableMainLibrary package =
   maybe False isComponentBuildable package.library
-
--- | Check if the main library has any exposed modules.
---
--- This should become irrelevant at some point since there's nothing inherently
--- wrong or different with packages exposing only modules in internal libraries
--- (for instance).
-mainLibraryHasExposedModules :: Package -> Bool
-mainLibraryHasExposedModules package =
-  maybe False (not . null . (.exposedModules)) package.library
 
 -- | Aggregate all unknown tools from all components. Mostly meant for
 -- build tools specified in the legacy manner (build-tools:) that failed the

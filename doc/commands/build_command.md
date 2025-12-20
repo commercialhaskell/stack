@@ -348,11 +348,6 @@ sets this flag.
 Stack applies Haddock's `--gen-contents` and `--gen-index` flags to generate a
 single HTML contents and index for multiple sets of Haddock documentation.
 
-!!! note
-
-    If a package does not have a main library that exposes modules, Haddock
-    documentation will not be built for that package, irrespective of the flag.
-
 !!! warning
 
     On Windows, the values for the `haddock-interfaces` and `haddock-html` keys
