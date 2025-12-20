@@ -12,6 +12,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Bump to Hpack 0.39.1.
+
 Bug fixes:
 
 ## v3.9.0.1 (release candidate)
