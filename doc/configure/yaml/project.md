@@ -87,7 +87,7 @@ and `/dir1/dir2/dir3/my-other-package`".
 The `packages` key is optional. The default value, '`.`', means that the
 project has a single project package located in the current directory.
 
-A project package will shaddow a dependency of the same name.
+A project package will shadow a dependency of the same name.
 
 A package version specified in a snapshot can be shadowed by an
 [extra-dep](#extra-deps) of the same name or a [project package](#packages) of
