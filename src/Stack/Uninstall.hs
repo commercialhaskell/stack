@@ -77,7 +77,7 @@ uninstallCmd () = withConfig NoReexec $ do
              [ flow "(1) the tool's subdirectory;"
              ]
          , hang 4 $ fillSep
-             [ flow "(2) the tool's archive file"
+             [ flow "(2) if present, the tool's archive file"
              , parens (style File "<tool>.tar.xz") <> "; and"
              ]
          , hang 4 $ fillSep
