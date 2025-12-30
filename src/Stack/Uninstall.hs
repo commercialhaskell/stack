@@ -85,6 +85,7 @@ uninstallCmd () = withConfig NoReexec $ do
              , parens (style File "<tool>.installed") <> "."
              ]
          ]
+    <> blankLine
     )
  where
   styleShell = style Shell
