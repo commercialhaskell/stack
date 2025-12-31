@@ -154,19 +154,18 @@ snapshotsDir = do
   pure $ root </> relDirSnapshots </> platform
 {-# DEPRECATED snapshotsDir "Not used by Stack >= 1.0.4. May be removed from a future version of stack." #-}
 
--- | Installation root for dependencies
+-- | Installation root for dependencies.
 installationRootDeps :: HasEnvConfig env => RIO env (Path Abs Dir)
 installationRootDeps = do
   root <- view stackRootL
-  -- TODO: also useShaPathOnWindows here, once #1173 is resolved.
   psc <- platformSnapAndCompilerRel
   pure $ root </> relDirSnapshots </> psc
 
--- | Installation root for locals
+-- | Installation root for locals.
 installationRootLocal :: HasEnvConfig env => RIO env (Path Abs Dir)
 installationRootLocal = do
   workDir <- getWorkDir
-  psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
+  psc <- platformSnapAndCompilerRel
   pure $ workDir </> relDirInstall </> psc
 
 -- | Get the hoogle database path.
@@ -215,7 +214,7 @@ bindirCompilerTools = do
 hoogleRoot :: HasEnvConfig env => RIO env (Path Abs Dir)
 hoogleRoot = do
   workDir <- getWorkDir
-  psc <- useShaPathOnWindows =<< platformSnapAndCompilerRel
+  psc <- platformSnapAndCompilerRel
   pure $ workDir </> relDirHoogle </> psc
 
 compilerVersionDir ::
