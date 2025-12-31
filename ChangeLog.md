@@ -10,6 +10,10 @@ Major changes:
 
 Behavior changes:
 
+* On Windows, the path segment _platform_\\_hash_\\_ghc version_, under
+  `.stack-work\install` and `.stack-work\hoogle`, is hashed only once, rather
+  than twice.
+
 Other enhancements:
 
 * Bump to Hpack 0.39.1.
