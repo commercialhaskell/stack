@@ -152,6 +152,7 @@ snapshotsDir = do
   root <- view stackRootL
   platform <- platformGhcRelDir
   pure $ root </> relDirSnapshots </> platform
+{-# DEPRECATED snapshotsDir "Not used by Stack >= 1.0.4. May be removed from a future version of stack." #-}
 
 -- | Installation root for dependencies
 installationRootDeps :: HasEnvConfig env => RIO env (Path Abs Dir)
