@@ -8,6 +8,8 @@ extra-deps:
 - hpack-0.39.1@sha256:d7378debd96e805760540e3640aeda3a1ebee1d000dac99726ed55c827c81a94,5229
 # lts-24.24 specifies pantry-0.10.1
 - pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
+# lts-24.24 specifies persistent-2.17.1.0
+- persistent-2.18.0.0@sha256:baa3e0959cf10bbd1da462efeb61d4f073d0cc924a149325494ba5ce29bc17a4,7096
 
 docker:
   enable: false

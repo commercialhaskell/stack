@@ -112,7 +112,7 @@ dependencies:
 # In order for Cabal (the tool) to build Stack, it needs to be told of the
 # upper bound on persistent. See
 # https://github.com/commercialhaskell/stack/pull/5677#issuecomment-1193318542
-- persistent >= 2.14.0.0 && < 2.18
+- persistent >= 2.14.0.0 && < 2.19
 - persistent-sqlite
 - pretty
 - process >= 1.6.13.2
