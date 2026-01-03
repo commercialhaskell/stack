@@ -6,6 +6,8 @@ extra-deps:
 - Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
 # lts-24.24 specifies pantry-0.10.1
 - pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
+# lts-24.24 specifies persistent-2.17.1.0
+- persistent-2.18.0.0@sha256:baa3e0959cf10bbd1da462efeb61d4f073d0cc924a149325494ba5ce29bc17a4,7096
 
 docker:
   enable: false
