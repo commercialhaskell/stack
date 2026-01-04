@@ -22,23 +22,27 @@
 
 ## Pre-release checks
 
-1.  Check for any important issues that should be dealt with before release.
+1.  Check that Stack is built against the most recent version of `hpack`
+    released on Hackage. If not, create an issue and/or raise a pull request
+    accordingly.
 
-2.  Check for un-merged pull requests that should be merged before release.
+2.  Check for any important issues that should be dealt with before release.
 
-3.  Ensure the `release` and `stable` branches are merged to the `master`
+3.  Check for un-merged pull requests that should be merged before release.
+
+4.  Ensure the `release` and `stable` branches are merged to the `master`
     branch.
 
-4.  Check the copyright dates, and update if needed.
+5.  Check the copyright dates, and update if needed.
 
-5.  Check the backwards compatibility section of `CONTRIBUTING.md` is up to
+6.  Check the backwards compatibility section of `CONTRIBUTING.md` is up to
     date.
 
-6.  Ensure CI matrices in docs (travis-complex, appveyor, azure) have current
+7.  Ensure CI matrices in docs (travis-complex, appveyor, azure) have current
     stackage snapshots and GHC versions (e.g.
     https://github.com/commercialhaskell/stack/pull/4565/files)
 
-7.  Update any `stack-*.yaml` that uses a `nightly` snapshot to the latest
+8.  Update any `stack-*.yaml` that uses a `nightly` snapshot to the latest
     nightly (go over the extra-deps too) and ensure the project builds and tests
     pass. For example, command:
 
@@ -46,14 +50,14 @@
     stack build --stack-yaml=… --haddock --test --bench --no-run-benchmarks
     ~~~
 
-8.  The Windows installer is built using an
+9.  The Windows installer is built using an
     [NSIS compiler](https://nsis.sourceforge.io/Main_Page). Check that the NSIS
     compiler that will be used is capable of handling
     [large strings](https://nsis.sourceforge.io/Special_Builds).
 
-9.  Ensure the integration tests pass on Linux, macOS and Windows.
+10. Ensure the integration tests pass on Linux, macOS and Windows.
 
-10. Some people prefer, or need, to build Stack with Cabal (the tool). Check
+11. Some people prefer, or need, to build Stack with Cabal (the tool). Check
     that `cabal.project` is up to date (the specified `with-compiler:`). Check
     that `cabal.config` is up to date and is not missing dependencies relevant
     on Windows and non-Windows operating systems, following the instructions in
