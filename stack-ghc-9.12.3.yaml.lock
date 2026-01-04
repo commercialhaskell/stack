@@ -20,7 +20,7 @@ packages:
     hackage: Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
 snapshots:
 - completed:
-    sha256: 8dd2b298abf5214ce1cc339f1282b9d424d66c511d433f874c12a92989dc3007
-    size: 715169
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2025/12/20.yaml
-  original: nightly-2025-12-20
+    sha256: b55db959b8fa7b6e87f83cfca88db0d54126158fbf8501a658c4642ba229b27c
+    size: 716307
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2026/1/4.yaml
+  original: nightly-2026-01-04

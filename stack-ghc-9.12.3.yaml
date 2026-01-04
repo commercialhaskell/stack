@@ -1,15 +1,18 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.12.2.
-snapshot: nightly-2025-12-20 # GHC 9.12.2
+# built with GHC 9.12.3.
+#
+# GHC 9.12.3 is, however, not recommended for use, due to:
+# https://gitlab.haskell.org/ghc/ghc/-/issues/26711
+snapshot: nightly-2026-01-04 # GHC 9.12.3
 
 extra-deps:
-# nightly-2025-12-20 specifies Cabal-3.14.1.0
+# nightly-2026-01-04 specifies Cabal-3.14.2.0
 - Cabal-3.16.0.0@sha256:9972c2bd263168a20bd990962a68d4fd024f50c30a00519a6b942e8871d1bd67,14455
 - Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
 
 docker:
   enable: false
-  repo: quay.io/benz0li/ghc-musl:9.12.2
+  repo: quay.io/benz0li/ghc-musl:9.12.3
 
 nix:
   # --nix on the command-line to enable.
