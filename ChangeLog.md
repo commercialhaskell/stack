@@ -16,6 +16,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Bump to Hpack 0.39.1.
+
 Bug fixes:
 
 ## v3.9.1
@@ -41,7 +43,7 @@ Behavior changes:
 
 Other enhancements:
 
-* Bump to Hpack 0.38.2.
+* Bump to Hpack 0.38.3.
 * Consider GHC 9.14 to be a tested compiler and remove warnings.
 * Consider Cabal 3.16 to be a tested library and remove warnings.
 * From GHC 9.12.1, `base` is not a GHC wired-in package. In configuration files,
