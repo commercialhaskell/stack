@@ -1,11 +1,11 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.39.1.
+-- This file has been generated from package.yaml by hpack version 0.38.3.
 --
 -- see: https://github.com/sol/hpack
 
 name:           stack
-version:        3.9.0.2
+version:        3.9.1
 synopsis:       A program for developing Haskell projects
 description:    Stack (the Haskell Tool Stack) is a program for developing Haskell projects.
                 It is aimed at new and experienced users of Haskell and seeks to support them
