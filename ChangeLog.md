@@ -6,21 +6,13 @@ Release notes:
 
 **Changes since v3.9.1:**
 
-Major changes:
-
 Behavior changes:
-
-* On Windows, the path segment _platform_\\_hash_\\_ghc version_, under
-  `.stack-work\install` and `.stack-work\hoogle`, is hashed only once, rather
-  than twice.
 
 Other enhancements:
 
-* Bump to Hpack 0.39.1.
-
 Bug fixes:
 
-## v3.9.1
+## v3.9.1 - 2026-01-04
 
 **Changes since v3.7.1:**
 
@@ -40,10 +32,13 @@ Behavior changes:
   `_build/reloc-bindist`.
 * Stack's `haddock` command no longer requires a package to have a main library
   that exposes modules.
+* On Windows, the path segment _platform_\\_hash_\\_ghc version_, under
+  `.stack-work\install` and `.stack-work\hoogle`, is hashed only once, rather
+  than twice.
 
 Other enhancements:
 
-* Bump to Hpack 0.38.3.
+* Bump to Hpack 0.39.1.
 * Consider GHC 9.14 to be a tested compiler and remove warnings.
 * Consider Cabal 3.16 to be a tested library and remove warnings.
 * From GHC 9.12.1, `base` is not a GHC wired-in package. In configuration files,
