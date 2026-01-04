@@ -5,7 +5,7 @@ about: Report a bug in Stack
 
 Please follow the steps below for reporting a bug in Stack:
 
-Make sure that you are using the latest release (currently Stack 3.7.1). See the
+Make sure that you are using the latest release (currently Stack 3.9.1). See the
 [upgrade instructions](http://docs.haskellstack.org/en/stable/install_and_upgrade/#upgrade)
 to upgrade.
 
@@ -45,7 +45,7 @@ stack <your command here> <args> --verbose
 
 ~~~text
 stack --version
-Version 3.7.1, Git revision cfae313a06ea9f7278e0ac55a58341fa0440f1aa x86_64 hpack-0.38.1
+Version 3.9.1, Git revision 49377548db1244e55d577b2e4107cf8f8579e060 x86_64 hpack-0.39.1
 ~~~
 
 ### Method of installation
