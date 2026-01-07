@@ -40,7 +40,7 @@ jobs:
           # Stack's project-level configuration (stack.yaml) specifies the
           # multi-architecture (including Linux/Aarch64) Docker image published
           # by Oliver Benz (@benz0li, on GitHub). That image comes with
-          # Stack 3.7.1. (Note that the online documentation for
+          # Stack 3.9.1. (Note that the online documentation for
           # '--docker-stack-exe image' specifies that the host Stack and image
           # Stack must have the same version number.)
           release-args: "--alpine --stack-args --docker-stack-exe=image"
@@ -97,10 +97,16 @@ jobs:
       run: |
         set -ex
 
+        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
+        then
+          # ubuntu-latest does not include Stack 3.9.1 as at 2026-01-06.
+          stack upgrade
+        fi
+
         if [[ "${{ matrix.os }}" == "ubuntu-24.04-arm" || "${{ matrix.os }}" == "macos-15-intel" || "${{ matrix.os }}" == "macos-latest" ]]
         then
           # ubuntu-24.04-arm, macos-15-intel and macos-latest do not include
-          # Haskell tools as at 2025-12-19.
+          # Haskell tools as at 2026-01-06.
           curl -sSL https://get.haskellstack.org/ | sh
         fi
 
