@@ -9,8 +9,8 @@ on:
     - rc/**
   workflow_dispatch:
 
-# As of 2025-11-5, ubuntu-latest and windows-latest come with Stack 3.7.1
-# and GHC 9.12.2. However, macos-latest does not come with Haskell tools.
+# As of 2026-01-30, ubuntu-latest and windows-latest come with Stack 3.9.1
+# and GHC 9.14.1. However, macos-latest does not come with Haskell tools.
 
 jobs:
   pedantic:
@@ -18,9 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Clone project
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Cache dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
@@ -53,16 +53,16 @@ jobs:
           stack-args: ""
     steps:
     - name: Clone project
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Cache dependencies on Unix-like OS
       if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.extra-suffix }}
     - name: Cache dependencies on Windows
       if: startsWith(runner.os, 'Windows')
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ~\AppData\Roaming\stack
@@ -76,7 +76,7 @@ jobs:
 
         if [[ "${{ matrix.os }}" == "macos-latest" ]]
         then
-          # macos-latest does not include Haskell tools as at 2025-03-15.
+          # macos-latest does not include Haskell tools as at 2026-01-30.
           curl -sSL https://get.haskellstack.org/ | sh
         fi
 
