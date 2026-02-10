@@ -36,29 +36,38 @@ Command line equivalent (takes precedence):
 
 The `snapshot` key specifies which snapshot is to be used for this project. A
 snapshot defines a GHC version, the package version of packages available for
-installation, and various settings like build flags. It is also called a
-resolver since a snapshot states how dependencies are resolved. There are
-currently four snapshot types:
+installation, and various settings like build flags. For example:
 
-* LTS Haskell snapshots, e.g. `snapshot: lts-24.24`
-* Stackage Nightly snapshots, e.g. `snapshot: nightly-2025-12-20`
-* No snapshot, just use packages shipped with the compiler. For GHC this looks
-  like `snapshot: ghc-9.10.3`
-* Custom snapshot, via a URL or relative file path. For further information, see
-  the [snapshot location](../../topics/snapshot_location.md) documentation.
+~~~yaml
+snapshot: lts-24-30 # A Stackage LTS Haskell snapshot
+~~~
 
-Each of these snapshots will also determine what constraints are placed on the
-compiler version. See the [compiler-check](non-project.md#compiler-check) option
-for some additional control over compiler version.
+or
+
+~~~yaml
+snapshot: nightly-2026-02-09 # A Stackage Nightly snapshot
+~~~
+
+For further information about how to specify the location of a snapshot, see the
+[snapshot location](../../topics/snapshot_location.md) documentation.
+
+The choice of snapshot determines what constraints are placed on the compiler
+version. For further information about additional control over the compiler
+version, see the [compiler-check](non-project.md#compiler-check) option
+documentation.
 
 A package version specified in a snapshot can be shadowed by an
 [extra-dep](#extra-deps) of the same name or a [project package](#packages) of
 the same name.
 
+A snapshot may also be called a resolver since it states how dependencies are
+resolved.
+
 ## resolver
 
-`resolver` and [`snapshot`](#snapshot) are synonyms. Only one of these keys is
-permitted, not both.
+`resolver` and [`snapshot`](#snapshot) are synonyms.
+
+One of these keys is required. More than one is prohibited.
 
 ## packages
 
