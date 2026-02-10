@@ -73,7 +73,7 @@ Available commands:
   recommend-stack-upgrade  Configure whether or not Stack should notify the user
                            if it identifes a new version of Stack is available.
   resolver                 Change the snapshot of the current project, using the
-                           resolver key.
+                           (deprecated) resolver key.
   snapshot                 Change the snapshot of the current project.
   system-ghc               Configure whether or not Stack should use a system
                            GHC installation.
@@ -152,7 +152,7 @@ stack config set resolver SNAPSHOT
 
 A command corresponding to the
 [`stack config set snapshot` command](#the-stack-config-set-snapshot-command)
-but using the `resolver` key instead of the `snapshot` key.
+but using the (deprecated) `resolver` key instead of the `snapshot` key.
 
 ## The `stack config set snapshot` command
 
@@ -171,7 +171,8 @@ A snapshot of `lts` or `nightly` will be translated into the most recent
 available. A snapshot of `lts-22` will be translated into the most recent
 available in the `lts-22` sequence.
 
-If a `resolver` key is present, it will be replaced by a `snapshot` key.
+If a (deprecated) `resolver` key is present, it will be replaced by a `snapshot`
+key.
 
 ## The `stack config set system-ghc` command
 

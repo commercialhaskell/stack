@@ -244,8 +244,10 @@ it, it is best omitted from the debug output.
 
 ## `--resolver` option
 
-The `--resolver` option and the [`--snapshot`](#-snapshot-option) option are
-synonyms.
+:octicons-thumbsdown-24: UNRELEASED
+
+The `--resolver` option (deprecated) and the [`--snapshot`](#-snapshot-option)
+option are synonyms.
 
 More than one of these options is prohibited.
 

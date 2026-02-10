@@ -8,10 +8,11 @@ This document describes the specification of a snapshot location:
 
 * **in YAML configuration files**, in the
   [`snapshot`](../configure/yaml/project.md#snapshot) or
-  [`resolver`](../configure/yaml/project.md#resolver) key; or
+  [`resolver`](../configure/yaml/project.md#resolver) (deprecated) key; or
 * **at the command line**, with the
   [`--snapshot`](../configure/global_flags.md#-snapshot-option) or
-  [`--resolver`](../configure/global_flags.md#-resolver-option) option.
+  [`--resolver`](../configure/global_flags.md#-resolver-option) (deprecated)
+  option.
 
 ## In YAML configuration files
 

@@ -16,8 +16,7 @@ Cabal flags for certain packages; and (d) sometimes, GHC options.
     on Windows) while most do not.
 
 Snapshots may extend any other snapshot that can be specified in a
-[`snapshot`](../configure/yaml/project.md#snapshot) or
-[`resolver`](../configure/yaml/project.md#resolver) key. The packages specified
+[`snapshot`](../configure/yaml/project.md#snapshot) key. The packages specified
 follow the same syntax for dependencies in Stack's project-level configuration
 files. Unlike the `extra-deps` key, however, no support for local directories is
 available in snapshots to ensure reproducibility.

@@ -85,8 +85,7 @@
 
     Stack can only use a system GHC installation if its version is compatible
     with the configuration of the current project, particularly the snapshot
-    specified by the [`snapshot`](configure/yaml/project.md#snapshot) or
-    [`resolver`](configure/yaml/project.md#resolver) key.
+    specified by the [`snapshot`](configure/yaml/project.md#snapshot) key.
 
     GHC installation does not work for all operating systems, so in some cases
     you will need to use `system-ghc` and install GHC yourself.

@@ -32,7 +32,7 @@ shadow a dependency of the same name.
 
 Command line equivalent (takes precedence):
 [`--snapshot`](../global_flags.md#-snapshot-option) or
-[`--resolver`](../global_flags.md#-resolver-option) option
+[`--resolver`](../global_flags.md#-resolver-option) (deprecated) option
 
 The `snapshot` key specifies which snapshot is to be used for this project. A
 snapshot defines a GHC version, the package version of packages available for
@@ -60,14 +60,8 @@ A package version specified in a snapshot can be shadowed by an
 [extra-dep](#extra-deps) of the same name or a [project package](#packages) of
 the same name.
 
-A snapshot may also be called a resolver since it states how dependencies are
+A snapshot was formerly called a resolver since it states how dependencies are
 resolved.
-
-## resolver
-
-`resolver` and [`snapshot`](#snapshot) are synonyms.
-
-One of these keys is required. More than one is prohibited.
 
 ## packages
 
@@ -260,8 +254,8 @@ in the snapshot.
 Default: `[]`
 
 Packages which, when present in the snapshot specified in the
-[`snapshot`](#snapshot) or [`resolver`](#resolver) key, should not be included
-in our project. This can be used for a few different purposes, e.g.:
+[`snapshot`](#snapshot) or (deprecated) [`resolver`](#resolver) key, should not
+be included in our project. This can be used for a few different purposes, e.g.:
 
 * Ensure that packages you do not want used in your project cannot be used in a
   `package.yaml` file (e.g., for license reasons)
@@ -427,6 +421,14 @@ package databases.
 
     Use of this feature may result in builds that are not reproducible, as Stack
     has no control over the contents of the extra package databases.
+
+## resolver
+
+:octicons-thumbsdown-24: UNRELEASED
+
+`resolver` (deprecated) and [`snapshot`](#snapshot) are synonyms.
+
+One of these keys is required. More than one is prohibited.
 
 ## curator
 

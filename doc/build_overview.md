@@ -59,7 +59,7 @@ Given these inputs, Stack attempts the following process when performing a build
 
 This file is parsed to provide the following config values:
 
-* `snapshot` (or, alternatively, `resolver`) (required key)
+* `snapshot` (or, alternatively, `resolver` (deprecated)) (required key)
 * `compiler` (optional key)
 * `packages` (optional key, value defaults to `["."]`)
 * `extra-deps` (optional key, value defaults to `[]`)
@@ -72,8 +72,8 @@ in CLI).
 
 ## Wanted compiler, dependencies, and project packages
 
-* If the `--snapshot` CLI is present, ignore the `snapshot` (or `resolver`) and
-  `compiler` config values
+* If the `--snapshot` CLI is present, ignore the `snapshot` (or `resolver`
+  (deprecated)) and `compiler` config values
 * Load up the indicated snapshot (either config value or CLI arg). This will
   provide:
     * A map from package name to package location, flags, GHC options,

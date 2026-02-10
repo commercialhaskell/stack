@@ -396,7 +396,7 @@ no snapshot is specified at the command line.
 
 Command line equivalent (takes precedence):
 [`--snapshot`](../global_flags.md#-snapshot-option) or
-[`--resolver`](../global_flags.md#-resolver-option) option
+[`--resolver`](../global_flags.md#-resolver-option) (deprecated) option
 
 This option specifies which snapshot to use with `stack init`, when none is
 specified at the command line.

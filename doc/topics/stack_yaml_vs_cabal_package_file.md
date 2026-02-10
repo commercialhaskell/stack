@@ -43,7 +43,7 @@ There is a one-to-one correspondence between a package and a Cabal file.
 
 Stack defines a new concept called a _project_. A project has:
 
-* A snapshot _resolver_ (more on this later)
+* A snapshot (more on this later)
 * Extra dependencies on top of the snapshot
 * Optionally, one or more local Cabal packages
 * Flag and GHC options configurations
@@ -55,7 +55,7 @@ be why you need to specify it both in the `stack.yaml` file _and_
 in the Cabal file. To explain, let us take a quick detour to talk about
 snapshots and how Stack resolves dependencies.
 
-## Snapshots and resolvers
+## Snapshots
 
 Stack follows a rule that says, for any project, there is precisely one version
 of each package available. Obviously, for many packages there are _many_
@@ -65,16 +65,15 @@ requires that you have chosen a specific version for each package available.
 The most common means by which this set of packages is defined is via a
 snapshot provided by Stackage. For example, if you go to the page
 <https://www.stackage.org/lts-24.24>, you will see a list of 3,415 packages at
-specific version numbers. When you then specify `snapshot: lts-24.24` or,
-alternatively, `resolver: lts-24.24`, you are telling Stack to use those package
-versions in resolving dependencies down to specific versions of packages.
+specific version numbers. When you then specify `snapshot: lts-24.24` you are
+telling Stack to use those package versions in resolving dependencies down to
+specific versions of packages.
 
 Sometimes a snapshot does not have all of the packages that you want. Or you
 want a different version of a package. Or you want to work on a local
 modification of a package. In all of those cases, you can add more configuration
 data to your `stack.yaml` file to override the values it received from your
-[`snapshot`](../configure/yaml/project.md#snapshot) or
-[`resolver`](../configure/yaml/project.md#resolver) setting. At the end of the
+[`snapshot`](../configure/yaml/project.md#snapshot) setting. At the end of the
 day, each of your projects will end up with some way of resolving a package name
 into a specific version of that package.
 

@@ -43,7 +43,7 @@ Relevant to this discussion, Stack's project-level configuration file
 (`stack.yaml`, by default) specifies:
 
 * the parent snapshot (the [`snapshot`](../configure/yaml/project.md#snapshot)
-  or [`resolver`](../configure/yaml/project.md#resolver) key)
+  key)
 * extra-deps
 
 Some of this information can be incomplete. Consider this `stack.yaml` file:

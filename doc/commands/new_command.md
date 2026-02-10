@@ -59,8 +59,7 @@ These arguments are ignored if the `--no-init` flag is passed.
 If a snapshot is specified at the command line and the project is initialised
 for use with Stack, `stack new` will try to use it. For further information, see
 the documentation for the
-[`--snapshot`](../configure/global_flags.md#-snapshot-option) and
-[`--resolver`](../configure/global_flags.md#-resolver-option) options.
+[`--snapshot`](../configure/global_flags.md#-snapshot-option) option.
 
 ## Project templates
 

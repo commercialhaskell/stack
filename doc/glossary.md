@@ -47,7 +47,7 @@ The following terms are used in Stack's documentation.
 |project package     |A Haskell package that is part of a project and located locally. Distinct from a dependency located locally.|
 |PVP                 |The Haskell [Package Versioning Policy](https://pvp.haskell.org/), which tells developers of libraries how to set their version numbers.|
 |REPL                |An interactive (run-eval-print loop) programming environment.|
-|resolver            |A synonym for snapshot.                                  |
+|resolver            |A synonym for snapshot, now deprecated.                  |
 |`Setup.hs`          |A project-specific file used by Cabal to perform setup tasks.|
 |snapshot            |A snapshot defines a version of GHC (and, implicitly, its boot packages), a set of packages (one version of each), Cabal flags and GHC options.|
 |Stack               |The Stack project or its executable `stack`.|
