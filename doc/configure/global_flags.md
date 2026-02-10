@@ -244,8 +244,10 @@ it, it is best omitted from the debug output.
 
 ## `--resolver` option
 
-A synonym for the [`--snapshot` option](#-snapshot-option) to specify the
-snapshot resolver.
+The `--resolver` option and the [`--snapshot`](#-snapshot-option) option are
+synonyms.
+
+More than one of these options is prohibited.
 
 ## `--[no-]rsl-in-log` flag
 
@@ -298,18 +300,6 @@ for the [`install-msys`](yaml/non-project.md#install-msys) configuration option.
 Pass the option `--snapshot <snapshot>` to specify the snapshot. For further
 information, see the [`snapshot`](yaml/project.md#snapshot) project-specific
 configuration option documentation.
-
-At the command line (only):
-
-*   `--snapshot lts-<major_version>` specifies the latest Stackage LTS Haskell
-    snapshot with the specified major version;
-*   `--snapshot lts` specifies, from those with the greatest major version, the
-    latest Stackage LTS Haskell snapshot;
-*   `--snapshot nightly` specifies the most recent Stackage Nightly snapshot;
-    and
-*   `--snapshot global` specifies the snapshot specified by the project-level
-    configuration file in the `global-project` directory in the
-    [Stack root](../topics/stack_root.md#global-project-directory).
 
 ## `--stack-colors` or `--stack-colours` options
 
