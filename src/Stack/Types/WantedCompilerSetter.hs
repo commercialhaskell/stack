@@ -16,7 +16,7 @@ data WantedCompilerSetter
   = CompilerAtCommandLine
     -- ^ At the command line with --compiler option.
   | SnapshotAtCommandLine
-    -- ^ At the command line with --snapshot (or --resolver) option.
+    -- ^ At the command line with --snapshot or (deprecated) --resolver option.
   | YamlConfiguration (Maybe (Path Abs File))
     -- ^ Via a configuration file.
   deriving Show

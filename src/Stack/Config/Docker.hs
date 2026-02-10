@@ -40,7 +40,7 @@ instance Exception ConfigDockerException where
   displayException (SnapshotNotSupportedException mproject mASnapshot) =
     concat
       [ "Error: [S-8575]\n"
-      , "Snapshot resolver not supported for Docker images:\n    "
+      , "Snapshot not supported for Docker images:\n    "
       , case (mproject, mASnapshot) of
           (Nothing, Nothing) -> "no snapshot specified"
           (_, Just aSnapshot) ->

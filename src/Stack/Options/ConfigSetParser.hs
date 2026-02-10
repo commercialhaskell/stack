@@ -48,7 +48,7 @@ configCmdSetParser =
                     <> OA.help "E.g. \"nightly\" or \"lts-24.24\"" ))
               ( OA.progDesc
                   "Change the snapshot of the current project, using the \
-                  \resolver key." ))
+                  \(deprecated) resolver key." ))
       , OA.command (T.unpack configMonoidSystemGHCName)
           ( OA.info
               (   ConfigCmdSetSystemGhc

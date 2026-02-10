@@ -128,7 +128,8 @@ cfgCmdSet cmd = do
         switchLine configFilePath cmdKey primaryCmdKey newValue' [] yamlLines
     _ -> do
       -- In practice, this warning should not be encountered because with
-      -- snapshot and resolver present, Stack will not parse the YAML file.
+      -- snapshot and resolver (deprecated) present, Stack will not parse the
+      -- YAML file.
       prettyWarnL
         [ pretty configFilePath
         , flow "contains more than one possible existing configuration and, \

@@ -439,7 +439,7 @@ instance Pretty BuildPrettyException where
                         SnapshotAtCommandLine -> fillSep
                           [ "the"
                           , style Shell "--snapshot" <> ","
-                          , "or"
+                          , "or (deprecated)"
                           , style Shell "--resolver" <> ","
                           , "option"
                           ]

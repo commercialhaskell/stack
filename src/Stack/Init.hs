@@ -434,7 +434,7 @@ renderStackYaml p ignoredPackages dupPackages =
     ]
   snapshotHelp = commentHelp
     [ "A 'specific' Stackage snapshot or a compiler version."
-    , "A snapshot resolver dictates the compiler version and the set of packages"
+    , "A snapshot dictates the compiler version and the set of packages"
     , "to be used for project dependencies. For example:"
     , ""
     , "snapshot: lts-24.24"

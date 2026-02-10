@@ -1,6 +1,6 @@
 #!/usr/bin/env stack
 {- stack script
-    --resolver lts-14.27
+    --snapshot lts-14.27
     --package base
     --package directory
     --package filepath

@@ -10,6 +10,9 @@ Behavior changes:
 
 Other enhancements:
 
+* The `resolver` synonym for `snapshot`, informally deprecated from Stack 3.1.1,
+  is formally deprecated in online and in-app documentation.
+
 Bug fixes:
 
 ## v3.9.1 - 2026-01-04
