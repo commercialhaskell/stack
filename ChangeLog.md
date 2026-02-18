@@ -15,6 +15,8 @@ Other enhancements:
 
 Bug fixes:
 
+* Stack's Docker integration supports Docker client versions 29.0.0 and greater.
+
 ## v3.9.1 - 2026-01-04
 
 **Changes since v3.7.1:**
