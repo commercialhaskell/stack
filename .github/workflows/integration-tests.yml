@@ -151,6 +151,14 @@ jobs:
         EOF
         fi
 
+        # A temporary fix, due to Docker 29.0.0 and later producing an error
+        # message in a format not recognised by Stack 3.9.1 or earlier. See
+        # https://github.com/commercialhaskell/stack/issues/6848
+        if [[ "${{ matrix.release-args }}" == "--alpine" ]]
+        then
+            docker pull quay.io/benz0li/ghc-musl:9.10.3
+        fi
+
         # In case GHCup hooks have been created, remove them
         if [ -d $(stack path --stack-root)/hooks ]
         then
