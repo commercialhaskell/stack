@@ -392,7 +392,13 @@ inspects images = do
           pure Map.empty
     Left e -> throwIO e
  where
-  missingImagePrefixes = ["Error: No such image", "Error: No such object:"]
+  missingImagePrefixes =
+    [ -- Docker >= 29.0.0. See:
+      -- https://github.com/docker/cli/commit/9ba1314d3acc5bd59417049c26275f33e3d54021
+      "error: no such object:"
+    , "Error: No such image"
+    , "Error: No such object:"
+    ]
 
 -- | Pull latest version of configured Docker image from registry.
 pull :: HasConfig env => RIO env ()
