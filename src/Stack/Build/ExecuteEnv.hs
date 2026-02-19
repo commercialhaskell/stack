@@ -115,6 +115,7 @@ import qualified System.Directory as D
 import           System.Environment ( lookupEnv )
 import           System.FileLock
                    ( SharedExclusive (..), withFileLock, withTryFileLock )
+import           System.Semaphore ( Semaphore, freshSemaphore, destroySemaphore )
 
 -- | Type representing environments in which the @Setup.hs@ commands of Cabal
 -- (the library) can be executed.
@@ -147,6 +148,8 @@ data ExecuteEnv = ExecuteEnv
     -- ^ For nicer interleaved output: track the largest package name size
   , pathEnvVar :: !Text
     -- ^ Value of the PATH environment variable
+  , semaphore :: !(Maybe Semaphore)
+    -- ^ Semaphore used for job control, if --semaphore is given
   }
 
 -- | Type representing setup executable circumstances.
@@ -256,6 +259,9 @@ getSetupExe setupHs setupShimHs tmpdir = do
       renameFile tmpExePath exePath
       pure $ Just exePath
 
+semaphorePrefix :: String
+semaphorePrefix = "stack"
+
 -- | Execute a function that takes an t'ExecuteEnv'.
 withExecuteEnv ::
      forall env a. HasEnvConfig env
@@ -330,6 +336,10 @@ withExecuteEnv
       logFiles <- liftIO $ atomically newTChan
       let totalWanted = length $ filter (.wanted) locals
       pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
+      jobs <- view $ configL . to (.jobs)
+      semaphore <- if buildOpts.semaphore
+        then Just <$> liftIO (freshSemaphore semaphorePrefix jobs)
+        else pure Nothing
       inner ExecuteEnv
         { buildOpts
         , buildOptsCLI
@@ -355,7 +365,10 @@ withExecuteEnv
         , customBuilt
         , largestPackageName
         , pathEnvVar
-        } `finally` dumpLogs logFiles totalWanted
+        , semaphore
+        } `finally` do
+          liftIO (whenJust semaphore destroySemaphore)
+          dumpLogs logFiles totalWanted
  where
   toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dp.ghcPkgId, dp))
 

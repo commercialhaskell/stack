@@ -1,6 +1,6 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.39.1.
+-- This file has been generated from package.yaml by hpack version 0.38.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -473,6 +473,7 @@ library
     , random
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
+    , semaphore-compat
     , split
     , stm
     , tar >=0.6.2.0
@@ -596,6 +597,7 @@ executable stack
     , random
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
+    , semaphore-compat
     , split
     , stack
     , stm
@@ -701,6 +703,7 @@ executable stack-integration-test
     , random
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
+    , semaphore-compat
     , split
     , stm
     , tar >=0.6.2.0
@@ -819,6 +822,7 @@ test-suite stack-unit-test
     , raw-strings-qq
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
+    , semaphore-compat
     , split
     , stack
     , stm

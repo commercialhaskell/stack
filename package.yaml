@@ -120,6 +120,7 @@ dependencies:
 - random
 - rio >= 0.1.22.0 && ( < 0.1.23.0 || > 0.1.23.0 )
 - rio-prettyprint >= 0.1.8.0
+- semaphore-compat
 - split
 - stm
 - tar >= 0.6.2.0
