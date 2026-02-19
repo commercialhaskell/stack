@@ -244,7 +244,7 @@ it, it is best omitted from the debug output.
 
 ## `--resolver` option
 
-:octicons-thumbsdown-24: UNRELEASED
+[:octicons-thumbsdown-24: 3.9.3](https://github.com/commercialhaskell/stack/releases/tag/v3.9.3)
 
 The `--resolver` option (deprecated) and the [`--snapshot`](#-snapshot-option)
 option are synonyms.

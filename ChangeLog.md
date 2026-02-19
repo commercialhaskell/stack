@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased changes
+## v3.9.3 - 2026-02-19
 
 Release notes:
 
-**Changes since v3.9.1:**
+* This release fixes a potential bug for users of Stack's Docker integration.
 
-Behavior changes:
+**Changes since v3.9.1:**
 
 Other enhancements:
 
