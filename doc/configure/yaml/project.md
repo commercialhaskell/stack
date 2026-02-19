@@ -424,7 +424,7 @@ package databases.
 
 ## resolver
 
-:octicons-thumbsdown-24: UNRELEASED
+[:octicons-thumbsdown-24: 3.9.3](https://github.com/commercialhaskell/stack/releases/tag/v3.9.3)
 
 `resolver` (deprecated) and [`snapshot`](#snapshot) are synonyms.
 

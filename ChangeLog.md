@@ -14,7 +14,7 @@ Other enhancements:
 
 Bug fixes:
 
-## v3.9.3
+## v3.9.3 - 2026-02-19
 
 Release notes:
 
