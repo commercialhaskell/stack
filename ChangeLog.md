@@ -12,6 +12,9 @@ Behavior changes:
 
 Other enhancements:
 
+* Added `--semaphore`, which allows modules within the same package to be built
+  in parallel.
+
 Bug fixes:
 
 ## v3.9.3 - 2026-02-19
