@@ -4,9 +4,23 @@
 
 Release notes:
 
-**Changes since v3.9.1:**
+**Changes since v3.9.3:**
+
+Major changes:
 
 Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+## v3.9.3
+
+Release notes:
+
+* This release fixes a potential bug for users of Stack's Docker integration.
+
+**Changes since v3.9.1:**
 
 Other enhancements:
 
