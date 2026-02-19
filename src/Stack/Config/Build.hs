@@ -95,6 +95,7 @@ buildOptsFromMonoid buildMonoid = BuildOpts
   , interleavedOutput = fromFirstTrue buildMonoid.interleavedOutput
   , progressBar = fromFirst CappedBar buildMonoid.progressBar
   , ddumpDir = getFirst buildMonoid.ddumpDir
+  , semaphore = fromFirstFalse buildMonoid.semaphore
   }
  where
   isHaddockFromHackage = fromFirstFalse buildMonoid.haddockForHackage

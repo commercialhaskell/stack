@@ -1298,13 +1298,14 @@ extraBuildOptions ::
 extraBuildOptions wc bopts = do
   colorOpt <- appropriateGhcColorFlag
   let optsFlag = compilerOptionsCabalFlag wc
+      semaphoreFlag = if bopts.semaphore then [ "--semaphore", "/tmp/temp" ] else []
       baseOpts = maybe "" (" " ++) colorOpt
   if bopts.testOpts.coverage
     then do
       hpcIndexDir <- toFilePathNoTrailingSep <$> hpcRelativeDir
-      pure [optsFlag, "-hpcdir " ++ hpcIndexDir ++ baseOpts]
+      pure $ semaphoreFlag ++ [optsFlag, "-hpcdir " ++ hpcIndexDir ++ baseOpts]
     else
-      pure [optsFlag, baseOpts]
+      pure $ semaphoreFlag ++ [optsFlag, baseOpts]
 
 -- Library, sub-library, foreign library and executable build components.
 primaryComponentOptions :: LocalPackage -> [String]

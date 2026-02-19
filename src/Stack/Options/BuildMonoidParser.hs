@@ -70,6 +70,7 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
   <*> interleavedOutput
   <*> progressBar
   <*> ddumpDir
+  <*> semaphore
  where
   hideBool = hide0 /= BuildCmdGlobalOpts
   hide :: Mod f a
@@ -244,6 +245,11 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
     <> help "Specify output directory for ddump-files."
     <> hide
     ))
+  semaphore = firstBoolFlagsFalse
+    "semaphore"
+    "Use Cabal's --semaphore feature to build modules of the same package in \
+    \parallel."
+    hide
 
 -- | Parser for Cabal verbosity options
 cabalVerbosityOptsParser :: Bool -> Parser (First CabalVerbosity)
