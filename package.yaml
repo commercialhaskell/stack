@@ -2,7 +2,7 @@
 spec-version: 0.35.0
 
 name: stack
-version: '3.9.3'
+version: '3.9.4'
 synopsis: A program for developing Haskell projects
 description: |
   Stack (the Haskell Tool Stack) is a program for developing Haskell projects.
