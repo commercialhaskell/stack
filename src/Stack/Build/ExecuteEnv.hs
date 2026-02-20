@@ -115,7 +115,8 @@ import qualified System.Directory as D
 import           System.Environment ( lookupEnv )
 import           System.FileLock
                    ( SharedExclusive (..), withFileLock, withTryFileLock )
-import           System.Semaphore ( Semaphore, freshSemaphore, destroySemaphore )
+import           System.Semaphore
+                   ( Semaphore, destroySemaphore, freshSemaphore )
 
 -- | Type representing environments in which the @Setup.hs@ commands of Cabal
 -- (the library) can be executed.
@@ -149,7 +150,7 @@ data ExecuteEnv = ExecuteEnv
   , pathEnvVar :: !Text
     -- ^ Value of the PATH environment variable
   , semaphore :: !(Maybe Semaphore)
-    -- ^ Semaphore used for job control, if --semaphore is given
+    -- ^ The semaphore that is used for job control, if --semaphore is given
   }
 
 -- | Type representing setup executable circumstances.

@@ -97,8 +97,8 @@ data BuildOpts = BuildOpts
     -- ^ Format of the progress bar
   , ddumpDir :: !(Maybe Text)
   , semaphore :: !Bool
-    -- ^ Use Cabal's --semaphore feature to build modules of the same package
-    -- in parallel.
+    -- ^ Use Cabal's --semaphore=SEMAPHORE option to build modules of the same
+    -- package in parallel.
   }
   deriving Show
 

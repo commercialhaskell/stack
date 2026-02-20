@@ -157,6 +157,10 @@ Default:
 
 ~~~yaml
 build:
+  # Since Stack UNRELEASED. Supported by GHC 9.8.1 or later with Cabal 3.12.0.0
+  # (a boot package of GHC 9.10.1) or later.
+  semaphore: false
+
   library-profiling: false
   executable-profiling: false
   library-stripping: true

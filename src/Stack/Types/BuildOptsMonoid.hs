@@ -44,7 +44,8 @@ import           Stack.Types.ComponentUtils ( StackUnqualCompName )
 -- | Build options that may be specified as non-project specific configuration
 -- options under the build key (with certain exceptions) or from the CLI.
 data BuildOptsMonoid = BuildOptsMonoid
-  { trace :: !Any
+  { semaphore :: !FirstFalse
+  , trace :: !Any
     -- ^ Cannot be specified under the build key
   , profile :: !Any
     -- ^ Cannot be specified under the build key
@@ -81,7 +82,6 @@ data BuildOptsMonoid = BuildOptsMonoid
   , interleavedOutput :: !FirstTrue
   , progressBar :: !(First ProgressBarFormat)
   , ddumpDir :: !(First Text)
-  , semaphore :: !FirstFalse
   }
   deriving (Generic, Show)
 
@@ -125,7 +125,8 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     ddumpDir <- o ..:? ddumpDirName ..!= mempty
     semaphore <- FirstFalse <$> o ..:? semaphoreArgName
     pure BuildOptsMonoid
-      { trace
+      { semaphore
+      , trace
       , profile
       , noStrip
       , libProfile
@@ -159,7 +160,6 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
       , interleavedOutput
       , progressBar
       , ddumpDir
-      , semaphore
       }
 
 libProfileArgName :: Text

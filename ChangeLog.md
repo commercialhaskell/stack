@@ -12,8 +12,9 @@ Behavior changes:
 
 Other enhancements:
 
-* Added `--semaphore`, which allows modules within the same package to be built
-  in parallel.
+* Add flag `--[no-]semaphore` (default: disabled) to Stack's `build` command,
+  to allow GHC to use a system semaphore to perform compilation in parallel when
+  possible. Supported, by default, by GHC 9.10.1 or later.
 
 Bug fixes:
 
