@@ -1140,7 +1140,14 @@ where the test suite takes the form of an executable and the executable takes
 nothing on the standard input stream (`stdin`). Pass this flag to override that
 specification and allow the executable to receive input on that stream. If you
 pass `--no-tests-allow-stdin` and the executable seeks input on the standard
-input stream, an exception will be thown.
+input stream, an exception will be thrown.
+
+### `--[no]-semaphore` flag
+
+Default: Disabled
+
+Uses the semaphore feature in Cabal/GHC to build multiple modules from the same
+package in parallel. (see GHC's documentation on `-jsem`)
 
 ## Examples
 
