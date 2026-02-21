@@ -67,57 +67,57 @@
 # Infinite: base/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-luLR/n-533:30"
+  id = "OBS-STAN-0102-luLR/n-540:30"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\New.hs
 #
-#  532 ┃
-#  533 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
-#  534 ┃                              ^^^^^^^^^^^^^^
+#  539 ┃
+#  540 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
+#  541 ┃                              ^^^^^^^^^^^^^^
 
 # Infinite: base/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-luLR/n-533:65"
+  id = "OBS-STAN-0102-luLR/n-540:65"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\New.hs
 #
-#  532 ┃
-#  533 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
-#  534 ┃                                                                 ^^^^^^^^^^^^^^
+#  539 ┃
+#  540 ┃   let isPkgSpec f = ".cabal" `L.isSuffixOf` f || "package.yaml" `L.isSuffixOf` f
+#  541 ┃                                                                 ^^^^^^^^^^^^^^
 
 # Infinite: ghc-internal/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-8cspI6-400:41"
+  id = "OBS-STAN-0102-8cspI6-404:41"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\Coverage.hs
 #
-#  399 ┃
-#  400 ┃                   pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
-#  401 ┃                                         ^^^^^^^^^^^^^^
+#  403 ┃
+#  404 ┃                   pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
+#  405 ┃                                         ^^^^^^^^^^^^^^
 
 # Infinite: ghc-internal/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-8cspI6-433:31"
+  id = "OBS-STAN-0102-8cspI6-437:31"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\Coverage.hs
 #
-#  432 ┃
-#  433 ┃         pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
-#  434 ┃                               ^^^^^^^^^^^^^^
+#  436 ┃
+#  437 ┃         pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
+#  438 ┃                               ^^^^^^^^^^^^^^
 
 # Infinite: ghc-internal/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
 [[ignore]]
-  id = "OBS-STAN-0102-8cspI6-664:30"
+  id = "OBS-STAN-0102-8cspI6-668:30"
 # ✦ Category:      #Infinite #List
 # ✦ File:          src\Stack\Coverage.hs
 #
-#  663 ┃
-#  664 ┃       pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
-#  665 ┃                             ^^^^^^^^^^^^^^
+#  667 ┃
+#  668 ┃       pure (filter ((".tix" `L.isSuffixOf`) . toFilePath) files)
+#  669 ┃                             ^^^^^^^^^^^^^^
 
 # Infinite: ghc-internal/isSuffixOf
 # Usage of the 'isSuffixOf' function that hangs on infinite lists
@@ -140,25 +140,25 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-erw24B-1043:3"
+  id = "OBS-STAN-0203-erw24B-1079:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecuteEnv.hs
 #
-#  1042 ┃
-#  1043 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  1044 ┃   ^^^^^^^
+#  1078 ┃
+#  1079 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+#  1080 ┃   ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-tuE+RG-249:24"
+  id = "OBS-STAN-0203-tuE+RG-250:24"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecutePackage.hs
 #
-#   248 ┃
-#   249 ┃   newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
-#   250 ┃                        ^^^^^^^
+#   249 ┃
+#   250 ┃   newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
+#   251 ┃                        ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
@@ -258,36 +258,36 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-67:17"
+  id = "OBS-STAN-0212-FNS1cF-68:17"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\BuildOpts.hs
 #
-#   66 ┃
-#   67 ┃   buildMonoid = undefined :: BuildOptsMonoid
-#   68 ┃                 ^^^^^^^^^
+#   67 ┃
+#   68 ┃   buildMonoid = undefined :: BuildOptsMonoid
+#   69 ┃                 ^^^^^^^^^
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-79:14"
+  id = "OBS-STAN-0212-FNS1cF-80:14"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\BuildOpts.hs
 #
-#   78 ┃
-#   79 ┃   toMonoid = undefined :: TestOptsMonoid
-#   80 ┃              ^^^^^^^^^
+#   79 ┃
+#   80 ┃   toMonoid = undefined :: TestOptsMonoid
+#   81 ┃              ^^^^^^^^^
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-90:15"
+  id = "OBS-STAN-0212-FNS1cF-91:15"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src/Stack/BuildOpts.hs
 #
-#   89 ┃
-#   90 ┃   beoMonoid = undefined :: BenchmarkOptsMonoid
-#   91 ┃               ^^^^^^^^^
+#   90 ┃
+#   91 ┃   beoMonoid = undefined :: BenchmarkOptsMonoid
+#   92 ┃               ^^^^^^^^^
 
 # Anti-pattern: Pattern matching on '_'
 # Pattern matching on '_' for sum types can create maintainability issues
