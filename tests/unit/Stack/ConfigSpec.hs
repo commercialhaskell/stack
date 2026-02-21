@@ -61,6 +61,7 @@ buildOptsConfig =
   "snapshot: lts-24.24\n" ++
   "packages: ['.']\n" ++
   "build:\n" ++
+  "  semaphore: true\n" ++
   "  library-profiling: true\n" ++
   "  executable-profiling: true\n" ++
   "  library-stripping: false\n" ++
@@ -228,6 +229,7 @@ spec = beforeAll setup $ do
       writeFile (toFilePath stackDotYaml) buildOptsConfig
       loadConfig' $ \config -> liftIO $ do
         let bopts = config.build
+        bopts.semaphore `shouldBe` True
         bopts.libProfile `shouldBe` True
         bopts.exeProfile `shouldBe` True
         bopts.libStrip `shouldBe` False

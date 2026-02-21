@@ -54,6 +54,7 @@ import qualified Distribution.Simple.Build.Macros as C
 import           Distribution.System ( OS (..), Platform (..) )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Verbosity ( showForCabal )
+import           Distribution.Version ( mkVersion )
 import           Path
                    ( PathException, (</>), parent, parseRelDir, parseRelFile )
 import           Path.Extra ( forgivingResolveFile, toFilePathNoTrailingSep )
@@ -86,7 +87,9 @@ import           Stack.Types.BuildOpts ( BuildOpts (..) )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.BuildOptsMonoid ( CabalVerbosity (..) )
 import           Stack.Types.Compiler
-                   ( WhichCompiler (..), compilerVersionString, whichCompilerL )
+                   ( WhichCompiler (..), compilerVersionString
+                   , getGhcVersion, whichCompilerL
+                   )
 import           Stack.Types.CompilerPaths
                    ( CompilerPaths (..), HasCompiler (..), cabalVersionL
                    , getCompilerPath
@@ -115,6 +118,8 @@ import qualified System.Directory as D
 import           System.Environment ( lookupEnv )
 import           System.FileLock
                    ( SharedExclusive (..), withFileLock, withTryFileLock )
+import           System.Semaphore
+                   ( Semaphore, destroySemaphore, freshSemaphore )
 
 -- | Type representing environments in which the @Setup.hs@ commands of Cabal
 -- (the library) can be executed.
@@ -147,6 +152,8 @@ data ExecuteEnv = ExecuteEnv
     -- ^ For nicer interleaved output: track the largest package name size
   , pathEnvVar :: !Text
     -- ^ Value of the PATH environment variable
+  , semaphore :: !(Maybe Semaphore)
+    -- ^ The semaphore that is used for job control, if --semaphore is given
   }
 
 -- | Type representing setup executable circumstances.
@@ -256,6 +263,9 @@ getSetupExe setupHs setupShimHs tmpdir = do
       renameFile tmpExePath exePath
       pure $ Just exePath
 
+semaphorePrefix :: String
+semaphorePrefix = "stack"
+
 -- | Execute a function that takes an t'ExecuteEnv'.
 withExecuteEnv ::
      forall env a. HasEnvConfig env
@@ -320,6 +330,8 @@ withExecuteEnv
       ignoringAbsence (removeFile setupO)
       ignoringAbsence (removeFile setupShimHi)
       ignoringAbsence (removeFile setupShimO)
+      compilerVersion <- view actualCompilerVersionL
+      let ghcVersion = getGhcVersion compilerVersion
       cabalPkgVer <- view cabalVersionL
       globalDB <- view $ compilerPathsL . to (.globalDB)
       let globalDumpPkgs = toDumpPackagesByGhcPkgId globalPackages
@@ -330,6 +342,27 @@ withExecuteEnv
       logFiles <- liftIO $ atomically newTChan
       let totalWanted = length $ filter (.wanted) locals
       pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
+      jobs <- view $ configL . to (.jobs)
+      let semaphoreSupported =
+               (cabalPkgVer >= mkVersion [3, 12, 0, 0])
+            && (ghcVersion >= mkVersion [9, 8, 1])
+          semaphoreUnsupportedWarning =
+            prettyWarnL
+              [ "The"
+              , style Shell "--semaphore"
+              , flow "flag was specified, which is supported by GHC 9.8.1 or \
+                     \later with Cabal 3.12.0.0 (a boot package of GHC 9.10.1) \
+                     \or later. GHC version"
+              , fromString (versionString ghcVersion)
+              , flow "and Cabal version"
+              , fromString (versionString cabalPkgVer)
+              , flow "was found. The flag will be ignored."
+              ]
+      semaphore <- if not buildOpts.semaphore
+        then pure Nothing
+        else if semaphoreSupported
+          then Just <$> liftIO (freshSemaphore semaphorePrefix jobs)
+          else semaphoreUnsupportedWarning >> pure Nothing
       inner ExecuteEnv
         { buildOpts
         , buildOptsCLI
@@ -355,7 +388,10 @@ withExecuteEnv
         , customBuilt
         , largestPackageName
         , pathEnvVar
-        } `finally` dumpLogs logFiles totalWanted
+        , semaphore
+        } `finally` do
+          liftIO (whenJust semaphore destroySemaphore)
+          dumpLogs logFiles totalWanted
  where
   toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dp.ghcPkgId, dp))
 

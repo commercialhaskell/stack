@@ -36,7 +36,8 @@ import           Stack.Types.ComponentUtils ( unqualCompFromString )
 -- | Parse command line arguments for build configuration.
 buildOptsMonoidParser :: GlobalOptsContext -> Parser BuildOptsMonoid
 buildOptsMonoidParser hide0 = BuildOptsMonoid
-  <$> trace'
+  <$> semaphore
+  <*> trace'
   <*> profile
   <*> noStrip
   <*> libProfiling
@@ -244,6 +245,11 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
     <> help "Specify output directory for ddump-files."
     <> hide
     ))
+  semaphore = firstBoolFlagsFalse
+    "semaphore"
+    "the use of a system semaphore to perform compilation in parallel when \
+    \possible. Supported, by default, by GHC 9.10.1 or later."
+    hide
 
 -- | Parser for Cabal verbosity options
 cabalVerbosityOptsParser :: Bool -> Parser (First CabalVerbosity)

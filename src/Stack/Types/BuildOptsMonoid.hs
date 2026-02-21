@@ -24,6 +24,7 @@ module Stack.Types.BuildOptsMonoid
   , buildOptsMonoidTestsL
   , buildOptsMonoidBenchmarksL
   , buildOptsMonoidInstallExesL
+  , buildOptsMonoidSemaphoreL
   , toFirstCabalVerbosity
   , readProgressBarFormat
   ) where
@@ -43,7 +44,8 @@ import           Stack.Types.ComponentUtils ( StackUnqualCompName )
 -- | Build options that may be specified as non-project specific configuration
 -- options under the build key (with certain exceptions) or from the CLI.
 data BuildOptsMonoid = BuildOptsMonoid
-  { trace :: !Any
+  { semaphore :: !FirstFalse
+  , trace :: !Any
     -- ^ Cannot be specified under the build key
   , profile :: !Any
     -- ^ Cannot be specified under the build key
@@ -121,8 +123,10 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
     interleavedOutput <- FirstTrue <$> o ..:? interleavedOutputName
     progressBar <- First <$> o ..:? progressBarName
     ddumpDir <- o ..:? ddumpDirName ..!= mempty
+    semaphore <- FirstFalse <$> o ..:? semaphoreArgName
     pure BuildOptsMonoid
-      { trace
+      { semaphore
+      , trace
       , profile
       , noStrip
       , libProfile
@@ -253,6 +257,9 @@ progressBarName = "progress-bar"
 
 ddumpDirName :: Text
 ddumpDirName = "ddump-dir"
+
+semaphoreArgName :: Text
+semaphoreArgName = "semaphore"
 
 instance Semigroup BuildOptsMonoid where
   (<>) = mappenddefault
@@ -402,6 +409,11 @@ buildOptsMonoidInstallExesL :: Lens' BuildOptsMonoid (Maybe Bool)
 buildOptsMonoidInstallExesL =
   lens (.installExes.firstFalse)
     (\buildMonoid t -> buildMonoid {installExes = FirstFalse t})
+
+buildOptsMonoidSemaphoreL :: Lens' BuildOptsMonoid (Maybe Bool)
+buildOptsMonoidSemaphoreL =
+  lens (.semaphore.firstFalse)
+    (\buildMonoid t -> buildMonoid {semaphore = FirstFalse t})
 
 -- Type representing formats of Stack's progress bar when building.
 data ProgressBarFormat

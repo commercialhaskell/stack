@@ -62,6 +62,7 @@ defaultBuildOpts = BuildOpts
   , interleavedOutput = defaultFirstTrue buildMonoid.interleavedOutput
   , progressBar = CappedBar
   , ddumpDir = Nothing
+  , semaphore = defaultFirstFalse buildMonoid.semaphore
   }
  where
   buildMonoid = undefined :: BuildOptsMonoid

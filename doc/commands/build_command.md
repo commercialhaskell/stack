@@ -7,11 +7,12 @@ stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
             [--flag PACKAGE:[-]FLAG] [--dependencies-only | --only-snapshot |
               --only-dependencies | --only-locals] [--file-watch |
               --file-watch-poll] [--watch-all] [--exec COMMAND [ARGUMENT(S)]]
-            [--only-configure] [--trace] [--profile] [--no-strip]
-            [--[no-]library-profiling] [--[no-]executable-profiling]
-            [--[no-]library-stripping] [--[no-]executable-stripping]
-            [--[no-]haddock] [--haddock-arguments HADDOCK_ARGS]
-            [--[no-]open] [--[no-]haddock-deps] [--[no-]haddock-internal]
+            [--only-configure] [--[no-]semaphore] [--trace] [--profile]
+            [--no-strip] [--[no-]library-profiling]
+            [--[no-]executable-profiling] [--[no-]library-stripping]
+            [--[no-]executable-stripping] [--[no-]haddock]
+            [--haddock-arguments HADDOCK_ARGS] [--[no-]open]
+            [--[no-]haddock-deps] [--[no-]haddock-internal]
             [--[no-]haddock-hyperlink-source] [--[no-]haddock-for-hackage]
             [--[no-]copy-bins] [--[no-]copy-compiler-tool] [--[no-]prefetch]
             [--[no-]keep-going] [--[no-]keep-tmp-files] [--[no-]force-dirty]
@@ -916,6 +917,23 @@ expressions, and generate a profiling report in tests or benchmarks.
 The flag affects the location of the local project installation directory. See
 the [`stack path --local-install-root`](path_command.md) command.
 
+### `--[no]-semaphore` flag
+
+:octicons-tag-24: UNRELEASED
+
+Default: Disabled
+
+This flag allows GHC to use a system semaphore to perform compilation in
+parallel when possible.
+
+!!! info
+
+    GHC 9.8.1 and later can act as a jobserver client, which enables two or more
+    GHC processes running at once to share system resources with each other,
+    communicating via a system semaphore. This GHC feature is supported by
+    Cabal 3.12.0.0 (a boot package of GHC 9.10.1) and later. The flag is ignored
+    with a warning when the feature is unsupported.
+
 ### `--[no-]split-objs` flag
 
 :octicons-beaker-24: Experimental
@@ -1140,7 +1158,7 @@ where the test suite takes the form of an executable and the executable takes
 nothing on the standard input stream (`stdin`). Pass this flag to override that
 specification and allow the executable to receive input on that stream. If you
 pass `--no-tests-allow-stdin` and the executable seeks input on the standard
-input stream, an exception will be thown.
+input stream, an exception will be thrown.
 
 ## Examples
 

@@ -18,6 +18,7 @@ module Stack.Types.BuildOpts
   , BenchmarkOpts (..)
   , buildOptsHaddockL
   , buildOptsInstallExesL
+  , buildOptsSemaphoreL
   ) where
 
 import           Stack.Prelude
@@ -95,6 +96,9 @@ data BuildOpts = BuildOpts
   , progressBar :: !ProgressBarFormat
     -- ^ Format of the progress bar
   , ddumpDir :: !(Maybe Text)
+  , semaphore :: !Bool
+    -- ^ Use Cabal's --semaphore=SEMAPHORE option to build modules of the same
+    -- package in parallel.
   }
   deriving Show
 
@@ -131,3 +135,7 @@ buildOptsInstallExesL =
 buildOptsHaddockL :: Lens' BuildOpts Bool
 buildOptsHaddockL =
   lens (.buildHaddocks) (\bopts t -> bopts {buildHaddocks = t})
+
+buildOptsSemaphoreL :: Lens' BuildOpts Bool
+buildOptsSemaphoreL =
+  lens (.semaphore) (\bopts t -> bopts {semaphore = t})
