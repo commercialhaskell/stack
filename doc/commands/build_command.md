@@ -919,6 +919,8 @@ the [`stack path --local-install-root`](path_command.md) command.
 
 ### `--[no]-semaphore` flag
 
+:octicons-beaker-24: Experimental
+
 :octicons-tag-24: UNRELEASED
 
 Default: Disabled
@@ -933,6 +935,13 @@ parallel when possible.
     communicating via a system semaphore. This GHC feature is supported by
     Cabal 3.12.0.0 (a boot package of GHC 9.10.1) and later. The flag is ignored
     with a warning when the feature is unsupported.
+
+!!! warning
+
+    On Linux, musl and non-musl system semaphores are incompatible. That means
+    that a Stack executable built on Alpine Linux (such as the official Stack
+    for Linux) creates system semaphores that cannot be used by a GHC executable
+    built on non-musl Linux distributions.
 
 ### `--[no-]split-objs` flag
 
