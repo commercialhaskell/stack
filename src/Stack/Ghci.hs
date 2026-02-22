@@ -916,32 +916,37 @@ makeGhciPkgInfo ::
   -> RIO env GhciPkgInfo
 makeGhciPkgInfo installMap installedMap locals addPkgs mfileTargets pkgDesc = do
   bopts <- view buildOptsL
-  let pkg = pkgDesc.package
+  let package = pkgDesc.package
       cabalFP = pkgDesc.cabalFP
       target = pkgDesc.target
-      name = pkg.name
-  (mods, files, opts) <-
-    getPackageOpts pkg installMap installedMap locals addPkgs cabalFP
-  let filteredOpts = filterWanted opts
+      name = package.name
+      dir = parent cabalFP
+      targetFiles = mfileTargets >>= M.lookup name
+  (mods, files, allOpts) <-
+    getPackageOpts package installMap installedMap locals addPkgs cabalFP
+  let opts = M.toList $ filterWanted allOpts
       filterWanted :: Map NamedComponent a -> Map NamedComponent a
       filterWanted = M.filterWithKey (\k _ -> k `S.member` allWanted)
-      allWanted = wantedPackageComponents bopts target pkg
-  pure GhciPkgInfo
-    { name
-    , opts = M.toList filteredOpts
-    , dir = parent cabalFP
-    , modules = unionModuleMaps $
+      allWanted = wantedPackageComponents bopts target package
+      modules = unionModuleMaps $
         map
           ( \(comp, mp) -> M.map
-              (\fp -> M.singleton fp (S.singleton (pkg.name, comp)))
+              (\fp -> M.singleton fp (S.singleton (name, comp)))
               mp
           )
           (M.toList (filterWanted mods))
-    , mainIs = M.map (mapMaybe dotCabalMainPath) files
-    , cFiles = mconcat
+      mainIs = M.map (mapMaybe dotCabalMainPath) files
+      cFiles = mconcat
         (M.elems (filterWanted (M.map (mapMaybe dotCabalCFilePath) files)))
-    , targetFiles = mfileTargets >>= M.lookup name
-    , package = pkg
+  pure GhciPkgInfo
+    { name
+    , opts
+    , dir
+    , modules
+    , mainIs
+    , cFiles
+    , targetFiles
+    , package
     }
 
 -- NOTE: this should make the same choices as the components code in
