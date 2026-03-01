@@ -354,7 +354,8 @@ not aim to be compatible with more than one version of the `Cabal` package at
 any time. At the time of writing (January 2026) the package versions are
 primarily ones in Stackage snapshot LTS Haskell 24.24 (for GHC 9.10.3), the
 latest version of `Cabal` released on Hackage (`Cabal-3.16.0.0`),
-`pantry-0.11.2`, and `persistent-2.18.0.0`.
+`pantry-0.11.2`, `persistent-2.18.0.0` and the latest version of packages in
+the `tls` family (which reduce dependencies on unmaintained packages).
 
 A Stack executable makes use of Cabal (the library) through a small 'Setup'
 executable that it compiles from Haskell source code. The executable compiles
