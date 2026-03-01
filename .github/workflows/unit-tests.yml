@@ -9,8 +9,10 @@ on:
     - rc/**
   workflow_dispatch:
 
-# As of 2026-01-30, ubuntu-latest and windows-latest come with Stack 3.9.1
-# and GHC 9.14.1. However, macos-latest does not come with Haskell tools.
+# As of 2026-03-01:
+# * ubuntu-latest comes with Stack 3.9.3 and GHC 9.14.1; and
+# * windows-latest comes with Stack 3.9.1 and GHC 9.14.1.
+# However, macos-15-intel and macos-latest do not come with Haskell tools.
 
 jobs:
   pedantic:
@@ -76,8 +78,18 @@ jobs:
 
         if [[ "${{ matrix.os }}" == "macos-latest" ]]
         then
-          # macos-latest does not include Haskell tools as at 2026-01-30.
+          # As at 2026-03-01:
+          #
+          # * macos-latest does not include Haskell tools.
           curl -sSL https://get.haskellstack.org/ | sh
+        fi
+
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]
+        then
+          # As at 2026-03-01:
+          #
+          # * windows-latest does not include Stack 3.9.3.
+          stack upgrade
         fi
 
         if [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
@@ -91,14 +103,6 @@ jobs:
             - /lib
             - /usr/lib
         EOF
-        fi
-
-        # A temporary fix, due to Docker 29.0.0 and later producing an error
-        # message in a format not recognised by Stack 3.9.1 or earlier. See
-        # https://github.com/commercialhaskell/stack/issues/6848
-        if [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
-        then
-            docker pull quay.io/benz0li/ghc-musl:9.10.3
         fi
 
         stack test ${{ matrix.stack-args }} --haddock --no-haddock-deps --ghc-options="-Werror -O0" --copy-bins --local-bin-path bin
