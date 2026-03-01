@@ -16,10 +16,13 @@ on:
 env:
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# As of 2026-01-30, ubuntu-latest and windows-latest come with Stack 3.9.1 and
-# GHC 9.14.1. However, macos-15-intel and macos-latest do not come with Haskell
-# tools. windows-latest no longer comes with NSIS 3.10, for which the default
-# value of the 'Unicode' installer attribute is 'true'. However, that is not the
+# As of 2026-03-01:
+# * ubuntu-latest comes with Stack 3.9.3 and GHC 9.14.1; and
+# * windows-latest comes with Stack 3.9.1 and GHC 9.14.1.
+# However, macos-15-intel and macos-latest do not come with Haskell tools.
+#
+# windows-latest no longer comes with NSIS 3.10, for which the default value of
+# the 'Unicode' installer attribute is 'true'. However, that is not the
 # 'large strings' build of NSIS and creates installers that corrupt the PATH
 # environment variable if the default string length of 1024 characters is
 # exceeded.
@@ -40,7 +43,7 @@ jobs:
           # Stack's project-level configuration (stack.yaml) specifies the
           # multi-architecture (including Linux/Aarch64) Docker image published
           # by Oliver Benz (@benz0li, on GitHub). That image comes with
-          # Stack 3.9.1. (Note that the online documentation for
+          # Stack 3.9.3. (Note that the online documentation for
           # '--docker-stack-exe image' specifies that the host Stack and image
           # Stack must have the same version number.)
           release-args: "--alpine --stack-args --docker-stack-exe=image"
@@ -99,9 +102,19 @@ jobs:
 
         if [[ "${{ matrix.os }}" == "ubuntu-24.04-arm" || "${{ matrix.os }}" == "macos-15-intel" || "${{ matrix.os }}" == "macos-latest" ]]
         then
-          # ubuntu-24.04-arm, macos-15-intel and macos-latest do not include
-          # Haskell tools as at 2026-01-30.
+          # As at 2026-03-01:
+          #
+          # * ubuntu-24.04-arm, macos-15-intel and macos-latest do not include
+          #   Haskell tools.
           curl -sSL https://get.haskellstack.org/ | sh
+        fi
+
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]
+        then
+          # As at 2026-03-01:
+          #
+          # * windows-latest does not include Stack 3.9.3.
+          stack upgrade
         fi
 
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]
@@ -149,14 +162,6 @@ jobs:
             - /lib
             - /usr/lib
         EOF
-        fi
-
-        # A temporary fix, due to Docker 29.0.0 and later producing an error
-        # message in a format not recognised by Stack 3.9.1 or earlier. See
-        # https://github.com/commercialhaskell/stack/issues/6848
-        if [[ "${{ matrix.release-args }}" == "--alpine" ]]
-        then
-            docker pull quay.io/benz0li/ghc-musl:9.10.3
         fi
 
         # In case GHCup hooks have been created, remove them
