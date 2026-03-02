@@ -136,10 +136,10 @@ jobs:
           # Enter the Nix environment...
           . ~/.nix-profile/etc/profile.d/nix.sh
           # Add a channel named 'nixpkgs' to the list of subscribed channels...
-          nix-channel --add https://nixos.org/channels/nixos-23.05 nixpkgs
+          nix-channel --add https://nixos.org/channels/nixos-25.11 nixpkgs
           # Download the Nix expressions for all subscribed channels...
           #
-          # As at 2023-08-21, nixos-23.05 provides GHC 9.2.8.
+          # As at 2026-03-01, nixos-25.11 provides GHC 9.10.2.
           nix-channel --update
           # The NIX_PATH environment variable sets a list of directories used to
           # look up the location of Nix expressions using paths enclosed in
