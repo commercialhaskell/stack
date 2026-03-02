@@ -1,4 +1,10 @@
-# As of 20 August 2023, there is no Nix package haskell.compiler.ghc946.
-# Available options include ghc92 (GHC 9.2.8), ghc926, ghc927,
-# ghc94 (GHC 9.4.5), ghc942, ghc943 or ghc944.
-snapshot: lts-20.26 # GHC 9.2.8
+# As of 2026-03-01, with channel nixos-25.11, avaiable Nix packages
+# haskell.compiler.ghc*, based on:
+#
+# $ nix-instantiate --eval -E "with import <nixpkgs> {}; lib.attrNames haskell.compiler"
+#
+# are:
+#
+# 948 (GHC 9.4.8), 967 (GHC 9.6.7), 984 (GHC 9.8.4), 9102 (GHC 9.10.2),
+# 9103 (GHC 9.10.3), 9122 (GHC 9.12.2).
+snapshot: lts-24.32 # GHC 9.10.3
