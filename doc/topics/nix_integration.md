@@ -35,7 +35,10 @@ can automatically create a Nix build environment in the background using
 `nix-shell`. There are two alternative options to create such a build
 environment:
 
-1. provide a list of [Nix packages][nix-search-packages]
+1. provide a list of [Nix packages][nix-search-packages]. To these, Stack will
+   add Nix packages for the GHC compiler, `git` (the distributed version control
+   system), `gcc` (the GNU compiler collection) and `gmp` (the GNU multiple
+   precision arithmetic library); and
 2. provide a `shell.nix` file that gives you more control over the libraries and
    tools available inside the shell.
 
