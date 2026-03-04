@@ -15,7 +15,7 @@ extra-deps:
 # lts-24.24 specifies crypton-x509-store-1.6.12
 - crypton-x509-store-1.8.0@sha256:075ba50a3daa0fdbb493481a665926e1ced2135c6b4ed56f97398aa855f0aecb,1674
 # lts-24.24 specifies crypton-x509-system-1.6.7
-- crypton-x509-system-1.8.0
+- crypton-x509-system-1.8.0@sha256:76bab32c7d9cb3ea356a905f85829c70967fb6f9b4b890f00d67dc54130d45ca,1521
 # lts-24.24 specifies crypton-x509-validation-1.6.14
 - crypton-x509-validation-1.8.0@sha256:63acb2df06f28c3ffdddaf6d9402105b9026796036aa10d7347ae4f7db51c36b,2018
 # lts-24.24 specifies hpack-0.38.3

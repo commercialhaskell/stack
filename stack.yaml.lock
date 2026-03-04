@@ -66,7 +66,7 @@ packages:
       sha256: 9ac33c993a82ac4da84804028c5398caec7aada7a83beeec3f28883fe470d68f
       size: 512
   original:
-    hackage: crypton-x509-system-1.8.0
+    hackage: crypton-x509-system-1.8.0@sha256:76bab32c7d9cb3ea356a905f85829c70967fb6f9b4b890f00d67dc54130d45ca,1521
 - completed:
     hackage: crypton-x509-validation-1.8.0@sha256:63acb2df06f28c3ffdddaf6d9402105b9026796036aa10d7347ae4f7db51c36b,2018
     pantry-tree:
