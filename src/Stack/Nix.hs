@@ -80,7 +80,9 @@ runShellAndExit = do
     ghc <- either throwIO pure $ nixCompiler compilerVersion
     ghcVersion <- either throwIO pure $ nixCompilerVersion compilerVersion
     let pkgsInConfig = config.nix.packages
-        pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp"]
+        -- It appears that cacert needs to be specified in order for
+        -- crypton-x509-system >= 1.6.8 to work with Stack's Nix integration:
+        pkgs = pkgsInConfig ++ [ghc, "git", "gcc", "gmp", "cacert"]
         pkgsStr = "[" <> T.intercalate " " pkgs <> "]"
         pureShell = config.nix.pureShell
         addGCRoots = config.nix.addGCRoots

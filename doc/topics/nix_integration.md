@@ -37,8 +37,9 @@ environment:
 
 1. provide a list of [Nix packages][nix-search-packages]. To these, Stack will
    add Nix packages for the GHC compiler, `git` (the distributed version control
-   system), `gcc` (the GNU compiler collection) and `gmp` (the GNU multiple
-   precision arithmetic library); and
+   system), `gcc` (the GNU compiler collection), `gmp` (the GNU multiple
+   precision arithmetic library) and `cacert` (a bundle of X.509 certificates of 
+   public Certificate Authorities); and
 2. provide a `shell.nix` file that gives you more control over the libraries and
    tools available inside the shell.
 

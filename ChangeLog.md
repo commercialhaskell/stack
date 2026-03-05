@@ -10,6 +10,9 @@ Major changes:
 
 Behavior changes:
 
+* Stack's default Nix integration now includes the `cacert` Nix package, in
+  order to support Stack's use of `crypton-x509-system >= 1.6.8`. 
+
 Other enhancements:
 
 * Experimental: Add flag `--[no-]semaphore` (default: disabled) to Stack's
