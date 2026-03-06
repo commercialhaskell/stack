@@ -31,7 +31,8 @@ By default:
     project packages). Pass the `--reach <packages>` option to exclude packages
     (including project packages) that cannot reach any of the specified packages
     in the dependency graph. In both cases, `<packages>` is a list of package
-    names separated by commas;
+    names separated by commas. A package with dependencies is pruned if all of
+    its direct dependencies are pruned;
 *   for all relevant project packages, relevant dependencies are included in the
     output. However, each project package for which dependencies are included
     can be specified as a target argument. The argument uses the same format as
