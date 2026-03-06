@@ -397,9 +397,7 @@ pruneGraph dontPrune names =
     if pkg `F.elem` names
       then Nothing
       else let filtered = Set.filter (`F.notElem` names) pkgDeps
-           in  if Set.null filtered && not (Set.null pkgDeps)
-                 then Nothing
-                 else Just (filtered, x))
+           in  Just (filtered, x))
 
 -- | Make sure that all unreachable nodes (orphans) are pruned
 pruneUnreachable ::
