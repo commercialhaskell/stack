@@ -117,9 +117,12 @@ createPrunedDependencyGraph dotOpts = withDotConfig dotOpts $ do
   localNames <- view $ buildConfigL . to (Map.keysSet . (.smWanted.project))
   logDebug "Creating dependency graph"
   (compiler, resultGraph) <- createDependencyGraph dotOpts
-  let pkgsToPrune = if dotOpts.includeBase
-                      then dotOpts.prune
-                      else Set.insert "base" dotOpts.prune
+  let pkgsToPrune = Set.union
+        ( if dotOpts.includeBase
+            then dotOpts.prune
+            else Set.insert "base" dotOpts.prune
+        )
+        (nonParentDependencies resultGraph dotOpts.reach)
       prunedGraph = pruneGraph localNames pkgsToPrune resultGraph
   logDebug "Returning pruned dependency graph"
   pure (compiler, localNames, prunedGraph)
@@ -412,6 +415,37 @@ pruneUnreachable dontPrune = fixpoint prune
    where
     reachable k = k `F.elem` dontPrune || k `Set.member` reachables
     reachables = F.fold (fst <$> graph')
+
+nonParentDependencies ::
+     F.Foldable f
+  => Map PackageName (Set PackageName, a)
+  -> f PackageName
+  -> Set PackageName
+nonParentDependencies graph names
+  | F.null names = Set.empty
+  | otherwise =
+      Set.difference (Map.keysSet graph) (backwardReachable names graph)
+
+backwardReachable ::
+     F.Foldable f
+  => f PackageName
+  -> Map PackageName (Set PackageName, a)
+  -> Set PackageName
+backwardReachable names graph = go Set.empty (F.toList names)
+  where
+    reverseGraph =
+      Map.fromListWith Set.union
+        [ (dep, Set.singleton name)
+        | (name, (deps, _)) <- Map.toList graph
+        , dep <- Set.toList deps
+        ]
+
+    go seen [] = seen
+    go seen (x : xs)
+      | x `Set.member` seen = go seen xs
+      | otherwise =
+          let parents = Map.findWithDefault Set.empty x reverseGraph
+          in go (Set.insert x seen) (Set.toList parents <> xs)
 
 localPackageToPackage :: LocalPackage -> Package
 localPackageToPackage lp = fromMaybe lp.package lp.testBench

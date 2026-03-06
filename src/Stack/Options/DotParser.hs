@@ -34,6 +34,7 @@ dotOptsParser externalDefault = DotOpts
   <*> includeBase
   <*> depthLimit
   <*> fmap (maybe Set.empty $ Set.fromList . splitNames) prunedPkgs
+  <*> fmap (maybe Set.empty $ Set.fromList . splitNames) reachPkgs
   <*> targetsParser
   <*> flagsParser
   <*> testTargets
@@ -57,6 +58,13 @@ dotOptsParser externalDefault = DotOpts
     (  long "prune"
     <> metavar "PACKAGES"
     <> help "Prune specified package(s). PACKAGES is a comma-separated list of \
+            \package names."
+    ))
+  reachPkgs = optional (strOption
+    (  long "reach"
+    <> metavar "PACKAGES"
+    <> help "Prune packages that cannot reach any of the specified package(s) \
+            \in the dependency graph. PACKAGES is a comma-separated list of \
             \package names."
     ))
 

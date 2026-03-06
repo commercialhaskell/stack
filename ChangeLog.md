@@ -11,7 +11,7 @@ Major changes:
 Behavior changes:
 
 * Stack's default Nix integration now includes the `cacert` Nix package, in
-  order to support Stack's use of `crypton-x509-system >= 1.6.8`. 
+  order to support Stack's use of `crypton-x509-system >= 1.6.8`.
 
 Other enhancements:
 
@@ -20,6 +20,9 @@ Other enhancements:
   in parallel when possible. Supported, by default, by GHC 9.10.1 or later. The
   option is considered experiemental because, on Linux only, musl and non-musl
   semaphores are incompatible.
+* Add option `--reach <packages>` to Stack's `dot` and `ls dependencies`
+  commands, to prune packages that cannot reach any of the specified packages in
+  the dependency graph.
 
 Bug fixes:
 
