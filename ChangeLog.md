@@ -26,6 +26,9 @@ Other enhancements:
 
 Bug fixes:
 
+* Stack's `dot` and `ls dependencies` commands no longer prune a package with
+  dependencies only because all its direct dependencies are to be pruned.
+
 ## v3.9.3 - 2026-02-19
 
 Release notes:
