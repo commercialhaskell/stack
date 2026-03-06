@@ -69,8 +69,10 @@ By default:
     `--depth <depth>` option to limit the depth;
 *   all relevant packages are included in the output. Pass the
     `--prune <packages>` option to exclude the specified packages (including
-    project packages), where `<packages>` is a list of package names separated
-    by commas;
+    project packages). Pass the `--reach <packages>` option to exclude packages
+    (including project packages) that cannot reach any of the specified packages
+    in the dependency graph. In both cases, `<packages>` is a list of package
+    names separated by commas;
 *   for all relevant project packages, relevant dependencies are included in the
     output. However, each project package for which dependencies are included
     can be specified as a target argument. The argument uses the same format as

@@ -27,6 +27,9 @@ data DotOpts = DotOpts
     -- fixpoint
   , prune :: !(Set PackageName)
     -- ^ Package names to prune from the graph
+  , reach :: !(Set PackageName)
+    -- ^ If not empty, packages in the pruned graph must be able to reach one or
+    -- more of these packages
   , dotTargets :: [Text]
     -- ^ Stack TARGETs to trace dependencies for
   , flags :: !(Map ApplyCLIFlag (Map FlagName Bool))
