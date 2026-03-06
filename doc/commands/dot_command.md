@@ -29,7 +29,8 @@ By default:
 *   all relevant packages are included in the output. Pass the
     `--prune <packages>` option to exclude the specified packages (including
     project packages), where `<packages>` is a list of package names separated
-    by commas;
+    by commas. A package with dependencies is pruned if all of its direct
+    dependencies are pruned;
 *   for all relevant project packages, relevant dependencies are included in the
     output. However, each project package for which dependencies are included
     can be specified as a target argument. The argument uses the same format as
