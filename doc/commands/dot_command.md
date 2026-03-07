@@ -115,3 +115,12 @@ output in the form of a SVG file named `wreq-example*.svg`.
     ~~~
 
     [![wreq-example6.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example6.svg)](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example6.svg)
+
+*   Include external dependencies and prune packages that cannot reach any of
+    `memory` and `basement` in the dependency graph:
+
+    ~~~text
+    stack dot --external --reach memory,basement | dot -Tsvg -o wreq-example7.svg
+    ~~~
+
+    [![wreq-example7.svg](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example7.svg)](https://cdn.jsdelivr.net/gh/commercialhaskell/stack@master/doc/img/dot_command/wreq-example7.svg)
