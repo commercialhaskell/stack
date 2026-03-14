@@ -93,10 +93,16 @@ setting Stack's configuration option
 [`notify-if-nix-on-path`](../configure/yaml/non-project.md#notify-if-nix-on-path)
 to `false`.
 
-With Nix integration enabled, `stack build` and `stack exec` will automatically
-launch themselves in a local build environment (using `nix-shell` behind the
-scenes). It is not necessary to run `stack setup`, unless you want to cache a
-GHC installation before running a build.
+If Nix integration is enabled:
+
+* `stack build` and `stack exec` automatically launch themselves in a local
+  build environment (using `nix-shell`). It is not necessary to run
+  `stack setup`, unless you want to cache a GHC installation before  running a
+  build; and
+
+* [`system-ghc: true`](../configure/yaml/non-project.md#system-ghc) is implied.
+  ([`install-ghc: false`](../configure/yaml/non-project.md#install-ghc) is not
+  implied.)
 
 **Known limitation on macOS:** currently, `stack --nix ghci` fails on macOS, due
 to a bug in GHCi when working with external shared libraries.
