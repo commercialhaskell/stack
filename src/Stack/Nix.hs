@@ -17,8 +17,12 @@ module Stack.Nix
   ) where
 
 import qualified Data.Text as T
+import qualified Data.ByteString.Lazy.Char8 as S8
 import           Path.IO ( resolveFile )
-import           RIO.Process ( exec, processContextL )
+import           RIO.Process
+                   ( HasProcessContext (..), exec, proc, processContextL
+                   , readProcess
+                   )
 import           Stack.Config ( getInContainer, withBuildConfig )
 import           Stack.Config.Nix ( nixCompiler, nixCompilerVersion )
 import           Stack.Constants
@@ -41,6 +45,7 @@ import qualified System.FilePath as F
 data NixPrettyException
   = CannotDetermineProjectRoot
     -- ^ Can't determine the project root (location of the shell file if any).
+  | NixInstantiateCommandFailure ![String] !S8.ByteString
   deriving Show
 
 instance Pretty NixPrettyException where
@@ -48,6 +53,20 @@ instance Pretty NixPrettyException where
     "[S-7384]"
     <> line
     <> flow "Cannot determine project root directory."
+  pretty (NixInstantiateCommandFailure args e) =
+    "[S-1264]"
+    <> line
+    <> fillSep
+         [ flow "While using"
+         , style Shell "nix-instantiate" <> ","
+         , flow "with arguments:"
+         ]
+    <> line
+    <> bulletedList (map (style Shell . string) args)
+    <> blankLine
+    <> flow "Stack encountered the following error:"
+    <> blankLine
+    <> string (T.unpack . textDisplay . displayBytesUtf8 $ S8.toStrict e)
 
 instance Exception NixPrettyException
 
@@ -128,10 +147,8 @@ runShellAndExit = do
                 , "} \"\""
                 ]
             ]
-
-        fullArgs = concat
-          [ [ "--pure" | pureShell ]
-          , if addGCRoots
+        instantiateArgs = concat
+          [ if addGCRoots
               then [ "--indirect"
                    , "--add-root"
                    , toFilePath
@@ -140,9 +157,14 @@ runShellAndExit = do
                        F.</> "gc-root"
                    ]
               else []
-          , map T.unpack config.nix.shellOptions
           , nixopts
-          , ["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args')]
+          ,  map T.unpack config.nix.instantiateOptions
+          , [ "--show-trace" ]
+          ]
+        shellArgs = concat
+          [ [ "--pure" | pureShell ]
+          , map T.unpack config.nix.shellOptions
+          , [ "--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args') ]
             -- Using --run instead of --command so we cannot end up in the
             -- nix-shell if stack build is Ctrl-C'd
           ]
@@ -158,7 +180,27 @@ runShellAndExit = do
                   "with nix packages: "
                <> display (T.intercalate ", " pkgs)
          )
-    exec "nix-shell" fullArgs
+    runNixShellExec instantiateArgs shellArgs
+
+runNixShellExec
+  :: (HasProcessContext env, HasLogFunc env)
+  => [String]
+     -- ^ nix-instantiate args
+  -> [String]
+     -- ^ nix-shell args
+  -> RIO env a
+runNixShellExec instantiateArgs shellArgs = do
+  (ec, out, err) <- proc "nix-instantiate" instantiateArgs readProcess
+  case ec of
+    ExitFailure _ ->
+      -- As of Nix 2.34, there appears to be no way to capture coloured output
+      prettyThrowIO (NixInstantiateCommandFailure instantiateArgs err)
+    ExitSuccess -> do
+      let drvPath = case S8.lines out of
+            [] -> error "error"
+            -- nix-instantiate prints the .drv path
+            (drvPath' : _) -> S8.unpack drvPath'
+      exec "nix-shell" (drvPath : shellArgs)
 
 -- | Shell-escape quotes inside the string and enclose it in quotes.
 escape :: String -> String

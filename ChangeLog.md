@@ -12,6 +12,9 @@ Behavior changes:
 
 * Stack's default Nix integration now includes the `cacert` Nix package, in
   order to support Stack's use of `crypton-x509-system >= 1.6.8`.
+* With Nix integration, Stack uses `nix-instantiate` before `nix-shell`,
+  enabling Stack to catch and report when the Nix expression cannot be
+  evaluated by Nix. The `nix-instantiate-options` option is added, accordingly.
 
 Other enhancements:
 
