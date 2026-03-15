@@ -12,13 +12,13 @@ Nix configuration.
 -}
 
 module Stack.Config.Nix
-  ( ConfigNixException
+  ( ConfigNixPrettyException
   , nixCompiler
   , nixCompilerVersion
   , nixOptsFromMonoid
   ) where
 
-import           Control.Monad.Extra ( ifM )
+import           Control.Monad.Extra ( ifM, whenJust )
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import           Distribution.System ( OS (..) )
@@ -28,26 +28,47 @@ import           Stack.Types.Runner ( HasRunner )
 import           Stack.Types.Nix ( NixOpts (..), NixOptsMonoid (..) )
 import           System.Directory ( doesFileExist )
 
--- | Type representing exceptions thrown by functions exported by the
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.Config.Nix" module.
-data ConfigNixException
-  = NixCannotUseShellFileAndPackagesException
+data ConfigNixPrettyException
+  = NixCannotUseShellFileAndPackagesException !FilePath ![Text]
     -- ^ Nix can't be given packages and a shell file at the same time
   | GHCMajorVersionUnspecified
   | OnlyGHCSupported
   deriving Show
 
-instance Exception ConfigNixException where
-  displayException NixCannotUseShellFileAndPackagesException =
-    "Error: [S-2726]\n"
-    ++ "You cannot have packages and a shell-file filled at the same time \
-       \in your nix-shell configuration."
-  displayException GHCMajorVersionUnspecified =
-    "Error: [S-9317]\n"
-    ++ "GHC major version not specified."
-  displayException OnlyGHCSupported =
-    "Error: [S-8605]\n"
-    ++ "Only GHC is supported by 'stack --nix'."
+instance Pretty ConfigNixPrettyException where
+  pretty (NixCannotUseShellFileAndPackagesException initFile packages) =
+    "[S-2726]"
+    <> line
+    <> flow "The configuration of Stack's Nix integration cannot specify both \
+            \a Nix shell file and Nix packages. You have specified:"
+    <> blankLine
+    <> spacedBulletedList
+         [ fillSep
+             [ flow "Shell file:"
+             , style File (fromString initFile) <> ";"
+             , "and"
+             ]
+         , fillSep $
+               flow "Nix packages:"
+             : mkNarrativeList (Just Shell) False prettyPackages
+         ]
+   where
+    prettyPackages :: [StyleDoc]
+    prettyPackages = map (fromString . T.unpack) packages
+  pretty GHCMajorVersionUnspecified =
+    "[S-9317]"
+    <> line
+    <> flow "Stack's Nix integration requires at least a major version of GHC \
+            \to be specified. No major version is specified."
+  pretty OnlyGHCSupported =
+    "[S-8605]"
+    <> line
+    <> flow "Stack's Nix integration supports only GHC binary distributions as \
+            \compiler."
+
+instance Exception ConfigNixPrettyException
 
 -- | Interprets NixOptsMonoid options.
 nixOptsFromMonoid ::
@@ -79,8 +100,9 @@ nixOptsFromMonoid nixMonoid os = do
         pure False
       else pure nixEnable0
 
-  when (not (null packages) && isJust initFile) $
-    throwIO NixCannotUseShellFileAndPackagesException
+  unless (null packages) $ whenJust initFile $ \fp ->
+    prettyThrowIO $ NixCannotUseShellFileAndPackagesException fp packages
+
   pure NixOpts
     { enable
     , pureShell
@@ -93,7 +115,7 @@ nixOptsFromMonoid nixMonoid os = do
   prefixAll p (x:xs) = p : x : prefixAll p xs
   prefixAll _ _      = []
 
-nixCompiler :: WantedCompiler -> Either ConfigNixException T.Text
+nixCompiler :: WantedCompiler -> Either ConfigNixPrettyException T.Text
 nixCompiler compilerVersion =
   case compilerVersion of
     WCGhc version ->
@@ -119,7 +141,7 @@ nixCompiler compilerVersion =
     WCGhcjs{} -> Left OnlyGHCSupported
     WCGhcGit{} -> Left OnlyGHCSupported
 
-nixCompilerVersion :: WantedCompiler -> Either ConfigNixException T.Text
+nixCompilerVersion :: WantedCompiler -> Either ConfigNixPrettyException T.Text
 nixCompilerVersion compilerVersion =
   case compilerVersion of
     WCGhc version ->

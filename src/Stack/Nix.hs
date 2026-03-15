@@ -36,17 +36,20 @@ import           Stack.Types.Version ( showStackVersion )
 import           System.Environment ( getArgs, lookupEnv )
 import qualified System.FilePath as F
 
--- | Type representing exceptions thrown by functions exported by the
--- "Stack.Nix" module.
-data NixException
+-- | Type representing  \'pretty\' exceptions thrown by functions exported by
+-- the "Stack.Nix" module.
+data NixPrettyException
   = CannotDetermineProjectRoot
     -- ^ Can't determine the project root (location of the shell file if any).
   deriving Show
 
-instance Exception NixException where
-  displayException CannotDetermineProjectRoot =
-    "Error: [S-7384]\n"
-    ++ "Cannot determine project root directory."
+instance Pretty NixPrettyException where
+  pretty CannotDetermineProjectRoot =
+    "[S-7384]"
+    <> line
+    <> flow "Cannot determine project root directory."
+
+instance Exception NixPrettyException
 
 -- | Execute @nix-shell@, replacing the current process.
 runShellAndExit :: RIO Config void
@@ -77,8 +80,8 @@ runShellAndExit = do
     -- (thus the void return type)
     compilerVersion <- withBuildConfig $ view wantedCompilerVersionL
 
-    ghc <- either throwIO pure $ nixCompiler compilerVersion
-    ghcVersion <- either throwIO pure $ nixCompilerVersion compilerVersion
+    ghc <- either prettyThrowIO pure $ nixCompiler compilerVersion
+    ghcVersion <- either prettyThrowIO pure $ nixCompilerVersion compilerVersion
     let pkgsInConfig = config.nix.packages
         -- It appears that cacert needs to be specified in order for
         -- crypton-x509-system >= 1.6.8 to work with Stack's Nix integration:
