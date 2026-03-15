@@ -54,6 +54,12 @@ nixOptsParser hide0 = overrideActivation <$>
         <> hide
         ))
   <*> optionalFirst (textArgsOption
+        (  long "nix-instantiate-options"
+        <> metavar "OPTIONS"
+        <> help "Additional options passed to nix-instantiate."
+        <> hide
+        ))
+  <*> optionalFirst (textArgsOption
         (  long "nix-shell-options"
         <> metavar "OPTIONS"
         <> help "Additional options passed to nix-shell."
