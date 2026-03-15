@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2026-04-24.
+`master` branch of the Stack repository. Last updated: 2026-07-07.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -214,6 +214,11 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-7384] = CannotDetermineProjectRoot
+        [S-1264] | NixInstantiateCommandFailure [String] ByteString
+        [S-3220] | NixInstantiateCommandNoDerivationPath
+        [S-5924] | NixInstantiateCommandNoSingleDerivationPath [String] [S8.ByteString]
+        [S-1537] | NixInstantiateCommandInvalidDerivationPath [String] String
+
         ~~~
 
     -   `Stack.PackageDump.PackageDumpException`

@@ -83,10 +83,11 @@ nixOptsFromMonoid nixMonoid os = do
       pureShell = fromFirst defaultPure nixMonoid.pureShell
       packages = fromFirst [] nixMonoid.packages
       initFile = getFirst nixMonoid.initFile
-      shellOptions =
-           fromFirst [] nixMonoid.shellOptions
-        ++ prefixAll (T.pack "-I") (fromFirst [] nixMonoid.path)
-      addGCRoots   = fromFirstFalse nixMonoid.addGCRoots
+      includePaths = prefixAll (T.pack "-I") (fromFirst [] nixMonoid.path)
+      instantiateOptions =
+        fromFirst [] nixMonoid.instantiateOptions ++ includePaths
+      shellOptions = fromFirst [] nixMonoid.shellOptions ++ includePaths
+      addGCRoots = fromFirstFalse nixMonoid.addGCRoots
 
   -- Enable Nix-mode by default on NixOS, unless Docker-mode was specified
   osIsNixOS <- isNixOS
@@ -108,6 +109,7 @@ nixOptsFromMonoid nixMonoid os = do
     , pureShell
     , packages
     , initFile
+    , instantiateOptions
     , shellOptions
     , addGCRoots
     }

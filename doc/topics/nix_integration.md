@@ -32,13 +32,15 @@ C libraries that you would normally install manually.
 
 Nix's `nix-shell` starts an interactive shell based on a Nix expression. Stack
 can automatically create a Nix build environment in the background using
-`nix-shell`. There are two alternative options to create such a build
-environment:
+`nix-instantiate` to produce a store derivation and `nix-shell` with that store
+derivation. This two-step process (since Stack UNRELEASED) allows Stack to
+report separately any errors in producing the store derivation. There are two
+alternative options to create such a build environment:
 
 1. provide a list of [Nix packages][nix-search-packages]. To these, Stack will
    add Nix packages for the GHC compiler, `git` (the distributed version control
    system), `gcc` (the GNU compiler collection), `gmp` (the GNU multiple
-   precision arithmetic library) and `cacert` (a bundle of X.509 certificates of 
+   precision arithmetic library) and `cacert` (a bundle of X.509 certificates of
    public Certificate Authorities); and
 2. provide a `shell.nix` file that gives you more control over the libraries and
    tools available inside the shell.
@@ -429,6 +431,12 @@ nix:
   # Unset by default. You cannot set this option if `packages:`
   # is already present and not empty.
   shell-file: shell.nix
+
+  # A list of strings, empty by default. Additional options that will be passed
+  # verbatim to the `nix-instantiate` command.
+  #
+  # Since Stack UNRELEASED
+  nix-instantiate-options: []
 
   # A list of strings, empty by default. Additional options that will be passed
   # verbatim to the `nix-shell` command.

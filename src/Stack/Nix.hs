@@ -17,8 +17,13 @@ module Stack.Nix
   ) where
 
 import qualified Data.Text as T
+import qualified Data.ByteString.Lazy.Char8 as S8
+import           Path ( parseAbsFile )
 import           Path.IO ( resolveFile )
-import           RIO.Process ( exec, processContextL )
+import           RIO.Process
+                   ( HasProcessContext (..), exec, proc, processContextL
+                   , readProcess
+                   )
 import           Stack.Config ( getInContainer, withBuildConfig )
 import           Stack.Config.Nix ( nixCompiler, nixCompilerVersion )
 import           Stack.Constants
@@ -41,6 +46,10 @@ import qualified System.FilePath as F
 data NixPrettyException
   = CannotDetermineProjectRoot
     -- ^ Can't determine the project root (location of the shell file if any).
+  | NixInstantiateCommandFailure ![String] !S8.ByteString
+  | NixInstantiateCommandNoDerivationPath ![String]
+  | NixInstantiateCommandNoSingleDerivationPath ![String] ![S8.ByteString]
+  | NixInstantiateCommandInvalidDerivationPath ![String] !String
   deriving Show
 
 instance Pretty NixPrettyException where
@@ -48,6 +57,47 @@ instance Pretty NixPrettyException where
     "[S-7384]"
     <> line
     <> flow "Cannot determine project root directory."
+  pretty (NixInstantiateCommandFailure args e) =
+    "[S-1264]"
+    <> line
+    <> whileUsingNixInstantiate args
+    <> flow "Stack encountered the following error:"
+    <> blankLine
+    <> string (T.unpack . textDisplay . displayBytesUtf8 $ S8.toStrict e)
+  pretty (NixInstantiateCommandNoDerivationPath args) =
+    "[S-3220]"
+    <> line
+    <> whileUsingNixInstantiate args
+    <> flow "the command succeeded but did not output a path to a store \
+            \derivation."
+  pretty (NixInstantiateCommandNoSingleDerivationPath args drvPaths) =
+    "[S-5924]"
+    <> line
+    <> whileUsingNixInstantiate args
+    <> flow "the command succeeded but expected a single path to a store \
+            \derivation and output was:"
+    <> line
+    <> bulletedList (map (style File . string . S8.unpack) drvPaths)
+    <> line
+  pretty (NixInstantiateCommandInvalidDerivationPath args drvPath) =
+    "[S-1537]"
+    <> line
+    <> whileUsingNixInstantiate args
+    <> flow "the command succeeded but expected a valid path to a store \
+            \derivation and output was:"
+    <> line
+    <> style Error (string drvPath)
+
+whileUsingNixInstantiate :: [String] -> StyleDoc
+whileUsingNixInstantiate args =
+     fillSep
+         [ flow "While using"
+         , style Shell "nix-instantiate" <> ","
+         , flow "with arguments:"
+         ]
+  <> line
+  <> bulletedList (map (style Shell . string) args)
+  <> blankLine
 
 instance Exception NixPrettyException
 
@@ -129,11 +179,11 @@ runShellAndExit = do
                 , "} \"\""
                 ]
             ]
-
-        fullArgs = concat
-          [ [ "--pure" | pureShell ]
-          , if addGCRoots
+        instantiateArgs = concat
+          [ if addGCRoots
               then [ "--indirect"
+                     -- From Nix 2.4, the --indirect flag is a no op and
+                     -- --add-root always generates indirect GC roots.
                    , "--add-root"
                    , toFilePath
                              config.workDir
@@ -141,12 +191,19 @@ runShellAndExit = do
                        F.</> "gc-root"
                    ]
               else []
-          , map T.unpack config.nix.shellOptions
           , nixopts
-          , ["--run", unwords (cmnd:"$STACK_IN_NIX_EXTRA_ARGS":args')]
-            -- Using --run instead of --command so we cannot end up in the
-            -- nix-shell if stack build is Ctrl-C'd
+          ,  map T.unpack config.nix.instantiateOptions
+          , [ "--show-trace" ]
           ]
+        shellArgs = concat
+          [ [ "--pure" | pureShell ]
+          , map T.unpack config.nix.shellOptions
+          , [ "--run"
+              -- Using --run instead of --command so we cannot end up in the
+              -- nix-shell if stack build is Ctrl-C'd
+            , unwords (cmnd : "$STACK_IN_NIX_EXTRA_ARGS" : args')
+            ]
+                      ]
     pathVar <- liftIO $ lookupEnv "PATH"
     logDebug $ "PATH is: " <> displayShow pathVar
     logDebug $
@@ -159,7 +216,44 @@ runShellAndExit = do
                   "with nix packages: "
                <> display (T.intercalate ", " pkgs)
          )
-    exec "nix-shell" fullArgs
+    runNixShellExec instantiateArgs shellArgs
+
+runNixShellExec
+  :: (HasProcessContext env, HasLogFunc env)
+  => [String]
+     -- ^ nix-instantiate args
+  -> [String]
+     -- ^ nix-shell args
+  -> RIO env a
+runNixShellExec instantiateArgs shellArgs = do
+  -- The nix-instantiate command instantiates (produces) a store derivation
+  -- from a Nix expression and prints the path of the store derivation on
+  -- standard output:
+  (ec, out, err) <- proc "nix-instantiate" instantiateArgs readProcess
+  case ec of
+    ExitFailure _ ->
+      -- As of Nix 2.34, there appears to be no way to capture coloured output
+      prettyThrowIO (NixInstantiateCommandFailure instantiateArgs err)
+    ExitSuccess -> do
+      drvPath <- case S8.lines out of
+            [] -> prettyThrowIO $
+              NixInstantiateCommandNoDerivationPath instantiateArgs
+            -- nix-instantiate prints the .drv path
+            [drvPath'] ->
+              let drvPath'' = S8.unpack drvPath'
+              in  if isJust $ parseAbsFile drvPath''
+                    then
+                      pure drvPath''
+                    else
+                      prettyThrowIO $
+                        NixInstantiateCommandInvalidDerivationPath
+                          instantiateArgs
+                          drvPath''
+            drvPaths -> prettyThrowIO $
+              NixInstantiateCommandNoSingleDerivationPath
+                instantiateArgs
+                drvPaths
+      exec "nix-shell" (drvPath : shellArgs)
 
 -- | Shell-escape quotes inside the string and enclose it in quotes.
 escape :: String -> String

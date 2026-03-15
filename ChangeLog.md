@@ -24,6 +24,9 @@ Behavior changes:
 * When Stack's Nix integration is enabled and a `shell-file` is not specified,
   Stack sets `LANG=C.UTF-8` (rather than `en_US.UTF-8`, which may not be
   available if Stack has been built from source).
+* With Nix integration, Stack uses `nix-instantiate` before `nix-shell`,
+  enabling Stack to catch and report when the Nix expression cannot be
+  evaluated by Nix. The `nix-instantiate-options` option is added, accordingly.
 
 Other enhancements:
 

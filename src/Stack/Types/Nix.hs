@@ -20,6 +20,7 @@ module Stack.Types.Nix
   , nixPackagesArgName
   , nixPathArgName
   , nixPureShellArgName
+  , nixInstantiateOptsArgName
   , nixShellOptsArgName
   ) where
 
@@ -39,6 +40,8 @@ data NixOpts = NixOpts
   , initFile :: !(Maybe FilePath)
     -- ^ The path of a file containing preconfiguration of the environment
     -- (e.g shell.nix)
+  , instantiateOptions :: ![Text]
+    -- ^ Options to be given to the nix-instantiate command line
   , shellOptions :: ![Text]
     -- ^ Options to be given to the nix-shell command line
   , addGCRoots :: !Bool
@@ -59,6 +62,8 @@ data NixOptsMonoid = NixOptsMonoid
   , initFile :: !(First FilePath)
     -- ^ The path of a file containing preconfiguration of the environment (e.g
     -- shell.nix)
+  , instantiateOptions :: !(First [Text])
+    -- ^ Options to be given to the nix-instantiate command line
   , shellOptions :: !(First [Text])
     -- ^ Options to be given to the nix-shell command line
   , path :: !(First [Text])
@@ -76,6 +81,7 @@ instance FromJSON (WithJSONWarnings NixOptsMonoid) where
     pureShell     <- First <$> o ..:? nixPureShellArgName
     packages      <- First <$> o ..:? nixPackagesArgName
     initFile      <- First <$> o ..:? nixInitFileArgName
+    instantiateOptions  <- First <$> o ..:? nixInstantiateOptsArgName
     shellOptions  <- First <$> o ..:? nixShellOptsArgName
     path          <- First <$> o ..:? nixPathArgName
     addGCRoots    <- FirstFalse <$> o ..:? nixAddGCRootsArgName
@@ -84,6 +90,7 @@ instance FromJSON (WithJSONWarnings NixOptsMonoid) where
       , pureShell
       , packages
       , initFile
+      , instantiateOptions
       , shellOptions
       , path
       , addGCRoots
@@ -113,6 +120,10 @@ nixPackagesArgName = "packages"
 -- | shell.nix file path argument name.
 nixInitFileArgName :: Text
 nixInitFileArgName = "shell-file"
+
+-- | Extra options for the nix-instantiate command argument name.
+nixInstantiateOptsArgName :: Text
+nixInstantiateOptsArgName = "nix-instantiate-options"
 
 -- | Extra options for the nix-shell command argument name.
 nixShellOptsArgName :: Text
