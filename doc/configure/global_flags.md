@@ -145,12 +145,21 @@ version of its built-in Hpack library to the standard output stream (e.g.
 ## `--[no-]install-ghc` flag
 
 Default: Enabled
+([:octicons-tag-24: 1.6.1](https://github.com/commercialhaskell/stack/releases/tag/v1.6.1))
 
-Enables/disables the download and installation of GHC when necessary. On
-Windows, `--no-install-ghc` also disables the download and installation of the
-Stack-supplied MSYS2 when necessary. For further information, see the
+If the specified GHC version is not available, enables/disables Stack seeking to
+download and install that version if it is needed. On Windows,
+`--no-install-ghc` also disables the download and installation of the
+Stack-supplied MSYS2 when it is needed. For further information, see the
 documentation for the corresponding non-project specific configuration
 [option](yaml/non-project.md#install-ghc).
+
+!!! note
+
+    The `--[no-]install-ghc` flag does not specify whether Stack checks the
+    availability of either a 'system' GHC executable on the PATH or a
+    Stack-supplied GHC executable. In that regard, see the
+    [`system-ghc`](yaml/non-project.md#system-ghc) option.
 
 ## `--[no-]install-msys` flag
 
@@ -329,9 +338,18 @@ configuration file.
 ## `--[no-]system-ghc` flag
 
 Default: Disabled
+([:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0))
 
-Enables/disables the use of a GHC executable on the PATH, if one is available
-and its version matches.
+Enables/disables Stack seeking to use a 'system' GHC executable (that is, one on
+the PATH) rather than a Stack-supplied GHC executable (or vice versa, if
+disabled). For further information, see the documentation for the corresponding
+non-project specific configuration [option](yaml/non-project.md#system-ghc).
+
+!!! note
+
+    The `--[no-]system-ghc` flag does not specify Stack's behaviour if the
+    specified GHC version is not already available. In that regard, see the
+    [`install-ghc`](yaml/non-project.md#install-ghc) option.
 
 ## `--[no-]terminal` flag
 

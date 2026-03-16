@@ -622,7 +622,7 @@ See [`setup-info`](#setup-info).
   so `stack setup` knows where to download it,
   or pass the `stack setup --ghc-bindist` argument on the command-line
 
-This option is incompatible with `system-ghc: true`.
+This option is incompatible with [`system-ghc: true`](#system-ghc).
 
 ## global-hints-location
 
@@ -727,14 +727,29 @@ will receive a warning if this configuration value is set.
 ## install-ghc
 
 Default: `true`
-([:octicons-tag-24: 1.5.0](https://github.com/commercialhaskell/stack/releases/tag/v1.5.0))
+([:octicons-tag-24: 1.6.1](https://github.com/commercialhaskell/stack/releases/tag/v1.6.1))
 
 Command line equivalent (takes precedence):
 [`--[no-]install-ghc`](../global_flags.md#-no-install-ghc-flag) flag
 
-Whether or not to download and install GHC when necessary. On Windows,
-`install-ghc: false` also disables the download and installation of the
-Stack-supplied MSYS2 when necessary.
+If the specified GHC version is not available, (if `true`) should Stack seek to
+download and install that version when it is needed or (if `false`) fail
+(reporting that the specified compiler is not available)?
+
+~~~yaml
+# Even if needed, do not seek to download and install a Stack-supplied GHC:
+install-ghc: false
+~~~
+
+On Windows, `install-ghc: false` also disables the download and installation of
+the Stack-supplied MSYS2 when it is needed.
+
+!!! note
+
+    The `install-ghc` option does not specify whether Stack checks the
+    availability of either a 'system' GHC executable on the PATH or a
+    Stack-supplied GHC executable. In that regard, see the
+    [`system-ghc`](#system-ghc) option.
 
 ## install-msys
 
@@ -749,7 +764,7 @@ Command line equivalent (takes precedence):
 [`--[no-]install-msys`](../global_flags.md#-no-install-msys-flag) flag
 
 If Stack is checking for the Stack-supplied MSYS2 when Stack is setting up the
-environment, whether or not to download and install MSYS2 when necessary.
+environment, whether or not to download and install MSYS2 when it is needed.
 
 To skip entirely checking for the Stack-supplied MSYS2, see the documentation
 for the [`skip-msys`](#skip-msys) configuration option.
@@ -1471,21 +1486,29 @@ stack-developer-mode: false
 
 ## system-ghc
 
-Default: `false`, unless the [Docker](../../topics/docker_integration.md) or
+Default: `false`
+([:octicons-tag-24: 1.3.0](https://github.com/commercialhaskell/stack/releases/tag/v1.3.0)),
+unless the [Docker](../../topics/docker_integration.md) or
 [Nix](../../topics/nix_integration.md) integration is enabled.
 
 Command line equivalent (takes precedence): `--[no-]system-ghc` flag
 
-Enables or disables using the GHC available on the PATH. (Make sure PATH is
-explicit, i.e., do not use ~.) Useful to enable if you want to save the time,
-bandwidth or storage space needed to setup an isolated GHC.
-
-In a Nix-enabled configuration, Stack is incompatible with `system-ghc: false`.
+Should Stack seek to use (if `true`) a 'system' GHC executable (that is, one on
+the PATH) or (if `false`) a Stack-supplied GHC executable?
 
 ~~~yaml
-# Turn on system GHC
+# Seek to use a 'system' GHC on the PATH rather than a Stack-supplied GHC:
 system-ghc: true
 ~~~
+
+Stack's [Nix integration](../../topics/nix_integration.md), when enabled, is
+incompatible with `system-ghc: false`.
+
+!!! note
+
+    The `system-ghc` option does not specify Stack's behaviour if the specified
+    GHC version is not already available. In that regard, see the
+    [`install-ghc`](#install-ghc) option.
 
 ## templates
 
