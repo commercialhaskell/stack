@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2025-08-16.
+`master` branch of the Stack repository. Last updated: 2026-03-15.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -78,10 +78,10 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-8575] = SnapshotNotSupportedException (Maybe Project) (Maybe AbstractSnapshot)
         ~~~
 
-    -   `Stack.Config.Nix.ConfigNixException`
+    -   `Stack.Config.Nix.ConfigNixPrettyException`
 
         ~~~haskell
-        [S-2726] = NixCannotUseShellFileAndPackagesException
+        [S-2726] = NixCannotUseShellFileAndPackagesException FilePath [Text]
         [S-9317] | GHCMajorVersionUnspecified
         [S-8605] | OnlyGHCSupported
         ~~~
@@ -208,7 +208,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3113] | AttemptedOverwrites [Path Abs File]
         ~~~
 
-    -   `Stack.Nix.NixException`
+    -   `Stack.Nix.NixPrettyException`
 
         ~~~haskell
         [S-7384] = CannotDetermineProjectRoot
