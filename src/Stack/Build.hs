@@ -69,8 +69,8 @@ import           Stack.Types.Package
                    , PackageConfig (..), lpFiles, lpFilesForComponents
                    )
 import           Stack.Types.Plan
-                   ( Plan (..), Task (..), TaskType (..), taskLocation
-                   , taskProvides
+                   ( Plan (..), Task (..), TaskType (..), componentKeyPkgName
+                   , taskLocation, taskProvides
                    )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( Runner, globalOptsL )
@@ -187,9 +187,11 @@ build msetLocalFiles = do
       getInstalled installMap
 
   baseConfigOpts <- mkBaseConfigOpts boptsCli
+  let allDumpPkgs = globalDumpPkgs ++ snapshotDumpPkgs ++ localDumpPkgs
   plan <- constructPlan
             baseConfigOpts
             localDumpPkgs
+            allDumpPkgs
             loadPackage
             sourceMap
             installedMap
@@ -242,8 +244,11 @@ buildLocalTargets ::
 buildLocalTargets targets =
   tryAny $ withNewLocalBuildTargets (NE.toList targets) $ build Nothing
 
+-- | Extract the local package identifiers from the plan. Multiple component
+-- tasks for the same package are deduplicated.
 justLocals :: Plan -> [PackageIdentifier]
 justLocals =
+  Set.toList . Set.fromList .
   map taskProvides .
   filter ((== Local) . taskLocation) .
   Map.elems .
@@ -324,11 +329,16 @@ warnIfExecutablesWithSameNameCouldBeOverwritten locals plan = do
   exesToBuild :: Map StackUnqualCompName (NonEmpty PackageName)
   exesToBuild =
     collect
-      [ (exe, pkgName')
-      | (pkgName', task) <- Map.toList plan.tasks
+      [ (exe, pn)
+      | (pn, task) <- Map.toList perPkgTasks
       , TTLocalMutable lp <- [task.taskType]
       , exe <- (Set.toList . exeComponents . (.components)) lp
       ]
+  -- Multiple component tasks for the same package share the same Task data.
+  -- Use one representative task per package to avoid duplicates.
+  perPkgTasks :: Map PackageName Task
+  perPkgTasks = Map.fromList
+    [ (componentKeyPkgName ck, t) | (ck, t) <- Map.toList plan.tasks ]
   localExes :: Map StackUnqualCompName (NonEmpty PackageName)
   localExes =
     collect

@@ -25,6 +25,7 @@ import           Control.Concurrent.STM ( check )
 import           Stack.Prelude
 import           Data.List ( sortBy )
 import qualified Data.Set as Set
+import           Stack.Types.Plan ( ComponentKey )
 
 -- | Type representing exceptions thrown by functions exported by the
 -- "Control.Concurrent.Execute" module.
@@ -40,13 +41,10 @@ instance Exception ExecuteException where
 -- | Type representing types of Stack build actions.
 data ActionType
   = ATBuild
-    -- ^ Action for building a package's library and executables. If
-    -- 'Stack.Types.Build.Task.allInOne' is 'True', then this will also build
-    -- benchmarks and tests. It is 'False' when the library's benchmarks or
-    -- test-suites have cyclic dependencies.
-  | ATBuildFinal
-    -- ^ Task for building the package's benchmarks and test-suites. Requires
-    -- that the library was already built.
+    -- ^ Action for configuring and building a single component (library,
+    -- sub-library, executable, or Backpack instantiation). Also used for
+    -- final build steps that compile test-suites and benchmarks when no
+    -- separate library build task exists for the component.
   | ATRunTests
     -- ^ Task for running the package's test-suites.
   | ATRunBenchmarks
@@ -55,7 +53,7 @@ data ActionType
 
 -- | Types representing the unique ids of Stack build actions.
 data ActionId
-  = ActionId !PackageIdentifier !ActionType
+  = ActionId !ComponentKey !ActionType
   deriving (Eq, Ord, Show)
 
 -- | Type representing Stack build actions.

@@ -1,0 +1,6 @@
+snapshot: ghc-9.10.3
+packages:
+  - str-sig
+  - logger-sig
+  - impl-pkg
+  - consumer-pkg

@@ -61,7 +61,7 @@ import           Stack.Types.Component
                    , StackTestSuite (..), StackUnqualCompName (..)
                    )
 import           Stack.Types.ComponentUtils
-                   ( emptyCompName, unqualCompToString )
+                   ( emptyCompName, unqualCompFromText, unqualCompToString )
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), prettyStackDevL )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
@@ -375,6 +375,7 @@ componentOutputDir namedComponent distDir =
     CExe name -> makeTmp name
     CTest name -> makeTmp name
     CBench name -> makeTmp name
+    CInst x -> makeTmp (unqualCompFromText x)
  where
   makeTmp name =
     buildDir distDir </> componentNameToDirNormOrTmp True name
@@ -603,6 +604,7 @@ componentBuildDir component distDir = case component of
   CExe name -> buildDir distDir </> componentNameToDir name
   CTest name -> buildDir distDir </> componentNameToDir name
   CBench name -> buildDir distDir </> componentNameToDir name
+  CInst x -> buildDir distDir </> componentNameToDir (unqualCompFromText x)
 
 -- Internal helper to define resolveFileOrWarn and resolveDirOrWarn
 resolveOrWarn ::
