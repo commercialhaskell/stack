@@ -40,6 +40,8 @@ data ConfigCacheType
     -- ^ Library Cabal flag cache.
   | ConfigCacheTypeFlagExecutable PackageIdentifier
     -- ^ Executable Cabal flag cache.
+  | ConfigCacheTypeInstantiation Text
+    -- ^ Backpack CInst instantiation cache, keyed by hash suffix.
   deriving (Eq, Show)
 
 instance PersistField ConfigCacheType where
@@ -48,10 +50,13 @@ instance PersistField ConfigCacheType where
     PersistText $ "lib:" <> ghcPkgIdToText v
   toPersistValue (ConfigCacheTypeFlagExecutable v) =
     PersistText $ "exe:" <> T.pack (packageIdentifierString v)
+  toPersistValue (ConfigCacheTypeInstantiation v) =
+    PersistText $ "inst:" <> v
   fromPersistValue (PersistText t) =
     fromMaybe (Left $ "Unexpected ConfigCacheType value: " <> t) $
     config <|> fmap lib (T.stripPrefix "lib:" t) <|>
-    fmap exe (T.stripPrefix "exe:" t)
+    fmap exe (T.stripPrefix "exe:" t) <|>
+    fmap inst (T.stripPrefix "inst:" t)
    where
     config
       | t == "config" = Just (Right ConfigCacheTypeConfig)
@@ -64,6 +69,7 @@ instance PersistField ConfigCacheType where
         maybe (Left $ "Unexpected ConfigCacheType value: " <> t) Right $
         parsePackageIdentifier (T.unpack v)
       Right $ ConfigCacheTypeFlagExecutable pkgId
+    inst v = Right $ ConfigCacheTypeInstantiation v
   fromPersistValue _ = Left "Unexpected ConfigCacheType type"
 
 instance PersistFieldSql ConfigCacheType where

@@ -1,0 +1,13 @@
+cabal-version: 2.0
+name:          app
+version:       0.1.0.0
+build-type:    Simple
+
+executable multi-inst-demo
+  main-is:         Main.hs
+  build-depends:
+    base >= 4.7 && < 5,
+    consumer-a,
+    consumer-b
+  hs-source-dirs:  app
+  default-language: Haskell2010

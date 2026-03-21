@@ -270,6 +270,7 @@ resolveRawTarget sma allLocs (rawInput, rt) =
   -- 'ComponentName'
   isCompNamed :: ComponentName -> NamedComponent -> Bool
   isCompNamed _ CLib = False
+  isCompNamed _ CInst{} = False
   isCompNamed t1 t2 = case t2 of
     (CSubLib t2') -> t1' == t2'
     (CExe t2') -> t1' == t2'

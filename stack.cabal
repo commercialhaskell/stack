@@ -216,6 +216,7 @@ library
       Path.Find
       Stack
       Stack.Build
+      Stack.Build.Backpack
       Stack.Build.Cache
       Stack.Build.ConstructPlan
       Stack.Build.Execute
@@ -749,6 +750,7 @@ test-suite stack-unit-test
   main-is: Spec.hs
   other-modules:
       Stack.ArgsSpec
+      Stack.Build.ConstructPlanSpec
       Stack.Build.ExecuteSpec
       Stack.Build.TargetSpec
       Stack.Config.DockerSpec
@@ -759,6 +761,7 @@ test-suite stack-unit-test
       Stack.LockSpec
       Stack.NixSpec
       Stack.PackageDumpSpec
+      Stack.Types.PlanSpec
       Stack.Types.TemplateNameSpec
       Stack.UploadSpec
       Paths_stack
