@@ -1,0 +1,37 @@
+cabal-version: 3.0
+name:          sublib-deps
+version:       0.1.0.0
+build-type:    Simple
+
+-- A package with sub-libraries that depend on each other.
+-- Sub-library "core" is standalone.
+-- Sub-library "extended" depends on "core".
+-- Main library depends on "extended".
+-- This tests intra-package component ordering.
+
+library core
+  exposed-modules: SublibDeps.Core
+  build-depends:   base >=4.14
+  hs-source-dirs:  src/core
+  default-language: Haskell2010
+
+library extended
+  exposed-modules: SublibDeps.Extended
+  build-depends:   base >=4.14,
+                   sublib-deps:core
+  hs-source-dirs:  src/extended
+  default-language: Haskell2010
+
+library
+  exposed-modules: SublibDeps
+  build-depends:   base >=4.14,
+                   sublib-deps:extended
+  hs-source-dirs:  src/main
+  default-language: Haskell2010
+
+executable sublib-deps-demo
+  main-is:         Main.hs
+  build-depends:   base >=4.14,
+                   sublib-deps
+  hs-source-dirs:  src/exe
+  default-language: Haskell2010

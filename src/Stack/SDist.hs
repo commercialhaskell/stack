@@ -489,7 +489,7 @@ getSDistFileList lp deps =
       [] [] [] Nothing -- provide empty list of globals. This is a hack around
                        -- custom Setup.hs files
       $ \ee ->
-      withSingleContext ac ee taskType deps (Just "sdist") $
+      withSingleContext ac ee taskType deps (Just "sdist") Nothing $
         \_package cabalFP _pkgDir cabal _announce _outputType -> do
           let outFile = toFilePath tmpdir FP.</> "source-files-list"
           cabal
