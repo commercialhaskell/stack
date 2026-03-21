@@ -14,6 +14,8 @@ Construct a @Plan@ for how to build.
 
 module Stack.Build.ConstructPlan
   ( constructPlan
+  -- * Exported for testing
+  , shouldSplitComponents
   ) where
 
 import           Control.Monad.Trans.Maybe ( MaybeT (..) )
@@ -22,7 +24,7 @@ import qualified Data.Map.Strict as Map
 import           Data.Monoid.Map ( MonoidMap(..) )
 import qualified Data.Set as Set
 import qualified Data.Text as T
-import           Distribution.Types.BuildType ( BuildType (Configure) )
+import           Distribution.Types.BuildType ( BuildType (Configure, Simple) )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Version ( mkVersion )
 import           Path ( parent )
@@ -31,6 +33,8 @@ import           RIO.Process ( findExecutable )
 import           RIO.State
                    ( State, StateT (..), execState, get, modify, modify', put )
 import           RIO.Writer ( WriterT (..), pass, tell )
+import           Stack.Build.Backpack
+                   ( addInstantiationTasks, upgradeFoundIndefinites )
 import           Stack.Build.Cache ( tryGetFlagCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
@@ -40,7 +44,10 @@ import           Stack.ConfigureOpts
                    )
 import           Stack.Constants ( compilerOptionsCabalFlag )
 import           Stack.Package
-                   ( applyForceCustomBuild, buildableExes, packageUnknownTools
+                   ( applyForceCustomBuild, buildableExes
+                   , buildableForeignLibs, buildableSubLibs
+                   , hasBuildableMainLibrary, hasIntraPackageDeps
+                   , packageUnknownTools
                    , processPackageDepsEither
                    )
 import           Stack.Prelude hiding ( loadPackage )
@@ -49,7 +56,7 @@ import           Stack.Types.Build.ConstructPlan
                    ( AddDepRes (..), CombinedMap, Ctx (..), M
                    , MissingPresentDeps (..), PackageInfo (..), ToolWarning(..)
                    , UnregisterState (..), W (..), adrHasLibrary, adrVersion
-                   , isAdrToInstall, toTask
+                   , toTask
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -68,7 +75,6 @@ import           Stack.Types.CompilerPaths
 import           Stack.Types.ComponentUtils ( unqualCompFromText )
 import           Stack.Types.Config ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
-import           Stack.Types.Curator ( Curator (..) )
 import           Stack.Types.Dependency ( DepValue (..), isDepTypeLibrary )
 import           Stack.Types.DumpPackage ( DumpPackage (..), sublibParentPkgId )
 import           Stack.Types.EnvConfig ( EnvConfig (..), HasEnvConfig (..) )
@@ -77,20 +83,26 @@ import           Stack.Types.EnvSettings
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Installed
-                   ( InstallLocation (..), Installed (..), InstalledMap
+                   ( InstallLocation (..), Installed (..)
+                   , InstalledMap
                    , installedVersion
                    )
 import           Stack.Types.IsMutable ( IsMutable (..) )
-import           Stack.Types.NamedComponent ( exeComponents, renderComponent )
+import           Stack.Types.NamedComponent
+                   ( NamedComponent (..), exeComponents, isCBench, isCTest
+                   , renderComponent
+                   )
 import           Stack.Types.Package
                    ( ExeName (..), LocalPackage (..), Package (..)
                    , PackageSource (..), installedMapGhcPkgId
                    , packageIdentifier, psVersion, runMemoizedWith
                    )
 import           Stack.Types.Plan
-                   ( Plan (..), Task (..), TaskConfigOpts (..), TaskType (..)
-                   , installLocationIsMutable, taskIsTarget, taskLocation
-                   , taskProvides, taskTargetIsMutable
+                   ( ComponentKey (..), Plan (..), Task (..)
+                   , TaskConfigOpts (..), TaskType (..)
+                   , componentKeyPkgName, installLocationIsMutable
+                   , taskIsTarget, taskLocation, taskProvides
+                   , taskTargetIsMutable
                    )
 import           Stack.Types.ProjectConfig ( isPCGlobalProject )
 import           Stack.Types.Runner ( HasRunner (..), globalOptsL )
@@ -122,6 +134,7 @@ constructPlan ::
      forall env. HasEnvConfig env
   => BaseConfigOpts
   -> [DumpPackage] -- ^ locally registered
+  -> [DumpPackage] -- ^ all dump packages (global + snapshot + local)
   -> (  PackageLocationImmutable
      -> Map FlagName Bool
      -> [Text]
@@ -139,6 +152,7 @@ constructPlan ::
 constructPlan
     baseConfigOpts0
     localDumpPkgs
+    allDumpPkgs
     loadPackage0
     sourceMap
     installedMap
@@ -208,7 +222,28 @@ constructPlan
         errs = errlibs ++ errfinals
     if null errs
       then do
-        let tasks = Map.fromList $ mapMaybe (toMaybe . second toTask) adrs
+        -- Upgrade ADRFound entries to ADRToInstall for indefinite packages
+        -- whose source is available. This ensures addInstantiationTasks can
+        -- clone their Task to create CInst instantiation tasks.
+        let loadPkg w x y z = applyForceCustomBuild globalCabalVersion
+                             <$> loadPackage0 w x y z
+            -- Build a module lookup map from installed packages (dump data).
+            -- Used by addInstantiationTasks to resolve modules from ADRFound
+            -- packages that don't have Package metadata.
+            installedModules = Map.fromListWith Set.union
+              [ (pkgName dp.packageIdent, dp.exposedModules)
+              | dp <- allDumpPkgs
+              , isNothing dp.sublib  -- Only main libraries
+              ]
+        adrs' <- upgradeFoundIndefinites
+                   loadPkg econfig ctx.combinedMap ctx.baseConfigOpts adrs
+        let expandedAdrs = concatMap (uncurry expandToComponentKeys) adrs'
+            (withInstantiations, bpWarnings) =
+              addInstantiationTasks installedModules adrs' expandedAdrs
+            tasks = Map.fromList $ mapMaybe
+              (toMaybe . second toTask)
+              withInstantiations
+        mapM_ prettyWarn bpWarnings
         takeSubset Plan
           { tasks = tasks
           , finals = Map.fromList finals
@@ -306,7 +341,8 @@ constructPlan
   -- | Throw an exception if there are any snapshot packages in the plan.
   errorOnSnapshot :: Plan -> RIO env Plan
   errorOnSnapshot plan@(Plan tasks _finals _unregister installExes) = do
-    let snapTasks = Map.keys $ Map.filter (\t -> taskLocation t == Snap) tasks
+    let snapTasks = Set.toList $ Set.fromList $ map componentKeyPkgName
+          $ Map.keys $ Map.filter (\t -> taskLocation t == Snap) tasks
         snapExes = Map.keys $ Map.filter (== Snap) installExes
     unless (null snapTasks && null snapExes) $
       prettyThrowIO $ NotOnlyLocal snapTasks snapExes
@@ -348,7 +384,7 @@ constructPlan
 -- | Determine which packages to unregister based on the given tasks and
 -- already registered project packages and local extra-deps.
 mkUnregisterLocal ::
-     Map PackageName Task
+     Map ComponentKey Task
      -- ^ Tasks
   -> Map PackageName Text
      -- ^ Reasons why packages are dirty and must be rebuilt
@@ -358,12 +394,17 @@ mkUnregisterLocal ::
      -- ^ If true, we're doing a special initialBuildSteps build - don't
      -- unregister target packages.
   -> Map GhcPkgId (PackageIdentifier, Text)
-mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
+mkUnregisterLocal componentTasks dirtyReason localDumpPkgs initialBuildSteps =
   -- We'll take multiple passes through the local packages. This will allow us
   -- to detect that a package should be unregistered, as well as all packages
   -- directly or transitively depending on it.
   loop Map.empty localDumpPkgs
  where
+  -- Derive a per-package task map: pick one representative task per package.
+  tasks :: Map PackageName Task
+  tasks = Map.fromList
+    [ (componentKeyPkgName ck, t) | (ck, t) <- Map.toList componentTasks ]
+
   loop ::
        Map GhcPkgId (PackageIdentifier, Text)
        -- ^ Current local packages to unregister.
@@ -448,25 +489,17 @@ mkUnregisterLocal tasks dirtyReason localDumpPkgs initialBuildSteps =
       relevantPkgName :: PackageName
       relevantPkgName = maybe (pkgName ident) pkgName mParentLibId
 
--- | Given a t'LocalPackage' and its 'testBench', adds a t'Task' for running
--- its tests and benchmarks.
---
--- If @isAllInOne@ is 'True', then this means that the build step will also
--- build the tests. Otherwise, this indicates that there's a cyclic dependency
--- and an additional build step needs to be done.
---
--- This will also add all the deps needed to build the tests / benchmarks. If
--- @isAllInOne@ is 'True' (the common case), then all of these should have
--- already been taken care of as part of the build step.
+-- | Given a t'LocalPackage' and its test\/benchmark 'Package', adds a
+-- t'Task' for running its tests and benchmarks. Resolves the package's deps
+-- via 'addPackageDeps' (in the common case these have already been resolved
+-- for the library build, so the lookups are cache hits).
 addFinal ::
      LocalPackage
   -> Package
   -> Bool
-     -- ^ Will the build step also build the tests?
-  -> Bool
      -- ^ Should Haddock documentation be built?
   -> M ()
-addFinal lp package allInOne buildHaddocks = do
+addFinal lp package buildHaddocks = do
   res <- addPackageDeps package >>= \case
     Left e -> pure $ Left e
     Right (MissingPresentDeps missing present _minLoc) -> do
@@ -479,17 +512,27 @@ addFinal lp package allInOne buildHaddocks = do
             , isLocalNonExtraDep = True
             , isMutable = Mutable
             , pkgConfigOpts
+            , instantiationDeps = []
             }
       pure $ Right Task
         { configOpts
         , buildHaddocks
         , present
         , taskType = TTLocalMutable lp
-        , allInOne
         , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFP))
         , buildTypeConfig = packageBuildTypeConfig package
+        , backpackInstEntries = []
         }
-  tell mempty { wFinals = Map.singleton package.name res }
+  let finalKeys
+        | shouldSplitComponents package =
+            let testComps = filter isCTest $ Set.toList lp.components
+                benchComps = filter isCBench $ Set.toList lp.components
+            in  case testComps ++ benchComps of
+                  [] -> [ComponentKey package.name CLib]
+                  comps -> map (ComponentKey package.name) comps
+        | otherwise = [ComponentKey package.name CLib]
+  forM_ finalKeys $ \ck ->
+    tell mempty { wFinals = Map.singleton ck res }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the package, if
 -- needed. First checks if the package name is in the library map.
@@ -663,24 +706,24 @@ installPackage name ps minstalled = do
   case ps of
     PSRemote pkgLoc _version _fromSnapshot cp -> do
       logDebugPlanS "installPackage" $
-           "Doing all-in-one build for upstream package "
+           "Building upstream package "
         <> fromPackageName name
         <> "."
       package <- ctx.loadPackage
         pkgLoc cp.flags cp.ghcOptions cp.cabalConfigOpts
-      resolveDepsAndInstall True cp.buildHaddocks ps package minstalled
+      resolveDepsAndInstall cp.buildHaddocks ps package minstalled
     PSFilePath lp -> do
       case lp.testBench of
         Nothing -> do
           logDebugPlanS "installPackage" $
                "No test or bench component for "
             <> fromPackageName name
-            <> " so doing an all-in-one build."
+            <> ", building directly."
           resolveDepsAndInstall
-            True lp.buildHaddocks ps lp.package minstalled
+            lp.buildHaddocks ps lp.package minstalled
         Just tb -> do
-          -- Attempt to find a plan which performs an all-in-one build. Ignore
-          -- the writer action + reset the state if it fails.
+          -- Attempt to resolve test/bench deps together with the library.
+          -- Ignore the writer action + reset the state if it fails.
           libMap <- get
           res <- pass $ do
             res <- addPackageDeps tb
@@ -694,22 +737,15 @@ installPackage name ps minstalled = do
                    "For "
                 <> fromPackageName name
                 <> ", successfully added package deps."
-              -- in curator builds we can't do all-in-one build as
-              -- test/benchmark failure could prevent library from being
-              -- available to its dependencies but when it's already available
-              -- it's OK to do that
-              splitRequired <- expectedTestOrBenchFailures <$> asks (.curator)
-              let isAllInOne = not splitRequired
               adr <- installPackageGivenDeps
-                isAllInOne lp.buildHaddocks ps tb minstalled deps
-              let finalAllInOne = not (isAdrToInstall adr && splitRequired)
+                lp.buildHaddocks ps tb minstalled deps
               -- FIXME: this redundantly adds the deps (but they'll all just
               -- get looked up in the map)
-              addFinal lp tb finalAllInOne False
+              addFinal lp tb False
               pure $ Right adr
             Left _ -> do
-              -- Reset the state to how it was before attempting to find an
-              -- all-in-one build plan.
+              -- Reset the state to how it was before attempting to find a
+              -- combined build plan.
               logDebugPlanS "installPackage" $
                    "Before trying cyclic plan, resetting lib result map to: "
                 <> fromString (show libMap)
@@ -717,49 +753,40 @@ installPackage name ps minstalled = do
               -- Otherwise, fall back on building the tests / benchmarks in a
               -- separate step.
               res' <- resolveDepsAndInstall
-                False lp.buildHaddocks ps lp.package minstalled
+                lp.buildHaddocks ps lp.package minstalled
               when (isRight res') $ do
                 -- Insert it into the map so that it's available for addFinal.
                 updateLibMap name res'
-                addFinal lp tb False False
+                addFinal lp tb False
               pure res'
- where
-  expectedTestOrBenchFailures maybeCurator = fromMaybe False $ do
-    curator <- maybeCurator
-    pure $  Set.member name curator.expectTestFailure
-         || Set.member name curator.expectBenchmarkFailure
 
 resolveDepsAndInstall ::
      Bool
-     -- ^ will the build step also build any tests?
-  -> Bool
      -- ^ Should Haddock documentation be built?
   -> PackageSource
   -> Package
   -> Maybe Installed
   -> M (Either ConstructPlanException AddDepRes)
-resolveDepsAndInstall isAllInOne buildHaddocks ps package minstalled =
+resolveDepsAndInstall buildHaddocks ps package minstalled =
   addPackageDeps package >>= \case
     Left err -> pure $ Left err
     Right deps ->
       Right <$>
         installPackageGivenDeps
-          isAllInOne buildHaddocks ps package minstalled deps
+          buildHaddocks ps package minstalled deps
 
 -- | Checks if we need to install the given t'Package', given the results of
 -- 'addPackageDeps'. If dependencies are missing, the package is dirty, or it is
 -- not installed, then it needs to be installed.
 installPackageGivenDeps ::
      Bool
-     -- ^ will the build step also build any tests?
-  -> Bool
      -- ^ Should Haddock documentation be built?
   -> PackageSource
   -> Package
   -> Maybe Installed
   -> MissingPresentDeps
   -> M AddDepRes
-installPackageGivenDeps allInOne buildHaddocks ps package minstalled
+installPackageGivenDeps buildHaddocks ps package minstalled
   (MissingPresentDeps missing present minMutable) = do
     let name = package.name
     mRightVersionInstalled <- case minstalled of
@@ -788,6 +815,7 @@ installPackageGivenDeps allInOne buildHaddocks ps package minstalled
             , isLocalNonExtraDep = psLocal ps
             , isMutable
             , pkgConfigOpts
+            , instantiationDeps = []
             }
     pure $ case mRightVersionInstalled of
       Just installed -> ADRFound loc installed
@@ -801,14 +829,47 @@ installPackageGivenDeps allInOne buildHaddocks ps package minstalled
                 TTLocalMutable lp
               PSRemote pkgLoc _version _fromSnapshot _cp ->
                 TTRemotePackage isMutable package pkgLoc
-        , allInOne
         , cachePkgSrc = toCachePkgSrc ps
         , buildTypeConfig = packageBuildTypeConfig package
+        , backpackInstEntries = []
         }
 
 -- | Is the build type of the package Configure
 packageBuildTypeConfig :: Package -> Bool
 packageBuildTypeConfig pkg = pkg.buildType == Configure
+
+-- | Whether a package should be split into per-component tasks. Only local
+-- packages with Simple build type and no intra-package dependencies (Backpack)
+-- are split. Remote packages, Custom/Hooks/Make build types, and Backpack
+-- packages get a single task.
+shouldSplitComponents :: Package -> Bool
+shouldSplitComponents pkg =
+  pkg.buildType == Simple && not (hasIntraPackageDeps pkg)
+
+-- | Expand an AddDepRes into per-component (ComponentKey, AddDepRes) pairs.
+-- For local Simple packages without intra-package deps, creates one entry per
+-- buildable component (lib, sub-libs, foreign libs, exes). Everything else
+-- gets a single CLib entry.
+expandToComponentKeys ::
+     PackageName -> AddDepRes -> [(ComponentKey, AddDepRes)]
+expandToComponentKeys name adr = case adr of
+  ADRToInstall task -> case task.taskType of
+    TTLocalMutable lp
+      | shouldSplitComponents lp.package ->
+          let pkg = lp.package
+              libComps = [CLib | hasBuildableMainLibrary pkg]
+              subLibComps =
+                map CSubLib $ Set.toList $ buildableSubLibs pkg
+              flibComps =
+                map CFlib $ Set.toList $ buildableForeignLibs pkg
+              exeComps =
+                map CExe $ Set.toList $ buildableExes pkg
+              allComps = libComps ++ subLibComps ++ flibComps ++ exeComps
+          in  case allComps of
+                [] -> [(ComponentKey name CLib, adr)]
+                _  -> map (\comp -> (ComponentKey name comp, adr)) allComps
+    _ -> [(ComponentKey name CLib, adr)]
+  _ -> [(ComponentKey name CLib, adr)]
 
 -- Update response in the library map. If it is an error, and there's already an
 -- error about cyclic dependencies, prefer the cyclic error.

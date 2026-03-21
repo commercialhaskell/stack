@@ -29,9 +29,11 @@ import           Stack.PackageDump
                    )
 import           Stack.Prelude
 import           Stack.Types.CompilerPaths ( GhcPkgExe (..) )
-import           Stack.Types.GhcPkgId ( parseGhcPkgId )
+import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId )
 import           Test.Hspec
-                   ( Spec, describe, hspec, it, shouldBe )
+                   ( Spec, anyException, describe, hspec, it, shouldBe
+                   , shouldThrow
+                   )
 import           Test.Hspec.QuickCheck ( prop )
 
 main :: IO ()
@@ -221,6 +223,22 @@ spec = do
             , exposedModules = Set.fromList ["GHC.Lexeme", "GHC.PackageDb"]
             }
 
+
+    describe "parseGhcPkgId" $ do
+        it "parses traditional package ID" $ do
+            gpkgId <- parseGhcPkgId "base-4.7.0.2-bfd89587617e381ae01b8dd7b6c7f1c1"
+            show gpkgId `shouldBe` show ("base-4.7.0.2-bfd89587617e381ae01b8dd7b6c7f1c1" :: String)
+
+        it "parses Backpack instantiated unit ID with '+'" $ do
+            gpkgId <- parseGhcPkgId "private-backpack-0.1.0.0-str-sig+8GTPQYg43xPFNOuG93VVSN"
+            show gpkgId `shouldBe` show ("private-backpack-0.1.0.0-str-sig+8GTPQYg43xPFNOuG93VVSN" :: String)
+
+        it "parses unit ID with only '+'" $ do
+            gpkgId <- parseGhcPkgId "pkg+hash"
+            show gpkgId `shouldBe` show ("pkg+hash" :: String)
+
+        it "rejects empty string" $ do
+            (parseGhcPkgId "" :: IO GhcPkgId) `shouldThrow` anyException
 
     it "sinkMatching" $ runEnvNoLogging $ \pkgexe -> do
         m <- ghcPkgDump pkgexe []

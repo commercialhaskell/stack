@@ -150,3 +150,8 @@ someFunc of packageA's Lib module
     [extra-dep](../configure/yaml/project.md#extra-deps). Although both
     dependencies are local, the former is part of the project and the latter is
     not.
+
+Multi-package projects are also the natural setting for GHC's
+[Backpack](../topics/backpack.md) module system, where a signature package, an
+implementation package, and a consumer package each live in separate directories
+under the same `stack.yaml`.
