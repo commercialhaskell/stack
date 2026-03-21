@@ -179,9 +179,11 @@ tryGetConfigCache ::
      HasEnvConfig env
   => Path Abs Dir
      -- ^ Package directory.
+  -> ConfigCacheType
+     -- ^ Type of cache.
   -> RIO env (Maybe ConfigCache)
 tryGetConfigCache dir =
-  loadConfigCache $ configCacheKey dir ConfigCacheTypeConfig
+  loadConfigCache . configCacheKey dir
 
 -- | Try to read the modification time of the Cabal file from the last build.
 tryGetCabalMod ::
@@ -241,11 +243,13 @@ writeConfigCache ::
      HasEnvConfig env
   => Path Abs Dir
      -- ^ Package directory.
+  -> ConfigCacheType
+     -- ^ Type of cache.
   -> ConfigCache
      -- ^ Cabal configuration cache.
   -> RIO env ()
-writeConfigCache dir =
-  saveConfigCache (configCacheKey dir ConfigCacheTypeConfig)
+writeConfigCache dir cacheType =
+  saveConfigCache (configCacheKey dir cacheType)
 
 -- | See 'tryGetCabalMod'
 writeCabalMod ::
@@ -288,13 +292,15 @@ deleteCaches ::
      HasEnvConfig env
   => Path Abs Dir
      -- ^ Package directory.
+  -> ConfigCacheType
+     -- ^ Type of cache.
   -> RIO env ()
-deleteCaches dir =
+deleteCaches dir cacheType =
   {- FIXME confirm that this is acceptable to remove
   bfp <- buildCacheFile dir
   removeFileIfExists bfp
   -}
-  deactiveConfigCache $ configCacheKey dir ConfigCacheTypeConfig
+  deactiveConfigCache $ configCacheKey dir cacheType
 
 -- | For the given installed item, yields the key used to retrieve a record from
 -- the library Cabal flag cache or executable Cabal flag cache.

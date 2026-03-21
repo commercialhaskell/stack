@@ -1,0 +1,22 @@
+cabal-version: 3.0
+name:          consumer
+version:       0.1.0.0
+build-type:    Simple
+
+-- A package that depends on provider's sub-library "utils" directly,
+-- NOT on provider's main library. This tests cross-package sub-library
+-- dependency resolution.
+
+library
+  exposed-modules: Consumer
+  build-depends:   base >=4.14,
+                   provider:utils
+  hs-source-dirs:  src/main
+  default-language: Haskell2010
+
+executable consumer-demo
+  main-is:         Main.hs
+  build-depends:   base >=4.14,
+                   consumer
+  hs-source-dirs:  src/exe
+  default-language: Haskell2010

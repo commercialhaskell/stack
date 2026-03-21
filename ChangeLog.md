@@ -8,6 +8,17 @@ Release notes:
 
 Major changes:
 
+* Stack now supports GHC's Backpack module system for cross-package use. When a
+  package uses `signatures` and `mixins` to depend on an abstract interface
+  provided by another package, Stack automatically creates the extra
+  instantiation build steps that Cabal requires. This includes support for
+  explicit renaming, multiple instantiations of the same indefinite package,
+  transitive signature chains, sub-library signatures, and indefinite packages
+  from Hackage or snapshots. See the
+  [Backpack topic](https://docs.haskellstack.org/en/stable/topics/backpack/) for
+  details. (Private Backpack — where signatures and implementations live in the
+  same package — has always worked without changes.)
+
 Behavior changes:
 
 * Stack's default Nix integration now includes the `cacert` Nix package, in
