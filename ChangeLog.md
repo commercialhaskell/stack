@@ -23,6 +23,10 @@ Other enhancements:
 * Add option `--reach <packages>` to Stack's `dot` and `ls dependencies`
   commands, to prune packages that cannot reach any of the specified packages in
   the dependency graph.
+* Add option `--test-suite-timeout-grace ARG` (and corresponding non-project
+  configuration key `test-suite-timeout-grace`) to pair with
+  `--test-suite-timeout ARG` and perform staged timeout termination for test
+  suites.
 
 Bug fixes:
 

@@ -115,6 +115,8 @@ data TestOpts = TestOpts
   , coverage :: !Bool -- ^ Generate a code coverage report
   , runTests :: !Bool -- ^ Enable running of tests
   , maximumTimeSeconds :: !(Maybe Int) -- ^ test suite timeout in seconds
+  , timeoutGraceSeconds :: !(Maybe Int)
+    -- ^ additional grace period after timeout before force-killing
   , allowStdin :: !Bool -- ^ Whether to allow standard input
   }
   deriving (Eq, Show)

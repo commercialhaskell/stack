@@ -74,6 +74,7 @@ defaultTestOpts = TestOpts
   , coverage = defaultFirstFalse toMonoid.coverage
   , runTests = defaultFirstTrue toMonoid.runTests
   , maximumTimeSeconds = Nothing
+  , timeoutGraceSeconds = Nothing
   , allowStdin = defaultFirstTrue toMonoid.allowStdin
   }
  where

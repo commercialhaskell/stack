@@ -47,6 +47,11 @@ testOptsParser hide0 = TestOptsMonoid
         <> help "Maximum test suite run time in seconds."
         <> hide
         ))
+  <*> optionalFirst (option (fmap Just auto)
+        (  long "test-suite-timeout-grace"
+        <> help "Grace period in seconds after timeout before force termination."
+        <> hide
+        ))
   <*> firstBoolFlagsTrue
         "tests-allow-stdin"
         "allow standard input in test suites."

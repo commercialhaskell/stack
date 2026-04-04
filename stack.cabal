@@ -509,6 +509,7 @@ library
     cpp-options: -DSTACK_DISABLE_STACK_UPLOAD=False
   if os(windows)
     other-modules:
+        Stack.Build.TestSuiteTimeout
         Stack.Constants.UsrLibDirs
         Stack.Docker.Handlers
         System.Posix.User
@@ -517,6 +518,7 @@ library
         src/windows/
   else
     other-modules:
+        Stack.Build.TestSuiteTimeout
         Stack.Constants.UsrLibDirs
         Stack.Docker.Handlers
         System.Uname
