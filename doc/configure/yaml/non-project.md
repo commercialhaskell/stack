@@ -209,6 +209,8 @@ build:
     additional-args: []
     coverage: false
     no-run-tests: false
+    # The option is ignored if the specified number of seconds is not positive:
+    test-suite-timeout: 0
   bench: false
   benchmark-opts:
 
