@@ -817,6 +817,15 @@ command line arguments:
     RTS options must be quoted to prevent the RTS extracting them as its own
     when the Stack executable is run.
 
+### `--test-suite-timeout` option
+
+Default: None
+
+`stack build --test --test-suite-timeout=<seconds>` wraps each running test
+suite in a timeout so that the test suite fails if no result is available within
+the specified number of seconds. The option is ignored if the number of seconds
+is not positive.
+
 ## Flags affecting GHC's behaviour
 
 ### `--[no-]executable-profiling` flag
