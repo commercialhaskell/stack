@@ -827,6 +827,16 @@ suite in a timeout so that the test suite fails if no result is available within
 the specified number of seconds. The option is ignored if the number of seconds
 is not positive.
 
+### `--test-suite-timeout-grace` option
+
+Default: None
+
+`stack build --test --test-suite-timeout=<seconds> --test-suite-timeout-grace=<seconds>`
+uses staged timeout termination for each running test suite: after
+`--test-suite-timeout` is reached, Stack waits the specified grace period before
+force termination. The option is ignored if the number of seconds is not
+positive.
+
 ## Flags affecting GHC's behaviour
 
 ### `--[no-]executable-profiling` flag

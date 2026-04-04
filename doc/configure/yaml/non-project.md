@@ -217,7 +217,8 @@ build:
     # The option is ignored if the specified number of seconds is not positive:
     test-suite-timeout: 0
     # Grace period in seconds after test-suite-timeout before force kill.
-    test-suite-timeout-grace: 1
+    # Ignored if not positive, or if test-suite-timeout is not positive.
+    test-suite-timeout-grace: 0
   bench: false
   benchmark-opts:
 
