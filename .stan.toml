@@ -151,7 +151,7 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-tuE+RG-250:24"
+  id = "OBS-STAN-0203-tuE+RG-252:24"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecutePackage.hs
@@ -269,7 +269,7 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-80:14"
+  id = "OBS-STAN-0212-FNS1cF-81:14"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src\Stack\BuildOpts.hs
@@ -280,7 +280,7 @@
 
 # Anti-pattern: unsafe functions
 [[ignore]]
-  id = "OBS-STAN-0212-FNS1cF-91:15"
+  id = "OBS-STAN-0212-FNS1cF-92:15"
 # ✦ Description:   Usage of unsafe functions breaks referential transparency
 # ✦ Category:      #Unsafe #AntiPattern
 # ✦ File:          src/Stack/BuildOpts.hs

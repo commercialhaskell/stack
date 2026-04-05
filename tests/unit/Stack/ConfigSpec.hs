@@ -90,6 +90,7 @@ buildOptsConfig =
   "    additional-args: ['-fprof']\n" ++
   "    coverage: true\n" ++
   "    no-run-tests: true\n" ++
+  "    test-suite-timeout-grace: 30\n" ++
   "  bench: true\n" ++
   "  benchmark-opts:\n" ++
   "    benchmark-arguments: -O2\n" ++
@@ -259,6 +260,7 @@ spec = beforeAll setup $ do
           , coverage = True
           , runTests = False
           , maximumTimeSeconds = Nothing
+          , timeoutGraceSeconds = Just 30
           , allowStdin = True
           }
         bopts.benchmarks `shouldBe` True

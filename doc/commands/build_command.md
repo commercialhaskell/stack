@@ -18,6 +18,7 @@ stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
             [--[no-]keep-going] [--[no-]keep-tmp-files] [--[no-]force-dirty]
             [--[no-]test] [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS]
             [--coverage] [--[no-]run-tests] [--test-suite-timeout ARG]
+            [--test-suite-timeout-grace ARG]
             [--[no-]tests-allow-stdin] [--[no-]bench]
             [--ba|--benchmark-arguments BENCH_ARGS] [--[no-]run-benchmarks]
             [--[no-]reconfigure] [--cabal-verbosity VERBOSITY |
@@ -825,6 +826,16 @@ Default: None
 suite in a timeout so that the test suite fails if no result is available within
 the specified number of seconds. The option is ignored if the number of seconds
 is not positive.
+
+### `--test-suite-timeout-grace` option
+
+Default: None
+
+`stack build --test --test-suite-timeout=<seconds> --test-suite-timeout-grace=<seconds>`
+uses staged timeout termination for each running test suite: after
+`--test-suite-timeout` is reached, Stack waits the specified grace period before
+force termination. The option is ignored if the number of seconds is not
+positive.
 
 ## Flags affecting GHC's behaviour
 

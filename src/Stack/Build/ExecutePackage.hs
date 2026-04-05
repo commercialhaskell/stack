@@ -68,6 +68,8 @@ import           Stack.Build.ExecuteEnv
                    ( ExcludeTHLoading (..), ExecuteEnv (..), KeepOutputOpen (..)
                    , OutputType (..), withSingleContext
                    )
+import           Stack.Build.TestSuiteTimeout
+                   ( forceKill, prepareForEscalation, terminateGracefully )
 import           Stack.Build.Source ( addUnlistedToBuildCache )
 import           Stack.Config.ConfigureScript ( ensureConfigureScript )
 import           Stack.ConfigureOpts
@@ -1156,13 +1158,47 @@ singleTest topts testsToRun ac ee task installedMap = do
                         )
                         createSource
                       OTLogFile _ h -> Nothing <$ useHandleOpen h
-                    optionalTimeout action
+                    runOutput p =
+                      case (getStdout p, getStderr p) of
+                        (Nothing, Nothing) -> pure ()
+                        (Just x, Just y) -> concurrently_ x y
+                        (x, y) -> assert False $
+                          concurrently_
+                            (fromMaybe (pure ()) x)
+                            (fromMaybe (pure ()) y)
+                    timeoutWithGrace p maxSecs graceSecs = do
+                      mExit <- timeout (maxSecs * 1000000) (waitExitCode p)
+                      case mExit of
+                        Just ec -> pure (Just ec)
+                        Nothing -> do
+                          terminateGracefully p
+                          mGraceExit <- timeout (graceSecs * 1000000)
+                            (waitExitCode p)
+                          case mGraceExit of
+                            Just _ -> pure Nothing
+                            Nothing -> do
+                              forceKill p
+                              void $ waitExitCode p
+                              pure Nothing
+                    runWithTimeout pc
+                      | Just maxSecs <- topts.maximumTimeSeconds, maxSecs > 0
+                      , Just graceSecs <- topts.timeoutGraceSeconds
+                      , graceSecs > 0 =
+                          withProcessWait (prepareForEscalation pc) $ \p -> do
+                            (_, mec') <- concurrently
+                              (runOutput p)
+                              (timeoutWithGrace p maxSecs graceSecs)
+                            pure mec'
                       | Just maxSecs <- topts.maximumTimeSeconds, maxSecs > 0 =
-                          timeout (maxSecs * 1000000) action
-                      | otherwise = Just <$> action
+                          timeout (maxSecs * 1000000) $
+                            withProcessWait pc $ \p -> do
+                              runOutput p
+                              waitExitCode p
+                      | otherwise =
+                          Just <$> withProcessWait pc (\p -> runOutput p *> waitExitCode p)
 
                 mec <- withWorkingDir (toFilePath pkgDir) $
-                  optionalTimeout $ proc (toFilePath exePath) args $ \pc0 -> do
+                  proc (toFilePath exePath) args $ \pc0 -> do
                     changeStdin <-
                       if isTestTypeLib
                         then do
@@ -1185,15 +1221,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                            $ setStdout output
                            $ setStderr output
                              pc0
-                    withProcessWait pc $ \p -> do
-                      case (getStdout p, getStderr p) of
-                        (Nothing, Nothing) -> pure ()
-                        (Just x, Just y) -> concurrently_ x y
-                        (x, y) -> assert False $
-                          concurrently_
-                            (fromMaybe (pure ()) x)
-                            (fromMaybe (pure ()) y)
-                      waitExitCode p
+                    runWithTimeout pc
                 -- Add a trailing newline, incase the test
                 -- output didn't finish with a newline.
                 case outputType of

@@ -135,6 +135,10 @@ testOptsFromMonoid toMonoid madditional = defaultTestOpts
       fromFirst
         defaultTestOpts.maximumTimeSeconds
         toMonoid.maximumTimeSeconds
+  , TestOpts.timeoutGraceSeconds =
+      fromFirst
+        defaultTestOpts.timeoutGraceSeconds
+        toMonoid.timeoutGraceSeconds
   , TestOpts.allowStdin = fromFirstTrue toMonoid.allowStdin
   }
 

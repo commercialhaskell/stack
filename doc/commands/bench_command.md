@@ -17,6 +17,7 @@ stack bench [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
             [--[no-]keep-going] [--[no-]keep-tmp-files] [--[no-]force-dirty]
             [--[no-]test] [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS]
             [--coverage] [--[no-]run-tests] [--test-suite-timeout ARG]
+            [--test-suite-timeout-grace ARG]
             [--[no-]tests-allow-stdin] [--[no-]bench]
             [--ba|--benchmark-arguments BENCH_ARGS] [--[no-]run-benchmarks]
             [--[no-]reconfigure] [--cabal-verbosity VERBOSITY |

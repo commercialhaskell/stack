@@ -274,6 +274,7 @@ data TestOptsMonoid = TestOptsMonoid
   , coverage :: !FirstFalse
   , runTests :: !FirstTrue
   , maximumTimeSeconds :: !(First (Maybe Int))
+  , timeoutGraceSeconds :: !(First (Maybe Int))
   , allowStdin :: !FirstTrue
   }
   deriving (Show, Generic)
@@ -285,6 +286,7 @@ instance FromJSON (WithJSONWarnings TestOptsMonoid) where
     coverage <- FirstFalse <$> o ..:? coverageArgName
     runTests <- FirstTrue . (not <$>) <$> o ..:? noRunTestsArgName
     maximumTimeSeconds <- First <$> o ..:? maximumTimeSecondsArgName
+    timeoutGraceSeconds <- First <$> o ..:? timeoutGraceSecondsArgName
     allowStdin <- FirstTrue <$> o ..:? testsAllowStdinName
     pure TestOptsMonoid
       { rerunTests
@@ -292,6 +294,7 @@ instance FromJSON (WithJSONWarnings TestOptsMonoid) where
       , coverage
       , runTests
       , maximumTimeSeconds
+      , timeoutGraceSeconds
       , allowStdin
       }
 
@@ -309,6 +312,9 @@ noRunTestsArgName = "no-run-tests"
 
 maximumTimeSecondsArgName :: Text
 maximumTimeSecondsArgName = "test-suite-timeout"
+
+timeoutGraceSecondsArgName :: Text
+timeoutGraceSecondsArgName = "test-suite-timeout-grace"
 
 testsAllowStdinName :: Text
 testsAllowStdinName = "tests-allow-stdin"
