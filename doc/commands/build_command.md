@@ -17,13 +17,13 @@ stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
             [--[no-]copy-bins] [--[no-]copy-compiler-tool] [--[no-]prefetch]
             [--[no-]keep-going] [--[no-]keep-tmp-files] [--[no-]force-dirty]
             [--[no-]test] [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS]
-            [--coverage] [--[no-]run-tests] [--test-suite-timeout ARG]
-            [--test-suite-timeout-grace ARG]
-            [--[no-]tests-allow-stdin] [--[no-]bench]
-            [--ba|--benchmark-arguments BENCH_ARGS] [--[no-]run-benchmarks]
-            [--[no-]reconfigure] [--cabal-verbosity VERBOSITY |
-              --[no-]cabal-verbose] [--[no-]split-objs] [--skip ARG]
-            [--[no-]interleaved-output] [--ddump-dir ARG]
+            [--coverage] [--[no-]run-tests] [--test-suite-timeout SECONDS]
+            [--test-suite-timeout-grace SECONDS] [--[no-]tests-allow-stdin]
+            [--[no-]bench] [--ba|--benchmark-arguments BENCH_ARGS]
+            [--[no-]run-benchmarks] [--[no-]reconfigure]
+            [--cabal-verbosity VERBOSITY | --[no-]cabal-verbose]
+            [--[no-]split-objs] [--skip ARG] [--[no-]interleaved-output]
+            [--ddump-dir ARG]
 ~~~
 
 `stack build` and its synonyms (`stack test`, `stack bench`, `stack haddock` and
@@ -827,14 +827,22 @@ suite in a timeout so that the test suite fails if no result is available within
 the specified number of seconds. The option is ignored if the number of seconds
 is not positive.
 
+!!! note
+
+    The `--test-suite-timeout` option, in isolation, is not guaranteed to
+    terminate a timed-out test suite process. In that regard, see the
+    [`--test-suite-timeout-grace`](#-test-suite-timeout-option).
+
 ### `--test-suite-timeout-grace` option
 
 Default: None
 
 `stack build --test --test-suite-timeout=<seconds> --test-suite-timeout-grace=<seconds>`
-uses staged timeout termination for each running test suite: after
-`--test-suite-timeout` is reached, Stack waits the specified grace period before
-force termination. The option is ignored if the number of seconds is not
+uses staged timeout termination for each running test suite: if
+[`--test-suite-timeout`](#-test-suite-timeout-option) causes the test suite to
+fail, Stack requests the termination of the test suite process and waits the
+specified number of seconds as a grace period before termination of the
+process is forced. The option is ignored if the number of seconds is not
 positive.
 
 ## Flags affecting GHC's behaviour

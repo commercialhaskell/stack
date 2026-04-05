@@ -44,12 +44,15 @@ testOptsParser hide0 = TestOptsMonoid
         hide
   <*> optionalFirst (option (fmap Just auto)
         (  long "test-suite-timeout"
-        <> help "Maximum test suite run time in seconds."
+        <> metavar "SECONDS"
+        <> help "For each test suite, maximum run time before it fails."
         <> hide
         ))
   <*> optionalFirst (option (fmap Just auto)
         (  long "test-suite-timeout-grace"
-        <> help "Grace period in seconds after timeout before force termination."
+        <> metavar "SECONDS"
+        <> help "Request termination of timed-out test suite process. Grace \
+                \period after timeout before termination is forced."
         <> hide
         ))
   <*> firstBoolFlagsTrue

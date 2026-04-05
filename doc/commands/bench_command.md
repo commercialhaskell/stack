@@ -16,13 +16,13 @@ stack bench [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
             [--[no-]copy-bins] [--[no-]copy-compiler-tool] [--[no-]prefetch]
             [--[no-]keep-going] [--[no-]keep-tmp-files] [--[no-]force-dirty]
             [--[no-]test] [--[no-]rerun-tests] [--ta|--test-arguments TEST_ARGS]
-            [--coverage] [--[no-]run-tests] [--test-suite-timeout ARG]
-            [--test-suite-timeout-grace ARG]
-            [--[no-]tests-allow-stdin] [--[no-]bench]
-            [--ba|--benchmark-arguments BENCH_ARGS] [--[no-]run-benchmarks]
-            [--[no-]reconfigure] [--cabal-verbosity VERBOSITY |
-              --[no-]cabal-verbose] [--[no-]split-objs] [--skip ARG]
-            [--[no-]interleaved-output] [--ddump-dir ARG]
+            [--coverage] [--[no-]run-tests] [--test-suite-timeout SECONDS]
+            [--test-suite-timeout-grace SECONDS] [--[no-]tests-allow-stdin]
+            [--[no-]bench] [--ba|--benchmark-arguments BENCH_ARGS]
+            [--[no-]run-benchmarks] [--[no-]reconfigure]
+            [--cabal-verbosity VERBOSITY | --[no-]cabal-verbose]
+            [--[no-]split-objs] [--skip ARG] [--[no-]interleaved-output]
+            [--ddump-dir ARG]
 ~~~
 
 `stack bench` is a synonym for `stack build --bench`. For further information,
