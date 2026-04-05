@@ -7,6 +7,8 @@ import Control.Monad (unless)
 
 main :: IO ()
 main = do
+  stack ["test", "--no-run-tests"] -- pre-build to avoid counting build time in the test
+
   start <- getCurrentTime
   errRef <- newIORef ""
   stackErrStderr
@@ -21,6 +23,8 @@ main = do
   let errLower = map toLower err
       elapsedSecs :: Double
       elapsedSecs = realToFrac (diffUTCTime end start)
+
+  logInfo $ "Elapsed time: " ++ show elapsedSecs ++ "s"
 
   unless ("timed out" `isInfixOf` errLower) $
     error "Expected test-suite timeout message in stderr output."
