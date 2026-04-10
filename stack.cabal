@@ -108,6 +108,7 @@ extra-source-files:
     doc/README.md
     doc/SIGNING_KEY.md
     doc/topics/azure_ci.md
+    doc/topics/backpack.md
     doc/topics/CI.md
     doc/topics/custom_snapshot.md
     doc/topics/debugging.md
