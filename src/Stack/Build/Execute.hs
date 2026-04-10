@@ -18,6 +18,10 @@ module Stack.Build.Execute
   -- * Running Setup.hs
   , ExcludeTHLoading (..)
   , KeepOutputOpen (..)
+  -- * Exported for testing
+  , missingToDeps
+  , intraPackageDeps
+  , finalTestsAndBenches
   ) where
 
 import           Control.Concurrent.Execute
@@ -81,13 +85,14 @@ import           Stack.Types.Installed
                    ( InstallLocation (..), InstalledMap
                    , installedPackageIdentifier
                    )
-import           Stack.Types.NamedComponent
-                   ( NamedComponent, benchComponents, testComponents )
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), packageIdentifier )
+import           Stack.Types.NamedComponent
+                   ( NamedComponent (..), benchComponents, testComponents )
 import           Stack.Types.Plan
-                   ( Plan (..), Task (..), TaskConfigOpts (..), TaskType (..)
-                   , taskLocation, taskProvides
+                   ( ComponentKey (..), Plan (..), Task (..)
+                   , TaskConfigOpts (..), TaskType (..)
+                   , componentKeyPkgName, taskLocation, taskProvides
                    )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( terminalL, viewExecutablePath )
@@ -286,7 +291,7 @@ executePlan
  where
   mlargestPackageName =
     Set.lookupMax $
-    Set.map (length . packageNameString) $
+    Set.map (length . packageNameString . componentKeyPkgName) $
     Map.keysSet plan.tasks <> Map.keysSet plan.finals
 
 copyExecutables ::
@@ -406,8 +411,10 @@ executePlan' installedMap0 targets plan ee = do
                  then pure Nothing
                  else Just <$> liftIO (newMVar ())
 
-  let actions = concatMap (toActions installedMap' mtestLock run ee) $
-        Map.elems $ Map.merge
+  let taskKeys = Map.keysSet plan.tasks
+      actions = concatMap
+        (uncurry $ toActions installedMap' mtestLock run ee taskKeys) $
+        Map.toList $ Map.merge
           (Map.mapMissing (\_ b -> (Just b, Nothing)))
           (Map.mapMissing (\_ f -> (Nothing, Just f)))
           (Map.zipWithMatched (\_ b f -> (Just b, Just f)))
@@ -447,7 +454,7 @@ executePlan' installedMap0 targets plan ee = do
             | otherwise = do
                 inProgress <- readTVarIO actionsVar
                 let packageNames = map
-                      (\(ActionId pkgID _) -> pkgName pkgID)
+                      (\(ActionId ck' _) -> componentKeyPkgName ck')
                       (toList inProgress)
                     nowBuilding :: [PackageName] -> Utf8Builder
                     nowBuilding []    = ""
@@ -500,8 +507,10 @@ executePlan' installedMap0 targets plan ee = do
         when buildOpts.openHaddocks $ do
           let planPkgs, localPkgs, installedPkgs, availablePkgs
                 :: Map PackageName (PackageIdentifier, InstallLocation)
-              planPkgs =
-                Map.map (taskProvides &&& taskLocation) plan.tasks
+              planPkgs = Map.fromList
+                [ (componentKeyPkgName ck, (taskProvides t, taskLocation t))
+                | (ck, t) <- Map.toList plan.tasks
+                ]
               localPkgs =
                 Map.fromList
                   [ (p.name, (packageIdentifier p, Local))
@@ -558,84 +567,88 @@ toActions ::
   -> Maybe (MVar ())
   -> (RIO env () -> IO ())
   -> ExecuteEnv
+  -> Set ComponentKey
+     -- ^ All component keys that have build tasks (not finals), used to
+     -- determine intra-package dependencies.
+  -> ComponentKey
   -> (Maybe Task, Maybe Task) -- build and final
   -> [Action]
-toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
+toActions installedMap mtestLock runInBase ee taskKeys ck (mbuild, mfinal) =
   abuild ++ afinal
  where
+  intraPackageDep = intraPackageDeps taskKeys ck
   abuild = case mbuild of
     Nothing -> []
     Just task ->
       [ Action
-          { actionId = ActionId (taskProvides task) ATBuild
+          { actionId = ActionId ck ATBuild
           , actionDeps =
-              Set.map (`ActionId` ATBuild) task.configOpts.missing
+              missingToDeps task.configOpts.missing
+              <> intraPackageDep
+              <> Set.fromList
+                   (map (`ActionId` ATBuild)
+                        task.configOpts.instantiationDeps)
           , action =
-              \ac -> runInBase $ singleBuild ac ee task installedMap False
+              \ac -> runInBase $ singleBuild ac ee task installedMap False ck
           , concurrency = ConcurrencyAllowed
           }
       ]
   afinal = case mfinal of
     Nothing -> []
-    Just task ->
-      ( if task.allInOne
-          then id
-          else (:) Action
-            { actionId = ActionId pkgId ATBuildFinal
-            , actionDeps = addBuild
-                (Set.map (`ActionId` ATBuild) task.configOpts.missing)
-            , action =
-                \ac -> runInBase $ singleBuild ac ee task installedMap True
-            , concurrency = ConcurrencyAllowed
-            }
-      ) $
+    Just task -> finalBuild ++ finalRun
+     where
+      (tests, benches) = finalTestsAndBenches ck (taskComponents task)
+      buildDep = Set.singleton (ActionId ck ATBuild)
+      -- When there's no library build task, we need our own build step for
+      -- tests/benchmarks. When there IS a library build, depend on it instead.
+      finalBuild = case mbuild of
+        Just _ -> []
+        Nothing ->
+          [ Action
+              { actionId = ActionId ck ATBuild
+              , actionDeps =
+                  missingToDeps task.configOpts.missing
+                  <> intraPackageDep
+                  <> Set.fromList
+                       (map (`ActionId` ATBuild)
+                            task.configOpts.instantiationDeps)
+              , action =
+                  \ac -> runInBase $ singleBuild ac ee task installedMap True ck
+              , concurrency = ConcurrencyAllowed
+              }
+          ]
       -- These are the "final" actions - running test suites and benchmarks,
       -- unless --no-run-tests or --no-run-benchmarks is enabled.
-      ( if Set.null tests || not runTests
-          then id
-          else (:) Action
-            { actionId = ActionId pkgId ATRunTests
-            , actionDeps = finalDeps
-            , action = \ac -> withLock mtestLock $ runInBase $
-                singleTest topts (Set.toList tests) ac ee task installedMap
-              -- Always allow tests tasks to run concurrently with other tasks,
-              -- particularly build tasks. Note that 'mtestLock' can optionally
-              -- make it so that only one test is run at a time.
-            , concurrency = ConcurrencyAllowed
-            }
-      ) $
-      ( if Set.null benches || not runBenchmarks
-          then id
-          else (:) Action
-            { actionId = ActionId pkgId ATRunBenchmarks
-            , actionDeps = finalDeps
-            , action = \ac -> runInBase $
-                singleBench
-                  beopts
-                  (Set.toList benches)
-                  ac
-                  ee
-                  task
-                  installedMap
-              -- Never run benchmarks concurrently with any other task, see
-              -- #3663
-            , concurrency = ConcurrencyDisallowed
-            }
-      )
-      []
-     where
-      pkgId = taskProvides task
-      comps = taskComponents task
-      tests = testComponents comps
-      benches = benchComponents comps
-      finalDeps =
-        if task.allInOne
-          then addBuild mempty
-          else Set.singleton (ActionId pkgId ATBuildFinal)
-      addBuild =
-        case mbuild of
-          Nothing -> id
-          Just _ -> Set.insert $ ActionId pkgId ATBuild
+      finalRun =
+           [ Action
+               { actionId = ActionId ck ATRunTests
+               , actionDeps = buildDep
+               , action = \ac -> withLock mtestLock $ runInBase $
+                   singleTest topts (Set.toList tests) ac ee task installedMap
+                 -- Always allow test tasks to run concurrently with other
+                 -- tasks, particularly build tasks. Note that 'mtestLock' can
+                 -- optionally make it so that only one test is run at a time.
+               , concurrency = ConcurrencyAllowed
+               }
+           | not (Set.null tests) && runTests
+           ]
+        ++ [ Action
+               { actionId = ActionId ck ATRunBenchmarks
+               , actionDeps = buildDep
+               , action = \ac -> runInBase $
+                   singleBench
+                     beopts
+                     (Set.toList benches)
+                     ac
+                     ee
+                     task
+                     installedMap
+               -- Never run benchmarks concurrently with any other task, see
+               -- #3663
+               , concurrency = ConcurrencyDisallowed
+               }
+           | not (Set.null benches) && runBenchmarks
+           ]
   withLock Nothing f = f
   withLock (Just lock) f = withMVar lock $ \() -> f
   bopts = ee.buildOpts
@@ -643,6 +656,39 @@ toActions installedMap mtestLock runInBase ee (mbuild, mfinal) =
   beopts = bopts.benchmarkOpts
   runTests = topts.runTests
   runBenchmarks = beopts.runBenchmarks
+
+-- | Map external package dependencies to ActionIds. External dependencies are
+-- always library dependencies, so each PackageIdentifier maps to a
+-- ComponentKey with CLib.
+missingToDeps :: Set PackageIdentifier -> Set ActionId
+missingToDeps = Set.map
+  (\pid -> ActionId (ComponentKey (pkgName pid) CLib) ATBuild)
+
+-- | Compute intra-package dependencies for a component. Non-CLib components
+-- depend on CLib ATBuild of the same package, if a CLib build task exists in
+-- the plan. CLib itself has no intra-package deps.
+intraPackageDeps :: Set ComponentKey -> ComponentKey -> Set ActionId
+intraPackageDeps taskKeys ck = case ck of
+  ComponentKey _ CLib -> Set.empty
+  ComponentKey name _ ->
+    let libKey = ComponentKey name CLib
+    in  if libKey `Set.member` taskKeys
+          then Set.singleton (ActionId libKey ATBuild)
+          else Set.empty
+
+-- | Determine which test suites and benchmarks should be run for a final
+-- action. For per-component CTest\/CBench keys, returns exactly that one
+-- component. For non-split CLib keys, returns all tests\/benches from the
+-- component set.
+finalTestsAndBenches ::
+     ComponentKey
+  -> Set NamedComponent
+  -> (Set StackUnqualCompName, Set StackUnqualCompName)
+     -- ^ (tests, benches)
+finalTestsAndBenches ck comps = case ck of
+  ComponentKey _ (CTest name) -> (Set.singleton name, Set.empty)
+  ComponentKey _ (CBench name) -> (Set.empty, Set.singleton name)
+  _ -> (testComponents comps, benchComponents comps)
 
 taskComponents :: Task -> Set NamedComponent
 taskComponents task =

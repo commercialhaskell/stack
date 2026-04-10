@@ -17,6 +17,8 @@ module Stack.Types.Plan
   , Task (..)
   , TaskType (..)
   , TaskConfigOpts (..)
+  , ComponentKey (..)
+  , componentKeyPkgName
   , taskAnyMissing
   , taskIsTarget
   , taskLocation
@@ -28,6 +30,7 @@ module Stack.Types.Plan
   ) where
 
 import           Data.List as L
+import           Distribution.ModuleName ( ModuleName )
 import qualified RIO.Set as Set
 import           Stack.Prelude
 import           Stack.Types.Cache ( CachePkgSrc )
@@ -37,15 +40,26 @@ import           Stack.Types.ConfigureOpts
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.IsMutable ( IsMutable (..) )
+import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.Package
                    ( InstallLocation (..), LocalPackage (..), Package (..)
                    , packageIdentifier
                    )
 
+-- | A key that identifies a single buildable unit in the plan. For most
+-- packages this is @ComponentKey pkgName CLib@. When per-component building
+-- is enabled (Phase 2 Backpack support), each component gets its own key.
+data ComponentKey = ComponentKey !PackageName !NamedComponent
+  deriving (Eq, Ord, Show)
+
+-- | Extract the package name from a 'ComponentKey'.
+componentKeyPkgName :: ComponentKey -> PackageName
+componentKeyPkgName (ComponentKey n _) = n
+
 -- | A complete plan of what needs to be built and how to do it
 data Plan = Plan
-  { tasks :: !(Map PackageName Task)
-  , finals :: !(Map PackageName Task)
+  { tasks :: !(Map ComponentKey Task)
+  , finals :: !(Map ComponentKey Task)
     -- ^ Final actions to be taken (test, benchmark, etc)
   , unregisterLocal :: !(Map GhcPkgId (PackageIdentifier, Text))
     -- ^ Text is reason we're unregistering, for display only
@@ -66,12 +80,13 @@ data Task = Task
   , present         :: !(Map PackageIdentifier GhcPkgId)
     -- ^ A dictionary of the package identifiers of already-installed
     -- dependencies, and their 'GhcPkgId'.
-  , allInOne        :: !Bool
-    -- ^ indicates that the package can be built in one step
   , cachePkgSrc     :: !CachePkgSrc
   , buildTypeConfig :: !Bool
     -- ^ Is the build type of this package Configure. Check out
     -- ensureConfigureScript in Stack.Build.Execute for the motivation
+  , backpackInstEntries :: ![(ModuleName, PackageName, ModuleName)]
+    -- ^ For CInst tasks: [(sigName, implPkgName, implModuleName)].
+    -- Empty for non-instantiation tasks.
   }
   deriving Show
 
@@ -88,11 +103,14 @@ data TaskType
 data TaskConfigOpts = TaskConfigOpts
   { missing :: !(Set PackageIdentifier)
     -- ^ Dependencies for which we don't yet have a 'GhcPkgId'
-  , envConfig :: !EnvConfig
-  , baseConfigOpts :: !BaseConfigOpts
+  , envConfig :: EnvConfig
+  , baseConfigOpts :: BaseConfigOpts
   , isLocalNonExtraDep :: !Bool
   , isMutable :: !IsMutable
   , pkgConfigOpts :: PackageConfigureOpts
+  , instantiationDeps :: ![ComponentKey]
+    -- ^ Additional deps on CInst tasks. Added to action deps at execution.
+    -- Empty for most tasks.
   }
 
 instance Show TaskConfigOpts where

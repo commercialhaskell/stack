@@ -1,0 +1,9 @@
+snapshot: ghc-9.10.3
+
+packages:
+- app
+- consumer-a
+- consumer-b
+- impl-a
+- impl-b
+- sig-pkg
