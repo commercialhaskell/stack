@@ -24,7 +24,6 @@ import           Distribution.Types.IncludeRenaming
 import           Distribution.Types.Mixin ( Mixin (..) )
 import           Distribution.Types.ModuleRenaming
                    ( ModuleRenaming (..) )
-import           Distribution.Types.LibraryName ( LibraryName (LMainLibName) )
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.Version ( mkVersion )
 import           Distribution.Types.VersionRange ( anyVersion )
