@@ -945,5 +945,6 @@ packageIsIndefinite :: Package -> Bool
 packageIsIndefinite pkg = any hasSignatures allLibs
  where
   hasSignatures lib = not (null lib.signatures)
-  allLibs = maybe [] (:[]) pkg.library
-         ++ toList pkg.subLibraries
+  allLibs =
+       maybeToList pkg.library
+    ++ toList pkg.subLibraries
