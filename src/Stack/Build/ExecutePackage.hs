@@ -1255,7 +1255,7 @@ singleTest topts testsToRun ac ee task installedMap = do
               else do
                 unless expectFailure $
                   logError $
-                    displayShow $ TestSuiteExeMissing
+                    fromString $ displayException $ TestSuiteExeMissing
                       (package.buildType == C.Simple)
                       exeName
                       (packageNameString package.name)
