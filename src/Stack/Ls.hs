@@ -223,7 +223,7 @@ handleRemote lsOpts = do
     LsStyles _ -> pure ()
     LsTools _ -> pure ()
  where
-  urlInfo = "https://www.stackage.org/snapshots"
+  urlInfo = "https://www.stackage.org/api/v1/snapshots"
 
 -- | Function underlying the @stack ls@ command.
 lsCmd :: LsCmdOpts -> RIO Runner ()
