@@ -282,6 +282,9 @@ configFromConfigMonoid
         latestSnapshot = fromFirst
           "https://stackage-haddock.haskell.org/snapshots.json"
           configMonoid.latestSnapshot
+        recentSnapshots = fromFirst
+          "https://www.stackage.org/api/v1/snapshots"
+          configMonoid.recentSnapshots
         clConnectionCount = fromFirst 8 configMonoid.connectionCount
         hideTHLoading = fromFirstTrue configMonoid.hideTHLoading
         prefixTimestamps = fromFirst False configMonoid.prefixTimestamps
@@ -596,6 +599,7 @@ configFromConfigMonoid
                 , ghcVariant
                 , ghcBuild
                 , latestSnapshot
+                , recentSnapshots
                 , systemGHC
                 , installGHC
                 , installMsys

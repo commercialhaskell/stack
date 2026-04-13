@@ -1586,17 +1586,28 @@ Default:
 ~~~yaml
 urls:
   latest-snapshot: https://stackage-haddock.haskell.org/snapshots.json
+  recent-snapshots: https://www.stackage.org/api/v1/snapshots
 ~~~
 
-Customize the URLs where Stack looks for snapshot build plans.
+Customize the URLs where Stack looks for information about available snapshots,
+either
+([:octicons-tag-24: 1.1.0](https://github.com/commercialhaskell/stack/releases/tag/v1.1.0))
+the latest LTS and Nightly snapshots (`latest-snapshots`) or
+(:octicons-tag-24: UNRELEASED) recently-published snapshots (`recent-snapshots`).
 
 !!! note
 
-    The default for Stack 1.3.0 to 2.15.3 was
+    The default for `latest-snapshots` for Stack 1.3.0 to 2.15.3 was
     https://s3.amazonaws.com/haddock.stackage.org/snapshots.json. Following the
     handover of the Stackage project to the Haskell Foundation in
     early 2024, the file at that URL may not be up to date. Users of those
     versions of Stack should configure the URL to be the default above.
+
+!!! note
+
+    The default for `recent-snapshots` for Stack 1.7.1 to 3.9.3 was
+    https://www.stackage.org/snapshots. The Stackage server API may cease to use
+    that end point in the future.
 
 ## with-gcc
 
