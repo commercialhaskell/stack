@@ -183,7 +183,7 @@ instance Exception BuildException where
       isSimpleBuildType $ concat
         [ "Test suite executable \""
         , exeName
-        , " not found for "
+        , "\" not found for "
         , pkgName'
         , ":test:"
         , testName
