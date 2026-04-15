@@ -194,6 +194,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-3421] = ParseFailure [Value]
+        [S-9131] | ParseRecentSnapshotsUrlFailed HttpException
         ~~~
 
     -   `Stack.New.NewPrettyException`

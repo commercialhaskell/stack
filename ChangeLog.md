@@ -12,6 +12,9 @@ Behavior changes:
 
 * Stack's default Nix integration now includes the `cacert` Nix package, in
   order to support Stack's use of `crypton-x509-system >= 1.6.8`.
+* Following a change to the Stackage project's server API, the default value of
+  the `urls` key includes
+  `recent-snapshots: https://stackage.org/api/v1/snapshots`.
 
 Other enhancements:
 
@@ -27,6 +30,9 @@ Other enhancements:
   request termination of a timed-out test suite process and, after the specified
   grace period, force termination. Used together with the existing
   `--test-suite-timeout=SECONDS` option.
+* In YAML configuration files, the `recent-snapshots` key is introduced (under
+  the `urls` key), to specify the URL used by Stack's `ls snapshots remote`
+  command.
 
 Bug fixes:
 

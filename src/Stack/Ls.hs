@@ -31,8 +31,8 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V
 import           Network.HTTP.StackClient
-                   ( addRequestHeader, hAccept, httpJSON, getResponseBody
-                   , parseRequest
+                   ( HttpException (..), addRequestHeader, getResponseBody
+                   , hAccept, httpJSON, parseUrlThrow
                    )
 import           Path ( parent )
 import           RIO.List ( sort )
@@ -48,7 +48,8 @@ import           Stack.Setup.Installed
 import           Stack.SourceMap ( globalsFromHints )
 import           Stack.Types.BuildConfig
                    ( BuildConfig (..), HasBuildConfig (..) )
-import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.Config
+                   ( Config (..), HasConfig (..), askRecentSnapshotsUrl )
 import           Stack.Types.DependencyTree
                    ( DependencyGraph, DependencyTree (..), DotPayload (..)
                    , licenseText, versionText
@@ -63,7 +64,7 @@ import           Stack.Types.LsOpts
                    , ListStylesOpts (..), ListToolsOpts (..), LsView (..)
                    , SnapshotOpts (..)
                    )
-import           Stack.Types.Runner ( HasRunner, Runner, terminalL )
+import           Stack.Types.Runner ( Runner, terminalL )
 import           Stack.Types.SourceMap ( SMWanted (..) )
 import           System.Console.ANSI.Codes
                    ( SGR (Reset), setSGRCode, sgrToCode )
@@ -73,8 +74,9 @@ import           System.IO ( putStrLn )
 
 -- | Type representing exceptions thrown by functions exported by the "Stack.Ls"
 -- module.
-newtype LsException
-  = ParseFailure [Value]
+data LsException
+  = ParseFailure ![Value]
+  | ParseRecentSnapshotsUrlFailed !HttpException
   deriving Show
 
 instance Exception LsException where
@@ -82,6 +84,11 @@ instance Exception LsException where
     "Error: [S-3421]\n"
     ++ "Failure to parse values as a snapshot: "
     ++ show val
+  displayException (ParseRecentSnapshotsUrlFailed e) =
+    "Error: [S-9131]\n"
+    ++ "While trying to parse the recent snapshots URL, Stack encountered the \
+       \following error:\n"
+    ++ displayException e
 
 -- | Type representing Stackage snapshot types.
 data SnapshotType
@@ -199,9 +206,12 @@ handleLocal lsOpts = do
     LsStyles _ -> pure ()
     LsTools _ -> pure ()
 
-handleRemote :: HasRunner env => LsCmdOpts -> RIO env ()
+handleRemote :: HasConfig env => LsCmdOpts -> RIO env ()
 handleRemote lsOpts = do
-  req <- liftIO $ parseRequest urlInfo
+  urlInfoText <- askRecentSnapshotsUrl
+  req <- catch
+    (parseUrlThrow $ T.unpack urlInfoText)
+    (throwM . ParseRecentSnapshotsUrlFailed)
   isStdoutTerminal <- view terminalL
   let req' = addRequestHeader hAccept "application/json" req
   result <- httpJSON req'
@@ -222,8 +232,6 @@ handleRemote lsOpts = do
     LsDependencies _ -> pure ()
     LsStyles _ -> pure ()
     LsTools _ -> pure ()
- where
-  urlInfo = "https://www.stackage.org/api/v1/snapshots"
 
 -- | Function underlying the @stack ls@ command.
 lsCmd :: LsCmdOpts -> RIO Runner ()
@@ -232,7 +240,7 @@ lsCmd lsOpts =
     LsSnapshot sopt ->
       case sopt.viewType of
         Local -> handleLocal lsOpts
-        Remote -> handleRemote lsOpts
+        Remote -> withConfig NoReexec $ handleRemote lsOpts
     LsGlobals globalsOpts -> withConfig NoReexec $ listGlobalsCmd globalsOpts
     LsDependencies depOpts -> listDependencies depOpts
     LsStyles stylesOpts -> withConfig NoReexec $ listStylesCmd stylesOpts

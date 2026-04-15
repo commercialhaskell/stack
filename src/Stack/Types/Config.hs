@@ -18,6 +18,7 @@ module Stack.Types.Config
     Config (..)
   , HasConfig (..)
   , askLatestSnapshotUrl
+  , askRecentSnapshotsUrl
   , configProjectRoot
   , ghcInstallHook
   -- * Lens helpers
@@ -95,6 +96,8 @@ data Config = Config
     -- tinfo6)
   , latestSnapshot          :: !Text
     -- ^ URL of a JSON file providing the latest LTS and Nightly snapshots.
+  , recentSnapshots         :: !Text
+    -- ^ URL of a JSON file providing recently-published snapshots.
   , systemGHC               :: !Bool
     -- ^ Should we use the system-installed GHC (on the PATH) if
     -- available? Can be overridden by command line options.
@@ -239,6 +242,10 @@ configProjectRoot c =
 -- | Get the URL to request the information on the latest snapshots
 askLatestSnapshotUrl :: (MonadReader env m, HasConfig env) => m Text
 askLatestSnapshotUrl = view $ configL . to (.latestSnapshot)
+
+-- | Get the URL to request the information on the recently-published snapshots
+askRecentSnapshotsUrl :: (MonadReader env m, HasConfig env) => m Text
+askRecentSnapshotsUrl = view $ configL . to (.recentSnapshots)
 
 -- | @STACK_ROOT\/hooks\/@
 hooksDir :: HasConfig env => RIO env (Path Abs Dir)

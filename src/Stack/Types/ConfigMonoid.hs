@@ -21,7 +21,7 @@ module Stack.Types.ConfigMonoid
   , configMonoidSystemGHCName
   ) where
 
-import           Data.Aeson.Types ( Object, Value )
+import           Data.Aeson.Types ( FromJSON (..), Object, Value )
 import           Data.Aeson.WarningParser
                    ( WarningParser, WithJSONWarnings, (..:?), (..!=)
                    , jsonSubWarnings, jsonSubWarningsT, withObjectWarnings
@@ -84,6 +84,8 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See: 'Stack.Types.Config.prefixTimestamps'
   , latestSnapshot          :: !(First Text)
     -- ^ See: 'Stack.Types.Config.latestSnapshot'
+  , recentSnapshots         :: !(First Text)
+    -- ^ See: 'Stack.Types.Config.recentSnapshots'
   , packageIndex            :: !(First PackageIndexConfig)
     -- ^ See: 'withPantryConfig'
   , systemGHC               :: !(First Bool)
@@ -228,6 +230,43 @@ instance Monoid ConfigMonoid where
   mempty = memptydefault
   mappend = (<>)
 
+-- | An uninterpreted representation of URLs options. Configurations may be
+-- "cascaded" using mappend (left-biased).
+data UrlsOptsMonoid = UrlsOptsMonoid
+  { latestSnapshot          :: !(First Text)
+    -- ^ See: 'Stack.Types.Config.latestSnapshot'
+  , recentSnapshots         :: !(First Text)
+    -- ^ See: 'Stack.Types.Config.recentSnapshots'
+  }
+  deriving Generic
+
+-- | Decode uninterpreted URLs options from JSON/YAML.
+instance FromJSON (WithJSONWarnings UrlsOptsMonoid) where
+  parseJSON = withObjectWarnings "UrlsOptsMonoid" $ \o -> do
+    latestSnapshot  <- First <$> o ..:? latestSnapshotArgName
+    recentSnapshots <- First <$> o ..:? recentSnapshotsArgName
+    pure UrlsOptsMonoid
+      { latestSnapshot
+      , recentSnapshots
+      }
+
+-- | Left-biased combine URLs options
+instance Semigroup UrlsOptsMonoid where
+  (<>) = mappenddefault
+
+-- | Left-biased combine URLs options
+instance Monoid UrlsOptsMonoid where
+  mempty = memptydefault
+  mappend = (<>)
+
+-- | URLs latest snapshots argument name.
+latestSnapshotArgName :: Text
+latestSnapshotArgName = "latest-snapshot"
+
+-- | URLs recent snapshots argument name.
+recentSnapshotsArgName :: Text
+recentSnapshotsArgName = "recent-snapshots"
+
 parseConfigMonoid ::
      Path Abs Dir
   -> Value
@@ -249,14 +288,10 @@ parseConfigMonoidObject rootDir obj = do
   connectionCount <- First <$> obj ..:? configMonoidConnectionCountName
   hideTHLoading <- FirstTrue <$> obj ..:? configMonoidHideTHLoadingName
   prefixTimestamps <- First <$> obj ..:? configMonoidPrefixTimestampsName
-
-  latestSnapshot <- obj ..:? configMonoidUrlsName >>= \case
-    Nothing -> pure $ First Nothing
-    Just urls -> jsonSubWarnings $ lift $ withObjectWarnings
-      "urls"
-      (\o -> First <$> o ..:? "latest-snapshot" :: WarningParser (First Text))
-      (urls :: Value)
-
+  urlsOpts :: UrlsOptsMonoid <-
+    jsonSubWarnings (obj ..:? configMonoidUrlsName ..!= mempty)
+  let latestSnapshot = urlsOpts.latestSnapshot
+      recentSnapshots = urlsOpts.recentSnapshots
   packageIndex <-
     First <$> jsonSubWarningsT (obj ..:?  configMonoidPackageIndexName)
   systemGHC <- First <$> obj ..:? configMonoidSystemGHCName
@@ -380,6 +415,7 @@ parseConfigMonoidObject rootDir obj = do
     , hideTHLoading
     , prefixTimestamps
     , latestSnapshot
+    , recentSnapshots
     , packageIndex
     , systemGHC
     , installGHC
