@@ -34,6 +34,8 @@ module Stack.Package
   , listOfPackageDeps
   , setOfPackageDeps
   , topSortPackageComponent
+  , hasIntraPackageDeps
+  , packageIsIndefinite
   ) where
 
 import qualified Data.Map.Strict as M
@@ -912,3 +914,36 @@ topProcessPackageComponent package target fn res = do
             processSubLibDep r = foldr' processSingleSubLib r subLibDeps
         processSubLibDep (processMainLibDep res')
       _ -> res'
+
+-- | Does this package have intra-package component dependencies that indicate
+-- Backpack or chained sub-libraries?  Specifically, checks whether the main
+-- library or any sub-library depends on the same package (indicating the
+-- library uses internal sub-libs, or sub-libraries chain among themselves).
+--
+-- Executables, tests, and benchmarks commonly depend on their own package's
+-- library via @build-depends: pkg-name@; this is normal and does NOT count as
+-- an intra-package dep for our purposes, because @cabal build exe:foo@ handles
+-- building the library first automatically.
+--
+-- When 'True', @Setup.hs build@ should be called without explicit component
+-- targets so that Cabal's internal build ordering (which handles Backpack
+-- instantiation) is used.
+hasIntraPackageDeps :: Package -> Bool
+hasIntraPackageDeps package =
+  packageIsIndefinite package || any hasSelfDep libraryBuildInfos
+ where
+  pname = package.name
+  hasSelfDep sbi = M.member pname sbi.dependency
+  libraryBuildInfos :: [Component.StackBuildInfo]
+  libraryBuildInfos =
+       maybe [] (\l -> [l.buildInfo]) package.library
+    ++ map (.buildInfo) (toList package.subLibraries)
+
+-- | Is this package indefinite (has unfilled Backpack signatures)?
+packageIsIndefinite :: Package -> Bool
+packageIsIndefinite pkg = any hasSignatures allLibs
+ where
+  hasSignatures lib = not (null lib.signatures)
+  allLibs =
+       maybeToList pkg.library
+    ++ toList pkg.subLibraries

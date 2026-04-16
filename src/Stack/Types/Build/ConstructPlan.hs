@@ -54,7 +54,7 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Plan
-                    ( Task (..), TaskType (..), taskProvides )
+                    ( ComponentKey, Task (..), TaskType (..), taskProvides )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 
@@ -95,9 +95,9 @@ type M =
 -- | Type representing values used as the output to be collected during the
 -- construction of a build plan.
 data W = W
-  { wFinals :: !(Map PackageName (Either ConstructPlanException Task))
-    -- ^ A dictionary of package names, and either a final task to perform when
-    -- building the package or an exception.
+  { wFinals :: !(Map ComponentKey (Either ConstructPlanException Task))
+    -- ^ A dictionary of component keys, and either a final task to perform when
+    -- building the component or an exception.
   , wInstall :: !(Map StackUnqualCompName InstallLocation)
     -- ^ A dictionary of executables to be installed, and location where the
     -- executable's binary is placed.

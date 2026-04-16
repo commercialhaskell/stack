@@ -1,0 +1,7 @@
+signature Str where
+
+data Str
+empty :: Str
+append :: Str -> Str -> Str
+toString :: Str -> String
+fromString :: String -> Str
