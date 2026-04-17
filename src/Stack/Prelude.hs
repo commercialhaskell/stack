@@ -38,6 +38,7 @@ module Stack.Prelude
   , ppException
   , prettyThrowIO
   , prettyThrowM
+  , prettyImpureThrow
   , mcons
   , MungedPackageId (..)
   , MungedPackageName (..)
@@ -133,8 +134,8 @@ import           RIO.PrettyPrint
                    )
 import           RIO.PrettyPrint.DefaultStyles (defaultStyles)
 import           RIO.PrettyPrint.PrettyException
-                   ( PrettyException (..), ppException, prettyThrowIO
-                   , prettyThrowM
+                   ( PrettyException (..), ppException, prettyImpureThrow
+                   , prettyThrowIO, prettyThrowM
                    )
 import           RIO.PrettyPrint.StylesUpdate
                    ( StylesUpdate (..), parseStylesUpdateFromString )

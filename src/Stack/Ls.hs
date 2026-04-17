@@ -72,23 +72,34 @@ import           System.Process.Pager ( pageText )
 import           System.Directory ( listDirectory )
 import           System.IO ( putStrLn )
 
--- | Type representing exceptions thrown by functions exported by the "Stack.Ls"
--- module.
-data LsException
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
+-- "Stack.Ls" module.
+data LsPrettyException
   = ParseFailure ![Value]
   | ParseRecentSnapshotsUrlFailed !HttpException
-  deriving Show
 
-instance Exception LsException where
-  displayException (ParseFailure val) =
-    "Error: [S-3421]\n"
-    ++ "Failure to parse values as a snapshot: "
-    ++ show val
-  displayException (ParseRecentSnapshotsUrlFailed e) =
-    "Error: [S-9131]\n"
-    ++ "While trying to parse the recent snapshots URL, Stack encountered the \
-       \following error:\n"
-    ++ displayException e
+deriving instance Show LsPrettyException
+
+instance Pretty LsPrettyException where
+  pretty (ParseFailure val) =
+    "[S-3421]"
+    <> line
+    <> fillSep
+         [ flow "Failure to parse values as a snapshot:"
+         , string (show val)
+         ]
+  pretty (ParseRecentSnapshotsUrlFailed err) =
+    "[S-9131]"
+    <> line
+    <> fillSep
+         [ flow "While trying to parse the"
+         , style Shell "recent-snapshots"
+         , flow "URL, Stack encountered the following error:"
+         ]
+    <> blankLine
+    <> fromString (displayException err)
+
+instance Exception LsPrettyException
 
 -- | Type representing Stackage snapshot types.
 data SnapshotType
@@ -127,7 +138,7 @@ toSnapshot [String snapId, String title, String time] =
     , title
     , time
     }
-toSnapshot val = impureThrow $ ParseFailure val
+toSnapshot val = prettyImpureThrow $ ParseFailure val
 
 parseSnapshot :: Value -> A.Parser Snapshot
 parseSnapshot = A.withArray "array of snapshot" (pure . toSnapshot . V.toList)
@@ -211,7 +222,7 @@ handleRemote lsOpts = do
   urlInfoText <- askRecentSnapshotsUrl
   req <- catch
     (parseUrlThrow $ T.unpack urlInfoText)
-    (throwM . ParseRecentSnapshotsUrlFailed)
+    (prettyThrowM . ParseRecentSnapshotsUrlFailed)
   isStdoutTerminal <- view terminalL
   let req' = addRequestHeader hAccept "application/json" req
   result <- httpJSON req'

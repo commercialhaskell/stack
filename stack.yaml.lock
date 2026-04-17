@@ -82,12 +82,12 @@ packages:
   original:
     hackage: crypton-x509-validation-1.8.0@sha256:63acb2df06f28c3ffdddaf6d9402105b9026796036aa10d7347ae4f7db51c36b,2018
 - completed:
-    hackage: hpack-0.39.1@sha256:d7378debd96e805760540e3640aeda3a1ebee1d000dac99726ed55c827c81a94,5229
+    hackage: hpack-0.39.3@sha256:8ce7ae9ec944a3181eeff971402102b5ec05946c8a484d460799a8e0bf23f8ee,5316
     pantry-tree:
-      sha256: 5f7ca06ce0556a87c8a38813bc7caf9725ba6ad6c0c05ab2c3dd002373973b2f
+      sha256: a6b33bf86bd2d4b453fdb6ba73c3fd5eb77d069a612f546f52baa7f62c321bdf
       size: 3799
   original:
-    hackage: hpack-0.39.1@sha256:d7378debd96e805760540e3640aeda3a1ebee1d000dac99726ed55c827c81a94,5229
+    hackage: hpack-0.39.3@sha256:8ce7ae9ec944a3181eeff971402102b5ec05946c8a484d460799a8e0bf23f8ee,5316
 - completed:
     hackage: pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
     pantry-tree:
@@ -102,6 +102,13 @@ packages:
       size: 7184
   original:
     hackage: persistent-2.18.0.0@sha256:baa3e0959cf10bbd1da462efeb61d4f073d0cc924a149325494ba5ce29bc17a4,7096
+- completed:
+    hackage: rio-prettyprint-0.1.9.0@sha256:f48afbfe28ed7be4d1a1bb96705669593dd5df12f28ed908516c6dfc4e0becbb,1375
+    pantry-tree:
+      sha256: c840f1193718b7af6c004fc62a67919e223b56cc1658a168c8e490e53a632aa0
+      size: 779
+  original:
+    hackage: rio-prettyprint-0.1.9.0@sha256:f48afbfe28ed7be4d1a1bb96705669593dd5df12f28ed908516c6dfc4e0becbb,1375
 - completed:
     hackage: time-hourglass-0.3.0@sha256:ee02356fe24919ec43ae17fc0007398c2fd0bbe822833b2d7a9c849537b90580,3114
     pantry-tree:

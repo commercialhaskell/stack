@@ -190,7 +190,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-1353] = WritingLockFileError (Path Abs File) Locked
         ~~~
 
-    -   `Stack.Ls.LsException` *
+    -   `Stack.Ls.LsPrettyException`
 
         ~~~haskell
         [S-3421] = ParseFailure [Value]

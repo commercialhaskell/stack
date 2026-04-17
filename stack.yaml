@@ -21,11 +21,13 @@ extra-deps:
 # lts-24.24 specifies crypton-x509-validation-1.6.14
 - crypton-x509-validation-1.8.0@sha256:63acb2df06f28c3ffdddaf6d9402105b9026796036aa10d7347ae4f7db51c36b,2018
 # lts-24.24 specifies hpack-0.38.3
-- hpack-0.39.1@sha256:d7378debd96e805760540e3640aeda3a1ebee1d000dac99726ed55c827c81a94,5229
+- hpack-0.39.3@sha256:8ce7ae9ec944a3181eeff971402102b5ec05946c8a484d460799a8e0bf23f8ee,5316
 # lts-24.24 specifies pantry-0.10.1
 - pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
 # lts-24.24 specifies persistent-2.17.1.0
 - persistent-2.18.0.0@sha256:baa3e0959cf10bbd1da462efeb61d4f073d0cc924a149325494ba5ce29bc17a4,7096
+# lts-24.24 specifies rio-prettyprint-0.1.8.0
+- rio-prettyprint-0.1.9.0@sha256:f48afbfe28ed7be4d1a1bb96705669593dd5df12f28ed908516c6dfc4e0becbb,1375
 # lts-24.24 does not include time-hourglass
 - time-hourglass-0.3.0@sha256:ee02356fe24919ec43ae17fc0007398c2fd0bbe822833b2d7a9c849537b90580,3114
 # lts-24.24 specifies tls-2.1.8
