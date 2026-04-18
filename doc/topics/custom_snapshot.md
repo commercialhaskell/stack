@@ -29,7 +29,7 @@ available in snapshots to ensure reproducibility.
 ~~~yaml
 # Inherits a specific GHC version and, implicitly, its boot packages and
 # specific versions of a set of other packages:
-snapshot: lts-24.24
+snapshot: lts-24.37
 # Overwrites the version of GHC (and, implicitly, its boot packages) specified
 # in the snapshot (optional):
 compiler: ghc-9.10.2
@@ -75,36 +75,36 @@ custom snapshot, due to Stack sharing snapshot packages whenever possible.
 
 ### Overriding the compiler
 
-The following snapshot specification will be identical to `lts-24.24`, but
+The following snapshot specification will be identical to `lts-24.37`, but
 instead use `ghc-9.10.2` and its boot packages instead of `ghc-9.10.3` and its
 boot packages:
 
 ~~~yaml
-snapshot: lts-24.24 # GHC 9.10.3
+snapshot: lts-24.37 # GHC 9.10.3
 compiler: ghc-9.10.2
 ~~~
 
 ### Dropping packages
 
-The following snapshot specification will be identical to `lts-24.24`, but
+The following snapshot specification will be identical to `lts-24.37`, but
 without the `text` package in our snapshot. Removing this package will cause all
 the packages that depend on `text` to be unbuildable, but they will still be
 present in the snapshot.
 
 ~~~yaml
-snapshot: lts-24.24
+snapshot: lts-24.37
 drop-packages:
 - text
 ~~~
 
 ### Hiding packages
 
-The following snapshot specification will be identical to `lts-24.24`, but the
+The following snapshot specification will be identical to `lts-24.37`, but the
 `text` package will be hidden when registering. This will affect, for example,
 the import parser in the script command.
 
 ~~~yaml
-snapshot: lts-24.24
+snapshot: lts-24.37
 hidden:
 - text
 ~~~
@@ -115,11 +115,11 @@ In order to specify GHC options for a package, you use the same syntax as the
 [ghc-options](../configure/yaml/non-project.md#ghc-options) key for build
 configuration.
 
-The following snapshot specification will be identical to `lts-24.24`, but
+The following snapshot specification will be identical to `lts-24.37`, but
 provides `-O1` as a ghc-option for `text`:
 
 ~~~yaml
-snapshot: lts-24.24
+snapshot: lts-24.37
 packages:
 - text-2.1.2
 ghc-options:
@@ -138,11 +138,11 @@ packages in the `packages` list, rather than all packages in the snapshot.
 
 In order to specify Cabal flags for a package, you use the same syntax as the
 [flags](../configure/yaml/project.md#flags) key for build configuration. The
-following snapshot specification will be identical to `lts-24.24`, but
+following snapshot specification will be identical to `lts-24.37`, but
 it enables the `developer` Cabal flag:
 
 ~~~yaml
-snapshot: lts-24.24
+snapshot: lts-24.37
 packages:
 - text-2.1.2
 flags:
