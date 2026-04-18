@@ -53,12 +53,12 @@ import           Test.Hspec
 
 sampleConfig :: String
 sampleConfig =
-  "snapshot: lts-24.24\n" ++
+  "snapshot: lts-24.37\n" ++
   "packages: ['.']\n"
 
 buildOptsConfig :: String
 buildOptsConfig =
-  "snapshot: lts-24.24\n" ++
+  "snapshot: lts-24.37\n" ++
   "packages: ['.']\n" ++
   "build:\n" ++
   "  semaphore: true\n" ++
@@ -106,7 +106,7 @@ buildOptsConfig =
 
 buildOptsHaddockForHackageConfig :: String
 buildOptsHaddockForHackageConfig =
-  "snapshot: lts-24.24\n" ++
+  "snapshot: lts-24.37\n" ++
   "packages: ['.']\n" ++
   "build:\n" ++
   "  haddock: true\n" ++
@@ -122,24 +122,24 @@ buildOptsHaddockForHackageConfig =
 
 hpackConfig :: String
 hpackConfig =
-  "snapshot: lts-24.24\n" ++
+  "snapshot: lts-24.37\n" ++
   "with-hpack: /usr/local/bin/hpack\n" ++
   "packages: ['.']\n"
 
 resolverConfig :: String
 resolverConfig =
-  "resolver: lts-24.24\n" ++
+  "resolver: lts-24.37\n" ++
   "packages: ['.']\n"
 
 snapshotConfig :: String
 snapshotConfig =
-  "snapshot: lts-24.24\n" ++
+  "snapshot: lts-24.37\n" ++
   "packages: ['.']\n"
 
 resolverSnapshotConfig :: String
 resolverSnapshotConfig =
-  "resolver: lts-24.24\n" ++
-  "snapshot: lts-24.24\n" ++
+  "resolver: lts-24.37\n" ++
+  "snapshot: lts-24.37\n" ++
   "packages: ['.']\n"
 
 stackDotYaml :: Path Rel File
@@ -189,11 +189,11 @@ spec = beforeAll setup $ do
 
     it "parses snapshot using 'resolver'" $ inTempDir $ do
       loadProject resolverConfig $ \project ->
-        project.snapshot `shouldBe` RSLSynonym (LTS 24 24)
+        project.snapshot `shouldBe` RSLSynonym (LTS 24 37)
 
     it "parses snapshot using 'snapshot'" $ inTempDir $ do
       loadProject snapshotConfig $ \project ->
-        project.snapshot `shouldBe` RSLSynonym (LTS 24 24)
+        project.snapshot `shouldBe` RSLSynonym (LTS 24 37)
 
     it "throws if both 'resolver' and 'snapshot' are present" $ inTempDir $ do
       loadProject resolverSnapshotConfig (const (pure ()))

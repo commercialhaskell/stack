@@ -39,13 +39,13 @@ snapshot defines a GHC version, the package version of packages available for
 installation, and various settings like build flags. For example:
 
 ~~~yaml
-snapshot: lts-24-30 # A Stackage LTS Haskell snapshot
+snapshot: lts-24.37 # A Stackage LTS Haskell snapshot
 ~~~
 
 or
 
 ~~~yaml
-snapshot: nightly-2026-02-09 # A Stackage Nightly snapshot
+snapshot: nightly-2026-04-18 # A Stackage Nightly snapshot
 ~~~
 
 For further information about how to specify the location of a snapshot, see the

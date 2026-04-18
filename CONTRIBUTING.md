@@ -352,7 +352,7 @@ Stack aims to depend on well-known packages. The specific versions on which it
 depends at any time are specified by `package.yaml` and `stack.yaml`. It does
 not aim to be compatible with more than one version of the `Cabal` package at
 any time. At the time of writing (January 2026) the package versions are
-primarily ones in Stackage snapshot LTS Haskell 24.24 (for GHC 9.10.3), the
+primarily ones in Stackage snapshot LTS Haskell 24.37 (for GHC 9.10.3), the
 latest version of `Cabal` released on Hackage (`Cabal-3.16.0.0`),
 `pantry-0.11.2`, `persistent-2.18.0.0` and the latest version of packages in
 the `tls` family (which reduce dependencies on unmaintained packages).
