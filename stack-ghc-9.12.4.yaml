@@ -1,7 +1,6 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.14.1.
+# built with GHC 9.12.4.
 snapshot: nightly-2026-04-17 # GHC 9.12.4
-compiler: ghc-9.14.1
 
 extra-deps:
 # nightly-2026-04-17 specifies Cabal-3.14.2.0
@@ -15,18 +14,14 @@ extra-deps:
 - crypton-x509-system-1.8.0@sha256:76bab32c7d9cb3ea356a905f85829c70967fb6f9b4b890f00d67dc54130d45ca,1521
 # nightly-2026-04-17 specifies crypton-x509-validation-1.6.14
 - crypton-x509-validation-1.8.0@sha256:63acb2df06f28c3ffdddaf6d9402105b9026796036aa10d7347ae4f7db51c36b,2018
-# nightly-2026-04-17 specifies http-api-data-0.6.7
-- http-api-data-0.7@sha256:b8145755fced98db1ac67f4f98c8010cd5f82c121a82b65addea2556b5fbd6d5,3157
 # nightly-2026-04-17 specifies rio-prettyprint-0.1.8.0
 - rio-prettyprint-0.1.9.0@sha256:f48afbfe28ed7be4d1a1bb96705669593dd5df12f28ed908516c6dfc4e0becbb,1375
-# nightly-2026-04-17 specifies tagged-0.8.9
-- tagged-0.8.10@sha256:e9b97c98e9827981d62f37c5febf9e6bbb67acec92b8bd41fd9f7ace5eb31d32,2201
 # nightly-2026-04-17 specifies tls-2.1.14
 - tls-2.2.2@sha256:95f5acd4ce76cbd6bdc46b737370dcbd93c59cf1cd1934a30e55c61c1dc140e9,7283
 
 docker:
   enable: false
-  repo: quay.io/benz0li/ghc-musl:9.14.1
+  repo: quay.io/benz0li/ghc-musl:9.12.4
 
 nix:
   # --nix on the command-line to enable.
