@@ -70,8 +70,6 @@ data BuildException
       Version -- version specified on command line
   | NoSetupHsFound (Path Abs Dir)
   | InvalidGhcOptionsSpecification [PackageName]
-  | TestSuiteExeMissing Bool String String String
-  | CabalCopyFailed Bool String
   | LocalPackagesPresent [PackageIdentifier]
   | CouldNotLockDistDir !(Path Abs File)
   | TaskCycleBug PackageIdentifier
@@ -178,23 +176,6 @@ instance Exception BuildException where
       , packageNameString name
       , "' not found"
       ]
-  displayException (TestSuiteExeMissing isSimpleBuildType exeName pkgName' testName) =
-    missingExeError "[S-7987]"
-      isSimpleBuildType $ concat
-        [ "Test suite executable \""
-        , exeName
-        , "\" not found for "
-        , pkgName'
-        , ":test:"
-        , testName
-        ]
-  displayException (CabalCopyFailed isSimpleBuildType innerMsg) =
-    missingExeError "[S-8027]"
-      isSimpleBuildType $ concat
-        [ "'cabal copy' failed.  Error message:\n"
-        , innerMsg
-        , "\n"
-        ]
   displayException (LocalPackagesPresent locals) = unlines
     $ "Error: [S-5510]"
     : "Local packages are not allowed when using the 'script' command. \
@@ -266,6 +247,8 @@ data BuildPrettyException
       WantedCompilerSetter -- Way that the wanted compiler is set
       StyleDoc -- recommended resolution
   | ActionNotFilteredBug StyleDoc
+  | TestSuiteExeMissing !Bool !String !PackageName !StackUnqualCompName
+  | CabalCopyFailed !Bool !BuildPrettyException
   deriving Show
 
 instance Pretty BuildPrettyException where
@@ -461,6 +444,29 @@ instance Pretty BuildPrettyException where
       , flow "is seeking to run an action that should have been filtered from \
              \the list of actions."
       ]
+  pretty (TestSuiteExeMissing isSimpleBuildType exeName pkgName testName) =
+    missingExeError "[S-7987]" isSimpleBuildType $
+         fillSep
+           [ flow "Test suite executable"
+           , style Shell (fromString exeName)
+           , flow "not found for"
+           , style PkgComponent pkgComponent <> "."
+           ]
+      <> line
+   where
+    pkgComponent =
+         fromString (packageNameString pkgName)
+      <> ":test:"
+      <> fromString (unqualCompToString testName)
+  pretty (CabalCopyFailed isSimpleBuildType err) =
+    missingExeError "[S-8027]" isSimpleBuildType $
+         fillSep
+           [ style Shell "cabal copy"
+           , flow "failed. Error message:"
+           ]
+      <> line
+      <> pretty err
+      <> line
 
 instance Exception BuildPrettyException
 
@@ -834,22 +840,42 @@ data BadDependency
   | BDDependencyCycleDetected ![PackageName]
   deriving (Eq, Ord, Show)
 
-missingExeError :: String -> Bool -> String -> String
-missingExeError errorCode isSimpleBuildType msg = unlines
-  $ "Error: " <> errorCode
-  : msg
-  : "Possible causes of this issue:"
-  : map ("* " <>) possibleCauses
+missingExeError :: StyleDoc -> Bool -> StyleDoc -> StyleDoc
+missingExeError errorCode isSimpleBuildType msg =
+     errorCode
+  <> line
+  <> msg
+  <> line
+  <> flow "Possible causes of this issue:"
+  <> line
+  <> bulletedList possibleCauses
  where
-  possibleCauses
-    = "No module named \"Main\". The 'main-is' source file should usually \
-      \have a header indicating that it's a 'Main' module."
-    : "A Cabal file that refers to nonexistent other files (e.g. a \
-      \license-file that doesn't exist). Running 'cabal check' may point \
-      \out these issues."
-    : [ "The Setup.hs file is changing the installation target dir."
-      | not isSimpleBuildType
-      ]
+  possibleCauses =
+       [ fillSep
+           [ flow "No module named"
+           , style Shell "Main" <> "."
+           , "The"
+           , style Shell "main-is"
+           , flow "source file should usually have a header indicating that \
+                  \it's a"
+           , style Shell "Main"
+           , "module."
+           ]
+       , fillSep
+           [ flow "A Cabal file that refers to nonexistent other files (e.g. a"
+           , style Shell "license-file"
+           , flow "that doesn't exist). Running"
+           , style Shell "cabal check"
+           , flow "may point out these issues."
+           ]
+       ]
+    <> [ fillSep
+           [ "The"
+           , style File "Setup.hs"
+           , flow "file is changing the installation target directory."
+           ]
+       | not isSimpleBuildType
+       ]
 
 showBuildError ::
      String

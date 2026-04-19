@@ -644,9 +644,9 @@ realConfigAndBuild
       announce "copy/register"
       try (cabal KeepTHLoading $ "copy" : copyOpts) >>= \case
         Left err@CabalExitedUnsuccessfully{} ->
-          throwM $ CabalCopyFailed
-                     (package.buildType == C.Simple)
-                     (displayException err)
+          prettyThrowM $ CabalCopyFailed
+            (package.buildType == C.Simple)
+            err
         _ -> pure ()
       when (hasLibrary || hasSubLibraries) $ cabal KeepTHLoading ["register"]
 
@@ -1254,12 +1254,12 @@ singleTest topts testsToRun ac ee task installedMap = do
                     else pure $ Map.singleton testName (Just ec)
               else do
                 unless expectFailure $
-                  logError $
-                    fromString $ displayException $ TestSuiteExeMissing
+                  prettyError $
+                    pretty $ TestSuiteExeMissing
                       (package.buildType == C.Simple)
                       exeName
-                      (packageNameString package.name)
-                      (unqualCompToString testName)
+                      package.name
+                      testName
                 pure emptyResult
 
         when needHpc $ do

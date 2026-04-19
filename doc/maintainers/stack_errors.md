@@ -350,8 +350,6 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-5797] | LocalPackageDoesn'tMatchTarget PackageName Version Version
         [S-3118] | NoSetupHsFound (Path Abs Dir)
         [S-4925] | InvalidGhcOptionsSpecification [PackageName]
-        [S-7987] | TestSuiteExeMissing Bool String String String
-        [S-8027] | CabalCopyFailed Bool String
         [S-5510] | LocalPackagesPresent [PackageIdentifier]
         [S-7168] | CouldNotLockDistDir (Path Abs File)
         [S-7868] | TaskCycleBug PackageIdentifier
@@ -378,6 +376,8 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-1727] | NotOnlyLocal [PackageName] [Text]
         [S-6362] | CompilerVersionMismatch (Maybe (ActualCompiler, Arch)) (WantedCompiler, Arch) GHCVariant CompilerBuild VersionCheck WantedCompilerSetter Text
         [S-4660] | ActionNotFilteredBug StyleDoc
+        [S-7987] | TestSuiteExeMissing Bool String PackageName StackUnqualCompName
+        [S-8027] | CabalCopyFailed Bool BuildPrettyException
         ~~~
 
     -   `Stack.Types.Compiler.CompilerException`
