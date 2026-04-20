@@ -100,6 +100,7 @@ nav:
     - configure/yaml/index.md
     - Project-specific configuration: configure/yaml/project.md
     - Non-project specific configuration: configure/yaml/non-project.md
+    - The !include directive: configure/yaml/include.md
   - Global flags and options: configure/global_flags.md
   - Customisation scripts: configure/customisation_scripts.md
 - Topics:

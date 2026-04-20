@@ -1,0 +1,3 @@
+snapshot: ghc-9.8.4
+<<:
+  !include stack-flags.yaml

@@ -55,6 +55,7 @@ import           Data.Monoid.Map ( MonoidMap (..) )
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
+import qualified Data.Yaml.Include as YamlInclude
 import qualified Distribution.PackageDescription as PD
 import           Distribution.System
                    ( Arch (..), OS (..), Platform (..), buildPlatform )
@@ -1216,7 +1217,7 @@ loadYaml ::
   -> Path Abs File
   -> RIO env (Either Yaml.ParseException a)
 loadYaml parser path =
-  liftIO (Yaml.decodeFileEither (toFilePath path)) >>= \case
+  liftIO (YamlInclude.decodeFileEither (toFilePath path)) >>= \case
     Left err -> pure (Left err)
     Right val ->
       case Yaml.parseEither parser val of
