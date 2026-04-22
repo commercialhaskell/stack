@@ -33,16 +33,22 @@ main = do
     ["--stack-yaml","stack-not-including-flags.yaml","run"]
     (checkFor "TEST_FLAG was set\n")
 
-  -- Check that 'config set' raises an error when applied to a stack.yaml file
-  -- that uses !include directives
-  stackErrStderr
-    ["--stack-yaml","stack-including-flags.yaml","config","set","snapshot","ghc-9.8.4"]
-    (expectMessage "!include")
+  -- Check that 'config set' succeeds when the key already exists in a
+  -- stack.yaml file that uses !include directives
+  stackCheckStderr
+    ["--stack-yaml","stack-including-flags.yaml","config","set","snapshot","lts-24.37"]
+    (expectMessage "already contained the intended configuration")
 
-  -- Check that 'config set' raises an error when applied to a stack.yaml file
-  -- that uses !include directives
+  -- Check that 'config set' succeeds when the key already exists in a
+  -- stack.yaml file that uses !include directives (with newline variant)
+  stackCheckStderr
+    ["--stack-yaml","stack-including-flags-with-newline.yaml","config","set","snapshot","lts-24.37"]
+    (expectMessage "already contained the intended configuration")
+
+  -- Check that 'config set' raises an error when the key does not exist in a
+  -- stack.yaml file that uses !include directives
   stackErrStderr
-    ["--stack-yaml","stack-including-flags-with-newline.yaml","config","set","snapshot","ghc-9.8.4"]
+    ["--stack-yaml","stack-including-file-with-install-ghc.yaml","config","set","install-ghc","true"]
     (expectMessage "!include")
 
 expectMessage :: String -> String -> IO ()

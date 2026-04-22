@@ -75,8 +75,8 @@ instance Exception ConfigCmdException where
     ++ "'config' command used when no project configuration available."
   displayException (ConfigFileContainsIncludes configFile) =
     "Error: [S-6088]\n"
-    ++ "The 'config set' command cannot modify a configuration file that \
-       \uses !include directives: "
+    ++ "The 'config set' command cannot add a new key to a configuration file \
+       \that uses !include directives: "
     ++ toFilePath configFile
 
 -- | Function underlying Stack's @config set@ command.
@@ -97,8 +97,6 @@ cfgCmdSet cmd = do
           -- maybe modify the ~/.stack/config.yaml file instead?
       CommandScopeGlobal -> pure conf.userGlobalConfigFile
   rawConfig <- liftIO (readFileUtf8 (toFilePath configFilePath))
-  when (yamlContainsInclude rawConfig) $
-    throwIO (ConfigFileContainsIncludes configFilePath)
   config <- either throwM pure (Yaml.decodeEither' $ encodeUtf8 rawConfig)
   newValue <- cfgCmdSetValue (parent configFilePath) cmd
   let yamlLines = T.lines rawConfig
@@ -110,6 +108,8 @@ cfgCmdSet cmd = do
       primaryCmdKey = NE.last $ NE.head cmdKeys
   newYamlLines <- case hits of
     [] -> do
+      when (yamlContainsInclude rawConfig) $
+        throwIO (ConfigFileContainsIncludes configFilePath)
       prettyInfoL
         [ pretty configFilePath
         , flow "has been extended."
@@ -302,7 +302,7 @@ yamlContainsInclude =
 
    includeAsValue strippedLine =
      let (_key, rest) = T.breakOn ":" strippedLine
-     in  "!include" `T.isPrefixOf` (T.stripStart (T.drop 1 rest))
+     in  "!include" `T.isPrefixOf` T.stripStart (T.drop 1 rest)
 
    includeOnOwnLine strippedLine =
      "!include" `T.isPrefixOf` strippedLine
