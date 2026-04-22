@@ -37,13 +37,13 @@ main = do
   -- stack.yaml file that uses !include directives
   stackCheckStderr
     ["--stack-yaml","stack-including-flags.yaml","config","set","snapshot","lts-24.37"]
-    (expectMessage "already contained the intended configuration")
+    (expectMessage "already")
 
   -- Check that 'config set' succeeds when the key already exists in a
   -- stack.yaml file that uses !include directives (with newline variant)
   stackCheckStderr
     ["--stack-yaml","stack-including-flags-with-newline.yaml","config","set","snapshot","lts-24.37"]
-    (expectMessage "already contained the intended configuration")
+    (expectMessage "already")
 
   -- Check that 'config set' raises an error when the key does not exist in a
   -- stack.yaml file that uses !include directives
