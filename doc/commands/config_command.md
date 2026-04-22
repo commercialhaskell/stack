@@ -87,6 +87,14 @@ to be set. See `stack config set` for the available keys.
     The `config set` commands support an existing key only in the form
     `key: value` on a single line.
 
+!!! warning
+
+    The `config set` commands cannot add a new key to a configuration file that
+    uses [`!include`](../configure/yaml/include.md) directives. Stack will report
+    an error if it detects `!include` directives in the target configuration file
+    and the key being set is not already present. Existing keys can be modified
+    even in files that use `!include`.
+
 ## The `stack config set install-ghc` command
 
 ~~~text

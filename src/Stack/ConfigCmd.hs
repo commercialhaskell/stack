@@ -19,6 +19,7 @@ module Stack.ConfigCmd
   , cfgCmdBuildFiles
   , cfgCmdBuildFilesName
   , cfgCmdName
+  , yamlContainsInclude
   ) where
 
 import qualified Data.Aeson.Key as Key
@@ -65,12 +66,18 @@ import           System.Environment ( getEnvironment )
 -- "Stack.ConfigCmd" module.
 data ConfigCmdException
   = NoProjectConfigAvailable
+  | ConfigFileContainsIncludes !(Path Abs File)
   deriving Show
 
 instance Exception ConfigCmdException where
   displayException NoProjectConfigAvailable =
     "Error: [S-3136]\n"
     ++ "'config' command used when no project configuration available."
+  displayException (ConfigFileContainsIncludes configFile) =
+    "Error: [S-6088]\n"
+    ++ "The 'config set' command cannot add a new key to a configuration file \
+       \that uses !include directives: "
+    ++ toFilePath configFile
 
 -- | Function underlying Stack's @config set@ command.
 cfgCmdSet ::
@@ -101,6 +108,8 @@ cfgCmdSet cmd = do
       primaryCmdKey = NE.last $ NE.head cmdKeys
   newYamlLines <- case hits of
     [] -> do
+      when (yamlContainsInclude rawConfig) $
+        throwIO (ConfigFileContainsIncludes configFilePath)
       prettyInfoL
         [ pretty configFilePath
         , flow "has been extended."
@@ -279,6 +288,26 @@ cfgCmdSetKeys (ConfigCmdSetRecommendStackUpgrade _ _) =
   [[configMonoidRecommendStackUpgradeName]]
 cfgCmdSetKeys (ConfigCmdSetDownloadPrefix _ _) =
   [["package-index", "download-prefix"]]
+
+-- | Check if YAML content contains a @!include@ directive in value position.
+-- This covers both inline values (e.g. @key: !include path@) and values on
+-- the next line after indentation. Stack config keys do not contain spaces or
+-- colons, so the first @:@ is always the value separator.
+yamlContainsInclude :: Text -> Bool
+yamlContainsInclude =
+ let
+   lineContainsInclude yamlLine =
+     let stripped = T.stripStart yamlLine
+     in  includeAsValue stripped || includeOnOwnLine stripped
+
+   includeAsValue strippedLine =
+     let (_key, rest) = T.breakOn ":" strippedLine
+     in  "!include" `T.isPrefixOf` T.stripStart (T.drop 1 rest)
+
+   includeOnOwnLine strippedLine =
+     "!include" `T.isPrefixOf` strippedLine
+ in
+   any lineContainsInclude . T.lines
 
 -- | The name of Stack's @config@ command.
 cfgCmdName :: String

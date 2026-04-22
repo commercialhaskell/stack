@@ -1,0 +1,2 @@
+ghc-options:
+  "$everything": -DTEST_FLAG

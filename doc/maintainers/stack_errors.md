@@ -90,6 +90,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
 
         ~~~haskell
         [S-3136] = NoProjectConfigAvailable
+        [S-6088] | ConfigFileContainsIncludes (Path Abs File)
         ~~~
 
     -   `Stack.Constants.ConstantsException`
