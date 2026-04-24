@@ -6,8 +6,8 @@ title: Configuration files
 # Configuration files
 
 Stack is configured by the content of files in the [YAML](https://yaml.org/)
-format. Stack also supports a non-standard [`!include` directive](include.md)
-for composing configuration from multiple YAML files.
+format. Stack also supports an [`!include` directive](include.md) that allows a
+configuration file to include the contents of another file.
 
 ## Project-specific and non-project specific options
 

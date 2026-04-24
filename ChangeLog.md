@@ -34,16 +34,13 @@ Other enhancements:
 * In YAML configuration files, the `recent-snapshots` key is introduced (under
   the `urls` key), to specify the URL used by Stack's `ls snapshots remote`
   command.
-* In YAML configuration files (`stack.yaml` and `config.yaml`), the `!include`
-  YAML directive is now supported, allowing common configuration to be shared
-  across multiple files. For example, projects that maintain multiple
-  `stack.yaml` files for testing against different snapshots can use `!include`
-  to avoid duplicating shared settings.
-* Stack's `config set` command now raises an error (message S-6088) if the
-  target configuration file contains `!include` directives and the key being
-  set is not already present in the file, as appending a new key to such files
-  cannot be done safely. Existing keys can be modified even in files that use
-  `!include`.
+* In YAML configuration files (`stack.yaml` and `config.yaml`), an
+  `!include <file path>` directive is now supported. This allows common
+  configuration to be shared across multiple files. For example, a project that
+  maintains multiple project-level configuration files for testing against
+  different snapshots can use `!include` to avoid duplicating shared settings.
+* Stack's `config set` command raises an error if the target configuration file
+  excludes the key being set and includes an `!include` directive.
 
 Bug fixes:
 

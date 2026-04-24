@@ -62,22 +62,34 @@ import           Stack.Types.Runner ( globalOptsL )
 import           Stack.Types.Snapshot ( AbstractSnapshot )
 import           System.Environment ( getEnvironment )
 
--- | Type repesenting exceptions thrown by functions exported by the
+-- | Type repesenting \'pretty\' exceptions thrown by functions exported by the
 -- "Stack.ConfigCmd" module.
-data ConfigCmdException
+data ConfigCmdPrettyException
   = NoProjectConfigAvailable
   | ConfigFileContainsIncludes !(Path Abs File)
   deriving Show
 
-instance Exception ConfigCmdException where
-  displayException NoProjectConfigAvailable =
-    "Error: [S-3136]\n"
-    ++ "'config' command used when no project configuration available."
-  displayException (ConfigFileContainsIncludes configFile) =
-    "Error: [S-6088]\n"
-    ++ "The 'config set' command cannot add a new key to a configuration file \
-       \that uses !include directives: "
-    ++ toFilePath configFile
+instance Pretty ConfigCmdPrettyException where
+  pretty NoProjectConfigAvailable =
+    "[S-3136]"
+    <> line
+    <> fillSep
+         [ style Shell "config"
+         , flow "command used when no project configuration available."
+         ]
+  pretty (ConfigFileContainsIncludes configFile) =
+    "[S-6088]"
+    <> line
+    <> fillSep
+         [ "The"
+         , style Shell "config set"
+         , flow "command cannot add a new key to a configuration file that uses"
+         , style Shell "!include"
+         , "directives:"
+         , pretty configFile
+         ]
+
+instance Exception ConfigCmdPrettyException
 
 -- | Function underlying Stack's @config set@ command.
 cfgCmdSet ::
@@ -93,7 +105,7 @@ cfgCmdSet cmd = do
         case mstackYaml of
           PCProject stackYaml -> pure stackYaml
           PCGlobalProject -> getImplicitGlobalProjectDir <&> (</> stackDotYaml)
-          PCNoProject _extraDeps -> throwIO NoProjectConfigAvailable
+          PCNoProject _extraDeps -> prettyThrowIO NoProjectConfigAvailable
           -- maybe modify the ~/.stack/config.yaml file instead?
       CommandScopeGlobal -> pure conf.userGlobalConfigFile
   rawConfig <- liftIO (readFileUtf8 (toFilePath configFilePath))
@@ -109,7 +121,7 @@ cfgCmdSet cmd = do
   newYamlLines <- case hits of
     [] -> do
       when (yamlContainsInclude rawConfig) $
-        throwIO (ConfigFileContainsIncludes configFilePath)
+        prettyThrowIO (ConfigFileContainsIncludes configFilePath)
       prettyInfoL
         [ pretty configFilePath
         , flow "has been extended."
@@ -295,19 +307,17 @@ cfgCmdSetKeys (ConfigCmdSetDownloadPrefix _ _) =
 -- colons, so the first @:@ is always the value separator.
 yamlContainsInclude :: Text -> Bool
 yamlContainsInclude =
- let
-   lineContainsInclude yamlLine =
-     let stripped = T.stripStart yamlLine
-     in  includeAsValue stripped || includeOnOwnLine stripped
+ let lineContainsInclude yamlLine =
+       let stripped = T.stripStart yamlLine
+       in  includeAsValue stripped || includeOnOwnLine stripped
 
-   includeAsValue strippedLine =
-     let (_key, rest) = T.breakOn ":" strippedLine
-     in  "!include" `T.isPrefixOf` T.stripStart (T.drop 1 rest)
+     includeAsValue strippedLine =
+       let (_key, rest) = T.breakOn ":" strippedLine
+       in  "!include" `T.isPrefixOf` T.stripStart (T.drop 1 rest)
 
-   includeOnOwnLine strippedLine =
-     "!include" `T.isPrefixOf` strippedLine
- in
-   any lineContainsInclude . T.lines
+     includeOnOwnLine strippedLine =
+       "!include" `T.isPrefixOf` strippedLine
+ in  any lineContainsInclude . T.lines
 
 -- | The name of Stack's @config@ command.
 cfgCmdName :: String
