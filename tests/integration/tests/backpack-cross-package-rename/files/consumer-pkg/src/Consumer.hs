@@ -1,6 +1,6 @@
 module Consumer where
 
-import Sig (message)
+import Impl (message)
 
 hello :: String
 hello = message

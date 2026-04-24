@@ -16,7 +16,7 @@ import           Stack.Build.Execute
                    ( finalTestsAndBenches, intraPackageDeps, missingToDeps )
 import           Stack.Build.ExecutePackage
                    ( componentEnableBenchmarks, componentEnableTests
-                   , componentTarget
+                   , componentTarget, dispatchBuildOpts
                    )
 import           Stack.Prelude
 import           Stack.Types.ComponentUtils ( unqualCompFromString )
@@ -543,3 +543,68 @@ spec = do
               (Set.fromList [CTest testA, CTest testB])
       Set.size tests `shouldBe` 1
       tests `shouldBe` Set.singleton testA
+
+  describe "dispatchBuildOpts" $ do
+    let primary = ["lib:pkg", "exe:app"]
+        finals  = ["test:spec", "bench:bench"]
+
+    describe "split path (Just target)" $ do
+      it "primary build: target is both build and copy" $
+        dispatchBuildOpts (Just "lib:pkg") False False [] []
+          `shouldBe` (["lib:pkg"], ["lib:pkg"])
+
+      it "final build: target is build, copy is empty" $
+        dispatchBuildOpts (Just "test:spec") True False [] []
+          `shouldBe` (["test:spec"], [])
+
+      it "isMergedBuild is ignored on the split path" $
+        dispatchBuildOpts (Just "lib:pkg") False True [] []
+          `shouldBe` dispatchBuildOpts (Just "lib:pkg") False False [] []
+
+      it "primary/final option lists are ignored on the split path" $
+        dispatchBuildOpts (Just "lib:pkg") False False primary finals
+          `shouldBe` (["lib:pkg"], ["lib:pkg"])
+
+    describe "non-split path (Nothing)" $ do
+      it "primary-only: build and copy primary" $
+        dispatchBuildOpts Nothing False False primary finals
+          `shouldBe` (primary, primary)
+
+      it "merged primary+final: build primary++finals, copy primary" $
+        dispatchBuildOpts Nothing True True primary finals
+          `shouldBe` (primary ++ finals, primary)
+
+      it "finals-only: build finals, skip copy" $
+        dispatchBuildOpts Nothing True False primary finals
+          `shouldBe` (finals, [])
+
+      it "isMergedBuild is ignored when isFinalBuild is False" $
+        dispatchBuildOpts Nothing False True primary finals
+          `shouldBe` dispatchBuildOpts Nothing False False primary finals
+
+    describe "non-split edge cases" $ do
+      it "merged with empty primary: build finals, copy empty" $
+        dispatchBuildOpts Nothing True True [] finals
+          `shouldBe` (finals, [])
+
+      it "finals-only with empty finals: build empty, copy empty" $
+        dispatchBuildOpts Nothing True False primary []
+          `shouldBe` ([], [])
+
+      it "primary-only with empty primary: build empty, copy empty" $
+        dispatchBuildOpts Nothing False False [] finals
+          `shouldBe` ([], [])
+
+    describe "componentTarget round-trip (split wiring)" $ do
+      it "split CTest final build renders test:<name>" $ do
+        let pn' = mkPackageName "pkg"
+            comp = CTest (unqualCompFromString "spec")
+        dispatchBuildOpts
+          (Just (componentTarget pn' comp)) True False [] []
+          `shouldBe` (["test:spec"], [])
+
+      it "split CLib primary build renders lib:<pkg>" $ do
+        let pn' = mkPackageName "pkg"
+        dispatchBuildOpts
+          (Just (componentTarget pn' CLib)) False False [] []
+          `shouldBe` (["lib:pkg"], ["lib:pkg"])

@@ -19,6 +19,7 @@ module Stack.Build.ExecutePackage
   , componentTarget
   , componentEnableTests
   , componentEnableBenchmarks
+  , dispatchBuildOpts
     -- * Backpack helpers (exported for testing)
   , findGhcPkgId
   , mkInstantiateWithOpts
@@ -445,7 +446,12 @@ singleBuild ::
   -> Task
   -> InstalledMap
   -> Bool
-     -- ^ Is this a final build?
+     -- ^ Is this a final build? (Controls enable-tests/--enable-benchmarks.)
+  -> Bool
+     -- ^ Is this a merged primary+final build? True only when a non-split
+     --   package's primary task is folded together with its final task in a
+     --   single Setup invocation, so lib/exe components are also built and
+     --   installed. Ignored when isFinalBuild is False.
   -> ComponentKey
      -- ^ The component key identifying which component this build is for.
   -> RIO env ()
@@ -455,6 +461,7 @@ singleBuild
     task
     installedMap
     isFinalBuild
+    isMergedBuild
     ck
   = do
     (allDepsMap, cache) <-
@@ -476,7 +483,7 @@ singleBuild
             task
             installedMap
             (enableTests, enableBenchmarks)
-            (isFinalBuild, buildingFinals)
+            (isFinalBuild, buildingFinals, isMergedBuild)
             cache
             curator
             allDepsMap
@@ -507,8 +514,8 @@ realConfigAndBuild ::
   -> Map PackageName (a, Installed)
   -> (Bool, Bool)
      -- ^ (enableTests, enableBenchmarks)
-  -> (Bool, Bool)
-     -- ^ (isFinalBuild, buildingFinals)
+  -> (Bool, Bool, Bool)
+     -- ^ (isFinalBuild, buildingFinals, isMergedBuild)
   -> ConfigCache
   -> Maybe Curator
   -> Map PackageIdentifier GhcPkgId
@@ -520,7 +527,7 @@ realConfigAndBuild
     task
     installedMap
     (enableTests, enableBenchmarks)
-    (isFinalBuild, buildingFinals)
+    (isFinalBuild, buildingFinals, isMergedBuild)
     cache
     mcurator0
     allDepsMap
@@ -571,7 +578,11 @@ realConfigAndBuild
     _ -> Nothing
   doHaddock curator =
        task.buildHaddocks
-    && not isFinalBuild
+       -- Skip haddock only for pure finals-only builds (split CTest/CBench
+       -- or the non-split finalBuild action with no primary to go with).
+       -- Merged non-split builds still produce primary components, so run
+       -- haddock for them as we would for a plain primary build.
+    && not (isFinalBuild && not isMergedBuild)
        -- Special help for the curator tool to avoid haddocks that are known
        -- to fail
     && maybe True (Set.notMember pname . (.skipHaddock)) curator
@@ -653,7 +664,7 @@ realConfigAndBuild
           | config.hideTHLoading = ExcludeTHLoading
           | otherwise                  = KeepTHLoading
     let (buildOpts, copyOpts) =
-          buildAndCopyOpts task.taskType ck isFinalBuild
+          buildAndCopyOpts task.taskType ck isFinalBuild isMergedBuild
     cabal stripTHLoading ("build" : buildOpts <> extraOpts)
       `catch` \ex -> case ex of
         CabalExitedUnsuccessfully{} ->
@@ -704,8 +715,14 @@ realConfigAndBuild
     let hasLibrary = hasBuildableMainLibrary package
         hasSubLibraries = not $ null package.subLibraries
         hasExecutables = not $ null package.executables
+        -- Skip copy/install only for pure finals-only builds: split
+        -- CTest/CBench components and non-split finalBuild actions that
+        -- follow a clean primary. Every other path — plain primary
+        -- builds, split primary components, merged primary+final non-split
+        -- builds, and intra-package Backpack CLib/CInst builds — copies
+        -- and registers as before.
         shouldCopy =
-             not isFinalBuild
+             not (isFinalBuild && not isMergedBuild)
           && (hasLibrary || hasSubLibraries || hasExecutables)
     when shouldCopy $ withMVar ee.installLock $ \() -> do
       announce "copy/register"
@@ -1483,22 +1500,65 @@ buildAndCopyOpts ::
      TaskType
   -> ComponentKey
   -> Bool -- ^ isFinalBuild
+  -> Bool -- ^ isMergedBuild (primary+final folded together)
   -> ([String], [String])
      -- ^ (buildOpts, copyOpts)
-buildAndCopyOpts taskType ck isFinalBuild = case taskType of
+buildAndCopyOpts taskType ck isFinalBuild isMergedBuild = case taskType of
   TTLocalMutable lp
     | hasIntraPackageDeps lp.package -> ([], [])
     | shouldSplitComponents lp.package
     , ComponentKey pn comp <- ck ->
-        let target = [componentTarget pn comp]
-        in  if isFinalBuild then (target, []) else (target, target)
-    -- Legacy: non-splittable local packages use original multi-component
-    -- target logic (Custom/Configure/Make build types, Backpack).
-    | isFinalBuild -> (finalComponentOptions lp, [])
+        dispatchBuildOpts
+          (Just (componentTarget pn comp))
+          isFinalBuild
+          isMergedBuild
+          []
+          []
     | otherwise ->
-        let componentOpts = primaryComponentOptions lp
-        in  (componentOpts, componentOpts)
+        dispatchBuildOpts
+          Nothing
+          isFinalBuild
+          isMergedBuild
+          (primaryComponentOptions lp)
+          (finalComponentOptions lp)
   TTRemotePackage{} -> ([], [])
+
+-- | Pure dispatcher for 'buildAndCopyOpts'. Given the build mode and the
+-- pre-computed Cabal target lists, decide which targets to pass to
+-- @setup build@ and which to @setup copy@. Exported for unit testing —
+-- 'buildAndCopyOpts' is the production caller.
+--
+-- Mode summary:
+--
+-- * @Just target@ + @isFinalBuild=False@ (split primary): build and copy
+--   the single target.
+-- * @Just target@ + @isFinalBuild=True@ (split final): build the single
+--   target, skip copy.
+-- * @Nothing@ + @isFinalBuild=False@ (non-split primary-only): build and
+--   copy all primary components.
+-- * @Nothing@ + @isFinalBuild=True@ + @isMergedBuild=True@ (non-split
+--   primary+final folded into one Setup invocation): build primary and
+--   final components together, copy only primary.
+-- * @Nothing@ + @isFinalBuild=True@ + @isMergedBuild=False@ (non-split
+--   finals-only, primary was clean): build final components, skip copy.
+dispatchBuildOpts ::
+     Maybe String
+     -- ^ Split-component target (rendered Cabal target string) when
+     --   'shouldSplitComponents' holds; 'Nothing' for non-split packages.
+  -> Bool     -- ^ isFinalBuild
+  -> Bool     -- ^ isMergedBuild
+  -> [String] -- ^ primary component options (ignored on the split path)
+  -> [String] -- ^ final component options (ignored on the split path)
+  -> ([String], [String])
+     -- ^ (buildOpts, copyOpts)
+dispatchBuildOpts (Just target) isFinalBuild _ _ _ =
+  if isFinalBuild then ([target], []) else ([target], [target])
+dispatchBuildOpts Nothing True True primary finals =
+  (primary ++ finals, primary)
+dispatchBuildOpts Nothing True False _ finals =
+  (finals, [])
+dispatchBuildOpts Nothing False _ primary _ =
+  (primary, primary)
 
 -- | Render a 'NamedComponent' as a Cabal build target string. This uses
 -- Cabal's target syntax (e.g. @lib:pkg-name@, @exe:my-exe@, @test:my-test@).
