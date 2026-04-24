@@ -577,6 +577,16 @@ toActions installedMap mtestLock runInBase ee taskKeys ck (mbuild, mfinal) =
   abuild ++ afinal
  where
   intraPackageDep = intraPackageDeps taskKeys ck
+  -- For non-split packages (Custom/Configure/Hooks/Make build-types, or
+  -- intra-package Backpack deps) the primary and final tasks share this
+  -- ComponentKey (CLib). When both are present we fold the final into the
+  -- primary build: singleBuild is flagged as both a final build AND a
+  -- merged build, which tells it to configure with
+  -- --enable-tests/--enable-benchmarks and build lib/exe alongside
+  -- tests/benches in a single Setup invocation. Split packages never hit
+  -- this merge because their final entries are keyed by CTest/CBench, not
+  -- CLib, so mfinal is Nothing here.
+  hasFinal = isJust mfinal
   abuild = case mbuild of
     Nothing -> []
     Just task ->
@@ -589,7 +599,8 @@ toActions installedMap mtestLock runInBase ee taskKeys ck (mbuild, mfinal) =
                    (map (`ActionId` ATBuild)
                         task.configOpts.instantiationDeps)
           , action =
-              \ac -> runInBase $ singleBuild ac ee task installedMap False ck
+              \ac -> runInBase $
+                singleBuild ac ee task installedMap hasFinal hasFinal ck
           , concurrency = ConcurrencyAllowed
           }
       ]
@@ -613,7 +624,12 @@ toActions installedMap mtestLock runInBase ee taskKeys ck (mbuild, mfinal) =
                        (map (`ActionId` ATBuild)
                             task.configOpts.instantiationDeps)
               , action =
-                  \ac -> runInBase $ singleBuild ac ee task installedMap True ck
+                  -- Finals-only build (no primary task exists for this
+                  -- ComponentKey): isFinalBuild=True, isMergedBuild=False so
+                  -- buildAndCopyOpts emits only test/bench targets and skips
+                  -- copy/install.
+                  \ac -> runInBase $
+                    singleBuild ac ee task installedMap True False ck
               , concurrency = ConcurrencyAllowed
               }
           ]
