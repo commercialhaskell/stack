@@ -14,7 +14,7 @@ main :: IO ()
 main = do
   stackCheckStderr
     ["build", ":alpha"]
-    (rejectMessage (unlines ["Installing executable beta in"]))
+    (rejectMessage "Installing executable beta in")
 
 rejectMessage :: String -> String -> IO ()
 rejectMessage msg stderr =
