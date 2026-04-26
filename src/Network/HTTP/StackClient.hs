@@ -80,16 +80,16 @@ import qualified Data.Text as T
 import           Data.Time.Clock
                    ( NominalDiffTime, diffUTCTime, getCurrentTime )
 import           Network.HTTP.Client
-                   ( HttpException (..), HttpExceptionContent (..), Request
-                   , RequestBody (..), Response (..), checkResponse, getUri
-                   , method, parseRequest, parseUrlThrow, path, requestBody
+                   ( HttpException (..), HttpExceptionContent (..), Manager
+                   , Request, RequestBody (..), Response (..), checkResponse
+                   , getUri, method, parseRequest, parseUrlThrow, path
+                   , requestBody
                    )
 import           Network.HTTP.Client.MultipartFormData
                    ( formDataBody, partBS, partFileRequestBody, partLBS )
 import           Network.HTTP.Client.TLS
-                   ( applyDigestAuth, displayDigestAuthException
-                   , getGlobalManager
-                   )
+                   ( displayDigestAuthException, getGlobalManager )
+import qualified Network.HTTP.Client.TLS ( applyDigestAuth )
 import           Network.HTTP.Conduit ( requestHeaders )
 import           Network.HTTP.Download
                    ( CheckHexDigest (..), DownloadRequest, HashCheck (..)
@@ -306,3 +306,15 @@ chunksOverTime diff = do
         then put (currentTime, mempty) >> yield acc'
         else put (lastTime,    acc')
       go
+
+-- | Like 'Network.HTTP.Client.TLS.applyDigestAuth' but sets the User-Agent
+-- request header.
+applyDigestAuth ::
+     (MonadIO m, MonadThrow n)
+  => Strict.ByteString
+  -> Strict.ByteString
+  -> Request
+  -> Manager
+  -> m (n Request)
+applyDigestAuth user pass =
+  Network.HTTP.Client.TLS.applyDigestAuth user pass . setUserAgent
