@@ -46,6 +46,9 @@ Bug fixes:
 
 * Stack's `dot` and `ls dependencies` commands no longer prune a package with
   dependencies only because all its direct dependencies are to be pruned.
+* After March 2026, Hackage requires Stack's user agent to be set when applying
+  digest authentication to a request. Stack's `upload` command now does that,
+  re-establishing authentication by Hackage username and password.
 
 ## v3.9.3 - 2026-02-19
 

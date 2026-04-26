@@ -89,15 +89,6 @@ are ignored.
 
 [:octicons-tag-24: 2.3.1](https://github.com/commercialhaskell/stack/releases/tag/v2.3.1)
 
-!!! warning
-
-    After March 2026, Hackage requires Stack to add its user agent when applying
-    digest authentication to a request. Stack 3.9.3 and earlier do not do this.
-    Consequently, Stack's `upload` command is unable to submit digest
-    credentials and encounters an authentication failure when uploading to the
-    server. A work around is to use the
-    [`HACKAGE_KEY` environment variable](#the-hackage_key-environment-variable).
-
 `stack upload` will request a Hackage username and password to authenticate.
 This can be avoided by setting the `HACKAGE_USERNAME` and `HACKAGE_PASSWORD`
 environment variables. For
