@@ -1,4 +1,4 @@
 module Internal where
 
-test :: Int
-test = 42
+internalFunc :: IO ()
+internalFunc = pure ()
