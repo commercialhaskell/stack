@@ -1,0 +1,13 @@
+spec-version: 0.36.0
+
+name: myPackage
+version: 0.1.0.0
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+  exposed-modules:
+  - Lib
+  other-modules: []

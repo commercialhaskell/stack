@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 
--- A bogus Setup.hs file that does not compile
+-- | Version of Lib that does not compile.
+module Lib where
 
 -- Avoid problems with CPP and HLint
 #ifndef __HLINT__

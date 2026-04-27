@@ -1,0 +1,19 @@
+spec-version: 0.36.0
+
+name: myPackage
+version: 0.1.0.0
+
+flags:
+  necessary:
+    description: The package will not build unless this flag is true.
+    manual: true
+    default: false
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+  when:
+  - condition: flag(necessary)
+    cpp-options: -DWORK

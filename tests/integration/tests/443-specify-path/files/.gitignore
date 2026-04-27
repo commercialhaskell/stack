@@ -1,0 +1,5 @@
+bin/
+bin-absolute/
+myPackage.cabal
+myPackage.exe
+myPackage
