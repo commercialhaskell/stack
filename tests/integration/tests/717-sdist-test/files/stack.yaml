@@ -1,7 +1,8 @@
-snapshot: lts-24.37
+snapshot: ghc-9.10.3
+
 packages:
-- package-with-th
-- package-with-working-th
-- package-with-failing-test
+- failing-package-with-test
+- failing-package-with-th
 - subdirs/dependent-on-failing-packages
 - subdirs/failing-in-subdir
+- working-package-with-th

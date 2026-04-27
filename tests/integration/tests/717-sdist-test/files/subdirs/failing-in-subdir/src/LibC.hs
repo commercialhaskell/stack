@@ -1,10 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
+
 module LibC
     ( someFuncC
     ) where
 
-import THInSubdir
-import Language.Haskell.TH
+import           THInSubdir ( thFuncC )
 
 someFuncC :: IO ()
 someFuncC = print $(thFuncC)

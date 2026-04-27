@@ -1,0 +1,5 @@
+dependent-on-failing-packages.cabal
+failing-in-subdir.cabal
+failing-package-with-th.cabal
+failing-package-with-test.cabal
+working-package-with-th.cabal
