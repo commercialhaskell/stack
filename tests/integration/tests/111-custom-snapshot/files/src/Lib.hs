@@ -1,8 +1,5 @@
 module Lib
-    ( someFunc
-    ) where
+  ( launchMissiles
+  ) where
 
-import Control.Monad.Reader ()
-
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+import Acme.Missiles ( launchMissiles )

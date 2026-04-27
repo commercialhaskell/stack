@@ -1,10 +1,6 @@
 {-# LANGUAGE CPP #-}
-module Lib
-    ( someFunc
-    ) where
 
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+module Lib where
 
 -- Avoid problems with CPP and HLint
 #ifndef __HLINT__

@@ -1,4 +1,5 @@
-snapshot: lts-24.37
+snapshot: ghc-9.10.3
+
 extra-deps:
-- bytestring-0.11.5.4
-- binary-0.8.9.0
+# GHC 9.10.3 comes with bytestring-0.12.2.0
+- bytestring-0.12.1.0

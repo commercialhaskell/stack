@@ -1,2 +1,3 @@
 embed.txt
-src/Unlisted.hs
+app/Unlisted.hs
+myPackage.cabal

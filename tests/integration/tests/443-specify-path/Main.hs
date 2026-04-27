@@ -1,30 +1,30 @@
+-- Stack can specify the directory to which built executable binary files are
+-- copied.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/443
+
 import StackTest
-import System.Directory
-import System.FilePath
-import System.Info (os)
+import System.Directory ( createDirectory, getCurrentDirectory )
+import System.FilePath ( (</>) )
 
 main :: IO ()
 main = do
-  -- install in relative path
-  removeDirIgnore "bin"
-  createDirectory "bin"
-  stack [defaultSnapshotArg, "--local-bin-path", "./bin", "install" , "happy"]
-  doesExist ("./bin/happy" ++ exeExt)
-
   -- Default install
-  -- This seems to fail due to directory being cleaned up,
-  -- a manual test of the default stack install is required
-  -- defaultDir <- getAppUserDataDirectory "local"
-  -- stack ["install", "happy"]
-  -- doesExist (defaultDir ++ "/bin/happy" ++ exeExt)
+  -- A manual test of the default stack install is required
 
-  -- install in current dir
-  stack [defaultSnapshotArg, "--local-bin-path", ".", "install", "happy" ]
-  doesExist ("happy" ++ exeExt)
+  -- Install in current dir
+  stack [ "--local-bin-path", ".", "install" ]
+  doesExist myPackageExe
 
-  -- install in absolute path
-  tmpDirectory <- fmap (</> "absolute-bin") getCurrentDirectory
-  removeDirIgnore tmpDirectory
+  -- Install in relative path
+  createDirectory "bin"
+  stack [ "--local-bin-path", "./bin", "install" ]
+  doesExist ("./bin/" <> myPackageExe)
+
+  -- Install in absolute path
+  tmpDirectory <- fmap (</> "bin-absolute") getCurrentDirectory
   createDirectory tmpDirectory
-  stack [defaultSnapshotArg, "--local-bin-path", tmpDirectory, "install", "happy" ]
-  doesExist (tmpDirectory </> ("happy" ++ exeExt))
+  stack [ "--local-bin-path", tmpDirectory, "install" ]
+  doesExist (tmpDirectory </> myPackageExe)
+ where
+  myPackageExe = "myPackage" <> exeExt

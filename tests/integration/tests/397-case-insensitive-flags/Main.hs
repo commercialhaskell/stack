@@ -1,10 +1,11 @@
+-- Cabal flags are case-insensitive and Stack treats them as such.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/397
+
 import StackTest
 
 main :: IO ()
 main = do
-    stackErr ["build"]
-    stack ["build", "--flag", "new-template:fixIt"]
-    stack ["build", "--flag", "new-template:fixit"]
-    stack ["build", "--flag", "new-template:fiXit"]
-    stack ["build", "--flag", "*:fiXit"]
-    stackErr ["build", "--flag", "*:fiXit-else"]
+  stackErr ["build"]
+  stack ["build", "--flag", "myPackage:nEcEssAry"]
+  stack ["build", "--flag", "*:nEcEssAry"]
