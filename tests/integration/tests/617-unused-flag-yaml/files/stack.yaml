@@ -1,4 +1,5 @@
 snapshot: ghc-9.10.3
+
 flags:
-  does-not-exist:
-    foo: false
+  no-such-package:
+    my-flag: false

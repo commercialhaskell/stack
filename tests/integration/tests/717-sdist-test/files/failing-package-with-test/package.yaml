@@ -1,0 +1,13 @@
+spec-version: 0.36.0
+
+name: failing-package-with-test
+version: 0.1.0.0
+description: A package with a test suite that is incomplete if sdist.
+
+dependencies:
+- base < 5
+
+tests:
+  my-test:
+    source-dirs: test
+    main: Test.hs

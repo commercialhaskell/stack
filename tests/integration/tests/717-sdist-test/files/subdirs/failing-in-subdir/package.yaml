@@ -1,0 +1,15 @@
+spec-version: 0.36.0
+
+name: failing-in-subdir
+version: 0.1.0.0
+description: A package with Template Haskell that is incomplete if sdist.
+
+extra-source-files:
+- README.md
+
+dependencies:
+- base < 5
+- template-haskell
+
+library:
+  source-dirs: src

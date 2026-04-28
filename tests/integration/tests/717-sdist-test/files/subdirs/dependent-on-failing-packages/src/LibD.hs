@@ -1,9 +1,9 @@
 module LibD
-    ( someFunc
-    ) where
+  ( someFuncD
+  ) where
 
-import Lib
-import LibC
+import           Lib ( someFunc )
+import           LibC ( someFuncC )
 
 someFuncD :: IO ()
 someFuncD = do

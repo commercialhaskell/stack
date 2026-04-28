@@ -1,0 +1,17 @@
+spec-version: 0.36.0
+
+name: dependent-on-failing-packages
+version: 0.1.0.0
+description: A package that can be sdist that depends on packages that cannot
+
+extra-source-files:
+- README.md
+
+dependencies:
+- base < 5
+- template-haskell
+- failing-package-with-th
+- failing-in-subdir
+
+library:
+  source-dirs: src
