@@ -1,28 +1,29 @@
-import StackTest
-import Control.Monad
-import System.Directory
-import System.FilePath
+-- Stack's new command accepts project names that are valid Cabal package names
+-- and rejects those that are not without creating a project directory.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/1336
+--      https://github.com/commercialhaskell/stack/issues/1337
 
-{-# ANN module "HLint: ignore Use unless" #-}
+import           Control.Monad ( unless, when )
+import           StackTest
+import           System.Directory
+                   ( doesDirectoryExist, removeDirectoryRecursive )
+
 main :: IO ()
-main =
-    if isWindows
-        then logInfo "Disabled on Windows (see https://github.com/commercialhaskell/stack/issues/1337#issuecomment-166118678)"
-        else when isLinux $ do
-            safeNew "1234a-4b-b4-abc-12b34"
-            doesExist "./1234a-4b-b4-abc-12b34/stack.yaml"
-            stackErr ["new", "1234-abc"]
-            doesNotExist "./1234-abc/stack.yaml"
-            doesNotExist "./1234-abc"
-            stackErr ["new", "1-abc"]
-            stackErr ["new", "44444444444444"]
-            stackErr ["new", "abc-1"]
-            stackErr ["new", "444-ば日本-4本"]
-            unless isMacOSX $ safeNew "ば日本-4本"
-            safeNew "אבהץש"
-            safeNew "ΔΘΩϬ"
-            doesExist "./ΔΘΩϬ/stack.yaml"
-            doesExist "./ΔΘΩϬ/ΔΘΩϬ.cabal"
+main = do
+  safeNew "1b3d-a2c4"
+  doesExist "./1b3d-a2c4/stack.yaml"
+  doesExist "./1b3d-a2c4/1b3d-a2c4.cabal"
+  stackErr ["new", "1234-abcd"]
+  doesNotExist "./1234-abcd"
+  stackErr ["new", "abcd-1234"]
+  -- The GitHub windows-latest (Microsoft Windows Server 2025) environment
+  -- appears to be unable to handle these Unicode code points.
+  unless isWindows $ do
+    stackErr ["new", "1234-ば日本-4本"]
+    safeNew "ば日本-4本"
+    safeNew "אבהץש"
+    safeNew "ΔΘΩϬ"
 
 safeNew :: String -> IO ()
 safeNew name = do

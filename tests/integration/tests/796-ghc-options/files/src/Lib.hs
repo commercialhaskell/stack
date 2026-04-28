@@ -1,24 +1,20 @@
 {-# LANGUAGE CPP #-}
-module Lib
-    ( someFunc
-    ) where
 
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+module Lib where
 
 -- Avoid problems with CPP and HLint
 #ifndef __HLINT__
 
-#ifndef FOO
-#error FOO isn't defined
+#ifndef VARIABLE_A
+#error VARIABLE_A isn't defined
 #endif
 
-#ifndef BAR
-#error BAR isn't defined
+#ifndef VARIABLE_B
+#error VARIABLE_B isn't defined
 #endif
 
-#ifdef BAZ
-#error BAZ is defined
+#ifdef VARIABLE_C
+#error VARIABLE_C is defined
 #endif
 
 #endif

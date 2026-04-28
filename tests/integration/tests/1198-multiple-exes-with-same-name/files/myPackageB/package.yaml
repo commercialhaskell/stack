@@ -1,0 +1,12 @@
+spec-version: 0.36.0
+
+name: myPackageB
+version: 0.1.0.0
+
+dependencies:
+- base
+
+executables:
+  myPackage:
+    source-dirs: app
+    main: Main.hs
