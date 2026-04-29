@@ -1,9 +1,0 @@
-name: bar
-version: 0
-
-dependencies:
-- base
-
-library:
-  source-dirs: src
-  ghc-options: -Wall

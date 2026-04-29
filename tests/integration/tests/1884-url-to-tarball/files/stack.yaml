@@ -1,5 +1,6 @@
-snapshot: lts-24.37
+snapshot: ghc-9.10.3
+
 extra-deps:
-- location: https://hackage.haskell.org/package/half-0.2.2.3/half-0.2.2.3.tar.gz
-  sha256: 85c244c80d1c889a3d79073a6f5a99d9e769dbe3c574ca11d992b2b4f7599a5c
-  size: 6050
+- location: https://hackage.haskell.org/package/acme-missiles-0.3/acme-missiles-0.3.tar.gz
+  sha256: e563d8b524017a06b32768c4db8eff1f822f3fb22a90320b7e414402647b735b
+  size: 1442

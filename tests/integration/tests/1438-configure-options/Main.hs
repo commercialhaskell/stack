@@ -1,12 +1,21 @@
-import StackTest
-import Control.Monad (unless)
-import Data.Foldable (for_)
-import Data.List (isInfixOf)
+-- Stack allows Cabal configuration options to be set.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/1337
+
+import           Control.Monad ( unless )
+import           Data.Foldable ( for_ )
+import           Data.List ( isInfixOf )
+import           StackTest
 
 main :: IO ()
 main = do
   stackCleanFull
-  let stackYamlFiles = words "stack-locals.yaml stack-everything.yaml stack-targets.yaml stack-name.yaml"
+  let stackYamlFiles =
+        [ "stack-locals.yaml"
+        , "stack-everything.yaml"
+        , "stack-targets.yaml"
+        , "stack-myPackage.yaml"
+        ]
   for_ stackYamlFiles $ \stackYaml ->
     stackErrStderr ["build", "--stack-yaml", stackYaml] $ \str ->
       unless ("invalid option" `isInfixOf` str) $
