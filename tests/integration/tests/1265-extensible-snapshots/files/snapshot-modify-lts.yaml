@@ -1,4 +1,9 @@
-snapshot: lts-24.37
 name: snapshot-modify-lts
+
+snapshot: lts-24.37
+
+packages:
+- acme-missiles-0.3
+
 drop-packages:
 - zlib

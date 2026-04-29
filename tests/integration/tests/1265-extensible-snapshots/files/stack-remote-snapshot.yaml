@@ -1,3 +1,4 @@
 snapshot: snapshots/remote-snapshot.yaml
-packages: []
-allow-newer: true
+
+packages:
+- myPackageA

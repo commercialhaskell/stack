@@ -1,4 +1,6 @@
-snapshot: lts-24.37
 name: local-snapshot
+
+snapshot: ghc-9.10.3
+
 packages:
-- archive: package-0.1.2.3.tar.gz
+- archive: myPackage-0.1.0.0.tar.gz

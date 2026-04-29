@@ -1,6 +1,6 @@
-snapshot: snapshot-2.yaml
 name: test-snapshot
-packages:
-- microlens-0.4.14.0
+
+snapshot: snapshot-2.yaml
+
 drop-packages:
-- zlib
+- acme-box

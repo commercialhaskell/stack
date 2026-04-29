@@ -1,2 +1,5 @@
 snapshot: snapshot-modify-lts.yaml
-packages: []
+
+packages:
+- myPackageA
+- myPackageD
