@@ -1,9 +1,0 @@
-name: issue3520
-version: 0.1.0.0
-
-dependencies:
-- base
-- mtl
-
-library:
-  source-dirs: src

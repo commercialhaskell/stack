@@ -7,6 +7,6 @@ dependencies:
 - base
 
 executables:
-  myPackage:
+  myExe:
     source-dirs: app
     main: Main.hs

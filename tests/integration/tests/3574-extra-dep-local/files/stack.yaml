@@ -3,7 +3,7 @@ snapshot: ghc-9.10.3
 packages: []
 
 extra-deps:
-- foo
+- myPackage
 
 ghc-options:
-  $locals: -bob
+  $locals: -dummy

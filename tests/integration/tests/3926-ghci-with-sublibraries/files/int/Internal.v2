@@ -1,0 +1,6 @@
+module Internal
+  ( checkInternal
+  ) where
+
+checkInternal :: String
+checkInternal = "OK"

@@ -1,6 +1,8 @@
-module Lib where
+module Lib
+  ( checkLib
+  ) where
 
 import Internal
 
-testStr :: String
-testStr = "OK"
+checkLib :: String
+checkLib = "OK"

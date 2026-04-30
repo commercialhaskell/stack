@@ -1,0 +1,23 @@
+spec-version: 0.36.0
+
+name: myPackage
+version: 0.1.0.0
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+  dependencies:
+  - internal
+
+internal-libraries:
+  internal:
+    source-dirs: int
+
+executables:
+  myExe:
+    source-dirs: app
+    main: Main.hs
+    dependencies:
+    - myPackage

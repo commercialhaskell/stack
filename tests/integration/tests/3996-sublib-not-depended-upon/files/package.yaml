@@ -7,8 +7,8 @@ dependencies:
 - base
 
 library:
-  source-dirs: src-myPackage
+  source-dirs: src
 
 internal-libraries:
   internal:
-    source-dirs: src-internal
+    source-dirs: int

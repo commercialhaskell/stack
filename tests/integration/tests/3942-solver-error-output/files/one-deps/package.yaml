@@ -1,16 +1,11 @@
+spec-version: 0.36.0
+
 name: one-deps
 version: 0.1.0.0
 synopsis: A package with one dependency (no-deps) other than base
-license: BSD3
-author: Author name here
-copyright: 2000 Author name here
-category: Development
-extra-source-files: []
 
 dependencies:
 - base
 - no-deps
 
-library:
-  source-dirs: '.'
-  exposed-modules: []
+library: {}

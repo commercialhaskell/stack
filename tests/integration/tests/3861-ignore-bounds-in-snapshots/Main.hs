@@ -1,7 +1,11 @@
+-- Stack trusts package versions in a snapshot over Cabal file dependency
+-- information.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/3861
+
 import StackTest
 
 main :: IO ()
 main = do
-  stackIgnoreException ["clean", "--stack-yaml", "stack-good.yaml", "--full"]
   stackErr ["build", "--stack-yaml", "stack-bad.yaml"]
   stack ["build", "--stack-yaml", "stack-good.yaml"]

@@ -9,4 +9,4 @@ main :: IO ()
 main = do
   setCurrentDirectory "app"
   stack ["build"]
-  stack ["exec", "myPackage"]
+  stack ["exec", "myExe"]
