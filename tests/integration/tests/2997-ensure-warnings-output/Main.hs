@@ -1,10 +1,14 @@
+-- Stack dumps logs with GHC warnings for multi-package projects and
+-- non-interleaved output.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/2997
+
+import Data.List ( isInfixOf )
 import StackTest
-import Data.List (isInfixOf)
 
 main :: IO ()
 main = do
-  stackCleanFull
-  stackCheckStderr ["build", "--terminal", "--color=always"] $ \str ->
+  stackCheckStderr ["build", "--no-interleaved-output"] $ \str ->
     if "no type signature" `isInfixOf` str
       then pure ()
       else error "Warnings are not being shown"

@@ -1,1 +1,3 @@
 module Lib where
+
+func = ()

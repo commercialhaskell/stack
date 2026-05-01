@@ -1,10 +1,11 @@
 spec-version: 0.36.0
 
-name: myPackage
+name: myPackageB
 version: 0.1.0.0
 
 dependencies:
 - base
-- acme-missiles
+- myPackageA
 
-library: {}
+library:
+  source-dirs: src

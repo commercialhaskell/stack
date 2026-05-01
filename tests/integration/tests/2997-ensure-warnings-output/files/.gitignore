@@ -1,1 +1,2 @@
-*.cabal
+myPackageA.cabal
+myPackageB.cabal

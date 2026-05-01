@@ -1,10 +1,13 @@
+-- Stack rebuilds a benchmark when an indirect dependency changes.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/2781
+
 import StackTest
-import System.Directory
+import System.Directory ( createDirectoryIfMissing )
 
 main :: IO ()
 main = do
-  createDirectoryIfMissing True "foo/src"
-  readFile "foo/v1/Foo.hs" >>= writeFile "foo/src/Foo.hs"
+  copy "myPackageB/v1/MyPackageB-v1.hs" "myPackageB/src/MyPackageB.hs"
   stack ["bench"]
-  readFile "foo/v2/Foo.hs" >>= writeFile "foo/src/Foo.hs"
+  copy "myPackageB/v2/MyPackageB-v2.hs" "myPackageB/src/MyPackageB.hs"
   stack ["bench"]

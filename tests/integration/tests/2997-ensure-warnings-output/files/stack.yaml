@@ -1,5 +1,7 @@
 snapshot: ghc-9.10.3
+
 packages:
-- foo
-- bar
+- myPackageA
+- myPackageB
+
 dump-logs: warning

@@ -1,6 +1,6 @@
 module Main where
 
-import Пσε
+import           Пσε ( θυπε )
 
 main :: IO ()
 main = putStrLn θυπε

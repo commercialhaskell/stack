@@ -1,1 +1,2 @@
-name.cabal
+myPackage.cabal
+*.yaml.lock

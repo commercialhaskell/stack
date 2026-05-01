@@ -1,1 +1,5 @@
-snapshot: lts-24.37
+snapshot: ghc-9.10.3
+
+packages:
+- myPackageA
+- myPackageB
