@@ -1,3 +1,5 @@
+-- See: https://github.com/commercialhaskell/stack/issues/4044
+
 {-# LANGUAGE OverloadedStrings #-}
 
 {--

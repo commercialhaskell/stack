@@ -1,0 +1,24 @@
+spec-version: 0.36.0
+
+name: myPackage
+version: 0.1.0.0
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+
+tests:
+  test:
+    source-dirs: test
+    main: Main.hs
+    dependencies:
+    - myPackage
+
+benchmarks:
+  bench:
+    source-dirs: bench
+    main: Main.hs
+    dependencies:
+    - myPackage

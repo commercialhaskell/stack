@@ -1,6 +1,6 @@
-import StackTest
+import           StackTest
 
 main :: IO ()
 main = do
-  stack ["build", "--stack-yaml", "stack1.yaml"]
-  stack ["build", "--stack-yaml", "stack2.yaml"]
+  stack ["--stack-yaml", "stack1.yaml", "build"]
+  stack [ "--stack-yaml", "stack2.yaml", "build"]

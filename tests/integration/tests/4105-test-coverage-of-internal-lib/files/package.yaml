@@ -6,9 +6,17 @@ version: 0.1.0.0
 dependencies:
 - base
 
-library: {}
+library:
+  source-dirs: src
+
+internal-libraries:
+  internal:
+    source-dirs: int
 
 tests:
   test:
     source-dirs: test
     main: Main.hs
+    dependencies:
+    - internal
+    - myPackage

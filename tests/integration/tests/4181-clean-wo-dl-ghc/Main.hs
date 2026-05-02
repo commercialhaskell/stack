@@ -1,6 +1,7 @@
--- |
--- The integration tests have no ghc present, initially. Stack should not
--- require ghc present to run the `clean` command.
+-- Stack's clean command should not require the presence of the specified
+-- version of GHC.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/4181
 
 import StackTest
 
