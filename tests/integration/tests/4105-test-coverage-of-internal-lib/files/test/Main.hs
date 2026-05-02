@@ -1,6 +1,6 @@
-import Control.Monad (when)
+import           Control.Monad ( when )
 
-import Src
-import B
+import Lib ( funcLib )
+import Internal ( funcInternal )
 
-main = when (funMainLib 41 /= funInternal 43) $ error "test failed"
+main = when (funcLib 41 /= funcInternal 43) $ error "test failed"

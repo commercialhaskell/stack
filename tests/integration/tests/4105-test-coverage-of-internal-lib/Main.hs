@@ -1,6 +1,11 @@
-import Control.Monad ( unless )
-import Data.List ( isInfixOf, isPrefixOf )
-import StackTest
+-- Stack generates coverage reports for main libraries and private named
+-- libraries (internal libraries).
+--
+-- See: https://github.com/commercialhaskell/stack/issues/4105
+
+import           Control.Monad ( unless )
+import           Data.List ( isInfixOf, isPrefixOf )
+import           StackTest
 
 main :: IO ()
 main = do

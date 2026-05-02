@@ -1,8 +1,12 @@
-name: foo
-version: 0
+spec-version: 0.36.0
+
+name: myPackage
+version: 0.1.0.0
+
 dependencies:
 - base
 
 executables:
-  ShowUnicode:
-    main: ShowUnicode.hs
+  myExe:
+    source-dirs: app
+    main: Main.hs

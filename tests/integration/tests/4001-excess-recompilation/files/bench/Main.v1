@@ -1,0 +1,4 @@
+import  Lib
+
+main :: IO ()
+main = putStrLn "Version 1"

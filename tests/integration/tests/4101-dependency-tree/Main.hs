@@ -1,13 +1,17 @@
-import Control.Monad (when, unless)
-import StackTest
-import System.Directory (getCurrentDirectory)
-import Data.List (isPrefixOf)
+-- Stack can report the dependency tree of project packages.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/4101
+
+import           Control.Monad ( unless, when )
+import           Data.List ( isPrefixOf )
+import           StackTest
+import           System.Directory ( getCurrentDirectory )
 
 main :: IO ()
 main = unless isWindows $ do
   stackCheckStdout ["ls", "dependencies", "tree"] $ \stdOut -> do
     let expected = unlines [ "Packages"
-                           , "├─┬ files 0.1.0.0"
+                           , "├─┬ myPackageA 0.1.0.0"
                            , "│ ├─┬ base 4.20.2.0"
                            ]
     unless (expected `isPrefixOf` stdOut) $
@@ -15,20 +19,20 @@ main = unless isWindows $ do
 
   stackCheckStdout ["ls", "dependencies", "tree", "--depth=1"] $ \stdOut -> do
     let expected = unlines [ "Packages"
-                           , "├─┬ files 0.1.0.0"
+                           , "├─┬ myPackageA 0.1.0.0"
                            , "│ ├── base 4.20.2.0"
                            , "│ ├── filelock 0.1.1.2"
                            , "│ ├── mtl 2.3.1"
-                           , "│ └── subproject 0.1.0.0"
-                           , "└─┬ subproject 0.1.0.0"
+                           , "│ └── myPackageB 0.1.0.0"
+                           , "└─┬ myPackageB 0.1.0.0"
                            , "  └── base 4.20.2.0"
                            ]
     when (stdOut /= expected) $
       error $ unlines [ "Expected:", expected, "Actual:", stdOut ]
 
-  stackCheckStdout ["ls", "dependencies", "tree", "subproject"] $ \stdOut -> do
+  stackCheckStdout ["ls", "dependencies", "tree", "myPackageB"] $ \stdOut -> do
     let expected = unlines [ "Packages"
-                           , "└─┬ subproject 0.1.0.0"
+                           , "└─┬ myPackageB 0.1.0.0"
                            , "  └─┬ base 4.20.2.0"
                            , "    ├─┬ ghc-internal 9.1003.0"
                            , "    │ ├─┬ ghc-bignum 1.3"
