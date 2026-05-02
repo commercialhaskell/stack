@@ -1,4 +1,6 @@
-name: issue3959
+spec-version: 0.36.0
+
+name: myPackage
 version: 0.1.0.0
 
 dependencies:
@@ -6,5 +8,5 @@ dependencies:
 
 tests:
   test:
-    main: Spec.hs
+    main: Main.hs
     source-dirs: test

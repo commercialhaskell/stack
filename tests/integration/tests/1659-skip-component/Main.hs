@@ -6,5 +6,5 @@ import           StackTest
 
 main :: IO ()
 main = do
-  stack ["build", "--test", "--bench", "--skip", "failing-test", "--skip", "failing-bench", "--skip", "myPackage-failing"]
-  stack ["build", ":failing-test", ":failing-bench", ":myPackage", ":myPackage-failing", "--skip", "failing-test", "--skip", "failing-bench", "--skip", "myPackage-failing"]
+  stack ["build", "--test", "--bench", "--skip", "test-failing", "--skip", "bench-failing", "--skip", "myExe-failing"]
+  stack ["build", ":test-failing", ":bench-failing", ":myExe", ":myExe-failing", "--skip", "test-failing", "--skip", "bench-failing", "--skip", "myExe-failing"]

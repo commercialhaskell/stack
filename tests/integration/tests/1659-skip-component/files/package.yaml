@@ -10,19 +10,19 @@ library:
   source-dirs: src
 
 executables:
-  myPackage:
+  myExe:
     source-dirs: app
     main: Main.hs
-  myPackage-failing:
+  myExe-failing:
     source-dirs: app-failing
     main: Main.hs
 
 tests:
-  failing-test:
+  test-failing:
     source-dirs: test
-    main: Spec.hs
+    main: Main.hs
 
 benchmarks:
-  failing-bench:
+  bench-failing:
     source-dirs: bench
-    main: Bench.hs
+    main: Main.hs

@@ -1,3 +1,2 @@
-.stack-work/
-*.cabal
-stack.yaml
+deps.cabal
+no-deps.cabal

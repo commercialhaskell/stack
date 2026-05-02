@@ -1,8 +1,0 @@
-cabal-version:      >= 1.2
-build-type:         Simple
-name:               foo
-version:            0
-
-library
-    build-depends: base
-    exposed-modules: Foo
