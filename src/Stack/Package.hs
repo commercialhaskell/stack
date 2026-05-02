@@ -36,6 +36,7 @@ module Stack.Package
   , topSortPackageComponent
   , hasIntraPackageDeps
   , packageIsIndefinite
+  , packageUsesBackpack
   ) where
 
 import qualified Data.Map.Strict as M
@@ -947,3 +948,18 @@ packageIsIndefinite pkg = any hasSignatures allLibs
   allLibs =
        maybeToList pkg.library
     ++ toList pkg.subLibraries
+
+-- | True iff the package has signatures or any component has mixins.
+packageUsesBackpack :: Package -> Bool
+packageUsesBackpack pkg =
+     packageIsIndefinite pkg
+  || any (not . null . (.mixins)) allBuildInfos
+ where
+  allBuildInfos :: [Component.StackBuildInfo]
+  allBuildInfos =
+       maybeToList ((.buildInfo) <$> pkg.library)
+    ++ map (.buildInfo) (toList pkg.subLibraries)
+    ++ map (.buildInfo) (toList pkg.foreignLibraries)
+    ++ map (.buildInfo) (toList pkg.executables)
+    ++ map (.buildInfo) (toList pkg.testSuites)
+    ++ map (.buildInfo) (toList pkg.benchmarks)

@@ -49,11 +49,9 @@ A package that has at least one unfilled signature is called *indefinite*.
 
 Backpack fills a signature through *mixin linking*: when a module with the same
 name as a signature is brought into scope, the compiler treats that module as
-the implementation. There is no special syntax for this — it happens
-automatically by name.
+the implementation.
 
-For example, if you depend on both the indefinite package above and a package
-that exposes a module named `Str`, mixin linking fills the hole:
+In Stack, you must declare this explicitly via the `mixins` field:
 
 ~~~cabal
 library
@@ -61,30 +59,39 @@ library
     , base
     , str-string          -- exposes module "Str"
     , my-indefinite-pkg   -- has signature "Str"
+  mixins:
+    my-indefinite-pkg requires (Str as Str)
 ~~~
 
-Because `str-string` exposes a module called `Str` and `my-indefinite-pkg`
-requires a signature called `Str`, the compiler matches them up and compiles
-`my-indefinite-pkg` with `str-string`'s `Str` as the implementation.
+Cabal supports an implicit form (mixin linking by name without a `mixins`
+field), but Stack's instantiation planner only walks explicit `mixins`
+declarations. Always add the `mixins` line for cross-package Backpack.
 
 ### Renaming
 
 When the signature name and the implementation module name differ, the
 `mixins` field lets you rename one or the other.
 
-Rename the requirement to match the implementation:
+Suppose the indefinite package has signature `Str`, and a separate package
+exposes the same declarations under the module name `MyStr`. Rename the
+requirement to match the implementation:
 
 ~~~cabal
-  mixins: my-indefinite-pkg requires (Str as Data.Text)
+  mixins: my-indefinite-pkg requires (Str as MyStr)
 ~~~
 
 Or rename the implementation to match the requirement:
 
 ~~~cabal
-  mixins: text (Data.Text as Str)
+  mixins: my-impl-pkg (MyStr as Str)
 ~~~
 
-Both achieve the same result: the `Str` signature is filled by `Data.Text`.
+Both achieve the same result: the `Str` signature is filled by `MyStr`.
+
+Note that mixin renaming is module-level: the implementation module must
+already export the same identifiers (types, functions) that the signature
+declares. Renaming only changes which module name fills which signature; it
+does not bridge mismatched contents.
 
 The `mixins` field also supports `hiding` on the `requires` side. This tells
 the compiler *not* to fill the listed signatures through mixin linking for this
@@ -99,14 +106,16 @@ implementations. Each instantiation gets its own renaming in `mixins`:
   mixins:
     my-indefinite-pkg
       (MyModule as MyModule.Text)
-      requires (Str as Data.Text),
+      requires (Str as TextStr),
     my-indefinite-pkg
       (MyModule as MyModule.BS)
-      requires (Str as Data.ByteString)
+      requires (Str as BSStr)
 ~~~
 
-This produces two copies of `MyModule` — one backed by `Data.Text`, the other
-by `Data.ByteString` — each with a distinct module name so they do not clash.
+Where `TextStr` and `BSStr` are modules from impl packages on `build-depends`
+that export the identifiers the `Str` signature declares. This produces two
+copies of `MyModule` — one backed by `TextStr`, the other by `BSStr` —
+each with a distinct module name so they do not clash.
 
 ### Sub-libraries
 
@@ -120,6 +129,7 @@ cabal-version: 2.2
 name: my-project
 
 library str-sig
+  build-depends: base
   signatures: Str
 
 library str-text
@@ -128,6 +138,7 @@ library str-text
 
 library
   build-depends: base, str-sig, str-text
+  mixins: str-sig requires (Str as Str)
   exposed-modules: MyModule
 ~~~
 
@@ -148,6 +159,7 @@ need to know about Backpack:
 ~~~cabal
 library
   build-depends: base, regex-indef, str-bytestring
+  mixins: regex-indef requires (Str as Str)
   reexported-modules: Regex as Regex.ByteString
 ~~~
 

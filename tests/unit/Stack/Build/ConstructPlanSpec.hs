@@ -32,7 +32,10 @@ import           Stack.Build.Backpack ( addInstantiationTasks )
 import           Stack.Build.ConstructPlan ( shouldSplitComponents )
 import           Stack.Build.ExecutePackage
                    ( findGhcPkgId, mkInstantiateWithOpts )
-import           Stack.Package ( hasIntraPackageDeps, packageIsIndefinite )
+import           Stack.Package
+                   ( hasIntraPackageDeps, packageIsIndefinite
+                   , packageUsesBackpack
+                   )
 import           Stack.Prelude
 import           Stack.Types.Build.ConstructPlan ( AddDepRes (..) )
 import           Database.Persist ( PersistField (..), PersistValue (..) )
@@ -54,7 +57,8 @@ import           Stack.Types.Installed
                    )
 import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId )
 import           Stack.Types.IsMutable ( IsMutable (..) )
-import           Stack.Types.NamedComponent ( NamedComponent (..) )
+import           Stack.Types.NamedComponent
+                   ( NamedComponent (..), exeComponents )
 import           Stack.Types.Package ( Package (..), packageIdentifier )
 import           Stack.Types.PackageFile ( StackPackageFile (..) )
 import           Stack.Types.Plan
@@ -216,31 +220,6 @@ withSelfDepTests names pkg = pkg
       ]
   }
 
--- | Add buildable benchmarks that depend on the package's own library.
-withSelfDepBenchmarks :: [String] -> Package -> Package
-withSelfDepBenchmarks names pkg = pkg
-  { benchmarks = foldAndMakeCollection id
-      [ StackBenchmark
-          { name = unqualCompFromString n
-          , buildInfo = selfDepBuildInfo pkg.name
-          , interface = BenchmarkUnsupported (BenchmarkTypeUnknown "" (mkVersion [0]))
-          }
-      | n <- names
-      ]
-  }
-
--- | Add buildable foreign libraries that depend on the package itself.
-withSelfDepForeignLibs :: [String] -> Package -> Package
-withSelfDepForeignLibs names pkg = pkg
-  { foreignLibraries = foldAndMakeCollection id
-      [ StackForeignLibrary
-          { name = unqualCompFromString n
-          , buildInfo = selfDepBuildInfo pkg.name
-          }
-      | n <- names
-      ]
-  }
-
 -- | Add buildable sub-libraries to a package.
 withSubLibs :: [String] -> Package -> Package
 withSubLibs names pkg = pkg
@@ -296,9 +275,19 @@ withBenchmarks names pkg = pkg
 spec :: Spec
 spec = do
   describe "shouldSplitComponents" $ do
-    it "returns True for Simple package without intra-package deps" $ do
+    it "returns False for non-Backpack Simple package (no library)" $ do
       let pkg = testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` True
+      shouldSplitComponents pkg `shouldBe` False
+
+    it "returns False for non-Backpack Simple package with library" $ do
+      let pkg = withLibrary $ testPackage (mkPackageName "pkg") Simple
+      shouldSplitComponents pkg `shouldBe` False
+
+    it "returns False for non-Backpack Simple package with lib + exes" $ do
+      let pkg = withExes ["exe1", "exe2"]
+              $ withLibrary
+              $ testPackage (mkPackageName "pkg") Simple
+      shouldSplitComponents pkg `shouldBe` False
 
     it "returns False for Custom build type" $ do
       let pkg = testPackage (mkPackageName "pkg") Custom
@@ -308,61 +297,109 @@ spec = do
       let pkg = testPackage (mkPackageName "pkg") Configure
       shouldSplitComponents pkg `shouldBe` False
 
-    it "returns False when main lib depends on own sub-libs (Backpack)" $ do
-      let pkg = withSelfDepLibrary $ testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` False
-
-    it "returns False when sub-lib has self-dep (Backpack)" $ do
-      let pkg = withSelfDepSubLib $ testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` False
-
-    it "returns True when only exes depend on own lib (normal pattern)" $ do
-      let pkg = withSelfDepExes ["my-exe"]
-              $ withLibrary
-              $ testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` True
-
-    it "returns True for Simple package with library but no self-dep" $ do
-      let pkg = withLibrary $ testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` True
-
-    it "returns True for Simple package with exes and lib" $ do
-      let pkg = withExes ["exe1", "exe2"]
-              $ withLibrary
-              $ testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` True
-
-    it "returns True when tests depend on own lib (normal pattern)" $ do
-      let pkg = withSelfDepTests ["my-tests"]
-              $ withLibrary
-              $ testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` True
-
-    it "returns True when benchmarks depend on own lib (normal pattern)" $ do
-      let pkg = withSelfDepBenchmarks ["my-bench"]
-              $ withLibrary
-              $ testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` True
-
-    it "returns True when foreign lib has self-dep (not Backpack)" $ do
-      let pkg = withSelfDepForeignLibs ["cbits"]
-              $ withLibrary
-              $ testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` True
-
-    it "returns True for all non-library self-deps combined" $ do
-      let pkg = withSelfDepExes ["app"]
-              $ withSelfDepTests ["tests"]
-              $ withSelfDepBenchmarks ["bench"]
-              $ withSelfDepForeignLibs ["ffi"]
-              $ withLibrary
-              $ testPackage (mkPackageName "pkg") Simple
-      shouldSplitComponents pkg `shouldBe` True
-
-    it "returns False for indefinite package (has signatures)" $ do
+    it "returns False for indefinite (sig) package: hasIntraPackageDeps wins" $ do
       let pkg = withIndefiniteLibrary ["Str"]
               $ testPackage (mkPackageName "sig-pkg") Simple
       shouldSplitComponents pkg `shouldBe` False
+
+    it "returns False when main lib has Backpack self-dep" $ do
+      let pkg = withSelfDepLibrary $ testPackage (mkPackageName "pkg") Simple
+      shouldSplitComponents pkg `shouldBe` False
+
+    it "returns False when sub-lib has Backpack self-dep" $ do
+      let pkg = withSelfDepSubLib $ testPackage (mkPackageName "pkg") Simple
+      shouldSplitComponents pkg `shouldBe` False
+
+    it "returns True for Backpack consumer (lib with mixin)" $ do
+      let pkg = withMixins [defaultMixin (mkPackageName "sig-pkg")]
+              $ withLibrary
+              $ testPackage (mkPackageName "consumer") Simple
+      shouldSplitComponents pkg `shouldBe` True
+
+    it "returns True for Backpack consumer with lib + exe + mixin" $ do
+      let pkg = withMixins [defaultMixin (mkPackageName "sig-pkg")]
+              $ withExes ["consumer-demo"]
+              $ withLibrary
+              $ testPackage (mkPackageName "consumer") Simple
+      shouldSplitComponents pkg `shouldBe` True
+
+    it "returns False for multi-library Backpack consumer (B's clause)" $ do
+      let pkg = withMixins [defaultMixin (mkPackageName "sig-pkg")]
+              $ withSubLibs ["internal"]
+              $ withLibrary
+              $ testPackage (mkPackageName "consumer") Simple
+      shouldSplitComponents pkg `shouldBe` False
+
+    it "returns False for non-Backpack Simple package with sublibs" $ do
+      let pkg = withSubLibs ["internal"]
+              $ withLibrary
+              $ testPackage (mkPackageName "pkg") Simple
+      shouldSplitComponents pkg `shouldBe` False
+
+  describe "packageUsesBackpack" $ do
+    it "returns False for empty package" $ do
+      let pkg = testPackage (mkPackageName "pkg") Simple
+      packageUsesBackpack pkg `shouldBe` False
+
+    it "returns False for plain library, no mixins, no signatures" $ do
+      let pkg = withLibrary $ testPackage (mkPackageName "pkg") Simple
+      packageUsesBackpack pkg `shouldBe` False
+
+    it "returns True when main library has signatures" $ do
+      let pkg = withIndefiniteLibrary ["Str"]
+              $ testPackage (mkPackageName "sig-pkg") Simple
+      packageUsesBackpack pkg `shouldBe` True
+
+    it "returns True when main library has a mixin" $ do
+      let pkg = withMixins [defaultMixin (mkPackageName "sig-pkg")]
+              $ withLibrary
+              $ testPackage (mkPackageName "consumer") Simple
+      packageUsesBackpack pkg `shouldBe` True
+
+    it "returns True when sub-library has a mixin" $ do
+      let pkg = withSubLibMixins "internal" [defaultMixin (mkPackageName "sig-pkg")]
+              $ withSubLibs ["internal"]
+              $ withLibrary
+              $ testPackage (mkPackageName "consumer") Simple
+      packageUsesBackpack pkg `shouldBe` True
+
+    it "returns True when foreign library has a mixin" $ do
+      let pkg = withForeignLibMixins "flib1" [defaultMixin (mkPackageName "sig-pkg")]
+              $ withForeignLibs ["flib1"]
+              $ withLibrary
+              $ testPackage (mkPackageName "consumer") Simple
+      packageUsesBackpack pkg `shouldBe` True
+
+    it "returns True when executable has a mixin" $ do
+      let pkg = withExeMixins "app" [defaultMixin (mkPackageName "sig-pkg")]
+              $ withExes ["app"]
+              $ withLibrary
+              $ testPackage (mkPackageName "consumer") Simple
+      packageUsesBackpack pkg `shouldBe` True
+
+    it "returns True when test suite has a mixin" $ do
+      let pkg = withTestMixins "spec" [defaultMixin (mkPackageName "sig-pkg")]
+              $ withTests ["spec"]
+              $ withLibrary
+              $ testPackage (mkPackageName "consumer") Simple
+      packageUsesBackpack pkg `shouldBe` True
+
+    it "returns True when benchmark has a mixin" $ do
+      let pkg = withBenchMixins "bench" [defaultMixin (mkPackageName "sig-pkg")]
+              $ withBenchmarks ["bench"]
+              $ withLibrary
+              $ testPackage (mkPackageName "consumer") Simple
+      packageUsesBackpack pkg `shouldBe` True
+
+    it "returns False when package has components but none use Backpack" $ do
+      let pkg = withBenchmarks ["bench"]
+              $ withTests ["spec"]
+              $ withExes ["app"]
+              $ withForeignLibs ["flib1"]
+              $ withSubLibs ["internal"]
+              $ withLibrary
+              $ testPackage (mkPackageName "pkg") Simple
+      packageUsesBackpack pkg `shouldBe` False
 
   describe "packageIsIndefinite" $ do
     it "returns False for package without signatures" $ do
@@ -495,33 +532,17 @@ spec = do
             pkg = withExes ["my-exe"]
                 $ withLibrary
                 $ testPackage pn Simple
-            keys = packageToComponentKeys pn pkg
+            keys = packageToComponentKeys pn False Set.empty pkg
         Set.size (Set.fromList keys) `shouldBe` 2
         keys `shouldSatisfy` (ComponentKey pn CLib `elem`)
         keys `shouldSatisfy`
           (ComponentKey pn (CExe (unqualCompFromString "my-exe")) `elem`)
 
-      it "non-splittable package always maps to single CLib key" $ do
-        let pn = mkPackageName "pkg"
-            pkg = withExes ["my-exe"]
-                $ withLibrary
-                $ testPackage pn Custom
-            keys = packageToComponentKeys pn pkg
-        keys `shouldBe` [ComponentKey pn CLib]
-
-      it "Backpack package (sub-lib self-dep) maps to single CLib key" $ do
-        let pn = mkPackageName "pkg"
-            pkg = withExes ["my-exe"]
-                $ withSelfDepSubLib
-                $ testPackage pn Simple
-            keys = packageToComponentKeys pn pkg
-        keys `shouldBe` [ComponentKey pn CLib]
-
-      it "empty splittable package falls back to CLib" $ do
+      it "empty splittable package returns no keys" $ do
         let pn = mkPackageName "pkg"
             pkg = testPackage pn Simple
-            keys = packageToComponentKeys pn pkg
-        keys `shouldBe` [ComponentKey pn CLib]
+            keys = packageToComponentKeys pn False Set.empty pkg
+        keys `shouldBe` []
 
       it "tests and benchmarks are NOT in build component keys" $ do
         let pn = mkPackageName "pkg"
@@ -532,6 +553,150 @@ spec = do
             comps = packageBuildableComponents pkg
         -- Tests and benchmarks go into finals, not build tasks
         comps `shouldBe` [CLib]
+
+    describe "expandToComponentKeys exe filtering" $ do
+      let alpha = unqualCompFromString "alpha"
+          beta = unqualCompFromString "beta"
+
+      it "wanted=True, components={CExe alpha}: only alpha in keys" $ do
+        let pn = mkPackageName "foo"
+            pkg = withExes ["alpha", "beta"]
+                $ withLibrary
+                $ testPackage pn Simple
+            components = Set.singleton (CExe alpha)
+            keys = packageToComponentKeys pn True components pkg
+        Set.fromList keys `shouldBe` Set.fromList
+          [ ComponentKey pn CLib
+          , ComponentKey pn (CExe alpha)
+          ]
+
+      it "wanted=True, components has both exes: both keys present" $ do
+        let pn = mkPackageName "foo"
+            pkg = withExes ["alpha", "beta"]
+                $ withLibrary
+                $ testPackage pn Simple
+            components = Set.fromList [CExe alpha, CExe beta]
+            keys = packageToComponentKeys pn True components pkg
+        Set.fromList keys `shouldBe` Set.fromList
+          [ ComponentKey pn CLib
+          , ComponentKey pn (CExe alpha)
+          , ComponentKey pn (CExe beta)
+          ]
+
+      it "wanted=False: all buildable exes enumerated (legacy behavior)" $ do
+        let pn = mkPackageName "foo"
+            pkg = withExes ["alpha", "beta"]
+                $ withLibrary
+                $ testPackage pn Simple
+            keys = packageToComponentKeys pn False Set.empty pkg
+        Set.fromList keys `shouldBe` Set.fromList
+          [ ComponentKey pn CLib
+          , ComponentKey pn (CExe alpha)
+          , ComponentKey pn (CExe beta)
+          ]
+
+      it "wanted=True, empty components (stack build foo:lib): only CLib" $ do
+        let pn = mkPackageName "foo"
+            pkg = withExes ["alpha", "beta"]
+                $ withLibrary
+                $ testPackage pn Simple
+            keys = packageToComponentKeys pn True Set.empty pkg
+        keys `shouldBe` [ComponentKey pn CLib]
+
+      it "wanted=True, components={CTest}: no exes leak in" $ do
+        let pn = mkPackageName "foo"
+            tst = unqualCompFromString "tst"
+            pkg = withTests ["tst"]
+                $ withExes ["alpha", "beta"]
+                $ withLibrary
+                $ testPackage pn Simple
+            components = Set.singleton (CTest tst)
+            keys = packageToComponentKeys pn True components pkg
+        keys `shouldBe` [ComponentKey pn CLib]
+
+      it "wanted=True, components={CExe exe}: sublib still enumerated" $ do
+        -- Sublibs are not in lp.components and must not be filtered out.
+        let pn = mkPackageName "files"
+            exe = unqualCompFromString "exe"
+            sublib = unqualCompFromString "sublib"
+            pkg = withExes ["exe"]
+                $ withSubLibs ["sublib"]
+                $ testPackage pn Simple
+            components = Set.singleton (CExe exe)
+            keys = packageToComponentKeys pn True components pkg
+        Set.fromList keys `shouldBe` Set.fromList
+          [ ComponentKey pn (CSubLib sublib)
+          , ComponentKey pn (CExe exe)
+          ]
+
+      it "wanted=True, 3 exes, components targets 2: only those 2 emit" $ do
+        let pn = mkPackageName "foo"
+            gamma = unqualCompFromString "gamma"
+            pkg = withExes ["alpha", "beta", "gamma"]
+                $ withLibrary
+                $ testPackage pn Simple
+            components = Set.fromList [CExe alpha, CExe gamma]
+            keys = packageToComponentKeys pn True components pkg
+        Set.fromList keys `shouldBe` Set.fromList
+          [ ComponentKey pn CLib
+          , ComponentKey pn (CExe alpha)
+          , ComponentKey pn (CExe gamma)
+          ]
+
+      it "wanted=True, components={CBench}: no exes leak in" $ do
+        let pn = mkPackageName "foo"
+            b1 = unqualCompFromString "b1"
+            pkg = withBenchmarks ["b1"]
+                $ withExes ["alpha", "beta"]
+                $ withLibrary
+                $ testPackage pn Simple
+            components = Set.singleton (CBench b1)
+            keys = packageToComponentKeys pn True components pkg
+        keys `shouldBe` [ComponentKey pn CLib]
+
+    describe "expandToComponentKeys empty-allComps no fallback" $ do
+      it "test-only package, wanted=True: no keys" $ do
+        let pn = mkPackageName "pkg"
+            tst = unqualCompFromString "test"
+            pkg = withTests ["test"]
+                $ testPackage pn Simple
+            components = Set.singleton (CTest tst)
+            keys = packageToComponentKeys pn True components pkg
+        keys `shouldBe` []
+
+      it "bench-only package, wanted=True: no keys" $ do
+        let pn = mkPackageName "pkg"
+            b1 = unqualCompFromString "b1"
+            pkg = withBenchmarks ["b1"]
+                $ testPackage pn Simple
+            components = Set.singleton (CBench b1)
+            keys = packageToComponentKeys pn True components pkg
+        keys `shouldBe` []
+
+      it "tests + benches, no lib, wanted=True: no keys" $ do
+        let pn = mkPackageName "pkg"
+            tst = unqualCompFromString "test"
+            b1 = unqualCompFromString "b1"
+            pkg = withBenchmarks ["b1"]
+                $ withTests ["test"]
+                $ testPackage pn Simple
+            components = Set.fromList [CTest tst, CBench b1]
+            keys = packageToComponentKeys pn True components pkg
+        keys `shouldBe` []
+
+      it "test-only package, wanted=False: no keys" $ do
+        let pn = mkPackageName "pkg"
+            pkg = withTests ["test"]
+                $ testPackage pn Simple
+            keys = packageToComponentKeys pn False Set.empty pkg
+        keys `shouldBe` []
+
+      it "bench-only package, wanted=False: no keys" $ do
+        let pn = mkPackageName "pkg"
+            pkg = withBenchmarks ["b1"]
+                $ testPackage pn Simple
+            keys = packageToComponentKeys pn False Set.empty pkg
+        keys `shouldBe` []
 
   describe "finals splitting" $ do
     it "test components produce CTest keys" $ do
@@ -559,16 +724,6 @@ spec = do
             ])
       finalKeys `shouldBe`
         [ComponentKey pn (CBench (unqualCompFromString "bench-a"))]
-
-    it "non-splittable package uses single CLib key for finals" $ do
-      let pn = mkPackageName "pkg"
-          pkg = withTests ["tests"]
-              $ withLibrary
-              $ testPackage pn Custom
-          finalKeys = packageToFinalKeys pn pkg (Set.fromList
-            [ CTest (unqualCompFromString "tests")
-            ])
-      finalKeys `shouldBe` [ComponentKey pn CLib]
 
     it "mixed test+bench components produce both keys" $ do
       let pn = mkPackageName "pkg"
@@ -2469,26 +2624,41 @@ packageBuildableComponents pkg =
     Just lib -> lib.buildInfo.buildable
     Nothing -> False
 
--- | Helper: simulate component key expansion for build tasks.
-packageToComponentKeys :: PackageName -> Package -> [ComponentKey]
-packageToComponentKeys pn pkg
-  | shouldSplitComponents pkg =
-      case packageBuildableComponents pkg of
-        [] -> [ComponentKey pn CLib]
-        comps -> map (ComponentKey pn) comps
-  | otherwise = [ComponentKey pn CLib]
+-- | Helper: simulate the split-path component expansion. Always applies
+-- the split logic; the routing decision (whether a given package goes
+-- through the split path at all) is tested separately by the
+-- 'shouldSplitComponents' describe block.
+packageToComponentKeys ::
+     PackageName -> Bool -> Set NamedComponent -> Package -> [ComponentKey]
+packageToComponentKeys pn wanted components pkg =
+  let libComps = [CLib | isJust pkg.library && buildableLib]
+      subLibComps =
+        map CSubLib $ Set.toList $ getBuildableSet pkg.subLibraries
+      flibComps =
+        map CFlib $ Set.toList $ getBuildableSet pkg.foreignLibraries
+      exeComps = map CExe $ Set.toList $
+        if wanted
+          then exeComponents components
+          else getBuildableSet pkg.executables
+      allComps = libComps ++ subLibComps ++ flibComps ++ exeComps
+  in  map (ComponentKey pn) allComps
+ where
+  buildableLib = case pkg.library of
+    Just lib -> lib.buildInfo.buildable
+    Nothing -> False
 
--- | Helper: simulate final key expansion (mirrors addFinal logic).
+-- | Helper: simulate final key expansion (mirrors the addFinal split-path
+-- branch). The routing decision is tested separately by the
+-- 'shouldSplitComponents' describe block; this helper exercises only the
+-- split-path expansion.
 packageToFinalKeys ::
      PackageName -> Package -> Set NamedComponent -> [ComponentKey]
-packageToFinalKeys pn pkg components
-  | shouldSplitComponents pkg =
-      let testComps = filter isCTest $ Set.toList components
-          benchComps = filter isCBench $ Set.toList components
-      in  case testComps ++ benchComps of
-            [] -> [ComponentKey pn CLib]
-            comps -> map (ComponentKey pn) comps
-  | otherwise = [ComponentKey pn CLib]
+packageToFinalKeys pn _pkg components =
+  let testComps = filter isCTest $ Set.toList components
+      benchComps = filter isCBench $ Set.toList components
+  in  case testComps ++ benchComps of
+        [] -> [ComponentKey pn CLib]
+        comps -> map (ComponentKey pn) comps
  where
   isCTest (CTest _) = True
   isCTest _ = False
@@ -2582,6 +2752,57 @@ withSubLibMixins subLibName ms pkg = pkg
                                 lib.exposedModules lib.signatures
           else lib
       | lib <- toList pkg.subLibraries
+      ]
+  }
+
+-- | Add mixins to a specific foreign library's buildInfo.
+withForeignLibMixins :: String -> [Mixin] -> Package -> Package
+withForeignLibMixins flibName ms pkg = pkg
+  { foreignLibraries = foldAndMakeCollection id
+      [ if flib.name == unqualCompFromString flibName
+          then let bi = flib.buildInfo :: StackBuildInfo
+               in  StackForeignLibrary flib.name (bi { mixins = ms })
+          else flib
+      | flib <- toList pkg.foreignLibraries
+      ]
+  }
+
+-- | Add mixins to a specific executable's buildInfo.
+withExeMixins :: String -> [Mixin] -> Package -> Package
+withExeMixins exeName ms pkg = pkg
+  { executables = foldAndMakeCollection id
+      [ if exe.name == unqualCompFromString exeName
+          then let bi = exe.buildInfo :: StackBuildInfo
+               in  StackExecutable exe.name (bi { mixins = ms })
+                                   exe.modulePath
+          else exe
+      | exe <- toList pkg.executables
+      ]
+  }
+
+-- | Add mixins to a specific test suite's buildInfo.
+withTestMixins :: String -> [Mixin] -> Package -> Package
+withTestMixins testName ms pkg = pkg
+  { testSuites = foldAndMakeCollection id
+      [ if test.name == unqualCompFromString testName
+          then let bi = test.buildInfo :: StackBuildInfo
+               in  StackTestSuite test.name (bi { mixins = ms })
+                                  test.interface
+          else test
+      | test <- toList pkg.testSuites
+      ]
+  }
+
+-- | Add mixins to a specific benchmark's buildInfo.
+withBenchMixins :: String -> [Mixin] -> Package -> Package
+withBenchMixins benchName ms pkg = pkg
+  { benchmarks = foldAndMakeCollection id
+      [ if bench.name == unqualCompFromString benchName
+          then let bi = bench.buildInfo :: StackBuildInfo
+               in  StackBenchmark bench.name (bi { mixins = ms })
+                                  bench.interface
+          else bench
+      | bench <- toList pkg.benchmarks
       ]
   }
 

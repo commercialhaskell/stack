@@ -47,7 +47,7 @@ import           Stack.Package
                    ( applyForceCustomBuild, buildableExes
                    , buildableForeignLibs, buildableSubLibs
                    , hasBuildableMainLibrary, hasIntraPackageDeps
-                   , packageUnknownTools
+                   , packageUnknownTools, packageUsesBackpack
                    , processPackageDepsEither
                    )
 import           Stack.Prelude hiding ( loadPackage )
@@ -838,13 +838,21 @@ installPackageGivenDeps buildHaddocks ps package minstalled
 packageBuildTypeConfig :: Package -> Bool
 packageBuildTypeConfig pkg = pkg.buildType == Configure
 
--- | Whether a package should be split into per-component tasks. Only local
--- packages with Simple build type and no intra-package dependencies (Backpack)
--- are split. Remote packages, Custom/Hooks/Make build types, and Backpack
--- packages get a single task.
+-- | Only Backpack-using single-library packages take the per-component
+-- split path. Everything else uses the legacy whole-package path.
 shouldSplitComponents :: Package -> Bool
 shouldSplitComponents pkg =
-  pkg.buildType == Simple && not (hasIntraPackageDeps pkg)
+     pkg.buildType == Simple
+  && not (hasIntraPackageDeps pkg)
+  && not (hasMultipleRegisterableLibraries pkg)
+  && packageUsesBackpack pkg
+
+-- | More than one registerable library (main + sub, or 2+ subs).
+hasMultipleRegisterableLibraries :: Package -> Bool
+hasMultipleRegisterableLibraries pkg =
+  let mainLibCount = if hasBuildableMainLibrary pkg then 1 else 0
+      subLibCount = Set.size (buildableSubLibs pkg)
+  in  mainLibCount + subLibCount > 1
 
 -- | Expand an AddDepRes into per-component (ComponentKey, AddDepRes) pairs.
 -- For local Simple packages without intra-package deps, creates one entry per
@@ -862,12 +870,14 @@ expandToComponentKeys name adr = case adr of
                 map CSubLib $ Set.toList $ buildableSubLibs pkg
               flibComps =
                 map CFlib $ Set.toList $ buildableForeignLibs pkg
+              -- Mirrors 'exesToBuild' in Stack.Build.ExecutePackage.
               exeComps =
-                map CExe $ Set.toList $ buildableExes pkg
+                map CExe $ Set.toList $
+                  if lp.wanted
+                    then exeComponents lp.components
+                    else buildableExes pkg
               allComps = libComps ++ subLibComps ++ flibComps ++ exeComps
-          in  case allComps of
-                [] -> [(ComponentKey name CLib, adr)]
-                _  -> map (\comp -> (ComponentKey name comp, adr)) allComps
+          in  map (\comp -> (ComponentKey name comp, adr)) allComps
     _ -> [(ComponentKey name CLib, adr)]
   _ -> [(ComponentKey name CLib, adr)]
 
