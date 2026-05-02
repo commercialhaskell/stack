@@ -1,5 +1,5 @@
-module Foo where
+module Lib where
 
 -- | The function below intentionally contains invalid Haddock
-foo :: ()
-foo = () -- ^ this should fail!!!
+func :: ()
+func = () -- ^ this should fail!!!

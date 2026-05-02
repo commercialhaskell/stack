@@ -1,7 +1,9 @@
-import StackTest
+--
+-- See: https://github.com/commercialhaskell/stack/issues/4783
+
+import           StackTest
 
 main :: IO ()
 main = do
-  stackCleanFull
-  stack ["build", "acme-dont-copy"]
+  stack ["build", "myPackageB"]
   stack ["test"]

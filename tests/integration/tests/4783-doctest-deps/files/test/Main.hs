@@ -1,4 +1,4 @@
-import Test.DocTest
+import           Test.DocTest
 
 main :: IO ()
-main = doctest ["src/Foo.hs"]
+main = doctest ["src/Lib.hs"]

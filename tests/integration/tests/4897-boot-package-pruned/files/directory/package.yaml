@@ -1,0 +1,8 @@
+spec-version: 0.36.0
+
+name: directory
+
+dependencies:
+- base
+
+library: {}

@@ -1,7 +1,8 @@
-import StackTest
-import System.Directory
+-- Stack supports tests of type detailed-0.9.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/4453
+
+import           StackTest
 
 main :: IO ()
-main = do
-    removeDirIgnore ".stack-work"
-    stack [defaultSnapshotArg, "test"]
+main = stack ["test"]

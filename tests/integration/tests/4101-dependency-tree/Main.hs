@@ -11,7 +11,7 @@ main :: IO ()
 main = unless isWindows $ do
   stackCheckStdout ["ls", "dependencies", "tree"] $ \stdOut -> do
     let expected = unlines [ "Packages"
-                           , "├─┬ myPackageA 0.1.0.0"
+                           , "├─┬ myPackageA 0.0.0"
                            , "│ ├─┬ base 4.20.2.0"
                            ]
     unless (expected `isPrefixOf` stdOut) $
@@ -19,12 +19,12 @@ main = unless isWindows $ do
 
   stackCheckStdout ["ls", "dependencies", "tree", "--depth=1"] $ \stdOut -> do
     let expected = unlines [ "Packages"
-                           , "├─┬ myPackageA 0.1.0.0"
+                           , "├─┬ myPackageA 0.0.0"
                            , "│ ├── base 4.20.2.0"
                            , "│ ├── filelock 0.1.1.2"
                            , "│ ├── mtl 2.3.1"
-                           , "│ └── myPackageB 0.1.0.0"
-                           , "└─┬ myPackageB 0.1.0.0"
+                           , "│ └── myPackageB 0.0.0"
+                           , "└─┬ myPackageB 0.0.0"
                            , "  └── base 4.20.2.0"
                            ]
     when (stdOut /= expected) $
@@ -32,7 +32,7 @@ main = unless isWindows $ do
 
   stackCheckStdout ["ls", "dependencies", "tree", "myPackageB"] $ \stdOut -> do
     let expected = unlines [ "Packages"
-                           , "└─┬ myPackageB 0.1.0.0"
+                           , "└─┬ myPackageB 0.0.0"
                            , "  └─┬ base 4.20.2.0"
                            , "    ├─┬ ghc-internal 9.1003.0"
                            , "    │ ├─┬ ghc-bignum 1.3"

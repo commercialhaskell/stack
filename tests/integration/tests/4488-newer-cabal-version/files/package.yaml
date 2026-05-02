@@ -1,0 +1,12 @@
+spec-version: 0.36.0
+
+name: myPackage
+custom-setup:
+  dependencies:
+  - base
+  - Cabal == 3.16.1.0
+
+dependencies:
+- base
+
+library: {}

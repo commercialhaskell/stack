@@ -1,0 +1,16 @@
+spec-version: 0.36.0
+
+name: myPackage
+
+dependencies:
+- base
+
+tests:
+  test:
+    verbatim:
+      type: detailed-0.9
+      test-module: Test
+    source-dirs: test
+    other-modules: []
+    dependencies:
+    - Cabal >= 1.20

@@ -1,10 +1,9 @@
-name: umlaut
-dependencies: [base]
+spec-version: 0.36.0
+
+name: myPackage
+
+dependencies:
+- base
+
 library:
-  source-dirs: .
-executables:
-  exe:
-    main: Main.hs
-    source-dirs: app
-    dependencies:
-    - umlaut
+  source-dirs: src
