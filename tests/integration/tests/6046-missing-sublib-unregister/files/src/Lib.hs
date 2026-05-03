@@ -1,5 +1,3 @@
-module Lib
-    ( someFunc
-    ) where
+module Lib where
 
-import Sub ( someFunc )
+import Internal

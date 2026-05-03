@@ -1,8 +1,8 @@
 {-# LANGUAGE CPP #-}
 
 module Main
-    ( main
-    ) where
+  ( main
+  ) where
 
 main :: IO ()
 main =
@@ -11,4 +11,3 @@ main =
 #else
   putStrLn "TEST_FLAG was not set"
 #endif
-

@@ -1,11 +1,14 @@
 {-# LANGUAGE CPP #-}
 
-module Main (main) where
+module Main
+  ( main
+  ) where
 
-import Control.Concurrent (threadDelay)
+import           Control.Concurrent ( threadDelay )
 
 #ifndef mingw32_HOST_OS
-import System.Posix.Signals (Handler (Ignore), installHandler, sigTERM)
+import           System.Posix.Signals
+                   ( Handler (Ignore), installHandler, sigTERM )
 #endif
 
 main :: IO ()

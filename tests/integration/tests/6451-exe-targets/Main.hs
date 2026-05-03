@@ -3,6 +3,8 @@
 --
 -- Issue: https://github.com/commercialhaskell/stack/issues/3229 is no longer
 -- applicable.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/6451
 
 module Main where
 
@@ -13,10 +15,10 @@ import           StackTest
 main :: IO ()
 main = do
   stackCheckStderr
-    ["build", ":alpha"]
-    (rejectMessage "Installing executable beta in")
+    ["build", ":myExeA"]
+    (rejectMessage "Installing executable myExeB in")
 
 rejectMessage :: String -> String -> IO ()
 rejectMessage msg stderr =
-    when (msg `isInfixOf` stderr)
-            (error $ "Did not expect message here: \n" ++ show msg)
+  when (msg `isInfixOf` stderr) $
+    error $ "Did not expect message here: \n" ++ show msg

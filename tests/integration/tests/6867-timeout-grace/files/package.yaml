@@ -1,16 +1,14 @@
-name: timeout-grace-fixture
-version: 0.1.0.0
-license: BSD-3-Clause
+spec-version: 0.36.0
 
-ghc-options:
-- -Wall
+name: myPackage
+
+dependencies:
+- base
 
 tests:
-  timeout-grace-fixture-test:
+  test:
     main: Main.hs
     source-dirs: test
-    dependencies:
-    - base
     when:
     - condition: '!os(windows)'
       dependencies:

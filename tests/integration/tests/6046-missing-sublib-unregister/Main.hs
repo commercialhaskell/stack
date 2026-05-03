@@ -1,12 +1,16 @@
+-- Stack builds a package where the main library depends on a private named
+-- lirary (an internal library).
+--
+-- See: https://github.com/commercialhaskell/stack/issues/6046
+
 import StackTest
 
 -- This tests building a package with a library and an internal sub library,
--- where the library depends on the sub library, first version 0.1.0.0 (the
--- Cabal file is @foo.cabal1@) and then version 0.2.0.0 (the Cabal file is
--- @foo.cabal2@).
+-- where the library depends on the sub library, first version 0.1.0.0 and then
+-- version 0.2.0.0.
 main :: IO ()
 main = do
-  copy "foo.cabal1" "foo.cabal"
+  copy "package1.yaml" "package.yaml"
   stack ["build"]
-  copy "foo.cabal2" "foo.cabal"
+  copy "package2.yaml" "package.yaml"
   stack ["build"]

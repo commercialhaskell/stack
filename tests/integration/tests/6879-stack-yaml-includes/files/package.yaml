@@ -1,0 +1,20 @@
+spec-version: 0.36.0
+
+name: myPackage
+
+dependencies:
+- base
+
+flags:
+  test-flag:
+    description: Generate a compiler error for test purposes
+    default: false
+    manual: true
+
+executables:
+  myExe:
+    source-dirs: app
+    main: Main.hs
+    when:
+    - condition: flag(test-flag)
+      cpp-options: -DTEST_FLAG
