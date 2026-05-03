@@ -1,0 +1,13 @@
+spec-version: 0.36.0
+
+name: myPackageB
+
+dependencies:
+- base
+
+library: {}
+
+internal-libraries:
+  myPackageB-sub:
+    visibility: public
+    source-dirs: src

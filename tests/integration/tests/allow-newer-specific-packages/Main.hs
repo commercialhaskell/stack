@@ -1,5 +1,7 @@
-import StackTest
+-- | Stack allows allow-newer to be applied to the dependencies of specified
+-- packages.
+
+import           StackTest
 
 main :: IO ()
-main = do
-    stack ["build"]
+main = stack ["build"]

@@ -1,11 +1,10 @@
-import StackTest
+-- | Stack distinguises between a package in the package index and a project
+-- package, even if they have the same name and version.
+
+import           StackTest
 
 main :: IO ()
 main = do
-    readFile "stack1.yaml" >>= writeFile "stack.yaml"
-    stack ["setup"]
-    stack ["build", "auto-update"]
-    readFile "stack2.yaml" >>= writeFile "stack.yaml"
-    removeDirIgnore "auto-update-0.1.2.1"
-    stack ["unpack", "auto-update-0.1.2.1"]
-    stack ["build"]
+  stack ["--stack-yaml", "stack1.yaml", "build", "acme-missiles"]
+  stack ["unpack", "acme-missiles-0.3"]
+  stack ["--stack-yaml", "stack2.yaml", "build"]
