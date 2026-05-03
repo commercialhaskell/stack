@@ -36,17 +36,16 @@ main = do
     ["--stack-yaml", "stack-not-including-flags.yaml", "run"]
     (checkFor "TEST_FLAG was set\n")
 
--- Disabling test, pending investigation ...
--- -- Check that 'config set' succeeds when the key already exists in a
--- -- stack.yaml file that uses !include directives
--- stackCheckStderr
---   ["--stack-yaml", "stack-including-flags.yaml", "config", "set", "snapshot", "ghc-9.10.3"]
---   (expectMessage "already")
--- -- Check that 'config set' succeeds when the key already exists in a
--- -- stack.yaml file that uses !include directives (with newline variant)
--- stackCheckStderr
---   ["--stack-yaml", "stack-including-flags-with-newline.yaml", "config", "set", "snapshot", "ghc-9.10.3"]
---   (expectMessage "already")
+  -- Check that 'config set' succeeds when the key already exists in a
+  -- stack.yaml file that uses !include directives
+  stackCheckStderr
+    ["--stack-yaml", "stack-including-flags.yaml", "config", "set", "snapshot", "ghc-9.10.3"]
+    (expectMessage "already")
+  -- Check that 'config set' succeeds when the key already exists in a
+  -- stack.yaml file that uses !include directives (with newline variant)
+  stackCheckStderr
+    ["--stack-yaml", "stack-including-flags-with-newline.yaml", "config", "set", "snapshot", "ghc-9.10.3"]
+    (expectMessage "already")
 
   -- Check that 'config set' raises an error when the key does not exist in a
   -- stack.yaml file that uses !include directives

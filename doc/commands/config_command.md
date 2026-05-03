@@ -179,6 +179,9 @@ A snapshot of `lts` or `nightly` will be translated into the most recent
 available. A snapshot of `lts-22` will be translated into the most recent
 available in the `lts-22` sequence.
 
+Snapshot values that are compiler versions, a URL or a local file path are also
+accepted.
+
 If a (deprecated) `resolver` key is present, it will be replaced by a `snapshot`
 key.
 

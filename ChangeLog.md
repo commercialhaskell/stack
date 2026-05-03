@@ -41,6 +41,8 @@ Other enhancements:
   different snapshots can use `!include` to avoid duplicating shared settings.
 * Stack's `config set` command raises an error if the target configuration file
   excludes the key being set and includes an `!include` directive.
+* Stack's `config set snapshot` command now works with other snapshot values
+  in addition to snapshot synonymns.
 
 Bug fixes:
 
