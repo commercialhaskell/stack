@@ -4,12 +4,10 @@ import           StackTest
 
 main :: IO ()
 main = do
-  removeDirIgnore ".stack-work"
-
-  -- BAR is defined here and FOO in stack.yaml file
-  stackCheckStderr ["haddock", "--haddock-arguments", "--optghc=-DBAR"] $ \s ->
+  -- VARIABLE_B is defined here and VARIABLE_A in stack.yaml file
+  stackCheckStderr ["haddock", "--haddock-arguments", "--optghc=-DVARIABLE_B"] $ \s ->
     unless (errorMsg `isInfixOf` s) $
-      error "FOO and BAR not both defined"
+      error "VARIABLE_A and VARIABLE_B not both defined"
   stack ["clean"]
   -- Works just fine, test #3099 while at it.
   stack ["haddock", "--no-haddock-hyperlink-source"]
@@ -20,5 +18,5 @@ main = do
 -- The error message differs by operating system
 errorMsg :: String
 errorMsg = if isLinux
-  then "error: #error FOO and BAR is defined"
-  else "error: FOO and BAR is defined"
+  then "error: #error VARIABLE_A and VARIABLE_B is defined"
+  else "error: VARIABLE_A and VARIABLE_B is defined"

@@ -1,0 +1,10 @@
+spec-version: 0.36.0
+
+name: myPackage
+
+dependencies:
+- base
+- validity
+
+library:
+  source-dirs: src

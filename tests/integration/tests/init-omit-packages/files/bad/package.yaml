@@ -1,0 +1,9 @@
+spec-version: 0.36.0
+
+name: bad
+
+dependencies:
+- base
+- non-existent-package == 666.0
+
+library: {}

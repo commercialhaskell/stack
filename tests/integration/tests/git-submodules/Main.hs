@@ -1,11 +1,13 @@
-import StackTest
-import System.Directory
-         ( createDirectoryIfMissing, withCurrentDirectory, getCurrentDirectory )
-import System.Exit ( exitFailure )
-import System.FilePath ( (</>) )
-import Data.List ( filter )
-import System.IO ( hPutStrLn, withFile, IOMode (..) )
-import Control.Monad ( when )
+import           Control.Monad ( when )
+import           Data.List ( filter )
+import           StackTest
+import           System.Directory
+                   ( createDirectoryIfMissing, getCurrentDirectory
+                   , withCurrentDirectory
+                   )
+import           System.Exit ( exitFailure )
+import           System.FilePath ( (</>) )
+import           System.IO ( IOMode (..), hPutStrLn, withFile )
 
 main :: IO ()
 main = when isLinux $ do

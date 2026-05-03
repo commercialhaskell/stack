@@ -1,8 +1,3 @@
-module Lib
-    ( someFunc
-    ) where
+module Lib where
 
 import Data.Validity
-
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
