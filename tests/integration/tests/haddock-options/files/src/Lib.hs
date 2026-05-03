@@ -1,11 +1,14 @@
 {-# LANGUAGE CPP #-}
+
 module Lib
-    ( someFunc
-    ) where
+  ( someFunc
+  ) where
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
 
-#if defined(FOO) && defined(BAR)
-#error FOO and BAR is defined
+#if defined(VARIABLE_A) && defined(VARIABLE_B)
+
+#error VARIABLE_A and VARIABLE_B is defined
+
 #endif

@@ -1,0 +1,40 @@
+spec-version: 0.36.0
+
+name: myPackage
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+
+internal-libraries:
+  internal:
+    source-dirs: int
+    dependencies:
+    - myPackage
+    - stm
+
+executables:
+  myExe:
+    source-dirs: app
+    main: Main.hs
+    dependencies:
+    - internal
+    - myPackage
+
+verbatim: |
+  foreign-library foreign
+    type: native-shared
+    other-modules:
+        Foreign
+    build-depends:
+        base
+      , myPackage
+      , internal
+      , mtl
+    hs-source-dirs:
+        src-foreign
+    default-language: Haskell2010
+    if os(Windows)
+      options: standalone
