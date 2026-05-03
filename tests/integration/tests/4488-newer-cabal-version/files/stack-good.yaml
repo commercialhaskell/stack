@@ -1,3 +1,6 @@
 snapshot: ghc-9.10.3
+
 extra-deps:
-- Cabal-2.4.1.0
+- Cabal-3.16.1.0
+- Cabal-syntax-3.16.1.0
+- alex-3.5.4.2

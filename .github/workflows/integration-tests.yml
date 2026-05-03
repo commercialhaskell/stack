@@ -189,6 +189,7 @@ jobs:
     - name: Build bindist
       shell: bash
       run: |
+        git status
         stack etc/scripts/release.hs build ${{ matrix.release-args }}
 
     - name: Upload bindist

@@ -1,7 +1,7 @@
 module Lib where
 
-import Foreign.C.String
-import System.IO.Unsafe
+import Foreign.C.String ( CString, peekCString )
+import System.IO.Unsafe ( unsafePerformIO)
 
 foreign import ccall unsafe "a_dependent.h greeting"
   c_greeting :: CString

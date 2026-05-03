@@ -1,7 +1,6 @@
 spec-version: 0.36.0
 
 name: one-deps
-version: 0.1.0.0
 synopsis: A package with one dependency (no-deps) other than base
 
 dependencies:
