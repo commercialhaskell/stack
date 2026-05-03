@@ -4,7 +4,6 @@ name: myPackage
 
 dependencies:
 - base
-- acme-missiles
 
 library:
   source-dirs: src

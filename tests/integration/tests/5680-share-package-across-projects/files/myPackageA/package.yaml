@@ -1,10 +1,9 @@
 spec-version: 0.36.0
 
-name: myPackage
+name: myPackageA
 
 dependencies:
 - base
-- acme-missiles
 
 library:
   source-dirs: src

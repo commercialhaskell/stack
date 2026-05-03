@@ -1,6 +1,9 @@
-import StackTest
+-- Stack sdist handles Unicode code points.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/6372
 
-import Control.Monad (unless)
+import           Control.Monad ( unless )
+import           StackTest
 
 -- | The test fails at runtime on the Windows Server 2022 GitHub-hosted runner
 -- only, at the point of outputting a Unicode character, with:
@@ -16,7 +19,5 @@ import Control.Monad (unless)
 -- Windows.
 
 main :: IO ()
-main = unless isWindows $ do
-  stack ["clean"]
-  stack ["build", "--dry-run"]
+main = unless isWindows $
   stack ["sdist", "."]

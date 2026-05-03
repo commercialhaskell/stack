@@ -1,9 +1,13 @@
-import Data.Char (toLower)
-import Data.IORef (newIORef, readIORef, writeIORef)
-import Data.List (isInfixOf)
-import Data.Time.Clock (diffUTCTime, getCurrentTime)
-import StackTest
-import Control.Monad (unless)
+-- | Stack supports a grace period timeout for test suites.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/6867
+
+import           Control.Monad ( unless )
+import           Data.Char ( toLower )
+import           Data.IORef ( newIORef, readIORef, writeIORef )
+import           Data.List ( isInfixOf )
+import           Data.Time.Clock ( diffUTCTime, getCurrentTime)
+import           StackTest
 
 main :: IO ()
 main = do

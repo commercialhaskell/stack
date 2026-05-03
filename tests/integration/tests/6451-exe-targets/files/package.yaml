@@ -1,24 +1,21 @@
 spec-version: 0.36.0
 
-name: foo
-version: 0
+name: myPackage
 
 dependencies:
-- base >= 4.7 && < 5
+- base
 
 library:
   source-dirs: src
 
 executables:
-  alpha:
-    source-dirs: app
-    main: Alpha.hs
-    other-modules: []
+  myExeA:
+    source-dirs: appA
+    main: Main.hs
     dependencies:
-    - foo
-  beta:
-    source-dirs: app
-    main: Beta.hs
-    other-modules: []
+    - myPackage
+  myExeB:
+    source-dirs: appB
+    main: Main.hs
     dependencies:
-    - foo
+    - myPackage
