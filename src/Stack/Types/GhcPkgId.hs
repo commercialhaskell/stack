@@ -86,7 +86,8 @@ parseGhcPkgId x = go x
 -- | A parser for a package-version-hash pair.
 ghcPkgIdParser :: Parser GhcPkgId
 ghcPkgIdParser =
-  let elements = "_.-" :: String
+  -- '+' is needed for Backpack instantiated unit IDs (e.g. "pkg-id-str-sig+hash")
+  let elements = "_.-+" :: String
   in  GhcPkgId . mkUnitId <$>
         many1 (choice [alphaNum, satisfy (`elem` elements)])
 

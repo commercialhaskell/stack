@@ -16,6 +16,13 @@ module Stack.Build.ExecutePackage
   ( singleBuild
   , singleTest
   , singleBench
+  , componentTarget
+  , componentEnableTests
+  , componentEnableBenchmarks
+  , dispatchBuildOpts
+    -- * Backpack helpers (exported for testing)
+  , findGhcPkgId
+  , mkInstantiateWithOpts
   ) where
 
 import           Control.Concurrent.Execute
@@ -33,6 +40,7 @@ import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import           Distribution.ModuleName ( ModuleName )
 import qualified Distribution.PackageDescription as C
 import           Distribution.System ( OS (..), Platform (..) )
 import qualified Distribution.Text as C
@@ -55,6 +63,7 @@ import           RIO.Process
                    , useHandleOpen, waitExitCode, withModifyEnvVars
                    , withProcessWait, withWorkingDir
                    )
+import           Stack.Build.ConstructPlan ( shouldSplitComponents )
 import           Stack.Build.Cache
                    ( TestStatus (..), deleteCaches, getTestStatus
                    , markExeInstalled, markExeNotInstalled, readPrecompiledCache
@@ -84,7 +93,7 @@ import           Stack.Coverage ( generateHpcReport, updateTixFile )
 import           Stack.GhcPkg ( ghcPkg, ghcPkgPathEnvVar, unregisterGhcPkgIds )
 import           Stack.Package
                    ( buildLogPath, buildableExes, buildableSubLibs
-                   , hasBuildableMainLibrary
+                   , hasBuildableMainLibrary, hasIntraPackageDeps
                    )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
@@ -98,7 +107,9 @@ import           Stack.Types.BuildOpts
                    )
 import           Stack.Types.BuildOptsCLI ( BuildOptsCLI (..) )
 import           Stack.Types.Cache
-                   ( ConfigCache (..), PrecompiledCache (..) )
+                   ( ConfigCache (..), ConfigCacheType (..)
+                   , PrecompiledCache (..)
+                   )
 import qualified Stack.Types.Cache as ConfigCache ( ConfigCache (..) )
 import           Stack.Types.CompCollection
                    ( collectionKeyValueList, collectionLookup
@@ -125,7 +136,8 @@ import           Stack.Types.EnvConfig
                    , appropriateGhcColorFlag
                    )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
-import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdToText )
+import           Stack.Types.GhcPkgId
+                   ( GhcPkgId, ghcPkgIdString, ghcPkgIdToText )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Installed
                    ( InstallLocation (..), Installed (..), InstalledMap
@@ -133,7 +145,7 @@ import           Stack.Types.Installed
                    )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent
-                   ( NamedComponent, exeComponents, isCBench, isCTest
+                   ( NamedComponent (..), exeComponents, isCBench, isCTest
                    , renderComponent
                    )
 import           Stack.Types.Package
@@ -143,7 +155,8 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Plan
-                   ( Task (..), TaskConfigOpts (..), TaskType (..), taskIsTarget
+                   ( ComponentKey (..), Task (..), TaskConfigOpts (..)
+                   , TaskType (..), componentKeyPkgName, taskIsTarget
                    , taskLocation, taskProvides, taskTargetIsMutable
                    , taskTypePackageIdentifier
                    )
@@ -206,8 +219,14 @@ getConfigCache ee task installedMap enableTest enableBench = do
         cOpts.isLocalNonExtraDep
         cOpts.isMutable
         pcOpts
+      instWithOpts =
+        mkInstantiateWithOpts task.backpackInstEntries allDepsMap
       configureOpts = configureOpts'
-        { nonPathRelated = configureOpts'.nonPathRelated ++ map T.unpack extra }
+        { nonPathRelated =
+            configureOpts'.nonPathRelated
+            ++ map T.unpack extra
+            ++ instWithOpts
+        }
       deps = Set.fromList $ Map.elems missing' ++ Map.elems task.present
       components = case task.taskType of
         TTLocalMutable lp ->
@@ -223,6 +242,40 @@ getConfigCache ee task installedMap enableTest enableBench = do
         }
   pure (allDepsMap, cache)
 
+-- | Look up the 'GhcPkgId' for a package by its 'PackageName' in a dependency
+-- map keyed by 'PackageIdentifier'. Used to resolve implementing packages for
+-- Backpack @--instantiate-with@ flags.
+findGhcPkgId ::
+     Map PackageIdentifier GhcPkgId
+  -> PackageName
+  -> Maybe GhcPkgId
+findGhcPkgId depsMap pn =
+  case [gid | (PackageIdentifier n _, gid) <- Map.toList depsMap, n == pn] of
+    (gid:_) -> Just gid
+    [] -> Nothing
+
+-- | Generate @--instantiate-with@ configure flags for CInst (Backpack
+-- instantiation) tasks. Each entry maps a signature name to an implementing
+-- module identified by its package's 'GhcPkgId'.
+--
+-- Format: @--instantiate-with=SigName=\<unit-id\>:ImplModuleName@
+mkInstantiateWithOpts ::
+     [(ModuleName, PackageName, ModuleName)]
+     -- ^ Backpack instantiation entries: (sigName, implPkgName, implModuleName)
+  -> Map PackageIdentifier GhcPkgId
+     -- ^ All dependency GhcPkgIds
+  -> [String]
+mkInstantiateWithOpts entries depsMap =
+  [ "--instantiate-with="
+    ++ C.display sigName
+    ++ "="
+    ++ ghcPkgIdString implGhcPkgId
+    ++ ":"
+    ++ C.display implModuleName
+  | (sigName, implPkgName, implModuleName) <- entries
+  , Just implGhcPkgId <- [findGhcPkgId depsMap implPkgName]
+  ]
+
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig ::
      HasEnvConfig env
@@ -231,6 +284,8 @@ ensureConfig ::
   -> Path Abs Dir
      -- ^ package directory
   -> BuildOpts
+  -> Maybe Text
+     -- ^ CInst hash suffix (Nothing for normal builds)
   -> RIO env ()
      -- ^ announce
   -> (ExcludeTHLoading -> [String] -> RIO env ())
@@ -239,10 +294,24 @@ ensureConfig ::
      -- ^ Cabal file
   -> Task
   -> RIO env Bool
-ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
+ensureConfig newConfigCache pkgDir buildOpts mInstSuffix announce cabal cabalFP task = do
+  -- CInst (Backpack instantiation) tasks share a source directory with the
+  -- indefinite package but use a separate --builddir. They use a separate
+  -- config cache entry (ConfigCacheTypeInstantiation) to avoid colliding with
+  -- the indefinite build's cache. File-based caches (cabalMod,
+  -- projectRoot) are shared since the .cabal file is the same, but
+  -- setup-config lives in the inst builddir and must be checked there.
+  let configCacheType =
+        maybe ConfigCacheTypeConfig ConfigCacheTypeInstantiation mInstSuffix
   newCabalMod <-
     liftIO $ modificationTime <$> getFileStatus (toFilePath cabalFP)
-  setupConfigfp <- setupConfigFromDir pkgDir
+  setupConfigfp <- case mInstSuffix of
+    Nothing -> setupConfigFromDir pkgDir
+    Just suffix -> do
+      dist <- distDirFromDir pkgDir
+      instSubDir <- parseRelDir ("inst-" ++ T.unpack suffix)
+      setupConfig <- parseRelFile "setup-config"
+      pure $ dist </> instSubDir </> setupConfig
   let getNewSetupConfigMod =
         liftIO $ either (const Nothing) (Just . modificationTime) <$>
         tryJust
@@ -269,7 +338,7 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
             ignoreComponents cc = cc { ConfigCache.components = Set.empty }
         -- Determine the old and new Cabal configuration for the package
         -- directory, to determine if we need to reconfigure.
-        mOldConfigCache <- tryGetConfigCache pkgDir
+        mOldConfigCache <- tryGetConfigCache pkgDir configCacheType
 
         mOldCabalMod <- tryGetCabalMod pkgDir
 
@@ -292,7 +361,7 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
     ensureConfigureScript pkgDir
 
   when needConfig $ do
-    deleteCaches pkgDir
+    deleteCaches pkgDir configCacheType
     announce
     cp <- view compilerPathsL
     let (GhcPkgExe pkgPath) = cp.pkg
@@ -312,18 +381,22 @@ ensureConfig newConfigCache pkgDir buildOpts announce cabal cabalFP task = do
     -- Configure cabal with arguments determined by
     -- Stack.Types.Build.configureOpts
     cabal KeepTHLoading $ "configure" : allOpts
-    -- Only write the cache for local packages.  Remote packages are built in a
+    -- Only write the cache for local packages. Remote packages are built in a
     -- temporary directory so the cache would never be used anyway.
     case task.taskType of
-      TTLocalMutable{} -> writeConfigCache pkgDir newConfigCache
+      TTLocalMutable{} -> writeConfigCache pkgDir configCacheType newConfigCache
       TTRemotePackage{} -> pure ()
-    writeCabalMod pkgDir newCabalMod
-    -- This file gets updated one more time by the configure step, so get the
-    -- most recent value. We could instead change our logic above to check if
-    -- our config mod file is newer than the file above, but this seems
-    -- reasonable too.
-    getNewSetupConfigMod >>= writeSetupConfigMod pkgDir
-    writePackageProjectRoot pkgDir newConfigFileRoot
+    -- File-based caches are shared with the indefinite build (same .cabal
+    -- file, same pkgDir). Only write them for normal (non-CInst) tasks to
+    -- avoid redundant writes.
+    when (isNothing mInstSuffix) $ do
+      writeCabalMod pkgDir newCabalMod
+      -- This file gets updated one more time by the configure step, so get the
+      -- most recent value. We could instead change our logic above to check if
+      -- our config mod file is newer than the file above, but this seems
+      -- reasonable too.
+      getNewSetupConfigMod >>= writeSetupConfigMod pkgDir
+      writePackageProjectRoot pkgDir newConfigFileRoot
   pure needConfig
 
 -- | Make a padded prefix for log messages
@@ -349,9 +422,7 @@ announceTask ee taskType action = logInfo $
   <> action
 
 -- | Implements running a package's build, used to implement
--- 'Control.Concurrent.Execute.ATBuild' and
--- 'Control.Concurrent.Execute.ATBuildFinal' tasks. The latter is a task for
--- building a package's benchmarks and test-suites.
+-- 'Control.Concurrent.Execute.ATBuild' tasks.
 --
 -- In particular this does the following:
 --
@@ -375,7 +446,14 @@ singleBuild ::
   -> Task
   -> InstalledMap
   -> Bool
-     -- ^ Is this a final build?
+     -- ^ Is this a final build? (Controls enable-tests/--enable-benchmarks.)
+  -> Bool
+     -- ^ Is this a merged primary+final build? True only when a non-split
+     --   package's primary task is folded together with its final task in a
+     --   single Setup invocation, so lib/exe components are also built and
+     --   installed. Ignored when isFinalBuild is False.
+  -> ComponentKey
+     -- ^ The component key identifying which component this build is for.
   -> RIO env ()
 singleBuild
     ac
@@ -383,14 +461,20 @@ singleBuild
     task
     installedMap
     isFinalBuild
+    isMergedBuild
+    ck
   = do
     (allDepsMap, cache) <-
       getConfigCache ee task installedMap enableTests enableBenchmarks
     let bcoSnapInstallRoot = ee.baseConfigOpts.snapInstallRoot
-    mprecompiled <- getPrecompiled cache task.taskType bcoSnapInstallRoot
+        isCInstTask = case ck of
+          ComponentKey _ (CInst _) -> True
+          _ -> False
+    mprecompiled <- getPrecompiled isCInstTask cache task.taskType bcoSnapInstallRoot
     minstalled <-
       case mprecompiled of
-        Just precompiled -> copyPreCompiled ee task pkgId precompiled
+        Just precompiled ->
+          copyPreCompiled isCInstTask ee task pkgId precompiled
         Nothing -> do
           curator <- view $ buildConfigL . to (.curator)
           realConfigAndBuild
@@ -399,18 +483,28 @@ singleBuild
             task
             installedMap
             (enableTests, enableBenchmarks)
-            (isFinalBuild, buildingFinals)
+            (isFinalBuild, buildingFinals, isMergedBuild)
             cache
             curator
             allDepsMap
-    whenJust minstalled $ \installed -> do
-      writeFlagCache installed cache
-      liftIO $ atomically $ modifyTVar ee.ghcPkgIds $ Map.insert pkgId installed
+            ck
+    -- For CInst (Backpack instantiation) tasks, do NOT update the ghcPkgIds
+    -- TVar. The consumer's --dependency flag must reference the indefinite
+    -- GhcPkgId (stored by the CLib task). Cabal resolves the instantiation
+    -- by looking up the package DB using mixin declarations. Writing the
+    -- flag cache is also skipped to avoid clobbering the indefinite build's
+    -- cache.
+    unless isCInstTask $
+      whenJust minstalled $ \installed -> do
+        writeFlagCache installed cache
+        liftIO $ atomically $ modifyTVar ee.ghcPkgIds $ Map.insert pkgId installed
  where
   pkgId = taskProvides task
-  buildingFinals = isFinalBuild || task.allInOne
-  enableTests = buildingFinals && any isCTest (taskComponents task)
-  enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
+  buildingFinals = isFinalBuild
+  enableTests = buildingFinals
+    && componentEnableTests ck (taskComponents task)
+  enableBenchmarks = buildingFinals
+    && componentEnableBenchmarks ck (taskComponents task)
 
 realConfigAndBuild ::
      forall env a. HasEnvConfig env
@@ -420,11 +514,12 @@ realConfigAndBuild ::
   -> Map PackageName (a, Installed)
   -> (Bool, Bool)
      -- ^ (enableTests, enableBenchmarks)
-  -> (Bool, Bool)
-     -- ^ (isFinalBuild, buildingFinals)
+  -> (Bool, Bool, Bool)
+     -- ^ (isFinalBuild, buildingFinals, isMergedBuild)
   -> ConfigCache
   -> Maybe Curator
   -> Map PackageIdentifier GhcPkgId
+  -> ComponentKey
   -> RIO env (Maybe Installed)
 realConfigAndBuild
     ac
@@ -432,11 +527,12 @@ realConfigAndBuild
     task
     installedMap
     (enableTests, enableBenchmarks)
-    (isFinalBuild, buildingFinals)
+    (isFinalBuild, buildingFinals, isMergedBuild)
     cache
     mcurator0
     allDepsMap
-  = withSingleContext ac ee task.taskType allDepsMap Nothing $
+    ck
+  = withSingleContext ac ee task.taskType allDepsMap Nothing mInstSuffix $
       \package cabalFP pkgDir cabal0 announce _outputType -> do
         let cabal = cabal0 CloseOnException
         _neededConfig <-
@@ -444,6 +540,7 @@ realConfigAndBuild
             cache
             pkgDir
             ee.buildOpts
+            mInstSuffix
             (announce ("configure" <> display annSuffix))
             cabal
             cabalFP
@@ -476,31 +573,21 @@ realConfigAndBuild
  where
   pkgId = taskProvides task
   PackageIdentifier pname _ = pkgId
+  mInstSuffix = case ck of
+    ComponentKey _ (CInst hashSuffix) -> Just hashSuffix
+    _ -> Nothing
   doHaddock curator =
        task.buildHaddocks
-    && not isFinalBuild
+       -- Skip haddock only for pure finals-only builds (split CTest/CBench
+       -- or the non-split finalBuild action with no primary to go with).
+       -- Merged non-split builds still produce primary components, so run
+       -- haddock for them as we would for a plain primary build.
+    && not (isFinalBuild && not isMergedBuild)
        -- Special help for the curator tool to avoid haddocks that are known
        -- to fail
     && maybe True (Set.notMember pname . (.skipHaddock)) curator
 
-  annSuffix = if result == "" then "" else " (" <> result <> ")"
-   where
-    result = T.intercalate " + " $ concat
-      [ ["lib" | task.allInOne && hasLib]
-      , ["sub-lib" | task.allInOne && hasSubLib]
-      , ["exe" | task.allInOne && hasExe]
-      , ["test" | enableTests]
-      , ["bench" | enableBenchmarks]
-      ]
-    (hasLib, hasSubLib, hasExe) = case task.taskType of
-      TTLocalMutable lp ->
-        let package = lp.package
-            hasLibrary = hasBuildableMainLibrary package
-            hasSubLibraries = not $ null package.subLibraries
-            hasExecutables = not . Set.null $ exesToBuild lp
-        in  (hasLibrary, hasSubLibraries, hasExecutables)
-      -- This isn't true, but we don't want to have this info for upstream deps.
-      _ -> (False, False, False)
+  annSuffix = buildAnnSuffix ck task enableTests enableBenchmarks
   initialBuildSteps cabal announce = do
     announce ("initial-build-steps" <> display annSuffix)
     cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
@@ -576,17 +663,8 @@ realConfigAndBuild
     let stripTHLoading
           | config.hideTHLoading = ExcludeTHLoading
           | otherwise                  = KeepTHLoading
-    (buildOpts, copyOpts) <-
-      case (task.taskType, task.allInOne, isFinalBuild) of
-        (_, True, True) -> throwM AllInOneBuildBug
-        (TTLocalMutable lp, False, False) ->
-          let componentOpts = primaryComponentOptions lp
-          in  pure (componentOpts, componentOpts)
-        (TTLocalMutable lp, False, True) -> pure (finalComponentOptions lp, [])
-        (TTLocalMutable lp, True, False) ->
-          let componentOpts = primaryComponentOptions lp
-          in pure (componentOpts <> finalComponentOptions lp, componentOpts)
-        (TTRemotePackage{}, _, _) -> pure ([], [])
+    let (buildOpts, copyOpts) =
+          buildAndCopyOpts task.taskType ck isFinalBuild isMergedBuild
     cabal stripTHLoading ("build" : buildOpts <> extraOpts)
       `catch` \ex -> case ex of
         CabalExitedUnsuccessfully{} ->
@@ -637,8 +715,14 @@ realConfigAndBuild
     let hasLibrary = hasBuildableMainLibrary package
         hasSubLibraries = not $ null package.subLibraries
         hasExecutables = not $ null package.executables
+        -- Skip copy/install only for pure finals-only builds: split
+        -- CTest/CBench components and non-split finalBuild actions that
+        -- follow a clean primary. Every other path — plain primary
+        -- builds, split primary components, merged primary+final non-split
+        -- builds, and intra-package Backpack CLib/CInst builds — copies
+        -- and registers as before.
         shouldCopy =
-             not isFinalBuild
+             not (isFinalBuild && not isMergedBuild)
           && (hasLibrary || hasSubLibraries || hasExecutables)
     when shouldCopy $ withMVar ee.installLock $ \() -> do
       announce "copy/register"
@@ -699,7 +783,7 @@ postProcessRemotePackage
         -- in tmp (#3018).
         let remaining =
               Set.filter
-                (\(ActionId x _) -> x == pkgId)
+                (\(ActionId ck _) -> componentKeyPkgName ck == pkgName pkgId)
                 ac.remaining
         when (null remaining) $ removeDirRecur pkgDir
       _ -> pure ()
@@ -797,19 +881,28 @@ copyDdumpFilesIfNeeded buildingFinals mDdumpPath = when buildingFinals $
 
 getPrecompiled ::
      HasEnvConfig env
-  => ConfigCache
+  => Bool
+     -- ^ Is this a CInst (Backpack instantiation) task? CInst tasks are
+     -- always created by addInstantiationTasks even when the instantiated
+     -- package is already registered. Skip the self-reference check so
+     -- the precompiled cache can short-circuit the build.
+  -> ConfigCache
   -> TaskType
   -> Path Abs Dir
   -> RIO env (Maybe (PrecompiledCache Abs))
-getPrecompiled cache taskType bcoSnapInstallRoot =
+getPrecompiled isCInst cache taskType bcoSnapInstallRoot =
   case taskType of
     TTRemotePackage Immutable _ loc ->
       readPrecompiledCache loc cache.configureOpts cache.buildHaddocks >>= \case
         Nothing -> pure Nothing
         -- Only pay attention to precompiled caches that refer to packages
-        -- within the snapshot.
+        -- within the snapshot. For CInst tasks, skip this check: CInst
+        -- tasks are always created regardless of whether the instantiated
+        -- package is already installed, and re-registering with --force is
+        -- harmless.
         Just pc
-          | maybe False
+          | not isCInst
+          , maybe False
               (bcoSnapInstallRoot `isProperPrefixOf`)
               pc.library -> pure Nothing
         -- If old precompiled cache files are left around but snapshots are
@@ -834,19 +927,26 @@ copyPreCompiled ::
      , HasProcessContext env
      , HasEnvConfig env
      )
-  => ExecuteEnv
+  => Bool
+     -- ^ Is this a CInst (Backpack instantiation) task? If so, skip
+     -- unregistration — the indefinite package and other instantiations
+     -- must remain in the DB.
+  -> ExecuteEnv
   -> Task
   -> PackageIdentifier
   -> PrecompiledCache b0
   -> RIO env (Maybe Installed)
-copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
+copyPreCompiled isCInst ee task pkgId (PrecompiledCache mlib subLibs exes) = do
   let PackageIdentifier pname pversion = pkgId
   announceTask ee task.taskType "using precompiled package"
 
   -- We need to copy .conf files for the main library and all sub-libraries
   -- which exist in the cache, from their old snapshot to the new one.
   -- However, we must unregister any such library in the new snapshot, in case
-  -- it was built with different flags.
+  -- it was built with different flags. For CInst tasks, we skip unregistration
+  -- because the indefinite package and other instantiations share the same
+  -- package name and must remain in the DB. The --force flag on register
+  -- handles any conflicts.
   let
     subLibNames = Set.toList $ buildableSubLibs $ case task.taskType of
       TTLocalMutable lp -> lp.package
@@ -872,12 +972,15 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
       let pkgDb = ee.baseConfigOpts.snapDB
       ghcPkgExe <- getGhcPkgExe
       -- First unregister, silently, everything that needs to be unregistered.
-      whenJust (nonEmpty allToUnregister) $ \allToUnregister' -> do
-        logLevel <- view $ globalOptsL . to (.logLevel)
-        let isDebug = logLevel == LevelDebug
-        catchAny
-          (unregisterGhcPkgIds isDebug ghcPkgExe pkgDb allToUnregister')
-          (const (pure ()))
+      -- Skip for CInst tasks to preserve the indefinite and other instantiated
+      -- entries.
+      unless isCInst $
+        whenJust (nonEmpty allToUnregister) $ \allToUnregister' -> do
+          logLevel <- view $ globalOptsL . to (.logLevel)
+          let isDebug = logLevel == LevelDebug
+          catchAny
+            (unregisterGhcPkgIds isDebug ghcPkgExe pkgDb allToUnregister')
+            (const (pure ()))
       -- There appears to be a bug in the ghc-pkg executable such that, on
       -- Windows only, it cannot register a package into a package database that
       -- is also listed in the GHC_PACKAGE_PATH environment variable. See:
@@ -939,7 +1042,24 @@ loadInstalledPkg pkgDbs tvar name = do
     [dp] -> do
       liftIO $ atomically $ modifyTVar' tvar (Map.insert dp.ghcPkgId dp)
       pure $ Just dp.ghcPkgId
-    _ -> throwM $ MultipleResultsBug name dps
+    -- For Backpack packages, ghc-pkg may return multiple entries for the same
+    -- component name: an indefinite (signature-only) package and one or more
+    -- instantiated packages. Pick the last instantiated one (has '+' in its
+    -- ID) since that contains the compiled code. Multiple instantiations
+    -- arise when different consumers fill the same signature with different
+    -- implementations. Register all entries in the dump.
+    _ -> case filter isInstantiated dps of
+      [] -> throwM $ MultipleResultsBug name dps
+      instantiated -> do
+        forM_ dps $ \d ->
+          liftIO $ atomically $ modifyTVar' tvar (Map.insert d.ghcPkgId d)
+        -- Pick the last instantiated entry. With multiple instantiations, the
+        -- order doesn't matter — the caller (CInst) discards the result anyway.
+        let dp = L.last instantiated
+        pure $ Just dp.ghcPkgId
+ where
+  isInstantiated dp =
+    '+' `elem` ghcPkgIdString dp.ghcPkgId
 
 fulfillHaddockExpectations ::
      (MonadUnliftIO m, HasTerm env, MonadReader env m)
@@ -998,7 +1118,7 @@ singleTest topts testsToRun ac ee task installedMap = do
   mcurator <- view $ buildConfigL . to (.curator)
   let pname = pkgName $ taskProvides task
       expectFailure = expectTestFailure pname mcurator
-  withSingleContext ac ee task.taskType allDepsMap (Just "test") $
+  withSingleContext ac ee task.taskType allDepsMap (Just "test") Nothing $
     \package _cabalfp pkgDir _cabal announce outputType -> do
       config <- view configL
       let needHpc = topts.coverage
@@ -1303,7 +1423,7 @@ singleBench ::
   -> RIO env ()
 singleBench beopts benchesToRun ac ee task installedMap = do
   (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
-  withSingleContext ac ee task.taskType allDepsMap (Just "bench") $
+  withSingleContext ac ee task.taskType allDepsMap (Just "bench") Nothing $
     \_package _cabalfp _pkgDir cabal announce _outputType -> do
       let args = map unqualCompToString benchesToRun <> maybe []
                        ((:[]) . ("--benchmark-options=" <>))
@@ -1339,6 +1459,135 @@ extraBuildOptions wc bopts semaphore = do
       pure $ semaphoreFlag ++ [optsFlag, "-hpcdir " ++ hpcIndexDir ++ baseOpts]
     else
       pure $ semaphoreFlag ++ [optsFlag, baseOpts]
+
+-- | Compute the announce suffix for build/configure log messages. For CInst
+-- tasks, shows the instantiation details (e.g. @inst:941095d7: Str = impl-pkg@).
+-- For other per-component builds, shows the component type. For final builds,
+-- shows test/bench.
+buildAnnSuffix ::
+     ComponentKey
+  -> Task
+  -> Bool -- ^ enableTests
+  -> Bool -- ^ enableBenchmarks
+  -> Text
+buildAnnSuffix ck task enableTests enableBenchmarks = case ck of
+  ComponentKey _ (CInst hash) ->
+    " (inst:" <> T.take 8 hash <> instDetail <> ")"
+  ComponentKey _ comp
+    | not (isCLib comp) -> " (" <> renderComponent comp <> ")"
+  _ | result /= "" -> " (" <> result <> ")"
+  _ -> ""
+ where
+  instDetail
+    | null task.backpackInstEntries = ""
+    | otherwise = ": " <> T.intercalate ", "
+        [ T.pack (C.display sig)
+          <> " = "
+          <> T.pack (packageNameString impl)
+          <> if sig == implMod then "" else ":" <> T.pack (C.display implMod)
+        | (sig, impl, implMod) <- task.backpackInstEntries
+        ]
+  result = T.intercalate " + " $
+    ["test" | enableTests] ++ ["bench" | enableBenchmarks]
+  isCLib CLib = True
+  isCLib _ = False
+
+-- | Compute the Cabal build and copy target options for a component. For
+-- packages with intra-package deps (e.g. Backpack), omits targets so Cabal
+-- handles ordering. For per-component builds, passes a single target. For
+-- remote packages, no targets are needed.
+buildAndCopyOpts ::
+     TaskType
+  -> ComponentKey
+  -> Bool -- ^ isFinalBuild
+  -> Bool -- ^ isMergedBuild (primary+final folded together)
+  -> ([String], [String])
+     -- ^ (buildOpts, copyOpts)
+buildAndCopyOpts taskType ck isFinalBuild isMergedBuild = case taskType of
+  TTLocalMutable lp
+    | hasIntraPackageDeps lp.package -> ([], [])
+    | shouldSplitComponents lp.package
+    , ComponentKey pn comp <- ck ->
+        dispatchBuildOpts
+          (Just (componentTarget pn comp))
+          isFinalBuild
+          isMergedBuild
+          []
+          []
+    | otherwise ->
+        dispatchBuildOpts
+          Nothing
+          isFinalBuild
+          isMergedBuild
+          (primaryComponentOptions lp)
+          (finalComponentOptions lp)
+  TTRemotePackage{} -> ([], [])
+
+-- | Pure dispatcher for 'buildAndCopyOpts'. Given the build mode and the
+-- pre-computed Cabal target lists, decide which targets to pass to
+-- @setup build@ and which to @setup copy@. Exported for unit testing —
+-- 'buildAndCopyOpts' is the production caller.
+--
+-- Mode summary:
+--
+-- * @Just target@ + @isFinalBuild=False@ (split primary): build and copy
+--   the single target.
+-- * @Just target@ + @isFinalBuild=True@ (split final): build the single
+--   target, skip copy.
+-- * @Nothing@ + @isFinalBuild=False@ (non-split primary-only): build and
+--   copy all primary components.
+-- * @Nothing@ + @isFinalBuild=True@ + @isMergedBuild=True@ (non-split
+--   primary+final folded into one Setup invocation): build primary and
+--   final components together, copy only primary.
+-- * @Nothing@ + @isFinalBuild=True@ + @isMergedBuild=False@ (non-split
+--   finals-only, primary was clean): build final components, skip copy.
+dispatchBuildOpts ::
+     Maybe String
+     -- ^ Split-component target (rendered Cabal target string) when
+     --   'shouldSplitComponents' holds; 'Nothing' for non-split packages.
+  -> Bool     -- ^ isFinalBuild
+  -> Bool     -- ^ isMergedBuild
+  -> [String] -- ^ primary component options (ignored on the split path)
+  -> [String] -- ^ final component options (ignored on the split path)
+  -> ([String], [String])
+     -- ^ (buildOpts, copyOpts)
+dispatchBuildOpts (Just target) isFinalBuild _ _ _ =
+  if isFinalBuild then ([target], []) else ([target], [target])
+dispatchBuildOpts Nothing True True primary finals =
+  (primary ++ finals, primary)
+dispatchBuildOpts Nothing True False _ finals =
+  (finals, [])
+dispatchBuildOpts Nothing False _ primary _ =
+  (primary, primary)
+
+-- | Render a 'NamedComponent' as a Cabal build target string. This uses
+-- Cabal's target syntax (e.g. @lib:pkg-name@, @exe:my-exe@, @test:my-test@).
+componentTarget :: PackageName -> NamedComponent -> String
+componentTarget pn CLib = "lib:" ++ packageNameString pn
+componentTarget _ (CSubLib x) = "lib:" ++ unqualCompToString x
+componentTarget _ (CFlib x) = "flib:" ++ unqualCompToString x
+componentTarget _ (CExe x) = "exe:" ++ unqualCompToString x
+componentTarget _ (CTest x) = "test:" ++ unqualCompToString x
+componentTarget _ (CBench x) = "bench:" ++ unqualCompToString x
+componentTarget _ (CInst _) = ""
+
+-- | Should tests be enabled (Cabal @--enable-tests@) for a given
+-- 'ComponentKey'? For per-component CTest keys, always True. For non-split
+-- CLib keys, checks the full component set. For all other keys, False.
+componentEnableTests :: ComponentKey -> Set NamedComponent -> Bool
+componentEnableTests ck comps = case ck of
+  ComponentKey _ (CTest _) -> True
+  ComponentKey _ CLib -> any isCTest comps
+  _ -> False
+
+-- | Should benchmarks be enabled (Cabal @--enable-benchmarks@) for a given
+-- 'ComponentKey'? For per-component CBench keys, always True. For non-split
+-- CLib keys, checks the full component set. For all other keys, False.
+componentEnableBenchmarks :: ComponentKey -> Set NamedComponent -> Bool
+componentEnableBenchmarks ck comps = case ck of
+  ComponentKey _ (CBench _) -> True
+  ComponentKey _ CLib -> any isCBench comps
+  _ -> False
 
 -- Library, sub-library, foreign library and executable build components.
 primaryComponentOptions :: LocalPackage -> [String]
