@@ -1,6 +1,8 @@
-import StackTest
+-- | Stack will build packages in the package index in the absence of a Stack
+-- project-level configuration file (by referring to the configuration file in
+-- the global-project directory in the Stack root).
+
+import           StackTest
 
 main :: IO ()
-main = do
-    stack [defaultSnapshotArg, "install", "acme-missiles-0.3"]
-    doesNotExist "stack.yaml"
+main = stack ["build", "acme-missiles-0.3"]

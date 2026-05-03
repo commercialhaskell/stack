@@ -1,2 +1,3 @@
-*.cabal
-/bin/
+myPackage.cabal
+bin1/
+bin2/

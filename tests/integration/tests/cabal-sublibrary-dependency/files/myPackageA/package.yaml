@@ -1,9 +1,10 @@
 spec-version: 0.36.0
 
-name: myPackage
+name: myPackageA
 
 dependencies:
 - base
+- myPackageB:myPackageB-sub
 
 executables:
   myExe:
