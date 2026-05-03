@@ -288,7 +288,20 @@ snapshotValue root snapshot = do
   concreteSnapshot <- makeConcreteSnapshot snapshot'
   -- Check that the snapshot actually exists
   void $ loadSnapshot =<< completeSnapshotLocation concreteSnapshot
-  pure (Yaml.toJSON concreteSnapshot)
+  rslValue concreteSnapshot
+
+rslValue :: HasConfig env => RawSnapshotLocation -> RIO env Yaml.Value
+rslValue (RSLCompiler compiler) = pure $ Yaml.toJSON compiler
+rslValue (RSLUrl url Nothing) = pure $ Yaml.toJSON url
+rslValue (RSLUrl url _) = do
+  -- I can't see how this would ever arise, but it is added for completeness:
+  prettyWarnL
+    [ flow "The specified snapshot value is a URL. The associated SHA256 hash \
+           \and file size will be ignored."
+    ]
+  pure $ Yaml.toJSON url
+rslValue (RSLFilePath rp) = pure $ Yaml.toJSON $ resolvedRelative rp
+rslValue rsl = pure $ Yaml.toJSON rsl
 
 cfgCmdSetKeys :: ConfigCmdSet -> NonEmpty (NonEmpty Text)
 cfgCmdSetKeys (ConfigCmdSetSnapshot _) = [["snapshot"], ["resolver"]]
