@@ -22,6 +22,7 @@ module Stack.Types.Build.ConstructPlan
   , adrHasLibrary
   , isAdrToInstall
   , Ctx (..)
+  , PackageLoader
   , UnregisterState (..)
   , ToolWarning (..)
   , MissingPresentDeps (..)
@@ -173,14 +174,9 @@ instance Monoid MissingPresentDeps where
 data Ctx = Ctx
   { baseConfigOpts :: !BaseConfigOpts
     -- ^ Basic information used to determine configure options
-  , loadPackage    :: !(  PackageLocationImmutable
-                       -> Map FlagName Bool
-                       -> [Text]
-                          -- ^ GHC options.
-                       -> [Text]
-                          -- ^ Cabal configure options.
-                       -> M Package
-                       )
+  , loadPackage    :: !(PackageLoader M)
+    -- ^ A function to load a `Package` given the location of a package assumed
+    -- to be immutable.
   , combinedMap    :: !CombinedMap
     -- ^ A dictionary of package names, and combined information about the
     -- package in respect of whether or not it is already installed and, unless
@@ -194,6 +190,20 @@ data Ctx = Ctx
   , curator       :: !(Maybe Curator)
   , pathEnvVar     :: !Text
   }
+
+-- | A type synonym representing functions that yield a 'Package' given the
+-- location of a package assumed to be immutable, parameterised by the relevant
+-- monad.
+type PackageLoader m =
+     PackageLocationImmutable
+     -- ^ Location of a package that is assumed to be immutable.
+  -> Map FlagName Bool
+     -- ^ Cabal flags.
+  -> [Text]
+     -- ^ GHC options.
+  -> [Text]
+     -- ^ Cabal configure options.
+  -> m Package
 
 instance HasPlatform Ctx where
   platformL = configL . platformL

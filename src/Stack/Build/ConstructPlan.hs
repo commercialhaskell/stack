@@ -47,9 +47,9 @@ import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
 import           Stack.Types.Build.ConstructPlan
                    ( AddDepRes (..), CombinedMap, Ctx (..), LibraryMap, M
-                   , MissingPresentDeps (..), PackageInfo (..), ToolWarning(..)
-                   , UnregisterState (..), W (..), adrHasLibrary, adrVersion
-                   , isAdrToInstall, toTask
+                   , MissingPresentDeps (..), PackageInfo (..), PackageLoader
+                   , ToolWarning(..), UnregisterState (..), W (..)
+                   , adrHasLibrary, adrVersion, isAdrToInstall, toTask
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -121,16 +121,11 @@ import           System.Environment ( lookupEnv )
 constructPlan ::
      forall env. HasEnvConfig env
   => BaseConfigOpts
-  -> [DumpPackage] -- ^ locally registered
-  -> (  PackageLocationImmutable
-     -> Map FlagName Bool
-     -> [Text]
-        -- ^ GHC options
-     -> [Text]
-        -- ^ Cabal configure options
-     -> RIO EnvConfig Package
-     )
-     -- ^ load upstream package
+  -> [DumpPackage]
+     -- ^ Locally registered.
+  -> PackageLoader (RIO EnvConfig)
+     -- ^ Function to load a 'Package' given the location of a package assumed
+     -- to be immutable.
   -> SourceMap
   -> InstalledMap
   -> Bool
@@ -195,7 +190,11 @@ constructPlan
     let ctx = mkCtx econfig globalCabalVersion sources curator pathEnvVar
         targetPackageNames = Map.keys sourceMap.targets.targets
         -- Ignore the result of 'getCachedDepOrAddDep'.
-        onTarget = void . getCachedDepOrAddDep
+        onTarget pkgName = do
+          logDebugPlanS "constructPlan" $
+               "Constructing for target "
+            <> fromPackageName pkgName
+          void $ getCachedDepOrAddDep pkgName
         inner :: M ()
         inner = mapM_ onTarget targetPackageNames
         action :: RIO Ctx (((), W), LibraryMap)
@@ -250,18 +249,23 @@ constructPlan
     -> Maybe Curator
     -> Text
     -> Ctx
-  mkCtx ctxEnvConfig globalCabalVersion sources curator pathEnvVar = Ctx
-    { baseConfigOpts = baseConfigOpts0
-    , loadPackage = \w x y z -> runRIO ctxEnvConfig $
-        applyForceCustomBuild globalCabalVersion <$> loadPackage0 w x y z
-    , combinedMap = combineMap sources installedMap
-    , ctxEnvConfig
-    , callStack = []
-    , wanted = Map.keysSet sourceMap.targets.targets
-    , localNames = Map.keysSet sourceProject
-    , curator
-    , pathEnvVar
-    }
+  mkCtx ctxEnvConfig globalCabalVersion sources curator pathEnvVar =
+    let loadPackage loc flags ghcOptions cabalConfigOpts = do
+          let action = do
+                package <- loadPackage0 loc flags ghcOptions cabalConfigOpts
+                pure $ applyForceCustomBuild globalCabalVersion package
+          runRIO ctxEnvConfig action
+    in  Ctx
+          { baseConfigOpts = baseConfigOpts0
+          , loadPackage
+          , combinedMap = combineMap sources installedMap
+          , ctxEnvConfig
+          , callStack = []
+          , wanted = Map.keysSet sourceMap.targets.targets
+          , localNames = Map.keysSet sourceProject
+          , curator
+          , pathEnvVar
+          }
 
   toEither :: (k, Either e v) -> Either e (k, v)
   toEither (_, Left e)  = Left e
@@ -478,6 +482,7 @@ addFinal ::
      -- ^ Should Haddock documentation be built?
   -> M ()
 addFinal lp package allInOne buildHaddocks = do
+  let name = package.name
   res <- addPackageDeps package >>= \case
     Left e -> pure $ Left e
     Right (MissingPresentDeps missing present _minLoc) -> do
@@ -500,7 +505,11 @@ addFinal lp package allInOne buildHaddocks = do
         , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFP))
         , buildTypeConfig = packageBuildTypeConfig package
         }
-  tell mempty { wFinals = Map.singleton package.name res }
+  logDebugPlanS "addFinal" $
+       "Adding to construction output "
+    <> fromPackageName name
+    <> summariseResult res
+  tell mempty { wFinals = Map.singleton name res }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the package, if
 -- needed. First checks if the package name is in the library map.
@@ -551,10 +560,19 @@ checkCallStackAndAddDep name = do
           <> fromPackageName name
           <> "."
         pure $ Left $ UnknownPackage compiler name
-      Just packageInfo ->
+      Just packageInfo -> do
+        logDebugPlanS "checkCallStackAndAddDep" $
+             "Pushing "
+          <> fromPackageName name
+          <> " on to the call stack."
         -- Add the current package name to the head of the call stack.
-        local (\ctx' -> ctx' { callStack = name : ctx'.callStack }) $
+        res <- local (\ctx' -> ctx' { callStack = name : ctx'.callStack }) $
           addDep name packageInfo
+        logDebugPlanS "checkCallStackAndAddDep" $
+             "Popped "
+          <> fromPackageName name
+          <> " from the call stack."
+        pure res
   updateLibMap name res
   pure res
 
@@ -688,15 +706,16 @@ installPackage name ps minstalled = do
           resolveDepsAndInstall
             True lp.buildHaddocks ps lp.package minstalled
         Just tb -> do
+          -- Preserve the current library map.
+          libMap <- get
           -- Attempt to find a plan which performs an all-in-one build. Ignore
           -- the writer action + reset the state if it fails.
-          libMap <- get
           res <- pass $ do
             res <- addPackageDeps tb
-            let writerFunc w = case res of
-                  Left _ -> mempty
-                  _ -> w
-            pure (res, writerFunc)
+            let modifyOutput = case res of
+                  Left _ -> const mempty
+                  _ -> id
+            pure (res, modifyOutput)
           case res of
             Right deps -> do
               logDebugPlanS "installPackage" $
@@ -768,8 +787,14 @@ installPackageGivenDeps ::
   -> Maybe Installed
   -> MissingPresentDeps
   -> M AddDepRes
-installPackageGivenDeps allInOne buildHaddocks ps package minstalled
-  (MissingPresentDeps missing present minMutable) = do
+installPackageGivenDeps
+    allInOne
+    buildHaddocks
+    ps
+    package
+    minstalled
+    (MissingPresentDeps missing present minMutable)
+  = do
     let name = package.name
     mRightVersionInstalled <- case minstalled of
       Just installed -> if Set.null missing
@@ -822,10 +847,15 @@ packageBuildTypeConfig pkg = pkg.buildType == Configure
 -- Update response in the library map. If it is an error, and there's already an
 -- error about cyclic dependencies, prefer the cyclic error.
 updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> M ()
-updateLibMap name val = modify $ \mp ->
-  case (Map.lookup name mp, val) of
-    (Just (Left DependencyCycleDetected{}), Left _) -> mp
-    _ -> Map.insert name val mp
+updateLibMap name res = do
+  logDebugPlanS "updateLibMap" $
+       "Updating for: "
+    <> fromPackageName name
+    <> summariseResult res
+  modify $ \mp ->
+    case (Map.lookup name mp, res) of
+      (Just (Left DependencyCycleDetected{}), Left _) -> mp
+      _ -> Map.insert name res mp
 
 addEllipsis :: Text -> Text
 addEllipsis t
@@ -1272,6 +1302,12 @@ logDebugPlanS ::
 logDebugPlanS s msg = do
   debugPlan <- view $ globalOptsL . to (.planInLog)
   when debugPlan $ logDebugS s msg
+
+-- | A function to summarise a result. Assumes that 'Left' is an error and
+-- 'Right' is not. Intended to be used to annotate, so includes an initial space
+-- character.
+summariseResult :: Either a b -> Utf8Builder
+summariseResult res = " (" <> either (const "error") (const "ok") res <> ")"
 
 -- | A function to yield a 'PackageInfo' value from: (1) a 'PackageSource'
 -- value; and (2) a pair of an 'InstallLocation' value and an 'Installed' value.
