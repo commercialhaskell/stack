@@ -47,9 +47,9 @@ import           Stack.Prelude hiding ( loadPackage )
 import           Stack.SourceMap ( getPLIVersion, mkProjectPackage )
 import           Stack.Types.Build.ConstructPlan
                    ( AddDepRes (..), CombinedMap, Ctx (..), LibraryMap, M
-                   , MissingPresentDeps (..), PackageInfo (..), ToolWarning(..)
-                   , UnregisterState (..), W (..), adrHasLibrary, adrVersion
-                   , isAdrToInstall, toTask
+                   , MissingPresentDeps (..), PackageInfo (..), PackageLoader
+                   , ToolWarning(..), UnregisterState (..), W (..)
+                   , adrHasLibrary, adrVersion, isAdrToInstall, toTask
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -122,15 +122,9 @@ constructPlan ::
      forall env. HasEnvConfig env
   => BaseConfigOpts
   -> [DumpPackage] -- ^ locally registered
-  -> (  PackageLocationImmutable
-     -> Map FlagName Bool
-     -> [Text]
-        -- ^ GHC options
-     -> [Text]
-        -- ^ Cabal configure options
-     -> RIO EnvConfig Package
-     )
-     -- ^ load upstream package
+  -> PackageLoader (RIO EnvConfig)
+     -- ^ Function to load a 'Package' given the location of a package assumed
+     -- to be immutable.
   -> SourceMap
   -> InstalledMap
   -> Bool

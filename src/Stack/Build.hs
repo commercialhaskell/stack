@@ -41,6 +41,7 @@ import           Stack.Package ( buildableExes, resolvePackage )
 import           Stack.Prelude hiding ( loadPackage )
 import           Stack.Runners ( ShouldReexec (..), withConfig, withEnvConfig )
 import           Stack.Setup ( withNewLocalBuildTargets )
+import           Stack.Types.Build.ConstructPlan ( PackageLoader )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig ( HasBuildConfig, configFileL )
@@ -408,13 +409,7 @@ mkBaseConfigOpts buildOptsCLI = do
     }
 
 -- | Provide a function for loading package information from the package index
-loadPackage ::
-     (HasBuildConfig env, HasSourceMap env)
-  => PackageLocationImmutable
-  -> Map FlagName Bool
-  -> [Text] -- ^ GHC options
-  -> [Text] -- ^ Cabal configure options
-  -> RIO env Package
+loadPackage :: (HasBuildConfig env, HasSourceMap env) => PackageLoader (RIO env)
 loadPackage loc flags ghcOptions cabalConfigOpts = do
   compilerVersion <- view actualCompilerVersionL
   platform <- view platformL
