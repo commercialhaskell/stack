@@ -625,7 +625,8 @@ mkDepPackage pl = do
 -- | Force a package to be treated as a custom build type, see
 -- <https://github.com/commercialhaskell/stack/issues/4488>
 applyForceCustomBuild ::
-     Version -- ^ global Cabal version
+     Version
+     -- ^ Global Cabal version.
   -> Package
   -> Package
 applyForceCustomBuild cabalVersion package

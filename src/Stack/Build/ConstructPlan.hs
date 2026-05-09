@@ -121,7 +121,8 @@ import           System.Environment ( lookupEnv )
 constructPlan ::
      forall env. HasEnvConfig env
   => BaseConfigOpts
-  -> [DumpPackage] -- ^ locally registered
+  -> [DumpPackage]
+     -- ^ Locally registered.
   -> PackageLoader (RIO EnvConfig)
      -- ^ Function to load a 'Package' given the location of a package assumed
      -- to be immutable.
@@ -248,18 +249,23 @@ constructPlan
     -> Maybe Curator
     -> Text
     -> Ctx
-  mkCtx ctxEnvConfig globalCabalVersion sources curator pathEnvVar = Ctx
-    { baseConfigOpts = baseConfigOpts0
-    , loadPackage = \w x y z -> runRIO ctxEnvConfig $
-        applyForceCustomBuild globalCabalVersion <$> loadPackage0 w x y z
-    , combinedMap = combineMap sources installedMap
-    , ctxEnvConfig
-    , callStack = []
-    , wanted = Map.keysSet sourceMap.targets.targets
-    , localNames = Map.keysSet sourceProject
-    , curator
-    , pathEnvVar
-    }
+  mkCtx ctxEnvConfig globalCabalVersion sources curator pathEnvVar =
+    let loadPackage loc flags ghcOptions cabalConfigOpts = do
+          let action = do
+                package <- loadPackage0 loc flags ghcOptions cabalConfigOpts
+                pure $ applyForceCustomBuild globalCabalVersion package
+          runRIO ctxEnvConfig action
+    in  Ctx
+          { baseConfigOpts = baseConfigOpts0
+          , loadPackage
+          , combinedMap = combineMap sources installedMap
+          , ctxEnvConfig
+          , callStack = []
+          , wanted = Map.keysSet sourceMap.targets.targets
+          , localNames = Map.keysSet sourceProject
+          , curator
+          , pathEnvVar
+          }
 
   toEither :: (k, Either e v) -> Either e (k, v)
   toEither (_, Left e)  = Left e
@@ -700,15 +706,16 @@ installPackage name ps minstalled = do
           resolveDepsAndInstall
             True lp.buildHaddocks ps lp.package minstalled
         Just tb -> do
+          -- Preserve the current library map.
+          libMap <- get
           -- Attempt to find a plan which performs an all-in-one build. Ignore
           -- the writer action + reset the state if it fails.
-          libMap <- get
           res <- pass $ do
             res <- addPackageDeps tb
-            let writerFunc w = case res of
-                  Left _ -> mempty
-                  _ -> w
-            pure (res, writerFunc)
+            let modifyOutput = case res of
+                  Left _ -> const mempty
+                  _ -> id
+            pure (res, modifyOutput)
           case res of
             Right deps -> do
               logDebugPlanS "installPackage" $
@@ -780,8 +787,14 @@ installPackageGivenDeps ::
   -> Maybe Installed
   -> MissingPresentDeps
   -> M AddDepRes
-installPackageGivenDeps allInOne buildHaddocks ps package minstalled
-  (MissingPresentDeps missing present minMutable) = do
+installPackageGivenDeps
+    allInOne
+    buildHaddocks
+    ps
+    package
+    minstalled
+    (MissingPresentDeps missing present minMutable)
+  = do
     let name = package.name
     mRightVersionInstalled <- case minstalled of
       Just installed -> if Set.null missing
