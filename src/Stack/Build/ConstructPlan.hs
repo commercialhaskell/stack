@@ -189,7 +189,11 @@ constructPlan
     let ctx = mkCtx econfig globalCabalVersion sources curator pathEnvVar
         targetPackageNames = Map.keys sourceMap.targets.targets
         -- Ignore the result of 'getCachedDepOrAddDep'.
-        onTarget = void . getCachedDepOrAddDep
+        onTarget pkgName = do
+          logDebugPlanS "constructPlan" $
+               "Constructing for target "
+            <> fromPackageName pkgName
+          void $ getCachedDepOrAddDep pkgName
         inner :: M ()
         inner = mapM_ onTarget targetPackageNames
         action :: RIO Ctx (((), W), LibraryMap)
@@ -472,6 +476,7 @@ addFinal ::
      -- ^ Should Haddock documentation be built?
   -> M ()
 addFinal lp package allInOne buildHaddocks = do
+  let name = package.name
   res <- addPackageDeps package >>= \case
     Left e -> pure $ Left e
     Right (MissingPresentDeps missing present _minLoc) -> do
@@ -494,7 +499,11 @@ addFinal lp package allInOne buildHaddocks = do
         , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFP))
         , buildTypeConfig = packageBuildTypeConfig package
         }
-  tell mempty { wFinals = Map.singleton package.name res }
+  logDebugPlanS "addFinal" $
+       "Adding to construction output "
+    <> fromPackageName name
+    <> summariseResult res
+  tell mempty { wFinals = Map.singleton name res }
 
 -- | Given a 'PackageName', adds all of the build tasks to build the package, if
 -- needed. First checks if the package name is in the library map.
@@ -545,10 +554,19 @@ checkCallStackAndAddDep name = do
           <> fromPackageName name
           <> "."
         pure $ Left $ UnknownPackage compiler name
-      Just packageInfo ->
+      Just packageInfo -> do
+        logDebugPlanS "checkCallStackAndAddDep" $
+             "Pushing "
+          <> fromPackageName name
+          <> " on to the call stack."
         -- Add the current package name to the head of the call stack.
-        local (\ctx' -> ctx' { callStack = name : ctx'.callStack }) $
+        res <- local (\ctx' -> ctx' { callStack = name : ctx'.callStack }) $
           addDep name packageInfo
+        logDebugPlanS "checkCallStackAndAddDep" $
+             "Popped "
+          <> fromPackageName name
+          <> " from the call stack."
+        pure res
   updateLibMap name res
   pure res
 
@@ -816,10 +834,15 @@ packageBuildTypeConfig pkg = pkg.buildType == Configure
 -- Update response in the library map. If it is an error, and there's already an
 -- error about cyclic dependencies, prefer the cyclic error.
 updateLibMap :: PackageName -> Either ConstructPlanException AddDepRes -> M ()
-updateLibMap name val = modify $ \mp ->
-  case (Map.lookup name mp, val) of
-    (Just (Left DependencyCycleDetected{}), Left _) -> mp
-    _ -> Map.insert name val mp
+updateLibMap name res = do
+  logDebugPlanS "updateLibMap" $
+       "Updating for: "
+    <> fromPackageName name
+    <> summariseResult res
+  modify $ \mp ->
+    case (Map.lookup name mp, res) of
+      (Just (Left DependencyCycleDetected{}), Left _) -> mp
+      _ -> Map.insert name res mp
 
 addEllipsis :: Text -> Text
 addEllipsis t
@@ -1266,6 +1289,12 @@ logDebugPlanS ::
 logDebugPlanS s msg = do
   debugPlan <- view $ globalOptsL . to (.planInLog)
   when debugPlan $ logDebugS s msg
+
+-- | A function to summarise a result. Assumes that 'Left' is an error and
+-- 'Right' is not. Intended to be used to annotate, so includes an initial space
+-- character.
+summariseResult :: Either a b -> Utf8Builder
+summariseResult res = " (" <> either (const "error") (const "ok") res <> ")"
 
 -- | A function to yield a 'PackageInfo' value from: (1) a 'PackageSource'
 -- value; and (2) a pair of an 'InstallLocation' value and an 'Installed' value.
