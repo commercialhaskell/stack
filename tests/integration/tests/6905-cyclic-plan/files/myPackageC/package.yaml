@@ -1,7 +1,6 @@
 spec-version: 0.36.0
 
-# Only builds if this package name comes before myPackageA, alphabetically!
-name: 0myPackageB
+name: myPackageC
 
 dependencies:
 - base
@@ -14,4 +13,4 @@ tests:
     source-dirs: test
     main: Main.hs
     dependencies:
-    - myPackageA
+    - myPackageD

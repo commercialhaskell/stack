@@ -8,8 +8,7 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-  # Only builds if this package name comes before myPackageA, alphabetically!
-  - 0myPackageB
+  - myPackageB
 
 executables:
   myExeA:

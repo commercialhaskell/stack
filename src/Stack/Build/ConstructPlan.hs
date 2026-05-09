@@ -483,7 +483,9 @@ addFinal ::
   -> M ()
 addFinal lp package allInOne buildHaddocks = do
   let name = package.name
-  res <- addPackageDeps package >>= \case
+  logDebugPlanS "addFinal" "Clearing the call stack."
+  res <- local (\ctx' -> ctx' { callStack = [] }) $
+           addPackageDeps package >>= \case
     Left e -> pure $ Left e
     Right (MissingPresentDeps missing present _minLoc) -> do
       let pkgConfigOpts = packageConfigureOptsFromPackage package
@@ -505,6 +507,10 @@ addFinal lp package allInOne buildHaddocks = do
         , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFP))
         , buildTypeConfig = packageBuildTypeConfig package
         }
+  ctx <- ask
+  logDebugPlanS "addFinal" $
+       "Restoring the call stack: "
+    <> fromString (show $ map packageNameString ctx.callStack)
   logDebugPlanS "addFinal" $
        "Adding to construction output "
     <> fromPackageName name

@@ -51,6 +51,10 @@ Bug fixes:
 * After March 2026, Hackage requires Stack's user agent to be set when applying
   digest authentication to a request. Stack's `upload` command now does that,
   re-establishing authentication by Hackage username and password.
+* Stack 3.9.3 and earlier fail to construct a build plan if project package A
+  depends on project package B and package B's executables (only) depend on
+  package A and the name of A is before that of B, alphabetically. That bug is
+  fixed.
 
 ## v3.9.3 - 2026-02-19
 
