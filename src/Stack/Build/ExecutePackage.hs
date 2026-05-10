@@ -37,6 +37,7 @@ import qualified Data.Conduit.List as CL
 import           Data.Conduit.Process.Typed ( createSource )
 import qualified Data.Conduit.Text as CT
 import qualified Data.List as L
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
@@ -1048,14 +1049,14 @@ loadInstalledPkg pkgDbs tvar name = do
     -- ID) since that contains the compiled code. Multiple instantiations
     -- arise when different consumers fill the same signature with different
     -- implementations. Register all entries in the dump.
-    _ -> case filter isInstantiated dps of
-      [] -> throwM $ MultipleResultsBug name dps
-      instantiated -> do
+    _ -> case NE.nonEmpty $ filter isInstantiated dps of
+      Nothing -> throwM $ MultipleResultsBug name dps
+      Just instantiated -> do
         forM_ dps $ \d ->
           liftIO $ atomically $ modifyTVar' tvar (Map.insert d.ghcPkgId d)
         -- Pick the last instantiated entry. With multiple instantiations, the
         -- order doesn't matter — the caller (CInst) discards the result anyway.
-        let dp = L.last instantiated
+        let dp = NE.last instantiated
         pure $ Just dp.ghcPkgId
  where
   isInstantiated dp =
