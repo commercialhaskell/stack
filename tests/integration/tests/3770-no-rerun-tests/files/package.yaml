@@ -5,9 +5,6 @@ name: myPackage
 dependencies:
 - base
 
-library:
-  source-dirs: src
-
 tests:
   test:
     source-dirs: test
