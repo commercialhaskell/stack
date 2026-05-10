@@ -954,7 +954,7 @@ packageIsIndefinite pkg = any hasSignatures allLibs
 packageUsesBackpack :: Package -> Bool
 packageUsesBackpack pkg =
      packageIsIndefinite pkg
-  || any (not . null . (.mixins)) allBuildInfos
+  || not (all (null . (.mixins)) allBuildInfos)
  where
   allBuildInfos :: [Component.StackBuildInfo]
   allBuildInfos =
