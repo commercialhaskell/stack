@@ -14,7 +14,7 @@ main =
     stackCheckStderr ["build"] (expectMessage $ buildWith (trimEnd compiler))
 
 buildWith :: String -> String
-buildWith compiler = "build (lib) with " <> compiler
+buildWith compiler = "build with " <> compiler
 
 expectMessage :: String -> String -> IO ()
 expectMessage msg stderr = do

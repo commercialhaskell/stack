@@ -1,0 +1,37 @@
+cabal-version: 3.4
+name:          private-backpack
+version:       0.1.0.0
+build-type:    Simple
+
+-- A package using Backpack internally (private Backpack).
+-- Sub-library "str-sig" defines an abstract Str signature.
+-- Sub-library "str-impl" provides a concrete Str module that fills the sig.
+-- Main library uses str-sig (indefinite) and str-impl fills the hole.
+-- The public API has no unfilled signatures.
+
+library str-sig
+  signatures:      Str
+  build-depends:   base >=4.14
+  hs-source-dirs:  src/sig
+  default-language: Haskell2010
+
+library str-impl
+  exposed-modules: Str
+  build-depends:   base >=4.14
+  hs-source-dirs:  src/impl
+  default-language: Haskell2010
+
+library
+  exposed-modules: PrivateBackpack
+  build-depends:   base >=4.14,
+                   private-backpack:str-sig,
+                   private-backpack:str-impl
+  hs-source-dirs:  src/main
+  default-language: Haskell2010
+
+executable private-backpack-demo
+  main-is:         Main.hs
+  build-depends:   base >=4.14,
+                   private-backpack
+  hs-source-dirs:  src/exe
+  default-language: Haskell2010

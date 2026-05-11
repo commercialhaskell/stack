@@ -30,6 +30,7 @@ import           Distribution.Compiler ( PerCompilerFlavor )
 import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription
                    ( BenchmarkInterface, Dependency, TestSuiteInterface )
+import           Distribution.Types.Mixin ( Mixin )
 import           Distribution.Simple ( Extension, Language )
 import           Distribution.Utils.Path ( Pkg, Source, SymbolicPath )
 import qualified Distribution.Utils.Path as Cabal
@@ -55,6 +56,8 @@ data StackLibrary = StackLibrary
   , buildInfo :: !StackBuildInfo
   , exposedModules :: [ModuleName]
     -- |^ This is only used for gathering the files related to this component.
+  , signatures :: [ModuleName]
+    -- ^ Backpack signature module names. Non-empty for indefinite packages.
   }
   deriving Show
 
@@ -157,6 +160,8 @@ data StackBuildInfo = StackBuildInfo
     -- ^ Only used in opts gathering.
   , frameworks :: [String]
     -- ^ Only used in opts gathering.
+  , mixins :: [Mixin]
+    -- ^ Backpack mixin declarations. Used for cross-package Backpack support.
   }
   deriving Show
 

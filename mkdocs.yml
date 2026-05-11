@@ -126,6 +126,7 @@ nav:
   - Azure CI: topics/azure_ci.md
   - Lock files: topics/lock_files.md
   - Haskell and C code: topics/haskell_and_c_code.md
+  - Backpack: topics/backpack.md
 - Get involved:
   - community/index.md
   - Contributors:
