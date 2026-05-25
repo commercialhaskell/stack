@@ -3,7 +3,7 @@
 --
 -- See: https://github.com/commercialhaskell/stack/issues/384
 
-import StackTest
+import           StackTest
 
 main :: IO ()
 main = do

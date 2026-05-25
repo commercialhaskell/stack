@@ -3,7 +3,7 @@
 --
 -- See: https://github.com/commercialhaskell/stack/issues/3574
 
-import StackTest
+import           StackTest
 
 main :: IO ()
 main = stack ["build", "myPackage"]

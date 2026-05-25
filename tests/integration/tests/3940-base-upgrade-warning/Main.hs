@@ -4,9 +4,9 @@
 --
 -- See: https://github.com/commercialhaskell/stack/issues/3940
 
-import Control.Monad ( unless )
-import Data.List ( isInfixOf )
-import StackTest
+import           Control.Monad ( unless )
+import           Data.List ( isInfixOf )
+import           StackTest
 
 -- Use short message fragment because prettyWarn formatting and colour
 unattainableBaseWarning :: String

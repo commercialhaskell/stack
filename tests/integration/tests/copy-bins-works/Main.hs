@@ -1,7 +1,7 @@
 -- | Stack's build command supports the copy-bins flag.
 
-import StackTest
-import System.Directory ( createDirectoryIfMissing )
+import           StackTest
+import           System.Directory ( createDirectoryIfMissing )
 
 main :: IO ()
 main = do

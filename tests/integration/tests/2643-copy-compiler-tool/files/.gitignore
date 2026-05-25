@@ -1,2 +1,3 @@
-binny/
-stack.yaml
+.stack-work/
+bin/
+myPackage.cabal

@@ -17,7 +17,7 @@
 -- `--dry-run` to succeed. But if we do this via `extra-deps`, we want it
 -- to fail.
 
-import StackTest
+import           StackTest
 
 main :: IO ()
 main = do

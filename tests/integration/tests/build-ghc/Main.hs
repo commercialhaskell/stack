@@ -1,5 +1,5 @@
-import StackTest
-import System.Directory (withCurrentDirectory)
+import           StackTest
+import           System.Directory ( withCurrentDirectory )
 
 main :: IO ()
 main = superslow $ do
