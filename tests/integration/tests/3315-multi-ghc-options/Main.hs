@@ -2,7 +2,7 @@
 --
 -- See: https://github.com/commercialhaskell/stack/issues/3315
 
-import StackTest.Repl
+import           StackTest.Repl
 
 main :: IO ()
 main = do

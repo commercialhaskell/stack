@@ -2,7 +2,7 @@
 --
 -- See: https://github.com/commercialhaskell/stack/issues/3390
 
-import StackTest
+import           StackTest
 
 main :: IO ()
 main = stack ["test"]

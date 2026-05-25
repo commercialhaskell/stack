@@ -3,10 +3,10 @@
 --
 -- See: https://github.com/commercialhaskell/stack/issues/3926
 
-import Control.Monad ( unless, when )
-import Control.Monad.IO.Class ( liftIO )
-import Data.List ( isInfixOf, isSuffixOf )
-import StackTest.Repl
+import           Control.Monad ( unless, when )
+import           Control.Monad.IO.Class ( liftIO )
+import           Data.List ( isInfixOf, isSuffixOf )
+import           StackTest.Repl
 
 main :: IO ()
 main = do

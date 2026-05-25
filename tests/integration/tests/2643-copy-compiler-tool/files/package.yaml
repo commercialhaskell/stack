@@ -1,0 +1,40 @@
+spec-version: 0.36.0
+
+name: myPackage
+
+flags:
+  build-myExeA:
+    description: Build myExeA
+    default: false
+    manual: true
+  build-myExeB:
+    description: Build myExeB
+    default: false
+    manual: true
+  build-myExeC:
+    description: Build myExeC
+    default: false
+    manual: true
+
+dependencies:
+- base
+
+executables:
+  myExeA:
+    source-dirs: appA
+    main: Main.hs
+    when:
+    - condition: "!flag(build-myExeA)"
+      buildable: false
+  myExeB:
+    source-dirs: appB
+    main: Main.hs
+    when:
+    - condition: "!flag(build-myExeB)"
+      buildable: false
+  myExeC:
+    source-dirs: appC
+    main: Main.hs
+    when:
+    - condition: "!flag(build-myExeC)"
+      buildable: false
