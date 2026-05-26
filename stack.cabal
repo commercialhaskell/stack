@@ -1,6 +1,6 @@
 cabal-version: 2.2
 
--- This file has been generated from package.yaml by hpack version 0.39.1.
+-- This file has been generated from package.yaml by hpack version 0.39.5.
 --
 -- see: https://github.com/sol/hpack
 
@@ -340,6 +340,7 @@ library
       Stack.Types.Component
       Stack.Types.ComponentUtils
       Stack.Types.Config
+      Stack.Types.ConfigExtra
       Stack.Types.Config.Exception
       Stack.Types.ConfigMonoid
       Stack.Types.ConfigSetOpts

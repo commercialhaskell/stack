@@ -32,22 +32,18 @@ import qualified Data.Map.Merge.Strict as Map
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import           Pantry ( loadSnapshot )
-import           Path ( (</>), parent )
+import           Path ( parent )
 import qualified RIO.Map as Map
 import           RIO.NonEmpty ( nonEmpty )
 import qualified RIO.NonEmpty as NE
 import           RIO.Process ( envVarsL )
-import           Stack.Config
-                   ( makeConcreteSnapshot, getProjectConfig
-                   , getImplicitGlobalProjectDir
-                   )
-import           Stack.Constants ( stackDotYaml )
+import           Stack.Config ( makeConcreteSnapshot, withConfigExtra )
 import           Stack.Prelude
 import           Stack.Types.BuildConfig ( BuildConfig )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.ConfigExtra ( ConfigExtra (..) )
 import           Stack.Types.ConfigMonoid
-                   ( configMonoidInstallGHCName
-                   , configMonoidInstallMsysName
+                   ( configMonoidInstallGHCName, configMonoidInstallMsysName
                    , configMonoidRecommendStackUpgradeName
                    , configMonoidSystemGHCName
                    )
@@ -56,9 +52,6 @@ import           Stack.Types.ConfigSetOpts
 import           Stack.Types.EnvConfig ( EnvConfig )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
-import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
-import           Stack.Types.ProjectConfig ( ProjectConfig (..) )
-import           Stack.Types.Runner ( globalOptsL )
 import           Stack.Types.Snapshot ( AbstractSnapshot )
 import           System.Environment ( getEnvironment )
 
@@ -95,18 +88,14 @@ instance Exception ConfigCmdPrettyException
 cfgCmdSet ::
      (HasConfig env, HasGHCVariant env)
   => ConfigCmdSet -> RIO env ()
-cfgCmdSet cmd = do
-  conf <- view configL
-  configFilePath <-
-    case configCmdSetScope cmd of
-      CommandScopeProject -> do
-        mstackYamlOption <- view $ globalOptsL . to (.stackYaml)
-        mstackYaml <- getProjectConfig mstackYamlOption
-        case mstackYaml of
-          PCProject stackYaml -> pure stackYaml
-          PCGlobalProject -> getImplicitGlobalProjectDir <&> (</> stackDotYaml)
-          PCNoProject _extraDeps -> prettyThrowIO NoProjectConfigAvailable
-          -- maybe modify the ~/.stack/config.yaml file instead?
+-- We ignore any user message in the project-level configuration file:
+cfgCmdSet cmd = withConfigExtra False $ \configExtra -> do
+  let conf = configExtra.config
+  configFilePath <- case configCmdSetScope cmd of
+      CommandScopeProject -> case configExtra.configFile of
+        Left _ -> prettyThrowIO NoProjectConfigAvailable
+        -- Maybe modify the global configuration file (config.yaml) instead?
+        Right fp -> pure fp
       CommandScopeGlobal -> pure conf.userGlobalConfigFile
   rawConfig <- liftIO (readFileUtf8 (toFilePath configFilePath))
   config <- either throwM pure (Yaml.decodeEither' $ encodeUtf8 rawConfig)

@@ -304,6 +304,7 @@ library:
   - Stack.Types.Component
   - Stack.Types.ComponentUtils
   - Stack.Types.Config
+  - Stack.Types.ConfigExtra
   - Stack.Types.Config.Exception
   - Stack.Types.ConfigMonoid
   - Stack.Types.ConfigSetOpts

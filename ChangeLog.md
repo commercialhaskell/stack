@@ -55,6 +55,9 @@ Bug fixes:
   depends on project package B and package B's executables (only) depend on
   package A and the name of A is before that of B, alphabetically. That bug is
   fixed.
+* Stack's `config set` commands will recreate the `global-project` directory
+  contents, if Stack needs to consult its project-level configuration file and
+  there is no file.
 
 ## v3.9.3 - 2026-02-19
 
