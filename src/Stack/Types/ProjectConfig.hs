@@ -24,7 +24,7 @@ data ProjectConfig a
     -- Instead, use the implicit global.
   | PCNoProject ![RawPackageLocationImmutable]
     -- ^ Use a no project run. This comes from
-    -- 'Stack.Types.StackYamlLocSYLNoProject'.
+    -- 'Stack.Types.StackYamlLoc.SYLNoProject'.
 
 -- | Yields 'True' only if the project configuration information is for the
 -- implicit global project.
