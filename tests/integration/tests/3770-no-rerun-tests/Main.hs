@@ -2,9 +2,9 @@
 --
 -- See: https://github.com/commercialhaskell/stack/pull/3770
 
-import          Control.Monad ( unless )
-import          Data.List ( isInfixOf )
-import          StackTest
+import           Control.Monad ( unless )
+import           Data.List ( isInfixOf )
+import           StackTest
 
 main :: IO ()
 main = do
