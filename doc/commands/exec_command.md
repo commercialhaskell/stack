@@ -9,10 +9,11 @@ stack exec COMMAND
            [--rts-options RTSFLAG] [--cwd DIR]
 ~~~
 
-`stack exec` executes the specified executable as a command in the Stack
-environment. If an executable is not specified, the first argument after `--` is
-taken to be the executable. Otherwise, all arguments after `--` are taken to be
-command line arguments for the specified executable.
+`stack exec` executes the specified executable as a command in the
+[Stack environment](../topics/stack_environment.md). If an executable is not
+specified, the first argument after `--` is taken to be the executable.
+Otherwise, all arguments after `--` are taken to be command line arguments for
+the specified executable.
 
 By default:
 

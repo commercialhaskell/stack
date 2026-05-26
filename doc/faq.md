@@ -59,7 +59,8 @@
 ??? question "Can I run `cabal` commands inside `stack exec`?"
 
     Yes. Some `cabal` commands are inconsistent with the `GHC_PACKAGE_PATH`
-    environment variable in the Stack environment. Command, for example:
+    environment variable in the
+    [Stack environment](topics/stack_environment.md). Command, for example:
 
     ~~~text
     stack exec --no-ghc-package-path -- cabal build

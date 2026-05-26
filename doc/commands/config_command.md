@@ -40,7 +40,8 @@ stack config env [--[no-]locals] [--[no-]ghc-package-path] [--[no-]stack-exe]
 ~~~
 
 `stack config env` outputs a script that sets or unsets environment variables
-for a Stack environment. Flags modify the script that is output:
+for a [Stack environment](../topics/stack_environment.md). Flags modify the
+script that is output:
 
 * `--[no-]locals` (enabled by default) include/exclude project package
   information

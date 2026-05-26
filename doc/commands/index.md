@@ -65,7 +65,8 @@ Stack is usually used with one of its commands (see further below). However:
 
 ### Executing in the Stack environment
 
-* [`exec`](exec_command.md) - executate a command in the Stack environment
+* [`exec`](exec_command.md) - executate a command in the
+  [Stack environment](../topics/stack_environment.md)
 * [`ghc`](ghc_command.md) - run `ghc`
 * [`eval`](eval_command.md) - evaluate some Haskell code inline
 * [`runghc`](runghc_command.md) - run `runghc`
@@ -130,7 +131,8 @@ Stack's commands are listed below, in alphabetical order.
 * [`docker`](docker_command.md) - use Stack with Docker
 * [`dot`](dot_command.md) - dependency visualization
 * [`eval`](eval_command.md) - evaluate some Haskell code inline
-* [`exec`](exec_command.md) - executate a command in the Stack environment
+* [`exec`](exec_command.md) - executate a command in the
+  [Stack environment](../topics/stack_environment.md)
 * [`haddock`](build_command.md) - a synonym for `stack build --haddock`
 * [`hoogle`](hoogle_command.md) - run `hoogle`
 * [`hpc`](hpc_command.md) - generate Haskell Program Coverage (HPC) code

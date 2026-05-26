@@ -18,9 +18,9 @@ Executables and libraries can be installed with the MSYS2 package manager
 `pacman`. All tools can be found in the [index](https://packages.msys2.org) to
 MSYS2 packages. A [guide](https://www.msys2.org/docs/package-management/) to
 package management with `pacman` is also available. `pacman` &mdash; like all
-other tools in the Stack environment &mdash; should be started with
-`stack exec -- pacman`. Help about `pacman` commands (operations) can be
-obtained by `stack exec -- pacman --help`. Help about a specific `pacman`
+other tools in the [Stack environment](stack_environment.md) &mdash; should be
+started with `stack exec -- pacman`. Help about `pacman` commands (operations)
+can be obtained by `stack exec -- pacman --help`. Help about a specific `pacman`
 operation can be obtained by using `--help` (or `-h`) with an operation. For
 example, help about the operation `--sync` (or `-S`) can be obtained with
 `stack exec -- pacman --sync --help` or, equivalently,
@@ -62,7 +62,7 @@ This command may need to be run more than once, until everything is reported by
 ## Setup.hs ##
 
 `Setup.hs` is automatically run inside the Stack environment. So when you need
-to launch another tool you do not need to prefix the command with 
+to launch another tool you do not need to prefix the command with
 `stack exec --` within the custom `Setup.hs` file.
 
 ## Pacman packages to install for common Haskell packages ##

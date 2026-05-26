@@ -106,6 +106,7 @@ nav:
   - topics/index.md
   - Stack root: topics/stack_root.md
   - Stack work directories: topics/stack_work.md
+  - Stack environment: topics/stack_environment.md
   - Snapshot location: topics/snapshot_location.md
   - Package location: topics/package_location.md
   - Snapshot specification: topics/custom_snapshot.md
