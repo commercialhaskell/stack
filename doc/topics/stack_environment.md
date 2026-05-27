@@ -4,12 +4,8 @@
 
 Command
 [`stack config env`](../commands/config_command.md#the-stack-config-env-command)
-to see how the PATH is defined in the Stack environment.
-
-Alternatively, command
-[`stack path --bin-path`](../commands/path_command.md) to see the PATH
-excluding the project Stack work directory's `bin` directory (see further
-below).
+or [`stack path --bin-path`](../commands/path_command.md) to see how the PATH is
+defined in the Stack environment.
 
 In that environment, Stack adds certain directories to the start of the PATH.
 The directories added are set out below, in order of search priority.

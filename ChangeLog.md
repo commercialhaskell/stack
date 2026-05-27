@@ -15,6 +15,8 @@ Behavior changes:
 * Following a change to the Stackage project's server API, the default value of
   the `urls` key includes
   `recent-snapshots: https://stackage.org/api/v1/snapshots`.
+* The `--[no-]keep-ghc-rts` flag of Stack's `config env` command is now enabled
+  by default, consistent with Stack's `exec` command.
 
 Other enhancements:
 
@@ -58,6 +60,9 @@ Bug fixes:
 * Stack's `config set` commands will recreate the `global-project` directory
   contents, if Stack needs to consult its project-level configuration file and
   there is no file.
+* The output of Stack's `path --bin-path` command is now consistent with the
+  Stack environment in Stack's `exec` command and includes the `bin` directory
+  of Stack's local install root directory.
 
 ## v3.9.3 - 2026-02-19
 
