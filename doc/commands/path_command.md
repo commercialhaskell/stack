@@ -18,7 +18,7 @@ Pass the following flags for information about specific files or locations:
 
 |Flag                   |File or location                                      |
 |-----------------------|------------------------------------------------------|
-|--bin-path             |The PATH in the Stack environment.                    |
+|--bin-path             |The PATH in the [Stack environment](../topics/stack_environment.md).|
 |--compiler-bin         |The directory containing the GHC executable.          |
 |--compiler-exe         |The GHC executable.                                   |
 |--compiler-tools-bin   |The directory containing binaries specific to a particular compiler.|

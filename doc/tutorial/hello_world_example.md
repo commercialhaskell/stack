@@ -194,7 +194,8 @@ occurring. This command may take some time, depending on download speeds.
 
     No. GHC will be installed to the Stack programs directory, which is likely
     not on the PATH, so commanding `ghc` will not work. However, that version of
-    GHC can be used in the Stack environment. For more information, see the
+    GHC can be used in the [Stack environment](../topics/stack_environment.md).
+    For more information, see the
     [`stack exec`](../commands/exec_command.md) command,
     [`stack ghc`](../commands/ghc_command.md) command, and
     [`stack runghc`](../commands/ghc_command.md) command documentation.
@@ -317,15 +318,17 @@ environment.
 
 ??? question "How I can find the PATH used in the Stack environment?"
 
-    Command `stack path --bin-path` to see the PATH in the Stack environment.
+    Command `stack path --bin-path` to see the PATH in the
+    [Stack environment](../topics/stack_environment.md).
 
 !!! info
 
-    On Windows, the Stack environment includes the `\mingw64\bin`, `\usr\bin`
-    and `\usr\local\bin` directories of the Stack-supplied MSYS2. If your
-    executable depends on files (for example, dynamic-link libraries) in those
-    directories and you want ro run it outside of the Stack environment, you
-    will need to ensure copies of those files are on the PATH.
+    On Windows, the [Stack environment](../topics/stack_environment.md) includes
+    the `\mingw64\bin`, `\usr\bin` and `\usr\local\bin` directories of the
+    Stack-supplied MSYS2. If your executable depends on files (for example,
+    dynamic-link libraries) in those directories and you want ro run it outside
+    of the Stack environment, you will need to ensure copies of those files are
+    on the PATH.
 
 ## The `stack test` command
 
