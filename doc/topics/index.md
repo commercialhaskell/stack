@@ -16,6 +16,11 @@ This part of the guide provides pages dedicated to specific topics.
 :   Stack work directories are directories within a local project or package
     directory in which Stack stores files created during the build process.
 
+[Stack environment](stack_environment.md)
+
+:   The Stack environment is the one used by Stack when it builds or it runs an
+    executable.
+
 [Snapshot location](snapshot_location.md)
 
 :   How to specify the location of snapshots.
