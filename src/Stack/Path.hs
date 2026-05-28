@@ -53,6 +53,7 @@ import           Stack.Types.EnvConfig
                    , packageDatabaseLocal
                    )
 import qualified Stack.Types.EnvConfig as EnvConfig
+import           Stack.Types.EnvSettings ( defaultEnvSettings )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
 import           Stack.Types.GlobalOpts
                    ( GlobalOpts (..), globalOptsBuildOptsMonoidL )
@@ -123,7 +124,13 @@ printKeys extractors single info = do
     T.putStrLn $ prefix <> extractPath info
 
 runHaddockWithEnvConfig :: Bool -> RIO EnvConfig () -> RIO Runner ()
-runHaddockWithEnvConfig x action = runHaddock x (withDefaultEnvConfig action)
+runHaddockWithEnvConfig x action = runHaddock x $
+  withDefaultEnvConfig $ do
+    config <- view configL
+    menv <- liftIO $ config.processContextSettings defaultEnvSettings
+    -- Required, as otherwise (due to withDefaultEnvConfig) the environment is
+    -- based on Stack.Type.EnvSettings.minimalEnvSettings.
+    withProcessContext menv action
 
 runHaddockWithConfig :: RIO Config () -> RIO Runner ()
 runHaddockWithConfig = runHaddock False
@@ -140,11 +147,6 @@ fillEnvConfigPathInfo = do
   -- We must use a BuildConfig from an EnvConfig to ensure that it contains the
   -- full environment info including GHC paths etc.
   buildConfig <- view $ envConfigL . buildConfigL
-  -- This is the modified 'bin-path',
-  -- including the local GHC or MSYS if not configured to operate on
-  -- global GHC.
-  -- It was set up in 'withBuildConfigAndLock -> withBuildConfigExt -> setupEnv'.
-  -- So it's not the *minimal* override path.
   snapDb <- packageDatabaseDeps
   localDb <- packageDatabaseLocal
   extraDbs <- packageDatabaseExtra

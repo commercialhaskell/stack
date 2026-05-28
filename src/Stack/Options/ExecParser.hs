@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 {-|
 Module      : Stack.Options.ExecParser
@@ -23,7 +24,8 @@ import           Stack.Exec
                    ( ExecOpts (..), ExecOptsExtra (..), SpecialExecCmd (..) )
 import           Stack.Options.Completion ( projectExeCompleter )
 import           Stack.Prelude
-import           Stack.Types.EnvSettings ( EnvSettings (..) )
+import           Stack.Types.EnvSettings
+                   ( EnvSettings (..), defaultEnvSettings )
 
 -- | Parse command line arguments for Stack's @exec@, @ghc@, @run@,
 -- @runghc@ and @runhaskell@ commands.
@@ -57,18 +59,18 @@ execOptsExtraParser = ExecOptsExtra
   <*> eoCwdParser
  where
   eoEnvSettingsParser :: Parser EnvSettings
-  eoEnvSettingsParser = EnvSettings True
-    <$> boolFlags True
+  eoEnvSettingsParser = EnvSettings defaultEnvSettings.includeLocals
+    <$> boolFlags defaultEnvSettings.includeGhcPackagePath
           "ghc-package-path"
           "setting the GHC_PACKAGE_PATH variable for the subprocess."
           idm
-    <*> boolFlags True
+    <*> boolFlags defaultEnvSettings.stackExe
           "stack-exe"
           "setting the STACK_EXE environment variable to the path for the \
           \stack executable."
           idm
-    <*> pure False
-    <*> pure True
+    <*> pure defaultEnvSettings.localeUtf8
+    <*> pure defaultEnvSettings.keepGhcRts
 
   eoPackagesParser :: Parser [String]
   eoPackagesParser = many (strOption

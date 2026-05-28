@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 {-|
 Module      : Stack.Options.ConfigEnvParser
@@ -14,16 +15,34 @@ module Stack.Options.ConfigEnvParser
 import qualified Options.Applicative as OA
 import           Options.Applicative.Builder.Extra ( boolFlags )
 import           Stack.Prelude
-import           Stack.Types.EnvSettings ( EnvSettings (..) )
+import           Stack.Types.EnvSettings
+                   ( EnvSettings (..), defaultEnvSettings )
 
 -- | Parse command line arguments for Stack's @config env@ command.
 configCmdEnvParser :: OA.Parser EnvSettings
 configCmdEnvParser = EnvSettings
-  <$> boolFlags True "locals" "include information about local packages" mempty
-  <*> boolFlags True
-        "ghc-package-path" "set GHC_PACKAGE_PATH environment variable" mempty
-  <*> boolFlags True "stack-exe" "set STACK_EXE environment variable" mempty
-  <*> boolFlags False
-        "locale-utf8" "set the GHC_CHARENC environment variable to UTF-8" mempty
-  <*> boolFlags False
-        "keep-ghc-rts" "keep any GHCRTS environment variable" mempty
+  <$> boolFlags
+        defaultEnvSettings.includeLocals
+        "locals"
+        "include information about local packages"
+        mempty
+  <*> boolFlags
+        defaultEnvSettings.includeGhcPackagePath
+        "ghc-package-path"
+        "set GHC_PACKAGE_PATH environment variable"
+        mempty
+  <*> boolFlags
+        defaultEnvSettings.stackExe
+        "stack-exe"
+        "set STACK_EXE environment variable"
+        mempty
+  <*> boolFlags
+        defaultEnvSettings.localeUtf8
+        "locale-utf8"
+        "set the GHC_CHARENC environment variable to UTF-8"
+        mempty
+  <*> boolFlags
+        defaultEnvSettings.keepGhcRts
+        "keep-ghc-rts"
+        "keep any GHCRTS environment variable"
+        mempty

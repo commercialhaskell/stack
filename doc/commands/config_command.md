@@ -51,7 +51,7 @@ script that is output:
   or not
 * `--[no-]locale-utf8` (disabled by default) set the `GHC_CHARENC`
   environment variable to `UTF-8` or not
-* `--[no-]keep-ghc-rts` (disabled by default) keep/discard any `GHCRTS`
+* `--[no-]keep-ghc-rts` (enabled by default) keep/discard any `GHCRTS`
   environment variable
 
 The command also accepts flags and options of the
