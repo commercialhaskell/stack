@@ -22,13 +22,14 @@ The directories added are set out below, in order of search priority.
     [`stack path --local-bin`](../commands/path_command.md) to see that
     directory.
 
-## The project Stack work directory's `bin` directory
+## The project's `bin` directory
 
 The Stack [work directory](stack_work.md#project-stack-work-directory) for a
-project contains an `install` directory with a path to a directory containing a
-`bin` directory, containing built executable files. Command
+project contains an `install` directory with a path to a directory (the local
+install root directory) containing a `bin` directory, containing built
+executable files. Command
 [`stack path --local-install-root`](../commands/path_command.md) to see the
-directory containing the `bin` directory.
+local install root directory.
 
 !!! info
 
@@ -36,7 +37,7 @@ directory containing the `bin` directory.
     executable files of project packages in this directory. Such files can be
     executed using Stack's [`exec` command](../commands/exec_command.md).
 
-## The snapshot `bin` directory
+## The snapshot's `bin` directory
 
 The `bin` directory in the root directory for snapshot installation. Command
 [`stack path --snapshot-install-root`](../commands/path_command.md) to see that
@@ -62,7 +63,7 @@ that directory.
     binary directory, put a copy of the alternative tool (or a link to it) in
     the compiler tools directory.
 
-## The compiler's binary directory
+## The compiler binary's directory
 
 The directory in which the GHC binary that will be used by Stack is located.
 Command [`stack path --compiler-bin`](../commands/path_command.md) to see
@@ -72,22 +73,17 @@ that directory.
 
 The GHC-supplied MinGW `bin` directory.
 
-## Stack-supplied MSYS2 MinGW `bin` directory (Windows only)
-
-The `bin` directory for the MSYS2 MinGW of the
-[Stack-supplied MSYS2](developing_on_windows.md).
-
 ## Stack-supplied MSYS2 environment `bin` directory (Windows only)
 
-The `bin` directory for the MSYS2 environment of the
+The `bin` directory for the specified MSYS2 environment of the
 [Stack-supplied MSYS2](developing_on_windows.md).
 
-## Stack-supplied MSYS2 `urs\bin` directory (Windows only)
+## Stack-supplied MSYS2 `usr\bin` directory (Windows only)
 
 The `usr\bin` directory for the
 [Stack-supplied MSYS2](developing_on_windows.md).
 
-## Stack-supplied MSYS2 `urs\local\bin` directory (Windows only)
+## Stack-supplied MSYS2 `usr\local\bin` directory (Windows only)
 
 The `usr\local\bin` directory for the
 [Stack-supplied MSYS2](developing_on_windows.md).
