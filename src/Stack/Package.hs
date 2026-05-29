@@ -696,115 +696,128 @@ processPackageComponent ::
   -> m a
      -- ^ Initial value.
   -> m a
-processPackageComponent pkg componentFn = do
-  let componentKindProcessor ::
-           forall component. HasComponentInfo component
-        => (Package -> CompCollection component)
-        -> m a
-        -> m a
-      componentKindProcessor target =
-        foldComponentToAnotherCollection
-          (target pkg)
-          componentFn
-      processMainLib = maybe id componentFn pkg.library
-      processAllComp =
-        ( if pkg.benchmarkEnabled
-            then componentKindProcessor (.benchmarks)
-            else id
-        )
-        . ( if pkg.testEnabled
-              then componentKindProcessor (.testSuites)
-              else id
-          )
-        . componentKindProcessor (.foreignLibraries)
-        . componentKindProcessor (.executables)
-        . componentKindProcessor (.subLibraries)
-        . processMainLib
-  processAllComp
+processPackageComponent pkg componentFn =
+    processBenchmarks
+  . processTestSuites
+  . componentKindProcessor (.foreignLibraries)
+  . componentKindProcessor (.executables)
+  . componentKindProcessor (.subLibraries)
+  . processMainLib
+ where
+  processMainLib = maybe id componentFn pkg.library
+
+  componentKindProcessor ::
+       forall component. HasComponentInfo component
+    => (Package -> CompCollection component)
+       -- ^ Accessor.
+    -> m a
+     -- ^ Initial value.
+    -> m a
+  componentKindProcessor target =
+    foldComponentToAnotherCollection (target pkg) componentFn
+
+  processTestSuites = if pkg.testEnabled
+    then componentKindProcessor (.testSuites)
+    else id
+
+  processBenchmarks = if pkg.benchmarkEnabled
+    then componentKindProcessor (.benchmarks)
+    else id
 
 -- | This is a function to iterate in a monad over all of a package's
--- dependencies, and yield a collection of results (used with list and set).
+-- dependencies (including any custom-setup ones), and yield a collection of
+-- results (used with list and set).
 processPackageMapDeps ::
      (Monad m)
   => Package
   -> (Map PackageName DepValue -> m a -> m a)
+     -- ^ Processing function.
   -> m a
+     -- ^ Initial value.
   -> m a
-processPackageMapDeps pkg fn = do
-  let packageSetupDepsProcessor resAction = case pkg.setupDeps of
-        Nothing -> resAction
-        Just v -> fn v resAction
-      processAllComp = processPackageComponent pkg (fn . componentDependencyMap)
-        . packageSetupDepsProcessor
-  processAllComp
+processPackageMapDeps pkg fn =
+  packageDepsProcessor . packageSetupDepsProcessor
+ where
+  packageSetupDepsProcessor action =
+    maybe action (`fn` action) pkg.setupDeps
 
--- | This is a function to iterate in a monad over all of a package component's
--- dependencies, and yield a collection of results.
+  packageDepsProcessor =
+    processPackageComponent pkg (fn . componentDependencyMap)
+
+-- | This is a function to iterate in a monad over all of a package's
+-- dependencies (including any custom-setup ones), and yield a collection of
+-- results.
 processPackageDeps ::
-     (Monad m)
+     forall a b m. Monad m
   => Package
-  -> (smallResT -> resT -> resT)
-  -> (PackageName -> DepValue -> m smallResT)
-  -> m resT
-  -> m resT
-processPackageDeps pkg combineResults fn = do
-  let
+  -> (b -> a -> a)
+     -- ^ Combining function.
+  -> (PackageName -> DepValue -> m b)
+     -- ^ Processing function for a dependency.
+  -> m a
+     -- ^ Intial value.
+  -> m a
+processPackageDeps pkg combineResults fn =
+  processPackageMapDeps pkg (flip (M.foldrWithKey' iterator))
+ where
+  iterator :: PackageName -> DepValue -> m a -> m a
+  iterator depPackageName depValue acc
+    | shouldIgnoreDep = acc
+    | otherwise = combineResults <$> fn depPackageName depValue <*> acc
+   where
+    shouldIgnoreDep
+      | depPackageName == pkg.name = True
+      | depPackageName `S.member` subLibNames = True
+      | depPackageName `S.member` foreignLibNames = True
+      | otherwise = False
+     where
+      !subLibNames = asPackageNameSet (.subLibraries)
+      !foreignLibNames = asPackageNameSet (.foreignLibraries)
       asPackageNameSet ::
-           (Package -> CompCollection component)
-        -> Set PackageName
+        (Package -> CompCollection component) -> Set PackageName
       asPackageNameSet accessor =
         S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
-      (!subLibNames, !foreignLibNames) =
-        ( asPackageNameSet (.subLibraries)
-        , asPackageNameSet (.foreignLibraries)
-        )
-      shouldIgnoreDep (packageNameV :: PackageName)
-        | packageNameV == pkg.name = True
-        | packageNameV `S.member` subLibNames = True
-        | packageNameV `S.member` foreignLibNames = True
-        | otherwise = False
-      innerIterator packageName depValue resListInMonad
-        | shouldIgnoreDep packageName = resListInMonad
-        | otherwise = do
-            resList <- resListInMonad
-            newResElement <- fn packageName depValue
-            pure $ combineResults newResElement resList
-  processPackageMapDeps pkg (flip (M.foldrWithKey' innerIterator))
 
--- | Iterate/fold on all the package dependencies, components, setup deps and
--- all.
+-- | This is a function to iterate in a monad over all of a package's
+-- dependencies (including any custom-setup ones), and yield a list of
+-- results.
 processPackageDepsToList ::
      Monad m
   => Package
-  -> (PackageName -> DepValue -> m resT)
-  -> m [resT]
+  -> (PackageName -> DepValue -> m b)
+     -- ^ Processing function for a dependency.
+  -> m [b]
 processPackageDepsToList pkg fn = processPackageDeps pkg (:) fn (pure [])
 
--- | Iterate/fold on all the package dependencies, components, setup deps and
--- all.
+-- | This is a function to iterate in a monad over all of a package's
+-- dependencies (including any custom-setup ones), and yield a collection of
+-- the results.
 processPackageDepsEither ::
      (Monad m, Monoid a, Monoid b)
   => Package
   -> (PackageName -> DepValue -> m (Either a b))
+     -- ^ Processing function for dependency.
   -> m (Either a b)
 processPackageDepsEither pkg fn =
-  processPackageDeps pkg combineRes fn (pure (Right mempty))
+  processPackageDeps pkg combineResults fn (pure (Right mempty))
  where
-  combineRes (Left err) (Left errs) = Left (errs <> err)
-  combineRes _ (Left b) = Left b
-  combineRes (Left err) _ = Left err
-  combineRes (Right a) (Right b) = Right $ a <> b
+  combineResults (Left a) (Left b) = Left (a <> b)
+  combineResults _ (Left b) = Left b
+  combineResults (Left a) _ = Left a
+  combineResults (Right a) (Right b) = Right (a <> b)
 
--- | List all package's dependencies in a "free" context through the identity
+-- | List the names of all of a package's dependencies (including any
+-- custom-setup ones) in a "free" context through the 'Data.Functor.Identity'
 -- monad.
 listOfPackageDeps :: Package -> [PackageName]
-listOfPackageDeps pkg =
-  runIdentity $ processPackageDepsToList pkg (\pn _ -> pure pn)
+listOfPackageDeps pkg = runIdentity $
+  processPackageDepsToList pkg (\pn _ -> pure pn)
 
--- | The set of package's dependencies.
+-- | Yield a set of the names of all a package's dependencies (including any
+-- custom-setup ones) through the 'Data.Functor.Identity' monad.
 setOfPackageDeps :: Package -> Set PackageName
-setOfPackageDeps pkg =
-  runIdentity $ processPackageDeps pkg S.insert (\pn _ -> pure pn) (pure mempty)
+setOfPackageDeps pkg = runIdentity $
+  processPackageDeps pkg S.insert (\pn _ -> pure pn) (pure mempty)
 
 -- | This implements a topological sort on all targeted components for the build
 -- and their dependencies. It's only targeting internal dependencies, so it's
