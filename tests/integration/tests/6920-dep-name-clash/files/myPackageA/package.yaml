@@ -1,0 +1,17 @@
+spec-version: 0.36.0
+
+# Required, otherwise Hpack picks cabal-version: 3.0 and the dependency on
+# acme-missiles is assumed to refer to the name of the internal-library.
+verbatim:
+  cabal-version: 3.4
+
+name: myPackageA
+
+dependencies:
+- base
+
+internal-libraries:
+  acme-missiles:
+    source-dirs: int
+    dependencies:
+    - acme-missiles

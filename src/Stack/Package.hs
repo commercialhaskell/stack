@@ -38,12 +38,10 @@ module Stack.Package
 
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import qualified Data.Text as T
 import           Distribution.CabalSpecVersion ( cabalSpecToVersionDigits )
 import           Distribution.Compiler
                    ( CompilerFlavor (..), PerCompilerFlavor (..) )
 import           Distribution.ModuleName ( ModuleName )
-import           Distribution.Package ( mkPackageName )
 import           Distribution.PackageDescription
                    ( Benchmark (..), BuildInfo (..), BuildType (..)
                    , CondTree (..), Condition (..), ConfVar (..)
@@ -87,7 +85,6 @@ import           Stack.Types.BuildConfig ( HasBuildConfig (..), getWorkDir )
 import           Stack.Types.CompCollection
                    ( CompCollection, collectionLookup, foldAndMakeCollection
                    , foldComponentToAnotherCollection, getBuildableSet
-                   , getBuildableSetText
                    )
 import           Stack.Types.Compiler ( ActualCompiler (..) )
 import           Stack.Types.CompilerPaths ( cabalVersionL )
@@ -762,21 +759,11 @@ processPackageDeps pkg combineResults fn =
  where
   iterator :: PackageName -> DepValue -> m a -> m a
   iterator depPackageName depValue acc
-    | shouldIgnoreDep = acc
+    -- If the name of the dependency package is the same as the package, we
+    -- ignore the former. It is possible for a dependency package to have the
+    -- same name as a named sublibrary or a named foreign library.
+    | depPackageName == pkg.name = acc
     | otherwise = combineResults <$> fn depPackageName depValue <*> acc
-   where
-    shouldIgnoreDep
-      | depPackageName == pkg.name = True
-      | depPackageName `S.member` subLibNames = True
-      | depPackageName `S.member` foreignLibNames = True
-      | otherwise = False
-     where
-      !subLibNames = asPackageNameSet (.subLibraries)
-      !foreignLibNames = asPackageNameSet (.foreignLibraries)
-      asPackageNameSet ::
-        (Package -> CompCollection component) -> Set PackageName
-      asPackageNameSet accessor =
-        S.map (mkPackageName . T.unpack) $ getBuildableSetText $ accessor pkg
 
 -- | This is a function to iterate in a monad over all of a package's
 -- dependencies (including any custom-setup ones), and yield a list of
