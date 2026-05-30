@@ -191,6 +191,27 @@ default, in the Stack root.
 If the work directory is deleted, and Stack needs that work directory, then
 Stack will recreate it.
 
+### `compiler-tools` directory (optional)
+
+When it exists, this contains a directory for the platform. That directory
+contains (if it has been created) a directory for a compiler version
+that, in turn, contains a `bin` directory (the compiler tools directory for that
+compiler version).
+
+If the compiler tools directory for a specified compiler version does not exist,
+and Stack needs that directory, then Stack will create it.
+
+In the [Stack environment](stack_environment.md#the-compiler-tools-directory),
+the compiler tools directory for the specified compiler version is on the PATH.
+
+For further information see:
+
+* The [Stack environment](stack_environment.md#the-compiler-tools-directory);
+* Stack's [`path --compiler-tools-bin` command](../commands/path_command.md);
+  and
+* Stack's
+  [`build --copy-compiler-tool` command](../commands/build_command.md#-no-copy-compiler-tool-flag).
+
 ### `global-project` directory
 
 This contains:

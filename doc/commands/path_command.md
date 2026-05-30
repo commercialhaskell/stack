@@ -21,7 +21,7 @@ Pass the following flags for information about specific files or locations:
 |--bin-path             |The PATH in the [Stack environment](../topics/stack_environment.md).|
 |--compiler-bin         |The directory containing the GHC executable.          |
 |--compiler-exe         |The GHC executable.                                   |
-|--compiler-tools-bin   |The directory containing binaries specific to a particular compiler.|
+|--compiler-tools-bin   |The [compiler tools directory](../topics/stack_root.md#compiler-tools-directory-optional) for the specified compiler version.|
 |--config-location      |Stack's project-level configuration file (`stack.yaml`, by default).|
 |--dist-dir             |The dist work directory, relative to the package directory.|
 |--extra-include-dirs   |Extra include directories.                            |
@@ -36,11 +36,11 @@ Pass the following flags for information about specific files or locations:
 |--local-install-root   |The root directory for local project installation.    |
 |--local-pkg-db         |The local package database.                           |
 |--programs             |The root directory for GHC and other Stack-supplied tools.|
-|--project-root         |The project root directory.|
+|--project-root         |The project root directory.                           |
 |--snapshot-doc-root    |The root directory for snapshot documentation.        |
 |--snapshot-install-root|The root directory for snapshot installation.         |
 |--snapshot-pkg-db      |The snapshot package database.                        |
-|--stack-root           |The Stack root.                                       |
+|--stack-root           |The [Stack root](../topics/stack_root.md).            |
 
 The command also accepts flags and options of the
 [`stack build`](build_command.md#flags-affecting-ghcs-behaviour) command that
