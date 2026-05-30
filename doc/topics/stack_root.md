@@ -199,7 +199,9 @@ that, in turn, contains a `bin` directory (the compiler tools directory for that
 compiler version).
 
 If the compiler tools directory for a specified compiler version does not exist,
-and Stack needs that directory, then Stack will create it.
+and Stack needs that directory, then Stack will create it. The directory can
+also be created using Stack's
+[`config compiler-tools` command](../commands/config_command.md#the-stack-config-compiler-tools-command)
 
 In the [Stack environment](stack_environment.md#the-compiler-tools-directory),
 the compiler tools directory for the specified compiler version is on the PATH.
@@ -207,8 +209,7 @@ the compiler tools directory for the specified compiler version is on the PATH.
 For further information see:
 
 * The [Stack environment](stack_environment.md#the-compiler-tools-directory);
-* Stack's [`path --compiler-tools-bin` command](../commands/path_command.md);
-  and
+* Stack's [`path --compiler-tools-bin` command](../commands/path_command.md); and
 * Stack's
   [`build --copy-compiler-tool` command](../commands/build_command.md#-no-copy-compiler-tool-flag).
 

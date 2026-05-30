@@ -41,7 +41,7 @@ root directory.
 
 ## The compiler tools directory
 
-When the directory is required, Stack creates, in the
+When the directory is required or requested, Stack creates, in the
 [Stack root](stack_root.md#compiler-tools-directory-optional), a compiler tools
 directory for the specified compiler version. Command
 [`stack path --compiler-tools-bin`](../commands/path_command.md) to see that
@@ -62,7 +62,9 @@ directory.
     compiler's executable file, put a copy of the alternative tool (or a link to
     it) in the
     [compiler tools directory](stack_root.md#compiler-tools-directory-optional)
-    for the specified compiler version.
+    for the specified compiler version. If that directory does not exist, it can
+    be created with Stack's
+    [`config compiler-tools` command](../commands/config_command.md#the-stack-config-compiler-tools-command).
 
 ## The compiler binary's directory
 
