@@ -8,6 +8,14 @@ Release notes:
 
 Major changes:
 
+* On 64-bit Windows, the default `msys-environment` configuration option is now
+  `CLANG64`, rather than `MINGW64` (which remains an option). The MSYS2 project
+  deprecated the latter environment on 15 March 2026. The GHC project has used
+  the former toolchain from GHC 9.4.1. No default is provided for 32-bit
+  Windows, rather than `MINGW32` (which remains an option). The MSYS2 project
+  ceased to actively support it on 17 May 2020. 32-bit Windows is not supported
+  by the GHC project from GHC 8.12.
+
 Behavior changes:
 
 Other enhancements:

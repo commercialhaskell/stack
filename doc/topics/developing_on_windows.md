@@ -3,11 +3,11 @@
 # Developing on Windows #
 
 On Windows, Stack comes with an installation of [MSYS2](https://www.msys2.org/).
-An environment of MSYS2 (by default, `MINGW64` on 64-bit Windows or `MINGW32` on
-32-bit Windows) will be used by Stack to provide a Unix-like shell and
-environment for Stack. This may be necessary for installing some Haskell
-packages, such as those which use `configure` scripts, or if your project needs
-some additional tools during the build phase.
+An environment of MSYS2 (by default, `CLANG64` on 64-bit Windows) will be used
+by Stack to provide a Unix-like shell and environment for Stack. This may be
+necessary for installing some Haskell packages, such as those which use
+`configure` scripts, or if your project needs some additional tools during the
+build phase.
 
 No matter which terminal software you choose (Windows Terminal, Console Windows
 Host, Command Prompt, PowerShell, Git bash or any other) you can use this
@@ -26,22 +26,22 @@ example, help about the operation `--sync` (or `-S`) can be obtained with
 `stack exec -- pacman --sync --help` or, equivalently,
 `stack exec -- pacman -Sh`.
 
-Command `stack path --bin-path` to see the PATH in the Stack environment. If the
-relevant MSYS2 environment is `MINGW64`, on Windows, it includes the
-`\mingw64\bin`, `\usr\bin` and `\usr\local\bin` directories of the
-Stack-supplied MSYS2. (It includes the corresponding directory if the relevant
-MSYS2 environment is other than `MINGW64`.) If your executable depends on files
-(for example, dynamic-link libraries) in those directories and you want to run
-it outside of the Stack environment, you will need to ensure copies of those
-files are on the PATH.
+Command `stack path --bin-path` to see the PATH in the
+[Stack environment](stack_environment.md). If the relevant MSYS2 environment is
+`CLANG64`, on Windows, it includes the `\clang64\bin`, `\usr\local\bin` and
+`\usr\bin` directories of the Stack-supplied MSYS2. (It includes the
+corresponding directory if the relevant MSYS2 environment is other than
+`CLANG64`.) If your executable depends on files (for example, dynamic-link
+libraries) in those directories and you want to run it outside of the Stack
+environment, you will need to ensure copies of those files are on the PATH.
 
 Command `stack path --extra-include-dirs` and `stack path --extra-library-dirs`
 to see the extra directories searched for C header files or system libraries
-files in the Stack environment. If the relevant MSYS2 environment is `MINGW64`,
-on Windows, it includes the `\mingw64\include` (include) and the `\mingw64\lib`
-and `\mingw64\bin` directories (library) of the Stack-supplied MSYS2. (It
+files in the Stack environment. If the relevant MSYS2 environment is `CLANG64`,
+on Windows, it includes the `\clang64\include` (include) and the `\clang64\lib`
+and `\clang64\bin` directories (library) of the Stack-supplied MSYS2. (It
 includes the corresponding directories if the relevant MSYS2 environment is
-other than `MINGW64`.)
+other than `CLANG64`.)
 
 For further information about configuring the relevant MSYS2 environment, see
 Stack's [`msys-environment`](../configure/yaml/non-project.md#msys-environment)
@@ -72,7 +72,7 @@ common Haskell packages on Windows. Feel free to submit additional entries via a
 pull request.
 
 *   For [text-icu](https://hackage.haskell.org/package/text-icu) install
-    `mingw64/mingw-w64-x86_64-icu`.
+    `mingw-w64-clang-x86_64-icu`.
 
 *   For [zlib >= 0.7](https://hackage.haskell.org/package/zlib) the default
     Cabal flag `pkg-config` is `true` and requires executable `pkg-config` on
@@ -83,27 +83,3 @@ pull request.
         stack exec -- pacman -S pkgconf
 
     Alternatively, build with `--flag zlib:-pkg-config`.
-
-## CMake ##
-
-CMake has trouble finding other tools even if they are available on the PATH.
-Likely this is not a CMake problem but one of the environment not fully
-integrating. For example GHC comes with a copy of GCC which is not installed by
-MSYS2 itself. If you want to use this GCC you can provide a full path to it, or
-find it first with `System.Directory.findExecutable` if you want to launch GCC
-from a Haskell file such as `Setup.hs`.
-
-Experience tells that the `mingw-w64` versions of Make and CMake are most
-likely to work. Though there are other versions available through `pacman`, so
-have a look to see what works for you. Both tools can be installed with the
-commands:
-
-    stack exec -- pacman -S mingw-w64-x86_64-make
-    stack exec -- pacman -S mingw-w64-x86_64-cmake
-
-Even though Make and CMake are then both installed into the same environment,
-CMake still seems to have trouble to find Make. To help CMake find GCC and Make
-supply the following flags:
-
-    -DCMAKE_C_COMPILER=path
-    -DCMAKE_MAKE_PROGRAM=path

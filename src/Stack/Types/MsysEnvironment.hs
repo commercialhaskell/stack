@@ -26,13 +26,10 @@ import           Stack.Prelude
 data MsysEnvironment
   = CLANG32
   | CLANG64
+    -- ^ Stack's default on architecture x86_64.
   | CLANGARM64
   | MINGW32
-    -- ^ Stack's default on architecture i386, and applied if GHC version is
-    -- earlier than GHC 9.6.
   | MINGW64
-    -- ^ Stack's default on architecture x86_64, and applied if GHC version is
-    -- earlier than GHC 9.6.
   | UCRT64
   deriving (Eq, Ord, Show)
 
