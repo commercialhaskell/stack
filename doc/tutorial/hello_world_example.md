@@ -324,7 +324,7 @@ environment.
 !!! info
 
     On Windows, the [Stack environment](../topics/stack_environment.md) includes
-    the `\mingw64\bin`, `\usr\bin` and `\usr\local\bin` directories of the
+    the `\clang64\bin`, `\usr\bin` and `\usr\local\bin` directories of the
     Stack-supplied MSYS2. If your executable depends on files (for example,
     dynamic-link libraries) in those directories and you want ro run it outside
     of the Stack environment, you will need to ensure copies of those files are

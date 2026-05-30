@@ -946,7 +946,9 @@ modify-code-page: false
 
 Restrictions: Windows systems only.
 
-Default: `MINGW64` (64-bit Windows) or `MINGW32` (32-bit Windows)
+Default:
+([:octicons-tag-24: 3.11.1](https://github.com/commercialhaskell/stack/releases/tag/v3.11.1))
+`CLANG64` (64-bit Windows)
 
 The name of the MSYS2 environment (case-sensitive) used in the Stack
 environment. Valid environments are `CLANG32`, `CLANG64`, `CLANGARM64`,
