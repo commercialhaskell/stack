@@ -167,25 +167,25 @@ Stack will build and install `happy` and `alex`, if not already on the PATH.
     ~~~pwsh
     stack exec -- pacman --sync --refresh
     # Synchronize MSYS2 package databases
-    stack exec -- pacman --sync mingw-w64-x86_64-python-pip
+    stack exec -- pacman --sync mingw-w64-clang-x86_64-python-pip
     # The PyPA recommended tool (pip) for installing Python packages. Also
     # installs Python as a dependency. GHC uses a Python script named `boot`.
-    # The package must be the one from the `mingw64` MSYS2 repository, as Python
+    # The package must be the one from the `clang64` MSYS2 repository, as Python
     # from the `msys` repository cannot interpret Windows file paths correctly.
-    stack exec -- pacman --sync mingw-w64-x86_64-autotools
+    stack exec -- pacman --sync mingw-w64-clang-x86_64-autotools
     # The GNU autotools build system, including `autoreconf`, `aclocal`
     # and `make`. GHC uses a sh script named `configure` which is itself created
     # from a file named `configure.ac`.
     stack exec -- pacman --sync patch
     # A utility to apply patch files to original sources.
-    stack exec -- pacman --sync texinfo
+    stack exec -- pacman --sync mingw-w64-clang-x86_64-texinfo
     # Utilities to work with and produce manuals, ASCII text, and on-line
     # documentation from a single source file, including `makeinfo`.
-    stack exec -- pacman --sync mingw-w64-x86_64-ca-certificates
+    stack exec -- pacman --sync mingw-w64-clang-x86_64-ca-certificates
     # Common CA (certificate authority) certificates.
-    stack exec -- pacman -sync mingw-w64-x86_64-python-sphinx
+    stack exec -- pacman -sync mingw-w64-clang-x86_64-python-sphinx
     # Sphinx is the Python documentation generator.
-    stack exec -- pacman -sync mingw-w64-x86_64-texlive-full
+    stack exec -- pacman -sync mingw-w64-clang-x86_64-texlive-full
     # The TeX Live distribution.
     ~~~
 

@@ -306,10 +306,6 @@ configFromConfigMonoid
         installMsys = fromFirst installGHC configMonoid.installMsys
         skipGHCCheck = fromFirstFalse configMonoid.skipGHCCheck
         skipMsys = fromFirstFalse configMonoid.skipMsys
-        defMsysEnvironment = case platform of
-          Platform I386 Windows -> Just MINGW32
-          Platform X86_64 Windows -> Just MINGW64
-          _ -> Nothing
         extraIncludeDirs = configMonoid.extraIncludeDirs
         extraLibDirs = configMonoid.extraLibDirs
         customPreprocessorExts = configMonoid.customPreprocessorExts
@@ -324,15 +320,19 @@ configFromConfigMonoid
         requireStackVersion = simplifyVersionRange
           configMonoid.requireStackVersion.intersectingVersionRange
         compilerCheck = fromFirst MatchMinor configMonoid.compilerCheck
-    msysEnvironment <- case defMsysEnvironment of
-      -- Ignore the configuration setting if there is no default for the
-      -- platform.
+        mMsysEnv = case platform of
+          Platform X86_64 Windows ->
+            -- Default CLANG64 on 64-bit Windows:
+            Just $ fromFirst CLANG64 configMonoid.msysEnvironment
+          Platform _ Windows ->
+            -- No default on unsupported 32-bit Windows:
+            getFirst configMonoid.msysEnvironment
+          _ -> Nothing
+    msysEnvironment <- case mMsysEnv of
       Nothing -> pure Nothing
-      Just defMsysEnv -> do
-        let msysEnv = fromFirst defMsysEnv configMonoid.msysEnvironment
-        if msysEnvArch msysEnv == arch
-          then pure $ Just msysEnv
-          else prettyThrowM $ BadMsysEnvironment msysEnv arch
+      Just msysEnv
+        | msysEnvArch msysEnv == arch -> pure $ Just msysEnv
+        | otherwise -> prettyThrowM $ BadMsysEnvironment msysEnv arch
     platformVariant <- liftIO $
       maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
     let build = buildOptsFromMonoid configMonoid.buildOpts
