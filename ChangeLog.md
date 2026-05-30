@@ -17,6 +17,9 @@ Behavior changes:
   `recent-snapshots: https://stackage.org/api/v1/snapshots`.
 * The `--[no-]keep-ghc-rts` flag of Stack's `config env` command is now enabled
   by default, consistent with Stack's `exec` command.
+* On Windows, in the Stack environment, the MSYS2 `usr/local/bin` directory (if
+  it exists) is now searched before the MSYS2 `usr/bin` directory, rather than
+  after.
 
 Other enhancements:
 

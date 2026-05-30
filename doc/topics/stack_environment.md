@@ -74,14 +74,14 @@ The GHC-supplied MinGW `bin` directory.
 The `bin` directory for the specified MSYS2 environment of the
 [Stack-supplied MSYS2](developing_on_windows.md).
 
-## Stack-supplied MSYS2 `usr\bin` directory (Windows only)
-
-The `usr\bin` directory for the
-[Stack-supplied MSYS2](developing_on_windows.md).
-
 ## Stack-supplied MSYS2 `usr\local\bin` directory (Windows only)
 
 The `usr\local\bin` directory for the
+[Stack-supplied MSYS2](developing_on_windows.md).
+
+## Stack-supplied MSYS2 `usr\bin` directory (Windows only)
+
+The `usr\bin` directory for the
 [Stack-supplied MSYS2](developing_on_windows.md).
 
 ## Specified extra paths
