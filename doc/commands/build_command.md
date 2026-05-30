@@ -949,7 +949,7 @@ the [`stack path --local-install-root`](path_command.md) command.
 
 :octicons-beaker-24: Experimental
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 3.11.1](https://github.com/commercialhaskell/stack/releases/tag/v3.11.1)
 
 Default: Disabled
 

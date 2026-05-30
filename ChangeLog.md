@@ -1,12 +1,8 @@
 # Changelog
 
-## Unreleased changes
-
-Release notes:
+## v3.11.0.1 (release candidate)
 
 **Changes since v3.9.3:**
-
-Major changes:
 
 Behavior changes:
 
