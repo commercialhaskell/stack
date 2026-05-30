@@ -12,7 +12,7 @@ import           StackTest
 
 main :: IO ()
 main = do
-  for_ ["lts-20.26", "lts-24.37"] $ \snapshot -> do
+  for_ ["lts-20.26", "lts-24.43"] $ \snapshot -> do
     stack ["init", "--force", "--snapshot", snapshot]
     str <- readFile "stack.yaml"
     case mapMaybe (stripPrefix "snapshot: ") $ lines str of

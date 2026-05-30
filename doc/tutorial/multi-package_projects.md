@@ -37,10 +37,10 @@ Using the Cabal packages:
 
 Selecting the best among 14 snapshots...
 
-Note: Matches https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/25.yaml
+Note: Matches https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/43.yaml
 
-Selected the snapshot https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/25.yaml.
-Initialising Stack's project-level configuration file using snapshot https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/25.yaml.
+Selected the snapshot https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/43.yaml.
+Initialising Stack's project-level configuration file using snapshot https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/43.yaml.
 Considered 2 user packages.
 Writing configuration to stack.yaml.
 Stack's project-level configuration file has been initialised.
@@ -51,7 +51,7 @@ should be something like this:
 
 ~~~yaml
 snapshot:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/25.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/43.yaml
 
 packages:
 - packageA
