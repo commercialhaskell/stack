@@ -299,7 +299,7 @@ pathsFromEnvConfig =
     , "compiler-bin"
     , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . parent . (.compiler)
     )
-  , ( "Directory containing binaries specific to a particular compiler"
+  , ( "The compiler tools directory for the specified compiler version."
     , "compiler-tools-bin"
     , WithoutHaddocks $ T.pack . toFilePathNoTrailingSep . (.toolsDir)
     )

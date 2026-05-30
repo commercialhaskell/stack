@@ -48,6 +48,9 @@ Other enhancements:
   excludes the key being set and includes an `!include` directive.
 * Stack's `config set snapshot` command now works with other snapshot values
   in addition to snapshot synonymns.
+* Add Stack's `config compiler-tools` command to create (when applicable) the
+  compiler tools directory for the specified compiler version (implies Stack's
+  `config build-files` command).
 
 Bug fixes:
 
@@ -197,7 +200,7 @@ Other enhancements:
   documentation.
 * `stack sdist` and `stack upload` report the version of Cabal (the library)
   being used to check packages.
-* Add the `stack config build-files` command to generate (when applicable) a
+* Add Stack's `config build-files` command to generate (when applicable) a
   Cabal file from a package description in the Hpack format and/or a lock file
   for Stack's project-level configuration, without taking any other build steps.
 

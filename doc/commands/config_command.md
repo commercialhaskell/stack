@@ -9,6 +9,9 @@ Available commands:
   build-files              Generate (when applicable) a Cabal file from a
                            package description in the Hpack format and/or a lock
                            file for Stack's project-level configuration.
+  compiler-tools-bin       Create (when applicable) the compiler tools
+                           directory for the specified compiler version (implies
+                           'config build-files').
   env                      Print environment variables for use in a shell.
   set                      Set a key in a configuration file to value.
 ~~~
@@ -31,6 +34,19 @@ stack config build-files
   configuration (by default, `stack.yaml`);
 
 without taking any other build steps.
+
+## The `stack config compiler-tools` command
+
+:octicons-tag-24: UNRELEASED
+
+~~~text
+stack config compiler-tools
+~~~
+
+`stack config compiler-tools` creates (when applicable) the
+[compiler tools directory](../topics/stack_root.md#compiler-tools-directory-optional)
+for the specified compiler version. Implies Stack's
+[`config build-files` command](#the-stack-config-build-files-command).
 
 ## The `stack config env` command
 

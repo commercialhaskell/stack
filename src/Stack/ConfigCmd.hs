@@ -18,6 +18,8 @@ module Stack.ConfigCmd
   , cfgCmdEnvName
   , cfgCmdBuildFiles
   , cfgCmdBuildFilesName
+  , cfgCmdCompilerTools
+  , cfgCmdCompilerToolsName
   , cfgCmdName
   , yamlContainsInclude
   ) where
@@ -33,6 +35,7 @@ import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import           Pantry ( loadSnapshot )
 import           Path ( parent )
+import           Path.IO ( ensureDir )
 import qualified RIO.Map as Map
 import           RIO.NonEmpty ( nonEmpty )
 import qualified RIO.NonEmpty as NE
@@ -49,7 +52,7 @@ import           Stack.Types.ConfigMonoid
                    )
 import           Stack.Types.ConfigSetOpts
                    ( CommandScope (..), ConfigCmdSet (..) ,configCmdSetScope )
-import           Stack.Types.EnvConfig ( EnvConfig )
+import           Stack.Types.EnvConfig ( EnvConfig, bindirCompilerTools )
 import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GHCVariant ( HasGHCVariant )
 import           Stack.Types.Snapshot ( AbstractSnapshot )
@@ -337,6 +340,10 @@ cfgCmdEnvName = "env"
 cfgCmdBuildFilesName :: String
 cfgCmdBuildFilesName = "build-files"
 
+-- | The name of Stack's @config@ command's @compiler-tools-bin@ subcommand.
+cfgCmdCompilerToolsName :: String
+cfgCmdCompilerToolsName = "compiler-tools"
+
 data EnvVarAction = EVASet !Text | EVAUnset
   deriving Show
 
@@ -370,3 +377,7 @@ cfgCmdEnv es = do
 -- 'Stack.Config.withBuildConfig' that yields the desired actions.
 cfgCmdBuildFiles :: () -> RIO BuildConfig ()
 cfgCmdBuildFiles () = pure ()
+
+-- | This function takes no settings.
+cfgCmdCompilerTools :: () -> RIO EnvConfig ()
+cfgCmdCompilerTools () = bindirCompilerTools >>= ensureDir

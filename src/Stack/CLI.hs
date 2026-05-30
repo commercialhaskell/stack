@@ -33,8 +33,9 @@ import           Stack.Build ( buildCmd )
 import           Stack.BuildInfo ( hpackVersion, versionString' )
 import           Stack.Clean ( CleanCommand (..), cleanCmd )
 import           Stack.ConfigCmd
-                   ( cfgCmdBuildFiles, cfgCmdBuildFilesName, cfgCmdEnv
-                   , cfgCmdEnvName, cfgCmdName, cfgCmdSet, cfgCmdSetName
+                   ( cfgCmdBuildFiles, cfgCmdBuildFilesName, cfgCmdCompilerTools
+                   , cfgCmdCompilerToolsName, cfgCmdEnv, cfgCmdEnvName
+                   , cfgCmdName, cfgCmdSet, cfgCmdSetName
                    )
 import           Stack.Constants
                    ( globalFooter, osIsWindows, relFileStack, relFileStackDotExe
@@ -256,6 +257,12 @@ commandLineHandler currentDir progName mExecutablePath isInterpreter =
               -- It is withBuildConfig that yields the desired actions;
               -- cfgCmdBuildFiles itself yields nothing of interest.
               (withConfig YesReexec . withBuildConfig . cfgCmdBuildFiles)
+              (pure ())
+            addCommand'
+              cfgCmdCompilerToolsName
+              "Create (when applicable) the compiler tools directory for the \
+              \specified compiler version (implies 'config build-files')."
+              (withConfig YesReexec . withDefaultEnvConfig . cfgCmdCompilerTools)
               (pure ())
         )
 
