@@ -4,9 +4,19 @@
 
 Release notes:
 
-**Changes since v3.9.3:**
+**Changes since v3.11.1:**
 
 Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+##  v3.11.1 - 2026-05-30
+
+**Changes since v3.9.3:**
 
 Behavior changes:
 
