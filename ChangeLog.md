@@ -63,6 +63,8 @@ Bug fixes:
 * The output of Stack's `path --bin-path` command is now consistent with the
   Stack environment in Stack's `exec` command and includes the `bin` directory
   of Stack's local install root directory.
+* Stack now builds packages that depend directly on packages with the same name
+  as a sublibrary or foreign library of the package.
 
 ## v3.9.3 - 2026-02-19
 
