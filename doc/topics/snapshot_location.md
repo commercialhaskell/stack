@@ -32,7 +32,7 @@ There are four ways to specify a snapshot location:
     *   **Stackage LTS Haskell snapshots**, for example:
 
         ~~~yaml
-        snapshot: lts-24.37
+        snapshot: lts-24.43
         ~~~
 
         ??? info "Expansion of `lts-X.Y`"
@@ -52,7 +52,7 @@ There are four ways to specify a snapshot location:
     *   **Stackage Nightly snapshots**, for example:
 
         ~~~yaml
-        snapshot: nightly-2026-04-18
+        snapshot: nightly-2026-05-29
         ~~~
 
         ??? info "Expansion of `nightly-YYYY-MM-DD`"
@@ -95,7 +95,7 @@ There are four ways to specify a snapshot location:
 3.  Via a **URL** pointing to a snapshot configuration file, for example:
 
     ~~~yaml
-    snapshot: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2025/8/17.yaml`
+    snapshot: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2026/5/29.yaml`
     ~~~
 
     For safer, more reproducible builds, you can optionally specify a URL
@@ -103,9 +103,9 @@ There are four ways to specify a snapshot location:
 
     ~~~yaml
     snapshot:
-      url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/12/0.yaml
-      size: 499143
-      sha256: 781ea577595dff08b9c8794761ba1321020e3e1ec3297fb833fe951cce1bee11
+      url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/43.yaml
+      size:  729011
+      sha256: 3c412a7c13dba6d3d808455a458e0776c58b6cf99b8a7961a2f5e55589d6f1d6
     ~~~
 
     `size` is the number of bytes in the file and `sha256` is the file's SHA256

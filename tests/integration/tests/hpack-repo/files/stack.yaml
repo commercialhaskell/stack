@@ -1,4 +1,4 @@
-snapshot: lts-24.37
+snapshot: lts-24.43
 
 # At this commit, the validity package is described only by a package.yaml file
 extra-deps:
