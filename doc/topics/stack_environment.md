@@ -45,29 +45,35 @@ root directory.
 
 ## The compiler tools directory
 
-Stack creates, in the [Stack root](stack_root.md), a compiler tools directory
-for the specified version of GHC (when the directory is required). Command
-[`stack path --compiler-tools-bin`](../commands/path_command.md) to see
-that directory.
+When the directory is required, Stack creates, in the
+[Stack root](stack_root.md#compiler-tools-directory-optional), a compiler tools
+directory for the specified compiler version. Command
+[`stack path --compiler-tools-bin`](../commands/path_command.md) to see that
+directory.
 
 !!! info
 
     Stack's
     [`build` command](../commands/build_command.md#-no-copy-compiler-tool-flag)
     can be configured to install built executable files of project packages into
-    the compiler tools directory.
+    the
+    [compiler tools directory](stack_root.md#compiler-tools-directory-optional)
+    for the specified compiler version.
 
 !!! info
 
-    If you wish to override a tool that is included in the specified compiler's
-    binary directory, put a copy of the alternative tool (or a link to it) in
-    the compiler tools directory.
+    If you wish to override a tool that is co-located with the specified
+    compiler's executable file, put a copy of the alternative tool (or a link to
+    it) in the
+    [compiler tools directory](stack_root.md#compiler-tools-directory-optional)
+    for the specified compiler version.
 
 ## The compiler binary's directory
 
-The directory in which the GHC binary that will be used by Stack is located.
-Command [`stack path --compiler-bin`](../commands/path_command.md) to see
-that directory.
+The directory in which the GHC executable file (binary) that will be used by
+Stack is located. Command
+[`stack path --compiler-bin`](../commands/path_command.md) to see that
+directory.
 
 ## GHC's MinGW `bin` directory (Windows only)
 

@@ -1026,8 +1026,10 @@ to Stack's local binary directory (see `stack path --local-bin`). The
 Default: Disabled
 
 Set the flag to enable copying of built executable files (binaries) of targets
-to Stack's compiler tools binary directory (see
-`stack path --compiler-tools-bin`).
+to Stack's
+[compiler tools directory](../topics/stack_root.md#compiler-tools-directory-optional)
+for the specified compiler version (see Stack's
+[`path --compiler-tools-bin` command](path_command.md)).
 
 ### `--coverage` flag
 
