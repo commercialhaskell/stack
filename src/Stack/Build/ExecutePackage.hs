@@ -130,7 +130,7 @@ import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdToText )
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Installed
                    ( InstallLocation (..), Installed (..), InstalledMap
-                   , InstalledLibraryInfo (..)
+                   , InstalledLibraryInfo (..), simpleInstalledLib
                    )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent
@@ -139,8 +139,7 @@ import           Stack.Types.NamedComponent
                    )
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), installedPackageToGhcPkgId
-                   , runMemoizedWith, simpleInstalledLib
-                   , toCabalMungedPackageName
+                   , runMemoizedWith, toCabalMungedPackageName
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Plan
@@ -726,27 +725,28 @@ fetchAndMarkInstalledPackage ::
   -> PackageIdentifier
   -> RIO env Installed
 fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
-  let ghcPkgIdLoader = fetchGhcPkgIdForLib ee taskInstallLocation package.name
-  -- Only pure the sub-libraries to cache them if we also cache the main
-  -- library (that is, if it exists)
-  if hasBuildableMainLibrary package
+  let hasMainLibrary = hasBuildableMainLibrary package
+      subLibs = package.subLibraries
+  if not hasMainLibrary && null subLibs
     then do
-      let foldSubLibToMap subLib mapInMonad = do
-            maybeGhcpkgId <- ghcPkgIdLoader (Just subLib.name)
-            mapInMonad <&> case maybeGhcpkgId of
-              Just v -> Map.insert subLib.name v
-              _ -> id
-      subLibsPkgIds <- foldComponentToAnotherCollection
-        package.subLibraries
-        foldSubLibToMap
-        mempty
-      ghcPkgIdLoader Nothing >>= \case
-        Nothing -> throwM $ Couldn'tFindPkgId package.name
-        Just ghcPkgId -> pure $ simpleInstalledLib pkgId ghcPkgId subLibsPkgIds
-    else do
-      markExeInstalled taskInstallLocation pkgId -- TODO unify somehow
-                                                  -- with writeFlagCache?
+      markExeInstalled taskInstallLocation pkgId
+      -- TODO: Unify the above somehow with writeFlagCache?
       pure $ Executable pkgId
+    else do
+      ghcPkgId <- if hasMainLibrary
+        then ghcPkgIdLoader Nothing
+        else pure Nothing
+      subLibsPkgIds <-
+        foldComponentToAnotherCollection subLibs foldSubLibToMap mempty
+      pure $ simpleInstalledLib pkgId ghcPkgId subLibsPkgIds
+ where
+  ghcPkgIdLoader = fetchGhcPkgIdForLib ee taskInstallLocation package.name
+
+  foldSubLibToMap subLib mapInMonad = do
+    maybeGhcpkgId <- ghcPkgIdLoader (Just subLib.name)
+    mapInMonad <&> case maybeGhcpkgId of
+      Just v -> Map.insert subLib.name v
+      _ -> id
 
 fetchGhcPkgIdForLib ::
      (HasTerm env, HasEnvConfig env)
@@ -926,7 +926,7 @@ copyPreCompiled ee task pkgId (PrecompiledCache mlib subLibs exes) = do
       pure $ Just $
         case mpkgid of
           Nothing -> assert False $ Executable pkgId
-          Just pkgid -> simpleInstalledLib pkgId pkgid mempty
+          _ -> simpleInstalledLib pkgId mpkgid mempty
  where
   bindir = ee.baseConfigOpts.snapInstallRoot </> bindirSuffix
 
@@ -1067,8 +1067,8 @@ singleTest topts testsToRun ac ee task installedMap = do
               idMap <- liftIO $ readTVarIO ee.ghcPkgIds
               pure $ Map.lookup (taskProvides task) idMap
           let pkgGhcIdList = case installed of
-                               Just (Library _ libInfo) -> [libInfo.ghcPkgId]
-                               _ -> []
+                Just (Library _ libInfo) -> maybeToList libInfo.mMainGhcPkgId
+                _ -> []
           -- doctest relies on template-haskell in QuickCheck-based tests
           thGhcId <-
             case L.find ((== "template-haskell") . pkgName . (.packageIdent) . snd)

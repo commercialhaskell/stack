@@ -287,7 +287,8 @@ toLoadHelper compiler pkgDb dp = LoadHelper
     if name `Set.member` wiredInPackages compiler
       then []
       else dp.depends
-  installedLibInfo = InstalledLibraryInfo ghcPkgId (Right <$> dp.license) mempty
+  installedLibInfo =
+    InstalledLibraryInfo (Just ghcPkgId) (Right <$> dp.license) mempty
 
   toInstallLocation :: PackageDbVariety -> InstallLocation
   toInstallLocation GlobalDb = Snap
@@ -313,23 +314,26 @@ gatherAndTransformSubLoadHelper lh =
       (_, Library _ existingLibInfo)
     = ( pLoc
       , Library pn existingLibInfo
-          { subLib = Map.union
-              incomingLibInfo.subLib
-              existingLibInfo.subLib
-          , ghcPkgId = if isJust lh.subLibDump
-                      then existingLibInfo.ghcPkgId
-                      else incomingLibInfo.ghcPkgId
+          { subLib = Map.union incomingLibInfo.subLib existingLibInfo.subLib
+          , mMainGhcPkgId =
+              if isJust lh.subLibDump
+                then existingLibInfo.mMainGhcPkgId
+                else incomingLibInfo.mMainGhcPkgId
           }
       )
   onPreviousLoadHelper newVal _oldVal = newVal
   (key, value) = case lh.subLibDump of
     Nothing -> (rawPackageName, rawValue)
     Just sd -> (sd.packageName, updateAsSublib sd <$> rawValue)
+  -- rawValue should always have a main library: see toLoadHelper.
   (rawPackageName, rawValue) = lh.pair
   updateAsSublib
       sd
       (Library (PackageIdentifier _sublibMungedPackageName version) libInfo)
-    = Library
-        (PackageIdentifier key version)
-        libInfo { subLib = Map.singleton sd.libraryName libInfo.ghcPkgId }
+    = case libInfo.mMainGhcPkgId of
+        Nothing ->
+          error "gatherAndTransformSubLoadHelper: the impossible happened!"
+        Just ghcPkgId' -> Library
+          (PackageIdentifier key version)
+          libInfo { subLib = Map.singleton sd.libraryName ghcPkgId' }
   updateAsSublib _ v = v

@@ -79,9 +79,7 @@ import           Stack.Types.EnvConfig
                    )
 import           Stack.Types.GhcPkgId ( ghcPkgIdString )
 import           Stack.Types.Installed
-                   ( InstallLocation (..), Installed (..)
-                   , InstalledLibraryInfo (..), foldOnGhcPkgId'
-                   )
+                   ( InstallLocation (..), Installed (..), foldOnGhcPkgId' )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), componentCachePath )
 import           Stack.Types.SourceMap ( smRelDir )
@@ -301,12 +299,9 @@ deleteCaches dir =
 flagCacheKey :: (HasEnvConfig env) => Installed -> RIO env ConfigCacheKey
 flagCacheKey installed = do
   installationRoot <- installationRootLocal
-  case installed of
-    Library _ installedInfo -> do
-      let gid = installedInfo.ghcPkgId
-      pure $ configCacheKey installationRoot (ConfigCacheTypeFlagLibrary gid)
-    Executable ident -> pure $
-      configCacheKey installationRoot (ConfigCacheTypeFlagExecutable ident)
+  pure $ configCacheKey installationRoot $ case installed of
+    Library ident _ -> ConfigCacheTypeFlagLibrary ident
+    Executable ident -> ConfigCacheTypeFlagExecutable ident
 
 -- | Loads the Cabal flag cache for the given installed extra-deps.
 tryGetFlagCache ::

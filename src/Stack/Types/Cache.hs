@@ -29,14 +29,13 @@ import           Database.Persist.Sql
                    )
 import           Stack.Prelude
 import           Stack.Types.ConfigureOpts ( ConfigureOpts )
-import           Stack.Types.GhcPkgId
-                   ( GhcPkgId, ghcPkgIdToText, parseGhcPkgId )
+import           Stack.Types.GhcPkgId ( GhcPkgId )
 
 -- | Type representing types of cache in the Stack project SQLite database.
 data ConfigCacheType
   = ConfigCacheTypeConfig
     -- ^ Cabal configuration cache.
-  | ConfigCacheTypeFlagLibrary GhcPkgId
+  | ConfigCacheTypeFlagLibrary PackageIdentifier
     -- ^ Library Cabal flag cache.
   | ConfigCacheTypeFlagExecutable PackageIdentifier
     -- ^ Executable Cabal flag cache.
@@ -45,25 +44,35 @@ data ConfigCacheType
 instance PersistField ConfigCacheType where
   toPersistValue ConfigCacheTypeConfig = PersistText "config"
   toPersistValue (ConfigCacheTypeFlagLibrary v) =
-    PersistText $ "lib:" <> ghcPkgIdToText v
+    PersistText $ "lib:" <> T.pack (packageIdentifierString v)
   toPersistValue (ConfigCacheTypeFlagExecutable v) =
     PersistText $ "exe:" <> T.pack (packageIdentifierString v)
+
   fromPersistValue (PersistText t) =
     fromMaybe (Left $ "Unexpected ConfigCacheType value: " <> t) $
-    config <|> fmap lib (T.stripPrefix "lib:" t) <|>
-    fmap exe (T.stripPrefix "exe:" t)
+          config
+      <|> flagCache ConfigCacheTypeFlagLibrary "lib:"
+      <|> flagCache ConfigCacheTypeFlagExecutable "exe:"
    where
     config
       | t == "config" = Just (Right ConfigCacheTypeConfig)
       | otherwise = Nothing
-    lib v = do
-      ghcPkgId <- mapLeft tshow (parseGhcPkgId v)
-      Right $ ConfigCacheTypeFlagLibrary ghcPkgId
-    exe v = do
-      pkgId <-
-        maybe (Left $ "Unexpected ConfigCacheType value: " <> t) Right $
-        parsePackageIdentifier (T.unpack v)
-      Right $ ConfigCacheTypeFlagExecutable pkgId
+
+    flagCache ::
+         (PackageIdentifier -> ConfigCacheType)
+         -- ^ Constructor
+      -> Text
+         -- ^ Prefex
+      -> Maybe (Either Text ConfigCacheType)
+    flagCache constructor prefix =
+      fmap toConfigCacheType (T.stripPrefix prefix t)
+     where
+      toConfigCacheType :: Text -> Either Text ConfigCacheType
+      toConfigCacheType v = do
+        pkgId <-
+          maybe (Left $ "Unexpected ConfigCacheType value: " <> t) Right $
+          parsePackageIdentifier (T.unpack v)
+        Right $ constructor pkgId
   fromPersistValue _ = Left "Unexpected ConfigCacheType type"
 
 instance PersistFieldSql ConfigCacheType where

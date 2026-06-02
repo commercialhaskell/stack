@@ -40,7 +40,6 @@ module Stack.Types.Package
   , packageIdentifier
   , psVersion
   , runMemoizedWith
-  , simpleInstalledLib
   , toCabalMungedPackageName
   , toPackageDbVariety
   ) where
@@ -74,8 +73,7 @@ import           Stack.Types.Installed
                    ( InstallLocation (..), InstallMap, Installed (..)
                    , InstalledLibraryInfo (..), InstalledMap
                    , InstalledPackageLocation (..), PackageDatabase (..)
-                   , PackageDbVariety(..), simpleInstalledLib
-                   , toPackageDbVariety
+                   , PackageDbVariety(..), toPackageDbVariety
                    )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.PackageFile
@@ -386,7 +384,8 @@ dotCabalGetPath dcp =
     DotCabalFilePath fp -> fp
     DotCabalCFilePath fp -> fp
 
--- | Gathers all the GhcPkgId provided by a library into a map
+-- | Gathers all the GhcPkgId provided by a library into a map, where the
+-- package identifier of a sublibrary is its munged package identifier.
 installedMapGhcPkgId ::
      PackageIdentifier
   -> InstalledLibraryInfo
@@ -394,7 +393,7 @@ installedMapGhcPkgId ::
 installedMapGhcPkgId pkgId@(PackageIdentifier pkgName version) installedLib =
   finalMap
  where
-  finalMap = M.insert pkgId installedLib.ghcPkgId baseMap
+  finalMap = maybe id (M.insert pkgId) installedLib.mMainGhcPkgId baseMap
   baseMap =
     M.mapKeysMonotonic
       (toCabalMungedPackageIdentifier pkgName version)
