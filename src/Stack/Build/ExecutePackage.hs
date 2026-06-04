@@ -88,6 +88,7 @@ import           Stack.Package
                    )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
+import           Stack.Types.Build ( RunCabalWithArgs )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig
@@ -508,9 +509,10 @@ realConfigAndBuild
   realBuild ::
        Package
     -> Path Abs Dir
-    -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
+    -> RunCabalWithArgs env
+       -- ^ Function to run Cabal (the library) with arguments.
     -> (Utf8Builder -> RIO env ())
-       -- ^ A plain 'announce' function
+       -- ^ A plain 'announce' function.
     -> RIO env Installed
   realBuild package pkgDir cabal0 announce = do
     let cabal = cabal0 CloseOnException
