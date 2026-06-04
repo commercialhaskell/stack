@@ -613,7 +613,8 @@ withSingleContext ::
      -> (Utf8Builder -> RIO env ())
         -- An plain 'announce' function, for different build phases
      -> OutputType
-     -> RIO env a)
+     -> RIO env a
+     )
   -> RIO env a
 withSingleContext
     ac
