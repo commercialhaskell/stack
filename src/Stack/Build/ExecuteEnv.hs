@@ -597,7 +597,9 @@ withSingleContext ::
   -> ExecuteEnv
   -> TaskType
   -> Map PackageIdentifier GhcPkgId
-     -- ^ All dependencies' package ids to provide to Setup.hs.
+     -- ^ Ids of Installed packages that are assumed to be available to build a
+     -- package's custom @Setup.hs@, given its dependencies specified in its
+     -- @custom-setup@ stanza of its Cabal file.
   -> Maybe String
      -- ^ An optional suffix for the build log's file name.
   -> (  Package        -- Package info

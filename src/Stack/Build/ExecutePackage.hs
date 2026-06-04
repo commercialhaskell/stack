@@ -199,11 +199,11 @@ getConfigCache ee task installedMap enableTest enableBench = do
       -- collision for the return here. But unifying things with configureOpts
       -- where it was the opposite resulted in this. It doesn't seem to make any
       -- difference anyway.
-      allDepsMap = Map.union missing' task.present
+      allDeps = Map.union missing' task.present
       configureOpts' = configureOptsFromBase
         cOpts.envConfig
         cOpts.baseConfigOpts
-        allDepsMap
+        allDeps
         cOpts.isLocalNonExtraDep
         cOpts.isMutable
         pcOpts
@@ -222,7 +222,7 @@ getConfigCache ee task installedMap enableTest enableBench = do
         , pkgSrc = task.cachePkgSrc
         , pathEnvVar = ee.pathEnvVar
         }
-  pure (allDepsMap, cache)
+  pure (allDeps, cache)
 
 -- | Ensure that the configuration for the package matches what is given
 ensureConfig ::
@@ -385,7 +385,7 @@ singleBuild
     installedMap
     isFinalBuild
   = do
-    (allDepsMap, cache) <-
+    (allDeps, cache) <-
       getConfigCache ee task installedMap enableTests enableBenchmarks
     let bcoSnapInstallRoot = ee.baseConfigOpts.snapInstallRoot
     mprecompiled <- getPrecompiled cache task.taskType bcoSnapInstallRoot
@@ -403,7 +403,7 @@ singleBuild
             (isFinalBuild, buildingFinals)
             cache
             curator
-            allDepsMap
+            allDeps
     whenJust minstalled $ \installed -> do
       writeFlagCache installed cache
       liftIO $ atomically $ modifyTVar ee.ghcPkgIds $ Map.insert pkgId installed
@@ -426,6 +426,9 @@ realConfigAndBuild ::
   -> ConfigCache
   -> Maybe Curator
   -> Map PackageIdentifier GhcPkgId
+     -- ^ Ids of installed packages that are assumed to be available to build a
+     -- package's custom @Setup.hs@, given its dependencies specified in its
+     -- @custom-setup@ stanza of its Cabal file.
   -> RIO env (Maybe Installed)
 realConfigAndBuild
     ac
@@ -436,8 +439,8 @@ realConfigAndBuild
     (isFinalBuild, buildingFinals)
     cache
     mcurator0
-    allDepsMap
-  = withSingleContext ac ee task.taskType allDepsMap Nothing $
+    allDeps
+  = withSingleContext ac ee task.taskType allDeps Nothing $
       \package cabalFP pkgDir cabal0 announce _outputType -> do
         let cabal = cabal0 CloseOnException
         _neededConfig <-
@@ -996,11 +999,11 @@ singleTest ::
 singleTest topts testsToRun ac ee task installedMap = do
   -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
   -- full blown 'withSingleContext'.
-  (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
+  (allDeps, _cache) <- getConfigCache ee task installedMap True False
   mcurator <- view $ buildConfigL . to (.curator)
   let pname = pkgName $ taskProvides task
       expectFailure = expectTestFailure pname mcurator
-  withSingleContext ac ee task.taskType allDepsMap (Just "test") $
+  withSingleContext ac ee task.taskType allDeps (Just "test") $
     \package _cabalfp pkgDir _cabal announce outputType -> do
       config <- view configL
       let needHpc = topts.coverage
@@ -1105,7 +1108,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                          <> display (ghcPkgIdToText ghcId)
                          <> "\n"
                      )
-                     (pkgGhcIdList ++ thGhcId:Map.elems allDepsMap)
+                     (pkgGhcIdList ++ thGhcId : Map.elems allDeps)
           writeFileUtf8Builder fp ghcEnv
           menv <- liftIO $
             setEnv fp =<< config.processContextSettings EnvSettings
@@ -1304,8 +1307,8 @@ singleBench ::
   -> InstalledMap
   -> RIO env ()
 singleBench beopts benchesToRun ac ee task installedMap = do
-  (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
-  withSingleContext ac ee task.taskType allDepsMap (Just "bench") $
+  (allDeps, _cache) <- getConfigCache ee task installedMap False True
+  withSingleContext ac ee task.taskType allDeps (Just "bench") $
     \_package _cabalfp _pkgDir cabal announce _outputType -> do
       let args = map unqualCompToString benchesToRun <> maybe []
                        ((:[]) . ("--benchmark-options=" <>))

@@ -478,8 +478,11 @@ getSDistFileList ::
      HasEnvConfig env
   => LocalPackage
   -> Map PackageIdentifier GhcPkgId
+     -- ^ Ids of installed packages that are assumed to be available to build a
+     -- package's custom @Setup.hs@, given its dependencies specified in its
+     -- @custom-setup@ stanza of its Cabal file.
   -> RIO env (String, Path Abs File)
-getSDistFileList lp deps =
+getSDistFileList lp allDeps =
   withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
     let bopts = defaultBuildOpts
     let boptsCli = defaultBuildOptsCLI
@@ -489,7 +492,7 @@ getSDistFileList lp deps =
       [] [] [] Nothing -- provide empty list of globals. This is a hack around
                        -- custom Setup.hs files
       $ \ee ->
-      withSingleContext ac ee taskType deps (Just "sdist") $
+      withSingleContext ac ee taskType allDeps (Just "sdist") $
         \_package cabalFP _pkgDir cabal _announce _outputType -> do
           let outFile = toFilePath tmpdir FP.</> "source-files-list"
           cabal
