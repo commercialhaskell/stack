@@ -28,8 +28,6 @@ module Stack.Types.Installed
   ) where
 
 import qualified Data.Map as M
-import qualified Distribution.SPDX.License as SPDX
-import           Distribution.License ( License )
 import           Stack.Prelude
 import           Stack.Types.ComponentUtils ( StackUnqualCompName )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
@@ -107,7 +105,6 @@ data InstalledLibraryInfo = InstalledLibraryInfo
   { mMainGhcPkgId :: Maybe GhcPkgId
     -- ^ The main library, if present. If absent, there must be one or more
     -- installed sublibraries.
-  , license :: Maybe (Either SPDX.License License)
   , subLib :: Map StackUnqualCompName GhcPkgId
     -- ^ If there are no sublibraries, there must be a main library.
   }
@@ -116,15 +113,14 @@ data InstalledLibraryInfo = InstalledLibraryInfo
 -- | Type representing information about what is installed.
 data Installed
   = Library PackageIdentifier InstalledLibraryInfo
-    -- ^ A library, including its installed package id and, optionally, its
-    -- license.
+    -- ^ A library, including the ids of its installed packages.
   | Executable PackageIdentifier
     -- ^ An executable.
   deriving (Eq, Show)
 
 installedLibraryInfoFromGhcPkgId :: GhcPkgId -> InstalledLibraryInfo
 installedLibraryInfoFromGhcPkgId ghcPkgId =
-  InstalledLibraryInfo (Just ghcPkgId) Nothing mempty
+  InstalledLibraryInfo (Just ghcPkgId) mempty
 
 simpleInstalledLib ::
      PackageIdentifier
@@ -133,8 +129,8 @@ simpleInstalledLib ::
   -> Map StackUnqualCompName GhcPkgId
      -- ^ The id of any sublibraries.
   -> Installed
-simpleInstalledLib pkgIdentifier ghcPkgId =
-  Library pkgIdentifier . InstalledLibraryInfo ghcPkgId Nothing
+simpleInstalledLib pkgIdentifier mMainGhcPkgId =
+  Library pkgIdentifier . InstalledLibraryInfo mMainGhcPkgId
 
 installedToPackageIdOpt :: InstalledLibraryInfo -> [String]
 installedToPackageIdOpt libInfo =

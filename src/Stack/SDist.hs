@@ -227,7 +227,7 @@ getSDistTarball mpvpBounds pkgDir = do
     getInstalled installMap
   let deps = Map.fromList
         [ (pid, ghcPkgId)
-        | (_, Library pid (InstalledLibraryInfo (Just ghcPkgId) _ _)) <- Map.elems installedMap
+        | (_, Library pid (InstalledLibraryInfo (Just ghcPkgId) _)) <- Map.elems installedMap
         ]
   prettyInfoL
     [ flow "Getting the file list for"

@@ -287,8 +287,7 @@ toLoadHelper compiler pkgDb dp = LoadHelper
     if name `Set.member` wiredInPackages compiler
       then []
       else dp.depends
-  installedLibInfo =
-    InstalledLibraryInfo (Just ghcPkgId) (Right <$> dp.license) mempty
+  installedLibInfo = InstalledLibraryInfo (Just ghcPkgId) mempty
 
   toInstallLocation :: PackageDbVariety -> InstallLocation
   toInstallLocation GlobalDb = Snap
