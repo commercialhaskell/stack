@@ -599,6 +599,7 @@ withSingleContext ::
   -> Map PackageIdentifier GhcPkgId
      -- ^ All dependencies' package ids to provide to Setup.hs.
   -> Maybe String
+     -- ^ An optional suffix for the build log's file name.
   -> (  Package        -- Package info
      -> Path Abs File  -- Cabal file path
      -> Path Abs Dir   -- Package root directory file path

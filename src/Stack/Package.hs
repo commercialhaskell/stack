@@ -571,6 +571,7 @@ buildLogPath ::
      (MonadReader env m, HasBuildConfig env, MonadThrow m)
   => Package
   -> Maybe String
+     -- ^ An optional suffix for the log's file name.
   -> m (Path Abs File)
 buildLogPath package' msuffix = do
   env <- ask
