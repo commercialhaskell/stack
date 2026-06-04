@@ -9,12 +9,18 @@ Build-specific types.
 -}
 
 module Stack.Types.Build
-  ( ExcludeTHLoading (..)
+  ( RunCabalWithArgs
+  , ExcludeTHLoading (..)
   , ConvertPathsToAbsolute (..)
   , KeepOutputOpen (..)
   ) where
 
 import           Stack.Prelude
+
+-- | Type synonym that represents functions that run Cabal (the library) with
+-- arguments.
+type RunCabalWithArgs env =
+  KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ()
 
 -- | Type representing treatments of GHC's informational messages during
 -- compilation when it evaluates Template Haskell code.

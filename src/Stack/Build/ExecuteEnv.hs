@@ -79,7 +79,7 @@ import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build
                    ( ConvertPathsToAbsolute (..), ExcludeTHLoading (..)
-                   , KeepOutputOpen (..)
+                   , KeepOutputOpen (..), RunCabalWithArgs
                    )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
@@ -597,20 +597,24 @@ withSingleContext ::
   -> ExecuteEnv
   -> TaskType
   -> Map PackageIdentifier GhcPkgId
-     -- ^ All dependencies' package ids to provide to Setup.hs.
+     -- ^ Ids of Installed packages that are assumed to be available to build a
+     -- package's custom @Setup.hs@, given its dependencies specified in its
+     -- @custom-setup@ stanza of its Cabal file.
   -> Maybe String
+     -- ^ An optional suffix for the build log's file name.
   -> (  Package        -- Package info
      -> Path Abs File  -- Cabal file path
      -> Path Abs Dir   -- Package root directory file path
         -- Note that the `Path Abs Dir` argument is redundant with the
         -- `Path Abs File` argument, but we provide both to avoid recalculating
         -- `parent` of the `File`.
-     -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
-        -- Function to run Cabal with args
+     -> RunCabalWithArgs env
+        -- Function to run Cabal (the library) with arguments.
      -> (Utf8Builder -> RIO env ())
         -- An plain 'announce' function, for different build phases
      -> OutputType
-     -> RIO env a)
+     -> RIO env a
+     )
   -> RIO env a
 withSingleContext
     ac
@@ -708,7 +712,8 @@ withSingleContext
        Package
     -> Path Abs Dir
     -> OutputType
-    -> (  (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
+    -> (  RunCabalWithArgs env
+          -- Function to run Cabal (the library) with arguments.
        -> RIO env a
        )
     -> RIO env a

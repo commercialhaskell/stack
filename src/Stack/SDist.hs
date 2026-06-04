@@ -204,8 +204,7 @@ getSDistTarball ::
      -- ^ Filename, tarball contents, and option Cabal file revision to upload
 getSDistTarball mpvpBounds pkgDir = do
   config <- view configL
-  let PvpBounds pvpBounds asRevision =
-        fromMaybe config.pvpBounds mpvpBounds
+  let PvpBounds pvpBounds asRevision = fromMaybe config.pvpBounds mpvpBounds
       tweakCabal = pvpBounds /= PvpBoundsNone
       pkgFp = toFilePath pkgDir
   lp <- readLocalPackage pkgDir
@@ -478,18 +477,21 @@ getSDistFileList ::
      HasEnvConfig env
   => LocalPackage
   -> Map PackageIdentifier GhcPkgId
+     -- ^ Ids of installed packages that are assumed to be available to build a
+     -- package's custom @Setup.hs@, given its dependencies specified in its
+     -- @custom-setup@ stanza of its Cabal file.
   -> RIO env (String, Path Abs File)
-getSDistFileList lp deps =
+getSDistFileList lp allDeps =
   withSystemTempDir (stackProgName <> "-sdist") $ \tmpdir -> do
     let bopts = defaultBuildOpts
     let boptsCli = defaultBuildOptsCLI
     baseConfigOpts <- mkBaseConfigOpts boptsCli
     locals <- projectLocalPackages
-    withExecuteEnv bopts boptsCli baseConfigOpts locals
-      [] [] [] Nothing -- provide empty list of globals. This is a hack around
-                       -- custom Setup.hs files
+    -- We provide three empty lists of dumped installed packages. This is a hack
+    -- around custom Setup.hs files:
+    withExecuteEnv bopts boptsCli baseConfigOpts locals [] [] [] Nothing
       $ \ee ->
-      withSingleContext ac ee taskType deps (Just "sdist") $
+      withSingleContext ac ee taskType allDeps (Just "sdist") $
         \_package cabalFP _pkgDir cabal _announce _outputType -> do
           let outFile = toFilePath tmpdir FP.</> "source-files-list"
           cabal
