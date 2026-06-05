@@ -163,7 +163,7 @@ getConfigCache ::
   -> InstalledMap
   -> Bool
   -> Bool
-  -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
+  -> RIO env (Map MungedPackageId GhcPkgId, ConfigCache)
 getConfigCache ee task installedMap enableTest enableBench = do
   let extra =
         -- We enable tests if the test suite dependencies are already
@@ -424,7 +424,7 @@ realConfigAndBuild ::
      -- ^ (isFinalBuild, buildingFinals)
   -> ConfigCache
   -> Maybe Curator
-  -> Map PackageIdentifier GhcPkgId
+  -> Map MungedPackageId GhcPkgId
      -- ^ Ids of installed packages that are assumed to be available to build a
      -- package's custom @Setup.hs@, given its dependencies specified in its
      -- @custom-setup@ stanza of its Cabal file.
@@ -755,7 +755,7 @@ fetchGhcPkgIdForLib ::
   -> PackageName
   -> Maybe Component.StackUnqualCompName
   -> RIO env (Maybe GhcPkgId)
-fetchGhcPkgIdForLib ee installLocation pkgName libName = do
+fetchGhcPkgIdForLib ee installLocation pkgName mLibName = do
   let baseConfigOpts = ee.baseConfigOpts
       (installedPkgDb, installedDumpPkgsTVar) =
         case installLocation of
@@ -766,11 +766,9 @@ fetchGhcPkgIdForLib ee installLocation pkgName libName = do
             ( baseConfigOpts.localDB
             , ee.localDumpPkgs )
   let commonLoader = loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar
-  case libName of
-    Nothing -> commonLoader pkgName
-    Just v -> do
-      let mungedName = encodeCompatPackageName $ toCabalMungedPackageName pkgName v
-      commonLoader mungedName
+      mungedPkgName = toCabalMungedPackageName pkgName mLibName
+      encodedPkgName = encodeCompatPackageName mungedPkgName
+  commonLoader encodedPkgName
 
 -- | Copy ddump-* files, if we are building finals and a non-empty ddump-dir
 -- has been specified.

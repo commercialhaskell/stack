@@ -1,0 +1,17 @@
+spec-version: 0.36.0
+
+verbatim:
+  cabal-version: 3.4
+
+name: myPackageC
+
+dependencies:
+- base
+
+custom-setup:
+  dependencies:
+  - base
+  - myPackageE:myPackageE-sub
+
+library:
+  source-dirs: src

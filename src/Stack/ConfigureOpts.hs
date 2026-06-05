@@ -18,8 +18,6 @@ module Stack.ConfigureOpts
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import           Database.Persist ( Entity, entityVal )
-import           Distribution.Types.MungedPackageName
-                   ( decodeCompatPackageName )
 import           Distribution.Types.PackageName ( unPackageName )
 import           Distribution.Types.UnqualComponentName
                    ( unUnqualComponentName )
@@ -70,7 +68,7 @@ configureOptsFromDb x y = ConfigureOpts
 configureOptsFromBase ::
      EnvConfig
   -> BaseConfigOpts
-  -> Map PackageIdentifier GhcPkgId -- ^ dependencies
+  -> Map MungedPackageId GhcPkgId -- ^ dependencies
   -> Bool -- ^ local non-extra-dep?
   -> IsMutable
   -> PackageConfigureOpts
@@ -119,7 +117,7 @@ configureOptsPathRelated bco isMutable pkgOpts = concat
 configureOptsNonPathRelated ::
      EnvConfig
   -> BaseConfigOpts
-  -> Map PackageIdentifier GhcPkgId -- ^ Dependencies.
+  -> Map MungedPackageId GhcPkgId -- ^ Dependencies.
   -> Bool -- ^ Is this a local, non-extra-dep?
   -> PackageConfigureOpts
   -> [String]
@@ -197,18 +195,18 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
 
   depOptions = mapAndAppend toDepOption [] deps
 
-  toDepOption (PackageIdentifier name _) gid = concat
+  toDepOption (MungedPackageId name _) gid = concat
     [ "--dependency="
     , depOptionKey
     , "="
     , ghcPkgIdString gid
     ]
    where
-    MungedPackageName subPkgName lib = decodeCompatPackageName name
-    depOptionKey = case lib of
-      LMainLibName -> unPackageName name
-      LSubLibName cn ->
-        unPackageName subPkgName <> ":" <> unUnqualComponentName cn
+    MungedPackageName pkgName libName = name
+    pkgName' = unPackageName pkgName
+    depOptionKey = case libName of
+      LMainLibName -> pkgName'
+      LSubLibName cn -> pkgName' <> ":" <> unUnqualComponentName cn
 
 -- | Render configure options as a single list of options.
 renderConfigureOpts :: ConfigureOpts -> [String]

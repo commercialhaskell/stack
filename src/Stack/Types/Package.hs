@@ -33,6 +33,7 @@ module Stack.Types.Package
   , dotCabalModulePath
   , installedMapGhcPkgId
   , installedPackageToGhcPkgId
+  , installedPackageToGhcPkgId'
   , lpFiles
   , lpFilesForComponents
   , memoizeRefWith
@@ -40,6 +41,7 @@ module Stack.Types.Package
   , packageIdentifier
   , psVersion
   , runMemoizedWith
+  , toCabalMungedPackageId
   , toCabalMungedPackageName
   , toPackageDbVariety
   ) where
@@ -53,8 +55,6 @@ import           Distribution.License ( License )
 import           Distribution.ModuleName ( ModuleName )
 import           Distribution.PackageDescription ( BuildType )
 import           Distribution.System ( Platform (..) )
-import           Distribution.Types.MungedPackageName
-                   ( encodeCompatPackageName )
 import qualified RIO.Text as T
 import           Stack.Prelude
 import           Stack.Types.Cache ( FileCache )
@@ -73,7 +73,8 @@ import           Stack.Types.Installed
                    ( InstallLocation (..), InstallMap, Installed (..)
                    , InstalledLibraryInfo (..), InstalledMap
                    , InstalledPackageLocation (..), PackageDatabase (..)
-                   , PackageDbVariety(..), toPackageDbVariety
+                   , PackageDbVariety(..), installedPackageIdentifier
+                   , toPackageDbVariety
                    )
 import           Stack.Types.NamedComponent ( NamedComponent )
 import           Stack.Types.PackageFile
@@ -388,40 +389,53 @@ dotCabalGetPath dcp =
 -- package identifier of a sublibrary is its munged package identifier.
 installedMapGhcPkgId ::
      PackageIdentifier
+     -- ^ The name and version of a Cabal package.
   -> InstalledLibraryInfo
-  -> Map PackageIdentifier GhcPkgId
-installedMapGhcPkgId pkgId@(PackageIdentifier pkgName version) installedLib =
-  finalMap
+  -> Map MungedPackageId GhcPkgId
+installedMapGhcPkgId pkgId libInfo =
+  mAddMainGhcPkgId libInfo.mMainGhcPkgId subLibMap
  where
-  finalMap = maybe id (M.insert pkgId) installedLib.mMainGhcPkgId baseMap
-  baseMap =
-    M.mapKeysMonotonic
-      (toCabalMungedPackageIdentifier pkgName version)
-      installedLib.subLib
+  mAddMainGhcPkgId = maybe id (M.insert mungedMainPkgId)
+  mungedMainPkgId = toCabalMungedPackageId pkgId Nothing
+  subLibMap =
+    M.mapKeysMonotonic (toCabalMungedPackageId pkgId . Just) libInfo.subLib
 
 installedPackageToGhcPkgId ::
      PackageIdentifier
+     -- ^ The name and version of a Cabal package.
   -> Installed
-  -> Map PackageIdentifier GhcPkgId
-installedPackageToGhcPkgId ident (Library ident' libInfo) =
-  assert (ident == ident') (installedMapGhcPkgId ident libInfo)
-installedPackageToGhcPkgId _ (Executable _) = mempty
+     -- ^ Assumed to be for the same Cabal package name and version.
+  -> Map MungedPackageId GhcPkgId
+installedPackageToGhcPkgId pkgId installed =
+  assert (pkgId == installedPackageIdentifier installed)
+    (installedPackageToGhcPkgId' installed)
 
--- | Creates a t'MungedPackageName' identifier.
-toCabalMungedPackageIdentifier ::
-     PackageName
-  -> Version
-  -> StackUnqualCompName
-  -> PackageIdentifier
-toCabalMungedPackageIdentifier pkgName version = flip PackageIdentifier version
-  . encodeCompatPackageName . toCabalMungedPackageName pkgName
+installedPackageToGhcPkgId' :: Installed -> Map MungedPackageId GhcPkgId
+installedPackageToGhcPkgId' (Library pkgId libInfo) =
+  installedMapGhcPkgId pkgId libInfo
+installedPackageToGhcPkgId' (Executable _) = mempty
 
+-- | Creates a munged package identifier.
+toCabalMungedPackageId ::
+     PackageIdentifier
+     -- ^ The name and version of a Cabal package.
+  -> Maybe StackUnqualCompName
+     -- ^ 'Nothing', if a main library.
+  -> MungedPackageId
+toCabalMungedPackageId pkgId mLibName =
+  MungedPackageId (toCabalMungedPackageName pkgName mLibName) version
+ where
+  PackageIdentifier pkgName version = pkgId
+
+-- | Creates a munged package name.
 toCabalMungedPackageName ::
      PackageName
-  -> StackUnqualCompName
+     -- ^ The name of a Cabal package.
+  -> Maybe StackUnqualCompName
+     -- ^ 'Nothing', if a main library.
   -> MungedPackageName
-toCabalMungedPackageName pkgName =
-  MungedPackageName pkgName . LSubLibName . toCabalName
+toCabalMungedPackageName pkgName mLibName = MungedPackageName pkgName $
+  maybe LMainLibName (LSubLibName . toCabalName) mLibName
 
 -- | Type representing inputs to 'Stack.Package.generateBuildInfoOpts'.
 data BioInput = BioInput
