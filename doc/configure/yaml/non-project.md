@@ -48,12 +48,15 @@ Command line equivalent (takes precedence):
 [`stack build --[no-]allow-newer`](../../commands/build_command.md#-no-allow-newer-flag)
 flag
 
-Whether to ignore lower and upper version bounds in Cabal files.
+!!! warning
 
-!!! info
+    This configuration option is misnamed. It causes Stack to ignore all the
+    bounds in the relevant Cabal file(s), not only upper bounds. The name was
+    chosen to match the `--allow-newer` option introduced in `Cabal-1.20.0.0`.
 
-    The name `allow-newer` was chosen to match a commonly-used Cabal option
-    which ignored only upper bounds.
+Whether to ignore all version bounds (upper and lower) in Cabal files. See the
+[`allow-newer-deps`](#allow-newer-deps) configuration option to specify the
+scope of application when `allow-newer` is `true`.
 
 ~~~yaml
 allow-newer: true
@@ -63,15 +66,20 @@ allow-newer: true
 
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
-Default: `none`
+Default: all packages (if `allow-newer` is `true`)
 
-Determines a subset of packages to which `allow-newer` should apply. This option
-has no effect (but warns) if `allow-newer` is `false`.
+See the [`allow-newer`](#allow-newer) configuration option.
+
+When `allow-newer` is `false`, this option has no effect (but warns).
+
+When `allow-newer` is `true`, this option specifies the scope of application
+for `allow-newer`. That is, the set of packages for which all version bounds
+(upper and lower) should be ignored in the packages' Cabal files.
 
 ~~~yaml
 allow-newer-deps:
-  - foo
-  - bar
+- myPackageA
+- myPackageB
 ~~~
 
 ## apply-ghc-options
