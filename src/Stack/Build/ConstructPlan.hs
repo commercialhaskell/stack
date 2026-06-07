@@ -1081,7 +1081,7 @@ checkDirtiness ::
      PackageSource
   -> Installed
   -> Package
-  -> Map PackageIdentifier GhcPkgId
+  -> Map MungedPackageId GhcPkgId
   -> Bool
      -- ^ Is Haddock documentation being built?
   -> M Bool

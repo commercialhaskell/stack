@@ -154,7 +154,7 @@ adrHasLibrary (ADRFound _ Executable{}) = False
 
 data MissingPresentDeps = MissingPresentDeps
   { missingPackages :: !(Set PackageIdentifier)
-  , presentPackages :: !(Map PackageIdentifier GhcPkgId)
+  , presentPackages :: !(Map MungedPackageId GhcPkgId)
   , isMutable :: !IsMutable
   }
   deriving Show
