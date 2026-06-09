@@ -2689,6 +2689,7 @@ mockTask pkg = Task
       , instantiationDeps = []
       }
   , buildHaddocks = False
+  , allInOne = True
   , present = Map.empty
   , cachePkgSrc = CacheSrcUpstream
   , buildTypeConfig = False

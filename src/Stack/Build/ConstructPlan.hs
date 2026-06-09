@@ -513,10 +513,18 @@ addFinal ::
      LocalPackage
   -> Package
   -> Bool
+     -- ^ Will the test\/benchmark build be folded into the package's primary
+     -- build (all-in-one)? 'False' forces a separate build step: curator
+     -- builds that expect test failures, or the cyclic-plan fallback.
+  -> Bool
      -- ^ Should Haddock documentation be built?
   -> M ()
-addFinal lp package buildHaddocks = do
+addFinal lp package allInOne buildHaddocks = do
   let name = package.name
+      -- Split (per-component Backpack) packages key their finals under
+      -- CTest\/CBench, separate from the primary CLib\/CInst build, so they
+      -- always need their own build step regardless of the caller's flag.
+      effectiveAllInOne = allInOne && not (shouldSplitComponents package)
   logDebugPlanS "addFinal" "Clearing the call stack."
   res <- local (\ctx' -> ctx' { callStack = [] }) $
            addPackageDeps package >>= \case
@@ -536,6 +544,7 @@ addFinal lp package buildHaddocks = do
       pure $ Right Task
         { configOpts
         , buildHaddocks
+        , allInOne = effectiveAllInOne
         , present
         , taskType = TTLocalMutable lp
         , cachePkgSrc = CacheSrcLocal (toFilePath (parent lp.cabalFP))
@@ -772,11 +781,19 @@ installPackage name ps minstalled = do
                    "For "
                 <> fromPackageName name
                 <> ", successfully added package deps."
+              -- In curator builds the test\/benchmark build can't be folded
+              -- into the library build: a test\/benchmark failure could stop
+              -- the library being available to its dependents. When the
+              -- library is already available (not 'ADRToInstall') it would
+              -- be fine, hence the 'isAdrToInstall' guard.
+              splitRequired <-
+                expectedTestOrBenchFailures name <$> asks (.curator)
               adr <- installPackageGivenDeps
                 lp.buildHaddocks ps tb minstalled deps
+              let finalAllInOne = not (isAdrToInstall adr && splitRequired)
               -- FIXME: this redundantly adds the deps (but they'll all just
               -- get looked up in the map)
-              addFinal lp tb False
+              addFinal lp tb finalAllInOne False
               pure $ Right adr
             Left _ -> do
               -- Reset the state to how it was before attempting to find a
@@ -786,14 +803,25 @@ installPackage name ps minstalled = do
                 <> fromString (show libMap)
               put libMap
               -- Otherwise, fall back on building the tests / benchmarks in a
-              -- separate step.
+              -- separate step (allInOne = False): the library is built on its
+              -- own first, then the test\/benchmark build on top of it.
               res' <- resolveDepsAndInstall
                 lp.buildHaddocks ps lp.package minstalled
               when (isRight res') $ do
                 -- Insert it into the map so that it's available for addFinal.
                 updateLibMap name res'
-                addFinal lp tb False
+                addFinal lp tb False False
               pure res'
+
+-- | Does the curator (if any) expect this package's test-suites or benchmarks
+-- to fail? If so, the test\/benchmark build must be a step separate from the
+-- library build, so that a test\/benchmark failure does not stop the library
+-- being available to its dependents.
+expectedTestOrBenchFailures :: PackageName -> Maybe Curator -> Bool
+expectedTestOrBenchFailures name maybeCurator = fromMaybe False $ do
+  curator <- maybeCurator
+  pure $  Set.member name curator.expectTestFailure
+       || Set.member name curator.expectBenchmarkFailure
 
 resolveDepsAndInstall ::
      Bool
@@ -862,6 +890,9 @@ installPackageGivenDeps
       Nothing -> ADRToInstall Task
         { configOpts
         , buildHaddocks
+        -- Primary build task: 'allInOne' is not consulted for these (only for
+        -- final tasks in 'Plan' @finals@); set to 'True'.
+        , allInOne = True
         , present
         , taskType =
             case ps of

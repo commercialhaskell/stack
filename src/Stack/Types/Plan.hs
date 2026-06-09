@@ -85,6 +85,13 @@ data Task = Task
     -- are missing and a function which yields configure options, given a
     -- dictionary of those identifiers and their 'GhcPkgId'.
   , buildHaddocks   :: !Bool
+  , allInOne        :: !Bool
+    -- ^ Meaningful for final (test\/benchmark) tasks in 'Plan' @finals@:
+    -- 'True' when the test\/benchmark build is folded into the package's
+    -- primary 'ATBuild' (the common case); 'False' when it needs its own
+    -- 'ATBuildFinal' step (curator builds that expect test failures, the
+    -- cyclic-plan fallback, or per-component CTest\/CBench keys). For primary
+    -- build tasks this field is not consulted and is set to 'True'.
   , present         :: !(Map MungedPackageId GhcPkgId)
     -- ^ A dictionary of the munged package identifiers of already-installed
     -- dependencies, and their 'GhcPkgId'.

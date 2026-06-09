@@ -1496,8 +1496,21 @@ buildAnnSuffix ck task enableTests enableBenchmarks = case ck of
           <> if sig == implMod then "" else ":" <> T.pack (C.display implMod)
         | (sig, impl, implMod) <- task.backpackInstEntries
         ]
-  result = T.intercalate " + " $
-    ["test" | enableTests] ++ ["bench" | enableBenchmarks]
+  result = T.intercalate " + " $ concat
+    [ ["lib"     | task.allInOne && hasLib]
+    , ["sub-lib" | task.allInOne && hasSubLib]
+    , ["exe"     | task.allInOne && hasExe]
+    , ["test"    | enableTests]
+    , ["bench"   | enableBenchmarks]
+    ]
+  (hasLib, hasSubLib, hasExe) = case task.taskType of
+    TTLocalMutable lp ->
+      let package = lp.package
+          hasLibrary = hasBuildableMainLibrary package
+          hasSubLibraries = not $ null package.subLibraries
+          hasExecutables = not . Set.null $ exesToBuild lp
+      in  (hasLibrary, hasSubLibraries, hasExecutables)
+    _ -> (False, False, False)
   isCLib CLib = True
   isCLib _ = False
 

@@ -42,9 +42,12 @@ instance Exception ExecuteException where
 data ActionType
   = ATBuild
     -- ^ Action for configuring and building a single component (library,
-    -- sub-library, executable, or Backpack instantiation). Also used for
-    -- final build steps that compile test-suites and benchmarks when no
-    -- separate library build task exists for the component.
+    -- sub-library, executable, or Backpack instantiation).
+  | ATBuildFinal
+    -- ^ Action for building a package's test-suites and\/or benchmarks as a
+    -- separate Setup invocation. Used when the final task is not folded into
+    -- the primary 'ATBuild': curator builds that expect test failures, the
+    -- cyclic-plan fallback, or per-component CTest\/CBench keys.
   | ATRunTests
     -- ^ Task for running the package's test-suites.
   | ATRunBenchmarks

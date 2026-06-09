@@ -80,12 +80,16 @@ spec = do
       Set.member depAction deps `shouldBe` True
 
   describe "ActionType" $ do
-    it "ATBuildFinal no longer exists (3 constructors only)" $ do
-      let types = [ATBuild, ATRunTests, ATRunBenchmarks]
-      length types `shouldBe` 3
+    it "has four constructors including ATBuildFinal" $ do
+      -- ATBuildFinal is used for test/bench builds that are NOT folded into
+      -- the primary ATBuild: curator builds that expect test failures, the
+      -- cyclic-plan fallback, and per-component CTest/CBench keys.
+      let types = [ATBuild, ATBuildFinal, ATRunTests, ATRunBenchmarks]
+      length types `shouldBe` 4
 
-    it "ATBuild < ATRunTests < ATRunBenchmarks (Ord)" $ do
-      (ATBuild < ATRunTests) `shouldBe` True
+    it "orders ATBuild < ATBuildFinal < ATRunTests < ATRunBenchmarks (Ord)" $ do
+      (ATBuild < ATBuildFinal) `shouldBe` True
+      (ATBuildFinal < ATRunTests) `shouldBe` True
       (ATRunTests < ATRunBenchmarks) `shouldBe` True
 
   describe "missingToDeps" $ do
@@ -139,46 +143,76 @@ spec = do
       length actionIds `shouldBe` 1
       actionIds `shouldBe` [ActionId ck ATBuild]
 
-    it "final-only key produces ATBuild + run actions" $ do
-      -- Simulating toActions (Nothing, Just final) with tests:
-      -- Should produce ATBuild (for final) + ATRunTests
-      let ck = ComponentKey (mkPackageName "pkg") CLib
-          buildId = ActionId ck ATBuild
+    it "non-all-in-one final-only key produces ATBuildFinal + run actions" $ do
+      -- Simulating toActions (Nothing, Just final) for a non-all-in-one final
+      -- (a per-component CTest key, or the cyclic-plan fallback): afinal
+      -- produces its own ATBuildFinal, and the run action depends on it.
+      let ck = ComponentKey (mkPackageName "pkg")
+                 (CTest (unqualCompFromString "tests"))
+          buildId = ActionId ck ATBuildFinal
           runId = ActionId ck ATRunTests
           actionIds = [buildId, runId]
-          -- ATRunTests depends on ATBuild
           runDeps = Set.singleton buildId
       length actionIds `shouldBe` 2
       Set.member buildId runDeps `shouldBe` True
 
-    it "build+final key produces one ATBuild (no duplicate)" $ do
-      -- Simulating toActions (Just build, Just final):
-      -- abuild produces ATBuild, afinal must NOT produce another ATBuild
-      -- afinal.finalBuild is [] when mbuild is Just
+    it "all-in-one clean final-only key produces only run actions" $ do
+      -- Simulating toActions (Nothing, Just final) for an all-in-one final
+      -- whose package is up-to-date (mbuild = Nothing): no build action is
+      -- created, and the run action has no build dependency. This is the
+      -- 3770-no-rerun-tests fix: no spurious build fires on a clean rebuild,
+      -- so the test-success flag is not clobbered before --no-rerun-tests
+      -- reads it.
       let ck = ComponentKey (mkPackageName "pkg") CLib
-          -- From abuild
+          runId = ActionId ck ATRunTests
+          actionIds = [runId]
+          runDeps = Set.empty :: Set ActionId
+      length actionIds `shouldBe` 1
+      runDeps `shouldBe` Set.empty
+
+    it "all-in-one build+final key produces one ATBuild (no duplicate)" $ do
+      -- Simulating toActions (Just build, Just final) for an all-in-one
+      -- final: abuild produces ATBuild (merged mode), afinal.finalBuild is []
+      -- because task.allInOne is True.
+      let ck = ComponentKey (mkPackageName "pkg") CLib
           abuildIds = [ActionId ck ATBuild]
-          -- From afinal.finalBuild when mbuild is Just: empty
           afinalBuildIds = [] :: [ActionId]
-          -- From afinal.finalRun
           afinalRunIds = [ActionId ck ATRunTests]
           allIds = abuildIds ++ afinalBuildIds ++ afinalRunIds
-      -- No duplicate ATBuild
       let buildCount = length $ filter
             (\(ActionId _ at) -> at == ATBuild) allIds
       buildCount `shouldBe` 1
-      -- Total: 1 ATBuild + 1 ATRunTests
       length allIds `shouldBe` 2
 
-    it "run actions always depend on ATBuild for same ComponentKey" $ do
+    it "non-all-in-one build+final key produces ATBuild and ATBuildFinal" $ do
+      -- Simulating toActions (Just build, Just final) for a non-all-in-one
+      -- final (the cyclic-plan fallback): abuild produces a plain ATBuild for
+      -- the library, afinal.finalBuild produces a separate ATBuildFinal for
+      -- the test/bench build. This is the 6905 fix: the test build is its
+      -- own Setup invocation, configured from the final task's deps (which
+      -- the lib-only primary task does not carry).
+      let ck = ComponentKey (mkPackageName "pkg") CLib
+          abuildIds = [ActionId ck ATBuild]
+          afinalBuildIds = [ActionId ck ATBuildFinal]
+          afinalRunIds = [ActionId ck ATRunTests]
+          allIds = abuildIds ++ afinalBuildIds ++ afinalRunIds
+      length (filter (\(ActionId _ at) -> at == ATBuild) allIds)
+        `shouldBe` 1
+      length (filter (\(ActionId _ at) -> at == ATBuildFinal) allIds)
+        `shouldBe` 1
+      -- distinct ActionIds: ATBuild and ATBuildFinal do not collide
+      Set.size (Set.fromList allIds) `shouldBe` 3
+
+    it "run actions depend on ATBuildFinal for a non-all-in-one final" $ do
+      -- For a non-all-in-one final the run actions depend on the separate
+      -- ATBuildFinal action, not on ATBuild.
       let ck = ComponentKey (mkPackageName "pkg")
                  (CTest (unqualCompFromString "tests"))
-          buildDep = Set.singleton (ActionId ck ATBuild)
-          -- ATRunTests and ATRunBenchmarks should both depend on ATBuild
+          buildDep = Set.singleton (ActionId ck ATBuildFinal)
           runTestsDeps = buildDep
           runBenchDeps = buildDep
-      Set.member (ActionId ck ATBuild) runTestsDeps `shouldBe` True
-      Set.member (ActionId ck ATBuild) runBenchDeps `shouldBe` True
+      Set.member (ActionId ck ATBuildFinal) runTestsDeps `shouldBe` True
+      Set.member (ActionId ck ATBuildFinal) runBenchDeps `shouldBe` True
 
   describe "per-package derivation from ComponentKey map" $ do
     it "single CLib key maps to one package entry" $ do

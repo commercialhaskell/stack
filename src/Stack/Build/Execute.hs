@@ -586,7 +586,14 @@ toActions installedMap mtestLock runInBase ee taskKeys ck (mbuild, mfinal) =
   -- tests/benches in a single Setup invocation. Split packages never hit
   -- this merge because their final entries are keyed by CTest/CBench, not
   -- CLib, so mfinal is Nothing here.
-  hasFinal = isJust mfinal
+  -- The primary build is "merged" with the final (it configures with
+  -- --enable-tests/--enable-benchmarks and builds the tests/benches alongside
+  -- the lib/exe in one Setup invocation) exactly when an all-in-one final
+  -- task exists for this ComponentKey. A non-all-in-one final (curator
+  -- builds, the cyclic-plan fallback, or per-component CTest/CBench keys)
+  -- gets its own ATBuildFinal action instead, built from the final task, and
+  -- the primary build stays plain.
+  merged = maybe False (.allInOne) mfinal
   abuild = case mbuild of
     Nothing -> []
     Just task ->
@@ -600,7 +607,7 @@ toActions installedMap mtestLock runInBase ee taskKeys ck (mbuild, mfinal) =
                         task.configOpts.instantiationDeps)
           , action =
               \ac -> runInBase $
-                singleBuild ac ee task installedMap hasFinal hasFinal ck
+                singleBuild ac ee task installedMap merged merged ck
           , concurrency = ConcurrencyAllowed
           }
       ]
@@ -609,30 +616,42 @@ toActions installedMap mtestLock runInBase ee taskKeys ck (mbuild, mfinal) =
     Just task -> finalBuild ++ finalRun
      where
       (tests, benches) = finalTestsAndBenches ck (taskComponents task)
-      buildDep = Set.singleton (ActionId ck ATBuild)
-      -- When there's no library build task, we need our own build step for
-      -- tests/benchmarks. When there IS a library build, depend on it instead.
-      finalBuild = case mbuild of
-        Just _ -> []
-        Nothing ->
-          [ Action
-              { actionId = ActionId ck ATBuild
-              , actionDeps =
-                  missingToDeps task.configOpts.missing
-                  <> intraPackageDep
-                  <> Set.fromList
-                       (map (`ActionId` ATBuild)
-                            task.configOpts.instantiationDeps)
-              , action =
-                  -- Finals-only build (no primary task exists for this
-                  -- ComponentKey): isFinalBuild=True, isMergedBuild=False so
-                  -- buildAndCopyOpts emits only test/bench targets and skips
-                  -- copy/install.
-                  \ac -> runInBase $
-                    singleBuild ac ee task installedMap True False ck
-              , concurrency = ConcurrencyAllowed
-              }
-          ]
+      -- An ATBuildFinal (and anything that builds for this key) depends on the
+      -- primary ATBuild for this key, if one exists (the package's own
+      -- library, built first).
+      onPrimaryBuild =
+        maybe id (const (Set.insert (ActionId ck ATBuild))) mbuild
+      -- An all-in-one final is built by the primary ATBuild (when one exists,
+      -- in merged mode); when the primary is up-to-date there is nothing to
+      -- build. A non-all-in-one final gets its own ATBuildFinal action, built
+      -- from the FINAL task, whose configOpts carry the test/bench
+      -- dependencies (which the lib-only primary task may not have).
+      finalBuild
+        | task.allInOne = []
+        | otherwise =
+            [ Action
+                { actionId = ActionId ck ATBuildFinal
+                , actionDeps = onPrimaryBuild $
+                    missingToDeps task.configOpts.missing
+                    <> intraPackageDep
+                    <> Set.fromList
+                         (map (`ActionId` ATBuild)
+                              task.configOpts.instantiationDeps)
+                , action =
+                    -- isFinalBuild=True, isMergedBuild=False: buildAndCopyOpts
+                    -- emits only test/bench targets and skips copy/install.
+                    \ac -> runInBase $
+                      singleBuild ac ee task installedMap True False ck
+                , concurrency = ConcurrencyAllowed
+                }
+            ]
+      -- The test/bench run actions depend on whichever action built them: the
+      -- primary ATBuild for an all-in-one final (when one exists), otherwise
+      -- the ATBuildFinal above.
+      buildDep
+        | task.allInOne =
+            maybe Set.empty (const (Set.singleton (ActionId ck ATBuild))) mbuild
+        | otherwise = Set.singleton (ActionId ck ATBuildFinal)
       -- These are the "final" actions - running test suites and benchmarks,
       -- unless --no-run-tests or --no-run-benchmarks is enabled.
       finalRun =

@@ -156,6 +156,7 @@ upgradeFoundIndefinites loadPkg econfig combinedMap bco adrs = do
               , instantiationDeps = []
               }
           , buildHaddocks = False
+          , allInOne = True
           , present = presentMap
           , taskType = case ps of
               PSFilePath lp -> TTLocalMutable lp
@@ -208,6 +209,7 @@ upgradeFoundIndefinites loadPkg econfig combinedMap bco adrs = do
                       , instantiationDeps = []
                       }
                   , buildHaddocks = False
+                  , allInOne = True
                   , present = presentMap
                   , taskType = TTRemotePackage Immutable package pkgLoc
                   , cachePkgSrc = CacheSrcUpstream
