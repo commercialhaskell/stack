@@ -3,8 +3,8 @@
 --
 -- See: https://github.com/commercialhaskell/stack/issues/2997
 
-import Data.List ( isInfixOf )
-import StackTest
+import           Data.List ( isInfixOf )
+import           StackTest
 
 main :: IO ()
 main = do

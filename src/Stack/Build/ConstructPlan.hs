@@ -56,7 +56,7 @@ import           Stack.Types.Build.ConstructPlan
                    ( AddDepRes (..), CombinedMap, Ctx (..), LibraryMap, M
                    , MissingPresentDeps (..), PackageInfo (..), PackageLoader
                    , ToolWarning(..), UnregisterState (..), W (..)
-                   , adrHasLibrary, adrVersion, toTask
+                   , adrHasLibrary, adrVersion, isAdrToInstall, toTask
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -1152,7 +1152,7 @@ checkDirtiness ::
      PackageSource
   -> Installed
   -> Package
-  -> Map PackageIdentifier GhcPkgId
+  -> Map MungedPackageId GhcPkgId
   -> Bool
      -- ^ Is Haddock documentation being built?
   -> M Bool

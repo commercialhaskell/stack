@@ -9,6 +9,9 @@ Available commands:
   build-files              Generate (when applicable) a Cabal file from a
                            package description in the Hpack format and/or a lock
                            file for Stack's project-level configuration.
+  compiler-tools-bin       Create (when applicable) the compiler tools
+                           directory for the specified compiler version (implies
+                           'config build-files').
   env                      Print environment variables for use in a shell.
   set                      Set a key in a configuration file to value.
 ~~~
@@ -32,6 +35,19 @@ stack config build-files
 
 without taking any other build steps.
 
+## The `stack config compiler-tools` command
+
+:octicons-tag-24: UNRELEASED
+
+~~~text
+stack config compiler-tools
+~~~
+
+`stack config compiler-tools` creates (when applicable) the
+[compiler tools directory](../topics/stack_root.md#compiler-tools-directory-optional)
+for the specified compiler version. Implies Stack's
+[`config build-files` command](#the-stack-config-build-files-command).
+
 ## The `stack config env` command
 
 ~~~text
@@ -40,7 +56,8 @@ stack config env [--[no-]locals] [--[no-]ghc-package-path] [--[no-]stack-exe]
 ~~~
 
 `stack config env` outputs a script that sets or unsets environment variables
-for a Stack environment. Flags modify the script that is output:
+for a [Stack environment](../topics/stack_environment.md). Flags modify the
+script that is output:
 
 * `--[no-]locals` (enabled by default) include/exclude project package
   information
@@ -50,7 +67,7 @@ for a Stack environment. Flags modify the script that is output:
   or not
 * `--[no-]locale-utf8` (disabled by default) set the `GHC_CHARENC`
   environment variable to `UTF-8` or not
-* `--[no-]keep-ghc-rts` (disabled by default) keep/discard any `GHCRTS`
+* `--[no-]keep-ghc-rts` (enabled by default) keep/discard any `GHCRTS`
   environment variable
 
 The command also accepts flags and options of the

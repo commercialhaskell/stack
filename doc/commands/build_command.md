@@ -258,10 +258,11 @@ non-project specific configuration option
 Pass the flag to enable or disable the ignoring of lower and upper version
 bounds in Cabal files.
 
-!!! info
+!!! warning
 
-    The name `allow-newer` was chosen to match a commonly-used Cabal option
-    which ignored only upper version bounds.
+    This command line flag is misnamed. It causes Stack to ignore all the
+    bounds in the relevant Cabal file(s), not only upper bounds. The name was
+    chosen to match the `--allow-newer` option introduced in `Cabal-1.20.0.0`.
 
 ### `--bench` flag
 
@@ -1072,8 +1073,10 @@ to Stack's local binary directory (see `stack path --local-bin`). The
 Default: Disabled
 
 Set the flag to enable copying of built executable files (binaries) of targets
-to Stack's compiler tools binary directory (see
-`stack path --compiler-tools-bin`).
+to Stack's
+[compiler tools directory](../topics/stack_root.md#compiler-tools-directory-optional)
+for the specified compiler version (see Stack's
+[`path --compiler-tools-bin` command](path_command.md)).
 
 ### `--coverage` flag
 

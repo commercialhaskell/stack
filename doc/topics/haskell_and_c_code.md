@@ -83,12 +83,13 @@ executables:
 
 The project's `stack.yaml` file only needs to identify a snapshot:
 ~~~yaml
-snapshot: lts-24.37 # GHC 9.10.3
+snapshot: lts-24.43 # GHC 9.10.3
 ~~~
 
 This example project can be built with Stack in the normal way (`stack build`),
-and the built executable can then be executed in the Stack environment in the
-normal way (`stack exec c-example-exe`).
+and the built executable can then be executed in the
+[Stack environment](stack_environment.md) in the normal way
+(`stack exec c-example-exe`).
 
 ## Haskell packages with C `main` function
 
@@ -220,10 +221,11 @@ The `include-dirs` key will cause the specified directory (again,
 
 The project's `stack.yaml` file only needs to identify a snapshot:
 ~~~yaml
-snapshot: lts-24.37 # GHC 9.10.3
+snapshot: lts-24.43 # GHC 9.10.3
 ~~~
 
 This example project can be built with Stack in the normal way (`stack build`),
-and the built executables can then be executed in the Stack environment in the
-normal way (`stack exec haskell-exe` for the 'Haskell' executable and
-`stack exec c-exe` for the 'C' executable).
+and the built executables can then be executed in the
+[Stack environment](stack_environment.md) in the normal way
+(`stack exec haskell-exe` for the 'Haskell' executable and `stack exec c-exe`
+for the 'C' executable).

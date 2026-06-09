@@ -1,7 +1,7 @@
 -- | Stack can load a package into GHC's repl.
 
-import Control.Monad ( when )
-import StackTest.Repl
+import           Control.Monad ( when )
+import           StackTest.Repl
 
 main :: IO ()
 main = stackRepl [] $ do

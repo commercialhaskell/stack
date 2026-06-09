@@ -57,6 +57,7 @@ import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), PackageSource (..)
                    , installedMapGhcPkgId, packageIdentifier
+                   , toCabalMungedPackageId
                    )
 import           Stack.Types.Plan
                    ( ComponentKey (..), Task (..), TaskConfigOpts (..)
@@ -359,9 +360,12 @@ addInstantiationTasks installedModules origAdrs expandedAdrs =
                         -- that mkInstantiateWithOpts can generate
                         -- --instantiate-with flags.
                         implPresent = Map.fromList
-                          [ (pid, gid)
+                          [ ( toCabalMungedPackageId pid Nothing
+                            , gid
+                            )
                           | (_, implPkgName', _) <- entries
-                          , Just (ADRFound _ (Library pid (InstalledLibraryInfo gid _ _))) <-
+                          , Just (ADRFound _ (Library pid
+                              (InstalledLibraryInfo (Just gid) _))) <-
                               [Map.lookup implPkgName' adrMap']
                           ]
                         instTask = sigTask

@@ -14,17 +14,17 @@ main = do
 
   -- Install in current dir
   stack [ "--local-bin-path", ".", "install" ]
-  doesExist myPackageExe
+  doesExist myExe
 
   -- Install in relative path
   createDirectory "bin"
   stack [ "--local-bin-path", "./bin", "install" ]
-  doesExist ("./bin/" <> myPackageExe)
+  doesExist ("./bin/" <> myExe)
 
   -- Install in absolute path
   tmpDirectory <- fmap (</> "bin-absolute") getCurrentDirectory
   createDirectory tmpDirectory
   stack [ "--local-bin-path", tmpDirectory, "install" ]
-  doesExist (tmpDirectory </> myPackageExe)
+  doesExist (tmpDirectory </> myExe)
  where
-  myPackageExe = "myPackage" <> exeExt
+  myExe = "myExe" <> exeExt

@@ -48,12 +48,15 @@ Command line equivalent (takes precedence):
 [`stack build --[no-]allow-newer`](../../commands/build_command.md#-no-allow-newer-flag)
 flag
 
-Whether to ignore lower and upper version bounds in Cabal files.
+!!! warning
 
-!!! info
+    This configuration option is misnamed. It causes Stack to ignore all the
+    bounds in the relevant Cabal file(s), not only upper bounds. The name was
+    chosen to match the `--allow-newer` option introduced in `Cabal-1.20.0.0`.
 
-    The name `allow-newer` was chosen to match a commonly-used Cabal option
-    which ignored only upper bounds.
+Whether to ignore all version bounds (upper and lower) in Cabal files. See the
+[`allow-newer-deps`](#allow-newer-deps) configuration option to specify the
+scope of application when `allow-newer` is `true`.
 
 ~~~yaml
 allow-newer: true
@@ -63,15 +66,20 @@ allow-newer: true
 
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
-Default: `none`
+Default: all packages (if `allow-newer` is `true`)
 
-Determines a subset of packages to which `allow-newer` should apply. This option
-has no effect (but warns) if `allow-newer` is `false`.
+See the [`allow-newer`](#allow-newer) configuration option.
+
+When `allow-newer` is `false`, this option has no effect (but warns).
+
+When `allow-newer` is `true`, this option specifies the scope of application
+for `allow-newer`. That is, the set of packages for which all version bounds
+(upper and lower) should be ignored in the packages' Cabal files.
 
 ~~~yaml
 allow-newer-deps:
-  - foo
-  - bar
+- myPackageA
+- myPackageB
 ~~~
 
 ## apply-ghc-options
@@ -309,7 +317,7 @@ can be used to override the compiler (and, implicitly, its boot packages) for a
 Stackage snapshot, like this:
 
 ~~~yaml
-snapshot: lts-24.37
+snapshot: lts-24.43
 compiler: ghc-9.10.2
 compiler-check: match-exact
 ~~~
@@ -946,7 +954,9 @@ modify-code-page: false
 
 Restrictions: Windows systems only.
 
-Default: `MINGW64` (64-bit Windows) or `MINGW32` (32-bit Windows)
+Default:
+([:octicons-tag-24: 3.11.1](https://github.com/commercialhaskell/stack/releases/tag/v3.11.1))
+`CLANG64` (64-bit Windows)
 
 The name of the MSYS2 environment (case-sensitive) used in the Stack
 environment. Valid environments are `CLANG32`, `CLANG64`, `CLANGARM64`,

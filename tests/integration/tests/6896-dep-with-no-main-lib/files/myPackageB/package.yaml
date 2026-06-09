@@ -1,0 +1,13 @@
+# This package has no unnamed main library.
+
+spec-version: 0.36.0
+
+name: myPackageB
+
+dependencies:
+- base
+
+internal-libraries:
+  myPackageB-sub:
+    visibility: public
+    source-dirs: sub

@@ -1,64 +1,50 @@
-import StackTest
-import System.Directory
-import Control.Monad (unless)
+-- Stack can install targets that are executables as compiler tools.
+
+-- See: https://github.com/commercialhaskell/stack/issues/2643
+
+import           Control.Monad ( unless )
+import           StackTest
+import           System.Directory ()
 
 main :: IO ()
 main = do
-  -- init
-  removeFileIgnore "stack.yaml"
-  removeDirIgnore ".stack-work"
-  stack ["init", defaultSnapshotArg]
-
-  -- place to throw some exes
-  removeDirIgnore "binny"
-  createDirectory "binny"
-
-  -- check assumptions on exec and the build flags and clean
-  stack ["build", "--flag", "copy-compiler-tool-test:build-baz"]
-  stack ["exec", "--", "baz-exe" ++ exeExt]
-  stackErr ["exec", "--", "bar-exe" ++ exeExt]
-  stackCleanFull
-  -- See #4936. The Windows condition is because `stackCleanFull` may have
-  -- failed.
-  unless isWindows $ stackErr ["exec", "--", "baz-exe" ++ exeExt]
-
-  -- install one exe normally
+  -- Install myExeA executable normally:
   stack ["install",
-         "--local-bin-path", "./binny",
-         "--flag", "*:build-foo"
+         "--local-bin-path", "./bin",
+         "--flag", "myPackage:build-myExeA"
         ]
 
-  -- and install two compiler-tools, opposite ways
-  -- (build or install)
+  -- Install myExeB and myExeC executables as compiler tools, in alternative
+  -- ways (build or install):
   stack ["build",
-         "--local-bin-path", "./binny",
+         "--local-bin-path", "./bin",
          "--copy-compiler-tool",
-         "--flag", "*:build-bar"
+         "--flag", "myPackage:build-myExeB"
         ]
   stack ["install",
-         "--local-bin-path", "./binny",
+         "--local-bin-path", "./bin",
          "--copy-compiler-tool",
-         "--flag", "*:build-baz"
+         "--flag", "myPackage:build-myExeC"
         ]
 
-  -- nuke the built things that go in .stack-work/, so we can test if
-  -- the installed ones exist for sure
+  -- Remove .stack-work/, so we can test if the installed ones exist:
   stackCleanFull
 
-  -- bar and baz were installed as compiler tools, should work fine
-  stack ["exec", "--", "bar-exe" ++ exeExt]
-  stack ["exec", "--", "baz-exe" ++ exeExt]
+  -- myExeB and myExeC were installed as compiler tools and should work:
+  stack ["exec", "--", "myExeB" <> exeExt]
+  stack ["exec", "--", "myExeC" <> exeExt]
 
-  -- foo was installed as a normal exe (in .binny/, which can't be on PATH),
-  -- so shouldn't
-  -- See #4936. The Windows condition is because `stackCleanFull` may have
-  -- failed.
-  unless isWindows $ stackErr ["exec", "--", "foo-exe" ++ exeExt]
+  -- myExeA was installed in .bin/, which is not on the PATH, and should not
+  -- work.
 
-  -- check existences make sense
-  doesExist $ "./binny/foo-exe" ++ exeExt
-  doesNotExist $ "./binny/bar-exe" ++ exeExt
-  doesNotExist $ "./binny/baz-exe" ++ exeExt
+  -- The Windows condition is because `stackCleanFull` may have failed (see
+  -- issue #4936):
+  unless isWindows $ stackErr ["exec", "--", "myExeA" <> exeExt]
 
-  -- just check that this exists
+  -- Check existences make sense:
+  doesExist $ "./bin/myExeA" <> exeExt
+  doesNotExist $ "./bin/myExeB" <> exeExt
+  doesNotExist $ "./bin/myExeC" <> exeExt
+
+  -- Check that this exists
   stack ["path", "--compiler-tools-bin"]

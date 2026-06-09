@@ -1,6 +1,6 @@
 name: snapshot-modify-lts
 
-snapshot: lts-24.37
+snapshot: lts-24.43
 
 packages:
 - acme-missiles-0.3

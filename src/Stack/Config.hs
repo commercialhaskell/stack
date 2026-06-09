@@ -33,6 +33,7 @@ module Stack.Config
   , defaultConfigYaml
   , getProjectConfig
   , withBuildConfig
+  , withConfigExtra
   , withNewLogFunc
   , determineStackRootAndOwnership
   ) where
@@ -126,6 +127,7 @@ import           Stack.Types.Config.Exception
                    ( ConfigException (..), ConfigPrettyException (..)
                    , ParseAbsolutePathException (..)
                    )
+import           Stack.Types.ConfigExtra ( ConfigExtra (..) )
 import           Stack.Types.ConfigMonoid
                    ( ConfigMonoid (..), parseConfigMonoid )
 import           Stack.Types.Casa ( CasaOptsMonoid (..) )
@@ -304,10 +306,6 @@ configFromConfigMonoid
         installMsys = fromFirst installGHC configMonoid.installMsys
         skipGHCCheck = fromFirstFalse configMonoid.skipGHCCheck
         skipMsys = fromFirstFalse configMonoid.skipMsys
-        defMsysEnvironment = case platform of
-          Platform I386 Windows -> Just MINGW32
-          Platform X86_64 Windows -> Just MINGW64
-          _ -> Nothing
         extraIncludeDirs = configMonoid.extraIncludeDirs
         extraLibDirs = configMonoid.extraLibDirs
         customPreprocessorExts = configMonoid.customPreprocessorExts
@@ -322,15 +320,19 @@ configFromConfigMonoid
         requireStackVersion = simplifyVersionRange
           configMonoid.requireStackVersion.intersectingVersionRange
         compilerCheck = fromFirst MatchMinor configMonoid.compilerCheck
-    msysEnvironment <- case defMsysEnvironment of
-      -- Ignore the configuration setting if there is no default for the
-      -- platform.
+        mMsysEnv = case platform of
+          Platform X86_64 Windows ->
+            -- Default CLANG64 on 64-bit Windows:
+            Just $ fromFirst CLANG64 configMonoid.msysEnvironment
+          Platform _ Windows ->
+            -- No default on unsupported 32-bit Windows:
+            getFirst configMonoid.msysEnvironment
+          _ -> Nothing
+    msysEnvironment <- case mMsysEnv of
       Nothing -> pure Nothing
-      Just defMsysEnv -> do
-        let msysEnv = fromFirst defMsysEnv configMonoid.msysEnvironment
-        if msysEnvArch msysEnv == arch
-          then pure $ Just msysEnv
-          else prettyThrowM $ BadMsysEnvironment msysEnv arch
+      Just msysEnv
+        | msysEnvArch msysEnv == arch -> pure $ Just msysEnv
+        | otherwise -> prettyThrowM $ BadMsysEnvironment msysEnv arch
     platformVariant <- liftIO $
       maybe PlatformVariantNone PlatformVariant <$> lookupEnv platformVariantEnvVar
     let build = buildOptsFromMonoid configMonoid.buildOpts
@@ -786,32 +788,77 @@ loadConfig inner = do
 -- by @loadConfig@. values.
 withBuildConfig :: RIO BuildConfig a -> RIO Config a
 withBuildConfig inner = do
-  config <- ask
+  withConfigExtra True $ \configExtra -> do
+    -- The mcompiler is provided on the command line.
+    mcompiler <- view $ globalOptsL . to (.compiler)
+    let config = configExtra.config
+        project' = configExtra.project
+        configFile = configExtra.configFile
+        project :: Project
+        project = project'
+          { Project.compiler = mcompiler <|> project'.compiler
+          , Project.snapshot = fromMaybe project'.snapshot configExtra.mSnapshot
+          }
+        -- We are indifferent as to whether the configuration file is a
+        -- user-specific global or a project-level one.
+        eitherConfigFile = EE.fromEither configFile
+    extraPackageDBs <- mapM resolveDir' project.extraPackageDBs
 
+    smWanted <- lockCachedWanted eitherConfigFile project.snapshot $
+      fillProjectWanted eitherConfigFile config project
+
+    -- Unfortunately redoes getWorkDir, since we don't have a BuildConfig yet
+    workDir <- view workDirL
+    let projectStorageFile =
+          parent eitherConfigFile </> workDir </> relFileStorage
+
+    initProjectStorage projectStorageFile $ \projectStorage -> do
+      let bc = BuildConfig
+            { config
+            , smWanted
+            , extraPackageDBs
+            , configFile
+            , curator = project.curator
+            , projectStorage
+            }
+      runRIO bc inner
+
+-- | Adds certain build-specific values to the configuration loaded by
+-- @loadConfig@ values.
+withConfigExtra ::
+     forall a env. (HasConfig env, HasTerm env)
+  => Bool
+     -- ^ Report user message in the project-level configuration file, if
+     -- a user message is present?
+  -> (ConfigExtra -> RIO env a)
+  -> RIO env a
+withConfigExtra reportUserMessage inner = do
+  config <- view configL
   -- If provided, turn the AbstractSnapshot from the command line into a
-  -- snapshot that can be used below.
+  -- snapshot that can be used.
 
-  -- The snapshot and mcompiler are provided on the command line. In order
-  -- to properly deal with an AbstractSnapshot, we need a base directory (to
-  -- deal with custom snapshot relative paths). We consider the current working
-  -- directory to be the correct base. Let's calculate the mSnapshot first.
+  -- The snapshot is provided on the command line. In order to properly deal
+  -- with an AbstractSnapshot, we need a base directory (to deal with custom
+  -- snapshot relative paths). We consider the current working directory to be
+  -- the correct base. We calculate the mSnapshot first.
   mSnapshot <- forM config.snapshot $ \aSnapshot -> do
     logDebug $
-          "Using snapshot: "
-       <> display aSnapshot
-       <> " specified on command line"
+         "Using snapshot: "
+      <> display aSnapshot
+      <> " specified on command line"
     makeConcreteSnapshot aSnapshot
 
-  (project', configFile) <- case config.project of
+  (project, configFile) <- case config.project of
     PCProject (project, fp) -> do
-      forM_ project.userMsg prettyUserMessage
+      when reportUserMessage $
+        forM_ project.userMsg prettyUserMessage
       pure (project, Right fp)
     PCNoProject extraDeps -> do
-      p <-
+      project <-
         case mSnapshot of
           Nothing -> throwIO NoSnapshotWhenUsingNoProject
           Just _ -> getEmptyProject mSnapshot extraDeps
-      pure (p, Left config.userGlobalConfigFile)
+      pure (project, Left config.userGlobalConfigFile)
     PCGlobalProject -> do
       logDebug "Run from outside a project, using implicit global project config"
       destDir <- getImplicitGlobalProjectDir
@@ -844,7 +891,7 @@ withBuildConfig inner = do
             , style Shell "snapshot"
             , flow "key there."
             ]
-          p <- getEmptyProject mSnapshot []
+          project <- getEmptyProject mSnapshot []
           liftIO $ do
             writeBinaryFileAtomic dest $ byteString $ S.concat
               [ "# This is the implicit global project's configuration file, which is only used\n"
@@ -855,45 +902,24 @@ withBuildConfig inner = do
               , "# For more information about Stack's configuration, see\n"
               , "# http://docs.haskellstack.org/en/stable/configure/yaml/\n"
               , "#\n"
-              , Yaml.encode p]
-            writeBinaryFileAtomic (parent dest </> relFileReadmeTxt) $
-              "This is the implicit global project, which is " <>
-              "used only when 'stack' is run\noutside of a " <>
-              "real project.\n"
-          pure (p, Right dest)
-  mcompiler <- view $ globalOptsL . to (.compiler)
-  let project :: Project
-      project = project'
-        { Project.compiler = mcompiler <|> project'.compiler
-        , Project.snapshot = fromMaybe project'.snapshot mSnapshot
-        }
-      -- We are indifferent as to whether the configuration file is a
-      -- user-specific global or a project-level one.
-      eitherConfigFile = EE.fromEither configFile
-  extraPackageDBs <- mapM resolveDir' project.extraPackageDBs
-
-  smWanted <- lockCachedWanted eitherConfigFile project.snapshot $
-    fillProjectWanted eitherConfigFile config project
-
-  -- Unfortunately redoes getWorkDir, since we don't have a BuildConfig yet
-  workDir <- view workDirL
-  let projectStorageFile = parent eitherConfigFile </> workDir </> relFileStorage
-
-  initProjectStorage projectStorageFile $ \projectStorage -> do
-    let bc = BuildConfig
-          { config
-          , smWanted
-          , extraPackageDBs
-          , configFile
-          , curator = project.curator
-          , projectStorage
-          }
-    runRIO bc inner
+              , Yaml.encode project
+              ]
+            writeBinaryFileAtomic (parent dest </> relFileReadmeTxt) $ mconcat
+              [ "This is the implicit global project, which is used only when 'stack' is run\n"
+              , "outside of a real project.\n"
+              ]
+          pure (project, Right dest)
+  inner $ ConfigExtra
+    { config
+    , mSnapshot
+    , project
+    , configFile
+    }
  where
   getEmptyProject ::
        Maybe RawSnapshotLocation
     -> [RawPackageLocationImmutable]
-    -> RIO Config Project
+    -> RIO env Project
   getEmptyProject mSnapshot extraDeps = do
     snapshot <- case mSnapshot of
       Just snapshot -> do
@@ -921,7 +947,7 @@ withBuildConfig inner = do
       , curator = Nothing
       , dropPackages = mempty
       }
-  prettyUserMessage :: String -> RIO Config ()
+  prettyUserMessage :: String -> RIO env ()
   prettyUserMessage userMsg = do
     let userMsgs = map flow $ splitAtLineEnds userMsg
         warningDoc = mconcat $ intersperse blankLine userMsgs

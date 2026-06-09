@@ -1,5 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 {-|
 Module      : Stack.Config.ConfigureScript
@@ -12,15 +13,17 @@ module Stack.Config.ConfigureScript
 
 import           Path ( (</>) )
 import           Path.IO ( doesFileExist )
+import           RIO.Process ( withWorkingDir )
 import           Stack.Constants ( osIsWindows, relFileConfigure )
 import           Stack.DefaultColorWhen ( defaultColorWhen )
 import           Stack.Prelude
-import           RIO.Process ( HasProcessContext, withWorkingDir )
+import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.MsysEnvironment ( MsysEnvironment (..) )
 
 -- | For the given directory, yields an action that trys to generate a
 -- @configure@ script with @autoreconf@, if one does not exist in the directory.
 ensureConfigureScript ::
-     (HasProcessContext env, HasTerm env)
+     HasConfig env
   => Path b Dir
   -> RIO env ()
 ensureConfigureScript dir = do
@@ -55,6 +58,7 @@ ensureConfigureScript dir = do
         <> blankLine
         <> string (displayException ex)
       when osIsWindows $ do
+        config <- view configL
         prettyInfo $
              fillSep
                [ flow "Check that executable"
@@ -79,22 +83,7 @@ ensureConfigureScript dir = do
           <> line
           <> indent 4 (style Shell $ flow "stack exec where.exe -- aclocal")
           <> blankLine
-          <> fillSep
-               [ "If"
-               , style File "perl" <> ","
-               , style File "autoreconf"
-               , "or"
-               , style File "aclocal"
-               , flow "is not on the path in the required location, add them \
-                      \with command (note that the relevant package name is"
-               , style File "autotools"
-               , "not"
-               , style File "autoreconf" <> "):"
-               ]
-          <> blankLine
-          <> indent 4
-               (style Shell $ flow "stack exec pacman -- --sync --refresh mingw-w64-x86_64-autotools")
-          <> blankLine
+          <> maybe mempty advice config.msysEnvironment
           <> fillSep
                [ flow "Some versions of"
                , style File "perl"
@@ -107,6 +96,33 @@ ensureConfigureScript dir = do
                , flow "in the required location is working, try command:"
                ]
           <> blankLine
-          <> indent 4 (style Shell $ flow "stack exec perl -- --version")
+          <> indent 4 (style Shell "stack exec perl -- --version")
           <> blankLine
     fixupOnWindows
+ where
+  advice :: MsysEnvironment -> StyleDoc
+  advice CLANG32 = mempty
+  advice MINGW32 = mempty
+  advice CLANG64 = adviceWith "mingw-w64-clang-x86_64-autotools"
+  advice CLANGARM64 = adviceWith "mingw-w64-clang-aarch64-autotools"
+  advice MINGW64 = adviceWith "mingw-w64-x86_64-autotools"
+  advice UCRT64 = adviceWith "mingw-w64-ucrt-x86_64-autotools"
+
+  adviceWith :: StyleDoc -> StyleDoc
+  adviceWith msysPackage =
+       fillSep
+         [ "If"
+         , style File "perl" <> ","
+         , style File "autoreconf"
+         , "or"
+         , style File "aclocal"
+         , flow "is not on the path in the required location, add them \
+                \with command (note that the relevant package name is"
+         , style File "autotools"
+         , "not"
+         , style File "autoreconf" <> "):"
+         ]
+    <> blankLine
+    <> indent 4
+         (style Shell $ "stack exec pacman -- --sync --refresh " <> msysPackage)
+    <> blankLine

@@ -5,7 +5,7 @@ cabal-version: 2.2
 -- see: https://github.com/sol/hpack
 
 name:           stack
-version:        3.10.0
+version:        3.12.0
 synopsis:       A program for developing Haskell projects
 description:    Stack (the Haskell Tool Stack) is a program for developing Haskell projects.
                 It is aimed at new and experienced users of Haskell and seeks to support them
@@ -126,6 +126,7 @@ extra-source-files:
     doc/topics/shell_autocompletion.md
     doc/topics/snapshot_location.md
     doc/topics/Stack_and_VS_Code.md
+    doc/topics/stack_environment.md
     doc/topics/stack_root.md
     doc/topics/stack_work.md
     doc/topics/stack_yaml_vs_cabal_package_file.md
@@ -342,6 +343,7 @@ library
       Stack.Types.Component
       Stack.Types.ComponentUtils
       Stack.Types.Config
+      Stack.Types.ConfigExtra
       Stack.Types.Config.Exception
       Stack.Types.ConfigMonoid
       Stack.Types.ConfigSetOpts

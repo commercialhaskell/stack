@@ -85,8 +85,8 @@ data Task = Task
     -- are missing and a function which yields configure options, given a
     -- dictionary of those identifiers and their 'GhcPkgId'.
   , buildHaddocks   :: !Bool
-  , present         :: !(Map PackageIdentifier GhcPkgId)
-    -- ^ A dictionary of the package identifiers of already-installed
+  , present         :: !(Map MungedPackageId GhcPkgId)
+    -- ^ A dictionary of the munged package identifiers of already-installed
     -- dependencies, and their 'GhcPkgId'.
   , cachePkgSrc     :: !CachePkgSrc
   , buildTypeConfig :: !Bool

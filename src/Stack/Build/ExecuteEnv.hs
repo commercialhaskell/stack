@@ -79,7 +79,7 @@ import           Stack.Prelude
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.Build
                    ( ConvertPathsToAbsolute (..), ExcludeTHLoading (..)
-                   , KeepOutputOpen (..)
+                   , KeepOutputOpen (..), RunCabalWithArgs
                    )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
@@ -97,7 +97,8 @@ import           Stack.Types.CompilerPaths
 import           Stack.Types.Config
                    ( Config (..), HasConfig (..), stackRootL )
 import           Stack.Types.ConfigureOpts ( BaseConfigOpts (..) )
-import           Stack.Types.Dependency ( DepValue(..) )
+import           Stack.Types.Dependency
+                   ( DepLibrary (..), DepType (..), DepValue (..) )
 import           Stack.Types.DumpLogs ( DumpLogs (..) )
 import           Stack.Types.DumpPackage ( DumpPackage (..) )
 import           Stack.Types.EnvConfig
@@ -108,7 +109,9 @@ import           Stack.Types.EnvSettings ( EnvSettings (..) )
 import           Stack.Types.GhcPkgId ( GhcPkgId, ghcPkgIdString )
 import           Stack.Types.Installed ( InstallLocation (..), Installed (..) )
 import           Stack.Types.Package
-                   ( LocalPackage (..), Package (..), packageIdentifier )
+                   ( LocalPackage (..), Package (..), packageIdentifier
+                   , toCabalMungedPackageName
+                   )
 import           Stack.Types.Plan
                    ( TaskType (..), componentKeyPkgName
                    , taskTypeLocation, taskTypePackageIdentifier
@@ -597,9 +600,12 @@ withSingleContext ::
   => ActionContext
   -> ExecuteEnv
   -> TaskType
-  -> Map PackageIdentifier GhcPkgId
-     -- ^ All dependencies' package ids to provide to Setup.hs.
+  -> Map MungedPackageId GhcPkgId
+     -- ^ Ids of Installed packages that are assumed to be available to build a
+     -- package's custom @Setup.hs@, given its dependencies specified in its
+     -- @custom-setup@ stanza of its Cabal file.
   -> Maybe String
+     -- ^ An optional suffix for the build log's file name.
   -> Maybe Text
      -- ^ Optional CInst dist-dir suffix for Backpack instantiation tasks.
      -- When 'Just', the @--builddir@ passed to Setup.hs is extended with
@@ -611,12 +617,13 @@ withSingleContext ::
         -- Note that the `Path Abs Dir` argument is redundant with the
         -- `Path Abs File` argument, but we provide both to avoid recalculating
         -- `parent` of the `File`.
-     -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
-        -- Function to run Cabal with args
+     -> RunCabalWithArgs env
+        -- Function to run Cabal (the library) with arguments.
      -> (Utf8Builder -> RIO env ())
         -- An plain 'announce' function, for different build phases
      -> OutputType
-     -> RIO env a)
+     -> RIO env a
+     )
   -> RIO env a
 withSingleContext
     ac
@@ -715,7 +722,8 @@ withSingleContext
        Package
     -> Path Abs Dir
     -> OutputType
-    -> (  (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
+    -> (  RunCabalWithArgs env
+          -- Function to run Cabal (the library) with arguments.
        -> RIO env a
        )
     -> RIO env a
@@ -807,25 +815,57 @@ withSingleContext
                       pure cabalPackageArg
                 matchedDeps <-
                   forM (Map.toList customSetupDeps) $ \(name, depValue) -> do
-                    let matches (PackageIdentifier name' version) =
-                             name == name'
+                    let mungedPkgNames = depToMungedPkgNames name depValue
+                        countMungedPkgNames = Set.size mungedPkgNames
+                        matches (MungedPackageId mungedPkgName version) _ =
+                             mungedPkgName `Set.member` mungedPkgNames
                           && version `withinRange` depValue.versionRange
-                    case filter (matches . fst) (Map.toList allDeps) of
-                      x:xs -> do
-                        unless (null xs) $
-                          prettyWarnL
-                            [ flow "Found multiple installed packages for \
-                                   \custom-setup dep:"
-                            , style Current (fromPackageName name) <> "."
-                            ]
-                        pure ("-package-id=" ++ ghcPkgIdString (snd x), Just (fst x))
-                      [] -> do
+                    case Map.filterWithKey matches allDeps of
+                      matchedDeps | Map.null matchedDeps -> do
                         prettyWarnL
                           [ flow "Could not find custom-setup dep:"
                           , style Current (fromPackageName name) <> "."
                           ]
-                        pure ("-package=" ++ packageNameString name, Nothing)
-                let depsArgs = map fst matchedDeps
+                        pure (["-package=" <> packageNameString name], Nothing)
+                      matchedDeps -> do
+                        let groupMatchedByVersion =
+                              Map.foldlWithKey'
+                                ( \acc k v ->
+                                    let p = mungedVersion k
+                                        innerMap = Map.singleton k v
+                                    in  Map.insertWith Map.union p innerMap acc
+                                )
+                                Map.empty
+                                matchedDeps
+                            countMatchedDeps = Map.size matchedDeps
+                        if Map.size groupMatchedByVersion == 1
+                          then do
+                            when (countMatchedDeps < countMungedPkgNames) $
+                              prettyWarnL
+                                [ flow "Found insufficent installed packages \
+                                       \for custom-setup dep:"
+                                , style Current (fromPackageName name) <> "."
+                                ]
+                          else do
+                            prettyWarnL
+                              [ flow "Found installed packages with multiple \
+                                     \versions for custom-setup dep:"
+                              , style Current (fromPackageName name) <> "."
+                              ]
+                        let packageIdOpt ghcPkgId =
+                              "-package-id=" <> ghcPkgIdString ghcPkgId
+                            -- The previous algorithm (arbitrarily?) selected
+                            -- the first relevant item yielded by Map.toList
+                            -- (which is Map.toAscList), so we select the
+                            -- minimum:
+                            selectedGroup = Map.findMin groupMatchedByVersion
+                            selectedVersion = fst selectedGroup
+                            packageIdOpts =
+                              map packageIdOpt $ Map.elems $ snd selectedGroup
+                            selectedPkgId =
+                              PackageIdentifier name selectedVersion
+                        pure (packageIdOpts, Just selectedPkgId)
+                let depsArgs = L.concatMap fst matchedDeps
                 -- Generate setup_macros.h and provide it to ghc
                 let macroDeps = mapMaybe snd matchedDeps
                     cppMacrosFile = setupDir </> relFileSetupMacrosH
@@ -886,6 +926,25 @@ withSingleContext
 
           setupArgs =
             ("--builddir=" ++ toFilePathNoTrailingSep buildDir) : args
+
+          depToMungedPkgNames ::
+               PackageName
+               -- ^ The name of the Cabal package.
+            -> DepValue
+               -- ^ The dependency value for that package.
+            -> Set.Set MungedPackageName
+          depToMungedPkgNames pkgName depValue
+            | AsLibrary depLibrary <- depValue.depType =
+                let addMain = if depLibrary.main
+                      then Set.insert mungedMainPkgName
+                      else id
+                    mungedMainPkgName = toCabalMungedPackageName pkgName Nothing
+                    subLibSet =
+                      Set.map
+                        (toCabalMungedPackageName pkgName . Just)
+                        depLibrary.subLib
+                in  addMain subLibSet
+            | otherwise = Set.empty
 
           runExe :: Path Abs File -> [String] -> RIO env ()
           runExe exeName fullArgs = do

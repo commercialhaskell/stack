@@ -1,8 +1,9 @@
-import StackTest
+-- Stack's runghc command allows packages to be identified for use with scripts.
+--
+-- See: https://github.com/commercialhaskell/stack/issues/444
+
+import           StackTest
 
 main :: IO ()
-main = do
-  isAlpine <- getIsAlpine
-  if isAlpine || isARM
-    then logInfo "Disabled on Alpine Linux and ARM since it cannot yet install its own GHC."
-    else stack [defaultSnapshotArg, "--install-ghc", "runghc", "--package", "safe", "Test.hs"]
+main = stack
+  ["--snapshot", "mySnapshot.yaml", "runghc", "--package", "acme-missiles", "Script.hs"]

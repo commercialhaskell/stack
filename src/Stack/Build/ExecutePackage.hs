@@ -98,6 +98,7 @@ import           Stack.Package
                    )
 import           Stack.PackageDump ( conduitDumpPackage, ghcPkgDescribe )
 import           Stack.Prelude
+import           Stack.Types.Build ( RunCabalWithArgs )
 import           Stack.Types.Build.Exception
                    ( BuildException (..), BuildPrettyException (..) )
 import           Stack.Types.BuildConfig
@@ -142,7 +143,7 @@ import           Stack.Types.GhcPkgId
 import           Stack.Types.GlobalOpts ( GlobalOpts (..) )
 import           Stack.Types.Installed
                    ( InstallLocation (..), Installed (..), InstalledMap
-                   , InstalledLibraryInfo (..)
+                   , InstalledLibraryInfo (..), simpleInstalledLib
                    )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent
@@ -151,8 +152,7 @@ import           Stack.Types.NamedComponent
                    )
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), installedPackageToGhcPkgId
-                   , runMemoizedWith, simpleInstalledLib
-                   , toCabalMungedPackageName
+                   , runMemoizedWith, toCabalMungedPackageName
                    )
 import           Stack.Types.PackageFile ( PackageWarning (..) )
 import           Stack.Types.Plan
@@ -177,7 +177,7 @@ getConfigCache ::
   -> InstalledMap
   -> Bool
   -> Bool
-  -> RIO env (Map PackageIdentifier GhcPkgId, ConfigCache)
+  -> RIO env (Map MungedPackageId GhcPkgId, ConfigCache)
 getConfigCache ee task installedMap enableTest enableBench = do
   let extra =
         -- We enable tests if the test suite dependencies are already
@@ -212,16 +212,16 @@ getConfigCache ee task installedMap enableTest enableBench = do
       -- collision for the return here. But unifying things with configureOpts
       -- where it was the opposite resulted in this. It doesn't seem to make any
       -- difference anyway.
-      allDepsMap = Map.union missing' task.present
+      allDeps = Map.union missing' task.present
       configureOpts' = configureOptsFromBase
         cOpts.envConfig
         cOpts.baseConfigOpts
-        allDepsMap
+        allDeps
         cOpts.isLocalNonExtraDep
         cOpts.isMutable
         pcOpts
       instWithOpts =
-        mkInstantiateWithOpts task.backpackInstEntries allDepsMap
+        mkInstantiateWithOpts task.backpackInstEntries allDeps
       configureOpts = configureOpts'
         { nonPathRelated =
             configureOpts'.nonPathRelated
@@ -241,17 +241,22 @@ getConfigCache ee task installedMap enableTest enableBench = do
         , pkgSrc = task.cachePkgSrc
         , pathEnvVar = ee.pathEnvVar
         }
-  pure (allDepsMap, cache)
+  pure (allDeps, cache)
 
--- | Look up the 'GhcPkgId' for a package by its 'PackageName' in a dependency
--- map keyed by 'PackageIdentifier'. Used to resolve implementing packages for
--- Backpack @--instantiate-with@ flags.
+-- | Look up the 'GhcPkgId' of a package's main library by its 'PackageName' in
+-- a dependency map keyed by 'MungedPackageId'. Used to resolve implementing
+-- packages for Backpack @--instantiate-with@ flags. Only matches the main
+-- library; sublibrary entries (LSubLibName) are ignored.
 findGhcPkgId ::
-     Map PackageIdentifier GhcPkgId
+     Map MungedPackageId GhcPkgId
   -> PackageName
   -> Maybe GhcPkgId
 findGhcPkgId depsMap pn =
-  case [gid | (PackageIdentifier n _, gid) <- Map.toList depsMap, n == pn] of
+  case [ gid
+       | (MungedPackageId (MungedPackageName n LMainLibName) _, gid)
+           <- Map.toList depsMap
+       , n == pn
+       ] of
     (gid:_) -> Just gid
     [] -> Nothing
 
@@ -263,8 +268,8 @@ findGhcPkgId depsMap pn =
 mkInstantiateWithOpts ::
      [(ModuleName, PackageName, ModuleName)]
      -- ^ Backpack instantiation entries: (sigName, implPkgName, implModuleName)
-  -> Map PackageIdentifier GhcPkgId
-     -- ^ All dependency GhcPkgIds
+  -> Map MungedPackageId GhcPkgId
+     -- ^ All dependency GhcPkgIds, keyed by munged identifier
   -> [String]
 mkInstantiateWithOpts entries depsMap =
   [ "--instantiate-with="
@@ -465,7 +470,7 @@ singleBuild
     isMergedBuild
     ck
   = do
-    (allDepsMap, cache) <-
+    (allDeps, cache) <-
       getConfigCache ee task installedMap enableTests enableBenchmarks
     let bcoSnapInstallRoot = ee.baseConfigOpts.snapInstallRoot
         isCInstTask = case ck of
@@ -487,7 +492,7 @@ singleBuild
             (isFinalBuild, buildingFinals, isMergedBuild)
             cache
             curator
-            allDepsMap
+            allDeps
             ck
     -- For CInst (Backpack instantiation) tasks, do NOT update the ghcPkgIds
     -- TVar. The consumer's --dependency flag must reference the indefinite
@@ -519,7 +524,10 @@ realConfigAndBuild ::
      -- ^ (isFinalBuild, buildingFinals, isMergedBuild)
   -> ConfigCache
   -> Maybe Curator
-  -> Map PackageIdentifier GhcPkgId
+  -> Map MungedPackageId GhcPkgId
+     -- ^ Ids of installed packages that are assumed to be available to build a
+     -- package's custom @Setup.hs@, given its dependencies specified in its
+     -- @custom-setup@ stanza of its Cabal file.
   -> ComponentKey
   -> RIO env (Maybe Installed)
 realConfigAndBuild
@@ -596,9 +604,10 @@ realConfigAndBuild
   realBuild ::
        Package
     -> Path Abs Dir
-    -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
+    -> RunCabalWithArgs env
+       -- ^ Function to run Cabal (the library) with arguments.
     -> (Utf8Builder -> RIO env ())
-       -- ^ A plain 'announce' function
+       -- ^ A plain 'announce' function.
     -> RIO env Installed
   realBuild package pkgDir cabal0 announce = do
     let cabal = cabal0 CloseOnException
@@ -806,27 +815,28 @@ fetchAndMarkInstalledPackage ::
   -> PackageIdentifier
   -> RIO env Installed
 fetchAndMarkInstalledPackage ee taskInstallLocation package pkgId = do
-  let ghcPkgIdLoader = fetchGhcPkgIdForLib ee taskInstallLocation package.name
-  -- Only pure the sub-libraries to cache them if we also cache the main
-  -- library (that is, if it exists)
-  if hasBuildableMainLibrary package
+  let hasMainLibrary = hasBuildableMainLibrary package
+      subLibs = package.subLibraries
+  if not hasMainLibrary && null subLibs
     then do
-      let foldSubLibToMap subLib mapInMonad = do
-            maybeGhcpkgId <- ghcPkgIdLoader (Just subLib.name)
-            mapInMonad <&> case maybeGhcpkgId of
-              Just v -> Map.insert subLib.name v
-              _ -> id
-      subLibsPkgIds <- foldComponentToAnotherCollection
-        package.subLibraries
-        foldSubLibToMap
-        mempty
-      ghcPkgIdLoader Nothing >>= \case
-        Nothing -> throwM $ Couldn'tFindPkgId package.name
-        Just ghcPkgId -> pure $ simpleInstalledLib pkgId ghcPkgId subLibsPkgIds
-    else do
-      markExeInstalled taskInstallLocation pkgId -- TODO unify somehow
-                                                  -- with writeFlagCache?
+      markExeInstalled taskInstallLocation pkgId
+      -- TODO: Unify the above somehow with writeFlagCache?
       pure $ Executable pkgId
+    else do
+      ghcPkgId <- if hasMainLibrary
+        then ghcPkgIdLoader Nothing
+        else pure Nothing
+      subLibsPkgIds <-
+        foldComponentToAnotherCollection subLibs foldSubLibToMap mempty
+      pure $ simpleInstalledLib pkgId ghcPkgId subLibsPkgIds
+ where
+  ghcPkgIdLoader = fetchGhcPkgIdForLib ee taskInstallLocation package.name
+
+  foldSubLibToMap subLib mapInMonad = do
+    maybeGhcpkgId <- ghcPkgIdLoader (Just subLib.name)
+    mapInMonad <&> case maybeGhcpkgId of
+      Just v -> Map.insert subLib.name v
+      _ -> id
 
 fetchGhcPkgIdForLib ::
      (HasTerm env, HasEnvConfig env)
@@ -835,7 +845,7 @@ fetchGhcPkgIdForLib ::
   -> PackageName
   -> Maybe Component.StackUnqualCompName
   -> RIO env (Maybe GhcPkgId)
-fetchGhcPkgIdForLib ee installLocation pkgName libName = do
+fetchGhcPkgIdForLib ee installLocation pkgName mLibName = do
   let baseConfigOpts = ee.baseConfigOpts
       (installedPkgDb, installedDumpPkgsTVar) =
         case installLocation of
@@ -846,11 +856,9 @@ fetchGhcPkgIdForLib ee installLocation pkgName libName = do
             ( baseConfigOpts.localDB
             , ee.localDumpPkgs )
   let commonLoader = loadInstalledPkg [installedPkgDb] installedDumpPkgsTVar
-  case libName of
-    Nothing -> commonLoader pkgName
-    Just v -> do
-      let mungedName = encodeCompatPackageName $ toCabalMungedPackageName pkgName v
-      commonLoader mungedName
+      mungedPkgName = toCabalMungedPackageName pkgName mLibName
+      encodedPkgName = encodeCompatPackageName mungedPkgName
+  commonLoader encodedPkgName
 
 -- | Copy ddump-* files, if we are building finals and a non-empty ddump-dir
 -- has been specified.
@@ -1025,7 +1033,7 @@ copyPreCompiled isCInst ee task pkgId (PrecompiledCache mlib subLibs exes) = do
       pure $ Just $
         case mpkgid of
           Nothing -> assert False $ Executable pkgId
-          Just pkgid -> simpleInstalledLib pkgId pkgid mempty
+          _ -> simpleInstalledLib pkgId mpkgid mempty
  where
   bindir = ee.baseConfigOpts.snapInstallRoot </> bindirSuffix
 
@@ -1115,11 +1123,11 @@ singleTest ::
 singleTest topts testsToRun ac ee task installedMap = do
   -- FIXME: Since this doesn't use cabal, we should be able to avoid using a
   -- full blown 'withSingleContext'.
-  (allDepsMap, _cache) <- getConfigCache ee task installedMap True False
+  (allDeps, _cache) <- getConfigCache ee task installedMap True False
   mcurator <- view $ buildConfigL . to (.curator)
   let pname = pkgName $ taskProvides task
       expectFailure = expectTestFailure pname mcurator
-  withSingleContext ac ee task.taskType allDepsMap (Just "test") Nothing $
+  withSingleContext ac ee task.taskType allDeps (Just "test") Nothing $
     \package _cabalfp pkgDir _cabal announce outputType -> do
       config <- view configL
       let needHpc = topts.coverage
@@ -1183,8 +1191,8 @@ singleTest topts testsToRun ac ee task installedMap = do
               idMap <- liftIO $ readTVarIO ee.ghcPkgIds
               pure $ Map.lookup (taskProvides task) idMap
           let pkgGhcIdList = case installed of
-                               Just (Library _ libInfo) -> [libInfo.ghcPkgId]
-                               _ -> []
+                Just (Library _ libInfo) -> maybeToList libInfo.mMainGhcPkgId
+                _ -> []
           -- doctest relies on template-haskell in QuickCheck-based tests
           thGhcId <-
             case L.find ((== "template-haskell") . pkgName . (.packageIdent) . snd)
@@ -1224,7 +1232,7 @@ singleTest topts testsToRun ac ee task installedMap = do
                          <> display (ghcPkgIdToText ghcId)
                          <> "\n"
                      )
-                     (pkgGhcIdList ++ thGhcId:Map.elems allDepsMap)
+                     (pkgGhcIdList ++ thGhcId : Map.elems allDeps)
           writeFileUtf8Builder fp ghcEnv
           menv <- liftIO $
             setEnv fp =<< config.processContextSettings EnvSettings
@@ -1423,8 +1431,8 @@ singleBench ::
   -> InstalledMap
   -> RIO env ()
 singleBench beopts benchesToRun ac ee task installedMap = do
-  (allDepsMap, _cache) <- getConfigCache ee task installedMap False True
-  withSingleContext ac ee task.taskType allDepsMap (Just "bench") Nothing $
+  (allDeps, _cache) <- getConfigCache ee task installedMap False True
+  withSingleContext ac ee task.taskType allDeps (Just "bench") Nothing $
     \_package _cabalfp _pkgDir cabal announce _outputType -> do
       let args = map unqualCompToString benchesToRun <> maybe []
                        ((:[]) . ("--benchmark-options=" <>))

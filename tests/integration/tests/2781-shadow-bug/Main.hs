@@ -2,8 +2,8 @@
 --
 -- See: https://github.com/commercialhaskell/stack/issues/2781
 
-import StackTest
-import System.Directory ( createDirectoryIfMissing )
+import           StackTest
+import           System.Directory ( createDirectoryIfMissing )
 
 main :: IO ()
 main = do

@@ -1,0 +1,8 @@
+snapshot: ghc-9.10.3
+
+packages:
+- myPackageA
+- myPackageB
+
+extra-deps:
+- acme-missiles-0.3

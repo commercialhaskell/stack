@@ -59,7 +59,8 @@ import           Stack.Types.GhcPkgId ( GhcPkgId, parseGhcPkgId )
 import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent
                    ( NamedComponent (..), exeComponents )
-import           Stack.Types.Package ( Package (..), packageIdentifier )
+import           Stack.Types.Package
+                   ( Package (..), packageIdentifier, toCabalMungedPackageId )
 import           Stack.Types.PackageFile ( StackPackageFile (..) )
 import           Stack.Types.Plan
                    ( ComponentKey (..), Task (..), TaskConfigOpts (..)
@@ -2222,7 +2223,9 @@ spec = do
                          , pn == sigPn
                          ]
       case instPresent of
-        [pm] -> Map.lookup implPid pm `shouldBe` Just implGid
+        [pm] ->
+          Map.lookup (toCabalMungedPackageId implPid Nothing) pm
+            `shouldBe` Just implGid
         _    -> expectationFailure "Expected exactly one CInst task"
 
     it "ADRFound impl not in installedModules produces warning" $ do
@@ -2480,17 +2483,20 @@ spec = do
       instHaddocks `shouldBe` [False]
 
   describe "findGhcPkgId" $ do
+    let mainLib name version =
+          toCabalMungedPackageId
+            (PackageIdentifier (mkPackageName name) (mkVersion version))
+            Nothing
     it "finds matching GhcPkgId by package name" $ do
       let implGid = unsafeParseGhcPkgId "impl-pkg-0.1.0.0-abc123"
           depsMap = Map.fromList
-            [ (PackageIdentifier (mkPackageName "impl-pkg") (mkVersion [0,1,0,0])
-              , implGid)
+            [ (mainLib "impl-pkg" [0,1,0,0], implGid)
             ]
       findGhcPkgId depsMap (mkPackageName "impl-pkg") `shouldBe` Just implGid
 
     it "returns Nothing for missing package" $ do
       let depsMap = Map.fromList
-            [ (PackageIdentifier (mkPackageName "other") (mkVersion [1,0])
+            [ (mainLib "other" [1,0]
               , unsafeParseGhcPkgId "other-1.0-xyz")
             ]
       findGhcPkgId depsMap (mkPackageName "impl-pkg") `shouldBe` Nothing
@@ -2499,8 +2505,8 @@ spec = do
       let gid1 = unsafeParseGhcPkgId "pkg-1.0-aaa"
           gid2 = unsafeParseGhcPkgId "pkg-2.0-bbb"
           depsMap = Map.fromList
-            [ (PackageIdentifier (mkPackageName "pkg") (mkVersion [1,0]), gid1)
-            , (PackageIdentifier (mkPackageName "pkg") (mkVersion [2,0]), gid2)
+            [ (mainLib "pkg" [1,0], gid1)
+            , (mainLib "pkg" [2,0], gid2)
             ]
       -- Map.toList iterates in key order; (pkg-1.0) < (pkg-2.0)
       findGhcPkgId depsMap (mkPackageName "pkg") `shouldBe` Just gid1
@@ -2509,11 +2515,14 @@ spec = do
       findGhcPkgId Map.empty (mkPackageName "anything") `shouldBe` Nothing
 
   describe "mkInstantiateWithOpts" $ do
+    let mainLib name version =
+          toCabalMungedPackageId
+            (PackageIdentifier (mkPackageName name) (mkVersion version))
+            Nothing
     it "produces correct --instantiate-with flag" $ do
       let implGid = unsafeParseGhcPkgId "impl-pkg-0.1.0.0-abc123"
           depsMap = Map.fromList
-            [ (PackageIdentifier (mkPackageName "impl-pkg") (mkVersion [0,1,0,0])
-              , implGid)
+            [ (mainLib "impl-pkg" [0,1,0,0], implGid)
             ]
           entries = [(mn "Str", mkPackageName "impl-pkg", mn "Str")]
           result = mkInstantiateWithOpts entries depsMap
@@ -2526,7 +2535,7 @@ spec = do
     it "skips entry when implementing package not in deps map" $ do
       let entries = [(mn "Str", mkPackageName "missing-pkg", mn "Str")]
           depsMap = Map.fromList
-            [ (PackageIdentifier (mkPackageName "other") (mkVersion [1,0])
+            [ (mainLib "other" [1,0]
               , unsafeParseGhcPkgId "other-1.0-xyz")
             ]
       mkInstantiateWithOpts entries depsMap `shouldBe` []
@@ -2535,8 +2544,8 @@ spec = do
       let gid1 = unsafeParseGhcPkgId "impl-a-1.0-aaa"
           gid2 = unsafeParseGhcPkgId "impl-b-1.0-bbb"
           depsMap = Map.fromList
-            [ (PackageIdentifier (mkPackageName "impl-a") (mkVersion [1,0]), gid1)
-            , (PackageIdentifier (mkPackageName "impl-b") (mkVersion [1,0]), gid2)
+            [ (mainLib "impl-a" [1,0], gid1)
+            , (mainLib "impl-b" [1,0], gid2)
             ]
           entries =
             [ (mn "SigA", mkPackageName "impl-a", mn "ModA")
@@ -2552,8 +2561,7 @@ spec = do
     it "handles renamed module (sigName /= implModuleName)" $ do
       let implGid = unsafeParseGhcPkgId "impl-pkg-1.0-abc"
           depsMap = Map.fromList
-            [ (PackageIdentifier (mkPackageName "impl-pkg") (mkVersion [1,0])
-              , implGid)
+            [ (mainLib "impl-pkg" [1,0], implGid)
             ]
           entries = [(mn "Signature", mkPackageName "impl-pkg", mn "ConcreteImpl")]
           result = mkInstantiateWithOpts entries depsMap
@@ -2563,8 +2571,7 @@ spec = do
     it "handles hierarchical module names" $ do
       let implGid = unsafeParseGhcPkgId "impl-pkg-1.0-abc"
           depsMap = Map.fromList
-            [ (PackageIdentifier (mkPackageName "impl-pkg") (mkVersion [1,0])
-              , implGid)
+            [ (mainLib "impl-pkg" [1,0], implGid)
             ]
           entries =
             [(mn "Data.Map.Sig", mkPackageName "impl-pkg", mn "Data.Map.Strict")]
@@ -2578,8 +2585,8 @@ spec = do
       fromPersistValue (toPersistValue v) `shouldBe` Right v
 
     it "round-trips ConfigCacheTypeFlagLibrary" $ do
-      let gid = unsafeParseGhcPkgId "foo-1.0-abc123"
-          v = ConfigCacheTypeFlagLibrary gid
+      let pid = PackageIdentifier (mkPackageName "foo") (mkVersion [1,0])
+          v = ConfigCacheTypeFlagLibrary pid
       fromPersistValue (toPersistValue v) `shouldBe` Right v
 
     it "round-trips ConfigCacheTypeFlagExecutable" $ do

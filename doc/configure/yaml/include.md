@@ -28,10 +28,10 @@ A value for a key can be provided by an included file. For example, given a file
 `snapshot.yaml` in the project directory with the content:
 
 ~~~yaml
-lts-24.37
+lts-24.43
 ~~~
 
-the following project-level configuration file would use `lts-24.37` as the
+the following project-level configuration file would use `lts-24.43` as the
 snapshot:
 
 ~~~yaml
@@ -42,7 +42,7 @@ The included file replaces the `!include` directive with its content, so this is
 equivalent to:
 
 ~~~yaml
-snapshot: lts-24.37
+snapshot: lts-24.43
 ~~~
 
 ## Including a sequence
@@ -59,7 +59,7 @@ directory with the content:
 the following project-level configuration file would use those as extra-deps:
 
 ~~~yaml
-snapshot: lts-24.37
+snapshot: lts-24.43
 extra-deps: !include extra-deps.yaml
 ~~~
 
@@ -83,14 +83,14 @@ flags:
 the following project-level configuration file would merge those options:
 
 ~~~yaml
-snapshot: lts-24.37
+snapshot: lts-24.43
 <<: !include shared-config.yaml
 ~~~
 
 This is equivalent to:
 
 ~~~yaml
-snapshot: lts-24.37
+snapshot: lts-24.43
 ghc-options:
   "$everything": -Wall
 flags:
@@ -101,7 +101,7 @@ flags:
 The `!include` directive can also be placed on the line after the merge key:
 
 ~~~yaml
-snapshot: lts-24.37
+snapshot: lts-24.43
 <<:
   !include shared-config.yaml
 ~~~

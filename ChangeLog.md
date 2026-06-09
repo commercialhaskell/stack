@@ -4,7 +4,7 @@
 
 Release notes:
 
-**Changes since v3.9.3:**
+**Changes since v3.11.1:**
 
 Major changes:
 
@@ -16,8 +16,25 @@ Major changes:
   transitive signature chains, sub-library signatures, and indefinite packages
   from Hackage or snapshots. See the
   [Backpack topic](https://docs.haskellstack.org/en/stable/topics/backpack/) for
-  details. (Private Backpack — where signatures and implementations live in the
-  same package — has always worked without changes.)
+  details. (Private Backpack, where signatures and implementations live in the
+  same package, has always worked without changes.)
+* On 64-bit Windows, the default `msys-environment` configuration option is now
+  `CLANG64`, rather than `MINGW64` (which remains an option). The MSYS2 project
+  deprecated the latter environment on 15 March 2026. The GHC project has used
+  the former toolchain from GHC 9.4.1. No default is provided for 32-bit
+  Windows, rather than `MINGW32` (which remains an option). The MSYS2 project
+  ceased to actively support it on 17 May 2020. 32-bit Windows is not supported
+  by the GHC project from GHC 8.12.
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+##  v3.11.1 - 2026-05-30
+
+**Changes since v3.9.3:**
 
 Behavior changes:
 
@@ -26,6 +43,11 @@ Behavior changes:
 * Following a change to the Stackage project's server API, the default value of
   the `urls` key includes
   `recent-snapshots: https://stackage.org/api/v1/snapshots`.
+* The `--[no-]keep-ghc-rts` flag of Stack's `config env` command is now enabled
+  by default, consistent with Stack's `exec` command.
+* On Windows, in the Stack environment, the MSYS2 `usr/local/bin` directory (if
+  it exists) is now searched before the MSYS2 `usr/bin` directory, rather than
+  after.
 
 Other enhancements:
 
@@ -54,6 +76,9 @@ Other enhancements:
   excludes the key being set and includes an `!include` directive.
 * Stack's `config set snapshot` command now works with other snapshot values
   in addition to snapshot synonymns.
+* Add Stack's `config compiler-tools` command to create (when applicable) the
+  compiler tools directory for the specified compiler version (implies Stack's
+  `config build-files` command).
 
 Bug fixes:
 
@@ -66,6 +91,14 @@ Bug fixes:
   depends on project package B and package B's executables (only) depend on
   package A and the name of A is before that of B, alphabetically. That bug is
   fixed.
+* Stack's `config set` commands will recreate the `global-project` directory
+  contents, if Stack needs to consult its project-level configuration file and
+  there is no file.
+* The output of Stack's `path --bin-path` command is now consistent with the
+  Stack environment in Stack's `exec` command and includes the `bin` directory
+  of Stack's local install root directory.
+* Stack now builds packages that depend directly on packages with the same name
+  as a sublibrary or foreign library of the package.
 
 ## v3.9.3 - 2026-02-19
 
@@ -195,7 +228,7 @@ Other enhancements:
   documentation.
 * `stack sdist` and `stack upload` report the version of Cabal (the library)
   being used to check packages.
-* Add the `stack config build-files` command to generate (when applicable) a
+* Add Stack's `config build-files` command to generate (when applicable) a
   Cabal file from a package description in the Hpack format and/or a lock file
   for Stack's project-level configuration, without taking any other build steps.
 

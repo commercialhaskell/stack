@@ -2,7 +2,7 @@
 --
 -- See: https://github.com/commercialhaskell/stack/issues/1884
 
-import StackTest
+import           StackTest
 
 main :: IO ()
 main = stack ["build", "--dry-run"]

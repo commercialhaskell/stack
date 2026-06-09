@@ -160,8 +160,10 @@ toolExtraDirs tool = do
       pure mempty
         { bins =
             [ dir </> relDirMsysEnvPrefix </> relDirBin
-            , dir </> relDirUsr </> relDirBin
+              -- Stack follows the Unix-like convention that usr/local/bin
+              -- should have search priority over usr/bin.
             , dir </> relDirUsr </> relDirLocal </> relDirBin
+            , dir </> relDirUsr </> relDirBin
             ]
         , includes =
             [ dir </> relDirMsysEnvPrefix </> relDirInclude
