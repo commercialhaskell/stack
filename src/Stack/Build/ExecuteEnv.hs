@@ -724,7 +724,7 @@ withSingleContext
           , keepGhcRts = False
           }
     menv <- liftIO $ config.processContextSettings envSettings
-    distRelativeDir' <- distRelativeDir
+    distDir' <- distDirFromDir pkgDir
     setupexehs <-
       -- Avoid broken Setup.hs files causing problems for simple build
       -- types, see:
@@ -873,7 +873,7 @@ withSingleContext
                   <> cabalPackageArg
 
           setupArgs =
-            ("--builddir=" ++ toFilePathNoTrailingSep distRelativeDir') : args
+            ("--builddir=" ++ toFilePathNoTrailingSep distDir') : args
 
           runExe :: Path Abs File -> [String] -> RIO env ()
           runExe exeName fullArgs = do

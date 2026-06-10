@@ -91,6 +91,8 @@ Bug fixes:
   of Stack's local install root directory.
 * Stack now builds packages that depend directly on packages with the same name
   as a sublibrary or foreign library of the package.
+* On Windows, Stack's `build` command now accepts a build directory that is a
+  long path.
 
 ## v3.9.3 - 2026-02-19
 
