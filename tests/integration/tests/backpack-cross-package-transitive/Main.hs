@@ -1,12 +1,15 @@
-import Control.Monad (unless)
-import Data.List (isInfixOf)
+import Control.Monad ( unless )
+import Data.List ( isInfixOf )
 import StackTest
 
 -- Test transitive Backpack chains: logger-sig (indefinite, sig: Logger) depends
 -- on str-sig (indefinite, sig: Str). When consumer mixes in logger-sig, both
 -- Logger and Str holes must be filled transitively.
 main :: IO ()
-main = do
+-- On Windows, this test fails because Cabal-3.12.1.0's copy command cannot cope
+-- with long paths. It appears it will be fixed in Cabal >= 3.18. We disable the
+-- test on Windows for now.
+main = unless isWindows $ do
   -- Build all four packages. This exercises:
   -- 1. str-sig CLib (indefinite, typecheck-only)
   -- 2. impl-pkg CLib (concrete Str + Logger)

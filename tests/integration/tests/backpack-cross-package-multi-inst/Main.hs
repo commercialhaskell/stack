@@ -1,11 +1,14 @@
-import Control.Monad (unless)
-import Data.List (isInfixOf)
+import Control.Monad ( unless )
+import Data.List ( isInfixOf )
 import StackTest
 
 -- Test multiple instantiations: two consumers fill the same sig-pkg with
 -- different implementations. Each consumer should get its own CInst task.
 main :: IO ()
-main = do
+-- On Windows, this test fails because Cabal-3.12.1.0's copy command cannot cope
+-- with long paths. It appears it will be fixed in Cabal >= 3.18. We disable the
+-- test on Windows for now.
+main = unless isWindows $ do
   stack ["build"]
 
   stackCheckStdout ["exec", "multi-inst-demo"] $ \out -> do
