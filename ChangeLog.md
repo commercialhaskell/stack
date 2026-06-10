@@ -32,8 +32,15 @@ Other enhancements:
 
 Bug fixes:
 
-* `stack test --no-rerun-tests` correctly skips test suites that have previously been built and run successfully, including for non-Backpack packages built by the per-component planner.
-* Stack's per-component build planner correctly handles the cross-package test/library cycle shape from issue #6905: project package A's library depending on project package B's library, with B's test suite depending on A, builds in the right order with the right configure flags.
+* `stack test --no-rerun-tests` correctly skips test suites that have 
+  previously been built and run successfully, including for non-Backpack 
+  packages built by the per-component planner.
+* Stack's per-component build planner correctly handles the cross-package 
+  test/library cycle shape from issue #6905: project package A's library 
+  depending on project package B's library, with B's test suite depending on A, 
+  builds in the right order with the right configure flags.
+* On Windows, Stack's `build` command now accepts a build directory that is a
+  long path.
 
 ##  v3.11.1 - 2026-05-30
 

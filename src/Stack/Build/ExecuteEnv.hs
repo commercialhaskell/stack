@@ -739,12 +739,12 @@ withSingleContext
           , keepGhcRts = False
           }
     menv <- liftIO $ config.processContextSettings envSettings
-    distRelativeDir' <- distRelativeDir
+    distDir' <- distDirFromDir pkgDir
     buildDir <- case mInstSuffix of
-      Nothing -> pure distRelativeDir'
+      Nothing -> pure distDir'
       Just suffix -> do
         instSubDir <- parseRelDir ("inst-" ++ T.unpack suffix)
-        pure (distRelativeDir' </> instSubDir)
+        pure (distDir' </> instSubDir)
     setupexehs <-
       -- Avoid broken Setup.hs files causing problems for simple build
       -- types, see:
