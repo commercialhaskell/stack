@@ -22,6 +22,9 @@ Other enhancements:
 
 Bug fixes:
 
+* On Windows, Stack's `build` command now accepts a build directory that is a
+  long path.
+
 ##  v3.11.1 - 2026-05-30
 
 **Changes since v3.9.3:**
