@@ -78,7 +78,8 @@ jobs:
         key: ${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
     - name: Install NSIS 3.12 on Windows
       if: startsWith(runner.os, 'Windows')
-      uses: repolevedavaj/install-nsis@v1.2.0
+      uses: xavier2k6/install-nsis@nsis_envvarplugin_fix
+      # repolevedavaj/install-nsis@v1.2.0
       with:
         nsis-version: '3.12'
     # Upgrades to a 'large strings' build of NSIS 3.10 tool. See
