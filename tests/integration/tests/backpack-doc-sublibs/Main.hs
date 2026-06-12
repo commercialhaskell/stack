@@ -13,10 +13,7 @@ import StackTest
 --   3. that the doc's str-sig stanza correctly includes build-depends: base
 --      (without it, GHC can't load Prelude to compile the .hsig)
 main :: IO ()
--- On Windows, this test fails because Cabal-3.12.1.0's copy command cannot cope
--- with long paths. It appears it will be fixed in Cabal >= 3.18. We disable the
--- test on Windows for now.
-main = unless isWindows $ do
+main = do
   stack ["build"]
 
   -- Confirm the build output mentions the signature and main library compiled.
