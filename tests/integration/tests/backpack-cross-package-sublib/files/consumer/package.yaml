@@ -1,0 +1,27 @@
+# A package that depends on provider's sub-library "utils" directly, NOT on
+# provider's main library. This tests cross-package sub-library dependency
+# resolution.
+
+spec-version: 0.36.0
+
+# Hpack 0.39.5 defaults to an unintended cabal-version.
+# See: https://github.com/sol/hpack/issues/649
+verbatim:
+  cabal-version: 3.4
+
+name: consumer
+
+dependencies:
+- base
+
+library:
+  source-dirs: src/main
+  dependencies:
+  - provider:utils
+
+executables:
+  consumer-demo:
+    source-dirs: src/exe
+    main: Main.hs
+    dependencies:
+    - consumer

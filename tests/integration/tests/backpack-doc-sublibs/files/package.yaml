@@ -1,0 +1,24 @@
+spec-version: 0.36.0
+
+name: myPackage
+
+dependencies:
+- base
+
+library:
+  source-dirs: src/main
+  dependencies:
+  - name: str-sig
+    mixin:
+    - requires (Str as Str)
+  - str-text
+
+internal-libraries:
+  str-sig:
+    source-dirs: src/sig
+    signatures:
+    - Str
+  str-text:
+    source-dirs: src/text
+    dependencies:
+    - text
