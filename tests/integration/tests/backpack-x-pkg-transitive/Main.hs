@@ -1,14 +1,13 @@
+-- Test transitive cross-package Backpack chains: logger-sig (indefinite,
+-- sig: Logger) depends on str-sig (indefinite, sig: Str). When consumer mixes
+-- in logger-sig, both Logger and Str holes must be filled transitively.
+
 import Control.Monad ( unless )
 import Data.List ( isInfixOf )
 import StackTest
 
--- Test transitive Backpack chains: logger-sig (indefinite, sig: Logger) depends
--- on str-sig (indefinite, sig: Str). When consumer mixes in logger-sig, both
--- Logger and Str holes must be filled transitively.
 main :: IO ()
--- On Windows, this test fails because Cabal-3.12.1.0's build command cannot
--- cope with long paths. We disable the test on Windows for now.
-main = unless isWindows $ do
+main = do
   -- Build all four packages. This exercises:
   -- 1. str-sig CLib (indefinite, typecheck-only)
   -- 2. impl-pkg CLib (concrete Str + Logger)

@@ -1,9 +1,11 @@
+-- Test Stack's support for cross-package Backpack with multiple instantiations:
+-- two consumers fill the same sig-pkg with different implementations. Each
+-- consumer should get its own CInst task.
+
 import Control.Monad ( unless )
 import Data.List ( isInfixOf )
 import StackTest
 
--- Test multiple instantiations: two consumers fill the same sig-pkg with
--- different implementations. Each consumer should get its own CInst task.
 main :: IO ()
 main = do
   stack ["build"]

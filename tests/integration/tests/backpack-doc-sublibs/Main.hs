@@ -1,7 +1,3 @@
-import Control.Monad ( unless )
-import Data.List ( isInfixOf )
-import StackTest
-
 -- Regression test for the sub-libraries example in doc/topics/backpack.md.
 -- The package shape is verbatim from the doc:
 --   library str-sig    -- indefinite, signatures: Str
@@ -12,6 +8,11 @@ import StackTest
 --   2. signature instantiation within a single package
 --   3. that the doc's str-sig stanza correctly includes build-depends: base
 --      (without it, GHC can't load Prelude to compile the .hsig)
+
+import Control.Monad ( unless )
+import Data.List ( isInfixOf )
+import StackTest
+
 main :: IO ()
 main = do
   stack ["build"]

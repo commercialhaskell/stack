@@ -1,10 +1,11 @@
+-- Test cross-package Backpack with module renaming: sig-pkg has a "Sig"
+-- signature, impl-pkg exposes "Impl", and consumer-pkg uses
+-- mixins: sig-pkg requires (Sig as Impl) to wire them together.
+
 import Control.Monad ( unless )
 import Data.List ( isInfixOf )
 import StackTest
 
--- Test cross-package Backpack with module renaming: sig-pkg has a "Sig"
--- signature, impl-pkg exposes "Impl", and consumer-pkg uses
--- mixins: sig-pkg requires (Sig as Impl) to wire them together.
 main :: IO ()
 main = do
   stack ["build"]

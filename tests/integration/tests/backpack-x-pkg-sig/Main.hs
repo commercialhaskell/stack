@@ -1,9 +1,10 @@
+-- Test cross-package Backpack: sig-pkg (indefinite, has Str signature) is
+-- instantiated with impl-pkg's Str module via consumer-pkg's mixin declaration.
+
 import Control.Monad ( unless )
 import Data.List ( isInfixOf )
 import StackTest
 
--- Test cross-package Backpack: sig-pkg (indefinite, has Str signature) is
--- instantiated with impl-pkg's Str module via consumer-pkg's mixin declaration.
 main :: IO ()
 main = do
   -- Build all three packages. This exercises:
