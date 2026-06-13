@@ -76,23 +76,17 @@ jobs:
           ~\AppData\Roaming\stack
           ~\AppData\Local\Programs\stack
         key: ${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('stack.yaml') }}-${{ matrix.cache-bust }}
-    - name: Install NSIS 3.12 on Windows
+    # Also upgrades to a 'large strings' build of NSIS 3.12 tool. See
+    # https://nsis.sourceforge.io/Special_Builds.
+    - name: Install and upgrade NSIS 3.12 on Windows
       if: startsWith(runner.os, 'Windows')
-      uses: xavier2k6/install-nsis@nsis_envvarplugin_fix
-      # repolevedavaj/install-nsis@v1.2.0
+      uses: repolevedavaj/install-nsis@v1.2.1
       with:
         nsis-version: '3.12'
-    # Upgrades to a 'large strings' build of NSIS 3.10 tool. See
-    # https://nsis.sourceforge.io/Special_Builds.
-    - name: Upgrade NSIS 3.12 on Windows
+    - name: Check NSIS 3.12 on Windows
       if: startsWith(runner.os, 'Windows')
       shell: bash
       run: |
-        # wget is not available but the Stack-supplied MSYS2 will provide it
-        stack exec -- wget -O nsis-3.12-strlen_8192.zip https://downloads.sourceforge.net/nsis/NSIS%203/3.12/nsis-3.12-strlen_8192.zip
-        7z x -aoa -o"/c/Program Files (x86)/NSIS" nsis-3.12-strlen_8192.zip
-        # Clean up
-        rm nsis-3.12-strlen_8192.zip
         makensis -VERSION && echo
         # Should include defined symbol NSIS_MAX_STRLEN=8192
         makensis -HDRINFO
