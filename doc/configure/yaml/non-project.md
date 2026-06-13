@@ -165,7 +165,7 @@ Default:
 
 ~~~yaml
 build:
-  # Experimental. Since Stack UNRELEASED. Supported by GHC 9.8.1 or later with
+  # Experimental. Since Stack 3.11.1. Supported by GHC 9.8.1 or later with
   # Cabal 3.12.0.0 (a boot package of GHC 9.10.1) or later. Ignored with a
   # warning when unsupported.
   semaphore: false
@@ -1603,7 +1603,8 @@ Customize the URLs where Stack looks for information about available snapshots,
 either
 ([:octicons-tag-24: 1.1.0](https://github.com/commercialhaskell/stack/releases/tag/v1.1.0))
 the latest LTS and Nightly snapshots (`latest-snapshots`) or
-(:octicons-tag-24: UNRELEASED) recently-published snapshots (`recent-snapshots`).
+([:octicons-tag-24: 3.11.1](https://github.com/commercialhaskell/stack/releases/tag/v3.11.1))
+recently-published snapshots (`recent-snapshots`).
 
 !!! note
 

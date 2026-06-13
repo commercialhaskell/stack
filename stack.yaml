@@ -17,7 +17,7 @@ extra-deps:
 # lts-24.43 specifies crypton-x509-validation-1.6.14
 - crypton-x509-validation-1.8.0@sha256:63acb2df06f28c3ffdddaf6d9402105b9026796036aa10d7347ae4f7db51c36b,2018
 # lts-24.43 specifies hpack-0.38.3
-- hpack-0.39.5@sha256:c214f49ed3df75ce75201709927fa27e08f642023ed4b4ca8cc43604e5199ced,5263
+- hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
 # lts-24.43 specifies pantry-0.10.1
 - pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
 # lts-24.43 specifies persistent-2.17.1.0

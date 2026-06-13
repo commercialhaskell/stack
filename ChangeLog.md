@@ -8,6 +8,18 @@ Release notes:
 
 Major changes:
 
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+##  v3.11.1 - 2026-06-13
+
+**Changes since v3.9.3:**
+
+Major changes:
+
 * On 64-bit Windows, the default `msys-environment` configuration option is now
   `CLANG64`, rather than `MINGW64` (which remains an option). The MSYS2 project
   deprecated the latter environment on 15 March 2026. The GHC project has used
@@ -15,19 +27,6 @@ Major changes:
   Windows, rather than `MINGW32` (which remains an option). The MSYS2 project
   ceased to actively support it on 17 May 2020. 32-bit Windows is not supported
   by the GHC project from GHC 8.12.
-
-Behavior changes:
-
-Other enhancements:
-
-Bug fixes:
-
-* On Windows, Stack's `build` command now accepts a build directory that is a
-  long path.
-
-##  v3.11.1 - 2026-05-30
-
-**Changes since v3.9.3:**
 
 Behavior changes:
 
@@ -44,7 +43,7 @@ Behavior changes:
 
 Other enhancements:
 
-* Bump to Hpack 0.39.5.
+* Bump to Hpack 0.39.6.
 * Experimental: Add flag `--[no-]semaphore` (default: disabled) to Stack's
   `build` command, to allow GHC to use a system semaphore to perform compilation
   in parallel when possible. Supported, by default, by GHC 9.10.1 or later. The
@@ -92,6 +91,8 @@ Bug fixes:
   of Stack's local install root directory.
 * Stack now builds packages that depend directly on packages with the same name
   as a sublibrary or foreign library of the package.
+* On Windows, Stack's `build` command now accepts a build directory that is a
+  long path.
 
 ## v3.9.3 - 2026-02-19
 
