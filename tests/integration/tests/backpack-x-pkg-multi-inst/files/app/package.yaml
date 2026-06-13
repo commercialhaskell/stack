@@ -1,0 +1,14 @@
+spec-version: 0.36.0
+
+name: app
+
+dependencies:
+- base
+
+executables:
+  multi-inst-demo:
+    source-dirs: app
+    main: Main.hs
+    dependencies:
+    - consumer-a
+    - consumer-b

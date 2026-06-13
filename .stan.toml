@@ -140,25 +140,36 @@
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-erw24B-1138:3"
+  id = "OBS-STAN-0203-EmXRiW-573:17"
+# ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
+# ✦ Category:      #AntiPattern
+# ✦ File:          src/Stack/Build/Backpack.hs
+#
+#   572 ┃
+#   573 ┃         input = S8.pack (L.intercalate "," sorted)
+#   574 ┃                 ^^^^^^^
+
+# Anti-pattern: Data.ByteString.Char8.pack
+[[ignore]]
+  id = "OBS-STAN-0203-erw24B-1150:3"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecuteEnv.hs
 #
-#  1137 ┃
-#  1138 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
-#  1139 ┃   ^^^^^^^
+#  1149 ┃
+#  1150 ┃   S8.pack . formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%6Q"
+#  1151 ┃   ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
-  id = "OBS-STAN-0203-tuE+RG-252:24"
+  id = "OBS-STAN-0203-tuE+RG-327:24"
 # ✦ Description:   Usage of 'pack' function that doesn't handle Unicode characters
 # ✦ Category:      #AntiPattern
 # ✦ File:          src\Stack\Build\ExecutePackage.hs
 #
-#   251 ┃
-#   252 ┃   newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
-#   253 ┃                        ^^^^^^^
+#   326 ┃
+#   327 ┃   newConfigFileRoot <- S8.pack . toFilePath <$> view configFileRootL
+#   328 ┃                        ^^^^^^^
 
 # Anti-pattern: Data.ByteString.Char8.pack
 [[ignore]]
@@ -192,6 +203,17 @@
 #  350 ┃
 #  351 ┃   hashRepoName = Hash.hash . BS.pack . takeWhile (\c -> c /= ':' && c /= '@')
 #  352 ┃                              ^^^^^^^
+
+# Anti-pattern: Slow 'nub' for lists
+[[ignore]]
+  id = "OBS-STAN-0209-EmXRiW-328:19"
+# ✦ Description:   Usage of 'nub' on lists that runs in quadratic time
+# ✦ Category:      #AntiPattern
+# ✦ File:          src/Stack/Build/Backpack.hs
+#
+#   327 ┃
+#   328 ┃                   L.nub $ collectInheritedSigs sigPkg adrMap' Set.empty
+#   329 ┃                   ^^^^^
 
 # Data types with non-strict fields
 # Defining lazy fields in data types can lead to unexpected space leaks

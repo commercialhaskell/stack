@@ -1,0 +1,37 @@
+# A package using Backpack internally (private Backpack). Sub-library "str-sig"
+# defines an abstract Str signature. Sub-library "str-impl" provides a concrete
+# Str module that fills the sig. Main library uses str-sig (indefinite) and
+# str-impl fills the hole. The public API has no unfilled signatures.
+
+spec-version: 0.36.0
+
+# Hpack 0.39.5 defaults to an unintended cabal-version.
+# See: https://github.com/sol/hpack/issues/649
+verbatim:
+  cabal-version: 3.4
+
+name: private-backpack
+
+dependencies:
+- base
+
+library:
+  source-dirs: src/main
+  dependencies:
+  - private-backpack:str-sig
+  - private-backpack:str-impl
+
+internal-libraries:
+  str-sig:
+    source-dirs: src/sig
+    signatures:
+    - Str
+  str-impl:
+    source-dirs: src/impl
+
+executables:
+  private-backpack-demo:
+    source-dirs: src/exe
+    main: Main.hs
+    dependencies:
+    - private-backpack

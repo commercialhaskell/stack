@@ -1,0 +1,39 @@
+# A package with sub-libraries that depend on each other.
+#
+# Sub-library "core" is standalone.
+# Sub-library "extended" depends on "core".
+# Main library depends on "extended".
+#
+# This tests intra-package component ordering.
+
+spec-version: 0.36.0
+
+# Hpack 0.39.5 defaults to an unintended cabal-version.
+# See: https://github.com/sol/hpack/issues/649
+verbatim:
+  cabal-version: 3.4
+
+name: sublib-deps
+
+dependencies:
+- base
+
+library:
+  source-dirs: src/main
+  dependencies:
+  - sublib-deps:extended
+
+internal-libraries:
+  core:
+    source-dirs: src/core
+  extended:
+    source-dirs: src/extended
+    dependencies:
+    - sublib-deps:core
+
+executables:
+  sublib-deps-demo:
+    source-dirs: src/exe
+    main: Main.hs
+    dependencies:
+    - sublib-deps

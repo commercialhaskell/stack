@@ -68,6 +68,7 @@ stackLibraryFromCabal cabalLib = StackLibrary
       LSubLibName v -> fromCabalName v
   , buildInfo = stackBuildInfoFromCabal cabalLib.libBuildInfo
   , exposedModules = cabalLib.exposedModules
+  , signatures = cabalLib.signatures
   }
 
 stackExecutableFromCabal :: Executable -> StackExecutable
@@ -122,6 +123,7 @@ stackBuildInfoFromCabal buildInfoV = gatherComponentToolsAndDepsFromCabal
     , extraLibs = buildInfoV.extraLibs
     , extraLibDirs = map interpretSymbolicPathCWD buildInfoV.extraLibDirs
     , frameworks = map interpretSymbolicPathCWD buildInfoV.frameworks
+    , mixins = buildInfoV.mixins
     }
 
 -- | Iterate on all three dependency list given, and transform and sort them

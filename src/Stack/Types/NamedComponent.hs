@@ -25,6 +25,7 @@ module Stack.Types.NamedComponent
   , isCExe
   , isCTest
   , isCBench
+  , isCInst
   , isPotentialDependency
   , splitComponents
   ) where
@@ -50,6 +51,8 @@ data NamedComponent
     -- A named test-suite component.
   | CBench !StackUnqualCompName
     -- A named benchmark component.
+  | CInst !Text
+    -- A Backpack instantiation (hash suffix identifying the instantiation).
   deriving (Eq, Ord, Show)
 
 -- | Render a component to anything with an "IsString" instance. For 'Text'
@@ -64,6 +67,7 @@ renderComponent (CFlib x) = "flib:" <> unqualCompToText x
 renderComponent (CExe x) = "exe:" <> unqualCompToText x
 renderComponent (CTest x) = "test:" <> unqualCompToText x
 renderComponent (CBench x) = "bench:" <> unqualCompToText x
+renderComponent (CInst x) = "inst:" <> x
 
 componentCachePath :: NamedComponent -> String
 componentCachePath CLib = "lib"
@@ -72,6 +76,7 @@ componentCachePath (CFlib x) = "flib-" <> unqualCompToString x
 componentCachePath (CExe x) = "exe-" <> unqualCompToString x
 componentCachePath (CTest x) = "test-" <> unqualCompToString x
 componentCachePath (CBench x) = "bench-" <> unqualCompToString x
+componentCachePath (CInst x) = "inst-" <> T.unpack x
 
 renderPkgComponents :: [(PackageName, NamedComponent)] -> Text
 renderPkgComponents = T.intercalate " " . map renderPkgComponent
@@ -124,8 +129,12 @@ isCBench :: NamedComponent -> Bool
 isCBench CBench{} = True
 isCBench _ = False
 
+isCInst :: NamedComponent -> Bool
+isCInst CInst{} = True
+isCInst _ = False
+
 isPotentialDependency :: NamedComponent -> Bool
-isPotentialDependency v = isCLib v || isCSubLib v || isCExe v
+isPotentialDependency v = isCLib v || isCSubLib v || isCExe v || isCInst v
 
 -- | A function to split the given list of components into sets of the names of
 -- the named components by the type of component (sub-libraries, executables,
@@ -155,3 +164,5 @@ splitComponents =
   go s e t b (CExe x : xs) = go s (e . (x:)) t b xs
   go s e t b (CTest x : xs) = go s e (t . (x:)) b xs
   go s e t b (CBench x : xs) = go s e t (b . (x:)) xs
+  -- Ignore CInst (Backpack instantiation), like CFlib.
+  go s e t b (CInst _ : xs) = go s e t b xs
