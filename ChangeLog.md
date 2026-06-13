@@ -1,20 +1,6 @@
 # Changelog
 
-## Unreleased changes
-
-Release notes:
-
-**Changes since v3.11.1:**
-
-Major changes:
-
-Behavior changes:
-
-Other enhancements:
-
-Bug fixes:
-
-## v3.11.1 - 2026-05-30
+## v3.11.1 - 2026-06-13
 
 **Changes since v3.9.3:**
 
