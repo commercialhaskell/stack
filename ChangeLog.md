@@ -43,7 +43,7 @@ Behavior changes:
 
 Other enhancements:
 
-* Bump to Hpack 0.39.5.
+* Bump to Hpack 0.39.6.
 * Experimental: Add flag `--[no-]semaphore` (default: disabled) to Stack's
   `build` command, to allow GHC to use a system semaphore to perform compilation
   in parallel when possible. Supported, by default, by GHC 9.10.1 or later. The
