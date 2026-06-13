@@ -116,6 +116,7 @@ nav:
   - Docker integration: topics/docker_integration.md
   - Nix integration: topics/nix_integration.md
   - Non-standard project initialization: topics/nonstandard_project_init.md
+  - Backpack support: topics/backpack.md
   - Building GHC from source: topics/GHC_from_source.md
   - Debugging: topics/debugging.md
   - Editor integration: topics/editor_integration.md
@@ -127,7 +128,6 @@ nav:
   - Azure CI: topics/azure_ci.md
   - Lock files: topics/lock_files.md
   - Haskell and C code: topics/haskell_and_c_code.md
-  - Backpack: topics/backpack.md
 - Get involved:
   - community/index.md
   - Contributors:
