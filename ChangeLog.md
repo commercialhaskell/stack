@@ -26,7 +26,7 @@ Major changes:
   the former toolchain from GHC 9.4.1. No default is provided for 32-bit
   Windows, rather than `MINGW32` (which remains an option). The MSYS2 project
   ceased to actively support it on 17 May 2020. 32-bit Windows is not supported
-  by the GHC project from GHC 8.12.
+  by the GHC project from GHC 9.0.1.
 
 Behavior changes:
 
