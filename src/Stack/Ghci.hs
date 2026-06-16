@@ -676,17 +676,23 @@ renderScript ::
      -- ^ Files targets with unknown GHC options.
   -> GhciScript
 renderScript pkgs mainFile onlyMain extraFiles = do
-  let addPhase = cmdAdd $ S.fromList (map Left allModules ++ addMain)
-      addMain = maybe [] (L.singleton . Right) mainFile
-      modulePhase = cmdModule $ S.fromList allModules
-      allModules = nubOrd $ concatMap (M.keys . (.modules)) pkgs
+  let allModules = S.unions $ map (M.keysSet . (.modules)) pkgs
+      addMain = maybe S.empty (S.singleton . Right) mainFile
+      -- If a main module is to be :add-ed, the context will be set to
+      -- it:
+      addPhase = cmdAdd $ S.map Left allModules <> addMain
+      modulePhase = cmdModule allModules
   case getFileTargets pkgs <> extraFiles of
     [] ->
       if onlyMain
         then
           if isJust mainFile
-            then cmdAdd (S.fromList addMain)
-            else mempty
+            then
+              -- If a main module is to be :add-ed, the context will be set to
+              -- it:
+              cmdAdd addMain
+            else
+              mempty
         else addPhase <> modulePhase
     fileTargets -> cmdAdd (S.fromList (map Right fileTargets))
 
