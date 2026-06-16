@@ -35,7 +35,15 @@ instance Monoid GhciScript where
 
 data GhciCommand
   = AddCmd (Set (Either ModuleName (Path Abs File)))
+    -- ^ Add the specified modules (specified by module name or source file) to
+    -- the current target set and perform a reload (that is, load the target set
+    -- of modules and the all the modules they depend on in dependency order).
+    -- The modules specified by name are added first (in ascending order), then
+    -- the modules specified by source file (in ascending order). The context is
+    -- set to the most recently successfully loaded module.
   | ModuleCmd (Set ModuleName)
+    -- ^ Add the specified modules to the context. The modules are added in
+    -- ascending order.
   deriving Show
 
 cmdAdd :: Set (Either ModuleName (Path Abs File)) -> GhciScript

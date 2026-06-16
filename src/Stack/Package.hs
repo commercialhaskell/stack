@@ -818,6 +818,7 @@ setOfPackageDeps pkg = runIdentity $
 topSortPackageComponent ::
      Package
   -> Target
+     -- ^ How the package is intended to be built.
   -> Bool
      -- ^ Include directTarget or not. False here means we won't include the
      -- actual targets in the result, only their deps. Using it with False here
@@ -845,6 +846,7 @@ topProcessPackageComponent ::
      forall b.
      Package
   -> Target
+     -- ^ How the package is intended to be built.
   -> (    forall component. (HasComponentInfo component)
        => PackageType
        -> component

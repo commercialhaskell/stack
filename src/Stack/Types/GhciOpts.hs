@@ -20,6 +20,7 @@ import           Stack.Types.BuildOptsCLI ( ApplyCLIFlag (..) )
 -- commands.
 data GhciOpts = GhciOpts
   { targets            :: ![Text]
+    -- ^ Raw (unprocessed) targets from the command line.
   , args               :: ![String]
   , ghcOptions         :: ![String]
   , flags              :: !(Map ApplyCLIFlag (Map FlagName Bool))
@@ -31,5 +32,6 @@ data GhciOpts = GhciOpts
   , hidePackages       :: !(Maybe Bool)
   , noBuild            :: !Bool
   , onlyMain           :: !Bool
+    -- ^ Only load and import the main module?
   }
   deriving Show

@@ -182,6 +182,7 @@ data GhciPkgDesc = GhciPkgDesc
   { package :: !Package
   , cabalFP :: !(Path Abs File)
   , target :: !Target
+    -- ^ How the package is intended to be built.
   }
 
 -- | Type synonym representing maps from a module name to a map with all of the
@@ -292,8 +293,12 @@ ghci opts = do
     localTargets
     mainFile
     pkgs
+    -- Files targets with unknown GHC options:
     (maybe [] snd mfileTargets)
+    -- The names of packages to be exposed:
     (nonLocalTargets ++ addPkgs)
+    -- A map of package names and sequences of their sublibrary components
+    -- depended upon (if any):
     relevantDependencies
 
 preprocessTargets ::
@@ -301,6 +306,7 @@ preprocessTargets ::
   => BuildOptsCLI
   -> SMActual GlobalPackage
   -> [Text]
+     -- ^ Raw (unprocessed) targets from the command line.
   -> RIO env (Either [Path Abs File] (Map PackageName Target))
 preprocessTargets buildOptsCLI sma rawTargets = do
   let (fileTargetsRaw, normalTargetsRaw) =
@@ -349,7 +355,12 @@ findFileTargets ::
      HasEnvConfig env
   => [LocalPackage]
   -> [Path Abs File]
-  -> RIO env (Map PackageName Target, Map PackageName [Path Abs File], [Path Abs File])
+  -> RIO
+       env
+       ( Map PackageName Target
+       , Map PackageName [Path Abs File]
+       , [Path Abs File]
+       )
 findFileTargets locals fileTargets = do
   filePackages <- forM locals $ \lp -> do
     PackageComponentFile _ compFiles _ _ <- getPackageFile lp.package lp.cabalFP
@@ -486,10 +497,17 @@ runGhci ::
   => GhciOpts
   -> [(PackageName, (Path Abs File, Target))]
   -> Maybe (Path Abs File)
+     -- ^ Path to source file for selected main module. 'Nothing' if no main
+     -- module is to be loaded and imported.
   -> [GhciPkgInfo]
   -> [Path Abs File]
+     -- ^ Files targets with unknown GHC options.
   -> [PackageName]
+     -- ^ The names of packages to be exposed.
   -> Map PackageName (Seq NamedComponent)
+     -- ^ A map of package names and their sublibraries depended on (if
+     -- any), the package names to be exposed if any sublibraries are
+     -- depended on.
   -> RIO env ()
 runGhci
     ghciOpts
@@ -650,8 +668,12 @@ writeHashedFile outputDirectory relFile contents = do
 renderScript ::
      [GhciPkgInfo]
   -> Maybe (Path Abs File)
+     -- ^ Path to source file for selected main module. 'Nothing' if no main
+     -- module is to be loaded and imported.
   -> Bool
+     -- ^ Only load and import the main module?
   -> [Path Abs File]
+     -- ^ Files targets with unknown GHC options.
   -> GhciScript
 renderScript pkgs mainFile onlyMain extraFiles = do
   let addPhase = cmdAdd $ S.fromList (map Left allModules ++ addMain)
