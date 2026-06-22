@@ -1,24 +1,24 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.12.4.
-snapshot: nightly-2026-04-17 # GHC 9.12.4
+snapshot: nightly-2026-06-22 # GHC 9.12.4
 
 extra-deps:
-# nightly-2026-04-17 specifies Cabal-3.14.2.0
-- Cabal-3.16.0.0@sha256:9972c2bd263168a20bd990962a68d4fd024f50c30a00519a6b942e8871d1bd67,14455
-- Cabal-syntax-3.16.0.0@sha256:6a35036763557301876c5b7a448de4f1cb54fe1e223ff6c4c0c1fdd6df635a65,7509
-# nightly-2026-04-17 specifies crypton-x509-1.7.7
+# nightly-2026-06-22 specifies Cabal-3.14.2.0
+- Cabal-3.16.1.0@sha256:39873317ab895194547c3fd72c91cdb97c800a49b2656920854747ee466627ca,14459
+- Cabal-syntax-3.16.1.0@sha256:17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504,7778
+# nightly-2026-06-22 specifies crypton-x509-1.7.7
 - crypton-x509-1.8.0@sha256:d4822ba8dcb19ee3233fc98152f5afda383ac952770a1d07f1d01168e9fcdbc2,2006
-# nightly-2026-04-17 specifies crypton-x509-store-1.6.14
+# nightly-2026-06-22 specifies crypton-x509-store-1.6.14
 - crypton-x509-store-1.8.0@sha256:075ba50a3daa0fdbb493481a665926e1ced2135c6b4ed56f97398aa855f0aecb,1674
-# nightly-2026-04-17 specifies crypton-x509-system-1.6.8
+# nightly-2026-06-22 specifies crypton-x509-system-1.6.8
 - crypton-x509-system-1.8.0@sha256:76bab32c7d9cb3ea356a905f85829c70967fb6f9b4b890f00d67dc54130d45ca,1521
-# nightly-2026-04-17 specifies crypton-x509-validation-1.6.14
+# nightly-2026-06-22 specifies crypton-x509-validation-1.6.14
 - crypton-x509-validation-1.8.0@sha256:63acb2df06f28c3ffdddaf6d9402105b9026796036aa10d7347ae4f7db51c36b,2018
-# nightly-2026-04-17 specifies hpack-0.39.3
-- hpack-0.39.5@sha256:c214f49ed3df75ce75201709927fa27e08f642023ed4b4ca8cc43604e5199ced,5263
-# nightly-2026-04-17 specifies rio-prettyprint-0.1.8.0
-- rio-prettyprint-0.1.9.0@sha256:f48afbfe28ed7be4d1a1bb96705669593dd5df12f28ed908516c6dfc4e0becbb,1375
-# nightly-2026-04-17 specifies tls-2.1.14
+# nightly-2026-06-22 specifies hpack-0.39.3
+- hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
+# nightly-2026-06-22 specifies open-browser-0.4.0.0
+- open-browser-0.5.0.0@sha256:0df6c833fd8abcd8e819c43c618487844f21243a40078eb084f707cfb6e06bbf,1959
+# nightly-2026-06-22 specifies tls-2.1.14
 - tls-2.2.2@sha256:95f5acd4ce76cbd6bdc46b737370dcbd93c59cf1cd1934a30e55c61c1dc140e9,7283
 
 docker:
