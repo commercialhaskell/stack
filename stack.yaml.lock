@@ -80,7 +80,7 @@ packages:
       sha256: 5462c6d2fed975e6b34830995320d7b1429c23d8ef194de99a7cc9b4cf261cbc
       size: 673
   original:
-    hackage: open-browser-0.5.0.0
+    hackage: open-browser-0.5.0.0@sha256:0df6c833fd8abcd8e819c43c618487844f21243a40078eb084f707cfb6e06bbf,1959
 - completed:
     hackage: pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
     pantry-tree:
