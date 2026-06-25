@@ -16,6 +16,7 @@ module Stack.Types.Cache
   , PrecompiledCache (..)
   , ConfigCacheType (..)
   , Action (..)
+  , GhcSemaphoreProtocolVersion (..)
   ) where
 
 import           Data.Aeson
@@ -30,6 +31,7 @@ import           Database.Persist.Sql
 import           Stack.Prelude
 import           Stack.Types.ConfigureOpts ( ConfigureOpts )
 import           Stack.Types.GhcPkgId ( GhcPkgId )
+import           System.Semaphore ( SemaphoreProtocolVersion (..) )
 
 -- | Type representing types of cache in the Stack project SQLite database.
 data ConfigCacheType
@@ -86,10 +88,36 @@ data Action
 
 instance PersistField Action where
   toPersistValue UpgradeCheck = PersistInt64 1
+
   fromPersistValue (PersistInt64 1) = Right UpgradeCheck
   fromPersistValue x = Left $ T.pack $ "Invalid Action: " ++ show x
 
 instance PersistFieldSql Action where
+  sqlType _ = SqlInt64
+
+-- Type representing GHC-supported semaphore protocol versions.
+data GhcSemaphoreProtocolVersion
+  = Unsupported
+  | Supported SemaphoreProtocolVersion
+  deriving (Eq, Ord, Show)
+
+instance PersistField GhcSemaphoreProtocolVersion where
+  toPersistValue Unsupported =
+    -- We can use 0 as a sentinel because we are confident that valid protocol
+    -- versions will always be >= 1:
+    PersistInt64 0
+  toPersistValue (Supported spv) =
+    PersistInt64 $ fromIntegral $ getSemaphoreProtocolVersion spv
+
+  fromPersistValue v
+    | PersistInt64 x <- v
+    , x == 0 = Right Unsupported
+    | PersistInt64 x <- v
+    , x > 0 = Right $ Supported $ SemaphoreProtocolVersion $ fromIntegral x
+    | otherwise =
+        Left $ T.pack $ "Invalid GhcSemaphoreProtocolVersion: " <> show v
+
+instance PersistFieldSql GhcSemaphoreProtocolVersion where
   sqlType _ = SqlInt64
 
 -- | Type synonym representing caches of files and information about them

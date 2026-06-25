@@ -184,6 +184,7 @@ import           System.IO.Error ( isPermissionError )
 import           System.FilePath ( searchPathSeparator )
 import qualified System.FilePath as FP
 import           System.Permissions ( setFileExecutable )
+import           System.Semaphore ( SemaphoreProtocolVersion (..) )
 import           System.Uname ( getRelease )
 
 -- | Type representing exceptions thrown by functions exported by the
@@ -233,6 +234,7 @@ data SetupPrettyException
   | GHCInfoMissingGlobalPackageDB
   | GHCInfoMissingTargetPlatform
   | GHCInfoTargetPlatformInvalid !String
+  | GHCInfoSemaphoreVersionUnknown !String
   | CabalNotFound !(Path Abs File)
   | GhcBootScriptNotFound
   | HadrianScriptNotFound
@@ -467,6 +469,13 @@ instance Pretty SetupPrettyException where
     <> fillSep
          [ flow "Invalid target platform in GHC info:"
          , fromString targetPlatform <> "."
+         ]
+  pretty (GHCInfoSemaphoreVersionUnknown s) =
+    "[S-6307]"
+    <> line
+    <> fillSep
+         [ flow "Unknown semaphore version in GHC info:"
+         , fromString s <> "."
          ]
   pretty (CabalNotFound compiler) =
     "[S-2574]"
@@ -1527,7 +1536,20 @@ pathsFromCompiler wc build sandboxed compiler =
       case Map.lookup cabalPackageName globalDump of
         Nothing -> prettyThrowIO $ CabalNotFound compiler
         Just dp -> pure $ pkgVersion dp.packageIdent
-
+    let semaphoreSupported =
+          getGhcVersion compilerVersion >= mkVersion [9, 8, 1]
+        semaphoreVersion = case Map.lookup "Semaphore version" infoMap of
+          Nothing -> if osIsWindows && semaphoreSupported
+            then
+              Just $ SemaphoreProtocolVersion 1
+            else
+              -- If GHC (via ghc --info) does not know what protocol version
+              -- for the semaphore it supports, we can be confident that it does
+              -- not support a protocol version >= 2:
+              Nothing
+          Just "1" -> Just $ SemaphoreProtocolVersion 1
+          Just "2" -> Just $ SemaphoreProtocolVersion 2
+          Just s -> prettyThrowM $ GHCInfoSemaphoreVersionUnknown s
     pure CompilerPaths
       { build
       , arch
@@ -1540,6 +1562,7 @@ pathsFromCompiler wc build sandboxed compiler =
       , cabalVersion
       , globalDB
       , ghcInfo
+      , semaphoreVersion
       , globalDump
       }
  where

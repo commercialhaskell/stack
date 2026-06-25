@@ -24,6 +24,7 @@ import           Stack.Types.Compiler
                    ( ActualCompiler, WhichCompiler, whichCompiler )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
 import           Stack.Types.DumpPackage ( DumpPackage )
+import           System.Semaphore ( SemaphoreProtocolVersion )
 
 -- | Paths on the filesystem for the compiler we're using
 data CompilerPaths = CompilerPaths
@@ -50,6 +51,8 @@ data CompilerPaths = CompilerPaths
     -- ^ Global package database
   , ghcInfo :: !ByteString
     -- ^ Output of @ghc --info@
+  , semaphoreVersion :: !(Maybe SemaphoreProtocolVersion)
+    -- ^ The semaphore protocol version supported by the compiler or 'Nothing'.
   , globalDump :: !(Map PackageName DumpPackage)
   }
   deriving Show
