@@ -72,6 +72,7 @@ import           Stack.Constants
                    , relDirSetupExeCache, relDirSetupExeSrc, relFileBuildLock
                    , relFileSetupHs, relFileSetupLhs, relFileSetupLower
                    , relFileSetupMacrosH, setupGhciShimCode, stackProgName
+                   , osIsWindows
                    )
 import           Stack.Constants.Config ( distDirFromDir, distRelativeDir )
 import           Stack.Package ( buildLogPath )
@@ -122,7 +123,9 @@ import           System.Environment ( lookupEnv )
 import           System.FileLock
                    ( SharedExclusive (..), withFileLock, withTryFileLock )
 import           System.Semaphore
-                   ( ServerSemaphore, destroyServerSemaphore, freshSemaphore )
+                   ( ServerSemaphore, destroyServerSemaphore, freshSemaphore
+                   , semaphoreVersion, versionsAreCompatible
+                   )
 
 -- | Type representing environments in which the @Setup.hs@ commands of Cabal
 -- (the library) can be executed.
@@ -346,22 +349,43 @@ withExecuteEnv
       logFiles <- liftIO $ atomically newTChan
       let totalWanted = length $ filter (.wanted) locals
       pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
+      ghcSemaphoreVersion <- view $ compilerPathsL . to (.semaphoreVersion)
       jobs <- view $ configL . to (.jobs)
       let semaphoreSupported =
                (cabalPkgVer >= mkVersion [3, 12, 0, 0])
-            && (ghcVersion >= mkVersion [9, 8, 1])
+            && maybe
+                 False
+                 (versionsAreCompatible semaphoreVersion)
+                 ghcSemaphoreVersion
           semaphoreUnsupportedWarning =
             prettyWarnL
               [ "The"
               , style Shell "--semaphore"
-              , flow "flag was specified, which is supported by GHC 9.8.1 or \
-                     \later with Cabal 3.12.0.0 (a boot package of GHC 9.10.1) \
-                     \or later. GHC version"
+              , flow "flag was specified, which is supported by"
+              , ghcSemaphoreSupportMessage
+              , flow "with Cabal 3.12.0.0 (a boot package of GHC 9.10.1) or \
+                     \later. GHC version"
               , fromString (versionString ghcVersion)
               , flow "and Cabal version"
               , fromString (versionString cabalPkgVer)
               , flow "was found. The flag will be ignored."
               ]
+          ghcSemaphoreSupportMessage = if osIsWindows
+            then
+              flow "GHC 9.8.1 or later (on Windows)"
+            else
+              -- Protocol version 1 was problematic on non-musl Linux
+              -- distributions only, because non-musl and musl semaphores are
+              -- incompatible and statically-linked binaries are musl. The GHC
+              -- project has decided that the semaphore-compat-2.0.0 package
+              -- will not be backwards compatible on all operating systems other
+              -- than Windows.
+              fillSep
+                [ flow "GHC if"
+                , style Shell "ghc --info"
+                , flow "reports a semaphore version (on operating systems \
+                       \other than Windows)"
+                ]
       serverSemaphore <- if not buildOpts.semaphore
         then pure Nothing
         else if semaphoreSupported
