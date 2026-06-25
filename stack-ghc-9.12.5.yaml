@@ -1,15 +1,13 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 9.12.5-rc2.
-snapshot: nightly-2026-07-12 # GHC 9.12.4
-compiler: ghc-9.12.4.20260614
+# built with GHC 9.12.5-rc3.
+snapshot: nightly-2026-07-26 # GHC 9.12.4
+compiler: ghc-9.12.4.20260713
 compiler-check: match-exact # Anticipating future rc releases
 
 extra-deps:
-# nightly-2026-07-02 specifies Cabal-3.14.2.0
+# nightly-2026-07-26 specifies Cabal-3.14.2.0
 - Cabal-3.16.1.0@sha256:39873317ab895194547c3fd72c91cdb97c800a49b2656920854747ee466627ca,14459
 - Cabal-syntax-3.16.1.0@sha256:17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504,7778
-# ghc-9.12.4.20260614 specifies semaphore-compat-2.0.0
-- semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
 
 docker:
   enable: false
