@@ -122,7 +122,7 @@ import           System.Environment ( lookupEnv )
 import           System.FileLock
                    ( SharedExclusive (..), withFileLock, withTryFileLock )
 import           System.Semaphore
-                   ( Semaphore, destroySemaphore, freshSemaphore )
+                   ( ServerSemaphore, destroyServerSemaphore, freshSemaphore )
 
 -- | Type representing environments in which the @Setup.hs@ commands of Cabal
 -- (the library) can be executed.
@@ -155,8 +155,9 @@ data ExecuteEnv = ExecuteEnv
     -- ^ For nicer interleaved output: track the largest package name size
   , pathEnvVar :: !Text
     -- ^ Value of the PATH environment variable
-  , semaphore :: !(Maybe Semaphore)
-    -- ^ The semaphore that is used for job control, if --semaphore is given
+  , serverSemaphore :: !(Maybe ServerSemaphore)
+    -- ^ The server semaphore that is used for job control, if --semaphore is
+    -- given
   }
 
 -- | Type representing setup executable circumstances.
@@ -361,10 +362,14 @@ withExecuteEnv
               , fromString (versionString cabalPkgVer)
               , flow "was found. The flag will be ignored."
               ]
-      semaphore <- if not buildOpts.semaphore
+      serverSemaphore <- if not buildOpts.semaphore
         then pure Nothing
         else if semaphoreSupported
-          then Just <$> liftIO (freshSemaphore semaphorePrefix jobs)
+          then do
+            result <- liftIO $ freshSemaphore semaphorePrefix jobs
+            case result of
+              Left err -> throwM err
+              Right serverSemaphore -> pure $ Just serverSemaphore
           else semaphoreUnsupportedWarning >> pure Nothing
       inner ExecuteEnv
         { buildOpts
@@ -391,9 +396,9 @@ withExecuteEnv
         , customBuilt
         , largestPackageName
         , pathEnvVar
-        , semaphore
+        , serverSemaphore
         } `finally` do
-          liftIO (whenJust semaphore destroySemaphore)
+          liftIO (whenJust serverSemaphore destroyServerSemaphore)
           dumpLogs logFiles totalWanted
  where
   toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dp.ghcPkgId, dp))
