@@ -1,0 +1,24 @@
+# A package that exposes a sub-library "utils" alongside its main library. The
+# consumer package depends on the sub-library specifically.
+
+spec-version: 0.36.0
+
+# Hpack 0.39.5 defaults to an unintended cabal-version.
+# See: https://github.com/sol/hpack/issues/649
+verbatim:
+  cabal-version: 3.4
+
+name: provider
+
+dependencies:
+- base
+
+library:
+  source-dirs: src/main
+  dependencies:
+  - provider:utils
+
+internal-libraries:
+  utils:
+    source-dirs: src/utils
+    visibility: public

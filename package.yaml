@@ -181,6 +181,7 @@ library:
   - Path.Find
   - Stack
   - Stack.Build
+  - Stack.Build.Backpack
   - Stack.Build.Cache
   - Stack.Build.ConstructPlan
   - Stack.Build.Execute

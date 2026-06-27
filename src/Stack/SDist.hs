@@ -489,7 +489,7 @@ getSDistFileList lp allDeps =
     -- around custom Setup.hs files:
     withExecuteEnv bopts boptsCli baseConfigOpts locals [] [] [] Nothing
       $ \ee ->
-      withSingleContext ac ee taskType allDeps (Just "sdist") $
+      withSingleContext ac ee taskType allDeps (Just "sdist") Nothing $
         \_package cabalFP _pkgDir cabal _announce _outputType -> do
           let outFile = toFilePath tmpdir FP.</> "source-files-list"
           cabal
