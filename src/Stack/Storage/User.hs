@@ -52,7 +52,10 @@ import qualified RIO.FilePath as FP
 import           Stack.Prelude
 import           Stack.Storage.Util
                    ( handleMigrationException, setUpdateDiff, updateCollection )
-import           Stack.Types.Cache ( Action (..), PrecompiledCache (..) )
+import           Stack.Types.Cache
+                   ( Action (..), GhcSemaphoreProtocolVersion (..)
+                   , PrecompiledCache (..)
+                   )
 import           Stack.Types.Compiler ( ActualCompiler, compilerVersionText )
 import           Stack.Types.CompilerBuild ( CompilerBuild )
 import           Stack.Types.CompilerPaths
@@ -70,6 +73,7 @@ data StorageUserException
   | GlobalPackageCacheFileMetadataMismatch
   | GlobalDumpParseFailure
   | CompilerCacheArchitectureInvalid Text
+  | GhcSemaphoreProtocolVersionUnknown
   deriving Show
 
 instance Exception StorageUserException where
@@ -88,6 +92,9 @@ instance Exception StorageUserException where
       , "Invalid arch: "
       , show compilerCacheArch
       ]
+  displayException GhcSemaphoreProtocolVersionUnknown =
+    "Error: [S-9841]\n"
+    ++ "GHC semaphore protocol version unknown, ignoring cache."
 
 share [ mkPersist sqlSettings
       , mkMigrate "migrateAll"
@@ -141,6 +148,7 @@ CompilerCache
   globalDb FilePath
   globalDbCacheSize Int64
   globalDbCacheModified Int64
+  semaphoreVersion GhcSemaphoreProtocolVersion Maybe
   info ByteString
 
   -- This is the ugliest part of this table, simply storing a Show/Read version of the
@@ -366,6 +374,13 @@ loadCompilerPaths compiler build sandboxed = do
         Nothing -> throwIO $
           CompilerCacheArchitectureInvalid compilerCache.compilerCacheArch
         Just arch -> pure arch
+    semaphoreVersion <- maybe
+          (throwIO GhcSemaphoreProtocolVersionUnknown)
+          ( \case
+              Unsupported -> pure Nothing
+              Supported spv -> pure $ Just spv
+          )
+          compilerCache.compilerCacheSemaphoreVersion
     pure CompilerPaths
       { compiler
       , compilerVersion = compilerCache.compilerCacheActualVersion
@@ -378,6 +393,7 @@ loadCompilerPaths compiler build sandboxed = do
       , cabalVersion
       , globalDB
       , ghcInfo = compilerCache.compilerCacheInfo
+      , semaphoreVersion
       , globalDump
       }
 
@@ -405,6 +421,8 @@ saveCompilerPaths cp = withUserStorage $ do
     , compilerCacheGlobalDbCacheSize = sizeToInt64 $ fileSize globalDbStatus
     , compilerCacheGlobalDbCacheModified =
         timeToInt64 $ modificationTime globalDbStatus
+    , compilerCacheSemaphoreVersion = Just $
+        maybe Unsupported Supported cp.semaphoreVersion
     , compilerCacheInfo = cp.ghcInfo
     , compilerCacheGlobalDump = tshow cp.globalDump
     , compilerCacheArch = T.pack $ Distribution.Text.display cp.arch
