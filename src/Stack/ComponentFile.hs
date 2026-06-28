@@ -459,18 +459,23 @@ findCandidate dirs name = do
 logPossibilities :: HasTerm env => [Path Abs Dir] -> ModuleName -> RIO env ()
 logPossibilities dirs mn = do
   possibilities <- fmap concat (makePossibilities mn)
-  unless (null possibilities) $ prettyWarnL
-    [ flow "Unable to find a known candidate for the Cabal entry"
-    , (style Module . fromString $ display mn) <> ","
-    , flow "but did find:"
-    , line <> bulletedList (map pretty possibilities)
-    , flow "If you are using a custom preprocessor for this module"
-    , flow "with its own file extension, consider adding the extension"
-    , flow "to the value of the"
-    , style Shell "custom-preprocessor-extensions"
-    , flow "key in Stack's project-level configuration file"
-    , "(" <> style File "stack.yaml" <> ")."
-    ]
+  unless (null possibilities) $ prettyWarn $
+       fillSep
+         [ flow "Unable to find a known candidate for the Cabal entry"
+         , (style Module . fromString $ display mn) <> ","
+         , flow "but did find:"
+         ]
+    <> line
+    <> bulletedList (map pretty possibilities)
+    <> blankLine
+    <> fillSep
+         [ flow "If you are using a custom preprocessor for this module with \
+                \its own file extension, consider adding the extension to the \
+                \value of the"
+         , style Shell "custom-preprocessor-extensions"
+         , flow "key in Stack's project-level configuration file"
+         , "(" <> style File "stack.yaml" <> ")."
+         ]
  where
   makePossibilities name =
     mapM
