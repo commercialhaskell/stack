@@ -571,6 +571,22 @@
 
 ## macOS-related
 
+??? question "On macOS, why do I see `ld: warning: -U option is redundant ...`?"
+
+    On macOS, the following may be reported during builds:
+
+    ~~~text
+    ld: warning: -U option is redundant when using -undefined dynamic_lookup
+    ~~~
+
+    The warning can be ignored. It arises because `process >= 1.6.30.0` passes
+    the option `-U _posix_spawn_file_actions_addchdir` to the linker (`ld`),
+    which means that the symbol `_posix_spawn_file_actions_addchdir` may be
+    undefined during linking. Separately, GHC also passes
+    `-undefined dynamic_lookup` when compiling dynamic libraries, which means
+    that all symbols may be undefined during linking, making the former
+    redundant.
+
 ??? question "On macOS, how do I resolve linker errors when running `stack setup` or `stack build`?"
 
     This is likely to be caused by having both a LLVM installation and default
