@@ -1,0 +1,6 @@
+app.cabal
+consumer-a.cabal
+consumer-b.cabal
+impl-a.cabal
+impl-b.cabal
+sig-pkg.cabal

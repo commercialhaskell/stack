@@ -74,7 +74,6 @@ data BuildException
   | CouldNotLockDistDir !(Path Abs File)
   | TaskCycleBug PackageIdentifier
   | PackageIdMissingBug PackageIdentifier
-  | AllInOneBuildBug
   | MultipleResultsBug PackageName [DumpPackage]
   | TemplateHaskellNotFoundBug
   | HaddockIndexNotFound
@@ -193,8 +192,6 @@ instance Exception BuildException where
   displayException (PackageIdMissingBug ident) = bugReport "[S-8923]" $
     "singleBuild: missing package ID missing: "
     ++ show ident
-  displayException AllInOneBuildBug = bugReport "[S-7371]"
-    "Cannot have an all-in-one build that also has a final build step."
   displayException (MultipleResultsBug name dps) = bugReport "[S-6739]" $
     "singleBuild: multiple results when describing installed package "
     ++ show (name, dps)

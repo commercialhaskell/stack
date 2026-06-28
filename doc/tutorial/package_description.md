@@ -93,6 +93,10 @@ package's root directory.
     benchmark components. The description identifies other packages on which
     those components depend.
 
+    A library component can also declare *signatures* — abstract module
+    interfaces that are filled in by a consumer. This is GHC's
+    [Backpack](../topics/backpack.md) module system.
+
 Stack is aware of two different formats of package description, and both files
 may be present in the package's root directory:
 

@@ -113,7 +113,8 @@ import           Stack.Types.Package
                    , toCabalMungedPackageName
                    )
 import           Stack.Types.Plan
-                   ( TaskType (..), taskTypeLocation, taskTypePackageIdentifier
+                   ( TaskType (..), componentKeyPkgName
+                   , taskTypeLocation, taskTypePackageIdentifier
                    )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Version ( withinRange )
@@ -605,6 +606,11 @@ withSingleContext ::
      -- @custom-setup@ stanza of its Cabal file.
   -> Maybe String
      -- ^ An optional suffix for the build log's file name.
+  -> Maybe Text
+     -- ^ Optional CInst dist-dir suffix for Backpack instantiation tasks.
+     -- When 'Just', the @--builddir@ passed to Setup.hs is extended with
+     -- @inst-\<suffix\>@ so that the instantiated build does not clobber the
+     -- indefinite package's build artifacts.
   -> (  Package        -- Package info
      -> Path Abs File  -- Cabal file path
      -> Path Abs Dir   -- Package root directory file path
@@ -625,6 +631,7 @@ withSingleContext
     taskType
     allDeps
     msuffix
+    mInstSuffix
     inner0
   = withPackage $ \package cabalFP pkgDir ->
       withOutputType pkgDir package $ \outputType ->
@@ -650,7 +657,7 @@ withSingleContext
   console =
        (  wanted
        && all
-            (\(ActionId ident _) -> ident == pkgId)
+            (\(ActionId ck _) -> componentKeyPkgName ck == pkgName pkgId)
             (Set.toList ac.remaining)
        && ee.totalWanted == 1
        )
@@ -733,6 +740,11 @@ withSingleContext
           }
     menv <- liftIO $ config.processContextSettings envSettings
     distDir' <- distDirFromDir pkgDir
+    buildDir <- case mInstSuffix of
+      Nothing -> pure distDir'
+      Just suffix -> do
+        instSubDir <- parseRelDir ("inst-" ++ T.unpack suffix)
+        pure (distDir' </> instSubDir)
     setupexehs <-
       -- Avoid broken Setup.hs files causing problems for simple build
       -- types, see:
@@ -913,7 +925,7 @@ withSingleContext
                   <> cabalPackageArg
 
           setupArgs =
-            ("--builddir=" ++ toFilePathNoTrailingSep distDir') : args
+            ("--builddir=" ++ toFilePathNoTrailingSep buildDir) : args
 
           depToMungedPkgNames ::
                PackageName
