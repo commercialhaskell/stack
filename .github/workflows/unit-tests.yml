@@ -9,9 +9,9 @@ on:
     - rc/**
   workflow_dispatch:
 
-# As of 2026-03-01:
-# * ubuntu-latest comes with Stack 3.9.3 and GHC 9.14.1; and
-# * windows-latest comes with Stack 3.9.1 and GHC 9.14.1.
+# As of 2026-06-28:
+# * ubuntu-latest comes with Stack 3.11.1 and GHC 9.14.1; and
+# * windows-latest comes with Stack 3.11.1 and GHC 9.14.1.
 # However, macos-15-intel and macos-latest do not come with Haskell tools.
 
 jobs:
@@ -20,9 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Clone project
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     - name: Cache dependencies
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ~/.stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}
@@ -55,16 +55,16 @@ jobs:
           stack-args: ""
     steps:
     - name: Clone project
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     - name: Cache dependencies on Unix-like OS
       if: startsWith(runner.os, 'Linux') || startsWith(runner.os, 'macOS')
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: ~/.stack
         key: ${{ runner.os }}-${{ hashFiles('stack.yaml') }}-${{ matrix.extra-suffix }}
     - name: Cache dependencies on Windows
       if: startsWith(runner.os, 'Windows')
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       with:
         path: |
           ~\AppData\Roaming\stack
@@ -78,18 +78,10 @@ jobs:
 
         if [[ "${{ matrix.os }}" == "macos-latest" ]]
         then
-          # As at 2026-03-01:
+          # As at 2026-06-28:
           #
           # * macos-latest does not include Haskell tools.
           curl -sSL https://get.haskellstack.org/ | sh
-        fi
-
-        if [[ "${{ matrix.os }}" == "windows-latest" ]]
-        then
-          # As at 2026-03-01:
-          #
-          # * windows-latest does not include Stack 3.9.3.
-          stack upgrade
         fi
 
         if [[ "${{ matrix.extra-suffix }}" == "alpine" ]]
