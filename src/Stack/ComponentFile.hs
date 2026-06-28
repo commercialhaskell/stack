@@ -458,7 +458,7 @@ findCandidate dirs name = do
 -- directories.
 logPossibilities :: HasTerm env => [Path Abs Dir] -> ModuleName -> RIO env ()
 logPossibilities dirs mn = do
-  possibilities <- fmap concat (makePossibilities mn)
+  possibilities <- concat <$> makePossibilities
   unless (null possibilities) $ prettyWarn $
        fillSep
          [ flow "Unable to find a known candidate for the Cabal entry"
@@ -477,20 +477,13 @@ logPossibilities dirs mn = do
          , "(" <> style File "stack.yaml" <> ")."
          ]
  where
-  makePossibilities name =
-    mapM
-      ( \dir -> do
-           (_,files) <- listDir dir
-           pure
-             ( map
-                 filename
-                 ( filter
-                     (isPrefixOf (display name) . toFilePath . filename)
-                     files
-                 )
-             )
-      )
-      dirs
+  makePossibilities = mapM makePossibility dirs
+
+  makePossibility dir = do
+    (_, files) <- listDir dir
+    pure $ map
+      filename
+      (filter (isPrefixOf (display mn) . toFilePath . filename) files)
 
 type CAndJsSources rec =
   (HasField "cSources" rec [FilePath], HasField "jsSources" rec [FilePath])
