@@ -97,7 +97,7 @@ dependencies:
 - http-client
 - http-client-tls >= 0.3.6.2
 - http-conduit
-- http-download >= 0.2.1.0
+- http-download >= 0.2.2.0
 - http-types
 - memory
 - microlens

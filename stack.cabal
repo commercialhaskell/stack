@@ -458,7 +458,7 @@ library
     , http-client
     , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download >=0.2.1.0
+    , http-download >=0.2.2.0
     , http-types
     , memory
     , microlens
@@ -584,7 +584,7 @@ executable stack
     , http-client
     , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download >=0.2.1.0
+    , http-download >=0.2.2.0
     , http-types
     , memory
     , microlens
@@ -689,7 +689,7 @@ executable stack-integration-test
     , http-client
     , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download >=0.2.1.0
+    , http-download >=0.2.2.0
     , http-types
     , memory
     , microlens
@@ -810,7 +810,7 @@ test-suite stack-unit-test
     , http-client
     , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download >=0.2.1.0
+    , http-download >=0.2.2.0
     , http-types
     , memory
     , microlens
