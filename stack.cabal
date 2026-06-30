@@ -458,16 +458,15 @@ library
     , http-client
     , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download >=0.2.1.0
+    , http-download >=0.2.2.0
     , http-types
-    , memory
     , microlens
     , mtl
     , mustache
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.11.0
+    , pantry >=0.11.3
     , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.19
@@ -475,6 +474,7 @@ library
     , pretty
     , process >=1.6.13.2
     , project-template
+    , ram
     , random
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
@@ -584,16 +584,15 @@ executable stack
     , http-client
     , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download >=0.2.1.0
+    , http-download >=0.2.2.0
     , http-types
-    , memory
     , microlens
     , mtl
     , mustache
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.11.0
+    , pantry >=0.11.3
     , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.19
@@ -601,6 +600,7 @@ executable stack
     , pretty
     , process >=1.6.13.2
     , project-template
+    , ram
     , random
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
@@ -689,9 +689,8 @@ executable stack-integration-test
     , http-client
     , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download >=0.2.1.0
+    , http-download >=0.2.2.0
     , http-types
-    , memory
     , microlens
     , mtl
     , mustache
@@ -699,7 +698,7 @@ executable stack-integration-test
     , open-browser
     , optparse-applicative >=0.18.1.0
     , optparse-generic
-    , pantry >=0.11.0
+    , pantry >=0.11.3
     , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.19
@@ -707,6 +706,7 @@ executable stack-integration-test
     , pretty
     , process >=1.6.13.2
     , project-template
+    , ram
     , random
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
@@ -810,16 +810,15 @@ test-suite stack-unit-test
     , http-client
     , http-client-tls >=0.3.6.2
     , http-conduit
-    , http-download >=0.2.1.0
+    , http-download >=0.2.2.0
     , http-types
-    , memory
     , microlens
     , mtl
     , mustache
     , neat-interpolation
     , open-browser
     , optparse-applicative >=0.18.1.0
-    , pantry >=0.11.0
+    , pantry >=0.11.3
     , path >=0.9.5
     , path-io
     , persistent >=2.14.0.0 && <2.19
@@ -827,6 +826,7 @@ test-suite stack-unit-test
     , pretty
     , process >=1.6.13.2
     , project-template
+    , ram
     , random
     , raw-strings-qq
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
