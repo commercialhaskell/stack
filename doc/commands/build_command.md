@@ -948,8 +948,6 @@ the [`stack path --local-install-root`](path_command.md) command.
 
 ### `--[no]-semaphore` flag
 
-:octicons-beaker-24: Experimental
-
 [:octicons-tag-24: 3.11.1](https://github.com/commercialhaskell/stack/releases/tag/v3.11.1)
 
 Default: Disabled
@@ -959,18 +957,18 @@ parallel when possible.
 
 !!! info
 
-    GHC 9.8.1 and later can act as a jobserver client, which enables two or more
+    Some GHC versions can act as a jobserver client, which enables two or more
     GHC processes running at once to share system resources with each other,
     communicating via a system semaphore. This GHC feature is supported by
-    Cabal 3.12.0.0 (a boot package of GHC 9.10.1) and later. The flag is ignored
-    with a warning when the feature is unsupported.
+    Cabal 3.12.0.0 (a boot package of GHC 9.10.1) and later. On Windows, this is
+    supported by GHC 9.8.1 and later. On other operating systems, this is
+    supported by GHC if `ghc --info` reports a semaphore version. The flag is
+    ignored with a warning when the feature is unsupported.
 
-!!! warning
+!!! note
 
-    On Linux, musl and non-musl system semaphores are incompatible. That means
-    that a Stack executable built on Alpine Linux (such as the official Stack
-    for Linux) creates system semaphores that cannot be used by a GHC executable
-    built on non-musl Linux distributions.
+    On non-Windows operating systems, GHC 9.8.1 to 9.8.4, GHC 9.10.1 to 9.10.3
+    and GHC 9.12.1 to 9.12.4 do not report a supported semaphore version.
 
 ### `--[no-]split-objs` flag
 

@@ -167,7 +167,10 @@ import           System.IO.Error ( isDoesNotExistError )
 import           System.PosixCompat.Files
                    ( createLink, getFileStatus, modificationTime )
 import           System.Random ( randomIO )
-import           System.Semaphore ( Semaphore (..), SemaphoreName (..) )
+import           System.Semaphore
+                   ( ServerSemaphore (..), clientSemaphoreName
+                   , semaphoreIdentifier
+                   )
 
 -- | Generate the t'ConfigCache' value.
 getConfigCache ::
@@ -669,7 +672,7 @@ realConfigAndBuild
       <> display actualCompiler
       )
     config <- view configL
-    extraOpts <- extraBuildOptions wc ee.buildOpts ee.semaphore
+    extraOpts <- extraBuildOptions wc ee.buildOpts ee.serverSemaphore
     let stripTHLoading
           | config.hideTHLoading = ExcludeTHLoading
           | otherwise                  = KeepTHLoading
@@ -1452,15 +1455,15 @@ extraBuildOptions ::
      (HasEnvConfig env, HasRunner env)
   => WhichCompiler
   -> BuildOpts
-  -> Maybe Semaphore
+  -> Maybe ServerSemaphore
   -> RIO env [String]
-extraBuildOptions wc bopts semaphore = do
+extraBuildOptions wc bopts mServerSemaphore = do
   colorOpt <- appropriateGhcColorFlag
   let optsFlag = compilerOptionsCabalFlag wc
       semaphoreFlag = maybe
         []
-        (("--semaphore":) . L.singleton . getSemaphoreName . semaphoreName)
-        semaphore
+        (("--semaphore":) . L.singleton . semaphoreIdentifier . clientSemaphoreName . serverClientSemaphore)
+        mServerSemaphore
       baseOpts = maybe "" (" " ++) colorOpt
   if bopts.testOpts.coverage
     then do
