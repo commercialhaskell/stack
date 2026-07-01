@@ -82,12 +82,12 @@ packages:
   original:
     hackage: hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
 - completed:
-    hackage: open-browser-0.5.0.0@sha256:0df6c833fd8abcd8e819c43c618487844f21243a40078eb084f707cfb6e06bbf,1959
+    hackage: open-browser-0.5.1.0@sha256:0dc8dc33b9bba0e025e444355f6c2d806f62a4656446961c3647165f80f0d278,1959
     pantry-tree:
-      sha256: 5462c6d2fed975e6b34830995320d7b1429c23d8ef194de99a7cc9b4cf261cbc
+      sha256: 394f3f9827acccd1522a46a34a42f4dee79859947869063632fa84cee95950d8
       size: 673
   original:
-    hackage: open-browser-0.5.0.0@sha256:0df6c833fd8abcd8e819c43c618487844f21243a40078eb084f707cfb6e06bbf,1959
+    hackage: open-browser-0.5.1.0@sha256:0dc8dc33b9bba0e025e444355f6c2d806f62a4656446961c3647165f80f0d278,1959
 - completed:
     hackage: pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
     pantry-tree:

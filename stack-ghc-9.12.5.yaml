@@ -19,7 +19,7 @@ extra-deps:
 # nightly-2026-06-22 specifies hpack-0.39.3
 - hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
 # nightly-2026-06-22 specifies open-browser-0.4.0.0
-- open-browser-0.5.0.0@sha256:0df6c833fd8abcd8e819c43c618487844f21243a40078eb084f707cfb6e06bbf,1959
+- open-browser-0.5.1.0@sha256:0dc8dc33b9bba0e025e444355f6c2d806f62a4656446961c3647165f80f0d278,1959
 # nightly-2026-06-22 specifies tls-2.1.14
 - tls-2.2.2@sha256:95f5acd4ce76cbd6bdc46b737370dcbd93c59cf1cd1934a30e55c61c1dc140e9,7283
 # ghc-9.12.4.20260614 specifies semaphore-compat-2.0.0
