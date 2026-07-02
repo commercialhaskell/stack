@@ -1,0 +1,11 @@
+spec-version: 0.36.0
+
+name: custom-preprocessor-warning
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+  exposed-modules: Lib
+  other-modules: Generated
