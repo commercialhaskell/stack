@@ -1,0 +1,4 @@
+module Generated where
+
+generated :: String
+generated = "generated"

@@ -41,8 +41,8 @@ import qualified Distribution.Utils.Path as Cabal
 import           GHC.Records ( HasField )
 import qualified HiFileParser as Iface
 import           Path
-                   ( (</>), filename, isProperPrefixOf, parent, parseRelDir
-                   , stripProperPrefix
+                   ( (</>), fileExtension, filename, isProperPrefixOf, parent
+                   , parseRelDir, stripProperPrefix
                    )
 import           Path.Extra
                    ( forgivingResolveDir, forgivingResolveFile
@@ -84,7 +84,7 @@ stackBenchmarkFiles ::
      StackBenchmark
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackBenchmarkFiles bench =
-  resolveComponentFiles (CBench bench.name) build names
+  resolveComponentFiles (CBench bench.name) build names []
  where
   names :: [DotCabalDescriptor]
   names = bnames <> exposed
@@ -106,7 +106,7 @@ stackTestSuiteFiles ::
      StackTestSuite
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackTestSuiteFiles test =
-  resolveComponentFiles (CTest test.name) build names
+  resolveComponentFiles (CTest test.name) build names []
  where
   names :: [DotCabalDescriptor]
   names = bnames <> exposed
@@ -129,7 +129,7 @@ stackExecutableFiles ::
      StackExecutable
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackExecutableFiles exe =
-  resolveComponentFiles (CExe exe.name) build names
+  resolveComponentFiles (CExe exe.name) build names []
  where
   build :: StackBuildInfo
   build = exe.buildInfo
@@ -144,7 +144,7 @@ stackLibraryFiles ::
      StackLibrary
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
 stackLibraryFiles lib =
-  resolveComponentFiles componentName build names
+  resolveComponentFiles componentName build names lib.signatures
  where
   componentRawName :: StackUnqualCompName
   componentRawName = lib.name
@@ -174,15 +174,22 @@ resolveComponentFiles ::
   => NamedComponent
   -> rec
   -> [DotCabalDescriptor]
+  -> [ModuleName]
   -> RIO GetPackageFileContext (NamedComponent, ComponentFile)
-resolveComponentFiles component build names = do
+resolveComponentFiles component build names signatureNames = do
   dirs <- mapMaybeM (resolveDirOrWarn . getSymbolicPath) build.hsSourceDirs
   dir <- asks (parent . (.file))
   agdirs <- autogenDirs
   let allDirs = (if null dirs then [dir] else dirs) ++ agdirs
-  (modules, files, warnings) <- resolveFilesAndDeps component allDirs names
+  (modules,files,warnings) <-
+    resolveFilesAndDeps
+      component
+      allDirs
+      names
+      (S.fromList signatureNames)
+  sigFiles <- resolveSignatureFiles allDirs signatureNames
   cfiles <- buildOtherSources build
-  pure (component, ComponentFile modules (files <> cfiles) warnings)
+  pure (component, ComponentFile modules (files <> sigFiles <> cfiles) warnings)
  where
   autogenDirs :: RIO GetPackageFileContext [Path Abs Dir]
   autogenDirs = do
@@ -198,11 +205,13 @@ resolveFilesAndDeps ::
      NamedComponent       -- ^ Package component name
   -> [Path Abs Dir]       -- ^ Directories to look in.
   -> [DotCabalDescriptor] -- ^ Base names.
+  -> Set ModuleName       -- ^ Backpack signatures already accounted for.
   -> RIO
        GetPackageFileContext
        (Map ModuleName (Path Abs File), [DotCabalPath], [PackageWarning])
-resolveFilesAndDeps component dirs names0 = do
-  (dotCabalPaths, foundModules, missingModules, _) <- loop names0 S.empty M.empty
+resolveFilesAndDeps component dirs names0 signatureModules = do
+  (dotCabalPaths, foundModules, missingModules, _) <-
+    loop names0 signatureModules M.empty
   warnings <-
     liftM2 (++) (warnUnlisted foundModules) (warnMissing missingModules)
   pure (foundModules, dotCabalPaths, warnings)
@@ -221,7 +230,7 @@ resolveFilesAndDeps component dirs names0 = do
          )
   loop [] _ _ = pure ([], M.empty, [], M.empty)
   loop names doneModules0 knownUsages = do
-    resolved <- resolveFiles dirs names
+    resolved <- resolveFiles dirs signatureModules names
     let foundFiles = mapMaybe snd resolved
         foundModules = mapMaybe toResolvedModule resolved
         missingModules = mapMaybe toMissingModule resolved
@@ -285,6 +294,22 @@ resolveFilesAndDeps component dirs names0 = do
     Just mn
   toMissingModule _ =
     Nothing
+
+-- | Resolve Backpack signature files declared by a library component. Signature
+-- files are tracked for rebuilds, but they are not ordinary implementation
+-- modules and should not feed unlisted-module warnings.
+resolveSignatureFiles ::
+     [Path Abs Dir]
+  -> [ModuleName]
+  -> RIO GetPackageFileContext [DotCabalPath]
+resolveSignatureFiles dirs =
+  fmap concat . mapM resolveSignatureFile
+ where
+  resolveSignatureFile mn = do
+    let relFile = Cabal.toFilePath mn ++ ".hsig"
+    matches <-
+      nubOrd . catMaybes <$> mapM (`resolveDirFile` relFile) dirs
+    pure $ map DotCabalFilePath matches
 
 -- | Get the dependencies of a Haskell module file.
 getDependencies ::
@@ -382,28 +407,33 @@ componentOutputDir namedComponent distDir =
 -- extensions.
 resolveFiles ::
      [Path Abs Dir] -- ^ Directories to look in.
+  -> Set ModuleName -- ^ Backpack signatures declared by the component.
   -> [DotCabalDescriptor] -- ^ Base names.
   -> RIO GetPackageFileContext [(DotCabalDescriptor, Maybe DotCabalPath)]
-resolveFiles dirs names =
-  forM names (\name -> fmap (name, ) (findCandidate dirs name))
+resolveFiles dirs signatureModules names =
+  forM names (\name -> fmap (name, ) (findCandidate dirs signatureModules name))
 
 -- | Find a candidate for the given module-or-filename from the list
 -- of directories and given extensions.
 findCandidate ::
      [Path Abs Dir]
+  -> Set ModuleName
   -> DotCabalDescriptor
   -> RIO GetPackageFileContext (Maybe DotCabalPath)
-findCandidate dirs name = do
+findCandidate dirs signatureModules name = do
   pkg <- asks (.file) >>= parsePackageNameFromFilePath
   customPreprocessorExts <- view $ configL . to (.customPreprocessorExts)
   let haskellPreprocessorExts =
-        haskellDefaultPreprocessorExts ++ customPreprocessorExts
+        filter
+          (not . isBackpackSignatureExt)
+          (haskellDefaultPreprocessorExts ++ customPreprocessorExts)
   liftIO (makeNameCandidates haskellPreprocessorExts) >>= \case
     [candidate] -> pure (Just (cons candidate))
     [] -> do
       case name of
         DotCabalModule mn
-          | display mn /= paths_pkg pkg -> logPossibilities dirs mn
+          | display mn /= paths_pkg pkg ->
+              logPossibilities dirs signatureModules mn
         _ -> pure ()
       pure Nothing
     (candidate:rest) -> do
@@ -448,21 +478,38 @@ findCandidate dirs name = do
             (xs, ys) -> xs ++ ys
   resolveCandidate dir = fmap maybeToList . resolveDirFile dir
 
+isBackpackSignatureExt :: Text -> Bool
+isBackpackSignatureExt ext =
+  T.toLower (fromMaybe ext $ T.stripPrefix "." ext) == "hsig"
+
+isBackpackSignatureFile :: Path b File -> Bool
+isBackpackSignatureFile file =
+  maybe False (isBackpackSignatureExt . T.pack) $ fileExtension file
+
 -- | Log that we couldn't find a candidate, but there are possibilities for
--- custom preprocessor extensions.
+-- custom preprocessor extensions or an undeclared Backpack signature.
 --
 -- For example: .erb for a Ruby file might exist in one of the directories.
-logPossibilities :: HasTerm env => [Path Abs Dir] -> ModuleName -> RIO env ()
-logPossibilities dirs mn = do
+logPossibilities ::
+     HasTerm env
+  => [Path Abs Dir]
+  -> Set ModuleName
+  -> ModuleName
+  -> RIO env ()
+logPossibilities dirs signatureModules mn = do
   possibilities <- concat <$> makePossibilities
-  unless (null possibilities) $ prettyWarn $
+  let nonSignaturePossibilities =
+        filter (not . isBackpackSignatureFile) possibilities
+      signaturePossibilities =
+        filter isBackpackSignatureFile possibilities
+  unless (null nonSignaturePossibilities) $ prettyWarn $
        fillSep
          [ flow "Unable to find a known candidate for the Cabal entry"
          , (style Module . fromString $ display mn) <> ","
          , flow "but did find:"
          ]
     <> line
-    <> bulletedList (map pretty possibilities)
+    <> bulletedList (map pretty nonSignaturePossibilities)
     <> blankLine
     <> fillSep
          [ flow "If you are using a custom preprocessor for this module with \
@@ -472,6 +519,26 @@ logPossibilities dirs mn = do
          , flow "key in Stack's project-level configuration file"
          , "(" <> style File "stack.yaml" <> ")."
          ]
+  when
+    (mn `S.notMember` signatureModules && not (null signaturePossibilities))
+    $ prettyWarn
+    $    fillSep
+           [ flow "Found Backpack signature file for Cabal entry"
+           , (style Module . fromString $ display mn) <> ","
+           , flow "but that module is not listed in the component's"
+           , style Shell "signatures"
+           , flow "field:"
+           ]
+      <> line
+      <> bulletedList (map pretty signaturePossibilities)
+      <> blankLine
+      <> fillSep
+           [ flow "If this file is meant to be a Backpack signature, add"
+           , style Module (fromString $ display mn)
+           , flow "to the"
+           , style Shell "signatures"
+           , flow "field in the package description."
+           ]
  where
   makePossibilities = mapM makePossibility dirs
 
