@@ -67,13 +67,6 @@ packages:
       size: 7056
   original:
     hackage: tls-2.2.2@sha256:95f5acd4ce76cbd6bdc46b737370dcbd93c59cf1cd1934a30e55c61c1dc140e9,7283
-- completed:
-    hackage: semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
-    pantry-tree:
-      sha256: 73f47245a0a2804e907df243638bef51c8b815c3dd5e6a016dbb61628353197e
-      size: 277
-  original:
-    hackage: semaphore-compat-1.0.0
 snapshots:
 - completed:
     sha256: 26504b113016bff86ea8678fc3e477ee8a73ac066912c176a241e0f162c31f76

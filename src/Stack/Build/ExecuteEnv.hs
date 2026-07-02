@@ -72,6 +72,7 @@ import           Stack.Constants
                    , relDirSetupExeCache, relDirSetupExeSrc, relFileBuildLock
                    , relFileSetupHs, relFileSetupLhs, relFileSetupLower
                    , relFileSetupMacrosH, setupGhciShimCode, stackProgName
+                   , osIsWindows
                    )
 import           Stack.Constants.Config ( distDirFromDir, distRelativeDir )
 import           Stack.Package ( buildLogPath )
@@ -123,7 +124,9 @@ import           System.Environment ( lookupEnv )
 import           System.FileLock
                    ( SharedExclusive (..), withFileLock, withTryFileLock )
 import           System.Semaphore
-                   ( Semaphore, destroySemaphore, freshSemaphore )
+                   ( ServerSemaphore, destroyServerSemaphore, freshSemaphore
+                   , semaphoreVersion, versionsAreCompatible
+                   )
 
 -- | Type representing environments in which the @Setup.hs@ commands of Cabal
 -- (the library) can be executed.
@@ -156,8 +159,9 @@ data ExecuteEnv = ExecuteEnv
     -- ^ For nicer interleaved output: track the largest package name size
   , pathEnvVar :: !Text
     -- ^ Value of the PATH environment variable
-  , semaphore :: !(Maybe Semaphore)
-    -- ^ The semaphore that is used for job control, if --semaphore is given
+  , serverSemaphore :: !(Maybe ServerSemaphore)
+    -- ^ The server semaphore that is used for job control, if --semaphore is
+    -- given
   }
 
 -- | Type representing setup executable circumstances.
@@ -346,26 +350,51 @@ withExecuteEnv
       logFiles <- liftIO $ atomically newTChan
       let totalWanted = length $ filter (.wanted) locals
       pathEnvVar <- liftIO $ maybe mempty T.pack <$> lookupEnv "PATH"
+      ghcSemaphoreVersion <- view $ compilerPathsL . to (.semaphoreVersion)
       jobs <- view $ configL . to (.jobs)
       let semaphoreSupported =
                (cabalPkgVer >= mkVersion [3, 12, 0, 0])
-            && (ghcVersion >= mkVersion [9, 8, 1])
+            && maybe
+                 False
+                 (versionsAreCompatible semaphoreVersion)
+                 ghcSemaphoreVersion
           semaphoreUnsupportedWarning =
             prettyWarnL
               [ "The"
               , style Shell "--semaphore"
-              , flow "flag was specified, which is supported by GHC 9.8.1 or \
-                     \later with Cabal 3.12.0.0 (a boot package of GHC 9.10.1) \
-                     \or later. GHC version"
+              , flow "flag was specified, which is supported by"
+              , ghcSemaphoreSupportMessage
+              , flow "with Cabal 3.12.0.0 (a boot package of GHC 9.10.1) or \
+                     \later. GHC version"
               , fromString (versionString ghcVersion)
               , flow "and Cabal version"
               , fromString (versionString cabalPkgVer)
               , flow "was found. The flag will be ignored."
               ]
-      semaphore <- if not buildOpts.semaphore
+          ghcSemaphoreSupportMessage = if osIsWindows
+            then
+              flow "GHC 9.8.1 or later (on Windows)"
+            else
+              -- Protocol version 1 was problematic on non-musl Linux
+              -- distributions only, because non-musl and musl semaphores are
+              -- incompatible and statically-linked binaries are musl. The GHC
+              -- project has decided that the semaphore-compat-2.0.0 package
+              -- will not be backwards compatible on all operating systems other
+              -- than Windows.
+              fillSep
+                [ flow "GHC if"
+                , style Shell "ghc --info"
+                , flow "reports a semaphore version (on operating systems \
+                       \other than Windows)"
+                ]
+      serverSemaphore <- if not buildOpts.semaphore
         then pure Nothing
         else if semaphoreSupported
-          then Just <$> liftIO (freshSemaphore semaphorePrefix jobs)
+          then do
+            result <- liftIO $ freshSemaphore semaphorePrefix jobs
+            case result of
+              Left err -> throwM err
+              Right serverSemaphore -> pure $ Just serverSemaphore
           else semaphoreUnsupportedWarning >> pure Nothing
       inner ExecuteEnv
         { buildOpts
@@ -392,9 +421,9 @@ withExecuteEnv
         , customBuilt
         , largestPackageName
         , pathEnvVar
-        , semaphore
+        , serverSemaphore
         } `finally` do
-          liftIO (whenJust semaphore destroySemaphore)
+          liftIO (whenJust serverSemaphore destroyServerSemaphore)
           dumpLogs logFiles totalWanted
  where
   toDumpPackagesByGhcPkgId = Map.fromList . map (\dp -> (dp.ghcPkgId, dp))
