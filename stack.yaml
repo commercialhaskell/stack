@@ -4,32 +4,52 @@ extra-deps:
 # lts-24.43 specifies Cabal-3.12.1.0
 - Cabal-3.16.1.0@sha256:39873317ab895194547c3fd72c91cdb97c800a49b2656920854747ee466627ca,14459
 - Cabal-syntax-3.16.1.0@sha256:17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504,7778
-# lts-24.43 does not include crypton-asn1-*
+# lts-24.43 specifies crypton-1.0.6
+- crypton-1.1.4@sha256:500174e81f6ad6b4c23a4e773771b934834ab3b953ef544cc6163eb952196c64,15142
+# lts-24.43 excludes crypton-asn1-encoding
 - crypton-asn1-encoding-0.10.0@sha256:45494a1723a047a815d0d620481c1028dca28a4ea5cf2554868687da90753961,2497
+# lts-24.43 excludes crypton-asn1-parse
 - crypton-asn1-parse-0.10.0@sha256:4a2cfc4980957d1a279ef69137ee5f665c247ccd8bb962812d5b071d543893fb,1359
+# lts-24.43 excludes crypton-asn1-types
 - crypton-asn1-types-0.4.1@sha256:02f3ec473011b3da92f7bf738bea19cadf88a6470b25a6cb5042216c7549c912,1326
+# lts-24.48 specifies crypton-conduit-0.2.3
+- crypton-conduit-0.3.0@sha256:20946683890fa9fd2519c6c734039d413888ccd9b64692db9aa390388ea58921,2016
+# lts-24.43 specifies crypton-connection-0.4.5
+- crypton-connection-0.4.6@sha256:a3764a44de9f43b1e9f590009ebbea1401fc3911e3ba41ce4d9b93d9f2a8d22e,1599
 # lts-24.43 specifies crypton-x509-1.7.7
-- crypton-x509-1.8.0@sha256:d4822ba8dcb19ee3233fc98152f5afda383ac952770a1d07f1d01168e9fcdbc2,2006
+- crypton-x509-1.9.1@sha256:6ed60424bd0664695db63cfda2052172bf6842b560dfb6f48478448c6f39ec65,2010
 # lts-24.43 specifies crypton-x509-store-1.6.14
-- crypton-x509-store-1.8.0@sha256:075ba50a3daa0fdbb493481a665926e1ced2135c6b4ed56f97398aa855f0aecb,1674
+- crypton-x509-store-1.9.0@sha256:9746160b993c24c175e560e27051dfe4616c6413014712776f1297e2ca8bba8a,1700
 # lts-24.43 specifies crypton-x509-system-1.6.8
-- crypton-x509-system-1.8.0@sha256:76bab32c7d9cb3ea356a905f85829c70967fb6f9b4b890f00d67dc54130d45ca,1521
+- crypton-x509-system-1.9.0@sha256:ccdc92bf98d7693c63dc680ff665b6487a28a701003dbee6695a6dbd38244392,1539
 # lts-24.43 specifies crypton-x509-validation-1.6.14
-- crypton-x509-validation-1.8.0@sha256:63acb2df06f28c3ffdddaf6d9402105b9026796036aa10d7347ae4f7db51c36b,2018
+- crypton-x509-validation-1.9.1@sha256:7fd1231e0ce13be7bbb95a348da58919174d341572309ff4471e39c3b3f4e68a,2113
 # lts-24.43 specifies hi-file-parser-0.1.8.0
 - hi-file-parser-0.1.9.0@sha256:a6f4cce3c5cfdd5c88f1145bad6fd0932ba5084591142956c30ee47a1d78eac5,3245
+# lts-24.43 specifies hpke-0.0.0
+- hpke-0.1.0@sha256:fb107670a0aeb91b4626e0b1dff4e7ec3342e48931cc994938d95af1a23f645d,1801
 # lts-24.43 specifies hpack-0.38.3
 - hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
+# lts-24.43 provides http-client-tls-0.3.6.4
+- http-client-tls-0.4.0@sha256:39fc60a864134946c773953fb96a836cd769b3af6fa03a4bfc547168a15e541d,2117
+# lts-24.43 provides http-download-0.2.1.0
+- http-download-0.2.2.0@sha256:cfe4722fcbad837db43b5758a49b6ea54b9fd475b1825b622e25f96a8406a4d0,1812
+# lts-24.43 excludes mlkem
+- mlkem-0.2.2.0@sha256:c16cb61190e915593767e716dd08957607f6045a01d7c3a1313fbd74eb31c75d,4759
 # lts-24.43 specifies open-browser-0.4.0.0
 - open-browser-0.5.1.0@sha256:0dc8dc33b9bba0e025e444355f6c2d806f62a4656446961c3647165f80f0d278,1959
 # lts-24.43 specifies pantry-0.10.1
-- pantry-0.11.2@sha256:bc14e75f512deb22e0d9d645e62eb63b319d1732bfed6509491601215ecbd307,7896
+- pantry-0.11.3@sha256:96fa2c7fa6cee9e470f984da567492f6bfaee058d14c1456f4f79b68a78d7be2,7668
 # lts-24.43 specifies persistent-2.17.1.0
 - persistent-2.18.1.0@sha256:6a111b26c3e710f1e080a7543cf93766c4cc53ac560dbaa0d4b7ddc98a2f7b1d,7096
-# lts-24.43 does not include time-hourglass
+# lts-24.43 excludes ram
+- ram-0.22.0@sha256:f6ce64a025929eb6ce42deeb80d072960a9ea2d83b9b9b28de668cc2b623127c,2814
+# lts-24.43 provides static-bytes-0.1.1
+- static-bytes-0.2.0@sha256:d61293dd0e810b78716e841462defadefc8698f8cfd59b899bb1b1abe34c4939,1617
+# lts-24.43 excludes time-hourglass
 - time-hourglass-0.3.0@sha256:ee02356fe24919ec43ae17fc0007398c2fd0bbe822833b2d7a9c849537b90580,3114
 # lts-24.43 specifies tls-2.1.8
-- tls-2.2.2@sha256:95f5acd4ce76cbd6bdc46b737370dcbd93c59cf1cd1934a30e55c61c1dc140e9,7283
+- tls-2.4.3@sha256:b69bad4c980463bebe216e3b1f88443884daff19878e2fec45661358abdbe6e8,7391
 
 docker:
   enable: false
