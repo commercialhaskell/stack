@@ -179,11 +179,8 @@ resolveComponentFiles component build names = do
   dirs <- mapMaybeM (resolveDirOrWarn . getSymbolicPath) build.hsSourceDirs
   dir <- asks (parent . (.file))
   agdirs <- autogenDirs
-  (modules,files,warnings) <-
-    resolveFilesAndDeps
-      component
-      ((if null dirs then [dir] else dirs) ++ agdirs)
-      names
+  let allDirs = (if null dirs then [dir] else dirs) ++ agdirs
+  (modules, files, warnings) <- resolveFilesAndDeps component allDirs names
   cfiles <- buildOtherSources build
   pure (component, ComponentFile modules (files <> cfiles) warnings)
  where
@@ -451,11 +448,10 @@ findCandidate dirs name = do
             (xs, ys) -> xs ++ ys
   resolveCandidate dir = fmap maybeToList . resolveDirFile dir
 
--- | Log that we couldn't find a candidate, but there are
--- possibilities for custom preprocessor extensions.
+-- | Log that we couldn't find a candidate, but there are possibilities for
+-- custom preprocessor extensions.
 --
--- For example: .erb for a Ruby file might exist in one of the
--- directories.
+-- For example: .erb for a Ruby file might exist in one of the directories.
 logPossibilities :: HasTerm env => [Path Abs Dir] -> ModuleName -> RIO env ()
 logPossibilities dirs mn = do
   possibilities <- concat <$> makePossibilities
