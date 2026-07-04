@@ -502,6 +502,7 @@ logPossibilities dirs signatureModules mn = do
         filter (not . isBackpackSignatureFile) possibilities
       signaturePossibilities =
         filter isBackpackSignatureFile possibilities
+      isSignaturePossibilities = not (null signaturePossibilities)
   unless (null nonSignaturePossibilities) $ prettyWarn $
        fillSep
          [ flow "Unable to find a known candidate for the Cabal entry"
@@ -519,10 +520,9 @@ logPossibilities dirs signatureModules mn = do
          , flow "key in Stack's project-level configuration file"
          , "(" <> style File "stack.yaml" <> ")."
          ]
-  when
-    (mn `S.notMember` signatureModules && not (null signaturePossibilities))
-    $ prettyWarn
-    $    fillSep
+  when (mn `S.notMember` signatureModules && isSignaturePossibilities) $
+    prettyWarn $
+         fillSep
            [ flow "Found Backpack signature file for Cabal entry"
            , (style Module . fromString $ display mn) <> ","
            , flow "but that module is not listed in the component's"
