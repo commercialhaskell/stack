@@ -7,5 +7,5 @@ dependencies:
 
 library:
   source-dirs: src
-  exposed-modules: Lib
+  # In error, Logger is listed under other-modules rather than signatures:
   other-modules: Logger
