@@ -128,10 +128,10 @@ There are four ways to specify a snapshot location:
 
     This allows local file paths and covenience synonyms to be disambiguated.
 
-!!! warning "Cyclic snapshot locations"
+!!! note "Cyclic snapshot locations"
 
-    If snapshot locations form a cycle, Stack will not detect this but will go
-    round in circles and appear to hang.
+    If Stack detects that snapshot locations form a cycle, it will report an
+    error.
 
 ## At the command line
 

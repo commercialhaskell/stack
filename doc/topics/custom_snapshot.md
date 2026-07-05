@@ -73,10 +73,10 @@ has changed by hashing the contents of the involved files, and using it to
 identify the snapshot internally. It is often reasonably efficient to modify a
 custom snapshot, due to Stack sharing snapshot packages whenever possible.
 
-!!! warning "Cyclic snapshot locations"
+!!! note "Cyclic snapshot locations"
 
-    If snapshot locations form a cycle, Stack will not detect this but will go
-    round in circles and appear to hang.
+    If Stack detects that snapshot locations form a cycle, it will report an
+    error.
 
 ### Overriding the compiler
 

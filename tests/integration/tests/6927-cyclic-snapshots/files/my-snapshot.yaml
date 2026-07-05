@@ -1,0 +1,4 @@
+name: my-snapshot
+
+# In error, refers to itself:
+snapshot: my-snapshot.yaml

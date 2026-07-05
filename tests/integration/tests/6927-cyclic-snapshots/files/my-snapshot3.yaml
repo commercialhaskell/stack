@@ -1,0 +1,4 @@
+name: my-snapshot3
+
+# In error, refers to my-snapshot1, creating a cycle:
+snapshot: my-snapshot4.yaml
