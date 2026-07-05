@@ -128,6 +128,11 @@ There are four ways to specify a snapshot location:
 
     This allows local file paths and covenience synonyms to be disambiguated.
 
+!!! warning "Cyclic snapshot locations"
+
+    If snapshot locations form a cycle, Stack will not detect this but will go
+    round in circles and appear to hang.
+
 ## At the command line
 
 As in YAML configuration files, a snapshot location can be specified via a

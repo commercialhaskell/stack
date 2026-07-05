@@ -73,6 +73,11 @@ has changed by hashing the contents of the involved files, and using it to
 identify the snapshot internally. It is often reasonably efficient to modify a
 custom snapshot, due to Stack sharing snapshot packages whenever possible.
 
+!!! warning "Cyclic snapshot locations"
+
+    If snapshot locations form a cycle, Stack will not detect this but will go
+    round in circles and appear to hang.
+
 ### Overriding the compiler
 
 The following snapshot specification will be identical to `lts-24.43`, but
