@@ -1,6 +1,7 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.12.4.
 snapshot: nightly-2026-07-02 # GHC 9.12.4
+compiler-check: match-exact # Protect against RCs of GHC 9.12.5
 
 extra-deps:
 # nightly-2026-07-02 specifies Cabal-3.14.2.0
@@ -18,8 +19,8 @@ docker:
 nix:
   # --nix on the command-line to enable.
   packages:
+  - pkg-config
   - zlib
-  - unzip
 
 flags:
   stack:
