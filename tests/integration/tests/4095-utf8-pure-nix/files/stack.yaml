@@ -1,10 +1,10 @@
-# As of 2026-03-01, with channel nixos-25.11, avaiable Nix packages
+# As of 2026-07-07, with channel nixos-26.05, avaiable Nix packages
 # haskell.compiler.ghc*, based on:
 #
 # $ nix-instantiate --eval -E "with import <nixpkgs> {}; lib.attrNames haskell.compiler"
 #
 # are:
 #
-# 948 (GHC 9.4.8), 967 (GHC 9.6.7), 984 (GHC 9.8.4), 9102 (GHC 9.10.2),
-# 9103 (GHC 9.10.3), 9122 (GHC 9.12.2).
+# 948 (GHC 9.4.8), 967 (GHC 9.6.7), 984 (GHC 9.8.4), 9103 (GHC 9.10.3),
+# 9123 (GHC 9.12.3), 9124 (GHC 9.12.4), 9141 (GHC 9.14.1).
 snapshot: ghc-9.10.3

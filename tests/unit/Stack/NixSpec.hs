@@ -32,7 +32,7 @@ import           Test.Hspec ( Spec, around_, beforeAll, describe, it, shouldBe )
 
 sampleConfigNixEnabled :: String
 sampleConfigNixEnabled =
-  "snapshot: lts-19.22\n" ++
+  "snapshot: lts-24.49\n" ++
   "packages: ['.']\n" ++
   "system-ghc: true\n" ++
   "nix:\n" ++
@@ -41,7 +41,7 @@ sampleConfigNixEnabled =
 
 sampleConfigNixDisabled :: String
 sampleConfigNixDisabled =
-  "snapshot: lts-19.22\n" ++
+  "snapshot: lts-24.49\n" ++
   "packages: ['.']\n" ++
   "nix:\n" ++
   "   enable: False"
@@ -111,6 +111,6 @@ spec = beforeAll setup $ do
           config.nix.enable `shouldBe` trueOnNonWindows
       it "sees that the only package asked for is glpk and asks for the correct GHC derivation" $ loadConfig' mempty $ \config -> do
         config.nix.packages `shouldBe` ["glpk"]
-        v <- parseVersionThrowing "9.0.2"
+        v <- parseVersionThrowing "9.10.3"
         ghc <- either throwIO pure $ nixCompiler (WCGhc v)
-        ghc `shouldBe` "haskell.compiler.ghc902"
+        ghc `shouldBe` "haskell.compiler.ghc9103"
