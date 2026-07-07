@@ -25,14 +25,16 @@ Other enhancements:
 
 Bug fixes:
 
-* `stack test --no-rerun-tests` correctly skips test suites that have 
-  previously been built and run successfully, including for non-Backpack 
+* `stack test --no-rerun-tests` correctly skips test suites that have
+  previously been built and run successfully, including for non-Backpack
   packages built by the per-component planner.
-* Stack's per-component build planner correctly handles the cross-package 
-  test/library cycle shape from issue #6905: project package A's library 
-  depending on project package B's library, with B's test suite depending on A, 
+* Stack's per-component build planner correctly handles the cross-package
+  test/library cycle shape from issue #6905: project package A's library
+  depending on project package B's library, with B's test suite depending on A,
   builds in the right order with the right configure flags.
-  
+* If snapshot locations are cyclic, Stack reports an error rather than going
+  round in circles.
+
 ##  v3.11.1 - 2026-06-13
 
 **Changes since v3.9.3:**

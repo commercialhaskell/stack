@@ -39,7 +39,7 @@ extra-deps:
 # lts-24.43 specifies open-browser-0.4.0.0
 - open-browser-0.5.1.0@sha256:0dc8dc33b9bba0e025e444355f6c2d806f62a4656446961c3647165f80f0d278,1959
 # lts-24.43 specifies pantry-0.10.1
-- pantry-0.11.3@sha256:96fa2c7fa6cee9e470f984da567492f6bfaee058d14c1456f4f79b68a78d7be2,7668
+- pantry-0.11.4@sha256:9885d02c58e8725179146352b6d3f57395d3f1337c7713dc1409c61c9c21bb09,7668
 # lts-24.43 specifies persistent-2.17.1.0
 - persistent-2.18.1.0@sha256:6a111b26c3e710f1e080a7543cf93766c4cc53ac560dbaa0d4b7ddc98a2f7b1d,7096
 # lts-24.43 excludes ram
