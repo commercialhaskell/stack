@@ -1,5 +1,4 @@
-import           System.IO ( stdout )
-import           Text.Printf ( hPrintf )
+import           Lib ( unicode )
 
 main :: IO ()
-main = hPrintf stdout "平和"
+main = unicode

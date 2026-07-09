@@ -5,7 +5,12 @@ name: myPackage
 dependencies:
 - base
 
+library:
+  source-dirs: src
+
 executables:
   myExe:
     source-dirs: app
     main: Main.hs
+    dependencies:
+    - myPackage

@@ -1,6 +1,7 @@
 -- Stack supports Unicode code points in a Nix environment.
 --
 -- See: https://github.com/commercialhaskell/stack/issues/4095
+-- See: https://github.com/commercialhaskell/stack/pull/6945
 
 import           Control.Monad ( unless )
 import           Data.Maybe ( isJust )
@@ -20,7 +21,9 @@ main
   | otherwise = do
       isInContainer <- getInContainer
       unless isInContainer $ do
+         -- Building causes GHC to emit Unicode:
          stack ["build", "--nix-pure"]
+         -- Running causes the executable to output Unicode:
          stack ["exec", "--nix-pure", "myExe"]
 
 -- | 'True' if we are currently running inside a Docker container.

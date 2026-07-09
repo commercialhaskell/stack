@@ -21,6 +21,10 @@ Major changes:
 
 Behavior changes:
 
+* When Stack's Nix integration is enabled and a `shell-file` is not specified,
+  Stack sets `LANG=C.UTF-8` (rather than `en_US.UTF-8`, which may not be
+  available if Stack has been built from source).
+
 Other enhancements:
 
 Bug fixes:
