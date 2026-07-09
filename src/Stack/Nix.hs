@@ -174,7 +174,7 @@ runShellAndExit = do
                 , "STACK_IN_NIX_EXTRA_ARGS = stackExtraArgs; "
                   -- overriding default locale so Unicode output using base
                   -- won't be broken
-                , "LANG=\"en_US.UTF-8\";"
+                , "LANG=\"C.UTF-8\";"
                 , "} \"\""
                 ]
             ]
