@@ -337,21 +337,24 @@ This overrides:
 
 Default: Disabled
 
-Set the flag to force the rebuild of packages that could, in principle, be dirty
-(such as [project packages](../configure/yaml/project.md#packages) or local file
+A package that is unchanged from when it was last built by Stack is said to be
+_clean_ and _dirty_ means the opposite. Set the flag to force the rebuild of
+packages that could, in principle, be dirty (such as
+[project packages](../configure/yaml/project.md#packages) or local file
 path [extra-deps](../configure/yaml/project.md#extra-deps)) even when it does
 not seem necessary based on file dirtiness.
 
 !!! note
 
-    The flag `--force-dirty` has no effect if the targets of the `build` command
-    do not include any that could, in principle, be dirty.
+    The flag `--force-dirty` has no effect if packages to be built do not
+    include any that could, in principle, be dirty. Packages that are deemed
+    immutable (unchanging) by Stack cannot, in principle, be dirty.
 
     There may be circumstances in which you wish Stack to rebuild an installed
     Haskell package (one registered in the relevant package database) that is
-    deemed immutable (unchanging). For example, if that package has a dependency
-    on a C library that has, in fact, changed since the package was registered.
-    To cause Stack to rebuild such a package, first unregister it from the
+    deemed immutable. For example, if that package has a dependency on a C
+    library that has, in fact, changed since the package was registered. To
+    cause Stack to try to rebuild such a package, first unregister it from the
     package database by commanding:
 
     ~~~text
