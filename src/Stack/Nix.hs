@@ -122,9 +122,10 @@ runShellAndExit = do
                   -- LD_LIBRARY_PATH is set because for now it's needed by
                   -- builds using Template Haskell
                 , "STACK_IN_NIX_EXTRA_ARGS = stackExtraArgs; "
-                  -- overriding default locale so Unicode output using base
-                  -- won't be broken
-                , "LANG=\"en_US.UTF-8\";"
+                  -- Overriding default locale so Unicode output using base
+                  -- won't be broken (including on systems that do not provide
+                  -- locale en_US.UTF-8):
+                , "LANG=\"C.UTF-8\";"
                 , "} \"\""
                 ]
             ]
