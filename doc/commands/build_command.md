@@ -337,8 +337,25 @@ This overrides:
 
 Default: Disabled
 
-Set the flag to force rebuild of packages even when it does not seem necessary
-based on file dirtiness.
+Set the flag to force the rebuild of packages that could, in principle, be dirty
+(such as project packages) even when it does not seem necessary based on file
+dirtiness.
+
+!!! note
+
+    The flag `--force-dirty` has no effect if the targets of the `build` command
+    do not include any that could, in principle, be dirty.
+
+    There may be circumstances in which you wish Stack to rebuild an installed
+    Haskell package (one registered in the relevant package database) that is
+    deemed immutable (unchanging). For example, if that package has a dependency
+    on a C library that has, in fact, changed since the package was registered.
+    To cause Stack to rebuild such a package, first unregister it from the
+    package database by commanding:
+
+    ~~~text
+    stack exec -- ghc-pkg unregister --force <package>
+    ~~~
 
 ### `--[no-]haddock` flag
 
