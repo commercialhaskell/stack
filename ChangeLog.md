@@ -27,6 +27,8 @@ Behavior changes:
 * With Nix integration, Stack uses `nix-instantiate` before `nix-shell`,
   enabling Stack to catch and report when the Nix expression cannot be
   evaluated by Nix. The `nix-instantiate-options` option is added, accordingly.
+* Stack's `build` command now warns if `--force-dirty` is specified but no
+  local packages will be built.
 
 Other enhancements:
 
