@@ -338,8 +338,9 @@ This overrides:
 Default: Disabled
 
 Set the flag to force the rebuild of packages that could, in principle, be dirty
-(such as project packages) even when it does not seem necessary based on file
-dirtiness.
+(such as [project packages](../configure/yaml/project.md#packages) or local file
+path [extra-deps](../configure/yaml/project.md#extra-deps)) even when it does
+not seem necessary based on file dirtiness.
 
 !!! note
 
