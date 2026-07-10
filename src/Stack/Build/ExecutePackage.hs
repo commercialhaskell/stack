@@ -128,7 +128,7 @@ import           Stack.Types.ComponentUtils
                    ( StackUnqualCompName, toCabalName, unqualCompToString
                    , unqualCompToText
                    )
-import           Stack.Types.Config ( Config (..), HasConfig (..) )
+import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..) )
 import           Stack.Types.Curator ( Curator (..) )
@@ -481,6 +481,7 @@ singleBuild
       case mprecompiled of
         Just precompiled ->
           copyPreCompiled isCInstTask ee task pkgId precompiled
+            <* warnImmutableCacheWithForceDirty
         Nothing -> do
           curator <- view $ buildConfigL . to (.curator)
           realConfigAndBuild
@@ -511,6 +512,19 @@ singleBuild
     && componentEnableTests ck (taskComponents task)
   enableBenchmarks = buildingFinals
     && componentEnableBenchmarks ck (taskComponents task)
+
+  -- Give a hint for surprisingly cached builds, https://github.com/commercialhaskell/stack/issues/1476
+  warnImmutableCacheWithForceDirty = do
+    forceDirtyFlagGiven <- view $ buildOptsL . to (.forceDirty)
+    targetsCLI <- view $ envConfigL . to (.buildOptsCLI.targetsCLI)
+    when (forceDirtyFlagGiven && fromPackageName (pkgName pkgId) `elem` targetsCLI) $ do
+      let pkg = fromPackageName (pkgName pkgId)
+      prettyNote $
+        fillSep [flow "Immutable snapshot package", style Current pkg, flow "picked from cached build despite --force-dirty."]
+        <> blankLine
+        <> flow "To force removal of cached build, try `stack exec -- ghc-pkg unregister --force " <+> pkg <> "`."
+        <> blankLine
+        <> flow "See Stack issue #1476 for more details."
 
 realConfigAndBuild ::
      forall env a. HasEnvConfig env
