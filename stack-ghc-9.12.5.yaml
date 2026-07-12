@@ -1,6 +1,6 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.12.5-rc2.
-snapshot: nightly-2026-07-02 # GHC 9.12.4
+snapshot: nightly-2026-07-12 # GHC 9.12.4
 compiler: ghc-9.12.4.20260614
 compiler-check: match-exact # Anticipating future rc releases
 
@@ -8,10 +8,6 @@ extra-deps:
 # nightly-2026-07-02 specifies Cabal-3.14.2.0
 - Cabal-3.16.1.0@sha256:39873317ab895194547c3fd72c91cdb97c800a49b2656920854747ee466627ca,14459
 - Cabal-syntax-3.16.1.0@sha256:17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504,7778
-# nightly-2026-07-02 specifies http-download-0.2.1.0
-- http-download-0.2.2.0@sha256:cfe4722fcbad837db43b5758a49b6ea54b9fd475b1825b622e25f96a8406a4d0,1812
-# nightly-2026-07-02 excludes pantry
-- pantry-0.11.4@sha256:9885d02c58e8725179146352b6d3f57395d3f1337c7713dc1409c61c9c21bb09,7668
 # ghc-9.12.4.20260614 specifies semaphore-compat-2.0.0
 - semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
 

@@ -19,20 +19,6 @@ packages:
   original:
     hackage: Cabal-syntax-3.16.1.0@sha256:17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504,7778
 - completed:
-    hackage: http-download-0.2.2.0@sha256:cfe4722fcbad837db43b5758a49b6ea54b9fd475b1825b622e25f96a8406a4d0,1812
-    pantry-tree:
-      sha256: 24abfb5cdd8d359cd58a084e67b394418f58f48940e66dfbeedfb62e839522ab
-      size: 393
-  original:
-    hackage: http-download-0.2.2.0@sha256:cfe4722fcbad837db43b5758a49b6ea54b9fd475b1825b622e25f96a8406a4d0,1812
-- completed:
-    hackage: pantry-0.11.4@sha256:9885d02c58e8725179146352b6d3f57395d3f1337c7713dc1409c61c9c21bb09,7668
-    pantry-tree:
-      sha256: cafafe0eb53f80194e20b7332db8e306c9eb949193f17cd48a71a79c8a3c30d2
-      size: 2722
-  original:
-    hackage: pantry-0.11.4@sha256:9885d02c58e8725179146352b6d3f57395d3f1337c7713dc1409c61c9c21bb09,7668
-- completed:
     hackage: semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
     pantry-tree:
       sha256: 73f47245a0a2804e907df243638bef51c8b815c3dd5e6a016dbb61628353197e
@@ -41,7 +27,7 @@ packages:
     hackage: semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
 snapshots:
 - completed:
-    sha256: 7aed37f3f67db7b404c9b477077c0c9bc5fbefa709c5e0a231131869e631de56
-    size: 753931
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2026/7/2.yaml
-  original: nightly-2026-07-02
+    sha256: cb7d0b9185684418fac8da3353d4054f002a98d065b70d501dd6b93cc3289fef
+    size: 757765
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2026/7/12.yaml
+  original: nightly-2026-07-12
