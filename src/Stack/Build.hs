@@ -199,9 +199,20 @@ build msetLocalFiles = do
             boptsCli.initialBuildSteps
 
   allowLocals <- view $ configL . to (.allowLocals)
-  unless allowLocals $ case justLocals plan of
-    [] -> pure ()
-    localsIdents -> throwM $ LocalPackagesPresent localsIdents
+  case justLocals plan of
+    [] -> when bopts.forceDirty $ prettyWarn $
+         fillSep
+           [ style Shell "--force-dirty"
+           , flow "is specified but no local packages will be built."
+           ]
+      <> blankLine
+      <> flow "If your aim is that Stack rebuilds an installed package (one \
+              \registered in the relevant package database) that Stack deems \
+              \immutable, first unregister it from the database by commanding:"
+      <> blankLine
+      <> style Shell "stack exec -- ghc-pkg unregister --force <package>"
+    localsIdents -> unless allowLocals $
+      throwM $ LocalPackagesPresent localsIdents
 
   checkCabalVersion
   haddockCompsSupported <- warnAboutHaddockComps bopts
