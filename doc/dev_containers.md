@@ -42,15 +42,16 @@ The tools in the Haskell Toolchain are installed at `/usr/local/bin`.
 [Visual Studio Code](https://code.visualstudio.com) (VS Code) is used as IDE,
 with the following extensions pre‑installed:
 
-* [Haskell](https://marketplace.visualstudio.com/items?itemName=haskell.haskell)
-  (Default Dev Container only)
-* [GitHub Pull Requests and Issues](https://marketplace.visualstudio.com/items?itemName=GitHub.vscode-pull-request-github)
-* [GitLens — Git supercharged](https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens)
-  * Pinned to version 11.7.0 due to unsolicited AI content in recent versions
-* [Git Graph](https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph)
-* [ShellCheck](https://marketplace.visualstudio.com/items?itemName=timonwong.shellcheck)
-* [hadolint](https://marketplace.visualstudio.com/items?itemName=exiasr.hadolint)
-* [Resource Monitor](https://marketplace.visualstudio.com/items?itemName=mutantdino.resourcemonitor)
+*   [Haskell](https://marketplace.visualstudio.com/items?itemName=haskell.haskell)
+    (Default Dev Container only)
+*   [GitHub Pull Requests and Issues](https://marketplace.visualstudio.com/items?itemName=GitHub.vscode-pull-request-github)
+*   [GitLens — Git supercharged](https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens)
+    *   Pinned to version 11.7.0 due to unsolicited AI content in subsequent
+        versions
+*   [Git Graph](https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph)
+*   [ShellCheck](https://marketplace.visualstudio.com/items?itemName=timonwong.shellcheck)
+*   [hadolint](https://marketplace.visualstudio.com/items?itemName=exiasr.hadolint)
+*   [Resource Monitor](https://marketplace.visualstudio.com/items?itemName=mutantdino.resourcemonitor)
 
 ## Parent images
 
@@ -58,7 +59,7 @@ Stack's Dev Containers are derived from Docker images that are used to build
 the *statically linked* Linux/x86_64 and Linux/AArch64 binary distributions of
 Stack. The repository providing those images is identified in Stack's
 project-level configuration files under the
-[`docker` key`](topics/docker_integration.md#configuration). For example:
+[`docker` key](topics/docker_integration.md#configuration). For example:
 
 ~~~yaml
 docker:
