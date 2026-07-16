@@ -2,34 +2,33 @@
 
 # Dev Containers
 
-A *container* refers to an isolated area of memory where application software
-and some drivers execute. A [Development Container](https://containers.dev) (or
-Dev Container for short) allows a container to be used as a full‑featured
+A *container* is an isolated area of memory where application software and some
+drivers execute. A [Development Container](https://containers.dev) (or Dev
+Container for short) allows a container to be used as a full‑featured
 development environment.
 
 Stack provides the following Dev Containers:
 
-* a default Dev Container, intended for use with Stack's default project‑level
+* a default one, intended for use with Stack's default project‑level
   configuration file (`stack.yaml`); and
-* alternative Dev Containers, intended for use with Stack's experimental
-  project‑level configurations (in anticipation of building Stack with more
-  recent versions of GHC).
+* alternative ones, intended for use with Stack's experimental project‑level
+  configuration files (in anticipation of building Stack with more recent
+  versions of GHC).
 
 Stack's Dev Containers provide the following tools:
 
 1. The
    [Haskell Toolchain](https://www.haskell.org/ghcup/install/#supported-tools)
    ([GHC](https://www.haskell.org/ghc), Stack,
-   [Cabal (the tool)](https://cabal.readthedocs.io) and
-   [HLS](https://haskell-language-server.readthedocs.io))
+   [Cabal (the tool)](https://cabal.readthedocs.io) and (in the default Dev
+   Container only) [HLS](https://haskell-language-server.readthedocs.io))
 2. [Git](https://git-scm.com)
 3. [HLint](https://hackage.haskell.org/package/hlint)
 4. [yamllint](https://yamllint.readthedocs.io)
 5. [ShellCheck](https://www.shellcheck.net)
 6. [hadolint](https://github.com/hadolint/hadolint)
 
-The tools in the Haskell Toolchain are installed at `/usr/local/bin`. HLS is
-provided in the default Dev Container only.
+The tools in the Haskell Toolchain are installed at `/usr/local/bin`.
 
 !!! info
 
@@ -40,8 +39,8 @@ provided in the default Dev Container only.
     `$HOME/.local/bin`) take precedence over the same executable installed at
     `/usr/local/sbin`, `/usr/local/bin`, etc.
 
-[VS Code](https://code.visualstudio.com) is used as IDE, with the following
-extensions pre‑installed:
+[Visual Studio Code](https://code.visualstudio.com) (VS Code) is used as IDE,
+with the following extensions pre‑installed:
 
 * [Haskell](https://marketplace.visualstudio.com/items?itemName=haskell.haskell)
   (Default Dev Container only)
@@ -57,19 +56,25 @@ extensions pre‑installed:
 
 Stack's Dev Containers are derived from Docker images that are used to build
 the *statically linked* Linux/x86_64 and Linux/AArch64 binary distributions of
-Stack.
+Stack. The repository providing those images is identified in Stack's
+project-level configuration files under the
+[`docker` key`](topics/docker_integration.md#configuration). For example:
+
+~~~yaml
+docker:
+  enable: false
+  repo: quay.io/benz0li/ghc-musl:9.10.3
+~~~
 
 These Docker images are multi‑architecture (`linux/amd64`, `linux/arm64/v8`)
 <nobr>*GHC musl*</nobr> images. They are based on Alpine Linux (that is
 [musl libc](https://musl.libc.org) and [BusyBox](https://www.busybox.net)).
 
 The images contain *unofficial* and *untested* binary distributions of GHC (that
-is, ones not released by the GHC developers). That is because:
-
-1. the official GHC binary distributions for Alpine Linux/x86_64 have
-   [known](https://gitlab.haskell.org/ghc/ghc/-/issues/23043)
-   [bugs](https://gitlab.haskell.org/ghc/ghc/-/issues/25093) ~~; and~~
-1. ~~there are no official binary distributions for Alpine Linux/AArch64.~~
+is, ones not released by the GHC developers). That is because the official GHC
+binary distributions for Alpine Linux/x86_64 have known bugs
+([GHC issue 23043](https://gitlab.haskell.org/ghc/ghc/-/issues/23043) and
+[GHC issue 25093](https://gitlab.haskell.org/ghc/ghc/-/issues/25093)).
 
 Stack's global configuration (`/etc/stack/config.yaml`) sets
 <nobr>`system-ghc: true`</nobr> and <nobr>`install-ghc: false`</nobr>. That
