@@ -1,0 +1,11 @@
+spec-version: 0.36.0
+
+name: hsig-warning
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+  # In error, Logger is listed under other-modules rather than signatures:
+  other-modules: Logger
