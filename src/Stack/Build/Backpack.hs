@@ -16,7 +16,7 @@ tasks that instantiate those packages with concrete implementations.
 
 module Stack.Build.Backpack
   ( addInstantiationTasks
-  , upgradeFoundIndefinites
+  , loadFoundIndefiniteTasks
   ) where
 
 import           Crypto.Hash ( hashWith, SHA256 (..) )
@@ -37,10 +37,12 @@ import           Distribution.Types.ModuleRenaming
 import           Path ( parent )
 import           Stack.ConfigureOpts ( packageConfigureOptsFromPackage )
 import           Stack.Package
-                   ( packageIsIndefinite )
+                   ( packageIsIndefinite, processPackageDepsEither )
 import           Stack.Prelude
 import           Stack.Types.Build.ConstructPlan
-                   ( AddDepRes (..), CombinedMap, PackageInfo (..) )
+                   ( AddDepRes (..), CombinedMap, MissingPresentDeps (..)
+                   , PackageInfo (..), processAdr
+                   )
 import           Stack.Types.SourceMap ( CommonPackage (..) )
 import           Distribution.Types.BuildType ( BuildType (Configure) )
 import           Stack.Types.Cache ( CachePkgSrc (..) )
@@ -56,22 +58,29 @@ import           Stack.Types.IsMutable ( IsMutable (..) )
 import           Stack.Types.NamedComponent ( NamedComponent (..) )
 import           Stack.Types.Package
                    ( LocalPackage (..), Package (..), PackageSource (..)
-                   , installedMapGhcPkgId, packageIdentifier
-                   , toCabalMungedPackageId
+                   , packageIdentifier, psVersion, toCabalMungedPackageId
                    )
 import           Stack.Types.Plan
                    ( ComponentKey (..), Task (..), TaskConfigOpts (..)
                    , TaskType (..), installLocationIsMutable
                    )
 
--- | Upgrade ADRFound entries to ADRToInstall for indefinite (Backpack
--- signature) packages whose source is available. This is needed because
--- addInstantiationTasks clones the sig-pkg's Task to create CInst tasks,
--- and ADRFound entries don't carry a Task.
+-- | Extract the package metadata from a build task.
+taskPackage :: Task -> Package
+taskPackage t = case t.taskType of
+  TTLocalMutable lp     -> lp.package
+  TTRemotePackage _ p _ -> p
+
+-- | Load source-backed template tasks for ADRFound indefinite (Backpack
+-- signature) packages. These tasks are used only as sources for CInst tasks.
+-- The original ADRFound entries must remain ADRFound: a clean installed
+-- indefinite package should not be added to the build plan just because a
+-- dependent package needs a CInst task.
 --
--- Only packages actually referenced by a consumer's mixin are loaded,
--- to avoid unnecessary Pantry lookups for the common case (no Backpack).
-upgradeFoundIndefinites ::
+-- Only packages actually referenced by a consumer's mixin, plus the indefinite
+-- dependencies discovered while loading those package descriptions, are loaded.
+-- This avoids unnecessary Pantry lookups for the common case (no Backpack).
+loadFoundIndefiniteTasks ::
      forall env. HasEnvConfig env
   => (  PackageLocationImmutable
      -> Map FlagName Bool
@@ -81,83 +90,103 @@ upgradeFoundIndefinites ::
      )
      -- ^ Load package from source (loadPackage0)
   -> EnvConfig
+  -> Map PackageName PackageSource
   -> CombinedMap
   -> BaseConfigOpts
   -> [(PackageName, AddDepRes)]
-  -> RIO env [(PackageName, AddDepRes)]
-upgradeFoundIndefinites loadPkg econfig combinedMap bco adrs = do
-  let adrMap = Map.fromList adrs
-      -- Collect package names referenced by any consumer's mixin.
-      mixinTargets :: Set PackageName
-      mixinTargets = Set.fromList
-        [ mixinPackageName mixin
-        | (_, ADRToInstall task) <- adrs
-        , let pkg = case task.taskType of
-                TTLocalMutable lp -> lp.package
-                TTRemotePackage _ p _ -> p
-        , mixin <- concatMap (\lib -> lib.buildInfo.mixins)
-                     (maybeToList pkg.library ++ toList pkg.subLibraries)
-        ]
-      -- Filter to mixin targets that are ADRFound.
-      foundTargets =
-        [ name
-        | name <- Set.toList mixinTargets
-        , Just (ADRFound _ _) <- [Map.lookup name adrMap]
-        ]
-  if null foundTargets
-    then pure adrs
-    else do
-      -- For each ADRFound mixin target, try to load its Package and
-      -- upgrade to ADRToInstall if it is indefinite.
-      upgrades <- fmap Map.fromList $ forM foundTargets $ \name ->
+  -> RIO env (Map PackageName Task)
+loadFoundIndefiniteTasks loadPkg econfig sources combinedMap bco adrs =
+  go Set.empty Map.empty foundTargets
+ where
+  adrMap :: Map PackageName AddDepRes
+  adrMap = Map.fromList adrs
+
+  -- Collect package names referenced by any consumer's mixin.
+  mixinTargets :: Set PackageName
+  mixinTargets = Set.fromList
+    [ depName
+    | (_, ADRToInstall task) <- adrs
+    , let pkg = taskPackage task
+    , depName <- mixinTargetsFor pkg
+    ]
+
+  -- Filter to mixin targets that are ADRFound.
+  foundTargets :: [PackageName]
+  foundTargets =
+    [ name
+    | name <- Set.toList mixinTargets
+    , Just (ADRFound _ _) <- [Map.lookup name adrMap]
+    ]
+
+  go ::
+       Set PackageName
+    -> Map PackageName Task
+    -> [PackageName]
+    -> RIO env (Map PackageName Task)
+  go _seen templates [] = pure templates
+  go seen templates (name:rest)
+    | name `Set.member` seen = go seen templates rest
+    | otherwise = do
+        mTemplate <- loadTemplate name
+        case mTemplate of
+          Nothing ->
+            go (Set.insert name seen) templates rest
+          Just (_, template) ->
+            let pkg = taskPackage template
+            in  go
+                  (Set.insert name seen)
+                  (Map.insert name template templates)
+                  (foundDependencyTargets pkg ++ rest)
+
+  loadTemplate ::
+       PackageName
+    -> RIO env (Maybe (PackageName, Task))
+  loadTemplate name =
+    case Map.lookup name sources of
+      Just ps ->
+        loadFromSourceTemplate name ps
+      Nothing ->
         case Map.lookup name combinedMap of
           Just (PIOnlyInstalled _ installed) ->
-            -- Source not available (GHC boot library or similar). Look up
-            -- Hackage as a fallback.
-            upgradeFromHackage name installed
-          Just (PIBoth ps installed) ->
-            upgradeFromSource name ps (Just installed)
+            -- Source not available from the source map (GHC boot library,
+            -- external package DB, or similar). Look up Hackage as a fallback;
+            -- packageIsIndefinite filters out ordinary dependencies.
+            loadFromHackage name installed
+          Just (PIBoth ps _) ->
+            loadFromSourceTemplate name ps
           Just (PIOnlySource ps) ->
             -- Should not happen (ADRFound implies installed), but handle
             -- gracefully by loading the package to check.
-            upgradeFromSource name ps Nothing
+            loadFromSourceTemplate name ps
           Nothing ->
             -- Package not in combined map — shouldn't happen. Skip.
-            pure (name, Nothing)
-      -- Apply upgrades.
-      pure
-        [ case Map.lookup name upgrades of
-            Just (Just adr') -> (name, adr')
-            _ -> (name, adr)
-        | (name, adr) <- adrs
-        ]
- where
+            pure Nothing
+
   loadFromSource :: PackageSource -> RIO env Package
   loadFromSource = \case
     PSRemote pkgLoc _version _fromSnapshot cp ->
       runRIO econfig $ loadPkg pkgLoc cp.flags cp.ghcOptions cp.cabalConfigOpts
     PSFilePath lp -> pure lp.package
 
-  mkTask :: Package -> PackageSource -> Maybe Installed -> Task
-  mkTask package ps mInstalled =
+  mkTask :: Package -> PackageSource -> Task
+  mkTask package ps =
     let loc = psLocation ps
         isMutable = installLocationIsMutable loc
-        presentMap = case mInstalled of
-          Just (Library pid ili) -> installedMapGhcPkgId pid ili
-          _ -> Map.empty
+        MissingPresentDeps missing present minMutable =
+          templateDeps package
     in  Task
           { configOpts = TaskConfigOpts
-              { missing = Set.empty
+              { missing
               , envConfig = econfig
               , baseConfigOpts = bco
               , isLocalNonExtraDep = psLocal ps
-              , isMutable
+              , isMutable = isMutable <> minMutable
               , pkgConfigOpts = packageConfigureOptsFromPackage package
               , instantiationDeps = []
               }
           , buildHaddocks = False
           , allInOne = True
-          , present = presentMap
+          , present
           , taskType = case ps of
               PSFilePath lp -> TTLocalMutable lp
               PSRemote pkgLoc _version _fromSnapshot _cp ->
@@ -167,22 +196,21 @@ upgradeFoundIndefinites loadPkg econfig combinedMap bco adrs = do
           , backpackInstEntries = []
           }
 
-  upgradeFromSource ::
+  loadFromSourceTemplate ::
        PackageName
     -> PackageSource
-    -> Maybe Installed
-    -> RIO env (PackageName, Maybe AddDepRes)
-  upgradeFromSource name ps mInstalled = do
+    -> RIO env (Maybe (PackageName, Task))
+  loadFromSourceTemplate name ps = do
     package <- loadFromSource ps
     if packageIsIndefinite package
-      then pure (name, Just $ ADRToInstall $ mkTask package ps mInstalled)
-      else pure (name, Nothing)
+      then pure $ Just (name, mkTask package ps)
+      else pure Nothing
 
-  upgradeFromHackage ::
+  loadFromHackage ::
        PackageName
     -> Installed
-    -> RIO env (PackageName, Maybe AddDepRes)
-  upgradeFromHackage name installed = do
+    -> RIO env (Maybe (PackageName, Task))
+  loadFromHackage name installed = do
     let version = installedVersion installed
     mPkgLoc <- runRIO econfig $
       getLatestHackageRevision YesRequireHackageIndex name version >>= \case
@@ -190,34 +218,84 @@ upgradeFoundIndefinites loadPkg econfig combinedMap bco adrs = do
         Just (_rev, cfKey, treeKey) ->
           pure $ Just $ PLIHackage (PackageIdentifier name version) cfKey treeKey
     case mPkgLoc of
-      Nothing -> pure (name, Nothing)
+      Nothing -> pure Nothing
       Just pkgLoc -> do
         package <- runRIO econfig $ loadPkg pkgLoc Map.empty [] []
         if packageIsIndefinite package
           then do
-            let presentMap = case installed of
-                  Library pid ili -> installedMapGhcPkgId pid ili
-                  _ -> Map.empty
+            let MissingPresentDeps missing present minMutable =
+                  templateDeps package
                 task = Task
                   { configOpts = TaskConfigOpts
-                      { missing = Set.empty
+                      { missing
                       , envConfig = econfig
                       , baseConfigOpts = bco
                       , isLocalNonExtraDep = False
-                      , isMutable = Immutable
+                      , isMutable = Immutable <> minMutable
                       , pkgConfigOpts = packageConfigureOptsFromPackage package
                       , instantiationDeps = []
                       }
                   , buildHaddocks = False
                   , allInOne = True
-                  , present = presentMap
+                  , present
                   , taskType = TTRemotePackage Immutable package pkgLoc
                   , cachePkgSrc = CacheSrcUpstream
                   , buildTypeConfig = packageBuildTypeConfig package
                   , backpackInstEntries = []
                   }
-            pure (name, Just $ ADRToInstall task)
-          else pure (name, Nothing)
+            pure $ Just (name, task)
+          else pure Nothing
+
+  foundDependencyTargets :: Package -> [PackageName]
+  foundDependencyTargets package =
+    [ depName
+    | depName <- mixinTargetsFor package
+    , Just ADRFound{} <- [Map.lookup depName adrMap]
+    ]
+
+  mixinTargetsFor :: Package -> [PackageName]
+  mixinTargetsFor package =
+    [ mixinPackageName mixin
+    | lib <- maybeToList package.library ++ toList package.subLibraries
+    , mixin <- lib.buildInfo.mixins
+    ]
+
+  templateDeps ::
+       Package
+    -> MissingPresentDeps
+  templateDeps package =
+    either (const mempty) id $
+      runIdentity $
+        processPackageDepsEither package $ \depName _depValue ->
+          pure (Right (case Map.lookup depName adrMap of
+            Just adr ->
+              processAdr adr
+            Nothing ->
+              dependencyFromCombinedMap depName) :: Either () MissingPresentDeps)
+
+  dependencyFromCombinedMap :: PackageName -> MissingPresentDeps
+  dependencyFromCombinedMap depName =
+    case Map.lookup depName combinedMap of
+      Just (PIOnlyInstalled loc installed) ->
+        dependencyFromInstalled loc installed
+      Just (PIBoth _ installed) ->
+        dependencyFromInstalled Local installed
+      Just (PIOnlySource ps) ->
+        MissingPresentDeps
+          { missingPackages = Set.singleton $
+              PackageIdentifier depName (psVersion ps)
+          , presentPackages = mempty
+          , isMutable = installLocationIsMutable $ psLocation ps
+          }
+      Nothing ->
+        mempty
+
+  dependencyFromInstalled ::
+       InstallLocation
+    -> Installed
+    -> MissingPresentDeps
+  dependencyFromInstalled loc installed =
+    processAdr $ ADRFound loc installed
 
 -- | Post-pass: scan consumer tasks for Backpack mixins referencing indefinite
 -- packages and create CInst instantiation tasks. Returns the augmented list
@@ -227,11 +305,13 @@ addInstantiationTasks ::
      -- ^ Installed package modules (from ghc-pkg dump). Used for module
      -- resolution when the implementing package is ADRFound (already
      -- installed, no Task/Package metadata available).
+  -> Map PackageName Task
+     -- ^ Source-backed templates for clean ADRFound indefinite packages.
   -> [(PackageName, AddDepRes)]     -- ^ Original per-package ADRs
   -> [(ComponentKey, AddDepRes)]    -- ^ Expanded component-keyed ADRs
   -> ([(ComponentKey, AddDepRes)], [StyleDoc])
      -- ^ (Augmented with CInst tasks, warnings)
-addInstantiationTasks installedModules origAdrs expandedAdrs =
+addInstantiationTasks installedModules foundIndefiniteTasks origAdrs expandedAdrs =
   let adrMap = Map.fromList origAdrs
       -- Process each entry, collecting new CInst tasks and modified consumers.
       (newInstTasks, modifiedEntries, warns) =
@@ -281,12 +361,6 @@ addInstantiationTasks installedModules origAdrs expandedAdrs =
   processEntry _ entry (instAcc, entryAcc, warnAcc) =
     (instAcc, entry : entryAcc, warnAcc)
 
-  -- Extract the Package from a Task's TaskType.
-  taskPackage :: Task -> Package
-  taskPackage t = case t.taskType of
-    TTLocalMutable lp       -> lp.package
-    TTRemotePackage _ p _   -> p
-
   -- Process all mixins for a consumer, returning new CInst entries, their
   -- ComponentKeys (to add as deps on the consumer), and any warnings.
   processAllMixins ::
@@ -307,10 +381,10 @@ addInstantiationTasks installedModules origAdrs expandedAdrs =
     -> ([(ComponentKey, AddDepRes)], [ComponentKey], [StyleDoc])
   processMixin adrMap' consumerDeps mixin (instAcc, keyAcc, warnAcc) =
     let depPkgName = mixinPackageName mixin
-    in  case Map.lookup depPkgName adrMap' of
-      Just (ADRToInstall sigTask)
-        | let sigPkg = taskPackage sigTask
-        , packageIsIndefinite sigPkg ->
+    in  case lookupIndefiniteTask depPkgName adrMap' of
+      Just sigTask ->
+            let sigPkg = taskPackage sigTask
+            in
             let -- Get signatures from the sig-pkg's main library.
                 ownSigs :: [ModuleName]
                 ownSigs = case sigPkg.library of
@@ -384,19 +458,21 @@ addInstantiationTasks installedModules origAdrs expandedAdrs =
                         , instCk : keyAcc
                         , resolveWarns ++ warnAcc
                         )
-      Just (ADRFound _ _) ->
-        -- Sig-pkg is installed and its source could not be resolved
-        -- (upgradeFoundIndefinites already tried). This typically means
-        -- a GHC boot library or a package missing from Hackage.
-        let w = fillSep
-              [ flow "Backpack: mixin referencing"
-              , style Current (fromPackageName depPkgName)
-              , flow "is skipped because that package is installed and its"
-              , flow "source could not be found for instantiation."
-              , flow "Consider adding it as a local package in stack.yaml."
-              ]
-        in  (instAcc, keyAcc, w : warnAcc)
-      _ -> (instAcc, keyAcc, warnAcc)
+      Nothing ->
+        case Map.lookup depPkgName adrMap' of
+          Just ADRFound{} ->
+            -- Sig-pkg is installed and its source could not be resolved
+            -- (loadFoundIndefiniteTasks already tried). This typically means
+            -- a GHC boot library or a package missing from Hackage.
+            let w = fillSep
+                  [ flow "Backpack: mixin referencing"
+                  , style Current (fromPackageName depPkgName)
+                  , flow "is skipped because that package is installed and its"
+                  , flow "source could not be found for instantiation."
+                  , flow "Consider adding it as a local package in stack.yaml."
+                  ]
+            in  (instAcc, keyAcc, w : warnAcc)
+          _ -> (instAcc, keyAcc, warnAcc)
 
   -- Collect signatures inherited from a package's transitive indefinite deps.
   -- When pkg-A depends on indefinite pkg-B, pkg-B's signatures propagate up
@@ -418,17 +494,27 @@ addInstantiationTasks installedModules origAdrs expandedAdrs =
     collectFromDep depName
       | depName `Set.member` visited = []
       | otherwise =
-          case Map.lookup depName adrMap' of
-            Just (ADRToInstall depTask)
-              | let depPkg = taskPackage depTask
-              , packageIsIndefinite depPkg ->
-                  let depSigs = case depPkg.library of
-                        Just lib -> lib.signatures
-                        Nothing  -> []
-                      transitive = collectInheritedSigs depPkg adrMap'
-                                     (Set.insert depName visited)
-                  in  depSigs ++ transitive
-            _ -> []
+          case lookupIndefiniteTask depName adrMap' of
+            Just depTask ->
+              let depPkg = taskPackage depTask
+                  depSigs = case depPkg.library of
+                    Just lib -> lib.signatures
+                    Nothing  -> []
+                  transitive = collectInheritedSigs depPkg adrMap'
+                                 (Set.insert depName visited)
+              in  depSigs ++ transitive
+            Nothing -> []
+
+  lookupIndefiniteTask ::
+       PackageName
+    -> Map PackageName AddDepRes
+    -> Maybe Task
+  lookupIndefiniteTask depPkgName adrMap' =
+    case Map.lookup depPkgName adrMap' of
+      Just (ADRToInstall task)
+        | packageIsIndefinite (taskPackage task) -> Just task
+      Just ADRFound{} -> Map.lookup depPkgName foundIndefiniteTasks
+      _ -> Nothing
 
   -- Resolve all signature entries for a mixin, collecting both successful
   -- resolutions and warnings for signatures that could not be resolved.

@@ -20,6 +20,7 @@ module Stack.Types.Build.ConstructPlan
   , toTask
   , adrVersion
   , adrHasLibrary
+  , processAdr
   , isAdrToInstall
   , Ctx (..)
   , PackageLoader
@@ -29,6 +30,8 @@ module Stack.Types.Build.ConstructPlan
   ) where
 
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import           RIO.Process ( HasProcessContext (..) )
 import           RIO.State ( StateT )
 import           RIO.Writer ( WriterT (..) )
@@ -52,11 +55,14 @@ import           Stack.Types.Installed
 import           Stack.Types.IsMutable ( IsMutable )
 import           Stack.Types.Package
                    ( ExeName (..), LocalPackage (..), Package (..)
-                   , PackageSource (..)
+                   , PackageSource (..), installedMapGhcPkgId
                    )
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Plan
-                    ( ComponentKey, Task (..), TaskType (..), taskProvides )
+                    ( ComponentKey, Task (..), TaskType (..)
+                    , installLocationIsMutable, taskProvides
+                    , taskTargetIsMutable
+                    )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 
@@ -151,6 +157,32 @@ adrHasLibrary (ADRToInstall task) = case task.taskType of
     hasBuildableMainLibrary p || not (null p.subLibraries)
 adrHasLibrary (ADRFound _ Library{}) = True
 adrHasLibrary (ADRFound _ Executable{}) = False
+
+-- | Given a result of 'Stack.Build.ConstructPlan.addDep', yields a triple
+-- indicating: (1) if the dependency is to be installed, its package identifier;
+-- (2) if the dependency is installed and a library, its package identifier and
+-- 'GhcPkgId'; and (3) if the dependency is, or will be when installed, mutable
+-- or immutable.
+processAdr ::
+     AddDepRes
+  -> MissingPresentDeps
+processAdr adr = case adr of
+  ADRToInstall task ->
+    MissingPresentDeps
+      { missingPackages = Set.singleton $ taskProvides task
+      , presentPackages = mempty
+      , isMutable = taskTargetIsMutable task
+      }
+  ADRFound loc installed ->
+    MissingPresentDeps
+      { missingPackages = mempty
+      , presentPackages = presentPackagesV
+      , isMutable = installLocationIsMutable loc
+      }
+   where
+    presentPackagesV = case installed of
+      Library ident installedInfo -> installedMapGhcPkgId ident installedInfo
+      _ -> Map.empty
 
 data MissingPresentDeps = MissingPresentDeps
   { missingPackages :: !(Set PackageIdentifier)
