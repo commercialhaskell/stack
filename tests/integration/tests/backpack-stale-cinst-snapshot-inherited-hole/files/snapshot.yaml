@@ -1,0 +1,6 @@
+name: backpack-stale-cinst-snapshot
+
+snapshot: ghc-9.10.3
+
+packages:
+- archive: snapshots/str-sig-0.0.0.tar.gz
