@@ -22,7 +22,6 @@ module Stack.Build.Backpack
 import           Crypto.Hash ( hashWith, SHA256 (..) )
 import qualified Data.ByteArray.Encoding as Mem
                    ( Base (Base16), convertToBase )
-import qualified Data.ByteString.Char8 as S8
 import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -264,7 +263,7 @@ loadFoundIndefiniteTasks loadPkg econfig sources combinedMap bco adrs =
        Package
     -> MissingPresentDeps
   templateDeps package =
-    either (const mempty) id $
+    fromRight mempty $
       runIdentity $
         processPackageDepsEither package $ \depName _depValue ->
           pure (Right (case Map.lookup depName adrMap of
@@ -399,7 +398,7 @@ addInstantiationTasks installedModules foundIndefiniteTasks origAdrs expandedAdr
                 inheritedSigs =
                   -- Deduplicate: diamond deps can yield the same sig
                   -- from multiple paths.
-                  L.nub $ collectInheritedSigs sigPkg adrMap' Set.empty
+                  nubOrd $ collectInheritedSigs sigPkg adrMap' Set.empty
                 -- Determine the module mapping from the mixin's requiresRn.
                 renaming = includeRequiresRn (mixinIncludeRenaming mixin)
                 -- Resolve the sig-pkg's own signatures using the consumer's
@@ -656,7 +655,7 @@ addInstantiationTasks installedModules foundIndefiniteTasks origAdrs expandedAdr
               ++ ":" ++ CabalText.display implMod
           | (sig, implPkg, implMod) <- entries
           ]
-        input = S8.pack (L.intercalate "," sorted)
+        input = encodeUtf8 $ T.pack $ L.intercalate "," sorted
         digest = hashWith SHA256 input
         -- Take first 16 hex chars for a short but unique-enough suffix.
         hexStr = Mem.convertToBase Mem.Base16 digest :: ByteString
