@@ -1,0 +1,24 @@
+spec-version: 0.36.0
+
+name: consumer-pkg
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+  dependencies:
+  - name: str-sig
+    mixin:
+    - requires (Str as Str)
+  - name: logger-sig
+    mixin:
+    - requires (Logger as Logger)
+  - impl-pkg
+
+executables:
+  consumer-demo:
+    source-dirs: app
+    main: Main.hs
+    dependencies:
+    - consumer-pkg

@@ -1,0 +1,14 @@
+spec-version: 0.36.0
+
+name: logger-sig
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+  signatures: Logger
+  dependencies:
+  - name: str-sig
+    mixin:
+    - requires (Str as Str)

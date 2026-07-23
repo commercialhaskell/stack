@@ -28,7 +28,7 @@ import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.Version ( mkVersion )
 import           Distribution.Types.VersionRange ( anyVersion )
 import           Distribution.ModuleName ( ModuleName )
-import           Stack.Build.Backpack ( addInstantiationTasks )
+import qualified Stack.Build.Backpack as Backpack
 import           Stack.Build.ConstructPlan ( shouldSplitComponents )
 import           Stack.Build.ExecutePackage
                    ( findGhcPkgId, mkInstantiateWithOpts )
@@ -70,6 +70,14 @@ import           Test.Hspec
                    ( Spec, describe, expectationFailure, hspec, it
                    , shouldBe, shouldSatisfy
                    )
+
+addInstantiationTasks ::
+     Map PackageName (Set ModuleName)
+  -> [(PackageName, AddDepRes)]
+  -> [(ComponentKey, AddDepRes)]
+  -> ([(ComponentKey, AddDepRes)], [StyleDoc])
+addInstantiationTasks installedModules =
+  Backpack.addInstantiationTasks installedModules Map.empty
 
 main :: IO ()
 main = hspec spec
