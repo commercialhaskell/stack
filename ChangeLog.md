@@ -4,6 +4,11 @@
 
 Release notes:
 
+* After an upgrade from an earlier version of Stack, on first use only,
+  Stack UNRELEASED may warn that it had trouble loading the CompilerPaths cache
+  and is ignoring the cache (code S-9841). That is because a field has been
+  added to the cache.
+
 **Changes since v3.11.1:**
 
 Major changes:
@@ -29,8 +34,14 @@ Behavior changes:
   evaluated by Nix. The `nix-instantiate-options` option is added, accordingly.
 * Stack's `build` command now warns if `--force-dirty` is specified but no
   local packages will be built.
+* On non-Windows operating systems, the flag `--[no-]semaphore` to Stack's
+  `build` command has no effect if `ghc --info` does not report a semaphore
+  version. This is a limitation of the `semaphore-compat >= 2` package.
 
 Other enhancements:
+
+* Flag `--[no-]semaphore` to Stack's `build` command is no longer classified as
+  experimental in documentation.
 
 Bug fixes:
 

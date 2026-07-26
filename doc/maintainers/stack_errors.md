@@ -302,6 +302,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2965] | GHCInfoMissingGlobalPackageDB
         [S-5219] | GHCInfoMissingTargetPlatform
         [S-8299] | GHCInfoTargetPlatformInvalid String
+        [S-6307] | GHCInfoSemaphoreVersionUnknown String
         [S-2574] | CabalNotFound (Path Abs File)
         [S-8488] | GhcBootScriptNotFound
         [S-1128] | HadrianScriptNotFound
@@ -336,6 +337,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-5378] | GlobalPackageCacheFileMetadataMismatch
         [S-2673] | GlobalDumpParseFailure
         [S-8441] | CompilerCacheArchitectureInvalid Text
+        [S-9841] | GhcSemaphoreProtocolVersionUnknown
         ~~~
 
     -   `Stack.Templates.TemplatesPrettyException`

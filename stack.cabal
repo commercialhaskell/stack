@@ -478,7 +478,7 @@ library
     , random
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
-    , semaphore-compat <2
+    , semaphore-compat >=2.0.1
     , split
     , stm
     , tar >=0.6.2.0
@@ -604,7 +604,7 @@ executable stack
     , random
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
-    , semaphore-compat <2
+    , semaphore-compat >=2.0.1
     , split
     , stack
     , stm
@@ -710,7 +710,7 @@ executable stack-integration-test
     , random
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
-    , semaphore-compat <2
+    , semaphore-compat >=2.0.1
     , split
     , stm
     , tar >=0.6.2.0
@@ -831,7 +831,7 @@ test-suite stack-unit-test
     , raw-strings-qq
     , rio >=0.1.22.0 && (<0.1.23.0 || >0.1.23.0)
     , rio-prettyprint >=0.1.8.0
-    , semaphore-compat <2
+    , semaphore-compat >=2.0.1
     , split
     , stack
     , stm
