@@ -29,6 +29,8 @@ cabal.project.local
 # Emacs-related
 .dir-locals.el
 *_flymake.hs
+*~
+.#*
 
 # Vim-related
 *.swp
@@ -57,7 +59,6 @@ cabal.project.local
 .VSCodeCounter
 
 # Unexplained
-*~
 *.imports
 src/highlight.js
 src/style.css
