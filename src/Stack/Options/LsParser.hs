@@ -23,7 +23,7 @@ import           Stack.Options.DotParser ( dotOptsParser )
 import           Stack.Prelude hiding ( sep )
 import           Stack.Types.LsOpts
                    ( ListDepsFormat (..), ListDepsFormatOpts (..)
-                   , ListDepsOpts (..), ListDepsTextFilter (..)
+                   , ListDepsOpts (..), ListDepsTextItem (..)
                    , ListGlobalsOpts (..), ListStylesOpts (..)
                    , ListToolsOpts (..), LsCmdOpts (..), LsCmds (..)
                    , LsView (..), SnapshotOpts (..), ListGlobalsOpts
@@ -171,11 +171,22 @@ formatSubCommand cmd desc formatParser =
     cmd (OA.info (toListDepsOptsParser formatParser) (OA.progDesc desc))
 
 listDepsTextParser :: OA.Parser ListDepsFormat
-listDepsTextParser =
-  ListDepsText <$> listDepsFormatOptsParser <*> textFilterParser
+listDepsTextParser = ListDepsText
+  <$> listDepsFormatOptsParser
+  <*> textQueryParser
+  <*> textFilterParser
 
-textFilterParser :: OA.Parser [ListDepsTextFilter]
-textFilterParser = many (OA.option parseListDepsTextFilter
+textQueryParser :: OA.Parser [ListDepsTextItem]
+textQueryParser = many (OA.option parseListDepsTextItem
+  (  OA.long "query"
+  <> OA.metavar "ITEM"
+  <> OA.help "Item to be retained, if present, being either $locals (for all \
+             \project packages) or a package name (can be specified multiple \
+             \times). All non-retained items are filtered out of the results."
+  ))
+
+textFilterParser :: OA.Parser [ListDepsTextItem]
+textFilterParser = many (OA.option parseListDepsTextItem
   (  OA.long "filter"
   <> OA.metavar "ITEM"
   <> OA.help "Item to be filtered out of the results, if present, being either \
@@ -183,12 +194,12 @@ textFilterParser = many (OA.option parseListDepsTextFilter
              \specified multiple times)."
   ))
 
-parseListDepsTextFilter :: OA.ReadM ListDepsTextFilter
-parseListDepsTextFilter = OA.eitherReader $ \s ->
+parseListDepsTextItem :: OA.ReadM ListDepsTextItem
+parseListDepsTextItem = OA.eitherReader $ \s ->
   if s == "$locals"
-    then Right FilterLocals
+    then Right AllProjectPackages
     else case parsePackageName s of
-      Just pkgName -> Right $ FilterPackage pkgName
+      Just pkgName -> Right $ PackageNameOnly pkgName
       Nothing -> Left $ s <> " is not a valid package name."
 
 listDepsConstraintsParser :: OA.Parser ListDepsFormat

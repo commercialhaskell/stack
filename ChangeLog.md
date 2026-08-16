@@ -32,6 +32,12 @@ Behavior changes:
 
 Other enhancements:
 
+* Add option `--query ITEM`, which can be specified multiple times, to Stack's
+  `ls dependencies text` command (the default `ls dependencies` command), to
+  cause Stack to filter out from the results all packages other than those
+  queried. Like the existing `--filter ITEM` option, an item is either a
+  package name or `$locals` for all project packages.
+
 Bug fixes:
 
 * `stack test --no-rerun-tests` correctly skips test suites that have

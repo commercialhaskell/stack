@@ -34,10 +34,11 @@ Available commands:
 or
 
 ~~~text
-stack ls dependencies [--[no-]license] [--separator SEP] [--filter ITEM]
-                      [--[no-]external] [--[no-]include-base] [--depth DEPTH]
-                      [--prune PACKAGES] [TARGET] [--flag PACKAGE:[-]FLAG]
-                      [--test] [--bench] [--global-hints]
+stack ls dependencies [--[no-]license] [--separator SEP] [--query ITEM]
+                      [--filter ITEM] [--[no-]external] [--[no-]include-base]
+                      [--depth DEPTH] [--prune PACKAGES] [TARGET]
+                      [--flag PACKAGE:[-]FLAG] [--test] [--bench]
+                      [--global-hints]
 ~~~
 
 `stack ls dependencies` lists package versions used for a project.
@@ -52,9 +53,12 @@ By default:
     and what follows is a space character. Pass the `--separator` option to
     specify a different separator;
 *   with the `text` command, all relevant package names are included. Pass the
-    `--filter` option to specify an item to be filtered out from the results, if
-    present. An item can be `$locals` (for all project packages) or a package
-    name. It can be specified multiple times;
+    `--query` option to specify an item to be retained in the results, if
+    present. Pass the `--filter` option to specify an item to be filtered out
+    from the results, if present. In both cases, an item is either a package
+    name or `$locals` for all project packages. In both cases, the option can be
+    specified multiple times. If the `--query` option is used, all non-retained
+    items are filtered out from the results;
 
     !!! note
 
