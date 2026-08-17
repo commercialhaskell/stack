@@ -60,7 +60,7 @@ import           Stack.Types.EnvConfig ( EnvConfig (..), installationRootDeps )
 import           Stack.Types.LsOpts
                    ( LsCmdOpts (..), LsCmds (..), ListDepsFormat (..)
                    , ListDepsFormatOpts (..), ListDepsOpts (..)
-                   , ListDepsTextFilter (..), ListGlobalsOpts (..)
+                   , ListDepsTextItem (..), ListGlobalsOpts (..)
                    , ListStylesOpts (..), ListToolsOpts (..), LsView (..)
                    , SnapshotOpts (..)
                    )
@@ -324,20 +324,23 @@ listDependencies opts = do
       T.putStrLn "Packages"
       >> printTree treeOpts dotOpts 0 [] (treeRoots opts pkgs) resultGraph
     ListDepsJSON -> printJSON pkgs resultGraph
-    ListDepsText textOpts listDepsTextFilters -> do
+    ListDepsText textOpts listDepsTextQueries listDepsTextFilters -> do
       let resultGraph' = Map.filterWithKey p resultGraph
+          locals = Set.toList pkgs
+          includes = expandLocals locals listDepsTextQueries
           p k _ =
-            Set.notMember k (exclude (Set.toList pkgs) listDepsTextFilters)
+               Set.notMember k (expandLocals locals listDepsTextFilters)
+            && (Set.null includes || Set.member k includes)
       void $ Map.traverseWithKey (go "" textOpts) (snd <$> resultGraph')
      where
-      exclude :: [PackageName] -> [ListDepsTextFilter] -> Set PackageName
-      exclude locals = Set.fromList . exclude' locals
+      expandLocals :: [PackageName] -> [ListDepsTextItem] -> Set PackageName
+      expandLocals locals = Set.fromList . expandLocals' locals
 
-      exclude' :: [PackageName] -> [ListDepsTextFilter] -> [PackageName]
-      exclude' _ [] = []
-      exclude' locals (f:fs) = case f of
-        FilterPackage pkgName -> pkgName : exclude' locals fs
-        FilterLocals -> locals <> exclude' locals fs
+      expandLocals' :: [PackageName] -> [ListDepsTextItem] -> [PackageName]
+      expandLocals' _ [] = []
+      expandLocals' locals (x:xs) = case x of
+        PackageNameOnly pkgName -> pkgName : expandLocals' locals xs
+        AllProjectPackages -> locals <> expandLocals' locals xs
     ListDepsConstraints -> do
       let constraintOpts = ListDepsFormatOpts
             { sep = " =="

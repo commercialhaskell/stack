@@ -17,7 +17,7 @@ module Stack.Types.LsOpts
   , ListDepsOpts (..)
   , ListDepsFormat (..)
   , ListDepsFormatOpts (..)
-  , ListDepsTextFilter (..)
+  , ListDepsTextItem (..)
   , ListGlobalsOpts (..)
   , ListStylesOpts (..)
   , ListToolsOpts (..)
@@ -70,7 +70,7 @@ data ListDepsOpts = ListDepsOpts
 
 -- | Type representing formats for printing dependencies.
 data ListDepsFormat
-  = ListDepsText ListDepsFormatOpts [ListDepsTextFilter]
+  = ListDepsText ListDepsFormatOpts [ListDepsTextItem] [ListDepsTextItem]
   | ListDepsTree ListDepsFormatOpts
   | ListDepsJSON
   | ListDepsConstraints
@@ -84,11 +84,12 @@ data ListDepsFormatOpts = ListDepsFormatOpts
     -- ^ Print dependency licenses instead of versions.
   }
 
--- | Type representing items to filter the results of @stack ls dependencies@.
-data ListDepsTextFilter
-  = FilterPackage PackageName
+-- | Type representing items to query or filter from the results of
+-- @stack ls dependencies text@.
+data ListDepsTextItem
+  = PackageNameOnly PackageName
     -- ^ Item is a package name.
-  | FilterLocals
+  | AllProjectPackages
     -- ^ Item represents all project packages.
 
 -- | Type representing command line options for the @stack ls stack-colors@ and
