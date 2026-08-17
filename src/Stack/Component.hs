@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude        #-}
-{-# LANGUAGE OverloadedRecordDot      #-}
-{-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 {-|
 Module      : Stack.Component

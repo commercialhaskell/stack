@@ -1,5 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
 
 {-|
 Module      : Stack.Types.GhciOpts

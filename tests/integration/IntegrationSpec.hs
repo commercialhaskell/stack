@@ -1,5 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 import           Conduit
                    ( (.|), connect, filterC, filterMC, foldMapC, mapM_C

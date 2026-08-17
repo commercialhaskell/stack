@@ -4,10 +4,10 @@ module Stack.Types.TemplateNameSpec
   ( spec
   ) where
 
-import Stack.Types.TemplateName
-import Path.Internal
-import System.Info (os)
-import Test.Hspec
+import           Path.Internal
+import           Stack.Types.TemplateName
+import           System.Info ( os )
+import           Test.Hspec
 
 spec :: Spec
 spec =

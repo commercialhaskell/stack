@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude  #-}
-{-# LANGUAGE NoFieldSelectors   #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoFieldSelectors  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-|
 Module      : Stack.Types.Casa
