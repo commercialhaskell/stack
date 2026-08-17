@@ -1,7 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE DuplicateRecordFields      #-}
-{-# LANGUAGE NoFieldSelectors           #-}
-{-# LANGUAGE OverloadedRecordDot        #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors      #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 {-|
 Module      : Stack.Types.Component

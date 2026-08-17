@@ -6,12 +6,11 @@ module Stack.Build.ExecuteSpec
   , spec
   ) where
 
+import           Control.Concurrent.Execute ( ActionId (..), ActionType (..) )
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.Version ( mkVersion )
-import           Control.Concurrent.Execute
-                   ( ActionId (..), ActionType (..) )
 import           Stack.Build.Execute
                    ( finalTestsAndBenches, intraPackageDeps, missingToDeps )
 import           Stack.Build.ExecutePackage

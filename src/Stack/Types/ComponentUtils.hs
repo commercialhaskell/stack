@@ -1,5 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE DuplicateRecordFields      #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 {-|
 Module      : Stack.Types.ComponentUtils

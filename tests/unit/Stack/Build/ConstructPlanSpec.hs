@@ -1,6 +1,6 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings   #-}
 
 module Stack.Build.ConstructPlanSpec
   ( main
@@ -9,9 +9,11 @@ module Stack.Build.ConstructPlanSpec
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import           Database.Persist ( PersistField (..), PersistValue (..) )
 import           Distribution.CabalSpecVersion ( CabalSpecVersion (..) )
 import           Distribution.Compiler ( PerCompilerFlavor (..) )
 import           Distribution.License ( License (BSD3) )
+import           Distribution.ModuleName ( ModuleName )
 import qualified Distribution.ModuleName as Cabal
 import           Distribution.PackageDescription
                    ( BenchmarkInterface (..), BenchmarkType (..)
@@ -27,7 +29,6 @@ import           Distribution.Types.ModuleRenaming
 import           Distribution.Types.PackageName ( mkPackageName )
 import           Distribution.Types.Version ( mkVersion )
 import           Distribution.Types.VersionRange ( anyVersion )
-import           Distribution.ModuleName ( ModuleName )
 import           Stack.Build.Backpack ( addInstantiationTasks )
 import           Stack.Build.ConstructPlan ( shouldSplitComponents )
 import           Stack.Build.ExecutePackage
@@ -38,7 +39,6 @@ import           Stack.Package
                    )
 import           Stack.Prelude
 import           Stack.Types.Build.ConstructPlan ( AddDepRes (..) )
-import           Database.Persist ( PersistField (..), PersistValue (..) )
 import           Stack.Types.Cache ( CachePkgSrc (..), ConfigCacheType (..) )
 import           Stack.Types.CompCollection
                    ( foldAndMakeCollection, getBuildableSet )

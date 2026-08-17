@@ -45,8 +45,8 @@ import           Stack.Types.Curator ( Curator )
 import           Stack.Types.DumpPackage ( DumpPackage )
 import           Stack.Types.EnvConfig
                    ( EnvConfig (..), HasEnvConfig (..), HasSourceMap (..) )
-import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.GHCVariant ( HasGHCVariant (..) )
+import           Stack.Types.GhcPkgId ( GhcPkgId )
 import           Stack.Types.Installed
                    ( InstallLocation, Installed (..), installedVersion )
 import           Stack.Types.IsMutable ( IsMutable )
@@ -56,7 +56,7 @@ import           Stack.Types.Package
                    )
 import           Stack.Types.ParentMap ( ParentMap )
 import           Stack.Types.Plan
-                    ( ComponentKey, Task (..), TaskType (..), taskProvides )
+                   ( ComponentKey, Task (..), TaskType (..), taskProvides )
 import           Stack.Types.Platform ( HasPlatform (..) )
 import           Stack.Types.Runner ( HasRunner (..) )
 
