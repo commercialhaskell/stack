@@ -362,12 +362,15 @@ executable that it compiles from Haskell source code. The executable compiles
 that code with a dependency on the version of Cabal that ships with the
 specified GHC compiler. Each release of Stack will normally aim to support all
 versions of GHC and the Cabal package in Stackage LTS Haskell snapshots
-published within seven years of the release. For example, snapshot LTS Haskell
-13.0, published on 23 December 2018, was the first LTS Haskell snapshot to
-provide GHC 8.6.3 which comes with `base-4.12.0.0` and `Cabal-2.4.0.1`.
-Normally, until, at least, 23 December 2025, Stack releases would aim to support
-the immediate predecessor, GHC 8.4.4 and `base-4.11.1.0`, `Cabal-2.2.0.1` and
-Haddock 2.20.0.
+published within seven years of the release.
+
+For example, snapshot LTS Haskell 15.0, published on 16 February 2020, was the
+first LTS Haskell snapshot to provide GHC 8.8.2 which comes with `base-4.13.0.0`
+and `Cabal-3.0.1.0`. Normally, until, at least, 16 February 2027, Stack releases
+would aim to support the immediate predecessor, GHC 8.6.5 and `base-4.12.0.0`,
+`Cabal-2.4.0.1` and Haddock 2.22.0.
+
+Stack 3.11.1 in fact supports GHC 8.4.1 and `base-4.11.0.0` and `Cabal-2.2.0.0`.
 
 When a version of the Stack executable actually ceases to support a version of
 GHC and `Cabal`, that should be recorded in Stack's
