@@ -1,0 +1,3 @@
+signature Logger where
+
+logMessage :: String -> String

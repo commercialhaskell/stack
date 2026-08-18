@@ -1,0 +1,4 @@
+consumer-pkg.cabal
+impl-pkg.cabal
+logger-sig.cabal
+str-sig.cabal

@@ -1,0 +1,6 @@
+snapshot: snapshot.yaml
+
+packages:
+- consumer-pkg
+- impl-pkg
+- logger-sig

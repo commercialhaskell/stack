@@ -1,0 +1,7 @@
+consumer-pkg.cabal
+impl-pkg.cabal
+logger-sig.cabal
+str-sig.cabal
+snapshots/*.tar.gz
+stack.yaml.lock
+snapshot.yaml.lock

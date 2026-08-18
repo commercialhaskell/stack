@@ -1,0 +1,3 @@
+signature Str where
+
+greeting :: String

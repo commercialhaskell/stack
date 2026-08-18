@@ -34,7 +34,7 @@ import           RIO.State
                    ( State, StateT (..), execState, get, modify, modify', put )
 import           RIO.Writer ( WriterT (..), pass, tell )
 import           Stack.Build.Backpack
-                   ( addInstantiationTasks, upgradeFoundIndefinites )
+                   ( addInstantiationTasks, loadFoundIndefiniteTasks )
 import           Stack.Build.Cache ( tryGetFlagCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
 import           Stack.Build.Source ( loadLocalPackage )
@@ -56,7 +56,8 @@ import           Stack.Types.Build.ConstructPlan
                    ( AddDepRes (..), CombinedMap, Ctx (..), LibraryMap, M
                    , MissingPresentDeps (..), PackageInfo (..), PackageLoader
                    , ToolWarning(..), UnregisterState (..), W (..)
-                   , adrHasLibrary, adrVersion, isAdrToInstall, toTask
+                   , adrHasLibrary, adrVersion, isAdrToInstall, processAdr
+                   , toTask
                    )
 import           Stack.Types.Build.Exception
                    ( BadDependency (..), BuildException (..)
@@ -95,14 +96,14 @@ import           Stack.Types.NamedComponent
                    )
 import           Stack.Types.Package
                    ( ExeName (..), LocalPackage (..), Package (..)
-                   , PackageSource (..), installedMapGhcPkgId
-                   , packageIdentifier, psVersion, runMemoizedWith
+                   , PackageSource (..), packageIdentifier, psVersion
+                   , runMemoizedWith
                    )
 import           Stack.Types.Plan
                    ( ComponentKey (..), Plan (..), Task (..)
                    , TaskConfigOpts (..), TaskType (..), componentKeyPkgName
                    , fromComponentKey, installLocationIsMutable, taskIsTarget
-                   , taskLocation, taskProvides, taskTargetIsMutable
+                   , taskLocation, taskProvides
                    )
 import           Stack.Types.ProjectConfig ( isPCGlobalProject )
 import           Stack.Types.Runner ( HasRunner (..), globalOptsL )
@@ -226,9 +227,9 @@ constructPlan
         errs = errlibs ++ errfinals
     if null errs
       then do
-        -- Upgrade ADRFound entries to ADRToInstall for indefinite packages
-        -- whose source is available. This ensures addInstantiationTasks can
-        -- clone their Task to create CInst instantiation tasks.
+        -- Load source-backed templates for clean installed indefinite packages.
+        -- This lets addInstantiationTasks clone them for CInst tasks without
+        -- turning their ADRFound CLib entries into build tasks.
         let loadPkg w x y z = applyForceCustomBuild globalCabalVersion
                              <$> loadPackage0 w x y z
             -- Build a module lookup map from installed packages (dump data).
@@ -239,11 +240,15 @@ constructPlan
               | dp <- allDumpPkgs
               , isNothing dp.sublib  -- Only main libraries
               ]
-        adrs' <- upgradeFoundIndefinites
-                   loadPkg econfig ctx.combinedMap ctx.baseConfigOpts adrs
-        let expandedAdrs = concatMap (uncurry expandToComponentKeys) adrs'
+        foundIndefiniteTasks <- loadFoundIndefiniteTasks
+                   loadPkg econfig sources ctx.combinedMap ctx.baseConfigOpts adrs
+        let expandedAdrs = concatMap (uncurry expandToComponentKeys) adrs
             (withInstantiations, bpWarnings) =
-              addInstantiationTasks installedModules adrs' expandedAdrs
+              addInstantiationTasks
+                installedModules
+                foundIndefiniteTasks
+                adrs
+                expandedAdrs
             tasks = Map.fromList $ mapMaybe
               (toMaybe . second toTask)
               withInstantiations
@@ -416,10 +421,17 @@ mkUnregisterLocal componentTasks dirtyReason localDumpPkgs initialBuildSteps =
   -- directly or transitively depending on it.
   loop Map.empty localDumpPkgs
  where
-  -- Derive a per-package task map: pick one representative task per package.
+  -- Derive a per-package task map: pick one representative non-CInst task per
+  -- package. A CInst task registers a Backpack instantiation, but it relies on
+  -- the existing indefinite library registration for the same package name.
+  -- Treating CInst-only packages as normal rebuilds unregisters that
+  -- indefinite unit before the CInst configure step can use it.
   tasks :: Map PackageName Task
   tasks = Map.fromList
-    [ (componentKeyPkgName ck, t) | (ck, t) <- Map.toList componentTasks ]
+    [ (componentKeyPkgName ck, t)
+    | (ck, t) <- Map.toList componentTasks
+    , not (componentKeyIsCInst ck)
+    ]
 
   loop ::
        Map GhcPkgId (PackageIdentifier, Text)
@@ -504,6 +516,10 @@ mkUnregisterLocal componentTasks dirtyReason localDumpPkgs initialBuildSteps =
       -- that of the parent.
       relevantPkgName :: PackageName
       relevantPkgName = maybe (pkgName ident) pkgName mParentLibId
+
+  componentKeyIsCInst :: ComponentKey -> Bool
+  componentKeyIsCInst (ComponentKey _ CInst{}) = True
+  componentKeyIsCInst _ = False
 
 -- | Given a t'LocalPackage' and its test\/benchmark 'Package', adds a
 -- t'Task' for running its tests and benchmarks. Resolves the package's deps
@@ -1153,31 +1169,6 @@ adrInRange pkgId name range adr = if adrVersion adr `withinRange` range
             [ "Reason:"
             , reason <> "."
             ]
-
--- | Given a result of 'addDep', yields a triple indicating: (1) if the
--- dependency is to be installed, its package identifier; (2) if the dependency
--- is installed and a library, its package identifier and 'GhcPkgId'; and (3) if
--- the dependency is, or will be when installed, mutable or immutable.
-processAdr ::
-     AddDepRes
-  -> MissingPresentDeps
-processAdr adr = case adr of
-  ADRToInstall task ->
-    MissingPresentDeps
-      { missingPackages = Set.singleton $ taskProvides task
-      , presentPackages = mempty
-      , isMutable = taskTargetIsMutable task
-      }
-  ADRFound loc installed ->
-    MissingPresentDeps
-      { missingPackages = mempty
-      , presentPackages = presentPackagesV
-      , isMutable = installLocationIsMutable loc
-      }
-   where
-    presentPackagesV = case installed of
-      Library ident installedInfo -> installedMapGhcPkgId ident installedInfo
-      _ -> Map.empty
 
 checkDirtiness ::
      PackageSource
