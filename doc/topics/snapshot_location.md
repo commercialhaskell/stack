@@ -32,7 +32,7 @@ There are four ways to specify a snapshot location:
     *   **Stackage LTS Haskell snapshots**, for example:
 
         ~~~yaml
-        snapshot: lts-24.43
+        snapshot: lts-24.55
         ~~~
 
         ??? info "Expansion of `lts-X.Y`"
@@ -52,7 +52,7 @@ There are four ways to specify a snapshot location:
     *   **Stackage Nightly snapshots**, for example:
 
         ~~~yaml
-        snapshot: nightly-2026-05-29
+        snapshot: nightly-2026-08-20
         ~~~
 
         ??? info "Expansion of `nightly-YYYY-MM-DD`"

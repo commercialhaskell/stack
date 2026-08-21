@@ -1,4 +1,4 @@
-snapshot: lts-24.43
+snapshot: lts-24.55
 
 extra-deps:
 - ./filepath-1.5.4.0
