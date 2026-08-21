@@ -4,6 +4,9 @@
 
 Release notes:
 
+* The change in major version from 3.x to 4.1 marks the introduction of Stack's
+  support for GHC's Backpack module system for cross-package use.
+
 **Changes since v3.11.1:**
 
 Major changes:
