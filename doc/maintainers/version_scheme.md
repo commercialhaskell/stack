@@ -33,31 +33,31 @@ A Stack package or executable may have a version with three or four components:
   (e.g. `v2.5.1.1`, in the `release` branch)
 
 * Pre-release unstable binaries will be released with the date as the `A`
-  component (e.g. `3.6.0.20241228`)
+  component (e.g. `4.2.0.20260821`)
 
 ## Examples
 
-* `3.5.0.0`: `v3.5.*` series pre-release branch (`rc/v3.5` branch)
+* `4.1.0.0`: `v4.1.*` series pre-release branch (`rc/v4.1` branch)
 
-* `3.5.0.1`: first release candidate for first release of `v3.5.*` series
-  (`rc/v3.5` branch)
+* `4.1.0.1`: first release candidate for first release of `v4.1.*` series
+  (`rc/v4.1` branch)
 
-* `3.5.0.2`: continuing development on pre-release branch
+* `4.1.0.2`: continuing development on pre-release branch
 
-* `3.5.0.3`: second release candidate for first release of `v3.5.*` series
-  (`rc/v3.5` branch)
+* `4.1.0.3`: second release candidate for first release of `v4.1.*` series
+  (`rc/v4.1` branch)
 
-* `3.5.1`: first release of the `3.5.*` series (`release` branch)
+* `4.1.1`: first release of the `4.1.*` series (`release` branch)
 
-* `3.5.2.1`: first release candidate for second release of `3.5.*` series
-  (`rc/v3.5` branch)
+* `4.1.2.1`: first release candidate for second release of `4.1.*` series
+  (`rc/v4.1` branch)
 
-* `3.5.3`: second release of `3.5.*` series (`release` branch)
+* `4.1.3`: second release of `4.1.*` series (`release` branch)
 
-* `3.5.3.1`: first Hackage-only patch of `3.5.3` (`release` branch)
+* `4.1.3.1`: first Hackage-only patch of `4.1.3` (`release` branch)
 
-* `3.5.3.2`: second Hackage-only patch of `3.5.3` (`release` branch)
+* `4.1.3.2`: second Hackage-only patch of `4.1.3` (`release` branch)
 
-* `3.6.0`: unstable development code (`master` branch)
+* `4.2.0`: unstable development code (`master` branch)
 
-* `3.6.0.20241228`: pre-release snapshot of unstable version (`master` branch)
+* `4.2.0.20260821`: pre-release snapshot of unstable version (`master` branch)

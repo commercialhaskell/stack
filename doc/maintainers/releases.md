@@ -69,7 +69,7 @@
 
 1.  `package.yaml`: bump to the next release candidate version (bump the second
     component to the next odd number, ensure the third component is `0`, and add
-    patchlevel `0`; e.g. from `3.4.0` to `3.5.0.0`).
+    patchlevel `0`; e.g. from `4.0.0` to `4.1.0.0`).
 
     !!! attention
 
@@ -98,7 +98,7 @@ git checkout -b rc/vX.Y
 
 1.  `package.yaml`: bump version to the next unstable version (bump the second
     component to the next even number, ensure the third component is `0`; e.g.
-    from `3.5.0` to `3.6.0`).
+    from `4.1.0` to `4.2.0`).
 
     !!! attention
 
@@ -111,7 +111,7 @@ git checkout -b rc/vX.Y
 3.  `Changelog.md`:
 
     *   Change the title of the existing **Unreleased changes** section to what
-        will be the next final (non-RC) release (e.g. `v3.5.1`).
+        will be the next final (non-RC) release (e.g. `v4.1.1`).
 
     *   Add new "Unreleased changes" section:
 
@@ -330,7 +330,7 @@ final release.
     In the `rc/vX.Y` branch:
 
     * `package.yaml`: bump the version number. Bump the fourth component to an
-       even number (e.g. from `3.5.0.1` to `3.5.0.2`).
+       even number (e.g. from `4.1.0.1` to `4.1.0.2`).
 
         !!! attention
 
@@ -597,7 +597,7 @@ final release.
     In the `stable` branch:
 
     * `package.yaml`: bump the version number. Bump the third component to an
-      even number (e.g. from `3.5.1` to `3.5.2`).
+      even number (e.g. from `4.1.1` to `4.1.2`).
 
         !!! attention
 
