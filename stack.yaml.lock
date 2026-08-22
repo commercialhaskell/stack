@@ -89,12 +89,12 @@ packages:
   original:
     hackage: crypton-x509-validation-1.9.1@sha256:7fd1231e0ce13be7bbb95a348da58919174d341572309ff4471e39c3b3f4e68a,2113
 - completed:
-    hackage: hi-file-parser-0.1.9.0@sha256:a6f4cce3c5cfdd5c88f1145bad6fd0932ba5084591142956c30ee47a1d78eac5,3245
+    hackage: hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
     pantry-tree:
-      sha256: fb6b131cdaa2bff3f069aaa4148710e85ff5535fb20666d17855853f6f8b4145
-      size: 3117
+      sha256: c8839695b53b682930d9a359357d1c6b7ded84a1e16d5b75ab7c77c99c3561f8
+      size: 3799
   original:
-    hackage: hi-file-parser-0.1.9.0@sha256:a6f4cce3c5cfdd5c88f1145bad6fd0932ba5084591142956c30ee47a1d78eac5,3245
+    hackage: hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
 - completed:
     hackage: hpke-0.1.0@sha256:fb107670a0aeb91b4626e0b1dff4e7ec3342e48931cc994938d95af1a23f645d,1801
     pantry-tree:
@@ -102,13 +102,6 @@ packages:
       size: 1320
   original:
     hackage: hpke-0.1.0@sha256:fb107670a0aeb91b4626e0b1dff4e7ec3342e48931cc994938d95af1a23f645d,1801
-- completed:
-    hackage: hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
-    pantry-tree:
-      sha256: c8839695b53b682930d9a359357d1c6b7ded84a1e16d5b75ab7c77c99c3561f8
-      size: 3799
-  original:
-    hackage: hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
 - completed:
     hackage: http-client-tls-0.4.0@sha256:39fc60a864134946c773953fb96a836cd769b3af6fa03a4bfc547168a15e541d,2117
     pantry-tree:
@@ -181,7 +174,7 @@ packages:
     hackage: tls-2.4.3@sha256:b69bad4c980463bebe216e3b1f88443884daff19878e2fec45661358abdbe6e8,7391
 snapshots:
 - completed:
-    sha256: 3c412a7c13dba6d3d808455a458e0776c58b6cf99b8a7961a2f5e55589d6f1d6
-    size: 729011
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/43.yaml
-  original: lts-24.43
+    sha256: 1c2140555bdf61c30a893b3ec1033987d01eda75ce82a1dda033e8fb6f8b322c
+    size: 732456
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/55.yaml
+  original: lts-24.55

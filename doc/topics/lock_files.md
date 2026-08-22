@@ -49,7 +49,7 @@ Relevant to this discussion, Stack's project-level configuration file
 Some of this information can be incomplete. Consider this `stack.yaml` file:
 
 ~~~yaml
-snapshot: lts-24.43
+snapshot: lts-24.55
 extra-deps:
 - acme-missiles-0.3
 ~~~
@@ -66,7 +66,7 @@ extra-deps:
     sha256: 614bc0cca76937507ea0a5ccc17a504c997ce458d7f2f9e43b15a10c8eaeb033
 ~~~
 
-The `lts-24.43` information is also incomplete. While we assume in general that
+The `lts-24.55` information is also incomplete. While we assume in general that
 Haskell LTS snapshots never change, there is nothing that prohibits that from
 happening. Instead, the complete version of that key is:
 
@@ -134,7 +134,7 @@ snapshots:
     sha256: 3c412a7c13dba6d3d808455a458e0776c58b6cf99b8a7961a2f5e55589d6f1d6
     size: 729011
     url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/43.yaml
-  original: lts-24.43
+  original: lts-24.55
 ~~~
 
 ## Creation procedure
