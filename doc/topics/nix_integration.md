@@ -33,7 +33,7 @@ C libraries that you would normally install manually.
 Nix's `nix-shell` starts an interactive shell based on a Nix expression. Stack
 can automatically create a Nix build environment in the background using
 `nix-instantiate` to produce a store derivation and `nix-shell` with that store
-derivation. This two-step process (since Stack UNRELEASED) allows Stack to
+derivation. This two-step process (since Stack 4.1.1) allows Stack to
 report separately any errors in producing the store derivation. There are two
 alternative options to create such a build environment:
 
@@ -435,7 +435,7 @@ nix:
   # A list of strings, empty by default. Additional options that will be passed
   # verbatim to the `nix-instantiate` command.
   #
-  # Since Stack UNRELEASED
+  # Since Stack 4.1.1
   nix-instantiate-options: []
 
   # A list of strings, empty by default. Additional options that will be passed

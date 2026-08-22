@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased changes
+## v4.1.0.1 (release candidate)
 
 Release notes:
 
@@ -11,16 +11,16 @@ Release notes:
 
 Major changes:
 
-* Stack now supports GHC's Backpack module system for cross-package use. When a
-  package uses `signatures` and `mixins` to depend on an abstract interface
-  provided by another package, Stack automatically creates the extra
-  instantiation build steps that Cabal requires. This includes support for
-  explicit renaming, multiple instantiations of the same indefinite package,
-  transitive signature chains, sub-library signatures, and indefinite packages
-  from Hackage or snapshots. See the
+* Stack now supports GHC's Backpack module system for cross-package use.
+  (Private Backpack, where signatures and implementations are in the same
+  package, was already supported.) When a package uses `signatures` and `mixins`
+  to depend on an abstract interface provided by another package, Stack
+  automatically creates the extra instantiation build steps that Cabal requires.
+  This includes support for explicit renaming, multiple instantiations of the
+  same indefinite package, transitive signature chains, sub-library signatures,
+  and indefinite package from Hackage or snapshots. See the
   [Backpack topic](https://docs.haskellstack.org/en/stable/topics/backpack/) for
-  details. (Private Backpack, where signatures and implementations live in the
-  same package, has always worked without changes.)
+  details.
 
 Behavior changes:
 
@@ -43,17 +43,10 @@ Other enhancements:
 
 Bug fixes:
 
-* `stack test --no-rerun-tests` correctly skips test suites that have
-  previously been built and run successfully, including for non-Backpack
-  packages built by the per-component planner.
-* Stack's per-component build planner correctly handles the cross-package
-  test/library cycle shape from issue #6905: project package A's library
-  depending on project package B's library, with B's test suite depending on A,
-  builds in the right order with the right configure flags.
 * If snapshot locations are cyclic, Stack reports an error rather than going
   round in circles.
 
-##  v3.11.1 - 2026-06-13
+## v3.11.1 - 2026-06-13
 
 **Changes since v3.9.3:**
 
