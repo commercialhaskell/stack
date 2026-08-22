@@ -4,6 +4,20 @@
 
 Release notes:
 
+**Changes since v4.1.1:**
+
+Major changes:
+
+Behavior changes:
+
+Other enhancements:
+
+Bug fixes:
+
+## v4.1.1
+
+Release notes:
+
 * The change in major version from 3.x to 4.1 marks the introduction of Stack's
   support for GHC's Backpack module system for cross-package use.
 
@@ -53,7 +67,7 @@ Bug fixes:
 * If snapshot locations are cyclic, Stack reports an error rather than going
   round in circles.
 
-##  v3.11.1 - 2026-06-13
+## v3.11.1 - 2026-06-13
 
 **Changes since v3.9.3:**
 
