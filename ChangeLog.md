@@ -12,6 +12,8 @@ Behavior changes:
 
 Other enhancements:
 
+* Consider Cabal 3.18 to be a tested library and remove warnings.
+
 Bug fixes:
 
 ## v4.1.1
