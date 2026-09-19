@@ -1095,9 +1095,9 @@ warnUnsupportedCompilerCabal cp didWarn = do
           , parens (style Shell "nightly-2018-03-13")
           , flow "or later specify such GHC versions."
           ]
-    | cabalVersion >= mkVersion [3, 17] && notifyIfCabalUntested ->
+    | cabalVersion >= mkVersion [3, 19] && notifyIfCabalUntested ->
         prettyWarnL
-          [ flow "Stack has not been tested with Cabal versions 3.18 and \
+          [ flow "Stack has not been tested with Cabal versions 3.20 and \
                  \above, but version"
           , fromString (versionString cabalVersion)
           , flow "was found, this may fail."

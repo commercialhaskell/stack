@@ -50,7 +50,11 @@ import Distribution.Types.PackageDescription ( PackageDescription )
 import Distribution.Utils.Path
          ( interpretSymbolicPathCWD, makeSymbolicPath, relativeSymbolicPath )
 #endif
+#if MIN_VERSION_Cabal(3,18,0)
+import Distribution.Verbosity ( Verbosity (..), defaultVerbosityHandles )
+#else
 import Distribution.Verbosity ( Verbosity )
+#endif
 #endif
 import Distribution.Verbosity ( flagToVerbosity )
 import Main
@@ -88,7 +92,13 @@ stackReplHook arg1 arg2 = do
             "Unexpected happened running Setup.hs with " <>
             "stack-initial-build-steps, expected to parse Cabal verbosity: " <>
             msg1
-          Right verbosity -> do
+          Right verbosityFlags -> do
+            let verbosity =
+#if MIN_VERSION_Cabal(3,18,0)
+                  Verbosity verbosityFlags defaultVerbosityHandles
+#else
+                  verbosityFlags
+#endif             
             eFp <-
 #if MIN_VERSION_Cabal(3,14,0)
               findPackageDesc Nothing
