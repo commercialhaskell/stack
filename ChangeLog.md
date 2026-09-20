@@ -13,6 +13,7 @@ Behavior changes:
 Other enhancements:
 
 * Consider Cabal 3.18 to be a tested library and remove warnings.
+* Consider GHC 10.0 to be a tested compiler and remove warnings.
 
 Bug fixes:
 

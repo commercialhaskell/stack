@@ -1051,9 +1051,9 @@ warnUnsupportedCompiler ghcVersion = do
           , flow "Valiantly attempting to run anyway, but this is doomed."
           ]
         pure True
-    | ghcVersion >= mkVersion [9, 15] && notifyIfGhcUntested -> do
+    | ghcVersion >= mkVersion [10, 1] && notifyIfGhcUntested -> do
         prettyWarnL
-          [ flow "Stack has not been tested with GHC versions 9.16 and above, \
+          [ flow "Stack has not been tested with GHC versions 10.2 and above, \
                  \and using"
           , fromString (versionString ghcVersion) <> ","
           , flow "this may fail."
