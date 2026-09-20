@@ -24,6 +24,8 @@ extra-deps:
 - crypton-x509-system-1.9.0@sha256:ccdc92bf98d7693c63dc680ff665b6487a28a701003dbee6695a6dbd38244392,1539
 # lts-24.55 specifies crypton-x509-validation-1.6.14
 - crypton-x509-validation-1.9.1@sha256:7fd1231e0ce13be7bbb95a348da58919174d341572309ff4471e39c3b3f4e68a,2113
+# lts-24.55 specifies hi-file-parser-0.1.9.1
+- hi-file-parser-0.1.9.2@sha256:7eb11939f55938de337732a1a4521c7753cb7b5d4e97c3e074a6475b6893855a,5359
 # lts-24.55 specifies hpack-0.38.3
 - hpack-0.39.6@sha256:3dcd46245401aec2239ff63680880f04817635c7df00ee8ebe2bea9b57393891,5263
 # lts-24.55 specifies hpke-0.0.0
