@@ -3399,7 +3399,7 @@ Other enhancements:
 * Cached data is written with a checksum of its structure
   [#889](https://github.com/commercialhaskell/stack/issues/889)
 * Fully removed `--optimizations` flag
-* Added `--cabal-verbose` flag
+* Added `--[no-]cabal-verbose` flag
 * Added `--file-watch-poll` flag for polling instead of using filesystem events
   (useful for running tests in a Docker container while modifying code in the
   host environment. When code is injected into the container via a volume, the
@@ -3681,7 +3681,7 @@ Bug fixes:
 
 ## 0.0.3 - 2015-06-17
 
-* `--prefetch`
+* `--[no-]prefetch`
   [#297](https://github.com/commercialhaskell/stack/issues/297)
 * `upload` command ported from stackage-upload
   [#225](https://github.com/commercialhaskell/stack/issues/225)

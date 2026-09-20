@@ -1207,7 +1207,7 @@ to be used for this project. Example: `require-stack-version: "== 0.1.*"`
 Default: `true`
 
 Command line equivalent (takes precedence):
-[`stack upload --[no]-save-hackage-creds`](../../commands/upload_command.md)
+[`stack upload --[no-]save-hackage-creds`](../../commands/upload_command.md)
 option
 
 Controls whether, when using `stack upload`, the user's Hackage username and

@@ -966,7 +966,7 @@ expressions, and generate a profiling report in tests or benchmarks.
 The flag affects the location of the local project installation directory. See
 the [`stack path --local-install-root`](path_command.md) command.
 
-### `--[no]-semaphore` flag
+### `--[no-]semaphore` flag
 
 :octicons-beaker-24: Experimental
 
@@ -1062,14 +1062,14 @@ configuration option.
 
 ## Flags relating to build outputs
 
-### `--[no]-cabal-verbose` flag
+### `--[no-]cabal-verbose` flag
 
 Default: Disabled
 
 Set the flag to enable verbose output from Cabal (the library). This flag is an
 alternative to the `--cabal-verbosity` option.
 
-### `--[no]-cabal-verbosity` option
+### `--cabal-verbosity` option
 
 `stack build --cabal-verbosity <verbosity_level>` sets the specified verbosity
 level for output from Cabal (the library). It accepts Cabal's numerical and
@@ -1177,7 +1177,7 @@ package is targeted in a multi-package project (for example, using
   specific configuration option documentation. The default `dump-logs` mode is
   to output the contents of any log files that include GHC warnings.
 
-### `--[no]-open` flag
+### `--[no-]open` flag
 
 Default: Disabled
 
@@ -1185,7 +1185,7 @@ Set the flag to enable opening the local Haddock documentation in the browser.
 
 ## Other flags and options
 
-### `--[no]-prefetch` flag
+### `--[no-]prefetch` flag
 
 Default: Disabled
 
