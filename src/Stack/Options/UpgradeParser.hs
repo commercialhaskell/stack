@@ -24,7 +24,7 @@ import         Stack.Types.UpgradeOpts
 -- | Parse command line arguments for Stack's @upgrade@ command.
 upgradeOptsParser ::
      Bool
-     -- ^ The default for --[no]-only-local-bin
+     -- ^ The default for --[no-]only-local-bin
   -> Parser UpgradeOpts
 upgradeOptsParser onlyLocalBin = UpgradeOpts
   <$> (sourceOnly <|> optional binaryOpts)
