@@ -174,6 +174,8 @@ build:
   executable-profiling: false
   library-stripping: true
   executable-stripping: true
+  # Since Stack UNRELEASED:
+  info-table-profiling: false
 
   # NOTE: global usage of haddock can cause build failures when documentation is
   # incorrectly formatted. This could also affect scripts which use Stack.
