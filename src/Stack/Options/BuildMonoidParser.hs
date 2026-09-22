@@ -44,6 +44,7 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
   <*> exeProfiling
   <*> libStripping
   <*> exeStripping
+  <*> infoTableProfiling
   <*> haddock
   <*> haddockOptsParser hideBool
   <*> openHaddocks
@@ -130,6 +131,11 @@ buildOptsMonoidParser hide0 = BuildOptsMonoid
   exeStripping = firstBoolFlagsTrue
     "executable-stripping"
     "executable stripping for TARGETs and all its dependencies."
+    hide
+  infoTableProfiling = firstBoolFlagsFalse
+    "info-table-profiling"
+    "info table profiling, including the creation of a new info table for \
+    \every use of a data constructor in the source program."
     hide
   haddock = firstBoolFlagsFalse
     "haddock"

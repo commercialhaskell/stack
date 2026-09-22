@@ -53,6 +53,7 @@ buildOptsFromMonoid buildMonoid = BuildOpts
       (  buildMonoid.exeStrip
       <> FirstTrue (if noStripping then Just False else Nothing)
       )
+  , infoTableProf = fromFirstFalse buildMonoid.infoTableProf
   , buildHaddocks = fromFirstFalse buildMonoid.buildHaddocks
   , haddockOpts = haddockOptsFromMonoid buildMonoid.haddockOpts
   , openHaddocks =

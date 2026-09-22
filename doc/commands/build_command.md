@@ -10,8 +10,8 @@ stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
             [--only-configure] [--[no-]semaphore] [--trace] [--profile]
             [--no-strip] [--[no-]library-profiling]
             [--[no-]executable-profiling] [--[no-]library-stripping]
-            [--[no-]executable-stripping] [--[no-]haddock]
-            [--haddock-arguments HADDOCK_ARGS] [--[no-]open]
+            [--[no-]executable-stripping] [--[no-]info-table-profiling]
+            [--[no-]haddock] [--haddock-arguments HADDOCK_ARGS] [--[no-]open]
             [--[no-]haddock-deps] [--[no-]haddock-internal]
             [--[no-]haddock-hyperlink-source] [--[no-]haddock-for-hackage]
             [--[no-]copy-bins] [--[no-]copy-compiler-tool] [--[no-]prefetch]
@@ -932,6 +932,18 @@ GHC's command line options are _order-dependent_ and evaluated from left to
 right. Later options can override the effect of earlier ones. Any GHC command
 line options for a package specified at Stack's command line are applied after
 those specified in Stack's configuration files.
+
+### `--[no-]info-table-profiling` flag
+
+:octicons-tag-24: UNRELEASED
+
+Default: Disabled
+
+Set the flag to enable info table profiling, including the creation of a new
+info table for every use of a data constructor in the source program.
+
+The flag affects the location of the local project installation directory. See
+the [`stack path --local-install-root`](path_command.md) command.
 
 ### `--[no-]library-profiling` flag
 

@@ -14,6 +14,10 @@ Other enhancements:
 
 * Consider Cabal 3.18 to be a tested library and remove warnings.
 * Consider GHC 10.0 to be a tested compiler and remove warnings.
+* Add flag `--[no-]info-table-profiling` (default: disabled) to Stack's
+  `build` command. Set the flag to enable info table profiling, including the
+  creation of a new info table for every use of a data constructor in the source
+  program.
 
 Bug fixes:
 

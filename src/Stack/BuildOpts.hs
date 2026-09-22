@@ -35,6 +35,7 @@ defaultBuildOpts = BuildOpts
   , exeProfile = defaultFirstFalse buildMonoid.exeProfile
   , libStrip = defaultFirstTrue buildMonoid.libStrip
   , exeStrip = defaultFirstTrue buildMonoid.exeStrip
+  , infoTableProf = defaultFirstFalse buildMonoid.infoTableProf
   , buildHaddocks = False
   , haddockOpts = defaultHaddockOpts
   , openHaddocks = defaultFirstFalse buildMonoid.openHaddocks

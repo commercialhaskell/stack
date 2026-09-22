@@ -28,6 +28,7 @@ import qualified Data.Map.Merge.Lazy as Map
 import qualified Data.Map.Strict as M
 import qualified Data.Set as Set
 import qualified Distribution.PackageDescription as C
+import           Distribution.Version ( mkVersion )
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
@@ -53,6 +54,7 @@ import           Stack.Types.BuildOptsCLI
                    )
 import           Stack.Types.CabalConfigKey ( CabalConfigKey (..) )
 import           Stack.Types.Cache ( FileCache, FileCacheInfo (..) )
+import           Stack.Types.Compiler ( getGhcVersion )
 import           Stack.Types.CompilerPaths ( HasCompiler, getCompilerPath )
 import           Stack.Types.Config ( Config (..), HasConfig (..), buildOptsL )
 import           Stack.Types.Curator ( Curator (..) )
@@ -108,15 +110,31 @@ loadSourceMap ::
   -> RIO env SourceMap
 loadSourceMap targets boptsCli sma = do
   logDebug "Applying and checking flags"
+  bconfig <- view buildConfigL
   let errsPackages = mapMaybe checkPackage packagesWithCliFlags
-  eProject <- mapM applyOptsFlagsPP (M.toList sma.project)
-  eDeps <- mapM applyOptsFlagsDep (M.toList targetsAndSmaDeps)
+      compiler = sma.compiler
+      ghcVersion = getGhcVersion compiler
+      buildOpts = bconfig.config.build
+      infoTableProfSupported = ghcVersion >= mkVersion [9, 2, 1]
+      infoTableProfUnsupportedWarning =
+            prettyWarnL
+              [ "The"
+              , style Shell "--info-table-profiling"
+              , flow "flag was specified, which is supported by GHC 9.2.1 or \
+                     \later. GHC version"
+              , fromString (versionString ghcVersion)
+              , flow "was found. The flag will be ignored."
+              ]
+  isInfoTableProf <- if infoTableProfSupported
+    then pure buildOpts.infoTableProf
+    else infoTableProfUnsupportedWarning >> pure False
+  eProject <- mapM (applyOptsFlagsPP isInfoTableProf) (M.toList sma.project)
+  eDeps <- mapM (applyOptsFlagsDep isInfoTableProf) (M.toList targetsAndSmaDeps)
   let (errsProject, project') = partitionEithers eProject
       (errsDeps, deps') = partitionEithers eDeps
       errs = errsPackages <> errsProject <> errsDeps
   unless (null errs) $ prettyThrowM $ InvalidFlagSpecification errs
-  let compiler = sma.compiler
-      project = M.fromList project'
+  let project = M.fromList project'
       deps = M.fromList deps'
       globalPkgs = pruneGlobals sma.globals (Map.keysSet deps)
   logDebug "SourceMap constructed"
@@ -144,25 +162,30 @@ loadSourceMap targets boptsCli sma = do
           (const Nothing)
            maybeCommon
   applyOptsFlagsPP ::
-       (a, ProjectPackage)
+       Bool
+    -> (a, ProjectPackage)
     -> RIO env (Either UnusedFlags (a, ProjectPackage))
-  applyOptsFlagsPP (name, p@ProjectPackage{ projectCommon = common }) = do
-    let isTarget = M.member common.name targets.targets
-    eCommon <- applyOptsFlags isTarget True common
-    pure $ (\common' -> (name, p { projectCommon = common' })) <$> eCommon
+  applyOptsFlagsPP
+    isInfoTableProf (name, p@ProjectPackage{ projectCommon = common }) = do
+      let isTarget = M.member common.name targets.targets
+      eCommon <- applyOptsFlags isInfoTableProf isTarget True common
+      pure $ (\common' -> (name, p { projectCommon = common' })) <$> eCommon
   applyOptsFlagsDep ::
-       (a, DepPackage)
+       Bool
+    -> (a, DepPackage)
     -> RIO env (Either UnusedFlags (a, DepPackage))
-  applyOptsFlagsDep (name, d@DepPackage{ depCommon = common }) = do
-    let isTarget = M.member common.name targets.deps
-    eCommon <- applyOptsFlags isTarget False common
-    pure $ (\common' -> (name, d { depCommon = common' })) <$> eCommon
+  applyOptsFlagsDep
+    isInfoTableProf (name, d@DepPackage{ depCommon = common }) = do
+      let isTarget = M.member common.name targets.deps
+      eCommon <- applyOptsFlags isInfoTableProf isTarget False common
+      pure $ (\common' -> (name, d { depCommon = common' })) <$> eCommon
   applyOptsFlags ::
        Bool
     -> Bool
+    -> Bool
     -> CommonPackage
     -> RIO env (Either UnusedFlags CommonPackage)
-  applyOptsFlags isTarget isProjectPackage common = do
+  applyOptsFlags isInfoTableProf isTarget isProjectPackage common = do
     let name = common.name
         cliFlagsByName = Map.findWithDefault Map.empty (ACFByName name) cliFlags
         cliFlagsAll =
@@ -186,8 +209,12 @@ loadSourceMap targets boptsCli sma = do
       then do
         bconfig <- view buildConfigL
         let bopts = bconfig.config.build
-            ghcOptions =
-              generalGhcOptions bconfig boptsCli isTarget isProjectPackage
+            ghcOptions = generalGhcOptions
+              bconfig
+              boptsCli
+              isTarget
+              isProjectPackage
+              isInfoTableProf
             cabalConfigOpts = generalCabalConfigOpts
               bconfig
               boptsCli
@@ -245,7 +272,11 @@ hashSourceMapData boptsCli sm = do
       -- boot packages so we'll have different hashes when bare snapshot
       -- 'ghc-X.Y.Z' is used, no extra-deps and e.g. user wants builds with
       -- profiling or without
-      bootGhcOpts = map display (generalGhcOptions bc boptsCli False False)
+      ghcVersion = getGhcVersion sm.compiler
+      isInfoTableProf =
+        ghcVersion >= mkVersion [9, 2, 1] && bc.config.build.infoTableProf
+      bootGhcOpts =
+        map display (generalGhcOptions bc boptsCli False False isInfoTableProf)
       hashedContent =
            toLazyByteString $ compilerPath
         <> compilerInfo
@@ -303,8 +334,14 @@ generalCabalConfigOpts bconfig boptsCli name isTarget isLocal = concat
 
 -- | Get the configured options to pass from GHC, based on the build
 -- configuration and commandline.
-generalGhcOptions :: BuildConfig -> BuildOptsCLI -> Bool -> Bool -> [Text]
-generalGhcOptions bconfig boptsCli isTarget isLocal = concat
+generalGhcOptions ::
+     BuildConfig
+  -> BuildOptsCLI
+  -> Bool
+  -> Bool
+  -> Bool
+  -> [Text]
+generalGhcOptions bconfig boptsCli isTarget isLocal isInfoTableProf = concat
   [ Map.findWithDefault [] AGOEverything config.ghcOptionsByCat
   , if isLocal
       then Map.findWithDefault [] AGOLocals config.ghcOptionsByCat
@@ -317,6 +354,9 @@ generalGhcOptions bconfig boptsCli isTarget isLocal = concat
       then ["-fprof-auto", "-fprof-cafs"]
       else []
   , [ "-g" | not $ bopts.libStrip || bopts.exeStrip ]
+  , if isInfoTableProf
+      then ["-finfo-table-map", "-fdistinct-constructor-tables"]
+      else []
   , if includeExtraOptions
       then boptsCli.ghcOptions
       else []

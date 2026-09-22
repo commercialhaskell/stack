@@ -55,6 +55,8 @@ data BuildOptsMonoid = BuildOptsMonoid
   , exeProfile :: !FirstFalse
   , libStrip :: !FirstTrue
   , exeStrip :: !FirstTrue
+  , infoTableProf :: !FirstFalse
+    -- ^ Build with info table profiling?
   , buildHaddocks :: !FirstFalse
   , haddockOpts :: !HaddockOptsMonoid
   , openHaddocks :: !FirstFalse
@@ -91,9 +93,10 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
         profile = Any False
         noStrip = Any False
     libProfile <- FirstFalse <$> o ..:? libProfileArgName
-    exeProfile <-FirstFalse <$>  o ..:? exeProfileArgName
+    exeProfile <- FirstFalse <$>  o ..:? exeProfileArgName
     libStrip <- FirstTrue <$> o ..:? libStripArgName
-    exeStrip <-FirstTrue <$>  o ..:? exeStripArgName
+    exeStrip <- FirstTrue <$>  o ..:? exeStripArgName
+    infoTableProf <- FirstFalse <$>  o ..:? infoTableProfilingArgName
     buildHaddocks <- FirstFalse <$> o ..:? haddockArgName
     haddockOpts <- jsonSubWarnings (o ..:? haddockOptsArgName ..!= mempty)
     openHaddocks <- FirstFalse <$> o ..:? openHaddocksArgName
@@ -133,6 +136,7 @@ instance FromJSON (WithJSONWarnings BuildOptsMonoid) where
       , exeProfile
       , libStrip
       , exeStrip
+      , infoTableProf
       , buildHaddocks
       , haddockOpts
       , openHaddocks
@@ -173,6 +177,9 @@ libStripArgName = "library-stripping"
 
 exeStripArgName :: Text
 exeStripArgName = "executable-stripping"
+
+infoTableProfilingArgName :: Text
+infoTableProfilingArgName = "info-table-profiling"
 
 haddockArgName :: Text
 haddockArgName = "haddock"
