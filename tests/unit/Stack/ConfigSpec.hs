@@ -66,6 +66,7 @@ buildOptsConfig =
   "  executable-profiling: true\n" ++
   "  library-stripping: false\n" ++
   "  executable-stripping: false\n" ++
+  "  info-table-profiling: true\n" ++
   "  haddock: true\n" ++
   "  haddock-arguments:\n" ++
   "    haddock-args:\n" ++
@@ -235,6 +236,7 @@ spec = beforeAll setup $ do
         bopts.exeProfile `shouldBe` True
         bopts.libStrip `shouldBe` False
         bopts.exeStrip `shouldBe` False
+        bopts.infoTableProf `shouldBe` True
         bopts.buildHaddocks `shouldBe` True
         bopts.haddockOpts `shouldBe` HaddockOpts
           { additionalArgs = ["--css=/home/user/my-css"]

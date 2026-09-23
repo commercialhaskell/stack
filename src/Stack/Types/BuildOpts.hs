@@ -33,6 +33,8 @@ data BuildOpts = BuildOpts
   , exeProfile :: !Bool
   , libStrip :: !Bool
   , exeStrip :: !Bool
+  , infoTableProf :: !Bool
+    -- ^ Build with info table profiling?
   , buildHaddocks :: !Bool
     -- ^ Build Haddock documentation?
   , haddockOpts :: !HaddockOpts
