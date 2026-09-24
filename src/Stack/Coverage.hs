@@ -653,8 +653,8 @@ displayReportPath prefix report reportPath =
   prettyInfoL
     [ prefix
     , report
-    , flow "is available at"
-    , reportPath <> "."
+    , flow "is available at:"
+    , reportPath
     ]
 
 findExtraTixFiles :: HasEnvConfig env => RIO env [Path Abs File]
