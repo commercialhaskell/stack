@@ -127,6 +127,12 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
     | bopts.libProfile || bopts.exeProfile
     ]
   , ["--enable-profiling" | bopts.exeProfile && isLocal]
+    -- The default --profiling-detail is exported-functions (equivalent to GHC's
+    -- -fprof-auto-exported) and toplevel-functions (equivalent to GHC's
+    -- -fprof-auto-top). Neither adds anything to GHC's -fprof-auto and neither
+    -- are required for GHC's -fprof-late. So, we turn it off, which applies to
+    -- both executables and libraries:
+  , ["--profiling-detail=none"]
   , ["--enable-split-objs" | bopts.splitObjs]
   , [ "--disable-library-stripping"
     | not $ bopts.libStrip || bopts.exeStrip

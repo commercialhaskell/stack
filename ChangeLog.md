@@ -4,6 +4,14 @@
 
 **Changes since v4.1.0.3:**
 
+Behavior changes:
+
+* From GHC 9.4.1, the strategy for the automatic insertion of cost-centres for
+  profiling recommended by the GHC User's Guide is `-fprof-late`. Stack's
+  `build --profile` command now adopts that recommendation (rather than
+  `-fprof-auto`, still applicable to earlier GHC versions). Existing profiling
+  builds will be rebuilt.
+
 Other enhancements:
 
 * Stack supports build type `Hooks`.
