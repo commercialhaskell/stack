@@ -232,8 +232,8 @@ scriptCmd opts = do
     case shouldRun of
       YesRun -> exec (fromAbsFile exe) opts.args
       NoRun -> prettyInfoL
-        [ flow "Compilation finished, executable available at"
-        , style File (fromString (fromAbsFile exe)) <> "."
+        [ flow "Compilation finished, executable available at:"
+        , style File (fromString (fromAbsFile exe))
         ]
 
   shortCut shouldRun shouldCompile file exe =
