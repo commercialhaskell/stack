@@ -32,6 +32,7 @@ import           Distribution.Version ( mkVersion )
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
+import           Stack.Constants ( ghcSupportsProfLate )
 import           Stack.Package
                    ( buildableBenchmarks, buildableExes, buildableTestSuites
                    , hasBuildableMainLibrary, resolvePackage
@@ -113,7 +114,6 @@ loadSourceMap targets boptsCli sma = do
   bconfig <- view buildConfigL
   let errsPackages = mapMaybe checkPackage packagesWithCliFlags
       compiler = sma.compiler
-      ghcVersion = getGhcVersion compiler
       buildOpts = bconfig.config.build
       infoTableProfSupported = ghcVersion >= mkVersion [9, 2, 1]
       infoTableProfUnsupportedWarning =
@@ -146,6 +146,7 @@ loadSourceMap targets boptsCli sma = do
     , globalPkgs
     }
  where
+  ghcVersion = getGhcVersion sma.compiler
   cliFlags = boptsCli.flags
   targetsAndSmaDeps = targets.deps <> sma.deps
   packagesWithCliFlags = mapMaybe maybeProjectWithCliFlags $ Map.toList cliFlags
@@ -212,6 +213,7 @@ loadSourceMap targets boptsCli sma = do
             ghcOptions = generalGhcOptions
               bconfig
               boptsCli
+              ghcVersion
               isTarget
               isProjectPackage
               isInfoTableProf
@@ -276,7 +278,7 @@ hashSourceMapData boptsCli sm = do
       isInfoTableProf =
         ghcVersion >= mkVersion [9, 2, 1] && bc.config.build.infoTableProf
       bootGhcOpts =
-        map display (generalGhcOptions bc boptsCli False False isInfoTableProf)
+        map display (generalGhcOptions bc boptsCli ghcVersion False False isInfoTableProf)
       hashedContent =
            toLazyByteString $ compilerPath
         <> compilerInfo
@@ -337,11 +339,12 @@ generalCabalConfigOpts bconfig boptsCli name isTarget isLocal = concat
 generalGhcOptions ::
      BuildConfig
   -> BuildOptsCLI
+  -> Version
   -> Bool
   -> Bool
   -> Bool
   -> [Text]
-generalGhcOptions bconfig boptsCli isTarget isLocal isInfoTableProf = concat
+generalGhcOptions bconfig boptsCli ghcVersion isTarget isLocal isInfoTableProf = concat
   [ Map.findWithDefault [] AGOEverything config.ghcOptionsByCat
   , if isLocal
       then Map.findWithDefault [] AGOLocals config.ghcOptionsByCat
@@ -351,7 +354,7 @@ generalGhcOptions bconfig boptsCli isTarget isLocal isInfoTableProf = concat
       else []
   , concat [["-fhpc"] | isLocal && bopts.testOpts.coverage]
   , if bopts.libProfile || bopts.exeProfile
-      then ["-fprof-auto", "-fprof-cafs"]
+      then [costCentreInsertion, "-fprof-cafs"]
       else []
   , [ "-g" | not $ bopts.libStrip || bopts.exeStrip ]
   , if isInfoTableProf
@@ -364,6 +367,8 @@ generalGhcOptions bconfig boptsCli isTarget isLocal isInfoTableProf = concat
  where
   bopts =  config.build
   config = view configL bconfig
+  costCentreInsertion =
+    if ghcSupportsProfLate ghcVersion then "-fprof-late" else "-fprof-auto"
   includeExtraOptions =
     case config.applyGhcOptions of
       AGOTargets -> isTarget
