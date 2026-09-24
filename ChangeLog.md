@@ -10,6 +10,12 @@ Major changes:
 
 Behavior changes:
 
+* With GHC 9.4.1 or later, when building with profiling, Stack passes GHC's
+  `-fprof-late` flag (rather than `-fprof-auto`) and Cabal's
+  `--profiling-detail=none` and `--library-profiling-detail=none` options. Cost
+  centres are then inserted after optimisation, so the profile reflects the
+  optimised program. Existing profiling builds will be rebuilt.
+
 Other enhancements:
 
 * Consider Cabal 3.18 to be a tested library and remove warnings.
