@@ -2,5 +2,5 @@
 
 set -euxo pipefail
 
-eval `stack --snapshot lts-24.55 config env`
+eval `stack --snapshot lts-24.61 config env`
 ghc Main.hs

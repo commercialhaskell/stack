@@ -32,7 +32,7 @@ There are four ways to specify a snapshot location:
     *   **Stackage LTS Haskell snapshots**, for example:
 
         ~~~yaml
-        snapshot: lts-24.55
+        snapshot: lts-24.61
         ~~~
 
         ??? info "Expansion of `lts-X.Y`"
@@ -52,7 +52,7 @@ There are four ways to specify a snapshot location:
     *   **Stackage Nightly snapshots**, for example:
 
         ~~~yaml
-        snapshot: nightly-2026-08-20
+        snapshot: nightly-2026-09-30
         ~~~
 
         ??? info "Expansion of `nightly-YYYY-MM-DD`"
@@ -95,7 +95,7 @@ There are four ways to specify a snapshot location:
 3.  Via a **URL** pointing to a snapshot configuration file, for example:
 
     ~~~yaml
-    snapshot: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2026/5/29.yaml`
+    snapshot: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2026/9/30.yaml`
     ~~~
 
     For safer, more reproducible builds, you can optionally specify a URL
