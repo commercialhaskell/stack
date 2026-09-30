@@ -174,7 +174,7 @@ build:
   executable-profiling: false
   library-stripping: true
   executable-stripping: true
-  # Since Stack UNRELEASED:
+  # Since Stack 4.1.1:
   info-table-profiling: false
 
   # NOTE: global usage of haddock can cause build failures when documentation is

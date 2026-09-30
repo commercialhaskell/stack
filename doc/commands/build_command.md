@@ -935,7 +935,7 @@ those specified in Stack's configuration files.
 
 ### `--[no-]info-table-profiling` flag
 
-:octicons-tag-24: UNRELEASED
+[:octicons-tag-24: 4.1.1](https://github.com/commercialhaskell/stack/releases/tag/v4.1.1)
 
 Default: Disabled
 
