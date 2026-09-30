@@ -1,14 +1,8 @@
 # Changelog
 
-## Unreleased changes
-
-Release notes:
+## v4.1.0.3 (release candidate)
 
 **Changes since v4.1.0.1:**
-
-Major changes:
-
-Behavior changes:
 
 Other enhancements:
 
@@ -18,8 +12,6 @@ Other enhancements:
   `build` command. Set the flag to enable info table profiling, including the
   creation of a new info table for every use of a data constructor in the source
   program.
-
-Bug fixes:
 
 ## v4.1.0.1 (release candidate)
 
