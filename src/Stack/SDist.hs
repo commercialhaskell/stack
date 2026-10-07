@@ -172,8 +172,8 @@ sdistCmd sdistOpts =
         sourceLazy tarBytes .|
         sinkFileCautious (toFilePath tarPath)
       prettyInfoL
-        [flow "Wrote sdist-format compressed archive to"
-        , pretty tarPath <> "."
+        [ flow "Wrote sdist-format compressed archive to:"
+        , pretty tarPath
         ]
       checkSDistTarball sdistOpts tarPath
       forM_ sdistOpts.tarPath $ copyTarToTarPath tarPath tarName
