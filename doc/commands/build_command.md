@@ -241,6 +241,11 @@ custom setup. That should list the dependencies needed to compile `Setup.hs`.
 Stack further customises the setup, using the `Cabal` package. If that package
 is not listed, Stack will warn and add the GHC boot package as a dependency.
 
+!!! note
+
+    Version 3.14 of the Cabal package description format specification
+    introduced the `Hooks` build type. Stack does not support the build type.
+
 In addition to specifying targets, you can also control what gets built, or
 retained, with the flags and options listed below. You can also affect what gets
 built by specifying Cabal (the library) options for the configure step
