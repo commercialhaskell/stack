@@ -98,7 +98,7 @@ stackReplHook arg1 arg2 = do
                   Verbosity verbosityFlags defaultVerbosityHandles
 #else
                   verbosityFlags
-#endif             
+#endif
             eFp <-
 #if MIN_VERSION_Cabal(3,14,0)
               findPackageDesc Nothing

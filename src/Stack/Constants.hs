@@ -45,6 +45,8 @@ module Stack.Constants
   , osIsWindows
   , relFileSetupHs
   , relFileSetupLhs
+  , relFileSetupHooksHs
+  , relFileSetupHooksLhs
   , relFileHpackPackageConfig
   , relDirGlobalAutogen
   , relDirAutogen
@@ -380,6 +382,12 @@ relFileSetupHs = $(mkRelFile "Setup.hs")
 
 relFileSetupLhs :: Path Rel File
 relFileSetupLhs = $(mkRelFile "Setup.lhs")
+
+relFileSetupHooksHs :: Path Rel File
+relFileSetupHooksHs = $(mkRelFile "SetupHooks.hs")
+
+relFileSetupHooksLhs :: Path Rel File
+relFileSetupHooksLhs = $(mkRelFile "SetupHooks.lhs")
 
 relFileHpackPackageConfig :: Path Rel File
 relFileHpackPackageConfig = $(mkRelFile packageConfig)

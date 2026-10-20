@@ -70,7 +70,8 @@ import           Stack.Config ( checkOwnership )
 import           Stack.Constants
                    ( cabalPackageName, relDirDist, relDirSetup
                    , relDirSetupExeCache, relDirSetupExeSrc, relFileBuildLock
-                   , relFileSetupHs, relFileSetupLhs, relFileSetupLower
+                   , relFileSetupHs, relFileSetupLhs, relFileSetupHooksHs
+                   , relFileSetupHooksLhs, relFileSetupLower
                    , relFileSetupMacrosH, setupGhciShimCode, stackProgName
                    )
 import           Stack.Constants.Config ( distDirFromDir, distRelativeDir )
@@ -136,6 +137,8 @@ data ExecuteEnv = ExecuteEnv
   , tempDir        :: !(Path Abs Dir)
   , setupHs        :: !(Path Abs File)
     -- ^ Temporary Setup.hs for simple builds
+  , hooksSetupHs   :: !(Path Abs File)
+    -- ^ Temporary Setup.hs for Hooks builds
   , setupShimHs    :: !(Path Abs File)
     -- ^ Temporary SetupShim.hs, to provide access to initial-build-steps
   , setupExe       :: !(Maybe (Path Abs File))
@@ -165,9 +168,12 @@ data SetupExe
   = SimpleSetupExe !(Path Abs File)
     -- ^ The build type is Simple and there is a path to an existing setup
     -- executable.
-  | OtherSetupHs !(Path Abs File)
-    -- ^ Other circumstances with a path to the source code for the setup
+  | CustomSetupHs !(Path Abs File)
+    -- ^ The build type is Custom with a path to the source code for the setup
     -- executable.
+  | SetupHooksHs !(Path Abs File)
+    -- ^ The build type is Hooks with a path to the source code for the
+    -- SetupHooks module.
 
 buildSetupArgs :: [String]
 buildSetupArgs =
@@ -185,6 +191,9 @@ buildSetupArgs =
 simpleSetupCode :: Builder
 simpleSetupCode = "import Distribution.Simple\nmain = defaultMain"
 
+hooksSetupCode :: Builder
+hooksSetupCode = "import Distribution.Simple\nimport SetupHooks\nmain = defaultMainWithSetupHooks setupHooks"
+
 simpleSetupHash :: String
 simpleSetupHash =
     T.unpack
@@ -198,6 +207,7 @@ simpleSetupHash =
   $  encodeUtf8Builder (T.pack (unwords buildSetupArgs))
   <> setupGhciShimCode
   <> simpleSetupCode
+  <> hooksSetupCode
 
 -- | Get a compiled Setup exe
 getSetupExe ::
@@ -316,6 +326,16 @@ withExecuteEnv
           setupO =  setupSrcDir </> setupOName
       setupHsExists <- doesFileExist setupHs
       unless setupHsExists $ writeBinaryFileAtomic setupHs simpleSetupCode
+      let hooksSetupStub = "hooksSetup-" ++ simpleSetupHash
+      hooksSetupFileName <- parseRelFile (hooksSetupStub ++ ".hs")
+      hooksSetupHiName <- parseRelFile (hooksSetupStub ++ ".hi")
+      hooksSetupOName <- parseRelFile (hooksSetupStub ++ ".o")
+      let hooksSetupHs = setupSrcDir </> hooksSetupFileName
+          hooksSetupHi = setupSrcDir </> hooksSetupHiName
+          hooksSetupO =  setupSrcDir </> hooksSetupOName
+      hooksSetupHsExists <- doesFileExist hooksSetupHs
+      unless hooksSetupHsExists $
+        writeBinaryFileAtomic hooksSetupHs hooksSetupCode
       let setupShimStub = "setup-shim-" ++ simpleSetupHash
       setupShimFileName <- parseRelFile (setupShimStub ++ ".hs")
       setupShimHiName <- parseRelFile (setupShimStub ++ ".hi")
@@ -332,6 +352,8 @@ withExecuteEnv
       -- support for the problematic versions of GHC.
       ignoringAbsence (removeFile setupHi)
       ignoringAbsence (removeFile setupO)
+      ignoringAbsence (removeFile hooksSetupHi)
+      ignoringAbsence (removeFile hooksSetupO)
       ignoringAbsence (removeFile setupShimHi)
       ignoringAbsence (removeFile setupShimO)
       compilerVersion <- view actualCompilerVersionL
@@ -378,6 +400,7 @@ withExecuteEnv
         , baseConfigOpts
         , ghcPkgIds
         , tempDir
+        , hooksSetupHs
         , setupHs
         , setupShimHs
         , setupExe
@@ -751,7 +774,8 @@ withSingleContext
       -- https://github.com/commercialhaskell/stack/issues/370
       case (package.buildType, ee.setupExe) of
         (C.Simple, Just setupExe) -> pure $ SimpleSetupExe setupExe
-        _ -> liftIO $ OtherSetupHs <$> getSetupHs pkgDir
+        (C.Hooks, _) -> liftIO $ SetupHooksHs <$> getSetupHooksHs pkgDir
+        _ -> liftIO $ CustomSetupHs <$> getSetupHs pkgDir
     inner $ \keepOutputOpen stripTHLoading args -> do
       let cabalPackageArg
             -- Omit cabal package dependency when building
@@ -1004,7 +1028,7 @@ withSingleContext
 
       exeName <- case setupexehs of
         SimpleSetupExe setupExe -> pure setupExe
-        OtherSetupHs setuphs -> do
+        CustomSetupHs setuphs -> do
           distDir <- distDirFromDir pkgDir
           let setupDir = distDir </> relDirSetup
               outputFile = setupDir </> relFileSetupLower
@@ -1023,6 +1047,50 @@ withSingleContext
                    ]
                 <> packageArgs
                 <> [ toFilePath setuphs
+                   , toFilePath ee.setupShimHs
+                   , "-main-is"
+                   , "StackSetupShim.mainOverride"
+                   , "-o", toFilePath outputFile
+                   , "-threaded"
+                   ]
+                -- Apply GHC options
+                -- https://github.com/commercialhaskell/stack/issues/4526
+                <> map
+                     T.unpack
+                     (  Map.findWithDefault
+                          []
+                          AGOEverything
+                          config.ghcOptionsByCat
+                     <> case config.applyGhcOptions of
+                          AGOEverything -> ee.buildOptsCLI.ghcOptions
+                          AGOTargets -> []
+                          AGOLocals -> []
+                     )
+
+              liftIO $ atomicModifyIORef' ee.customBuilt $
+                \oldCustomBuilt ->
+                  (Set.insert package.name oldCustomBuilt, ())
+              pure outputFile
+        SetupHooksHs setupHookshs -> do
+          distDir <- distDirFromDir pkgDir
+          let setupDir = distDir </> relDirSetup
+              outputFile = setupDir </> relFileSetupLower
+          customBuilt <- liftIO $ readIORef ee.customBuilt
+          if Set.member package.name customBuilt
+            then pure outputFile
+            else do
+              ensureDir setupDir
+              compilerPath <- view $ compilerPathsL . to (.compiler)
+              packageArgs <- getPackageArgs setupDir
+              runExe compilerPath $
+                   [ "--make"
+                   , "-odir", toFilePathNoTrailingSep setupDir
+                   , "-hidir", toFilePathNoTrailingSep setupDir
+                   , "-i", "-i."
+                   ]
+                <> packageArgs
+                <> [ toFilePath setupHookshs
+                   , toFilePath ee.hooksSetupHs
                    , toFilePath ee.setupShimHs
                    , "-main-is"
                    , "StackSetupShim.mainOverride"
@@ -1166,3 +1234,21 @@ getSetupHs dir = do
  where
   fp1 = dir </> relFileSetupHs
   fp2 = dir </> relFileSetupLhs
+
+-- | Find the SetupHooks.hs or SetupHooks.lhs in the given directory. If none
+-- exists, throw an exception.
+getSetupHooksHs ::
+     Path Abs Dir -- ^ project directory
+  -> IO (Path Abs File)
+getSetupHooksHs dir = do
+  exists1 <- doesFileExist fp1
+  if exists1
+    then pure fp1
+    else do
+      exists2 <- doesFileExist fp2
+      if exists2
+        then pure fp2
+        else throwM $ NoSetupHooksHsFound dir
+ where
+  fp1 = dir </> relFileSetupHooksHs
+  fp2 = dir </> relFileSetupHooksLhs

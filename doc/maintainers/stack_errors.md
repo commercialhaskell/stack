@@ -5,7 +5,7 @@
 In connection with considering Stack's support of the
 [Haskell Error Index](https://errors.haskell.org/) initiative, this page seeks
 to take stock of the errors that Stack itself can raise, by reference to the
-`master` branch of the Stack repository. Last updated: 2026-07-07.
+`master` branch of the Stack repository. Last updated: 2026-10-20.
 
 *   `Stack.main`: catches exceptions from action `commandLineHandler`.
 
@@ -228,6 +228,13 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-2016] | Couldn'tParseField Text [Line]
         ~~~
 
+    -   `Stack.PackageFile.PackageFilePrettyException`
+
+        ~~~haskell
+        [S-7404] = UnexpectedSetupFile PackageName
+        [S-4200] | MissingSetupHooksFile PackageName
+        ~~~
+
     -   `Stack.Query.QueryException`
 
         ~~~haskell
@@ -355,6 +362,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3819] | TestSuiteTypeUnsupported TestSuiteInterface
         [S-5797] | LocalPackageDoesn'tMatchTarget PackageName Version Version
         [S-3118] | NoSetupHsFound (Path Abs Dir)
+        [S-3118] | NoSetupHooksHsFound (Path Abs Dir)
         [S-4925] | InvalidGhcOptionsSpecification [PackageName]
         [S-5510] | LocalPackagesPresent [PackageIdentifier]
         [S-7168] | CouldNotLockDistDir (Path Abs File)

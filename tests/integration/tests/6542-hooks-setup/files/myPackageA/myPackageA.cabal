@@ -1,0 +1,22 @@
+cabal-version: 3.14
+
+-- We don't use package.yaml because Hpack does not yet support build type
+-- Hooks.
+
+name:           myPackageA
+version:        0.0.0
+build-type:     Hooks
+
+custom-setup
+  setup-depends:
+      base
+    , Cabal
+
+library
+  exposed-modules:
+      LibA
+  hs-source-dirs:
+      src
+  build-depends:
+      base
+  default-language: Haskell2010

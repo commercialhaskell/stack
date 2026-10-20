@@ -19,8 +19,7 @@ import           Distribution.PackageDescription
                    ( BenchmarkInterface (..), BenchmarkType (..)
                    , TestSuiteInterface (..), TestType (..)
                    )
-import           Distribution.Types.BuildType
-                   ( BuildType (Configure, Custom, Simple) )
+import           Distribution.Types.BuildType ( BuildType (..) )
 import           Distribution.Types.IncludeRenaming
                    ( IncludeRenaming (..), defaultIncludeRenaming )
 import           Distribution.Types.Mixin ( Mixin (..) )
@@ -300,6 +299,10 @@ spec = do
 
     it "returns False for Custom build type" $ do
       let pkg = testPackage (mkPackageName "pkg") Custom
+      shouldSplitComponents pkg `shouldBe` False
+
+    it "returns False for Hooks build type" $ do
+      let pkg = testPackage (mkPackageName "pkg") Hooks
       shouldSplitComponents pkg `shouldBe` False
 
     it "returns False for Configure build type" $ do

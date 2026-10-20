@@ -1,5 +1,13 @@
 # Changelog
 
+## v4.1.0.5 (release candidate)
+
+**Changes since v4.1.0.3:**
+
+Other enhancements:
+
+* Stack supports build type `Hooks`.
+
 ## v4.1.0.3 (release candidate)
 
 **Changes since v4.1.0.1:**

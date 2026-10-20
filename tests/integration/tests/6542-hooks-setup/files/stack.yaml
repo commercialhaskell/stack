@@ -1,0 +1,14 @@
+snapshot: ghc-9.10.3
+
+packages:
+- myPackageA
+- myPackageB
+- myPackageC
+- myPackageD
+- myPackageE
+
+extra-deps:
+# We need a version of Cabal that supports the Hooks build type:
+- Cabal-3.14.2.0
+- Cabal-syntax-3.14.2.0
+- alex-3.5.4.2
