@@ -10,8 +10,6 @@ Major changes:
 
 Behavior changes:
 
-* When applicable, Stack reports that build type `Hooks` is unsupported.
-
 Other enhancements:
 
 * Consider Cabal 3.18 to be a tested library and remove warnings.
@@ -20,6 +18,7 @@ Other enhancements:
   `build` command. Set the flag to enable info table profiling, including the
   creation of a new info table for every use of a data constructor in the source
   program.
+* Stack supports build type `Hooks`.
 
 Bug fixes:
 
