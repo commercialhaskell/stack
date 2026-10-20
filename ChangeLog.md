@@ -10,6 +10,8 @@ Major changes:
 
 Behavior changes:
 
+* When applicable, Stack reports that build type `Hooks` is unsupported.
+
 Other enhancements:
 
 * Consider Cabal 3.18 to be a tested library and remove warnings.

@@ -46,6 +46,26 @@ import           Stack.Types.PackageFile
 import qualified System.FilePath as FilePath
 import           System.IO.Error ( isUserError )
 
+-- | Type representing \'pretty\' exceptions thrown by functions exported by the
+-- "Stack.PackageFile" module.
+newtype PackageFilePrettyException
+  = HooksBuildTypeUnsupported PackageName
+  deriving Show
+
+instance Pretty PackageFilePrettyException where
+  pretty (HooksBuildTypeUnsupported pkgName) =
+    "[S-2211]"
+    <> line
+    <> fillSep
+         [ flow "The package"
+         , style Error . fromPackageName $ pkgName
+         , flow "specifies build type"
+         , style Shell "Hooks"
+         , flow "but that build type is unsupported."
+         ]
+
+instance Exception PackageFilePrettyException
+
 -- | Resolve the file, if it can't be resolved, warn for the user
 -- (purely to be helpful).
 resolveFileOrWarn ::
@@ -156,20 +176,20 @@ getPackageFile pkg cabalFP =
       runRIO
         (GetPackageFileContext cabalFP distDir bc cabalVer)
         (packageDescModulesAndFiles pkg)
-    setupFiles <-
-      if pkg.buildType == Cabal.Custom
-        then do
-          let setupHsPath = pkgDir </> relFileSetupHs
-              setupLhsPath = pkgDir </> relFileSetupLhs
-          setupHsExists <- doesFileExist setupHsPath
-          if setupHsExists
-            then pure (S.singleton setupHsPath)
-            else do
-              setupLhsExists <- doesFileExist setupLhsPath
-              if setupLhsExists
-                then pure (S.singleton setupLhsPath)
-                else pure S.empty
-        else pure S.empty
+    setupFiles <- case pkg.buildType of
+      Cabal.Custom -> do
+        let setupHsPath = pkgDir </> relFileSetupHs
+            setupLhsPath = pkgDir </> relFileSetupLhs
+        setupHsExists <- doesFileExist setupHsPath
+        if setupHsExists
+          then pure (S.singleton setupHsPath)
+          else do
+            setupLhsExists <- doesFileExist setupLhsPath
+            if setupLhsExists
+              then pure (S.singleton setupLhsPath)
+              else pure S.empty
+      Cabal.Hooks -> prettyThrowM $ HooksBuildTypeUnsupported pkg.name
+      _ -> pure S.empty
     moreBuildFiles <- fmap (S.insert cabalFP . S.union setupFiles) $ do
       let hpackPath = pkgDir </> relFileHpackPackageConfig
       hpackExists <- doesFileExist hpackPath
