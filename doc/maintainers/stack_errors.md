@@ -231,7 +231,8 @@ to take stock of the errors that Stack itself can raise, by reference to the
     -   `Stack.PackageFile.PackageFilePrettyException`
 
         ~~~haskell
-        [S-2211] = HooksBuildTypeUnsupported PackageName
+        [S-7404] = UnexpectedSetupFile PackageName
+        [S-4200] | MissingSetupHooksFile PackageName
         ~~~
 
     -   `Stack.Query.QueryException`
@@ -361,6 +362,7 @@ to take stock of the errors that Stack itself can raise, by reference to the
         [S-3819] | TestSuiteTypeUnsupported TestSuiteInterface
         [S-5797] | LocalPackageDoesn'tMatchTarget PackageName Version Version
         [S-3118] | NoSetupHsFound (Path Abs Dir)
+        [S-3118] | NoSetupHooksHsFound (Path Abs Dir)
         [S-4925] | InvalidGhcOptionsSpecification [PackageName]
         [S-5510] | LocalPackagesPresent [PackageIdentifier]
         [S-7168] | CouldNotLockDistDir (Path Abs File)

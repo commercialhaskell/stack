@@ -69,6 +69,7 @@ data BuildException
       Version -- local version
       Version -- version specified on command line
   | NoSetupHsFound (Path Abs Dir)
+  | NoSetupHooksHsFound (Path Abs Dir)
   | InvalidGhcOptionsSpecification [PackageName]
   | LocalPackagesPresent [PackageIdentifier]
   | CouldNotLockDistDir !(Path Abs File)
@@ -163,6 +164,11 @@ instance Exception BuildException where
   displayException (NoSetupHsFound dir) = concat
     [ "Error: [S-3118]\n"
     , "No Setup.hs or Setup.lhs file found in "
+    , toFilePath dir
+    ]
+  displayException (NoSetupHooksHsFound dir) = concat
+    [ "Error: [S-3505]\n"
+    , "No SetupHooks.hs or SetupHooks.lhs file found in "
     , toFilePath dir
     ]
   displayException (InvalidGhcOptionsSpecification unused) = unlines
