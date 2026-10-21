@@ -977,6 +977,23 @@ Pass the flag to build your project with the GHC options `-Wall` and `-Werror`.
 Pass the flag to enable profiling in libraries, executables, etc. for all
 expressions, and generate a profiling report in tests or benchmarks.
 
+GHC provides various strategies for the automatic insertion of cost-centres into
+the compiled program. The flag enables the strategy recommended in the GHC
+User's Guide (GHC flag `-fprof-auto`) and gives every Constant Applicative Form
+(CAF, a top-level thunk) its own cost-centre stack) (GHC flag `-fprof-cafs`).
+
+!!! note
+
+    From GHC 9.4.1, the stategy recommended in the GHC User's Guide has been
+    `-fprof-late`. Stack has not yet been updated to reflect that.
+
+The recommended strategy annotates, before GHC's optimizer has run, all bindings (top-level or nested, whether exported or not), other than those marked
+`INLINE`, with `SCC` (Set Cost Centre) before GHC's optimizer has run.
+
+The GHC flags set by the flag can be reversed with GHC flags `-fno-prof-auto` or
+`-fno-prof-cafs` and other GHC flags applied. See the
+[`--ghc-options`](#-ghc-options-option) option.
+
 The flag affects the location of the local project installation directory. See
 the [`stack path --local-install-root`](path_command.md) command.
 
