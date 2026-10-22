@@ -10,11 +10,11 @@ Major changes:
 
 Behavior changes:
 
-* With GHC 9.4.1 or later, when building with profiling, Stack passes GHC's
-  `-fprof-late` flag (rather than `-fprof-auto`) and Cabal's
-  `--profiling-detail=none` and `--library-profiling-detail=none` options. Cost
-  centres are then inserted after optimisation, so the profile reflects the
-  optimised program. Existing profiling builds will be rebuilt.
+* From GHC 9.4.1, the strategy for the automatic insertion of cost-centres for
+  profiling recommended by the GHC User's Guide is `-fprof-late`. Stack's
+  `build --profile` command now adopts that recommendation (rather than
+  `-fprof-auto`, still applicable to earlier GHC versions). Existing profiling
+  builds will be rebuilt.
 
 Other enhancements:
 
