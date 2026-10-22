@@ -988,7 +988,7 @@ User's Guide (GHC flag `-fprof-auto`) and gives every Constant Applicative Form
     `-fprof-late`. Stack has not yet been updated to reflect that.
 
 The recommended strategy annotates, before GHC's optimizer has run, all bindings (top-level or nested, whether exported or not), other than those marked
-`INLINE`, with `SCC` (Set Cost Centre) before GHC's optimizer has run.
+`INLINE`, with `SCC` (Set Cost Centre).
 
 The GHC flags set by the flag can be reversed with GHC flags `-fno-prof-auto` or
 `-fno-prof-cafs` and other GHC flags applied. See the
