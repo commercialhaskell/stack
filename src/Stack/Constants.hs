@@ -37,7 +37,6 @@ module Stack.Constants
   , defaultGlobalConfigPath
   , platformVariantEnvVar
   , compilerOptionsCabalFlag
-  , ghcSupportsProfLate
   , ghcColorForceFlag
   , minTerminalWidth
   , maxTerminalWidth
@@ -359,9 +358,6 @@ platformVariantEnvVar = stackProgNameUpper ++ "_PLATFORM_VARIANT"
 -- | Provides --ghc-options for 'Ghc'
 compilerOptionsCabalFlag :: WhichCompiler -> String
 compilerOptionsCabalFlag Ghc = "--ghc-options"
-
-ghcSupportsProfLate :: Version -> Bool
-ghcSupportsProfLate ghcVersion = ghcVersion >= mkVersion [9, 4, 1]
 
 -- | The flag to pass to GHC when we want to force its output to be
 -- colorized.
