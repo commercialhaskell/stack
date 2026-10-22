@@ -979,20 +979,24 @@ expressions, and generate a profiling report in tests or benchmarks.
 
 GHC provides various strategies for the automatic insertion of cost-centres into
 the compiled program. The flag enables the strategy recommended in the GHC
-User's Guide (GHC flag `-fprof-auto`) and gives every Constant Applicative Form
-(CAF, a top-level thunk) its own cost-centre stack) (GHC flag `-fprof-cafs`).
+User's Guide and gives every Constant Applicative Form (CAF, a top-level thunk)
+its own cost-centre stack) (GHC flag `-fprof-cafs`).
 
-!!! note
+The recommended strategy:
 
-    From GHC 9.4.1, the stategy recommended in the GHC User's Guide has been
-    `-fprof-late`. Stack has not yet been updated to reflect that.
+* **for GHC 9.4.1 and later**, is enabled by GHC flag `-fprof-late`. This
+  strategy annotates, after GHC's optimizer has run and unfoldings have been
+  created, all top-level bindings (only) with `SCC` (Set Cost Centre). If a
+  function is inlined into a use site its costs will be counted against the
+  caller’s cost-centre; and
 
-The recommended strategy annotates, before GHC's optimizer has run, all bindings (top-level or nested, whether exported or not), other than those marked
-`INLINE`, with `SCC` (Set Cost Centre).
+* **otherwise**, is enabled by GHC flag `-fprof-auto`. This strategy annotates,
+  before GHC's optimizer has run, all bindings (top-level or nested, whether
+  exported or not), other than those marked `INLINE`, with `SCC`.
 
-The GHC flags set by the flag can be reversed with GHC flags `-fno-prof-auto` or
-`-fno-prof-cafs` and other GHC flags applied. See the
-[`--ghc-options`](#-ghc-options-option) option.
+The GHC flags set by the flag can be reversed with GHC flags `-fno-prof-late` or
+`-fno-prof-auto` (as applicable) or `-fno-prof-cafs` and other GHC flags
+applied. See the [`--ghc-options`](#-ghc-options-option) option.
 
 The flag affects the location of the local project installation directory. See
 the [`stack path --local-install-root`](path_command.md) command.
