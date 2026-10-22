@@ -32,7 +32,6 @@ import           Distribution.Version ( mkVersion )
 import qualified Pantry.SHA256 as SHA256
 import           Stack.Build.Cache ( tryGetBuildCache )
 import           Stack.Build.Haddock ( shouldHaddockDeps )
-import           Stack.Constants ( ghcSupportsProfLate )
 import           Stack.Package
                    ( buildableBenchmarks, buildableExes, buildableTestSuites
                    , hasBuildableMainLibrary, resolvePackage
@@ -354,7 +353,7 @@ generalGhcOptions bconfig boptsCli ghcVersion isTarget isLocal isInfoTableProf =
       else []
   , concat [["-fhpc"] | isLocal && bopts.testOpts.coverage]
   , if bopts.libProfile || bopts.exeProfile
-      then [costCentreInsertion, "-fprof-cafs"]
+      then [recommendedProfStrategy, "-fprof-cafs"]
       else []
   , [ "-g" | not $ bopts.libStrip || bopts.exeStrip ]
   , if isInfoTableProf
@@ -367,8 +366,12 @@ generalGhcOptions bconfig boptsCli ghcVersion isTarget isLocal isInfoTableProf =
  where
   bopts =  config.build
   config = view configL bconfig
-  costCentreInsertion =
-    if ghcSupportsProfLate ghcVersion then "-fprof-late" else "-fprof-auto"
+  -- The strategy for the automatic insertion of cost centres for profiling, as
+  -- recommended by the GHC User's Guide:
+  recommendedProfStrategy :: Text
+  recommendedProfStrategy
+    | ghcVersion >= mkVersion [9, 4, 1] = "-fprof-late"
+    | otherwise = "-fprof-auto"
   includeExtraOptions =
     case config.applyGhcOptions of
       AGOTargets -> isTarget
