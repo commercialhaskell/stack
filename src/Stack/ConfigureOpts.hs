@@ -26,12 +26,11 @@ import           Path ( (</>), parseRelDir )
 import           Path.Extra ( toFilePathNoTrailingSep )
 import           Stack.Constants
                    ( bindirSuffix, compilerOptionsCabalFlag, docDirSuffix
-                   , ghcSupportsProfLate, relDirEtc, relDirLib, relDirLibexec
-                   , relDirShare
+                   , relDirEtc, relDirLib, relDirLibexec, relDirShare
                    )
 import           Stack.Prelude
 import           Stack.Types.BuildOpts ( BuildOpts (..) )
-import           Stack.Types.Compiler ( getGhcVersion, whichCompiler )
+import           Stack.Types.Compiler ( whichCompiler )
 import           Stack.Types.Config ( Config (..), HasConfig (..) )
 import           Stack.Types.ConfigureOpts
                    ( BaseConfigOpts (..), ConfigureOpts (..)
@@ -124,11 +123,16 @@ configureOptsNonPathRelated ::
   -> [String]
 configureOptsNonPathRelated econfig bco deps isLocal package = concat
   [ depOptions
-  , ["--enable-library-profiling" | profiling]
+  , [ "--enable-library-profiling"
+    | bopts.libProfile || bopts.exeProfile
+    ]
   , ["--enable-profiling" | bopts.exeProfile && isLocal]
-  , if profiling && ghcSupportsProfLate ghcVersion
-      then ["--profiling-detail=none", "--library-profiling-detail=none"]
-      else []
+    -- The default --profiling-detail is exported-functions (equivalent to GHC's
+    -- -fprof-auto-exported) and toplevel-functions (equivalent to GHC's
+    -- -fprof-auto-top). Neither adds anything to GHC's -fprof-auto and neither
+    -- are required for GHC's -fprof-late. So, we turn it off, which applies to
+    -- both executables and libraries:
+  , ["--profiling-detail=none"]
   , ["--enable-split-objs" | bopts.splitObjs]
   , [ "--disable-library-stripping"
     | not $ bopts.libStrip || bopts.exeStrip
@@ -178,13 +182,11 @@ configureOptsNonPathRelated econfig bco deps isLocal package = concat
     in  concatMap (\x -> [compilerOptionsCabalFlag wc, T.unpack x]) newArgs
 
   wc = view (actualCompilerVersionL . to whichCompiler) econfig
-  ghcVersion = view (actualCompilerVersionL . to getGhcVersion) econfig
 
   hideSourcePaths = config.hideSourcePaths
 
   config = view configL econfig
   bopts = bco.buildOpts
-  profiling = bopts.libProfile || bopts.exeProfile
   mapAndAppend fn = Map.foldrWithKey' (fmap (:) . fn)
   -- Unioning atop defaults is needed so that all flags are specified with
   -- --exact-configuration.
