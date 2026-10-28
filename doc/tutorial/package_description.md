@@ -140,8 +140,9 @@ may be present in the package's root directory:
     syntax, which may already be familiar for some users, can also avoid
     repetition.
 
-    In particular, the format's defaults can infer the names of exposed and
-    other modules.
+    In particular, if package components have distinct source file directories,
+    the format's defaults can infer the names of exposed and other modules for
+    library components and other modules for other components.
 
     The format allows a user to specify defaults in a file on GitHub or a local
     file.
@@ -277,6 +278,68 @@ functionality to create a Cabal file.
         - -with-rtsopts=-N
         dependencies:
         - my-package
+    ~~~
+
+??? question "Must package components have distinct source file directories?"
+
+    Package components can share source file directories, but care may be needed
+    when specifying exposed modules (if applicable) and other modules.
+
+    For example, this (naïve) `package.yaml` file:
+    ~~~yaml
+    spec-version: 0.36.0
+
+    package: my-package
+    version: 0.1.0.0
+    dependencies:
+    - base
+    library:
+      source-dirs: .
+    executables:
+      my-program:
+        source-dirs: .
+        main: Main.hs
+    ~~~
+
+    with `Main.hs` and, say, `Lib.hs` in the package directory, will result in
+    a Cabal file with a library stanza:
+
+    ~~~text
+    library
+      exposed-modules:
+          Lib
+          Main
+      hs-source-dirs:
+          ./
+      build-depends:
+          base
+      default-language: Haskell2010
+    ~~~
+
+    `Main` is, incorrectly, specified as an exposed module of the library
+    component. Further, when compiling, GHC will recognise that `Main` exports
+    `main` and create an executable file and other files in the same directory
+    as the `Main.hs` source code file.
+
+    With shared source file directories, the `package.yaml` file must be
+    express about exposed and other modules. For example:
+
+    ~~~yaml
+    spec-version: 0.36.0
+
+    package: my-package
+    version: 0.1.0.0
+    dependencies:
+    - base
+    library:
+      source-dirs: .
+      exposed-modules: Lib
+      other-modules: [] # The other modules are to be ignored
+    executables:
+      my-program:
+        source-dirs: .
+        main: Main.hs
+        other-modules: [] # The other modules are to be ignored
     ~~~
 
 ## `helloworld.cabal`
