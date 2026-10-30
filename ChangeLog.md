@@ -10,6 +10,12 @@ Major changes:
 
 Behavior changes:
 
+* From GHC 9.4.1, the strategy for the automatic insertion of cost-centres for
+  profiling recommended by the GHC User's Guide is `-fprof-late`. Stack's
+  `build --profile` command now adopts that recommendation (rather than
+  `-fprof-auto`, still applicable to earlier GHC versions). Existing profiling
+  builds will be rebuilt.
+
 Other enhancements:
 
 * Consider Cabal 3.18 to be a tested library and remove warnings.
