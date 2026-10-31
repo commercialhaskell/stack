@@ -223,6 +223,9 @@ data Config = Config
   , notifyIfBaseNotBoot     :: !Bool
     -- ^ Notify if the specified base package is other than the GHC boot
     -- package?
+  , notifyIfNoProjectTarget  :: !Bool
+    -- ^ Notify if @stack ghci@ or @stack repl@ has been commanded with no
+    -- project package targets specified, so that a plain GHCi will be started?
   , noRunCompile            :: !Bool
     -- ^ Use --no-run and --compile options when using `stack script`
   , stackDeveloperMode      :: !Bool

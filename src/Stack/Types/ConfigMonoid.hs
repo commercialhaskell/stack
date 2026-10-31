@@ -208,6 +208,8 @@ data ConfigMonoid = ConfigMonoid
     -- ^ See 'Stack.Types.Config.notifyIfNoRunBenchmarks'
   , notifyIfBaseNotBoot     :: !FirstTrue
     -- ^ See 'Stack.Types.Config.notifyIfBaseNotBoot'
+  , notifyIfNoProjectTarget :: !FirstTrue
+    -- ^ See 'Stack.Types.Config.notifyIfNoProjectTarget'
   , casaOpts                :: !CasaOptsMonoid
     -- ^ Casa configuration options.
   , casaRepoPrefix          :: !(First CasaRepoPrefix)
@@ -398,6 +400,8 @@ parseConfigMonoidObject rootDir obj = do
     FirstTrue <$> obj ..:? configMonoidNotifyIfNoRunBenchmarksName
   notifyIfBaseNotBoot <-
     FirstTrue <$> obj ..:? configMonoidNotifyIfBaseNotBootName
+  notifyIfNoProjectTarget <-
+    FirstTrue <$> obj ..:? configMonoidNotifyIfNoProjectTarget
   casaOpts <- jsonSubWarnings (obj ..:? configMonoidCasaOptsName ..!= mempty)
   casaRepoPrefix <- First <$> obj ..:? configMonoidCasaRepoPrefixName
   snapshotLocation <- First <$> obj ..:? configMonoidSnapshotLocationName
@@ -474,6 +478,7 @@ parseConfigMonoidObject rootDir obj = do
     , notifyIfNoRunTests
     , notifyIfNoRunBenchmarks
     , notifyIfBaseNotBoot
+    , notifyIfNoProjectTarget
     , casaOpts
     , casaRepoPrefix
     , snapshotLocation
@@ -682,6 +687,9 @@ configMonoidNotifyIfNoRunBenchmarksName = "notify-if-no-run-benchmarks"
 
 configMonoidNotifyIfBaseNotBootName :: Text
 configMonoidNotifyIfBaseNotBootName = "notify-if-base-not-boot"
+
+configMonoidNotifyIfNoProjectTarget :: Text
+configMonoidNotifyIfNoProjectTarget = "notify-if-no-project-target"
 
 configMonoidCasaOptsName :: Text
 configMonoidCasaOptsName = "casa"

@@ -494,6 +494,8 @@ configFromConfigMonoid
           fromFirstTrue configMonoid.notifyIfNoRunBenchmarks
         notifyIfBaseNotBoot =
           fromFirstTrue configMonoid.notifyIfBaseNotBoot
+        notifyIfNoProjectTarget =
+          fromFirstTrue configMonoid.notifyIfNoProjectTarget
         noRunCompile = fromFirstFalse configMonoid.noRunCompile
     allowDifferentUser <-
       case getFirst configMonoid.allowDifferentUser of
@@ -658,6 +660,7 @@ configFromConfigMonoid
                 , notifyIfNoRunTests
                 , notifyIfNoRunBenchmarks
                 , notifyIfBaseNotBoot
+                , notifyIfNoProjectTarget
                 , noRunCompile
                 , stackDeveloperMode
                 , casa
