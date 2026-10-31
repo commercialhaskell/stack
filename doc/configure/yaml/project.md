@@ -39,7 +39,7 @@ snapshot defines a GHC version, the package version of packages available for
 installation, and various settings like build flags. For example:
 
 ~~~yaml
-snapshot: lts-24.61 # A Stackage LTS Haskell snapshot
+snapshot: lts-24.65 # A Stackage LTS Haskell snapshot
 ~~~
 
 or

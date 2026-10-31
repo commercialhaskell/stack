@@ -7,8 +7,8 @@ import           System.IO ( readFile )
 
 main :: IO ()
 main = do
-  stackErr ["init", "--snapshot", "lts-24.61"]
-  stack ["init", "--snapshot", "lts-24.61", "--omit-packages"]
+  stackErr ["init", "--snapshot", "lts-24.65"]
+  stack ["init", "--snapshot", "lts-24.65", "--omit-packages"]
   contents <- lines <$> readFile "stack.yaml"
   unless ("#- bad" `elem` contents) $
     error "commented out 'bad' package was expected"
