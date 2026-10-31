@@ -975,10 +975,27 @@ Pass the flag to build your project with the GHC options `-Wall` and `-Werror`.
 Pass the flag to enable profiling in libraries, executables, etc. for all
 expressions, and generate a profiling report in tests or benchmarks.
 
+GHC provides various strategies for the automatic insertion of cost-centres into
+the compiled program. The flag enables the strategy recommended in the GHC
+User's Guide (GHC flag `-fprof-auto`) and gives every Constant Applicative Form
+(CAF, a top-level thunk) its own cost-centre stack) (GHC flag `-fprof-cafs`).
+
+!!! note
+
+    From GHC 9.4.1, the stategy recommended in the GHC User's Guide has been
+    `-fprof-late`. Stack has not yet been updated to reflect that.
+
+The recommended strategy annotates, before GHC's optimizer has run, all bindings (top-level or nested, whether exported or not), other than those marked
+`INLINE`, with `SCC` (Set Cost Centre).
+
+The GHC flags set by the flag can be reversed with GHC flags `-fno-prof-auto` or
+`-fno-prof-cafs` and other GHC flags applied. See the
+[`--ghc-options`](#-ghc-options-option) option.
+
 The flag affects the location of the local project installation directory. See
 the [`stack path --local-install-root`](path_command.md) command.
 
-### `--[no]-semaphore` flag
+### `--[no-]semaphore` flag
 
 :octicons-beaker-24: Experimental
 
@@ -1074,14 +1091,14 @@ configuration option.
 
 ## Flags relating to build outputs
 
-### `--[no]-cabal-verbose` flag
+### `--[no-]cabal-verbose` flag
 
 Default: Disabled
 
 Set the flag to enable verbose output from Cabal (the library). This flag is an
 alternative to the `--cabal-verbosity` option.
 
-### `--[no]-cabal-verbosity` option
+### `--cabal-verbosity` option
 
 `stack build --cabal-verbosity <verbosity_level>` sets the specified verbosity
 level for output from Cabal (the library). It accepts Cabal's numerical and
@@ -1189,7 +1206,7 @@ package is targeted in a multi-package project (for example, using
   specific configuration option documentation. The default `dump-logs` mode is
   to output the contents of any log files that include GHC warnings.
 
-### `--[no]-open` flag
+### `--[no-]open` flag
 
 Default: Disabled
 
@@ -1197,7 +1214,7 @@ Set the flag to enable opening the local Haddock documentation in the browser.
 
 ## Other flags and options
 
-### `--[no]-prefetch` flag
+### `--[no-]prefetch` flag
 
 Default: Disabled
 
