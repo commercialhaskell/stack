@@ -25,6 +25,10 @@ Other enhancements:
   creation of a new info table for every use of a data constructor in the source
   program.
 * Stack supports build type `Hooks`.
+* If Stack's `ghci` or `repl` command is used without specifying any project
+  package targets, a plain ghci is started with no package hiding or package
+  options. In configuration files, the `notify-if-no-project-target` key is
+  introduced, to allow the exisitng notification to be muted if unwanted.
 
 Bug fixes:
 

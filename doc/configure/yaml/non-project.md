@@ -1037,6 +1037,16 @@ Default: `true`
 If Stack's integration with the Nix package manager is not enabled, should Stack
 notify the user if a `nix` executable is on the PATH?
 
+## notify-if-no-project-target
+
+:octicons-tag-24: UNRELEASED
+
+Default: `true`
+
+Should Stack notify the user if `stack ghci` or `stack repl` is commanded with
+no project package targets specified, so a plain ghci will be started with no
+package hiding or package options?
+
 ## notify-if-no-run-benchmarks
 
 [:octicons-tag-24: 3.3.1](https://github.com/commercialhaskell/stack/releases/tag/v3.3.1)
