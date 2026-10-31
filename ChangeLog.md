@@ -15,6 +15,10 @@ Behavior changes:
 Other enhancements:
 
 * Stack supports build type `Hooks`.
+* If Stack's `ghci` or `repl` command is used without specifying any project
+  package targets, a plain GHCi is started with no package hiding or package
+  options. In configuration files, the `notify-if-no-project-target` key is
+  introduced, to allow the existing notification to be muted if unwanted.
 
 ## v4.1.0.3 (release candidate)
 
@@ -1970,7 +1974,7 @@ Behavior changes:
   GHC. You can explicitly set `install-ghc: false` or pass the flag
   `--no-install-ghc` to regain the previous behavior.
 * `stack ghci` no longer loads modules grouped by package. This is
-  always an improvement for plain ghci - it makes loading faster and
+  always an improvement for plain GHCi - it makes loading faster and
   less noisy. For intero, this has the side-effect that it will no
   longer load multiple packages that depend on TH loading relative
   paths.  TH relative paths will still work when loading a single

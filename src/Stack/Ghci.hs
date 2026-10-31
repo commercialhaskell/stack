@@ -571,11 +571,12 @@ runGhci
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir
             ]
-      prettyInfoL
-        ( flow "Configuring GHCi with the following packages:"
-        : mkNarrativeList (Just Current) False
-            (map (fromPackageName . (.name)) pkgs :: [StyleDoc])
-        )
+      unless (null pkgs) $
+        prettyInfoL
+          ( flow "Configuring GHCi with the following packages:"
+          : mkNarrativeList (Just Current) False
+              (map (fromPackageName . (.name)) pkgs :: [StyleDoc])
+          )
       compilerExeName <-
         view $ compilerPathsL . to (.compiler) . to toFilePath
       let execGhci extras = do
@@ -1183,37 +1184,46 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
       -- A user-specific global configuration file
       Left _ -> prettyThrowM ConfigFileNotProjectLevelBug
       -- A project-level configuration file
-      Right projectConfigFile -> prettyNote $ vsep
-        [ flow "No project package targets specified, so a plain ghci will be \
-               \started with no package hiding or package options."
-        , ""
-        , flow $ T.unpack $ utf8BuilderToText $
-                 "You are using snapshot: " <>
-                 display smWanted.snapshotLocation
-        , ""
-        , flow "If you want to use package hiding and options, then you can try \
-               \one of the following:"
-        , ""
-        , bulletedList
-            [ fillSep
-                [ flow "If you want to start a different project configuration \
-                       \than"
-                , pretty projectConfigFile <> ","
-                , flow "then you can use"
-                , style Shell "stack init"
-                , flow "to create a new"
-                , style File "stack.yaml"
-                , flow "for the packages in the current directory."
-                , line
-                ]
-            , flow "If you want to use the project configuration at"
-            , pretty projectConfigFile <> ","
-            , flow "then you can add to the value of its"
-            , style Shell "packages"
-            , "key."
-            ]
-        , ""
-        ]
+      Right projectConfigFile -> do
+        config <- view configL
+        when config.notifyIfNoProjectTarget $
+          prettyNote $
+               fillSep
+                 [ flow "You are using snapshot"
+                 , pretty smWanted.snapshotLocation
+                 , flow "with no project package targets specified."
+                 ]
+            <> blankLine
+            <> flow "A plain GHCi will be started with no package hiding or \
+                    \package options. If you want to use package hiding and \
+                    \options, then you can try one of the following:"
+            <> blankLine
+            <> bulletedList
+                 [ fillSep
+                     [ flow "If you want to start a different project \
+                            \configuration than"
+                     , pretty projectConfigFile <> ","
+                     , flow "then you can use"
+                     , style Shell "stack init"
+                     , flow "to create a new"
+                     , style File "stack.yaml"
+                     , flow "for the packages in the current directory."
+                     ]
+                 , fillSep
+                     [ flow "If you want to use the project configuration at"
+                     , pretty projectConfigFile <> ","
+                     , flow "then you can add to the value of its"
+                     , style Shell "packages"
+                     , "key."
+                     ]
+                 ]
+            <> blankLine
+            <> fillSep
+                 [ flow "To mute this message in future, set"
+                 , style Shell (flow "notify-if-no-project-target: false")
+                 , flow "in Stack's configuration."
+                 ]
+            <> line
 
 -- Adds in intermediate dependencies between ghci targets. Note that it will
 -- return a Lib component for these intermediate dependencies even if they don't
