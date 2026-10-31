@@ -1,0 +1,32 @@
+# This is an experimental project-level configuration, to see if Stack can be
+# built with GHC 9.14.2-rc2.
+snapshot: nightly-2026-10-28 # GHC 9.12.4
+compiler: ghc-9.14.1.20260916
+compiler-check: match-exact # Anticipating future rc releases
+
+extra-deps:
+# ghc-9.14.1.20260916 specifies semaphore-compat-2.0.1
+- semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
+
+allow-newer: true
+
+allow-newer-deps:
+- cborg
+- http-api-data
+- persistent
+- semaphore-compat
+- serialise
+
+docker:
+  enable: false
+  repo: quay.io/benz0li/ghc-musl:9.14.2
+
+nix:
+  # --nix on the command-line to enable.
+  packages:
+  - pkg-config
+  - zlib
+
+flags:
+  stack:
+    developer-mode: true

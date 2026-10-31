@@ -32,7 +32,7 @@ There are four ways to specify a snapshot location:
     *   **Stackage LTS Haskell snapshots**, for example:
 
         ~~~yaml
-        snapshot: lts-24.55
+        snapshot: lts-24.65
         ~~~
 
         ??? info "Expansion of `lts-X.Y`"
