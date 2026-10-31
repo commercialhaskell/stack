@@ -1043,9 +1043,9 @@ notify the user if a `nix` executable is on the PATH?
 
 Default: `true`
 
-Should Stack notify the user if `stack ghci` or `stack repl` is commanded with
-no project package targets specified, so a plain ghci will be started with no
-package hiding or package options?
+If Stack's `ghci` or `repl` command is used with no project package targets
+specified, should Stack notify the user that a plain GHCi will be started with
+no package hiding or package options, and advise on alternatives?
 
 ## notify-if-no-run-benchmarks
 

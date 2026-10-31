@@ -225,7 +225,7 @@ data Config = Config
     -- package?
   , notifyIfNoProjectTarget  :: !Bool
     -- ^ Notify if @stack ghci@ or @stack repl@ has been commanded with no
-    -- project package targets specified, so that a plain ghci will be started?
+    -- project package targets specified, so that a plain GHCi will be started?
   , noRunCompile            :: !Bool
     -- ^ Use --no-run and --compile options when using `stack script`
   , stackDeveloperMode      :: !Bool

@@ -571,11 +571,12 @@ runGhci
             [ "-odir=" <> toFilePathNoTrailingSep oiDir
             , "-hidir=" <> toFilePathNoTrailingSep oiDir
             ]
-      prettyInfoL
-        ( flow "Configuring GHCi with the following packages:"
-        : mkNarrativeList (Just Current) False
-            (map (fromPackageName . (.name)) pkgs :: [StyleDoc])
-        )
+      unless (null pkgs) $
+        prettyInfoL
+          ( flow "Configuring GHCi with the following packages:"
+          : mkNarrativeList (Just Current) False
+              (map (fromPackageName . (.name)) pkgs :: [StyleDoc])
+          )
       compilerExeName <-
         view $ compilerPathsL . to (.compiler) . to toFilePath
       let execGhci extras = do
@@ -1193,7 +1194,7 @@ targetWarnings localTargets nonLocalTargets mfileTargets = do
                  , flow "with no project package targets specified."
                  ]
             <> blankLine
-            <> flow "A plain ghci will be started with no package hiding or \
+            <> flow "A plain GHCi will be started with no package hiding or \
                     \package options. If you want to use package hiding and \
                     \options, then you can try one of the following:"
             <> blankLine
