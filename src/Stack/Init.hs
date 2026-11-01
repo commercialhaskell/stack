@@ -437,7 +437,7 @@ renderStackYaml p ignoredPackages dupPackages =
     , "A snapshot dictates the compiler version and the set of packages"
     , "to be used for project dependencies. For example:"
     , ""
-    , "snapshot: lts-24.55"
+    , "snapshot: lts-24.65"
     , "snapshot: nightly-2026-08-20"
     , "snapshot: ghc-9.10.3"
     , ""

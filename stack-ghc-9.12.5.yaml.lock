@@ -27,7 +27,7 @@ packages:
     hackage: semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
 snapshots:
 - completed:
-    sha256: cb7d0b9185684418fac8da3353d4054f002a98d065b70d501dd6b93cc3289fef
-    size: 757765
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2026/7/12.yaml
-  original: nightly-2026-07-12
+    sha256: 5a365a790387c6fee9c1158c97f3701fdb34e523ba85730c8f0e45e1c4c30a7b
+    size: 780550
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2026/10/28.yaml
+  original: nightly-2026-10-28

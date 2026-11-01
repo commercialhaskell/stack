@@ -1,5 +1,5 @@
 {- stack script
-   --snapshot lts-24.55
+   --snapshot lts-24.65
    --package nsis
 -}
 {-# LANGUAGE OverloadedStrings #-}
