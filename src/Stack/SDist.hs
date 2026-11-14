@@ -49,6 +49,7 @@ import qualified Distribution.PackageDescription.Check as Check
 import qualified Distribution.PackageDescription.Parsec as Cabal
 import           Distribution.PackageDescription.PrettyPrint
                    ( showGenericPackageDescription )
+import           Distribution.Parsec ( PErrorWithSource (..) )
 import           Distribution.Simple.Utils ( cabalVersion )
 import           Distribution.Version
                    ( earlierVersion, hasLowerBound, hasUpperBound, isAnyVersion
@@ -65,7 +66,8 @@ import           Stack.Build.ExecuteEnv ( withExecuteEnv, withSingleContext )
 import           Stack.Build.Installed ( getInstalled, toInstallMap )
 import           Stack.Build.Source ( projectLocalPackages )
 import           Stack.BuildOpts ( defaultBuildOpts )
-import           Stack.Constants ( stackProgName, stackProgName' )
+import           Stack.Constants
+                   ( silentVerbosity, stackProgName, stackProgName' )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Package ( resolvePackage, resolvePackageDescription )
 import           Stack.Prelude
@@ -381,7 +383,7 @@ getCabalLbs pvpBounds mrev cabalFP sourceMap = do
            , style Url "https://github.com/haskell/cabal/issues/new"
            ]
       <> line
-      <> flow ("The parse error is: " <> unlines (map show (toList errs)))
+      <> flow ("The parse error is: " <> unlines (map (show . perror) (toList errs)))
       <> blankLine
   pure
     ( ident
@@ -574,7 +576,7 @@ checkPackageInExtractedTarball pkgDir = do
     ]
   let pkgChecks = Check.checkPackage gpd
   fileChecks <-
-    liftIO $ Check.checkPackageFiles minBound pkgDesc (toFilePath pkgDir)
+    liftIO $ Check.checkPackageFiles silentVerbosity pkgDesc (toFilePath pkgDir)
   let checks = pkgChecks ++ fileChecks
       (errors, warnings) =
         let criticalIssue (Check.PackageBuildImpossible _) = True

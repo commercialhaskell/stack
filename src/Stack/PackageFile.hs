@@ -31,7 +31,7 @@ import           Stack.ComponentFile
                    )
 import           Stack.Constants
                    ( relFileHpackPackageConfig, relFileSetupHs, relFileSetupLhs
-                   , relFileSetupHooksHs, relFileSetupHooksLhs
+                   , relFileSetupHooksHs, relFileSetupHooksLhs, silentVerbosity
                    )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.Prelude
@@ -166,7 +166,11 @@ resolveGlobFiles cabalFileVersion =
     -> RIO GetPackageFileContext [FilePath]
   matchDirFileGlob' dir glob = map getSymbolicPath <$> do
     catch
-      (liftIO $ matchDirFileGlob minBound cabalFileVersion (Just $ makeSymbolicPath dir) (makeSymbolicPath glob))
+      (liftIO $ matchDirFileGlob
+         silentVerbosity
+         cabalFileVersion
+         (Just $ makeSymbolicPath dir)
+         (makeSymbolicPath glob))
       ( \(e :: IOException) ->
         if isUserError e
           then do

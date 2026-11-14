@@ -156,6 +156,7 @@ module Stack.Constants
   , gitHubTokenEnvVar
   , altGitHubTokenEnvVar
   , hackageBaseUrl
+  , silentVerbosity
   ) where
 
 import           Data.ByteString.Builder ( byteString )
@@ -165,6 +166,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Distribution.Package ( mkPackageName )
 import           Distribution.Version ( mkVersion )
+import           Distribution.Verbosity
+                   ( Verbosity (..), defaultVerbosityHandles, silent )
 import           Hpack.Config ( packageConfig )
 import qualified Language.Haskell.TH.Syntax as TH ( runIO, lift )
 import           Path ( (</>), mkRelDir, mkRelFile, parseAbsFile )
@@ -745,3 +748,7 @@ altGitHubTokenEnvVar = "GITHUB_TOKEN"
 
 hackageBaseUrl :: Text
 hackageBaseUrl = "https://hackage.haskell.org/"
+
+-- | Cabal's silent verbosity
+silentVerbosity :: Verbosity
+silentVerbosity = Verbosity silent defaultVerbosityHandles

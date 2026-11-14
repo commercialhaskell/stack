@@ -2,8 +2,8 @@ snapshot: lts-24.65 # GHC 9.10.3
 
 extra-deps:
 # lts-24.65 specifies Cabal-3.12.1.0
-- Cabal-3.16.1.0@sha256:39873317ab895194547c3fd72c91cdb97c800a49b2656920854747ee466627ca,14459
-- Cabal-syntax-3.16.1.0@sha256:17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504,7778
+- Cabal-3.18.2.0@sha256:12ff223739a4d3223744925112d147354916261c478bde639fb497820f3268d3,13985
+- Cabal-syntax-3.18.2.0@sha256:8f7430a41796b2d69b597348999a382442f15d113e48a604ed5369a10bc42a45,7529
 # lts-24.65 specifies crypton-1.0.6
 - crypton-1.1.5@sha256:792068de19ec3e75367ba52f5bb68c2b01f76182f9d38d9fcb6eccfece8f5228,15142
 # lts-24.65 excludes crypton-asn1-encoding
@@ -40,6 +40,8 @@ extra-deps:
 - pantry-0.11.5@sha256:25e03e65894cca878a33ce6f33bd0e5c7c09c16ddb0442ae24fbb7f0324a8f84,7325
 # lts-24.65 specifies persistent-2.17.1.0
 - persistent-2.18.1.0@sha256:6a111b26c3e710f1e080a7543cf93766c4cc53ac560dbaa0d4b7ddc98a2f7b1d,7096
+# lts-24.65 specifies process-1.6.26.1
+- process-1.6.30.0@sha256:b74eed77eb3237c4ab6a39f08bcce4712b4486b091712ee20e92c8864f1e80a0,3754
 # lts-24.65 excludes ram
 - ram-0.22.1@sha256:ae1111ae126f1c89f54ff6d616d25a78db0db6e1e76e20a13d1526dc6afe37e8,2814
 # lts-24.65 provides static-bytes-0.1.1
@@ -48,6 +50,11 @@ extra-deps:
 - time-hourglass-0.3.0@sha256:ee02356fe24919ec43ae17fc0007398c2fd0bbe822833b2d7a9c849537b90580,3114
 # lts-24.65 specifies tls-2.1.8
 - tls-2.4.6@sha256:5ff7876f723b35c9d03b9d02aed2bf4f036893c3a9e8ffed9a230d76f6f216fa,7426
+
+allow-newer: true
+
+allow-newer-deps:
+- hpack
 
 docker:
   enable: false
@@ -64,5 +71,7 @@ nix:
   - zlib
 
 flags:
+  process:
+    os-string: true
   stack:
     developer-mode: true

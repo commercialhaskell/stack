@@ -55,14 +55,11 @@ import           Distribution.PackageDescription
                    , buildType, depPkgName, depVerRange
                    , unqualComponentNameToPackageName
                    )
-import qualified Distribution.PackageDescription as Executable
-                   ( Executable (..) )
 import           Distribution.Simple.PackageDescription ( readHookedBuildInfo )
 import           Distribution.System ( OS (..), Arch, Platform (..) )
 import           Distribution.Text ( display )
 import qualified Distribution.Types.CondTree as Cabal
 import           Distribution.Utils.Path ( makeSymbolicPath, getSymbolicPath )
-import           Distribution.Verbosity ( silent )
 import           Distribution.Version
                    ( anyVersion, mkVersion, orLaterVersion )
 import           Path
@@ -80,7 +77,8 @@ import           Stack.ComponentFile
                    ( buildDir, componentAutogenDir, componentBuildDir
                    , componentOutputDir, packageAutogenDir
                    )
-import           Stack.Constants ( relFileCabalMacrosH, relDirLogs )
+import           Stack.Constants
+                   ( relFileCabalMacrosH, relDirLogs, silentVerbosity )
 import           Stack.Constants.Config ( distDirFromDir )
 import           Stack.PackageFile ( getPackageFile, stackPackageFileFromCabal )
 import           Stack.Prelude hiding ( Display (..) )
@@ -131,7 +129,10 @@ import           RIO.Seq ((|>))
 -- NOTE: not to be confused with BuildInfo, an Stack-internal datatype.
 readDotBuildinfo :: MonadIO m => Path Abs File -> m HookedBuildInfo
 readDotBuildinfo =
-  liftIO . readHookedBuildInfo silent Nothing . makeSymbolicPath . toFilePath
+    liftIO
+  . readHookedBuildInfo silentVerbosity Nothing
+  . makeSymbolicPath
+  . toFilePath
 
 -- | Resolve a parsed Cabal file into a t'Package', which contains all of the
 -- info needed for Stack to build the t'Package' given the current
@@ -459,29 +460,21 @@ resolvePackageDescription
         desc _ defaultFlags mlib subLibs foreignLibs' exes tests benches
     )
   = desc
-      { library = fmap (resolveConditions rc updateLibDeps) mlib
+      { library = fmap (resolveConditions rc) mlib
       , subLibraries = map
-          ( \(n, v) ->
-              (resolveConditions rc updateLibDeps v){libName = LSubLibName n}
-          )
+          ( \(n, v) ->(resolveConditions rc v){libName = LSubLibName n} )
           subLibs
       , foreignLibs = map
-          ( \(n, v) ->
-              (resolveConditions rc updateForeignLibDeps v){foreignLibName = n}
-          )
+          ( \(n, v) -> (resolveConditions rc v){foreignLibName = n} )
           foreignLibs'
       , executables = map
-          ( \(n, v) -> (resolveConditions rc updateExeDeps v){exeName = n} )
+          ( \(n, v) -> (resolveConditions rc v){exeName = n} )
           exes
       , testSuites = map
-          ( \(n, v) ->
-              (resolveConditions rc updateTestDeps v){testName = n}
-          )
+          ( \(n, v) -> (resolveConditions rc v){testName = n} )
           tests
       , benchmarks = map
-          ( \(n, v) ->
-              (resolveConditions rc updateBenchmarkDeps v){benchmarkName = n}
-          )
+          ( \(n, v) -> (resolveConditions rc v){benchmarkName = n} )
           benches
       }
  where
@@ -490,20 +483,6 @@ resolvePackageDescription
          packageConfig.compilerVersion
          packageConfig.platform
          flags
-  updateLibDeps lib deps = lib
-    { libBuildInfo = (libBuildInfo lib) {targetBuildDepends = deps} }
-  updateForeignLibDeps lib deps = lib
-    { foreignLibBuildInfo =
-        (foreignLibBuildInfo lib) {targetBuildDepends = deps}
-    }
-  updateExeDeps exe deps = exe
-    { Executable.buildInfo = (buildInfo exe) {targetBuildDepends = deps} }
-  updateTestDeps test deps = test
-    { testBuildInfo = (testBuildInfo test) {targetBuildDepends = deps} }
-  updateBenchmarkDeps bench deps = bench
-    { benchmarkBuildInfo =
-        (benchmarkBuildInfo bench) {targetBuildDepends = deps}
-    }
 
 -- | Make a map from a list of flag specifications.
 --
@@ -538,18 +517,16 @@ mkResolveConditions compilerVersion (Platform arch os) flags = ResolveConditions
 resolveConditions ::
      (Semigroup target, Monoid target, Show target)
   => ResolveConditions
-  -> (target -> cs -> target)
-  -> CondTree ConfVar cs target
+  -> CondTree ConfVar target
   -> target
-resolveConditions rc addDeps (CondNode lib deps cs) = basic <> children
+resolveConditions rc (CondNode lib cs) = lib <> children
  where
-  basic = addDeps lib deps
   children = mconcat (map apply cs)
    where
     apply (Cabal.CondBranch cond node mcs) =
       if condSatisfied cond
-         then resolveConditions rc addDeps node
-         else maybe mempty (resolveConditions rc addDeps) mcs
+         then resolveConditions rc node
+         else maybe mempty (resolveConditions rc) mcs
     condSatisfied c =
       case c of
         Var v -> varSatisfied v

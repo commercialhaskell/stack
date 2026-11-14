@@ -5,19 +5,19 @@
 
 packages:
 - completed:
-    hackage: Cabal-3.16.1.0@sha256:39873317ab895194547c3fd72c91cdb97c800a49b2656920854747ee466627ca,14459
+    hackage: Cabal-3.18.2.0@sha256:12ff223739a4d3223744925112d147354916261c478bde639fb497820f3268d3,13985
     pantry-tree:
-      sha256: b6ac49163659ec305805fc0d2c0564c35fac7132f4c5be6689d0c80a6405ecf0
-      size: 12139
+      sha256: a37f12179eae1b78f16425bdeb6f96b7fbfbe77a4fa1df348b52a07f02b260af
+      size: 12010
   original:
-    hackage: Cabal-3.16.1.0@sha256:39873317ab895194547c3fd72c91cdb97c800a49b2656920854747ee466627ca,14459
+    hackage: Cabal-3.18.2.0@sha256:12ff223739a4d3223744925112d147354916261c478bde639fb497820f3268d3,13985
 - completed:
-    hackage: Cabal-syntax-3.16.1.0@sha256:17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504,7778
+    hackage: Cabal-syntax-3.18.2.0@sha256:8f7430a41796b2d69b597348999a382442f15d113e48a604ed5369a10bc42a45,7529
     pantry-tree:
-      sha256: 1db24d3ca877095a7c4f99fda3c58155a33d8041dfe9faa886420c43572330a3
-      size: 11238
+      sha256: 9a7d6dc46e5bb262256639f455b98527c2f0212c956180eeeaeaabe041c9e525
+      size: 11237
   original:
-    hackage: Cabal-syntax-3.16.1.0@sha256:17cf54d07d7aa65ea24ba4045912b8a8af065f10e429fd1811d43810b313c504,7778
+    hackage: Cabal-syntax-3.18.2.0@sha256:8f7430a41796b2d69b597348999a382442f15d113e48a604ed5369a10bc42a45,7529
 - completed:
     hackage: crypton-1.1.5@sha256:792068de19ec3e75367ba52f5bb68c2b01f76182f9d38d9fcb6eccfece8f5228,15142
     pantry-tree:
@@ -144,6 +144,13 @@ packages:
       size: 7184
   original:
     hackage: persistent-2.18.1.0@sha256:6a111b26c3e710f1e080a7543cf93766c4cc53ac560dbaa0d4b7ddc98a2f7b1d,7096
+- completed:
+    hackage: process-1.6.30.0@sha256:b74eed77eb3237c4ab6a39f08bcce4712b4486b091712ee20e92c8864f1e80a0,3754
+    pantry-tree:
+      sha256: 70a960bb009d19114daf7a03c7e459a7bf0bfd5834444ab5c1d15b177fe26cb1
+      size: 1869
+  original:
+    hackage: process-1.6.30.0@sha256:b74eed77eb3237c4ab6a39f08bcce4712b4486b091712ee20e92c8864f1e80a0,3754
 - completed:
     hackage: ram-0.22.1@sha256:ae1111ae126f1c89f54ff6d616d25a78db0db6e1e76e20a13d1526dc6afe37e8,2814
     pantry-tree:

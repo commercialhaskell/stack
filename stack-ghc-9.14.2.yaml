@@ -5,6 +5,9 @@ compiler: ghc-9.14.1.20261110
 compiler-check: match-exact # Anticipating future rc releases
 
 extra-deps:
+# ghc-9.14.1.20261110 specifies Cabal-3.16.0.0
+- Cabal-3.18.2.0@sha256:12ff223739a4d3223744925112d147354916261c478bde639fb497820f3268d3,13985
+- Cabal-syntax-3.18.2.0@sha256:8f7430a41796b2d69b597348999a382442f15d113e48a604ed5369a10bc42a45,7529
 # ghc-9.14.1.20261110 specifies semaphore-compat-2.0.1
 - semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
 # nightly-2026-11-14 specifies pantry-0.11.4
@@ -14,6 +17,7 @@ allow-newer: true
 
 allow-newer-deps:
 - cborg
+- hpack
 - http-api-data
 - persistent
 - semaphore-compat

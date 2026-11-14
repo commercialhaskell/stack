@@ -431,7 +431,7 @@ allExposedModules gpd = do
           pure $ compiler == GHC
       -- currently we don't do flag checking here
       checkCond other = Left other
-      mlibrary = snd . C.simplifyCondTree checkCond <$> PD.condLibrary gpd
+      mlibrary = C.simplifyCondTree checkCond <$> PD.condLibrary gpd
   pure $ case mlibrary of
     Just lib -> PD.exposedModules lib ++
                 map moduleReexportName (PD.reexportedModules lib)

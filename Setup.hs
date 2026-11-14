@@ -26,19 +26,24 @@ import           Distribution.Types.PackageName ( unPackageName )
 import           Distribution.Types.UnqualComponentName
                    ( unUnqualComponentName )
 import           Distribution.Utils.Path ( interpretSymbolicPathCWD )
-import           Distribution.Verbosity ( Verbosity, normal )
+import           Distribution.Verbosity
+                   ( Verbosity (..), defaultVerbosityHandles, normal )
 import           System.FilePath ( (</>) )
 
 main :: IO ()
 main = defaultMainWithHooks simpleUserHooks
   { buildHook = \pkg lbi hooks flags -> do
-      generateBuildModule (fromFlag (buildVerbosity flags)) pkg lbi
+      let verbosity =
+            Verbosity (fromFlag (buildVerbosity flags)) defaultVerbosityHandles
+      generateBuildModule verbosity pkg lbi
       buildHook simpleUserHooks pkg lbi hooks flags
     -- The 'cabal repl' hook corresponds to the 'cabal build' hook and is added
     -- because, with a Cabal-based cradle, Haskell Language Server makes use of
     -- 'cabal repl'.
   , replHook = \pkg lbi hooks flags args -> do
-      generateBuildModule (fromFlag (replVerbosity flags)) pkg lbi
+      let verbosity =
+            Verbosity (fromFlag (replVerbosity flags)) defaultVerbosityHandles
+      generateBuildModule verbosity pkg lbi
       replHook simpleUserHooks pkg lbi hooks flags args
   }
 
@@ -53,7 +58,8 @@ generateBuildModule verbosity pkg lbi = do
   withLibLBI pkg lbi $ \_ libcfg -> do
     withExeLBI pkg lbi $ \exe clbi -> do
       let name = exeName' exe
-      rewriteFileEx normal (dir </> "Build_" ++ name ++ ".hs") $ unlines
+          normalVerbosity = Verbosity normal defaultVerbosityHandles
+      rewriteFileEx normalVerbosity (dir </> "Build_" ++ name ++ ".hs") $ unlines
         [ "{-|"
         , "Module      : Build_" ++ name
         , "License     : BSD-3-Clause"

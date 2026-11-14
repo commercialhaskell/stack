@@ -36,7 +36,7 @@ import           Data.Aeson.WarningParser
                    )
 import qualified Data.Text as T
 import           Distribution.Parsec ( Parsec (..), simpleParsec )
-import           Distribution.Verbosity ( Verbosity, normal, verbose )
+import           Distribution.Verbosity ( VerbosityFlags, normal, verbose )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Stack.Prelude hiding ( trace )
 import           Stack.Types.ComponentUtils ( StackUnqualCompName )
@@ -383,7 +383,7 @@ instance Monoid BenchmarkOptsMonoid where
   mappend = (<>)
 
 newtype CabalVerbosity
-  = CabalVerbosity Verbosity
+  = CabalVerbosity VerbosityFlags
   deriving (Eq, Show)
 
 toFirstCabalVerbosity :: FirstFalse -> First CabalVerbosity
