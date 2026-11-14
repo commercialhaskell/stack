@@ -1,13 +1,15 @@
 # This is an experimental project-level configuration, to see if Stack can be
-# built with GHC 10.0.1-alpha1. It can't, because hashable requires modules
-# exposed by ghc-bignum.
-snapshot: nightly-2026-10-28 # GHC 9.12.4
-compiler: ghc-10.0.0.20260917
-compiler-check: match-exact # Anticipating future alpha or rc releases
+# built with GHC 10.0.1-alpha2. It can't, not least because hashable requires
+# modules exposed by ghc-bignum.
+snapshot: nightly-2026-11-14 # GHC 9.12.4
+compiler: ghc-10.0.0.20261109
+compiler-check: match-exact # Anticipating future alpha or RC releases
 
 extra-deps:
-# ghc-10.0.0.20260917 specifies semaphore-compat-2.0.1
+# ghc-10.0.0.20261109 specifies semaphore-compat-2.0.1
 - semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
+# nightly-2026-11-14 specifies pantry-0.11.4
+- pantry-0.11.5@sha256:25e03e65894cca878a33ce6f33bd0e5c7c09c16ddb0442ae24fbb7f0324a8f84,7325
 
 allow-newer: true
 
@@ -30,7 +32,6 @@ allow-newer-deps:
 - indexed-traversable-instances
 - integer-conversion
 - microlens-th
-- pantry
 - path-io
 - persistent
 - primitive

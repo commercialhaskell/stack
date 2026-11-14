@@ -1,12 +1,27 @@
 # This is an experimental project-level configuration, to see if Stack can be
 # built with GHC 9.12.5-rc3.
-snapshot: nightly-2026-10-28 # GHC 9.12.4
+snapshot: nightly-2026-11-14 # GHC 9.12.4
 compiler: ghc-9.12.4.20260713
 compiler-check: match-exact # Anticipating future rc releases
+
+# Only required before the GHC version has been installed:
+setup-info:
+  ghc:
+    windows64:
+      9.12.4.20260713:
+        url: https://downloads.haskell.org/ghc/9.12.5-rc3/ghc-9.12.4.20260713-x86_64-unknown-mingw32.tar.xz
+        # Can be extended with SHA protections etc: see https://docs.haskellstack.org/en/stable/configure/yaml/non-project/#setup-info
+    macosx-aarch64:
+      9.12.4.20260713:
+        url: https://downloads.haskell.org/ghc/9.12.5-rc3/ghc-9.12.4.20260713-aarch64-apple-darwin.tar.bz2
+        # Can be extended with SHA protections etc: see https://docs.haskellstack.org/en/stable/configure/yaml/non-project/#setup-info
 
 extra-deps:
 # ghc-9.12.4.20260713 specifies semaphore-compat-2.0.0
 - semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
+# nightly-2026-11-14 specifies pantry-0.11.4
+- pantry-0.11.5@sha256:25e03e65894cca878a33ce6f33bd0e5c7c09c16ddb0442ae24fbb7f0324a8f84,7325
+
 
 docker:
   enable: false
