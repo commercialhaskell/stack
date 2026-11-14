@@ -11,6 +11,7 @@ Behavior changes:
   `build --profile` command now adopts that recommendation (rather than
   `-fprof-auto`, still applicable to earlier GHC versions). Existing profiling
   builds will be rebuilt.
+* Fix a deprecation warning originating from Stack's Nix integration.
 
 Other enhancements:
 
