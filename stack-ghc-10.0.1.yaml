@@ -10,6 +10,12 @@ extra-deps:
 - semaphore-compat-1.0.0@sha256:2dff81c2c0ec9bac9f8bae364db497188654d2e1e4330f4a0e2f12310149f3e9,1176
 # nightly-2026-11-14 specifies pantry-0.11.4
 - pantry-0.11.5@sha256:25e03e65894cca878a33ce6f33bd0e5c7c09c16ddb0442ae24fbb7f0324a8f84,7325
+# Patched locally:
+- ../../../Haskell/hashable-1.5.1.0
+# Patched locally:
+- ../../../Haskell/crypton-1.1.5
+# Patched locally:
+- ../../../Haskell/persistent-sqlite-2.13.3.1
 
 allow-newer: true
 
