@@ -32,6 +32,8 @@ Other enhancements:
 
 Bug fixes:
 
+* Fix a deprecation warning originating from Stack's Nix integration.
+
 ## v4.1.1
 
 Release notes:

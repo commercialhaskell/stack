@@ -158,7 +158,7 @@ runShellAndExit = do
                 ,     "  ''--extra-include-dirs=${lib.getDev pkg}/include'' ]"
                 ,     ") inputs; in "
                 , "runCommand ''myEnv'' { "
-                , "buildInputs = lib.optional stdenv.isLinux glibcLocales ++ inputs; "
+                , "buildInputs = lib.optional stdenv.hostPlatform.isLinux glibcLocales ++ inputs; "
                   -- glibcLocales is necessary on Linux to avoid warnings about
                   -- GHC being incapable to set the locale.
                 , T.pack platformVariantEnvVar <> "=''nix''; "
