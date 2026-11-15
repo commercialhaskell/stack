@@ -284,7 +284,6 @@ library:
   - Stack.Storage.Util
   - Stack.Templates
   - Stack.Types.AddCommand
-  - Stack.Types.AllowNewerDeps
   - Stack.Types.ApplyGhcOptions
   - Stack.Types.ApplyProgOptions
   - Stack.Types.Build
@@ -335,6 +334,7 @@ library:
   - Stack.Types.GlobalOptsMonoid
   - Stack.Types.HpcReportOpts
   - Stack.Types.IdeOpts
+  - Stack.Types.IgnoreBoundsPkgs
   - Stack.Types.Installed
   - Stack.Types.InterfaceOpt
   - Stack.Types.IsMutable

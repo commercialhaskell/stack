@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ApplicativeDo     #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
@@ -64,10 +65,7 @@ buildOptsParser cmd = BuildOptsCLI
       )
   <*> progsOptionsParser
   <*> flagsParser
-  <*> firstBoolFlagsNoDefault
-        "allow-newer"
-        "ignoring of lower and upper version bounds in Cabal files."
-        (hideMods False)
+  <*> ignoreBoundsParser
   <*> (   flag' BSOnlyDependencies
             (  long "dependencies-only"
             <> help "A synonym for --only-dependencies."
@@ -181,3 +179,15 @@ progsOptionsParser =
     (  long (T.unpack prog <> "-option")
     <> internal
     )
+
+ignoreBoundsParser :: Parser (First Bool)
+ignoreBoundsParser = do
+  ignoreBounds <- firstBoolFlagsNoDefault
+      "ignore-bounds"
+      "ignoring of lower and upper version bounds in Cabal files."
+      (hideMods False)
+  allowNewer <- firstBoolFlagsNoDefault
+      "allow-newer"
+      "ignoring of lower and upper version bounds in Cabal files."
+      (hideMods True)
+  pure (ignoreBounds <> allowNewer)

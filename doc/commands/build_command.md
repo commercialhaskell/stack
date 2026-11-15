@@ -4,11 +4,11 @@
 
 ~~~text
 stack build [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
-            [--flag PACKAGE:[-]FLAG] [--dependencies-only | --only-snapshot |
-              --only-dependencies | --only-locals] [--file-watch |
-              --file-watch-poll] [--watch-all] [--exec COMMAND [ARGUMENT(S)]]
-            [--only-configure] [--[no-]semaphore] [--trace] [--profile]
-            [--no-strip] [--[no-]library-profiling]
+            [--PROG-option ARG] [--flag PACKAGE:[-]FLAG] [--[no-]ignore-bounds]
+            [--dependencies-only | --only-snapshot | --only-dependencies |
+              --only-locals] [--file-watch | --file-watch-poll] [--watch-all]
+            [--exec COMMAND [ARGUMENT(S)]] [--only-configure] [--[no-]semaphore]
+            [--trace] [--profile] [--no-strip] [--[no-]library-profiling]
             [--[no-]executable-profiling] [--[no-]library-stripping]
             [--[no-]executable-stripping] [--[no-]info-table-profiling]
             [--[no-]haddock] [--haddock-arguments HADDOCK_ARGS] [--[no-]open]
@@ -254,17 +254,16 @@ configuration option).
 
 [:octicons-tag-24: 3.1.1](https://github.com/commercialhaskell/stack/releases/tag/v3.1.1)
 
-Overrides: [`allow-newer`](../configure/yaml/non-project.md#allow-newer)
-non-project specific configuration option
+Deprecated from Stack UNRELEASED.
 
-Pass the flag to enable or disable the ignoring of lower and upper version
-bounds in Cabal files.
+A synonym for the [`--[no-]ignore-bounds`](#-no-ignore-bounds-flag) flag. If
+both flags are used, [`--[no-]ignore-bounds`](#-no-ignore-bounds-flag) has
+precedence.
 
 !!! warning
 
-    This command line flag is misnamed. It causes Stack to ignore all the
-    bounds in the relevant Cabal file(s), not only upper bounds. The name was
-    chosen to match the `--allow-newer` option introduced in `Cabal-1.20.0.0`.
+    This command line flag is misnamed. The name was chosen to match the
+    `--allow-newer` option introduced in `Cabal-1.20.0.0`.
 
 ### `--bench` flag
 
@@ -560,6 +559,18 @@ this flag is ignored.
     benchmarks) in a project package or more than one project package with an
     executable, the Haddock documentation for the `Main` module of one
     executable will overwrite the Haddock documentation for others.
+
+### `--[no-]ignore-bounds` flag
+
+:octicons-tag-24: UNRELEASED
+
+Overrides: [`ignore-bounds`](../configure/yaml/non-project.md#ignore-bounds)
+non-project specific configuration option and
+[`--[no-]allow-newer](#-no-allow-newer-flag) flag (its deprecated
+synonym)
+
+Pass the flag to enable or disable the ignoring of lower and upper version
+bounds in Cabal files.
 
 ### `--[no-]keep-going` flag
 

@@ -1,4 +1,4 @@
--- Stack advises the use of allow-newer in a configuration file if the package
+-- Stack advises the use of ignore-bounds in a configuration file if the package
 -- versions needed are not the version in the snapshot.
 --
 -- See: https://github.com/commercialhaskell/stack/issues/3685

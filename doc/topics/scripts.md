@@ -202,9 +202,9 @@ command itself, is ignored.
     Non-project level configuration options in global configuration files
     (`config.yaml`), are not ignored by the
     [`stack script`](../commands/script_command.md) command. Such options may be
-    useful if [`allow-newer`](../configure/yaml/non-project.md#allow-newer)
+    useful if [`ignore-bounds`](../configure/yaml/non-project.md#ignore-bounds)
     and/or
-    [`allow-newer-deps`](../configure/yaml/non-project.md#allow-newer-deps)
+    [`ignore-bounds-in`](../configure/yaml/non-project.md#ignore-bounds-in)
     are required.
 
 When using the  [`stack runghc`](../commands/runghc_command.md) command, as when

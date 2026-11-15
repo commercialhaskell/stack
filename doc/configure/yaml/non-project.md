@@ -42,45 +42,24 @@ process.
 
 [:octicons-tag-24: 0.1.8.0](https://github.com/commercialhaskell/stack/releases/tag/v0.1.8.0)
 
-Default: `false`
+Deprecated in Stack UNRELEASED.
 
-Command line equivalent (takes precedence):
-[`stack build --[no-]allow-newer`](../../commands/build_command.md#-no-allow-newer-flag)
-flag
+A synonym for the [`ignore-bounds`](#ignore-bounds) configuration option. If
+both options are used, [`ignore-bounds`](#ignore-bounds) has precedence.
 
 !!! warning
 
-    This configuration option is misnamed. It causes Stack to ignore all the
-    bounds in the relevant Cabal file(s), not only upper bounds. The name was
-    chosen to match the `--allow-newer` option introduced in `Cabal-1.20.0.0`.
-
-Whether to ignore all version bounds (upper and lower) in Cabal files. See the
-[`allow-newer-deps`](#allow-newer-deps) configuration option to specify the
-scope of application when `allow-newer` is `true`.
-
-~~~yaml
-allow-newer: true
-~~~
+    This configuration option was misnamed. The name was chosen to match the
+    `--allow-newer` option introduced in `Cabal-1.20.0.0`.
 
 ## allow-newer-deps
 
 [:octicons-tag-24: 2.9.3](https://github.com/commercialhaskell/stack/releases/tag/v2.9.3)
 
-Default: all packages (if `allow-newer` is `true`)
+Deprecated in Stack UNRELEASED.
 
-See the [`allow-newer`](#allow-newer) configuration option.
-
-When `allow-newer` is `false`, this option has no effect (but warns).
-
-When `allow-newer` is `true`, this option specifies the scope of application
-for `allow-newer`. That is, the set of packages for which all version bounds
-(upper and lower) should be ignored in the packages' Cabal files.
-
-~~~yaml
-allow-newer-deps:
-- myPackageA
-- myPackageB
-~~~
+A synonym for the [`ignore-bounds-in`](#ignore-bounds-in) configuration option.
+If both options are used, their values are combined.
 
 ## apply-ghc-options
 
@@ -735,6 +714,48 @@ more recent version of Hpack or has been modified manually. By default,
 Hpack 0.12.0 or later will decline to overwrite a Cabal file that was created by
 a more recent version of Hpack and Hpack 0.20.0 or later will decline to
 overwrite a Cabal file that has been modified manually.
+
+## ignore-bounds
+
+:octicons-tag-24: UNRELEASED
+
+Default: `false`
+
+Command line equivalent (takes precedence):
+[`stack build --[no-]ignore-bounds`](../../commands/build_command.md#-no-ignore-bounds-flag)
+flag or
+[`stack build --[no-]allow-newer`](../../commands/build_command.md#-no-allow-newer-flag)
+flag (its deprecated synonym)
+
+Whether to ignore all version bounds (upper and lower) in Cabal files. See the
+[`ignore-bounds-in`](#ignore-bounds-in) configuration option to specify the
+scope of application when `ignore-bounds` is `true`.
+
+~~~yaml
+ignore-bounds: true
+~~~
+
+## ignore-bounds-in
+
+:octicons-tag-24: UNRELEASED
+
+Default: all packages (if [`ignore-bounds`](#ignore-bounds) is `true`)
+
+See the [`ignore-bounds`](#ignore-bounds) configuration option.
+
+When [`ignore-bounds`](#ignore-bounds) is `false`, this option has no effect
+(but warns).
+
+When [`ignore-bounds`](#ignore-bounds) is `true`, this option specifies the
+scope of application for [`ignore-bounds`](#ignore-bounds). That is, the set of
+packages for which all version bounds (upper and lower) should be ignored in the
+packages' Cabal files.
+
+~~~yaml
+ignore-bounds-in:
+- myPackageA
+- myPackageB
+~~~
 
 ## ignore-revision-mismatch
 
