@@ -741,15 +741,14 @@ ignore-bounds: true
 
 Default: all packages (if [`ignore-bounds`](#ignore-bounds) is `true`)
 
-See the [`ignore-bounds`](#ignore-bounds) configuration option.
+When [`ignore-bounds`](#ignore-bounds) is `true`, the `ignore-bounds-in` option
+specifies the scope its application. That is, the set of packages for which all
+version bounds in the packages' Cabal files should be ignored. If the
+[`allow-newer-deps`](#allow-newer-deps) option (its deprecated synonym) is also
+used, their values are combined.
 
-When [`ignore-bounds`](#ignore-bounds) is `false`, this option has no effect
-(but warns).
-
-When [`ignore-bounds`](#ignore-bounds) is `true`, this option specifies the
-scope of application for [`ignore-bounds`](#ignore-bounds). That is, the set of
-packages for which all version bounds (upper and lower) should be ignored in the
-packages' Cabal files.
+This option has no effect (but warns) when [`ignore-bounds`](#ignore-bounds) is
+`false`.
 
 ~~~yaml
 ignore-bounds-in:

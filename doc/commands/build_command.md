@@ -566,7 +566,7 @@ this flag is ignored.
 
 Overrides: [`ignore-bounds`](../configure/yaml/non-project.md#ignore-bounds)
 non-project specific configuration option and
-[`--[no-]allow-newer](#-no-allow-newer-flag) flag (its deprecated
+[`--[no-]allow-newer`](#-no-allow-newer-flag) flag (its deprecated
 synonym)
 
 Pass the flag to enable or disable the ignoring of lower and upper version
