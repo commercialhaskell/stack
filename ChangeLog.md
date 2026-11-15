@@ -15,6 +15,8 @@ Behavior changes:
   `build --profile` command now adopts that recommendation (rather than
   `-fprof-auto`, still applicable to earlier GHC versions). Existing profiling
   builds will be rebuilt.
+* With Nix integration, Stack now uses `stdenv.hostPlatform.isLinux` and no
+  longer warns that `stdenv.isLinux` is deprecated.
 
 Other enhancements:
 
@@ -31,8 +33,6 @@ Other enhancements:
   introduced, to allow the existing notification to be muted if unwanted.
 
 Bug fixes:
-
-* Fix a deprecation warning originating from Stack's Nix integration.
 
 ## v4.1.1
 
