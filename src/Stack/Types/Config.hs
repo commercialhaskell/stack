@@ -167,12 +167,11 @@ data Config = Config
   , applyProgOptions        :: !ApplyProgOptions
     -- ^ Which packages do all and any --PROG-option options on the command line
     -- apply to?
-  , allowNewer              :: !(First Bool)
-    -- ^ Ignore version ranges in .cabal files. Funny naming chosen to
-    -- match cabal.
-  , allowNewerDeps          :: !(Maybe [PackageName])
+  , ignoreBounds            :: !(First Bool)
+    -- ^ Ignore version ranges in Cabal files.
+  , ignoreBoundsPkgs        :: !(Maybe [PackageName])
     -- ^ Ignore dependency upper and lower bounds only for specified
-    -- packages. No effect unless allow-newer is enabled.
+    -- packages. No effect unless ignore-bounds is enabled.
   , defaultInitSnapshot     :: !(First AbstractSnapshot)
     -- ^ An optional default snapshot to use with @stack init@ when none is
     -- specified at the command line.

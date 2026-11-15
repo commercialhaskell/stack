@@ -4,7 +4,8 @@
 
 ~~~text
 stack haddock [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
-              [--flag PACKAGE:[-]FLAG] [--dependencies-only | --only-snapshot |
+              [--PROG-option ARG] [--flag PACKAGE:[-]FLAG]
+              [--[no-]ignore-bounds] [--dependencies-only | --only-snapshot |
                 --only-dependencies | --only-locals] [--file-watch |
                 --file-watch-poll] [--watch-all] [--exec COMMAND [ARGUMENT(S)]]
               [--only-configure] [--trace] [--profile] [--no-strip]

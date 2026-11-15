@@ -21,8 +21,8 @@ Non-project level configuration options in global configuration files
 !!! info
 
     Non-project level configuration options may be useful if
-    [`allow-newer`](../configure/yaml/non-project.md#allow-newer) and/or
-    [`allow-newer-deps`](../configure/yaml/non-project.md#allow-newer-deps) are
+    [`ignore-bounds`](../configure/yaml/non-project.md#ignore-bounds) and/or
+    [`ignore-bounds-in`](../configure/yaml/non-project.md#ignore-bounds-in) are
     required.
 
 ## Project-level configuration file

@@ -4,14 +4,14 @@
 
 ~~~text
 stack bench [TARGET] [--dry-run] [--pedantic] [--fast] [--ghc-options OPTIONS]
-            [--flag PACKAGE:[-]FLAG] [--dependencies-only | --only-snapshot |
-              --only-dependencies | --only-locals] [--file-watch |
-              --file-watch-poll] [--watch-all] [--exec COMMAND [ARGUMENT(S)]]
-            [--only-configure] [--trace] [--profile] [--no-strip]
-            [--[no-]library-profiling] [--[no-]executable-profiling]
-            [--[no-]library-stripping] [--[no-]executable-stripping]
-            [--[no-]info-table-profiling] [--[no-]haddock]
-            [--haddock-arguments HADDOCK_ARGS] [--[no-]open]
+            [--PROG-option ARG] [--flag PACKAGE:[-]FLAG] [--[no-]ignore-bounds]
+            [--dependencies-only | --only-snapshot | --only-dependencies |
+              --only-locals] [--file-watch | --file-watch-poll] [--watch-all]
+            [--exec COMMAND [ARGUMENT(S)]] [--only-configure] [--trace]
+            [--profile] [--no-strip] [--[no-]library-profiling]
+            [--[no-]executable-profiling] [--[no-]library-stripping]
+            [--[no-]executable-stripping] [--[no-]info-table-profiling]
+            [--[no-]haddock] [--haddock-arguments HADDOCK_ARGS] [--[no-]open]
             [--[no-]haddock-deps] [--[no-]haddock-internal]
             [--[no-]haddock-hyperlink-source] [--[no-]haddock-for-hackage]
             [--[no-]copy-bins] [--[no-]copy-compiler-tool] [--[no-]prefetch]

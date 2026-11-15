@@ -34,7 +34,7 @@ data BuildOptsCLI = BuildOptsCLI
   , ghcOptions :: ![Text]
   , progsOptions :: ![(Text, [Text])]
   , flags :: !(Map ApplyCLIFlag (Map FlagName Bool))
-  , allowNewer :: !(First Bool)
+  , ignoreBounds :: !(First Bool)
   , buildSubset :: !BuildSubset
   , fileWatch :: !FileWatchOpts
   , watchAll :: !Bool
@@ -50,7 +50,7 @@ defaultBuildOptsCLI = BuildOptsCLI
   { targetsCLI = []
   , dryrun = False
   , flags = Map.empty
-  , allowNewer = mempty
+  , ignoreBounds = mempty
   , ghcOptions = []
   , progsOptions = []
   , buildSubset = BSAll

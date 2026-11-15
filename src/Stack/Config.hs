@@ -107,7 +107,7 @@ import           Stack.SourceMap ( additionalDepPackage, mkProjectPackage )
 import           Stack.Storage.Project ( initProjectStorage )
 import           Stack.Storage.User ( initUserStorage )
 import           Stack.Storage.Util ( handleMigrationException )
-import           Stack.Types.AllowNewerDeps ( AllowNewerDeps (..) )
+import           Stack.Types.IgnoreBoundsPkgs ( IgnoreBoundsPkgs (..) )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
 import           Stack.Types.Build.Exception
@@ -472,8 +472,10 @@ configFromConfigMonoid
           fromFirst AGOLocals configMonoid.applyGhcOptions
         applyProgOptions =
           fromFirst APOLocals configMonoid.applyProgOptions
-        allowNewer = configMonoid.allowNewer
-        allowNewerDeps = coerce configMonoid.allowNewerDeps
+        ignoreBounds = configMonoid.ignoreBounds <> configMonoid.allowNewer
+        ignoreBoundsPkgs =
+             coerce configMonoid.ignoreBoundsIn
+          <> coerce configMonoid.allowNewerDeps
     defaultInitSnapshot <- do
       root <- getCurrentDir
       let resolve = (First <$>) . traverse (resolvePaths (Just root)) . getFirst
@@ -636,8 +638,8 @@ configFromConfigMonoid
                 , rebuildGhcOptions
                 , applyGhcOptions
                 , applyProgOptions
-                , allowNewer
-                , allowNewerDeps
+                , ignoreBounds
+                , ignoreBoundsPkgs
                 , defaultInitSnapshot
                 , defaultTemplate
                 , allowDifferentUser

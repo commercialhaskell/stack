@@ -3,7 +3,7 @@ snapshot: ghc-9.10.3
 extra-deps:
 - acme-missiles-0.3
 
-allow-newer: true
+ignore-bounds: true
 
-allow-newer-deps:
+ignore-bounds-in:
 - myPackage

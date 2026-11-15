@@ -1,12 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 {-|
-Module      : Stack.Types.AllowNewerDeps
+Module      : Stack.Types.IgnoreBoundsPkgs
 License     : BSD-3-Clause
 -}
 
-module Stack.Types.AllowNewerDeps
-  ( AllowNewerDeps (..)
+module Stack.Types.IgnoreBoundsPkgs
+  ( IgnoreBoundsPkgs (..)
   ) where
 
 import           Data.Aeson.Types ( FromJSON (..) )
@@ -15,9 +15,9 @@ import           Stack.Prelude
 
 -- | A type representing lists of packages for which Stack should ignore lower
 -- and upper version bounds in its Cabal file.
-newtype AllowNewerDeps
-  = AllowNewerDeps [PackageName]
+newtype IgnoreBoundsPkgs
+  = IgnoreBoundsPkgs [PackageName]
   deriving (Eq, Generic, Monoid, Ord, Read, Semigroup, Show)
 
-instance FromJSON AllowNewerDeps where
-  parseJSON = fmap (AllowNewerDeps . fmap mkPackageName) . parseJSON
+instance FromJSON IgnoreBoundsPkgs where
+  parseJSON = fmap (IgnoreBoundsPkgs . fmap mkPackageName) . parseJSON
