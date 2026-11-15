@@ -29,6 +29,10 @@ Other enhancements:
   package targets, a plain GHCi is started with no package hiding or package
   options. In configuration files, the `notify-if-no-project-target` key is
   introduced, to allow the existing notification to be muted if unwanted.
+* Add `--[no-]ignore-bounds` flag as a synonym for `--[no-]allow-newer` and add
+  `ignore-bounds` and `ignore-bounds-in` non-project specific configuration
+  options as synonyms for `allow-newer` and `allow-newer-deps` (respectively).
+  The latter are deprecated.
 
 Bug fixes:
 
@@ -217,7 +221,7 @@ Other enhancements:
 * Add flag `--[no-]omit-this` (default: disabled) to Stack's `clean` command to
   omit directories currently in use from cleaning (when `--full` is not
   specified).
-* Add option `-w` as synonym for `--stack-yaml`.
+* Add option `-w` as a synonym for `--stack-yaml`.
 * `stack new` now allows `codeberg:` as a service for template downloads
 * In YAML configuration files, the `compiler-target` and
   `compiler-bindist-path` keys are introduced to allow, when building GHC from
@@ -590,7 +594,7 @@ Other enhancements:
 * Add option `--filter <item>` to Stack's `ls dependencies text` command to
   filter out an item from the results, if present. The item can be `$locals` for
   all project packages.
-* Add option `--snapshot` as synonym for `--resolver`.
+* Add option `--snapshot` as a synonym for `--resolver`.
 * Add the `config set snapshot` command, corresponding to the
   `config set resolver` command.
 

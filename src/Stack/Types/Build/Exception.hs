@@ -542,18 +542,18 @@ pprintExceptions exceptions configFile stackRoot isImplicitGlobal parentMap want
   exceptions' = {- should we dedupe these somehow? nubOrd -} exceptions
 
   recommendations =
-       [ allowNewerMsg True False | onlyHasDependencyMismatches ]
+       [ ignoreBoundsMsg True False | onlyHasDependencyMismatches ]
     <> [ fillSep
-           $ allowNewerMsg False onlyHasDependencyMismatches
+           $ ignoreBoundsMsg False onlyHasDependencyMismatches
            : flow "add these package names under"
-           : style Shell "allow-newer-deps" <> ":"
+           : style Shell "ignore-bounds-in" <> ":"
            : mkNarrativeList (Just Shell) False
                (map fromPackageName (Set.elems pkgsWithMismatches) :: [StyleDoc])
        | not $ Set.null pkgsWithMismatches
        ]
     <> addExtraDepsRecommendations
    where
-    allowNewerMsg isAll isRepetitive = fillSep
+    ignoreBoundsMsg isAll isRepetitive = fillSep
       $ flow "To ignore"
       : (if isAll then "all" else "certain")
       : flow "version constraints and build anyway,"
@@ -562,7 +562,7 @@ pprintExceptions exceptions configFile stackRoot isImplicitGlobal parentMap want
           else
             [ fillSep
                 $  [ "pass"
-                   , style Shell "--allow-newer" <> ","
+                   , style Shell "--ignore-bounds" <> ","
                    , flow "or, in"
                    , pretty (defaultUserConfigPath stackRoot)
                    , flow
@@ -581,7 +581,7 @@ pprintExceptions exceptions configFile stackRoot isImplicitGlobal parentMap want
                           ]
                    )
                 <> [ "set"
-                   ,    style Shell (flow "allow-newer: true")
+                   ,    style Shell (flow "ignore-bounds: true")
                      <> if isAll then "." else mempty
                    ]
                 <> [ "and" | not isAll ]
@@ -641,7 +641,7 @@ pprintExceptions exceptions configFile stackRoot isImplicitGlobal parentMap want
   filterExceptions ::
     ( Bool
       -- ^ All the errors are DependencyMismatch. This checks if
-      -- 'allow-newer: true' could resolve all reported issues.
+      -- 'ignore-bounds: true' could resolve all reported issues.
     , Bool
       -- ^ One or more messages refer to 'the Stack configuration'. This
       -- triggers a message to explain what that phrase means.

@@ -1075,7 +1075,7 @@ getLatestApplicableVersionAndRev name range = do
 
 -- | Function to determine whether the result of 'addDep' is within range, given
 -- the version range of the dependency and taking into account Stack's
--- @allow-newer@ configuration.
+-- @ignore-bounds@ configuration.
 adrInRange ::
      PackageIdentifier
      -- ^ The package which has the dependency.
@@ -1090,51 +1090,51 @@ adrInRange pkgId name range adr = if adrVersion adr `withinRange` range
   then pure True
   else do
     config <- view configL
-    allowNewerCLI <- view $ envConfigL . to (.buildOptsCLI) . to (.allowNewer)
-    let allowNewerConfig = config.allowNewer
-        allowNewer = fromFirst False $ allowNewerCLI <> allowNewerConfig
-        allowNewerDeps = config.allowNewerDeps
-    if allowNewer
-      then case allowNewerDeps of
+    ignoreBoundsCLI <- view $ envConfigL . to (.buildOptsCLI) . to (.ignoreBounds)
+    let ignoreBoundsConfig = config.ignoreBounds
+        ignoreBounds = fromFirst False $ ignoreBoundsCLI <> ignoreBoundsConfig
+        ignoreBoundsPkgs = config.ignoreBoundsPkgs
+    if ignoreBounds
+      then case ignoreBoundsPkgs of
         Nothing -> do
           warn_ True $
             fillSep
-              [ style Shell "allow-newer"
+              [ style Shell "ignore-bounds"
               , "enabled"
               ]
           pure True
-        Just boundsIgnoredDeps -> do
+        Just boundsIgnoredPkgs -> do
           let pkgName' = fromPackageName pkgName
-              isBoundsIgnoreDep = pkgName `elem` boundsIgnoredDeps
-              reason = if isBoundsIgnoreDep
+              isBoundsIgnorePkg = pkgName `elem` boundsIgnoredPkgs
+              reason = if isBoundsIgnorePkg
                 then fillSep
-                  [ style Current pkgName'
-                  , flow "is an"
-                  , style Shell "allow-newer-dep"
-                  , flow "and"
-                  , style Shell "allow-newer"
-                  , "enabled"
+                  [ style Shell "ignore-bounds"
+                  , "is"
+                  , style Shell "true"
+                  , flow "and we"
+                  , style Shell "ignore-bounds-in"
+                  , style Current pkgName'
                   ]
                 else fillSep
-                  [ style Current pkgName'
-                  , flow "is not an"
-                  , style Shell "allow-newer-dep"
-                  , flow "although"
-                  , style Shell "allow-newer"
-                  , "enabled"
+                  [ style Shell "ignore-bounds"
+                  , "is"
+                  , style Shell "true"
+                  , flow "but we don't"
+                  , style Shell "ignore-bounds-in"
+                  , style Current pkgName'
                   ]
-          warn_ isBoundsIgnoreDep reason
-          pure isBoundsIgnoreDep
+          warn_ isBoundsIgnorePkg reason
+          pure isBoundsIgnorePkg
       else do
-        when (isJust allowNewerDeps) $
+        when (isJust ignoreBoundsPkgs) $
           warn_ False $
             fillSep
-              [ "although"
-              , style Shell "allow-newer-deps"
-              , flow "are specified,"
-              , style Shell "allow-newer"
+              [ style Shell "ignore-bounds"
               , "is"
               , style Shell "false"
+              , "(although"
+              , style Shell "ignore-bounds-in"
+              , flow "is used)"
               ]
         -- We ignore dependency information for packages in a snapshot
         pkgInSnapshot <- inSnapshot pkgName version

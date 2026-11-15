@@ -37,7 +37,7 @@ import qualified Data.Yaml as Yaml
 import           Distribution.Version ( anyVersion )
 import           Generics.Deriving.Monoid ( mappenddefault, memptydefault )
 import           Stack.Prelude hiding ( snapshotLocation )
-import           Stack.Types.AllowNewerDeps ( AllowNewerDeps )
+import           Stack.Types.IgnoreBoundsPkgs ( IgnoreBoundsPkgs )
 import           Stack.Types.ApplyGhcOptions ( ApplyGhcOptions (..) )
 import           Stack.Types.ApplyProgOptions ( ApplyProgOptions (..) )
 import           Stack.Types.BuildOptsMonoid ( BuildOptsMonoid )
@@ -169,9 +169,13 @@ data ConfigMonoid = ConfigMonoid
   , applyProgOptions        :: !(First ApplyProgOptions)
     -- ^ See 'Stack.Types.Config.applyProgOptions'
   , allowNewer              :: !(First Bool)
-    -- ^ See 'Stack.Types.Config.monoidAllowNewer'
-  , allowNewerDeps          :: !(Maybe AllowNewerDeps)
-    -- ^ See 'Stack.Types.Config.monoidAllowNewerDeps'
+    -- ^ See 'Stack.Types.Config.monoidIgnoreBounds'
+  , allowNewerDeps          :: !(Maybe IgnoreBoundsPkgs)
+    -- ^ See 'Stack.Types.Config.monoidIgnoreBoundsIn'
+  , ignoreBounds            :: !(First Bool)
+    -- ^ See 'Stack.Types.Config.monoidIgnoreBounds'
+  , ignoreBoundsIn          :: !(Maybe IgnoreBoundsPkgs)
+    -- ^ See 'Stack.Types.Config.monoidIgnoreBoundsPkgs'
   , defaultInitSnapshot     :: !(First (Unresolved AbstractSnapshot))
    -- ^ An optional default snapshot to use with @stack init@ when none is
    -- specified.
@@ -372,6 +376,8 @@ parseConfigMonoidObject rootDir obj = do
   applyProgOptions <- First <$> obj ..:? configMonoidApplyProgOptionsName
   allowNewer <- First <$> obj ..:? configMonoidAllowNewerName
   allowNewerDeps <- obj ..:? configMonoidAllowNewerDepsName
+  ignoreBounds <- First <$> obj ..:? configMonoidIgnoreBoundsName
+  ignoreBoundsIn <- obj ..:? configMonoidIgnoreBoundsInName
   defaultInitSnapshot <- First <$> obj ..:? configMonoidDefaultInitSnapshotName
   defaultTemplate <- First <$> obj ..:? configMonoidDefaultTemplateName
   allowDifferentUser <- First <$> obj ..:? configMonoidAllowDifferentUserName
@@ -461,6 +467,8 @@ parseConfigMonoidObject rootDir obj = do
     , applyProgOptions
     , allowNewer
     , allowNewerDeps
+    , ignoreBounds
+    , ignoreBoundsIn
     , defaultInitSnapshot
     , defaultTemplate
     , allowDifferentUser
@@ -630,6 +638,12 @@ configMonoidAllowNewerName = "allow-newer"
 
 configMonoidAllowNewerDepsName :: Text
 configMonoidAllowNewerDepsName = "allow-newer-deps"
+
+configMonoidIgnoreBoundsName :: Text
+configMonoidIgnoreBoundsName = "ignore-bounds"
+
+configMonoidIgnoreBoundsInName :: Text
+configMonoidIgnoreBoundsInName = "ignore-bounds-in"
 
 configMonoidDefaultInitSnapshotName :: Text
 configMonoidDefaultInitSnapshotName = "default-init-snapshot"
