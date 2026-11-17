@@ -1,0 +1,10 @@
+snapshot: ghc-9.10.3
+
+extra-deps:
+- acme-missiles-0.3
+
+# Will need to be enabled on the command line
+ignore-bounds: false
+
+ignore-bounds-in:
+- myPackage
