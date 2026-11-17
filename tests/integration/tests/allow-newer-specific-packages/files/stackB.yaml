@@ -1,0 +1,12 @@
+snapshot: ghc-9.10.3
+
+extra-deps:
+- acme-missiles-0.3
+
+# Should take precedence over allow-newer
+ignore-bounds: true
+
+allow-newer: false
+
+ignore-bounds-in:
+- myPackage

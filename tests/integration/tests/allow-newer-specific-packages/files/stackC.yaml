@@ -1,0 +1,10 @@
+snapshot: ghc-9.10.3
+
+extra-deps:
+- acme-missiles-0.3
+
+# Deprecated synonym
+allow-newer: true
+
+ignore-bounds-in:
+- myPackage
