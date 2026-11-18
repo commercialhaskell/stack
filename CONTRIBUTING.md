@@ -574,7 +574,7 @@ stack build --flag stack:integration-tests stack --exec "stack-integration-test 
 ~~~
 
 Where `<PATTERN>` is the name of the folder listed in the
-[test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
+[tests/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/tests/integration/tests)
 directory.
 
 You may also achieve this through GHCi with this command:
@@ -586,7 +586,7 @@ stack ghci stack:stack-integration-test
 ~~~
 
 Where again, `<PATTERN>` is the name of the folder listed in the
-[test/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/test/integration/tests)
+[tests/integration/tests/](https://github.com/commercialhaskell/stack/tree/master/tests/integration/tests)
 directory.
 
 You can disable a few integration tests through the -n option :
