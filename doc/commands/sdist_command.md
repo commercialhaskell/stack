@@ -40,6 +40,16 @@ By default:
     [`pvp-bounds`](../configure/yaml/non-project.md#pvp-bounds) non-project
     specific configuration option documentation.
 
+!!! info
+
+    The Cabal specification says that a Cabal package must include a `Setup.hs`
+    or `Setup.lhs` file. In practice, Stack and Cabal (the tool) do not need
+    such a file to be present to build if the package's build type is `Simple`,
+    and Hackage will accept such a Cabal package missing such a file. If such a
+    file is missing from such a package, Stack and Cabal (the tool) will not add
+    one to the tarball. However the `sdist` action of Cabal (the library) will
+    add one.
+
 !!! note
 
     Stack checks a package for common mistakes using checks provided by Cabal
